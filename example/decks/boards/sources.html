@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Auth refresh — sources</title>
+		<meta name="board" content='{"w":1600,"h":1120,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 700px">
+			<h2>What this is built on</h2>
+			<p style="color: var(--b-muted)">
+				The real documents, on the board. Not summaries of them.
+			</p>
+		</div>
+
+		<!-- Deck-relative: stays a relative URL, so this board still works opened as a file. -->
+		<div class="embed" data-id="notes" data-embed="../docs/notes.md"
+			style="left: 48px; top: 136px; width: 520px; height: 560px"></div>
+
+		<!-- A real PDF, pages 1-2 only: a citation shows the part it means. -->
+		<div class="embed" data-id="paper" data-embed="../papers/sample.pdf" data-pages="1-2"
+			style="left: 608px; top: 140px; width: 460px; height: 680px"></div>
+
+		<!--
+			Outside the deck, through a root declared in deck.json. Foreign HTML, so
+			board.js mounts it in a nested sandboxed frame; the page itself prints what
+			it can reach, which is how the quarantine shows its work.
+		-->
+		<div class="embed" data-id="report" data-embed="../../shared/report.html"
+			style="left: 1108px; top: 140px; width: 440px; height: 420px"></div>
+
+		<div class="embed" data-id="sketch" data-embed="../assets/sketch.svg"
+			style="left: 1104px; top: 600px; width: 440px; height: 260px"></div>
+
+		<div class="callout" data-id="note" style="left: 48px; top: 740px; width: 520px">
+			An embed that cannot be resolved says so in place, with the path — the way a missing root
+			announces itself instead of leaving a blank rectangle.
+		</div>
+
+		<div class="embed" data-id="missing" data-embed="~/nowhere/not-a-file.md"
+			style="left: 48px; top: 880px; width: 520px; height: 160px"></div>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

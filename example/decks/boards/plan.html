@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Auth refresh — the plan</title>
+		<meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 184px; top: 120px; width: 720px">
+			<h1>One refresh, two tabs</h1>
+			<p style="color: var(--b-muted)">
+				Drafted on the canvas. Every box here has a <code>data-id</code>, which is how it gets
+				edited, pointed at, and commented on.
+			</p>
+		</div>
+
+		<div class="chip" data-id="status" style="left: 1320px; top: 80px; width: 120px; height: 40px">draft · not agreed</div>
+
+		<section class="card" data-id="goal" style="left: 48px; top: 168px; width: 380px">
+			<h3>Goal</h3>
+			<p>
+				A second tab that wakes up must not spend a token the first tab already spent. One
+				session, two tabs, no re-login.
+			</p>
+		</section>
+
+		<section class="card" data-id="approach" style="left: 520px; top: 168px; width: 380px">
+			<h3>Approach</h3>
+			<p>Treat a refresh as a <strong>claim</strong>: first claim wins, the losers wait for its answer.</p>
+			<ul>
+				<li>Server: short-lived lock per token family</li>
+				<li>Client: one shared promise per tab group</li>
+			</ul>
+		</section>
+
+		<div class="sticky" data-id="risk" style="left: 992px; top: 168px; width: 256px; height: 136px">
+			<strong>The race is small</strong><br />
+			~240ms, but a laptop waking from sleep hits it nearly every time.
+		</div>
+
+		<div class="callout" data-id="decision" data-tone="warn" style="left: 48px; top: 452px; width: 852px">
+			<strong>Open question.</strong> Rotate on every refresh, or only when the family is
+			suspected? Rotating always means more windows, not fewer — see the risks board.
+		</div>
+
+		<div class="kpi" data-id="kpi-failed" style="left: 992px; top: 452px; width: 220px">
+			<span class="value">2,455</span>
+			<span class="label">failed refreshes · worst week</span>
+		</div>
+
+		<div class="kpi" data-id="kpi-users" style="left: 1264px; top: 452px; width: 220px">
+			<span class="value">517</span>
+			<span class="label">users affected</span>
+		</div>
+
+		<div class="panel" data-id="sequence" style="left: 48px; top: 604px; width: 620px" data-md>
+			## The sequence
+
+			1. Tab A and tab B both see a 401.
+			2. Both ask to refresh with the same token `t0`.
+			3. The lock admits one. It gets `t1`, and writes it where both can see.
+			4. The other wakes, finds `t1`, and retries with it.
+
+			Cost per refresh stays $O(1)$: one write with a TTL, one round trip for the losers.
+		</div>
+
+
+
+
+		<section class="card" data-id="next" style="left: 728px; top: 604px; width: 380px">
+			<h3>Next</h3>
+			<ul>
+				<li>Agree the rotation rule</li>
+				<li>Write the lock, with the TTL as a setting</li>
+				<li>Reproduce the race in a test before fixing it</li>
+			</ul>
+		</section>
+
+		<svg class="link" data-id="goal-approach" data-from="goal" data-to="approach" data-label="how"></svg>
+		<svg class="link" data-id="approach-risk" data-from="approach" data-to="risk"></svg>
+		<svg class="link" data-id="approach-sequence" data-from="approach" data-to="sequence" data-tone="accent"></svg>
+		<svg class="link" data-id="sequence-next" data-from="sequence" data-to="next"></svg>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

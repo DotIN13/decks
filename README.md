@@ -1,0 +1,95 @@
+# Decks
+
+A canvas-centric coding agent powered by [Pi](https://github.com/earendil-works/pi).
+
+A **board** is a local HTML file of absolutely-positioned components. Boards live on an
+infinite stage you pan and zoom; the agent draws on them by editing the file, and you draw
+on them with a palette. The transcript floats at the edge. Boards are artifacts: they pass
+between agents as context, and they can embed your real documents — markdown, PDF, HTML.
+
+```
+deck.json → Deck → boards/*.html → the stage · the chats → Pi sessions
+```
+
+## Requirements
+
+- Node.js >= 22.19
+- Pi credentials configured (`pi auth`, or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in the
+  environment). Decks reads the same `~/.pi/agent/auth.json` the Pi CLI uses.
+
+## Getting started
+
+```bash
+npm install
+npm run dev            # API on 127.0.0.1:4329, Vite on 127.0.0.1:4328
+npm run dev:example    # the demo deck instead of yours
+```
+
+Open the Vite URL. The first run creates an empty deck and shows you a blank canvas; ask
+the agent for something and the first board appears on it.
+
+## Where things are kept
+
+One directory holds everything, and the deck is `decks/` inside it:
+
+```
+$DECKS_DATA_DIR/          default ~/.decks · npm run dev uses <repo>/data
+  decks/
+    deck.json             where the boards sit, and which roots embeds may reach
+    boards/*.html         the boards. The artifact
+    lib/                  the primitives, copied in so a board renders on its own
+    assets/               images the boards use
+    .decks/               revisions and agent avatars — never served except by hash
+```
+
+One deck per data directory, because a deck is a working directory: Pi keys a session's
+transcripts to the path it ran in, so "which deck" and "which history" are one choice.
+Switch by pointing somewhere else — `npm start -- ~/other-data`, or `DECKS_DATA_DIR`.
+
+**The transcripts are not in the deck.** Pi owns them, under
+`~/.pi/agent/sessions/<slug of the deck path>/`. Moving a deck therefore leaves its
+conversations behind unless you copy that directory too; the boards, their revisions and
+their arrangement all travel with the folder. Note that the app never resumes a session —
+each start is a new conversation, and older ones are reachable with `pi -r` from inside the
+deck directory.
+
+| variable | |
+|---|---|
+| `DECKS_DATA_DIR` | the directory above. A positional argument beats it: `npm start -- ~/other` |
+| `DECKS_HOST` / `DECKS_PORT` | default `127.0.0.1:4329` |
+
+## What it does
+
+- **Boards are files.** `boards/*.html`, absolutely positioned, rendered on an infinite
+  canvas. The agent writes them with its ordinary tools; you drag, resize, retype and
+  insert with a palette. Both edits land in the same file, and a drag rewrites exactly
+  one attribute.
+- **One tool for the canvas.** `stage_eval` runs TypeScript against a typed API
+  (`runtime/stage.d.ts`, injected into the agent's context verbatim): start a board, put
+  boards in play, hold others in context, rearrange, name itself, draw its own avatar,
+  hand work to a subagent.
+- **Boards are how the agent talks.** It answers your questions, lays out designs and
+  reports finished work on boards, so the canvas — not the chat column — is where you look
+  to see what is happening. It holds a set of boards in context and chooses which of them
+  to put in play; the chat says which board and why.
+- **Embeds.** A board can show your real documents — markdown, PDF with page ranges,
+  HTML, images — from the deck or from a root declared in `deck.json`.
+- **Agents are a chat list.** Each has the name it chose and the face it drew.
+  Subagents are rows too, tagged with their parent.
+- **A time machine.** Hover the timeline to see the boards as they were at that point
+  in the conversation; click to rewind; restore the boards only if you ask.
+
+## Development
+
+```bash
+npm run vendor      # re-copy the board primitives into runtime/lib
+npm run sync:lib    # push runtime/lib into example/decks/lib after editing it
+npm test            # 69 tests: config, path guards, patches, revisions, eval, camera
+npm run typecheck
+```
+
+`example/` is a committed data directory — `example/decks` is the demo deck and
+`example/shared` is the out-of-deck file its sources board embeds, which is the only thing
+in the repository that exercises the quarantine path end to end.
+
+See [docs/DESIGN.md](docs/DESIGN.md) for the design and the reasoning behind it.

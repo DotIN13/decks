@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "name": "Example",
+  "boards": {
+    "boards/plan.html": {
+      "x": 0,
+      "y": 0
+    },
+    "boards/risks.html": {
+      "x": 1760,
+      "y": 0
+    },
+    "boards/sources.html": {
+      "x": 0,
+      "y": 1160
+    }
+  },
+  "roots": [
+    {
+      "path": "../shared",
+      "writable": false
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>{{TITLE}}</title>
+		<meta name="board" content='{"w":{{W}},"h":{{H}},"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 900px">
+			<h1>{{TITLE}}</h1>
+			<p style="color: var(--b-muted)">What was done, and what it means.</p>
+		</div>
+
+		<!-- Method: how, briefly. Not a log. -->
+		<section class="panel" data-id="method" style="left: 48px; top: 168px; width: 420px">
+			<h4>Method</h4>
+			<ol>
+				<li>…</li>
+			</ol>
+		</section>
+
+		<!-- Result: what changed, and the numbers if there are any. -->
+		<section class="card" data-id="result" style="left: 512px; top: 168px; width: 420px">
+			<h4>Result</h4>
+			<p>…</p>
+		</section>
+
+		<div class="kpi" data-id="headline" style="left: 984px; top: 168px; width: 220px">
+			<span class="value">—</span>
+			<span class="label">the number that matters</span>
+		</div>
+
+		<!-- What is left, if anything. Say "nothing" rather than deleting it. -->
+		<div class="callout" data-id="left" data-tone="warn" style="left: 48px; top: 520px; width: 884px">
+			<strong>Left to do.</strong> …
+		</div>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

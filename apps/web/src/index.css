@@ -1,0 +1,1358 @@
+@import "tailwindcss";
+
+/*
+ * The app's own tokens.
+ *
+ * The same ramp `runtime/lib/board.css` uses, so a board on the stage and the
+ * chrome around it are visibly one piece of software. Boards cannot import this —
+ * they are standalone documents — so the two files carry the same values on
+ * purpose, and the comment in each says so.
+ */
+@theme {
+	--color-grey-50: #ffffff;
+	--color-grey-100: #fafafa;
+	--color-grey-200: #f2f2f2;
+	--color-grey-300: #eeeeee;
+	--color-grey-400: #dbdbdb;
+	--color-grey-500: #aeaeae;
+	--color-grey-600: #808080;
+	--color-grey-700: #5c5c5c;
+	--color-grey-800: #3a3a3a;
+	--color-grey-900: #2e2e2e;
+	--color-grey-1000: #242424;
+	--color-grey-1100: #161616;
+	--color-grey-1200: #080808;
+	--color-accent: #3b5cf6;
+	--color-accent-soft: #d7e2fc;
+	--color-warn: #e7af36;
+	--color-danger: #d92e3c;
+	--color-ok: #2eaf5a;
+	--font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+	--bg: var(--color-grey-100);
+	--bg-deep: var(--color-grey-200);
+	--panel: rgb(255 255 255 / 88%);
+	--fg: var(--color-grey-1100);
+	--muted: var(--color-grey-700);
+	--faint: var(--color-grey-600);
+	--line: rgb(0 0 0 / 10%);
+	--line-strong: rgb(0 0 0 / 20%);
+	--shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 8px 24px rgb(0 0 0 / 8%);
+	--stage: var(--color-grey-300);
+	color-scheme: light;
+}
+
+[data-color-scheme="dark"] {
+	--bg: var(--color-grey-1100);
+	--bg-deep: var(--color-grey-1200);
+	--panel: rgb(36 36 36 / 88%);
+	--fg: var(--color-grey-100);
+	--muted: var(--color-grey-500);
+	--faint: var(--color-grey-600);
+	--line: rgb(255 255 255 / 12%);
+	--line-strong: rgb(255 255 255 / 24%);
+	--shadow: 0 1px 2px rgb(0 0 0 / 50%), 0 10px 30px rgb(0 0 0 / 40%);
+	--stage: #101010;
+	color-scheme: dark;
+}
+
+html,
+body,
+#root {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	overflow: hidden;
+	background: var(--bg);
+	color: var(--fg);
+	font-family: var(--font-sans);
+	font-size: 13px;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* --- app chrome -------------------------------------------------------------- */
+
+.app {
+	display: grid;
+	height: 100%;
+	grid-template-rows: 40px 1fr;
+}
+
+.titlebar {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	padding: 0 12px;
+	border-bottom: 1px solid var(--line);
+	background: var(--bg);
+	-webkit-app-region: drag;
+}
+
+.titlebar .deck-name {
+	font-weight: 600;
+}
+
+.titlebar .path {
+	overflow: hidden;
+	color: var(--faint);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.titlebar .spacer {
+	flex: 1;
+}
+
+.dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 999px;
+	background: var(--color-ok);
+}
+
+.dot[data-off="true"] {
+	background: var(--color-danger);
+}
+
+.work {
+	position: relative;
+	overflow: hidden;
+}
+
+/* --- the stage --------------------------------------------------------------- */
+
+.stage {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	background: var(--stage);
+	touch-action: none;
+}
+
+.stage[data-panning="true"] {
+	cursor: grabbing;
+}
+
+.world {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform-origin: 0 0;
+	will-change: transform;
+}
+
+/* --- a board on the stage ---------------------------------------------------- */
+
+.board-node {
+	position: absolute;
+}
+
+.board-node > .chrome {
+	position: absolute;
+	top: -26px;
+	left: 0;
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	width: 100%;
+	height: 24px;
+	color: var(--muted);
+	cursor: grab;
+	user-select: none;
+}
+
+.board-node[data-dragging="true"] > .chrome {
+	cursor: grabbing;
+}
+
+.board-node > .chrome .title {
+	overflow: hidden;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Takes the board off the canvas; appears on hover, like the message actions. */
+.board-node > .chrome .hide {
+	margin-left: auto;
+	padding: 0 5px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	font: inherit;
+	font-size: 14px;
+	line-height: 1;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.board-node:hover > .chrome .hide {
+	opacity: 1;
+}
+
+.board-node > .chrome .hide:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+.board-node > .chrome .file {
+	color: var(--faint);
+	font-family: var(--font-mono);
+	font-size: 11px;
+}
+
+.board-node > .surface {
+	position: relative;
+	overflow: hidden;
+	border-radius: 12px;
+	background: var(--bg);
+	box-shadow: var(--shadow);
+	outline: 1px solid var(--line);
+}
+
+.board-node[data-selected="true"] > .surface {
+	outline: 2px solid var(--color-accent);
+}
+
+.board-node > .surface > iframe {
+	display: block;
+	border: 0;
+}
+
+/* Above the interaction threshold the frame is inert, so a pan that crosses a
+   board is a pan and not a click into somebody's page. */
+.board-node[data-inert="true"] > .surface > iframe {
+	pointer-events: none;
+}
+
+.board-node .placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	color: var(--faint);
+	font-family: var(--font-mono);
+	font-size: 12px;
+}
+
+/* --- floating panels -------------------------------------------------------- */
+
+.panel-float {
+	position: absolute;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--panel);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(12px);
+}
+
+.rail {
+	display: flex;
+	flex-direction: column;
+	padding: 8px;
+	gap: 6px;
+}
+
+.rail .rail-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	padding: 2px 4px 6px;
+	color: var(--faint);
+	font-size: 11px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.rail .items {
+	display: flex;
+	overflow-y: auto;
+	/* `min-height: 0` is what makes the scroll real. A flex child defaults to
+	   `min-height: auto`, which refuses to shrink below its content, so a rail of
+	   fourteen boards grew to its full height and ran off the bottom of the screen
+	   instead of scrolling — `overflow-y: auto` never engages on a box that is never
+	   smaller than what is inside it. */
+	min-height: 0;
+	flex: 1;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.rail-item {
+	display: flex;
+	flex-direction: column;
+	padding: 0;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--bg);
+	cursor: pointer;
+	gap: 0;
+	text-align: left;
+}
+
+/* Held but not on the canvas: dimmed, because the agent is working from it without
+   asking you to look at it. */
+.rail-item[data-off-canvas="true"] {
+	opacity: 0.45;
+}
+
+.rail-item[data-off-canvas="true"]:hover {
+	opacity: 1;
+}
+
+.rail-item[data-current="true"] {
+	border-color: var(--color-accent);
+	box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.rail-item .thumb {
+	position: relative;
+	overflow: hidden;
+	height: 92px;
+	border-bottom: 1px solid var(--line);
+	border-radius: 7px 7px 0 0;
+	background: var(--bg-deep);
+}
+
+.rail-item .thumb > iframe,
+.rail-item .thumb > img {
+	position: absolute;
+	top: 0;
+	left: 0;
+	border: 0;
+	pointer-events: none;
+	transform-origin: 0 0;
+}
+
+.rail-item .label {
+	overflow: hidden;
+	padding: 5px 7px;
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rail-item .label .file {
+	color: var(--faint);
+	font-family: var(--font-mono);
+	font-size: 10px;
+}
+
+.zoombar {
+	right: 26px;
+	bottom: 12px;
+	display: flex;
+	align-items: center;
+	padding: 4px;
+	gap: 2px;
+}
+
+.zoombar button,
+.titlebar button {
+	padding: 4px 8px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--fg);
+	cursor: pointer;
+	font: inherit;
+}
+
+.zoombar button:hover,
+.titlebar button:hover {
+	background: var(--line);
+}
+
+.zoombar .level {
+	min-width: 52px;
+	color: var(--muted);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	text-align: center;
+}
+
+.notices {
+	position: absolute;
+	top: 58px;
+	left: 50%;
+	display: flex;
+	max-width: 560px;
+	flex-direction: column;
+	transform: translateX(-50%);
+	gap: 6px;
+	pointer-events: none;
+}
+
+.notice {
+	padding: 7px 12px;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(12px);
+	font-size: 12px;
+}
+
+.notice[data-level="warn"] {
+	border-color: color-mix(in srgb, var(--color-warn) 50%, var(--line));
+}
+
+.notice[data-level="error"] {
+	border-color: color-mix(in srgb, var(--color-danger) 50%, var(--line));
+}
+
+/* Above the composer, not behind it — and it is a first-run affordance, so it
+   fades out rather than living there forever. */
+.hint {
+	position: absolute;
+	bottom: 92px;
+	left: 50%;
+	animation: hint-fade 12s ease-in forwards;
+	color: var(--faint);
+	font-size: 11px;
+	transform: translateX(-50%);
+	pointer-events: none;
+}
+
+@keyframes hint-fade {
+	0%, 60% { opacity: 1; }
+	100% { opacity: 0; }
+}
+
+/* --- the chat column -------------------------------------------------------- */
+
+.chat {
+	top: 12px;
+	right: 12px;
+	bottom: 88px;
+	display: flex;
+	width: 380px;
+	flex-direction: column;
+	padding: 0;
+	gap: 0;
+	/* Fully away — the spine beside it is the handle, so there is no sliver to show. */
+	transform: translateX(calc(100% + 22px));
+}
+
+/*
+ * The sliver says which panel it is, and the chat's says whether anything happened
+ * while it was away — a dot on the edge, in the agent's own colour.
+ */
+.side::after,
+.chat::after {
+	position: absolute;
+	top: 50%;
+	width: 3px;
+	height: 34px;
+	border-radius: 999px;
+	background: var(--line-strong);
+	content: "";
+	transform: translateY(-50%);
+	transition: opacity 150ms ease;
+}
+
+.side::after {
+	right: 3px;
+}
+
+.chat::after {
+	left: 3px;
+}
+
+.side[data-open="true"]::after,
+.chat[data-open="true"]::after {
+	opacity: 0;
+}
+
+.chat[data-unread="true"]::after {
+	height: 10px;
+	width: 10px;
+	background: var(--color-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+.chat .chat-head {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--line);
+	color: var(--muted);
+	font-size: 11px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.chat .chat-head .avatar {
+	display: grid;
+	width: 18px;
+	height: 18px;
+	border-radius: 999px;
+	color: #fff;
+	font-size: 10px;
+	place-items: center;
+	text-transform: none;
+}
+
+.chat .chat-head .spacer {
+	flex: 1;
+}
+
+.chat .stream {
+	display: flex;
+	overflow-y: auto;
+	flex: 1;
+	flex-direction: column;
+	padding: 10px;
+	gap: 8px;
+	overscroll-behavior: contain;
+}
+
+/*
+ * The column overflows by design — that is what scrolling is for — and a flex column
+ * shrinks its children to try to avoid it. Text-bearing bubbles resist through their
+ * min-content height; a tool chip has `overflow: hidden` and nothing of its own to
+ * push back with, so every one of them was squeezed to a line the moment the
+ * transcript filled up.
+ */
+.chat .stream > * {
+	flex: 0 0 auto;
+}
+
+.bubble {
+	max-width: 92%;
+	padding: 8px 11px;
+	border-radius: 12px;
+	font-size: 13px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.bubble[data-who="user"] {
+	align-self: flex-end;
+	background: var(--color-accent);
+	border-bottom-right-radius: 4px;
+	color: #fff;
+}
+
+.bubble[data-who="agent"] {
+	align-self: flex-start;
+	border: 1px solid var(--line);
+	background: var(--bg);
+	border-bottom-left-radius: 4px;
+}
+
+.bubble .caret {
+	display: inline-block;
+	width: 7px;
+	height: 13px;
+	background: currentColor;
+	opacity: 0.5;
+	translate: 0 2px;
+	animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+	to {
+		visibility: hidden;
+	}
+}
+
+.bubble code,
+.bubble pre {
+	font-family: var(--font-mono);
+	font-size: 12px;
+}
+
+.bubble pre {
+	margin: 6px 0 0;
+	padding: 8px;
+	overflow-x: auto;
+	border-radius: 8px;
+	background: var(--bg-deep);
+}
+
+.bubble[data-who="user"] pre {
+	background: rgb(0 0 0 / 20%);
+}
+
+/*
+ * A user message and the way back to it.
+ *
+ * The actions are hidden until the message is hovered: they are on every turn, and three
+ * words under each one would make the column unreadable. `rewind` previews on hover, so
+ * the row is deliberately not shown on touch-first widths (there is no hover to preview
+ * with) — see the known edges in DESIGN §8.
+ */
+.turn-row {
+	display: flex;
+	align-self: flex-end;
+	max-width: 92%;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 3px;
+}
+
+.turn-row > .bubble {
+	max-width: 100%;
+}
+
+.turn-actions {
+	display: flex;
+	gap: 2px;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.turn-row:hover .turn-actions,
+.turn-row:focus-within .turn-actions {
+	opacity: 1;
+}
+
+.turn-actions button {
+	padding: 1px 6px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	font: inherit;
+	font-size: 10px;
+}
+
+.turn-actions button:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+/* Hovering this one shows the past on the canvas, so it says so in the same colour the
+   boards are outlined in. */
+.turn-actions button:first-child:hover {
+	background: color-mix(in srgb, var(--color-warn) 22%, transparent);
+	color: var(--fg);
+}
+
+.thinking {
+	align-self: flex-start;
+	max-width: 92%;
+	padding: 0 4px;
+	color: var(--faint);
+	font-size: 12px;
+}
+
+.thinking > button {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	font: inherit;
+	text-decoration: underline dotted;
+}
+
+.thinking > .body {
+	margin-top: 4px;
+	padding-left: 8px;
+	border-left: 2px solid var(--line);
+	white-space: pre-wrap;
+}
+
+.tool {
+	align-self: stretch;
+	overflow: hidden;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--bg);
+}
+
+.tool > .row {
+	display: flex;
+	width: 100%;
+	gap: 8px;
+	align-items: center;
+	padding: 6px 9px;
+	border: 0;
+	background: none;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+}
+
+.tool > .row .name {
+	color: var(--muted);
+	font-family: var(--font-mono);
+	font-size: 11px;
+}
+
+.tool > .row .title {
+	overflow: hidden;
+	flex: 1;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tool > .row .state {
+	width: 7px;
+	height: 7px;
+	border-radius: 999px;
+	background: var(--color-grey-500);
+}
+
+.tool[data-state="running"] > .row .state {
+	background: var(--color-warn);
+	animation: pulse 1.2s ease-in-out infinite;
+}
+
+.tool[data-state="done"] > .row .state {
+	background: var(--color-ok);
+}
+
+.tool[data-state="error"] > .row .state {
+	background: var(--color-danger);
+}
+
+@keyframes pulse {
+	50% {
+		opacity: 0.3;
+	}
+}
+
+.tool > pre {
+	max-height: 260px;
+	margin: 0;
+	padding: 8px 10px;
+	overflow: auto;
+	border-top: 1px solid var(--line);
+	background: var(--bg-deep);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	white-space: pre-wrap;
+}
+
+.chat-notice {
+	align-self: stretch;
+	padding: 6px 10px;
+	border-left: 2px solid var(--line-strong);
+	color: var(--muted);
+	font-size: 12px;
+	white-space: pre-wrap;
+}
+
+.chat-notice[data-level="warn"] {
+	border-left-color: var(--color-warn);
+}
+
+.chat-notice[data-level="error"] {
+	border-left-color: var(--color-danger);
+	color: var(--fg);
+}
+
+.dialog-card {
+	align-self: stretch;
+	padding: 10px 11px;
+	border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--line));
+	border-radius: 12px;
+	background: var(--bg);
+	box-shadow: var(--shadow);
+}
+
+.dialog-card .q {
+	font-weight: 600;
+}
+
+.dialog-card .m {
+	margin-top: 3px;
+	color: var(--muted);
+	font-size: 12px;
+	white-space: pre-wrap;
+}
+
+.dialog-card .actions {
+	display: flex;
+	flex-wrap: wrap;
+	margin-top: 8px;
+	gap: 6px;
+}
+
+.dialog-card button,
+.composer button {
+	padding: 4px 10px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--bg);
+	color: var(--fg);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+}
+
+.dialog-card button[data-primary="true"] {
+	border-color: transparent;
+	background: var(--color-accent);
+	color: #fff;
+}
+
+.dialog-card input {
+	width: 100%;
+	margin-top: 8px;
+	padding: 5px 8px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--bg-deep);
+	color: var(--fg);
+	font: inherit;
+}
+
+/* --- the composer ----------------------------------------------------------- */
+
+/*
+ * Centred on the *free* space, not on the window.
+ *
+ * The rail takes 192px on the left and the chat column 404px on the right, so a
+ * bar centred at 50% sits a hundred pixels off and slides under the transcript.
+ * Half the difference between those two is the offset.
+ */
+.composer {
+	bottom: 12px;
+	left: calc(50% - 90px);
+	width: min(720px, calc(100% - 650px));
+	padding: 8px;
+	transform: translateX(-50%);
+}
+
+.composer textarea {
+	display: block;
+	width: 100%;
+	max-height: 180px;
+	padding: 4px 6px;
+	border: 0;
+	background: none;
+	color: var(--fg);
+	font: inherit;
+	font-size: 13px;
+	resize: none;
+	field-sizing: content;
+}
+
+.composer textarea:focus {
+	outline: none;
+}
+
+.composer .controls {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	padding-top: 6px;
+}
+
+.composer .controls .spacer {
+	flex: 1;
+}
+
+.composer select {
+	max-width: 200px;
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--bg);
+	color: var(--muted);
+	font: inherit;
+	font-size: 11px;
+}
+
+.composer .send[data-busy="true"] {
+	border-color: transparent;
+	background: var(--color-danger);
+	color: #fff;
+}
+
+.composer .send:not([data-busy="true"]) {
+	border-color: transparent;
+	background: var(--color-accent);
+	color: #fff;
+}
+
+.composer .usage {
+	color: var(--faint);
+	font-family: var(--font-mono);
+	font-size: 10px;
+}
+
+/* An agent pointing at something on a board. */
+.agent-cursor {
+	position: absolute;
+	display: flex;
+	gap: 5px;
+	align-items: center;
+	transform-origin: 0 0;
+	pointer-events: none;
+}
+
+.agent-cursor .dot {
+	width: 10px;
+	height: 10px;
+	border: 2px solid var(--bg);
+	border-radius: 999px;
+	background: var(--cursor-color);
+	box-shadow: 0 1px 4px rgb(0 0 0 / 40%);
+}
+
+.agent-cursor .label {
+	padding: 1px 6px;
+	border-radius: 999px;
+	background: var(--cursor-color);
+	color: #fff;
+	font-size: 10px;
+	white-space: nowrap;
+}
+
+/* --- palette and picker ----------------------------------------------------- */
+
+/*
+ * A horizontal strip at the top, clear of both panels.
+ *
+ * It used to sit at the left edge, which put it inside the reach that summons the
+ * agent list — you could not move to the palette without calling up the panel that
+ * then covered it.
+ */
+.palette {
+	top: 12px;
+	left: 50%;
+	display: flex;
+	padding: 4px;
+	gap: 2px;
+	transform: translateX(-50%);
+}
+
+.palette button {
+	width: 30px;
+	height: 30px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	font-family: var(--font-sans);
+	font-size: 14px;
+}
+
+.palette button:hover {
+	background: var(--line);
+}
+
+.palette button[data-active="true"] {
+	background: var(--color-accent);
+	color: #fff;
+}
+
+.picker-backdrop {
+	position: absolute;
+	z-index: 20;
+	display: grid;
+	inset: 0;
+	background: rgb(0 0 0 / 30%);
+	place-items: center;
+}
+
+.picker {
+	position: static;
+	display: flex;
+	width: 520px;
+	max-height: 70%;
+	flex-direction: column;
+	padding: 0;
+}
+
+.picker header {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--line);
+}
+
+.picker header button {
+	padding: 2px 8px;
+	border: 1px solid var(--line);
+	border-radius: 7px;
+	background: var(--bg);
+	color: var(--fg);
+	cursor: pointer;
+	font: inherit;
+	font-size: 11px;
+}
+
+.picker .where {
+	overflow: hidden;
+	color: var(--faint);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.picker .entries {
+	overflow-y: auto;
+	padding: 6px;
+}
+
+.picker .entry {
+	display: flex;
+	width: 100%;
+	gap: 8px;
+	align-items: center;
+	padding: 5px 8px;
+	border: 0;
+	border-radius: 7px;
+	background: none;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	text-align: left;
+}
+
+.picker .entry:hover {
+	background: var(--line);
+}
+
+.picker .entry .glyph {
+	color: var(--faint);
+}
+
+.picker .entry .name {
+	flex: 1;
+}
+
+.picker .entry .size,
+.picker .empty {
+	color: var(--faint);
+	font-size: 11px;
+}
+
+.picker .empty {
+	padding: 10px;
+}
+
+/* --- the chat list ---------------------------------------------------------- */
+
+/*
+ * The two floating panels are away by default and come when reached for — the canvas
+ * is the work, and the chrome should not sit on top of it while unused. A sliver
+ * stays visible so there is something to aim at, and the transform is what moves:
+ * one composited property, so a panel arriving never costs a layout.
+ */
+.side,
+.chat {
+	--peek: 10px;
+	z-index: 10;
+	opacity: 0.55;
+	transition:
+		transform 190ms cubic-bezier(0.22, 0.8, 0.24, 1),
+		opacity 190ms ease;
+	/* Closed, it is scenery: clicks belong to whatever is behind it. */
+	pointer-events: none;
+}
+
+.side[data-open="true"],
+.chat[data-open="true"] {
+	opacity: 1;
+	transform: none;
+	pointer-events: auto;
+}
+
+.side {
+	top: 12px;
+	bottom: 12px;
+	left: 12px;
+	display: flex;
+	width: 200px;
+	flex-direction: column;
+	padding: 0;
+	gap: 0;
+	transform: translateX(calc(-100% - 12px + var(--peek)));
+}
+
+.side .chats {
+	display: flex;
+	min-height: 0;
+	max-height: 55%;
+	flex-direction: column;
+	border-bottom: 1px solid var(--line);
+}
+
+.side .rail {
+	position: static;
+	width: auto;
+	/* Same reason as `.rail .items`: without this the rail takes its content's height
+	   and overflows `.side`, which is the box that is actually bounded. */
+	min-height: 0;
+	flex: 1;
+	border: 0;
+	background: none;
+	box-shadow: none;
+	backdrop-filter: none;
+}
+
+.chats .rail-head {
+	padding: 8px 10px 6px;
+}
+
+.pin {
+	padding: 0 5px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	line-height: 1;
+}
+
+.pin:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+.pin[data-on="true"] {
+	color: var(--color-accent);
+}
+
+.chats .rail-head button {
+	padding: 0 6px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--muted);
+	cursor: pointer;
+	font: inherit;
+	font-size: 14px;
+}
+
+.chats .rail-head button:hover {
+	background: var(--line);
+}
+
+.chat-rows {
+	display: flex;
+	overflow-y: auto;
+	/* And again for the agent list: it has to be allowed to shrink inside `.chats`
+	   before it will scroll. */
+	min-height: 0;
+	flex: 1;
+	flex-direction: column;
+	padding: 0 6px 6px;
+	gap: 2px;
+}
+
+.chat-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	padding: 6px;
+	border: 0;
+	border-radius: 9px;
+	background: none;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+}
+
+.chat-row:hover {
+	background: var(--line);
+}
+
+.chat-row[data-current="true"] {
+	background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.chat-row[data-child="true"] {
+	margin-left: 12px;
+}
+
+.chat-row .avatar {
+	position: relative;
+	display: grid;
+	overflow: hidden;
+	width: 26px;
+	height: 26px;
+	flex: 0 0 auto;
+	border-radius: 999px;
+	color: #fff;
+	font-size: 11px;
+	place-items: center;
+}
+
+.chat-row .avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* Working shows as a ring on the face, not a second row of furniture. */
+.chat-row .avatar[data-state]:not([data-state="idle"])::after {
+	position: absolute;
+	border: 2px solid var(--dot);
+	border-radius: 999px;
+	content: "";
+	inset: -3px;
+	animation: pulse 1.2s ease-in-out infinite;
+}
+
+.chat-row .who {
+	display: flex;
+	overflow: hidden;
+	flex: 1;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.chat-row .top,
+.chat-row .bottom {
+	display: flex;
+	gap: 6px;
+	align-items: baseline;
+	justify-content: space-between;
+}
+
+.chat-row .name {
+	overflow: hidden;
+	font-size: 12px;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.chat-row .when {
+	flex: 0 0 auto;
+	color: var(--faint);
+	font-size: 10px;
+}
+
+.chat-row .last {
+	overflow: hidden;
+	color: var(--muted);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.chat-row .tag {
+	color: var(--faint);
+}
+
+.chat-row .unread {
+	min-width: 16px;
+	padding: 0 4px;
+	border-radius: 999px;
+	background: var(--color-accent);
+	color: #fff;
+	font-size: 10px;
+	text-align: center;
+}
+
+.chat .chat-head .avatar img {
+	width: 100%;
+	height: 100%;
+	border-radius: 999px;
+	object-fit: cover;
+}
+
+/*
+ * A previewed past is marked and untouchable: it is a look, not a state.
+ *
+ * The transcript used to dim along with it, which made sense while the control was a bar
+ * outside the panel. Now the control is a button on the message itself, and fading the
+ * thing under the cursor is exactly wrong — so the signal is on the boards, where the
+ * change actually is.
+ */
+.stage[data-previewing="true"] .board-node > .surface {
+	outline-color: var(--color-warn);
+}
+
+.stage[data-previewing="true"] .board-node > .surface > iframe {
+	pointer-events: none;
+}
+
+/* --- the turn bar ------------------------------------------------------------ */
+
+/*
+ * The spine: one block per turn, newest at the bottom, hard against the right edge.
+ * It is the chat panel's handle — always there, always aimable — and the panel slides
+ * in beside it rather than over it, so a block stays clickable while you read.
+ */
+.turnbar {
+	position: absolute;
+	top: 12px;
+	right: 4px;
+	bottom: 88px;
+	z-index: 11;
+	display: flex;
+	width: 14px;
+	flex-direction: column;
+	justify-content: flex-end;
+	padding: 3px 2px;
+	gap: 3px;
+}
+
+.turnbar .turn {
+	width: 10px;
+	height: 15px;
+	flex: 0 1 15px;
+	min-height: 3px;
+	padding: 0;
+	border: 0;
+	border-radius: 3px;
+	background: var(--line-strong);
+	cursor: pointer;
+	transition:
+		background 140ms ease,
+		width 140ms ease;
+}
+
+.turnbar .turn:hover {
+	width: 14px;
+	background: var(--muted);
+}
+
+.turnbar .turn[data-current="true"] {
+	background: var(--fg);
+}
+
+.turnbar .turn[data-unseen="true"] {
+	background: var(--color-accent);
+}
+
+.turnbar .turn[data-state="running"] {
+	background: var(--color-warn);
+	animation: pulse 1.2s ease-in-out infinite;
+}
+
+.turnbar .turn[data-state="error"] {
+	background: var(--color-danger);
+}
+
+/* The panel parks beside the spine, not under it. */
+.chat {
+	right: 22px;
+}
+
+/* The chat's own sliver would only compete with the spine. */
+.chat::after {
+	display: none;
+}

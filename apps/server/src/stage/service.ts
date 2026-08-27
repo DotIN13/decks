@@ -1,0 +1,140 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { randomUUID } from "node:crypto";
+import type { Board, Camera, ServerMessage, StageCall, StageResult } from "@decks/protocol";
+import type { Deck } from "../deck/loader.ts";
+import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
+
+/**
+ * The single path from a tool to the canvas.
+ *
+ * Two kinds of operation, and the difference matters. A **read** — which boards
+ * exist, what one says, where the roots are — the server can answer itself, so it
+ * does, immediately. A **camera** operation only the browser can carry out, so it
+ * becomes a `stage.call` frame and is awaited.
+ *
+ * With no browser connected the second kind resolves as a no-op and says so in the
+ * result rather than hanging: an agent working while nobody is watching should
+ * finish its work and report that the canvas was not there, which is also what
+ * makes a headless run possible at all.
+ */
+
+export interface StageHost {
+	/** Write a new board from a template and return its deck-relative path. */
+	newBoard(options: { title: string; kind: string; size?: { w?: number; h?: number } }): string;
+	/** Send to the focused browser, and resolve when it answers. */
+	call(call: Omit<StageCall, "id">): Promise<unknown>;
+	/** Is anyone looking? */
+	connected(): boolean;
+	broadcast(message: ServerMessage): void;
+	/** The camera the browser last reported. */
+	camera(): Camera;
+	/** Agents, for `stage.agents()` and for `inContext` on every board. */
+	agents(): Array<{ id: string; name: string; state: string; context: string[] }>;
+}
+
+export class StageService {
+	constructor(
+		private deck: Deck,
+		private readonly host: StageHost,
+	) {}
+
+	setDeck(deck: Deck): void {
+		this.deck = deck;
+	}
+
+	// --- reads --------------------------------------------------------------------
+
+	boards(): Board[] {
+		const holders = this.host.agents();
+		return this.deck.boards.map((board) => ({
+			...board,
+			inContext: holders.filter((agent) => agent.context.includes(board.path)).map((agent) => agent.id),
+		}));
+	}
+
+	read(path: string): string {
+		return readFileSync(this.deck.fileOf(path), "utf8");
+	}
+
+	roots() {
+		return this.deck.roots.roots;
+	}
+
+	/** A path on disk -> the URL a board should embed. Refuses what the route would. */
+	resolve(file: string): string {
+		return fileUrl(resolveFileRequest(this.deck.roots, { path: file }));
+	}
+
+	/** Where Playwright should point to look at a board. */
+	url(path: string, port: number): string {
+		const board = this.deck.board(path);
+		const rev = board ? `?rev=${board.rev}` : "";
+		const encoded = path.split("/").map(encodeURIComponent).join("/");
+		return `http://127.0.0.1:${port}/api/board/${encoded}${rev}`;
+	}
+
+	// --- writes the server owns ----------------------------------------------------
+
+	move(path: string, at: { x: number; y: number }): Board {
+		const board = this.deck.setPosition(path, at.x, at.y);
+		if (!board) throw new Error(`No such board: ${path}`);
+		this.host.broadcast({ type: "board.changed", path: board.path, rev: board.rev, board });
+		return board;
+	}
+
+	/** A new board from a template — the shell, so the agent writes only the content. */
+	newBoard(options: { title: string; kind: string; size?: { w?: number; h?: number } }): string {
+		return this.host.newBoard(options);
+	}
+
+	/** An agent's avatar, drawn by the agent, stored beside the deck. */
+	writeAvatar(agentId: string, svg: string): string {
+		const file = join(this.deck.path, ".decks", "avatars", `${agentId}.svg`);
+		mkdirSync(dirname(file), { recursive: true });
+		writeFileSync(file, svg);
+		// The revision is a fresh id rather than a hash: an avatar is written once per
+		// change and the only job of the query is to get past the browser's cache.
+		return `/api/avatar/${agentId}?rev=${randomUUID().slice(0, 8)}`;
+	}
+
+	// --- the browser's half ---------------------------------------------------------
+
+	camera(): Camera {
+		return this.host.camera();
+	}
+
+	async setCamera(at: Camera): Promise<void> {
+		await this.ask({ op: "camera", args: at });
+	}
+
+	async show(paths: string[], options: { fit?: "board" | "all"; highlight?: string } = {}): Promise<void> {
+		for (const path of paths) {
+			if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
+		}
+		await this.ask({ op: "show", args: { paths, ...options } });
+	}
+
+	async reload(path: string): Promise<void> {
+		await this.ask({ op: "reload", args: { path } });
+	}
+
+	async cursor(path: string, at: { x: number; y: number } | null, label: string, color: string): Promise<void> {
+		await this.ask({ op: "cursor", args: { path, at, label, color } });
+	}
+
+	async toast(text: string): Promise<void> {
+		await this.ask({ op: "toast", args: { text } });
+	}
+
+	private async ask(call: Omit<StageCall, "id">): Promise<unknown> {
+		if (!this.host.connected()) {
+			// Not an error: an agent can do useful work with nobody watching, and it
+			// should be told rather than blocked.
+			return { skipped: "no browser is connected to the canvas" };
+		}
+		return this.host.call(call);
+	}
+}
+
+export type { StageResult };

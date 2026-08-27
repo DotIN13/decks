@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>{{TITLE}}</title>
+		<meta name="board" content='{"w":{{W}},"h":{{H}},"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 900px">
+			<h1>{{TITLE}}</h1>
+		</div>
+
+		<section class="card" data-id="goal" style="left: 48px; top: 152px; width: 380px">
+			<h3>Goal</h3>
+			<p>One sentence that would survive being read out loud.</p>
+		</section>
+
+		<section class="card" data-id="approach" style="left: 476px; top: 152px; width: 380px">
+			<h3>Approach</h3>
+			<p>…</p>
+		</section>
+
+		<section class="card" data-id="steps" style="left: 48px; top: 420px; width: 808px">
+			<h3>Steps</h3>
+			<ol>
+				<li>…</li>
+			</ol>
+		</section>
+
+		<svg class="link" data-id="goal-approach" data-from="goal" data-to="approach"></svg>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

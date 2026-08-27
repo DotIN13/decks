@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>{{TITLE}}</title>
+		<meta name="board" content='{"w":{{W}},"h":{{H}},"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 900px">
+			<h1>{{TITLE}}</h1>
+			<p style="color: var(--b-muted)">What is being decided, in one line.</p>
+		</div>
+
+		<!-- The options, as columns of the same width and top. -->
+		<section class="card" data-id="option-a" style="left: 48px; top: 168px; width: 380px">
+			<h3>Option A</h3>
+			<p>…</p>
+		</section>
+		<section class="card" data-id="option-b" style="left: 476px; top: 168px; width: 380px">
+			<h3>Option B</h3>
+			<p>…</p>
+		</section>
+
+		<!-- The recommendation, said plainly, in a callout so the eye lands on it. -->
+		<div class="callout" data-id="recommendation" style="left: 48px; top: 520px; width: 808px">
+			<strong>Recommendation.</strong> …
+		</div>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

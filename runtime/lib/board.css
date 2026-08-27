@@ -1,0 +1,524 @@
+/*
+ * The board primitives: tokens, and the components a board is built from.
+ *
+ * A board is a standalone document — you can open the file in a browser and it
+ * looks right — so this carries its own palette rather than inheriting the app's.
+ * The ramp is the same one Picone uses (opencode's v2 system), so a board and the
+ * shell around it read as one piece of software.
+ *
+ * Everything here assumes absolute positioning: a component's `left`/`top`/`width`
+ * live in its own `style` attribute, because that is the one place both an agent
+ * editing text and a person dragging a box can agree on.
+ */
+
+:root {
+	--b-grey-50: #ffffff;
+	--b-grey-100: #fafafa;
+	--b-grey-200: #f2f2f2;
+	--b-grey-300: #eeeeee;
+	--b-grey-400: #dbdbdb;
+	--b-grey-500: #aeaeae;
+	--b-grey-600: #808080;
+	--b-grey-700: #5c5c5c;
+	--b-grey-800: #3a3a3a;
+	--b-grey-900: #2e2e2e;
+	--b-grey-1000: #242424;
+	--b-grey-1100: #161616;
+
+	--b-blue-200: #d7e2fc;
+	--b-blue-600: #3b5cf6;
+	--b-blue-900: #263fa9;
+	--b-yellow-200: #fcefd0;
+	--b-yellow-400: #f3da9b;
+	--b-yellow-900: #ac8833;
+	--b-green-200: #d0f0d5;
+	--b-green-700: #2eaf5a;
+	--b-red-200: #f6d5d3;
+	--b-red-700: #d92e3c;
+	--b-purple-700: #623be2;
+
+	/* Semantic, light. */
+	--b-bg: var(--b-grey-50);
+	--b-bg-deep: var(--b-grey-100);
+	--b-bg-layer: var(--b-grey-200);
+	--b-fg: var(--b-grey-1100);
+	--b-muted: var(--b-grey-700);
+	--b-faint: var(--b-grey-600);
+	--b-border: rgb(0 0 0 / 10%);
+	--b-border-strong: rgb(0 0 0 / 22%);
+	--b-accent: var(--b-blue-600);
+	--b-accent-soft: var(--b-blue-200);
+	--b-sticky: var(--b-yellow-200);
+	--b-sticky-edge: var(--b-yellow-400);
+	--b-ok: var(--b-green-700);
+	--b-warn: var(--b-yellow-900);
+	--b-danger: var(--b-red-700);
+	--b-grid: rgb(0 0 0 / 5%);
+	--b-shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 12px rgb(0 0 0 / 5%);
+
+	--b-radius: 10px;
+	--b-radius-sm: 6px;
+	--b-unit: 8px;
+	--b-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--b-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Dark when the board says so, or when the reader's system does and it has not. */
+[data-theme="dark"] {
+	--b-bg: var(--b-grey-1100);
+	--b-bg-deep: #0f0f0f;
+	--b-bg-layer: var(--b-grey-1000);
+	--b-fg: var(--b-grey-100);
+	--b-muted: var(--b-grey-500);
+	--b-faint: var(--b-grey-600);
+	--b-border: rgb(255 255 255 / 12%);
+	--b-border-strong: rgb(255 255 255 / 24%);
+	--b-accent-soft: #1e2a52;
+	--b-sticky: #4a3d1c;
+	--b-sticky-edge: #6b5726;
+	--b-grid: rgb(255 255 255 / 6%);
+	--b-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
+}
+
+@media (prefers-color-scheme: dark) {
+	html:not([data-theme="light"]) {
+		--b-bg: var(--b-grey-1100);
+		--b-bg-deep: #0f0f0f;
+		--b-bg-layer: var(--b-grey-1000);
+		--b-fg: var(--b-grey-100);
+		--b-muted: var(--b-grey-500);
+		--b-border: rgb(255 255 255 / 12%);
+		--b-border-strong: rgb(255 255 255 / 24%);
+		--b-accent-soft: #1e2a52;
+		--b-sticky: #4a3d1c;
+		--b-sticky-edge: #6b5726;
+		--b-grid: rgb(255 255 255 / 6%);
+		--b-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+
+/*
+ * The board itself.
+ *
+ * `overflow: hidden` because the stage does the panning: a board that scrolls
+ * inside its own frame fights the camera, and a screenshot of it shows a
+ * scrollbar instead of the work.
+ */
+body.board {
+	position: relative;
+	width: 1200px;
+	height: 800px;
+	overflow: hidden;
+	background-color: var(--b-bg);
+	color: var(--b-fg);
+	font-family: var(--b-font);
+	font-size: 15px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* A grid, because absolute positioning without one is guesswork. */
+body.board[data-bg="grid"] {
+	background-image:
+		linear-gradient(to right, var(--b-grid) 1px, transparent 1px),
+		linear-gradient(to bottom, var(--b-grid) 1px, transparent 1px);
+	background-size: calc(var(--b-unit) * 4) calc(var(--b-unit) * 4);
+}
+
+body.board[data-bg="dots"] {
+	background-image: radial-gradient(var(--b-grid) 1.5px, transparent 1.5px);
+	background-size: calc(var(--b-unit) * 4) calc(var(--b-unit) * 4);
+}
+
+body.board > * {
+	position: absolute;
+}
+
+/* --- components --------------------------------------------------------------- */
+
+.card,
+.panel,
+.sticky,
+.text,
+.callout,
+.kpi,
+.embed,
+.table {
+	position: absolute;
+	max-width: none;
+}
+
+.card {
+	padding: calc(var(--b-unit) * 2);
+	border: 1px solid var(--b-border);
+	border-radius: var(--b-radius);
+	background: var(--b-bg);
+	box-shadow: var(--b-shadow);
+}
+
+.panel {
+	padding: calc(var(--b-unit) * 2);
+	border: 1px solid var(--b-border);
+	border-radius: var(--b-radius);
+	background: var(--b-bg-deep);
+}
+
+.sticky {
+	min-width: 160px;
+	min-height: 120px;
+	padding: calc(var(--b-unit) * 1.5);
+	border-bottom: 2px solid var(--b-sticky-edge);
+	border-radius: var(--b-radius-sm);
+	background: var(--b-sticky);
+	box-shadow: var(--b-shadow);
+	font-size: 14px;
+}
+
+.text {
+	color: var(--b-fg);
+}
+
+.callout {
+	padding: calc(var(--b-unit) * 1.5) calc(var(--b-unit) * 2);
+	border-left: 3px solid var(--b-accent);
+	border-radius: 0 var(--b-radius-sm) var(--b-radius-sm) 0;
+	background: var(--b-accent-soft);
+}
+
+.callout[data-tone="warn"] {
+	border-left-color: var(--b-warn);
+	background: color-mix(in srgb, var(--b-yellow-200) 70%, var(--b-bg));
+}
+
+.callout[data-tone="danger"] {
+	border-left-color: var(--b-danger);
+	background: color-mix(in srgb, var(--b-red-200) 70%, var(--b-bg));
+}
+
+.callout[data-tone="ok"] {
+	border-left-color: var(--b-ok);
+	background: color-mix(in srgb, var(--b-green-200) 70%, var(--b-bg));
+}
+
+.kpi {
+	text-align: left;
+}
+
+.kpi > .value {
+	display: block;
+	font-size: 40px;
+	font-weight: 600;
+	letter-spacing: -0.02em;
+	line-height: 1.1;
+}
+
+.kpi > .label {
+	display: block;
+	color: var(--b-muted);
+	font-size: 12px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.chip {
+	display: inline-block;
+	padding: 2px 8px;
+	border: 1px solid var(--b-border);
+	border-radius: 999px;
+	background: var(--b-bg-layer);
+	color: var(--b-muted);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+/* Headings inside a component: the component owns its spacing, not the document. */
+.card > :first-child,
+.panel > :first-child,
+.sticky > :first-child,
+.callout > :first-child,
+.embed > :first-child {
+	margin-top: 0;
+}
+
+.card > :last-child,
+.panel > :last-child,
+.sticky > :last-child,
+.callout > :last-child {
+	margin-bottom: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+	margin: 0 0 calc(var(--b-unit) * 1.5);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	line-height: 1.25;
+}
+
+h1 {
+	font-size: 30px;
+}
+h2 {
+	font-size: 22px;
+}
+h3 {
+	font-size: 17px;
+}
+h4 {
+	color: var(--b-muted);
+	font-size: 13px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+p,
+ul,
+ol {
+	margin: 0 0 calc(var(--b-unit) * 1.5);
+}
+
+ul,
+ol {
+	padding-left: calc(var(--b-unit) * 2.5);
+}
+
+li {
+	margin: 2px 0;
+}
+
+a {
+	color: var(--b-accent);
+	text-decoration-color: var(--b-border-strong);
+}
+
+code,
+kbd,
+pre {
+	font-family: var(--b-mono);
+	font-size: 0.9em;
+}
+
+code {
+	padding: 1px 5px;
+	border-radius: 4px;
+	background: var(--b-bg-layer);
+}
+
+pre {
+	margin: 0 0 calc(var(--b-unit) * 1.5);
+	padding: calc(var(--b-unit) * 1.5);
+	overflow-x: auto;
+	border: 1px solid var(--b-border);
+	border-radius: var(--b-radius-sm);
+	background: var(--b-bg-deep);
+	line-height: 1.45;
+}
+
+pre code {
+	padding: 0;
+	background: none;
+}
+
+blockquote {
+	margin: 0 0 calc(var(--b-unit) * 1.5);
+	padding-left: calc(var(--b-unit) * 1.5);
+	border-left: 2px solid var(--b-border-strong);
+	color: var(--b-muted);
+}
+
+table.table,
+.table > table,
+.embed table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.table th,
+.table td,
+.embed th,
+.embed td {
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--b-border);
+	text-align: left;
+}
+
+.table th {
+	color: var(--b-muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+/* --- connectors -------------------------------------------------------------- */
+
+/*
+ * A connector is an SVG the size of the board, drawn by board.js from the two
+ * components it names. It sits under everything and must never eat a click, or
+ * the component it points at cannot be selected through it.
+ */
+svg.link {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	pointer-events: none;
+}
+
+svg.link path {
+	fill: none;
+	stroke: var(--b-border-strong);
+	stroke-width: 2;
+}
+
+/*
+ * The arrowhead is a `path` inside the same `svg.link`, so the rule above would
+ * make it an unfilled outline — a CSS declaration beats the `fill` attribute the
+ * marker sets on itself. It gets its own rule, and `currentColor` so a tinted
+ * connector keeps its point.
+ */
+svg.link marker path {
+	fill: currentColor;
+	stroke: none;
+}
+
+svg.link text {
+	fill: var(--b-muted);
+	font-family: var(--b-font);
+	font-size: 12px;
+}
+
+svg.link[data-tone="accent"] path {
+	stroke: var(--b-accent);
+}
+
+/*
+ * A diagram is given a box and has to live in it, so the box centres it and
+ * clips rather than letting a tall flowchart run out over the board.
+ */
+[data-mermaid] {
+	display: flex;
+	overflow: hidden;
+	align-items: center;
+	justify-content: center;
+}
+
+[data-mermaid] > svg {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+/* --- embeds ------------------------------------------------------------------ */
+
+.embed {
+	display: flex;
+	overflow: hidden;
+	flex-direction: column;
+	border: 1px solid var(--b-border);
+	border-radius: var(--b-radius);
+	background: var(--b-bg);
+	box-shadow: var(--b-shadow);
+}
+
+.embed > .embed-head {
+	display: flex;
+	flex: 0 0 auto;
+	gap: var(--b-unit);
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--b-border);
+	background: var(--b-bg-deep);
+	color: var(--b-muted);
+	font-size: 12px;
+}
+
+.embed > .embed-head .name {
+	overflow: hidden;
+	color: var(--b-fg);
+	font-family: var(--b-mono);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.embed > .embed-body {
+	position: relative;
+	flex: 1 1 auto;
+	overflow: auto;
+	padding: 0;
+}
+
+.embed[data-kind="md"] > .embed-body {
+	padding: calc(var(--b-unit) * 2);
+}
+
+.embed > .embed-body > iframe {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+
+.embed > .embed-body > img {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+.embed[data-kind="pdf"] > .embed-body {
+	background: var(--b-bg-layer);
+}
+
+.embed canvas.page {
+	display: block;
+	width: 100%;
+	height: auto;
+	margin: 0 auto calc(var(--b-unit));
+	background: #fff;
+	box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+}
+
+/* An embed that could not be resolved says so, in place, with the path. */
+.embed[data-kind="missing"] > .embed-body,
+.embed[data-kind="file"] > .embed-body {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	justify-content: center;
+	padding: calc(var(--b-unit) * 2);
+	color: var(--b-muted);
+	font-size: 13px;
+}
+
+.embed[data-kind="missing"] {
+	border-style: dashed;
+}
+
+/* --- selection (the editor's affordance; harmless when nothing is selected) --- */
+
+[data-selected="true"] {
+	outline: 2px solid var(--b-accent);
+	outline-offset: 2px;
+}
+
+/* Screenshots and printing: the grid is furniture, the work is the content. */
+@media print {
+	body.board {
+		background-image: none;
+	}
+}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>{{TITLE}}</title>
+		<meta name="board" content='{"w":{{W}},"h":{{H}},"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<div class="text" data-id="question" style="left: 48px; top: 40px; width: 900px">
+			<h1>{{TITLE}}</h1>
+		</div>
+
+		<!--
+			The answer, in one screen. Replace this section; add more beside it at
+			x = 48 / 560 / 1072 rather than scattering them.
+		-->
+		<section class="card" data-id="answer" style="left: 48px; top: 152px; width: 480px">
+			<p>…</p>
+		</section>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

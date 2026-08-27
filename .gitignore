@@ -1,0 +1,22 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+
+# Per-deck state, not source: revisions, avatars and agent transcripts. Written into
+# whatever data directory is in use, including example/.
+.decks/
+.pi/
+
+# The dev server's data directory (DECKS_DATA_DIR defaults to it via `npm run dev`).
+# One person's working deck is not the project.
+/data/
+
+# A copy of runtime/lib, so a board in the example deck is standalone. Generated —
+# `npm run sync:lib` restores it — and committing it would duplicate ~6 MB of
+# vendored library on every change to the originals.
+/example/decks/lib/
+
+# Local screenshot helpers, kept out of the tree because nothing references them.
+/check.mjs
+/shot.mjs

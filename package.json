@@ -1,0 +1,36 @@
+{
+  "name": "decks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A canvas-centric coding agent powered by Pi",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently --raw --kill-others-on-fail \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "DECKS_DATA_DIR=\"${DECKS_DATA_DIR:-$PWD/data}\" npm run dev --workspace @decks/server",
+    "dev:web": "npm run dev --workspace @decks/web",
+    "build": "npm run build --workspace @decks/server && npm run build --workspace @decks/web",
+    "start": "DECKS_DATA_DIR=\"${DECKS_DATA_DIR:-$PWD/data}\" npm run start --workspace @decks/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "vendor": "node scripts/vendor.mjs",
+    "dev:example": "npm run sync:lib && DECKS_DATA_DIR=\"$PWD/example\" npm run dev --workspace @decks/server",
+    "sync:lib": "node -e \"const{cpSync,rmSync}=require('node:fs');rmSync('example/decks/lib',{recursive:true,force:true});cpSync('runtime/lib','example/decks/lib',{recursive:true});console.log('[sync] runtime/lib -> example/decks/lib')\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.9.3",
+    "d3": "^7.9.0",
+    "esbuild": "^0.25.0",
+    "katex": "^0.16.11",
+    "marked": "^15.0.12",
+    "mermaid": "^11.6.0",
+    "pdfjs-dist": "^5.4.149"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}
