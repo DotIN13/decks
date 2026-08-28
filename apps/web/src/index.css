@@ -93,17 +93,25 @@ body {
 	-webkit-app-region: drag;
 }
 
-.titlebar .deck-name {
-	font-weight: 600;
+.titlebar .brand {
+	display: flex;
+	align-items: center;
+	color: var(--fg);
+	gap: 8px;
 }
 
-.titlebar .path {
-	overflow: hidden;
-	color: var(--faint);
-	font-family: var(--font-mono);
-	font-size: 11px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+.titlebar .brand[data-off="true"] {
+	color: var(--color-danger);
+}
+
+.titlebar .brand svg {
+	display: block;
+	flex: none;
+}
+
+.titlebar .wordmark {
+	font-weight: 600;
+	letter-spacing: -0.01em;
 }
 
 .titlebar .spacer {
@@ -370,6 +378,22 @@ body {
 .zoombar button:hover,
 .titlebar button:hover {
 	background: var(--line);
+}
+
+.titlebar .icon-button {
+	display: grid;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	color: var(--faint);
+	place-items: center;
+	/* The bar is a drag handle in a desktop shell, which would otherwise swallow the
+	   click before the button sees it. */
+	-webkit-app-region: no-drag;
+}
+
+.titlebar .icon-button:hover {
+	color: var(--fg);
 }
 
 .zoombar .level {

@@ -16,6 +16,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { BoardRail } from "./canvas/BoardRail.tsx";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
+import { DecksMark, MoonIcon, SunIcon } from "./icons.tsx";
 import { Palette } from "./canvas/Palette.tsx";
 import { Stage } from "./canvas/Stage.tsx";
 import { runStageCall } from "./canvas/stage-ops.ts";
@@ -484,12 +485,29 @@ export function App() {
 	return (
 		<div class="app">
 			<header class="titlebar">
-				<span class="dot" data-off={!connected()} title={connected() ? "connected" : "offline"} />
-				<span class="deck-name">{state.deck?.name ?? "…"}</span>
-				<span class="path">{state.deck?.path}</span>
+				{/* The connection state used to be its own dot beside the deck name. With the
+				    name and the path gone the dot would be the only thing left to explain,
+				    so it lives in the mark's colour instead — nothing is lost, and there is
+				    one thing on the left rather than three. */}
+				<span
+					class="brand"
+					data-off={!connected()}
+					title={connected() ? "Decks" : "Decks — not connected to the server"}
+				>
+					<DecksMark />
+					<span class="wordmark">Decks</span>
+				</span>
 				<span class="spacer" />
-				<button type="button" onClick={() => toggleScheme()} title="Light or dark, for the app and its boards">
-					{scheme() === "dark" ? "dark" : "light"}
+				<button
+					class="icon-button"
+					type="button"
+					onClick={() => toggleScheme()}
+					title={scheme() === "dark" ? "Switch to light" : "Switch to dark"}
+					aria-label={scheme() === "dark" ? "Switch to light" : "Switch to dark"}
+				>
+					{/* The icon is the destination, not the current state: it is a button, and
+					    what a button shows should be what pressing it gets you. */}
+					{scheme() === "dark" ? <SunIcon /> : <MoonIcon />}
 				</button>
 			</header>
 
