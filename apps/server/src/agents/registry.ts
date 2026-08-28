@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
-import type { AgentChat, Camera, ServerMessage } from "@decks/protocol";
+import type { AgentChat, AgentKind, Camera, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import type { DelegateReport, DelegateSpec } from "../pi/extension.ts";
 import type { StageService } from "../stage/service.ts";
+import type { DelegateReport, DelegateSpec } from "../stage/tool.ts";
 import { DeckAgent } from "./session.ts";
+import { SnapshotStore } from "./snapshot.ts";
 
 /**
  * Which agents exist, and which one the browser is looking at.
@@ -24,6 +25,8 @@ const MAX_CHILDREN = 4;
 export class Registry {
 	private readonly agents: DeckAgent[] = [];
 	private focusedId: string | undefined;
+	/** Shared, so a fork can inherit the canvas of the agent it came from (§6.2). */
+	private readonly snapshots = new SnapshotStore();
 
 	constructor(
 		private deck: Deck,
@@ -31,6 +34,8 @@ export class Registry {
 		private readonly stage: StageService,
 		private readonly host: {
 			port: number;
+			/** The runtime a new agent gets unless it asks for another one. */
+			defaultKind: AgentKind;
 			camera(): Camera;
 			recordRevision(path: string): string | undefined;
 			boardPathOf(file: string): string | undefined;
@@ -45,7 +50,22 @@ export class Registry {
 		});
 	}
 
-	create(options: { name?: string; parentId?: string; resumeRef?: string } = {}): DeckAgent {
+	/**
+	 * A new agent.
+	 *
+	 * `kind` is the runtime, fixed here for the agent's life. It defaults to the server's
+	 * (`DECKS_BACKEND`), so the `+` button gives you whatever the deck is set up for
+	 * without having to say so every time.
+	 */
+	create(
+		options: {
+			name?: string;
+			parentId?: string;
+			resumeRef?: string;
+			kind?: AgentKind;
+			forkedFrom?: { agentId: string; at: number };
+		} = {},
+	): DeckAgent {
 		const agent = new DeckAgent(
 			this.deck,
 			this.emit,
@@ -58,7 +78,12 @@ export class Registry {
 				recordRevision: (path) => this.host.recordRevision(path),
 				boardPathOf: (file) => this.host.boardPathOf(file),
 			},
-			{ ...options, color: COLORS[this.agents.length % COLORS.length]! },
+			{
+				...options,
+				color: COLORS[this.agents.length % COLORS.length]!,
+				kind: options.kind ?? this.host.defaultKind,
+				snapshots: this.snapshots,
+			},
 		);
 		this.agents.push(agent);
 		this.focusedId ??= agent.id;
@@ -133,6 +158,11 @@ export class Registry {
 		for (const agent of this.agents) agent.userEdited(path, summary);
 	}
 
+	/** An agent that is gone keeps nothing. */
+	forget(id: string): void {
+		this.snapshots.forget(id);
+	}
+
 	/** A board was deleted: no agent should still be holding it. */
 	boardRemoved(path: string): void {
 		let touched = false;
@@ -141,11 +171,21 @@ export class Registry {
 	}
 
 	publish(): void {
-		this.emit({ type: "agents", chats: this.chats(), ...(this.focusedId ? { focused: this.focusedId } : {}) });
+		this.emit({
+			type: "agents",
+			chats: this.chats(),
+			defaultKind: this.host.defaultKind,
+			...(this.focusedId ? { focused: this.focusedId } : {}),
+		});
 	}
 
 	greet(reply: (message: ServerMessage) => void): void {
-		reply({ type: "agents", chats: this.chats(), ...(this.focusedId ? { focused: this.focusedId } : {}) });
+		reply({
+			type: "agents",
+			chats: this.chats(),
+			defaultKind: this.host.defaultKind,
+			...(this.focusedId ? { focused: this.focusedId } : {}),
+		});
 		for (const agent of this.agents) agent.greet(reply);
 	}
 

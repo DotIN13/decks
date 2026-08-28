@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
+import type { AgentKind } from "@decks/protocol";
 
 /**
  * Everything the process is told from outside, read once.
@@ -22,6 +23,13 @@ export interface Config {
 	dataDir: string;
 	/** The deck inside it. Created on first run if it is not there. */
 	deck: string;
+	/**
+	 * Which runtime a new agent gets unless it asks for another.
+	 *
+	 * A default rather than a setting: both runtimes are available at once and the choice
+	 * is per agent (§6.2). This is only what the `+` button hands you.
+	 */
+	backend: AgentKind;
 }
 
 export function expandUser(path: string): string {
@@ -42,10 +50,16 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): Config {
 	const named = expandUser(positional ?? process.env.DECKS_DATA_DIR ?? "~/.decks");
 	const dataDir = isAbsolute(named) ? named : resolve(process.cwd(), named);
 
+	// Anything unrecognised falls back to Pi rather than failing to start: a typo in an
+	// environment variable should not cost you the deck.
+	const asked = process.env.DECKS_BACKEND;
+	const backend: AgentKind = asked === "claude" ? "claude" : "pi";
+
 	return {
 		host: process.env.DECKS_HOST ?? "127.0.0.1",
 		port: Number(process.env.DECKS_PORT ?? 4329),
 		dataDir,
 		deck: join(dataDir, DECK_DIR),
+		backend,
 	};
 }

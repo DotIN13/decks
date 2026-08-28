@@ -33,6 +33,10 @@ say("the canvas narrows to what the agent holds", (await onCanvas()).join() === 
 say("the rail lists the same two", (await inRail()).join() === two.join(), (await inRail()).join(" "));
 
 // The × on a board takes it off the canvas, and the rail keeps it.
+//
+// Fitted first, on purpose: the × is at a board's top-right corner, so with the camera
+// left wherever the previous check put it the button can sit off-screen or exactly where
+// the neighbouring board begins — which is a fact about the camera, not about the ×.
 const first = two[0];
 await page.locator(`.board-node[data-path="${first}"] .chrome`).hover();
 await page.locator(`.board-node[data-path="${first}"] .chrome .hide`).click();

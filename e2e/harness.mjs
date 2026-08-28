@@ -98,8 +98,30 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 		}
 	}, scheme);
 	await page.goto(`${WEB}/`, { waitUntil: "load" });
+	/*
+	 * Answer permission questions, because a check cannot.
+	 *
+	 * A Claude agent's runtime asks before a command it judges risky, and an unanswered
+	 * question stops the turn — so a suite with nobody watching would hang rather than
+	 * fail. The fixture is a throwaway copy of `example/`, so allowing is safe here in a
+	 * way it would not be in a real deck. Recorded on `asked` so a check can assert on it.
+	 */
+	const asked = [];
+	const answer = async () => {
+		try {
+			const card = page.locator(".dialog-card");
+			if ((await card.count()) === 0) return;
+			asked.push((await card.locator(".q").first().textContent()) ?? "");
+			await card.locator("button", { hasText: /^Allow$/ }).first().click({ timeout: 2000 });
+		} catch {
+			/* the dialog went away on its own, which is the outcome we wanted anyway */
+		}
+	};
+	const watch = setInterval(() => void answer(), 700);
+	page.on("close", () => clearInterval(watch));
+
 	if (boards) await ready(page);
-	return { browser, page, errors };
+	return { browser, page, errors, asked, stopAnswering: () => clearInterval(watch) };
 }
 
 /**

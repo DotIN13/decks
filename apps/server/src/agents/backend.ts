@@ -1,16 +1,19 @@
-import type { AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
-import type { InlineExtension } from "@earendil-works/pi-coding-agent";
+import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import type { ExtensionUiBridge } from "../pi/extension-ui.ts";
+import type { StageAgentHooks, StageTool } from "../stage/tool.ts";
+import type { ExtensionUiBridge } from "./extension-ui.ts";
 import type { Translator } from "./translator.ts";
 
 /**
  * What the shell needs from an agent, and nothing about how it works.
  *
- * Pi is the only implementation today. The interface exists anyway, for the same
- * reason `translator.ts` is separate from `pi/events.ts`: the transcript, the
- * identity and the chat list are the same for every agent, and the day a second
- * one arrives the seam should already be where it belongs.
+ * There are two implementations: Pi and Claude Code. The interface predates the second
+ * one, for the same reason `translator.ts` is separate from `pi/events.ts` — the
+ * transcript, the identity and the chat list are the same for every agent — and the
+ * second one arriving is what tested the claim.
+ *
+ * What differs between runtimes lives in `capabilities` rather than in a method that
+ * throws: a client that can see what an agent cannot do never offers it.
  */
 export interface AgentBackendContext {
 	cwd: string;
@@ -19,8 +22,28 @@ export interface AgentBackendContext {
 	bridge: ExtensionUiBridge;
 	/** For things that are the environment's fault rather than the agent's. */
 	notice(level: "info" | "warn" | "error", text: string): void;
-	/** Built here rather than found on disk, so they can reach the canvas (§6.2). */
-	extensions: InlineExtension[];
+	/**
+	 * A turn finished.
+	 *
+	 * Only a backend whose `prompt()` returns before the turn does needs this — Claude's
+	 * does, because the turn runs on its message stream. Pi's `prompt()` awaits, so the
+	 * shell already knows.
+	 */
+	turnEnded?(): void;
+	/**
+	 * The canvas tool, defined once and adapted by each backend (§6.3).
+	 *
+	 * Not a Pi extension any more: Pi takes a tool definition directly, the Claude SDK
+	 * takes an in-process MCP server, and the description and guidelines are the part
+	 * that matters and must not drift between them.
+	 */
+	tool: StageTool;
+	/**
+	 * The agent behind the tool, for the parts of a backend that are not the tool itself.
+	 *
+	 * Pi's adapter needs it to attribute a board revision to a turn; nothing else does.
+	 */
+	stageAgent: StageAgentHooks;
 	/** A session file to open instead of starting a new one — see `forkFrom`. */
 	resumeRef?: string;
 }
@@ -38,6 +61,8 @@ export interface ConversationPoint {
 }
 
 export interface AgentBackend {
+	readonly capabilities: AgentCapabilities;
+
 	prompt(text: string): Promise<void>;
 	abort(): Promise<void>;
 	readonly isStreaming: boolean;
@@ -45,6 +70,9 @@ export interface AgentBackend {
 	model(): AgentModel | undefined;
 	setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void>;
 	setThinking(level: ThinkingLevel): void;
+	/** Only meaningful when `capabilities.modes` is non-empty. */
+	setMode?(mode: AgentMode): Promise<void>;
+	mode?(): AgentMode | undefined;
 	models(): Promise<ModelOption[]>;
 	usage(): AgentUsage | null;
 
@@ -56,14 +84,19 @@ export interface AgentBackend {
 
 	/** The points in this conversation worth returning to: the user's messages. */
 	timeline(): ConversationPoint[];
-	/** Tag the transcript's user messages with the session entries they became. */
-	syncEntryIds(): void;
+	/**
+	 * Tag the transcript's user messages with the session entries they became.
+	 *
+	 * Async because Claude's message ids come from reading the session file, which Pi
+	 * can do from memory.
+	 */
+	syncEntryIds(): Promise<void>;
 	/** Which revision each board was at, at that point in the conversation. */
 	revisionsAt(entryId: string): Record<string, string>;
 	/** Move the conversation back to just before that message. */
 	rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }>;
-	/** A session file containing everything up to that point, for a new chat to open. */
-	forkFrom(entryId: string): string | undefined;
+	/** A handle a new chat can open, holding everything up to that point. */
+	forkFrom(entryId: string): Promise<string | undefined>;
 
 	dispose(): void;
 }

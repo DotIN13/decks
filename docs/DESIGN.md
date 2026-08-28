@@ -207,8 +207,22 @@ lives there and is written *in response to* a change, so watching it would loop.
 
 ### 6.2 One agent, and many
 
-`pi/backend.ts` wraps `createAgentSession` with cwd set to the deck root, and
-`agents/session.ts` owns what is not Pi's: the transcript in memory, the identity, the
+**Two runtimes, one seam.** `agents/backend.ts` says what the shell needs from an agent;
+`pi/backend.ts` wraps Pi's `createAgentSession` and `claude/backend.ts` holds one
+`@anthropic-ai/claude-agent-sdk` `query()` open per agent in streaming-input mode. Streaming
+input is not a preference: it is what makes `interrupt`, `setModel`, `setPermissionMode` and
+`getContextUsage` exist at all, and a query per turn would re-pay process start every time.
+The SDK is a thin client for the `claude` binary, which it does *not* look for on `PATH`, so
+`claude/available.ts` does the looking (`DECKS_CLAUDE_PATH` overrides) — that way an install
+can use the Claude Code already on the machine instead of a per-platform 283 MB dependency.
+
+Which runtime an agent uses is chosen when it is created and fixed for its life: a live
+session cannot swap the process behind it, and pretending otherwise would silently start a
+new conversation. `DECKS_BACKEND` is only what the `+` button hands you. Where the runtimes
+differ, the difference is in `capabilities` rather than in a method that throws, so a client
+that can see what an agent cannot do never offers it.
+
+`agents/session.ts` owns what is neither runtime's: the transcript in memory, the identity, the
 context set. `agents/translator.ts` decides what a transcript *is* — when a reply is
 flushed, what a tool call is called — and is shared by any future backend;
 `pi/events.ts` is the only file that reads Pi's event shapes.
@@ -225,6 +239,29 @@ What it does not share is context: it is a fresh session with its own file. The 
 is handed the *source* of the boards it needs, because that is the point of boards
 being files — alignment is a paste, not a briefing. Four children at a time, which is
 a legibility limit rather than a resource one.
+
+**The canvas tool is defined once.** `stage/tool.ts` holds its description, its guidelines
+and the `stage` object; `pi/extension.ts` registers it with a TypeBox schema and
+`claude/tools.ts` wraps it in an in-process MCP server with a Zod one. That split is forced:
+`tool()` inside `createSdkMcpServer` is the SDK's only route for your own tools — the `tools`
+option is an availability filter over Claude's built-ins — and "MCP" oversells it, because
+the server runs in this process with no subprocess and no transport. Two consequences are
+real: the model sees `mcp__decks__stage_eval`, so the instruction text names the tool through
+a `{{STAGE_TOOL}}` placeholder rather than hardcoding it; and tool search defers SDK MCP
+tools by default, so `alwaysLoad` keeps the schema in the initial prompt instead of costing
+a discovery call.
+
+**Two things Pi did through its session tree now live in the shell**, because they had no
+Claude counterpart and one mechanism is better than two. The stage snapshot — what an agent
+held, showed and called itself — was carried in a tool result's `details` and rebuilt from
+the branch on `session_start`; MCP tool results have no `details`, and the SDK's
+`structuredContent` looks like the equivalent but *replaces* the text the model reads. It is
+now `agents/snapshot.ts`, a series resolved by time, the same way `App.boardsAt` picks which
+revision of a board to show. It is in memory rather than on disk because nothing recreates
+agents when the server restarts, so a snapshot has nothing to survive to. And the "the user
+edited a board" nudge was `pi.sendMessage({ deliverAs: "nextTurn" })`; it is now a queue on
+the agent, prepended to the next prompt, which keeps the property it was chosen for — a
+board edit is not an interruption — without needing the runtime's cooperation.
 
 **A board has to be cheaper than a paragraph.** If answering on a board costs fifteen
 lines of boilerplate and answering in chat costs nothing, the chat wins every time — so
@@ -322,12 +359,26 @@ were always durable; the *order* was not, and without it a restart made "the old
 version I know of" mean "the file as it is now" — so both undo and the timeline quietly
 lost everything from before the restart.
 
-Which version belonged to which moment is answered two ways. The agent's writes append
-a `board-rev` custom entry to the session, so the mapping travels in the session tree
-and costs no LLM context. For boards the conversation has not written to, the store
-answers by time: the newest version that already existed when that message was sent.
-That scan does not assume the sequence is sorted — a migrated index has entries dated
-zero, and a restore is old content written now.
+Which version belonged to which moment is answered two ways. Under Pi the agent's writes
+append a `board-rev` custom entry to the session, so the mapping travels in the session tree
+and costs no LLM context. For boards the conversation has not written to — and for every
+board under Claude, which has no custom-entry API — the store answers by time: the newest
+version that already existed when that message was sent. That fallback is why the Claude
+backend can return an empty map from `revisionsAt` and still have a working time machine;
+the two answers differ only where two writes share a second. That scan does not assume the
+sequence is sorted — a migrated index has entries dated zero, and a restore is old content
+written now.
+
+**A rewind means different things to the two runtimes, and the same thing to the user.** Pi
+walks its session tree in place with `navigateTree`. Claude cannot, but it can copy a session
+up to a point, so a rewind is *a fork you stay in*: the history becomes a new session id and
+the agent's query is reopened against it. Either way the abandoned path stays on disk.
+
+Pairing a message with its session entry has a timing trap worth knowing. Pi's `prompt()`
+awaits the turn, so the shell can pair immediately afterwards. Claude's returns as soon as
+the message is queued — the turn runs on its message stream — so pairing there happens when
+the *turn ends*, on the `result` frame. Doing it where Pi does left every message after the
+first with no id, and a message with no id has no rewind, no fork and no board restore.
 
 **The controls live on the user's messages**, one set per turn: `rewind · fork · restore
 boards`, revealed on hover. A user message is the point `navigateTree` accepts and the
@@ -347,14 +398,32 @@ There was a second control for a while — a bar of notches at the bottom right 
 the same list of user messages drawn twice, thirty pixels from the spine. Removed. The
 spine keeps one job (open the chat at a turn) and the messages carry the actions.
 
-### 6.8 Permissions belong to a Pi extension
+### 6.8 Permissions belong to the runtime, and the app supplies the surface
 
-Decks ships no gate. What it ships is the surface an extension needs to ask a
-human: `bindExtensions({mode: "rpc", uiContext})`, and a bridge that turns Pi's dialog
-calls into frames the browser draws. A permission extension then covers `bash`,
-`write`, `edit` and `stage_eval` alike, and nothing about it is Decks-specific. The
-path guards on the HTTP routes stay regardless: that is web-server hygiene, not agent
-policy.
+Decks ships no policy of its own. What it ships is the surface a runtime needs to ask a
+human: `bindExtensions({mode: "rpc", uiContext})` for Pi, `canUseTool` for Claude, and one
+bridge (`agents/extension-ui.ts`) that turns either into frames the browser draws. Under Pi
+a permission extension then covers `bash`, `write`, `edit` and `stage_eval` alike, and
+nothing about it is Decks-specific. Under Claude the CLI decides what is worth asking about
+and Decks answers. The path guards on the HTTP routes stay regardless: that is web-server
+hygiene, not agent policy.
+
+**Claude's four modes are exposed rather than chosen for you** — `manual`, `acceptEdits`,
+`plan`, `auto`, mapping onto the CLI's own permission modes, with `acceptEdits` the default
+because writing boards is what the agent is *for* and a confirm per board write would make
+the app unusable. `capabilities.modes` is empty for Pi, so the control is absent rather than
+present and inert.
+
+Two things this got wrong first, both about visibility rather than policy:
+
+The dialog is drawn inside the chat column, where the question belongs to the conversation
+that raised it rather than covering the canvas it is about. That was fine while nothing ever
+asked — Decks ships no Pi permission extension — and wrong the moment Claude did: the
+column is away by default, so the first thing a Claude agent asked stopped the turn for a
+reason nobody could see. A question now holds the column open until it is answered.
+
+And a pending question is replayed in the agent's greeting. It was sent once, to a browser
+that then reloaded, and the agent waited forever on an answer that could no longer arrive.
 
 ## 7. The canvas
 

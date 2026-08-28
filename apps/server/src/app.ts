@@ -59,6 +59,7 @@ export class App {
 			this.stage,
 			{
 				port: config.port,
+				defaultKind: config.backend,
 				camera: () => this.lastCamera,
 				recordRevision: (path) => this.recordRevision(path),
 				boardPathOf: (file) => this.boardPathOf(file),
@@ -216,7 +217,10 @@ export class App {
 			}
 
 			case "agent.create": {
-				const agent = this.agents.create({ ...(message.parentId ? { parentId: message.parentId } : {}) });
+				const agent = this.agents.create({
+					...(message.parentId ? { parentId: message.parentId } : {}),
+					...(message.kind ? { kind: message.kind } : {}),
+				});
 				/*
 				 * Asked for by a person, so it is what they want to talk to. A subagent is
 				 * created through `Registry.spawn` instead and deliberately does not take
@@ -260,6 +264,18 @@ export class App {
 				return;
 			}
 
+			case "agent.setMode": {
+				const agent = this.agents.get(message.id);
+				if (!agent) return;
+				void agent
+					.setMode(message.mode)
+					.then(() => this.agents.publish())
+					.catch((error: unknown) => {
+						reply({ type: "notice", level: "warn", text: `Could not change mode: ${(error as Error).message}` });
+					});
+				return;
+			}
+
 			case "rewind.preview": {
 				const agent = this.agents.get(message.id);
 				if (!agent) return;
@@ -292,14 +308,24 @@ export class App {
 			case "fork.from": {
 				const agent = this.agents.get(message.id);
 				if (!agent) return;
-				const resumeRef = agent.forkFrom(message.entryId);
-				if (!resumeRef) {
-					reply({ type: "notice", level: "warn", text: "There is nothing before that message to fork from." });
-					return;
-				}
-				// A fork is a new chat that remembers everything up to that point.
-				const child = this.agents.create({ name: `${agent.chat().name} (fork)`, resumeRef });
-				this.agents.focus(child.id);
+				// Async now: Claude's handle comes from copying a session file, which Pi
+				// can do from memory.
+				void agent.forkFrom(message.entryId).then((resumeRef) => {
+					if (!resumeRef) {
+						reply({ type: "notice", level: "warn", text: "There is nothing before that message to fork from." });
+						return;
+					}
+					const at = agent.entryTime(message.entryId);
+					// A fork is a new chat that remembers everything up to that point —
+					// including what was on the canvas then, so it does not open blank.
+					const child = this.agents.create({
+						name: `${agent.chat().name} (fork)`,
+						resumeRef,
+						kind: agent.kind,
+						...(at ? { forkedFrom: { agentId: agent.id, at } } : {}),
+					});
+					this.agents.focus(child.id);
+				});
 				return;
 			}
 

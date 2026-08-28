@@ -13,6 +13,8 @@ const picker = await page.evaluate(() => {
 		selectedGroup: select.selectedOptions[0]?.parentElement?.label,
 		selectedValue: select.value,
 		groupCount: groups.length,
+		groupLabels: groups.map((group) => group.label).sort(),
+		providers: [...new Set([...select.querySelectorAll("option")].map((o) => o.value.split("/")[0]))].sort(),
 		total: select.querySelectorAll("option").length,
 		ungrouped: [...select.querySelectorAll("option")].filter((o) => o.parentElement.tagName !== "OPTGROUP").length,
 	};
@@ -23,7 +25,14 @@ say(
 	picker.selectedGroup === picker.selectedValue.split("/")[0],
 	`${picker.selectedGroup} / ${picker.selectedValue}`,
 );
-say("the list is grouped by provider", picker.groupCount > 1, `${picker.groupCount} groups over ${picker.total} models`);
+// One group per provider, whatever the runtime happens to offer. This used to assert
+// "more than one group", which is a fact about Pi's model list rather than about grouping:
+// the Claude backend has a single provider and failed a check it satisfies perfectly.
+say(
+	"there is one group per provider",
+	picker.groupCount === picker.providers.length && picker.groupLabels.join() === picker.providers.join(),
+	`${picker.groupCount} groups for providers [${picker.providers.join(" ")}] over ${picker.total} models`,
+);
 say("every model sits in a group", picker.ungrouped === 0, `${picker.ungrouped} ungrouped`);
 say("the selected option is the session's model", (picker.selected?.length ?? 0) > 0, picker.selected);
 

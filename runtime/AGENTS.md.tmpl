@@ -76,11 +76,11 @@ missing root is visible rather than silent.
 
 {{ROOTS}}
 
-## The canvas itself: `stage_eval`
+## The canvas itself: `{{STAGE_TOOL}}`
 
 Boards are files, and you edit them with your ordinary tools. The *canvas* — what the
 user is looking at, which boards you are holding, and who you are — is one tool:
-`stage_eval`, which runs TypeScript with `stage` in scope. Whatever you return comes
+`{{STAGE_TOOL}}`, which runs TypeScript with `stage` in scope. Whatever you return comes
 back as JSON; whatever you `console.log` comes back with it.
 
 ```ts

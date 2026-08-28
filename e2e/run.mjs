@@ -85,6 +85,20 @@ process.on("SIGINT", () => {
 
 try {
 	await waitForServer();
+	/*
+	 * Confirm it is *our* server.
+	 *
+	 * `npm run dev` fails to bind a port that is already taken, and the checks then talk
+	 * happily to whatever else is listening — which is how a run once went against a
+	 * scratch deck and reported a parity result that meant nothing. The ports are fixed, so
+	 * this is not a rare accident; it is what happens whenever a dev server is left up.
+	 */
+	const serving = await deckPath();
+	if (!serving || !serving.startsWith(data)) {
+		throw new Error(
+			`something else is already serving 127.0.0.1:4329 — it has ${serving ?? "an unknown deck"} open, not the fixture at ${data}. Stop it and run again.`,
+		);
+	}
 	console.log(`fixture: ${data}`);
 	console.log(`running ${selected.length} check(s)${skipped.length ? `, skipping ${skipped.length}` : ""}\n`);
 
@@ -112,9 +126,11 @@ try {
 			for (const line of result.output.split("\n")) {
 				if (/^FAIL/.test(line)) console.log(`        ${line}`);
 			}
-			if (counts.pass + counts.fail === 0) {
-				console.log(`        no checks ran — the script errored:`);
-				for (const line of result.output.trim().split("\n").slice(-6)) console.log(`        ${line}`);
+			// Printed whenever the process failed, not only when nothing ran: a script that
+			// throws after three passing checks looked like a silent failure.
+			if (result.code !== 0) {
+				console.log(`        exited ${result.code} — tail of its output:`);
+				for (const line of result.output.trim().split("\n").slice(-8)) console.log(`        ${line}`);
 			}
 		}
 	}
@@ -144,6 +160,16 @@ async function waitForServer() {
 		await new Promise((resolve) => setTimeout(resolve, 400));
 	}
 	throw new Error("dev server did not come up within 90s");
+}
+
+async function deckPath() {
+	try {
+		const response = await fetch("http://127.0.0.1:4329/api/deck");
+		if (!response.ok) return undefined;
+		return (await response.json())?.deck?.path;
+	} catch {
+		return undefined;
+	}
 }
 
 async function ping(url) {

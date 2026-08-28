@@ -74,6 +74,12 @@ deck directory.
   to put in play; the chat says which board and why.
 - **Embeds.** A board can show your real documents — markdown, PDF with page ranges,
   HTML, images — from the deck or from a root declared in `deck.json`.
+- **Two runtimes.** An agent runs on [pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
+  or on Claude Code, chosen when you create it and fixed for its life; `DECKS_BACKEND=pi|claude`
+  sets what `+` gives you. Claude agents also carry a mode — ask first, edit freely, plan
+  only, auto — and their permission questions appear in the chat column rather than stopping
+  the turn silently. A Claude agent needs Claude Code on `PATH`, or `DECKS_CLAUDE_PATH`
+  pointing at it.
 - **Agents are a chat list.** Each has the name it chose and the face it drew.
   Subagents are rows too, tagged with their parent.
 - **A time machine.** Hover the timeline to see the boards as they were at that point

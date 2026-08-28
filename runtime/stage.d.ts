@@ -1,5 +1,5 @@
 /**
- * The stage API, available inside `stage_eval` as `stage`.
+ * The stage API, available inside `{{STAGE_TOOL}}` as `stage`.
  *
  * This file is injected into your context verbatim, so it is the whole contract:
  * if something is not here, it does not exist. Your code runs as the body of an

@@ -93,6 +93,40 @@ body {
 	-webkit-app-region: drag;
 }
 
+/* The runtime a row is running on: present, and quiet. */
+.chat-row .runtime {
+	padding: 1px 5px;
+	border-radius: 5px;
+	background: var(--line);
+	color: var(--faint);
+	font-size: 9px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.chat-row .runtime[data-kind="claude"] {
+	background: color-mix(in oklab, var(--color-accent) 22%, transparent);
+	color: var(--fg);
+}
+
+/* Sits with the + rather than beside it: one control, two parts. */
+.chats .rail-head select.kind {
+	max-width: 62px;
+	padding: 2px 4px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--faint);
+	cursor: pointer;
+	font: inherit;
+	font-size: 10px;
+}
+
+.chats .rail-head select.kind:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
 .titlebar .brand {
 	display: flex;
 	align-items: center;

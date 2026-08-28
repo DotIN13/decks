@@ -58,6 +58,29 @@ export interface DeckState {
 
 export type AgentState = "idle" | "thinking" | "streaming" | "tool" | "waiting";
 
+/**
+ * Which runtime is behind an agent.
+ *
+ * Fixed for an agent's life: a live session cannot change the process it is talking to,
+ * and pretending otherwise would mean silently starting a new conversation.
+ */
+export type AgentKind = "pi" | "claude";
+
+/**
+ * How much an agent asks before acting.
+ *
+ * Claude Code's four permission modes, under its own names. Pi has none — permissions
+ * there are an extension's business (DESIGN §6.8) — so `capabilities.modes` says which of
+ * these an agent actually offers and the composer shows the control only when it does.
+ */
+export type AgentMode = "manual" | "acceptEdits" | "plan" | "auto";
+
+/** What an agent's runtime can do, where runtimes differ. */
+export interface AgentCapabilities {
+	/** Empty for a runtime with no notion of asking first. */
+	modes: AgentMode[];
+}
+
 /** One row in the chat list: an agent, as a messaging app would draw it. */
 export interface AgentChat {
 	id: string;
@@ -72,6 +95,10 @@ export interface AgentChat {
 	lastAt?: number;
 	unread: number;
 	contextCount: number;
+	kind: AgentKind;
+	capabilities: AgentCapabilities;
+	/** Absent when the runtime has no modes. */
+	mode?: AgentMode;
 }
 
 export interface Identity {
@@ -208,12 +235,13 @@ export type ClientMessage =
 	| { type: "board.hide"; path: string }
 	| { type: "board.comment"; path: string; id: string; text: string }
 	| { type: "camera.set"; camera: Camera }
-	| { type: "agent.create"; parentId?: string }
+	| { type: "agent.create"; parentId?: string; kind?: AgentKind }
 	| { type: "agent.focus"; id: string }
 	| { type: "agent.prompt"; id: string; text: string }
 	| { type: "agent.abort"; id: string }
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
 	| { type: "agent.thinking"; id: string; thinking: ThinkingLevel }
+	| { type: "agent.setMode"; id: string; mode: AgentMode }
 	| { type: "stage.result"; result: StageResult }
 	| { type: "extension.ui.answer"; answer: ExtensionUiAnswer }
 	| { type: "rewind.preview"; id: string; entryId: string | null }
@@ -226,7 +254,13 @@ export type ServerMessage =
 	| { type: "deck.state"; deck: DeckState }
 	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean }
 	| { type: "board.patched"; path: string; rev: number; refused?: string }
-	| { type: "agents"; chats: AgentChat[]; focused?: string }
+	| {
+			type: "agents";
+			chats: AgentChat[];
+			focused?: string;
+			/** What `+` hands a new agent, from `DECKS_BACKEND`. */
+			defaultKind: AgentKind;
+	  }
 	| { type: "agent.state"; id: string; state: AgentState }
 	| { type: "agent.identity"; id: string; identity: Identity }
 	| { type: "agent.model"; id: string; model?: AgentModel }

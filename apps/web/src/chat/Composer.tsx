@@ -1,7 +1,15 @@
-import type { AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
+import type { AgentMode, AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+/** What each mode means to someone deciding, rather than the CLI's own word for it. */
+const LABEL: Record<AgentMode, string> = {
+	manual: "ask first",
+	acceptEdits: "edit freely",
+	plan: "plan only",
+	auto: "auto",
+};
 
 /**
  * The input bar, floating over the canvas.
@@ -16,6 +24,15 @@ export function Composer(props: {
 	model: AgentModel | undefined;
 	models: ModelOption[];
 	usage: AgentUsage | undefined;
+	/**
+	 * What the agent's runtime asks before acting, and the modes it has.
+	 *
+	 * Empty for Pi, where permissions are an extension's business (§6.8), so the control
+	 * is absent rather than present and inert.
+	 */
+	modes: AgentMode[];
+	mode: AgentMode | undefined;
+	onMode: (mode: AgentMode) => void;
 	onSend: (text: string) => void;
 	onAbort: () => void;
 	onModel: (provider: string, model: string) => void;
@@ -113,6 +130,17 @@ export function Composer(props: {
 						onChange={(event) => props.onThinking(event.currentTarget.value as ThinkingLevel)}
 					>
 						<For each={THINKING}>{(level) => <option value={level}>{level}</option>}</For>
+					</select>
+				</Show>
+
+				<Show when={props.modes.length > 0}>
+					<select
+						class="mode"
+						value={props.mode ?? "acceptEdits"}
+						title="How much this agent asks before acting"
+						onChange={(event) => props.onMode(event.currentTarget.value as AgentMode)}
+					>
+						<For each={props.modes}>{(mode) => <option value={mode}>{LABEL[mode]}</option>}</For>
 					</select>
 				</Show>
 

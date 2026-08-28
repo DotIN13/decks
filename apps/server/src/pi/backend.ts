@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import type { AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
 import {
 	createAgentSession,
 	DefaultResourceLoader,
@@ -8,8 +7,10 @@ import {
 	SessionManager,
 	type AgentSession,
 } from "@earendil-works/pi-coding-agent";
+import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
-import { deckContext, skillsDir } from "./context.ts";
+import { decksStage } from "./extension.ts";
+import { deckContext, skillsDir } from "../agents/context.ts";
 import { handlePiEvent } from "./events.ts";
 
 /**
@@ -23,7 +24,12 @@ import { handlePiEvent } from "./events.ts";
  * What is *not* here: the transcript (that is `agents/translator.ts`, shared), and
  * any permission gate (that is an extension's job — DESIGN §6.8).
  */
+/** Pi has no notion of asking first: that is an extension's business (§6.8). */
+const CAPABILITIES: AgentCapabilities = { modes: [] };
+
 export class PiBackend implements AgentBackend {
+	readonly capabilities = CAPABILITIES;
+
 	private session!: AgentSession;
 	private modelRuntime!: ModelRuntime;
 	private unsubscribe: (() => void) | undefined;
@@ -37,7 +43,7 @@ export class PiBackend implements AgentBackend {
 	}
 
 	private async init(): Promise<void> {
-		const { cwd, deck, translator, bridge, notice, extensions } = this.context;
+		const { cwd, deck, translator, bridge, notice, tool } = this.context;
 		const agentDir = getAgentDir();
 
 		const loader = new DefaultResourceLoader({
@@ -48,14 +54,16 @@ export class PiBackend implements AgentBackend {
 			additionalSkillPaths: [skillsDir()],
 			// Visible in the startup list on purpose: `stage_eval` is a tool the agent
 			// has, and where it came from should not be a mystery.
-			extensionFactories: extensions,
+			// Built here rather than found on disk: Pi hands a factory only `ExtensionAPI`,
+			// so an extension on disk could not reach the canvas (§6.3).
+			extensionFactories: [decksStage({ tool, agent: this.context.stageAgent })],
 			/*
 			 * The deck's description goes in as a context file, once. Pi owns it from
 			 * there — re-injecting it every turn would be a second, competing source of
 			 * truth about a deck the agent can simply look at.
 			 */
 			agentsFilesOverride: (base) => ({
-				agentsFiles: [...base.agentsFiles, { path: `${deck.path} (deck)`, content: deckContext(deck) }],
+				agentsFiles: [...base.agentsFiles, { path: `${deck.path} (deck)`, content: deckContext(deck, tool.name) }],
 			}),
 		});
 		await loader.reload();
@@ -185,7 +193,7 @@ export class PiBackend implements AgentBackend {
 	 * right way to be wrong. (The algorithm is Picone's, at
 	 * `picone/apps/server/src/pi/backend.ts:503`.)
 	 */
-	syncEntryIds(): void {
+	async syncEntryIds(): Promise<void> {
 		const entries = (this.session?.sessionManager.getBranch() ?? []).filter(
 			(entry): entry is typeof entry & { message: { role: string; content: unknown } } =>
 				entry.type === "message" && (entry as { message?: { role?: string } }).message?.role === "user",
@@ -258,7 +266,7 @@ export class PiBackend implements AgentBackend {
 	 * file, which would hijack this session — so it runs on a throwaway manager opened
 	 * on the same path and only the filename is kept. (Picone found this one first.)
 	 */
-	forkFrom(entryId: string): string | undefined {
+	async forkFrom(entryId: string): Promise<string | undefined> {
 		const entry = this.session.sessionManager.getEntry(entryId);
 		// Fork *before* the message, so the new chat opens with it unasked.
 		const upTo = entry?.parentId;

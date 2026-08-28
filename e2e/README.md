@@ -11,7 +11,19 @@ npx playwright install chromium
 npm run test:e2e                        # everything that does not need a model  (~35s)
 DECKS_E2E_AGENT=1 npm run test:e2e      # including the five that prompt an agent (~80s)
 npm run test:e2e -- keys gestures       # just these
+DECKS_BACKEND=claude npm run test:e2e   # the same checks, on the Claude runtime
 ```
+
+The checks are written against the UI and the protocol, not against a runtime, so the same
+suite is the parity test for both: `DECKS_BACKEND=claude DECKS_E2E_AGENT=1 npm run test:e2e`
+should pass exactly as `DECKS_E2E_AGENT=1 npm run test:e2e` does. Where one fails, it is
+either a real gap in that backend or a check that was secretly specific to the other — both
+worth knowing. A Claude run answers the runtime's permission questions automatically, since
+the fixture is a throwaway copy.
+
+The runner also refuses to run if something *else* is already serving port 4329. That is not
+hypothetical: a dev server left up meant a whole parity run silently went against a scratch
+deck and reported a result that meant nothing.
 
 The runner (`run.mjs`) copies `example/` to a throwaway directory under the system temp,
 starts the dev server on it, runs each file in `checks/`, and deletes it. Nothing here ever

@@ -7,6 +7,7 @@ import type { ServerMessage } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import { DeckAgent } from "./session.ts";
+import { SnapshotStore } from "./snapshot.ts";
 
 /**
  * The two sets and the invariant between them (DESIGN §2).
@@ -34,7 +35,7 @@ function agentOn(boards: string[]) {
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color: "#000" },
+		{ color: "#000", kind: "pi", snapshots: new SnapshotStore() },
 	);
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");

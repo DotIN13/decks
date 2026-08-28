@@ -1,4 +1,4 @@
-import type { AgentChat, Identity } from "@decks/protocol";
+import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import { For, Show } from "solid-js";
 
 /**
@@ -16,7 +16,10 @@ export function ChatList(props: {
 	focused: string | undefined;
 	unread: Record<string, number>;
 	onFocus: (id: string) => void;
-	onNew: () => void;
+	/** `kind` is the runtime, chosen here because it cannot change later. */
+	onNew: (kind?: AgentKind) => void;
+	/** What the server hands a new agent unless told otherwise. */
+	defaultKind: AgentKind;
 	pinned: boolean;
 	onPin: (pinned: boolean) => void;
 }) {
@@ -35,6 +38,30 @@ export function ChatList(props: {
 				<button type="button" title="Start another agent" onClick={() => props.onNew()}>
 					+
 				</button>
+				{/*
+				 * The runtime is picked before the agent exists because it cannot be
+				 * changed afterwards: a live session cannot swap the process behind it, and
+				 * pretending otherwise would silently start a new conversation.
+				 */}
+				<select
+					class="kind"
+					title="Which runtime a new agent starts on"
+					onChange={(event) => {
+						const kind = event.currentTarget.value as AgentKind;
+						props.onNew(kind);
+						// Left showing the default rather than the last choice: this is a
+						// button that happens to have options, not a setting.
+						event.currentTarget.value = props.defaultKind;
+					}}
+				>
+					<For each={["pi", "claude"] as AgentKind[]}>
+						{(kind) => (
+							<option value={kind} selected={kind === props.defaultKind}>
+								{kind}
+							</option>
+						)}
+					</For>
+				</select>
 				<button
 					class="pin"
 					type="button"
@@ -59,6 +86,9 @@ export function ChatList(props: {
 							<span class="who">
 								<span class="top">
 									<span class="name">{props.identities[chat.id]?.name ?? chat.name}</span>
+									<span class="runtime" data-kind={chat.kind} title={`Running on ${chat.kind}`}>
+										{chat.kind}
+									</span>
 									<span class="when">{chat.lastAt ? when(chat.lastAt) : ""}</span>
 								</span>
 								<span class="bottom">

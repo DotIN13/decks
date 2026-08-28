@@ -1,12 +1,23 @@
 import { randomUUID } from "node:crypto";
-import type { AgentChat, AgentState, Camera, Identity, ModelOption, ServerMessage, ThinkingLevel } from "@decks/protocol";
-import type { DelegateReport, DelegateSpec } from "../pi/extension.ts";
+import type {
+	AgentChat,
+	AgentKind,
+	AgentMode,
+	AgentState,
+	Camera,
+	Identity,
+	ModelOption,
+	ServerMessage,
+	ThinkingLevel,
+} from "@decks/protocol";
+import { ClaudeBackend } from "../claude/backend.ts";
 import type { Deck } from "../deck/loader.ts";
-import { decksStage } from "../pi/extension.ts";
-import { ExtensionUiBridge } from "../pi/extension-ui.ts";
 import { PiBackend } from "../pi/backend.ts";
 import type { StageService } from "../stage/service.ts";
-import type { AgentBackend } from "./backend.ts";
+import { createStageTool, type DelegateReport, type DelegateSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
+import type { AgentBackend, AgentBackendContext } from "./backend.ts";
+import { ExtensionUiBridge } from "./extension-ui.ts";
+import type { SnapshotStore } from "./snapshot.ts";
 import { Translator } from "./translator.ts";
 
 /**
@@ -48,8 +59,16 @@ export class DeckAgent {
 	 * being attached or shown, and taken out of play without leaving the context.
 	 */
 	private playing: string[] = [];
-	/** Set by the extension once it is running; the only route to the model. */
-	private tell: ((text: string) => void) | undefined;
+	/**
+	 * Things to tell the agent before its next turn.
+	 *
+	 * Pi could do this through `pi.sendMessage({ deliverAs: "nextTurn" })`, which is an
+	 * Extension API only Pi has. A queue here works for both runtimes and keeps the
+	 * behaviour the Pi version was chosen for: a board edit is not an interruption, so it
+	 * rides along with whatever the user says next rather than waking the agent up.
+	 */
+	private pending: string[] = [];
+	private tool: StageTool | undefined;
 
 	constructor(
 		private readonly deck: Deck,
@@ -63,11 +82,28 @@ export class DeckAgent {
 			recordRevision(path: string): string | undefined;
 			boardPathOf(file: string): string | undefined;
 		},
-		options: { name?: string; color: string; parentId?: string; resumeRef?: string },
+		options: {
+			name?: string;
+			color: string;
+			parentId?: string;
+			resumeRef?: string;
+			kind: AgentKind;
+			snapshots: SnapshotStore;
+			/** The agent this one was forked from, so its canvas can be inherited. */
+			forkedFrom?: { agentId: string; at: number };
+		},
 	) {
 		this.identity = { name: options.name ?? "Agent", color: options.color };
 		this.parentId = options.parentId;
 		this.resumeRef = options.resumeRef;
+		this.kind = options.kind;
+		this.snapshots = options.snapshots;
+		// A fork opens a conversation that already happened, so it should open with the
+		// canvas that conversation had rather than an empty context.
+		if (options.forkedFrom) {
+			this.snapshots.seed(options.forkedFrom.agentId, this.id, options.forkedFrom.at);
+			this.apply(this.snapshots.latest(this.id));
+		}
 
 		/*
 		 * The translator's frames pass through here so the agent can keep the one
@@ -93,7 +129,19 @@ export class DeckAgent {
 	}
 
 	readonly parentId: string | undefined;
+	readonly kind: AgentKind;
 	private readonly resumeRef: string | undefined;
+	private readonly snapshots: SnapshotStore;
+	private currentMode: AgentMode | undefined;
+
+	/** Put a remembered canvas back: what the agent held, showed and called itself. */
+	private apply(snapshot: StageSnapshot | undefined): void {
+		if (!snapshot) return;
+		if (Array.isArray(snapshot.context)) this.setContext(snapshot.context.filter((path) => typeof path === "string"));
+		if (Array.isArray(snapshot.inPlay)) this.setInPlay(snapshot.inPlay.filter((path) => typeof path === "string"));
+		if (snapshot.identity?.name) this.rename(snapshot.identity.name);
+		if (snapshot.identity?.avatar) this.setAvatar(snapshot.identity.avatar);
+	}
 
 	/** What the canvas extension is allowed to reach on this agent (§6.2). */
 	private stageHooks() {
@@ -163,40 +211,64 @@ export class DeckAgent {
 		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
 	}
 
-	/** Start the backend, once, and remember the reason if it will not start. */
+	/**
+	 * Start the backend, once, and remember the reason if it will not start.
+	 *
+	 * The only place that knows both runtimes exist. Which one an agent uses is fixed at
+	 * creation: a live session cannot change the process it is talking to, and pretending
+	 * otherwise would silently start a new conversation.
+	 */
 	start(): Promise<void> {
-		this.starting ??= PiBackend.create({
+		const tool = createStageTool({
+			stage: this.stage,
+			agent: this.stageHooks(),
+			port: this.host.port,
+			// Recorded after every run, so a rewind can put the canvas back to what it was
+			// at that point and a fork can inherit it (§6.2).
+			persist: (snapshot) => this.snapshots.record(this.id, snapshot),
+		});
+		this.tool = tool;
+
+		const context: AgentBackendContext = {
 			cwd: this.deck.path,
 			deck: this.deck,
 			translator: this.translator,
 			bridge: this.bridge,
 			notice: (level, text) => this.translator.notice(level, text),
+			turnEnded: () => {
+				if (!this.backend) return;
+				this.emit({
+					type: "agent.usage",
+					id: this.id,
+					usage: this.backend.usage() ?? { contextTokens: null, contextWindow: 0, cost: 0 },
+				});
+			},
+			tool,
+			stageAgent: this.stageHooks(),
 			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
-			extensions: [
-				decksStage({
-					stage: this.stage,
-					agent: this.stageHooks(),
-					port: this.host.port,
-					bind: (tell) => {
-						this.tell = tell;
-					},
-				}),
-			],
-		})
+		};
+
+		const create: Promise<AgentBackend> =
+			this.kind === "claude" ? ClaudeBackend.create(context) : PiBackend.create(context);
+		this.starting ??= create
 			.then((backend) => {
 				this.backend = backend;
+				this.currentMode = backend.mode?.();
 				const name = backend.name();
 				if (name) this.identity = { ...this.identity, name };
+				// A resumed session had a canvas; without this it opens holding nothing,
+				// which reads as the boards having been lost.
+				this.apply(this.snapshots.latest(this.id));
 				this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
 				this.emit({ type: "agent.model", id: this.id, model: backend.model() });
 				void this.publishModels();
 			})
 			.catch((error: unknown) => {
 				/*
-				 * The usual cause is no credentials, and the usual fix is `pi auth`. So
-				 * this is a notice in the agent's own column rather than a thrown error
-				 * that takes the deck down: the boards still work, and the reason is
-				 * where the person is looking.
+				 * The usual cause is credentials — `pi auth`, or a Claude Code that is not
+				 * installed. So this is a notice in the agent's own column rather than a
+				 * thrown error that takes the deck down: the boards still work, and the
+				 * reason is where the person is looking.
 				 */
 				this.failure = error instanceof Error ? error.message : String(error);
 				this.translator.notice("error", `This agent could not start: ${this.failure}`);
@@ -222,8 +294,15 @@ export class DeckAgent {
 		}
 		this.translator.user(text);
 		this.translator.setState("thinking");
+		/*
+		 * Anything the user did to a board since the last turn rides along with this
+		 * message rather than arriving as its own interruption. Prefixed, not appended:
+		 * the agent should know the board moved *before* it reads what to do about it.
+		 */
+		const nudges = this.pending.splice(0);
+		const sent = nudges.length > 0 ? `${nudges.join("\n")}\n\n${text}` : text;
 		try {
-			await this.backend.prompt(text);
+			await this.backend.prompt(sent);
 		} catch (error) {
 			this.translator.notice("error", (error as Error).message);
 			this.translator.setState("idle");
@@ -231,7 +310,7 @@ export class DeckAgent {
 		this.emit({ type: "agent.usage", id: this.id, usage: this.backend.usage() ?? { contextTokens: null, contextWindow: 0, cost: 0 } });
 		// The branch gained a point — the message just asked — so the transcript's user
 		// messages can be paired with it and get their rewind actions.
-		this.backend.syncEntryIds();
+		await this.backend.syncEntryIds();
 	}
 
 	/**
@@ -247,9 +326,11 @@ export class DeckAgent {
 	 * its business, which is also how it behaves in every other respect.
 	 */
 	userEdited(path: string, summary: string): void {
-		if (!this.tell) return;
 		if (this.held.length > 0 && !this.held.includes(path)) return;
-		this.tell(`The user edited ${path}: ${summary}. Read it again before assuming it says what you last wrote.`);
+		const line = `The user edited ${path}: ${summary}. Read it again before assuming it says what you last wrote.`;
+		// Deduplicated: editing the same board five times before saying anything should
+		// not spend five lines of the next turn saying so.
+		if (!this.pending.includes(line)) this.pending.push(line);
 	}
 
 	/**
@@ -293,13 +374,31 @@ export class DeckAgent {
 			this.translator.truncateToUserMessage(result.editorText);
 			this.emit({ type: "chat.history", agentId: this.id, items: this.translator.history() });
 			// The branch moved, so the pairing is stale for everything still shown.
-			this.backend?.syncEntryIds();
+			await this.backend?.syncEntryIds();
+			/*
+			 * And the canvas moves with the conversation, which is the whole point of
+			 * rewinding: the boards, the context and the name it was going by at that
+			 * moment. Resolved by time, the same way `App.boardsAt` picks a revision.
+			 */
+			const when = this.timeline().find((point) => point.id === entryId)?.at;
+			if (when) this.apply(this.snapshots.at(this.id, when));
 		}
 		return result;
 	}
 
-	forkFrom(entryId: string): string | undefined {
+	async forkFrom(entryId: string): Promise<string | undefined> {
 		return this.backend?.forkFrom(entryId);
+	}
+
+	/** When a message was sent, so a fork can inherit the canvas as it was then. */
+	entryTime(entryId: string): number | undefined {
+		return this.timeline().find((point) => point.id === entryId)?.at;
+	}
+
+	async setMode(mode: AgentMode): Promise<void> {
+		if (!this.backend?.setMode) return;
+		await this.backend.setMode(mode);
+		this.currentMode = mode;
 	}
 
 	get running(): boolean {
@@ -350,6 +449,9 @@ export class DeckAgent {
 			...(last ? { lastLine: last.text, lastAt: last.at } : {}),
 			unread: 0,
 			contextCount: this.held.length,
+			kind: this.kind,
+			capabilities: this.backend?.capabilities ?? { modes: [] },
+			...(this.currentMode ? { mode: this.currentMode } : {}),
 		};
 	}
 
@@ -360,6 +462,9 @@ export class DeckAgent {
 		reply({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
 		if (this.backend) reply({ type: "agent.model", id: this.id, model: this.backend.model() });
 		if (this.modelOptions.length > 0) reply({ type: "models", models: this.modelOptions });
+		// A question asked before this browser existed still needs answering, or the agent
+		// that asked it waits forever.
+		for (const prompt of this.bridge.outstanding()) reply({ type: "extension.ui.prompt", prompt });
 	}
 
 	answerDialog(...args: Parameters<ExtensionUiBridge["answer"]>): void {

@@ -1,4 +1,5 @@
 import type {
+	AgentKind,
 	AgentChat,
 	AgentModel,
 	AgentUsage,
@@ -63,6 +64,7 @@ export function App() {
 		inPlay: Record<string, string[]>;
 		/** Reload counters from `stage.reload`, per board. */
 		nonces: Record<string, number>;
+		defaultKind: AgentKind;
 		cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
 		/**
 		 * A point being previewed, and the revisions to render while it is.
@@ -82,6 +84,7 @@ export function App() {
 		contexts: {} as Record<string, string[]>,
 		inPlay: {} as Record<string, string[]>,
 		nonces: {} as Record<string, number>,
+		defaultKind: "pi" as AgentKind,
 	});
 
 	const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
@@ -230,7 +233,7 @@ export function App() {
 						setAtTurn(undefined);
 						setSeenAt(Date.now());
 					}
-					setState({ chats: message.chats, focused });
+					setState({ chats: message.chats, focused, defaultKind: message.defaultKind });
 					return;
 				}
 
@@ -329,10 +332,24 @@ export function App() {
 
 				case "extension.ui.prompt":
 					setState("dialog", message.prompt);
+					/*
+					 * The dialog is drawn inside the chat column, where the question belongs
+					 * to the conversation that raised it rather than covering the canvas it
+					 * is about. But the column is away by default, so a question nobody can
+					 * see is an agent stopped for a reason nobody can find — which is
+					 * exactly what a Claude agent asking about a shell command produced.
+					 * Held open until it is answered.
+					 */
+					panels.right.hold(true);
+					notice("info", "The agent is waiting on a question in the chat column.");
 					return;
 
 				case "extension.ui.prompt.closed":
-					setState("dialog", (current) => (current?.id === message.id ? undefined : current));
+					setState("dialog", (current) => {
+						if (current?.id !== message.id) return current;
+						panels.right.hold(false);
+						return undefined;
+					});
 					return;
 
 				case "notice":
@@ -549,7 +566,8 @@ export function App() {
 							setSeenAt(Date.now());
 							socket.send({ type: "agent.focus", id });
 						}}
-						onNew={() => socket.send({ type: "agent.create" })}
+						defaultKind={state.defaultKind}
+						onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 						pinned={panels.left.pinned()}
 						onPin={panels.left.setPinned}
 					/>
@@ -603,12 +621,14 @@ export function App() {
 						setState("preview", undefined);
 						socket.send({ type: "boards.restore", id: state.focused, entryId });
 					}}
-					onAnswer={(answer) =>
+					onAnswer={(answer) => {
 						socket.send({
 							type: "extension.ui.answer",
 							answer: { id: state.dialog!.id, ...answer } as never,
-						})
-					}
+						});
+						setState("dialog", undefined);
+						panels.right.hold(false);
+					}}
 				/>
 
 				<Composer
@@ -616,6 +636,9 @@ export function App() {
 					model={state.model}
 					models={state.models}
 					usage={state.usage}
+					modes={focusedChat()?.capabilities?.modes ?? []}
+					mode={focusedChat()?.mode}
+					onMode={(mode) => socket.send({ type: "agent.setMode", id: state.focused ?? "", mode })}
 					onSend={(text) => socket.send({ type: "agent.prompt", id: state.focused ?? "", text })}
 					onAbort={() => socket.send({ type: "agent.abort", id: state.focused ?? "" })}
 					onModel={(provider, model) =>

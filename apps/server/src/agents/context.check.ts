@@ -8,7 +8,7 @@ import { Deck } from "../deck/loader.ts";
 import { deckContext } from "./context.ts";
 
 const deck = Deck.open(process.argv[2] ?? "../../example/decks");
-const text = deckContext(deck);
+const text = deckContext(deck, "stage_eval");
 console.log(`length: ${text.length} chars, ~${Math.round(text.length / 4)} tokens`);
 for (const needle of ["delegate(", "stage.show", "board-debug", "data-id", "interface Stage", "{{"]) {
 	console.log(`${needle.padEnd(18)} ${text.includes(needle) ? "present" : "MISSING"}`);

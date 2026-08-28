@@ -6,8 +6,9 @@ import type { Deck } from "../deck/loader.ts";
 /**
  * What the agent is told about the deck, once, as a context file.
  *
- * Pi injects it with the rest of the AGENTS.md discovery and owns it from there —
- * it is not re-sent per turn and must not pretend to be live. So it holds the
+ * Each backend injects it once and owns it from there — Pi with the rest of its AGENTS.md
+ * discovery, Claude as an appended system prompt — so it is not re-sent per turn and must
+ * not pretend to be live. So it holds the
  * things that do not change under the agent's feet (what a board is, how to write
  * one, which roots exist) and points at `list`-style facts rather than embedding a
  * snapshot that will be wrong by the third turn.
@@ -39,12 +40,12 @@ export function skillsDir(): string {
 	return resolve(RUNTIME, "skills");
 }
 
-export function deckContext(deck: Deck): string {
+export function deckContext(deck: Deck, toolName: string): string {
 	const template = resolve(RUNTIME, "AGENTS.md.tmpl");
 	if (!existsSync(template)) {
 		// A missing template is a broken install, not a reason to refuse to run: the
 		// agent still has the skills and the deck.
-		return `You are working in a deck at ${deck.path}. Boards are HTML files under boards/.`;
+		return `You are working in a deck at ${deck.path}. Boards are HTML files under boards/. The canvas tool is \`${toolName}\`.`;
 	}
 
 	const boards = deck.boards;
@@ -73,5 +74,13 @@ export function deckContext(deck: Deck): string {
 		.replaceAll("{{DECK_NAME}}", deck.name)
 		.replaceAll("{{DECK_PATH}}", deck.path)
 		.replaceAll("{{BOARDS}}", boardList)
-		.replaceAll("{{ROOTS}}", rootList);
+		.replaceAll("{{ROOTS}}", rootList)
+		/*
+		 * Last, and deliberately: the tool has a different name on each runtime — Pi
+		 * registers `stage_eval`, while through the SDK's MCP server the model sees
+		 * `mcp__decks__stage_eval` — and `{{STAGE_API}}` above inlines `stage.d.ts`, which
+		 * names it too. Substituting after that insertion covers both places, so neither
+		 * runtime reads instructions naming a tool it does not have.
+		 */
+		.replaceAll("{{STAGE_TOOL}}", toolName);
 }

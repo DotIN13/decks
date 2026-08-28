@@ -2,13 +2,14 @@ import { randomUUID } from "node:crypto";
 import type { ExtensionUiAnswer, ExtensionUiPrompt } from "@decks/protocol";
 
 /**
- * Pi's dialog surface, implemented against a browser (DESIGN §6.8).
+ * The app's dialog surface, implemented against a browser (DESIGN §6.8).
  *
- * Decks has no permission layer of its own: permissions are a Pi extension's job,
- * and an extension asks by calling `ui.confirm`. So the app's obligation is to
- * make those calls arrive somewhere a human can see them — which is this, and it
- * is the whole reason `bindExtensions({ mode: "rpc" })` is used rather than
- * leaving extensions with no UI at all.
+ * Two callers, for the same reason. A Pi extension asks by calling `ui.confirm` — that is
+ * where permissions live under Pi — and Claude Code asks through `canUseTool`, because the
+ * CLI has no terminal of its own in a session like this. Either way the app's obligation is
+ * the same: make the question arrive somewhere a human can see it. It is the whole reason
+ * `bindExtensions({ mode: "rpc" })` is used rather than leaving extensions with no UI at
+ * all, and it is why a Claude agent can be asked to confirm a command instead of stalling.
  *
  * Two rules hold it together. Every pending question resolves exactly once, and a
  * question that is abandoned — timeout, abort, disposal — resolves with the
@@ -31,6 +32,8 @@ type PromptDraft = DistributiveOmit<ExtensionUiPrompt, "id">;
 interface Pending {
 	resolve: (value: unknown) => void;
 	fallback: unknown;
+	/** Kept so a browser that connects later can be shown the question. */
+	prompt: ExtensionUiPrompt;
 }
 
 interface DialogOptions {
@@ -66,7 +69,7 @@ export class ExtensionUiBridge {
 				resolve(value as T);
 			};
 
-			this.pending.set(id, { resolve: finish, fallback });
+			this.pending.set(id, { resolve: finish, fallback, prompt });
 
 			const timer = options?.timeout ? setTimeout(() => finish(fallback), options.timeout) : undefined;
 			options?.signal?.addEventListener("abort", () => finish(fallback), { once: true });
@@ -89,6 +92,17 @@ export class ExtensionUiBridge {
 	 *
 	 * Cast at the call site, deliberately — see the note at the top of this file.
 	 */
+	/**
+	 * Questions still waiting for an answer.
+	 *
+	 * Replayed to a browser that connects after one was asked. Without this, reloading the
+	 * page while an agent waits loses the only way to unblock it: the prompt was sent once,
+	 * to a client that no longer exists, and the agent waits forever.
+	 */
+	outstanding(): ExtensionUiPrompt[] {
+		return [...this.pending.values()].map((entry) => entry.prompt);
+	}
+
 	context() {
 		return {
 			select: (title: string, options: string[], opts?: DialogOptions) =>

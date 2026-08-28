@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { App } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { createHttpApp } from "./http.ts";
-import { installDir } from "./pi/context.ts";
+import { installDir } from "./agents/context.ts";
 import { Hub } from "./ws.ts";
 
 const config = loadConfig();

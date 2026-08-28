@@ -64,3 +64,19 @@ test("host and port stay separate knobs", () => {
 		assert.equal(config.port, 5000);
 	});
 });
+
+test("the default runtime comes from DECKS_BACKEND, and Pi is the fallback", () => {
+	withEnv({}, () => {
+		assert.equal(loadConfig([]).backend, "pi", "unset");
+	});
+	withEnv({ DECKS_BACKEND: "claude" }, () => {
+		assert.equal(loadConfig([]).backend, "claude");
+	});
+	withEnv({ DECKS_BACKEND: "pi" }, () => {
+		assert.equal(loadConfig([]).backend, "pi");
+	});
+	// A typo should not cost you the deck: it starts on Pi rather than refusing.
+	withEnv({ DECKS_BACKEND: "clade" }, () => {
+		assert.equal(loadConfig([]).backend, "pi");
+	});
+});
