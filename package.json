@@ -23,13 +23,14 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
-    "typescript": "^5.9.3",
     "d3": "^7.9.0",
     "esbuild": "^0.25.0",
     "katex": "^0.16.11",
     "marked": "^15.0.12",
     "mermaid": "^11.6.0",
-    "pdfjs-dist": "^5.4.149"
+    "pdfjs-dist": "^5.4.149",
+    "playwright": "^1.62.1",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=22.19.0"

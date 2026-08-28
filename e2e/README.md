@@ -1,5 +1,12 @@
 # Browser checks
 
+Chromium comes from Playwright, which is a devDependency — a fresh clone needs its browser
+binary once:
+
+```sh
+npx playwright install chromium
+```
+
 ```sh
 npm run test:e2e                        # everything that does not need a model  (~35s)
 DECKS_E2E_AGENT=1 npm run test:e2e      # including the five that prompt an agent (~80s)
