@@ -1,0 +1,206 @@
+/**
+ * What the browser checks share: where the deck is, when the app is ready, and how a
+ * result is reported.
+ *
+ * Two rules hold the suite together.
+ *
+ * **Nothing is hardcoded to one machine.** The deck under test comes from the running
+ * server (`/api/deck`), not from a path written into the script, so the same check runs
+ * against a throwaway fixture here and against whatever deck you point it at.
+ *
+ * **Wait for the app, never for the clock.** These scripts used to pad every page load
+ * with `waitForTimeout(2500)`. Two thirds of the suite's runtime was those pads, and they
+ * are the wrong tool twice over: 2.5s is ~2s longer than a board actually needs, and it is
+ * still too short on a loaded machine, so it was simultaneously slow and flaky. Boards
+ * publish `window.__boardReady`, which is the thing to wait on.
+ */
+import { readFileSync, writeFileSync } from "node:fs";
+import { chromium } from "playwright";
+
+export const WEB = process.env.DECKS_E2E_WEB ?? "http://127.0.0.1:4328";
+export const API = process.env.DECKS_E2E_API ?? "http://127.0.0.1:4329";
+
+let failures = 0;
+
+/** Report one check. A failure sets the exit code, so a runner can trust it. */
+export function say(name, ok, detail = "") {
+	console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
+	if (!ok) {
+		failures += 1;
+		process.exitCode = 1;
+	}
+}
+
+export function failed() {
+	return failures;
+}
+
+/** The deck the server actually has open, straight from the API. */
+export async function deckState() {
+	const response = await fetch(`${API}/api/deck`);
+	if (!response.ok) throw new Error(`GET /api/deck -> ${response.status}`);
+	return (await response.json()).deck;
+}
+
+/**
+ * Refuse to run against a deck that is not a fixture.
+ *
+ * This exists because it already happened: a stale server on the API port meant a run
+ * went against the deck being worked in, and boards were dragged ~100px before anyone
+ * noticed. A check that writes to boards has no business guessing.
+ */
+export async function preflight() {
+	const deck = await deckState();
+	const marker = process.env.DECKS_E2E_MARKER ?? "decks-e2e";
+	if (!deck.path.includes(marker)) {
+		console.error(`refusing to run: ${deck.path} does not look like a fixture (no "${marker}" in the path).`);
+		console.error("start the server on a fixture deck, or set DECKS_E2E_MARKER.");
+		process.exit(2);
+	}
+	return deck;
+}
+
+/** A board file inside the deck under test. */
+export async function boardPath(name) {
+	const deck = await deckState();
+	return `${deck.path}/boards/${name}`;
+}
+
+export function read(file) {
+	return readFileSync(file, "utf8");
+}
+
+export function write(file, text) {
+	writeFileSync(file, text);
+}
+
+/**
+ * Open the app.
+ *
+ * `localStorage` is cleared so a check never inherits the last one's camera, pins or
+ * panel state, and the scheme is set explicitly so screenshots are stable.
+ */
+export async function open({ width = 1500, height = 950, scheme = "dark", boards = true } = {}) {
+	const browser = await chromium.launch();
+	const page = await browser.newPage({ viewport: { width, height } });
+	const errors = [];
+	page.on("pageerror", (error) => {
+		// The init script touches localStorage before the app has a chance to; that throw
+		// is the harness's own noise, not the app's.
+		if (!/localStorage/.test(error.message)) errors.push(error.message);
+	});
+	await page.addInitScript((wanted) => {
+		try {
+			localStorage.clear();
+			localStorage.setItem("decks.scheme", wanted);
+		} catch {
+			/* private mode, or a page that has no storage access yet */
+		}
+	}, scheme);
+	await page.goto(`${WEB}/`, { waitUntil: "load" });
+	if (boards) await ready(page);
+	return { browser, page, errors };
+}
+
+/**
+ * Wait until every board on the canvas has finished mounting.
+ *
+ * `__boardReady` is set by `runtime/lib/board.js` once the document has rendered its
+ * components, which is the same signal the app itself waits for.
+ */
+export async function ready(page, { timeout = 30000 } = {}) {
+	await page.waitForSelector(".board-node iframe", { timeout });
+	await page.waitForFunction(
+		() => {
+			const frames = [...document.querySelectorAll(".board-node iframe")];
+			return frames.length > 0 && frames.every((frame) => frame.contentWindow?.__boardReady === true);
+		},
+		null,
+		{ timeout },
+	);
+}
+
+/** Wait for one board to finish mounting, by deck-relative path. */
+export async function boardReady(page, path, { timeout = 30000 } = {}) {
+	await page.waitForSelector(`.board-node[data-path="${path}"] iframe`, { timeout });
+	await page.waitForFunction(
+		(wanted) => {
+			const frame = document.querySelector(`.board-node[data-path="${wanted}"] iframe`);
+			return frame?.contentWindow?.__boardReady === true;
+		},
+		path,
+		{ timeout },
+	);
+}
+
+/**
+ * Wait for the file on disk to change, instead of sleeping and hoping.
+ *
+ * A write travels board → server → watcher → client, so "did the edit land" is a
+ * condition with no fixed duration.
+ */
+export async function changed(file, was, { timeout = 15000 } = {}) {
+	const deadline = Date.now() + timeout;
+	while (Date.now() < deadline) {
+		const now = read(file);
+		if (now !== was) return now;
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	throw new Error(`${file} did not change within ${timeout}ms`);
+}
+
+/** Wait for the focused agent to go idle — i.e. the turn finished. */
+export async function idle(page, { timeout = 600000 } = {}) {
+	await page.waitForFunction(() => document.querySelector(".composer .send")?.dataset.busy === "false", null, {
+		timeout,
+	});
+}
+
+/** Send one prompt and wait out the turn. Never swallow the timeout: a prompt typed into
+ *  a still-running turn truncates it, and the truncated reply then looks like a bug. */
+export async function ask(page, text, { timeout = 600000 } = {}) {
+	await page.locator(".composer textarea").fill(text);
+	await page.locator(".composer textarea").press("Enter");
+	await page.waitForFunction(() => document.querySelector(".composer .send")?.dataset.busy === "true", null, {
+		timeout: 15000,
+	});
+	await idle(page, { timeout });
+}
+
+/** Talk to the server the way the client does. */
+export async function socket() {
+	const ws = new WebSocket(`${API.replace("http", "ws")}/ws`);
+	const received = [];
+	await new Promise((resolve, reject) => {
+		ws.onopen = resolve;
+		ws.onerror = reject;
+	});
+	ws.onmessage = (event) => received.push(JSON.parse(String(event.data)));
+	return {
+		received,
+		send: (message) => ws.send(JSON.stringify(message)),
+		last: (type) => received.filter((m) => m.type === type).at(-1),
+		close: () => ws.close(),
+	};
+}
+
+/**
+ * Put the whole deck on the canvas.
+ *
+ * Most of these checks predate the context/in-play tiers and expect to see every board.
+ * Without this they inherit whatever the previous check narrowed the canvas to, and fail
+ * for reasons that have nothing to do with what they test.
+ */
+export async function resetStage() {
+	const deck = await deckState();
+	const link = await socket();
+	for (const board of deck.boards) link.send({ type: "board.play", path: board.path });
+	await new Promise((resolve) => setTimeout(resolve, 400));
+	link.close();
+	return deck.boards.map((board) => board.path);
+}
+
+/** A short settle for things with no observable signal — a CSS transition, mostly. */
+export function settle(page, ms = 350) {
+	return page.waitForTimeout(ms);
+}

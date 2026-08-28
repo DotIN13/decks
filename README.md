@@ -80,16 +80,20 @@ deck directory.
   in the conversation; click to rewind; restore the boards only if you ask.
 
 ## Development
-
 ```bash
+npm test            # 83 unit tests: config, path guards, patches, revisions, eval, camera
+npm run test:e2e    # 93 browser checks against a throwaway copy of example/ (~35s)
+npm run typecheck
 npm run vendor      # re-copy the board primitives into runtime/lib
 npm run sync:lib    # push runtime/lib into example/decks/lib after editing it
-npm test            # 69 tests: config, path guards, patches, revisions, eval, camera
-npm run typecheck
 ```
+
+The browser checks are in [e2e/](e2e/README.md). Five more of them drive a real agent turn
+and are skipped unless you ask: `DECKS_E2E_AGENT=1 npm run test:e2e`.
 
 `example/` is a committed data directory — `example/decks` is the demo deck and
 `example/shared` is the out-of-deck file its sources board embeds, which is the only thing
-in the repository that exercises the quarantine path end to end.
+in the repository that exercises the quarantine path end to end. Its `decks/lib` is
+generated rather than committed, so `npm run dev:example` syncs it first.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design and the reasoning behind it.

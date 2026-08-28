@@ -57,6 +57,25 @@ export function createHttpApp(app: App): Express {
 	);
 
 	/**
+	 * The board primitives, reachable from a document not served under `/board`.
+	 *
+	 * A revision preview is served at `/api/revision/<sha>`, so the `../lib/board.css` in
+	 * its own markup resolves to `/api/lib/board.css` — not to `/api/board/lib/board.css`,
+	 * where the deck's copy lives. Without this alias a previewed board arrived as unstyled
+	 * HTML with `board.js` missing, so the time machine looked like it worked (the text was
+	 * right) while showing nothing like the board it was previewing.
+	 */
+	api.get(
+		"/lib/*path",
+		asyncRoute(async (req, res) => {
+			const target = resolveInDeck(app.deck.path, join("lib", wildcard(req)));
+			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(wildcard(req), "not a file");
+			boardHeaders(res);
+			await sendFile(res, target);
+		}),
+	);
+
+	/**
 	 * A file from outside the deck — asked for by path, answered with a redirect.
 	 *
 	 * The redirect is the interesting part. A browser deletes `..` segments from a
