@@ -1,4 +1,4 @@
-import type { AgentChat, ChatItem, ExtensionUiPrompt, Identity } from "@decks/protocol";
+import type { AgentChat, ChatItem, Identity } from "@decks/protocol";
 import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
 import { ToolChip } from "./ToolChip.tsx";
 
@@ -15,7 +15,6 @@ export function Bubbles(props: {
 	agent: AgentChat | undefined;
 	identity: Identity | undefined;
 	items: ChatItem[];
-	dialog: ExtensionUiPrompt | undefined;
 	previewing?: boolean;
 	open: boolean;
 	pinned: boolean;
@@ -34,7 +33,6 @@ export function Bubbles(props: {
 	onRestore: (entryId: string) => void;
 	/** An item to bring into view — the turn the spine was clicked at. */
 	scrollTo?: { id: string; at: number };
-	onAnswer: (answer: { value?: string; confirmed?: boolean; cancelled?: true }) => void;
 }) {
 	let stream!: HTMLDivElement;
 	const [pinned, setPinned] = createSignal(true);
@@ -149,7 +147,6 @@ export function Bubbles(props: {
 					)}
 				</For>
 
-				<Show when={props.dialog}>{(prompt) => <Dialog prompt={prompt()} onAnswer={props.onAnswer} />}</Show>
 			</div>
 		</section>
 	);
@@ -269,84 +266,3 @@ function splitFences(text: string): Array<{ code: boolean; text: string }> {
 	return blocks.filter((block) => block.text.length > 0);
 }
 
-/**
- * An extension asking the user something (DESIGN §6.8).
- *
- * It is a card in the transcript rather than a modal, for the reason Picone found:
- * the question belongs to the conversation that raised it, and a modal over a canvas
- * hides the thing the question is about.
- */
-function Dialog(props: {
-	prompt: ExtensionUiPrompt;
-	onAnswer: (answer: { value?: string; confirmed?: boolean; cancelled?: true }) => void;
-}) {
-	const [text, setText] = createSignal(
-		props.prompt.method === "editor" ? (props.prompt.prefill ?? "") : "",
-	);
-
-	return (
-		<div class="dialog-card">
-			<Switch>
-				<Match when={props.prompt.method === "confirm"}>
-					<div class="q">{(props.prompt as { title: string }).title}</div>
-					<div class="m">{(props.prompt as { message: string }).message}</div>
-					<div class="actions">
-						<button type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
-							Allow
-						</button>
-						<button type="button" onClick={() => props.onAnswer({ confirmed: false })}>
-							Deny
-						</button>
-					</div>
-				</Match>
-
-				<Match when={props.prompt.method === "select"}>
-					<div class="q">{(props.prompt as { title: string }).title}</div>
-					<div class="actions">
-						<For each={(props.prompt as { options: string[] }).options}>
-							{(option, index) => (
-								<button type="button" data-primary={index() === 0} onClick={() => props.onAnswer({ value: option })}>
-									{option}
-								</button>
-							)}
-						</For>
-						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
-							Cancel
-						</button>
-					</div>
-				</Match>
-
-				<Match when={props.prompt.method === "input" || props.prompt.method === "editor"}>
-					<div class="q">{(props.prompt as { title: string }).title}</div>
-					<input
-						value={text()}
-						placeholder={(props.prompt as { placeholder?: string }).placeholder ?? ""}
-						onInput={(event) => setText(event.currentTarget.value)}
-						onKeyDown={(event) => {
-							if (event.key === "Enter") props.onAnswer({ value: text() });
-							if (event.key === "Escape") props.onAnswer({ cancelled: true });
-						}}
-					/>
-					<div class="actions">
-						<button type="button" data-primary="true" onClick={() => props.onAnswer({ value: text() })}>
-							Send
-						</button>
-						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
-							Cancel
-						</button>
-					</div>
-				</Match>
-
-				{/* `custom` is a terminal screen; there is nothing here that could be one. */}
-				<Match when={props.prompt.method === "custom"}>
-					<div class="q">An extension asked for a terminal screen, which this app has no equivalent of.</div>
-					<div class="actions">
-						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
-							Dismiss
-						</button>
-					</div>
-				</Match>
-			</Switch>
-		</div>
-	);
-}

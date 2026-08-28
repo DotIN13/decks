@@ -414,16 +414,12 @@ because writing boards is what the agent is *for* and a confirm per board write 
 the app unusable. `capabilities.modes` is empty for Pi, so the control is absent rather than
 present and inert.
 
-Two things this got wrong first, both about visibility rather than policy:
-
-The dialog is drawn inside the chat column, where the question belongs to the conversation
-that raised it rather than covering the canvas it is about. That was fine while nothing ever
-asked — Decks ships no Pi permission extension — and wrong the moment Claude did: the
-column is away by default, so the first thing a Claude agent asked stopped the turn for a
-reason nobody could see. A question now holds the column open until it is answered.
-
-And a pending question is replayed in the agent's greeting. It was sent once, to a browser
-that then reloaded, and the agent waited forever on an answer that could no longer arrive.
+Two things this got wrong first, both about visibility rather than policy. The question was
+drawn inside the chat column, which is away by default, so the first thing a Claude agent
+asked stopped the turn for a reason nobody could see; it is in the dock above the input bar
+now (§7). And a pending question is replayed in the agent's greeting — it was sent once, to
+a browser that then reloaded, and the agent waited forever on an answer that could no longer
+arrive.
 
 ## 7. The canvas
 
@@ -506,6 +502,27 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
   A thumbnail is therefore never stale and never a job that has to finish before you
   can see your deck. `<meta name="poster">` is the way out for a board that is
   expensive to mount.
+- **The dock: the last reply, a question if one is waiting, and the input bar.** One
+  bottom-centred stack rather than three separately-positioned things, so a question
+  appearing pushes the reply up instead of landing on it, and none of them has to know how
+  tall the others are. The first-run hint sits in it too, which is what removed the
+  hardcoded `bottom: 92px` that a taller stack collided with.
+
+  The reply floating there is the concession the app owes its own thesis. Boards are the
+  medium and the chat column is away by default — but *not needing* the transcript is not
+  the same as never seeing a word of it, and a reply that names the board it just wrote is
+  worth a glance. So the last one flows above the input bar as it arrives, following the
+  text while it streams and returning to the top once it stops, because a finished message
+  left scrolled to its end opens mid-sentence and reads as if the start had been lost.
+  Clicking it opens the column; the × waves it away, keyed by message id so dismissing one
+  reply does not silence the next.
+
+  A question goes here too, and only here (§6.8). It used to be a card in the transcript on
+  the argument that a question belongs to the conversation that raised it. That argument was
+  right and the placement was still wrong: the column is away, so the first thing a Claude
+  agent asked stopped the turn for a reason nobody could see. Above the input bar it is
+  where the user's hands already are, and it is not a modal — the canvas the question is
+  about stays visible.
 - **A list that scrolls has to be allowed to shrink.** `.side` is the box with a height
   (`top`/`bottom`), and the rail inside it is `flex: 1` — but a flex child defaults to
   `min-height: auto`, which refuses to go below its content. So a rail of fourteen boards

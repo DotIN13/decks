@@ -23,6 +23,8 @@ import { Stage } from "./canvas/Stage.tsx";
 import { runStageCall } from "./canvas/stage-ops.ts";
 import { Bubbles } from "./chat/Bubbles.tsx";
 import { ChatList } from "./chat/ChatList.tsx";
+import { Dialog } from "./chat/Dialog.tsx";
+import { Latest } from "./chat/Latest.tsx";
 import { Composer } from "./chat/Composer.tsx";
 import { TurnBar, turnsOf } from "./chat/TurnBar.tsx";
 import { boxOf, fit, INTERACT_ZOOM } from "./lib/camera.ts";
@@ -104,6 +106,13 @@ export function App() {
 	 * comparison is skipped entirely rather than being kept up to date — see `turns`.
 	 */
 	const [seenAt, setSeenAt] = createSignal(Date.now());
+	/**
+	 * A reply the user has waved away, by id.
+	 *
+	 * Kept per message rather than as a flag, so dismissing this one does not also hide the
+	 * next one — the point of the glimpse is that the *newest* thing is there.
+	 */
+	const [dismissed, setDismissed] = createSignal<string | undefined>(undefined);
 	/**
 	 * Unread counts, kept here rather than on the server.
 	 *
@@ -332,24 +341,12 @@ export function App() {
 
 				case "extension.ui.prompt":
 					setState("dialog", message.prompt);
-					/*
-					 * The dialog is drawn inside the chat column, where the question belongs
-					 * to the conversation that raised it rather than covering the canvas it
-					 * is about. But the column is away by default, so a question nobody can
-					 * see is an agent stopped for a reason nobody can find — which is
-					 * exactly what a Claude agent asking about a shell command produced.
-					 * Held open until it is answered.
-					 */
-					panels.right.hold(true);
-					notice("info", "The agent is waiting on a question in the chat column.");
+					// Drawn in the dock, above the input bar, so it needs nothing dragged
+					// open to be seen.
 					return;
 
 				case "extension.ui.prompt.closed":
-					setState("dialog", (current) => {
-						if (current?.id !== message.id) return current;
-						panels.right.hold(false);
-						return undefined;
-					});
+					setState("dialog", (current) => (current?.id === message.id ? undefined : current));
 					return;
 
 				case "notice":
@@ -591,7 +588,6 @@ export function App() {
 					agent={focusedChat()}
 					identity={state.focused ? state.identities[state.focused] : undefined}
 					items={transcript()}
-					dialog={state.dialog}
 					previewing={Boolean(state.preview)}
 					open={panels.right.open()}
 					pinned={panels.right.pinned()}
@@ -621,17 +617,47 @@ export function App() {
 						setState("preview", undefined);
 						socket.send({ type: "boards.restore", id: state.focused, entryId });
 					}}
-					onAnswer={(answer) => {
-						socket.send({
-							type: "extension.ui.answer",
-							answer: { id: state.dialog!.id, ...answer } as never,
-						});
-						setState("dialog", undefined);
-						panels.right.hold(false);
-					}}
 				/>
 
-				<Composer
+				{/*
+				 * The dock: what the agent last said, a question if one is waiting, and the
+				 * input bar. One bottom-centred stack, because these three are the same
+				 * conversation and they should not be in three different places.
+				 */}
+				<div class="dock">
+					{/* First in the dock, so it sits above whatever else is in it rather than
+					    at a hardcoded offset that a taller stack would collide with. */}
+					<Show when={state.boards.length > 0}>
+						<div class="hint">two-finger scroll to pan · pinch or ⌘-wheel to zoom · space-drag anywhere · 0 fit all · 1 fit board</div>
+					</Show>
+
+					<Show when={state.dialog}>
+						{(prompt) => (
+							<Dialog
+								prompt={prompt()}
+								onAnswer={(answer) => {
+									socket.send({
+										type: "extension.ui.answer",
+										answer: { id: prompt().id, ...answer } as never,
+									});
+									setState("dialog", undefined);
+								}}
+							/>
+						)}
+					</Show>
+
+					<Latest
+						items={transcript()}
+						columnOpen={panels.right.open()}
+						onOpen={() => {
+							panels.right.hold(true);
+							setSeenAt(Date.now());
+						}}
+						dismissed={dismissed()}
+						onDismiss={(id) => setDismissed(id)}
+					/>
+
+					<Composer
 					busy={busy()}
 					model={state.model}
 					models={state.models}
@@ -644,10 +670,11 @@ export function App() {
 					onModel={(provider, model) =>
 						socket.send({ type: "agent.setModel", id: state.focused ?? "", provider, model })
 					}
-					onThinking={(thinking: ThinkingLevel) =>
-						socket.send({ type: "agent.thinking", id: state.focused ?? "", thinking })
-					}
-				/>
+						onThinking={(thinking: ThinkingLevel) =>
+							socket.send({ type: "agent.thinking", id: state.focused ?? "", thinking })
+						}
+					/>
+				</div>
 
 				<div class="panel-float zoombar">
 					<button type="button" title="Fit all (0)" onClick={() => fitAll(state.boards, setCamera)}>
@@ -677,9 +704,6 @@ export function App() {
 					<For each={state.notices}>{(item) => <div class="notice" data-level={item.level}>{item.text}</div>}</For>
 				</div>
 
-				<Show when={state.boards.length > 0}>
-					<div class="hint">two-finger scroll to pan · pinch or ⌘-wheel to zoom · space-drag anywhere · 0 fit all · 1 fit board</div>
-				</Show>
 			</div>
 		</div>
 	);

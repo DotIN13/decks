@@ -34,6 +34,7 @@ const CHECKS = [
 	{ file: "deleted-board.mjs", needsAgent: false },
 	{ file: "rail-scroll.mjs", needsAgent: false },
 	{ file: "model-picker.mjs", needsAgent: false },
+	{ file: "dock.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "turn-bar.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },

@@ -468,16 +468,13 @@ body {
 	border-color: color-mix(in srgb, var(--color-danger) 50%, var(--line));
 }
 
-/* Above the composer, not behind it — and it is a first-run affordance, so it
-   fades out rather than living there forever. */
+/* Sits in the dock above the input bar, so it never has to guess how tall the stack is —
+   and it is a first-run affordance, so it fades out rather than living there forever. */
 .hint {
-	position: absolute;
-	bottom: 92px;
-	left: 50%;
 	animation: hint-fade 12s ease-in forwards;
 	color: var(--faint);
 	font-size: 11px;
-	transform: translateX(-50%);
+	text-align: center;
 	pointer-events: none;
 }
 
@@ -883,12 +880,103 @@ body {
  * bar centred at 50% sits a hundred pixels off and slides under the transcript.
  * Half the difference between those two is the offset.
  */
-.composer {
+/*
+ * The dock: the last reply, a question if one is waiting, and the input bar.
+ *
+ * One bottom-centred stack rather than three separately-positioned things, so a question
+ * appearing pushes the reply up instead of landing on top of it, and none of them has to
+ * know the height of the others. The offset from centre leaves the chat column room.
+ */
+.dock {
+	position: absolute;
 	bottom: 12px;
 	left: calc(50% - 90px);
+	display: flex;
 	width: min(720px, calc(100% - 650px));
-	padding: 8px;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 8px;
 	transform: translateX(-50%);
+	/* The stack is a frame around its children; only the children take clicks. */
+	pointer-events: none;
+}
+
+.dock > * {
+	pointer-events: auto;
+}
+
+.composer {
+	position: static;
+	width: auto;
+	padding: 8px;
+	transform: none;
+}
+
+/* The newest reply, flowing above the input bar. */
+.latest {
+	display: flex;
+	max-height: 5.5em;
+	align-items: flex-start;
+	padding: 7px 6px 7px 10px;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--panel);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(12px);
+	gap: 4px;
+}
+
+.latest .body {
+	max-height: 4.1em;
+	flex: 1;
+	padding: 0;
+	overflow-y: auto;
+	border: 0;
+	background: none;
+	color: var(--muted);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	line-height: 1.35;
+	text-align: left;
+	/* Model output, so newlines are meaningful and long words must not push the bar wide. */
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+	scrollbar-width: none;
+}
+
+.latest .body::-webkit-scrollbar {
+	display: none;
+}
+
+.latest .body:hover {
+	color: var(--fg);
+}
+
+/* While it is still arriving, the text is the live thing on screen. */
+.latest[data-streaming="true"] .body {
+	color: var(--fg);
+}
+
+.latest .dismiss {
+	padding: 0 4px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	font: inherit;
+	line-height: 1.2;
+}
+
+.latest .dismiss:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+/* Asked here rather than in the transcript, so it cannot be missed (DESIGN §6.8). */
+.dock .dialog-card {
+	align-self: stretch;
 }
 
 .composer textarea {
