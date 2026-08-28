@@ -2,9 +2,15 @@ import { createServer } from "node:http";
 import { App } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { createHttpApp } from "./http.ts";
+import { installDir } from "./pi/context.ts";
 import { Hub } from "./ws.ts";
 
 const config = loadConfig();
+
+// The agent's tools inherit this process's environment, and a script the agent
+// writes runs with the deck as its cwd — from where Decks' own `node_modules` is
+// not reachable. `??=` so an explicit value still wins.
+process.env.DECKS_APP_DIR ??= installDir();
 
 let app: App;
 try {

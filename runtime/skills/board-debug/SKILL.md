@@ -9,25 +9,39 @@ Boards are HTML, and the app serves them at a URL, so the way to see one is to o
 it in a browser you drive. There is no screenshot tool to call: you have `bash`, and
 that is enough.
 
-## Once, if Playwright is not installed
+## Once, if the browser is not installed
+
+Playwright ships with Decks; its browser does not, because it is ~100MB. Install it
+from Decks' own directory, which is where its `node_modules` lives:
 
 ```bash
-npm ls playwright 2>/dev/null | grep -q playwright || npx --yes playwright install chromium
+cd "$DECKS_APP_DIR" && npx playwright install chromium
 ```
 
-The download is ~100MB and only happens once per machine. If there is no network,
-work from the source instead — you wrote it, so you know what it says.
+Once per machine, cached under `~/.cache/ms-playwright` and shared by every deck. If
+there is no network, work from the source instead — you wrote it, so you know what it
+says. If a launch later fails naming a missing shared library, the host is short of
+the system packages Chromium links against; that needs root, so say so rather than
+trying — `npx playwright install-deps chromium`, as root, is the fix.
 
 ## The loop
 
-The app serves boards at `http://127.0.0.1:4329/api/board/<deck-relative path>`
-(port 4329 unless `DECKS_PORT` says otherwise). Wait for `window.__boardReady`: the
-board sets it after fonts, markdown, diagrams and PDFs have all finished, and a
-screenshot taken before it is a picture of a board still loading.
+The app serves boards at `/api/board/<deck-relative path>`. Wait for
+`window.__boardReady`: the board sets it after fonts, markdown, diagrams and PDFs have
+all finished, and a screenshot taken before it is a picture of a board still loading.
+
+Two things in the preamble are worth keeping when you adapt this. `createRequire`
+anchored at `DECKS_APP_DIR` is what lets the script resolve `playwright` from wherever
+you wrote it — your cwd is the deck, and a deck is not inside the install, so a bare
+`import "playwright"` fails. And the origin comes from the environment, because the
+host and port are configurable.
 
 ```bash
 cat > /tmp/shot.mjs <<'JS'
-import { chromium } from "playwright";
+import { createRequire } from "node:module";
+// The deck is not inside Decks' install, so resolve from the install instead.
+const base = process.env.DECKS_APP_DIR ? `${process.env.DECKS_APP_DIR}/` : import.meta.url;
+const { chromium } = createRequire(base)("playwright");
 const [url, out] = process.argv.slice(2);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
@@ -42,7 +56,8 @@ await page.screenshot({ path: out, fullPage: true });
 console.log(notes.join("\n") || "(clean)");
 await browser.close();
 JS
-node /tmp/shot.mjs "http://127.0.0.1:4329/api/board/boards/plan.html" /tmp/board.png
+HOST=${DECKS_HOST:-127.0.0.1}; [ "$HOST" = "0.0.0.0" ] && HOST=127.0.0.1
+node /tmp/shot.mjs "http://$HOST:${DECKS_PORT:-4329}/api/board/boards/plan.html" /tmp/board.png
 ```
 
 Then `read /tmp/board.png`. That is the picture, in your context, at full size.

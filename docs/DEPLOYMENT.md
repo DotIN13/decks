@@ -111,6 +111,33 @@ sudo -u decks -H mkdir -p /home/decks/data
   platform packages for every architecture are recorded in it.
 - `npm test` is a fair smoke test of a fresh deployment, and it needs no credentials.
 
+### The browser
+
+The `board-debug` skill drives Chromium to screenshot a board, read its console and
+measure its elements. That is a capability of the agent rather than a test tool, so a
+deployment that skips it ships an agent that cannot see its own work. Two halves, and they
+need different privileges:
+
+```bash
+# System libraries Chromium links against. Needs root, so not the service user.
+sudo npx --yes playwright@<version> install-deps chromium
+
+# The browser itself, as the service user, into its own cache.
+sudo -u decks -H bash -c "cd /home/decks/app && npx playwright install chromium"
+```
+
+The version should match the `playwright` devDependency, so the dependency list matches the
+browser. The binary lands in `~/.cache/ms-playwright` — inside the service user's home, so
+`ReadWritePaths=` already covers it, and no unit change is needed.
+
+`npm ci` will *not* fetch the browser for you: npm >= 11 skips Playwright's postinstall
+along with everything else, which is why this is a separate step rather than a side effect.
+
+Chromium runs happily under the §7 sandbox — verified with the directives applied, writing
+into the private `/tmp`. Notably it also survives `kernel.apparmor_restrict_unprivileged_userns=1`
+(the default on Ubuntu 24.04, which breaks many headless-Chrome setups), because Playwright
+installs Chrome Headless Shell rather than full Chromium. No sysctl needs relaxing.
+
 ## 6. Credentials
 
 Decks reads the same `~/.pi/agent/` the Pi CLI uses. **Copying `auth.json` alone is usually
@@ -161,7 +188,8 @@ Environment=HOME=/home/decks
 Environment=NODE_ENV=production
 Environment=DECKS_DATA_DIR=/home/decks/data
 # Loopback only. The private-network proxy (§8) is the sole way in, so the
-# plain-HTTP port is unreachable from every interface on the host.
+# plain-HTTP port is unreachable from every interface on the host. It is also
+# the address the board-debug skill's browser connects back to.
 Environment=DECKS_HOST=127.0.0.1
 Environment=DECKS_PORT=4329
 

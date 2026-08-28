@@ -22,6 +22,19 @@ export function runtimeDir(): string {
 	return RUNTIME;
 }
 
+/**
+ * Where Decks itself is installed — the directory `node_modules` sits in.
+ *
+ * The agent runs with the *deck* as its cwd, and a deck is not inside the install
+ * (`~/.decks/decks` by default). So a helper script the agent writes cannot resolve
+ * `playwright` — or anything else Decks depends on — by walking up from where it
+ * runs, and the `board-debug` skill needs to. Exported as `DECKS_APP_DIR` so a
+ * script can anchor `createRequire` here instead of guessing.
+ */
+export function installDir(): string {
+	return resolve(RUNTIME, "..");
+}
+
 export function skillsDir(): string {
 	return resolve(RUNTIME, "skills");
 }
