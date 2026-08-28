@@ -96,4 +96,7 @@ and are skipped unless you ask: `DECKS_E2E_AGENT=1 npm run test:e2e`.
 in the repository that exercises the quarantine path end to end. Its `decks/lib` is
 generated rather than committed, so `npm run dev:example` syncs it first.
 
-See [docs/DESIGN.md](docs/DESIGN.md) for the design and the reasoning behind it.
+See [docs/DESIGN.md](docs/DESIGN.md) for the design and the reasoning behind it, and
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for running a deck on a machine other than the one
+you are sitting at — which starts by noting that Decks has no authentication, and that this
+governs everything else about such a setup.
