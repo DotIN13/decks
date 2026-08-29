@@ -5,6 +5,7 @@ import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
 import StickyNote from "lucide-solid/icons/sticky-note";
 import Type from "lucide-solid/icons/type";
+import Undo2 from "lucide-solid/icons/undo-2";
 import { For, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import type { Tool } from "./Editor.ts";
@@ -31,7 +32,13 @@ const TOOLS: Array<{ tool: Tool; icon: LucideIcon; label: string; key: string }>
 	{ tool: "arrow", icon: MoveRight, label: "Connect two components", key: "A" },
 ];
 
-export function Palette(props: { tool: Tool; visible: boolean; onPick: (tool: Tool) => void }) {
+export function Palette(props: {
+	tool: Tool;
+	visible: boolean;
+	onPick: (tool: Tool) => void;
+	/** Undo the last edit to the selected board — ⌘Z, for a device with no ⌘. */
+	onUndo?: () => void;
+}) {
 	return (
 		<Show when={props.visible}>
 			<aside class="panel-float palette">
@@ -48,6 +55,30 @@ export function Palette(props: { tool: Tool; visible: boolean; onPick: (tool: To
 						</button>
 					)}
 				</For>
+
+				{/*
+					Undo, where a keyboard is not available.
+
+					It is not a tool, and it sits here anyway: the palette is the editing
+					chrome, and on a touchscreen it is the *only* editing chrome — it appears
+					under exactly the condition that makes an edit possible (`INTERACT_ZOOM`),
+					which is also when losing one matters. ⌘Z is the desktop's answer and
+					nothing about it changes; this is hidden by `index.css` where the pointer
+					can hover, rather than being a second button for everyone to wonder about.
+				*/}
+				<Show when={props.onUndo}>
+					{(undo) => (
+						<button
+							class="undo touch-only"
+							type="button"
+							title="Undo the last edit to this board"
+							aria-label="Undo the last edit to this board"
+							onClick={() => undo()()}
+						>
+							<Icon of={Undo2} size={17} />
+						</button>
+					)}
+				</Show>
 			</aside>
 		</Show>
 	);

@@ -17,6 +17,13 @@
  * rather than assumed: `e2e/checks/file-drop.mjs` drops at a known point and reads
  * the `left`/`top` the server wrote.
  *
+ * **A paste is a drop with no cursor, and it lands here too.** Pasting an image was
+ * the obvious sibling of dropping one and was listed as a known edge; it costs almost
+ * nothing now that the plumbing exists, and on a phone it is not a nicety — a
+ * screenshot is the commonest file anybody has and there is no desktop to drag it from.
+ * The only thing a paste lacks is a point, so it uses the last place the board was
+ * touched, falling back to the middle of it.
+ *
  * **The app's own document must refuse the browser's default.** The default action
  * for a dropped file is to *navigate to it*, which would unload the SPA — socket,
  * camera, transcript and all — to show the file. So the parent swallows file drags
@@ -133,6 +140,31 @@ export function attachFrameDrop(frame: HTMLIFrameElement, host: FileDropHost): (
 		host.drop(files, { x: event.clientX + win.scrollX, y: event.clientY + win.scrollY });
 	};
 
+	/**
+	 * Where this board was last touched, for a paste to land on.
+	 *
+	 * A drop carries `clientX/clientY` and a paste carries nothing at all, so the point
+	 * has to come from somewhere — and the last tap is both the most recent thing the
+	 * user pointed at and, on a touchscreen, how they selected the board in the first
+	 * place. The middle of the board is the fallback, which is what a paste onto a board
+	 * nobody has touched yet means.
+	 */
+	let lastTouched: { x: number; y: number } | undefined;
+	const onPointerDown = (event: PointerEvent) => {
+		lastTouched = { x: event.clientX + win.scrollX, y: event.clientY + win.scrollY };
+	};
+
+	const onPaste = (event: ClipboardEvent) => {
+		// Somebody typing over a run of text owns their own clipboard.
+		if ((event.target as HTMLElement | null)?.isContentEditable) return;
+		const files = Array.from(event.clipboardData?.files ?? []);
+		if (files.length === 0 || !host.enabled()) return;
+		event.preventDefault();
+		host.drop(files, lastTouched ?? { x: win.innerWidth / 2, y: win.innerHeight / 2 });
+	};
+
+	doc.addEventListener("pointerdown", onPointerDown, { passive: true, capture: true });
+	doc.addEventListener("paste", onPaste);
 	doc.addEventListener("dragenter", onDragEnter);
 	doc.addEventListener("dragover", onDragOver);
 	doc.addEventListener("dragleave", onDragLeave);
@@ -143,6 +175,8 @@ export function attachFrameDrop(frame: HTMLIFrameElement, host: FileDropHost): (
 	win.addEventListener("blur", hide);
 
 	return () => {
+		doc.removeEventListener("pointerdown", onPointerDown, true);
+		doc.removeEventListener("paste", onPaste);
 		doc.removeEventListener("dragenter", onDragEnter);
 		doc.removeEventListener("dragover", onDragOver);
 		doc.removeEventListener("dragleave", onDragLeave);

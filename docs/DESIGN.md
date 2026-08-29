@@ -799,6 +799,142 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
   would mean either sorting the rail by position, which moves items around as boards are
   dragged, or letting the rail dictate layout.
 
+### 7.1 A hand instead of a cursor
+
+A phone is not the primary way to use a coding agent's canvas and never will be. But an
+infinite canvas you cannot zoom with two fingers is not usable *at all*, and that is what
+this was: a touchscreen sends no wheel events, so two-finger scroll, pinch, ⌘-wheel and
+space-drag were all simply absent, and a one-finger drag over a live board moved nothing
+whatsoever — the canvas was frozen wherever a board sat under your finger, which up close
+is the whole screen. The aim here is "genuinely usable for looking at a deck, reading a
+board, talking to the agent and light editing", and everything below serves that.
+
+- **Two fingers are always the canvas, and there is one pool of fingers for the whole
+  stage.** `canvas/touch.ts` reduces a set of fingers to a pan or to one step of a pinch,
+  and `pinchCamera` (`lib/camera.ts`) turns that step into a camera: the world point under
+  the old midpoint goes under the new one at the new zoom, which is `zoomAbout` generalised
+  to an anchor that moves. Steps are measured against the previous event rather than
+  against the start of the gesture, so a spread past `MAX_ZOOM` is clamped once instead of
+  being accumulated into a gesture the camera has to unwind before it answers again.
+
+  The pool is what makes it correct, and it is not an optimisation. A pinch does not
+  respect document boundaries: one finger can be inside a board's iframe and the other on
+  bare canvas, or on a *different* board's title bar. Each of those is two event streams
+  and one gesture, and a tracker per stream turns a pinch into two independent one-finger
+  pans — which was the original bug in miniature. So the stage owns the fingers and the
+  other documents report into it (`frame-gestures.ts`, `BoardFrame`), which is the same
+  division of labour §7 already describes for the wheel: the frame knows where the pointer
+  is, the stage owns the camera.
+
+- **One finger moves the canvas unless it landed on something that says otherwise.** That
+  is the whole rule, and the exceptions are: a board's title bar moves the board, a
+  scrollable box inside a board scrolls, and a component *already selected* drags. A
+  desktop distinguishes dragging from panning by which button is down and whether space is
+  held; a finger has neither, and the two gestures it must not confuse are "read this
+  board" and "rearrange it". So **selecting is a tap and only a tap**, and dragging is
+  available on the second gesture, when the thing under the finger is the thing the outline
+  is already around. Nothing is ever picked up by accident, a pan across a board never
+  changes the selection, and the price is one extra tap before a move.
+
+  A finger that belongs to something else is *claimed* rather than withheld
+  (`claimTouch`): it still counts towards the pool, so a second finger forms a pinch with
+  the right positions, and two fingers clear every claim — pinching out of a board you had
+  begun to drag is a change of mind, not an ambiguity, and the board goes back where it
+  was.
+
+- **Coordinates, three traps deep.** In-frame pixels are board pixels (§6.5), and for
+  touch that is not enough. (1) A pan measured in them cancels half of itself, because the
+  pan drags the board along under the finger: 60 screen pixels of finger moved the camera
+  30. So the frame converts to stage pixels before reporting, and the stage does *not*
+  convert again — subtracting the stage's offset twice is a horizontal pinch that walks the
+  canvas 90px vertically. (2) The conversion has to use the frame's geometry as of the
+  coordinates the browser is reporting, which during a gesture is *before* the camera
+  change that gesture just caused; sampling it after each step and using it for the next is
+  the pairing that holds a pinch's midpoint still. (3) A tap cannot be told from a pan by
+  distance travelled at all, for the same reason as (1) — a 60px pan measures 8px in the
+  board's frame — so `frame-gestures.ts` says so out loud and `Editor.ts` listens
+  (`pan-signal.ts`). Screen coordinates would have answered it, and `screenX` is 0 for a
+  synthesised touch, so the browser checks could not have seen the bug either.
+
+- **`touch-action: none` on everything inside a board frame.** On the root alone it was not
+  enough: the browser still claimed a finger that landed inside an embed's own scroller,
+  scrolled it natively and sent a `pointercancel` three events in, so the gesture was half
+  native and half ours and the canvas took the rest. The universal selector is blunt and it
+  is exactly the intent — a board on the stage does not scroll itself, and the scrolling
+  that looks native is done by hand for the reason the wheel path documents. The style is
+  marked `data-decks-ui` like every other affordance, so a board opened on its own scrolls
+  the way any page does.
+
+- **Tap to select, tap again to retype.** A double-tap is the browser's zoom gesture and a
+  poor thing to ask of a finger over a 14px line of text, so the second tap on a component
+  that is already selected starts the edit — the idiom every phone teaches, and it falls
+  out of the selection rule rather than being a second mechanism. Focusing that
+  `contenteditable` raises the keyboard over the bottom half of the screen, which is
+  usually where the words are: `keepVisible` pans the camera the smallest distance that
+  puts the component in the room left over, and `lib/viewport.ts` publishes how much of the
+  window the keyboard is covering as `--keyboard`, which the bottom chrome adds to its own
+  offset. There is no CSS unit for that inset, and `dvh` describes the wrong thing.
+
+- **Where a cursor cannot hover, the chrome is toggled.** The two floating panels arrive
+  when the cursor approaches an edge, and a finger cannot approach anything: on a phone
+  both panels were unreachable, and worse, a pan that began at the left edge summoned the
+  rail over the canvas mid-gesture. So under `(hover: none)` proximity is off entirely and
+  two buttons in the title bar open the panels, which honours §7's thesis better than an
+  edge that opens by accident. Below 760px they are sheets across the screen and **mutually
+  exclusive** — 200px of rail and 380px of transcript on a 390px phone is two panels and no
+  canvas — and both stop above the dock, so the composer is never what a panel covers.
+  Everything else that was revealed by hovering (a board's `×`, a message's `rewind · fork ·
+  restore boards`) is simply there.
+
+- **Three media queries, asked about three different things.** `(hover: none)` is about
+  *discoverability*, `(pointer: coarse)` is about *size* — nothing moves, the targets grow
+  to 40–44px — and a width breakpoint is used only for what is genuinely about width: the
+  dock's clearance, and the panels becoming sheets. Nothing is a separate mobile layout;
+  every rule is an override, and above the thresholds the stylesheet is the app it was.
+
+- **The inspector becomes a bottom sheet, and it is the one place the desktop's reasoning
+  does not survive the smaller screen.** Top right is right on a laptop (§6.5). Across the
+  top of a phone it is in the way of the tap that opened it: you tap a component, a panel
+  appears where your finger just was, and the next tap lands on a class switch nobody meant
+  to touch — which happened, and wrote a revision each time. At the bottom the hand is
+  already there and the component stays visible above it. It takes the zoom controls' place
+  while it is up, because zooming has fingers to do it with.
+
+- **The dock was zero pixels wide.** `width: min(720px, calc(100% - 650px))` is the room
+  left beside two panels, and on a 390px screen that is a negative number: the composer was
+  18px across with the placeholder broken one letter per line, and the send button was
+  unreachable. This is the whole class of bug that only a real device viewport finds, which
+  is why `e2e/checks/mobile.mjs` runs in a device context with `hasTouch` and dispatches
+  real touches through CDP — a mouse would have hidden every one of these.
+
+- **Getting a file in without a desktop to drag from.** The upload route and the insert
+  path already existed (§6.9); what was missing was somewhere to tap. The file picker grew
+  a "from this device" button over a hidden `<input type="file">`, which on a phone offers
+  the camera and the photo library as well as the file browser — three routes for one
+  control, none of them ours to build — and a pasted file lands on the selected board, at
+  the last point that board was touched. The picker is dismissed by a press that *begins*
+  on its backdrop rather than by a click on it: the tap that opened the picker produces a
+  `click` afterwards at the same coordinates, and the backdrop is by then underneath it, so
+  a click closed the picker the instant it opened.
+
+- **Every keyboard-only action has a touch route.** The palette's `V S C T E A` are its
+  buttons, ⌘D / `[` / `]` / ⌫ are the inspector's row, `0` is the zoombar's `fit`, `1` is a
+  rail item or a double-tap on a title bar, and Escape is the inspector's `×`. ⌘Z had
+  nothing, so undo sits in the palette on a touch device — not a tool, and there anyway,
+  because the palette is the only editing chrome a finger has and it appears under exactly
+  the condition that makes an edit possible.
+
+**What mobile deliberately does not cover.** Editing on a phone happens zoomed in, because
+`INTERACT_ZOOM` is unchanged: a whole 1600px board fitted to a 390px screen is 24%, where a
+frame takes no pointer events and text is unreadable anyway. There is no drag-and-drop of
+files (the platform has none), no marquee, no multi-select, no keyboard shortcuts, and no
+hover preview on the timeline — the spine is hidden below 760px and rewinding is reached
+through the transcript, so the tap is the whole gesture rather than a preview and then a
+commitment. A pinch whose fingers land inside a *nested* sandboxed embed (an HTML embed is
+an iframe two levels in) is not forwarded, exactly as a wheel over one is not. And the
+agent-facing side is untouched: `stage_eval`, the time machine and the permission dialogs
+are the same code on any device.
+
 ## 8. What is built
 
 All six milestones, each verified against the real app rather than only unit-tested.
@@ -812,6 +948,11 @@ All six milestones, each verified against the real app rather than only unit-tes
 | M5 | Many chats: registry, chat list, `stage.delegate` with board handoff. |
 | M6 | Time machine: rewind / fork / restore on each message, preview from revisions. |
 
+Since then the canvas also works under a finger — pinch and two-finger pan pooled across
+the board frames, tap to select and tap again to retype, the panels toggled and the chrome
+sized for a fingertip (§7.1) — with the scope of that stated at the end of the same
+section.
+
 ### Known edges
 
 - The rail and the chat list share the left panel, and it has no collapsed-but-visible
@@ -822,9 +963,10 @@ All six milestones, each verified against the real app rather than only unit-tes
 - No session resume, so a restart is a fresh conversation and older sessions are reachable
   only through the Pi CLI. Drawing one would mean rebuilding a transcript from a session
   file — `agents/translator.ts` builds it from live events only.
-- Panel reveal is hover-driven, and so is the reveal of a message's `rewind · fork ·
-  restore boards` row. Both want rethinking for touch, where there is no cursor to approach
-  an edge with and no hover to preview from.
+- Panel reveal is hover-driven, and where there is no hover the two panels are toggled
+  from the title bar instead and everything hover-revealed is simply shown (§7.1). What
+  touch loses with it is the *preview*: `rewind` previews the boards on hover, so on a
+  phone the tap is the whole gesture.
 - An arrow is selected by clicking its line, which `board.js` widens to an invisible
   10px band because 2px is not a target. That band is on top of whatever it crosses, so
   a connector routed over a card takes a click meant for the card; zooming in makes both
@@ -845,7 +987,10 @@ All six milestones, each verified against the real app rather than only unit-tes
 - A dropped file only lands on a board, and only while the board is live: on empty canvas
   it is refused with a notice, and there is no drop onto a rail thumbnail (they are
   `pointer-events: none`, so such a drop is the stage's and gets the same notice). Pasting
-  an image from the clipboard is the obvious sibling and is not built.
+  is built now and needs a rule where a drop has a point: a pasted file lands on the
+  *selected* board, at the last place that board was touched, and on no board at all if
+  none is selected. A file added through the picker's "from this device" is one file, not a
+  batch — a batch is the drop path's shape, which lays several out in a row.
 - A rewind truncates our transcript by matching the rewound message's text, which is
   what `navigateTree` hands back. Two identical messages in one conversation would cut
   at the first.

@@ -1,4 +1,5 @@
 import type { BoardPatch, ComponentKind, Rect } from "@decks/protocol";
+import { cameraMovedSince } from "./pan-signal.ts";
 
 /**
  * The user's half of a board: select, drag, resize, retype, delete, insert, connect.
@@ -47,11 +48,26 @@ export interface EditorHost {
 	onSelectionChange(listener: () => void): () => void;
 	patch(path: string, patches: BoardPatch[]): void;
 	undo(path: string): void;
-	/** Ask for a file to embed; resolves to a board-relative or absolute path. */
-	pickFile(): Promise<string | undefined>;
+	/**
+	 * Ask for a file to embed; resolves to a board-relative or absolute path.
+	 *
+	 * The board is passed so the picker can also *add* a file — a photo from the phone
+	 * that is not in the deck yet — and hand back a path written the way that board
+	 * addresses its siblings.
+	 */
+	pickFile(board?: string): Promise<string | undefined>;
 	notice(text: string): void;
 	/** Whether editing is on at all — below a certain zoom the frame is inert. */
 	enabled(): boolean;
+	/**
+	 * Bring a box on this board into the part of the screen a person can see.
+	 *
+	 * For the on-screen keyboard, which is the only thing that has ever needed it: a
+	 * text run is tapped, the keyboard takes half the screen, and the words being typed
+	 * are behind it. The box is in board coordinates — this file has no camera maths in
+	 * it (§6.5) and is not about to start — so the caller converts and moves the camera.
+	 */
+	reveal(path: string, box: { x: number; y: number; w: number; h: number }): void;
 }
 
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
@@ -84,6 +100,16 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
 		}
 		.decks-editing { outline: 2px solid var(--b-accent, #3b5cf6); outline-offset: 2px; }
+
+		/*
+		 * A 12px square is a mouse target. Asked of the input device rather than of the
+		 * screen — a tablet with a trackpad keeps the small one — and only the box grows:
+		 * the handle is positioned by its centre (a negative margin of half its size), so
+		 * the corner it marks stays exactly where the component's corner is.
+		 */
+		@media (pointer: coarse) {
+			.decks-handle { width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 6px; }
+		}
 
 		/*
 		 * A connector covers the whole board and takes no clicks (board.css), which is
@@ -164,7 +190,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	const insert = async (kind: ComponentKind, at: { x: number; y: number }) => {
 		let embed: string | undefined;
 		if (kind === "embed" || kind === "image") {
-			embed = await host.pickFile();
+			embed = await host.pickFile(path);
 			if (!embed) {
 				host.resetTool();
 				return;
@@ -239,10 +265,94 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		| { kind: "resize"; element: HTMLElement; from: { x: number; y: number }; origin: Rect }
 		| undefined;
 
+	/**
+	 * A finger that has landed and not yet said what it meant.
+	 *
+	 * **The touch rule, in one place: a finger moves the canvas unless it is on
+	 * something already selected.** A desktop tells a drag from a pan apart by which
+	 * button is down and whether space is held; a finger has neither, and the two
+	 * gestures it has to distinguish are the two you least want confused — "read this
+	 * board" and "rearrange it". So selecting is a tap and only a tap, and dragging is
+	 * available on the second gesture, when the thing under the finger is the thing the
+	 * outline is already around. Nothing is ever picked up by accident, a pan across a
+	 * board never changes the selection, and the price is one extra tap before a move.
+	 *
+	 * Two things disqualify a tap, and it takes both. **Distance** catches a gesture that
+	 * moved something — dragging the selected component, scrolling an embed — and is
+	 * measured in board pixels like everything else here. It cannot catch a *pan*: a pan
+	 * drags the board along under the finger, so in the board's own coordinates the finger
+	 * has barely moved (60 screen pixels of pan measured 8). That one is answered by the
+	 * other side saying so — `pan-signal.ts`, and its comment is where the reasoning is.
+	 */
+	let tap:
+		| {
+				at: { x: number; y: number };
+				/** When it landed, so a camera move during the gesture can be noticed. */
+				since: number;
+				/** The same point in board coordinates, which is where an insert would land. */
+				on: { x: number; y: number };
+				moved: number;
+				target: EventTarget | null;
+				onSelection: boolean;
+		  }
+		| undefined;
+	const TAP_SLOP = 10;
+
+	/**
+	 * Put a gesture back and forget it, without patching anything.
+	 *
+	 * For the second finger: a pinch that began as a one-finger drag would otherwise
+	 * leave the component wherever the first finger had dragged it to, as an edit nobody
+	 * asked for on the way to zooming out.
+	 */
+	const abortGesture = () => {
+		const active = gesture;
+		gesture = undefined;
+		if (!active) return;
+		active.element.style.left = `${active.origin.left}px`;
+		active.element.style.top = `${active.origin.top}px`;
+		if (active.kind === "resize") {
+			active.element.style.width = `${active.origin.width}px`;
+			active.element.style.height = `${active.origin.height}px`;
+		}
+		placeHandle();
+		redraw();
+	};
+
 	on("pointerdown", (event) => {
 		if (!host.enabled()) return;
 
+		if (event.pointerType === "touch" && !event.isPrimary) {
+			// A second finger is the canvas asking for a pinch (`frame-gestures.ts`), and
+			// it beats whatever one finger had started.
+			abortGesture();
+			tap = undefined;
+			return;
+		}
+
 		const tool = host.tool();
+		const touched = event.pointerType === "touch";
+		/*
+		 * With a tool armed, a finger still has to be allowed to pan.
+		 *
+		 * A mouse can hold a tool and travel without pressing anything; a finger cannot,
+		 * so inserting on the way down meant arming "sticky" and then being unable to
+		 * move the canvas to the place you wanted the sticky. The tool is therefore
+		 * resolved when the finger lifts, by the same slop that separates a tap from a
+		 * pan — see `endTap`.
+		 */
+		if (touched && tool !== "select") {
+			tap = {
+				at: { x: event.clientX, y: event.clientY },
+				since: performance.now(),
+				on: { x: event.clientX + win.scrollX, y: event.clientY + win.scrollY },
+				moved: 0,
+				target: event.target,
+				onSelection: false,
+			};
+			return;
+		}
+
 		if (tool === "arrow") {
 			event.preventDefault();
 			connect(event.target);
@@ -268,6 +378,30 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		}
 
 		const element = componentAt(event.target);
+
+		if (touched) {
+			const selection = host.selected();
+			const onSelection = Boolean(element && selection?.path === path && selection.id === element.dataset.id);
+			tap = {
+				at: { x: event.clientX, y: event.clientY },
+				since: performance.now(),
+				on: { x: event.clientX + win.scrollX, y: event.clientY + win.scrollY },
+				moved: 0,
+				target: event.target,
+				onSelection,
+			};
+			/*
+			 * Deliberately no `preventDefault` and no gesture unless this component is
+			 * already the selection: the default is how the frame's own touch handler
+			 * learns the canvas may pan (it reads `defaultPrevented` on this event), and
+			 * what makes a drag across a board a pan rather than a rearrangement.
+			 */
+			if (!element || !onSelection || element.isContentEditable || editing) return;
+			event.preventDefault();
+			gesture = { kind: "move", element, from: { x: event.clientX, y: event.clientY }, origin: rectOf(element) };
+			return;
+		}
+
 		if (!element) {
 			host.select(undefined);
 			return;
@@ -287,6 +421,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	});
 
 	on("pointermove", (event) => {
+		if (tap) tap.moved = Math.max(tap.moved, Math.hypot(event.clientX - tap.at.x, event.clientY - tap.at.y));
 		if (!gesture) return;
 		const dx = event.clientX - gesture.from.x;
 		const dy = event.clientY - gesture.from.y;
@@ -316,8 +451,61 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			host.patch(path, [{ op: "update", id, style: { width: box.width, height: box.height } }]);
 		}
 	};
-	on("pointerup", endGesture);
-	on("pointercancel", endGesture);
+	/**
+	 * What a tap turned out to mean, once the finger is off the glass.
+	 *
+	 * Resolved here rather than on the way down because a finger that landed on a
+	 * component may still have been a pan, and the only difference between the two is
+	 * how far it travelled. In order: a tap on nothing clears the selection, a tap on a
+	 * component selects it, and a tap on the component *already* selected starts typing
+	 * over the run of text under the finger — which is the touch half of §6.5's
+	 * double-click, and the only gesture here that is not also a mouse gesture.
+	 */
+	const endTap = (event: PointerEvent) => {
+		const finished = tap;
+		tap = undefined;
+		if (!finished || event.pointerType !== "touch" || finished.moved > TAP_SLOP) return;
+		// The gesture turned out to be the canvas moving, which is not a tap on anything.
+		if (cameraMovedSince(doc, finished.since)) return;
+		if (!host.enabled()) return;
+
+		// An armed tool has been waiting for the finger to lift, so that the same finger
+		// could have panned instead.
+		const tool = host.tool();
+		if (tool === "arrow") {
+			// `from` deliberately survives: the arrow tool is two taps, and the first one
+			// is the thing the second one needs.
+			connect(finished.target);
+			return;
+		}
+		if (tool !== "select") {
+			from = undefined;
+			void insert(tool, finished.on);
+			return;
+		}
+
+		const element = componentAt(finished.target);
+		if (!element) {
+			if (!editing) host.select(undefined);
+			return;
+		}
+		if (!finished.onSelection) {
+			host.select({ path, id: element.dataset.id! });
+			return;
+		}
+		if (editing?.element.contains(finished.target as Node)) return;
+		beginEditing(finished.target, false);
+	};
+
+	on("pointerup", (event) => {
+		endGesture();
+		endTap(event);
+	});
+	on("pointercancel", (event) => {
+		tap = undefined;
+		endGesture();
+		void event;
+	});
 
 	// --- typing -------------------------------------------------------------------------
 
@@ -384,21 +572,32 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		element.dataset.mermaid !== undefined ||
 		element.tagName.toLowerCase() === "svg";
 
-	on("dblclick", (event) => {
-		if (!host.enabled()) return;
-		const run = runAt(event.target);
-		if (!run) return;
+	/**
+	 * Start typing over a run of text, however the user asked for it.
+	 *
+	 * Two gestures reach here. A double-click, which is what a mouse has always done —
+	 * and a second tap on a component that is already selected, because a double-tap is
+	 * not available on a touchscreen: it is the browser's zoom gesture, and even with
+	 * that suppressed it is a poor thing to ask of a finger over a 14px line of text.
+	 * "Tap to select, tap again to edit" is the idiom every phone already teaches, and
+	 * it falls out of the selection rule below rather than being a second mechanism.
+	 */
+	const beginEditing = (target: EventTarget | null, mouse: boolean): boolean => {
+		if (!host.enabled()) return false;
+		const run = runAt(target);
+		if (!run) return false;
 		if (rendered(run.component)) {
 			host.notice("The board draws that from a file — change what it points at, or ask the agent.");
-			return;
+			return false;
 		}
 		// A run of plain text, and nothing else: the server refuses to flatten markup,
 		// so offering to edit a paragraph with a link in it would be offering a refusal.
 		if (run.element.children.length > 0) {
-			host.notice("Double-click the line you want to retype.");
-			return;
+			// Only worth saying to somebody who aimed: a tap on a card's padding is not a
+			// failed attempt to retype it, it is the tap that selected the card.
+			if (mouse) host.notice("Double-click the line you want to retype.");
+			return false;
 		}
-		event.preventDefault();
 		editing = { element: run.element, id: run.component.dataset.id!, at: run.at, before: run.element.textContent ?? "" };
 		run.element.contentEditable = "true";
 		run.element.focus();
@@ -406,6 +605,19 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		range.selectNodeContents(run.element);
 		win.getSelection()?.removeAllRanges();
 		win.getSelection()?.addRange(range);
+		/*
+		 * Focusing a `contenteditable` on a phone raises the keyboard over the bottom
+		 * half of the screen, which is where the thing being typed usually is. The box
+		 * asked for is the component rather than the run, so the heading of a card stays
+		 * visible with the card it belongs to.
+		 */
+		const box = rectOf(run.component);
+		host.reveal(path, { x: box.left, y: box.top, w: box.width ?? 0, h: box.height ?? 0 });
+		return true;
+	};
+
+	on("dblclick", (event) => {
+		if (beginEditing(event.target, true)) event.preventDefault();
 	});
 
 	on("focusout", () => stopEditing(true));

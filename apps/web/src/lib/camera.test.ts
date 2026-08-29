@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clampZoom, fit, MAX_ZOOM, MIN_ZOOM, pan, toScreen, toWorld, zoomAbout } from "./camera.ts";
+import { breathingRoom, clampZoom, fit, keepVisible, MAX_ZOOM, MIN_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
 
 const view = { width: 1200, height: 800 };
 
@@ -76,4 +76,57 @@ test("fitting several boards frames all of them", () => {
 test("fitting nothing, or into no viewport, is harmless", () => {
 	assert.deepEqual(fit([], view), { x: 0, y: 0, zoom: 1 });
 	assert.deepEqual(fit([{ x: 0, y: 0, w: 100, h: 100 }], { width: 0, height: 0 }), { x: 0, y: 0, zoom: 1 });
+});
+
+test("a phone gets less breathing room than a laptop, because it has less to give", () => {
+	// A laptop and a tablet are unchanged: the cap is what they were always given.
+	assert.equal(breathingRoom({ width: 1500, height: 950 }), 96);
+	assert.equal(breathingRoom({ width: 810, height: 1080 }), 96);
+	// A phone, where a constant 96 left the deck in the middle quarter of the screen.
+	assert.ok(breathingRoom({ width: 393, height: 659 }) < 60);
+	const wide = fit([{ x: 0, y: 0, w: 1600, h: 1000 }], { width: 393, height: 659 });
+	const narrow = fit([{ x: 0, y: 0, w: 1600, h: 1000 }], { width: 393, height: 659 }, 96);
+	assert.ok(wide.zoom > narrow.zoom, `${wide.zoom} should be closer than ${narrow.zoom}`);
+});
+
+test("a pinch is a pan and a zoom in one expression", () => {
+	const camera = { x: 0, y: 0, zoom: 1 };
+	// Same distance, both fingers moved right: a pan and nothing else.
+	const panned = pinchCamera(camera, view, [{ x: 400, y: 400 }, { x: 600, y: 400 }], [{ x: 450, y: 400 }, { x: 650, y: 400 }]);
+	assert.equal(panned.zoom, 1);
+	assert.ok(Math.abs(panned.x + 50) < 1e-9);
+
+	// Same midpoint, twice the distance: a zoom and nothing else.
+	const zoomed = pinchCamera(camera, view, [{ x: 500, y: 400 }, { x: 700, y: 400 }], [{ x: 400, y: 400 }, { x: 800, y: 400 }]);
+	assert.equal(zoomed.zoom, 2);
+	assert.deepEqual(toWorld(zoomed, view, { x: 600, y: 400 }), toWorld(camera, view, { x: 600, y: 400 }));
+});
+
+test("two fingers landing on the same spot do not divide by zero", () => {
+	const camera = { x: 10, y: 20, zoom: 1.5 };
+	const step = pinchCamera(camera, view, [{ x: 300, y: 300 }, { x: 300, y: 300 }], [{ x: 310, y: 300 }, { x: 300, y: 300 }]);
+	assert.equal(step.zoom, 1.5);
+	assert.ok(Number.isFinite(step.x) && Number.isFinite(step.y));
+});
+
+test("keeping a box visible moves as little as it can, and not at all when it already is", () => {
+	const camera = { x: 0, y: 0, zoom: 1 };
+	const middle = { x: -100, y: -100, w: 200, h: 200 };
+	assert.equal(keepVisible(camera, view, middle), camera);
+
+	// The on-screen keyboard: 300px of the bottom is gone, and the box is under it.
+	const low = { x: -100, y: 200, w: 200, h: 100 };
+	const moved = keepVisible(camera, view, low, { bottom: 300 });
+	const at = toScreen(moved, view, { x: low.x, y: low.y + low.h });
+	assert.ok(at.y <= view.height - 300 + 1e-6, `the bottom of the box is at ${at.y}`);
+	// Vertically only: nothing was wrong horizontally.
+	assert.equal(moved.x, camera.x);
+});
+
+test("a box too big for the room left is aligned to its top left, where reading starts", () => {
+	const camera = { x: 0, y: 0, zoom: 1 };
+	const tall = { x: -100, y: 100, w: 200, h: 900 };
+	const moved = keepVisible(camera, view, tall, { top: 40, bottom: 300 });
+	const top = toScreen(moved, view, { x: tall.x, y: tall.y });
+	assert.ok(Math.abs(top.y - 40) < 1e-6, `the top of the box is at ${top.y}`);
 });

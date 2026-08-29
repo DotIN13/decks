@@ -15,7 +15,7 @@
  * publish `window.__boardReady`, which is the thing to wait on.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { chromium } from "playwright";
+import { chromium, devices } from "playwright";
 
 export const WEB = process.env.DECKS_E2E_WEB ?? "http://127.0.0.1:4328";
 export const API = process.env.DECKS_E2E_API ?? "http://127.0.0.1:4329";
@@ -79,10 +79,19 @@ export function write(file, text) {
  *
  * `localStorage` is cleared so a check never inherits the last one's camera, pins or
  * panel state, and the scheme is set explicitly so screenshots are stable.
+ *
+ * `device` names one of Playwright's device descriptors ("iPhone 15", "Pixel 7", "iPad
+ * (gen 7)") and is what `mobile.mjs` needs: a viewport alone still has a mouse, and a
+ * mouse hides exactly the bugs a touchscreen has. A device context brings `hasTouch`,
+ * the pixel ratio and the user agent with it, and the returned `context` is what a check
+ * attaches a CDP session to in order to dispatch real touches.
  */
-export async function open({ width = 1500, height = 950, scheme = "dark", boards = true } = {}) {
+export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device } = {}) {
 	const browser = await chromium.launch();
-	const page = await browser.newPage({ viewport: { width, height } });
+	const descriptor = device ? devices[device] : undefined;
+	if (device && !descriptor) throw new Error(`playwright has no device called "${device}"`);
+	const context = descriptor ? await browser.newContext({ ...descriptor }) : await browser.newContext({ viewport: { width, height } });
+	const page = await context.newPage();
 	const errors = [];
 	page.on("pageerror", (error) => {
 		// The init script touches localStorage before the app has a chance to; that throw
@@ -121,7 +130,7 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	page.on("close", () => clearInterval(watch));
 
 	if (boards) await ready(page);
-	return { browser, page, errors, asked, stopAnswering: () => clearInterval(watch) };
+	return { browser, page, context, errors, asked, stopAnswering: () => clearInterval(watch) };
 }
 
 /**

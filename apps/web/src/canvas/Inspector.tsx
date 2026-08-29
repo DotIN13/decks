@@ -4,6 +4,7 @@ import Copy from "lucide-solid/icons/copy";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import SendToBack from "lucide-solid/icons/send-to-back";
 import Trash2 from "lucide-solid/icons/trash-2";
+import X from "lucide-solid/icons/x";
 import { createMemo, For, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { isPdf, type Edit, type Shape } from "./inspect.ts";
@@ -36,6 +37,8 @@ export function Inspector(props: {
 	onEdit: (edit: Edit) => void;
 	/** The file picker, for what an embed points at. Resolves to a board-relative path. */
 	pickFile: () => Promise<string | undefined>;
+	/** Let the selection go, which is what Escape does and a finger cannot. */
+	onClose: () => void;
 }) {
 	/** The tones `board.css` styles for this component, or none for the rest. */
 	const tones = createMemo(() => {
@@ -101,6 +104,20 @@ export function Inspector(props: {
 						    have written, or the tag when there is no class we know. */}
 						<span class="what">{shape().box ?? (shape().family === "link" ? "connector" : shape().family === "embed" ? "embed" : shape().classes[0] ?? shape().tag)}</span>
 						{field("name", () => shape().id, (next) => next && props.onEdit({ kind: "rename", to: next }))}
+						{/*
+							Escape clears the selection and a tap on bare canvas does too — but on a
+							narrow screen this panel is a sheet across the top, and "tap the canvas"
+							is advice about a part of the screen the sheet is covering.
+						*/}
+						<button
+							class="close"
+							type="button"
+							title="Done (Esc)"
+							aria-label="Close the inspector"
+							onClick={() => props.onClose()}
+						>
+							<Icon of={X} size={15} />
+						</button>
 					</header>
 
 					<Show when={shape().family === "box"}>
@@ -112,7 +129,10 @@ export function Inspector(props: {
 										data-box={box}
 										data-active={shape().box === box}
 										title={`Make this a ${box}`}
-										onClick={() => props.onEdit({ kind: "box", to: box as BoxClass })}
+										/* The one it already is does nothing at all: an edit is a revision, and
+										   the revision list is the undo history (§6.7). A finger lands on the
+										   wrong button often enough that "no-op" had to mean no write. */
+										onClick={() => shape().box !== box && props.onEdit({ kind: "box", to: box as BoxClass })}
 									>
 										{box}
 									</button>
@@ -132,7 +152,7 @@ export function Inspector(props: {
 								data-active={!shape().attrs["data-tone"]}
 								title="Default"
 								aria-label="Default tone"
-								onClick={() => props.onEdit({ kind: "attr", name: "data-tone", value: null })}
+								onClick={() => shape().attrs["data-tone"] && props.onEdit({ kind: "attr", name: "data-tone", value: null })}
 							/>
 							<For each={tones()}>
 								{(tone) => (
@@ -142,7 +162,9 @@ export function Inspector(props: {
 										data-active={shape().attrs["data-tone"] === tone}
 										title={tone}
 										aria-label={`${tone} tone`}
-										onClick={() => props.onEdit({ kind: "attr", name: "data-tone", value: tone })}
+										onClick={() =>
+											shape().attrs["data-tone"] !== tone && props.onEdit({ kind: "attr", name: "data-tone", value: tone })
+										}
 									/>
 								)}
 							</For>

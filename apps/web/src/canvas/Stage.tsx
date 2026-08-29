@@ -1,11 +1,12 @@
 import type { Board, Camera } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, onMount } from "solid-js";
-import { boxOf, fit, INTERACT_ZOOM, pan, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
+import { boxOf, fit, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
 import { BoardFrame } from "./BoardFrame.tsx";
 import { notePointer } from "../lib/panels.ts";
 import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
 import type { FrameGestureHost } from "./frame-gestures.ts";
+import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 
 /** The palette's keys, in the order the palette draws them. */
 const TOOL_KEYS: Record<string, Tool> = { v: "select", s: "sticky", c: "card", t: "text", e: "embed", a: "arrow" };
@@ -21,6 +22,14 @@ const TOOL_KEYS: Record<string, Tool> = { v: "select", s: "sticky", c: "card", t
  * Gestures follow the trackpad, because that is what this is used on: two-finger
  * scroll pans, pinch zooms, and a plain wheel zooms only when a modifier says so.
  * Space or middle-button drag pans from anywhere, including across a board.
+ *
+ * **And they follow a hand, because a phone has no trackpad either.** A touchscreen
+ * sends no wheel events at all, so every one of those gestures was missing: pinching
+ * the canvas moved it about instead of zooming it, since two fingers were two
+ * independent one-finger pans. Two fingers are now one gesture (`touch.ts` reduces
+ * them, `pinchCamera` moves the camera) and one finger pans — the rule being that a
+ * finger on the canvas moves the canvas unless it landed on something that says
+ * otherwise, which on a board means a title bar or a component already selected.
  */
 export function Stage(props: {
 	boards: Board[];
@@ -161,9 +170,110 @@ export function Stage(props: {
 		wheel({ x: at.x, y: at.y, deltaX: event.deltaX, deltaY: event.deltaY, zooming: event.ctrlKey || event.metaKey });
 	};
 
+	/**
+	 * Every finger on the canvas, wherever it landed, and the camera they move.
+	 *
+	 * **One set of fingers for the whole stage**, and that is the load-bearing decision
+	 * here. A pinch does not respect the boundaries of the documents it happens over: one
+	 * finger can be inside a board's iframe and the other on bare canvas, or one on a
+	 * board's title bar and the other on a third board. Each of those is two event
+	 * streams and one gesture, and a tracker per stream turns it into two one-finger pans
+	 * — which is precisely the bug that made a pinch shove the canvas about. So the
+	 * fingers are pooled here (`touch.ts` reduces the pool), and the other documents feed
+	 * them in: `frame-gestures.ts` for a board's own document, `BoardFrame` for its title
+	 * bar.
+	 *
+	 * A finger can also be **claimed** by whoever it landed on — a scrollable embed, a
+	 * board being dragged by its bar. A claimed finger still counts towards the pool, so
+	 * a second finger makes a pinch with the right positions; it just does not pan. Two
+	 * fingers always win: a pinch clears every claim, because zooming out of a board you
+	 * had started to drag is a change of mind, not an ambiguity.
+	 */
+	const touches = createTouches();
+	const claimed = new Set<number>();
+	/** Fingers this document is carrying, as opposed to ones reported from a frame. */
+	const carried = new Set<number>();
+
+	/**
+	 * A finger of this document's, in the stage's own coordinates.
+	 *
+	 * The pool is kept in stage coordinates because that is the space the camera works
+	 * in, and because a board's document has no other way to describe where a finger is —
+	 * it converts on its way out (`frame-gestures.ts`). Converting again on the way in
+	 * would subtract the stage's offset twice, which is a pinch that walks the canvas 90px
+	 * *down* for a gesture that never moved vertically at all: exactly the bug that this
+	 * conversion existing in one place instead of two is meant to stop.
+	 */
+	const fingerOf = (event: PointerEvent): Finger => {
+		const rect = element.getBoundingClientRect();
+		return { id: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top };
+	};
+
+	/** One finger's worth of a gesture, from this document or from a board's. */
+	const touch = (phase: "down" | "move" | "up", finger: Finger): TouchStep => {
+		if (phase === "down") {
+			touches.down(finger);
+			setPanning(true);
+			return { kind: "idle" };
+		}
+		if (phase === "up") {
+			touches.up(finger.id);
+			claimed.delete(finger.id);
+			if (touches.count() === 0) setPanning(false);
+			return { kind: "idle" };
+		}
+
+		const step = touches.move(finger);
+		if (step.kind === "pinch") {
+			claimed.clear();
+			props.setCamera(pinchCamera(props.camera, view(), step.from, step.to));
+			return step;
+		}
+		if (step.kind === "pan" && !claimed.has(finger.id)) props.setCamera(pan(props.camera, step.dx, step.dy));
+		return step;
+	};
+
+	const onTouchMove = (event: PointerEvent) => {
+		if (!carried.has(event.pointerId)) return;
+		touch("move", fingerOf(event));
+	};
+
+	const onTouchEnd = (event: PointerEvent) => {
+		if (!carried.has(event.pointerId)) return;
+		carried.delete(event.pointerId);
+		touch("up", fingerOf(event));
+		if (carried.size > 0) return;
+		element.removeEventListener("pointermove", onTouchMove);
+		element.removeEventListener("pointerup", onTouchEnd);
+		element.removeEventListener("pointercancel", onTouchEnd);
+	};
+
+	const beginTouch = (event: PointerEvent) => {
+		// A tap on bare canvas clears the selection, exactly as a click does. Decided on
+		// the way down rather than on the way up: a pan that starts on empty stage is not
+		// a gesture that wants to keep a component selected either.
+		if (event.target === element) props.onSelect(undefined);
+		if (carried.size === 0) {
+			element.addEventListener("pointermove", onTouchMove);
+			element.addEventListener("pointerup", onTouchEnd);
+			element.addEventListener("pointercancel", onTouchEnd);
+		}
+		carried.add(event.pointerId);
+		touch("down", fingerOf(event));
+		try {
+			element.setPointerCapture(event.pointerId);
+		} catch {
+			// Capture is per-pointer and can be refused; the listeners above still carry
+			// the gesture for as long as the finger stays over the stage.
+		}
+	};
+
 	/** What a board frame hands back when a canvas gesture starts inside it. */
 	const gestures: FrameGestureHost = {
 		wheel,
+		touch,
+		claimTouch: (id) => claimed.add(id),
+		pinching: () => touches.count() > 1,
 		pan: (dx, dy) => props.setCamera(pan(props.camera, dx, dy)),
 		space: (held) => setSpaceHeld(held),
 		spaceHeld: () => spaceHeld(),
@@ -173,6 +283,18 @@ export function Stage(props: {
 	};
 
 	const onPointerDown = (event: PointerEvent) => {
+		/*
+		 * Touch is its own gesture set, and it is asked of the event rather than of the
+		 * screen size: a laptop with a touchscreen has both, and each pointer should mean
+		 * what it means. `preventDefault` is deliberately not called — the frames'
+		 * `touch-action` is what stops the browser scrolling, and swallowing the default
+		 * here would take focus away from the composer mid-sentence.
+		 */
+		if (event.pointerType === "touch") {
+			beginTouch(event);
+			return;
+		}
+
 		const middle = event.button === 1;
 		const emptySpace = event.button === 0 && event.target === element;
 		if (!middle && !emptySpace && !(spaceHeld() && event.button === 0)) return;

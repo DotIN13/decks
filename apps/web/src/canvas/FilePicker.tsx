@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-solid";
 import ChevronUp from "lucide-solid/icons/chevron-up";
+import Upload from "lucide-solid/icons/upload";
 import File from "lucide-solid/icons/file";
 import FileCode from "lucide-solid/icons/file-code";
 import FileImage from "lucide-solid/icons/file-image";
@@ -28,8 +29,26 @@ interface BrowseResult {
  * It browses exactly what `/api/file` will serve — the deck, and the roots declared
  * in `deck.json` — because a picker that can reach further than the route offers you
  * a file and then a broken embed.
+ *
+ * **And it is the way in for a file that is not in the deck yet.** Dropping one from the
+ * desktop (§6.9) is impossible on a phone — there is no desktop and no drag — while the
+ * upload route and the insert path it feeds already existed, so what was missing was
+ * somewhere to tap. `<input type="file">` is that somewhere, and on a phone the platform
+ * answers it with the camera and the photo library as well as the file browser, which is
+ * three routes for one control and none of them ours to build.
  */
-export function FilePicker(props: { onPick: (path: string) => void; onCancel: () => void }) {
+export function FilePicker(props: {
+	onPick: (path: string) => void;
+	onCancel: () => void;
+	/**
+	 * Copy this into the deck and answer with the path a board should point at.
+	 *
+	 * One file, because one embed is what the caller asked for: the picker is opened to
+	 * answer "what does this component point at", and a batch belongs to the drop path
+	 * (§6.9), which lays several out in a row rather than in a pile.
+	 */
+	onAdd?: (file: File) => Promise<string | undefined>;
+}) {
 	/*
 	 * `""` and not `undefined`, which is the whole reason the picker used to open empty.
 	 *
@@ -48,9 +67,40 @@ export function FilePicker(props: { onPick: (path: string) => void; onCancel: ()
 		return (await response.json()) as BrowseResult;
 	});
 
+	const [adding, setAdding] = createSignal(false);
+	let input!: HTMLInputElement;
+
+	const add = async (file: File | undefined) => {
+		if (!file || !props.onAdd) return;
+		setAdding(true);
+		try {
+			const picked = await props.onAdd(file);
+			// A refused upload leaves the picker open on purpose: the notice says why, and
+			// closing on failure would take the browsing position away with it.
+			if (picked) props.onPick(picked);
+		} finally {
+			setAdding(false);
+		}
+	};
+
+	/*
+	 * Dismissed by a press that *begins* on the backdrop, not by a click on it.
+	 *
+	 * A click was the obvious thing and on a touchscreen it closed the picker the instant
+	 * it opened. The tap that asked for a file is one gesture that produces two events —
+	 * the `pointerdown` the editor acts on, and a `click` at the same coordinates
+	 * afterwards — and by the time the click arrives the backdrop has appeared under
+	 * exactly that point. A press is the honest test of intent: a ghost click has no
+	 * `pointerdown` of its own, because its `pointerdown` happened before this existed.
+	 */
 	return (
-		<div class="picker-backdrop" onClick={() => props.onCancel()}>
-			<div class="panel-float picker" onClick={(event) => event.stopPropagation()}>
+		<div
+			class="picker-backdrop"
+			onPointerDown={(event) => {
+				if (event.target === event.currentTarget) props.onCancel();
+			}}
+		>
+			<div class="panel-float picker">
 				<header>
 					<Show when={listing()?.parent} fallback={<span class="where">roots</span>}>
 						{(parent) => (
@@ -61,6 +111,34 @@ export function FilePicker(props: { onPick: (path: string) => void; onCancel: ()
 						)}
 					</Show>
 					<span class="where">{listing()?.path || "the deck and its roots"}</span>
+					<Show when={props.onAdd}>
+						{/*
+							Hidden input, visible button: a file input styles as whatever the
+							platform feels like and cannot be given an icon, and the label-wrapping
+							trick loses the keyboard focus ring. The button is the affordance and
+							the input is the mechanism.
+						*/}
+						<input
+							ref={input}
+							class="from-device"
+							type="file"
+							onChange={(event) => {
+								const file = event.currentTarget.files?.[0];
+								event.currentTarget.value = "";
+								void add(file);
+							}}
+						/>
+						<button
+							class="add"
+							type="button"
+							title="Copy a file or photo from this device into the deck"
+							disabled={adding()}
+							onClick={() => input.click()}
+						>
+							<Icon of={Upload} size={14} />
+							{adding() ? "adding…" : "from this device"}
+						</button>
+					</Show>
 				</header>
 
 				<div class="entries">

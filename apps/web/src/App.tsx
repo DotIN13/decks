@@ -13,8 +13,10 @@ import type {
 	ModelOption,
 	ThinkingLevel,
 } from "@decks/protocol";
+import MessageSquare from "lucide-solid/icons/message-square";
 import Minus from "lucide-solid/icons/minus";
 import Moon from "lucide-solid/icons/moon";
+import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
 import Sun from "lucide-solid/icons/sun";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
@@ -36,10 +38,11 @@ import { Dialog } from "./chat/Dialog.tsx";
 import { Latest } from "./chat/Latest.tsx";
 import { Composer } from "./chat/Composer.tsx";
 import { TurnBar, turnsOf } from "./chat/TurnBar.tsx";
-import { boxOf, fit, INTERACT_ZOOM } from "./lib/camera.ts";
+import { boxOf, fit, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
 import { connect, type Socket } from "./lib/socket.ts";
 import { embedPath, uploadAsset } from "./lib/upload.ts";
-import { createPanels } from "./lib/panels.ts";
+import { canHover, createPanels } from "./lib/panels.ts";
+import { obscured, trackVisualViewport } from "./lib/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 
 interface Notice {
@@ -104,7 +107,14 @@ export function App() {
 	const [selected, setSelected] = createSignal<string | undefined>(undefined);
 	const [tool, setTool] = createSignal<Tool>("select");
 	const [component, setComponent] = createSignal<{ path: string; id: string } | undefined>(undefined);
-	const [picking, setPicking] = createSignal<((path: string | undefined) => void) | undefined>(undefined);
+	/**
+	 * The file picker's promise, and which board asked.
+	 *
+	 * The board is what a file uploaded *through* the picker needs: an embed is written
+	 * the way that board's document would address it (`embedPath`), so "add a photo from
+	 * this phone" cannot be answered without knowing where the answer is going.
+	 */
+	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; board?: string } | undefined>(undefined);
 	const panels = createPanels();
 	/** The turn the chat was opened at, from a click on the spine. */
 	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
@@ -573,17 +583,39 @@ export function App() {
 			sendPatches(path, board.rev, patches);
 		},
 		undo: (path) => socket.send({ type: "board.undo", path }),
-		pickFile: () =>
+		pickFile: (board) =>
 			new Promise<string | undefined>((resolve) => {
-				setPicking(() => (picked: string | undefined) => {
-					setPicking(undefined);
-					resolve(picked);
+				setPicking({
+					board,
+					resolve: (picked: string | undefined) => {
+						setPicking(undefined);
+						resolve(picked);
+					},
 				});
 			}),
 		notice: (text) => notice("info", text),
 		// Editing follows the same threshold as pointer events: if the frame is inert
 		// because we are zoomed out, there is nothing to edit with.
 		enabled: () => camera().zoom >= INTERACT_ZOOM,
+		reveal: (path, box) => {
+			const board = state.boards.find((candidate) => candidate.path === path);
+			const stage = document.querySelector(".stage");
+			if (!board || !stage) return;
+			/*
+			 * The room to aim for. The bottom is the keyboard plus the dock that sits above
+			 * it — a caret tucked behind the input bar is as lost as one behind the keys —
+			 * and the top is the title bar the canvas already runs under.
+			 */
+			const dock = document.querySelector(".dock")?.getBoundingClientRect().height ?? 0;
+			setCamera(
+				keepVisible(
+					camera(),
+					{ width: stage.clientWidth, height: stage.clientHeight },
+					{ x: board.x + box.x, y: board.y + box.y, w: box.w, h: box.h },
+					{ top: 12, bottom: obscured().bottom + dock + 12 },
+				),
+			);
+		},
 	};
 
 	/**
@@ -703,6 +735,95 @@ export function App() {
 		drop: (files, at) => void dropOnBoard(path, files, at),
 	});
 
+	/**
+	 * One file from the device, copied into the deck, answered as an embed path.
+	 *
+	 * The other end of the file picker (`FilePicker`), and the whole of "getting a photo
+	 * off a phone onto a board": the upload route and the insert path were already there
+	 * for the desktop drag (§6.9), and a drag is the one gesture a touchscreen does not
+	 * have. So this is the same two steps in the other order — the bytes go into the deck
+	 * first, and the path comes back for the component that asked.
+	 */
+	const addFile = async (board: string | undefined, file: File): Promise<string | undefined> => {
+		const report = working(`Adding ${file.name}…`);
+		try {
+			const asset = await uploadAsset(file, (fraction) =>
+				report.update(`${file.name} — ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+			);
+			report.done(`${file.name} added${asset.reused ? " (already in the deck)" : ""}`);
+			// Relative to the board that asked, because a deck is self-contained and an
+			// absolute path is a board that breaks when the deck moves.
+			return board ? embedPath(board, asset.path) : asset.path;
+		} catch (error) {
+			report.done(`${file.name}: ${error instanceof Error ? error.message : String(error)}`, "warn");
+			return undefined;
+		}
+	};
+
+	/**
+	 * A file on the clipboard, landing on the selected board.
+	 *
+	 * The sibling of the drop path, and the one edge §8 listed against §6.9. A paste has no
+	 * cursor position — that is the whole difference from a drop — so it needs a rule
+	 * instead of a point: **the selected board, at the middle of it.** The selection is
+	 * the board the user is working on and it is already visible on screen, which makes
+	 * this the smallest rule that is never surprising; nothing is invented when there is
+	 * no selection, exactly as nothing is invented for a file dropped on empty canvas.
+	 *
+	 * A paste while something is focused belongs to that thing: the composer, an
+	 * inspector field, a run of text being retyped. A screenshot pasted into a sentence
+	 * you are writing is not an embed.
+	 */
+	const pasteOnBoard = (files: File[]) => {
+		if (files.length === 0) return;
+		const path = selected();
+		const board = path ? state.boards.find((candidate) => candidate.path === path) : undefined;
+		if (!board) {
+			notice("info", "Pick a board first — a pasted file becomes an embed, and an embed lives on a board.");
+			return;
+		}
+		if (!editor.enabled()) {
+			notice("info", "Zoom in until the board is live, then paste.");
+			return;
+		}
+		void dropOnBoard(board.path, files, { x: board.w / 2, y: board.h / 2 });
+	};
+
+	onMount(() => {
+		const onPaste = (event: ClipboardEvent) => {
+			// `closest` is asked for rather than assumed: a paste with nothing focused
+			// targets the document, which is not an element.
+			const target = event.target as HTMLElement | null;
+			if (target?.closest?.("input, textarea, [contenteditable]")) return;
+			const files = Array.from(event.clipboardData?.files ?? []);
+			if (files.length === 0) return;
+			event.preventDefault();
+			pasteOnBoard(files);
+		};
+		document.addEventListener("paste", onPaste);
+		onCleanup(() => document.removeEventListener("paste", onPaste));
+		// The visual viewport, so the dock stays above the on-screen keyboard.
+		onCleanup(trackVisualViewport());
+
+		/*
+		 * How tall the dock currently is, published for the stylesheet.
+		 *
+		 * The transcript sheet on a narrow screen sits above the dock, and the dock is a
+		 * stack of however many of "the last reply", "a permission question" and "the
+		 * input bar" are true right now. A constant would be wrong most of the time and
+		 * on top of the composer some of it, so the one thing that knows measures it.
+		 */
+		const dock = document.querySelector(".dock");
+		if (dock) {
+			const observer = new ResizeObserver(([entry]) => {
+				const height = Math.round(entry?.contentRect.height ?? 0);
+				document.documentElement.style.setProperty("--dock", `${height}px`);
+			});
+			observer.observe(dock);
+			onCleanup(() => observer.disconnect());
+		}
+	});
+
 	/*
 	 * The browser opens a dropped file by default, which would unload the app — socket,
 	 * camera, transcript and all — to show a picture. Guarded on the whole document
@@ -763,8 +884,41 @@ export function App() {
 					<span class="wordmark">Decks</span>
 				</span>
 				<span class="spacer" />
+				{/*
+					The two panels, reachable by tapping.
+
+					Only where the pointer cannot hover (`.touch-only`, a media query in
+					index.css): with a cursor the edges already summon them, and two more
+					buttons in the title bar would be a second way to do a thing that works.
+					Without one they are the *only* way — a finger cannot approach an edge —
+					so this is the difference between chrome that is away and chrome that is
+					gone. `aria-pressed` rather than a title that changes, because what the
+					button does never changes; only what it currently is does.
+				*/}
 				<button
-					class="icon-button"
+					class="icon-button touch-only"
+					type="button"
+					aria-pressed={panels.left.open()}
+					data-open={panels.left.open()}
+					title="Boards and chats"
+					aria-label="Boards and chats"
+					onClick={() => panels.left.toggle()}
+				>
+					<Icon of={PanelLeft} size={19} />
+				</button>
+				<button
+					class="icon-button touch-only"
+					type="button"
+					aria-pressed={panels.right.open()}
+					data-open={panels.right.open()}
+					title="The conversation"
+					aria-label="The conversation"
+					onClick={() => panels.right.toggle()}
+				>
+					<Icon of={MessageSquare} size={19} />
+				</button>
+				<button
+					class="icon-button theme"
 					type="button"
 					onClick={() => toggleScheme()}
 					title={scheme() === "dark" ? "Switch to light" : "Switch to dark"}
@@ -795,7 +949,19 @@ export function App() {
 					preview={state.preview?.boards}
 				/>
 
-				<Palette tool={tool()} visible={camera().zoom >= INTERACT_ZOOM} onPick={setTool} />
+				<Palette
+					tool={tool()}
+					visible={camera().zoom >= INTERACT_ZOOM}
+					onPick={setTool}
+					onUndo={() => {
+						const path = selected() ?? component()?.path;
+						if (!path) {
+							notice("info", "Pick the board to undo on first.");
+							return;
+						}
+						socket.send({ type: "board.undo", path });
+					}}
+				/>
 
 				{/* The selection's properties. Same visibility rule as the palette — below
 				    `INTERACT_ZOOM` a board takes no pointer events and nothing can be
@@ -805,12 +971,17 @@ export function App() {
 					shape={shape()}
 					visible={camera().zoom >= INTERACT_ZOOM && !state.preview}
 					onEdit={inspect}
-					pickFile={editor.pickFile}
+					pickFile={() => editor.pickFile(shape()?.path)}
+					onClose={() => setComponent(undefined)}
 				/>
 
 				<Show when={picking()}>
-					{(resolve) => (
-						<FilePicker onPick={(path) => resolve()(path)} onCancel={() => resolve()(undefined)} />
+					{(request) => (
+						<FilePicker
+							onPick={(path) => request().resolve(path)}
+							onCancel={() => request().resolve(undefined)}
+							onAdd={(file) => addFile(request().board, file)}
+						/>
 					)}
 				</Show>
 
@@ -891,8 +1062,15 @@ export function App() {
 				<div class="dock">
 					{/* First in the dock, so it sits above whatever else is in it rather than
 					    at a hardcoded offset that a taller stack would collide with. */}
+					{/* The gestures it names have to be gestures this device has: a phone has no
+					    wheel, no space bar and no keys to fit with, and a hint that lists them
+					    is a first-run message that teaches nothing. */}
 					<Show when={state.boards.length > 0}>
-						<div class="hint">two-finger scroll to pan · pinch or ⌘-wheel to zoom · space-drag anywhere · 0 fit all · 1 fit board</div>
+						<div class="hint">
+							{canHover()
+								? "two-finger scroll to pan · pinch or ⌘-wheel to zoom · space-drag anywhere · 0 fit all · 1 fit board"
+								: "drag to pan · pinch to zoom · tap a component to select it, again to retype it · drag a board by its title"}
+						</div>
 					</Show>
 
 					<Show when={state.dialog}>

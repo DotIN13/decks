@@ -27,6 +27,7 @@ const CHECKS = [
 	{ file: "camera.mjs", needsAgent: false },
 	{ file: "keys.mjs", needsAgent: false },
 	{ file: "gestures.mjs", needsAgent: false },
+	{ file: "mobile.mjs", needsAgent: false },
 	{ file: "embed-scroll.mjs", needsAgent: false },
 	{ file: "editing.mjs", needsAgent: false },
 	{ file: "inspector.mjs", needsAgent: false },

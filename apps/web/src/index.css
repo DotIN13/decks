@@ -32,6 +32,12 @@
 }
 
 :root {
+	/*
+	 * How much of the window the browser is covering from below — the on-screen
+	 * keyboard, mostly. Kept true by `lib/viewport.ts`; 0 everywhere else, so every
+	 * rule that adds it reads exactly as it did before it existed.
+	 */
+	--keyboard: 0px;
 	--bg: var(--color-grey-100);
 	--bg-deep: var(--color-grey-200);
 	--panel: rgb(255 255 255 / 88%);
@@ -66,13 +72,27 @@ body,
 	margin: 0;
 }
 
+html {
+	/* A phone in landscape enlarges body text by its own factor, which on a canvas
+	   app moves every panel and none of the boards. The canvas has its own zoom. */
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
 body {
 	overflow: hidden;
+	/* No rubber band: the whole app is one screen, nothing here scrolls the document,
+	   and a bounce at the edge of a canvas reads as the canvas coming loose. */
+	overscroll-behavior: none;
 	background: var(--bg);
 	color: var(--fg);
 	font-family: var(--font-sans);
 	font-size: 13px;
 	-webkit-font-smoothing: antialiased;
+	/* Kills the 300ms wait for a second tap, and with it the double-tap zoom, on the
+	   chrome — where a double-tap means nothing and the delay is felt on every button.
+	   The stage sets `none` for itself; the frames do it in `frame-gestures.ts`. */
+	touch-action: manipulation;
 }
 
 /* --- app chrome -------------------------------------------------------------- */
@@ -118,14 +138,16 @@ svg.lucide {
 .app {
 	display: grid;
 	height: 100%;
-	grid-template-rows: 40px 1fr;
+	/* The title bar grows into the notch rather than hiding under it; on everything
+	   without one the inset is 0 and this is the 40px it always was. */
+	grid-template-rows: calc(40px + env(safe-area-inset-top)) 1fr;
 }
 
 .titlebar {
 	display: flex;
 	gap: 12px;
 	align-items: center;
-	padding: 0 12px;
+	padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
 	border-bottom: 1px solid var(--line);
 	background: var(--bg);
 	-webkit-app-region: drag;
@@ -239,6 +261,11 @@ svg.lucide {
 	top: -26px;
 	left: 0;
 	display: flex;
+	/* Clipped to the board's own on-screen width. The bar is counter-scaled, so its
+	   text is a constant size while the board shrinks — at 7% zoom, which is what
+	   fitting three boards into a phone comes to, the path label was three times the
+	   width of the board and written across the board next to it. */
+	overflow: hidden;
 	gap: 8px;
 	align-items: center;
 	width: 100%;
@@ -286,9 +313,21 @@ svg.lucide {
 }
 
 .board-node > .chrome .file {
+	/*
+	 * The path is what gives way when the bar is clipped, and it takes saying so twice.
+	 * A nowrap flex item's automatic minimum size is its content, so it refused to shrink
+	 * at all and the *title* absorbed the whole overflow — a phone showed three board
+	 * paths and no board names. `overflow: hidden` is what lets it go below its content,
+	 * and the shrink factor is what makes it go first.
+	 */
+	overflow: hidden;
+	min-width: 0;
+	flex-shrink: 3;
 	color: var(--faint);
 	font-family: var(--font-mono);
 	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .board-node > .surface {
@@ -430,7 +469,7 @@ svg.lucide {
 
 .zoombar {
 	right: 26px;
-	bottom: 12px;
+	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
 	display: flex;
 	align-items: center;
 	padding: 4px;
@@ -517,7 +556,7 @@ svg.lucide {
 .chat {
 	top: 12px;
 	right: 12px;
-	bottom: 88px;
+	bottom: calc(88px + var(--keyboard) + env(safe-area-inset-bottom));
 	display: flex;
 	width: 380px;
 	flex-direction: column;
@@ -928,10 +967,18 @@ svg.lucide {
  */
 .dock {
 	position: absolute;
-	bottom: 12px;
+	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
 	left: calc(50% - 90px);
 	display: flex;
-	width: min(720px, calc(100% - 650px));
+	/*
+	 * `calc(100% - 650px)` is the room left beside both panels, and on anything under
+	 * about 700px wide it is a negative number: the dock was 0 pixels across on a
+	 * phone, which is not a degraded input bar but an invisible one — the placeholder
+	 * broke to one letter per line and the send button was 18px wide. The clamp keeps
+	 * the desktop measurement and stops it going below something usable; under 1100px
+	 * the media query at the end of this file gives up on the offset altogether.
+	 */
+	width: min(720px, max(320px, calc(100% - 650px)));
 	flex-direction: column;
 	align-items: stretch;
 	gap: 8px;
@@ -1189,6 +1236,26 @@ svg.lucide {
 	border-bottom: 1px solid var(--line);
 }
 
+/* Lets the selection go, which Escape also does — see the comment on the button. */
+.inspector header .close {
+	display: grid;
+	width: 22px;
+	height: 22px;
+	margin-left: auto;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	place-items: center;
+}
+
+.inspector header .close:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
 .inspector header .what {
 	color: var(--faint);
 	font-size: 10px;
@@ -1350,7 +1417,8 @@ svg.lucide {
 .picker {
 	position: static;
 	display: flex;
-	width: 520px;
+	/* Wide enough to read a path on a laptop, never wider than the screen. */
+	width: min(520px, calc(100vw - 24px));
 	max-height: 70%;
 	flex-direction: column;
 	padding: 0;
@@ -1376,6 +1444,34 @@ svg.lucide {
 	cursor: pointer;
 	font: inherit;
 	font-size: 11px;
+}
+
+/*
+ * Copying a file in from the device, beside the browse position.
+ *
+ * The input itself is never seen: a file input cannot be given an icon, styles as
+ * whatever the platform decides, and the usual label-wrapping trick loses the focus
+ * ring. `display: none` would take it out of the accessibility tree with the button that
+ * drives it, so it is clipped instead.
+ */
+.picker header .add {
+	margin-left: auto;
+	white-space: nowrap;
+}
+
+.picker header .add:disabled {
+	color: var(--faint);
+	cursor: default;
+}
+
+.picker input.from-device {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	opacity: 0;
+	pointer-events: none;
 }
 
 .picker .where {
@@ -1460,8 +1556,8 @@ svg.lucide {
 
 .side {
 	top: 12px;
-	bottom: 12px;
-	left: 12px;
+	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
+	left: max(12px, env(safe-area-inset-left));
 	display: flex;
 	width: 200px;
 	flex-direction: column;
@@ -1701,7 +1797,7 @@ svg.lucide {
 	position: absolute;
 	top: 12px;
 	right: 4px;
-	bottom: 88px;
+	bottom: calc(88px + var(--keyboard) + env(safe-area-inset-bottom));
 	z-index: 11;
 	display: flex;
 	width: 14px;
@@ -1756,4 +1852,351 @@ svg.lucide {
 /* The chat's own sliver would only compete with the spine. */
 .chat::after {
 	display: none;
+}
+
+
+/* --- a phone, and a hand ------------------------------------------------------ */
+
+/*
+ * What changes when the pointer is a finger, and what changes when the screen is small.
+ *
+ * Two different questions, asked separately and answered separately, because they are
+ * not the same device: a tablet with a trackpad has a fine pointer on a small screen,
+ * and a touchscreen laptop has a coarse one on a large screen.
+ *
+ * - `(hover: none)` is **discoverability**. Everything this app reveals by approaching
+ *   it — the two panels at the edges, the `×` on a board's title bar, the row of
+ *   `rewind · fork · restore boards` under a message — reveals itself to nothing at all
+ *   on a touchscreen. So where there is no hover, those things are simply there, and the
+ *   two panels grow the pair of buttons in the title bar that `.touch-only` marks.
+ * - `(pointer: coarse)` is **size**. The chrome draws its icon buttons at 20–30px, which
+ *   is right for a cursor and roughly half of what a fingertip can reliably hit. Nothing
+ *   moves; the targets grow.
+ * - A **width** breakpoint is used for exactly what is about width: the dock's clearance
+ *   for the two panels, and the panels themselves becoming sheets. A 390px phone cannot
+ *   hold 200px of rail, 380px of transcript and a canvas at the same time, so it holds
+ *   one of them at a time (`lib/panels.ts` makes them mutually exclusive at the same
+ *   threshold) and the boards keep the screen — which is §7's thesis, not a retreat from
+ *   it: the chrome is away by default, and on a phone "away" simply has to mean gone.
+ *
+ * Nothing here is a separate mobile layout. Every rule is an override of the desktop
+ * one, and above these thresholds the stylesheet is byte-for-byte the app it was.
+ */
+
+/*
+ * Two controls exist only for a pointer that cannot hover: the panel toggles in the
+ * title bar and the palette's undo. Spelled out per selector rather than as a bare
+ * `.touch-only`, because `.titlebar .icon-button` and `.palette button` both set
+ * `display` themselves and would win against one class.
+ */
+.titlebar .icon-button.touch-only,
+.palette button.touch-only {
+	display: none;
+}
+
+@media (hover: none) {
+	.titlebar .icon-button.touch-only,
+	.palette button.touch-only {
+		display: grid;
+	}
+
+	/* Which panel is out, on the button that puts it there. */
+	.titlebar .icon-button[data-open="true"] {
+		background: var(--line);
+		color: var(--fg);
+	}
+
+	/* Separated from the tools: it acts on the board, not on the next thing you draw. */
+	.palette button.undo {
+		margin-left: 6px;
+		border-left: 1px solid var(--line);
+		border-radius: 0 8px 8px 0;
+	}
+
+	/* Hidden until hovered is hidden forever here. Both of these are the only route to
+	   what they do: taking a board off the canvas, and the time machine. */
+	.board-node > .chrome .hide,
+	.turn-row .turn-actions {
+		opacity: 1;
+	}
+
+	/* A held-but-not-played board is dimmed and un-dimmed by hovering it. Without the
+	   second half, "dimmed" is just harder to read. */
+	.rail-item[data-off-canvas="true"] {
+		opacity: 0.62;
+	}
+}
+
+@media (pointer: coarse) {
+	/* A 40px bar cannot hold a 44px target. */
+	.app {
+		grid-template-rows: calc(52px + env(safe-area-inset-top)) 1fr;
+	}
+
+	.titlebar .icon-button,
+	.zoombar .icon-button {
+		width: 44px;
+		height: 44px;
+	}
+
+	.palette {
+		padding: 5px;
+	}
+
+	.palette button {
+		width: 44px;
+		height: 44px;
+	}
+
+	.zoombar {
+		padding: 3px;
+	}
+
+	.zoombar button {
+		min-width: 44px;
+		min-height: 44px;
+		padding: 4px 12px;
+	}
+
+	.zoombar .level {
+		min-width: 46px;
+	}
+
+	.composer .send {
+		width: 44px;
+		height: 44px;
+		border-radius: 12px;
+	}
+
+	.composer textarea {
+		/* 16px or the browser zooms the page when the field takes focus, which leaves
+		   the canvas at a scale nobody chose and the chrome half off screen. */
+		font-size: 16px;
+	}
+
+	.composer select,
+	.inspector input,
+	.inspector select {
+		min-height: 36px;
+		font-size: 13px;
+	}
+
+	.latest .dismiss,
+	.pin,
+	.chats .rail-head button {
+		width: 38px;
+		height: 38px;
+	}
+
+	.chats .rail-head select.kind {
+		min-height: 34px;
+		max-width: 92px;
+		font-size: 12px;
+	}
+
+	.inspector .boxes button,
+	.inspector .tones button,
+	.inspector .row.file button,
+	.inspector .acts button {
+		min-width: 38px;
+		min-height: 38px;
+	}
+
+	.inspector header .close {
+		width: 38px;
+		height: 38px;
+	}
+
+	.picker .entry {
+		min-height: 44px;
+	}
+
+	.picker header button {
+		min-height: 38px;
+	}
+
+	.turn-actions button {
+		min-height: 32px;
+		padding: 3px 10px;
+		font-size: 11px;
+	}
+
+	/* The board's own chrome is counter-scaled, so these are screen pixels at any zoom.
+	   24 rather than 44: the bar it sits in is 24 tall, and a target taller than the
+	   thing it belongs to would cover the board underneath it. */
+	.board-node > .chrome .hide {
+		width: 24px;
+		height: 24px;
+	}
+
+	/* Clear of a palette whose buttons are now 44px in a 52px bar; on a fine pointer
+	   58px is exactly under the 40px one. */
+	.notices {
+		top: 74px;
+	}
+
+	/* A 10px notch in a 14px column is not a target. */
+	.turnbar {
+		width: 24px;
+	}
+
+	.turnbar .turn {
+		width: 18px;
+		min-height: 8px;
+	}
+}
+
+/*
+ * The dock, once there is no longer room to keep it clear of both panels.
+ *
+ * Full width and no offset from centre: below this the panels are sheets that take turns
+ * with the canvas anyway, so there is nothing left for the dock to be beside.
+ */
+@media (max-width: 1100px) {
+	.dock {
+		left: max(12px, env(safe-area-inset-left));
+		right: max(12px, env(safe-area-inset-right));
+		width: auto;
+		transform: none;
+	}
+
+	/*
+	 * And the zoom controls go above it rather than into its bottom-right corner, which
+	 * is where a full-width dock now is. They are camera chrome and the dock is the
+	 * conversation, so this is the one place the two are allowed to stack: side by side
+	 * there is no longer the width for both.
+	 */
+	.zoombar {
+		right: max(12px, env(safe-area-inset-right));
+		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+	}
+}
+
+@media (max-width: 760px) {
+	/* The model, the thinking level and the mode do not fit on one line beside the send
+	   button at this width; wrapped, they are three rows of real controls instead of
+	   three ellipses. */
+	.composer .controls {
+		flex-wrap: wrap;
+	}
+
+	.composer select {
+		max-width: 46%;
+		flex: 1;
+	}
+
+	/*
+	 * The two panels become sheets: the full width of the screen, with the canvas behind
+	 * them rather than beside them. `--peek` goes to nothing — a sliver is something to
+	 * aim a cursor at, and there is no cursor here.
+	 */
+	.side,
+	.chat {
+		--peek: 0px;
+		left: max(8px, env(safe-area-inset-left));
+		/* `right` for the chat as well, which parks beside the timeline spine on a
+		   desktop — and the spine is gone below this width. */
+		right: max(8px, env(safe-area-inset-right));
+		/*
+		 * Both sheets stop above the dock, so the composer is never the thing a panel
+		 * covers: it is how you answer whatever you opened the panel to read. `--dock` is
+		 * the dock's measured height (`App` publishes it), because the dock holds a reply,
+		 * a permission question and an input bar in whatever combination is currently
+		 * true — the 88px fallback is the desktop constant, and it sat on the composer.
+		 */
+		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+		width: auto;
+	}
+
+	/* Each one still slides in from its own edge: a transform is the one property that
+	   costs nothing to animate. */
+	.side {
+		transform: translateX(calc(-100% - 16px));
+	}
+
+	.chat {
+		transform: translateX(calc(100% + 16px));
+	}
+
+	/*
+	 * A rail item turns on its side. The thumbnail is the board itself scaled by a fixed
+	 * 150px (`BoardRail`), so in a full-width sheet a column layout left two thirds of
+	 * every row empty — as a row, the 150px is the picture and the rest is the name.
+	 */
+	.rail-item {
+		flex-direction: row;
+		align-items: stretch;
+	}
+
+	.rail-item .thumb {
+		width: 150px;
+		flex: none;
+		border-right: 1px solid var(--line);
+		border-bottom: 0;
+		border-radius: 7px 0 0 7px;
+	}
+
+	.rail-item .label {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		justify-content: center;
+		padding: 8px 12px;
+	}
+
+	.side::after,
+	.chat::after {
+		display: none;
+	}
+
+	/*
+	 * The timeline spine goes. It is a column of 10px notches on the right edge, which
+	 * is both the hardest thing on screen to hit and the edge the transcript sheet now
+	 * arrives from; the same rewind, fork and restore live on each message in the
+	 * transcript, which is reachable (see `(hover: none)` above).
+	 */
+	.turnbar {
+		display: none;
+	}
+
+	.palette {
+		top: 8px;
+	}
+
+	/*
+	 * The inspector becomes a bottom sheet, and this is the one place the desktop's
+	 * reasoning does not survive the screen getting smaller.
+	 *
+	 * Top right is right on a laptop: it is out of the way of the boards and clear of the
+	 * chat panel's reach (§6.5). Across the top of a phone it is *in the way of the tap
+	 * that opened it* — you tap a component, a panel appears over the place your finger
+	 * just was, and your next tap lands on a class switch you never meant to touch. That
+	 * is not a hypothetical; it is what the first version of this rule did, and it wrote a
+	 * revision each time. At the bottom the sheet is where the hand already is and the
+	 * component it describes stays visible above it.
+	 *
+	 * It takes the zoom controls' place while it is up rather than stacking above them.
+	 * Zooming has fingers to do it with, so the camera buttons are the thing that can be
+	 * missing for a moment; two floating panels in one corner is neither of them usable.
+	 */
+	.inspector {
+		top: auto;
+		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+		right: max(8px, env(safe-area-inset-right));
+		left: max(8px, env(safe-area-inset-left));
+		width: auto;
+		max-height: 42vh;
+		overflow-y: auto;
+	}
+
+	.work:has(.inspector) .zoombar {
+		display: none;
+	}
+
+	.notices {
+		left: 12px;
+		right: 12px;
+		max-width: none;
+		transform: none;
+	}
 }

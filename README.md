@@ -90,7 +90,15 @@ deck directory.
   `assets/` — a deck is self-contained, so an embed of something on your desktop would
   be a board that breaks the moment you tidy up. Identical files are stored once, and
   nothing is ever overwritten. The agent is told what you dropped, the same way it is
-  told about any other edit you make to a board.
+  told about any other edit you make to a board. Where there is nothing to drag from, the
+  file picker will take one from the device instead — the camera or the photo library on a
+  phone — and a file on the clipboard can be pasted onto the selected board.
+- **And it works under a finger.** Two fingers pan and pinch the canvas, over the boards as
+  well as between them; one finger pans, and a tap selects — tap the same thing again to
+  retype it. The panels become sheets you open from the title bar, since there is no cursor
+  to reach an edge with, and the chrome grows to fingertip size. A phone will never be the
+  main way to use this: the aim is looking at a deck, reading a board, talking to the agent
+  and light editing, and [docs/DESIGN.md §7.1](docs/DESIGN.md) says what is out of scope.
 - **Two runtimes.** An agent runs on [pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
   or on Claude Code, chosen when you create it and fixed for its life; `DECKS_BACKEND=pi|claude`
   sets what `+` gives you. Claude agents also carry a mode — ask first, edit freely, plan
@@ -104,15 +112,17 @@ deck directory.
 
 ## Development
 ```bash
-npm test            # 153 unit tests: config, path guards, uploads, patches, revisions, eval, camera
-npm run test:e2e    # 135 browser checks against a throwaway copy of example/ (~55s)
+npm test            # 166 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
+npm run test:e2e    # 159 browser checks against a throwaway copy of example/ (~65s)
 npm run typecheck
 npm run vendor      # re-copy the board primitives into runtime/lib
 npm run sync:lib    # push runtime/lib into example/decks/lib after editing it
 ```
 
-The browser checks are in [e2e/](e2e/README.md). Six more files drive a real agent turn
-and are skipped unless you ask: `DECKS_E2E_AGENT=1 npm run test:e2e`.
+The browser checks are in [e2e/](e2e/README.md). One of them (`mobile.mjs`) runs in a
+Playwright device context and drives real touches, because a mouse hides every bug a
+touchscreen has. Six more files drive a real agent turn and are skipped unless you ask:
+`DECKS_E2E_AGENT=1 npm run test:e2e`.
 
 `example/` is a committed data directory — `example/decks` is the demo deck and
 `example/shared` is the out-of-deck file its sources board embeds, which is the only thing
