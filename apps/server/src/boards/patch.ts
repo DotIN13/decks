@@ -33,7 +33,22 @@ export interface PatchOutcome {
 	ids: string[];
 }
 
-export function applyPatches(html: string, patches: BoardPatch[]): PatchOutcome {
+/**
+ * Apply a batch of patches to a board's source.
+ *
+ * `name` mints an id for an insert that arrived without one, and it is called per
+ * patch against the file *as it is by then* rather than once against the file as it
+ * arrived. That distinction is the whole reason it is a parameter: naming the batch
+ * up front gave two inserts of the same kind the same id — which is what dropping
+ * two files on a board at once does — and the second was then refused for a name the
+ * first had only just taken. Who decides the name still lives on the server (§6.5);
+ * this only decides *when* it is asked.
+ */
+export function applyPatches(
+	html: string,
+	patches: BoardPatch[],
+	name?: (html: string, kind: ComponentKind) => string,
+): PatchOutcome {
 	let current = html;
 	const summary: string[] = [];
 	const ids: string[] = [];
@@ -44,10 +59,11 @@ export function applyPatches(html: string, patches: BoardPatch[]): PatchOutcome 
 	 * the cost of parsing a 4KB document a handful of times.
 	 */
 	for (const patch of patches) {
-		const result = applyOne(current, patch);
+		const named = patch.op === "insert" && !patch.id && name ? { ...patch, id: name(current, patch.kind) } : patch;
+		const result = applyOne(current, named);
 		current = result.html;
 		summary.push(result.summary);
-		ids.push(patch.id);
+		ids.push(named.id);
 	}
 
 	return { html: current, summary, ids };
@@ -65,7 +81,14 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 		const at = body.sourceCodeLocation.endTag.startOffset;
 		const indent = indentOf(html, at);
 		const markup = `${render(patch.kind, patch.id, patch.at, patch.text, patch.embed, indent)}\n${indent}`;
-		return { html: html.slice(0, at) + markup + html.slice(at), summary: `added ${patch.kind} #${patch.id}` };
+		// The embed is named in the summary because that summary is what the agent is
+		// told (§6.5): "added embed #embed-2" leaves it unable to see the file the user
+		// just dropped without re-reading the board to find out what it points at.
+		const showing = patch.kind === "embed" || patch.kind === "image" ? ` showing ${patch.embed ?? "nothing"}` : "";
+		return {
+			html: html.slice(0, at) + markup + html.slice(at),
+			summary: `added ${patch.kind} #${patch.id}${showing}`,
+		};
 	}
 
 	const element = findById(document, patch.id);

@@ -245,7 +245,11 @@ before parsing. A `[data-mermaid]` box needs a height; the diagram scales to fit
 
 - Paths are relative **to the board**, as in an `<img src>`.
 - `.md` renders as markdown, `.pdf` through pdf.js (`data-pages="3-5"` or `"1,4-6"`),
-  `.html` in a sandboxed frame, images as images, anything else as a file card.
+  `.html` in a sandboxed frame, images as images, and `.txt`/`.csv`/`.json`/`.py`/`.ts`
+  and friends as escaped preformatted text, truncated at 256 KB. Anything else becomes a
+  chip naming the file, its size and its kind, which opens or downloads it.
+- Files the user drags onto a board are copied into `assets/` and embedded from there, so
+  a `data-embed="../assets/…"` you did not write is probably one of theirs.
 - Outside the deck, the file must sit under a root declared in `deck.json`.
 - Embeds want an explicit `height`: they have no content of their own to size to.
 

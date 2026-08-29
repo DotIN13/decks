@@ -22,7 +22,12 @@ import type { BoardPatch, ComponentKind, Rect } from "@decks/protocol";
 
 export type Tool = "select" | ComponentKind;
 
-const GRID = 8;
+/**
+ * The grid every placement snaps to, exported because the drop path snaps to it too
+ * (`file-drop.ts`). A file dropped on a board has to line up with the components
+ * placed by hand beside it, and two definitions of "the grid" is one too many.
+ */
+export const GRID = 8;
 const MIN_SIZE = 40;
 
 export interface EditorHost {
@@ -49,7 +54,7 @@ export interface EditorHost {
 	enabled(): boolean;
 }
 
-const snap = (value: number) => Math.round(value / GRID) * GRID;
+export const snap = (value: number) => Math.round(value / GRID) * GRID;
 
 export function attachEditor(frame: HTMLIFrameElement, path: string, host: EditorHost): () => void {
 	const doc = frame.contentDocument;

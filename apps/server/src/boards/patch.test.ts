@@ -84,6 +84,31 @@ test("inserting puts a component before </body>, indented like its neighbours", 
 	untouched(BOARD, html, "sticky-1");
 });
 
+test("two inserts in one batch get two names", () => {
+	// Dropping two files on a board at once is exactly this batch. Minting both names
+	// against the file as it *arrived* gave them the same one, and the second insert
+	// was then refused for a name the first had only just taken.
+	const { html, ids } = applyPatches(
+		BOARD,
+		[
+			{ op: "insert", kind: "embed", id: "", at: { left: 0, top: 0 }, embed: "../assets/a.png" },
+			{ op: "insert", kind: "embed", id: "", at: { left: 32, top: 32 }, embed: "../assets/b.png" },
+		],
+		mintId,
+	);
+	assert.deepEqual(ids, ["embed-1", "embed-2"]);
+	assert.ok(html.includes('data-id="embed-1"') && html.includes('data-id="embed-2"'));
+});
+
+test("an inserted embed names its file in the summary the agent is told", () => {
+	const { summary } = applyPatches(
+		BOARD,
+		[{ op: "insert", kind: "embed", id: "", at: { left: 0, top: 0 }, embed: "../assets/dropped.png" }],
+		mintId,
+	);
+	assert.deepEqual(summary, ["added embed #embed-1 showing ../assets/dropped.png"]);
+});
+
 test("an insert cannot reuse an id", () => {
 	assert.throws(
 		() => applyPatches(BOARD, [{ op: "insert", kind: "sticky", id: "risk", at: { left: 0, top: 0 } }]),

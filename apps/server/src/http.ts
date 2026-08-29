@@ -2,24 +2,48 @@ import { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
+import { MAX_UPLOAD_BYTES } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/roots.ts";
 import { browse } from "./files/browse.ts";
-import { boardHeaders, quarantine } from "./files/serve.ts";
+import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
+import { refuseCrossSite, storeAsset, UploadRefused } from "./files/upload.ts";
 import type { App } from "./app.ts";
 
 /**
- * The HTTP surface: reading files, and the built UI.
+ * The HTTP surface: reading files, writing one kind of file, and the built UI.
  *
- * Everything that *changes* something goes over the WebSocket instead, so this
- * file has no mutating route to guard. What it does have is the two routes that
- * turn a URL into a file, and they are the security boundary of the whole app —
- * both go through `deck/roots.ts` and nothing else does.
+ * Almost everything that *changes* something goes over the WebSocket, because the
+ * socket is where state lives — but bytes are not state. A file the user drags in
+ * from the desktop has to arrive as a body on a request (`POST /api/upload`), so
+ * this file does have one mutating route, and it is the only way anything in Decks
+ * writes a file the user did not name.
+ *
+ * The routes that turn a URL into a file, plus that one, are the security boundary
+ * of the whole app. Every one of them asks `deck/roots.ts` where the path may go
+ * and nothing else makes that decision. The upload route adds its own guards, all
+ * in `files/upload.ts`: a size cap refused before the body is buffered, a name
+ * derived rather than trusted, a refusal to overwrite, and one `Sec-Fetch-Site`
+ * check so it is not the easiest way in. What it does not add is authentication —
+ * there is none anywhere (DEPLOYMENT §1), and `/ws` next door already runs tool
+ * calls for whoever asks, which is what bounds how much this route could matter.
  */
 
 function asyncRoute(handler: (req: Request, res: Response) => Promise<void>) {
 	return (req: Request, res: Response, next: NextFunction) => {
 		handler(req, res).catch(next);
 	};
+}
+
+/**
+ * Whether a deck-relative path is a board, as opposed to a file a board uses.
+ *
+ * Answered from the shape of the path rather than by asking the open deck, on
+ * purpose: a board written a moment ago is on disk before the watcher has told the
+ * deck about it, and a board served as an asset would lose the origin the editor
+ * needs — a wrong answer that reads as "editing stopped working".
+ */
+function isBoardPath(requested: string): boolean {
+	return /^boards\/[^\0]*\.x?html?$/i.test(requested.split("\\").join("/").replace(/^\/+/, ""));
 }
 
 /** The wildcard segment of `/api/board/*path`, as one forward-slashed string. */
@@ -49,9 +73,19 @@ export function createHttpApp(app: App): Express {
 	api.get(
 		"/board/*path",
 		asyncRoute(async (req, res) => {
-			const target = resolveInDeck(app.deck.path, wildcard(req));
-			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(wildcard(req), "not a file");
-			boardHeaders(res);
+			const requested = wildcard(req);
+			const target = resolveInDeck(app.deck.path, requested);
+			if (!existsSync(target) || !statSync(target).isFile()) throw new PathRefused(requested, "not a file");
+			/*
+			 * This route serves the whole deck, not only its boards — a board's own
+			 * `../assets/photo.png` and `../lib/board.css` resolve to sibling URLs and
+			 * land here. A *board* is what gets the app's origin (§4); everything else
+			 * gets the asset treatment, which sandboxes anything a browser would run.
+			 * That distinction started mattering the day the user could drop an HTML
+			 * file onto a board and have it stored in `assets/`.
+			 */
+			if (isBoardPath(requested)) boardHeaders(res);
+			else assetHeaders(res, target);
 			await sendFile(res, target);
 		}),
 	);
@@ -152,6 +186,30 @@ export function createHttpApp(app: App): Express {
 		res.json(browse(app.deck.roots, path));
 	});
 
+	/**
+	 * A file the user dropped onto a board, copied into the deck's `assets/` (§3).
+	 *
+	 * One file per request, its bytes as the body and its name in the query. Not
+	 * `multipart/form-data`: a raw body needs no parser and therefore no parser
+	 * dependency, and one request per file is what lets the browser report progress
+	 * per file and land each one as its own component.
+	 *
+	 * `express.raw` is where the cap is enforced, and it enforces it twice — it
+	 * refuses on `Content-Length` before reading anything, and again on the stream
+	 * for a chunked body that lied. Either way the answer is a 413 with a sentence,
+	 * not a truncated file.
+	 */
+	api.post(
+		"/upload",
+		express.raw({ type: () => true, limit: MAX_UPLOAD_BYTES }),
+		(req, res) => {
+			refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			const name = typeof req.query.name === "string" ? req.query.name : "";
+			const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+			res.json(storeAsset(app.deck.path, name, bytes));
+		},
+	);
+
 	server.use("/api", api);
 
 	// The built UI, when there is one. In development Vite serves it instead and
@@ -167,6 +225,17 @@ export function createHttpApp(app: App): Express {
 	server.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 		if (error instanceof PathRefused) {
 			res.status(403).type("text/plain").send(error.message);
+			return;
+		}
+		if (error instanceof UploadRefused) {
+			res.status(error.status).type("text/plain").send(error.message);
+			return;
+		}
+		// Body-parser's own refusal. Mapped rather than left to fall through, because a
+		// file over the cap is a 413 the browser can explain, not a 500 that reads as a
+		// crash.
+		if ((error as { type?: string }).type === "entity.too.large") {
+			res.status(413).type("text/plain").send(`That file is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB.`);
 			return;
 		}
 		const message = error instanceof Error ? error.message : String(error);

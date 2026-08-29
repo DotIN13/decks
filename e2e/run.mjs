@@ -29,6 +29,7 @@ const CHECKS = [
 	{ file: "gestures.mjs", needsAgent: false },
 	{ file: "embed-scroll.mjs", needsAgent: false },
 	{ file: "editing.mjs", needsAgent: false },
+	{ file: "file-drop.mjs", needsAgent: false },
 	{ file: "no-flicker.mjs", needsAgent: false },
 	{ file: "tiers.mjs", needsAgent: false },
 	{ file: "deleted-board.mjs", needsAgent: false },

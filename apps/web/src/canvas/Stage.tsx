@@ -4,6 +4,7 @@ import { boxOf, fit, INTERACT_ZOOM, pan, toScreen, zoomAbout, type Viewport } fr
 import { BoardFrame } from "./BoardFrame.tsx";
 import { notePointer } from "../lib/panels.ts";
 import type { EditorHost } from "./Editor.ts";
+import type { FileDropHost } from "./file-drop.ts";
 import type { FrameGestureHost } from "./frame-gestures.ts";
 
 /**
@@ -32,6 +33,8 @@ export function Stage(props: {
 	/** So the server can answer `stage.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
 	editor: EditorHost;
+	/** A file dropped from the desktop onto a board, per board (`file-drop.ts`). */
+	drops: (path: string) => FileDropHost;
 	/** Which revision each frame is showing; see `selfEdited` in App. */
 	frameRevs?: Record<string, number>;
 	/** While previewing a past point: board path -> revision sha to render instead. */
@@ -235,6 +238,7 @@ export function Stage(props: {
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
 							editor={props.editor}
 							gestures={gestures}
+							drops={props.drops(board.path)}
 							showRev={props.frameRevs?.[board.path]}
 							previewSha={props.preview?.[board.path]}
 							onSelect={() => props.onSelect(board.path)}

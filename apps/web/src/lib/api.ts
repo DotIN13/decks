@@ -1,11 +1,13 @@
 import type { Board, DeckState } from "@decks/protocol";
 
 /**
- * The read-only half of the server, over HTTP.
+ * The server's file surface, over HTTP: what a URL is, for reading.
  *
- * Anything that changes state goes over the socket instead, so this stays a
- * handful of GETs — which is also why there is no error-handling ceremony here:
- * a failed read is a caller's problem to show, not a thing to retry silently.
+ * State changes go over the socket, so this stays a handful of GETs — which is
+ * also why there is no error-handling ceremony here: a failed read is a caller's
+ * problem to show, not a thing to retry silently. The one exception is bytes,
+ * which are not state: a file the user drops on a board is POSTed in
+ * `upload.ts`, where it can be streamed and its progress reported.
  */
 export async function fetchDeck(): Promise<{ deck: DeckState; warnings: string[] }> {
 	const response = await fetch("/api/deck");

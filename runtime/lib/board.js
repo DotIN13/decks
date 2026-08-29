@@ -308,6 +308,52 @@
 		return { head, body, note: right };
 	}
 
+	/**
+	 * The extensions rendered as escaped preformatted text.
+	 *
+	 * Two families were originally one: `.txt` was handled inside the markdown branch
+	 * and everything else with a `.py` or a `.json` in it fell through to the generic
+	 * "here is a file" chip, which is a blank box with a name on it. Source is the
+	 * thing people most often want *on* a board next to a plan, so it is a family.
+	 *
+	 * Rendered with `textContent`, never `innerHTML`: a `.json` containing `<script>`
+	 * is a file with those characters in it, and a board is same-origin (DESIGN §4),
+	 * so parsing it as markup would be the one place foreign bytes could execute with
+	 * the app's authority.
+	 */
+	const TEXTUAL = new Set([
+		"txt", "text", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "ini", "cfg", "conf", "env",
+		"ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rb", "go", "rs", "java", "kt", "c", "h", "cc", "cpp", "hpp",
+		"cs", "swift", "php", "sh", "bash", "zsh", "fish", "sql", "css", "scss", "less", "diff", "patch",
+	]);
+
+	/** How much of a text file is drawn. A 50MB log must not become a 50MB DOM node. */
+	const TEXT_LIMIT = 256 * 1024;
+
+	/**
+	 * Which family an extension belongs to — the one place that decides.
+	 *
+	 * It was a ladder of `if`s inside the mount, which was fine until there were six
+	 * of them and the fallback stopped being an edge case: "anything" is the whole
+	 * point of an embed, so what happens to an unrecognised file is a family too.
+	 */
+	function familyOf(extension) {
+		if (["md", "markdown", "mdx"].includes(extension)) return "md";
+		if (extension === "pdf") return "pdf";
+		if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"].includes(extension)) return "image";
+		if (["html", "htm", "xhtml"].includes(extension)) return "html";
+		if (TEXTUAL.has(extension)) return "text";
+		return "file";
+	}
+
+	/** A byte count as a person would say it. */
+	function sizeLabel(bytes) {
+		if (!Number.isFinite(bytes) || bytes <= 0) return "";
+		if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+		if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+		return `${bytes} B`;
+	}
+
 	async function mountEmbed(host) {
 		const raw = host.dataset.embed;
 		const url = urlFor(raw);
@@ -325,32 +371,69 @@
 		 */
 		const extension = (String(raw).split("?")[0].split("#")[0].match(/\.([a-z0-9]+)$/i)?.[1] ?? "").toLowerCase();
 		const mode = host.dataset.mode ?? "live";
+		const family = familyOf(extension);
 
 		try {
-			if (["md", "markdown", "mdx", "txt", "text"].includes(extension)) {
+			if (family === "md") {
 				const { body, note } = chrome(host, "md", label);
 				const response = await fetch(url);
 				if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
 				const text = await response.text();
-				if (extension === "txt" || extension === "text") {
-					const pre = document.createElement("pre");
-					pre.textContent = text;
-					body.appendChild(pre);
-				} else {
-					await renderMarkdown(body, text);
-				}
+				await renderMarkdown(body, text);
 				note.textContent = `${text.split("\n").length} lines`;
 				return;
 			}
 
-			if (extension === "pdf") {
+			if (family === "text") {
+				const { body, note } = chrome(host, "text", label);
+				/*
+				 * Asked for by range, so the truncation happens on the wire rather than in
+				 * memory: `/api/board` and `/api/f` both send with `acceptRanges`, and a
+				 * board that fetched a 50MB log in full would stall every other mount
+				 * behind it — `__boardReady` waits for all of them.
+				 *
+				 * A server that ignores the header answers 200 with everything, so the
+				 * slice below is the second half of the same guard.
+				 */
+				const response = await fetch(url, { headers: { Range: `bytes=0-${TEXT_LIMIT - 1}` } });
+				if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+				const whole = await response.text();
+				const text = whole.slice(0, TEXT_LIMIT);
+				/*
+				 * A 206 does *not* mean truncated: a range wider than the file is answered
+				 * with the whole file and a 206 anyway, so every text embed claimed to be
+				 * "the first 256 KB". `Content-Range` carries the real total, and the
+				 * character-count fallback is for a server that ignored the header.
+				 */
+				const total = Number(String(response.headers.get("content-range") ?? "").split("/")[1]);
+				const partial = Number.isFinite(total) ? total > TEXT_LIMIT : whole.length >= TEXT_LIMIT;
+				const pre = document.createElement("pre");
+				// textContent: this is somebody else's file, and it is text.
+				pre.textContent = text;
+				body.appendChild(pre);
+				if (partial) {
+					const rest = document.createElement("a");
+					rest.className = "more";
+					rest.href = url;
+					rest.target = "_blank";
+					rest.rel = "noreferrer";
+					rest.textContent = "open the whole file";
+					body.appendChild(rest);
+				}
+				note.textContent = partial
+					? `first ${sizeLabel(TEXT_LIMIT)}${Number.isFinite(total) ? ` of ${sizeLabel(total)}` : ""}`
+					: `${text.split("\n").length} lines`;
+				return;
+			}
+
+			if (family === "pdf") {
 				const { body, note } = chrome(host, "pdf", label, "loading…");
 				const pages = await renderPdf(body, url, host.dataset.pages, host.clientWidth - 2);
 				note.textContent = host.dataset.pages ? `pages ${host.dataset.pages} of ${pages}` : pages;
 				return;
 			}
 
-			if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg"].includes(extension)) {
+			if (family === "image") {
 				const { body } = chrome(host, "image", label);
 				const img = document.createElement("img");
 				img.src = url;
@@ -359,7 +442,7 @@
 				return;
 			}
 
-			if (["html", "htm", "xhtml"].includes(extension)) {
+			if (family === "html") {
 				const { body, note } = chrome(host, "html", label, mode === "snapshot" ? "snapshot" : "live");
 				/*
 				 * The one place a board contains something it did not write.
@@ -380,7 +463,15 @@
 				return;
 			}
 
-			// Something else: say what it is and how big, rather than showing a blank.
+			/*
+			 * Anything else — a `.zip`, a `.sketch`, a file with no extension at all.
+			 *
+			 * This is the branch that decides whether "drop anything onto a board" is
+			 * true, so it is a component rather than an apology: the name, the size, the
+			 * kind, and two things to do with it. A blank box with a console warning
+			 * behind it was the previous answer, and a user looking at the board could
+			 * not tell it from a broken embed.
+			 */
 			const { body, note } = chrome(host, "file", label);
 			let size;
 			try {
@@ -389,7 +480,7 @@
 				const length = Number(head.headers.get("content-length"));
 				if (Number.isFinite(length) && length > 0) size = length;
 			} catch {
-				/* the card is worth showing even when the size is not known */
+				/* the chip is worth showing even when the size is not known */
 			}
 			const link = document.createElement("a");
 			link.href = url;
@@ -397,9 +488,20 @@
 			link.rel = "noreferrer";
 			link.textContent = label;
 			const meta = document.createElement("span");
-			meta.textContent = size ? `${(size / 1024).toFixed(0)} KB` : extension ? `.${extension}` : "file";
-			body.append(link, meta);
-			note.textContent = "open";
+			meta.className = "meta";
+			meta.textContent = [extension ? `${extension.toUpperCase()} file` : "file", sizeLabel(size)]
+				.filter(Boolean)
+				.join(" · ");
+			// `download` and not another `target=_blank`: for a type the browser cannot
+			// display, opening is a download that looks like a failed navigation, and for
+			// one it can, a person who wants the file wants the file.
+			const save = document.createElement("a");
+			save.className = "more";
+			save.href = url;
+			save.download = label;
+			save.textContent = "download";
+			body.append(link, meta, save);
+			note.textContent = extension || "file";
 		} catch (error) {
 			const { body } = chrome(host, "missing", label, "not available");
 			const message = document.createElement("span");

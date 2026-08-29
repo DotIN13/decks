@@ -33,7 +33,7 @@ $DECKS_DATA_DIR/     default ~/.decks · npm run dev uses <repo>/data · tests a
     deck.json        the arrangement, and the roots embeds may reach
     boards/*.html    the boards
     lib/             the primitives, copied in so a board is standalone
-    assets/          images the boards use
+    assets/          images the boards use, and the files the user drops on them
     .decks/          revisions and avatars — never watched, never served except by hash
   shared/            optional; the demo uses one as an out-of-deck root
 ```
@@ -137,6 +137,18 @@ understand survive a write (`schema.ts`). It is a file a person is expected to o
   waits for it before measuring; the agent's Playwright waits for it before shooting.
   Without it a screenshot is a race, and the race is usually lost.
 
+**An embed is sorted into a family by extension, and the last family is "anything".**
+Markdown, PDF (with page ranges), image, HTML, and plain-text-or-source — the last
+rendered as escaped preformatted text through `textContent`, never as markup, and asked
+for with a `Range` header so a 50MB log truncates on the wire rather than in a DOM node
+every other mount waits behind. What is left over is not an error case: a file with no
+family becomes a chip naming it, its size and its kind, with an open and a download,
+because "put anything on a board" is the promise and a blank box with a console warning
+behind it is indistinguishable from a broken embed. `familyOf` in `board.js` is the one
+place that decides, and the file picker's icons and the drop's default box shape both
+name the same list from their own side — `board.js` is standalone by design (§3) and
+cannot import from the app.
+
 The revision of a board is a **hash of its contents**, not its modification time.
 Mtime was the obvious choice and the wrong one: it has millisecond resolution, so two
 writes inside the same millisecond leave it unchanged and the frame never reloads.
@@ -154,6 +166,20 @@ editing are ordinary app code. There is no bridge, no `postMessage` protocol and
 capability token anywhere in the system. The first thing this buys is small and
 telling: a dark shell hands its `data-theme` to its boards in three lines
 (`lib/theme.ts`), and a board that named its own theme keeps it.
+
+**Inside the deck, only a board gets the origin.** `/api/board/*path` serves the whole
+deck, because that is what makes a board's own `../assets/photo.png` and
+`../lib/board.css` resolve — so "same origin, no sandbox" cannot be a property of the
+route. It is a property of *being a board*: a path under `boards/` ending in `.html`
+gets `boardHeaders`, and everything else gets `assetHeaders`, which adds
+`Content-Security-Policy: sandbox allow-scripts` to anything a browser would run. That
+distinction was cosmetic until the user could drop a file onto a board (§6.9): an
+uploaded `evil.html` served with the app's origin is a stored cross-site script, and
+`data-embed="../assets/evil.html"` writes the URL into a board file where somebody
+will eventually open it in a tab. The rule is decided from the shape of the path rather
+than by asking the open deck, because a board written a second ago is on disk before the
+watcher has mentioned it, and a board served as an asset loses the origin the editor
+needs.
 
 **A foreign file is quarantined.** `/api/file` is read-only, resolves only inside a
 root declared in `deck.json`, never follows a symlink out, never lists a directory,
@@ -421,6 +447,70 @@ now (§7). And a pending question is replayed in the agent's greeting — it was
 a browser that then reloaded, and the agent waited forever on an answer that could no longer
 arrive.
 
+### 6.9 Files the user drops in
+
+Everything that changes state goes over the socket (§5) — but bytes are not state, so a
+file dragged in from the desktop is the one thing that arrives as a request body:
+`POST /api/upload?name=…`, one file per request, the bytes raw. Not
+`multipart/form-data`, which would be a parser and therefore a dependency for no gain;
+one request per file is also what lets the browser report progress per file and land each
+one as its own component.
+
+**A dropped file is copied into the deck.** `assets/` already meant "the images the
+boards use", and a deck is meant to be self-contained: an embed pointing at
+`~/Desktop/photo.png` is a board that breaks the first time the user tidies up, and it
+would not survive being handed to another machine either.
+
+This is the first thing in Decks that writes bytes the user did not name, so the guards
+are worth listing, and so is what they do not cover.
+
+- **One directory.** `resolveAssetWrite` in `deck/roots.ts` — every path decision is
+  still in that one file — takes a plain file name and answers with a path inside
+  `<deck>/assets`, resolving symlinks before both containment tests, since an `assets`
+  that is a link out of the deck is as much a way out as a name that is.
+- **The name is derived, not trusted.** `assetName` reduces whatever the browser sent to
+  a basename over a conservative ASCII alphabet: no separators of either kind, no `..`,
+  no control characters, no leading dot (so an upload can never be a dotfile, and never
+  addresses `.decks/`). It *repairs*; `resolveAssetWrite` then *refuses* anything that
+  still does not look like a plain name, so a bug in the repair is a 403 rather than a
+  traversal. A test asserts every name the first produces is one the second accepts,
+  because the interesting failure is those two drifting apart.
+- **A cap checked before the body is buffered.** `MAX_UPLOAD_BYTES` (32MB) lives in the
+  protocol package so both sides know it; `express.raw` refuses on `Content-Length`
+  before reading a byte and again on a chunked body that lied, and the answer is a 413
+  with a sentence.
+- **Nothing is overwritten, and identical files are stored once.** The name stays
+  readable and a clash becomes `photo-2.png`; the content hash is used for *comparison*
+  rather than as the file name. Naming files after their hash was the alternative and it
+  is worse where it matters: `assets/` is a directory a person opens and an agent greps,
+  and `data-embed="../assets/9f3c…d1.png"` tells neither of them anything. The write is
+  `O_EXCL`, so "never overwrite" survives the gap between the check and the write.
+- **An uploaded HTML file cannot script the app.** See §4: an asset that a browser would
+  run is served sandboxed even though it lives inside the deck.
+- **One CSRF-shaped check**, because it is free: `Sec-Fetch-Site` is set by the browser
+  and cannot be forged by page script, so an upload that says `cross-site` is refused. An
+  absent header is allowed — `curl` and older Safari do not send one.
+
+**What is deliberately not defended against.** There is no authentication anywhere
+(DEPLOYMENT §1), and this route does not invent any: `/ws` next door accepts every frame
+from every origin and runs `bash`, and WebSockets are not subject to CORS, so a hostile
+page in a browser pointed at the port already has strictly more than this offers. Nor is
+there a quota — the cap is per file, not per deck — no rate limit, no scanning of what is
+uploaded, and no re-encoding of images: an uploaded PNG is stored as it arrived and drawn
+by the browser's own decoder. Windows-reserved names (`nul.txt`) are not special-cased.
+
+**The agent hears about it for free.** A drop is an ordinary `insert` patch, so it goes
+through the same path a palette insert does and produces the same "the user edited this
+board" nudge (§6.5) — with the embed's path named in the summary, since "added embed
+#embed-2" would leave the agent unable to see the file the user just dropped without
+re-reading the board to find out what it points at.
+
+**Two inserts in one batch used to collide.** Ids are minted on the server against the
+file as it is (§6.5), and the batch was named up front — so two files dropped together
+both became `embed-1` and the second was refused for a name the first had only just
+taken. `applyPatches` now takes the minting function and calls it per patch, against the
+file the previous patch produced.
+
 ## 7. The canvas
 
 One CSS transform over an absolutely-positioned layer of frames. The boards live in
@@ -442,6 +532,32 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
   since the zoom is a transform on an ancestor) and deltas are passed through
   unchanged; a test pans by the same delta over bare stage and over a board and
   insists the camera moves equally.
+- **A file dropped on a board is the same problem, and the same answer.** A drag from the
+  desktop over a board produces `dragover`/`drop` inside the frame's document and nothing
+  in the app's, so `file-drop.ts` listens inside the frame exactly as `frame-gestures.ts`
+  does. Drag events carry `clientX/clientY` in the frame's pixels, which are board
+  pixels, so the drop point needs no camera maths either — asserted by a check that drops
+  at a known point and reads back the `left`/`top` the server wrote, rather than assumed
+  from the pointer case. The highlight is an element appended to the board's document and
+  marked `data-decks-ui`, like the editor's handles, and it is driven by a *counter* over
+  `dragenter`/`dragleave`: both fire per element crossed and both bubble, so a boolean
+  made the highlight strobe as the cursor passed over a card. A batch flows rightwards
+  from the drop point and wraps at the board's own width; each component is sized for what
+  it holds, an image from its own pixels. The first version cascaded them a few pixels
+  apart, which for five embeds is a pile in which four are unreadable.
+- **The app's document swallows file drags globally**, because the browser's default for a
+  dropped file is to navigate to it — which would unload the SPA, socket and camera and
+  all, to show a PNG. Reaching the parent's handler means the drop missed every live
+  board, since a drop over one is consumed inside that frame, and the answer there is a
+  notice: an embed belongs to a board, and inventing a board to hold a file dropped on
+  empty canvas would be the app deciding something it was not asked to. Zoomed out past
+  `INTERACT_ZOOM` the frames take no pointer events at all, so a drop then lands on the
+  stage; the notice says to zoom in when the cursor was over a board.
+- **An insert is the one edit that does want the frame to reload.** The pin (below) exists
+  because the editor has already mutated the frame's DOM — true of a drag, false of an
+  insert, whose component exists only in the file, because the server mints the id and
+  writes the markup. Pinned, a dropped file landed in `assets/`, landed in the board's
+  source, and appeared nowhere on screen.
 - **Space is held in one place.** Each document only sees the keys pressed while it has
   focus, so a space pressed over the canvas and a drag begun over a board were two
   documents with two opinions. The stage owns the answer and the frames ask it.
@@ -558,7 +674,7 @@ All six milestones, each verified against the real app rather than only unit-tes
 
 | | |
 |---|---|
-| M1 | Deck, stage, embeds: pan/zoom, drag-to-arrange, md/pdf/html/image embeds, live reload. |
+| M1 | Deck, stage, embeds: pan/zoom, drag-to-arrange, md/pdf/html/image/text embeds, files dropped in from the desktop, live reload. |
 | M2 | One agent: Pi adapter, transcript, composer, extension-UI bridge, both skills. |
 | M3 | `stage_eval`: stage service, eval, identity, state rebuilt from the branch. |
 | M4 | The user draws: editor, palette, patches, revisions, undo, the agent is told. |
@@ -579,6 +695,10 @@ All six milestones, each verified against the real app rather than only unit-tes
   restore boards` row. Both want rethinking for touch, where there is no cursor to approach
   an edge with and no hover to preview from.
 - Arrows cannot be drawn from the palette — connectors are the agent's to write.
+- A dropped file only lands on a board, and only while the board is live: on empty canvas
+  it is refused with a notice, and there is no drop onto a rail thumbnail (they are
+  `pointer-events: none`, so such a drop is the stage's and gets the same notice). Pasting
+  an image from the clipboard is the obvious sibling and is not built.
 - A rewind truncates our transcript by matching the rewound message's text, which is
   what `navigateTree` hands back. Two identical messages in one conversation would cut
   at the first.

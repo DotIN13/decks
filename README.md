@@ -38,7 +38,7 @@ $DECKS_DATA_DIR/          default ~/.decks · npm run dev uses <repo>/data
     deck.json             where the boards sit, and which roots embeds may reach
     boards/*.html         the boards. The artifact
     lib/                  the primitives, copied in so a board renders on its own
-    assets/               images the boards use
+    assets/               images the boards use, and the files you drop on them
     .decks/               revisions and agent avatars — never served except by hash
 ```
 
@@ -73,7 +73,15 @@ deck directory.
   to see what is happening. It holds a set of boards in context and chooses which of them
   to put in play; the chat says which board and why.
 - **Embeds.** A board can show your real documents — markdown, PDF with page ranges,
-  HTML, images — from the deck or from a root declared in `deck.json`.
+  HTML, images, plain text and source — from the deck or from a root declared in
+  `deck.json`. Anything the board cannot draw becomes a chip naming the file, its size
+  and its kind, which opens or downloads it.
+- **Drag files in.** Drop files from your desktop onto a board and they land there as
+  embeds, at the point you dropped them. The bytes are copied into the deck's
+  `assets/` — a deck is self-contained, so an embed of something on your desktop would
+  be a board that breaks the moment you tidy up. Identical files are stored once, and
+  nothing is ever overwritten. The agent is told what you dropped, the same way it is
+  told about any other edit you make to a board.
 - **Two runtimes.** An agent runs on [pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
   or on Claude Code, chosen when you create it and fixed for its life; `DECKS_BACKEND=pi|claude`
   sets what `+` gives you. Claude agents also carry a mode — ask first, edit freely, plan
@@ -87,8 +95,8 @@ deck directory.
 
 ## Development
 ```bash
-npm test            # 83 unit tests: config, path guards, patches, revisions, eval, camera
-npm run test:e2e    # 93 browser checks against a throwaway copy of example/ (~35s)
+npm test            # 121 unit tests: config, path guards, uploads, patches, revisions, eval, camera
+npm run test:e2e    # 109 browser checks against a throwaway copy of example/ (~50s)
 npm run typecheck
 npm run vendor      # re-copy the board primitives into runtime/lib
 npm run sync:lib    # push runtime/lib into example/decks/lib after editing it

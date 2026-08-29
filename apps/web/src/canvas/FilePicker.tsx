@@ -93,16 +93,27 @@ export function FilePicker(props: { onPick: (path: string) => void; onCancel: ()
  *
  * The picker already knows the extension, and a directory that looked like `▸` beside a
  * file that looked like `·` was very nearly no information at all. The families are the
- * ones `board.js` sorts an embed into — prose, picture, markup, PDF — so a row's icon
- * answers "what will this look like on the board" rather than naming a filetype, and
- * anything outside them gets the plain file the board would fall back to.
+ * ones `board.js` sorts an embed into — prose, picture, markup, PDF, plain text and
+ * source — so a row's icon answers "what will this look like on the board" rather than
+ * naming a filetype, and anything outside them gets the plain file the board falls back
+ * to: a chip naming it, which is still a component and still opens.
  */
 function iconFor(entry: BrowseEntry): LucideIcon {
 	if (entry.kind === "dir") return Folder;
 	const extension = entry.name.slice(entry.name.lastIndexOf(".") + 1).toLowerCase();
-	if (["md", "markdown", "mdx", "txt", "text"].includes(extension)) return FileText;
+	if (["md", "markdown", "mdx"].includes(extension)) return FileText;
 	if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg"].includes(extension)) return FileImage;
 	if (["html", "htm", "xhtml"].includes(extension)) return FileCode;
 	if (extension === "pdf") return FileType;
+	// Text and source both render as escaped preformatted text on a board, so they
+	// share an icon with markup rather than with prose: what you get is the source.
+	if (PREFORMATTED.has(extension)) return FileCode;
 	return File;
 }
+
+/** The extensions `board.js` renders as preformatted text; see its `TEXTUAL` list. */
+const PREFORMATTED = new Set([
+	"txt", "text", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "ini", "cfg", "conf", "env",
+	"ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rb", "go", "rs", "java", "kt", "c", "h", "cc", "cpp", "hpp",
+	"cs", "swift", "php", "sh", "bash", "zsh", "fish", "sql", "css", "scss", "less", "diff", "patch",
+]);

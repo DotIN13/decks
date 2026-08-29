@@ -5,6 +5,7 @@ import { Icon } from "../icons.tsx";
 import { boardUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../lib/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
+import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
 import { paintFrame } from "../lib/theme.ts";
 
@@ -40,6 +41,8 @@ export function BoardFrame(props: {
 	editor: EditorHost;
 	/** Canvas gestures that start inside the frame and belong to the stage. */
 	gestures: FrameGestureHost;
+	/** A file dragged in from the desktop, which also arrives inside the frame. */
+	drops: FileDropHost;
 	/**
 	 * The revision this frame should display, when that is not the newest one — after
 	 * this browser's own edit, the DOM is already correct and reloading it would
@@ -54,9 +57,11 @@ export function BoardFrame(props: {
 }) {
 	let detachEditor: (() => void) | undefined;
 	let detachGestures: (() => void) | undefined;
+	let detachDrop: (() => void) | undefined;
 	onCleanup(() => {
 		detachEditor?.();
 		detachGestures?.();
+		detachDrop?.();
 	});
 
 	const [dragging, setDragging] = createSignal(false);
@@ -234,8 +239,10 @@ export function BoardFrame(props: {
 							// listeners went with the old one.
 							detachEditor?.();
 							detachGestures?.();
+							detachDrop?.();
 							detachEditor = attachEditor(frame, props.board.path, props.editor);
 							detachGestures = attachFrameGestures(frame, props.gestures);
+							detachDrop = attachFrameDrop(frame, props.drops);
 						}}
 					/>
 				</Show>

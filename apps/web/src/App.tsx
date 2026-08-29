@@ -4,6 +4,7 @@ import type {
 	AgentModel,
 	AgentUsage,
 	Board,
+	BoardPatch,
 	Camera,
 	ChatItem,
 	DeckState,
@@ -20,6 +21,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { createStore, reconcile } from "solid-js/store";
 import { BoardRail } from "./canvas/BoardRail.tsx";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
+import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
 import { Palette } from "./canvas/Palette.tsx";
@@ -33,6 +35,7 @@ import { Composer } from "./chat/Composer.tsx";
 import { TurnBar, turnsOf } from "./chat/TurnBar.tsx";
 import { boxOf, fit, INTERACT_ZOOM } from "./lib/camera.ts";
 import { connect, type Socket } from "./lib/socket.ts";
+import { embedPath, uploadAsset } from "./lib/upload.ts";
 import { createPanels } from "./lib/panels.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 
@@ -165,6 +168,29 @@ export function App() {
 		// burst of warnings does not become a wall.
 		const linger = Math.min(12000, Math.max(4000, (text.length / 20) * 1000));
 		setTimeout(() => setState("notices", (all) => all.filter((item) => item.id !== id)), linger);
+	};
+
+	/**
+	 * A notice that lasts as long as the work it describes.
+	 *
+	 * The timed notices above are for things that have already happened. An upload has
+	 * not: it takes as long as the file is big, and a message that expires after four
+	 * seconds while the bytes are still going is worse than none. So this one is held
+	 * open by the caller, rewritten as the work progresses, and replaced by an ordinary
+	 * timed notice when it ends.
+	 */
+	const working = (text: string) => {
+		const id = ++noticeId;
+		setState("notices", (all) => [...all, { id, level: "info" as const, text }]);
+		const drop = () => setState("notices", (all) => all.filter((item) => item.id !== id));
+		return {
+			update: (next: string) =>
+				setState("notices", (all) => all.map((item) => (item.id === id ? { ...item, text: next } : item))),
+			done: (final?: string, level: Notice["level"] = "info") => {
+				drop();
+				if (final) notice(level, final);
+			},
+		};
 	};
 
 	onMount(() => {
@@ -466,11 +492,22 @@ export function App() {
 			const board = state.boards.find((candidate) => candidate.path === path);
 			if (!board) return;
 			patching.add(path);
-			// Pin to what the frame is showing *now*, before the write lands — and only if
-			// it is not already pinned. Re-pinning on each edit moves the pin to the newest
-			// rev while the document on screen is still the one it first loaded, so the URL
-			// changes and the frame reloads: the flash came back on the second drag.
-			if (!frameRevs[path]) setFrameRevs(path, board.rev);
+			/*
+			 * Pin to what the frame is showing *now*, before the write lands — and only if
+			 * it is not already pinned. Re-pinning on each edit moves the pin to the newest
+			 * rev while the document on screen is still the one it first loaded, so the URL
+			 * changes and the frame reloads: the flash came back on the second drag.
+			 *
+			 * An insert is the exception, and has to actively *unpin*. The pin's premise is
+			 * that the frame's DOM is already correct because the editor mutated it — true
+			 * of a drag, false of an insert, whose component exists only in the file: the
+			 * server mints the id and writes the markup, deliberately (§6.5). Pinned, a
+			 * dropped file landed in `assets/`, landed in the board's source, and appeared
+			 * nowhere on screen until something else reloaded the frame. One reload beats a
+			 * component the user cannot see.
+			 */
+			if (patches.some((patch) => patch.op === "insert")) setFrameRevs(path, 0);
+			else if (!frameRevs[path]) setFrameRevs(path, board.rev);
 			socket.send({ type: "board.patch", path, rev: board.rev, patches });
 		},
 		undo: (path) => socket.send({ type: "board.undo", path }),
@@ -486,6 +523,107 @@ export function App() {
 		// because we are zoomed out, there is nothing to edit with.
 		enabled: () => camera().zoom >= INTERACT_ZOOM,
 	};
+
+	/**
+	 * A file dragged in from the desktop, landing on a board as an embed (§3).
+	 *
+	 * The order matters and is the reason this is not two lines: the bytes have to be
+	 * *in* the deck before a board can point at them, so every file is uploaded first
+	 * and the inserts go out afterwards as **one** patch. One patch and not one each
+	 * because a patch carries the revision it was composed against — a second patch
+	 * sent before the first has come back would be refused as stale, and three files
+	 * dropped together would land as one.
+	 *
+	 * Uploads are sequential rather than parallel, so the progress line means
+	 * something: four bars all at 30% is not information anybody can act on.
+	 */
+	const dropOnBoard = async (path: string, files: File[], at: { x: number; y: number }) => {
+		const board = state.boards.find((candidate) => candidate.path === path);
+		if (!board) return;
+		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
+		// The insert variant specifically, so the summary below can read back `embed`.
+		const inserts: Extract<BoardPatch, { op: "insert" }>[] = [];
+		const failures: string[] = [];
+		let reused = 0;
+
+		/*
+		 * Laid out before anything is uploaded, and for the whole batch at once. The
+		 * shapes are read from the files locally — an image's own pixels, mostly — and
+		 * `flow` needs to see all of them to put them in a row that wraps at the board's
+		 * edge instead of a pile at the cursor.
+		 */
+		const boxes = flow(await Promise.all(files.map(shapeFor)), at, board.w);
+
+		for (const [index, file] of files.entries()) {
+			const of = files.length > 1 ? `${index + 1} of ${files.length} · ` : "";
+			try {
+				const asset = await uploadAsset(file, (fraction) =>
+					report.update(`${of}${file.name} — ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+				);
+				if (asset.reused) reused += 1;
+				inserts.push({
+					op: "insert",
+					// `image` and `embed` render the same markup; the kind is what names the
+					// component, so `image-1` in the file says what it is without opening it.
+					kind: isImage(file) ? "image" : "embed",
+					id: "",
+					at: boxes[index]!,
+					embed: embedPath(path, asset.path),
+				});
+			} catch (error) {
+				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+
+		if (inserts.length > 0) editor.patch(path, inserts);
+		const added =
+			inserts.length === 0
+				? ""
+				: `${inserts.length === 1 ? inserts[0]?.embed?.split("/").pop() : `${inserts.length} files`} added${reused > 0 ? ` (${reused} already in the deck)` : ""}`;
+		report.done([added, ...failures].filter(Boolean).join(" · ") || undefined, failures.length > 0 ? "warn" : "info");
+	};
+
+	/**
+	 * What a board frame hands back when files are dropped inside it (`file-drop.ts`).
+	 *
+	 * Per board, because the drop belongs to the board it landed on: the frame knows
+	 * where in its own document the cursor was, and those pixels are board pixels.
+	 */
+	const drops = (path: string): FileDropHost => ({
+		enabled: () => editor.enabled(),
+		drop: (files, at) => void dropOnBoard(path, files, at),
+	});
+
+	/*
+	 * The browser opens a dropped file by default, which would unload the app — socket,
+	 * camera, transcript and all — to show a picture. Guarded on the whole document
+	 * rather than over the canvas, because "anywhere" includes the chat column and the
+	 * gap between boards.
+	 *
+	 * Reaching here means the drop missed every live board, since a drop over one is
+	 * consumed inside that frame's document. The answer is a notice and nothing else:
+	 * an embed belongs to a board, and inventing a board to hold a file the user
+	 * dropped on empty canvas would be the app deciding something it was not asked to.
+	 */
+	onMount(() => {
+		onCleanup(
+			guardDocumentDrops(document, (at) => {
+				const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node");
+				// While the timeline is being previewed the frames take no pointer events, so
+				// every drop arrives here — and "zoom in" would be a lie about why.
+				if (state.preview) {
+					notice("info", "That is a board as it used to be. Let go of the timeline first.");
+					return;
+				}
+				notice(
+					"info",
+					over
+						? "Zoom in until the board is live, then drop the file on it."
+						: "Drop a file onto a board — an embed lives on a board, not on the canvas.",
+				);
+			}),
+		);
+	});
 
 	const turns = createMemo(() => turnsOf(transcript(), panels.right.open() ? Number.POSITIVE_INFINITY : seenAt()));
 
@@ -542,6 +680,7 @@ export function App() {
 					cursor={state.cursor}
 					onViewport={() => reportCamera(camera())}
 					editor={editor}
+					drops={drops}
 					frameRevs={frameRevs}
 					preview={state.preview?.boards}
 				/>
@@ -725,6 +864,13 @@ export function App() {
 			</div>
 		</div>
 	);
+}
+
+/** A byte count as a person would say it, for a progress line. */
+function sizeLabel(bytes: number): string {
+	if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+	if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+	return `${bytes} B`;
 }
 
 function fitAll(boards: Board[], setCamera: (camera: Camera) => void): void {

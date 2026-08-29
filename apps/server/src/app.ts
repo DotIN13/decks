@@ -485,12 +485,11 @@ export class App {
 			 * A name has to be unique against the file as it is now, and only the server
 			 * has that — two tabs inserting at once would otherwise both pick
 			 * `sticky-3`, and the second insert would be refused for a reason that reads
-			 * like a bug.
+			 * like a bug. Handed to `applyPatches` as a function rather than applied to
+			 * the batch first, so each insert is named against the file the one before it
+			 * produced: dropping two files on a board is one batch of two inserts.
 			 */
-			const named = patches.map((patch) =>
-				patch.op === "insert" && !patch.id ? { ...patch, id: mintId(before, patch.kind) } : patch,
-			);
-			const { html, summary } = applyPatches(before, named);
+			const { html, summary } = applyPatches(before, patches, mintId);
 			if (html === before) {
 				reply({ type: "board.patched", path, rev: board.rev });
 				return;
