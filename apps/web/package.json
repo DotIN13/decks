@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@decks/protocol": "*",
+    "lucide-solid": "^1.37.0",
     "solid-js": "^1.9.14"
   },
   "devDependencies": {

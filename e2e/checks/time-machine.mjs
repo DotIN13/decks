@@ -14,7 +14,7 @@ try {
 	// A fresh agent, so the history is this run's.
 	await page.mouse.move(6, 480);
 	await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
-	await page.locator(".chats .rail-head button", { hasText: "+" }).click();
+	await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 	await settle(page, 1200);
 	await page.mouse.move(800, 500);
 

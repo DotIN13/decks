@@ -41,6 +41,26 @@ await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });
 const palette = await onScreen(".palette");
 say("the palette sits clear of the agent list", palette.left > 220, JSON.stringify(palette));
 
+/*
+ * Every icon-only button still says what it is.
+ *
+ * The chrome's controls used to be text glyphs — `▹`, `+`, `×`, `◉` — which were their
+ * own accessible names, badly. Now they are Lucide SVGs, and an SVG has no name at all
+ * unless one is given: `aria-hidden` is Lucide's default, so a button with nothing but an
+ * icon in it reads as blank to a screen reader and matches nothing in a check. This runs
+ * with the agent list out and the palette up, so it covers the pin, the `+`, the tools
+ * and the zoom bar in one pass.
+ */
+await page.mouse.move(6, 480);
+await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
+const nameless = await page.evaluate(() =>
+	[...document.querySelectorAll("button")]
+		.filter((button) => button.textContent.trim() === "" && button.querySelector("svg"))
+		.filter((button) => !button.getAttribute("aria-label") && !button.getAttribute("title"))
+		.map((button) => button.className || button.outerHTML.slice(0, 60)),
+);
+say("every icon-only button has an accessible name", nameless.length === 0, nameless.join(" | "));
+
 // A closed panel takes no clicks, so each press reaches for the edge first — which is
 // what a hand has to do too.
 const pressPin = async () => {

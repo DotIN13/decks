@@ -1,5 +1,7 @@
 import type { Board, Camera } from "@decks/protocol";
+import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import { Icon } from "../icons.tsx";
 import { boardUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../lib/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
@@ -182,13 +184,14 @@ export function BoardFrame(props: {
 							class="hide"
 							type="button"
 							title="Take this board off the canvas. The agent keeps it in context."
+							aria-label="Take this board off the canvas"
 							onPointerDown={(event) => event.stopPropagation()}
 							onClick={(event) => {
 								event.stopPropagation();
 								hide()();
 							}}
 						>
-							×
+							<Icon of={X} size={14} />
 						</button>
 					)}
 				</Show>

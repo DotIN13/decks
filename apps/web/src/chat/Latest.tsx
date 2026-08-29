@@ -1,5 +1,7 @@
 import type { ChatItem } from "@decks/protocol";
+import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, Show } from "solid-js";
+import { Icon } from "../icons.tsx";
 
 /**
  * The newest thing the agent said, floating over the canvas above the input bar.
@@ -62,8 +64,14 @@ export function Latest(props: {
 					>
 						{current().text}
 					</button>
-					<button class="dismiss" type="button" title="Dismiss" onClick={() => props.onDismiss(current().id)}>
-						×
+					<button
+						class="dismiss"
+						type="button"
+						title="Dismiss"
+						aria-label="Dismiss"
+						onClick={() => props.onDismiss(current().id)}
+					>
+						<Icon of={X} size={14} />
 					</button>
 				</div>
 			)}

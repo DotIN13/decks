@@ -1,5 +1,8 @@
 import type { AgentMode, AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
+import ArrowUp from "lucide-solid/icons/arrow-up";
+import Square from "lucide-solid/icons/square";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { Icon } from "../icons.tsx";
 
 const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
@@ -153,13 +156,22 @@ export function Composer(props: {
 					</span>
 				</Show>
 
+				{/*
+				 * One control, two meanings, and the icon is whichever one applies: an arrow
+				 * up out of the box you have just typed in, or the square that means stop
+				 * everywhere else. The words "send" and "stop" said the same thing in a
+				 * different alphabet from the rest of the chrome. `data-busy` still carries
+				 * the state, so the colour and the browser checks are unchanged.
+				 */}
 				<button
 					class="send"
 					type="button"
 					data-busy={props.busy}
+					title={props.busy ? "Stop this turn" : "Send"}
+					aria-label={props.busy ? "Stop this turn" : "Send"}
 					onClick={() => (props.busy ? props.onAbort() : send())}
 				>
-					{props.busy ? "stop" : "send"}
+					{props.busy ? <Icon of={Square} size={14} /> : <Icon of={ArrowUp} size={16} />}
 				</button>
 			</div>
 		</section>

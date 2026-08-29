@@ -1,5 +1,9 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
+import CornerDownRight from "lucide-solid/icons/corner-down-right";
+import Pin from "lucide-solid/icons/pin";
+import Plus from "lucide-solid/icons/plus";
 import { For, Show } from "solid-js";
+import { Icon } from "../icons.tsx";
 
 /**
  * The agents, as a messaging app's conversation list.
@@ -35,8 +39,13 @@ export function ChatList(props: {
 			<div class="rail-head">
 				<span>agents</span>
 				<span style={{ flex: 1 }} />
-				<button type="button" title="Start another agent" onClick={() => props.onNew()}>
-					+
+				<button
+					type="button"
+					title="Start another agent"
+					aria-label="Start another agent"
+					onClick={() => props.onNew()}
+				>
+					<Icon of={Plus} size={16} />
 				</button>
 				{/*
 				 * The runtime is picked before the agent exists because it cannot be
@@ -67,9 +76,12 @@ export function ChatList(props: {
 					type="button"
 					data-on={props.pinned}
 					title={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
+					aria-label={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
 					onClick={() => props.onPin(!props.pinned)}
 				>
-					{props.pinned ? "◉" : "○"}
+					{/* One icon for both states, with the colour saying which one it is in:
+					    `Pin` beside `PinOff` reads as "cannot be pinned", not "not pinned". */}
+					<Icon of={Pin} size={14} />
 				</button>
 			</div>
 			<div class="chat-rows">
@@ -94,7 +106,10 @@ export function ChatList(props: {
 								<span class="bottom">
 									<span class="last">
 										<Show when={chat.parentId}>
-											<span class="tag">↳ {props.chats.find((other) => other.id === chat.parentId)?.name ?? "parent"}</span>{" "}
+											<span class="tag">
+												<Icon of={CornerDownRight} size={11} />
+												{props.chats.find((other) => other.id === chat.parentId)?.name ?? "parent"}
+											</span>{" "}
 										</Show>
 										{chat.state === "idle" ? (chat.lastLine ?? "no messages yet") : working(chat.state)}
 									</span>

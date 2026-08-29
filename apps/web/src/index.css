@@ -77,6 +77,44 @@ body {
 
 /* --- app chrome -------------------------------------------------------------- */
 
+/*
+ * Lucide icons, wherever they land.
+ *
+ * Only `flex: none` is really ours — Tailwind's preflight already makes an `svg` a
+ * block, which is what stops an icon reserving a descender under itself and sitting a
+ * pixel low beside its label. What is left is the rule that an icon is never the thing
+ * that gives way: every one of these sits in a flex row next to a label that can be a
+ * long path, and a shrunk icon is a squashed icon. Size, colour and stroke are
+ * deliberately absent — they come from the `Icon` wrapper in `icons.tsx`, so the weight
+ * is one decision in one place.
+ */
+svg.lucide {
+	flex: none;
+}
+
+/*
+ * A button whose whole label is an icon.
+ *
+ * Named rather than inferred, because the sizing is the point: a fixed square with the
+ * icon gridded into the middle, instead of the `font-size` each of these used to carry
+ * to talk a text glyph into looking centred. The two selectors are spelled out because
+ * `.zoombar button` already sets a padding and would otherwise win.
+ */
+.titlebar .icon-button,
+.zoombar .icon-button {
+	display: grid;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	color: var(--faint);
+	place-items: center;
+}
+
+.titlebar .icon-button:hover,
+.zoombar .icon-button:hover {
+	color: var(--fg);
+}
+
 .app {
 	display: grid;
 	height: 100%;
@@ -223,17 +261,18 @@ body {
 
 /* Takes the board off the canvas; appears on hover, like the message actions. */
 .board-node > .chrome .hide {
+	display: grid;
+	width: 18px;
+	height: 18px;
 	margin-left: auto;
-	padding: 0 5px;
+	padding: 0;
 	border: 0;
 	border-radius: 5px;
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
-	font: inherit;
-	font-size: 14px;
-	line-height: 1;
 	opacity: 0;
+	place-items: center;
 	transition: opacity 120ms ease;
 }
 
@@ -415,19 +454,9 @@ body {
 }
 
 .titlebar .icon-button {
-	display: grid;
-	width: 28px;
-	height: 28px;
-	padding: 0;
-	color: var(--faint);
-	place-items: center;
 	/* The bar is a drag handle in a desktop shell, which would otherwise swallow the
 	   click before the button sees it. */
 	-webkit-app-region: no-drag;
-}
-
-.titlebar .icon-button:hover {
-	color: var(--fg);
 }
 
 .zoombar .level {
@@ -759,6 +788,16 @@ body {
 	white-space: nowrap;
 }
 
+/* The chevron that says the row opens. Turned, not swapped for a second icon. */
+.tool > .row .twist {
+	color: var(--faint);
+	transition: transform 120ms ease;
+}
+
+.tool > .row[data-open="true"] .twist {
+	transform: rotate(90deg);
+}
+
 .tool > .row .state {
 	width: 7px;
 	height: 7px;
@@ -959,14 +998,16 @@ body {
 }
 
 .latest .dismiss {
-	padding: 0 4px;
+	display: grid;
+	width: 20px;
+	height: 20px;
+	padding: 0;
 	border: 0;
 	border-radius: 6px;
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
-	font: inherit;
-	line-height: 1.2;
+	place-items: center;
 }
 
 .latest .dismiss:hover {
@@ -1017,6 +1058,19 @@ body {
 	color: var(--muted);
 	font: inherit;
 	font-size: 11px;
+}
+
+/*
+ * A circle, now that it is one icon rather than the word "send" or the word "stop".
+ * Square and centred so the two never change the bar's height between turns.
+ */
+.composer .send {
+	display: grid;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border-radius: 999px;
+	place-items: center;
 }
 
 .composer .send[data-busy="true"] {
@@ -1084,15 +1138,16 @@ body {
 }
 
 .palette button {
+	display: grid;
 	width: 30px;
 	height: 30px;
+	padding: 0;
 	border: 0;
 	border-radius: 8px;
 	background: transparent;
 	color: var(--muted);
 	cursor: pointer;
-	font-family: var(--font-sans);
-	font-size: 14px;
+	place-items: center;
 }
 
 .palette button:hover {
@@ -1131,7 +1186,10 @@ body {
 }
 
 .picker header button {
-	padding: 2px 8px;
+	display: flex;
+	align-items: center;
+	padding: 2px 8px 2px 5px;
+	gap: 3px;
 	border: 1px solid var(--line);
 	border-radius: 7px;
 	background: var(--bg);
@@ -1175,6 +1233,7 @@ body {
 	background: var(--line);
 }
 
+/* The kind of thing a row is, in the same grey as the size on the other end. */
 .picker .entry .glyph {
 	color: var(--faint);
 }
@@ -1257,16 +1316,24 @@ body {
 	padding: 8px 10px 6px;
 }
 
+/*
+ * `inline-grid`, not `grid`: the agent list's head is a line of inline boxes rather than
+ * a flex row, so a block-level button on it stacked the `+`, the runtime and the pin into
+ * a column. Inline keeps the row, the grid still centres the icon in its square, and the
+ * chat header — which *is* a flex row — blockifies it back on its own.
+ */
 .pin {
-	padding: 0 5px;
+	display: inline-grid;
+	width: 20px;
+	height: 20px;
+	padding: 0;
 	border: 0;
 	border-radius: 6px;
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
-	font: inherit;
-	font-size: 12px;
-	line-height: 1;
+	place-items: center;
+	vertical-align: middle;
 }
 
 .pin:hover {
@@ -1279,14 +1346,17 @@ body {
 }
 
 .chats .rail-head button {
-	padding: 0 6px;
+	display: inline-grid;
+	width: 22px;
+	height: 22px;
+	padding: 0;
 	border: 0;
 	border-radius: 6px;
 	background: none;
 	color: var(--muted);
 	cursor: pointer;
-	font: inherit;
-	font-size: 14px;
+	place-items: center;
+	vertical-align: middle;
 }
 
 .chats .rail-head button:hover {
@@ -1398,8 +1468,14 @@ body {
 	white-space: nowrap;
 }
 
+/* The tag sits inside a line of running text, and the arrow in it is a block-level SVG,
+   so the tag itself becomes the small flex box that puts the two on a shared centre. */
 .chat-row .tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
 	color: var(--faint);
+	vertical-align: -1px;
 }
 
 .chat-row .unread {

@@ -1,5 +1,7 @@
 import type { ChatItem } from "@decks/protocol";
+import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createSignal, Show } from "solid-js";
+import { Icon } from "../icons.tsx";
 
 /**
  * A tool call, collapsed to one line.
@@ -16,8 +18,11 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 
 	return (
 		<div class="tool" data-item={props.item.id} data-state={props.item.state}>
-			<button class="row" type="button" onClick={() => setOpen(!open())}>
+			<button class="row" type="button" data-open={open()} onClick={() => setOpen(!open())}>
 				<span class="state" />
+				{/* The row has always been a disclosure without looking like one. The chevron
+				    says so, and turns rather than being swapped for a second icon. */}
+				<Icon of={ChevronRight} class="twist" size={12} />
 				<span class="name">{props.item.name}</span>
 				<span class="title">{props.item.title}</span>
 				<Show when={props.item.images}>{(count) => <span class="name">{count()} img</span>}</Show>

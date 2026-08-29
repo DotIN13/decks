@@ -1,5 +1,7 @@
 import type { AgentChat, ChatItem, Identity } from "@decks/protocol";
+import Pin from "lucide-solid/icons/pin";
 import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
+import { Icon } from "../icons.tsx";
 import { ToolChip } from "./ToolChip.tsx";
 
 /**
@@ -110,9 +112,10 @@ export function Bubbles(props: {
 					type="button"
 					data-on={props.pinned}
 					title={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
+					aria-label={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
 					onClick={() => props.onPin(!props.pinned)}
 				>
-					{props.pinned ? "◉" : "○"}
+					<Icon of={Pin} size={14} />
 				</button>
 			</header>
 

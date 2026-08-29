@@ -12,12 +12,16 @@ import type {
 	ModelOption,
 	ThinkingLevel,
 } from "@decks/protocol";
+import Minus from "lucide-solid/icons/minus";
+import Moon from "lucide-solid/icons/moon";
+import Plus from "lucide-solid/icons/plus";
+import Sun from "lucide-solid/icons/sun";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { BoardRail } from "./canvas/BoardRail.tsx";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
-import { DecksMark, MoonIcon, SunIcon } from "./icons.tsx";
+import { DecksMark, Icon } from "./icons.tsx";
 import { Palette } from "./canvas/Palette.tsx";
 import { Stage } from "./canvas/Stage.tsx";
 import { runStageCall } from "./canvas/stage-ops.ts";
@@ -521,7 +525,7 @@ export function App() {
 				>
 					{/* The icon is the destination, not the current state: it is a button, and
 					    what a button shows should be what pressing it gets you. */}
-					{scheme() === "dark" ? <SunIcon /> : <MoonIcon />}
+					{scheme() === "dark" ? <Icon of={Sun} size={17} /> : <Icon of={Moon} size={17} />}
 				</button>
 			</header>
 
@@ -681,11 +685,25 @@ export function App() {
 						fit
 					</button>
 					<span class="level">{Math.round(camera().zoom * 100)}%</span>
-					<button type="button" onClick={() => setCamera((c) => ({ ...c, zoom: Math.min(4, c.zoom * 1.25) }))}>
-						+
+					{/* Titled, now that the glyph is gone: an icon-only button with no accessible
+					    name is a button screen readers and the browser checks both read as blank. */}
+					<button
+						class="icon-button"
+						type="button"
+						title="Zoom in (=)"
+						aria-label="Zoom in"
+						onClick={() => setCamera((c) => ({ ...c, zoom: Math.min(4, c.zoom * 1.25) }))}
+					>
+						<Icon of={Plus} />
 					</button>
-					<button type="button" onClick={() => setCamera((c) => ({ ...c, zoom: Math.max(0.02, c.zoom / 1.25) }))}>
-						−
+					<button
+						class="icon-button"
+						type="button"
+						title="Zoom out (-)"
+						aria-label="Zoom out"
+						onClick={() => setCamera((c) => ({ ...c, zoom: Math.max(0.02, c.zoom / 1.25) }))}
+					>
+						<Icon of={Minus} />
 					</button>
 				</div>
 

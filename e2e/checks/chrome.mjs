@@ -14,7 +14,7 @@ say("the bottom history bar is gone", (await page.locator(".timeline").count()) 
 // A fresh agent, so this run does not inherit anyone else's turns.
 await page.mouse.move(6, 480);
 await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
-await page.locator(".chats .rail-head button", { hasText: "+" }).click();
+await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 await settle(page, 1200);
 await page.mouse.move(800, 500);
 
