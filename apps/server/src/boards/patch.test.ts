@@ -51,13 +51,24 @@ test("a resize keeps declarations the patch never mentioned", () => {
 	untouched(BOARD, html, "goal");
 });
 
-test("a component with no style attribute gets one, beside its tag name", () => {
+test("a component with no style attribute gets one, at the end of its tag", () => {
+	// After what is already there, not wedged between the tag name and the class: an
+	// agent reads these files, and every component in one leads with `class` and
+	// `data-id`.
 	const plain = `<body class="board">\n\t<div class="text" data-id="t">Hi</div>\n</body>`;
 	const { html } = applyPatches(plain, [{ op: "update", id: "t", style: { left: 8, top: 16 } }]);
-	assert.match(html, /<div style="left: 8px; top: 16px" class="text" data-id="t">Hi<\/div>/);
+	assert.match(html, /<div class="text" data-id="t" style="left: 8px; top: 16px">Hi<\/div>/);
+});
+
+test("an attribute added to a tag that spans lines lands at its end", () => {
+	const wrapped = `<body class="board">\n\t<div class="embed" data-id="paper" data-embed="../a.pdf"\n\t\tstyle="left: 8px"></div>\n</body>`;
+	const { html } = applyPatches(wrapped, [{ op: "update", id: "paper", attrs: { "data-pages": "2" } }]);
+	assert.match(html, /style="left: 8px" data-pages="2"><\/div>/);
 });
 
 test("text is replaced as text, and escaped", () => {
+	// The sticky's text is written on the tag's own line, so nothing is trimmed here and
+	// a newline the user typed into a sticky would survive.
 	const { html, summary } = applyPatches(BOARD, [{ op: "text", id: "risk", text: 'Races & <b>bugs</b>' }]);
 	assert.match(html, /data-id="risk"[^>]*>Races &amp; &lt;b&gt;bugs&lt;\/b&gt;<\/div>/);
 	assert.deepEqual(summary, ["retyped #risk"]);
@@ -132,6 +143,19 @@ test("z-order is document order, so to-front is last in the body", () => {
 	assert.match(html, /<script src="\.\.\/lib\/board\.js"><\/script>/, "the script tag survives");
 });
 
+test("a reordered component keeps its own indentation", () => {
+	// Both directions, because they insert at different ends of the body and the first
+	// version took the indent from the line it was moving *to*: one tab, against
+	// siblings at two.
+	const front = applyPatches(BOARD, [{ op: "order", id: "risk", to: "front" }]).html;
+	assert.match(front, /\n\t\t<div class="sticky" data-id="risk" style="left: 480px; top: 48px">Refresh races<\/div>\n\t<\/body>/);
+	const back = applyPatches(BOARD, [{ op: "order", id: "risk", to: "back" }]).html;
+	assert.match(back, /<body class="board">\n\t\t<div class="sticky" data-id="risk"/);
+	// Same components, same lines, different order: nothing was reformatted.
+	assert.deepEqual([...front.split("\n")].sort(), [...BOARD.split("\n")].sort());
+	assert.deepEqual([...back.split("\n")].sort(), [...BOARD.split("\n")].sort());
+});
+
 test("an unknown id is refused, with the id in the reason", () => {
 	assert.throws(() => applyPatches(BOARD, [{ op: "update", id: "nope", style: { left: 1 } }]), /no component with data-id="nope"/);
 });
@@ -151,13 +175,203 @@ test("minted ids are named after the thing and never collide", () => {
 	assert.equal(mintId(once, "sticky"), "sticky-2");
 });
 
-test("an arrow needs two ends", () => {
+test("an arrow needs two ends, and they are ordinary attributes", () => {
 	assert.throws(
 		() => applyPatches(BOARD, [{ op: "insert", kind: "arrow", id: "a1", at: { left: 0, top: 0 } }]),
 		/needs a from and a to/,
 	);
 	const { html } = applyPatches(BOARD, [
-		{ op: "insert", kind: "arrow", id: "a1", at: { left: 0, top: 0 }, embed: "goal>risk" },
+		{
+			op: "insert",
+			kind: "arrow",
+			id: "a1",
+			at: { left: 0, top: 0 },
+			attrs: { "data-from": "goal", "data-to": "risk", "data-label": "leads to" },
+		},
 	]);
-	assert.match(html, /<svg class="link" data-id="a1" data-from="goal" data-to="risk"><\/svg>/);
+	// The ends first and in the order a person writes them, then the rest. They used
+	// to arrive as one `"from>to"` string in the `embed` field.
+	assert.match(html, /<svg class="link" data-id="a1" data-from="goal" data-to="risk" data-label="leads to"><\/svg>/);
+	untouched(BOARD, html, "a1");
+});
+
+// --- retyping part of a component ------------------------------------------------
+
+test("a path retypes a card's heading and leaves its paragraph alone", () => {
+	const { html, summary } = applyPatches(BOARD, [{ op: "text", id: "goal", text: "Ship it", path: [0] }]);
+	assert.match(html, /<h3>Ship it<\/h3>/);
+	assert.match(html, /<p>Keep it short\.<\/p>/);
+	assert.deepEqual(summary, ["retyped the <h3> in #goal"]);
+	// Only the heading's line differs — the component's own tag is not rewritten.
+	const differing = BOARD.split("\n").filter((line, index) => line !== html.split("\n")[index]);
+	assert.deepEqual(differing, ["\t\t\t<h3>Goal</h3>"]);
+});
+
+test("retyping a paragraph written over several lines keeps its shape", () => {
+	const board = `<body class="board">
+	<section class="card" data-id="goal" style="left: 8px">
+		<h3>Goal</h3>
+		<p>
+			A second tab that wakes up must not spend a token the first tab
+			already spent.
+		</p>
+	</section>
+</body>`;
+	// The text arrives carrying the indentation the browser read back with it, which is
+	// exactly what must not be written on top of the indentation already in the file.
+	const { html } = applyPatches(board, [
+		{ op: "text", id: "goal", text: "\n\t\t\tOne session, two tabs.\n\t\t", path: [1] },
+	]);
+	assert.equal(
+		html,
+		`<body class="board">
+	<section class="card" data-id="goal" style="left: 8px">
+		<h3>Goal</h3>
+		<p>
+			One session, two tabs.
+		</p>
+	</section>
+</body>`,
+	);
+});
+
+test("a path retypes the body of the same card", () => {
+	const { html } = applyPatches(BOARD, [{ op: "text", id: "goal", text: "Two sentences now. Both short.", path: [1] }]);
+	assert.match(html, /<p>Two sentences now\. Both short\.<\/p>/);
+	assert.match(html, /<h3>Goal<\/h3>/);
+});
+
+test("a path that resolves to nothing is refused rather than guessed at", () => {
+	// This is the markdown case: a `[data-md]` panel's headings exist only in the DOM
+	// board.js rendered, so the indices the browser computed address nothing here.
+	assert.throws(
+		() => applyPatches(BOARD, [{ op: "text", id: "goal", text: "x", path: [4] }]),
+		/cannot find that part of #goal/,
+	);
+	const md = `<body class="board">\n\t<div class="panel" data-id="notes" data-md>## Heading\n\ttext</div>\n</body>`;
+	assert.throws(() => applyPatches(md, [{ op: "text", id: "notes", text: "x", path: [0] }]), /cannot find that part/);
+});
+
+test("a path onto markup is refused, like a component made of markup", () => {
+	const nested = `<body class="board">\n\t<div class="callout" data-id="note"><p><strong>Careful.</strong> Read this.</p></div>\n</body>`;
+	assert.throws(() => applyPatches(nested, [{ op: "text", id: "note", text: "flat", path: [0] }]), /contains markup/);
+	// One level further in is a run of plain text, and that one goes through.
+	const { html } = applyPatches(nested, [{ op: "text", id: "note", text: "Careful!", path: [0, 0] }]);
+	assert.match(html, /<strong>Careful!<\/strong> Read this\./);
+});
+
+// --- appearance, as attributes ---------------------------------------------------
+
+test("a tone is set as an attribute, and cleared by removing it", () => {
+	const { html, summary } = applyPatches(BOARD, [{ op: "update", id: "risk", attrs: { "data-tone": "warn" } }]);
+	assert.match(html, /<div class="sticky" data-id="risk" style="left: 480px; top: 48px" data-tone="warn">/);
+	assert.deepEqual(summary, ['set data-tone="warn" on #risk']);
+
+	const cleared = applyPatches(html, [{ op: "update", id: "risk", attrs: { "data-tone": null } }]);
+	assert.deepEqual(cleared.summary, ["cleared data-tone on #risk"]);
+	// Byte-identical to the board before the tone was ever set: the attribute takes
+	// the space in front of it with it. `data-tone=""` would have looked the same on
+	// screen and been a different file.
+	assert.equal(cleared.html, BOARD);
+});
+
+test("clearing an attribute that is not there changes nothing", () => {
+	const { html } = applyPatches(BOARD, [{ op: "update", id: "risk", attrs: { "data-tone": null } }]);
+	assert.equal(html, BOARD);
+});
+
+test("a sticky becomes a callout by its class, and the agent is told which", () => {
+	const { html, summary } = applyPatches(BOARD, [{ op: "update", id: "risk", class: "callout" }]);
+	assert.match(html, /<div class="callout" data-id="risk"/);
+	assert.deepEqual(summary, ["made #risk a callout"]);
+	untouched(BOARD, html, "risk");
+});
+
+test("one update can move, restyle and set an attribute, and says so once", () => {
+	const { html, summary } = applyPatches(BOARD, [
+		{ op: "update", id: "risk", style: { left: 8 }, class: "callout", attrs: { "data-tone": "danger" } },
+	]);
+	assert.match(html, /<div class="callout" data-id="risk" style="left: 8px; top: 48px" data-tone="danger">/);
+	assert.deepEqual(summary, ['moved #risk and made #risk a callout and set data-tone="danger" on #risk']);
+});
+
+// --- duplicate -------------------------------------------------------------------
+
+test("a duplicate is a copy of the source bytes, offset, named after the original", () => {
+	const { html, summary, ids } = applyPatches(BOARD, [{ op: "duplicate", id: "goal" }]);
+	assert.deepEqual(summary, ["duplicated #goal as #goal-2"]);
+	assert.deepEqual(ids, ["goal-2"]);
+	// The markup inside it survives, which is the whole reason this is not an insert.
+	assert.match(
+		html,
+		/<section class="card" data-id="goal-2" style="left: 64px; top: 64px; width: 380px; background: var\(--b-bg-deep\)">\n\t\t\t<h3>Goal<\/h3>\n\t\t\t<p>Keep it short\.<\/p>\n\t\t<\/section>\n\t<\/body>/,
+	);
+	// And the original is exactly as it was.
+	assert.ok(html.includes(BOARD.split("\n").slice(8, 11).join("\n")));
+});
+
+test("a second duplicate does not reuse the first copy's name", () => {
+	const once = applyPatches(BOARD, [{ op: "duplicate", id: "goal" }]).html;
+	const { ids } = applyPatches(once, [{ op: "duplicate", id: "goal" }]);
+	assert.deepEqual(ids, ["goal-3"]);
+	const fromCopy = applyPatches(once, [{ op: "duplicate", id: "goal-2" }]);
+	assert.deepEqual(fromCopy.ids, ["goal-3"], "the trailing number is a counter, not part of the name");
+});
+
+test("duplicating something with no position copies it as it is", () => {
+	// A connector covers the whole board and has no left/top to offset.
+	const { html, ids } = applyPatches(BOARD, [{ op: "duplicate", id: "goal-risk" }]);
+	assert.deepEqual(ids, ["goal-risk-2"]);
+	assert.match(html, /<svg class="link" data-id="goal-risk-2" data-from="goal" data-to="risk"><\/svg>/);
+});
+
+test("a duplicate can be offset by the caller", () => {
+	const { html } = applyPatches(BOARD, [{ op: "duplicate", id: "risk", offset: { x: 0, y: 200 } }]);
+	assert.match(html, /data-id="risk-2" style="left: 480px; top: 248px"/);
+});
+
+// --- rename ----------------------------------------------------------------------
+
+test("a rename takes the connectors that named it with it", () => {
+	const { html, summary, ids } = applyPatches(BOARD, [{ op: "rename", id: "risk", to: "refresh-race" }]);
+	assert.deepEqual(summary, ["renamed #risk to #refresh-race (and 1 connector end)"]);
+	assert.deepEqual(ids, ["refresh-race"]);
+	assert.match(html, /<div class="sticky" data-id="refresh-race"/);
+	assert.match(html, /data-from="goal" data-to="refresh-race"/);
+	// An arrow pointing at a name nothing has is drawn as nothing, and the file still
+	// looks right — so this is the one edit that must not be a single attribute write.
+	assert.ok(!html.includes('"risk"'));
+});
+
+test("a rename refuses a name already taken, and one no board could use", () => {
+	assert.throws(() => applyPatches(BOARD, [{ op: "rename", id: "risk", to: "goal" }]), /already a component called goal/);
+	assert.throws(() => applyPatches(BOARD, [{ op: "rename", id: "risk", to: "a b" }]), /letters, digits and dashes/);
+	assert.throws(() => applyPatches(BOARD, [{ op: "rename", id: "risk", to: "" }]), /letters, digits and dashes/);
+});
+
+test("renaming something to its own name is a no-op, not a collision", () => {
+	const { html, summary } = applyPatches(BOARD, [{ op: "rename", id: "risk", to: "risk" }]);
+	assert.equal(html, BOARD);
+	assert.deepEqual(summary, ["#risk kept its name"]);
+});
+
+test("an insert can carry attributes, so a dropped PDF can arrive with its pages", () => {
+	const { html } = applyPatches(BOARD, [
+		{
+			op: "insert",
+			kind: "embed",
+			id: "paper",
+			at: { left: 40, top: 400, width: 420, height: 320 },
+			embed: "../assets/oauth.pdf",
+			attrs: { "data-pages": "3-5" },
+		},
+	]);
+	assert.match(html, /<div class="embed" data-id="paper" data-embed="\.\.\/assets\/oauth\.pdf" data-pages="3-5" style="left: 40px/);
+});
+
+test("z-order to the back is first in the body", () => {
+	const { html, summary } = applyPatches(BOARD, [{ op: "order", id: "risk", to: "back" }]);
+	assert.ok(html.indexOf('data-id="risk"') < html.indexOf('data-id="goal"'), "risk now paints under goal");
+	assert.deepEqual(summary, ["sent #risk to back"]);
+	assert.match(html, /<body class="board">\n\t\t<div class="sticky" data-id="risk"/);
 });

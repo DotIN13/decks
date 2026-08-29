@@ -142,7 +142,11 @@ await stage.show("boards/refresh-race.html");
   with a screenshot that nothing is clipped.
 - **A board is one idea.** Two ideas are two boards, side by side on the canvas.
 - **`data-id` on everything.** Stable, meaningful names — `goal`, `risk-refresh` — not
-  `box-3`.
+  `box-3`. The user can rename one from their inspector, and can turn a card into a
+  panel or a callout the same way, so a name or a class you wrote may have changed since
+  you wrote it. You are told when it does, in the same line that reports any other edit
+  they made; if a component you expected is not there under the name you remember, read
+  the board rather than writing it again.
 
 ## Components
 

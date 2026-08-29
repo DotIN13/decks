@@ -129,6 +129,12 @@ understand survive a write (`schema.ts`). It is a file a person is expected to o
   a user's drag becomes a patch against an id rather than against a pixel.
 - `<meta name="poster">` is optional and is the escape hatch for a board too
   expensive to mount at thumbnail size (§7).
+- **The component vocabulary is small, and it is `board.css`'s.** Five classes that mean
+  "a box with prose in it" (`text`, `sticky`, `card`, `panel`, `callout`), three that
+  bring their own inner markup (`kpi`, `table`, `chip`), the `embed`, and `svg.link`;
+  the only variant attribute is `data-tone`. That list is also the ceiling on what the
+  user's editor can offer (§6.5), because a deck's `lib/` is a copy taken when the deck
+  was created — a class added here is not in a deck that already exists.
 - The head asks for exactly two files. `board.js` loads whatever a component actually
   uses — marked, KaTeX, mermaid, pdf.js — from the same `lib/`, so a board of three
   stickies does not pay for pdf.js and the agent does not have to remember which
@@ -351,6 +357,129 @@ never mentioned; everything else in the file comes out identical, which the test
 assert byte-for-byte. What the splicer cannot do safely — a text edit over a component
 made of markup — is refused with a reason rather than half-applied.
 
+**What "editable" means, and the three mechanisms that cover it.** For a while only one
+thing was: a component whose entire content was plain text. That excluded the shape the
+agent writes most — a card with a heading and a paragraph — and everything about a
+component that is neither its box nor its words. It is now three mechanisms, and
+between them they cover most of every kind:
+
+| | | |
+|---|---|---|
+| **position, size** | drag, resize handle, arrow-key nudge | `update` with `style` |
+| **words** | double-click the run of text and retype it | `text`, now with a `path` |
+| **everything else** | the inspector, floating for the selection | `update` with `class` / `attrs`, `rename`, `duplicate`, `order`, `remove` |
+
+Two of those ops existed and nothing reached them: `update` could already carry a
+`class` and an `attrs` map, and `order` had a test and no caller. Most of what follows
+is therefore a UI over the protocol that was already there, and the protocol grew by
+two ops rather than by ten.
+
+**Typing addresses a child, by index.** A card is a heading and a paragraph, and
+retyping *the card* is not an edit anybody wants — the old rule (the whole component,
+or a refusal) made the commonest component the one shape a user could not touch. A
+`text` patch now carries `path: number[]`, the indices of the element children walked
+into from the component: `[0]` is the heading, `[1]` the paragraph. Indices rather than
+a selector or a vocabulary of part names (`"heading"`, `"body"`): the browser computes
+one from the element the user actually double-clicked, parse5 resolves it against the
+file with no selector engine, and there is no shared list of names for the two sides to
+drift on. Where it resolves to nothing it is refused, which is exactly what a
+`[data-md]` panel does — its headings exist only in the DOM `board.js` rendered, so the
+editor refuses that one up front and says why.
+
+The splice keeps the whitespace it found. A paragraph written over three indented lines
+is the normal shape of a board, and replacing the whole inner range pulled the text up
+onto the opening tag and the closing tag up behind it: a three-line diff for a retype.
+Only the text *between* the surrounding whitespace is replaced — and the incoming text
+is trimmed when that whitespace is being kept, because `contenteditable` hands back the
+file's own indentation as part of `textContent` and writing it on top of the indent
+already there put a blank line in the file on every edit.
+
+**The appearance vocabulary is the stylesheet's, and it is thinner than it looks.**
+`board.css` has five component classes that mean the same thing — a box with prose in
+it: `text`, `sticky`, `card`, `panel`, `callout` — and one variant attribute,
+`data-tone` (a callout's warn/danger/ok, a connector's accent). That is all it has:
+there is no sticky colour, no font size, no alignment. So the inspector offers a class
+switch and a tone, and nothing it invented. **A deck's `lib/` is a copy**, taken when
+the deck was created and never upgraded (`Deck.create`), so a class this build adds to
+`board.css` renders as an unstyled box in every deck that already exists — inventing
+`.sticky[data-tone="blue"]` would be a control that does nothing for most users, which
+is worse than a control that is absent. `BOX_CLASSES` and the tone lists live in
+`@decks/protocol` with that constraint written next to them. `kpi`, `table` and `chip`
+are deliberately not in the switch: their CSS styles children the other five do not
+have, so swapping one in produces a component whose content no longer fits it.
+
+**The inspector is a floating panel, not a sidebar.** It appears at the top right for
+the selection and only above `INTERACT_ZOOM`, the rule the palette already documents —
+below that a board is a tile on a map, its frame takes no pointer events, and there is
+nothing to select. `right: 30px` is load-bearing: the chat panel opens when the cursor
+comes within 26px of the right edge (`lib/panels.ts`), and a panel any closer would
+pull the transcript over itself as you reached for it. A permanent sidebar was the
+obvious alternative and it contradicts §7 — the chrome is away by default because the
+canvas is the work. A context menu was the other, and it is a second place to put the
+same rows, reachable only by knowing it is there; the keyboard covers the frequent ones
+instead (⌘D duplicates, `[` and `]` change order, ⌫ deletes, and the palette's own
+`V S C T E A` finally do something).
+
+What the inspector will not offer, on purpose: a colour picker writing
+`background: #f0c`. Boards use tokens, the authoring skill tells the agent never to
+write a hex, and widening `update`'s `style` from a rectangle to arbitrary CSS turns a
+byte-range splice into a stylesheet editor. Nor a textarea holding the component's
+HTML: that is re-serialising by hand, and the agent is the fallback editor.
+
+**Two new ops, both of which had to be ops.** `duplicate` copies the component's own
+source bytes with two attributes rewritten inside the copy, because that is the only
+copy that keeps a card's heading, its paragraph and its list — an `insert` composed by
+the browser would produce the palette's placeholder wearing a new name. Its name is
+derived from the original's (`goal` → `goal-2`), since an id is the one thing in a
+board a person and an agent both address by hand. `rename` writes the new `data-id`
+*and* every `data-from`/`data-to` that named the old one, in one pass of descending
+offsets: through the generic `attrs` path it would have written the name and silently
+orphaned the connectors, and an arrow that stops being drawn while the file still looks
+right is the worst kind of edit. Renaming is worth having despite what it costs — an
+agent may hold the old name in context — because the summary it is told says exactly
+what changed, which is the same mechanism every other edit relies on.
+
+A connector became editable at all only after it became *selectable*. `board.css` gives
+`svg.link` no pointer events, correctly: it covers the whole board, and a board-sized
+rectangle over everything would eat every click. The editor turns events back on for
+the paths inside it (a child may, under a parent that turned them off) and `board.js`
+draws each connector twice — the line you see, and an invisible 10px copy of it that is
+the thing you can actually hit, since a 2px stroke is not a target. Selected, an arrow
+thickens and takes the accent rather than growing an outline around the whole board, and
+it gets no resize handle: `offsetWidth` on an SVG element is not even a number.
+Drawing one is two clicks, which is what the palette's arrow tool used to promise in a
+notice and never do; both ends travel as ordinary `data-from`/`data-to` attributes,
+replacing a `"from>to"` string that was smuggled through the `embed` field.
+
+**A burst of inspector clicks is one patch.** A patch carries the rev it was composed
+against and a stale one is refused (below) — right for "the agent wrote this file while
+you were dragging", absurd for "you clicked three tone swatches". So an edit made while
+a patch is in flight waits (`canvas/patches.ts`), coalesced — consecutive updates to
+one component merge, and two retypings of one run keep the last — and goes as a single
+batch against the rev the acknowledgement carries. The rev has to come from that
+message: `board.rev` in the store is not updated until `board.changed` arrives one
+message later, so composing against it there would send a stale patch to fix a stale
+patch. The file-drop path (§6.9) found this first and solved it by hand for its own
+batch; this is the general form, and it also fixes the case that was quietly broken
+before there was an inspector — an arrow key held down sends a patch per repeat.
+
+**An inspector edit is applied to the live document as well.** The frame is pinned to
+the revision it loaded so a user's own edit does not reload the board they are working
+on (§7), and that pin assumes the editor has already made the change on screen. Every
+edit therefore does both halves — `setAttribute` and the patch — and asks `board.js` to
+re-mount an embed whose source changed or redraw the connectors when something moved.
+Deleting was the one that had never done its half: the patch took the component out of
+the file and it stayed on screen until something else reloaded the frame. A duplicate
+is the deliberate exception, since its markup exists only in the file; that op unpins
+and takes the reload, exactly as an insert does.
+
+One trap worth naming, because it shipped for an hour: a class swap sends the whole
+attribute, and the editor's own `decks-editing` class lives on that element in that
+document. The first version wrote `class="callout decks-editing"` into the file — the
+overlay leaking into the artifact, which is the one thing the affordances are marked
+for. `readShape` drops every `decks-` class, and a check asserts the file never
+contains one.
+
 Ids are minted on the server, against the file as it is now: two tabs inserting at once
 would both pick `sticky-3` otherwise, and the second would be refused for a reason that
 reads like a bug.
@@ -553,11 +682,13 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
   empty canvas would be the app deciding something it was not asked to. Zoomed out past
   `INTERACT_ZOOM` the frames take no pointer events at all, so a drop then lands on the
   stage; the notice says to zoom in when the cursor was over a board.
-- **An insert is the one edit that does want the frame to reload.** The pin (below) exists
-  because the editor has already mutated the frame's DOM — true of a drag, false of an
-  insert, whose component exists only in the file, because the server mints the id and
+- **An insert is the one edit that does want the frame to reload** — and a duplicate, for
+  the same reason. The pin (below) exists because the editor has already mutated the
+  frame's DOM: true of a drag, of a class swap, of a delete, and false of an insert or a
+  copy, whose component exists only in the file because the server mints the id and
   writes the markup. Pinned, a dropped file landed in `assets/`, landed in the board's
-  source, and appeared nowhere on screen.
+  source, and appeared nowhere on screen. `needsReload` in `canvas/patches.ts` is the one
+  place that decides.
 - **Space is held in one place.** Each document only sees the keys pressed while it has
   focus, so a space pressed over the canvas and a drag begun over a board were two
   documents with two opinions. The stage owns the answer and the frames ask it.
@@ -677,7 +808,7 @@ All six milestones, each verified against the real app rather than only unit-tes
 | M1 | Deck, stage, embeds: pan/zoom, drag-to-arrange, md/pdf/html/image/text embeds, files dropped in from the desktop, live reload. |
 | M2 | One agent: Pi adapter, transcript, composer, extension-UI bridge, both skills. |
 | M3 | `stage_eval`: stage service, eval, identity, state rebuilt from the branch. |
-| M4 | The user draws: editor, palette, patches, revisions, undo, the agent is told. |
+| M4 | The user draws: editor, palette, inspector, patches, revisions, undo, the agent is told. |
 | M5 | Many chats: registry, chat list, `stage.delegate` with board handoff. |
 | M6 | Time machine: rewind / fork / restore on each message, preview from revisions. |
 
@@ -694,7 +825,23 @@ All six milestones, each verified against the real app rather than only unit-tes
 - Panel reveal is hover-driven, and so is the reveal of a message's `rewind · fork ·
   restore boards` row. Both want rethinking for touch, where there is no cursor to approach
   an edge with and no hover to preview from.
-- Arrows cannot be drawn from the palette — connectors are the agent's to write.
+- An arrow is selected by clicking its line, which `board.js` widens to an invisible
+  10px band because 2px is not a target. That band is on top of whatever it crosses, so
+  a connector routed over a card takes a click meant for the card; zooming in makes both
+  targets bigger, which is the only answer here that does not involve a modifier key.
+- The inspector edits one component at a time. There is no multi-select, so "make these
+  four cards panels" is four clicks or a sentence to the agent.
+- `kpi`, `table` and `chip` get a name, an order, a copy and a delete, and no appearance
+  rows: their CSS styles children the five prose classes do not have.
+- An embed's caption, an image's alt text and how a picture fits its box are not
+  editable, and this is the lib-is-a-copy constraint rather than an oversight —
+  `board.js` labels an embed from its filename and `board.css` has one rule for the
+  image inside one, so every one of those needs a runtime that older decks do not have.
+  The board's own `<meta>` (size, background, theme) is not editable either: it is not a
+  component, and it is one line for the agent.
+- A component inserted or duplicated lands before `</body>`, which is *after* the
+  `<script src="../lib/board.js">` line. Valid, and it renders, but a reader of the file
+  sees a component below the script tag.
 - A dropped file only lands on a board, and only while the board is live: on empty canvas
   it is refused with a notice, and there is no drop onto a rail thumbnail (they are
   `pointer-events: none`, so such a drop is the stage's and gets the same notice). Pasting

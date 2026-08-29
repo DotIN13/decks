@@ -166,11 +166,62 @@ export interface Rect {
  * refused write re-syncs it.
  */
 export type BoardPatch =
-	| { op: "insert"; kind: ComponentKind; id: string; at: Rect; text?: string; embed?: string }
-	| { op: "update"; id: string; style?: Partial<Rect>; class?: string; attrs?: Record<string, string> }
-	| { op: "text"; id: string; text: string }
+	/** `attrs` is how an arrow gets its two ends: `data-from` and `data-to`, named. */
+	| { op: "insert"; kind: ComponentKind; id: string; at: Rect; text?: string; embed?: string; attrs?: Record<string, string> }
+	/** `null` in `attrs` *removes* the attribute, which is how a tone goes back to the default. */
+	| { op: "update"; id: string; style?: Partial<Rect>; class?: string; attrs?: Record<string, string | null> }
+	/**
+	 * Retype a run of text. `path` addresses a descendant by the indices of the
+	 * element children walked into — `[0]` is a card's heading, `[1]` its paragraph.
+	 *
+	 * Indices rather than a selector or a name like `"heading"`: the browser computes
+	 * one from the element the user actually double-clicked, the server resolves it
+	 * against the parse tree with no selector engine, and there is no vocabulary of
+	 * part names for the two sides to disagree about.
+	 */
+	| { op: "text"; id: string; text: string; path?: number[] }
 	| { op: "remove"; id: string }
+	/**
+	 * A copy of a component, offset, with a name derived from the original's.
+	 *
+	 * Its own op rather than an `insert` composed by the browser, because a card is a
+	 * heading and a paragraph and a list: the only copy that keeps that is a copy of
+	 * the source bytes, and only the server has those. The one op here that is not
+	 * idempotent — applying it twice means two copies, which is what it says.
+	 */
+	| { op: "duplicate"; id: string; offset?: { x: number; y: number } }
+	/**
+	 * Rename a component, and every arrow that points at it.
+	 *
+	 * Its own op rather than `attrs: { "data-id": … }`, which would write the new name
+	 * and silently orphan the connectors naming the old one. An id is how an agent
+	 * refers to a component, so the rename is in the summary it is told (§6.5) — an
+	 * agent holding the old name in context hears that it changed.
+	 */
+	| { op: "rename"; id: string; to: string }
 	| { op: "order"; id: string; to: "front" | "back" };
+
+/**
+ * The five component classes that mean the same thing — a box with prose in it —
+ * and so can be swapped for one another by the inspector (§6.5).
+ *
+ * This list is `board.css`'s, not this build's. `lib/` is **copied into a deck when
+ * the deck is created** and never upgraded, so a class invented here renders as an
+ * unstyled box in every deck that already exists: the vocabulary the editor offers
+ * can only be the vocabulary the stylesheet already had. `kpi`, `table` and `chip`
+ * are deliberately absent — their CSS styles children the other five do not have,
+ * so swapping one in produces a component whose content no longer fits it.
+ */
+export const BOX_CLASSES = ["text", "sticky", "card", "panel", "callout"] as const;
+export type BoxClass = (typeof BOX_CLASSES)[number];
+
+/**
+ * `data-tone` as `board.css` reads it: absent means accent for a callout and the
+ * border colour for a connector. Same reasoning as `BOX_CLASSES` — this is the
+ * stylesheet's list, and it stops where the stylesheet stops.
+ */
+export const CALLOUT_TONES = ["warn", "danger", "ok"] as const;
+export const LINK_TONES = ["accent"] as const;
 
 /** What the agent is told the user changed, and what `stage.edits()` returns. */
 export interface UserEdit {

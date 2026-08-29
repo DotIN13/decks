@@ -64,6 +64,15 @@ deck directory.
   canvas. The agent writes them with its ordinary tools; you drag, resize, retype and
   insert with a palette. Both edits land in the same file, and a drag rewrites exactly
   one attribute.
+- **And most of a board is editable by hand.** Double-click any line of text — a card's
+  heading and its paragraph are separate edits — and the selection gets an inspector:
+  what kind of box it is (text · sticky · card · panel · callout), its tone, what an
+  embed points at and which pages of a PDF, where a connector ends and what it is
+  labelled, its name, its order, a copy of it. Arrows are drawn by clicking their two
+  ends. What it offers is exactly what the board stylesheet already styles, and every
+  change lands as a splice of the lines it named — so the file an agent reads back is
+  still one it recognises, and an edit it cannot do that way is refused with a reason
+  rather than half-applied.
 - **One tool for the canvas.** `stage_eval` runs TypeScript against a typed API
   (`runtime/stage.d.ts`, injected into the agent's context verbatim): start a board, put
   boards in play, hold others in context, rearrange, name itself, draw its own avatar,
@@ -95,14 +104,14 @@ deck directory.
 
 ## Development
 ```bash
-npm test            # 121 unit tests: config, path guards, uploads, patches, revisions, eval, camera
-npm run test:e2e    # 109 browser checks against a throwaway copy of example/ (~50s)
+npm test            # 153 unit tests: config, path guards, uploads, patches, revisions, eval, camera
+npm run test:e2e    # 135 browser checks against a throwaway copy of example/ (~55s)
 npm run typecheck
 npm run vendor      # re-copy the board primitives into runtime/lib
 npm run sync:lib    # push runtime/lib into example/decks/lib after editing it
 ```
 
-The browser checks are in [e2e/](e2e/README.md). Five more of them drive a real agent turn
+The browser checks are in [e2e/](e2e/README.md). Six more files drive a real agent turn
 and are skipped unless you ask: `DECKS_E2E_AGENT=1 npm run test:e2e`.
 
 `example/` is a committed data directory — `example/decks` is the demo deck and

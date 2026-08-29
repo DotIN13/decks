@@ -1159,6 +1159,185 @@ svg.lucide {
 	color: #fff;
 }
 
+/* --- the inspector ----------------------------------------------------------- */
+
+/*
+ * The selection's properties (§6.5). Top right, not beside the palette: the notices
+ * land under the palette, and the palette is a row of 30px targets that a column of
+ * fields does not belong in.
+ *
+ * `right: 30px` is load-bearing. The chat panel opens when the cursor comes within
+ * `REACH` (26px) of the right edge (`lib/panels.ts`), so a panel any closer than that
+ * would pull the transcript over itself the moment you reached for it.
+ */
+.inspector {
+	top: 12px;
+	right: 30px;
+	display: flex;
+	width: 236px;
+	flex-direction: column;
+	padding: 8px;
+	gap: 6px;
+	font-size: 12px;
+}
+
+.inspector header {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--line);
+}
+
+.inspector header .what {
+	color: var(--faint);
+	font-size: 10px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.inspector .row {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+
+.inspector .row .label {
+	width: 34px;
+	flex: 0 0 auto;
+	color: var(--faint);
+	font-size: 11px;
+}
+
+.inspector .row .value {
+	overflow: hidden;
+	flex: 1;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.inspector input,
+.inspector select {
+	min-width: 0;
+	flex: 1;
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--bg);
+	color: var(--fg);
+	font: inherit;
+	font-family: var(--font-mono);
+	font-size: 11px;
+}
+
+.inspector input:focus,
+.inspector select:focus {
+	border-color: var(--color-accent);
+	outline: none;
+}
+
+/* The five interchangeable box classes, named rather than drawn: an icon for
+   "callout" is a guess the user has to decode, and the words are what an agent would
+   have written in the file anyway. */
+.inspector .boxes {
+	flex-wrap: wrap;
+	gap: 3px;
+}
+
+.inspector .boxes button {
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	font: inherit;
+	font-size: 10px;
+}
+
+.inspector .boxes button:hover {
+	background: var(--line);
+}
+
+.inspector .boxes button[data-active="true"] {
+	border-color: transparent;
+	background: var(--color-accent);
+	color: #fff;
+}
+
+/* A tone is a colour, so the control is the colour. */
+.inspector .tones button {
+	width: 15px;
+	height: 15px;
+	padding: 0;
+	border: 1px solid var(--line-strong);
+	border-radius: 999px;
+	cursor: pointer;
+}
+
+/* "Default" is the absence of `data-tone`, and what that *looks* like depends on the
+   component: a callout with no tone is accent, a connector with no tone is the border
+   colour. The swatch says what the board will draw, not what the control is called. */
+.inspector .tones button[data-tone="default"] {
+	background: var(--color-accent);
+}
+
+.inspector[data-family="link"] .tones button[data-tone="default"] {
+	background: var(--line-strong);
+}
+.inspector .tones button[data-tone="accent"] {
+	background: var(--color-accent);
+}
+.inspector .tones button[data-tone="warn"] {
+	background: var(--color-warn);
+}
+.inspector .tones button[data-tone="danger"] {
+	background: var(--color-danger);
+}
+.inspector .tones button[data-tone="ok"] {
+	background: var(--color-ok);
+}
+
+.inspector .tones button[data-active="true"] {
+	box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--fg);
+}
+
+.inspector .acts {
+	padding-top: 6px;
+	border-top: 1px solid var(--line);
+}
+
+.inspector .acts .spacer {
+	flex: 1;
+}
+
+.inspector .row.file button,
+.inspector .acts button {
+	display: grid;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	place-items: center;
+}
+
+.inspector .row.file button:hover,
+.inspector .acts button:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+.inspector .acts button.danger:hover {
+	background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+	color: var(--color-danger);
+}
+
 .picker-backdrop {
 	position: absolute;
 	z-index: 20;

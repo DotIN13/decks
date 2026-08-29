@@ -24,7 +24,10 @@ import type { EditorHost, Tool } from "./canvas/Editor.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
+import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
+import { Inspector } from "./canvas/Inspector.tsx";
 import { Palette } from "./canvas/Palette.tsx";
+import { coalesce, needsReload } from "./canvas/patches.ts";
 import { Stage } from "./canvas/Stage.tsx";
 import { runStageCall } from "./canvas/stage-ops.ts";
 import { Bubbles } from "./chat/Bubbles.tsx";
@@ -149,6 +152,16 @@ export function App() {
 	/** Paths with a patch in flight, before the accepted rev is known. */
 	const patching = new Set<string>();
 	/**
+	 * Edits made while a patch was in flight, per path.
+	 *
+	 * A patch carries the rev it was composed against, so a second one sent before the
+	 * first is acknowledged names a revision that no longer exists and is refused —
+	 * correct for "the agent wrote this file underneath you" and absurd for "you
+	 * clicked three inspector buttons". They wait here and go as one batch against the
+	 * rev the acknowledgement brings back. See `canvas/patches.ts`.
+	 */
+	const queued = new Map<string, BoardPatch[]>();
+	/**
 	 * The revision each frame is pinned to, or 0 for "show the newest".
 	 *
 	 * A pin is what stops a reload. Our own edit is already in the frame's DOM, so the
@@ -200,6 +213,15 @@ export function App() {
 				case "deck.state":
 					setState("deck", message.deck);
 					/*
+					 * The greeting is a refresh (§5), so nothing is in flight any more. Said
+					 * out loud because the patch queue depends on it: an edit made while a
+					 * patch is unacknowledged waits for that acknowledgement, and one lost to
+					 * a dropped socket would otherwise leave every later edit to that board
+					 * waiting for a message that is never coming.
+					 */
+					patching.clear();
+					queued.clear();
+					/*
 					 * Reconciled by path, not replaced.
 					 *
 					 * A board row owns a live iframe, and Solid re-creates a row whose item
@@ -215,7 +237,15 @@ export function App() {
 					patching.delete(message.path);
 					if (message.refused) {
 						notice("warn", message.refused);
-						// Its optimistic DOM is now a lie: unpin and reload from the file.
+						// Its optimistic DOM is now a lie: unpin and reload from the file. What
+						// was queued behind it was composed against that same lie, so it goes
+						// too — one warning, not one per held-back click.
+						queued.delete(message.path);
+						// And the selection, which may name a component that was never renamed
+						// or a copy that was never made. The frame is about to reload with the
+						// file's own answer; a selection composed against the refused version of
+						// it would leave the inspector describing something that does not exist.
+						setComponent(undefined);
 						selfRevs.delete(message.path);
 						setFrameRevs(message.path, 0);
 						setState("nonces", message.path, (current = 0) => current + 1);
@@ -224,6 +254,18 @@ export function App() {
 					// Accepted: remember the rev our write produced so both echoes of it are
 					// recognised, and keep the pin so the frame holds the DOM it already has.
 					selfRevs.set(message.path, message.rev);
+					/*
+					 * Whatever arrived while this was in flight goes now, against the rev this
+					 * message carries — which is the only place the new rev is known this
+					 * early: `board.rev` in the store is not updated until `board.changed`
+					 * lands, one message later, so composing against it here would send a
+					 * stale patch to fix a stale patch.
+					 */
+					const waiting = queued.get(message.path);
+					if (waiting && waiting.length > 0) {
+						queued.delete(message.path);
+						sendPatches(message.path, message.rev, waiting);
+					}
 					return;
 				}
 
@@ -476,6 +518,36 @@ export function App() {
 		for (const listener of selectionListeners) listener();
 	});
 
+	/**
+	 * A batch of patches, down the socket, against a named revision.
+	 *
+	 * Split out from `editor.patch` because the queue above sends from a second place:
+	 * the acknowledgement of the patch that was in flight.
+	 */
+	const sendPatches = (path: string, rev: number, patches: BoardPatch[]) => {
+		patching.add(path);
+		/*
+		 * Pin to what the frame is showing *now*, before the write lands — and only if
+		 * it is not already pinned. Re-pinning on each edit moves the pin to the newest
+		 * rev while the document on screen is still the one it first loaded, so the URL
+		 * changes and the frame reloads: the flash came back on the second drag.
+		 *
+		 * An insert is the exception, and a duplicate with it: both have to actively
+		 * *unpin*. The pin's premise is that the frame's DOM is already correct because
+		 * the editor mutated it — true of a drag, false of a component that exists only
+		 * in the file, because the server mints the id and writes the markup (§6.5).
+		 * Pinned, a dropped file landed in `assets/`, landed in the board's source, and
+		 * appeared nowhere on screen until something else reloaded the frame. One reload
+		 * beats a component the user cannot see.
+		 */
+		if (needsReload(patches)) setFrameRevs(path, 0);
+		else if (!frameRevs[path]) {
+			const board = state.boards.find((candidate) => candidate.path === path);
+			if (board) setFrameRevs(path, board.rev);
+		}
+		socket.send({ type: "board.patch", path, rev, patches });
+	};
+
 	const editor: EditorHost = {
 		tool: () => tool(),
 		resetTool: () => setTool("select"),
@@ -491,24 +563,14 @@ export function App() {
 		patch: (path, patches) => {
 			const board = state.boards.find((candidate) => candidate.path === path);
 			if (!board) return;
-			patching.add(path);
-			/*
-			 * Pin to what the frame is showing *now*, before the write lands — and only if
-			 * it is not already pinned. Re-pinning on each edit moves the pin to the newest
-			 * rev while the document on screen is still the one it first loaded, so the URL
-			 * changes and the frame reloads: the flash came back on the second drag.
-			 *
-			 * An insert is the exception, and has to actively *unpin*. The pin's premise is
-			 * that the frame's DOM is already correct because the editor mutated it — true
-			 * of a drag, false of an insert, whose component exists only in the file: the
-			 * server mints the id and writes the markup, deliberately (§6.5). Pinned, a
-			 * dropped file landed in `assets/`, landed in the board's source, and appeared
-			 * nowhere on screen until something else reloaded the frame. One reload beats a
-			 * component the user cannot see.
-			 */
-			if (patches.some((patch) => patch.op === "insert")) setFrameRevs(path, 0);
-			else if (!frameRevs[path]) setFrameRevs(path, board.rev);
-			socket.send({ type: "board.patch", path, rev: board.rev, patches });
+			// One patch at a time per board. The rest wait for the rev the acknowledgement
+			// brings, coalesced, because a burst of edits to one component is one edit as
+			// far as the file is concerned.
+			if (patching.has(path)) {
+				queued.set(path, coalesce([...(queued.get(path) ?? []), ...patches]));
+				return;
+			}
+			sendPatches(path, board.rev, patches);
 		},
 		undo: (path) => socket.send({ type: "board.undo", path }),
 		pickFile: () =>
@@ -522,6 +584,53 @@ export function App() {
 		// Editing follows the same threshold as pointer events: if the frame is inert
 		// because we are zoomed out, there is nothing to edit with.
 		enabled: () => camera().zoom >= INTERACT_ZOOM,
+	};
+
+	/**
+	 * The selected component as the inspector needs it (`canvas/inspect.ts`).
+	 *
+	 * Read from the live document rather than kept in the store: the board is
+	 * same-origin (§4) and the DOM is already the truth about what is on screen, so a
+	 * second copy of "what class does this have" would be one more thing to invalidate.
+	 * Re-read when the selection changes, when the board's revision changes (our own
+	 * write, or the agent's), and when a reload is forced — those three cover every way
+	 * the component under the selection can become something else.
+	 */
+	const [shape, setShape] = createSignal<Shape | undefined>(undefined);
+	createEffect(() => {
+		const selection = component();
+		if (!selection) {
+			setShape(undefined);
+			return;
+		}
+		// Read as dependencies, not for their values.
+		void state.boards.find((board) => board.path === selection.path)?.rev;
+		void state.nonces[selection.path];
+		setShape(readShape(selection.path, selection.id));
+	});
+
+	/**
+	 * An inspector edit: the live document, then the file.
+	 *
+	 * Both halves, because the frame is pinned to the revision it loaded (§7) — a patch
+	 * alone would be a change the user cannot see until somebody else writes the board.
+	 * The exception is a duplicate, whose markup exists only in the file; `patches.ts`
+	 * is where that unpins.
+	 */
+	const inspect = (edit: Edit) => {
+		const current = shape();
+		if (!current) return;
+		applyLive(current, edit);
+		editor.patch(current.path, patchesFor(current, edit));
+		if (edit.kind === "remove") {
+			setComponent(undefined);
+			return;
+		}
+		// A rename moves the selection with it: the id *is* how the component is
+		// addressed, here as in the file, and the old one now names nothing.
+		const id = edit.kind === "rename" ? edit.to : current.id;
+		if (edit.kind === "rename") setComponent({ path: current.path, id });
+		setShape(readShape(current.path, id));
 	};
 
 	/**
@@ -680,12 +789,24 @@ export function App() {
 					cursor={state.cursor}
 					onViewport={() => reportCamera(camera())}
 					editor={editor}
+					onTool={setTool}
 					drops={drops}
 					frameRevs={frameRevs}
 					preview={state.preview?.boards}
 				/>
 
 				<Palette tool={tool()} visible={camera().zoom >= INTERACT_ZOOM} onPick={setTool} />
+
+				{/* The selection's properties. Same visibility rule as the palette — below
+				    `INTERACT_ZOOM` a board takes no pointer events and nothing can be
+				    selected — and off entirely while a past revision is being previewed,
+				    which is a read-only view of a board that no longer exists (§6.7). */}
+				<Inspector
+					shape={shape()}
+					visible={camera().zoom >= INTERACT_ZOOM && !state.preview}
+					onEdit={inspect}
+					pickFile={editor.pickFile}
+				/>
 
 				<Show when={picking()}>
 					{(resolve) => (

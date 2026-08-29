@@ -3,9 +3,12 @@ import { createEffect, createSignal, For, onCleanup, onMount } from "solid-js";
 import { boxOf, fit, INTERACT_ZOOM, pan, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
 import { BoardFrame } from "./BoardFrame.tsx";
 import { notePointer } from "../lib/panels.ts";
-import type { EditorHost } from "./Editor.ts";
+import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
 import type { FrameGestureHost } from "./frame-gestures.ts";
+
+/** The palette's keys, in the order the palette draws them. */
+const TOOL_KEYS: Record<string, Tool> = { v: "select", s: "sticky", c: "card", t: "text", e: "embed", a: "arrow" };
 
 /**
  * The stage: one transform over the boards, and the gestures that move it.
@@ -33,6 +36,8 @@ export function Stage(props: {
 	/** So the server can answer `stage.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
 	editor: EditorHost;
+	/** A tool picked by its key, which the palette's tooltips have always claimed. */
+	onTool?: (tool: Tool) => void;
 	/** A file dropped from the desktop onto a board, per board (`file-drop.ts`). */
 	drops: (path: string) => FileDropHost;
 	/** Which revision each frame is showing; see `selfEdited` in App. */
@@ -88,6 +93,18 @@ export function Stage(props: {
 	 * board. Returns whether the key meant anything, so the caller knows to swallow it.
 	 */
 	const shortcut = (key: string): boolean => {
+		/*
+		 * The palette's keys live here rather than in the palette, for the same reason
+		 * the camera's do: a click on a board puts focus inside its iframe, so a
+		 * keypress arrives in the board's document and is handed back through
+		 * `frame-gestures.ts`. A component listening for its own key would hear nothing
+		 * the moment anyone touched a board.
+		 */
+		const tool = TOOL_KEYS[key];
+		if (tool && props.onTool) {
+			props.onTool(tool);
+			return true;
+		}
 		switch (key) {
 			case "0":
 				props.setCamera(fit(props.boards.map(boxOf), view()));

@@ -555,13 +555,34 @@
 			const defs = document.createElementNS(ns, "defs");
 			defs.appendChild(marker);
 
+			const d = `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`;
 			const path = document.createElementNS(ns, "path");
-			path.setAttribute("d", `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`);
+			path.setAttribute("d", d);
 			path.setAttribute("marker-end", `url(#${markerId})`);
 			// `currentColor` on the head, so an arrow tinted by CSS keeps its point.
 			path.style.color = getComputedStyle(path).stroke;
 
-			svg.append(defs, path);
+			/*
+			 * An invisible wider copy of the same curve, first so it sits under it.
+			 *
+			 * A 2px line is not something anybody can click, and a connector is a
+			 * component the user can now select and edit (DESIGN §6.5) — so the target is
+			 * this, and the arrow does not have to get fatter to be reachable. It takes no
+			 * clicks of its own here: `svg.link` is `pointer-events: none` in board.css and
+			 * only the editor turns events back on for these paths, so a board opened on
+			 * its own behaves exactly as it did.
+			 *
+			 * The colour is an inline style rather than an attribute because `svg.link
+			 * path` sets `stroke` in the stylesheet, and a declaration beats an attribute —
+			 * the same trap the arrowhead's `fill` fell into.
+			 */
+			const hit = document.createElementNS(ns, "path");
+			hit.setAttribute("d", d);
+			hit.style.stroke = "transparent";
+			hit.style.strokeWidth = "10";
+			hit.style.fill = "none";
+
+			svg.append(defs, hit, path);
 
 			const label = svg.dataset.label;
 			if (label) {
