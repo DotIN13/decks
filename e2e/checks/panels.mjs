@@ -187,6 +187,39 @@ await page.locator(".chat-row-wrap").first().hover();
 await settle(page, 250);
 say("…and appears on approach", (await closeOpacity()) === 1);
 
+// The × belongs to the row: inside the box that draws the highlight, not beside it in the
+// gutter. And that box has to span the list, which it stopped doing when the highlight lived
+// on the `<button>` — a button's width is fit-content where a flex child is stretched.
+const shape = await page.evaluate(() => {
+	const list = document.querySelector(".chat-rows");
+	const wrap = document.querySelector(".chat-row-wrap");
+	const close = wrap.querySelector(".close");
+	/*
+	 * Whichever box is actually painted, found rather than assumed.
+	 *
+	 * Measuring the wrapper is what made an earlier version of this check useless: the
+	 * wrapper was full-width and did contain the × even when the *highlight* was on the
+	 * narrower button inside it, which is the thing that looked wrong. So find the element
+	 * carrying a background and ask the questions of that.
+	 */
+	const painted = [wrap, wrap.querySelector(".chat-row")].find(
+		(element) => getComputedStyle(element).backgroundColor !== "rgba(0, 0, 0, 0)",
+	);
+	const listBox = list.getBoundingClientRect();
+	const box = (painted ?? wrap).getBoundingClientRect();
+	const x = close.getBoundingClientRect();
+	const padding = parseFloat(getComputedStyle(list).paddingRight);
+	return {
+		painted: painted?.className ?? "nothing",
+		spans: Math.round(listBox.right - padding - box.right),
+		inside: x.left >= box.left && x.right <= box.right && x.top >= box.top && x.bottom <= box.bottom,
+		highlighted: painted ? getComputedStyle(painted).backgroundColor : "rgba(0, 0, 0, 0)",
+	};
+});
+say("the row's highlight spans the list", shape.spans === 0, `${shape.painted} is ${shape.spans}px short of the content edge`);
+say("the × sits inside that highlight", shape.inside, `highlight is ${shape.painted}`);
+say("…and the row is what is highlighted", shape.highlighted !== "rgba(0, 0, 0, 0)", shape.highlighted);
+
 // It must not also focus the row it sits on.
 const focusedBefore = await page.evaluate(() => document.querySelector('.chat-row[data-current="true"] .name')?.textContent);
 await page.locator(".chat-row-wrap").last().hover();

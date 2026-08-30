@@ -152,8 +152,10 @@ export function ChatList(props: {
 							</button>
 
 							{/*
-							 * A sibling of the row, not a child of it: a button inside a button is
-							 * invalid, and a browser resolves it by dropping one of them.
+							 * A sibling of the row's button rather than a child of it — a button
+							 * inside a button is invalid — but inside the wrapper, which is the box
+							 * that draws the row and its highlight, so it reads as part of the row
+							 * rather than something floating in the gutter beside it.
 							 *
 							 * The chat closes; the conversation does not. Its transcript is a session
 							 * file on disk, which is why this needs no confirmation — and why the

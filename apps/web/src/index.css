@@ -1738,15 +1738,41 @@ svg.lucide {
 	gap: 2px;
 }
 
-/* The row and its close button, which is a sibling rather than a child of it. */
+/*
+ * The visual row is the wrapper, not the `<button>` inside it.
+ *
+ * The × has to be a sibling of that button — a button inside a button is invalid, and a
+ * browser resolves it by dropping one — but it still has to look like part of the row. So
+ * the wrapper owns the shape and the highlight, and holds the button and the × side by
+ * side. Two things follow from that, and both were wrong when the highlight lived on the
+ * button: the × sat outside the highlight in the panel's gutter, and the highlight stopped
+ * spanning the panel at all, because a `<button>` sizes to its content where a flex child
+ * of `.chat-rows` was stretched for it.
+ *
+ * `:has` rather than moving `data-current` onto the wrapper: the row is what is current, and
+ * this is the box that draws it.
+ */
 .chat-row-wrap {
-	position: relative;
+	display: flex;
+	align-items: center;
+	padding-right: 4px;
+	border-radius: 9px;
+	gap: 2px;
+}
+
+.chat-row-wrap:hover {
+	background: var(--line);
+}
+
+.chat-row-wrap:has(.chat-row[data-current="true"]) {
+	background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.chat-row-wrap:has(.chat-row[data-child="true"]) {
+	margin-left: 12px;
 }
 
 .chat-row-wrap .close {
-	position: absolute;
-	top: 4px;
-	right: 4px;
 	display: grid;
 	width: 20px;
 	height: 20px;
@@ -1754,27 +1780,37 @@ svg.lucide {
 	border: 0;
 	border-radius: 6px;
 	opacity: 0;
-	background: var(--panel);
+	background: none;
 	color: var(--faint);
 	cursor: pointer;
+	flex: none;
 	place-items: center;
 	transition: opacity 120ms ease;
 }
 
-/* Shown on approach, like the board's own ×. Kept when focused by the keyboard, which is
-   the only way it can be reached without a pointer. */
+/*
+ * Its slot is held whether or not it is showing, so a row does not reflow under the cursor
+ * and the name truncates at the same place either way.
+ *
+ * Shown on approach, like the board's own ×, and kept when focused by the keyboard — which
+ * is the only way to reach it without a pointer.
+ */
 .chat-row-wrap:hover .close,
 .chat-row-wrap .close:focus-visible {
 	opacity: 1;
 }
 
 .chat-row-wrap .close:hover {
-	background: var(--line);
+	background: color-mix(in srgb, var(--fg) 12%, transparent);
 	color: var(--fg);
 }
 
 .chat-row {
 	display: flex;
+	/* Fills the wrapper, which is the flex child `.chat-rows` stretches. A button's own
+	   width is fit-content, which is what left the highlight short of the panel edge. */
+	min-width: 0;
+	flex: 1;
 	gap: 8px;
 	align-items: center;
 	padding: 6px;
@@ -1785,18 +1821,6 @@ svg.lucide {
 	cursor: pointer;
 	font: inherit;
 	text-align: left;
-}
-
-.chat-row:hover {
-	background: var(--line);
-}
-
-.chat-row[data-current="true"] {
-	background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-}
-
-.chat-row[data-child="true"] {
-	margin-left: 12px;
 }
 
 .chat-row .avatar {
