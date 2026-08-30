@@ -192,10 +192,14 @@ function Avatar(props: { chat: AgentChat; identity: Identity | undefined; unread
 					{(src) => <img src={src()} alt="" />}
 				</Show>
 			</span>
+			{/*
+			 * A dot, not a count. A 16px numbered badge on a 26px avatar covers the face it
+			 * is reporting on — and the number was never the point: what a person does with
+			 * it is "that one has something", which a dot says at a fifth of the area. The
+			 * count stays in the title for anyone who wants it.
+			 */}
 			<Show when={props.unread > 0}>
-				<span class="unread" title={`${props.unread} unread`}>
-					{props.unread > 9 ? "9+" : props.unread}
-				</span>
+				<span class="unread" title={props.unread === 1 ? "1 unread message" : `${props.unread} unread messages`} />
 			</Show>
 		</span>
 	);

@@ -1905,7 +1905,8 @@ svg.lucide {
  *
  * It used to sit at the right of the row's second line, which is where the × now is — and
  * two things competing for that corner is how a click lands on the wrong one. On the avatar
- * it is also next to the thing it is about.
+ * it is also next to the thing it is about, and a dot rather than a number because a 16px
+ * numbered badge obscured the face it was reporting on.
  *
  * The ring is the panel's colour rather than the row's, which is close enough: a row's
  * highlight is a translucent tint over the same panel, so the ring reads as a gap either
@@ -1919,12 +1920,17 @@ svg.lucide {
 
 .chat-row .unread {
 	position: absolute;
-	top: -3px;
-	right: -3px;
-	display: grid;
-	min-width: 16px;
-	height: 16px;
-	padding: 0 4px;
+	/*
+	 * On the arc, not at the corner of the box.
+	 *
+	 * The avatar is a circle in a square box, so its top-right *corner* is empty space and a
+	 * badge placed there floats free of it. At 0/0 an 8px dot's centre lands within a
+	 * pixel of the 45° point on a 26px circle's edge — half on the face, half off it.
+	 */
+	top: 0;
+	right: 0;
+	width: 8px;
+	height: 8px;
 	border-radius: 999px;
 	/*
 	 * The text colour, inverted — not the accent.
@@ -1937,10 +1943,6 @@ svg.lucide {
 	 */
 	background: var(--fg);
 	box-shadow: 0 0 0 2px var(--panel);
-	color: var(--bg);
-	font-size: 9px;
-	font-weight: 600;
-	place-items: center;
 }
 
 .chat .chat-head .avatar img {

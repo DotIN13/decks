@@ -240,6 +240,38 @@ say("no timestamp is left in a row", right.timestamps === 0);
 say("the × is the rightmost thing to click", right.rightmostIsClose, right.buttons);
 say("no unread count sits outside the avatar", right.unreadOutsideAvatar === 0);
 say("the unread count's place is the avatar", right.faceHoldsTheBadgeSlot);
+
+/*
+ * The dot must not cover the face it reports on.
+ *
+ * Injected rather than earned with a real turn, because this is about geometry: a numbered
+ * badge here was 16px on a 26px avatar, which is what "obscuring" meant. The dot's own
+ * rendering with a real unread count is checked by hand.
+ */
+const dot = await page.evaluate(() => {
+	const face = document.querySelector(".chat-row .face");
+	const probe = document.createElement("span");
+	probe.className = "unread";
+	face.append(probe);
+	const box = probe.getBoundingClientRect();
+	const avatar = face.querySelector(".avatar").getBoundingClientRect();
+	const centre = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+	const radius = avatar.width / 2;
+	const from = Math.hypot(centre.x - (avatar.left + radius), centre.y - (avatar.top + radius));
+	probe.remove();
+	return {
+		size: Math.round(box.width),
+		avatar: Math.round(avatar.width),
+		coverage: Math.round(((box.width * box.height) / (Math.PI * radius * radius)) * 100),
+		// Sat on the arc: its centre a hair from the edge, so half of it is off the face.
+		offArc: Math.round(Math.abs(from - radius) * 10) / 10,
+		empty: probe.textContent === "",
+	};
+});
+say("the unread mark is a dot, not a badge", dot.size <= 10, `${dot.size}px on a ${dot.avatar}px avatar`);
+say("…covering little of the avatar", dot.coverage <= 15, `${dot.coverage}% of the face`);
+say("…and sitting on its edge rather than over it", dot.offArc <= 2, `${dot.offArc}px off the arc`);
+say("…with no number in it", dot.empty);
 say("…before the name", row.mark !== undefined && row.name !== undefined && row.mark < row.name);
 const claudeInk = row.inks.find((i) => i.agent === "claude")?.ink;
 const piInk = row.inks.find((i) => i.agent === "pi")?.ink;
