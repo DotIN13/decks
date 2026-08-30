@@ -113,11 +113,11 @@ deck directory.
 
 ## Development
 ```bash
-npm test            # 166 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
+npm test            # 174 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
 npm run test:e2e    # 159 browser checks against a throwaway copy of example/ (~65s)
 npm run typecheck
 npm run vendor      # re-copy the board primitives into runtime/lib
-npm run sync:lib    # push runtime/lib into example/decks/lib after editing it
+npm run sync:lib    # push runtime/lib into example/decks/lib by hand (the server does it on open)
 ```
 
 The browser checks are in [e2e/](e2e/README.md). One of them (`mobile.mjs`) runs in a
@@ -128,7 +128,8 @@ touchscreen has. Six more files drive a real agent turn and are skipped unless y
 `example/` is a committed data directory — `example/decks` is the demo deck and
 `example/shared` is the out-of-deck file its sources board embeds, which is the only thing
 in the repository that exercises the quarantine path end to end. Its `decks/lib` is
-generated rather than committed, so `npm run dev:example` syncs it first.
+generated rather than committed, and needs no step of its own: opening a deck refreshes
+its primitives (§2.1), so a fresh clone gets one on the first `npm run dev:example`.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design and the reasoning behind it, and
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for running a deck on a machine other than the one
