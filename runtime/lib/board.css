@@ -363,52 +363,20 @@ table.table,
 	text-transform: uppercase;
 }
 
-/* --- connectors -------------------------------------------------------------- */
+/* --- diagrams ----------------------------------------------------------------- */
 
 /*
- * A connector is an SVG the size of the board, drawn by board.js from the two
- * components it names. It sits under everything and must never eat a click, or
- * the component it points at cannot be selected through it.
+ * There is no connector primitive, and that is the decision rather than a gap. A
+ * line routed between two named components at mount time has no position in the
+ * file, so nobody — agent or person — can say where it goes without running the
+ * page. A diagram is a component that states its own coordinates instead: an
+ * `<svg>` the author sized and positioned, styled from the tokens above like
+ * everything else. `skills/board-authoring` has the worked example.
  */
-svg.link {
-	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
-	overflow: visible;
-	pointer-events: none;
-}
-
-svg.link path {
-	fill: none;
-	stroke: var(--b-border-strong);
-	stroke-width: 2;
-}
 
 /*
- * The arrowhead is a `path` inside the same `svg.link`, so the rule above would
- * make it an unfilled outline — a CSS declaration beats the `fill` attribute the
- * marker sets on itself. It gets its own rule, and `currentColor` so a tinted
- * connector keeps its point.
- */
-svg.link marker path {
-	fill: currentColor;
-	stroke: none;
-}
-
-svg.link text {
-	fill: var(--b-muted);
-	font-family: var(--b-font);
-	font-size: 12px;
-}
-
-svg.link[data-tone="accent"] path {
-	stroke: var(--b-accent);
-}
-
-/*
- * A diagram is given a box and has to live in it, so the box centres it and
- * clips rather than letting a tall flowchart run out over the board.
+ * A mermaid diagram is given a box and has to live in it, so the box centres it
+ * and clips rather than letting a tall flowchart run out over the board.
  */
 [data-mermaid] {
 	display: flex;

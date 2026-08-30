@@ -21,7 +21,7 @@ const BOARD = `<!doctype html>
 			<p>Keep it short.</p>
 		</section>
 		<div class="sticky" data-id="risk" style="left: 480px; top: 48px">Refresh races</div>
-		<svg class="link" data-id="goal-risk" data-from="goal" data-to="risk"></svg>
+		<div class="chip" data-id="status">draft</div>
 		<script src="../lib/board.js"></script>
 	</body>
 </html>
@@ -175,24 +175,16 @@ test("minted ids are named after the thing and never collide", () => {
 	assert.equal(mintId(once, "sticky"), "sticky-2");
 });
 
-test("an arrow needs two ends, and they are ordinary attributes", () => {
+test("there is no arrow left to insert", () => {
+	/*
+	 * `ComponentKind` no longer has it, so writing this needs a cast — which is the point.
+	 * An old client that still sends one is refused with a reason rather than writing an
+	 * `svg.link` into the file that nothing will ever draw.
+	 */
 	assert.throws(
-		() => applyPatches(BOARD, [{ op: "insert", kind: "arrow", id: "a1", at: { left: 0, top: 0 } }]),
-		/needs a from and a to/,
+		() => applyPatches(BOARD, [{ op: "insert", kind: "arrow", id: "a1", at: { left: 0, top: 0 } } as never]),
+		/cannot insert an? arrow/,
 	);
-	const { html } = applyPatches(BOARD, [
-		{
-			op: "insert",
-			kind: "arrow",
-			id: "a1",
-			at: { left: 0, top: 0 },
-			attrs: { "data-from": "goal", "data-to": "risk", "data-label": "leads to" },
-		},
-	]);
-	// The ends first and in the order a person writes them, then the rest. They used
-	// to arrive as one `"from>to"` string in the `embed` field.
-	assert.match(html, /<svg class="link" data-id="a1" data-from="goal" data-to="risk" data-label="leads to"><\/svg>/);
-	untouched(BOARD, html, "a1");
 });
 
 // --- retyping part of a component ------------------------------------------------
@@ -319,10 +311,11 @@ test("a second duplicate does not reuse the first copy's name", () => {
 });
 
 test("duplicating something with no position copies it as it is", () => {
-	// A connector covers the whole board and has no left/top to offset.
-	const { html, ids } = applyPatches(BOARD, [{ op: "duplicate", id: "goal-risk" }]);
-	assert.deepEqual(ids, ["goal-risk-2"]);
-	assert.match(html, /<svg class="link" data-id="goal-risk-2" data-from="goal" data-to="risk"><\/svg>/);
+	// No `style` attribute to offset, so the copy is not given coordinates this file
+	// invented — it lands on top of the original and the user drags it off.
+	const { html, ids } = applyPatches(BOARD, [{ op: "duplicate", id: "status" }]);
+	assert.deepEqual(ids, ["status-2"]);
+	assert.match(html, /<div class="chip" data-id="status-2">draft<\/div>/);
 });
 
 test("a duplicate can be offset by the caller", () => {
@@ -332,15 +325,17 @@ test("a duplicate can be offset by the caller", () => {
 
 // --- rename ----------------------------------------------------------------------
 
-test("a rename takes the connectors that named it with it", () => {
+test("a rename writes the name, answers with it, and touches nothing else", () => {
 	const { html, summary, ids } = applyPatches(BOARD, [{ op: "rename", id: "risk", to: "refresh-race" }]);
-	assert.deepEqual(summary, ["renamed #risk to #refresh-race (and 1 connector end)"]);
+	// No parenthetical about connector ends: nothing in a board names another component
+	// any more, so a rename is a single-attribute splice and says so.
+	assert.deepEqual(summary, ["renamed #risk to #refresh-race"]);
+	// The new name is what the op answers with, because an agent holding the old one is
+	// told what to address it by now.
 	assert.deepEqual(ids, ["refresh-race"]);
-	assert.match(html, /<div class="sticky" data-id="refresh-race"/);
-	assert.match(html, /data-from="goal" data-to="refresh-race"/);
-	// An arrow pointing at a name nothing has is drawn as nothing, and the file still
-	// looks right — so this is the one edit that must not be a single attribute write.
+	assert.match(html, /<div class="sticky" data-id="refresh-race" style="left: 480px; top: 48px">Refresh races<\/div>/);
 	assert.ok(!html.includes('"risk"'));
+	untouched(BOARD, html, "risk", "refresh-race");
 });
 
 test("a rename refuses a name already taken, and one no board could use", () => {

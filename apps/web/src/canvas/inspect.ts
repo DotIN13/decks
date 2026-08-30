@@ -21,12 +21,12 @@ import { BOX_CLASSES, type BoardPatch, type BoxClass } from "@decks/protocol";
  * deck on its next restart rather than never. Adding a row here therefore means
  * adding the CSS in the same commit — not that the vocabulary is fixed. That is the
  * whole answer to "what does appearance mean for a component" —
- * the five interchangeable box classes, `data-tone`, and the handful of attributes
- * an embed and a connector are made of.
+ * the five interchangeable box classes, `data-tone`, and the two attributes an embed
+ * is made of.
  */
 
 /** Which set of rows the inspector draws. */
-export type Family = "box" | "embed" | "link" | "other";
+export type Family = "box" | "embed" | "other";
 
 export interface Shape {
 	path: string;
@@ -40,16 +40,9 @@ export interface Shape {
 	classes: string[];
 	attrs: Record<string, string>;
 	/**
-	 * The components on this board an arrow could point at.
-	 *
-	 * Connectors are not among them: `board.js` routes a link from the boxes it names,
-	 * and an arrow pointing at an arrow has nothing to measure.
-	 */
-	ids: string[];
-	/**
 	 * Whether `board.js` owns what is inside it — an embed, a `[data-md]` panel, a
-	 * diagram, a connector. Retyping such a component in place would be editing the
-	 * *rendered* DOM, whose shape has nothing to do with the file's.
+	 * diagram. Retyping such a component in place would be editing the *rendered* DOM,
+	 * whose shape has nothing to do with the file's.
 	 */
 	generated: boolean;
 }
@@ -64,11 +57,15 @@ export type Edit =
 
 /** Attributes whose change means `board.js` has to mount the component again. */
 const REMOUNT = new Set(["data-embed", "data-pages", "data-mode"]);
-/** Attributes a connector is drawn from. */
-const REDRAW = new Set(["data-from", "data-to", "data-label", "data-tone"]);
 
-export function familyOf(tag: string, classes: string[], attrs: Record<string, string>): Family {
-	if (tag === "svg" || classes.includes("link")) return "link";
+/**
+ * Which rows the selection gets, from its classes and attributes alone.
+ *
+ * The tag used to be part of it, because an `<svg>` was a connector by construction.
+ * Nothing is decided by the tag now: a hand-drawn diagram is whatever its author
+ * classed it, and an agent that gave it a box class means it to have the box rows.
+ */
+export function familyOf(classes: string[], attrs: Record<string, string>): Family {
 	if (attrs["data-embed"] !== undefined || classes.includes("embed")) return "embed";
 	if (classes.some((name) => (BOX_CLASSES as readonly string[]).includes(name))) return "box";
 	// A `kpi`, a `table`, a `chip`, or something the agent invented: it still has a
@@ -122,7 +119,7 @@ export function readShape(path: string, id: string): Shape | undefined {
 	 */
 	const classes = [...element.classList].filter((name) => !name.startsWith("decks-"));
 	const tag = element.tagName.toLowerCase();
-	const family = familyOf(tag, classes, attrs);
+	const family = familyOf(classes, attrs);
 
 	return {
 		path,
@@ -132,11 +129,7 @@ export function readShape(path: string, id: string): Shape | undefined {
 		box: classes.find((name) => (BOX_CLASSES as readonly string[]).includes(name)) as BoxClass | undefined,
 		classes,
 		attrs,
-		ids: [...frame.doc.body.children]
-			.filter((child) => !child.classList.contains("link") && child.tagName.toLowerCase() !== "svg")
-			.map((child) => (child as HTMLElement).dataset.id)
-			.filter((each): each is string => Boolean(each)),
-		generated: family === "embed" || family === "link" || "data-md" in attrs || "data-mermaid" in attrs,
+		generated: family === "embed" || "data-md" in attrs || "data-mermaid" in attrs,
 	};
 }
 
@@ -176,41 +169,30 @@ export function applyLive(shape: Shape, edit: Edit): boolean {
 	const frame = frameOf(shape.path);
 	const element = elementOf(shape.path, shape.id);
 	if (!frame || !element) return false;
-	const board = (frame.win as Window & { __board?: { redraw?: () => void; mount?: (host: Element) => void } }).__board;
+	const board = (frame.win as Window & { __board?: { mount?: (host: Element) => void } }).__board;
 
 	switch (edit.kind) {
 		case "box":
 			// `setAttribute` and not `className`, which on an SVG element is not a string.
 			element.setAttribute("class", swapBox(shape.classes, edit.to));
-			// A box that changed size changes where the arrows into it land.
-			board?.redraw?.();
 			return true;
 		case "attr": {
 			if (edit.value === null || edit.value === "") element.removeAttribute(edit.name);
 			else element.setAttribute(edit.name, edit.value);
 			if (REMOUNT.has(edit.name)) void board?.mount?.(element);
-			if (REDRAW.has(edit.name)) board?.redraw?.();
 			return true;
 		}
-		case "rename": {
+		case "rename":
+			// Nothing else in the board names it: an id is referred to from outside the
+			// component only by the app, never by another component (`board.js`).
 			element.dataset.id = edit.to;
-			// The connectors follow, here as in the file: board.js resolves an end by id
-			// at draw time, so a link left naming the old one draws nothing at all.
-			for (const end of ["data-from", "data-to"]) {
-				for (const link of frame.doc.querySelectorAll(`[${end}="${cssEscape(shape.id)}"]`)) {
-					link.setAttribute(end, edit.to);
-				}
-			}
-			board?.redraw?.();
 			return true;
-		}
 		case "order":
 			if (edit.to === "front") frame.doc.body.appendChild(element);
 			else frame.doc.body.insertBefore(element, frame.doc.body.firstElementChild);
 			return true;
 		case "remove":
 			element.remove();
-			board?.redraw?.();
 			return true;
 		case "duplicate":
 			return false;

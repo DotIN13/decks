@@ -1,4 +1,4 @@
-import { BOX_CLASSES, CALLOUT_TONES, LINK_TONES, type BoxClass } from "@decks/protocol";
+import { BOX_CLASSES, CALLOUT_TONES, type BoxClass } from "@decks/protocol";
 import BringToFront from "lucide-solid/icons/bring-to-front";
 import Copy from "lucide-solid/icons/copy";
 import FolderOpen from "lucide-solid/icons/folder-open";
@@ -13,9 +13,9 @@ import { isPdf, type Edit, type Shape } from "./inspect.ts";
  * The selection's properties, floating beside the stage.
  *
  * Everything about a component that is not its position, its size or a run of its
- * text — what kind of box it is, its tone, what an embed points at, where a
- * connector ends, its name, its order, a copy of it, its removal. Position and size
- * are the drag handles' job and text is typed in place; this is the rest of §6.5.
+ * text — what kind of box it is, its tone, what an embed points at, its name, its
+ * order, a copy of it, its removal. Position and size are the drag handles' job and
+ * text is typed in place; this is the rest of §6.5.
  *
  * It appears for the selection and only above `INTERACT_ZOOM`, the same rule the
  * palette follows: below that a board is a tile on a map, its frame takes no pointer
@@ -24,12 +24,17 @@ import { isPdf, type Edit, type Shape } from "./inspect.ts";
  * reach, so hovering the inspector does not pull the transcript over it.
  *
  * **The rows are the stylesheet's vocabulary, not an invented one.** `board.css` has
- * five interchangeable box classes and a `data-tone`; `board.js` reads `data-embed`,
- * `data-pages`, `data-from`, `data-to` and `data-label`. A deck's `lib/` is a copy
- * taken when the deck was created, so a colour this build invented would be an
- * unstyled box in every deck that already exists (see `inspect.ts`). Anything an
- * agent can write that this cannot edit is left to the agent, which is the fallback
- * editor and a good one.
+ * five interchangeable box classes and a `data-tone`; `board.js` reads `data-embed`
+ * and `data-pages`. A deck's `lib/` is a copy taken when the deck was created, so a
+ * colour this build invented would be an unstyled box in every deck that already
+ * exists (see `inspect.ts`). Anything an agent can write that this cannot edit is left
+ * to the agent, which is the fallback editor and a good one.
+ *
+ * There were three more rows here — a connector's `from`, `to` and label. They went
+ * with the connector itself: a line whose ends are named rather than placed has no
+ * position the file states, so neither the agent that wrote it nor the person editing
+ * it could say where it went. A diagram is a component with its own coordinates now,
+ * and coordinates are the drag handles' job rather than this panel's.
  */
 export function Inspector(props: {
 	shape: Shape | undefined;
@@ -41,28 +46,9 @@ export function Inspector(props: {
 	onClose: () => void;
 }) {
 	/** The tones `board.css` styles for this component, or none for the rest. */
-	const tones = createMemo(() => {
-		const shape = props.shape;
-		if (!shape) return [];
-		if (shape.family === "link") return [...LINK_TONES];
-		return shape.box === "callout" ? [...CALLOUT_TONES] : [];
-	});
+	const tones = createMemo(() => (props.shape?.box === "callout" ? [...CALLOUT_TONES] : []));
 
 	const source = () => props.shape?.attrs["data-embed"] ?? "";
-
-	/**
-	 * What a connector's ends can be, plus whatever it currently names.
-	 *
-	 * The current value is included even when nothing on the board has that id, because
-	 * a dangling end is precisely when somebody opens this panel: a `<select>` that
-	 * silently displays its first option instead would say the arrow points somewhere it
-	 * does not, and then write that as an edit nobody asked for.
-	 */
-	const ends = (current: string) => {
-		const shape = props.shape;
-		const others = (shape?.ids ?? []).filter((id) => id !== shape?.id);
-		return current && !others.includes(current) ? [current, ...others] : others;
-	};
 
 	/**
 	 * A field that commits on Enter or on leaving, and abandons on Escape.
@@ -102,7 +88,7 @@ export function Inspector(props: {
 					<header>
 						{/* What it is, said in the board's own words: the class an agent would
 						    have written, or the tag when there is no class we know. */}
-						<span class="what">{shape().box ?? (shape().family === "link" ? "connector" : shape().family === "embed" ? "embed" : shape().classes[0] ?? shape().tag)}</span>
+						<span class="what">{shape().box ?? (shape().family === "embed" ? "embed" : shape().classes[0] ?? shape().tag)}</span>
 						{field("name", () => shape().id, (next) => next && props.onEdit({ kind: "rename", to: next }))}
 						{/*
 							Escape clears the selection and a tap on bare canvas does too — but on a
@@ -205,35 +191,6 @@ export function Inspector(props: {
 								)}
 							</div>
 						</Show>
-					</Show>
-
-					<Show when={shape().family === "link"}>
-						<div class="row">
-							<span class="label">from</span>
-							<select
-								name="from"
-								value={shape().attrs["data-from"] ?? ""}
-								onChange={(event) => props.onEdit({ kind: "attr", name: "data-from", value: event.currentTarget.value })}
-							>
-								<For each={ends(shape().attrs["data-from"] ?? "")}>{(id) => <option value={id}>{id}</option>}</For>
-							</select>
-						</div>
-						<div class="row">
-							<span class="label">to</span>
-							<select
-								name="to"
-								value={shape().attrs["data-to"] ?? ""}
-								onChange={(event) => props.onEdit({ kind: "attr", name: "data-to", value: event.currentTarget.value })}
-							>
-								<For each={ends(shape().attrs["data-to"] ?? "")}>{(id) => <option value={id}>{id}</option>}</For>
-							</select>
-						</div>
-						<div class="row">
-							<span class="label">label</span>
-							{field("label", () => shape().attrs["data-label"] ?? "", (next) =>
-								props.onEdit({ kind: "attr", name: "data-label", value: next }),
-							)}
-						</div>
 					</Show>
 
 					<div class="row acts">

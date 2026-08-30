@@ -165,11 +165,21 @@ reason.
   expensive to mount at thumbnail size (§7).
 - **The component vocabulary is small, and it is `board.css`'s.** Five classes that mean
   "a box with prose in it" (`text`, `sticky`, `card`, `panel`, `callout`), three that
-  bring their own inner markup (`kpi`, `table`, `chip`), the `embed`, and `svg.link`;
-  the only variant attribute is `data-tone`. That list is also the ceiling on what the
+  bring their own inner markup (`kpi`, `table`, `chip`), and the `embed`; the only
+  variant attribute is `data-tone`. That list is also the ceiling on what the
   user's editor can offer (§6.5). It is a copy in every deck rather than a route, and it
   is brought forward on every open (§2.1), so growing the vocabulary means editing
   `board.css` and the editor's list together.
+- **There is no connector, and `board.js` draws nothing of its own.** It used to route an
+  `svg.link` between two components named by id, and that was removed: a line positioned
+  at mount time is a drawing the file does not state, so the file stopped being the whole
+  truth about the board — the agent could not say where a line went without running the
+  page, and the user had nothing to drag. A diagram is now a component that owns its own
+  geometry, an `<svg>` inside a box with coordinates its author chose, which is a thing
+  both of them can read and edit. `runtime/skills/board-authoring` teaches it and the
+  example deck's two boards are built that way. The cost is accepted and was paid
+  knowingly: `lib/` is re-synced on every open (§2.1), so existing user boards lost their
+  arrows on their next restart, with no compatibility path.
 - The head asks for exactly two files. `board.js` loads whatever a component actually
   uses — marked, KaTeX, mermaid, pdf.js — from the same `lib/`, so a board of three
   stickies does not pay for pdf.js and the agent does not have to remember which
@@ -432,7 +442,7 @@ already there put a blank line in the file on every edit.
 **The appearance vocabulary is the stylesheet's, and it is thinner than it looks.**
 `board.css` has five component classes that mean the same thing — a box with prose in
 it: `text`, `sticky`, `card`, `panel`, `callout` — and one variant attribute,
-`data-tone` (a callout's warn/danger/ok, a connector's accent). That is all it has:
+`data-tone` (a callout's warn/danger/ok). That is all it has:
 there is no sticky colour, no font size, no alignment. So the inspector offers a class
 switch and a tone, and nothing it invented. **A deck's `lib/` is a copy** — but one
 that is refreshed on every open (§2.1), so the constraint this design was written under
@@ -454,7 +464,7 @@ obvious alternative and it contradicts §7 — the chrome is away by default bec
 canvas is the work. A context menu was the other, and it is a second place to put the
 same rows, reachable only by knowing it is there; the keyboard covers the frequent ones
 instead (⌘D duplicates, `[` and `]` change order, ⌫ deletes, and the palette's own
-`V S C T E A` finally do something).
+`V S C T E` finally do something).
 
 What the inspector will not offer, on purpose: a colour picker writing
 `background: #f0c`. Boards use tokens, the authoring skill tells the agent never to
@@ -467,25 +477,28 @@ source bytes with two attributes rewritten inside the copy, because that is the 
 copy that keeps a card's heading, its paragraph and its list — an `insert` composed by
 the browser would produce the palette's placeholder wearing a new name. Its name is
 derived from the original's (`goal` → `goal-2`), since an id is the one thing in a
-board a person and an agent both address by hand. `rename` writes the new `data-id`
-*and* every `data-from`/`data-to` that named the old one, in one pass of descending
-offsets: through the generic `attrs` path it would have written the name and silently
-orphaned the connectors, and an arrow that stops being drawn while the file still looks
-right is the worst kind of edit. Renaming is worth having despite what it costs — an
-agent may hold the old name in context — because the summary it is told says exactly
-what changed, which is the same mechanism every other edit relies on.
+board a person and an agent both address by hand. `rename` is an op rather than an
+`attrs: { "data-id": … }` write because a name is not an attribute like the others: it
+has to be one a board can use, it has to be one nothing else has, and the op has to
+answer with it. Renaming is worth having despite what it costs — an agent may hold the
+old name in context — because the summary it is told says exactly what changed, which is
+the same mechanism every other edit relies on. It used to have a second job: rewriting
+every `data-from`/`data-to` that named the old id, in one pass of descending offsets,
+because otherwise the file still looked right while an arrow silently stopped being
+drawn. Connectors went, and with them the only thing in a board that named a component
+from outside it, so a rename is now a single-attribute splice. `duplicate` is what still
+needs the multi-splice path, for the copy's `data-id` and its `style`.
 
-A connector became editable at all only after it became *selectable*. `board.css` gives
-`svg.link` no pointer events, correctly: it covers the whole board, and a board-sized
-rectangle over everything would eat every click. The editor turns events back on for
-the paths inside it (a child may, under a parent that turned them off) and `board.js`
-draws each connector twice — the line you see, and an invisible 10px copy of it that is
-the thing you can actually hit, since a 2px stroke is not a target. Selected, an arrow
-thickens and takes the accent rather than growing an outline around the whole board, and
-it gets no resize handle: `offsetWidth` on an SVG element is not even a number.
-Drawing one is two clicks, which is what the palette's arrow tool used to promise in a
-notice and never do; both ends travel as ordinary `data-from`/`data-to` attributes,
-replacing a `"from>to"` string that was smuggled through the `embed` field.
+**What a family is, after the connector went.** The inspector sorts the selection into
+`box`, `embed` or `other` by its classes and attributes, and no longer by its tag: an
+`<svg>` was a connector by construction, and a hand-drawn diagram is whatever its author
+classed it. A top-level `<svg>` is therefore an `other` — a name, an order, a copy, a
+delete — and gets no drag, no resize and no retype, because every gesture in
+`canvas/Editor.ts` is `offsetLeft`/`offsetWidth` and an `SVGElement` has neither. The
+authoring skill answers that by putting the drawing inside a box component, which is
+draggable like anything else and scales the `viewBox` with it. A guard in the editor
+rather than a fix: making SVG geometry work would mean a second coordinate path through
+that file for a shape the guidance says not to write.
 
 **A burst of inspector clicks is one patch.** A patch carries the rev it was composed
 against and a stale one is refused (below) — right for "the agent wrote this file while
@@ -503,8 +516,8 @@ before there was an inspector — an arrow key held down sends a patch per repea
 the revision it loaded so a user's own edit does not reload the board they are working
 on (§7), and that pin assumes the editor has already made the change on screen. Every
 edit therefore does both halves — `setAttribute` and the patch — and asks `board.js` to
-re-mount an embed whose source changed or redraw the connectors when something moved.
-Deleting was the one that had never done its half: the patch took the component out of
+re-mount an embed whose source changed. Deleting was the one that had never done its
+half: the patch took the component out of
 the file and it stayed on screen until something else reloaded the frame. A duplicate
 is the deliberate exception, since its markup exists only in the file; that op unpins
 and takes the reload, exactly as an insert does.
@@ -953,7 +966,7 @@ board, talking to the agent and light editing", and everything below serves that
   `click` afterwards at the same coordinates, and the backdrop is by then underneath it, so
   a click closed the picker the instant it opened.
 
-- **Every keyboard-only action has a touch route.** The palette's `V S C T E A` are its
+- **Every keyboard-only action has a touch route.** The palette's `V S C T E` are its
   buttons, ⌘D / `[` / `]` / ⌫ are the inspector's row, `0` is the zoombar's `fit`, `1` is a
   rail item or a double-tap on a title bar, and Escape is the inspector's `×`. ⌘Z had
   nothing, so undo sits in the palette on a touch device — not a tool, and there anyway,
@@ -1003,10 +1016,10 @@ section.
   from the title bar instead and everything hover-revealed is simply shown (§7.1). What
   touch loses with it is the *preview*: `rewind` previews the boards on hover, so on a
   phone the tap is the whole gesture.
-- An arrow is selected by clicking its line, which `board.js` widens to an invisible
-  10px band because 2px is not a target. That band is on top of whatever it crosses, so
-  a connector routed over a card takes a click meant for the card; zooming in makes both
-  targets bigger, which is the only answer here that does not involve a modifier key.
+- A diagram drawn as a bare top-level `<svg>` can be selected, renamed, copied and
+  deleted but not dragged, resized or retyped — the editor's geometry is `HTMLElement`'s
+  and an `SVGElement` has none of it (§6.5). Putting the drawing inside a box component
+  is the answer the authoring skill gives, and it costs one wrapper.
 - The inspector edits one component at a time. There is no multi-select, so "make these
   four cards panels" is four clicks or a sentence to the agent.
 - `kpi`, `table` and `chip` get a name, an order, a copy and a delete, and no appearance

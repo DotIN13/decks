@@ -5,6 +5,46 @@
 		<title>Auth refresh — the plan</title>
 		<meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
+		<style>
+			/*
+			 * The claim diagram's own vocabulary. Keyed on `.claim` and never on
+			 * `.card .claim`, because the user may have made this a panel by the time
+			 * anybody reads it.
+			 */
+			.claim .box {
+				fill: var(--b-bg-deep);
+				stroke: var(--b-border-strong);
+				stroke-width: 1.5;
+			}
+			.claim .flow {
+				fill: none;
+				stroke: var(--b-border-strong);
+				stroke-width: 1.5;
+			}
+			.claim .flow.wins {
+				stroke: var(--b-accent);
+			}
+			/*
+			 * A marker's `fill` has to be a declaration, not an attribute: the rule above
+			 * gives every `.flow` `fill: none`, and the arrowhead is a path inside one.
+			 */
+			.claim marker > path {
+				fill: var(--b-border-strong);
+				stroke: none;
+			}
+			.claim marker#claim-wins > path {
+				fill: var(--b-accent);
+			}
+			.claim text {
+				fill: var(--b-fg);
+				font-family: var(--b-font);
+				font-size: 12px;
+			}
+			.claim text.aside {
+				fill: var(--b-muted);
+				font-size: 11px;
+			}
+		</style>
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 184px; top: 120px; width: 720px">
@@ -77,10 +117,46 @@
 			</ul>
 		</section>
 
-		<svg class="link" data-id="goal-approach" data-from="goal" data-to="approach" data-label="how"></svg>
-		<svg class="link" data-id="approach-risk" data-from="approach" data-to="risk"></svg>
-		<svg class="link" data-id="approach-sequence" data-from="approach" data-to="sequence" data-tone="accent"></svg>
-		<svg class="link" data-id="sequence-next" data-from="sequence" data-to="next"></svg>
+		<!--
+			The diagram is a component, and it owns both its boxes and its arrows.
+
+			Every number here is in the file, which is the point: the shape of the picture
+			can be read without running the page, and moving a line means editing a
+			coordinate rather than hoping a router picks a different side. The `viewBox` is
+			the drawing's own coordinate space, so dragging the card's corner scales it
+			instead of breaking it.
+		-->
+		<section class="card claim" data-id="claim" style="left: 1140px; top: 604px; width: 412px; height: 232px">
+			<h3>One claim, two tabs</h3>
+			<svg viewBox="0 0 380 160" width="100%" height="160" role="img" aria-label="Both tabs see a 401 and ask; the lock admits one; the loser retries with its answer.">
+				<defs>
+					<marker id="claim-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+						<path d="M 0 0 L 10 5 L 0 10 z" />
+					</marker>
+					<marker id="claim-wins" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+						<path d="M 0 0 L 10 5 L 0 10 z" />
+					</marker>
+				</defs>
+
+				<rect class="box" x="1" y="6" width="96" height="34" rx="6" />
+				<text x="49" y="28" text-anchor="middle">tab A</text>
+				<rect class="box" x="1" y="118" width="96" height="34" rx="6" />
+				<text x="49" y="140" text-anchor="middle">tab B</text>
+				<rect class="box" x="138" y="62" width="84" height="34" rx="6" />
+				<text x="180" y="84" text-anchor="middle">the lock</text>
+				<rect class="box" x="288" y="62" width="91" height="34" rx="6" />
+				<text x="333" y="84" text-anchor="middle">t1, once</text>
+
+				<path class="flow" d="M 97 23 H 118 V 79 H 134" marker-end="url(#claim-tip)" />
+				<path class="flow" d="M 97 135 H 118 V 79 H 134" marker-end="url(#claim-tip)" />
+				<path class="flow wins" d="M 222 79 H 284" marker-end="url(#claim-wins)" />
+				<path class="flow" d="M 333 96 V 135 H 101" marker-end="url(#claim-tip)" />
+
+				<text class="aside" x="110" y="76" text-anchor="end">both see 401</text>
+				<text class="aside" x="253" y="71" text-anchor="middle">first wins</text>
+				<text class="aside" x="320" y="128" text-anchor="end">the loser retries with it</text>
+			</svg>
+		</section>
 
 		<script src="../lib/board.js"></script>
 	</body>

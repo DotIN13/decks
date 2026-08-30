@@ -1,6 +1,6 @@
 ---
 name: board-authoring
-description: How to say something on a board — the three shapes that carry an answer, a design and a finished piece of work — plus the components that come with the board (cards, stickies, callouts, KPIs, tables, connectors, markdown, maths, diagrams, embeds), how to invent one the board does not have, and the layout rules that keep a board readable. Read before answering on a board or building one with anything beyond cards and text.
+description: How to say something on a board — the three shapes that carry an answer, a design and a finished piece of work — plus the components that come with the board (cards, stickies, callouts, KPIs, tables, markdown, maths, mermaid, embeds), how to draw a diagram with your own coordinates, how to invent a component the board does not have, and the layout rules that keep a board readable. Read before answering on a board or building one with anything beyond cards and text.
 ---
 
 # Writing a board
@@ -201,19 +201,90 @@ it, and read "Inventing a component" below for the one obligation that comes wit
 </div>
 ```
 
-### Connectors
+### Diagrams: you draw them, and you choose the coordinates
 
-An `svg.link` draws an arrow between two components by id, routed automatically from
-the nearest facing sides and redrawn whenever the layout moves.
+**There is no connector between two components.** There was one — an `svg.link` naming a
+`data-from` and a `data-to`, routed at mount time — and it is gone. The reason is worth
+having in mind while you draw, because it decides everything below: a line whose position
+is computed when the page loads is a line the *file does not state*. You could not tell
+from the source where it went, so you could not reason about your own board without
+screenshotting it; and the user could not drag it, because there was nothing to drag.
+
+So a diagram is a component that owns both its boxes and the arrows between them, with
+every number in the file. Two ways to write one, and the first is the ordinary one.
+
+**A box with an `<svg>` in it.** Put the drawing inside a normal component, not directly
+in the `<body>`: a `<div>` or `<section>` is what the user drags and resizes, and a
+top-level `<svg>` gets neither (an `SVGElement` has no `offsetLeft` for the editor to
+measure). Give the `<svg>` a `viewBox` and `width="100%"` and the drawing scales with the
+box it is in instead of breaking when the box changes.
 
 ```html
-<svg class="link" data-id="goal-approach" data-from="goal" data-to="approach" data-label="how"></svg>
-<svg class="link" data-id="a-b" data-from="a" data-to="b" data-tone="accent"></svg>
+<style>
+	/* Keyed on `.claim`, never on `.card .claim` — the user may make it a panel. */
+	.claim .box { fill: var(--b-bg-deep); stroke: var(--b-border-strong); stroke-width: 1.5; }
+	.claim .flow { fill: none; stroke: var(--b-border-strong); stroke-width: 1.5; }
+	/* A marker's head is a path inside a `.flow`, and the rule above gave that
+	   `fill: none` — a declaration beats the attribute, so the head needs its own rule. */
+	.claim marker > path { fill: var(--b-border-strong); stroke: none; }
+	.claim text { fill: var(--b-fg); font-family: var(--b-font); font-size: 12px; }
+	.claim text.aside { fill: var(--b-muted); font-size: 11px; }
+</style>
+
+<section class="card claim" data-id="claim" style="left: 1140px; top: 604px; width: 412px; height: 232px">
+	<h3>One claim, two tabs</h3>
+	<svg viewBox="0 0 380 160" width="100%" height="160" role="img" aria-label="Both tabs ask; the lock admits one; the loser retries with its answer.">
+		<defs>
+			<marker id="claim-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+				<path d="M 0 0 L 10 5 L 0 10 z" />
+			</marker>
+		</defs>
+
+		<rect class="box" x="1" y="6" width="96" height="34" rx="6" />
+		<text x="49" y="28" text-anchor="middle">tab A</text>
+		<rect class="box" x="1" y="118" width="96" height="34" rx="6" />
+		<text x="49" y="140" text-anchor="middle">tab B</text>
+		<rect class="box" x="138" y="62" width="84" height="34" rx="6" />
+		<text x="180" y="84" text-anchor="middle">the lock</text>
+
+		<!-- Elbows, not curves: two segments you can read off the file. -->
+		<path class="flow" d="M 97 23 H 118 V 79 H 134" marker-end="url(#claim-tip)" />
+		<path class="flow" d="M 97 135 H 118 V 79 H 134" marker-end="url(#claim-tip)" />
+		<text class="aside" x="110" y="76" text-anchor="end">both see 401</text>
+	</svg>
+</section>
 ```
 
-No `style` needed — a connector covers the whole board and takes no clicks.
+`example/decks/boards/plan.html` and `risks.html` are both built this way — a flow and a
+timeline. Read them before writing your first one.
 
-### Markdown, maths, diagrams
+What makes such a diagram good, in order of how often it goes wrong:
+
+- **Lay it out on a grid you decide first.** Pick the box size and the gaps (34-high
+  boxes 56 apart, say) and derive every coordinate from them. Numbers chosen one at a
+  time do not line up, and nothing here will line them up for you.
+- **Elbows beat curves.** `M 97 23 H 118 V 79 H 134` is five numbers a reader can check
+  against the boxes it joins; a cubic Bézier's control points are not.
+- **Leave room for the arrowhead.** End the path a few units short of the box it points
+  at (`H 134` into a box whose left edge is 138), or the head lands inside the border.
+- **Tokens, not hexes** — through CSS in the board's own `<head>`, keyed on your class.
+  An SVG defaults to `fill: black; stroke: none`, so say what you mean for every shape:
+  `fill: none` on a path, and an explicit `fill` on every `<text>`.
+- **`role="img"` and an `aria-label`** saying what the picture says. It is the only text a
+  screen reader gets, and it is also the sentence that tells you whether the drawing was
+  worth making.
+
+**A chart, or a graph too big to place by hand: d3.** It is vendored beside the board and
+the section below shows it. Everything above still applies — d3 computes the coordinates,
+and it does so at mount time, so use it where the *data* is the point (a scale, a layout
+of forty nodes) and not to avoid choosing where four boxes go.
+
+**Mermaid is still there**, and is the right answer for a flowchart whose shape you do not
+want to own. It is a `[data-mermaid]` box (below); the difference from a diagram you draw
+is exactly the one this section is about, so reach for it when the picture is disposable
+and draw it yourself when the positions mean something.
+
+### Markdown, maths, mermaid
 
 ```html
 <div class="panel" data-id="sequence" style="left: 48px; top: 604px; width: 620px" data-md>
@@ -264,9 +335,9 @@ before parsing. A `[data-mermaid]` box needs a height; the diagram scales to fit
 ## Inventing a component
 
 Nothing stops you. A board is an HTML file you write with your ordinary tools; no schema
-validates it, and `board.js` only ever looks at four things — `svg.link`, `[data-md]`,
+validates it, and `board.js` only ever looks at three things — `[data-md]`,
 `[data-mermaid]` and `[data-embed]`. Every other element in the body it leaves exactly as
-you wrote it. So a shape the catalogue does not have is a shape you can build, and you
+you wrote it, including every `<svg>` you draw. So a shape the catalogue does not have is a shape you can build, and you
 should, rather than forcing a timeline into three stickies.
 
 **Your CSS goes in the board**, in a `<style>` in its own `<head>`:
@@ -303,10 +374,14 @@ invent is as editable as you make it, and the rules are mechanical:
 - **Keep the words in the file.** A patch splices the board's source, so text that lives in
   an attribute, in a CSS `content:`, or in a string your `<script>` writes at runtime has
   nowhere for an edit to land. Static markup wherever it can be static.
-- **`data-md`, `data-mermaid`, `data-embed` and `<svg>` are not editable, by design.**
+- **`data-md`, `data-mermaid` and `data-embed` are not retypeable, by design.**
   `board.js` replaces what is inside them, so the file's shape is not the shape on screen
-  and retyping is refused with a reason. Reach for markdown when the content really is
+  and an edit is refused with a reason. Reach for markdown when the content really is
   prose you own; do not wrap a component in `data-md` for the convenience of writing it.
+- **A top-level `<svg>` is a component the editor cannot measure.** Every gesture in it
+  reads `offsetLeft`/`offsetWidth`, which an `SVGElement` does not have, so such a
+  component can be selected, renamed, copied and deleted but not dragged, resized or
+  retyped. Put the drawing inside a box, as the diagram section does, and all of it works.
 
 A component that follows those rules, and is worth the two lines of CSS above:
 
@@ -358,6 +433,11 @@ Use the variables, never raw colours, so a board works in light and dark:
 Read the palette from the tokens rather than hard-coding hexes, and the chart follows
 the theme like everything else.
 
+One caution, which is the diagram section's caution again: what a `<script>` writes at
+mount time is not in the file. Nothing can retype a bar's label, and neither you nor the
+user can see the layout without running the page. That is a fair price for a scale over
+forty points and a bad one for four boxes — draw those.
+
 ## Checklist before you say a board is done
 
 - Does every component have a meaningful `data-id`?
@@ -367,6 +447,8 @@ the theme like everything else.
 - Are colours tokens, not hexes?
 - If you invented a component: is every string in it its own leaf element, does it carry a
   box class beside your own, and is its CSS in the board rather than in `lib/`?
+- If you drew a diagram: is it inside a box component rather than a bare `<svg>`, are its
+  coordinates on a grid you chose, and does its `aria-label` say what it says?
 - Does it say one thing?
 - **Could the user understand this without reading the chat?** That is the test that
   matters. If the board needs a sentence you only said in the column, the sentence belongs

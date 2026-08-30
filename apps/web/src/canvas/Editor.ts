@@ -2,7 +2,7 @@ import type { BoardPatch, ComponentKind, Rect } from "@decks/protocol";
 import { cameraMovedSince } from "./pan-signal.ts";
 
 /**
- * The user's half of a board: select, drag, resize, retype, delete, insert, connect.
+ * The user's half of a board: select, drag, resize, retype, delete, insert.
  *
  * This is ordinary app code operating on `frame.contentDocument`, which is the
  * point of serving boards same-origin (DESIGN §4). Two consequences worth naming:
@@ -110,23 +110,6 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		@media (pointer: coarse) {
 			.decks-handle { width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 6px; }
 		}
-
-		/*
-		 * A connector covers the whole board and takes no clicks (board.css), which is
-		 * right for every other purpose and left an arrow the one component that could
-		 * not be selected. The svg still takes none; its own lines take them — a child
-		 * may turn pointer events back on under a parent that turned them off — so the
-		 * target is the arrow itself rather than a board-sized rectangle over
-		 * everything else. board.js draws each connector twice for this: the line you
-		 * see, and an invisible 10px copy of it that is the thing you can actually hit.
-		 *
-		 * Selected, it says so by thickening and taking the accent: an outline around a
-		 * board-sized element would frame the whole board, and the resize handle it
-		 * would otherwise get belongs to a box with a size.
-		 */
-		svg.link > path, svg.link > text { pointer-events: stroke; }
-		svg.link.decks-editing { outline: none; }
-		svg.link.decks-editing > path { stroke: var(--b-accent, #3b5cf6); stroke-width: 3; }
 	`;
 	doc.head.appendChild(style);
 	cleanups.push(() => style.remove());
@@ -147,16 +130,6 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		return owner && owner.parentElement === doc.body ? owner : undefined;
 	};
 
-	/**
-	 * Ask board.js to redraw the connectors.
-	 *
-	 * A component that moved, changed shape or went away changes where the arrows into
-	 * it land, and the runtime exposes `redraw` for exactly this (`window.__board`).
-	 * Its own ResizeObserver catches most of it; a removal is the case it cannot see,
-	 * because the element is gone before anything measures it.
-	 */
-	const redraw = () => (win as Window & { __board?: { redraw?: () => void } }).__board?.redraw?.();
-
 	const rectOf = (element: HTMLElement) => ({
 		left: element.offsetLeft,
 		top: element.offsetTop,
@@ -173,8 +146,13 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			return;
 		}
 		element.classList.add("decks-editing");
-		// A connector has no box of its own — `offsetWidth` on an SVG element is not
-		// even a number — so there is nothing to put a resize handle on.
+		/*
+		 * Every measurement in this file is `offsetLeft`/`offsetWidth`, which belong to
+		 * `HTMLElement` — an `SVGElement` has neither, so a top-level `<svg>` reads as
+		 * `undefined` and there is nothing to hang a handle off. The authoring skill
+		 * therefore has a hand-drawn diagram sit *inside* a box component, which is what
+		 * makes it draggable and resizable like anything else.
+		 */
 		if (element.tagName.toLowerCase() === "svg") {
 			handle.style.display = "none";
 			return;
@@ -214,47 +192,6 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 				...(embed ? { embed } : {}),
 			},
 		]);
-		host.resetTool();
-	};
-
-	/**
-	 * An arrow, drawn by clicking its two ends.
-	 *
-	 * A connector is not a box you place: it is a relation between two components, so
-	 * there is nothing to drag out and nowhere to put it. The first click names the
-	 * start and holds it; the second sends the insert. Both ends go as ordinary
-	 * attributes (`data-from`, `data-to`), which is also what an agent writes.
-	 *
-	 * The palette used to answer this tool with a notice promising a gesture that did
-	 * not exist ("select one, then shift-click another").
-	 */
-	let from: string | undefined;
-	const connect = (target: EventTarget | null) => {
-		const element = componentAt(target);
-		if (!element) {
-			host.notice(from ? "Click the component it should point at." : "Click the component the arrow starts from.");
-			return;
-		}
-		if (element.tagName.toLowerCase() === "svg") {
-			// board.js routes a link from the boxes it names, and an arrow has no box.
-			host.notice("An arrow points at a component, not at another arrow.");
-			return;
-		}
-		const id = element.dataset.id!;
-		if (!from) {
-			from = id;
-			host.select({ path, id });
-			host.notice(`From ${id} — now click where it points.`);
-			return;
-		}
-		if (from === id) {
-			host.notice("An arrow needs two different components.");
-			return;
-		}
-		host.patch(path, [
-			{ op: "insert", kind: "arrow", id: "", at: { left: 0, top: 0 }, attrs: { "data-from": from, "data-to": id } },
-		]);
-		from = undefined;
 		host.resetTool();
 	};
 
@@ -316,7 +253,6 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			active.element.style.height = `${active.origin.height}px`;
 		}
 		placeHandle();
-		redraw();
 	};
 
 	on("pointerdown", (event) => {
@@ -353,15 +289,6 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			return;
 		}
 
-		if (tool === "arrow") {
-			event.preventDefault();
-			connect(event.target);
-			return;
-		}
-		// Half-drawn arrows do not survive picking up another tool: coming back to the
-		// arrow later and having the first click finish a connector from wherever you
-		// were ten minutes ago is a component nobody asked for.
-		from = undefined;
 		if (tool !== "select") {
 			event.preventDefault();
 			void insert(tool, { x: event.clientX + win.scrollX, y: event.clientY + win.scrollY });
@@ -472,14 +399,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		// An armed tool has been waiting for the finger to lift, so that the same finger
 		// could have panned instead.
 		const tool = host.tool();
-		if (tool === "arrow") {
-			// `from` deliberately survives: the arrow tool is two taps, and the first one
-			// is the thing the second one needs.
-			connect(finished.target);
-			return;
-		}
 		if (tool !== "select") {
-			from = undefined;
 			void insert(tool, finished.on);
 			return;
 		}
@@ -559,12 +479,17 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	};
 
 	/**
-	 * Whether `board.js` owns what is inside a component.
+	 * Whether a component is one this cannot address a run of text inside.
 	 *
-	 * An embed, a `[data-md]` panel, a diagram and a connector are all *rendered*: the
-	 * DOM on screen is not the shape the file has, so the indices above would address
-	 * something that does not exist there and the patch would be refused after the
-	 * optimistic edit had already happened. Refused up front instead, with the reason.
+	 * An embed, a `[data-md]` panel and a diagram are *rendered*: the DOM on screen is
+	 * not the shape the file has, so the indices above would address something that does
+	 * not exist there and the patch would be refused after the optimistic edit had
+	 * already happened. Refused up front instead, with the reason.
+	 *
+	 * A top-level `<svg>` is here for the other reason — `beginEditing` ends by asking
+	 * for `rectOf(component)` to keep the caret on screen, and an `SVGElement` has no
+	 * `offsetLeft` to give it. A hand-drawn diagram inside a box component is editable
+	 * as normal, which is how the authoring skill says to write one.
 	 */
 	const rendered = (element: HTMLElement) =>
 		element.dataset.embed !== undefined ||
@@ -588,6 +513,18 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		if (!run) return false;
 		if (rendered(run.component)) {
 			host.notice("The board draws that from a file — change what it points at, or ask the agent.");
+			return false;
+		}
+		/*
+		 * `contentEditable` is `HTMLElement`'s, and an `<svg>`'s own `<text>` is not one.
+		 * Assigning the property on it is silently a no-op — no attribute is set and
+		 * `isContentEditable` stays undefined — so this used to leave the editor in an
+		 * editing state over an element nobody could type into, and only Escape got out of
+		 * it. Reachable because the authoring skill now tells an agent to draw a diagram
+		 * inside a box component, whose own tag says nothing about what is under it.
+		 */
+		if (!(run.element instanceof (win as Window & typeof globalThis).HTMLElement)) {
+			if (mouse) host.notice("That word is placed by the drawing's own coordinates — ask the agent to change it.");
 			return false;
 		}
 		// A run of plain text, and nothing else: the server refuses to flatten markup,
@@ -654,7 +591,6 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			 * something else reloaded the frame.
 			 */
 			doc.querySelector(`[data-id="${cssEscape(selection.id)}"]`)?.remove();
-			redraw();
 			host.patch(path, [{ op: "remove", id: selection.id }]);
 			host.select(undefined);
 			return;

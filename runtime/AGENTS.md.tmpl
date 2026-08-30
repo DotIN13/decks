@@ -58,9 +58,15 @@ Four rules, and they matter more than they look:
 
 The components are documented in the **board-authoring** skill: read it before you
 build a board with anything beyond cards and text. In short: `.card`, `.panel`,
-`.sticky`, `.text`, `.chip`, `.callout` (`data-tone`), `.kpi`, `.table`, `svg.link`
-(connectors between two `data-id`s), `[data-md]` (markdown + KaTeX),
-`[data-mermaid]`, and `[data-embed]` for showing a real file.
+`.sticky`, `.text`, `.chip`, `.callout` (`data-tone`), `.kpi`, `.table`, `[data-md]`
+(markdown + KaTeX), `[data-mermaid]`, and `[data-embed]` for showing a real file.
+
+**A diagram is one you draw.** There is no connector between two components — a line
+routed at mount time has no position in the file, so neither you nor the user can say
+where it goes without loading the page. Put an `<svg>` with a `viewBox` inside a box
+component and choose the coordinates yourself; `d3` is vendored beside the board for the
+case where the data is the point. The skill has a worked example, and
+`boards/plan.html` in the example deck is one.
 
 ## Showing the user's own documents
 

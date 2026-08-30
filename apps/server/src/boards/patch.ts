@@ -217,9 +217,8 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 			const offset = patch.offset ?? { x: 16, y: 16 };
 			const styleAt = location.attrs?.style;
 			if (styleAt) {
-				// A connector has no position to offset, and neither has a component an
-				// agent left unpositioned; both copy as they are rather than being given
-				// coordinates this file invented.
+				// A component an agent left unpositioned copies as it is, rather than being
+				// given coordinates this file invented.
 				const existing = attributeValue(element, "style") ?? "";
 				const left = pixelsOf(existing, "left");
 				const top = pixelsOf(existing, "top");
@@ -248,29 +247,19 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 			if (findById(document, patch.to)) throw new PatchRefused(`there is already a component called ${patch.to}`);
 
 			/*
-			 * The connectors move with it. `data-from`/`data-to` name components by id
-			 * (board.js resolves them at draw time), so renaming the component alone
-			 * leaves an arrow pointing at nothing — and an arrow that silently stops
-			 * being drawn is the worst kind of edit, because the file still looks right.
+			 * One splice, of the `data-id` attribute's own byte range.
 			 *
-			 * One parse, every offset collected, applied back to front: renaming through
-			 * repeated single-attribute writes would move the offsets under itself.
+			 * This used to rewrite every `data-from`/`data-to` that named the old id along
+			 * with it, because a connector resolved its ends by name at draw time and a
+			 * rename left an arrow pointing at nothing. Connectors are gone (`board.js`),
+			 * and with them the only thing in a board that referred to a component by id
+			 * from somewhere else — so a rename is now local, and what remains of the
+			 * reason this is an op is the checking above and the name it answers with.
 			 */
-			const edits: Array<{ from: number; to: number; text: string }> = [];
 			const idAt = location.attrs?.["data-id"];
 			if (!idAt) throw new PatchRefused(`cannot locate the name of #${patch.id}`);
-			edits.push({ from: idAt.startOffset, to: idAt.endOffset, text: attr("data-id", patch.to) });
-			let links = 0;
-			for (const end of ["data-from", "data-to"]) {
-				for (const link of findAll(document, (node) => attributeValue(node, end) === patch.id)) {
-					const spot = link.sourceCodeLocation?.attrs?.[end];
-					if (!spot) continue;
-					edits.push({ from: spot.startOffset, to: spot.endOffset, text: attr(end, patch.to) });
-					links += 1;
-				}
-			}
-			const also = links === 0 ? "" : ` (and ${links} connector end${links === 1 ? "" : "s"})`;
-			return { html: splice(html, edits), summary: `renamed #${patch.id} to #${patch.to}${also}`, id: patch.to };
+			const renamed = splice(html, [{ from: idAt.startOffset, to: idAt.endOffset, text: attr("data-id", patch.to) }]);
+			return { html: renamed, summary: `renamed #${patch.id} to #${patch.to}`, id: patch.to };
 		}
 
 		case "order": {
@@ -409,10 +398,9 @@ function attributeValue(element: Element, name: string): string | undefined {
  * Several splices at once, applied back to front.
  *
  * Every offset in this file comes from one parse, and a splice moves everything
- * after it — so an edit that touches three attributes (a rename, with the two
- * connectors that named the old id) either does them in descending order or
- * re-parses twice per attribute. Descending order is the cheap one and it cannot
- * drift.
+ * after it — so an edit that touches two attributes (a duplicate rewrites the copy's
+ * `data-id` and its `style`) either does them in descending order or re-parses
+ * between them. Descending order is the cheap one and it cannot drift.
  */
 function splice(text: string, edits: Array<{ from: number; to: number; text: string }>): string {
 	let out = text;
@@ -472,26 +460,6 @@ function render(patch: Extract<BoardPatch, { op: "insert" }>, indent: string): s
 		case "image":
 		case "embed":
 			return `${indent}<div class="embed" data-id="${id}" data-embed="${embed ?? ""}"${extra} style="${style}"></div>`;
-		case "arrow":
-			/*
-			 * A connector is its two ends and nothing else — no position, no size, since
-			 * it covers the whole board and is routed from the components it names.
-			 *
-			 * The ends arrive as ordinary attributes. They used to arrive in the `embed`
-			 * field as `"from>to"`, which was one string doing a job the protocol already
-			 * had a shape for, and it meant the one op that could not be read without
-			 * knowing the trick.
-			 */
-			{
-				const from = patch.attrs?.["data-from"];
-				const to = patch.attrs?.["data-to"];
-				if (!from || !to) throw new PatchRefused("an arrow needs a from and a to");
-				const rest = Object.entries(patch.attrs ?? {})
-					.filter(([name]) => name !== "data-from" && name !== "data-to")
-					.map(([name, value]) => ` ${attr(name, value)}`)
-					.join("");
-				return `${indent}<svg class="link" data-id="${id}" data-from="${from}" data-to="${to}"${rest}></svg>`;
-			}
 		default:
 			throw new PatchRefused(`cannot insert a ${kind}`);
 	}
@@ -532,16 +500,6 @@ function find(node: Node, predicate: (node: Element) => boolean): Element | unde
 		if (nested) return nested;
 	}
 	return undefined;
-}
-
-function findAll(node: Node, predicate: (node: Element) => boolean): Element[] {
-	const found: Element[] = [];
-	for (const child of (node as { childNodes?: Node[] }).childNodes ?? []) {
-		const element = child as Element;
-		if (element.tagName && predicate(element)) found.push(element);
-		found.push(...findAll(child, predicate));
-	}
-	return found;
 }
 
 /** The element children, in document order — what a `text` patch's path indexes. */

@@ -9,7 +9,7 @@ import type { FrameGestureHost } from "./frame-gestures.ts";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 
 /** The palette's keys, in the order the palette draws them. */
-const TOOL_KEYS: Record<string, Tool> = { v: "select", s: "sticky", c: "card", t: "text", e: "embed", a: "arrow" };
+const TOOL_KEYS: Record<string, Tool> = { v: "select", s: "sticky", c: "card", t: "text", e: "embed" };
 
 /**
  * The stage: one transform over the boards, and the gestures that move it.

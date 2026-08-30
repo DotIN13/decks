@@ -5,6 +5,13 @@
  * The assertions that matter here are about the file, not the screen. A board is read
  * back by an agent, so an edit that reflows a paragraph, or writes the editor's own
  * selection class into the markup, is a bug even when it looks right.
+ *
+ * The fixture carries a drawn diagram and a bare `<svg>` where it used to carry a
+ * connector. Those are the two shapes whose family the *tag* used to decide — an `<svg>`
+ * was a connector by construction — so they are what proves nothing goes by the tag any
+ * more: one is a `card` with every appearance row, the other an `other` with none. The
+ * dead `svg.link` at the top of the fixture is the third: it is what a board written
+ * against the old runtime looks like, and it must draw as nothing at all.
  */
 import { rmSync } from "node:fs";
 import { boardPath, open, read, say, socket, write } from "../harness.mjs";
@@ -39,6 +46,15 @@ const original = `<!doctype html>
 		<link rel="stylesheet" href="../lib/board.css" />
 	</head>
 	<body class="board">
+		<!--
+			A board written against the old runtime, which drew a curve between the two
+			components an svg.link named. Nothing draws it now, and this is here to say so:
+			lib/ is re-synced on every open (DESIGN §2.1), so such a board loses its arrows
+			rather than half-drawing them. First in the body deliberately — with no left/top
+			it lands at 0,0 at its own intrinsic size, and later in the document it would sit
+			over the card and eat the clicks meant for it.
+		-->
+		<svg class="link" data-id="stale-arrow" data-from="goal" data-to="note"></svg>
 		<section class="card" data-id="goal" style="left: 48px; top: 48px; width: 380px">
 			<h3>Goal</h3>
 			<p>
@@ -47,7 +63,22 @@ const original = `<!doctype html>
 			</p>
 		</section>
 		<div class="sticky" data-id="note" style="left: 520px; top: 48px; width: 240px">Refresh races</div>
-		<svg class="link" data-id="goal-note" data-from="goal" data-to="note"></svg>
+		<section class="card flow" data-id="diagram" style="left: 48px; top: 320px; width: 380px; height: 220px">
+			<h3>The claim</h3>
+			<svg viewBox="0 0 340 120" width="100%" height="120">
+				<rect x="1" y="8" width="96" height="34" rx="6" fill="none" stroke="#888888" />
+				<text x="49" y="30" text-anchor="middle">tab A</text>
+				<path d="M 97 25 H 130" fill="none" stroke="#888888" />
+			</svg>
+		</section>
+		<!--
+			Filled, not outlined: only the parts of an SVG that paint take a pointer event,
+			so a hollow drawing is a component nobody can click. One more reason the
+			authoring skill puts a drawing inside a box.
+		-->
+		<svg class="bare" data-id="bare" viewBox="0 0 200 120" width="200" height="120" style="left: 820px; top: 320px">
+			<rect x="1" y="1" width="198" height="118" fill="#dddddd" stroke="#888888" />
+		</svg>
 		<script src="../lib/board.js"></script>
 	</body>
 </html>
@@ -80,6 +111,19 @@ try {
 		await page.mouse.click(box.x + dx, box.y + dy);
 		await inspector.waitFor({ timeout: 5000 });
 	};
+
+	// --- the connector is gone from the runtime, not merely from the palette -----------
+
+	say(
+		"an svg.link left over in a board is drawn as nothing at all",
+		await page.evaluate((wanted) => {
+			const stale = document
+				.querySelector(`.board-node[data-path="${wanted}"] iframe`)
+				.contentDocument.querySelector("svg.link[data-from][data-to]");
+			return stale !== null && stale.childElementCount === 0;
+		}, path),
+		"board.js used to fill it with a curve, an arrowhead and an invisible copy to click",
+	);
 
 	// --- it appears for the selection, and says what the thing is ---------------------
 
@@ -162,44 +206,27 @@ try {
 	say(
 		"the body is a second, separate run of text",
 		/<p>\n\t\t\t\tOne session, two tabs\.\n\t\t\t<\/p>/.test(body),
-		body.split("\n").slice(9, 13).join("⏎"),
+		body.split("\n").find((line) => line.includes("One session"))?.trim(),
 	);
 
-	// --- the connector: selected by its line, repointed, renamed into ------------------
+	// --- renaming, which is now a splice of one attribute ------------------------------
 
-	const at = await page.evaluate((wanted) => {
-		const element = document.querySelector(`.board-node[data-path="${wanted}"] iframe`);
-		const rect = element.getBoundingClientRect();
-		const scale = rect.width / element.clientWidth;
-		// `> path`: the first path inside the svg is the arrowhead, in the marker's defs.
-		const line = element.contentDocument.querySelector('[data-id="goal-note"] > path');
-		const middle = line.getPointAtLength(line.getTotalLength() / 2);
-		return { x: rect.left + middle.x * scale, y: rect.top + middle.y * scale };
-	}, path);
-	await page.mouse.click(at.x, at.y);
-	await page.waitForTimeout(300);
-	say(
-		"a connector is selected by clicking its line",
-		(await page.locator(".inspector header .what").textContent()) === "connector",
-		"board.css gives the svg no pointer events; board.js draws a wide invisible copy for this",
-	);
-
-	await page.locator('.inspector input[name="label"]').fill("spends");
-	await page.locator('.inspector input[name="label"]').press("Enter");
-	const labelled = await until(fixture, /data-label="spends"/);
-	say(
-		"a connector can be labelled",
-		/<svg class="link" data-id="goal-note" data-from="goal" data-to="note" data-label="spends"><\/svg>/.test(labelled),
-	);
-
+	const beforeRename = read(fixture);
 	await pick("goal");
 	const name = page.locator('.inspector input[name="name"]');
 	await name.fill("objective");
 	await name.press("Enter");
 	const renamed = await until(fixture, /data-id="objective"/);
 	say(
-		"renaming a component takes the connectors that named it",
-		renamed.includes('data-id="objective"') && renamed.includes('data-from="objective"') && !renamed.includes('"goal"'),
+		"renaming writes the new name",
+		renamed.includes('<section class="card" data-id="objective" style="left: 48px; top: 48px; width: 380px">') &&
+			!renamed.includes('data-id="goal"'),
+		renamed.split("\n").find((line) => line.includes('data-id="objective"'))?.trim(),
+	);
+	say(
+		"and exactly one line moved — it no longer chases what named the old id",
+		renamed.split("\n").filter((line, index) => line !== beforeRename.split("\n")[index]).length === 1 &&
+			renamed.includes('data-from="goal" data-to="note"'),
 		renamed.split("\n").find((line) => line.includes("svg class"))?.trim(),
 	);
 
@@ -225,7 +252,7 @@ try {
 	say(
 		"send-to-back moves the component to the top of the body, keeping its indentation",
 		/<body class="board">\n\t\t<section class="card" data-id="objective-2"/.test(sent),
-		sent.split("\n").slice(8, 10).join("⏎"),
+		sent.split("\n").find((line) => line.includes('data-id="objective-2"'))?.trim(),
 	);
 
 	await page.locator('.inspector button[data-act="remove"]').click();
@@ -238,20 +265,76 @@ try {
 	);
 	say("and the inspector goes with it", (await inspector.count()) === 0);
 
-	// --- the arrow tool: two clicks, not a box to place --------------------------------
+	// --- a diagram the author drew, which is what replaced the connector ---------------
 
-	await page.locator('.palette button[title^="Connect"]').click();
-	await frame().locator('[data-id="note"]').click({ position: { x: 20, y: 12 } });
-	await frame().locator('[data-id="objective"]').click({ position: { x: 20, y: 12 } });
-	const connected = await until(fixture, /data-id="arrow-1"/);
 	say(
-		"the arrow tool connects two components in two clicks",
-		/<svg class="link" data-id="arrow-1" data-from="note" data-to="objective"><\/svg>/.test(connected),
-		connected.split("\n").filter((line) => line.includes("svg class")).length + " connectors now",
+		"the palette has no connect tool",
+		(await page.locator('.palette button[title*="Connect"]').count()) === 0 &&
+			(await page.locator(".palette button:not(.undo)").count()) === 5,
+		(await page.locator(".palette button:not(.undo)").evaluateAll((buttons) => buttons.map((button) => button.title))).join(" | "),
+	);
+
+	await pick("diagram");
+	say(
+		"a drawn diagram is a box, because its author put a box class beside its own",
+		(await page.locator(".inspector header .what").textContent()) === "card" &&
+			(await page.locator(".inspector .row.boxes button").count()) === 5,
+		"an <svg> used to be a connector by its tag alone; nothing goes by the tag now",
 	);
 	say(
-		"and the tool goes back to select",
-		await page.evaluate(() => document.querySelector('.palette button[data-active="true"]')?.title?.startsWith("Select") ?? false),
+		"and it has a resize handle, because the drawing is inside the box and is not the box",
+		await page.evaluate(
+			(wanted) =>
+				document.querySelector(`.board-node[data-path="${wanted}"] iframe`).contentDocument.querySelector(".decks-handle")
+					?.style.display === "block",
+			path,
+		),
+	);
+
+	// The one thing a drawing costs: the words in it stay the agent's, because
+	// `contentEditable` is `HTMLElement`'s and an SVG `<text>` is not one.
+	const beforeSvg = read(fixture);
+	await frame().locator('[data-id="diagram"] text').dblclick();
+	/*
+	 * "Zoo" rather than a word that means something. A keystroke over a board with nothing
+	 * editable under it falls through to the stage's own shortcuts, and `V S C T E` arm the
+	 * palette — typing "tab" here armed the text tool, and the next click inserted a
+	 * component instead of selecting one.
+	 */
+	await page.keyboard.type("Zoo");
+	await page.keyboard.press("Meta+Enter");
+	await page.waitForTimeout(600);
+	say(
+		"a word inside a drawing says so rather than pretending to be editable",
+		read(fixture) === beforeSvg && (await page.locator(".notice").allTextContents()).some((text) => text.includes("coordinates")),
+		(await page.locator(".notice").allTextContents()).join(" | ") || "no notice",
+	);
+
+	// --- a bare top-level <svg>: a component, with the rows that can still apply -------
+
+	/*
+	 * Clicked on the `rect` rather than at an offset from the component's corner: only the
+	 * parts of an SVG that paint take a pointer event, and Playwright aims at the middle of
+	 * whatever it is given.
+	 */
+	await frame().locator('[data-id="bare"] rect').click();
+	await inspector.waitFor({ timeout: 5000 });
+	say(
+		"a bare <svg> is other, not a connector, and keeps the rows that still mean something",
+		(await page.locator(".inspector header .what").textContent()) === "bare" &&
+			(await page.locator(".inspector .row.boxes").count()) === 0 &&
+			(await page.locator(".inspector .tones").count()) === 0 &&
+			(await page.locator('.inspector button[data-act="duplicate"]').count()) === 1,
+		`it says "${await page.locator(".inspector header .what").textContent()}"`,
+	);
+	say(
+		"and gets no resize handle, because an SVGElement has no offsetWidth to measure",
+		await page.evaluate(
+			(wanted) =>
+				document.querySelector(`.board-node[data-path="${wanted}"] iframe`).contentDocument.querySelector(".decks-handle")
+					?.style.display === "none",
+			path,
+		),
 	);
 
 	// --- and it is off when the board is a map ----------------------------------------

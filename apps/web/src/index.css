@@ -1420,19 +1420,14 @@ svg.lucide {
 	cursor: pointer;
 }
 
-/* "Default" is the absence of `data-tone`, and what that *looks* like depends on the
-   component: a callout with no tone is accent, a connector with no tone is the border
-   colour. The swatch says what the board will draw, not what the control is called. */
+/* "Default" is the absence of `data-tone`, and the swatch says what the board will
+   draw rather than what the control is called — a callout with no tone is accent. Only
+   a callout has tones at all, which is why there is one default colour and not a rule
+   per family. */
 .inspector .tones button[data-tone="default"] {
 	background: var(--color-accent);
 }
 
-.inspector[data-family="link"] .tones button[data-tone="default"] {
-	background: var(--line-strong);
-}
-.inspector .tones button[data-tone="accent"] {
-	background: var(--color-accent);
-}
 .inspector .tones button[data-tone="warn"] {
 	background: var(--color-warn);
 }

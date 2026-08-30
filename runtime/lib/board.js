@@ -7,6 +7,14 @@
  * does not pay for pdf.js and the agent does not have to remember which script
  * tag goes with which component.
  *
+ * **It draws nothing of its own.** It used to route an arrow between two components
+ * named by id, and that is gone on purpose: a line whose position is decided at mount
+ * time is a drawing the file does not state, so the file stopped being the whole truth
+ * about the board. Neither an agent nor a person could say where the line went without
+ * running the page, and there was nothing to edit. A diagram is now a component that
+ * owns its own geometry — an `<svg>` with coordinates its author chose — which is a
+ * thing both of them can read and change. See `skills/board-authoring`.
+ *
  * It also owns the readiness flag. Every async mount is awaited, then
  * `window.__boardReady` goes true — which is what the app waits for before it
  * measures a board, and what the agent's Playwright waits for before it takes a
@@ -513,120 +521,6 @@
 		}
 	}
 
-	// --- connectors --------------------------------------------------------------
-
-	/**
-	 * Draw every `svg.link[data-from][data-to]` between the two components it names.
-	 *
-	 * Positions are read from the live layout rather than computed from the style
-	 * attributes, so a component whose height came from its own content — a card
-	 * that grew a line of text — still gets an arrow that touches it.
-	 */
-	function drawLinks() {
-		const board = document.body;
-		for (const svg of document.querySelectorAll("svg.link")) {
-			const from = document.querySelector(`[data-id="${cssEscape(svg.dataset.from ?? "")}"]`);
-			const to = document.querySelector(`[data-id="${cssEscape(svg.dataset.to ?? "")}"]`);
-			svg.innerHTML = "";
-			if (!from || !to || from === svg || to === svg) continue;
-
-			const a = box(from, board);
-			const b = box(to, board);
-			const [start, end] = nearestSides(a, b);
-			const bend = Math.max(24, Math.abs(end.x - start.x) / 2);
-			const horizontal = start.side === "left" || start.side === "right";
-			const c1 = horizontal ? { x: start.x + (start.side === "right" ? bend : -bend), y: start.y } : { x: start.x, y: start.y + (start.side === "bottom" ? bend : -bend) };
-			const c2 = horizontal ? { x: end.x + (end.side === "right" ? bend : -bend), y: end.y } : { x: end.x, y: end.y + (end.side === "bottom" ? bend : -bend) };
-
-			const ns = "http://www.w3.org/2000/svg";
-			const marker = document.createElementNS(ns, "marker");
-			const markerId = `arrow-${Math.random().toString(36).slice(2, 8)}`;
-			marker.setAttribute("id", markerId);
-			marker.setAttribute("viewBox", "0 0 10 10");
-			marker.setAttribute("refX", "9");
-			marker.setAttribute("refY", "5");
-			marker.setAttribute("markerWidth", "6");
-			marker.setAttribute("markerHeight", "6");
-			marker.setAttribute("orient", "auto-start-reverse");
-			const head = document.createElementNS(ns, "path");
-			head.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-			head.setAttribute("fill", "currentColor");
-			marker.appendChild(head);
-			const defs = document.createElementNS(ns, "defs");
-			defs.appendChild(marker);
-
-			const d = `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`;
-			const path = document.createElementNS(ns, "path");
-			path.setAttribute("d", d);
-			path.setAttribute("marker-end", `url(#${markerId})`);
-			// `currentColor` on the head, so an arrow tinted by CSS keeps its point.
-			path.style.color = getComputedStyle(path).stroke;
-
-			/*
-			 * An invisible wider copy of the same curve, first so it sits under it.
-			 *
-			 * A 2px line is not something anybody can click, and a connector is a
-			 * component the user can now select and edit (DESIGN §6.5) — so the target is
-			 * this, and the arrow does not have to get fatter to be reachable. It takes no
-			 * clicks of its own here: `svg.link` is `pointer-events: none` in board.css and
-			 * only the editor turns events back on for these paths, so a board opened on
-			 * its own behaves exactly as it did.
-			 *
-			 * The colour is an inline style rather than an attribute because `svg.link
-			 * path` sets `stroke` in the stylesheet, and a declaration beats an attribute —
-			 * the same trap the arrowhead's `fill` fell into.
-			 */
-			const hit = document.createElementNS(ns, "path");
-			hit.setAttribute("d", d);
-			hit.style.stroke = "transparent";
-			hit.style.strokeWidth = "10";
-			hit.style.fill = "none";
-
-			svg.append(defs, hit, path);
-
-			const label = svg.dataset.label;
-			if (label) {
-				const text = document.createElementNS(ns, "text");
-				text.setAttribute("x", String((start.x + end.x) / 2));
-				text.setAttribute("y", String((start.y + end.y) / 2 - 6));
-				text.setAttribute("text-anchor", "middle");
-				text.textContent = label;
-				svg.appendChild(text);
-			}
-		}
-	}
-
-	function cssEscape(value) {
-		return window.CSS?.escape ? CSS.escape(value) : value.replace(/["\\]/g, "\\$&");
-	}
-
-	function box(element, board) {
-		const rect = element.getBoundingClientRect();
-		const origin = board.getBoundingClientRect();
-		return {
-			left: rect.left - origin.left,
-			top: rect.top - origin.top,
-			width: rect.width,
-			height: rect.height,
-			cx: rect.left - origin.left + rect.width / 2,
-			cy: rect.top - origin.top + rect.height / 2,
-		};
-	}
-
-	/** The pair of sides that face each other, so the line takes the short way. */
-	function nearestSides(a, b) {
-		const dx = b.cx - a.cx;
-		const dy = b.cy - a.cy;
-		if (Math.abs(dx) >= Math.abs(dy)) {
-			return dx >= 0
-				? [{ x: a.left + a.width, y: a.cy, side: "right" }, { x: b.left, y: b.cy, side: "left" }]
-				: [{ x: a.left, y: a.cy, side: "left" }, { x: b.left + b.width, y: b.cy, side: "right" }];
-		}
-		return dy >= 0
-			? [{ x: a.cx, y: a.top + a.height, side: "bottom" }, { x: b.cx, y: b.top, side: "top" }]
-			: [{ x: a.cx, y: a.top, side: "top" }, { x: b.cx, y: b.top + b.height, side: "bottom" }];
-	}
-
 	// --- go ----------------------------------------------------------------------
 
 	async function start() {
@@ -650,7 +544,6 @@
 		}
 
 		await Promise.allSettled(work);
-		drawLinks();
 
 		// Fonts last: text laid out in a fallback face and then reflowed is the
 		// other half of a screenshot taken too early.
@@ -659,19 +552,12 @@
 		} catch {
 			/* not fatal */
 		}
-		drawLinks();
 
-		window.__board = { meta, redraw: drawLinks, mount: mountEmbed, markdown: renderMarkdown };
+		window.__board = { meta, mount: mountEmbed, markdown: renderMarkdown };
 		window.__boardReady = true;
 		document.body.dataset.ready = "true";
 		document.dispatchEvent(new CustomEvent("board:ready", { detail: { meta } }));
 	}
-
-	// Redraw connectors when the layout moves under them — a resized frame, a
-	// component the editor just dragged, an embed that finished loading tall.
-	const observer = new ResizeObserver(() => drawLinks());
-	addEventListener("load", () => observer.observe(document.body));
-	addEventListener("resize", () => drawLinks());
 
 	if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void start());
 	else void start();

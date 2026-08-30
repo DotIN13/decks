@@ -10,26 +10,33 @@ const shape = (over: Partial<Shape> = {}): Shape => ({
 	box: "sticky",
 	classes: ["sticky"],
 	attrs: {},
-	ids: ["note", "goal"],
 	generated: false,
 	...over,
 });
 
 test("a component's family decides which rows it gets", () => {
-	assert.equal(familyOf("div", ["sticky"], {}), "box");
-	assert.equal(familyOf("section", ["card"], {}), "box");
-	assert.equal(familyOf("svg", ["link"], { "data-from": "a" }), "link");
-	assert.equal(familyOf("div", ["embed"], { "data-embed": "../a.pdf" }), "embed");
+	assert.equal(familyOf(["sticky"], {}), "box");
+	assert.equal(familyOf(["card"], {}), "box");
+	assert.equal(familyOf(["embed"], { "data-embed": "../a.pdf" }), "embed");
 	// An embed the agent wrote without the class is still an embed: board.js goes by
 	// the attribute, and so does this.
-	assert.equal(familyOf("div", [], { "data-embed": "../a.pdf" }), "embed");
+	assert.equal(familyOf([], { "data-embed": "../a.pdf" }), "embed");
 	// A kpi has a vocabulary of its own that this build does not know; it keeps its
 	// name, its order and its copy, and gets no appearance rows.
-	assert.equal(familyOf("div", ["kpi"], {}), "other");
+	assert.equal(familyOf(["kpi"], {}), "other");
 	// What the board-authoring skill promises an agent that invents a component: a box
 	// class beside its own buys the appearance rows, and its absence is what costs them.
-	assert.equal(familyOf("section", ["card", "phases"], {}), "box");
-	assert.equal(familyOf("section", ["phases"], {}), "other");
+	assert.equal(familyOf(["card", "phases"], {}), "box");
+	assert.equal(familyOf(["phases"], {}), "other");
+	/*
+	 * `class="link"` and the `<svg>` tag each used to be a family all by themselves — the
+	 * connector's. There is no `link` family left, so a board still carrying one gets what
+	 * any unrecognised component gets: a name, an order, a copy, a delete, and none of the
+	 * appearance rows this build would have invented for it. The tag is not even asked for
+	 * any more, which is what lets a hand-drawn diagram be a `card`.
+	 */
+	assert.equal(familyOf(["link"], { "data-from": "a", "data-to": "b" }), "other");
+	assert.equal(familyOf(["card", "diagram"], {}), "box");
 });
 
 test("swapping the box keeps classes this build does not own", () => {

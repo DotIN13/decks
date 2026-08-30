@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-solid";
 import FileText from "lucide-solid/icons/file-text";
-import MoveRight from "lucide-solid/icons/move-right";
 import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
 import StickyNote from "lucide-solid/icons/sticky-note";
@@ -27,9 +26,6 @@ const TOOLS: Array<{ tool: Tool; icon: LucideIcon; label: string; key: string }>
 	{ tool: "card", icon: RectangleHorizontal, label: "Card", key: "C" },
 	{ tool: "text", icon: Type, label: "Text", key: "T" },
 	{ tool: "embed", icon: FileText, label: "Embed a file", key: "E" },
-	// Two clicks rather than a drag: a connector is a relation between two components,
-	// not a box you place. It was the agent's alone until the editor learnt the gesture.
-	{ tool: "arrow", icon: MoveRight, label: "Connect two components", key: "A" },
 ];
 
 export function Palette(props: {

@@ -149,7 +149,7 @@ export interface ToolSummary {
 
 // --- editing -------------------------------------------------------------------
 
-export type ComponentKind = "sticky" | "card" | "text" | "arrow" | "image" | "embed" | "panel";
+export type ComponentKind = "sticky" | "card" | "text" | "image" | "embed" | "panel";
 
 export interface Rect {
 	left: number;
@@ -166,7 +166,7 @@ export interface Rect {
  * refused write re-syncs it.
  */
 export type BoardPatch =
-	/** `attrs` is how an arrow gets its two ends: `data-from` and `data-to`, named. */
+	/** `attrs` carries whatever else the new component needs named — a dropped PDF's `data-pages`. */
 	| { op: "insert"; kind: ComponentKind; id: string; at: Rect; text?: string; embed?: string; attrs?: Record<string, string> }
 	/** `null` in `attrs` *removes* the attribute, which is how a tone goes back to the default. */
 	| { op: "update"; id: string; style?: Partial<Rect>; class?: string; attrs?: Record<string, string | null> }
@@ -191,12 +191,13 @@ export type BoardPatch =
 	 */
 	| { op: "duplicate"; id: string; offset?: { x: number; y: number } }
 	/**
-	 * Rename a component, and every arrow that points at it.
+	 * Rename a component.
 	 *
-	 * Its own op rather than `attrs: { "data-id": … }`, which would write the new name
-	 * and silently orphan the connectors naming the old one. An id is how an agent
-	 * refers to a component, so the rename is in the summary it is told (§6.5) — an
-	 * agent holding the old name in context hears that it changed.
+	 * Its own op rather than `attrs: { "data-id": … }`, because a name is not an
+	 * attribute like the others: it has to be a name a board can use, it has to be one
+	 * nothing else has, and the op has to answer with it. An id is how an agent refers
+	 * to a component, so the new name is in the summary it is told and in the ids the
+	 * patch reports (§6.5) — an agent holding the old one hears that it changed.
 	 */
 	| { op: "rename"; id: string; to: string }
 	| { op: "order"; id: string; to: "front" | "back" };
@@ -221,12 +222,11 @@ export const BOX_CLASSES = ["text", "sticky", "card", "panel", "callout"] as con
 export type BoxClass = (typeof BOX_CLASSES)[number];
 
 /**
- * `data-tone` as `board.css` reads it: absent means accent for a callout and the
- * border colour for a connector. Same reasoning as `BOX_CLASSES` — this is the
+ * `data-tone` as `board.css` reads it, and a callout is the only component that reads
+ * it — absent means the accent. Same reasoning as `BOX_CLASSES`: this is the
  * stylesheet's list, and it stops where the stylesheet stops.
  */
 export const CALLOUT_TONES = ["warn", "danger", "ok"] as const;
-export const LINK_TONES = ["accent"] as const;
 
 /** What the agent is told the user changed, and what `stage.edits()` returns. */
 export interface UserEdit {
