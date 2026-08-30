@@ -5,6 +5,7 @@ import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import Plus from "lucide-solid/icons/plus";
 import { For, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
+import { AgentMark } from "./agent-marks.tsx";
 
 /**
  * The agents, as a messaging app's conversation list.
@@ -70,7 +71,7 @@ export function ChatList(props: {
 					 * whatever the platform draws.
 					 */}
 					<span class="kind" data-kind={props.defaultKind}>
-						<span class="value">{props.defaultKind}</span>
+						<AgentMark agent={props.defaultKind} size={13} />
 						<Icon of={ChevronDown} size={12} />
 						<select
 							title="Which runtime a new agent starts on"
@@ -121,18 +122,16 @@ export function ChatList(props: {
 								<Avatar chat={chat} identity={props.identities[chat.id]} />
 								<span class="who">
 									<span class="top">
-										<span class="name">{props.identities[chat.id]?.name ?? chat.name}</span>
 										{/*
-										 * The runtime and the time are one group at the right edge. Left
-										 * as three children of a `space-between` row, the badge had a gap
-										 * on both sides and read as dangling after the name.
+										 * The mark leads the row. Which runtime an agent is on cannot
+										 * change, so it belongs with the name rather than out at the
+										 * right with the things that do change.
 										 */}
-										<span class="meta">
-											<span class="runtime" data-kind={chat.kind} title={`Running on ${chat.kind}`}>
-												{chat.kind}
-											</span>
-											<span class="when">{chat.lastAt ? when(chat.lastAt) : ""}</span>
+										<span class="runtime" data-kind={chat.kind} title={`Running on ${chat.kind}`}>
+											<AgentMark agent={chat.kind} size={13} />
 										</span>
+										<span class="name">{props.identities[chat.id]?.name ?? chat.name}</span>
+										<span class="when">{chat.lastAt ? when(chat.lastAt) : ""}</span>
 									</span>
 									<span class="bottom">
 										<span class="last">

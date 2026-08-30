@@ -128,15 +128,16 @@ say(
 	`agents ${heads.agents.labelSize}/${heads.agents.labelTransform} vs boards ${heads.boards.labelSize}/${heads.boards.labelTransform}`,
 );
 
-// The runtime chip: what `+` will create, and the width of what it says.
+// The runtime chip: what `+` will create, shown as that runtime's mark.
 const chip = await page.evaluate(() => {
 	const kind = document.querySelector(".chats .rail-head .kind");
-	const value = kind.querySelector(".value").getBoundingClientRect();
-	const icon = kind.querySelector("svg").getBoundingClientRect();
+	const mark = kind.querySelector("svg[data-agent]");
+	const chevron = [...kind.querySelectorAll("svg")].find((svg) => !svg.dataset.agent);
 	return {
-		label: kind.querySelector(".value").textContent,
-		// A native select sizes to its widest option, which left a gap here.
-		valueToChevron: Math.round(icon.left - value.right),
+		agent: mark?.dataset.agent,
+		// The mark is the same width whichever runtime it is, so the chevron sits against
+		// it — a text label showing "pi" while "claude" existed left a gap here.
+		markToChevron: mark && chevron ? Math.round(chevron.getBoundingClientRect().left - mark.getBoundingClientRect().right) : null,
 		selectCovers: (() => {
 			const box = kind.getBoundingClientRect();
 			const select = kind.querySelector("select").getBoundingClientRect();
@@ -145,8 +146,8 @@ const chip = await page.evaluate(() => {
 		named: kind.querySelector("select").getAttribute("aria-label"),
 	};
 });
-say("the chip says what + will create", chip.label === "pi", chip.label);
-say("…with the chevron against the value", chip.valueToChevron >= 0 && chip.valueToChevron <= 4, `${chip.valueToChevron}px`);
+say("the chip shows the mark of what + will create", chip.agent === "pi", String(chip.agent));
+say("…with the chevron against it", chip.markToChevron !== null && chip.markToChevron >= 0 && chip.markToChevron <= 4, `${chip.markToChevron}px`);
 say("…and the real control still covers it", chip.selectCovers);
 say("…and is still named for a screen reader", Boolean(chip.named), chip.named ?? "");
 
@@ -155,19 +156,63 @@ say("…and is still named for a screen reader", Boolean(chip.named), chip.named
 const before = await page.evaluate(() => document.querySelectorAll(".chat-row").length);
 await page.selectOption(".chats .rail-head .kind select", "claude");
 await page.waitForFunction((was) => document.querySelectorAll(".chat-row").length > was, before, { timeout: 8000 });
-const kinds = await page.evaluate(() => [...document.querySelectorAll(".chat-row .runtime")].map((r) => r.textContent));
+// Read from `data-agent` rather than from text: the badge is a mark now.
+const kinds = await page.evaluate(() => [...document.querySelectorAll(".chat-row .runtime svg")].map((s) => s.dataset.agent));
 say("choosing a runtime creates an agent on it", kinds.includes("claude"), kinds.join(" "));
-say("…and the chip goes back to the default", (await page.evaluate(() => document.querySelector(".chats .rail-head .kind .value").textContent)) === "pi");
+say(
+	"…and the chip goes back to the default",
+	(await page.evaluate(() => document.querySelector(".chats .rail-head .kind svg[data-agent]")?.dataset.agent)) === "pi",
+);
 
-// The row's badge belongs with the time, not adrift after the name.
+/*
+ * The mark leads the row, and the two runtimes' marks are optically the same size.
+ *
+ * They are drawn in different boxes with different amounts of air — Claude's burst fills its
+ * 100 box, Pi's glyph uses 59% of an 800 box — so "the same size" has to be checked as ink,
+ * not as the frame each is rendered into.
+ */
 const row = await page.evaluate(() => {
 	const top = document.querySelector(".chat-row .top");
-	const box = top.getBoundingClientRect();
-	const meta = top.querySelector(".meta").getBoundingClientRect();
-	return { children: top.children.length, metaAtRight: Math.round(box.right - meta.right) };
+	const kids = [...top.children].map((c) => c.className);
+	const inks = [...document.querySelectorAll(".chat-row .runtime svg")].map((svg) => {
+		// The *rendered* ink, not `getBBox`, which reports the geometry before the transform
+		// that scales each drawing into the frame — 100 for Claude against 469 for Pi.
+		const frame = svg.getBoundingClientRect();
+		const drawn = svg.querySelector("g").getBoundingClientRect();
+		const units = (Math.max(drawn.width, drawn.height) / frame.width) * 24;
+		return { agent: svg.dataset.agent, ink: Math.round(units * 10) / 10 };
+	});
+	/*
+	 * Where the ink sits against the text, which is the thing the eye judges.
+	 *
+	 * The row is `align-items: baseline` — right for the name and the time, two runs of text
+	 * at different sizes — and an SVG has no baseline, so a browser sits its bottom edge on
+	 * the text's and the mark rides 2.5px high. Measured as ink rather than as the frame,
+	 * because the frame has air in it.
+	 */
+	const mark = top.querySelector(".runtime svg");
+	const name = top.querySelector(".name");
+	const drawn = mark.querySelector("g").getBoundingClientRect();
+	const nameBox = name.getBoundingClientRect();
+	const offBy = Math.abs(drawn.top + drawn.height / 2 - (nameBox.top + nameBox.height / 2));
+	return {
+		kids,
+		inks,
+		offBy: Math.round(offBy * 10) / 10,
+		name: nameBox.left,
+		mark: top.querySelector(".runtime")?.getBoundingClientRect().left,
+	};
 });
-say("the runtime badge is grouped with the time", row.children === 2, `${row.children} children on the row's top line`);
-say("…at the right edge", Math.abs(row.metaAtRight) <= 2, `${row.metaAtRight}px`);
+say("the mark leads the row", row.kids[0] === "runtime", row.kids.join(" · "));
+say("…before the name", row.mark !== undefined && row.name !== undefined && row.mark < row.name);
+const claudeInk = row.inks.find((i) => i.agent === "claude")?.ink;
+const piInk = row.inks.find((i) => i.agent === "pi")?.ink;
+say("the mark's ink centres on the name beside it", row.offBy <= 1, `${row.offBy}px off the text's centre`);
+say(
+	"the two marks are drawn to their own optical sizes",
+	claudeInk !== undefined && piInk !== undefined && claudeInk > piInk && claudeInk / piInk < 1.3,
+	`claude ${claudeInk} vs pi ${piInk} units of a 24 frame`,
+);
 
 /*
  * Closing a chat.

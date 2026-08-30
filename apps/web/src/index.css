@@ -153,38 +153,42 @@ svg.lucide {
 	-webkit-app-region: drag;
 }
 
-/* The runtime a row is running on: present, and quiet. */
-/* The runtime and the time, one group hugging the right edge. */
-.chat-row .meta {
-	display: flex;
-	align-items: baseline;
-	flex: 0 0 auto;
-	gap: 5px;
-}
-
+/*
+ * The runtime's mark, leading the row.
+ *
+ * A mark rather than the word. It was a text chip reading PI or CLAUDE — a lot of furniture
+ * for a fact that never changes, and at 9px uppercase it read as a label stuck on the name
+ * rather than as part of it. `flex: none` because a long name should take the room, not the
+ * mark.
+ */
 .chat-row .runtime {
-	padding: 1px 5px;
-	border-radius: 5px;
-	background: var(--line);
+	display: flex;
+	flex: none;
+	/*
+	 * Centred on the line, not sat on the baseline.
+	 *
+	 * The row is `align-items: baseline`, which is right for the name and the time — two
+	 * runs of text at different sizes. An SVG has no baseline, so a browser aligns its
+	 * bottom edge to the text's instead, which left the mark's ink 2.5px above the centre
+	 * of the name beside it.
+	 */
+	align-self: center;
+	align-items: center;
 	color: var(--faint);
-	font-size: 9px;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
 }
 
-.chat-row .runtime[data-kind="claude"] {
-	background: color-mix(in oklab, var(--color-accent) 22%, transparent);
-	color: var(--fg);
+/* The name is what shrinks; the time keeps its place at the right. */
+.chat-row .top .name {
+	flex: 1;
 }
 
 /* Sits with the + rather than beside it: one control, two parts. */
 /*
- * What `+` will create: a drawn label with the real select laid over it.
+ * What `+` will create: the runtime's mark, with the real select laid over it.
  *
- * A `<select>` sizes itself to its *widest* option, so showing "pi" while "claude" exists
- * left a gap between the value and the chevron — the same dangling look the row badge had.
- * Drawing the label makes the chip the width of what it says, and the chevron the app's own
- * icon rather than whatever the platform draws.
+ * A `<select>` sizes itself to its *widest* option, so a text label showing "pi" while
+ * "claude" existed left a gap before the chevron. A mark is the same width whichever runtime
+ * it is, which ends that problem rather than compensating for it.
  *
  * Quiet until hovered, like the two buttons beside it: a persistent fill made the widest
  * control in the row also the loudest.
