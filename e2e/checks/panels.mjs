@@ -81,5 +81,93 @@ await page.waitForFunction(() => document.querySelector(".side")?.dataset.open =
 say("unpinning lets it hide again", (await isOpen(".side")) === false);
 say("the pin is remembered", (await page.evaluate(() => localStorage.getItem("decks.panel.left"))) === "away");
 
+/*
+ * The two panel headers, which are the same design and were not the same code.
+ *
+ * `.chats` is `.rail`'s sibling, so `.rail .rail-head` never matched the agent list: its
+ * header was a plain block with a `flex: 1` spacer that measured zero, so the label was
+ * body text and all three controls crowded against it with the right half of the row empty.
+ */
+await page.mouse.move(6, 480);
+await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
+await settle(page, 300);
+
+const heads = await page.evaluate(() => {
+	const read = (selector) => {
+		const head = document.querySelector(selector);
+		if (!head) return null;
+		const style = getComputedStyle(head);
+		const label = head.firstElementChild;
+		const labelStyle = getComputedStyle(label);
+		const box = head.getBoundingClientRect();
+		/*
+		 * The *last control*, not the group that holds it. A `display: flex` group is
+		 * block-level, so with the header laid out as a block its own right edge is in the
+		 * right place while everything inside it sits left — which is the bug, and this
+		 * assertion passed straight through it until it looked one level deeper.
+		 */
+		const controls = head.lastElementChild;
+		const last = (controls.lastElementChild ?? controls).getBoundingClientRect();
+		return {
+			display: style.display,
+			// How much empty room is left to the right of the last control.
+			trailing: Math.round(box.right - parseFloat(style.paddingRight) - last.right),
+			labelSize: labelStyle.fontSize,
+			labelTransform: labelStyle.textTransform,
+			labelLeft: Math.round(label.getBoundingClientRect().left - box.left),
+		};
+	};
+	return { agents: read(".chats .rail-head"), boards: read(".rail .rail-head") };
+});
+
+say("the agent header is a row, not a block", heads.agents.display === "flex", heads.agents.display);
+say("its controls sit at the right edge", Math.abs(heads.agents.trailing) <= 2, `${heads.agents.trailing}px of room left over`);
+say(
+	"both panel headers label the same way",
+	heads.agents.labelSize === heads.boards.labelSize && heads.agents.labelTransform === heads.boards.labelTransform,
+	`agents ${heads.agents.labelSize}/${heads.agents.labelTransform} vs boards ${heads.boards.labelSize}/${heads.boards.labelTransform}`,
+);
+
+// The runtime chip: what `+` will create, and the width of what it says.
+const chip = await page.evaluate(() => {
+	const kind = document.querySelector(".chats .rail-head .kind");
+	const value = kind.querySelector(".value").getBoundingClientRect();
+	const icon = kind.querySelector("svg").getBoundingClientRect();
+	return {
+		label: kind.querySelector(".value").textContent,
+		// A native select sizes to its widest option, which left a gap here.
+		valueToChevron: Math.round(icon.left - value.right),
+		selectCovers: (() => {
+			const box = kind.getBoundingClientRect();
+			const select = kind.querySelector("select").getBoundingClientRect();
+			return Math.round(select.width) === Math.round(box.width) && Math.round(select.height) === Math.round(box.height);
+		})(),
+		named: kind.querySelector("select").getAttribute("aria-label"),
+	};
+});
+say("the chip says what + will create", chip.label === "pi", chip.label);
+say("…with the chevron against the value", chip.valueToChevron >= 0 && chip.valueToChevron <= 4, `${chip.valueToChevron}px`);
+say("…and the real control still covers it", chip.selectCovers);
+say("…and is still named for a screen reader", Boolean(chip.named), chip.named ?? "");
+
+// Choosing a runtime creates an agent on it. It stays reachable by keyboard because the
+// select is only invisible, not replaced.
+const before = await page.evaluate(() => document.querySelectorAll(".chat-row").length);
+await page.selectOption(".chats .rail-head .kind select", "claude");
+await page.waitForFunction((was) => document.querySelectorAll(".chat-row").length > was, before, { timeout: 8000 });
+const kinds = await page.evaluate(() => [...document.querySelectorAll(".chat-row .runtime")].map((r) => r.textContent));
+say("choosing a runtime creates an agent on it", kinds.includes("claude"), kinds.join(" "));
+say("…and the chip goes back to the default", (await page.evaluate(() => document.querySelector(".chats .rail-head .kind .value").textContent)) === "pi");
+
+// The row's badge belongs with the time, not adrift after the name.
+const row = await page.evaluate(() => {
+	const top = document.querySelector(".chat-row .top");
+	const box = top.getBoundingClientRect();
+	const meta = top.querySelector(".meta").getBoundingClientRect();
+	return { children: top.children.length, metaAtRight: Math.round(box.right - meta.right) };
+});
+say("the runtime badge is grouped with the time", row.children === 2, `${row.children} children on the row's top line`);
+say("…at the right edge", Math.abs(row.metaAtRight) <= 2, `${row.metaAtRight}px`);
+
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

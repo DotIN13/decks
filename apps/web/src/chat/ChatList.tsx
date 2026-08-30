@@ -1,4 +1,5 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
+import ChevronDown from "lucide-solid/icons/chevron-down";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import Plus from "lucide-solid/icons/plus";
 import { For, Show } from "solid-js";
@@ -37,52 +38,72 @@ export function ChatList(props: {
 		<section class="chats">
 			<div class="rail-head">
 				<span>agents</span>
-				<span style={{ flex: 1 }} />
-				<button
-					type="button"
-					title="Start another agent"
-					aria-label="Start another agent"
-					onClick={() => props.onNew()}
-				>
-					<Icon of={Plus} size={16} />
-				</button>
 				{/*
-				 * The runtime is picked before the agent exists because it cannot be
-				 * changed afterwards: a live session cannot swap the process behind it, and
-				 * pretending otherwise would silently start a new conversation.
+				 * A group, not a spacer. The spacer here was `flex: 1` on a header that is
+				 * not a flex row — `.rail .rail-head` styles the *boards* rail, and `.chats`
+				 * is its sibling rather than its child — so it measured zero and all three
+				 * controls piled up against the label.
 				 */}
-				<select
-					class="kind"
-					title="Which runtime a new agent starts on"
-					onChange={(event) => {
-						const kind = event.currentTarget.value as AgentKind;
-						props.onNew(kind);
-						// Left showing the default rather than the last choice: this is a
-						// button that happens to have options, not a setting.
-						event.currentTarget.value = props.defaultKind;
-					}}
-				>
-					<For each={["pi", "claude"] as AgentKind[]}>
-						{(kind) => (
-							<option value={kind} selected={kind === props.defaultKind}>
-								{kind}
-							</option>
-						)}
-					</For>
-				</select>
-				<button
-					class="pin"
-					type="button"
-					data-on={props.pinned}
-					title={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
-					aria-label={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
-					onClick={() => props.onPin(!props.pinned)}
-				>
-					{/* The dot, not a pin glyph: filled is pinned, hollow is not. A pin icon
-					    needs a second icon or a colour to say which state it is in; a filled
-					    circle beside a hollow one is the state, at 12px and in one character. */}
-					{props.pinned ? "◉" : "○"}
-				</button>
+				<span class="tools">
+					<button
+						type="button"
+						title="Start another agent"
+						aria-label="Start another agent"
+						onClick={() => props.onNew()}
+					>
+						<Icon of={Plus} size={16} />
+					</button>
+					{/*
+					 * The runtime is picked before the agent exists because it cannot be
+					 * changed afterwards: a live session cannot swap the process behind it,
+					 * and pretending otherwise would silently start a new conversation.
+					 */}
+					{/*
+					 * The label is drawn, and the native select laid transparently over it.
+					 *
+					 * A `<select>` sizes itself to its *widest* option, so showing "pi" while
+					 * "claude" exists left a gap between the value and the chevron — the same
+					 * dangling look the row badge had. Drawing the label means the chip is the
+					 * width of what it says, and the chevron is the app's own icon rather than
+					 * whatever the platform draws.
+					 */}
+					<span class="kind" data-kind={props.defaultKind}>
+						<span class="value">{props.defaultKind}</span>
+						<Icon of={ChevronDown} size={12} />
+						<select
+							title="Which runtime a new agent starts on"
+							aria-label="Which runtime a new agent starts on"
+							onChange={(event) => {
+								const kind = event.currentTarget.value as AgentKind;
+								props.onNew(kind);
+								// Left showing the default rather than the last choice: this is a
+								// button that happens to have options, not a setting.
+								event.currentTarget.value = props.defaultKind;
+							}}
+						>
+							<For each={["pi", "claude"] as AgentKind[]}>
+								{(kind) => (
+									<option value={kind} selected={kind === props.defaultKind}>
+										new {kind} agent
+									</option>
+								)}
+							</For>
+						</select>
+					</span>
+					<button
+						class="pin"
+						type="button"
+						data-on={props.pinned}
+						title={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
+						aria-label={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
+						onClick={() => props.onPin(!props.pinned)}
+					>
+						{/* The dot, not a pin glyph: filled is pinned, hollow is not. A pin icon
+						    needs a second icon or a colour to say which state it is in; a filled
+						    circle beside a hollow one is the state, at 12px and in one character. */}
+						{props.pinned ? "◉" : "○"}
+					</button>
+				</span>
 			</div>
 			<div class="chat-rows">
 				<For each={ordered()}>
@@ -98,10 +119,17 @@ export function ChatList(props: {
 							<span class="who">
 								<span class="top">
 									<span class="name">{props.identities[chat.id]?.name ?? chat.name}</span>
-									<span class="runtime" data-kind={chat.kind} title={`Running on ${chat.kind}`}>
-										{chat.kind}
+									{/*
+									 * The runtime and the time are one group at the right edge. Left
+									 * as three children of a `space-between` row, the badge had a gap
+									 * on both sides and read as dangling after the name.
+									 */}
+									<span class="meta">
+										<span class="runtime" data-kind={chat.kind} title={`Running on ${chat.kind}`}>
+											{chat.kind}
+										</span>
+										<span class="when">{chat.lastAt ? when(chat.lastAt) : ""}</span>
 									</span>
-									<span class="when">{chat.lastAt ? when(chat.lastAt) : ""}</span>
 								</span>
 								<span class="bottom">
 									<span class="last">
