@@ -254,6 +254,12 @@ export class App {
 				return;
 			}
 
+			case "agent.remove": {
+				const outcome = this.agents.remove(message.id);
+				if (!outcome.removed && outcome.reason) reply({ type: "notice", level: "warn", text: outcome.reason });
+				return;
+			}
+
 			case "agent.prompt": {
 				const agent = this.agents.get(message.id) ?? this.agents.focused();
 				// Deliberately not awaited: a prompt runs for minutes and the socket has

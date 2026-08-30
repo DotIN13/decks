@@ -1641,7 +1641,12 @@ svg.lucide {
 .side .chats {
 	display: flex;
 	min-height: 0;
-	max-height: 55%;
+	/*
+	 * A little under half, rather than 55%: the boards rail below is the one that grows
+	 * with the deck, and an agent list is usually two or three rows. It still scrolls
+	 * (`.chat-rows`), so this is about who gets the spare room, not about a limit.
+	 */
+	max-height: 42%;
 	flex-direction: column;
 	border-bottom: 1px solid var(--line);
 }
@@ -1731,6 +1736,41 @@ svg.lucide {
 	flex-direction: column;
 	padding: 0 6px 6px;
 	gap: 2px;
+}
+
+/* The row and its close button, which is a sibling rather than a child of it. */
+.chat-row-wrap {
+	position: relative;
+}
+
+.chat-row-wrap .close {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	display: grid;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	opacity: 0;
+	background: var(--panel);
+	color: var(--faint);
+	cursor: pointer;
+	place-items: center;
+	transition: opacity 120ms ease;
+}
+
+/* Shown on approach, like the board's own ×. Kept when focused by the keyboard, which is
+   the only way it can be reached without a pointer. */
+.chat-row-wrap:hover .close,
+.chat-row-wrap .close:focus-visible {
+	opacity: 1;
+}
+
+.chat-row-wrap .close:hover {
+	background: var(--line);
+	color: var(--fg);
 }
 
 .chat-row {
@@ -2069,6 +2109,13 @@ svg.lucide {
 	.chats .rail-head button {
 		width: 38px;
 		height: 38px;
+	}
+
+	/* No hover to reveal it, so it is simply there. */
+	.chat-row-wrap .close {
+		width: 34px;
+		height: 34px;
+		opacity: 1;
 	}
 
 	.chats .rail-head .kind {

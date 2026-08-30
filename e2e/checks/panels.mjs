@@ -169,5 +169,51 @@ const row = await page.evaluate(() => {
 say("the runtime badge is grouped with the time", row.children === 2, `${row.children} children on the row's top line`);
 say("…at the right edge", Math.abs(row.metaAtRight) <= 2, `${row.metaAtRight}px`);
 
+/*
+ * Closing a chat.
+ *
+ * The row goes; the transcript stays on disk, which is why there is no confirmation and why
+ * the label says "close" rather than "delete".
+ */
+const rows = () => page.evaluate(() => [...document.querySelectorAll(".chat-row .name")].map((n) => n.textContent));
+const before2 = await rows();
+say("there is more than one chat to close", before2.length >= 2, `${before2.length} rows`);
+
+// Hidden until the row is approached, like a board's own ×.
+const closeOpacity = () =>
+	page.evaluate(() => Number(getComputedStyle(document.querySelector(".chat-row-wrap .close")).opacity));
+say("the close button is out of the way until hovered", (await closeOpacity()) === 0);
+await page.locator(".chat-row-wrap").first().hover();
+await settle(page, 250);
+say("…and appears on approach", (await closeOpacity()) === 1);
+
+// It must not also focus the row it sits on.
+const focusedBefore = await page.evaluate(() => document.querySelector('.chat-row[data-current="true"] .name')?.textContent);
+await page.locator(".chat-row-wrap").last().hover();
+await page.locator(".chat-row-wrap").last().locator(".close").click();
+await page.waitForFunction((was) => document.querySelectorAll(".chat-row").length < was, before2.length, { timeout: 8000 });
+const after2 = await rows();
+say("clicking it closes that chat", after2.length === before2.length - 1, `${before2.length} → ${after2.length} rows`);
+say(
+	"…and does not quietly focus the row it sat on",
+	(await page.evaluate(() => document.querySelector('.chat-row[data-current="true"] .name')?.textContent)) === focusedBefore,
+	`focus stayed on ${focusedBefore}`,
+);
+say("no button on a row is nameless", await page.evaluate(() =>
+	[...document.querySelectorAll(".chat-row-wrap button")].every(
+		(b) => (b.getAttribute("aria-label") ?? b.textContent ?? "").trim().length > 0,
+	),
+));
+
+// Closing the focused chat has to leave one focused, or the composer talks to nothing.
+await page.locator('.chat-row[data-current="true"]').hover();
+await page.locator(".chat-row-wrap:has(.chat-row[data-current='true'])").locator(".close").click();
+await settle(page, 900);
+const focus = await page.evaluate(() => ({
+	rows: document.querySelectorAll(".chat-row").length,
+	current: document.querySelectorAll('.chat-row[data-current="true"]').length,
+}));
+say("closing the focused chat leaves another focused", focus.rows === 0 || focus.current === 1, JSON.stringify(focus));
+
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

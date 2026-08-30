@@ -1,5 +1,6 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
+import X from "lucide-solid/icons/x";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import Plus from "lucide-solid/icons/plus";
 import { For, Show } from "solid-js";
@@ -20,6 +21,7 @@ export function ChatList(props: {
 	focused: string | undefined;
 	unread: Record<string, number>;
 	onFocus: (id: string) => void;
+	onRemove: (id: string) => void;
 	/** `kind` is the runtime, chosen here because it cannot change later. */
 	onNew: (kind?: AgentKind) => void;
 	/** What the server hands a new agent unless told otherwise. */
@@ -108,45 +110,69 @@ export function ChatList(props: {
 			<div class="chat-rows">
 				<For each={ordered()}>
 					{(chat) => (
-						<button
-							type="button"
-							class="chat-row"
-							data-current={props.focused === chat.id}
-							data-child={Boolean(chat.parentId)}
-							onClick={() => props.onFocus(chat.id)}
-						>
-							<Avatar chat={chat} identity={props.identities[chat.id]} />
-							<span class="who">
-								<span class="top">
-									<span class="name">{props.identities[chat.id]?.name ?? chat.name}</span>
-									{/*
-									 * The runtime and the time are one group at the right edge. Left
-									 * as three children of a `space-between` row, the badge had a gap
-									 * on both sides and read as dangling after the name.
-									 */}
-									<span class="meta">
-										<span class="runtime" data-kind={chat.kind} title={`Running on ${chat.kind}`}>
-											{chat.kind}
+						<div class="chat-row-wrap">
+							<button
+								type="button"
+								class="chat-row"
+								data-current={props.focused === chat.id}
+								data-child={Boolean(chat.parentId)}
+								onClick={() => props.onFocus(chat.id)}
+							>
+								<Avatar chat={chat} identity={props.identities[chat.id]} />
+								<span class="who">
+									<span class="top">
+										<span class="name">{props.identities[chat.id]?.name ?? chat.name}</span>
+										{/*
+										 * The runtime and the time are one group at the right edge. Left
+										 * as three children of a `space-between` row, the badge had a gap
+										 * on both sides and read as dangling after the name.
+										 */}
+										<span class="meta">
+											<span class="runtime" data-kind={chat.kind} title={`Running on ${chat.kind}`}>
+												{chat.kind}
+											</span>
+											<span class="when">{chat.lastAt ? when(chat.lastAt) : ""}</span>
 										</span>
-										<span class="when">{chat.lastAt ? when(chat.lastAt) : ""}</span>
 									</span>
-								</span>
-								<span class="bottom">
-									<span class="last">
-										<Show when={chat.parentId}>
-											<span class="tag">
-												<Icon of={CornerDownRight} size={11} />
-												{props.chats.find((other) => other.id === chat.parentId)?.name ?? "parent"}
-											</span>{" "}
+									<span class="bottom">
+										<span class="last">
+											<Show when={chat.parentId}>
+												<span class="tag">
+													<Icon of={CornerDownRight} size={11} />
+													{props.chats.find((other) => other.id === chat.parentId)?.name ?? "parent"}
+												</span>{" "}
+											</Show>
+											{chat.state === "idle" ? (chat.lastLine ?? "no messages yet") : working(chat.state)}
+										</span>
+										<Show when={props.unread[chat.id]}>
+											{(count) => <span class="unread">{count() > 9 ? "9+" : count()}</span>}
 										</Show>
-										{chat.state === "idle" ? (chat.lastLine ?? "no messages yet") : working(chat.state)}
 									</span>
-									<Show when={props.unread[chat.id]}>
-										{(count) => <span class="unread">{count() > 9 ? "9+" : count()}</span>}
-									</Show>
 								</span>
-							</span>
-						</button>
+							</button>
+
+							{/*
+							 * A sibling of the row, not a child of it: a button inside a button is
+							 * invalid, and a browser resolves it by dropping one of them.
+							 *
+							 * The chat closes; the conversation does not. Its transcript is a session
+							 * file on disk, which is why this needs no confirmation — and why the
+							 * label says "close" rather than "delete".
+							 */}
+							<button
+								class="close"
+								type="button"
+								title={`Close this chat with ${props.identities[chat.id]?.name ?? chat.name}`}
+								aria-label={`Close this chat with ${props.identities[chat.id]?.name ?? chat.name}`}
+								onClick={(event) => {
+									// Without this the row underneath takes the focus on the way past.
+									event.stopPropagation();
+									props.onRemove(chat.id);
+								}}
+							>
+								<Icon of={X} size={13} />
+							</button>
+						</div>
 					)}
 				</For>
 			</div>

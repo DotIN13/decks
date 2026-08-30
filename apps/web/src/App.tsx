@@ -328,6 +328,21 @@ export function App() {
 					return;
 				}
 
+				case "agent.removed": {
+					/*
+					 * Drop what was being kept for it. The `agents` frame that follows sets
+					 * the list and the focus, so this is only about not holding a transcript
+					 * for a chat that is gone — and about not showing its unread count on
+					 * whatever row happens to take its place.
+					 */
+					setState("transcripts", message.id, undefined as never);
+					setState("identities", message.id, undefined as never);
+					setState("contexts", message.id, undefined as never);
+					setState("inPlay", message.id, undefined as never);
+					setUnread(message.id, 0);
+					return;
+				}
+
 				case "agent.identity":
 					setState("identities", message.id, message.identity);
 					return;
@@ -1000,6 +1015,7 @@ export function App() {
 						}}
 						defaultKind={state.defaultKind}
 						onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+						onRemove={(id) => socket.send({ type: "agent.remove", id })}
 						pinned={panels.left.pinned()}
 						onPin={panels.left.setPinned}
 					/>

@@ -293,6 +293,14 @@ export type ClientMessage =
 	| { type: "camera.set"; camera: Camera }
 	| { type: "agent.create"; parentId?: string; kind?: AgentKind }
 	| { type: "agent.focus"; id: string }
+	/**
+	 * Take an agent off the list.
+	 *
+	 * The row goes; the conversation does not. Its transcript is a session file on disk
+	 * (`~/.pi/agent/sessions/…` or Claude's own store), so this closes a chat rather than
+	 * destroying its history.
+	 */
+	| { type: "agent.remove"; id: string }
 	| { type: "agent.prompt"; id: string; text: string }
 	| { type: "agent.abort"; id: string }
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
@@ -318,6 +326,8 @@ export type ServerMessage =
 			defaultKind: AgentKind;
 	  }
 	| { type: "agent.state"; id: string; state: AgentState }
+	/** An agent is off the list; anything the browser kept for it can go. */
+	| { type: "agent.removed"; id: string }
 	| { type: "agent.identity"; id: string; identity: Identity }
 	| { type: "agent.model"; id: string; model?: AgentModel }
 	| { type: "agent.usage"; id: string; usage: AgentUsage }
