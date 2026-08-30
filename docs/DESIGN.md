@@ -32,7 +32,7 @@ $DECKS_DATA_DIR/     default ~/.decks · npm run dev uses <repo>/data · tests a
   decks/
     deck.json        the arrangement, and the roots embeds may reach
     boards/*.html    the boards
-    lib/             the primitives, copied in so a board is standalone
+    lib/             the primitives, copied in and refreshed on open (§2.1)
     assets/          images the boards use, and the files the user drops on them
     .decks/          revisions and avatars — never watched, never served except by hash
   shared/            optional; the demo uses one as an out-of-deck root
@@ -112,6 +112,40 @@ first; an agent's edit writes the first and never the second.
 default plus a warning, never a refusal to open, and keys this build does not
 understand survive a write (`schema.ts`). It is a file a person is expected to open.
 
+### 2.1 `lib/` is a copy, and the copy is refreshed
+
+A board is a standalone document, so its stylesheet and its runtime have to be files
+sitting beside it — not a route this server serves. That is why `lib/` is copied into
+every deck, and it is not negotiable: a board has to render from the filesystem with
+Decks not running.
+
+But a copy taken once and never touched again is a deck frozen at the version of Decks
+that happened to create it, and the cost was not hypothetical. It set the ceiling on the
+component vocabulary the editor could offer (§6.5): a class this build added to
+`board.css` was an unstyled box in every deck made before it, so the editor could only
+ever speak the *oldest* `board.css` in the wild. It also meant a fixed bug in
+`board.js` never reached the decks that had it.
+
+So **opening a deck brings its `lib/` up to this build** (`deck/lib-sync.ts`,
+`App.refreshLib`). `lib/` is this application's directory, not the user's; a file of
+your own belongs in `assets/`. Three properties make that safe to do on every start:
+
+- **Content-compared, so an unchanged restart writes nothing.** Not an mtime
+  comparison, which is the usual shortcut and wrong here — a fresh clone or an
+  `npm ci` rewrites mtimes without changing a byte. Rewriting 82 files would wake the
+  watcher and reload every board on the canvas for nothing (§4, the `asset` case).
+- **It runs before the watcher attaches**, so even the restart that *does* rewrite
+  files cannot reload the boards twice.
+- **A missing `runtime/lib` is refused rather than treated as an empty one.** A broken
+  or partial install must not be able to prune a working deck's primitives to nothing.
+
+Stale files are removed, which is the part worth arguing about since it can delete
+something a person put there. It earns its keep: the vendored libraries rename files
+between versions, and a `pdf.worker.min.mjs` from an older pdf.js sitting beside a
+newer `pdf.min.mjs` is not untidiness — it is a board that fails to open a paper with a
+version-mismatch error nobody can place. Every removal is logged by name for that
+reason.
+
 ## 3. The board file
 
 ```html
@@ -133,8 +167,9 @@ understand survive a write (`schema.ts`). It is a file a person is expected to o
   "a box with prose in it" (`text`, `sticky`, `card`, `panel`, `callout`), three that
   bring their own inner markup (`kpi`, `table`, `chip`), the `embed`, and `svg.link`;
   the only variant attribute is `data-tone`. That list is also the ceiling on what the
-  user's editor can offer (§6.5), because a deck's `lib/` is a copy taken when the deck
-  was created — a class added here is not in a deck that already exists.
+  user's editor can offer (§6.5). It is a copy in every deck rather than a route, and it
+  is brought forward on every open (§2.1), so growing the vocabulary means editing
+  `board.css` and the editor's list together.
 - The head asks for exactly two files. `board.js` loads whatever a component actually
   uses — marked, KaTeX, mermaid, pdf.js — from the same `lib/`, so a board of three
   stickies does not pay for pdf.js and the agent does not have to remember which
@@ -399,12 +434,13 @@ already there put a blank line in the file on every edit.
 it: `text`, `sticky`, `card`, `panel`, `callout` — and one variant attribute,
 `data-tone` (a callout's warn/danger/ok, a connector's accent). That is all it has:
 there is no sticky colour, no font size, no alignment. So the inspector offers a class
-switch and a tone, and nothing it invented. **A deck's `lib/` is a copy**, taken when
-the deck was created and never upgraded (`Deck.create`), so a class this build adds to
-`board.css` renders as an unstyled box in every deck that already exists — inventing
-`.sticky[data-tone="blue"]` would be a control that does nothing for most users, which
-is worse than a control that is absent. `BOX_CLASSES` and the tone lists live in
-`@decks/protocol` with that constraint written next to them. `kpi`, `table` and `chip`
+switch and a tone, and nothing it invented. **A deck's `lib/` is a copy** — but one
+that is refreshed on every open (§2.1), so the constraint this design was written under
+has softened: a class added to `board.css` reaches an existing deck on its next restart
+instead of never. What survives is the discipline rather than the deadline — the
+vocabulary and the stylesheet are one decision, and inventing `.sticky[data-tone="blue"]`
+in the inspector without the CSS to match is still a control that does nothing.
+`BOX_CLASSES` and the tone lists live in `@decks/protocol` with that written next to them. `kpi`, `table` and `chip`
 are deliberately not in the switch: their CSS styles children the other five do not
 have, so swapping one in produces a component whose content no longer fits it.
 

@@ -37,7 +37,8 @@ $DECKS_DATA_DIR/          default ~/.decks · npm run dev uses <repo>/data
   decks/
     deck.json             where the boards sit, and which roots embeds may reach
     boards/*.html         the boards. The artifact
-    lib/                  the primitives, copied in so a board renders on its own
+    lib/                  the primitives, copied in so a board renders on its own.
+                          Refreshed from the running build every time the deck is opened
     assets/               images the boards use, and the files you drop on them
     .decks/               revisions and agent avatars — never served except by hash
 ```

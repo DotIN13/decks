@@ -205,10 +205,15 @@ export type BoardPatch =
  * The five component classes that mean the same thing — a box with prose in it —
  * and so can be swapped for one another by the inspector (§6.5).
  *
- * This list is `board.css`'s, not this build's. `lib/` is **copied into a deck when
- * the deck is created** and never upgraded, so a class invented here renders as an
- * unstyled box in every deck that already exists: the vocabulary the editor offers
- * can only be the vocabulary the stylesheet already had. `kpi`, `table` and `chip`
+ * This list is `board.css`'s, not this build's — the editor can only offer what the
+ * stylesheet already styles. That used to be a harder constraint than it is: `lib/` is
+ * copied into a deck, and the copy was once made at `Deck.create` and never touched
+ * again, so a class invented here was an unstyled box in every deck that already
+ * existed. Opening a deck now brings its `lib/` up to this build (`deck/lib-sync.ts`),
+ * so adding to this list means adding to `board.css` in the same commit and no longer
+ * means waiting a release. What has not changed: the list and the stylesheet are one
+ * decision, and a class in one and not the other is a control that does nothing.
+ * `kpi`, `table` and `chip`
  * are deliberately absent — their CSS styles children the other five do not have,
  * so swapping one in produces a component whose content no longer fits it.
  */

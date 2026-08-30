@@ -14,11 +14,13 @@ import { BOX_CLASSES, type BoardPatch, type BoxClass } from "@decks/protocol";
  *    mutation of the live document (so the change is on screen before the write
  *    lands, which is what lets the frame stay pinned and not flash — §7).
  *
- * The vocabulary is `board.css`'s and `board.js`'s, not this file's. A deck's `lib/`
- * is a **copy**, made when the deck was created and never upgraded, so a class or an
- * attribute invented here would be inert in every deck that already exists: the
- * editor can only offer what the stylesheet already styles and the runtime already
- * reads. That is the whole answer to "what does appearance mean for a component" —
+ * The vocabulary is `board.css`'s and `board.js`'s, not this file's: the editor can
+ * only offer what the stylesheet already styles and the runtime already reads. A
+ * deck's `lib/` is a **copy**, but it is refreshed from this build every time the deck
+ * is opened (`deck/lib-sync.ts`), so a class added to `board.css` reaches an existing
+ * deck on its next restart rather than never. Adding a row here therefore means
+ * adding the CSS in the same commit — not that the vocabulary is fixed. That is the
+ * whole answer to "what does appearance mean for a component" —
  * the five interchangeable box classes, `data-tone`, and the handful of attributes
  * an embed and a connector are made of.
  */

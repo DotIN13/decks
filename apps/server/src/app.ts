@@ -9,6 +9,7 @@ import { Revisions } from "./boards/snapshots.ts";
 import { renderTemplate, slugFor, type BoardKind } from "./boards/templates.ts";
 import { StageService } from "./stage/service.ts";
 import { DECK_DIR, type Config } from "./config.ts";
+import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { watchDeck } from "./deck/watcher.ts";
 import { Hub } from "./ws.ts";
@@ -96,13 +97,31 @@ export class App {
 	 * pointing at it.
 	 */
 	static open(config: Config): App {
-		const deck = existsSync(join(config.deck, "deck.json")) || existsSync(join(config.deck, "boards"))
-			? Deck.open(config.deck)
-			: Deck.create(config.deck, App.runtimeLib);
+		const existing = existsSync(join(config.deck, "deck.json")) || existsSync(join(config.deck, "boards"));
+		const deck = existing ? Deck.open(config.deck) : Deck.create(config.deck, App.runtimeLib);
+		// A deck this build did not create has whichever `lib/` created it, so every
+		// start brings the primitives forward. `Deck.create` has just done it for a new
+		// one. Before `attach()`, deliberately: the watcher is not running yet, so the
+		// one restart that does rewrite files cannot also reload every board twice.
+		if (existing) App.refreshLib(deck);
 		return new App(config, deck);
 	}
 
-	/** Where the shipped primitives live, copied into every new deck by `Deck.create`. */
+	/**
+	 * Bring a deck's copied primitives up to this build's (DESIGN §2).
+	 *
+	 * Logged rather than sent as a notice: on a normal restart it changes nothing and
+	 * says nothing, and when it does change something the person who needs to know is
+	 * whoever is reading the server's output wondering why a board looks different.
+	 */
+	private static refreshLib(deck: Deck): void {
+		const sync = syncRuntimeLib(App.runtimeLib, join(deck.path, "lib"));
+		const summary = describeSync(sync);
+		if (summary) console.log(`[decks] lib/ ${summary}`);
+		for (const gone of sync.removed) console.log(`[decks] lib/ removed ${gone} — this build no longer ships it`);
+	}
+
+	/** Where the shipped primitives live, copied into every deck and refreshed on open. */
 	static get runtimeLib(): string {
 		return resolve(dirname(fileURLToPath(import.meta.url)), "../../../runtime/lib");
 	}
@@ -554,9 +573,9 @@ export class App {
 	 */
 	openDeck(path: string): void {
 		const deckPath = join(path, DECK_DIR);
-		this.deck = existsSync(join(deckPath, "deck.json")) || existsSync(join(deckPath, "boards"))
-			? Deck.open(deckPath)
-			: Deck.create(deckPath, App.runtimeLib);
+		const existing = existsSync(join(deckPath, "deck.json")) || existsSync(join(deckPath, "boards"));
+		this.deck = existing ? Deck.open(deckPath) : Deck.create(deckPath, App.runtimeLib);
+		if (existing) App.refreshLib(this.deck);
 		this.stage.setDeck(this.deck);
 		this.revisions.setDeck(this.deck);
 		// An agent's cwd is the deck, and a Pi session's cwd cannot move, so opening
