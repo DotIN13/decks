@@ -52,16 +52,18 @@ test("nothing merges across an op that is not an update", () => {
 
 test("retyping the same run twice keeps the last version only", () => {
 	const merged = coalesce([
-		{ op: "text", id: "goal", text: "Shi" },
-		{ op: "text", id: "goal", text: "Ship it" },
+		{ op: "text", edit: "goal-title", text: "Shi" },
+		{ op: "text", edit: "goal-title", text: "Ship it" },
 	]);
-	assert.deepEqual(merged, [{ op: "text", id: "goal", text: "Ship it" }]);
+	assert.deepEqual(merged, [{ op: "text", edit: "goal-title", text: "Ship it" }]);
 });
 
 test("a card's heading and its body are two runs and both are kept", () => {
+	// Two names rather than one name and two indices, so this is a comparison of one
+	// field: what the two sides of the wire agree on is the whole address.
 	const merged = coalesce([
-		{ op: "text", id: "goal", text: "Heading", path: [0] },
-		{ op: "text", id: "goal", text: "Body", path: [1] },
+		{ op: "text", edit: "goal-title", text: "Heading" },
+		{ op: "text", edit: "goal-body", text: "Body" },
 	]);
 	assert.equal(merged.length, 2);
 });

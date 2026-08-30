@@ -31,7 +31,7 @@
  * misses every board is answered with a sentence instead of a lost session.
  */
 
-import { GRID, snap } from "./Editor.ts";
+import { GRID, snap, typingInto } from "./Editor.ts";
 
 /** Whether a drag is carrying files, as opposed to text or a component of its own. */
 function carriesFiles(transfer: DataTransfer | null): boolean {
@@ -155,8 +155,8 @@ export function attachFrameDrop(frame: HTMLIFrameElement, host: FileDropHost): (
 	};
 
 	const onPaste = (event: ClipboardEvent) => {
-		// Somebody typing over a run of text owns their own clipboard.
-		if ((event.target as HTMLElement | null)?.isContentEditable) return;
+		// Somebody typing over a run of text, or into a source editor, owns their clipboard.
+		if (typingInto(event.target)) return;
 		const files = Array.from(event.clipboardData?.files ?? []);
 		if (files.length === 0 || !host.enabled()) return;
 		event.preventDefault();

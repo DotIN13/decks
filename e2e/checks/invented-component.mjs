@@ -3,7 +3,7 @@
  *
  * The skill tells the agent to build shapes the catalogue does not have, in exchange for
  * three rules: a `data-id` on a direct child of the body, a box class beside its own, and
- * one editable string per leaf element. This is the example printed in that skill, so a
+ * a `data-edit` naming every run of words. This is the example printed in that skill, so a
  * failure here means the documentation is lying to every agent that reads it — which is a
  * worse bug than a broken control, because nobody would think to check.
  *
@@ -43,9 +43,9 @@ write(
 	</head>
 	<body class="board">
 		<section class="card phases" data-id="rollout" style="left: 48px; top: 48px; width: 420px">
-			<h3>Rollout</h3>
-			<div class="phase"><span class="when">week 1</span><span>Lock behind a flag</span></div>
-			<div class="phase"><span class="when">week 2</span><span>Ramp to 10%</span></div>
+			<h3 data-edit="rollout-title">Rollout</h3>
+			<div class="phase"><span class="when" data-edit="rollout-when-1">week 1</span><span data-edit="rollout-what-1">Lock behind a flag</span></div>
+			<div class="phase"><span class="when" data-edit="rollout-when-2">week 2</span><span data-edit="rollout-what-2">Ramp to 10%</span></div>
 		</section>
 		<script src="../lib/board.js"></script>
 	</body>
@@ -109,7 +109,7 @@ try {
 		swapped.split("\n").find((line) => line.includes('data-id="rollout"'))?.trim(),
 	);
 
-	// --- rule three: one string per leaf, so each one retypes -------------------------
+	// --- rule three: a name on every run, so each one retypes -------------------------
 
 	const label = await frame().locator("[data-id='rollout'] .phase .when").first().boundingBox();
 	await page.mouse.dblclick(label.x + label.width / 2, label.y + label.height / 2);
@@ -119,8 +119,8 @@ try {
 	await page.keyboard.press("ControlOrMeta+Enter");
 	const retyped = await until(fixture, /week 3/);
 	say(
-		"a leaf span deep inside an invented component retypes in place",
-		/<span class="when">week 3<\/span><span>Lock behind a flag<\/span>/.test(retyped),
+		"a named leaf deep inside an invented component retypes in place",
+		/<span class="when" data-edit="rollout-when-1">week 3<\/span>/.test(retyped),
 		retyped.split("\n").find((line) => line.includes("week 3"))?.trim(),
 	);
 	say(

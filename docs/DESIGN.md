@@ -151,7 +151,9 @@ reason.
 ```html
 <meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}'>
 <link rel="stylesheet" href="../lib/board.css">
-<section class="card" data-id="goal" style="left:40px;top:40px;width:360px">…</section>
+<section class="card" data-id="goal" style="left:40px;top:40px;width:360px">
+  <h3 data-edit="goal-title">Goal</h3>
+</section>
 <div data-embed="../papers/oauth.pdf" data-pages="3-5" data-id="spec" …></div>
 <script src="../lib/board.js"></script>
 ```
@@ -161,6 +163,12 @@ reason.
 - **Every component carries `data-id`.** It is what makes a board addressable from
   three directions: the agent edits by unique anchor, the stage highlights by id, and
   a user's drag becomes a patch against an id rather than against a pixel.
+- **Every editable run of words carries `data-edit`**, unique within the board. A retype
+  is a patch against that name alone, and a run without one is not retypeable — the
+  convention is the whole mechanism, so the templates, the example deck and the authoring
+  skill all carry it. `data-edit` and not a nested `data-id` because the rule above is the
+  one that defines what a component *is*: a `data-id` inside another component is not a
+  component, and reusing the attribute for parts would blur the only line there is.
 - `<meta name="poster">` is optional and is the escape hatch for a board too
   expensive to mount at thumbnail size (§7).
 - **The component vocabulary is small, and it is `board.css`'s.** Five classes that mean
@@ -411,7 +419,7 @@ between them they cover most of every kind:
 | | | |
 |---|---|---|
 | **position, size** | drag, resize handle, arrow-key nudge | `update` with `style` |
-| **words** | double-click the run of text and retype it | `text`, now with a `path` |
+| **words** | double-click a named run and retype it, in place or in a source editor | `text`, addressed by `data-edit` |
 | **everything else** | the inspector, floating for the selection | `update` with `class` / `attrs`, `rename`, `duplicate`, `order`, `remove` |
 
 Two of those ops existed and nothing reached them: `update` could already carry a
@@ -419,17 +427,53 @@ Two of those ops existed and nothing reached them: `update` could already carry 
 is therefore a UI over the protocol that was already there, and the protocol grew by
 two ops rather than by ten.
 
-**Typing addresses a child, by index.** A card is a heading and a paragraph, and
-retyping *the card* is not an edit anybody wants — the old rule (the whole component,
-or a refusal) made the commonest component the one shape a user could not touch. A
-`text` patch now carries `path: number[]`, the indices of the element children walked
-into from the component: `[0]` is the heading, `[1]` the paragraph. Indices rather than
-a selector or a vocabulary of part names (`"heading"`, `"body"`): the browser computes
-one from the element the user actually double-clicked, parse5 resolves it against the
-file with no selector engine, and there is no shared list of names for the two sides to
-drift on. Where it resolves to nothing it is refused, which is exactly what a
-`[data-md]` panel does — its headings exist only in the DOM `board.js` rendered, so the
-editor refuses that one up front and says why.
+**An editable run is one the author named, and the name is the whole address.** A
+`data-edit`, unique within a board, on the leaf element holding the words: a `text`
+patch carries that name and the new text and nothing else. The component is not in the
+patch — the server finds the run and walks up to the nearest `data-id` — because a
+second address in the same message is a second thing that can disagree with the first,
+and the server has to resolve the element anyway to say which component the edit landed
+in.
+
+Three decisions, in the order they were made.
+
+*`data-edit`, not a nested `data-id`.* The protocol's one structural rule is that a
+component is a `data-id` on a child of the body, and that a `data-id` *inside* another
+component is therefore not a component — the card around it is. Reusing the attribute
+for parts would blur the only line that defines the vocabulary, and every place that
+resolves a component by id (`elementOf`, `findById`, the stage's highlight) would have
+had to learn "…but only at the top level".
+
+*A name, not an index path.* Typing used to carry `path: number[]`, the indices of the
+element children walked into from the component, because nothing in a board named its
+runs. The browser computed one from the element under the pointer and parse5 resolved it
+against the file: two derivations of one thing, which agree only where the DOM's shape
+*is* the file's. That held for a hand-written card and failed completely for anything
+`board.js` renders, so markdown was not editable at all — a path into what it drew
+addressed nothing in the file, and the editor had to refuse such a component up front.
+An authored id is the same string on both sides of the wire, so the failure mode moves
+from "silently addresses the wrong element as a board is edited" to "refuses a name
+nothing has". The one wrong answer it can give — two elements with one name — is checked
+rather than resolved to the first match, and `duplicate` mints new names for every run
+inside the copy so the app never creates that case itself. The cost is real and was
+accepted: **a board written before this convention has no retypeable text**, and there is
+no fallback path, because a fallback would be the index path again with its failures
+moved later.
+
+*Two editing surfaces, because there are two shapes.* Plain text keeps the in-place
+`contenteditable` it always had: that path preserves the file's own whitespace and
+produces a one-line diff, which is the property everything here is for, and it must not
+regress. A `[data-md]` or `[data-mermaid]` component gets a **monospace textarea over
+it** holding its whole source, because what is on screen there is not what the file says
+— `board.js` was handed `## The sequence` and drew an `<h2>`, and there is no byte range
+in the file corresponding to that `<h2>`. So the editable unit is the source, named once
+on the component, and not a rendered block. `board.js` keeps the source it drew from (a
+`WeakMap`, not a `data-source` attribute — the file is the one truth, and a copy in the
+DOM would be a second) and exposes `source` and `redraw` on `window.__board`. A commit
+re-renders that one component rather than reloading the frame, which is what keeps the
+frame pinned to the revision it loaded (§7) — the alternative flashed the whole board for
+one panel. A re-render takes `__boardReady` down and puts it back, because everything
+that waits for a board waits on that flag.
 
 The splice keeps the whitespace it found. A paragraph written over three indented lines
 is the normal shape of a board, and replacing the whole inner range pulled the text up
@@ -437,7 +481,19 @@ onto the opening tag and the closing tag up behind it: a three-line diff for a r
 Only the text *between* the surrounding whitespace is replaced — and the incoming text
 is trimmed when that whitespace is being kept, because `contenteditable` hands back the
 file's own indentation as part of `textContent` and writing it on top of the indent
-already there put a blank line in the file on every edit.
+already there put a blank line in the file on every edit. The source editor is the
+multi-line case of the same rule: it shows the block dedented, since that is what the
+markdown parser sees and four stray spaces are a code block, and re-indents it on commit
+so that changing one line of a panel is one line of the diff. Two characters are escaped
+on the way in, `&` and `<`, and no longer `>` — a Mermaid source is `A --> B` on every
+line, and escaping that rewrote a whole diagram for a one-line edit.
+
+What is still refused, and honestly: a run whose content is markup (`See <a>the doc</a>`
+cannot survive a plain-text replacement, so the author marks the words instead), a source
+with raw HTML in it (the browser only ever had the element's `textContent`, with the tags
+already dropped, so writing it back is the same loss), a name nothing on the board has,
+and a `data-embed`, whose content is somebody else's file and whose editable thing is the
+path.
 
 **The appearance vocabulary is the stylesheet's, and it is thinner than it looks.**
 `board.css` has five component classes that mean the same thing — a box with prose in
@@ -467,15 +523,22 @@ instead (⌘D duplicates, `[` and `]` change order, ⌫ deletes, and the palette
 `V S C T E` finally do something).
 
 What the inspector will not offer, on purpose: a colour picker writing
-`background: #f0c`. Boards use tokens, the authoring skill tells the agent never to
+`background: #f0c`. (The source editor is not a counter-example: it holds a markdown or
+Mermaid source, which is text a `text` patch can splice, and never a component's HTML.) Boards use tokens, the authoring skill tells the agent never to
 write a hex, and widening `update`'s `style` from a rectangle to arbitrary CSS turns a
 byte-range splice into a stylesheet editor. Nor a textarea holding the component's
 HTML: that is re-serialising by hand, and the agent is the fallback editor.
 
 **Two new ops, both of which had to be ops.** `duplicate` copies the component's own
-source bytes with two attributes rewritten inside the copy, because that is the only
-copy that keeps a card's heading, its paragraph and its list — an `insert` composed by
-the browser would produce the palette's placeholder wearing a new name. Its name is
+source bytes with a handful of attributes rewritten inside the copy, because that is the
+only copy that keeps a card's heading, its paragraph and its list — an `insert` composed
+by the browser would produce the palette's placeholder wearing a new name. Every
+`data-edit` inside the copy is renamed along with the `data-id`, which is not a nicety:
+two components sharing an editable name make a retype of either ambiguous, and it is the
+one way the app could create that case itself. The palette's `insert` writes a
+`data-edit` for the same reason from the other end — the first thing anybody does with a
+new sticky is double-click the placeholder, and a component that had to be named by an
+agent before it could be typed into would look broken. Its name is
 derived from the original's (`goal` → `goal-2`), since an id is the one thing in a
 board a person and an agent both address by hand. `rename` is an op rather than an
 `attrs: { "data-id": … }` write because a name is not an attribute like the others: it
@@ -1020,6 +1083,15 @@ section.
   deleted but not dragged, resized or retyped — the editor's geometry is `HTMLElement`'s
   and an `SVGElement` has none of it (§6.5). Putting the drawing inside a box component
   is the answer the authoring skill gives, and it costs one wrapper.
+- A board written before `data-edit` has no retypeable text: the name is the whole
+  address and there is no fallback (§6.5). The templates, the example deck and the
+  authoring skill all carry the convention, so what is left is boards an older agent
+  wrote — for those, a retype is a sentence to the agent, which is also what adds the
+  names.
+- A markdown or Mermaid source containing raw HTML cannot be edited from the app. What
+  `board.js` mounted was the element's `textContent`, with the tags already dropped, so
+  the browser never had the file's bytes to send back; it is refused rather than
+  flattened.
 - The inspector edits one component at a time. There is no multi-select, so "make these
   four cards panels" is four clicks or a sentence to the agent.
 - `kpi`, `table` and `chip` get a name, an order, a copy and a delete, and no appearance

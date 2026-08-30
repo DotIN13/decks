@@ -1,3 +1,4 @@
+import { typingInto } from "./Editor.ts";
 import { noteCameraMove } from "./pan-signal.ts";
 import type { Finger, TouchStep } from "./touch.ts";
 
@@ -174,7 +175,7 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	let spaceHeld = false;
 	const onKeyDown = (event: KeyboardEvent) => {
 		// Someone typing into a component owns every key, including the space bar.
-		if ((event.target as HTMLElement | null)?.isContentEditable) return;
+		if (typingInto(event.target)) return;
 
 		if (event.code === "Space") {
 			event.preventDefault();

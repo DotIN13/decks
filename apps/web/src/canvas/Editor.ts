@@ -19,6 +19,12 @@ import { cameraMovedSince } from "./pan-signal.ts";
  * The gesture mutates the DOM immediately and sends a patch when it ends. The file
  * is the artifact — the optimistic mutation is a preview of a write, and a refused
  * write re-reads the frame.
+ *
+ * Typing is two surfaces on purpose (§6.5). A run of plain text is typed *in place*,
+ * because that path already preserves the file's own whitespace and produces a one-line
+ * diff. A `[data-md]` or `[data-mermaid]` component is typed in a textarea over it,
+ * because what is on screen there was drawn from words that are no longer in the
+ * document at all — the source comes back from `board.js`, and goes back to it.
  */
 
 export type Tool = "select" | ComponentKind;
@@ -100,6 +106,27 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
 		}
 		.decks-editing { outline: 2px solid var(--b-accent, #3b5cf6); outline-offset: 2px; }
+
+		/*
+		 * The source editor. Monospace because this is markdown or Mermaid source, where a
+		 * leading space is a list item and four of them are a code block — a proportional
+		 * face hides the one thing its author has to be able to see. Soft wrapping is left
+		 * on: a long paragraph in a narrow panel would otherwise run off to the right with
+		 * no way to follow it, and a wrapped line is still one line in the file.
+		 */
+		.decks-source {
+			box-sizing: border-box;
+			padding: 8px;
+			font: 12px/1.55 var(--b-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+			color: var(--b-fg, #161616);
+			background: var(--b-bg, #fff);
+			border: 2px solid var(--b-accent, #3b5cf6);
+			border-radius: var(--b-radius, 6px);
+			box-shadow: 0 6px 24px rgb(0 0 0 / 25%);
+			white-space: pre-wrap;
+			tab-size: 2;
+			resize: none;
+		}
 
 		/*
 		 * A 12px square is a mouse target. Asked of the input device rather than of the
@@ -258,6 +285,14 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	on("pointerdown", (event) => {
 		if (!host.enabled()) return;
 
+		/*
+		 * A press inside whatever is being typed into belongs to it. Checked before
+		 * anything else because the source editor is a *sibling* of the component rather
+		 * than part of it: `componentAt` sees a `data-decks-ui` element and answers
+		 * nothing, which the branches below would read as "clear the selection".
+		 */
+		if (editingOwns(event.target)) return;
+
 		if (event.pointerType === "touch" && !event.isPrimary) {
 			// A second finger is the canvas asking for a pinch (`frame-gestures.ts`), and
 			// it beats whatever one finger had started.
@@ -342,7 +377,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * component around it is *not* the contenteditable — and a click into the heading
 		 * was picking the card up and dropping the caret wherever the drag ended.
 		 */
-		if (element.isContentEditable || editing?.element.contains(event.target as Node)) return;
+		if (element.isContentEditable || editingOwns(event.target)) return;
 		event.preventDefault();
 		gesture = { kind: "move", element, from: { x: event.clientX, y: event.clientY }, origin: rectOf(element) };
 	});
@@ -413,7 +448,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			host.select({ path, id: element.dataset.id! });
 			return;
 		}
-		if (editing?.element.contains(finished.target as Node)) return;
+		if (editingOwns(finished.target)) return;
 		beginEditing(finished.target, false);
 	};
 
@@ -430,116 +465,205 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	// --- typing -------------------------------------------------------------------------
 
 	/**
-	 * `id` and `at` together are the address the patch carries: the component, and the
-	 * indices of the element children walked into to reach the run being typed.
+	 * What is being typed into, and how the patch will name it.
+	 *
+	 * `edit` is the whole address: the `data-edit` its author wrote on the run, unique
+	 * within the board, and the same string on both sides of the wire (§6.5). It
+	 * replaced a path of child indices, which the browser computed and the server
+	 * resolved — two derivations of one thing, which agreed only for components whose
+	 * DOM shape was the file's.
+	 *
+	 * Two shapes, because there are two surfaces. A `run` is typed in place. A `source`
+	 * is the whole of a `[data-md]` or `[data-mermaid]` component, typed in a textarea
+	 * over it, and carries the `indent` its lines were stripped of so they can be put
+	 * back exactly where the file had them.
 	 */
-	let editing: { element: HTMLElement; id: string; at: number[]; before: string } | undefined;
+	let editing:
+		| { kind: "run"; element: HTMLElement; edit: string; before: string }
+		| { kind: "source"; element: HTMLElement; area: HTMLTextAreaElement; edit: string; before: string; indent: string }
+		| undefined;
+
+	/** Whether a node is inside whatever is being typed into — including the textarea. */
+	const editingOwns = (node: EventTarget | null): boolean => {
+		if (!editing || !node) return false;
+		const surface = editing.kind === "run" ? editing.element : editing.area;
+		return surface.contains(node as Node);
+	};
+
+	/** `board.js`'s side of a rendered component: the source it drew from, and a re-draw. */
+	const runtime = () =>
+		(
+			win as Window & {
+				__board?: { source?: (element: Element) => string; redraw?: (element: Element, source: string) => Promise<void> };
+			}
+		).__board;
 
 	const stopEditing = (commit: boolean) => {
 		const active = editing;
 		editing = undefined;
 		if (!active) return;
-		active.element.contentEditable = "false";
-		const text = active.element.textContent ?? "";
-		if (!commit || text === active.before) {
-			active.element.textContent = active.before;
+
+		if (active.kind === "run") {
+			active.element.contentEditable = "false";
+			const text = active.element.textContent ?? "";
+			if (!commit || text === active.before) {
+				active.element.textContent = active.before;
+				return;
+			}
+			host.patch(path, [{ op: "text", edit: active.edit, text }]);
 			return;
 		}
-		host.patch(path, [
-			{ op: "text", id: active.id, text, ...(active.at.length > 0 ? { path: active.at } : {}) },
-		]);
+
+		const typed = active.area.value;
+		active.area.remove();
+		if (!commit || typed === active.before) return;
+		/*
+		 * Indented back into the shape the file had it in, which is what keeps a change
+		 * to one line of a panel a change to one line of the file. The server trims the
+		 * first line's indent and the last line's newline off again, because those are
+		 * the whitespace it is already keeping around the run.
+		 */
+		const source = redent(typed, active.indent);
+		/*
+		 * Drawn again here rather than by reloading the frame. The frame is pinned to the
+		 * revision it loaded so a user's own edit does not reload the board they are
+		 * working on (§7), and that pin assumes the editor has already made the change on
+		 * screen — for a rendered component only `board.js` can.
+		 */
+		void runtime()?.redraw?.(active.element, source);
+		host.patch(path, [{ op: "text", edit: active.edit, text: source }]);
 	};
 
 	/**
-	 * Which run of text a double-click means, and how the file names it.
+	 * Open the source of a rendered component in a textarea over it.
 	 *
-	 * A card is a heading and a paragraph, and "retype the card" is not an edit anyone
-	 * wants — the old rule (the whole component, or a notice) meant a card was the one
-	 * shape a user could not touch, which is most of what an agent writes. So the
-	 * target is the element that was clicked, addressed relative to the component by
-	 * the indices of the element children on the way down. `[0]` is the heading.
-	 *
-	 * Indices, and not a selector or a name like "heading", because the browser can
-	 * compute one from the element under the pointer and parse5 can resolve it against
-	 * the file with no selector engine and no shared vocabulary to drift.
+	 * The unit is the whole source and not a rendered block, because a rendered block is
+	 * not a thing the file has: `board.js` was handed `## The sequence` and drew an
+	 * `<h2>`, and there is no byte range in the file that corresponds to the `<h2>`. One
+	 * editor holding what the author actually wrote is both simpler and the only version
+	 * that can add a line.
 	 */
-	const runAt = (target: EventTarget | null): { component: HTMLElement; element: HTMLElement; at: number[] } | undefined => {
-		const component = componentAt(target);
-		const element = target as HTMLElement | null;
-		if (!component || !element) return undefined;
-		const at: number[] = [];
-		let cursor: HTMLElement = element;
-		while (cursor !== component) {
-			const parent: HTMLElement | null = cursor.parentElement;
-			if (!parent) return undefined;
-			at.unshift([...parent.children].indexOf(cursor));
-			cursor = parent;
+	const openSource = (element: HTMLElement, edit: string, mouse: boolean): boolean => {
+		const raw = runtime()?.source?.(element);
+		if (raw === undefined) {
+			// Only reachable before `board.js` has mounted, or in a board that loaded an
+			// older copy of it — `lib/` is re-synced on every open (§2.1), so this is a
+			// message about timing rather than about versions.
+			if (mouse) host.notice("That component has not finished loading yet.");
+			return false;
 		}
-		return { component, element, at };
+		const { text, indent } = undent(raw);
+		const area = doc.createElement("textarea");
+		area.className = "decks-source";
+		area.dataset.decksUi = "true";
+		area.spellcheck = false;
+		area.value = text;
+		const box = rectOf(element);
+		area.style.left = `${box.left}px`;
+		area.style.top = `${box.top}px`;
+		area.style.width = `${box.width}px`;
+		// A panel is sized to the drawing, and a diagram is usually taller as source than
+		// it is as a picture — so the editor may need more room than the component has.
+		area.style.height = `${Math.max(box.height ?? 0, 180)}px`;
+		doc.body.appendChild(area);
+		area.focus();
+		area.setSelectionRange(text.length, text.length);
+		editing = { kind: "source", element, area, edit, before: text, indent };
+		// The editor's own box, not the component's: on a phone the keyboard takes the
+		// bottom half of the screen and the thing being typed is what has to stay in view.
+		host.reveal(path, { x: box.left, y: box.top, w: box.width ?? 0, h: Math.max(box.height ?? 0, 180) });
+		return true;
 	};
 
 	/**
-	 * Whether a component is one this cannot address a run of text inside.
-	 *
-	 * An embed, a `[data-md]` panel and a diagram are *rendered*: the DOM on screen is
-	 * not the shape the file has, so the indices above would address something that does
-	 * not exist there and the patch would be refused after the optimistic edit had
-	 * already happened. Refused up front instead, with the reason.
-	 *
-	 * A top-level `<svg>` is here for the other reason — `beginEditing` ends by asking
-	 * for `rectOf(component)` to keep the caret on screen, and an `SVGElement` has no
-	 * `offsetLeft` to give it. A hand-drawn diagram inside a box component is editable
-	 * as normal, which is how the authoring skill says to write one.
-	 */
-	const rendered = (element: HTMLElement) =>
-		element.dataset.embed !== undefined ||
-		element.dataset.md !== undefined ||
-		element.dataset.mermaid !== undefined ||
-		element.tagName.toLowerCase() === "svg";
-
-	/**
-	 * Start typing over a run of text, however the user asked for it.
+	 * Start typing over something, however the user asked for it.
 	 *
 	 * Two gestures reach here. A double-click, which is what a mouse has always done —
 	 * and a second tap on a component that is already selected, because a double-tap is
 	 * not available on a touchscreen: it is the browser's zoom gesture, and even with
 	 * that suppressed it is a poor thing to ask of a finger over a 14px line of text.
 	 * "Tap to select, tap again to edit" is the idiom every phone already teaches, and
-	 * it falls out of the selection rule below rather than being a second mechanism.
+	 * it falls out of the selection rule rather than being a second mechanism.
+	 *
+	 * What is editable is what the file says is: an element carrying a `data-edit`, or a
+	 * rendered component whose source is one. A board written before that convention has
+	 * no retypeable text and is told so, which is the accepted price of an address that
+	 * cannot be computed from the DOM.
 	 */
 	const beginEditing = (target: EventTarget | null, mouse: boolean): boolean => {
 		if (!host.enabled()) return false;
-		const run = runAt(target);
-		if (!run) return false;
-		if (rendered(run.component)) {
+		const component = componentAt(target);
+		const clicked = target as HTMLElement | null;
+		if (!component || !clicked?.closest) return false;
+		// Whatever was being typed into is finished with first, and committed: switching
+		// runs is not a way to throw an edit away.
+		if (editing && !editingOwns(clicked)) stopEditing(true);
+
+		/*
+		 * A rendered component is asked about before the element under the pointer is,
+		 * because the element under the pointer is something `board.js` drew and its own
+		 * attributes say nothing about the file.
+		 */
+		const drawn = clicked.closest("[data-md], [data-mermaid]") as HTMLElement | null;
+		if (drawn && component.contains(drawn)) {
+			const named = drawn.dataset.edit;
+			if (!named) {
+				if (mouse) host.notice("That panel's source has no name in the file — ask the agent for a data-edit on it.");
+				return false;
+			}
+			return openSource(drawn, named, mouse);
+		}
+
+		if (component.dataset.embed !== undefined) {
 			host.notice("The board draws that from a file — change what it points at, or ask the agent.");
 			return false;
 		}
 		/*
-		 * `contentEditable` is `HTMLElement`'s, and an `<svg>`'s own `<text>` is not one.
-		 * Assigning the property on it is silently a no-op — no attribute is set and
-		 * `isContentEditable` stays undefined — so this used to leave the editor in an
-		 * editing state over an element nobody could type into, and only Escape got out of
-		 * it. Reachable because the authoring skill now tells an agent to draw a diagram
-		 * inside a box component, whose own tag says nothing about what is under it.
+		 * A top-level `<svg>` cannot be edited for the reason it cannot be dragged: the
+		 * reveal below asks for `rectOf(component)`, and an `SVGElement` has no
+		 * `offsetLeft` to give it. The authoring skill says to put a drawing inside a box,
+		 * which makes all of this work as normal.
 		 */
-		if (!(run.element instanceof (win as Window & typeof globalThis).HTMLElement)) {
+		if (component.tagName.toLowerCase() === "svg") return false;
+
+		/*
+		 * A word inside a drawing, asked before whether it is named, because the answer is
+		 * the same either way: `contentEditable` is `HTMLElement`'s and an `<svg>`'s own
+		 * `<text>` is not one. Assigning the property on it is silently a no-op — no
+		 * attribute is set and `isContentEditable` stays undefined — so this used to leave
+		 * the editor in an editing state over an element nobody could type into, escapable
+		 * only with Escape. Reachable because the authoring skill tells an agent to draw a
+		 * diagram inside a box component, whose own tag says nothing about what is under it.
+		 */
+		if (clicked.closest("svg")) {
 			if (mouse) host.notice("That word is placed by the drawing's own coordinates — ask the agent to change it.");
 			return false;
 		}
-		// A run of plain text, and nothing else: the server refuses to flatten markup,
-		// so offering to edit a paragraph with a link in it would be offering a refusal.
-		if (run.element.children.length > 0) {
+
+		const run = clicked.closest("[data-edit]") as HTMLElement | null;
+		if (!run || !component.contains(run)) {
 			// Only worth saying to somebody who aimed: a tap on a card's padding is not a
 			// failed attempt to retype it, it is the tap that selected the card.
-			if (mouse) host.notice("Double-click the line you want to retype.");
+			if (mouse) host.notice("Nothing here is named as editable — ask the agent for a data-edit on it.");
 			return false;
 		}
-		editing = { element: run.element, id: run.component.dataset.id!, at: run.at, before: run.element.textContent ?? "" };
-		run.element.contentEditable = "true";
-		run.element.focus();
+		// A run of plain text, and nothing else: the server refuses to flatten markup, so
+		// offering to edit a paragraph with a link in it would be offering a refusal.
+		if (run.children.length > 0) {
+			if (mouse) host.notice("That run has markup inside it — the words themselves need naming, not the paragraph.");
+			return false;
+		}
+		const before = run.textContent ?? "";
+		run.contentEditable = "true";
+		run.focus();
+		/*
+		 * Assigned after focusing, not before. Moving focus out of a `contenteditable`
+		 * fires `focusout` synchronously, and this handler commits on `focusout` — so a
+		 * state set first would be committed by the very act of starting to edit.
+		 */
+		editing = { kind: "run", element: run, edit: run.dataset.edit!, before };
 		const range = doc.createRange();
-		range.selectNodeContents(run.element);
+		range.selectNodeContents(run);
 		win.getSelection()?.removeAllRanges();
 		win.getSelection()?.addRange(range);
 		/*
@@ -548,7 +672,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * asked for is the component rather than the run, so the heading of a card stays
 		 * visible with the card it belongs to.
 		 */
-		const box = rectOf(run.component);
+		const box = rectOf(component);
 		host.reveal(path, { x: box.left, y: box.top, w: box.width ?? 0, h: box.height ?? 0 });
 		return true;
 	};
@@ -665,6 +789,71 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		stopEditing(false);
 		for (const cleanup of cleanups.reverse()) cleanup();
 	};
+}
+
+/**
+ * Whether a key or a paste belongs to something the user is typing into.
+ *
+ * Both of the other files that listen inside a board's document need this, and both had
+ * it wrong the same way: they asked `isContentEditable`, which is true of a run being
+ * retyped and false of the source editor's `<textarea>`. So the palette's own letters
+ * were taken out of a Mermaid source as it was typed — `## What lands` arrived in the
+ * file as `##Whaland` — and the space bar panned the canvas mid-word. Exported from here
+ * because this is the file that puts those surfaces on the screen, which is the same
+ * reason `GRID` lives here.
+ */
+export function typingInto(target: EventTarget | null): boolean {
+	const element = target as HTMLElement | null;
+	if (!element) return false;
+	return Boolean(element.isContentEditable) || element.tagName === "TEXTAREA" || element.tagName === "INPUT";
+}
+
+/**
+ * A block of inline source as its author would want to type it, and the indentation
+ * taken off it.
+ *
+ * Markdown inside a board is indented to line up with the HTML around it, and every one
+ * of those spaces means something to a markdown parser — four of them are a code block —
+ * so `board.js` strips the common indent before parsing and the editor shows what the
+ * parser saw. Handing over the raw bytes instead would open an editor whose every line
+ * begins with three tabs, and inside which the author cannot tell their own indentation
+ * from the file's.
+ *
+ * The indent comes back on commit (`redent`). Without that half, a panel's source drifts
+ * to column zero on its first edit: it still *renders* the same, since the parser
+ * dedents anyway, but every line of the block turns up in the diff and the file stops
+ * looking like something a person wrote.
+ */
+export function undent(raw: string): { text: string; indent: string } {
+	const lines = raw.split("\n");
+	// The blank first and last lines are the file's, not the author's: they are the
+	// newline after the opening tag and the one before the closing one, and the server
+	// keeps that whitespace itself.
+	while (lines.length > 0 && lines[0]!.trim() === "") lines.shift();
+	while (lines.length > 0 && lines[lines.length - 1]!.trim() === "") lines.pop();
+
+	const indents = lines.filter((line) => line.trim() !== "").map((line) => /^[ \t]*/.exec(line)![0]);
+	// The longest prefix every line shares, character by character rather than by
+	// counting: a file indented with tabs and one indented with spaces are both normal,
+	// and a count would let the two be mixed back together.
+	const indent = indents.reduce((shared, own) => {
+		let index = 0;
+		while (index < shared.length && index < own.length && shared[index] === own[index]) index += 1;
+		return shared.slice(0, index);
+	}, indents[0] ?? "");
+
+	const text = lines.map((line) => (line.startsWith(indent) ? line.slice(indent.length) : line.trimStart())).join("\n");
+	return { text, indent };
+}
+
+/** The other half: back into the file's shape, so a line nobody touched is untouched. */
+export function redent(text: string, indent: string): string {
+	// A blank line stays empty rather than becoming trailing whitespace — which is what
+	// the file already has, and what an editor would strip anyway.
+	return text
+		.split("\n")
+		.map((line) => (line.trim() === "" ? "" : `${indent}${line}`))
+		.join("\n");
 }
 
 function cssEscape(value: string): string {

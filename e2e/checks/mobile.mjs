@@ -195,12 +195,15 @@ const run = await page.evaluate(() => {
 		const box = node.getBoundingClientRect();
 		return { x: rect.left + (box.x + Math.min(40, box.width / 2)) * scale, y: rect.top + (box.y + box.height / 2) * scale };
 	};
-	const found = [...frame.contentDocument.querySelectorAll("[data-id] > *")].find((node) => {
+	// A run the board's author named. `data-edit` is the whole address a retype carries
+	// (DESIGN §6.5), so a run without one is not editable by any gesture and tapping it
+	// twice would prove nothing.
+	const found = [...frame.contentDocument.querySelectorAll("[data-edit]")].find((node) => {
 		if (node.children.length > 0 || (node.textContent ?? "").trim().length < 5) return false;
 		const point = at(node);
 		return point.x > 40 && point.x < window.innerWidth - 40 && point.y > 120 && point.y < 300;
 	});
-	return found ? { id: found.parentElement.dataset.id, ...at(found) } : null;
+	return found ? { id: found.closest("[data-id]").dataset.id, edit: found.dataset.edit, ...at(found) } : null;
 });
 if (!run) {
 	say("a run of text is on screen to tap", false, "nothing found — the camera moved somewhere unexpected");
@@ -229,7 +232,7 @@ if (!run) {
 				.contentDocument.querySelector('[contenteditable="true"]'),
 		),
 	);
-	say("tapping it again starts typing over the run of text", typing);
+	say("tapping it again starts typing over the run of text", typing, `over data-edit="${run.edit}"`);
 	await page.evaluate(() =>
 		document
 			.querySelector('.board-node[data-path="boards/plan.html"] iframe')

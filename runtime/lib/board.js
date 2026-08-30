@@ -15,10 +15,19 @@
  * owns its own geometry — an `<svg>` with coordinates its author chose — which is a
  * thing both of them can read and change. See `skills/board-authoring`.
  *
+ * **What it renders, it can be asked to render again.** A `[data-md]` or
+ * `[data-mermaid]` component is written as its source and mounted as the drawing made
+ * from it, so a moment later the file's own words are nowhere in the live document.
+ * That is why markdown used to be the one thing a user could not retype. The source is
+ * kept instead, and handed out through `window.__board` along with a re-render of a
+ * single component — which is what lets the editor open it, and what lets the frame
+ * stay on the revision it loaded instead of reloading a whole board for one panel.
+ *
  * It also owns the readiness flag. Every async mount is awaited, then
  * `window.__boardReady` goes true — which is what the app waits for before it
  * measures a board, and what the agent's Playwright waits for before it takes a
- * picture. Without it a screenshot is a race, and the race is usually lost.
+ * picture. Without it a screenshot is a race, and the race is usually lost. A
+ * re-render takes the flag down and puts it back for the same reason.
  */
 (() => {
 	"use strict";
@@ -176,6 +185,71 @@
 			});
 		} catch (error) {
 			console.warn("[board] maths did not render:", error);
+		}
+	}
+
+	/**
+	 * The source each rendered component was written from.
+	 *
+	 * A `WeakMap` and not an attribute: the source is the file's, and writing it into
+	 * the live DOM as a `data-source` would put a copy of it in the document the
+	 * inspector reads and the editor walks — a second truth to keep in step, in the one
+	 * place this project insists there is only one. A component the board removes takes
+	 * its entry with it.
+	 */
+	const sources = new WeakMap();
+
+	/** What a component's source is now: what it was retyped to, or what the file said. */
+	function sourceOf(element) {
+		const kept = sources.get(element);
+		return kept === undefined ? (element.textContent ?? "") : kept;
+	}
+
+	/**
+	 * Draw a `[data-md]` or `[data-mermaid]` component, and remember what from.
+	 *
+	 * The source is read out of the element the first time — after which the element no
+	 * longer holds it, because rendering is what replaced it. A failure is reported in
+	 * place and never rethrown: one diagram that will not parse must not take the board
+	 * down with it, and the source is kept either way, so it can be retyped into
+	 * something that does parse.
+	 */
+	async function drawSource(element, source) {
+		const raw = source === undefined ? sourceOf(element) : source;
+		sources.set(element, raw);
+		const diagram = element.dataset.mermaid !== undefined;
+		try {
+			if (diagram) await renderMermaid(element, raw);
+			else await renderMarkdown(element, raw);
+		} catch (error) {
+			const said = error instanceof Error ? error.message : String(error);
+			if (diagram) element.textContent = `mermaid: ${said}`;
+			console.warn(`[board] ${diagram ? "mermaid" : "markdown"}:`, error);
+		}
+	}
+
+	/**
+	 * Draw one component again, from a source the user has just changed.
+	 *
+	 * The alternative is reloading the frame, and the frame is deliberately pinned to
+	 * the revision it loaded so a user's own edit does not reload the board they are
+	 * editing (DESIGN §7) — a markdown panel that could only be re-rendered by reload
+	 * would flash the whole board on every keystroke's worth of commit.
+	 *
+	 * `__boardReady` goes down for as long as it takes, because everything that waits
+	 * for a board waits on that flag and a flag left true through a re-render is a
+	 * promise this file had quietly stopped keeping. `board:ready` is *not* dispatched
+	 * again: that event means the board finished loading, which happens once, and a
+	 * board's own `<script>` listening for it would run a second time.
+	 */
+	async function redraw(element, source) {
+		window.__boardReady = false;
+		document.body.dataset.ready = "false";
+		try {
+			await drawSource(element, source);
+		} finally {
+			window.__boardReady = true;
+			document.body.dataset.ready = "true";
 		}
 	}
 
@@ -529,15 +603,8 @@
 
 		const work = [];
 
-		for (const element of document.querySelectorAll("[data-md]")) {
-			work.push(renderMarkdown(element, element.textContent ?? "").catch((error) => console.warn("[board] markdown:", error)));
-		}
-		for (const element of document.querySelectorAll("[data-mermaid]")) {
-			const source = element.textContent ?? "";
-			work.push(renderMermaid(element, source).catch((error) => {
-				element.textContent = `mermaid: ${error instanceof Error ? error.message : String(error)}`;
-				console.warn("[board] mermaid:", error);
-			}));
+		for (const element of document.querySelectorAll("[data-md], [data-mermaid]")) {
+			work.push(drawSource(element));
 		}
 		for (const element of document.querySelectorAll("[data-embed]")) {
 			work.push(mountEmbed(element));
@@ -553,7 +620,15 @@
 			/* not fatal */
 		}
 
-		window.__board = { meta, mount: mountEmbed, markdown: renderMarkdown };
+		/*
+		 * What the app is allowed to ask of a mounted board.
+		 *
+		 * `mount` re-mounts an embed whose `data-embed` changed, `source` hands back the
+		 * words a rendered component was written from, and `redraw` draws it again from
+		 * words the user has just typed. `markdown` is here for a caller that has prose
+		 * and an element and no component to go with them.
+		 */
+		window.__board = { meta, mount: mountEmbed, markdown: renderMarkdown, source: sourceOf, redraw };
 		window.__boardReady = true;
 		document.body.dataset.ready = "true";
 		document.dispatchEvent(new CustomEvent("board:ready", { detail: { meta } }));

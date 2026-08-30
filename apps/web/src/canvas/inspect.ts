@@ -41,8 +41,10 @@ export interface Shape {
 	attrs: Record<string, string>;
 	/**
 	 * Whether `board.js` owns what is inside it — an embed, a `[data-md]` panel, a
-	 * diagram. Retyping such a component in place would be editing the *rendered* DOM,
-	 * whose shape has nothing to do with the file's.
+	 * diagram. Nothing in such a component can be typed *in place*, because the DOM on
+	 * screen is what was drawn and not what the file says; a markdown or Mermaid source
+	 * is edited in a textarea over it instead (`Editor.ts`), and an embed is edited by
+	 * changing what it points at.
 	 */
 	generated: boolean;
 }

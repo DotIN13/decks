@@ -46,14 +46,9 @@ export function coalesce(patches: BoardPatch[]): BoardPatch[] {
 		}
 
 		// Two retypings of the same run of text: the first never existed as far as the
-		// file is concerned. Compared by path as well as id, since a card's heading and
-		// its body are two different runs under one id.
-		if (
-			patch.op === "text" &&
-			last.op === "text" &&
-			last.id === patch.id &&
-			(last.path ?? []).join() === (patch.path ?? []).join()
-		) {
+		// file is concerned. Compared by `edit` alone, which is the whole address now — a
+		// card's heading and its body are two names, not one name and two indices.
+		if (patch.op === "text" && last.op === "text" && last.edit === patch.edit) {
 			out[out.length - 1] = patch;
 			continue;
 		}

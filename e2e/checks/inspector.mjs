@@ -6,6 +6,12 @@
  * back by an agent, so an edit that reflows a paragraph, or writes the editor's own
  * selection class into the markup, is a bug even when it looks right.
  *
+ * It also drives the two editing surfaces §6.5 describes: a named run of plain text typed
+ * in place, and a `[data-md]` panel's whole source typed in an editor over it — the shape
+ * that was not editable at all until there was a name for it, because `board.js` replaces
+ * the source with what it drew. The assertion that matters for that one is the same as for
+ * every other edit: one line of the file moved.
+ *
  * The fixture carries a drawn diagram and a bare `<svg>` where it used to carry a
  * connector. Those are the two shapes whose family the *tag* used to decide — an `<svg>`
  * was a connector by construction — so they are what proves nothing goes by the tag any
@@ -56,14 +62,27 @@ const original = `<!doctype html>
 		-->
 		<svg class="link" data-id="stale-arrow" data-from="goal" data-to="note"></svg>
 		<section class="card" data-id="goal" style="left: 48px; top: 48px; width: 380px">
-			<h3>Goal</h3>
-			<p>
+			<h3 data-edit="goal-title">Goal</h3>
+			<p data-edit="goal-body">
 				A second tab that wakes up must not spend a token the first tab already
 				spent.
 			</p>
 		</section>
-		<div class="sticky" data-id="note" style="left: 520px; top: 48px; width: 240px">Refresh races</div>
+		<div class="sticky" data-id="note" data-edit="note-text" style="left: 520px; top: 48px; width: 240px">Refresh races</div>
+		<!--
+			Markdown, whose editable is its whole source and not the headings board.js drew
+			from it. Three tabs of indentation like the rest of the file, and a genuinely
+			empty line in the middle: the editor shows this dedented and puts the indentation
+			back, so a commit that changed nothing would write the same bytes.
+		-->
+		<div class="panel" data-id="notes" data-md data-edit="notes-md" style="left: 520px; top: 140px; width: 420px; height: 170px">
+			## What lands
+
+			1. The heading above is drawn, not written.
+			2. Only this line changes.
+		</div>
 		<section class="card flow" data-id="diagram" style="left: 48px; top: 320px; width: 380px; height: 220px">
+			<!-- Deliberately unnamed: a run with no data-edit is not retypeable, and says so. -->
 			<h3>The claim</h3>
 			<svg viewBox="0 0 340 120" width="100%" height="120">
 				<rect x="1" y="8" width="96" height="34" rx="6" fill="none" stroke="#888888" />
@@ -143,7 +162,7 @@ try {
 	// --- appearance: the class, then the tone -----------------------------------------
 
 	await page.locator('.inspector button[data-box="callout"]').click();
-	const wantCallout = /<div class="callout" data-id="note" style="left: 520px; top: 48px; width: 240px">Refresh races<\/div>/;
+	const wantCallout = /<div class="callout" data-id="note" data-edit="note-text" style="left: 520px; top: 48px; width: 240px">Refresh races<\/div>/;
 	const toned = await until(fixture, wantCallout);
 	say(
 		"a sticky becomes a callout by its class alone",
@@ -158,7 +177,7 @@ try {
 	say("a callout is offered the tones it has", (await page.locator(".inspector .tones button").count()) === 4);
 
 	await page.locator('.inspector .tones button[data-tone="warn"]').click();
-	const wantTone = /<div class="callout" data-id="note" style="[^"]*" data-tone="warn">/;
+	const wantTone = /<div class="callout" data-id="note" data-edit="note-text" style="[^"]*" data-tone="warn">/;
 	const warned = await until(fixture, wantTone);
 	say(
 		"a tone is one attribute at the end of the tag",
@@ -167,7 +186,7 @@ try {
 	);
 
 	await page.locator('.inspector .tones button[data-tone="default"]').click();
-	const cleared = await until(fixture, /class="callout" data-id="note" style="[^"]*">/);
+	const cleared = await until(fixture, /class="callout" data-id="note" data-edit="note-text" style="[^"]*">/);
 	say(
 		"clearing the tone removes the attribute rather than emptying it",
 		!cleared.includes("data-tone") && cleared.includes('class="callout" data-id="note"'),
@@ -187,13 +206,17 @@ try {
 		stormed.join(" | ") || "no warnings",
 	);
 
-	// --- typing in place, addressing a child -----------------------------------------
+	// --- typing in place, addressed by the name its author wrote ----------------------
 
 	await frame().locator('[data-id="goal"] h3').dblclick();
 	await page.keyboard.type("Ship it");
 	await page.keyboard.press("Meta+Enter");
-	const retyped = await until(fixture, /<h3>Ship it<\/h3>/);
-	say("a card's heading can be retyped in place", retyped.includes("<h3>Ship it</h3>"));
+	const retyped = await until(fixture, /<h3 data-edit="goal-title">Ship it<\/h3>/);
+	say(
+		"a named run inside a card can be retyped in place",
+		retyped.includes('<h3 data-edit="goal-title">Ship it</h3>'),
+		retyped.split("\n").find((line) => line.includes("Ship it"))?.trim(),
+	);
 	say(
 		"and its paragraph is untouched, indentation and wrapping included",
 		retyped.includes("\t\t\t\tA second tab that wakes up must not spend a token the first tab already\n"),
@@ -204,9 +227,76 @@ try {
 	await page.keyboard.press("Meta+Enter");
 	const body = await until(fixture, /One session, two tabs\./);
 	say(
-		"the body is a second, separate run of text",
-		/<p>\n\t\t\t\tOne session, two tabs\.\n\t\t\t<\/p>/.test(body),
+		"the body is a second name, not a second index",
+		/<p data-edit="goal-body">\n\t\t\t\tOne session, two tabs\.\n\t\t\t<\/p>/.test(body),
 		body.split("\n").find((line) => line.includes("One session"))?.trim(),
+	);
+
+	/*
+	 * A run its author never named has no address, so there is nothing to type into — the
+	 * accepted price of an id that means the same thing in the file and on screen. "Zoo"
+	 * rather than a word that means something: a keystroke over a board with nothing
+	 * editable under it falls through to the stage's own shortcuts, and `V S C T E` arm the
+	 * palette, so the next click would insert a component instead of selecting one.
+	 */
+	const beforeUnnamed = read(fixture);
+	await frame().locator('[data-id="diagram"] h3').dblclick();
+	await page.keyboard.type("Zoo");
+	await page.keyboard.press("Meta+Enter");
+	await page.waitForTimeout(600);
+	say(
+		"a run with no data-edit is not editable, and says why",
+		read(fixture) === beforeUnnamed &&
+			(await page.locator(".notice").allTextContents()).some((text) => text.includes("data-edit")),
+		(await page.locator(".notice").allTextContents()).join(" | ") || "no notice",
+	);
+
+	// --- a markdown panel: its source, in an editor over it ---------------------------
+
+	say(
+		"a markdown panel is on screen as what board.js drew, not as its source",
+		(await frame().locator('[data-id="notes"] h2').count()) === 1 &&
+			(await frame().locator('[data-id="notes"]').textContent()).includes("What lands") &&
+			!(await frame().locator('[data-id="notes"]').textContent()).includes("## "),
+	);
+
+	// Marked before the edit, and read after it: a re-render must not be a frame reload.
+	await page.evaluate((wanted) => {
+		document.querySelector(`.board-node[data-path="${wanted}"] iframe`).contentWindow.__stillHere = 7;
+	}, path);
+
+	const beforeSource = read(fixture);
+	await frame().locator('[data-id="notes"] h2').dblclick();
+	const editor = frame().locator("textarea.decks-source");
+	await editor.waitFor({ timeout: 5000 });
+	say(
+		"double-clicking it opens the source board.js kept, dedented",
+		(await editor.inputValue()) === "## What lands\n\n1. The heading above is drawn, not written.\n2. Only this line changes.",
+		JSON.stringify(await editor.inputValue()),
+	);
+
+	await page.keyboard.press("ControlOrMeta+a");
+	await page.keyboard.type("## What lands\n\n1. The heading above is drawn, not written.\n2. Only this line is different.");
+	await page.keyboard.press("ControlOrMeta+Enter");
+	const sourced = await until(fixture, /Only this line is different/);
+	const movedLines = sourced.split("\n").filter((line, index) => line !== beforeSource.split("\n")[index]);
+	say(
+		"committing a whole markdown source moves one line of the file",
+		movedLines.length === 1 && movedLines[0] === "\t\t\t2. Only this line is different.",
+		`${movedLines.length} line(s): ${movedLines.map((line) => JSON.stringify(line)).join(" ")}`,
+	);
+	say(
+		"the panel re-renders in place, without reloading the frame",
+		(await frame().locator('[data-id="notes"] li').last().textContent()).includes("Only this line is different") &&
+			(await page.evaluate(
+				(wanted) => document.querySelector(`.board-node[data-path="${wanted}"] iframe`).contentWindow.__stillHere,
+				path,
+			)) === 7,
+		"a reload would have taken the marker on the frame's window with it",
+	);
+	say(
+		"and the editor is gone from the screen and never in the file",
+		(await frame().locator("textarea.decks-source").count()) === 0 && !sourced.includes("decks-source") && !sourced.includes("textarea"),
 	);
 
 	// --- renaming, which is now a splice of one attribute ------------------------------
@@ -240,8 +330,9 @@ try {
 		copied.split("\n").find((line) => line.includes('data-id="objective-2"'))?.trim(),
 	);
 	say(
-		"and it keeps what the component is made of",
-		copied.includes("<h3>Ship it</h3>") && copied.match(/<h3>Ship it<\/h3>/g).length === 2,
+		"and it keeps what the component is made of, with every editable inside it renamed",
+		copied.includes('<h3 data-edit="goal-title">Ship it</h3>') && copied.includes('<h3 data-edit="goal-title-2">Ship it</h3>'),
+		(copied.match(/data-edit="goal-[^"]*"/g) ?? []).join(" "),
 	);
 
 	// --- order, and a delete that leaves the screen as well as the file ----------------

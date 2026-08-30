@@ -171,15 +171,27 @@ export type BoardPatch =
 	/** `null` in `attrs` *removes* the attribute, which is how a tone goes back to the default. */
 	| { op: "update"; id: string; style?: Partial<Rect>; class?: string; attrs?: Record<string, string | null> }
 	/**
-	 * Retype a run of text. `path` addresses a descendant by the indices of the
-	 * element children walked into — `[0]` is a card's heading, `[1]` its paragraph.
+	 * Retype an editable run, addressed by the `data-edit` its author wrote on it.
 	 *
-	 * Indices rather than a selector or a name like `"heading"`: the browser computes
-	 * one from the element the user actually double-clicked, the server resolves it
-	 * against the parse tree with no selector engine, and there is no vocabulary of
-	 * part names for the two sides to disagree about.
+	 * There is no component id here on purpose. A `data-edit` is unique within a board,
+	 * so naming the component as well would be a second address that can disagree with
+	 * the first — and the server has to resolve the element anyway to say which
+	 * component the edit landed in, which is what the summary and `ids` report.
+	 *
+	 * It replaces an index `path` into the component's element children, which existed
+	 * only because nothing in a board named its editable runs. Indices were computed
+	 * from the DOM and resolved against the file, so they addressed one thing in a
+	 * hand-written component and nothing at all in a rendered one — a `[data-md]`
+	 * panel's headings exist only in what `board.js` drew. An authored id is the same
+	 * name on both sides of the wire, and a board that does not carry one simply has no
+	 * retypeable text: there is no fallback, because a fallback would be the index path
+	 * again with its refusals moved later.
+	 *
+	 * The run may be the whole of a `[data-md]` or `[data-mermaid]` component, which is
+	 * how markdown became editable: its editable unit is its source, in one editor,
+	 * rather than a rendered block that is not in the file at all.
 	 */
-	| { op: "text"; id: string; text: string; path?: number[] }
+	| { op: "text"; edit: string; text: string }
 	| { op: "remove"; id: string }
 	/**
 	 * A copy of a component, offset, with a name derived from the original's.

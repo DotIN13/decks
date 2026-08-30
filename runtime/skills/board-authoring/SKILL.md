@@ -23,17 +23,17 @@ answer comes first and fits one screen; the evidence sits beside it, not above i
 
 ```html
 <div class="text" data-id="question" style="left: 48px; top: 40px; width: 900px">
-	<h1>Why does the second tab get logged out?</h1>
+	<h1 data-edit="question-title">Why does the second tab get logged out?</h1>
 </div>
 
 <section class="card" data-id="answer" style="left: 48px; top: 152px; width: 480px">
-	<p>
+	<p data-edit="answer-body">
 		Both tabs refresh with the same token. The first spends it; the second arrives
 		~240ms later holding something already used, and the family is flagged as replayed.
 	</p>
 </section>
 
-<section class="panel" data-id="evidence" style="left: 560px; top: 152px; width: 420px" data-md>
+<section class="panel" data-id="evidence" data-md data-edit="evidence-md" style="left: 560px; top: 152px; width: 420px">
 	## Where this shows
 
 	- `auth.ts:88` — refresh has no single-flight guard
@@ -41,8 +41,9 @@ answer comes first and fits one screen; the evidence sits beside it, not above i
 </section>
 
 <div class="callout" data-id="so-what" data-tone="warn" style="left: 48px; top: 420px; width: 932px">
-	<strong>So the fix is not "retry".</strong> A retry spends another token; the loser has
-	to wait for the winner's answer instead.
+	<strong data-edit="so-what-label">So the fix is not "retry".</strong>
+	<span data-edit="so-what-body">A retry spends another token; the loser has to wait for the
+	winner's answer instead.</span>
 </div>
 ```
 
@@ -56,20 +57,27 @@ recommendation is said plainly, in a callout, not implied by ordering.
 
 ```html
 <section class="card" data-id="option-lock" style="left: 48px; top: 168px; width: 380px">
-	<h3>Server lock per family</h3>
-	<p>First claim wins; losers wait for its answer.</p>
-	<ul><li>Fixes two processes</li><li>One write, one RTT for losers</li></ul>
+	<h3 data-edit="option-lock-title">Server lock per family</h3>
+	<p data-edit="option-lock-body">First claim wins; losers wait for its answer.</p>
+	<ul>
+		<li data-edit="option-lock-1">Fixes two processes</li>
+		<li data-edit="option-lock-2">One write, one RTT for losers</li>
+	</ul>
 </section>
 
 <section class="card" data-id="option-client" style="left: 476px; top: 168px; width: 380px">
-	<h3>Client single-flight</h3>
-	<p>One promise per tab group.</p>
-	<ul><li>Free</li><li>Does not fix two tabs</li></ul>
+	<h3 data-edit="option-client-title">Client single-flight</h3>
+	<p data-edit="option-client-body">One promise per tab group.</p>
+	<ul>
+		<li data-edit="option-client-1">Free</li>
+		<li data-edit="option-client-2">Does not fix two tabs</li>
+	</ul>
 </section>
 
 <div class="callout" data-id="recommendation" style="left: 48px; top: 520px; width: 808px">
-	<strong>Take the lock.</strong> The client guard is free but solves the case that was
-	never broken.
+	<strong data-edit="recommendation-label">Take the lock.</strong>
+	<span data-edit="recommendation-body">The client guard is free but solves the case that
+	was never broken.</span>
 </div>
 ```
 
@@ -80,26 +88,27 @@ what is left. This is what the user reads instead of the chat, so it has to stan
 
 ```html
 <section class="panel" data-id="method" style="left: 48px; top: 168px; width: 420px">
-	<h4>Method</h4>
+	<h4 data-edit="method-title">Method</h4>
 	<ol>
-		<li>Reproduced with two clients and one token</li>
-		<li>Added a lock keyed by token family, 5s TTL</li>
-		<li>Re-ran the repro 200 times</li>
+		<li data-edit="method-1">Reproduced with two clients and one token</li>
+		<li data-edit="method-2">Added a lock keyed by token family, 5s TTL</li>
+		<li data-edit="method-3">Re-ran the repro 200 times</li>
 	</ol>
 </section>
 
 <section class="card" data-id="result" style="left: 512px; top: 168px; width: 420px">
-	<h4>Result</h4>
-	<p>No replay flags. Losers wait a single round trip.</p>
+	<h4 data-edit="result-title">Result</h4>
+	<p data-edit="result-body">No replay flags. Losers wait a single round trip.</p>
 </section>
 
 <div class="kpi" data-id="headline" style="left: 984px; top: 168px; width: 220px">
-	<span class="value">0</span>
-	<span class="label">replays in 200 runs</span>
+	<span class="value" data-edit="headline-value">0</span>
+	<span class="label" data-edit="headline-label">replays in 200 runs</span>
 </div>
 
 <div class="callout" data-id="left" data-tone="warn" style="left: 48px; top: 420px; width: 1160px">
-	<strong>Left to do.</strong> The TTL is a guess; it wants a number from production.
+	<strong data-edit="left-label">Left to do.</strong>
+	<span data-edit="left-body">The TTL is a guess; it wants a number from production.</span>
 </div>
 ```
 
@@ -141,8 +150,11 @@ await stage.show("boards/refresh-race.html");
   only on embeds and panels that must be a certain size. If you set a height, verify
   with a screenshot that nothing is clipped.
 - **A board is one idea.** Two ideas are two boards, side by side on the canvas.
-- **`data-id` on everything.** Stable, meaningful names — `goal`, `risk-refresh` — not
-  `box-3`. The user can rename one from their inspector, and can turn a card into a
+- **`data-id` on everything, and `data-edit` on every run of words.** Stable, meaningful
+  names — `goal`, `risk-refresh`, `goal-title` — not `box-3`. The `data-id` is what the
+  user selects and you address; the `data-edit` is what they retype, one per leaf and
+  unique within the board (see "the one obligation" below). The user can rename a component
+  from their inspector, and can turn a card into a
   panel or a callout the same way, so a name or a class you wrote may have changed since
   you wrote it. You are told when it does, in the same line that reports any other edit
   they made; if a component you expected is not there under the name you remember, read
@@ -150,7 +162,8 @@ await stage.show("boards/refresh-race.html");
 
 ## Components
 
-Every one of these takes `style="left: …; top: …; width: …"` and a `data-id`.
+Every one of these takes `style="left: …; top: …; width: …"`, a `data-id`, and a
+`data-edit` on each run of words the user should be able to retype.
 
 This is what the board comes with, not the set of things a board may contain. When the
 content wants a shape that is not here — a timeline, a diff, a scorecard, a legend — build
@@ -160,43 +173,44 @@ it, and read "Inventing a component" below for the one obligation that comes wit
 
 ```html
 <div class="text" data-id="heading" style="left: 48px; top: 40px; width: 720px">
-	<h1>One refresh, two tabs</h1>
-	<p style="color: var(--b-muted)">A subtitle, in the muted token.</p>
+	<h1 data-edit="heading-title">One refresh, two tabs</h1>
+	<p data-edit="heading-line" style="color: var(--b-muted)">A subtitle, in the muted token.</p>
 </div>
 
 <section class="card" data-id="goal" style="left: 48px; top: 168px; width: 380px">
-	<h3>Goal</h3>
-	<p>Cards are the default container: a border, a shadow, and padding.</p>
+	<h3 data-edit="goal-title">Goal</h3>
+	<p data-edit="goal-body">Cards are the default container: a border, a shadow, and padding.</p>
 </section>
 
 <section class="panel" data-id="detail" style="left: 480px; top: 168px; width: 380px">
-	<h3>Panel</h3>
-	<p>Flatter than a card — a background, no shadow. Use for supporting detail.</p>
+	<h3 data-edit="detail-title">Panel</h3>
+	<p data-edit="detail-body">Flatter than a card — a background, no shadow. Use for supporting detail.</p>
 </section>
 
-<div class="sticky" data-id="note" style="left: 900px; top: 168px; width: 220px">
+<div class="sticky" data-id="note" data-edit="note-body" style="left: 900px; top: 168px; width: 220px">
 	A sticky is for a remark, a doubt, or something the user should answer.
 </div>
 
-<span class="chip" data-id="status" style="left: 1360px; top: 52px">draft</span>
+<span class="chip" data-id="status" data-edit="status-text" style="left: 1360px; top: 52px">draft</span>
 ```
 
 ### Emphasis
 
 ```html
 <div class="callout" data-id="decision" data-tone="warn" style="left: 48px; top: 452px; width: 852px">
-	<strong>Open question.</strong> Tones: omit for accent, or "warn", "danger", "ok".
+	<strong data-edit="decision-label">Open question.</strong>
+	<span data-edit="decision-body">Tones: omit for accent, or "warn", "danger", "ok".</span>
 </div>
 
 <div class="kpi" data-id="failed" style="left: 992px; top: 452px; width: 220px">
-	<span class="value">2,455</span>
-	<span class="label">failed refreshes · worst week</span>
+	<span class="value" data-edit="failed-value">2,455</span>
+	<span class="label" data-edit="failed-label">failed refreshes · worst week</span>
 </div>
 
 <div class="table" data-id="costs" style="left: 720px; top: 140px; width: 620px">
 	<table>
 		<thead><tr><th>Fix</th><th>Cost</th></tr></thead>
-		<tbody><tr><td>Server lock</td><td>1 write</td></tr></tbody>
+		<tbody><tr><td data-edit="costs-fix-1">Server lock</td><td data-edit="costs-cost-1">1 write</td></tr></tbody>
 	</table>
 </div>
 ```
@@ -232,7 +246,7 @@ box it is in instead of breaking when the box changes.
 </style>
 
 <section class="card claim" data-id="claim" style="left: 1140px; top: 604px; width: 412px; height: 232px">
-	<h3>One claim, two tabs</h3>
+	<h3 data-edit="claim-title">One claim, two tabs</h3>
 	<svg viewBox="0 0 380 160" width="100%" height="160" role="img" aria-label="Both tabs ask; the lock admits one; the loser retries with its answer.">
 		<defs>
 			<marker id="claim-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
@@ -287,7 +301,7 @@ and draw it yourself when the positions mean something.
 ### Markdown, maths, mermaid
 
 ```html
-<div class="panel" data-id="sequence" style="left: 48px; top: 604px; width: 620px" data-md>
+<div class="panel" data-id="sequence" data-md data-edit="sequence-md" style="left: 48px; top: 604px; width: 620px">
 	## The sequence
 
 	1. Both tabs see a 401.
@@ -296,7 +310,7 @@ and draw it yourself when the positions mean something.
 	Cost per refresh stays $O(1)$ — inline maths in `$…$`, display in `$$…$$`.
 </div>
 
-<div class="panel" data-id="flow" style="left: 48px; top: 140px; width: 620px; height: 420px" data-mermaid>
+<div class="panel" data-id="flow" data-mermaid data-edit="flow-src" style="left: 48px; top: 140px; width: 620px; height: 420px">
 	flowchart TD
 		A["tab A: 401"] --> L{"lock free?"}
 		L -- yes --> R["refresh"]
@@ -305,6 +319,11 @@ and draw it yourself when the positions mean something.
 
 Indent the content to match the surrounding HTML — the common indent is stripped
 before parsing. A `[data-mermaid]` box needs a height; the diagram scales to fit it.
+
+The `data-edit` is what makes one of these editable, and it goes on the component because
+the whole source is the unit: a double-click opens the source in an editor over the panel,
+and a commit re-renders that one component. One name, not one per block — see "the one
+obligation" below.
 
 ### Embeds — the user's real files
 
@@ -367,33 +386,60 @@ invent is as editable as you make it, and the rules are mechanical:
   the class switch and the tone; without one it can only offer the name and the order. A
   swap replaces just the box class and leaves your token alone, so key your CSS on `.phases`
   and never on `.card .phases` — the card may be a panel by the time anyone reads it.
-- **One editable string per leaf element.** A run of text is retypeable in place only if
-  its element has no element children: `<h3>Goal</h3>` yes, `<p>See <a>the doc</a></p>` no
-  (the paragraph is refused, though the link's own text is a leaf and is fine). Three
-  labelled numbers want three spans, not one span with three numbers in it.
+- **`data-edit` on every run of words that should be retypeable, and a name nothing else
+  on the board has.** That name is the whole address: the user double-clicks the words,
+  the app sends `data-edit="goal-title"` and the new text, and the server splices that
+  element's byte range in the file. A run with no `data-edit` cannot be retyped, and there
+  is no fallback — a board written without them has no retypeable text at all, which is
+  the price of an address that means the same thing in the file and on screen. Name them
+  after the component they belong to (`goal-title`, `goal-body`, `rollout-when-1`): the
+  file reads better, and a duplicate of the component gets `goal-title-2` so the copy and
+  the original stay separately editable.
+- **A run is a leaf.** `<h3 data-edit="goal-title">Goal</h3>` yes;
+  `<p data-edit="x">See <a>the doc</a></p>` no — replacing that with plain text would
+  throw the link away, so it is refused with a reason. Mark the words themselves: three
+  labelled numbers are three marked spans, not one marked row containing them. A bare text
+  node cannot be marked at all, which is why a callout's sentence wants a `<span>` around
+  it if the user is to retype it.
+- **A `[data-md]` or `[data-mermaid]` component's editable is its whole source, named once
+  on the component itself.** `board.js` keeps the words it drew the panel from and hands
+  them back, so a double-click opens the *source* in a monospace editor over the panel and
+  a commit re-renders just that component. Do not mark the blocks inside one: a rendered
+  `<h2>` came from `## …` and has no byte range of its own in the file. Two things this
+  costs — a source with raw HTML in it (`<br />`) is refused, because the browser only ever
+  had the element's text with the tags already dropped; and the editor shows the source
+  dedented, so keep the block's indentation regular and it comes back exactly as it was.
 - **Keep the words in the file.** A patch splices the board's source, so text that lives in
   an attribute, in a CSS `content:`, or in a string your `<script>` writes at runtime has
   nowhere for an edit to land. Static markup wherever it can be static.
-- **`data-md`, `data-mermaid` and `data-embed` are not retypeable, by design.**
-  `board.js` replaces what is inside them, so the file's shape is not the shape on screen
-  and an edit is refused with a reason. Reach for markdown when the content really is
-  prose you own; do not wrap a component in `data-md` for the convenience of writing it.
+- **`data-embed` is not retypeable, by design.** What it shows is somebody else's file, so
+  what there is to edit is the path — which the user's inspector offers. Reach for
+  `data-md` when the prose is yours; do not wrap a component in it for the convenience of
+  writing the content.
 - **A top-level `<svg>` is a component the editor cannot measure.** Every gesture in it
   reads `offsetLeft`/`offsetWidth`, which an `SVGElement` does not have, so such a
   component can be selected, renamed, copied and deleted but not dragged, resized or
   retyped. Put the drawing inside a box, as the diagram section does, and all of it works.
+  A `<text>` inside a drawing is never retypeable wherever the drawing sits —
+  `contentEditable` is `HTMLElement`'s — so the words in a diagram stay yours to change.
 
 A component that follows those rules, and is worth the two lines of CSS above:
 
 ```html
 <section class="card phases" data-id="rollout" style="left: 48px; top: 168px; width: 420px">
-	<h3>Rollout</h3>
-	<div class="phase"><span class="when">week 1</span><span>Lock behind a flag</span></div>
-	<div class="phase"><span class="when">week 2</span><span>Ramp to 10%</span></div>
+	<h3 data-edit="rollout-title">Rollout</h3>
+	<div class="phase">
+		<span class="when" data-edit="rollout-when-1">week 1</span>
+		<span data-edit="rollout-what-1">Lock behind a flag</span>
+	</div>
+	<div class="phase">
+		<span class="when" data-edit="rollout-when-2">week 2</span>
+		<span data-edit="rollout-what-2">Ramp to 10%</span>
+	</div>
 </section>
 ```
 
-Every string in it is its own leaf, so the user can retype any of the four; it is a `card`,
+Every run in it is a named leaf, so the user can retype any of the five; it is a `card`,
 so they can make it a panel or a callout; and it has a name, so you can find it again.
 
 ## Tokens
@@ -445,7 +491,9 @@ forty points and a bad one for four boxes — draw those.
 - Are positions on the 8px grid, with two or three x values reused rather than a new one
   per component?
 - Are colours tokens, not hexes?
-- If you invented a component: is every string in it its own leaf element, does it carry a
+- Does every run of words carry a `data-edit` nothing else on the board has — including
+  the source of every `[data-md]` and `[data-mermaid]` panel?
+- If you invented a component: is every marked run a leaf element, does it carry a
   box class beside your own, and is its CSS in the board rather than in `lib/`?
 - If you drew a diagram: is it inside a box component rather than a bare `<svg>`, are its
   coordinates on a grid you chose, and does its `aria-label` say what it says?

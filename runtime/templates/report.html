@@ -8,32 +8,32 @@
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 900px">
-			<h1>{{TITLE}}</h1>
-			<p style="color: var(--b-muted)">What was done, and what it means.</p>
+			<h1 data-edit="heading-title">{{TITLE}}</h1>
+			<p data-edit="heading-line" style="color: var(--b-muted)">What was done, and what it means.</p>
 		</div>
 
 		<!-- Method: how, briefly. Not a log. -->
 		<section class="panel" data-id="method" style="left: 48px; top: 168px; width: 420px">
-			<h4>Method</h4>
+			<h4 data-edit="method-title">Method</h4>
 			<ol>
-				<li>…</li>
+				<li data-edit="method-1">…</li>
 			</ol>
 		</section>
 
 		<!-- Result: what changed, and the numbers if there are any. -->
 		<section class="card" data-id="result" style="left: 512px; top: 168px; width: 420px">
-			<h4>Result</h4>
-			<p>…</p>
+			<h4 data-edit="result-title">Result</h4>
+			<p data-edit="result-body">…</p>
 		</section>
 
 		<div class="kpi" data-id="headline" style="left: 984px; top: 168px; width: 220px">
-			<span class="value">—</span>
-			<span class="label">the number that matters</span>
+			<span class="value" data-edit="headline-value">—</span>
+			<span class="label" data-edit="headline-label">the number that matters</span>
 		</div>
 
 		<!-- What is left, if anything. Say "nothing" rather than deleting it. -->
 		<div class="callout" data-id="left" data-tone="warn" style="left: 48px; top: 520px; width: 884px">
-			<strong>Left to do.</strong> …
+			<strong data-edit="left-label">Left to do.</strong> <span data-edit="left-body">…</span>
 		</div>
 
 		<script src="../lib/board.js"></script>
