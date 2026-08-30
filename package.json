@@ -17,8 +17,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "vendor": "node scripts/vendor.mjs",
-    "dev:example": "npm run sync:lib && DECKS_DATA_DIR=\"$PWD/example\" npm run dev --workspace @decks/server",
-    "sync:lib": "node -e \"const{cpSync,rmSync}=require('node:fs');rmSync('example/decks/lib',{recursive:true,force:true});cpSync('runtime/lib','example/decks/lib',{recursive:true});console.log('[sync] runtime/lib -> example/decks/lib')\"",
+    "dev:example": "DECKS_DATA_DIR=\"$PWD/example\" npm run dev --workspace @decks/server",
     "test:e2e": "node e2e/run.mjs"
   },
   "devDependencies": {
