@@ -1,122 +1,32 @@
 ---
 name: board-authoring
-description: How to say something on a board — the three shapes that carry an answer, a design and a finished piece of work — plus the components that come with the board (cards, stickies, callouts, KPIs, tables, connectors, markdown, maths, diagrams, embeds), how to invent one the board does not have, and the layout rules that keep a board readable. Read before answering on a board or building one with anything beyond cards and text.
+description: How to write a board — the document and its metadata, positioning on the canvas, the built-in component classes (card, panel, sticky, callout, kpi, table, chip, connectors), markdown, maths, Mermaid, embeds, custom components of your own, and `data-edit` for declaring which text the user may retype. Read before answering on a board or building one with anything beyond cards and text.
 ---
 
-# Writing a board
+# Board authoring
 
-A board is a fixed-size canvas of absolutely-positioned components. It does not
-scroll, reflow, or adapt: you choose where everything goes, the way you would in a
-design tool. That is the trade — you do the layout, and in exchange the user can
-drag your boxes around and the result is a file you can both edit.
+A board is a fixed-size HTML canvas made of absolutely positioned components. It does
+not scroll or reflow, so the author is responsible for placement and sizing.
 
-## The three shapes
+Use boards for answers, designs, reports, diagrams, or other visual work where the user
+should be able to inspect and rearrange the result.
 
-Boards are how you talk here, so most boards you write are one of three things. Start each
-with `stage.newBoard({ title, kind })` — that writes the document, and you write the
-content.
+## Create the board
 
-### An answer
-
-The question is the heading, so the board says what it is from across the canvas. The
-answer comes first and fits one screen; the evidence sits beside it, not above it.
-
-```html
-<div class="text" data-id="question" style="left: 48px; top: 40px; width: 900px">
-	<h1>Why does the second tab get logged out?</h1>
-</div>
-
-<section class="card" data-id="answer" style="left: 48px; top: 152px; width: 480px">
-	<p>
-		Both tabs refresh with the same token. The first spends it; the second arrives
-		~240ms later holding something already used, and the family is flagged as replayed.
-	</p>
-</section>
-
-<section class="panel" data-id="evidence" style="left: 560px; top: 152px; width: 420px" data-md>
-	## Where this shows
-
-	- `auth.ts:88` — refresh has no single-flight guard
-	- 2,455 failures in the worst week, 517 users
-</section>
-
-<div class="callout" data-id="so-what" data-tone="warn" style="left: 48px; top: 420px; width: 932px">
-	<strong>So the fix is not "retry".</strong> A retry spends another token; the loser has
-	to wait for the winner's answer instead.
-</div>
-```
-
-If a later question is about the same thing, **add a section to this board** rather than
-starting a third one — newest at the top, and move the older sections down.
-
-### A design
-
-Options as columns of the same width and top, so they can be compared by eye. The
-recommendation is said plainly, in a callout, not implied by ordering.
-
-```html
-<section class="card" data-id="option-lock" style="left: 48px; top: 168px; width: 380px">
-	<h3>Server lock per family</h3>
-	<p>First claim wins; losers wait for its answer.</p>
-	<ul><li>Fixes two processes</li><li>One write, one RTT for losers</li></ul>
-</section>
-
-<section class="card" data-id="option-client" style="left: 476px; top: 168px; width: 380px">
-	<h3>Client single-flight</h3>
-	<p>One promise per tab group.</p>
-	<ul><li>Free</li><li>Does not fix two tabs</li></ul>
-</section>
-
-<div class="callout" data-id="recommendation" style="left: 48px; top: 520px; width: 808px">
-	<strong>Take the lock.</strong> The client guard is free but solves the case that was
-	never broken.
-</div>
-```
-
-### A report, when the work is done
-
-Not a log — a presentation. Method briefly, the result with the number that matters, and
-what is left. This is what the user reads instead of the chat, so it has to stand alone.
-
-```html
-<section class="panel" data-id="method" style="left: 48px; top: 168px; width: 420px">
-	<h4>Method</h4>
-	<ol>
-		<li>Reproduced with two clients and one token</li>
-		<li>Added a lock keyed by token family, 5s TTL</li>
-		<li>Re-ran the repro 200 times</li>
-	</ol>
-</section>
-
-<section class="card" data-id="result" style="left: 512px; top: 168px; width: 420px">
-	<h4>Result</h4>
-	<p>No replay flags. Losers wait a single round trip.</p>
-</section>
-
-<div class="kpi" data-id="headline" style="left: 984px; top: 168px; width: 220px">
-	<span class="value">0</span>
-	<span class="label">replays in 200 runs</span>
-</div>
-
-<div class="callout" data-id="left" data-tone="warn" style="left: 48px; top: 420px; width: 1160px">
-	<strong>Left to do.</strong> The TTL is a guess; it wants a number from production.
-</div>
-```
-
-Show what you have made when it is worth looking at:
+Start with:
 
 ```ts
-await stage.show("boards/refresh-race.html");
+stage.newBoard({ title, kind })
 ```
 
-## The document
+A board document should include:
 
 ```html
 <!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Auth refresh — the plan</title>
+		<title>Board title</title>
 		<meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 	</head>
@@ -127,247 +37,277 @@ await stage.show("boards/refresh-race.html");
 </html>
 ```
 
-`<meta name="board">` takes `w`, `h`, `bg` (`"grid"`, `"dots"`, or omit for plain) and
-`theme` (`"light"` / `"dark"` — omit it, and the board follows the app).
-`<meta name="poster" content="assets/x.png">` is optional; see the board-debug skill.
+The board metadata supports:
 
-## Layout rules
+- `w` and `h` for canvas dimensions
+- `bg`: `"grid"`, `"dots"`, or omitted
+- `theme`: `"light"` or `"dark"` when a fixed theme is required
 
-- **8px grid.** Positions and sizes in multiples of 8. Gutters of 24–48px between
-  components, 48px margins at the board edge.
-- **Columns, not scatter.** Pick two or three x positions and reuse them. A board
-  where every box starts at a different x reads as noise.
-- **Size to content, then check.** Height is usually best left to the content; set it
-  only on embeds and panels that must be a certain size. If you set a height, verify
-  with a screenshot that nothing is clipped.
-- **A board is one idea.** Two ideas are two boards, side by side on the canvas.
-- **`data-id` on everything.** Stable, meaningful names — `goal`, `risk-refresh` — not
-  `box-3`. The user can rename one from their inspector, and can turn a card into a
-  panel or a callout the same way, so a name or a class you wrote may have changed since
-  you wrote it. You are told when it does, in the same line that reports any other edit
-  they made; if a component you expected is not there under the name you remember, read
-  the board rather than writing it again.
-
-## Components
-
-Every one of these takes `style="left: …; top: …; width: …"` and a `data-id`.
-
-This is what the board comes with, not the set of things a board may contain. When the
-content wants a shape that is not here — a timeline, a diff, a scorecard, a legend — build
-it, and read "Inventing a component" below for the one obligation that comes with it.
-
-### Text and structure
+An optional poster can be declared with:
 
 ```html
-<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 720px">
-	<h1>One refresh, two tabs</h1>
-	<p style="color: var(--b-muted)">A subtitle, in the muted token.</p>
-</div>
-
-<section class="card" data-id="goal" style="left: 48px; top: 168px; width: 380px">
-	<h3>Goal</h3>
-	<p>Cards are the default container: a border, a shadow, and padding.</p>
-</section>
-
-<section class="panel" data-id="detail" style="left: 480px; top: 168px; width: 380px">
-	<h3>Panel</h3>
-	<p>Flatter than a card — a background, no shadow. Use for supporting detail.</p>
-</section>
-
-<div class="sticky" data-id="note" style="left: 900px; top: 168px; width: 220px">
-	A sticky is for a remark, a doubt, or something the user should answer.
-</div>
-
-<span class="chip" data-id="status" style="left: 1360px; top: 52px">draft</span>
+<meta name="poster" content="assets/poster.png">
 ```
 
-### Emphasis
+Show a completed board when useful with:
+
+```ts
+await stage.show("boards/example.html")
+```
+
+## Positioning
+
+Board components are positioned with inline styles:
 
 ```html
-<div class="callout" data-id="decision" data-tone="warn" style="left: 48px; top: 452px; width: 852px">
-	<strong>Open question.</strong> Tones: omit for accent, or "warn", "danger", "ok".
-</div>
-
-<div class="kpi" data-id="failed" style="left: 992px; top: 452px; width: 220px">
-	<span class="value">2,455</span>
-	<span class="label">failed refreshes · worst week</span>
-</div>
-
-<div class="table" data-id="costs" style="left: 720px; top: 140px; width: 620px">
-	<table>
-		<thead><tr><th>Fix</th><th>Cost</th></tr></thead>
-		<tbody><tr><td>Server lock</td><td>1 write</td></tr></tbody>
-	</table>
-</div>
+style="left: 48px; top: 144px; width: 400px"
 ```
 
-### Connectors
+Use an 8px positioning grid where practical.
 
-An `svg.link` draws an arrow between two components by id, routed automatically from
-the nearest facing sides and redrawn whenever the layout moves.
+Keep reasonable margins and gutters, and reuse a small number of column positions rather
+than scattering components arbitrarily.
+
+Prefer sizing from content. Set explicit heights only where needed, particularly for
+embeds, diagrams, charts, or constrained panels.
+
+Increase the board dimensions if content would otherwise clip.
+
+## Component metadata
+
+Every user-editable board component must:
+
+- be a direct child of `<body>`
+- have a meaningful, stable `data-id`
+- have its own position and width
+
+For example:
+
+```html
+<section class="card" data-id="project-goal" style="left: 48px; top: 144px; width: 400px">
+	...
+</section>
+```
+
+Use semantic IDs such as `goal`, `recommendation`, `timeline`, or `risk-auth`, not
+positional names such as `box-3`.
+
+The user may rename, restyle, move, duplicate, or delete components. Do not assume a
+component still has the class or ID you originally gave it if the board has since been
+edited. You are told when they change one, in the same line that reports any other edit
+they made; read the board rather than writing it again from memory.
+
+## Built-in component classes
+
+The board stylesheet provides common visual containers including:
+
+- `text`
+- `card`
+- `panel`
+- `sticky`
+- `callout`
+- `kpi`
+- `table`
+- `chip`
+
+Use these when useful, but they are not a schema or a limit on what may appear on a
+board.
+
+Callouts can use:
+
+```html
+data-tone="warn"
+data-tone="danger"
+data-tone="ok"
+```
+
+Omitting the tone uses the default accent treatment.
+
+## Connectors
+
+An `svg.link` draws an arrow between two components by id, routed from the nearest facing
+sides and redrawn whenever either end moves:
 
 ```html
 <svg class="link" data-id="goal-approach" data-from="goal" data-to="approach" data-label="how"></svg>
-<svg class="link" data-id="a-b" data-from="a" data-to="b" data-tone="accent"></svg>
 ```
 
-No `style` needed — a connector covers the whole board and takes no clicks.
+No `style` is needed — a connector covers the whole board and takes clicks only on its
+own line. `data-tone="accent"` is available.
 
-### Markdown, maths, diagrams
+## Markdown and maths
+
+A component with `data-md` is rendered as markdown:
 
 ```html
-<div class="panel" data-id="sequence" style="left: 48px; top: 604px; width: 620px" data-md>
-	## The sequence
-
-	1. Both tabs see a 401.
-	2. The lock admits one.
-
-	Cost per refresh stays $O(1)$ — inline maths in `$…$`, display in `$$…$$`.
-</div>
-
-<div class="panel" data-id="flow" style="left: 48px; top: 140px; width: 620px; height: 420px" data-mermaid>
-	flowchart TD
-		A["tab A: 401"] --> L{"lock free?"}
-		L -- yes --> R["refresh"]
+<div class="panel" data-id="notes" style="left: 48px; top: 144px; width: 520px" data-md>
+	Markdown content here.
 </div>
 ```
 
-Indent the content to match the surrounding HTML — the common indent is stripped
-before parsing. A `[data-mermaid]` box needs a height; the diagram scales to fit it.
+Markdown supports inline and display maths using `$…$` and `$$…$$`.
 
-### Embeds — the user's real files
+Indent the content to match the surrounding HTML; the common indent is stripped before
+parsing.
 
-```html
-<div class="embed" data-id="notes" data-embed="../docs/notes.md"
-     style="left: 48px; top: 140px; width: 520px; height: 560px"></div>
+Use markdown for content that benefits from markdown rendering rather than merely as a
+shortcut for ordinary editable text.
 
-<div class="embed" data-id="paper" data-embed="../papers/oauth.pdf" data-pages="1-2"
-     style="left: 608px; top: 140px; width: 460px; height: 680px"></div>
+## Mermaid diagrams
 
-<div class="embed" data-id="report" data-embed="../../shared/report.html"
-     style="left: 1108px; top: 140px; width: 440px; height: 420px"></div>
-
-<div class="embed" data-id="fig" data-embed="../assets/sketch.svg"
-     style="left: 1108px; top: 600px; width: 440px; height: 260px"></div>
-```
-
-- Paths are relative **to the board**, as in an `<img src>`.
-- `.md` renders as markdown, `.pdf` through pdf.js (`data-pages="3-5"` or `"1,4-6"`),
-  `.html` in a sandboxed frame, images as images, and `.txt`/`.csv`/`.json`/`.py`/`.ts`
-  and friends as escaped preformatted text, truncated at 256 KB. Anything else becomes a
-  chip naming the file, its size and its kind, which opens or downloads it.
-- Files the user drags onto a board are copied into `assets/` and embedded from there, so
-  a `data-embed="../assets/…"` you did not write is probably one of theirs.
-- Outside the deck, the file must sit under a root declared in `deck.json`.
-- Embeds want an explicit `height`: they have no content of their own to size to.
-
-## Inventing a component
-
-Nothing stops you. A board is an HTML file you write with your ordinary tools; no schema
-validates it, and `board.js` only ever looks at four things — `svg.link`, `[data-md]`,
-`[data-mermaid]` and `[data-embed]`. Every other element in the body it leaves exactly as
-you wrote it. So a shape the catalogue does not have is a shape you can build, and you
-should, rather than forcing a timeline into three stickies.
-
-**Your CSS goes in the board**, in a `<style>` in its own `<head>`:
+Use `data-mermaid` for Mermaid diagrams:
 
 ```html
-<style>
-	.phase { display: grid; grid-template-columns: 88px 1fr; gap: var(--b-unit); }
-	.phase > .when { color: var(--b-faint); font-family: var(--b-mono); }
-</style>
+<div class="panel"
+     data-id="flow"
+     style="left: 48px; top: 144px; width: 600px; height: 400px"
+     data-mermaid>
+	...
+</div>
 ```
 
-Never in `lib/board.css`. That directory belongs to the application and is rewritten from
-the running build every time the deck is opened, so an edit there is reverted without
-warning — and it would change every board in the deck, not the one you are writing.
+Give Mermaid components an explicit height so the diagram has a known rendering area.
 
-### The one obligation: leave it editable
+## Embeds
 
-The user edits boards by hand, and they can only edit what they can reach. A component you
-invent is as editable as you make it, and the rules are mechanical:
+Use `data-embed` to place files on a board:
 
-- **`data-id` on the outer element, and make that element a direct child of `<body>`.**
-  That alone earns selecting, dragging, resizing, renaming, duplicating, deleting and
-  reordering. A `data-id` nested inside another component is not a component — the card
-  around it is.
-- **Keep a box class beside your own**: `class="card phases"`, not `class="phases"`. With
-  one of `text` `sticky` `card` `panel` `callout` present, the user's inspector also offers
-  the class switch and the tone; without one it can only offer the name and the order. A
-  swap replaces just the box class and leaves your token alone, so key your CSS on `.phases`
-  and never on `.card .phases` — the card may be a panel by the time anyone reads it.
-- **One editable string per leaf element.** A run of text is retypeable in place only if
-  its element has no element children: `<h3>Goal</h3>` yes, `<p>See <a>the doc</a></p>` no
-  (the paragraph is refused, though the link's own text is a leaf and is fine). Three
-  labelled numbers want three spans, not one span with three numbers in it.
-- **Keep the words in the file.** A patch splices the board's source, so text that lives in
-  an attribute, in a CSS `content:`, or in a string your `<script>` writes at runtime has
-  nowhere for an edit to land. Static markup wherever it can be static.
-- **`data-md`, `data-mermaid`, `data-embed` and `<svg>` are not editable, by design.**
-  `board.js` replaces what is inside them, so the file's shape is not the shape on screen
-  and retyping is refused with a reason. Reach for markdown when the content really is
-  prose you own; do not wrap a component in `data-md` for the convenience of writing it.
+```html
+<div class="embed"
+     data-id="reference"
+     data-embed="../docs/reference.md"
+     style="left: 48px; top: 144px; width: 520px; height: 560px"></div>
+```
 
-A component that follows those rules, and is worth the two lines of CSS above:
+Embed paths are relative to the board file.
+
+Supported content includes documents, PDFs, HTML, images, source files, JSON, CSV, and
+other text-like formats. PDFs may specify page ranges with `data-pages`. Anything
+unrecognised becomes a chip naming the file, its size and its kind.
+
+Embeds should normally have an explicit height.
+
+Files must live under a root permitted by the deck configuration. A
+`data-embed="../assets/…"` you did not write is probably a file the user dragged onto the
+board.
+
+## Custom components
+
+Boards are ordinary HTML, so custom components may be created whenever the built-in
+classes are insufficient.
+
+Put board-specific CSS in a `<style>` block inside the board document. Never modify
+`lib/board.css` — it belongs to the application and is rewritten from the running build
+whenever the deck is opened, so an edit there is reverted without warning.
+
+To keep a custom component editable:
+
+- make its outer element a direct child of `<body>`
+- give that outer element a `data-id`
+- keep user-editable wording in static HTML
+- place each independently editable string in its own leaf element
+
+For example, prefer separate `<span>` elements for separate labels or values rather than
+combining unrelated editable strings into one complex element.
+
+Do not place editable text in CSS `content`, generated JavaScript strings, or attributes
+when it can live in normal markup.
+
+Custom CSS should target the custom class itself rather than depend on the current box
+class, because the user may change a card into a panel or callout. Keep a box class
+alongside your own — `class="card phases"` — so the component keeps the class switch and
+the tone the inspector offers.
 
 ```html
 <section class="card phases" data-id="rollout" style="left: 48px; top: 168px; width: 420px">
-	<h3>Rollout</h3>
-	<div class="phase"><span class="when">week 1</span><span>Lock behind a flag</span></div>
-	<div class="phase"><span class="when">week 2</span><span>Ramp to 10%</span></div>
+	<h3 data-edit>Rollout</h3>
+	<div class="phase"><span class="when" data-edit>week 1</span><span data-edit>Lock behind a flag</span></div>
+	<div class="phase"><span class="when" data-edit>week 2</span><span data-edit>Ramp to 10%</span></div>
 </section>
 ```
 
-Every string in it is its own leaf, so the user can retype any of the four; it is a `card`,
-so they can make it a panel or a callout; and it has a name, so you can find it again.
+## `data-edit` — declaring what the user may retype
 
-## Tokens
+Editability is otherwise inferred: a leaf element whose text is in the file can be
+retyped in place. That inference cannot tell an editable label from a computed number, so
+say which is which.
 
-Use the variables, never raw colours, so a board works in light and dark:
+```html
+<span data-edit>Ramp to 10%</span>              <!-- yours to retype -->
+<span data-edit="false">2,455</span>            <!-- computed; leave it alone -->
+```
+
+**`data-edit`** marks a string as an intended field. It is a declaration, not a
+mechanism: it does not make anything editable that was not already, and it does not
+override either rule below. What it buys is the affordance — the app underlines a
+declared field under the cursor, so the user can see where to type instead of
+double-clicking around to find out.
+
+**`data-edit="false"`** seals an element and everything inside it. Use it for a value a
+script computes, a label that has to stay in step with a chart's axis, a legend, or any
+line the board rewrites on mount — all of which look exactly like editable text to the
+leaf rule. Both the app and the server refuse a retype there, so the seal holds however
+the edit arrives.
+
+Put `data-edit` on the leaf that holds the string, not on the container: a seal inherits
+down the tree, but a declaration describes one field.
+
+Two rules `data-edit` cannot lift, because they are properties of how an edit is applied
+rather than policy:
+
+- **A run must be a leaf.** An element with element children inside it — `<p>See <a
+  href="…">the doc</a></p>` — cannot be retyped as plain text, because that would throw
+  the markup away. The link's own text is a leaf and is editable; the paragraph is not.
+- **`[data-md]`, `[data-mermaid]`, `[data-embed]` and `<svg>` hold rendered content.**
+  What is on screen is not the shape the file has, so no path into one resolves. Use them
+  when rendered or external content matters more than inline editing.
+
+## Libraries and scripts
+
+Board-specific JavaScript may be added when necessary.
+
+D3 is available locally and can be loaded with:
+
+```html
+<script src="../lib/d3.min.js"></script>
+```
+
+For scripts that depend on the board layout being ready, initialize them after:
+
+```js
+document.addEventListener("board:ready", () => {
+	// render or initialize
+})
+```
+
+Only load extra libraries on boards that need them. Text a script writes is not in the
+file and cannot be retyped, so seal it with `data-edit="false"` rather than leaving the
+user a field whose edit the next mount discards.
+
+## Theme tokens
+
+Use board CSS variables instead of hard-coded colors so components work across themes.
+
+Available tokens include:
 
 `--b-bg`, `--b-bg-deep`, `--b-bg-layer`, `--b-fg`, `--b-muted`, `--b-faint`,
 `--b-border`, `--b-border-strong`, `--b-accent`, `--b-accent-soft`, `--b-sticky`,
-`--b-ok`, `--b-warn`, `--b-danger`, `--b-radius`, `--b-unit` (8px), `--b-font`,
-`--b-mono`.
+`--b-ok`, `--b-warn`, `--b-danger`, `--b-radius`, `--b-unit`, `--b-font`, and `--b-mono`.
 
-```html
-<p style="color: var(--b-muted)">Secondary text.</p>
-```
+Scripts and charts should read these tokens from computed styles rather than duplicating
+color values.
 
-## d3, when a chart is the point
+## Before finishing
 
-`d3` is vendored beside the board. Load it only on a board that uses it:
+Check that:
 
-```html
-<div class="card" data-id="chart" style="left: 48px; top: 140px; width: 600px; height: 360px">
-	<svg id="plot" width="568" height="300"></svg>
-</div>
-<script src="../lib/d3.min.js"></script>
-<script>
-	// Runs after board.js has laid the board out.
-	document.addEventListener("board:ready", () => {
-		const data = [1, 3, 2, 5, 4];
-		d3.select("#plot").selectAll("rect").data(data).join("rect")
-			.attr("x", (d, i) => i * 110).attr("y", (d) => 300 - d * 55)
-			.attr("width", 90).attr("height", (d) => d * 55)
-			.attr("fill", getComputedStyle(document.body).getPropertyValue("--b-accent"));
-	});
-</script>
-```
-
-Read the palette from the tokens rather than hard-coding hexes, and the chart follows
-the theme like everything else.
-
-## Checklist before you say a board is done
-
-- Does every component have a meaningful `data-id`?
-- Is the board big enough that nothing clips? (Screenshot it — board-debug skill.)
-- Are positions on the 8px grid, with two or three x values reused rather than a new one
-  per component?
-- Are colours tokens, not hexes?
-- If you invented a component: is every string in it its own leaf element, does it carry a
-  box class beside your own, and is its CSS in the board rather than in `lib/`?
-- Does it say one thing?
-- **Could the user understand this without reading the chat?** That is the test that
-  matters. If the board needs a sentence you only said in the column, the sentence belongs
-  on the board.
+- every component has a meaningful `data-id`
+- components fit within the canvas without clipping
+- positioning is reasonably aligned and spaced
+- custom components remain editable
+- editable strings are marked `data-edit`, and computed or script-written ones
+  `data-edit="false"`
+- board-specific CSS stays inside the board
+- colors use board tokens
+- embeds and diagrams have sufficient dimensions
+- the board contains enough context to be understood on its own

@@ -43,9 +43,10 @@ write(
 	</head>
 	<body class="board">
 		<section class="card phases" data-id="rollout" style="left: 48px; top: 48px; width: 420px">
-			<h3>Rollout</h3>
-			<div class="phase"><span class="when">week 1</span><span>Lock behind a flag</span></div>
-			<div class="phase"><span class="when">week 2</span><span>Ramp to 10%</span></div>
+			<h3 data-edit>Rollout</h3>
+			<div class="phase"><span class="when" data-edit>week 1</span><span data-edit>Lock behind a flag</span></div>
+			<div class="phase"><span class="when" data-edit>week 2</span><span data-edit>Ramp to 10%</span></div>
+			<span class="computed" data-edit="false">2,455 so far</span>
 		</section>
 		<script src="../lib/board.js"></script>
 	</body>
@@ -120,13 +121,44 @@ try {
 	const retyped = await until(fixture, /week 3/);
 	say(
 		"a leaf span deep inside an invented component retypes in place",
-		/<span class="when">week 3<\/span><span>Lock behind a flag<\/span>/.test(retyped),
+		/<span class="when" data-edit>week 3<\/span><span data-edit>Lock behind a flag<\/span>/.test(retyped),
 		retyped.split("\n").find((line) => line.includes("week 3"))?.trim(),
 	);
 	say(
 		"and the retype touched one line and nothing else",
 		retyped.split("\n").filter((line, index) => line !== swapped.split("\n")[index]).length === 1,
 	);
+
+	// --- data-edit: the declaration, and the seal -------------------------------------
+
+	say(
+		"a declared field is underlined under the cursor, so you can see where to type",
+		await frame()
+			.locator("[data-id='rollout'] h3")
+			.evaluate((el) => {
+				// :hover cannot be forced from script, so ask the rule itself.
+				const sheet = [...el.ownerDocument.styleSheets].find((s) =>
+					[...(s.cssRules ?? [])].some((r) => r.selectorText?.includes("data-edit")),
+				);
+				const rule = [...sheet.cssRules].find((r) => r.selectorText?.includes("data-edit"));
+				return rule.selectorText.includes(":hover") && rule.style.textDecoration.includes("underline");
+			}),
+	);
+
+	const before = read(fixture);
+	const sealed = await frame().locator("[data-id='rollout'] .computed").boundingBox();
+	await page.mouse.dblclick(sealed.x + sealed.width / 2, sealed.y + sealed.height / 2);
+	await page.waitForTimeout(400);
+	say(
+		'data-edit="false" is not typed into, and says why rather than failing silently',
+		await frame()
+			.locator("[data-id='rollout'] .computed")
+			.evaluate((el) => el.isContentEditable === false),
+	);
+	const notices = await page.locator(".notice").allTextContents();
+	say("the refusal reaches the user", notices.some((text) => /in step with/.test(text)), notices.join(" | "));
+	await page.waitForTimeout(600);
+	say("and the file is untouched by the attempt", read(fixture) === before);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));
 } finally {

@@ -142,10 +142,12 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 			 * refused rather than guessed at.
 			 */
 			let target = element;
+			refuseIfSealed(target, patch.id);
 			for (const index of patch.path ?? []) {
 				const child = childElements(target)[index];
 				if (!child) throw new PatchRefused(`cannot find that part of #${patch.id} in the source`);
 				target = child;
+				refuseIfSealed(target, patch.id);
 			}
 			const spot = target.sourceCodeLocation;
 			if (!spot?.startTag) throw new PatchRefused(`cannot locate that part of #${patch.id} in the source`);
@@ -403,6 +405,27 @@ const attr = (name: string, value: string) => `${name}="${value.replace(/"/g, "&
 
 function attributeValue(element: Element, name: string): string | undefined {
 	return element.attrs.find((attribute) => attribute.name === name.toLowerCase())?.value;
+}
+
+/**
+ * `data-edit="false"` — the author saying this text is not the user's to retype.
+ *
+ * Editability is otherwise *inferred*: a leaf element whose text is in the file is
+ * editable, and that inference has no way to know that a number is computed, that a
+ * label has to match a chart's axis, or that a script rewrites this line on every
+ * mount. So the attribute is how a board declares it, and the browser refuses the
+ * same thing before offering the gesture (`Editor.beginEditing`).
+ *
+ * Checked on the way *down* the path rather than by walking up: the descent already
+ * visits exactly the component and the ancestors inside it, so a seal on a container
+ * covers everything under it without a second traversal. Only `"false"` seals —
+ * `data-edit` on its own is the opposite claim, and treating any value as a seal
+ * would make the affordance turn editing off.
+ */
+function refuseIfSealed(element: Element, id: string): void {
+	if (attributeValue(element, "data-edit") === "false") {
+		throw new PatchRefused(`#${id} is marked data-edit="false" — that text is the board's, not the user's`);
+	}
 }
 
 /**

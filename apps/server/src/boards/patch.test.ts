@@ -413,6 +413,62 @@ test("the row wrapping two spans is markup, and says so rather than flattening t
 	assert.throws(() => applyPatches(INVENTED, [{ op: "text", id: "rollout", text: "week 1 — flag", path: [1] }]), PatchRefused);
 });
 
+// --- data-edit: what the board says is the user's to retype ------------------------
+
+const SEALED = `<body class="board">
+	<section class="card metrics" data-id="throughput" style="left: 48px; top: 48px; width: 320px">
+		<h3 data-edit>Throughput</h3>
+		<span class="value" data-edit="false">2,455</span>
+		<div class="note" data-edit="false"><span>recomputed on mount</span></div>
+	</section>
+</body>
+`;
+
+test("data-edit on a leaf changes nothing about how it retypes", () => {
+	// It is a declaration and an affordance, not a mechanism: the heading was always
+	// editable and still is, attribute or no attribute.
+	const { html, summary } = applyPatches(SEALED, [{ op: "text", id: "throughput", text: "Requests", path: [0] }]);
+	assert.match(html, /<h3 data-edit>Requests<\/h3>/);
+	assert.deepEqual(summary, ["retyped the <h3> in #throughput"]);
+});
+
+test('data-edit="false" refuses the retype, and says why', () => {
+	assert.throws(
+		() => applyPatches(SEALED, [{ op: "text", id: "throughput", text: "9,001", path: [1] }]),
+		(error) => error instanceof PatchRefused && /data-edit="false"/.test(error.message),
+	);
+});
+
+test("a seal covers what is inside it, not just the element carrying it", () => {
+	// `.note` is sealed and the span within it is a perfectly ordinary leaf — the whole
+	// point of the attribute is that the subtree goes with it.
+	assert.throws(() => applyPatches(SEALED, [{ op: "text", id: "throughput", text: "no", path: [2, 0] }]), PatchRefused);
+});
+
+test("a seal on the component seals every string in it", () => {
+	const board = SEALED.replace('class="card metrics"', 'class="card metrics" data-edit="false"');
+	assert.throws(() => applyPatches(board, [{ op: "text", id: "throughput", text: "Requests", path: [0] }]), PatchRefused);
+	// And the component itself, addressed with no path at all.
+	assert.throws(() => applyPatches(board, [{ op: "text", id: "throughput", text: "x" }]), PatchRefused);
+});
+
+test("only \"false\" seals — any other value is the opposite claim", () => {
+	// Treating a truthy value as a seal would make the affordance turn editing off,
+	// which is the one way this attribute could be actively harmful.
+	for (const value of ["", "true", "yes", "Label"]) {
+		const board = SEALED.replace("<h3 data-edit>", `<h3 data-edit="${value}">`);
+		const { html } = applyPatches(board, [{ op: "text", id: "throughput", text: "Requests", path: [0] }]);
+		assert.match(html, /Requests/, `data-edit="${value}" should not seal`);
+	}
+});
+
+test("a seal does not stop the component being moved, restyled or renamed", () => {
+	// It is about text. A sealed chart is still a box the user can put somewhere else.
+	const board = SEALED.replace('class="card metrics"', 'class="card metrics" data-edit="false"');
+	assert.match(applyPatches(board, [{ op: "update", id: "throughput", style: { left: 96 } }]).html, /left: 96px/);
+	assert.match(applyPatches(board, [{ op: "rename", id: "throughput", to: "rate" }]).html, /data-id="rate"/);
+});
+
 test("a class swap on an invented component keeps the class it invented", () => {
 	const { html } = applyPatches(INVENTED, [{ op: "update", id: "rollout", class: "panel phases" }]);
 	assert.match(html, /<section class="panel phases" data-id="rollout"/);

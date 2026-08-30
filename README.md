@@ -113,8 +113,8 @@ deck directory.
 
 ## Development
 ```bash
-npm test            # 177 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
-npm run test:e2e    # 168 browser checks against a throwaway copy of example/ (~65s)
+npm test            # 184 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
+npm run test:e2e    # 204 browser checks against a throwaway copy of example/ (~70s)
 npm run typecheck
 npm run vendor      # re-copy the board primitives into runtime/lib
 ```

@@ -127,6 +127,21 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		svg.link > path, svg.link > text { pointer-events: stroke; }
 		svg.link.decks-editing { outline: none; }
 		svg.link.decks-editing > path { stroke: var(--b-accent, #3b5cf6); stroke-width: 3; }
+
+		/*
+		 * A field the board declared with data-edit says so under the cursor. (No
+		 * backticks in here: this is a template literal, and one would end it.)
+		 *
+		 * Only on hover, and only an underline: the point is to answer "can I type here"
+		 * at the moment somebody wonders, not to draw boxes over a finished board. It
+		 * needs no zoom guard — below INTERACT_ZOOM the frame takes no pointer events, so
+		 * nothing in it can be hovered.
+		 */
+		[data-edit]:not([data-edit="false"]):hover {
+			text-decoration: underline dotted var(--b-faint, #9aa0aa);
+			text-underline-offset: 3px;
+			cursor: text;
+		}
 	`;
 	doc.head.appendChild(style);
 	cleanups.push(() => style.remove());
@@ -566,6 +581,34 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	 * something that does not exist there and the patch would be refused after the
 	 * optimistic edit had already happened. Refused up front instead, with the reason.
 	 */
+	/**
+	 * `data-edit="false"` — the board saying this text is not the user's to retype.
+	 *
+	 * The counterpart to `rendered` below: that one is a fact about what board.js did,
+	 * this is the author's intent. A computed number, a label that has to match a
+	 * chart's axis, a line a script rewrites on every mount — every one of them looks
+	 * exactly like editable text to the leaf-element rule, and this is how a board says
+	 * otherwise. The server refuses the same patch (`refuseIfSealed`), so the rule holds
+	 * whether or not it was this UI that sent it.
+	 *
+	 * The walk stops at the component, because a seal is about what is inside a
+	 * component and the board's own body is nobody's field.
+	 *
+	 * Only `"false"` seals. `data-edit` alone is the *opposite* claim — a field the
+	 * author means to be typed in — and it earns the hover underline in the style block
+	 * above, not a change of behaviour. Treating any value as a seal would make the
+	 * affordance turn editing off, which is the one way this attribute could do harm.
+	 */
+	const sealed = (element: HTMLElement, component: HTMLElement): boolean => {
+		let cursor: HTMLElement | null = element;
+		while (cursor) {
+			if (cursor.dataset.edit === "false") return true;
+			if (cursor === component) return false;
+			cursor = cursor.parentElement;
+		}
+		return false;
+	};
+
 	const rendered = (element: HTMLElement) =>
 		element.dataset.embed !== undefined ||
 		element.dataset.md !== undefined ||
@@ -588,6 +631,10 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		if (!run) return false;
 		if (rendered(run.component)) {
 			host.notice("The board draws that from a file — change what it points at, or ask the agent.");
+			return false;
+		}
+		if (sealed(run.element, run.component)) {
+			host.notice("The board keeps that text in step with something else. Ask the agent to change it.");
 			return false;
 		}
 		// A run of plain text, and nothing else: the server refuses to flatten markup,

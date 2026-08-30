@@ -444,6 +444,20 @@ in the inspector without the CSS to match is still a control that does nothing.
 are deliberately not in the switch: their CSS styles children the other five do not
 have, so swapping one in produces a component whose content no longer fits it.
 
+**`data-edit` is the board's own say in what may be typed.** Editability is otherwise
+inferred — a leaf element whose text is in the file — and that inference cannot tell an
+editable label from a number a script recomputes on every mount, a legend, or a caption
+that has to match a chart's axis. All of them are leaves with text in the file, and all of
+them accept a retype the next render throws away. So a board can mark a field
+(`data-edit`, which earns a hover underline and nothing else) or seal one
+(`data-edit="false"`, which covers the element and everything under it). The seal is
+enforced in both places, like the markup rule: `Editor.sealed` refuses before offering the
+gesture, `patch.refuseIfSealed` refuses the patch. Only `"false"` seals — treating any
+value as one would let the affordance turn editing off, which is the single way the
+attribute could do harm. It is about text alone: a sealed component still drags, restyles
+and renames, because a chart the user may not retype is still a box they may put
+somewhere else.
+
 **The inspector is a floating panel, not a sidebar.** It appears at the top right for
 the selection and only above `INTERACT_ZOOM`, the rule the palette already documents —
 below that a board is a tile on a map, its frame takes no pointer events, and there is
