@@ -1880,11 +1880,7 @@ svg.lucide {
 	white-space: nowrap;
 }
 
-.chat-row .when {
-	flex: 0 0 auto;
-	color: var(--faint);
-	font-size: 10px;
-}
+
 
 .chat-row .last {
 	overflow: hidden;
@@ -1904,14 +1900,47 @@ svg.lucide {
 	vertical-align: -1px;
 }
 
+/*
+ * The unread count, on the corner of the avatar.
+ *
+ * It used to sit at the right of the row's second line, which is where the × now is — and
+ * two things competing for that corner is how a click lands on the wrong one. On the avatar
+ * it is also next to the thing it is about.
+ *
+ * The ring is the panel's colour rather than the row's, which is close enough: a row's
+ * highlight is a translucent tint over the same panel, so the ring reads as a gap either
+ * way and needs no rule per state.
+ */
+.chat-row .face {
+	position: relative;
+	display: grid;
+	flex: 0 0 auto;
+}
+
 .chat-row .unread {
+	position: absolute;
+	top: -3px;
+	right: -3px;
+	display: grid;
 	min-width: 16px;
+	height: 16px;
 	padding: 0 4px;
 	border-radius: 999px;
-	background: var(--color-accent);
-	color: #fff;
-	font-size: 10px;
-	text-align: center;
+	/*
+	 * The text colour, inverted — not the accent.
+	 *
+	 * Agent colours cycle from blue, and the accent is blue, so an accent badge on the first
+	 * agent's avatar was blue on blue: the ring separated the shapes but the count still
+	 * read as part of the circle. Inverting the foreground is legible against any of the six
+	 * avatar colours rather than against five of them, and a count is the one thing in this
+	 * list that should catch the eye.
+	 */
+	background: var(--fg);
+	box-shadow: 0 0 0 2px var(--panel);
+	color: var(--bg);
+	font-size: 9px;
+	font-weight: 600;
+	place-items: center;
 }
 
 .chat .chat-head .avatar img {

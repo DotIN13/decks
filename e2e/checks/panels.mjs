@@ -204,6 +204,42 @@ const row = await page.evaluate(() => {
 	};
 });
 say("the mark leads the row", row.kids[0] === "runtime", row.kids.join(" · "));
+/*
+ * The right of a row is the × and nothing else.
+ *
+ * The timestamp is gone and the unread count moved onto the avatar: two things competing
+ * for that corner is how a click lands on the wrong one. The count only renders when there
+ * is one, so what is checked here is that its *place* is the avatar — `.face` is the
+ * wrapper that exists solely to hold it, since the avatar clips to its circle.
+ */
+say("the row's top line is the mark and the name", row.kids.join(" ") === "runtime name", row.kids.join(" · "));
+const right = await page.evaluate(() => {
+	const wrap = document.querySelector(".chat-row-wrap");
+	const face = wrap.querySelector(".face");
+	const avatar = wrap.querySelector(".avatar");
+	/*
+	 * Asked as "what is at the right", not "whose box reaches the right".
+	 *
+	 * `.who` and `.name` are stretched containers — they reach the edge by design and paint
+	 * nothing there — so measuring boxes flagged them and said nothing about what a person
+	 * sees or clicks. What matters is that the × is the only thing there to hit, and that
+	 * the two things that used to be are gone.
+	 */
+	const rightmost = [...wrap.querySelectorAll("button")].sort(
+		(a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right,
+	)[0];
+	return {
+		timestamps: wrap.querySelectorAll(".when").length,
+		unreadOutsideAvatar: [...wrap.querySelectorAll(".unread")].filter((el) => !face?.contains(el)).length,
+		rightmostIsClose: rightmost?.classList.contains("close") ?? false,
+		buttons: [...wrap.querySelectorAll("button")].map((b) => b.className).join(" · "),
+		faceHoldsTheBadgeSlot: Boolean(face) && face.contains(avatar) && getComputedStyle(face).position === "relative",
+	};
+});
+say("no timestamp is left in a row", right.timestamps === 0);
+say("the × is the rightmost thing to click", right.rightmostIsClose, right.buttons);
+say("no unread count sits outside the avatar", right.unreadOutsideAvatar === 0);
+say("the unread count's place is the avatar", right.faceHoldsTheBadgeSlot);
 say("…before the name", row.mark !== undefined && row.name !== undefined && row.mark < row.name);
 const claudeInk = row.inks.find((i) => i.agent === "claude")?.ink;
 const piInk = row.inks.find((i) => i.agent === "pi")?.ink;

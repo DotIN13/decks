@@ -119,7 +119,7 @@ export function ChatList(props: {
 								data-child={Boolean(chat.parentId)}
 								onClick={() => props.onFocus(chat.id)}
 							>
-								<Avatar chat={chat} identity={props.identities[chat.id]} />
+								<Avatar chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} />
 								<span class="who">
 									<span class="top">
 										{/*
@@ -131,7 +131,6 @@ export function ChatList(props: {
 											<AgentMark agent={chat.kind} size={13} />
 										</span>
 										<span class="name">{props.identities[chat.id]?.name ?? chat.name}</span>
-										<span class="when">{chat.lastAt ? when(chat.lastAt) : ""}</span>
 									</span>
 									<span class="bottom">
 										<span class="last">
@@ -143,9 +142,6 @@ export function ChatList(props: {
 											</Show>
 											{chat.state === "idle" ? (chat.lastLine ?? "no messages yet") : working(chat.state)}
 										</span>
-										<Show when={props.unread[chat.id]}>
-											{(count) => <span class="unread">{count() > 9 ? "9+" : count()}</span>}
-										</Show>
 									</span>
 								</span>
 							</button>
@@ -181,13 +177,25 @@ export function ChatList(props: {
 	);
 }
 
-function Avatar(props: { chat: AgentChat; identity: Identity | undefined }) {
+function Avatar(props: { chat: AgentChat; identity: Identity | undefined; unread: number }) {
 	const colour = () => props.identity?.color ?? "var(--color-accent)";
 	const avatar = () => props.identity?.avatar;
 	return (
-		<span class="avatar" data-state={props.chat.state} style={{ background: avatar() ? "transparent" : colour(), "--dot": colour() }}>
-			<Show when={avatar()} fallback={(props.identity?.name ?? props.chat.name).slice(0, 1).toUpperCase()}>
-				{(src) => <img src={src()} alt="" />}
+		/*
+		 * A wrapper, because the count sits on the corner of the avatar and the avatar
+		 * itself clips to its circle — that `overflow: hidden` is what rounds an image
+		 * avatar, so a badge inside it would be cut in half.
+		 */
+		<span class="face">
+			<span class="avatar" data-state={props.chat.state} style={{ background: avatar() ? "transparent" : colour(), "--dot": colour() }}>
+				<Show when={avatar()} fallback={(props.identity?.name ?? props.chat.name).slice(0, 1).toUpperCase()}>
+					{(src) => <img src={src()} alt="" />}
+				</Show>
+			</span>
+			<Show when={props.unread > 0}>
+				<span class="unread" title={`${props.unread} unread`}>
+					{props.unread > 9 ? "9+" : props.unread}
+				</span>
 			</Show>
 		</span>
 	);
@@ -205,10 +213,3 @@ function working(state: AgentChat["state"]): string {
 	}
 }
 
-function when(at: number): string {
-	const seconds = Math.max(0, (Date.now() - at) / 1000);
-	if (seconds < 60) return "now";
-	if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-	if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-	return new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
