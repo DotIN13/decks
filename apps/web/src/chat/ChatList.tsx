@@ -1,6 +1,5 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
-import Pin from "lucide-solid/icons/pin";
 import Plus from "lucide-solid/icons/plus";
 import { For, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
@@ -79,9 +78,10 @@ export function ChatList(props: {
 					aria-label={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
 					onClick={() => props.onPin(!props.pinned)}
 				>
-					{/* One icon for both states, with the colour saying which one it is in:
-					    `Pin` beside `PinOff` reads as "cannot be pinned", not "not pinned". */}
-					<Icon of={Pin} size={14} />
+					{/* The dot, not a pin glyph: filled is pinned, hollow is not. A pin icon
+					    needs a second icon or a colour to say which state it is in; a filled
+					    circle beside a hollow one is the state, at 12px and in one character. */}
+					{props.pinned ? "◉" : "○"}
 				</button>
 			</div>
 			<div class="chat-rows">

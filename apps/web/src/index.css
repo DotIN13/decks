@@ -968,17 +968,34 @@ svg.lucide {
 .dock {
 	position: absolute;
 	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
-	left: calc(50% - 90px);
+	left: 50%;
 	display: flex;
 	/*
-	 * `calc(100% - 650px)` is the room left beside both panels, and on anything under
-	 * about 700px wide it is a negative number: the dock was 0 pixels across on a
-	 * phone, which is not a degraded input bar but an invisible one — the placeholder
-	 * broke to one letter per line and the send button was 18px wide. The clamp keeps
-	 * the desktop measurement and stops it going below something usable; under 1100px
-	 * the media query at the end of this file gives up on the offset altogether.
+	 * Centred on the window, not on the gap between the panels.
+	 *
+	 * It used to sit at `calc(50% - 90px)`, which was exact rather than arbitrary: the
+	 * rail is 200px and the chat column 380px, and half that difference is 90px, so the
+	 * dock was centred in the room left between them. The trouble is that both panels
+	 * are away by default (§7) — so the measurement was right for the rare arrangement
+	 * and visibly off-centre for the usual one, which reads as a bug in the thing you
+	 * type into. Anchoring it to the panels' *state* instead would be worse: they open
+	 * on cursor proximity, so the input bar would slide sideways as you reached for
+	 * one.
+	 *
+	 * The width had to change with it, and this is the part that is easy to get wrong:
+	 * `calc(100% - 650px)` was the room left beside *both* panels added together, which
+	 * is the right sum only for a dock free to sit off-centre. Centred, the dock has to
+	 * clear the wider panel on both sides, so the reservation is twice the chat column
+	 * (380px + its 12px margin + a 12px gutter). Measured rather than reasoned: at
+	 * 1500px the old sum left a dock spanning 390–1110 against a panel starting at
+	 * 1100 — a ten-pixel overlap that the off-centre version never had.
+	 *
+	 * Under about 800px that width is a negative number — the dock was 0 pixels across
+	 * on a phone, which is not a degraded input bar but an invisible one — so the clamp
+	 * stops it going below something usable. Under 1100px the media query at the end of
+	 * this file goes full-width instead, which is where that clamp stops mattering.
 	 */
-	width: min(720px, max(320px, calc(100% - 650px)));
+	width: min(720px, max(320px, calc(100% - 808px)));
 	flex-direction: column;
 	align-items: stretch;
 	gap: 8px;
@@ -1597,6 +1614,14 @@ svg.lucide {
  * a column. Inline keeps the row, the grid still centres the icon in its square, and the
  * chat header — which *is* a flex row — blockifies it back on its own.
  */
+/*
+ * The pin is a character, not an icon, so it needs its own size back.
+ *
+ * The square and the centring stay — that is the tap target the touch pass gave it,
+ * and it holds a glyph as happily as an SVG. What had to come back is `font-size`:
+ * the icon sweep dropped it along with every other glyph-era rule, and `◉` inherited
+ * the panel header's size, which drew a dot half again too big for the row.
+ */
 .pin {
 	display: inline-grid;
 	width: 20px;
@@ -1607,6 +1632,9 @@ svg.lucide {
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	line-height: 1;
 	place-items: center;
 	vertical-align: middle;
 }
