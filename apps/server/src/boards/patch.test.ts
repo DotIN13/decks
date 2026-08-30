@@ -375,3 +375,47 @@ test("z-order to the back is first in the body", () => {
 	assert.deepEqual(summary, ["sent #risk to back"]);
 	assert.match(html, /<body class="board">\n\t\t<div class="sticky" data-id="risk"/);
 });
+
+// --- the contract the board-authoring skill promises for an invented component ----
+
+/*
+ * The skill tells the agent to invent components, and makes it three promises in
+ * exchange for following three rules: a box class beside its own keeps the class
+ * switch, every string in its own leaf element stays retypeable, and a swap leaves
+ * its custom token alone. This is the example printed in that skill, so if these
+ * fail the documentation is wrong rather than the test.
+ */
+const INVENTED = `<body class="board">
+	<section class="card phases" data-id="rollout" style="left: 48px; top: 168px; width: 420px">
+		<h3>Rollout</h3>
+		<div class="phase"><span class="when">week 1</span><span>Lock behind a flag</span></div>
+		<div class="phase"><span class="when">week 2</span><span>Ramp to 10%</span></div>
+	</section>
+</body>
+`;
+
+test("every string in an invented component is its own leaf, so each one retypes", () => {
+	// The heading, then the label and the text of the first row: [0], [1,0], [1,1].
+	const heading = applyPatches(INVENTED, [{ op: "text", id: "rollout", text: "Plan", path: [0] }]);
+	assert.match(heading.html, /<h3>Plan<\/h3>/);
+
+	const when = applyPatches(INVENTED, [{ op: "text", id: "rollout", text: "week 3", path: [1, 0] }]);
+	assert.match(when.html, /<span class="when">week 3<\/span><span>Lock behind a flag<\/span>/);
+
+	const what = applyPatches(INVENTED, [{ op: "text", id: "rollout", text: "Ramp to 50%", path: [2, 1] }]);
+	assert.match(what.html, /<span class="when">week 2<\/span><span>Ramp to 50%<\/span>/);
+	assert.deepEqual(what.summary, ["retyped the <span> in #rollout"]);
+});
+
+test("the row wrapping two spans is markup, and says so rather than flattening them", () => {
+	// Why the skill says one string per leaf: a `.phase` holding two spans is exactly
+	// the shape a plain-text replacement would destroy.
+	assert.throws(() => applyPatches(INVENTED, [{ op: "text", id: "rollout", text: "week 1 — flag", path: [1] }]), PatchRefused);
+});
+
+test("a class swap on an invented component keeps the class it invented", () => {
+	const { html } = applyPatches(INVENTED, [{ op: "update", id: "rollout", class: "panel phases" }]);
+	assert.match(html, /<section class="panel phases" data-id="rollout"/);
+	// And the CSS the agent wrote is keyed on `.phases`, which is why that must survive.
+	assert.match(html, /class="phase"/);
+});

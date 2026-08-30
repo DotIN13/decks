@@ -1,6 +1,6 @@
 ---
 name: board-authoring
-description: How to say something on a board — the three shapes that carry an answer, a design and a finished piece of work — plus the full catalogue of components (cards, stickies, callouts, KPIs, tables, connectors, markdown, maths, diagrams, embeds) and the layout rules that keep a board readable. Read before answering on a board or building one with anything beyond cards and text.
+description: How to say something on a board — the three shapes that carry an answer, a design and a finished piece of work — plus the components that come with the board (cards, stickies, callouts, KPIs, tables, connectors, markdown, maths, diagrams, embeds), how to invent one the board does not have, and the layout rules that keep a board readable. Read before answering on a board or building one with anything beyond cards and text.
 ---
 
 # Writing a board
@@ -152,6 +152,10 @@ await stage.show("boards/refresh-race.html");
 
 Every one of these takes `style="left: …; top: …; width: …"` and a `data-id`.
 
+This is what the board comes with, not the set of things a board may contain. When the
+content wants a shape that is not here — a timeline, a diff, a scorecard, a legend — build
+it, and read "Inventing a component" below for the one obligation that comes with it.
+
 ### Text and structure
 
 ```html
@@ -257,6 +261,66 @@ before parsing. A `[data-mermaid]` box needs a height; the diagram scales to fit
 - Outside the deck, the file must sit under a root declared in `deck.json`.
 - Embeds want an explicit `height`: they have no content of their own to size to.
 
+## Inventing a component
+
+Nothing stops you. A board is an HTML file you write with your ordinary tools; no schema
+validates it, and `board.js` only ever looks at four things — `svg.link`, `[data-md]`,
+`[data-mermaid]` and `[data-embed]`. Every other element in the body it leaves exactly as
+you wrote it. So a shape the catalogue does not have is a shape you can build, and you
+should, rather than forcing a timeline into three stickies.
+
+**Your CSS goes in the board**, in a `<style>` in its own `<head>`:
+
+```html
+<style>
+	.phase { display: grid; grid-template-columns: 88px 1fr; gap: var(--b-unit); }
+	.phase > .when { color: var(--b-faint); font-family: var(--b-mono); }
+</style>
+```
+
+Never in `lib/board.css`. That directory belongs to the application and is rewritten from
+the running build every time the deck is opened, so an edit there is reverted without
+warning — and it would change every board in the deck, not the one you are writing.
+
+### The one obligation: leave it editable
+
+The user edits boards by hand, and they can only edit what they can reach. A component you
+invent is as editable as you make it, and the rules are mechanical:
+
+- **`data-id` on the outer element, and make that element a direct child of `<body>`.**
+  That alone earns selecting, dragging, resizing, renaming, duplicating, deleting and
+  reordering. A `data-id` nested inside another component is not a component — the card
+  around it is.
+- **Keep a box class beside your own**: `class="card phases"`, not `class="phases"`. With
+  one of `text` `sticky` `card` `panel` `callout` present, the user's inspector also offers
+  the class switch and the tone; without one it can only offer the name and the order. A
+  swap replaces just the box class and leaves your token alone, so key your CSS on `.phases`
+  and never on `.card .phases` — the card may be a panel by the time anyone reads it.
+- **One editable string per leaf element.** A run of text is retypeable in place only if
+  its element has no element children: `<h3>Goal</h3>` yes, `<p>See <a>the doc</a></p>` no
+  (the paragraph is refused, though the link's own text is a leaf and is fine). Three
+  labelled numbers want three spans, not one span with three numbers in it.
+- **Keep the words in the file.** A patch splices the board's source, so text that lives in
+  an attribute, in a CSS `content:`, or in a string your `<script>` writes at runtime has
+  nowhere for an edit to land. Static markup wherever it can be static.
+- **`data-md`, `data-mermaid`, `data-embed` and `<svg>` are not editable, by design.**
+  `board.js` replaces what is inside them, so the file's shape is not the shape on screen
+  and retyping is refused with a reason. Reach for markdown when the content really is
+  prose you own; do not wrap a component in `data-md` for the convenience of writing it.
+
+A component that follows those rules, and is worth the two lines of CSS above:
+
+```html
+<section class="card phases" data-id="rollout" style="left: 48px; top: 168px; width: 420px">
+	<h3>Rollout</h3>
+	<div class="phase"><span class="when">week 1</span><span>Lock behind a flag</span></div>
+	<div class="phase"><span class="when">week 2</span><span>Ramp to 10%</span></div>
+</section>
+```
+
+Every string in it is its own leaf, so the user can retype any of the four; it is a `card`,
+so they can make it a panel or a callout; and it has a name, so you can find it again.
+
 ## Tokens
 
 Use the variables, never raw colours, so a board works in light and dark:
@@ -301,6 +365,8 @@ the theme like everything else.
 - Are positions on the 8px grid, with two or three x values reused rather than a new one
   per component?
 - Are colours tokens, not hexes?
+- If you invented a component: is every string in it its own leaf element, does it carry a
+  box class beside your own, and is its CSS in the board rather than in `lib/`?
 - Does it say one thing?
 - **Could the user understand this without reading the chat?** That is the test that
   matters. If the board needs a sentence you only said in the column, the sentence belongs

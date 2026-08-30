@@ -26,6 +26,10 @@ test("a component's family decides which rows it gets", () => {
 	// A kpi has a vocabulary of its own that this build does not know; it keeps its
 	// name, its order and its copy, and gets no appearance rows.
 	assert.equal(familyOf("div", ["kpi"], {}), "other");
+	// What the board-authoring skill promises an agent that invents a component: a box
+	// class beside its own buys the appearance rows, and its absence is what costs them.
+	assert.equal(familyOf("section", ["card", "phases"], {}), "box");
+	assert.equal(familyOf("section", ["phases"], {}), "other");
 });
 
 test("swapping the box keeps classes this build does not own", () => {

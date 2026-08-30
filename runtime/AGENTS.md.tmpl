@@ -9,8 +9,10 @@ This deck is `{{DECK_NAME}}` at `{{DECK_PATH}}`, and it is your working director
 
 ```
 boards/*.html   the boards. Edit these with read/write/edit/grep like any file.
-lib/            the primitives every board loads. Do not edit; they are vendored.
-assets/         images boards use.
+lib/            the primitives every board loads. Vendored, and rewritten from the
+                app's own copy whenever this deck is opened — an edit here is reverted.
+                A board's own CSS goes in a <style> in that board.
+assets/         images boards use, and files the user drags onto a board.
 deck.json       where boards sit on the canvas. The user drags boards; leave it alone.
 ```
 
