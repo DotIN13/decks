@@ -40,11 +40,11 @@ test("a component's family decides which rows it gets", () => {
 });
 
 test("swapping the box keeps classes this build does not own", () => {
-	assert.equal(swapBox(["card"], "panel"), "panel");
+	assert.equal(swapBox(["card"], "callout"), "callout");
 	assert.equal(swapBox(["card", "wide"], "callout"), "callout wide");
 	assert.equal(swapBox(["wide"], "card"), "card wide");
 	// Idempotent, so clicking the class it already has writes the same attribute.
-	assert.equal(swapBox(["panel"], "panel"), "panel");
+	assert.equal(swapBox(["callout"], "callout"), "callout");
 });
 
 test("an emptied field clears the attribute rather than setting it to nothing", () => {

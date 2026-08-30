@@ -297,7 +297,7 @@ test("retyping a paragraph written over several lines keeps its shape", () => {
  * The answer is one editable, named on the component itself, holding the source.
  */
 const MARKDOWN = `<body class="board">
-	<div class="panel" data-id="sequence" data-md data-edit="sequence-md" style="left: 48px; top: 604px; width: 620px">
+	<div class="card" data-id="sequence" data-md data-edit="sequence-md" style="left: 48px; top: 604px; width: 620px">
 		## The sequence
 
 		1. Tab A and tab B both see a 401.
@@ -334,7 +334,7 @@ test("editing one line of a markdown source is a one-line diff", () => {
 	assert.deepEqual(differing, ["\t\t2. Both ask to refresh with the same token `t0`."]);
 	assert.match(html, /2\. Both ask to refresh with the token they hold\./);
 	// The component's own tag is untouched: `data-md` still says what it is.
-	assert.match(html, /<div class="panel" data-id="sequence" data-md data-edit="sequence-md" style="left: 48px/);
+	assert.match(html, /<div class="card" data-id="sequence" data-md data-edit="sequence-md" style="left: 48px/);
 });
 
 test("markdown with raw HTML in it is refused, for the same reason a card is", () => {
@@ -343,13 +343,13 @@ test("markdown with raw HTML in it is refused, for the same reason a card is", (
 	 * one of these from the element's `textContent`, which is the source with the tags
 	 * already dropped, so the browser never had the file's bytes to send back.
 	 */
-	const raw = `<body class="board">\n\t<div class="panel" data-id="notes" data-md data-edit="notes-md">A line<br />and another</div>\n</body>`;
+	const raw = `<body class="board">\n\t<div class="card" data-id="notes" data-md data-edit="notes-md">A line<br />and another</div>\n</body>`;
 	assert.throws(() => applyPatches(raw, [{ op: "text", edit: "notes-md", text: "A line" }]), /contains markup/);
 });
 
 test("a mermaid diagram is the same mechanism, not a second one", () => {
 	const board = `<body class="board">
-	<div class="panel" data-id="flow" data-mermaid data-edit="flow-src" style="left: 48px; top: 184px">
+	<div class="card" data-id="flow" data-mermaid data-edit="flow-src" style="left: 48px; top: 184px">
 		flowchart TD
 			A["tab A: 401"] --> L{"lock free?"}
 	</div>
@@ -359,7 +359,7 @@ test("a mermaid diagram is the same mechanism, not a second one", () => {
 	]);
 	assert.deepEqual(summary, ["retyped #flow"]);
 	assert.match(html, /L -- yes --> R\["refresh"\]/);
-	assert.match(html, /<div class="panel" data-id="flow" data-mermaid data-edit="flow-src"/);
+	assert.match(html, /<div class="card" data-id="flow" data-mermaid data-edit="flow-src"/);
 });
 
 // --- a fresh component is editable, and a copy is separately editable -------------
@@ -560,8 +560,8 @@ test("a row wrapping two named spans is markup, and cannot itself be named", () 
 });
 
 test("a class swap on an invented component keeps the class it invented", () => {
-	const { html } = applyPatches(INVENTED, [{ op: "update", id: "rollout", class: "panel phases" }]);
-	assert.match(html, /<section class="panel phases" data-id="rollout"/);
+	const { html } = applyPatches(INVENTED, [{ op: "update", id: "rollout", class: "callout phases" }]);
+	assert.match(html, /<section class="callout phases" data-id="rollout"/);
 	// And the CSS the agent wrote is keyed on `.phases`, which is why that must survive.
 	assert.match(html, /class="phase"/);
 });

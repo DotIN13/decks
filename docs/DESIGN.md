@@ -172,7 +172,7 @@ reason.
 - `<meta name="poster">` is optional and is the escape hatch for a board too
   expensive to mount at thumbnail size (§7).
 - **The component vocabulary is small, and it is `board.css`'s.** Five classes that mean
-  "a box with prose in it" (`text`, `sticky`, `card`, `panel`, `callout`), three that
+  "a box with prose in it" (`text`, `sticky`, `card`, `callout`), three that
   bring their own inner markup (`kpi`, `table`, `chip`), and the `embed`; the only
   variant attribute is `data-tone`. That list is also the ceiling on what the
   user's editor can offer (§6.5). It is a copy in every deck rather than a route, and it
@@ -472,7 +472,7 @@ on the component, and not a rendered block. `board.js` keeps the source it drew 
 DOM would be a second) and exposes `source` and `redraw` on `window.__board`. A commit
 re-renders that one component rather than reloading the frame, which is what keeps the
 frame pinned to the revision it loaded (§7) — the alternative flashed the whole board for
-one panel. A re-render takes `__boardReady` down and puts it back, because everything
+one component. A re-render takes `__boardReady` down and puts it back, because everything
 that waits for a board waits on that flag.
 
 The splice keeps the whitespace it found. A paragraph written over three indented lines
@@ -484,7 +484,7 @@ file's own indentation as part of `textContent` and writing it on top of the ind
 already there put a blank line in the file on every edit. The source editor is the
 multi-line case of the same rule: it shows the block dedented, since that is what the
 markdown parser sees and four stray spaces are a code block, and re-indents it on commit
-so that changing one line of a panel is one line of the diff. Two characters are escaped
+so that changing one line of a rendered component is one line of the diff. Two characters are escaped
 on the way in, `&` and `<`, and no longer `>` — a Mermaid source is `A --> B` on every
 line, and escaping that rewrote a whole diagram for a one-line edit.
 
@@ -497,7 +497,7 @@ path.
 
 **The appearance vocabulary is the stylesheet's, and it is thinner than it looks.**
 `board.css` has five component classes that mean the same thing — a box with prose in
-it: `text`, `sticky`, `card`, `panel`, `callout` — and one variant attribute,
+it: `text`, `sticky`, `card`, `callout` — and one variant attribute,
 `data-tone` (a callout's warn/danger/ok). That is all it has:
 there is no sticky colour, no font size, no alignment. So the inspector offers a class
 switch and a tone, and nothing it invented. **A deck's `lib/` is a copy** — but one
@@ -509,6 +509,15 @@ in the inspector without the CSS to match is still a control that does nothing.
 `BOX_CLASSES` and the tone lists live in `@decks/protocol` with that written next to them. `kpi`, `table` and `chip`
 are deliberately not in the switch: their CSS styles children the other five do not
 have, so swapping one in produces a component whose content no longer fits it.
+
+`panel` was a fifth and is gone. It differed from `card` in two declarations — a deeper
+background and no shadow — which is too little to choose between under pressure, and the
+inspector offered the choice on every box. Deleting it is not free, because the class list
+that carried it is also what gives a component `position: absolute`: a board still saying
+`class="panel"` does not merely lose a colour, it drops out of absolute positioning and
+collapses into document flow. So the removal is only safe paired with rewriting the boards
+that used one, which is why the fixtures, the templates and the skill changed in the same
+commit.
 
 **The inspector is a floating panel, not a sidebar.** It appears at the top right for
 the selection and only above `INTERACT_ZOOM`, the rule the palette already documents —
@@ -1093,9 +1102,9 @@ section.
   the browser never had the file's bytes to send back; it is refused rather than
   flattened.
 - The inspector edits one component at a time. There is no multi-select, so "make these
-  four cards panels" is four clicks or a sentence to the agent.
+  four cards callouts" is four clicks or a sentence to the agent.
 - `kpi`, `table` and `chip` get a name, an order, a copy and a delete, and no appearance
-  rows: their CSS styles children the five prose classes do not have.
+  rows: their CSS styles children the four prose classes do not have.
 - An embed's caption, an image's alt text and how a picture fits its box are not
   editable, and this is the lib-is-a-copy constraint rather than an oversight —
   `board.js` labels an embed from its filename and `board.css` has one rule for the

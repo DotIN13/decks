@@ -33,7 +33,7 @@ answer comes first and fits one screen; the evidence sits beside it, not above i
 	</p>
 </section>
 
-<section class="panel" data-id="evidence" data-md data-edit="evidence-md" style="left: 560px; top: 152px; width: 420px">
+<section class="card" data-id="evidence" data-md data-edit="evidence-md" style="left: 560px; top: 152px; width: 420px">
 	## Where this shows
 
 	- `auth.ts:88` — refresh has no single-flight guard
@@ -87,7 +87,7 @@ Not a log — a presentation. Method briefly, the result with the number that ma
 what is left. This is what the user reads instead of the chat, so it has to stand alone.
 
 ```html
-<section class="panel" data-id="method" style="left: 48px; top: 168px; width: 420px">
+<section class="card" data-id="method" style="left: 48px; top: 168px; width: 420px">
 	<h4 data-edit="method-title">Method</h4>
 	<ol>
 		<li data-edit="method-1">Reproduced with two clients and one token</li>
@@ -147,7 +147,7 @@ await stage.show("boards/refresh-race.html");
 - **Columns, not scatter.** Pick two or three x positions and reuse them. A board
   where every box starts at a different x reads as noise.
 - **Size to content, then check.** Height is usually best left to the content; set it
-  only on embeds and panels that must be a certain size. If you set a height, verify
+  only on embeds and boxes that must be a certain size. If you set a height, verify
   with a screenshot that nothing is clipped.
 - **A board is one idea.** Two ideas are two boards, side by side on the canvas.
 - **`data-id` on everything, and `data-edit` on every run of words.** Stable, meaningful
@@ -155,7 +155,7 @@ await stage.show("boards/refresh-race.html");
   user selects and you address; the `data-edit` is what they retype, one per leaf and
   unique within the board (see "the one obligation" below). The user can rename a component
   from their inspector, and can turn a card into a
-  panel or a callout the same way, so a name or a class you wrote may have changed since
+  card or a callout the same way, so a name or a class you wrote may have changed since
   you wrote it. You are told when it does, in the same line that reports any other edit
   they made; if a component you expected is not there under the name you remember, read
   the board rather than writing it again.
@@ -182,8 +182,8 @@ it, and read "Inventing a component" below for the one obligation that comes wit
 	<p data-edit="goal-body">Cards are the default container: a border, a shadow, and padding.</p>
 </section>
 
-<section class="panel" data-id="detail" style="left: 480px; top: 168px; width: 380px">
-	<h3 data-edit="detail-title">Panel</h3>
+<section class="card" data-id="detail" style="left: 480px; top: 168px; width: 380px">
+	<h3 data-edit="detail-title">Detail</h3>
 	<p data-edit="detail-body">Flatter than a card — a background, no shadow. Use for supporting detail.</p>
 </section>
 
@@ -235,7 +235,7 @@ box it is in instead of breaking when the box changes.
 
 ```html
 <style>
-	/* Keyed on `.claim`, never on `.card .claim` — the user may make it a panel. */
+	/* Keyed on `.claim`, never on `.card .claim` — the user may make it a callout. */
 	.claim .box { fill: var(--b-bg-deep); stroke: var(--b-border-strong); stroke-width: 1.5; }
 	.claim .flow { fill: none; stroke: var(--b-border-strong); stroke-width: 1.5; }
 	/* A marker's head is a path inside a `.flow`, and the rule above gave that
@@ -301,7 +301,7 @@ and draw it yourself when the positions mean something.
 ### Markdown, maths, mermaid
 
 ```html
-<div class="panel" data-id="sequence" data-md data-edit="sequence-md" style="left: 48px; top: 604px; width: 620px">
+<div class="card" data-id="sequence" data-md data-edit="sequence-md" style="left: 48px; top: 604px; width: 620px">
 	## The sequence
 
 	1. Both tabs see a 401.
@@ -310,7 +310,7 @@ and draw it yourself when the positions mean something.
 	Cost per refresh stays $O(1)$ — inline maths in `$…$`, display in `$$…$$`.
 </div>
 
-<div class="panel" data-id="flow" data-mermaid data-edit="flow-src" style="left: 48px; top: 140px; width: 620px; height: 420px">
+<div class="card" data-id="flow" data-mermaid data-edit="flow-src" style="left: 48px; top: 140px; width: 620px; height: 420px">
 	flowchart TD
 		A["tab A: 401"] --> L{"lock free?"}
 		L -- yes --> R["refresh"]
@@ -321,7 +321,7 @@ Indent the content to match the surrounding HTML — the common indent is stripp
 before parsing. A `[data-mermaid]` box needs a height; the diagram scales to fit it.
 
 The `data-edit` is what makes one of these editable, and it goes on the component because
-the whole source is the unit: a double-click opens the source in an editor over the panel,
+the whole source is the unit: a double-click opens the source in an editor over the component,
 and a commit re-renders that one component. One name, not one per block — see "the one
 obligation" below.
 
@@ -382,10 +382,10 @@ invent is as editable as you make it, and the rules are mechanical:
   reordering. A `data-id` nested inside another component is not a component — the card
   around it is.
 - **Keep a box class beside your own**: `class="card phases"`, not `class="phases"`. With
-  one of `text` `sticky` `card` `panel` `callout` present, the user's inspector also offers
+  one of `text` `sticky` `card` `callout` present, the user's inspector also offers
   the class switch and the tone; without one it can only offer the name and the order. A
   swap replaces just the box class and leaves your token alone, so key your CSS on `.phases`
-  and never on `.card .phases` — the card may be a panel by the time anyone reads it.
+  and never on `.card .phases` — the card may be a callout by the time anyone reads it.
 - **`data-edit` on every run of words that should be retypeable, and a name nothing else
   on the board has.** That name is the whole address: the user double-clicks the words,
   the app sends `data-edit="goal-title"` and the new text, and the server splices that
@@ -402,8 +402,8 @@ invent is as editable as you make it, and the rules are mechanical:
   node cannot be marked at all, which is why a callout's sentence wants a `<span>` around
   it if the user is to retype it.
 - **A `[data-md]` or `[data-mermaid]` component's editable is its whole source, named once
-  on the component itself.** `board.js` keeps the words it drew the panel from and hands
-  them back, so a double-click opens the *source* in a monospace editor over the panel and
+  on the component itself.** `board.js` keeps the words it drew the component from and hands
+  them back, so a double-click opens the *source* in a monospace editor over the component and
   a commit re-renders just that component. Do not mark the blocks inside one: a rendered
   `<h2>` came from `## …` and has no byte range of its own in the file. Two things this
   costs — a source with raw HTML in it (`<br />`) is refused, because the browser only ever
@@ -440,7 +440,7 @@ A component that follows those rules, and is worth the two lines of CSS above:
 ```
 
 Every run in it is a named leaf, so the user can retype any of the five; it is a `card`,
-so they can make it a panel or a callout; and it has a name, so you can find it again.
+so they can make it a sticky or a callout; and it has a name, so you can find it again.
 
 ## Tokens
 
@@ -492,7 +492,7 @@ forty points and a bad one for four boxes — draw those.
   per component?
 - Are colours tokens, not hexes?
 - Does every run of words carry a `data-edit` nothing else on the board has — including
-  the source of every `[data-md]` and `[data-mermaid]` panel?
+  the source of every `[data-md]` and `[data-mermaid]` component?
 - If you invented a component: is every marked run a leaf element, does it carry a
   box class beside your own, and is its CSS in the board rather than in `lib/`?
 - If you drew a diagram: is it inside a box component rather than a bare `<svg>`, are its

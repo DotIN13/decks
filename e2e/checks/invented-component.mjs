@@ -101,11 +101,11 @@ try {
 		"a box class beside its own earns the class switch",
 		(await page.locator(".inspector button[data-box]").count()) > 0,
 	);
-	await page.locator('.inspector button[data-box="panel"]').click();
-	const swapped = await until(fixture, /class="panel phases"/);
+	await page.locator('.inspector button[data-box="callout"]').click();
+	const swapped = await until(fixture, /class="callout phases"/);
 	say(
 		"and a swap replaces only the box class, keeping the invented one",
-		/<section class="panel phases" data-id="rollout"/.test(swapped),
+		/<section class="callout phases" data-id="rollout"/.test(swapped),
 		swapped.split("\n").find((line) => line.includes('data-id="rollout"'))?.trim(),
 	);
 

@@ -1381,7 +1381,7 @@ svg.lucide {
 	outline: none;
 }
 
-/* The five interchangeable box classes, named rather than drawn: an icon for
+/* The four interchangeable box classes, named rather than drawn: an icon for
    "callout" is a guess the user has to decode, and the words are what an agent would
    have written in the file anyway. */
 .inspector .boxes {

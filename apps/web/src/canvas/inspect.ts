@@ -21,7 +21,7 @@ import { BOX_CLASSES, type BoardPatch, type BoxClass } from "@decks/protocol";
  * deck on its next restart rather than never. Adding a row here therefore means
  * adding the CSS in the same commit — not that the vocabulary is fixed. That is the
  * whole answer to "what does appearance mean for a component" —
- * the five interchangeable box classes, `data-tone`, and the two attributes an embed
+ * the four interchangeable box classes, `data-tone`, and the two attributes an embed
  * is made of.
  */
 
@@ -79,7 +79,7 @@ export function familyOf(classes: string[], attrs: Record<string, string>): Fami
  * The class attribute after a swap, keeping every token this build does not own.
  *
  * An agent writes `class="card wide"` and means both halves of it; replacing the
- * whole attribute with `"panel"` would silently drop a rule it wrote its own CSS
+ * whole attribute with `"callout"` would silently drop a rule it wrote its own CSS
  * for. So the box class is substituted in place and everything else stays where it
  * was, in its own order.
  */

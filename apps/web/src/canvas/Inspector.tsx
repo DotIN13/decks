@@ -24,7 +24,7 @@ import { isPdf, type Edit, type Shape } from "./inspect.ts";
  * reach, so hovering the inspector does not pull the transcript over it.
  *
  * **The rows are the stylesheet's vocabulary, not an invented one.** `board.css` has
- * five interchangeable box classes and a `data-tone`; `board.js` reads `data-embed`
+ * four interchangeable box classes and a `data-tone`; `board.js` reads `data-embed`
  * and `data-pages`. A deck's `lib/` is a copy taken when the deck was created, so a
  * colour this build invented would be an unstyled box in every deck that already
  * exists (see `inspect.ts`). Anything an agent can write that this cannot edit is left

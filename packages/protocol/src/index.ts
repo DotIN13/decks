@@ -149,7 +149,7 @@ export interface ToolSummary {
 
 // --- editing -------------------------------------------------------------------
 
-export type ComponentKind = "sticky" | "card" | "text" | "image" | "embed" | "panel";
+export type ComponentKind = "sticky" | "card" | "text" | "image" | "embed";
 
 export interface Rect {
 	left: number;
@@ -230,7 +230,7 @@ export type BoardPatch =
  * are deliberately absent — their CSS styles children the other five do not have,
  * so swapping one in produces a component whose content no longer fits it.
  */
-export const BOX_CLASSES = ["text", "sticky", "card", "panel", "callout"] as const;
+export const BOX_CLASSES = ["text", "sticky", "card", "callout"] as const;
 export type BoxClass = (typeof BOX_CLASSES)[number];
 
 /**

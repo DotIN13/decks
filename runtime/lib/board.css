@@ -147,7 +147,6 @@ body.board > * {
 /* --- components --------------------------------------------------------------- */
 
 .card,
-.panel,
 .sticky,
 .text,
 .callout,
@@ -164,13 +163,6 @@ body.board > * {
 	border-radius: var(--b-radius);
 	background: var(--b-bg);
 	box-shadow: var(--b-shadow);
-}
-
-.panel {
-	padding: calc(var(--b-unit) * 2);
-	border: 1px solid var(--b-border);
-	border-radius: var(--b-radius);
-	background: var(--b-bg-deep);
 }
 
 .sticky {
@@ -243,7 +235,6 @@ body.board > * {
 
 /* Headings inside a component: the component owns its spacing, not the document. */
 .card > :first-child,
-.panel > :first-child,
 .sticky > :first-child,
 .callout > :first-child,
 .embed > :first-child {
@@ -251,7 +242,6 @@ body.board > * {
 }
 
 .card > :last-child,
-.panel > :last-child,
 .sticky > :last-child,
 .callout > :last-child {
 	margin-bottom: 0;

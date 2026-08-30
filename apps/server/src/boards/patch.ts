@@ -343,7 +343,7 @@ function retype(html: string, document: Node, edit: string, incoming: string): {
 	 * A markdown source is the multi-line case, and the editor sends it indented to
 	 * match the block it came out of: the first line's indent and the last line's
 	 * newline are what this trim takes off, and every line between keeps the
-	 * indentation the file already had, so changing one line of a panel is a one-line
+	 * indentation the file already had, so changing one line of a rendered component is a one-line
 	 * diff.
 	 */
 	const text = lead || trail ? incoming.trim() : incoming;
@@ -542,8 +542,6 @@ function render(patch: Extract<BoardPatch, { op: "insert" }>, indent: string, ed
 	switch (kind) {
 		case "card":
 			return `${indent}<section class="card" data-id="${id}"${extra} style="${style}">\n${indent}\t<h3 data-edit="${edit}">${body}</h3>\n${indent}</section>`;
-		case "panel":
-			return `${indent}<section class="panel" data-id="${id}"${extra} style="${style}">\n${indent}\t<h3 data-edit="${edit}">${body}</h3>\n${indent}</section>`;
 		case "sticky":
 			return `${indent}<div class="sticky" data-id="${id}" data-edit="${edit}"${extra} style="${style}">${body}</div>`;
 		case "text":
@@ -561,7 +559,6 @@ function defaultText(kind: ComponentKind): string {
 		case "sticky":
 			return "…";
 		case "card":
-		case "panel":
 			return "Untitled";
 		case "text":
 			return "Text";
@@ -619,7 +616,7 @@ function findByEdit(node: Node, edit: string): Element[] {
 /**
  * The component an editable run belongs to: the nearest ancestor with a `data-id`.
  *
- * A run may *be* the component — a `[data-md]` panel's editable is its whole source —
+ * A run may *be* the component — a `[data-md]` component's editable is its whole source —
  * so the element itself counts. Nothing here checks that the component is a child of
  * the body: the browser decides what it lets a user select, and a file this walks is
  * the file an agent wrote, so a stricter rule here would only produce a refusal whose

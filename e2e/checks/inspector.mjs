@@ -19,6 +19,7 @@
  * dead `svg.link` at the top of the fixture is the third: it is what a board written
  * against the old runtime looks like, and it must draw as nothing at all.
  */
+import { BOX_CLASSES } from "@decks/protocol";
 import { rmSync } from "node:fs";
 import { boardPath, open, read, say, socket, write } from "../harness.mjs";
 
@@ -369,7 +370,8 @@ try {
 	say(
 		"a drawn diagram is a box, because its author put a box class beside its own",
 		(await page.locator(".inspector header .what").textContent()) === "card" &&
-			(await page.locator(".inspector .row.boxes button").count()) === 5,
+			// One button per interchangeable box class: text, sticky, card, callout.
+			(await page.locator(".inspector .row.boxes button").count()) === BOX_CLASSES.length,
 		"an <svg> used to be a connector by its tag alone; nothing goes by the tag now",
 	);
 	say(
