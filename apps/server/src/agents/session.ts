@@ -1,23 +1,26 @@
 import { randomUUID } from "node:crypto";
 import type {
+	AgentCapabilities,
 	AgentChat,
 	AgentKind,
 	AgentMode,
 	AgentState,
 	Camera,
+	ChatItem,
 	Identity,
 	ModelOption,
 	ServerMessage,
 	ThinkingLevel,
 } from "@decks/protocol";
-import { ClaudeBackend } from "../claude/backend.ts";
+import { CLAUDE_CAPABILITIES, ClaudeBackend } from "../claude/backend.ts";
 import type { Deck } from "../deck/loader.ts";
-import { PiBackend } from "../pi/backend.ts";
+import { PI_CAPABILITIES, PiBackend } from "../pi/backend.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, type DelegateReport, type DelegateSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { SnapshotStore } from "./snapshot.ts";
+import type { AgentRecord, AgentStore } from "./store.ts";
 import { Translator } from "./translator.ts";
 
 /**
@@ -31,7 +34,8 @@ import { Translator } from "./translator.ts";
  * types faster than a model runtime starts.
  */
 export class DeckAgent {
-	readonly id = randomUUID();
+	/** Kept across restarts when the agent was restored: the avatar file is addressed by it. */
+	readonly id: string;
 	readonly translator: Translator;
 	readonly bridge: ExtensionUiBridge;
 
@@ -89,11 +93,23 @@ export class DeckAgent {
 			resumeRef?: string;
 			kind: AgentKind;
 			snapshots: SnapshotStore;
+			store: AgentStore;
 			/** The agent this one was forked from, so its canvas can be inherited. */
 			forkedFrom?: { agentId: string; at: number };
+			/**
+			 * Everything a chat needs to be a row again without its runtime running
+			 * (`agents/store.ts`). Its presence is also what makes the agent dormant: it
+			 * exists, it can be read, and it starts nothing until it is prompted.
+			 */
+			restored?: { id: string; items: ChatItem[]; context: string[]; inPlay: string[]; avatar?: string; createdAt: number };
 		},
 	) {
+		this.id = options.restored?.id ?? randomUUID();
+		this.store = options.store;
+		this.restored = options.restored !== undefined;
+		this.createdAt = options.restored?.createdAt ?? Date.now();
 		this.identity = { name: options.name ?? "Agent", color: options.color };
+		if (options.restored?.avatar) this.identity = { ...this.identity, avatar: options.restored.avatar };
 		this.parentId = options.parentId;
 		this.resumeRef = options.resumeRef;
 		this.kind = options.kind;
@@ -117,7 +133,21 @@ export class DeckAgent {
 				this.emit(message);
 			},
 			deck.path,
+			() => this.save(),
 		);
+
+		/*
+		 * A restored chat is put back before anything can change it.
+		 *
+		 * `held` and `playing` are assigned rather than set through `setContext`, which
+		 * would broadcast a `context.changed` for an agent no browser has been told about
+		 * yet. The greeting is what carries this to a client, and it reads the same fields.
+		 */
+		if (options.restored) {
+			this.translator.load(options.restored.items);
+			this.held = [...options.restored.context];
+			this.playing = options.restored.inPlay.filter((path) => this.held.includes(path));
+		}
 
 		this.bridge = new ExtensionUiBridge({
 			prompt: (prompt) => this.emit({ type: "extension.ui.prompt", prompt }),
@@ -131,8 +161,17 @@ export class DeckAgent {
 	/** Mutable only through `orphan`: a subagent outlives the parent it reported to. */
 	parentId: string | undefined;
 	readonly kind: AgentKind;
-	private readonly resumeRef: string | undefined;
+	/**
+	 * Mutable, unlike the rest of this block: a rewind moves the session it points at, so
+	 * the stored ref is refreshed from the backend rather than fixed at creation.
+	 */
+	private resumeRef: string | undefined;
 	private readonly snapshots: SnapshotStore;
+	private readonly store: AgentStore;
+	/** Restored from disk and not yet started — a row you can read but nothing is running. */
+	private readonly restored: boolean;
+	private readonly createdAt: number;
+	private saving: ReturnType<typeof setTimeout> | undefined;
 	private currentMode: AgentMode | undefined;
 
 	/**
@@ -221,6 +260,60 @@ export class DeckAgent {
 
 	private publishContext(): void {
 		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
+		// The boards are part of the record, and this is not a transcript change, so the
+		// translator's hook does not cover it.
+		this.save();
+	}
+
+	// --- the record on disk (§6.2) ----------------------------------------------------
+
+	/**
+	 * Note that something worth keeping changed, and write it shortly.
+	 *
+	 * Debounced because the transcript changes many times a turn — every message, every
+	 * tool result — and the record is a whole-file write. A second is short enough that a
+	 * `node --watch` restart lands after it and long enough that a turn costs one write
+	 * rather than thirty.
+	 *
+	 * **An agent nobody has spoken to is not written down.** `focused()` creates one on
+	 * demand so a deck is never agentless, so without this rule every boot would leave an
+	 * empty "Agent" row behind and the list would fill with them.
+	 */
+	private save(): void {
+		if (this.translator.userMessages().length === 0) return;
+		if (this.saving) return;
+		this.saving = setTimeout(() => {
+			this.saving = undefined;
+			this.flush();
+		}, 1000);
+	}
+
+	/** Write the record now. */
+	private flush(): void {
+		if (this.translator.userMessages().length === 0) return;
+		// Taken from the backend each time: a rewind moves the session, and a ref from
+		// start() would point at the branch that was abandoned.
+		this.resumeRef = this.backend?.sessionRef() ?? this.resumeRef;
+		this.store.write(this.record(), this.translator.history());
+	}
+
+	private record(): AgentRecord {
+		return {
+			id: this.id,
+			kind: this.kind,
+			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
+			name: this.identity.name,
+			...(this.identity.avatar ? { avatar: this.identity.avatar } : {}),
+			color: this.identity.color,
+			...(this.parentId ? { parentId: this.parentId } : {}),
+			context: [...this.held],
+			inPlay: [...this.playing],
+			createdAt: this.createdAt,
+			// The last thing actually said, not the time of this write — it is what the list
+			// is ordered by and what `prune` keeps, so a flush on shutdown must not make an
+			// old chat look like the newest one.
+			lastAt: this.translator.lastLine()?.at ?? this.createdAt,
+		};
 	}
 
 	/**
@@ -231,6 +324,12 @@ export class DeckAgent {
 	 * otherwise would silently start a new conversation.
 	 */
 	start(): Promise<void> {
+		// Returned before anything is built, not just before the promise is replaced. The
+		// memo below is on `starting` alone, so every call used to construct a fresh stage
+		// tool and context and throw them away — which was invisible while `start()` was
+		// called once at creation, and is not now that a prompt is what starts an agent.
+		if (this.starting) return this.starting;
+
 		const tool = createStageTool({
 			stage: this.stage,
 			agent: this.stageHooks(),
@@ -254,6 +353,9 @@ export class DeckAgent {
 					id: this.id,
 					usage: this.backend.usage() ?? { contextTokens: null, contextWindow: 0, cost: 0 },
 				});
+				// A finished turn is the point worth being durable at, rather than a second
+				// later: it is also the first moment the session ref exists to be stored.
+				this.flush();
 			},
 			tool,
 			stageAgent: this.stageHooks(),
@@ -438,11 +540,13 @@ export class DeckAgent {
 		this.identity = { ...this.identity, name };
 		this.backend?.setName(name);
 		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
+		this.save();
 	}
 
 	setAvatar(url: string | undefined): void {
 		this.identity = { ...this.identity, avatar: url };
 		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
+		this.save();
 	}
 
 	get color(): string {
@@ -462,8 +566,10 @@ export class DeckAgent {
 			unread: 0,
 			contextCount: this.held.length,
 			kind: this.kind,
-			capabilities: this.backend?.capabilities ?? { modes: [] },
+			capabilities: this.backend?.capabilities ?? capabilitiesOf(this.kind),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
+			// Restored and untouched: readable, but nothing is running until it is prompted.
+			...(this.restored && !this.starting ? { dormant: true as const } : {}),
 		};
 	}
 
@@ -484,7 +590,25 @@ export class DeckAgent {
 	}
 
 	dispose(): void {
+		// Before the backend goes: `flush` asks it for the session to resume, and a disposed
+		// one cannot answer. A pending debounce is cancelled because this write supersedes it.
+		if (this.saving) clearTimeout(this.saving);
+		this.saving = undefined;
+		this.flush();
 		this.bridge.dispose();
 		this.backend?.dispose();
 	}
+}
+
+/**
+ * What a runtime can do, without an instance of it.
+ *
+ * A dormant chat has no backend to ask, but its row still has to say whether the mode
+ * control belongs on it — and capabilities are a property of the runtime, not of a session,
+ * which is why both backends declare them as a module constant. `session.ts` is already the
+ * only file that knows both runtimes exist, so the mapping belongs here rather than in the
+ * neutral interface.
+ */
+function capabilitiesOf(kind: AgentKind): AgentCapabilities {
+	return kind === "claude" ? CLAUDE_CAPABILITIES : PI_CAPABILITIES;
 }

@@ -129,10 +129,15 @@ export class App {
 	attach(hub: Hub): void {
 		this.hub = hub;
 		this.watch();
-		// One agent from the start. Starting it is asynchronous and may fail (no
-		// credentials, most often), and that failure belongs in its own transcript
-		// rather than in the way of the deck.
-		this.agents.create();
+		/*
+		 * The deck's own chat list first, then one agent only if it had none.
+		 *
+		 * Restored chats start nothing, so this is a directory read rather than fifteen
+		 * runtimes. Starting a *new* agent is asynchronous and may fail (no credentials, most
+		 * often), and that failure belongs in its own transcript rather than in the way of the
+		 * deck.
+		 */
+		if (this.agents.restore() === 0) this.agents.create();
 	}
 
 	private watch(): void {
@@ -586,7 +591,9 @@ export class App {
 		this.revisions.setDeck(this.deck);
 		// An agent's cwd is the deck, and a Pi session's cwd cannot move, so opening
 		// another deck starts again rather than re-pointing what is running.
-		void this.agents.reset(this.deck).then(() => this.agents.create());
+		void this.agents.reset(this.deck).then(() => {
+			if (this.agents.restore() === 0) this.agents.create();
+		});
 		this.watch();
 		this.send({ type: "deck.state", deck: this.deck.state() });
 		for (const warning of this.deck.warnings) this.send({ type: "notice", level: "warn", text: warning });

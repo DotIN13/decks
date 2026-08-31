@@ -1785,6 +1785,49 @@ svg.lucide {
 	margin-left: 12px;
 }
 
+/*
+ * A chat from a previous run, with nothing running behind it.
+ *
+ * Dimmed rather than marked with an icon, because "not resumed yet" is an absence and a
+ * badge would make it look like a status the agent chose. Opacity is on the wrapper so the
+ * avatar, the runtime mark and the name all recede together; hover and selection bring it
+ * back to full strength, since by then you are about to open it.
+ */
+.chat-row-wrap[data-dormant="true"] {
+	opacity: 0.55;
+}
+
+.chat-row-wrap[data-dormant="true"]:hover,
+.chat-row-wrap[data-dormant="true"]:has(.chat-row[data-current="true"]) {
+	opacity: 1;
+}
+
+/*
+ * The line between this run's chats and the ones restored from disk.
+ *
+ * A label rather than a rule, because a bare `border-top` in a list of rounded rows reads
+ * as a mistake. `::after` draws the rule so the text can sit at the left and the line take
+ * whatever is left, without a wrapper element or a background-colour trick that would have
+ * to know the panel's colour.
+ */
+.chats .earlier {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 10px 2px 4px;
+	color: var(--muted);
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.chats .earlier::after {
+	content: "";
+	flex: 1;
+	height: 1px;
+	background: var(--line);
+}
+
 .chat-row-wrap .close {
 	display: grid;
 	width: 20px;

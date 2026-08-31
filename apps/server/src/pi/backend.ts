@@ -25,10 +25,10 @@ import { handlePiEvent } from "./events.ts";
  * any permission gate (that is an extension's job — DESIGN §6.8).
  */
 /** Pi has no notion of asking first: that is an extension's business (§6.8). */
-const CAPABILITIES: AgentCapabilities = { modes: [] };
+export const PI_CAPABILITIES: AgentCapabilities = { modes: [] };
 
 export class PiBackend implements AgentBackend {
-	readonly capabilities = CAPABILITIES;
+	readonly capabilities = PI_CAPABILITIES;
 
 	private session!: AgentSession;
 	private modelRuntime!: ModelRuntime;
@@ -266,6 +266,11 @@ export class PiBackend implements AgentBackend {
 	 * file, which would hijack this session — so it runs on a throwaway manager opened
 	 * on the same path and only the filename is kept. (Picone found this one first.)
 	 */
+	/** The session file this conversation is being written to (`AgentBackend.sessionRef`). */
+	sessionRef(): string | undefined {
+		return this.session?.sessionManager.getSessionFile() ?? undefined;
+	}
+
 	async forkFrom(entryId: string): Promise<string | undefined> {
 		const entry = this.session.sessionManager.getEntry(entryId);
 		// Fork *before* the message, so the new chat opens with it unasked.

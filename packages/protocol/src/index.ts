@@ -99,6 +99,15 @@ export interface AgentChat {
 	capabilities: AgentCapabilities;
 	/** Absent when the runtime has no modes. */
 	mode?: AgentMode;
+	/**
+	 * Restored from a previous run and not yet resumed.
+	 *
+	 * The conversation is readable and the boards it held are known, but no runtime is
+	 * running behind it — the first prompt starts one. Drawn differently because the
+	 * distinction is real: a dormant chat cannot be aborted, has no model to report and
+	 * will take a moment longer to answer.
+	 */
+	dormant?: true;
 }
 
 export interface Identity {

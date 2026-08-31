@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
-import type { AgentChat, AgentKind, Camera, ServerMessage } from "@decks/protocol";
+import type { AgentChat, AgentKind, Camera, ChatItem, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import type { DelegateReport, DelegateSpec } from "../stage/tool.ts";
 import { DeckAgent } from "./session.ts";
 import { SnapshotStore } from "./snapshot.ts";
+import { AgentStore } from "./store.ts";
 
 /**
  * Which agents exist, and which one the browser is looking at.
@@ -21,12 +22,23 @@ const COLORS = ["#3b5cf6", "#2eaf5a", "#e7af36", "#623be2", "#d92e3c", "#0f9ba8"
  * at once produce a canvas nobody can follow and a bill nobody expected.
  */
 const MAX_CHILDREN = 4;
+/**
+ * How many past chats a deck keeps.
+ *
+ * A legibility limit again, not a storage one — the records are small. Every restart used to
+ * leave a conversation behind on disk, so a deck worked in daily would list dozens of rows
+ * nobody will open. The newest fifteen are the ones with any chance of being wanted; the
+ * rest are pruned when the deck opens.
+ */
+const KEEP_CHATS = 15;
 
 export class Registry {
 	private readonly agents: DeckAgent[] = [];
 	private focusedId: string | undefined;
 	/** Shared, so a fork can inherit the canvas of the agent it came from (§6.2). */
 	private readonly snapshots = new SnapshotStore();
+	/** The chat list on disk, so it survives a restart (§6.2). */
+	private store: AgentStore;
 
 	constructor(
 		private deck: Deck,
@@ -40,7 +52,9 @@ export class Registry {
 			recordRevision(path: string): string | undefined;
 			boardPathOf(file: string): string | undefined;
 		},
-	) {}
+	) {
+		this.store = new AgentStore(deck);
+	}
 
 	/** What every agent may know about the others — including itself. */
 	summaries(): Array<{ id: string; name: string; state: string; context: string[] }> {
@@ -63,7 +77,10 @@ export class Registry {
 			parentId?: string;
 			resumeRef?: string;
 			kind?: AgentKind;
+			color?: string;
 			forkedFrom?: { agentId: string; at: number };
+			/** Set only by `restore`: a chat from a previous run, with nothing running behind it. */
+			restored?: { id: string; items: ChatItem[]; context: string[]; inPlay: string[]; avatar?: string; createdAt: number };
 		} = {},
 	): DeckAgent {
 		const agent = new DeckAgent(
@@ -80,16 +97,60 @@ export class Registry {
 			},
 			{
 				...options,
-				color: COLORS[this.agents.length % COLORS.length]!,
+				color: options.color ?? COLORS[this.agents.length % COLORS.length]!,
 				kind: options.kind ?? this.host.defaultKind,
 				snapshots: this.snapshots,
+				store: this.store,
 			},
 		);
 		this.agents.push(agent);
 		this.focusedId ??= agent.id;
-		void agent.start();
+		/*
+		 * A restored chat starts nothing.
+		 *
+		 * Fifteen rows would otherwise mean fifteen runtimes at boot — fifteen model runtimes
+		 * for pi, fifteen CLI subprocesses for Claude — for conversations nobody has asked to
+		 * continue. `prompt()` already opens with `await this.start()` and `start()` is
+		 * memoised, so the first thing said to a dormant agent starts it.
+		 */
+		if (!options.restored) void agent.start();
 		this.publish();
 		return agent;
+	}
+
+	/**
+	 * Put the deck's chat list back (§6.2).
+	 *
+	 * Called once when the deck opens. Returns how many rows were restored, so the caller can
+	 * decide whether the deck still needs its first agent — a restored deck does not.
+	 */
+	restore(): number {
+		for (const { record, items } of this.store.prune(KEEP_CHATS).reverse()) {
+			this.create({
+				name: record.name,
+				kind: record.kind,
+				color: record.color,
+				...(record.resumeRef ? { resumeRef: record.resumeRef } : {}),
+				...(record.parentId ? { parentId: record.parentId } : {}),
+				restored: {
+					id: record.id,
+					items,
+					context: record.context,
+					inPlay: record.inPlay,
+					...(record.avatar ? { avatar: record.avatar } : {}),
+					createdAt: record.createdAt,
+				},
+			});
+		}
+		/*
+		 * Focus the newest, not the first one put back.
+		 *
+		 * `create` sets `focusedId ??=`, and the list is restored oldest-first so the colour
+		 * fallback lands in the original order — which together would focus the *oldest* chat.
+		 */
+		this.focusedId = this.agents.at(-1)?.id;
+		this.publish();
+		return this.agents.length;
 	}
 
 	get(id: string | undefined): DeckAgent | undefined {
@@ -121,8 +182,9 @@ export class Registry {
 	 * removing a parent must not take its children's work with it — they become top-level
 	 * chats instead of rows pointing at a parent that is gone.
 	 *
-	 * Nothing on disk is touched. The session file is the record of the conversation; this
-	 * closes a chat.
+	 * The chat's own record goes with it (`agents/store.ts`), or it would be restored on the
+	 * next boot. What is *not* touched is the runtime's session file: pi's and Claude's
+	 * transcript directories are theirs, and closing a chat is not deleting a conversation.
 	 */
 	remove(id: string): { removed: boolean; reason?: string } {
 		const index = this.agents.findIndex((agent) => agent.id === id);
@@ -133,6 +195,9 @@ export class Registry {
 		this.agents.splice(index, 1);
 		agent.dispose();
 		this.snapshots.forget(id);
+		// After `dispose`, which flushes the record — deleting first would leave that write
+		// to put it straight back, and the row would return on the next restart.
+		this.store.forget(id);
 		for (const child of this.agents) child.orphan(id);
 
 		// The focus moves to whatever is nearest, or to a new agent on the next request —
@@ -232,6 +297,7 @@ export class Registry {
 		this.agents.length = 0;
 		this.focusedId = undefined;
 		this.deck = deck;
+		this.store.setDeck(deck);
 	}
 
 	dispose(): void {

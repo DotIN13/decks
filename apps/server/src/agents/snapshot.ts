@@ -11,11 +11,17 @@ import type { StageSnapshot } from "../stage/tool.ts";
  * *replaces* the text the model reads. So both runtimes use this instead, and there is one
  * mechanism to be wrong in rather than two.
  *
- * **In memory, not on disk.** Nothing recreates agents when the server restarts — a fresh
- * process has a fresh chat list — so a snapshot has nothing to survive *to*. What it does
- * have to survive is a rewind inside a session and a fork seeding its child, both of which
- * happen while the process is up. A file would be honest-looking machinery for a
- * capability that does not exist.
+ * **In memory, not on disk** — still, but not for the reason first given here. That reason
+ * was "nothing recreates agents when the server restarts, so a snapshot has nothing to
+ * survive *to*", and `agents/store.ts` made it false: a chat is now restored with the boards
+ * it was holding. The resolved sets live in that record, which is the thing that had to be
+ * durable.
+ *
+ * What is kept here is the *series*, and it is in memory because of what it is for: answering
+ * "what was on the canvas at that point?" during a rewind, and seeding a fork from its
+ * parent. Both happen while the process is up, and neither survives a restart in any runtime
+ * — a rewind reaches into a live session tree. Persisting the series would be honest-looking
+ * machinery for a capability that still does not exist.
  *
  * Kept as a series rather than one value per agent, because a rewind asks a question about
  * the past: *what was on the canvas at that point?* Resolved by time, the same way

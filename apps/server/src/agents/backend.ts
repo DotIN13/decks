@@ -82,6 +82,19 @@ export interface AgentBackend {
 
 	// --- the session tree (§6.7, the time machine) ---------------------------------
 
+	/**
+	 * A handle that reopens *this* conversation — what `resumeRef` will be next time.
+	 *
+	 * Both runtimes already hold it and neither exposed it: pi's is the session file path,
+	 * Claude's is the session id. Read after a turn rather than only at start, because a
+	 * rewind moves it — Claude's rewind is a fork it stays in, so the id changes and a
+	 * stored ref taken at start would point at the abandoned branch.
+	 *
+	 * `undefined` before the session exists, which is why an agent that has never run is
+	 * not worth persisting.
+	 */
+	sessionRef(): string | undefined;
+
 	/** The points in this conversation worth returning to: the user's messages. */
 	timeline(): ConversationPoint[];
 	/**

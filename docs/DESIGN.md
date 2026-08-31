@@ -325,6 +325,40 @@ resolve models and check credentials, so `start()` is a promise a prompt waits o
 failure to start (no credentials, usually) is a notice in that agent's own transcript
 rather than something that takes the deck down.
 
+**The chat list is a record, not a scratch buffer.** `agents/store.ts` keeps one directory
+per agent under `.decks/agents/<id>/`: `meta.json` is how to continue (the runtime, the ref
+to resume, and what the row says before anything starts) and `chat.json` is what to show.
+Before this, agents lived only in `Registry`'s array, so every restart emptied the list and
+`focused()` minted a replacement with a new id — and in development, where `node --watch`
+restarts the server on any source edit, that happened every few minutes. Nothing was ever
+corrupted; the runtimes keep their own transcripts, and Decks simply had no way back to them.
+
+Two properties make it cheap. **Restored chats start nothing** — `prompt()` already opens
+with `await this.start()` and `start()` is memoised, so a dormant row costs a directory read
+and the first thing said to it starts its runtime. Fifteen rows would otherwise mean fifteen
+model runtimes at boot. And **resuming is in place, not a fork**: pi reopens the session file
+with `SessionManager.open` and Claude passes `resume` without `forkSession`, so continuing a
+chat continues it. Fork stays what it is in §6.7 — a deliberate branch.
+
+Three details that are decisions rather than mechanics:
+
+- **The transcript is stored whole on each change, not appended to.** `ChatItem`s mutate
+  after they are pushed — deltas accumulate, tool calls gain results, an assistant turn that
+  only called tools is spliced out again — so an append log would persist half-built rows and
+  need a truncation pass for rewinds. Writing `history()` whole makes both vanish, and the
+  translator's 500-item cap bounds the file.
+- **An agent nobody spoke to is not written down.** `focused()` creates one on demand so a
+  deck is never agentless, so without this rule every boot would leave an empty row behind.
+- **Closing a chat deletes its record**, or it would return on the next restart. What it does
+  not touch is the runtime's own session file: pi's and Claude's transcript directories are
+  theirs, and closing a chat is not deleting a conversation.
+
+Because the id is part of the record, an avatar at `.decks/avatars/<id>.svg` resolves again
+after a restart; it used to be orphaned by the new id every time.
+
+What this does *not* recover is a turn that was in flight. A restart kills the reply being
+written, and the resumed session simply lacks its tail — persistence cannot help there.
+
 **Delegation** (`registry.spawn`) creates a child in-process — not a subprocess, as
 Pi's own subagent example does — because the child should share this deck's stage, so
 its boards land on the same canvas and its transcript is a row in the same chat list.
@@ -350,8 +384,12 @@ held, showed and called itself — was carried in a tool result's `details` and 
 the branch on `session_start`; MCP tool results have no `details`, and the SDK's
 `structuredContent` looks like the equivalent but *replaces* the text the model reads. It is
 now `agents/snapshot.ts`, a series resolved by time, the same way `App.boardsAt` picks which
-revision of a board to show. It is in memory rather than on disk because nothing recreates
-agents when the server restarts, so a snapshot has nothing to survive to. And the "the user
+revision of a board to show. It stays in memory, but no longer for the reason first given —
+"nothing recreates agents when the server restarts, so a snapshot has nothing to survive to"
+stopped being true the moment agents were persisted. What it survives *to* is now the record
+below, which stores the resolved context and in-play sets; the series itself is in memory
+because what it exists for — answering "what was on the canvas at that point?" during a
+rewind, and seeding a fork — only ever happens while the process is up. And the "the user
 edited a board" nudge was `pi.sendMessage({ deliverAs: "nextTurn" })`; it is now a queue on
 the agent, prepended to the next prompt, which keeps the property it was chosen for — a
 board edit is not an interruption — without needing the runtime's cooperation.

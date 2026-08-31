@@ -9,8 +9,9 @@ import type { AgentState, ChatItem, ServerMessage } from "@decks/protocol";
  * `pi/events.ts`, so a second agent backend would reuse this and rewrite that.
  *
  * The transcript is kept in memory as well as sent, because a browser that
- * reconnects needs the conversation back and the session file is Pi's format,
- * not ours. It is capped: the file is the record, this is the tail of it.
+ * reconnects needs the conversation back and the runtime's session file is its
+ * format, not ours. It is capped at the tail; `agents/store.ts` writes that tail
+ * to disk so a chat survives a restart, and `load` is how it comes back.
  */
 const KEEP = 500;
 
@@ -24,7 +25,37 @@ export class Translator {
 		private readonly emit: (message: ServerMessage) => void,
 		/** The deck, so a tool call on a board reads as `boards/plan.html`. */
 		private readonly deckPath?: string,
+		/**
+		 * The transcript reached a stable shape — persist it (`agents/store.ts`).
+		 *
+		 * Called where an item stops changing, not on every delta: a reply arrives a token
+		 * at a time and `endAssistant` is the point at which it is worth writing down. The
+		 * caller debounces anyway, so this is about not generating work rather than about
+		 * correctness.
+		 */
+		private readonly onChange?: () => void,
 	) {}
+
+	/**
+	 * Put a stored transcript back.
+	 *
+	 * The counterpart of `history()`, for an agent restored from disk before its runtime has
+	 * been started.
+	 *
+	 * `counter` is moved past the highest number any restored id used, rather than by the
+	 * number of items. Those are not the same: ids are minted per *item created*, and an
+	 * assistant turn that only called tools is spliced out again (`endAssistant`), so a
+	 * transcript of three items can have consumed five numbers. Counting items would then
+	 * re-mint `u4` for a message that already exists under that id, and since the browser
+	 * keys on ids, the new message would land on top of the old one.
+	 */
+	load(items: ChatItem[]): void {
+		this.items.push(...items);
+		for (const item of items) {
+			const used = Number(/(\d+)$/.exec(item.id)?.[1] ?? 0);
+			if (used > this.counter) this.counter = used;
+		}
+	}
 
 	private id(prefix: string): string {
 		return `${this.agentId}:${prefix}${++this.counter}`;
@@ -34,6 +65,7 @@ export class Translator {
 		this.items.push(item);
 		if (this.items.length > KEEP) this.items.splice(0, this.items.length - KEEP);
 		this.emit({ type: "chat.item", agentId: this.agentId, item });
+		this.onChange?.();
 		return item;
 	}
 
@@ -62,6 +94,7 @@ export class Translator {
 			? this.items.findIndex((item) => item.kind === "user" && item.text.trim() === needle)
 			: this.items.map((item) => item.kind).lastIndexOf("user");
 		if (index >= 0) this.items.splice(index);
+		this.onChange?.();
 		this.streaming = undefined;
 	}
 
@@ -82,6 +115,8 @@ export class Translator {
 		if (!item || item.kind !== "user" || item.entryId === entryId) return;
 		item.entryId = entryId;
 		this.emit({ type: "chat.item", agentId: this.agentId, item });
+		// Persisted, because this is what a restored message needs to be rewindable at all.
+		this.onChange?.();
 	}
 
 	/** The last thing said, for the chat list's preview line. */
@@ -159,6 +194,7 @@ export class Translator {
 			if (index !== -1) this.items.splice(index, 1);
 		}
 		this.emit({ type: "chat.item", agentId: this.agentId, item: this.itemOf(active.id) ?? { kind: "assistant", id: active.id, text: active.text, at: Date.now(), streaming: false } });
+		this.onChange?.();
 	}
 
 	// --- tools --------------------------------------------------------------------
@@ -175,6 +211,7 @@ export class Translator {
 
 	toolEnd(callId: string, text: string, isError: boolean, images: number): void {
 		this.patchTool(callId, { result: text, images, state: isError ? "error" : "done" });
+		this.onChange?.();
 	}
 
 	notice(level: "info" | "warn" | "error", text: string): void {

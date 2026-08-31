@@ -41,7 +41,7 @@ const CLI_MODE: Record<AgentMode, PermissionMode> = {
 	auto: "auto",
 };
 
-const CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "plan", "auto"] };
+export const CLAUDE_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "plan", "auto"] };
 
 /**
  * Boards are the medium, so edits inside the deck proceed unasked.
@@ -53,7 +53,7 @@ const CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "plan
 const DEFAULT_MODE: AgentMode = "acceptEdits";
 
 export class ClaudeBackend implements AgentBackend {
-	readonly capabilities = CAPABILITIES;
+	readonly capabilities = CLAUDE_CAPABILITIES;
 
 	private session!: Query;
 	/** Messages waiting to go into the open query. */
@@ -434,6 +434,16 @@ export class ClaudeBackend implements AgentBackend {
 	 * *inclusive* and Decks forks from *before* a message — so the new chat opens with it
 	 * unasked — which means cutting at the message before ours.
 	 */
+	/**
+	 * The session id to resume (`AgentBackend.sessionRef`).
+	 *
+	 * Reassigned by `rewindTo`, which forks and stays in the new session — so this is the
+	 * live branch rather than the one the agent started on.
+	 */
+	sessionRef(): string | undefined {
+		return this.sessionId;
+	}
+
 	async forkFrom(entryId: string): Promise<string | undefined> {
 		if (!this.sessionId) return undefined;
 		let messages: Awaited<ReturnType<typeof getSessionMessages>>;

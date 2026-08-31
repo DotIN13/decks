@@ -8,6 +8,7 @@ import { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import { DeckAgent } from "./session.ts";
 import { SnapshotStore } from "./snapshot.ts";
+import { AgentStore } from "./store.ts";
 
 /**
  * The two sets and the invariant between them (DESIGN §2).
@@ -23,8 +24,9 @@ function agentOn(boards: string[], options: { parentId?: string } = {}) {
 		writeFileSync(join(root, "boards", name), `<!doctype html><title>${name}</title><body class="board"></body>`);
 	}
 	const sent: ServerMessage[] = [];
+	const deck = Deck.open(root);
 	const agent = new DeckAgent(
-		Deck.open(root),
+		deck,
 		(message) => sent.push(message),
 		{} as StageService,
 		{
@@ -35,7 +37,9 @@ function agentOn(boards: string[], options: { parentId?: string } = {}) {
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color: "#000", kind: "pi", snapshots: new SnapshotStore(), ...options },
+		// Given a store, but nothing reaches it here: an agent with no user message is never
+		// written down, which is what keeps these tests off the disk.
+		{ color: "#000", kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck), ...options },
 	);
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");

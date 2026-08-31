@@ -37,6 +37,9 @@ export function ChatList(props: {
 		return roots.flatMap((root) => [root, ...childrenOf(root.id)]);
 	};
 
+	/** The first chat restored from a previous run, which is where the divider goes. */
+	const firstDormant = () => ordered().find((chat) => chat.dormant)?.id;
+
 	return (
 		<section class="chats">
 			<div class="rail-head">
@@ -111,65 +114,89 @@ export function ChatList(props: {
 			<div class="chat-rows">
 				<For each={ordered()}>
 					{(chat) => (
-						<div class="chat-row-wrap">
-							<button
-								type="button"
-								class="chat-row"
-								data-current={props.focused === chat.id}
-								data-child={Boolean(chat.parentId)}
-								onClick={() => props.onFocus(chat.id)}
-							>
-								<Avatar chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} />
-								<span class="who">
-									<span class="top">
-										{/*
-										 * The mark leads the row. Which runtime an agent is on cannot
-										 * change, so it belongs with the name rather than out at the
-										 * right with the things that do change.
-										 */}
-										<span class="runtime" data-kind={chat.kind} title={`Running on ${chat.kind}`}>
-											<AgentMark agent={chat.kind} size={13} />
-										</span>
-										<span class="name">{props.identities[chat.id]?.name ?? chat.name}</span>
-									</span>
-									<span class="bottom">
-										<span class="last">
-											<Show when={chat.parentId}>
-												<span class="tag">
-													<Icon of={CornerDownRight} size={11} />
-													{props.chats.find((other) => other.id === chat.parentId)?.name ?? "parent"}
-												</span>{" "}
-											</Show>
-											{chat.state === "idle" ? (chat.lastLine ?? "no messages yet") : working(chat.state)}
-										</span>
-									</span>
-								</span>
-							</button>
-
+						<>
 							{/*
-							 * A sibling of the row's button rather than a child of it — a button
-							 * inside a button is invalid — but inside the wrapper, which is the box
-							 * that draws the row and its highlight, so it reads as part of the row
-							 * rather than something floating in the gutter beside it.
+							 * Where the chats from previous runs begin.
 							 *
-							 * The chat closes; the conversation does not. Its transcript is a session
-							 * file on disk, which is why this needs no confirmation — and why the
-							 * label says "close" rather than "delete".
+							 * A sibling of the row rather than a child of it: `.chat-row-wrap` is the
+							 * box that draws the row's highlight, so a divider inside one would be
+							 * highlighted along with it on hover.
+							 *
+							 * Drawn before the first dormant row rather than around all of them, so it
+							 * costs one element and cannot disagree with the ordering — the server
+							 * restores oldest-first and `ordered()` keeps that order, so every dormant
+							 * row follows every live one.
 							 */}
-							<button
-								class="close"
-								type="button"
-								title={`Close this chat with ${props.identities[chat.id]?.name ?? chat.name}`}
-								aria-label={`Close this chat with ${props.identities[chat.id]?.name ?? chat.name}`}
-								onClick={(event) => {
-									// Without this the row underneath takes the focus on the way past.
-									event.stopPropagation();
-									props.onRemove(chat.id);
-								}}
-							>
-								<Icon of={X} size={13} />
-							</button>
-						</div>
+							<Show when={chat.id === firstDormant()}>
+								<span class="earlier">earlier</span>
+							</Show>
+							<div class="chat-row-wrap" data-dormant={chat.dormant === true}>
+								<button
+									type="button"
+									class="chat-row"
+									data-current={props.focused === chat.id}
+									data-child={Boolean(chat.parentId)}
+									onClick={() => props.onFocus(chat.id)}
+								>
+									<Avatar chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} />
+									<span class="who">
+										<span class="top">
+											{/*
+											 * The mark leads the row. Which runtime an agent is on cannot
+											 * change, so it belongs with the name rather than out at the
+											 * right with the things that do change.
+											 */}
+											<span class="runtime" data-kind={chat.kind} title={chat.dormant ? `On ${chat.kind} — not resumed yet` : `Running on ${chat.kind}`}>
+												<AgentMark agent={chat.kind} size={13} />
+											</span>
+											<span class="name">{props.identities[chat.id]?.name ?? chat.name}</span>
+										</span>
+										<span class="bottom">
+											<span class="last">
+												<Show when={chat.parentId}>
+													<span class="tag">
+														<Icon of={CornerDownRight} size={11} />
+														{props.chats.find((other) => other.id === chat.parentId)?.name ?? "parent"}
+													</span>{" "}
+												</Show>
+												{chat.state === "idle" ? (chat.lastLine ?? (chat.dormant ? "not resumed yet" : "no messages yet")) : working(chat.state)}
+											</span>
+										</span>
+									</span>
+								</button>
+
+								{/*
+								 * A sibling of the row's button rather than a child of it — a button
+								 * inside a button is invalid — but inside the wrapper, which is the box
+								 * that draws the row and its highlight, so it reads as part of the row
+								 * rather than something floating in the gutter beside it.
+								 *
+								 * The chat closes; the conversation does not. The runtime's own transcript
+								 * stays where it is — pi's and Claude's session directories are theirs, and
+								 * this does not touch them — which is why the label says "close" rather
+								 * than "delete".
+								 *
+								 * It does now drop the row from the deck's list for good, so it will not be
+								 * back after a restart the way it would have been before agents were
+								 * persisted. Still unconfirmed: a chat is cheap to start again, and a
+								 * confirm on every close is the kind of friction that makes people keep
+								 * rows they do not want.
+								 */}
+								<button
+									class="close"
+									type="button"
+									title={`Close this chat with ${props.identities[chat.id]?.name ?? chat.name}`}
+									aria-label={`Close this chat with ${props.identities[chat.id]?.name ?? chat.name}`}
+									onClick={(event) => {
+										// Without this the row underneath takes the focus on the way past.
+										event.stopPropagation();
+										props.onRemove(chat.id);
+									}}
+								>
+									<Icon of={X} size={13} />
+								</button>
+							</div>
+						</>
 					)}
 				</For>
 			</div>
