@@ -65,15 +65,16 @@ deck directory.
   canvas. The agent writes them with its ordinary tools; you drag, resize, retype and
   insert with a palette. Both edits land in the same file, and a drag rewrites exactly
   one attribute.
-- **And most of a board is editable by hand.** Double-click any line of text — a card's
-  heading and its paragraph are separate edits — and the selection gets an inspector:
-  what kind of box it is (text · sticky · card · panel · callout), its tone, what an
-  embed points at and which pages of a PDF, where a connector ends and what it is
-  labelled, its name, its order, a copy of it. Arrows are drawn by clicking their two
-  ends. What it offers is exactly what the board stylesheet already styles, and every
-  change lands as a splice of the lines it named — so the file an agent reads back is
-  still one it recognises, and an edit it cannot do that way is refused with a reason
-  rather than half-applied.
+- **And most of a board is editable by hand.** Double-click any run of words the board
+  named — a card's heading and its paragraph are separate edits, and a markdown or
+  Mermaid component opens its whole source — and the selection gets an inspector: what
+  kind of box it is (text · sticky · card · callout), its tone, what an embed points at
+  and which pages of a PDF, its name, its order, a copy of it. A run is editable when the
+  file says so, with a `data-edit` naming it, which is also what earns it an underline
+  under the cursor. What the inspector offers is exactly what the board stylesheet
+  already styles, and every change lands as a splice of the lines it named — so the file
+  an agent reads back is still one it recognises, and an edit it cannot do that way is
+  refused with a reason rather than half-applied.
 - **One tool for the canvas.** `stage_eval` runs TypeScript against a typed API
   (`runtime/stage.d.ts`, injected into the agent's context verbatim): start a board, put
   boards in play, hold others in context, rearrange, name itself, draw its own avatar,
@@ -113,8 +114,8 @@ deck directory.
 
 ## Development
 ```bash
-npm test            # 177 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
-npm run test:e2e    # 168 browser checks against a throwaway copy of example/ (~65s)
+npm test            # 200 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
+npm run test:e2e    # 215 browser checks against a throwaway copy of example/ (~60s)
 npm run typecheck
 npm run vendor      # re-copy the board primitives into runtime/lib
 ```

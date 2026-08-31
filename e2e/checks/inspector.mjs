@@ -76,7 +76,7 @@ const original = `<!doctype html>
 			empty line in the middle: the editor shows this dedented and puts the indentation
 			back, so a commit that changed nothing would write the same bytes.
 		-->
-		<div class="panel" data-id="notes" data-md data-edit="notes-md" style="left: 520px; top: 140px; width: 420px; height: 170px">
+		<div class="card" data-id="notes" data-md data-edit="notes-md" style="left: 520px; top: 140px; width: 420px; height: 170px">
 			## What lands
 
 			1. The heading above is drawn, not written.

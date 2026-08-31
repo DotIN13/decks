@@ -559,6 +559,71 @@ test("a row wrapping two named spans is markup, and cannot itself be named", () 
 	assert.throws(() => applyPatches(onTheRow, [{ op: "text", edit: "rollout-row-1", text: "week 1 — flag" }]), PatchRefused);
 });
 
+// --- data-edit: "false" is the one value that is never a name ---------------------
+
+/*
+ * These replace six tests from the other line of this branch, which covered
+ * `data-edit="false"` as a subtree seal over editability that was otherwise inferred: a
+ * declaration changing nothing, a seal refusing, a seal covering a subtree, a seal on a
+ * whole component, only "false" sealing, and a seal leaving move and rename alone. All
+ * six addressed the run with `{ id, path }`, and the seal is gone with the path — under
+ * this rule a run with no name is not editable, so omitting the name already does
+ * everything a seal did.
+ *
+ * What survives is the reservation, and these are the tests for it. An author who read
+ * that other guidance would write `data-edit="false"` to turn editing off, and with the
+ * name as the address it would do the opposite: mint a retypeable run called `false`.
+ */
+
+const RESERVED = `<body class="board">
+	<section class="card metrics" data-id="throughput" style="left: 48px; top: 48px; width: 320px">
+		<h3 data-edit="throughput-title">Throughput</h3>
+		<span class="value" data-edit="false">2,455</span>
+	</section>
+</body>
+`;
+
+test('data-edit="false" is refused as a name, and the reason says what to do instead', () => {
+	assert.throws(
+		() => applyPatches(RESERVED, [{ op: "text", edit: "false", text: "9,001" }]),
+		(error: unknown) => {
+			assert.ok(error instanceof PatchRefused);
+			assert.match(error.message, /data-edit="false" is not a name — omit the attribute/);
+			return true;
+		},
+	);
+	// And the refusal is the whole batch: nothing was spliced on the way to it.
+	assert.throws(
+		() =>
+			applyPatches(RESERVED, [
+				{ op: "text", edit: "throughput-title", text: "Requests" },
+				{ op: "text", edit: "false", text: "9,001" },
+			]),
+		PatchRefused,
+	);
+});
+
+test('only "false" is reserved — every other value is an ordinary name', () => {
+	// Reserving anything that merely looks boolean would be a second rule to remember,
+	// and `true` or `yes` on a run is an author naming it badly rather than sealing it.
+	for (const value of ["true", "yes", "False", "false-start"]) {
+		const board = RESERVED.replace('data-edit="false"', `data-edit="${value}"`);
+		const { html } = applyPatches(board, [{ op: "text", edit: value, text: "9,001" }]);
+		assert.match(html, /9,001/, `data-edit="${value}" should be a usable name`);
+	}
+});
+
+test("a run the author did not name is not editable, which is what a seal used to be for", () => {
+	const unnamed = RESERVED.replace(' data-edit="false"', "");
+	assert.throws(
+		() => applyPatches(unnamed, [{ op: "text", edit: "throughput-value", text: "9,001" }]),
+		/nothing on this board is called data-edit="throughput-value"/,
+	);
+	// The named heading beside it still retypes, so this is the absence of a name and not
+	// a component-wide refusal.
+	assert.match(applyPatches(unnamed, [{ op: "text", edit: "throughput-title", text: "Requests" }]).html, /Requests/);
+});
+
 test("a class swap on an invented component keeps the class it invented", () => {
 	const { html } = applyPatches(INVENTED, [{ op: "update", id: "rollout", class: "callout phases" }]);
 	assert.match(html, /<section class="callout phases" data-id="rollout"/);

@@ -284,6 +284,25 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
  * a name two things have, and content that is markup rather than text.
  */
 function retype(html: string, document: Node, edit: string, incoming: string): { html: string; summary: string; id: string } {
+	/*
+	 * `"false"` is reserved, and is never an address.
+	 *
+	 * The other line of this branch had `data-edit` as an optional *hint* — editability
+	 * stayed inferred, the attribute bought a hover affordance, and `data-edit="false"`
+	 * sealed an element and its subtree, refused here by a `refuseIfSealed` that is gone
+	 * with the index path it walked. That mechanism was discarded rather than merged:
+	 * under this one nothing is editable unless the author named it, so omitting the name
+	 * *is* the seal and a seal has nothing left to do.
+	 *
+	 * What does not go away is the author who read that guidance. Writing
+	 * `data-edit="false"` to turn editing off would, with the name as the address, do the
+	 * exact opposite — create an editable run *called* `false`, retypeable by anyone who
+	 * double-clicks it. So the value is refused in both places, here and in
+	 * `Editor.beginEditing`, rather than merely left undocumented.
+	 */
+	if (edit === "false") {
+		throw new PatchRefused(`data-edit="false" is not a name — omit the attribute to make a run uneditable`);
+	}
 	const found = findByEdit(document, edit);
 	if (found.length === 0) throw new PatchRefused(`nothing on this board is called data-edit="${edit}"`);
 	/*

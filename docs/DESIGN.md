@@ -519,6 +519,19 @@ collapses into document flow. So the removal is only safe paired with rewriting 
 that used one, which is why the fixtures, the templates and the skill changed in the same
 commit.
 
+**A `data-edit` earns a hover underline, and `"false"` is reserved.** The name is the
+whole address (§6.5), so an element carrying one is exactly an editable element — which
+is what makes the affordance safe to draw: a dotted underline under the cursor answers
+"can I type here" where the question is asked, and it cannot promise a retype that will
+then be refused. The other line of this branch arrived at the same underline from the
+opposite direction, as a *hint* over editability that stayed inferred, with
+`data-edit="false"` sealing an element and its subtree. The seal is discarded — under this
+rule there is nothing to seal, because a run with no name is already not editable — but
+`"false"` stays reserved and refused in both places (`Editor.nameOf`, `patch.retype`).
+That is not tidiness. With the name as the address, an author who wrote
+`data-edit="false"` meaning to turn editing off would create an editable run *called*
+`false`, which is the one way this attribute could do the opposite of what it says.
+
 **The inspector is a floating panel, not a sidebar.** It appears at the top right for
 the selection and only above `INTERACT_ZOOM`, the rule the palette already documents —
 below that a board is a tile on a map, its frame takes no pointer events, and there is

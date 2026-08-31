@@ -137,6 +137,32 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		@media (pointer: coarse) {
 			.decks-handle { width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 6px; }
 		}
+
+		/*
+		 * An editable run says so under the cursor. (No backticks in here: this is a
+		 * template literal, and one would end it.)
+		 *
+		 * Kept from the other line of this branch, where the attribute was an optional
+		 * hint over inferred editability. It is a better affordance under this rule than
+		 * it was under that one: there, an underline could appear on a run the two hard
+		 * rules would then refuse — a leaf whose content is markup, a heading a
+		 * [data-md] only rendered — and promise something that would not happen. Here an
+		 * element carrying a data-edit is exactly an editable one, so the underline
+		 * cannot lie.
+		 *
+		 * The false exclusion is not a seal. Nothing is sealed any more; the value is
+		 * simply refused as an address (see patch.ts retype), so it must not be offered.
+		 *
+		 * Only on hover, and only an underline: the point is to answer "can I type here"
+		 * at the moment somebody wonders, not to draw boxes over a finished board. It
+		 * needs no zoom guard — below INTERACT_ZOOM the frame takes no pointer events, so
+		 * nothing in it can be hovered.
+		 */
+		[data-edit]:not([data-edit="false"]):hover {
+			text-decoration: underline dotted var(--b-faint, #9aa0aa);
+			text-underline-offset: 3px;
+			cursor: text;
+		}
 	`;
 	doc.head.appendChild(style);
 	cleanups.push(() => style.remove());
@@ -576,6 +602,26 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	};
 
 	/**
+	 * The name an element carries, or `undefined` if it has none to carry.
+	 *
+	 * `"false"` is reserved and is never an address. The other line of this branch had
+	 * `data-edit="false"` seal an element and its subtree, over editability that was
+	 * otherwise inferred; that seal is discarded, because under this rule nothing is
+	 * editable unless it was named and so omitting the name already *is* the seal.
+	 *
+	 * The value is still refused rather than left undocumented, and this is the reason.
+	 * An author who read that other guidance would write `data-edit="false"` meaning to
+	 * turn editing off, and with the name *as* the address it would do the exact
+	 * opposite: mint an editable run called `false` that anybody can double-click. The
+	 * server refuses the same value (`retype` in patch.ts), so the reservation holds
+	 * whether or not it was this UI that sent the patch.
+	 */
+	const nameOf = (element: HTMLElement): string | undefined => {
+		const name = element.dataset.edit;
+		return name === undefined || name === "false" ? undefined : name;
+	};
+
+	/**
 	 * Start typing over something, however the user asked for it.
 	 *
 	 * Two gestures reach here. A double-click, which is what a mouse has always done —
@@ -606,7 +652,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 */
 		const drawn = clicked.closest("[data-md], [data-mermaid]") as HTMLElement | null;
 		if (drawn && component.contains(drawn)) {
-			const named = drawn.dataset.edit;
+			const named = nameOf(drawn);
 			if (!named) {
 				if (mouse) host.notice("That panel's source has no name in the file — ask the agent for a data-edit on it.");
 				return false;
@@ -653,6 +699,16 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			if (mouse) host.notice("That run has markup inside it — the words themselves need naming, not the paragraph.");
 			return false;
 		}
+		// Said plainly rather than folded into the notice above, because the two are
+		// different mistakes: that one is an author who named the wrong element, this is
+		// one who wrote the reserved value meaning to seal. Not resolved by looking further
+		// up for a real name either — an author who wrote `false` here was aiming at *this*
+		// element, and quietly retyping its parent instead is the worse answer.
+		const name = nameOf(run);
+		if (name === undefined) {
+			if (mouse) host.notice('data-edit="false" is not a name — ask the agent to drop the attribute instead.');
+			return false;
+		}
 		const before = run.textContent ?? "";
 		run.contentEditable = "true";
 		run.focus();
@@ -661,7 +717,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * fires `focusout` synchronously, and this handler commits on `focusout` — so a
 		 * state set first would be committed by the very act of starting to edit.
 		 */
-		editing = { kind: "run", element: run, edit: run.dataset.edit!, before };
+		editing = { kind: "run", element: run, edit: name, before };
 		const range = doc.createRange();
 		range.selectNodeContents(run);
 		win.getSelection()?.removeAllRanges();

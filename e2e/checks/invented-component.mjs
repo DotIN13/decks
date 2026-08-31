@@ -7,6 +7,11 @@
  * failure here means the documentation is lying to every agent that reads it — which is a
  * worse bug than a broken control, because nobody would think to check.
  *
+ * It also carries the one value that is not a name. `data-edit="false"` came from the
+ * other line of this branch, where it sealed a subtree; the seal is gone but the value is
+ * still refused, because with the name as the address it would otherwise mint an editable
+ * run called `false`.
+ *
  * The board also carries its own `<style>`, because "your CSS goes in the board" is the
  * other half of the advice and would be worthless if board.js touched it.
  */
@@ -46,6 +51,7 @@ write(
 			<h3 data-edit="rollout-title">Rollout</h3>
 			<div class="phase"><span class="when" data-edit="rollout-when-1">week 1</span><span data-edit="rollout-what-1">Lock behind a flag</span></div>
 			<div class="phase"><span class="when" data-edit="rollout-when-2">week 2</span><span data-edit="rollout-what-2">Ramp to 10%</span></div>
+			<span class="computed" data-edit="false">2,455 so far</span>
 		</section>
 		<script src="../lib/board.js"></script>
 	</body>
@@ -127,6 +133,55 @@ try {
 		"and the retype touched one line and nothing else",
 		retyped.split("\n").filter((line, index) => line !== swapped.split("\n")[index]).length === 1,
 	);
+
+	// --- data-edit: the affordance, and the one value that is not a name ---------------
+
+	// Two plain strings out of the frame, not the rule: a CSSStyleRule does not survive
+	// Playwright's serialisation, and reading them here is what lets both assertions
+	// report the selector they were given when one of them fails.
+	const rule = await frame()
+		.locator("[data-id='rollout'] h3")
+		.evaluate((el) => {
+			// :hover cannot be forced from script, so ask the rule itself.
+			const sheet = [...el.ownerDocument.styleSheets].find((s) =>
+				[...(s.cssRules ?? [])].some((r) => r.selectorText?.includes("data-edit")),
+			);
+			const found = [...(sheet?.cssRules ?? [])].find((r) => r.selectorText?.includes("data-edit"));
+			return { selector: found?.selectorText ?? "", decoration: found?.style?.textDecoration ?? "" };
+		});
+	say(
+		"a named run is underlined under the cursor, so you can see where to type",
+		rule.selector.includes(":hover") && rule.decoration.includes("underline"),
+		`${rule.selector} { text-decoration: ${rule.decoration} }`,
+	);
+	say(
+		"and the underline does not reach the reserved value, which is not editable",
+		rule.selector.includes(':not([data-edit="false"])'),
+		rule.selector,
+	);
+
+	/*
+	 * `data-edit="false"` is the reserved value, and this is the assertion that keeps it
+	 * reserved. The other line of this branch made it a subtree seal over inferred
+	 * editability; here the name *is* the address, so an author writing it to turn editing
+	 * off would otherwise get an editable run called `false` — the opposite of what they
+	 * asked for. It is refused in the browser and in the server, and this checks the
+	 * browser end and that nothing reached the file.
+	 */
+	const before = read(fixture);
+	const reserved = await frame().locator("[data-id='rollout'] .computed").boundingBox();
+	await page.mouse.dblclick(reserved.x + reserved.width / 2, reserved.y + reserved.height / 2);
+	await page.waitForTimeout(400);
+	say(
+		'data-edit="false" is not typed into, and says why rather than failing silently',
+		await frame()
+			.locator("[data-id='rollout'] .computed")
+			.evaluate((el) => el.isContentEditable === false),
+	);
+	const notices = await page.locator(".notice").allTextContents();
+	say("the refusal reaches the user", notices.some((text) => /is not a name/.test(text)), notices.join(" | "));
+	await page.waitForTimeout(600);
+	say("and the file is untouched by the attempt", read(fixture) === before);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));
 } finally {
