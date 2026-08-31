@@ -1,6 +1,6 @@
 ---
 name: board-authoring
-description: How to write a board — the document and its metadata, positioning on the canvas, the built-in component classes (card, panel, sticky, callout, kpi, table, chip, connectors), markdown, maths, Mermaid, embeds, custom components of your own, and `data-edit` for declaring which text the user may retype. Read before answering on a board or building one with anything beyond cards and text.
+description: How to write a board — the document and its metadata, positioning on the canvas, the built-in component classes (card, panel, sticky, callout, kpi, table, chip), markdown, maths, Mermaid, embeds, custom components of your own, and `data-edit` for declaring which text the user may retype. Read before answering on a board or building one with anything beyond cards and text.
 ---
 
 # Board authoring
@@ -122,18 +122,6 @@ data-tone="ok"
 ```
 
 Omitting the tone uses the default accent treatment.
-
-## Connectors
-
-An `svg.link` draws an arrow between two components by id, routed from the nearest facing
-sides and redrawn whenever either end moves:
-
-```html
-<svg class="link" data-id="goal-approach" data-from="goal" data-to="approach" data-label="how"></svg>
-```
-
-No `style` is needed — a connector covers the whole board and takes clicks only on its
-own line. `data-tone="accent"` is available.
 
 ## Markdown and maths
 
