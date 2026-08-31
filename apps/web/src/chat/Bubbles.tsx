@@ -103,19 +103,13 @@ export function Bubbles(props: {
 			 * Guarding `onScroll` for the animation's duration would work too, but the
 			 * duration belongs to the browser and the guard would be a magic number. There is
 			 * also nothing to animate for: the panel is sliding in over the same frames, so
-			 * the smoothness was never visible. The ring below is what points at the turn.
+			 * the smoothness was never visible.
+			 *
+			 * Nothing marks the turn once it is there, either. A pulsing ring used to, and it
+			 * looked cheap — the position *is* the answer to "which turn", and a panel that
+			 * has just slid in with that turn at its top needs no second announcement.
 			 */
 			element.scrollIntoView({ block: "start", behavior: "auto" });
-			// A ring, not a wash: animating `background-color` replaced the bubble's own
-			// colour for the length of the animation, so a user message flashed from blue
-			// to nothing and back.
-			element.animate(
-				[
-					{ boxShadow: "0 0 0 3px color-mix(in srgb, var(--color-accent) 55%, transparent)" },
-					{ boxShadow: "0 0 0 3px transparent" },
-				],
-				{ duration: 1100, easing: "ease-out" },
-			);
 		});
 	});
 
