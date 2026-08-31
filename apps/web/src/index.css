@@ -454,6 +454,20 @@ svg.lucide {
 
 .rail .items {
 	display: flex;
+	/*
+	 * A pixel of room for the current board's ring.
+	 *
+	 * The selected item is a 1px border plus a 1px `box-shadow` *outside* its box, and this
+	 * is a scroll container: setting `overflow-y` makes `overflow-x` compute to `auto` as
+	 * well, so anything painted outside the item is clipped. With the items exactly as wide
+	 * as the content box, the accent showed on the top and bottom edges and was cut off down
+	 * both sides.
+	 *
+	 * Padding rather than an inset shadow, which was the other candidate: an inset shadow
+	 * paints on the element's own background, underneath its children, and the thumbnail is
+	 * opaque — so it would have been hidden everywhere except the label strip.
+	 */
+	padding: 1px;
 	overflow-y: auto;
 	/* `min-height: 0` is what makes the scroll real. A flex child defaults to
 	   `min-height: auto`, which refuses to shrink below its content, so a rail of

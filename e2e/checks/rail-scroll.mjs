@@ -113,6 +113,52 @@ try {
 	);
 	say("scrolling back re-mounts the first board", true);
 
+	/*
+	 * The selected board's ring has to be inside the clip region on every side.
+	 *
+	 * It is a 1px border plus a 1px `box-shadow` outside the item's box, and the list is a
+	 * scroll container — setting `overflow-y` makes `overflow-x` compute to `auto` too — so
+	 * anything painted outside the item is clipped. Measured against the *padding* box,
+	 * which is where a scroll container clips; measuring against the content box says
+	 * nothing, and told me the fix had not worked when it had.
+	 */
+	await page.locator(".side .rail .rail-item").first().click();
+	await settle(page, 900);
+	await page.mouse.move(6, 400);
+	await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
+	await settle(page, 300);
+
+	const ring = await page.evaluate(() => {
+		const list = document.querySelector(".side .rail .items");
+		const current = document.querySelector('.side .rail .rail-item[data-current="true"]');
+		if (!current) return { current: false };
+		const style = getComputedStyle(list);
+		const box = list.getBoundingClientRect();
+		const item = current.getBoundingClientRect();
+		// The clip edge: the padding box, i.e. inside any border on the container.
+		const clip = {
+			left: box.left + parseFloat(style.borderLeftWidth),
+			right: box.right - parseFloat(style.borderRightWidth),
+			top: box.top + parseFloat(style.borderTopWidth),
+		};
+		// How thick the ring is, read from the shadow rather than assumed.
+		const spread = Math.ceil(parseFloat((getComputedStyle(current).boxShadow.match(/(\d+(?:\.\d+)?)px\s*$/) ?? ["", "1"])[1]));
+		return {
+			current: true,
+			spread,
+			left: Math.round((item.left - clip.left) * 10) / 10,
+			right: Math.round((clip.right - item.right) * 10) / 10,
+			top: Math.round((item.top - clip.top) * 10) / 10,
+		};
+	});
+	say("a board is selected, so it has a ring to draw", ring.current);
+	say(
+		"the selected board's ring is not clipped down its sides",
+		ring.left >= ring.spread && ring.right >= ring.spread,
+		`${ring.left}px left, ${ring.right}px right, for a ${ring.spread}px ring`,
+	);
+	say("…nor at the top of the list", ring.top >= ring.spread, `${ring.top}px above`);
+
 	say("no page errors", errors.length === 0, errors.join(" | "));
 } finally {
 	for (const file of made) rmSync(file, { force: true });
