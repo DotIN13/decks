@@ -512,12 +512,18 @@ have, so swapping one in produces a component whose content no longer fits it.
 
 `panel` was a fifth and is gone. It differed from `card` in two declarations — a deeper
 background and no shadow — which is too little to choose between under pressure, and the
-inspector offered the choice on every box. Deleting it is not free, because the class list
-that carried it is also what gives a component `position: absolute`: a board still saying
-`class="panel"` does not merely lose a colour, it drops out of absolute positioning and
-collapses into document flow. So the removal is only safe paired with rewriting the boards
+inspector offered the choice on every box. A board still saying `class="panel"` gets a box
+with no padding, no border and no background: the words are still where the author put
+them, because `body.board > *` positions every top-level component regardless of its class,
+but it no longer looks like anything. So the removal is paired with rewriting the boards
 that used one, which is why the fixtures, the templates and the skill changed in the same
 commit.
+
+An earlier version of this paragraph claimed such a board "drops out of absolute
+positioning and collapses into document flow". That was read off the `.card, .sticky, …`
+selector list without checking whether anything else granted it, and `body.board > *` does
+— so it is true only of a *nested* `class="panel"`, which was never a component anyway. The
+action was right and the stated failure was worse than the real one.
 
 **A `data-edit` earns a hover underline, and `"false"` is reserved.** The name is the
 whole address (§6.5), so an element carrying one is exactly an editable element — which
