@@ -55,24 +55,57 @@ export function Bubbles(props: {
 		if (pinned() && stream) stream.scrollTop = stream.scrollHeight;
 	});
 
+	/**
+	 * The scroll request already carried out, so it is not carried out again.
+	 *
+	 * `scrollTo` is not a one-shot event — it is also what the spine reads to mark the block
+	 * you are looking at, so `App` keeps it set and only clears it when the agent changes.
+	 * This effect additionally depends on `open` and on the item count, and the combination
+	 * made the transcript unusable: every reopen, and every message that arrived, replayed
+	 * the jump to a turn clicked long ago. Scrolling back down was pointless because the next
+	 * frame threw you up again.
+	 *
+	 * Keyed on `at` as well as `id`, so clicking the same block twice is a new request and
+	 * does return to it.
+	 */
+	let travelled: string | undefined;
+
 	/*
 	 * Opened at a turn, not at the bottom.
 	 *
 	 * The reason to reach for a transcript is usually something specific that scrolled
 	 * away, so a click on the spine brings that turn to the top of the column and stops
 	 * following the bottom until you scroll back down to it.
-	 *
-	 * Keyed on `at` as well as `id` so clicking the same block twice returns to it.
 	 */
 	createEffect(() => {
 		const target = props.scrollTo;
 		if (!target || !props.open || !stream) return;
+		const key = `${target.id}:${target.at}`;
+		if (travelled === key) return;
 		props.items.length;
 		requestAnimationFrame(() => {
 			const element = stream.querySelector(`[data-item="${cssEscape(target.id)}"]`);
+			// Not marked as travelled: the column can be open before its history has
+			// arrived, and this effect re-runs when the items do. Marking here would swallow
+			// the one request that was going to work.
 			if (!element) return;
+			travelled = key;
 			setPinned(false);
-			element.scrollIntoView({ block: "start", behavior: "smooth" });
+			/*
+			 * Instant, not smooth, because smooth lost a fight with the effect above.
+			 *
+			 * A jump almost always starts from the bottom — you have been watching the reply
+			 * arrive. The first frames of a smooth scroll are therefore still *at* the bottom,
+			 * so `onScroll` read slack ≈ 0, re-pinned, and the follow-the-bottom effect
+			 * immediately yanked the column back down. Clicking a block looked like it did
+			 * nothing at all, and whether it worked came down to timing.
+			 *
+			 * Guarding `onScroll` for the animation's duration would work too, but the
+			 * duration belongs to the browser and the guard would be a magic number. There is
+			 * also nothing to animate for: the panel is sliding in over the same frames, so
+			 * the smoothness was never visible. The ring below is what points at the turn.
+			 */
+			element.scrollIntoView({ block: "start", behavior: "auto" });
 			// A ring, not a wash: animating `background-color` replaced the bubble's own
 			// colour for the length of the animation, so a user message flashed from blue
 			// to nothing and back.

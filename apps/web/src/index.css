@@ -1091,7 +1091,7 @@ svg.lucide {
 /* The newest reply, flowing above the input bar. */
 .latest {
 	display: flex;
-	max-height: 5.5em;
+	max-height: 7em;
 	align-items: flex-start;
 	padding: 7px 6px 7px 10px;
 	border: 1px solid var(--line);
@@ -1102,9 +1102,23 @@ svg.lucide {
 	gap: 4px;
 }
 
+/*
+ * What was said, and what is running, stacked.
+ *
+ * `min-width: 0` because this is a flex child holding text that must be allowed to
+ * ellipsize — without it the working row's title sets the floor and pushes the whole strip
+ * as wide as a shell command.
+ */
+.latest .stack {
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	flex-direction: column;
+	gap: 3px;
+}
+
 .latest .body {
 	max-height: 4.1em;
-	flex: 1;
 	padding: 0;
 	overflow-y: auto;
 	border: 0;
@@ -1132,6 +1146,56 @@ svg.lucide {
 /* While it is still arriving, the text is the live thing on screen. */
 .latest[data-streaming="true"] .body {
 	color: var(--fg);
+}
+
+/*
+ * The tool in flight, under whatever was last said.
+ *
+ * One line, always: a strip over the canvas that grows with the length of a command is a
+ * strip that moves the input bar around. The dot and the animation are the ones a running
+ * tool already has in the transcript (`.tool[data-state="running"]`), so the same state
+ * reads the same way in both places.
+ */
+.latest .working {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--muted);
+	cursor: pointer;
+	font: inherit;
+	font-size: 11px;
+	gap: 6px;
+	text-align: left;
+}
+
+.latest .working .state {
+	width: 6px;
+	height: 6px;
+	flex: none;
+	border-radius: 50%;
+	background: var(--color-warn);
+	animation: pulse 1.2s ease-in-out infinite;
+}
+
+.latest .working .name {
+	flex: none;
+	color: var(--fg);
+	font-variant-numeric: tabular-nums;
+}
+
+.latest .working .what {
+	overflow: hidden;
+	color: var(--faint);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.latest .working .more {
+	flex: none;
+	color: var(--faint);
 }
 
 .latest .dismiss {
