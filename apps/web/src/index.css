@@ -2231,6 +2231,21 @@ svg.lucide {
 		grid-template-rows: calc(52px + env(safe-area-inset-top)) 1fr;
 	}
 
+	/*
+	 * The blur behind the floating chrome is the expensive thing to recompose on a
+	 * phone: whatever moves under a sheet — a panning canvas above all — forces the
+	 * blur region to be re-rasterised at the device's pixel ratio, every frame. The
+	 * panels are already 88% opaque, so the blur is frosting rather than legibility,
+	 * and frosting is the one thing a drag can spare. Kept on fine pointers, where
+	 * the compositor is not on the same battery.
+	 */
+	.panel-float,
+	.latest,
+	.rail,
+	.notice {
+		backdrop-filter: none;
+	}
+
 	.titlebar .icon-button,
 	.zoombar .icon-button {
 		width: 44px;
@@ -2378,16 +2393,30 @@ svg.lucide {
 }
 
 @media (max-width: 760px) {
-	/* The model, the thinking level and the mode do not fit on one line beside the send
-	   button at this width; wrapped, they are three rows of real controls instead of
-	   three ellipses. */
+	/*
+	 * One line, always: the model, the thinking level and (where present) the mode
+	 * share the row beside the send button, each truncating its own label rather than
+	 * wrapping the bar onto a second row. Three wrapped rows made the dock up to three
+	 * times as tall — and the panels measure themselves against the dock, so they sat
+	 * higher on the screen than the bar they were meant to sit above. A truncated
+	 * label on a phone is a fine trade: the picker is full-screen when opened; it is
+	 * the bar that has to fit.
+	 */
 	.composer .controls {
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 	}
 
 	.composer select {
-		max-width: 46%;
-		flex: 1;
+		min-width: 0;
+		max-width: none;
+		flex: 1 1 0;
+	}
+
+	/* The context meter is the first thing to give way: the least-used control in the
+	   bar and the one with the most words. The cost it reports is still in the column
+	   on hover (desktop), so nothing is lost but the bar's own width. */
+	.composer .usage {
+		display: none;
 	}
 
 	/*
@@ -2403,14 +2432,23 @@ svg.lucide {
 		   desktop — and the spine is gone below this width. */
 		right: max(8px, env(safe-area-inset-right));
 		/*
-		 * Both sheets stop above the dock, so the composer is never the thing a panel
-		 * covers: it is how you answer whatever you opened the panel to read. `--dock` is
-		 * the dock's measured height (`App` publishes it), because the dock holds a reply,
-		 * a permission question and an input bar in whatever combination is currently
-		 * true — the 88px fallback is the desktop constant, and it sat on the composer.
+		 * To the bottom of the screen, past the dock. The dock — the last reply, a
+		 * question, the input bar — is what made the sheets stop 88px up, which on a
+		 * phone is a large margin of mostly empty chrome under the thing you opened.
+		 * A sheet that reaches the bottom leaves no such gap. The composer sits behind
+		 * the sheet while it is open, which is the point: the sheet you opened *is*
+		 * the conversation, and it dismisses by a swipe or a tap on the title bar.
 		 */
-		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+		bottom: max(8px, env(safe-area-inset-bottom));
 		width: auto;
+	}
+
+	/* A sidebar for the boards, not a takeover: the rail was two-thirds empty width
+	   stretched across the screen, and a narrower panel leaves a strip of canvas
+	   beside it — which is the difference between chrome and a wall. */
+	.side {
+		right: auto;
+		width: min(340px, 78vw);
 	}
 
 	/* Each one still slides in from its own edge: a transform is the one property that

@@ -1,7 +1,8 @@
 import type { AgentChat, ChatItem, Identity } from "@decks/protocol";
-import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { ToolChip } from "./ToolChip.tsx";
+import { attachSwipeClose } from "./swipe-close.ts";
 
 /**
  * The conversation, as bubbles at the edge of the canvas.
@@ -34,9 +35,22 @@ export function Bubbles(props: {
 	onRestore: (entryId: string) => void;
 	/** An item to bring into view — the turn the spine was clicked at. */
 	scrollTo?: { id: string; at: number };
+	/** A way to dismiss the sheet: the right-swipe hands the finger's intent here. */
+	onClose: () => void;
 }) {
 	let stream!: HTMLDivElement;
+	let sheet!: HTMLElement;
 	const [pinned, setPinned] = createSignal(true);
+
+	/*
+	 * A swipe toward the right edge puts the sheet away, and releasing mid-gesture puts
+	 * it back — the same rule iOS and Android use for a sheet. Vertical drags inside
+	 * the stream are never touched, so scrolling the history still scrolls.
+	 */
+	onMount(() => {
+		const detach = attachSwipeClose(sheet, () => props.open, props.onClose);
+		onCleanup(detach);
+	});
 
 	/*
 	 * Follow the bottom by watching it, not by holding it: a stream that scrolls
@@ -118,6 +132,7 @@ export function Bubbles(props: {
 	return (
 		<section
 			class="panel-float chat"
+			ref={sheet}
 			data-previewing={props.previewing}
 			data-open={props.open}
 			data-unread={props.unread && !props.open}

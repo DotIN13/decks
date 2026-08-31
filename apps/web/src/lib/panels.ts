@@ -175,8 +175,27 @@ function createPanel(side: Side, width: () => number): Panel {
 			}
 		},
 		hold: setHeld,
-		toggle: () => setTapped((was) => !was),
-		close: () => setTapped(false),
+		toggle: () => {
+			setTapped((was) => {
+				// A tap that closes a panel opens it again by the same tap: whatever held
+				// it open is done too, or the panel would stay up with no way to put it
+				// down (a touchscreen has no cursor to wander away).
+				if (was) setHeld(false);
+				return !was;
+			});
+		},
+		/**
+		 * Closed for good, even if it was held open.
+		 *
+		 * ``setTapped`` alone leaves a held panel open — clicking a turn on the spine
+		 * sets a hold, and then nothing on a touchscreen would dismiss it. A swipe or a
+		 * tap on the other panel is not “leave the cursor alone for a moment”; it is
+		 * “I am done here”, and the hold goes too.
+		 */
+		close: () => {
+			setTapped(false);
+			setHeld(false);
+		},
 	};
 }
 

@@ -1056,6 +1056,7 @@ export function App() {
 					pinned={panels.right.pinned()}
 					unread={Boolean(state.focused && unread[state.focused])}
 					onPin={panels.right.setPinned}
+					onClose={() => panels.right.close()}
 					scrollTo={atTurn()}
 					onPreview={(entryId) => {
 						if (!state.focused) return;
