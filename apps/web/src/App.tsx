@@ -1148,7 +1148,7 @@ export function App() {
 				</div>
 
 				<div class="panel-float zoombar">
-					<button type="button" title="Fit all (0)" onClick={() => fitAll(state.boards, setCamera)}>
+					<button type="button" title="Fit all (0)" onClick={() => fitAll(stageBoards(), setCamera)}>
 						fit
 					</button>
 					<span class="level">{Math.round(camera().zoom * 100)}%</span>
