@@ -151,6 +151,18 @@ export async function ready(page, { timeout = 30000 } = {}) {
 	);
 }
 
+/**
+ * Wait for the canvas to be empty.
+ *
+ * The counterpart of `ready`, and needed as often: an agent holding nothing puts nothing in
+ * play, so a check that has just created one is waiting for boards to *go* rather than to
+ * arrive. Asserting on an empty canvas without waiting is how you assert on the moment
+ * before it emptied.
+ */
+export async function emptyCanvas(page, { timeout = 15000 } = {}) {
+	await page.waitForFunction(() => document.querySelectorAll(".board-node").length === 0, null, { timeout });
+}
+
 /** Wait for one board to finish mounting, by deck-relative path. */
 export async function boardReady(page, path, { timeout = 30000 } = {}) {
 	await page.waitForSelector(`.board-node[data-path="${path}"] iframe`, { timeout });

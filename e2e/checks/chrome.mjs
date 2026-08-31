@@ -4,7 +4,7 @@
  *
  * Needs a model — the tool chips being measured are real tool calls.
  */
-import { ask, boardPath, open, read, say, settle } from "../harness.mjs";
+import { ask, boardPath, open, read, say, settle, socket } from "../harness.mjs";
 
 const plan = await boardPath("plan.html");
 
@@ -78,6 +78,19 @@ const turn = await page.evaluate(() => {
 say("the user message carries the time machine", turn.actions.join(" · ") === "rewind · fork · restore boards", turn.actions.join(" · "));
 say("the actions are hidden until hovered", turn.hiddenByDefault === 0, `opacity ${turn.hiddenByDefault}`);
 
+/*
+ * A board has to be in play for there to be a preview.
+ *
+ * This agent read three boards and attached none, and an agent holding nothing now puts
+ * nothing on the canvas (§2) — so there was no frame whose `src` could swap to a revision,
+ * and the assertion read `undefined`. Played over the socket rather than asked for, because
+ * what is being tested here is the chrome, not the agent's judgement.
+ */
+const link = await socket();
+link.send({ type: "board.play", path: "boards/plan.html" });
+await page.waitForSelector('.board-node[data-path="boards/plan.html"] iframe', { timeout: 10000 });
+await settle(page, 600);
+
 // Hovering rewind previews instantly; the transcript is not dimmed.
 const before = read(plan);
 await page.locator(".chat .turn-row").first().hover();
@@ -113,5 +126,6 @@ await settle(page, 3000);
 const churn = await page.evaluate(() => ({ churn: window.__churn, hovered: document.querySelectorAll(".turnbar .turn:hover").length }));
 say("hovering a spine block does not rebuild it", churn.churn === 0 && churn.hovered === 1, `${churn.churn} node changes, ${churn.hovered} hovered`);
 
+link.close();
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

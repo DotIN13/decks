@@ -5,7 +5,7 @@
  * socket — no model needed. The agent-side half (`attach`/`show` from `stage_eval`) is
  * checked in stage-api.mjs, which does need one.
  */
-import { deckState, open, ready, say, settle, socket } from "../harness.mjs";
+import { deckState, emptyCanvas, open, say, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const paths = deck.boards.map((board) => board.path).sort();
@@ -14,15 +14,20 @@ const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 const onCanvas = () => page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
 const inRail = () => page.evaluate(() => [...document.querySelectorAll(".rail-item .file")].map((n) => n.textContent).sort());
 
-// A fresh agent holds nothing, so the canvas falls back to the whole deck. Without that
-// fallback a new agent on an existing deck opens onto a blank canvas and reads as data loss.
+/*
+ * A fresh agent holds nothing, so it puts nothing on the canvas — and the rail still lists
+ * the whole deck, so nothing is hidden. The canvas used to fall back to every board, which
+ * claimed the agent was working from all of them and made its first act, narrowing to one,
+ * look like boards disappearing.
+ */
 await page.mouse.move(6, 480);
 await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
 await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 await settle(page, 1200);
+await emptyCanvas(page);
+say("an agent holding nothing puts nothing on the canvas", (await onCanvas()).length === 0, (await onCanvas()).join(" ") || "(empty)");
+say("…while the rail still lists the whole deck", (await inRail()).join() === paths.join(), (await inRail()).join(" "));
 await page.mouse.move(800, 500);
-await ready(page);
-say("an agent holding nothing shows the whole deck", (await onCanvas()).join() === paths.join(), (await onCanvas()).join(" "));
 
 // Holding two boards narrows the canvas to them.
 const two = paths.slice(0, 2);

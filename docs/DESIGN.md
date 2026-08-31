@@ -53,10 +53,18 @@ dropping it from context. That asymmetry is deliberate: the canvas is the user's
 they may clear it, but an agent's context is its own, and a user quietly removing a board
 the agent is reasoning from would be a bug they could not see.
 
-**An agent holding nothing shows the whole deck.** Without that fallback a fresh agent on
-an existing deck would open on a blank canvas and look broken. It is one rule in two
-places — `railBoards` in the client and the stage — and it is why a new agent is useful
-before it has done anything.
+**An agent holding nothing lists the whole deck and shows none of it.** The two tiers
+answer the empty case differently, and the difference is the point: the rail is how you
+find a board, so it lists everything there is to find; the canvas is what an agent put in
+play, so it holds nothing until something does.
+
+Both used to fall back to the whole deck, on the argument that a fresh agent opening onto a
+blank canvas reads as data loss. That was wrong about which state misleads. A canvas showing
+every board claims the agent is working from all of them, and it made the first useful thing
+an agent does — narrowing to the one board it is answering on — look like the rest of the
+deck being deleted. An empty canvas beside a full rail states the truth up front instead of
+contradicting itself one turn later. The cost is honest and worth naming: the first screen
+of a new deck is a grid with nothing on it, and finding the boards means the rail.
 
 **A deleted board has to leave the context with it**, or the fallback is one path away from
 never firing. A board that is gone still resolves to nothing in the rail and matches nothing

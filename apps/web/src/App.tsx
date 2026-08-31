@@ -508,7 +508,13 @@ export function App() {
 		return paths.filter((path) => known.has(path));
 	});
 
-	/** The focused agent's boards, in attach order — or the whole deck if it holds none. */
+	/**
+	 * The focused agent's boards, in attach order — or the whole deck if it holds none.
+	 *
+	 * The one place the empty-context fallback survives, and deliberately: the rail is how
+	 * you find a board, so it lists everything there is to find. The canvas is what an agent
+	 * put in play, so it lists nothing until something does.
+	 */
 	const railBoards = createMemo(() => {
 		if (held().length === 0) return state.boards;
 		const byPath = new Map(state.boards.map((board) => [board.path, board]));
@@ -519,14 +525,20 @@ export function App() {
 	});
 
 	/**
-	 * What is on the canvas: the focused agent's in-play set.
+	 * What is on the canvas: the focused agent's in-play set, and nothing else.
 	 *
-	 * An agent holding nothing shows the whole deck — without that, a fresh agent on a
-	 * deck full of work would open onto a blank canvas, which reads as data loss rather
-	 * than as an empty context.
+	 * An agent holding nothing shows *no* boards. The rail still lists the whole deck
+	 * (`railBoards` above), so nothing is hidden — what is empty is the canvas, which is
+	 * the honest reading of "this agent has not put anything in play".
+	 *
+	 * This used to fall back to the whole deck, on the argument that a fresh agent opening
+	 * onto a blank canvas reads as data loss. The argument was wrong about which state is
+	 * misleading: a canvas showing every board in the deck claims the agent is working from
+	 * all of them, and it made the first thing an agent did — narrowing to one board — look
+	 * like boards disappearing. An empty canvas beside a full rail says what is true, and
+	 * says it before anything has happened rather than after.
 	 */
 	const stageBoards = createMemo(() => {
-		if (held().length === 0) return state.boards;
 		const playing = new Set(state.focused ? state.inPlay[state.focused] ?? [] : []);
 		return state.boards.filter((board) => playing.has(board.path));
 	});
