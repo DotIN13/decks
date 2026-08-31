@@ -32,6 +32,12 @@
 }
 
 :root {
+	/*
+	 * How much of the window the browser is covering from below — the on-screen
+	 * keyboard, mostly. Kept true by `lib/viewport.ts`; 0 everywhere else, so every
+	 * rule that adds it reads exactly as it did before it existed.
+	 */
+	--keyboard: 0px;
 	--bg: var(--color-grey-100);
 	--bg-deep: var(--color-grey-200);
 	--panel: rgb(255 255 255 / 88%);
@@ -66,66 +72,158 @@ body,
 	margin: 0;
 }
 
+html {
+	/* A phone in landscape enlarges body text by its own factor, which on a canvas
+	   app moves every panel and none of the boards. The canvas has its own zoom. */
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
 body {
 	overflow: hidden;
+	/* No rubber band: the whole app is one screen, nothing here scrolls the document,
+	   and a bounce at the edge of a canvas reads as the canvas coming loose. */
+	overscroll-behavior: none;
 	background: var(--bg);
 	color: var(--fg);
 	font-family: var(--font-sans);
 	font-size: 13px;
 	-webkit-font-smoothing: antialiased;
+	/* Kills the 300ms wait for a second tap, and with it the double-tap zoom, on the
+	   chrome — where a double-tap means nothing and the delay is felt on every button.
+	   The stage sets `none` for itself; the frames do it in `frame-gestures.ts`. */
+	touch-action: manipulation;
 }
 
 /* --- app chrome -------------------------------------------------------------- */
 
+/*
+ * Lucide icons, wherever they land.
+ *
+ * Only `flex: none` is really ours — Tailwind's preflight already makes an `svg` a
+ * block, which is what stops an icon reserving a descender under itself and sitting a
+ * pixel low beside its label. What is left is the rule that an icon is never the thing
+ * that gives way: every one of these sits in a flex row next to a label that can be a
+ * long path, and a shrunk icon is a squashed icon. Size, colour and stroke are
+ * deliberately absent — they come from the `Icon` wrapper in `icons.tsx`, so the weight
+ * is one decision in one place.
+ */
+svg.lucide {
+	flex: none;
+}
+
+/*
+ * A button whose whole label is an icon.
+ *
+ * Named rather than inferred, because the sizing is the point: a fixed square with the
+ * icon gridded into the middle, instead of the `font-size` each of these used to carry
+ * to talk a text glyph into looking centred. The two selectors are spelled out because
+ * `.zoombar button` already sets a padding and would otherwise win.
+ */
+.titlebar .icon-button,
+.zoombar .icon-button {
+	display: grid;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	color: var(--faint);
+	place-items: center;
+}
+
+.titlebar .icon-button:hover,
+.zoombar .icon-button:hover {
+	color: var(--fg);
+}
+
 .app {
 	display: grid;
 	height: 100%;
-	grid-template-rows: 40px 1fr;
+	/* The title bar grows into the notch rather than hiding under it; on everything
+	   without one the inset is 0 and this is the 40px it always was. */
+	grid-template-rows: calc(40px + env(safe-area-inset-top)) 1fr;
 }
 
 .titlebar {
 	display: flex;
 	gap: 12px;
 	align-items: center;
-	padding: 0 12px;
+	padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
 	border-bottom: 1px solid var(--line);
 	background: var(--bg);
 	-webkit-app-region: drag;
 }
 
-/* The runtime a row is running on: present, and quiet. */
+/*
+ * The runtime's mark, leading the row.
+ *
+ * A mark rather than the word. It was a text chip reading PI or CLAUDE — a lot of furniture
+ * for a fact that never changes, and at 9px uppercase it read as a label stuck on the name
+ * rather than as part of it. `flex: none` because a long name should take the room, not the
+ * mark.
+ */
 .chat-row .runtime {
-	padding: 1px 5px;
-	border-radius: 5px;
-	background: var(--line);
+	display: flex;
+	flex: none;
+	/*
+	 * Centred on the line, not sat on the baseline.
+	 *
+	 * The row is `align-items: baseline`, which is right for the name and the time — two
+	 * runs of text at different sizes. An SVG has no baseline, so a browser aligns its
+	 * bottom edge to the text's instead, which left the mark's ink 2.5px above the centre
+	 * of the name beside it.
+	 */
+	align-self: center;
+	align-items: center;
 	color: var(--faint);
-	font-size: 9px;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
 }
 
-.chat-row .runtime[data-kind="claude"] {
-	background: color-mix(in oklab, var(--color-accent) 22%, transparent);
-	color: var(--fg);
+/* The name is what shrinks; the time keeps its place at the right. */
+.chat-row .top .name {
+	flex: 1;
 }
 
 /* Sits with the + rather than beside it: one control, two parts. */
-.chats .rail-head select.kind {
-	max-width: 62px;
-	padding: 2px 4px;
-	border: 0;
+/*
+ * What `+` will create: the runtime's mark, with the real select laid over it.
+ *
+ * A `<select>` sizes itself to its *widest* option, so a text label showing "pi" while
+ * "claude" existed left a gap before the chevron. A mark is the same width whichever runtime
+ * it is, which ends that problem rather than compensating for it.
+ *
+ * Quiet until hovered, like the two buttons beside it: a persistent fill made the widest
+ * control in the row also the loudest.
+ */
+.chats .rail-head .kind {
+	position: relative;
+	display: flex;
+	height: 22px;
+	align-items: center;
+	padding: 0 3px 0 6px;
 	border-radius: 6px;
-	background: transparent;
 	color: var(--faint);
 	cursor: pointer;
-	font: inherit;
 	font-size: 10px;
+	gap: 1px;
 }
 
-.chats .rail-head select.kind:hover {
+.chats .rail-head .kind:hover {
 	background: var(--line);
 	color: var(--fg);
 }
+
+/* Still the thing that is clicked, and still keyboard-reachable — just not the thing that
+   is seen. */
+.chats .rail-head .kind select {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	opacity: 0;
+	cursor: pointer;
+	font: inherit;
+}
+
 
 .titlebar .brand {
 	display: flex;
@@ -201,6 +299,11 @@ body {
 	top: -26px;
 	left: 0;
 	display: flex;
+	/* Clipped to the board's own on-screen width. The bar is counter-scaled, so its
+	   text is a constant size while the board shrinks — at 7% zoom, which is what
+	   fitting three boards into a phone comes to, the path label was three times the
+	   width of the board and written across the board next to it. */
+	overflow: hidden;
 	gap: 8px;
 	align-items: center;
 	width: 100%;
@@ -223,17 +326,18 @@ body {
 
 /* Takes the board off the canvas; appears on hover, like the message actions. */
 .board-node > .chrome .hide {
+	display: grid;
+	width: 18px;
+	height: 18px;
 	margin-left: auto;
-	padding: 0 5px;
+	padding: 0;
 	border: 0;
 	border-radius: 5px;
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
-	font: inherit;
-	font-size: 14px;
-	line-height: 1;
 	opacity: 0;
+	place-items: center;
 	transition: opacity 120ms ease;
 }
 
@@ -247,9 +351,21 @@ body {
 }
 
 .board-node > .chrome .file {
+	/*
+	 * The path is what gives way when the bar is clipped, and it takes saying so twice.
+	 * A nowrap flex item's automatic minimum size is its content, so it refused to shrink
+	 * at all and the *title* absorbed the whole overflow — a phone showed three board
+	 * paths and no board names. `overflow: hidden` is what lets it go below its content,
+	 * and the shrink factor is what makes it go first.
+	 */
+	overflow: hidden;
+	min-width: 0;
+	flex-shrink: 3;
 	color: var(--faint);
 	font-family: var(--font-mono);
 	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .board-node > .surface {
@@ -304,19 +420,54 @@ body {
 	gap: 6px;
 }
 
-.rail .rail-head {
+/*
+ * Both panel headers: a small-caps label at the left, its controls at the right.
+ *
+ * Written bare rather than under `.rail`, which is what it used to be — and `.chats` is
+ * `.rail`'s *sibling*, not its child, so the agent list's header matched none of this. It
+ * was a plain block, which is why its `flex: 1` spacer measured zero and its three controls
+ * crowded against the label, and why its label was body text while the boards rail's was
+ * small caps.
+ */
+.rail-head {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
 	justify-content: space-between;
-	padding: 2px 4px 6px;
+	gap: 6px;
 	color: var(--faint);
 	font-size: 11px;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 }
 
+.rail .rail-head {
+	padding: 2px 4px 6px;
+}
+
+/* The controls, as one thing: they belong to the label, not to the gap. */
+.rail-head .tools {
+	display: flex;
+	align-items: center;
+	flex: 0 0 auto;
+	gap: 2px;
+}
+
 .rail .items {
 	display: flex;
+	/*
+	 * A pixel of room for the current board's ring.
+	 *
+	 * The selected item is a 1px border plus a 1px `box-shadow` *outside* its box, and this
+	 * is a scroll container: setting `overflow-y` makes `overflow-x` compute to `auto` as
+	 * well, so anything painted outside the item is clipped. With the items exactly as wide
+	 * as the content box, the accent showed on the top and bottom edges and was cut off down
+	 * both sides.
+	 *
+	 * Padding rather than an inset shadow, which was the other candidate: an inset shadow
+	 * paints on the element's own background, underneath its children, and the thumbnail is
+	 * opaque — so it would have been hidden everywhere except the label strip.
+	 */
+	padding: 1px;
 	overflow-y: auto;
 	/* `min-height: 0` is what makes the scroll real. A flex child defaults to
 	   `min-height: auto`, which refuses to shrink below its content, so a rail of
@@ -391,7 +542,7 @@ body {
 
 .zoombar {
 	right: 26px;
-	bottom: 12px;
+	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
 	display: flex;
 	align-items: center;
 	padding: 4px;
@@ -415,19 +566,9 @@ body {
 }
 
 .titlebar .icon-button {
-	display: grid;
-	width: 28px;
-	height: 28px;
-	padding: 0;
-	color: var(--faint);
-	place-items: center;
 	/* The bar is a drag handle in a desktop shell, which would otherwise swallow the
 	   click before the button sees it. */
 	-webkit-app-region: no-drag;
-}
-
-.titlebar .icon-button:hover {
-	color: var(--fg);
 }
 
 .zoombar .level {
@@ -488,7 +629,7 @@ body {
 .chat {
 	top: 12px;
 	right: 12px;
-	bottom: 88px;
+	bottom: calc(88px + var(--keyboard) + env(safe-area-inset-bottom));
 	display: flex;
 	width: 380px;
 	flex-direction: column;
@@ -759,6 +900,16 @@ body {
 	white-space: nowrap;
 }
 
+/* The chevron that says the row opens. Turned, not swapped for a second icon. */
+.tool > .row .twist {
+	color: var(--faint);
+	transition: transform 120ms ease;
+}
+
+.tool > .row[data-open="true"] .twist {
+	transform: rotate(90deg);
+}
+
 .tool > .row .state {
 	width: 7px;
 	height: 7px;
@@ -889,10 +1040,35 @@ body {
  */
 .dock {
 	position: absolute;
-	bottom: 12px;
-	left: calc(50% - 90px);
+	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
+	left: 50%;
 	display: flex;
-	width: min(720px, calc(100% - 650px));
+	/*
+	 * Centred on the window, not on the gap between the panels.
+	 *
+	 * It used to sit at `calc(50% - 90px)`, which was exact rather than arbitrary: the
+	 * rail is 200px and the chat column 380px, and half that difference is 90px, so the
+	 * dock was centred in the room left between them. The trouble is that both panels
+	 * are away by default (§7) — so the measurement was right for the rare arrangement
+	 * and visibly off-centre for the usual one, which reads as a bug in the thing you
+	 * type into. Anchoring it to the panels' *state* instead would be worse: they open
+	 * on cursor proximity, so the input bar would slide sideways as you reached for
+	 * one.
+	 *
+	 * The width had to change with it, and this is the part that is easy to get wrong:
+	 * `calc(100% - 650px)` was the room left beside *both* panels added together, which
+	 * is the right sum only for a dock free to sit off-centre. Centred, the dock has to
+	 * clear the wider panel on both sides, so the reservation is twice the chat column
+	 * (380px + its 12px margin + a 12px gutter). Measured rather than reasoned: at
+	 * 1500px the old sum left a dock spanning 390–1110 against a panel starting at
+	 * 1100 — a ten-pixel overlap that the off-centre version never had.
+	 *
+	 * Under about 800px that width is a negative number — the dock was 0 pixels across
+	 * on a phone, which is not a degraded input bar but an invisible one — so the clamp
+	 * stops it going below something usable. Under 1100px the media query at the end of
+	 * this file goes full-width instead, which is where that clamp stops mattering.
+	 */
+	width: min(720px, max(320px, calc(100% - 808px)));
 	flex-direction: column;
 	align-items: stretch;
 	gap: 8px;
@@ -959,14 +1135,16 @@ body {
 }
 
 .latest .dismiss {
-	padding: 0 4px;
+	display: grid;
+	width: 20px;
+	height: 20px;
+	padding: 0;
 	border: 0;
 	border-radius: 6px;
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
-	font: inherit;
-	line-height: 1.2;
+	place-items: center;
 }
 
 .latest .dismiss:hover {
@@ -1017,6 +1195,19 @@ body {
 	color: var(--muted);
 	font: inherit;
 	font-size: 11px;
+}
+
+/*
+ * A circle, now that it is one icon rather than the word "send" or the word "stop".
+ * Square and centred so the two never change the bar's height between turns.
+ */
+.composer .send {
+	display: grid;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border-radius: 999px;
+	place-items: center;
 }
 
 .composer .send[data-busy="true"] {
@@ -1084,15 +1275,16 @@ body {
 }
 
 .palette button {
+	display: grid;
 	width: 30px;
 	height: 30px;
+	padding: 0;
 	border: 0;
 	border-radius: 8px;
 	background: transparent;
 	color: var(--muted);
 	cursor: pointer;
-	font-family: var(--font-sans);
-	font-size: 14px;
+	place-items: center;
 }
 
 .palette button:hover {
@@ -1102,6 +1294,200 @@ body {
 .palette button[data-active="true"] {
 	background: var(--color-accent);
 	color: #fff;
+}
+
+/* --- the inspector ----------------------------------------------------------- */
+
+/*
+ * The selection's properties (§6.5). Top right, not beside the palette: the notices
+ * land under the palette, and the palette is a row of 30px targets that a column of
+ * fields does not belong in.
+ *
+ * `right: 30px` is load-bearing. The chat panel opens when the cursor comes within
+ * `REACH` (26px) of the right edge (`lib/panels.ts`), so a panel any closer than that
+ * would pull the transcript over itself the moment you reached for it.
+ */
+.inspector {
+	top: 12px;
+	right: 30px;
+	display: flex;
+	width: 236px;
+	flex-direction: column;
+	padding: 8px;
+	gap: 6px;
+	font-size: 12px;
+}
+
+.inspector header {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--line);
+}
+
+/* Lets the selection go, which Escape also does — see the comment on the button. */
+.inspector header .close {
+	display: grid;
+	width: 22px;
+	height: 22px;
+	margin-left: auto;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	place-items: center;
+}
+
+.inspector header .close:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+.inspector header .what {
+	color: var(--faint);
+	font-size: 10px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.inspector .row {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+
+.inspector .row .label {
+	width: 34px;
+	flex: 0 0 auto;
+	color: var(--faint);
+	font-size: 11px;
+}
+
+.inspector .row .value {
+	overflow: hidden;
+	flex: 1;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.inspector input,
+.inspector select {
+	min-width: 0;
+	flex: 1;
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--bg);
+	color: var(--fg);
+	font: inherit;
+	font-family: var(--font-mono);
+	font-size: 11px;
+}
+
+.inspector input:focus,
+.inspector select:focus {
+	border-color: var(--color-accent);
+	outline: none;
+}
+
+/* The four interchangeable box classes, named rather than drawn: an icon for
+   "callout" is a guess the user has to decode, and the words are what an agent would
+   have written in the file anyway. */
+.inspector .boxes {
+	flex-wrap: wrap;
+	gap: 3px;
+}
+
+.inspector .boxes button {
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	font: inherit;
+	font-size: 10px;
+}
+
+.inspector .boxes button:hover {
+	background: var(--line);
+}
+
+.inspector .boxes button[data-active="true"] {
+	border-color: transparent;
+	background: var(--color-accent);
+	color: #fff;
+}
+
+/* A tone is a colour, so the control is the colour. */
+.inspector .tones button {
+	width: 15px;
+	height: 15px;
+	padding: 0;
+	border: 1px solid var(--line-strong);
+	border-radius: 999px;
+	cursor: pointer;
+}
+
+/* "Default" is the absence of `data-tone`, and the swatch says what the board will
+   draw rather than what the control is called — a callout with no tone is accent. Only
+   a callout has tones at all, which is why there is one default colour and not a rule
+   per family. */
+.inspector .tones button[data-tone="default"] {
+	background: var(--color-accent);
+}
+
+.inspector .tones button[data-tone="warn"] {
+	background: var(--color-warn);
+}
+.inspector .tones button[data-tone="danger"] {
+	background: var(--color-danger);
+}
+.inspector .tones button[data-tone="ok"] {
+	background: var(--color-ok);
+}
+
+.inspector .tones button[data-active="true"] {
+	box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--fg);
+}
+
+.inspector .acts {
+	padding-top: 6px;
+	border-top: 1px solid var(--line);
+}
+
+.inspector .acts .spacer {
+	flex: 1;
+}
+
+.inspector .row.file button,
+.inspector .acts button {
+	display: grid;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	place-items: center;
+}
+
+.inspector .row.file button:hover,
+.inspector .acts button:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+.inspector .acts button.danger:hover {
+	background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+	color: var(--color-danger);
 }
 
 .picker-backdrop {
@@ -1116,7 +1502,8 @@ body {
 .picker {
 	position: static;
 	display: flex;
-	width: 520px;
+	/* Wide enough to read a path on a laptop, never wider than the screen. */
+	width: min(520px, calc(100vw - 24px));
 	max-height: 70%;
 	flex-direction: column;
 	padding: 0;
@@ -1131,7 +1518,10 @@ body {
 }
 
 .picker header button {
-	padding: 2px 8px;
+	display: flex;
+	align-items: center;
+	padding: 2px 8px 2px 5px;
+	gap: 3px;
 	border: 1px solid var(--line);
 	border-radius: 7px;
 	background: var(--bg);
@@ -1139,6 +1529,34 @@ body {
 	cursor: pointer;
 	font: inherit;
 	font-size: 11px;
+}
+
+/*
+ * Copying a file in from the device, beside the browse position.
+ *
+ * The input itself is never seen: a file input cannot be given an icon, styles as
+ * whatever the platform decides, and the usual label-wrapping trick loses the focus
+ * ring. `display: none` would take it out of the accessibility tree with the button that
+ * drives it, so it is clipped instead.
+ */
+.picker header .add {
+	margin-left: auto;
+	white-space: nowrap;
+}
+
+.picker header .add:disabled {
+	color: var(--faint);
+	cursor: default;
+}
+
+.picker input.from-device {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	opacity: 0;
+	pointer-events: none;
 }
 
 .picker .where {
@@ -1175,6 +1593,7 @@ body {
 	background: var(--line);
 }
 
+/* The kind of thing a row is, in the same grey as the size on the other end. */
 .picker .entry .glyph {
 	color: var(--faint);
 }
@@ -1222,8 +1641,8 @@ body {
 
 .side {
 	top: 12px;
-	bottom: 12px;
-	left: 12px;
+	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
+	left: max(12px, env(safe-area-inset-left));
 	display: flex;
 	width: 200px;
 	flex-direction: column;
@@ -1235,7 +1654,12 @@ body {
 .side .chats {
 	display: flex;
 	min-height: 0;
-	max-height: 55%;
+	/*
+	 * A little under half, rather than 55%: the boards rail below is the one that grows
+	 * with the deck, and an agent list is usually two or three rows. It still scrolls
+	 * (`.chat-rows`), so this is about who gets the spare room, not about a limit.
+	 */
+	max-height: 42%;
 	flex-direction: column;
 	border-bottom: 1px solid var(--line);
 }
@@ -1257,8 +1681,25 @@ body {
 	padding: 8px 10px 6px;
 }
 
+/*
+ * `inline-grid`, not `grid`: the agent list's head is a line of inline boxes rather than
+ * a flex row, so a block-level button on it stacked the `+`, the runtime and the pin into
+ * a column. Inline keeps the row, the grid still centres the icon in its square, and the
+ * chat header — which *is* a flex row — blockifies it back on its own.
+ */
+/*
+ * The pin is a character, not an icon, so it needs its own size back.
+ *
+ * The square and the centring stay — that is the tap target the touch pass gave it,
+ * and it holds a glyph as happily as an SVG. What had to come back is `font-size`:
+ * the icon sweep dropped it along with every other glyph-era rule, and `◉` inherited
+ * the panel header's size, which drew a dot half again too big for the row.
+ */
 .pin {
-	padding: 0 5px;
+	display: inline-grid;
+	width: 20px;
+	height: 20px;
+	padding: 0;
 	border: 0;
 	border-radius: 6px;
 	background: none;
@@ -1267,6 +1708,8 @@ body {
 	font: inherit;
 	font-size: 12px;
 	line-height: 1;
+	place-items: center;
+	vertical-align: middle;
 }
 
 .pin:hover {
@@ -1279,14 +1722,17 @@ body {
 }
 
 .chats .rail-head button {
-	padding: 0 6px;
+	display: inline-grid;
+	width: 22px;
+	height: 22px;
+	padding: 0;
 	border: 0;
 	border-radius: 6px;
 	background: none;
 	color: var(--muted);
 	cursor: pointer;
-	font: inherit;
-	font-size: 14px;
+	place-items: center;
+	vertical-align: middle;
 }
 
 .chats .rail-head button:hover {
@@ -1305,8 +1751,79 @@ body {
 	gap: 2px;
 }
 
+/*
+ * The visual row is the wrapper, not the `<button>` inside it.
+ *
+ * The × has to be a sibling of that button — a button inside a button is invalid, and a
+ * browser resolves it by dropping one — but it still has to look like part of the row. So
+ * the wrapper owns the shape and the highlight, and holds the button and the × side by
+ * side. Two things follow from that, and both were wrong when the highlight lived on the
+ * button: the × sat outside the highlight in the panel's gutter, and the highlight stopped
+ * spanning the panel at all, because a `<button>` sizes to its content where a flex child
+ * of `.chat-rows` was stretched for it.
+ *
+ * `:has` rather than moving `data-current` onto the wrapper: the row is what is current, and
+ * this is the box that draws it.
+ */
+.chat-row-wrap {
+	display: flex;
+	align-items: center;
+	padding-right: 4px;
+	border-radius: 9px;
+	gap: 2px;
+}
+
+.chat-row-wrap:hover {
+	background: var(--line);
+}
+
+.chat-row-wrap:has(.chat-row[data-current="true"]) {
+	background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.chat-row-wrap:has(.chat-row[data-child="true"]) {
+	margin-left: 12px;
+}
+
+.chat-row-wrap .close {
+	display: grid;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	opacity: 0;
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	flex: none;
+	place-items: center;
+	transition: opacity 120ms ease;
+}
+
+/*
+ * Its slot is held whether or not it is showing, so a row does not reflow under the cursor
+ * and the name truncates at the same place either way.
+ *
+ * Shown on approach, like the board's own ×, and kept when focused by the keyboard — which
+ * is the only way to reach it without a pointer.
+ */
+.chat-row-wrap:hover .close,
+.chat-row-wrap .close:focus-visible {
+	opacity: 1;
+}
+
+.chat-row-wrap .close:hover {
+	background: color-mix(in srgb, var(--fg) 12%, transparent);
+	color: var(--fg);
+}
+
 .chat-row {
 	display: flex;
+	/* Fills the wrapper, which is the flex child `.chat-rows` stretches. A button's own
+	   width is fit-content, which is what left the highlight short of the panel edge. */
+	min-width: 0;
+	flex: 1;
 	gap: 8px;
 	align-items: center;
 	padding: 6px;
@@ -1317,18 +1834,6 @@ body {
 	cursor: pointer;
 	font: inherit;
 	text-align: left;
-}
-
-.chat-row:hover {
-	background: var(--line);
-}
-
-.chat-row[data-current="true"] {
-	background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-}
-
-.chat-row[data-child="true"] {
-	margin-left: 12px;
 }
 
 .chat-row .avatar {
@@ -1384,11 +1889,7 @@ body {
 	white-space: nowrap;
 }
 
-.chat-row .when {
-	flex: 0 0 auto;
-	color: var(--faint);
-	font-size: 10px;
-}
+
 
 .chat-row .last {
 	overflow: hidden;
@@ -1398,18 +1899,59 @@ body {
 	white-space: nowrap;
 }
 
+/* The tag sits inside a line of running text, and the arrow in it is a block-level SVG,
+   so the tag itself becomes the small flex box that puts the two on a shared centre. */
 .chat-row .tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
 	color: var(--faint);
+	vertical-align: -1px;
+}
+
+/*
+ * The unread count, on the corner of the avatar.
+ *
+ * It used to sit at the right of the row's second line, which is where the × now is — and
+ * two things competing for that corner is how a click lands on the wrong one. On the avatar
+ * it is also next to the thing it is about, and a dot rather than a number because a 16px
+ * numbered badge obscured the face it was reporting on.
+ *
+ * The ring is the panel's colour rather than the row's, which is close enough: a row's
+ * highlight is a translucent tint over the same panel, so the ring reads as a gap either
+ * way and needs no rule per state.
+ */
+.chat-row .face {
+	position: relative;
+	display: grid;
+	flex: 0 0 auto;
 }
 
 .chat-row .unread {
-	min-width: 16px;
-	padding: 0 4px;
+	position: absolute;
+	/*
+	 * On the arc, not at the corner of the box.
+	 *
+	 * The avatar is a circle in a square box, so its top-right *corner* is empty space and a
+	 * badge placed there floats free of it. At 0/0 an 8px dot's centre lands within a
+	 * pixel of the 45° point on a 26px circle's edge — half on the face, half off it.
+	 */
+	top: 0;
+	right: 0;
+	width: 8px;
+	height: 8px;
 	border-radius: 999px;
-	background: var(--color-accent);
-	color: #fff;
-	font-size: 10px;
-	text-align: center;
+	/*
+	 * The text colour, inverted — not the accent.
+	 *
+	 * Agent colours cycle from blue, and the accent is blue, so an accent badge on the first
+	 * agent's avatar was blue on blue: the ring separated the shapes but the count still
+	 * read as part of the circle. Inverting the foreground is legible against any of the six
+	 * avatar colours rather than against five of them, and a count is the one thing in this
+	 * list that should catch the eye.
+	 */
+	background: var(--fg);
+	box-shadow: 0 0 0 2px var(--panel);
 }
 
 .chat .chat-head .avatar img {
@@ -1446,7 +1988,7 @@ body {
 	position: absolute;
 	top: 12px;
 	right: 4px;
-	bottom: 88px;
+	bottom: calc(88px + var(--keyboard) + env(safe-area-inset-bottom));
 	z-index: 11;
 	display: flex;
 	width: 14px;
@@ -1501,4 +2043,358 @@ body {
 /* The chat's own sliver would only compete with the spine. */
 .chat::after {
 	display: none;
+}
+
+
+/* --- a phone, and a hand ------------------------------------------------------ */
+
+/*
+ * What changes when the pointer is a finger, and what changes when the screen is small.
+ *
+ * Two different questions, asked separately and answered separately, because they are
+ * not the same device: a tablet with a trackpad has a fine pointer on a small screen,
+ * and a touchscreen laptop has a coarse one on a large screen.
+ *
+ * - `(hover: none)` is **discoverability**. Everything this app reveals by approaching
+ *   it — the two panels at the edges, the `×` on a board's title bar, the row of
+ *   `rewind · fork · restore boards` under a message — reveals itself to nothing at all
+ *   on a touchscreen. So where there is no hover, those things are simply there, and the
+ *   two panels grow the pair of buttons in the title bar that `.touch-only` marks.
+ * - `(pointer: coarse)` is **size**. The chrome draws its icon buttons at 20–30px, which
+ *   is right for a cursor and roughly half of what a fingertip can reliably hit. Nothing
+ *   moves; the targets grow.
+ * - A **width** breakpoint is used for exactly what is about width: the dock's clearance
+ *   for the two panels, and the panels themselves becoming sheets. A 390px phone cannot
+ *   hold 200px of rail, 380px of transcript and a canvas at the same time, so it holds
+ *   one of them at a time (`lib/panels.ts` makes them mutually exclusive at the same
+ *   threshold) and the boards keep the screen — which is §7's thesis, not a retreat from
+ *   it: the chrome is away by default, and on a phone "away" simply has to mean gone.
+ *
+ * Nothing here is a separate mobile layout. Every rule is an override of the desktop
+ * one, and above these thresholds the stylesheet is byte-for-byte the app it was.
+ */
+
+/*
+ * Two controls exist only for a pointer that cannot hover: the panel toggles in the
+ * title bar and the palette's undo. Spelled out per selector rather than as a bare
+ * `.touch-only`, because `.titlebar .icon-button` and `.palette button` both set
+ * `display` themselves and would win against one class.
+ */
+.titlebar .icon-button.touch-only,
+.palette button.touch-only {
+	display: none;
+}
+
+@media (hover: none) {
+	.titlebar .icon-button.touch-only,
+	.palette button.touch-only {
+		display: grid;
+	}
+
+	/* Which panel is out, on the button that puts it there. */
+	.titlebar .icon-button[data-open="true"] {
+		background: var(--line);
+		color: var(--fg);
+	}
+
+	/* Separated from the tools: it acts on the board, not on the next thing you draw. */
+	.palette button.undo {
+		margin-left: 6px;
+		border-left: 1px solid var(--line);
+		border-radius: 0 8px 8px 0;
+	}
+
+	/* Hidden until hovered is hidden forever here. Both of these are the only route to
+	   what they do: taking a board off the canvas, and the time machine. */
+	.board-node > .chrome .hide,
+	.turn-row .turn-actions {
+		opacity: 1;
+	}
+
+	/* A held-but-not-played board is dimmed and un-dimmed by hovering it. Without the
+	   second half, "dimmed" is just harder to read. */
+	.rail-item[data-off-canvas="true"] {
+		opacity: 0.62;
+	}
+}
+
+@media (pointer: coarse) {
+	/* A 40px bar cannot hold a 44px target. */
+	.app {
+		grid-template-rows: calc(52px + env(safe-area-inset-top)) 1fr;
+	}
+
+	.titlebar .icon-button,
+	.zoombar .icon-button {
+		width: 44px;
+		height: 44px;
+	}
+
+	.palette {
+		padding: 5px;
+	}
+
+	.palette button {
+		width: 44px;
+		height: 44px;
+	}
+
+	.zoombar {
+		padding: 3px;
+	}
+
+	.zoombar button {
+		min-width: 44px;
+		min-height: 44px;
+		padding: 4px 12px;
+	}
+
+	.zoombar .level {
+		min-width: 46px;
+	}
+
+	.composer .send {
+		width: 44px;
+		height: 44px;
+		border-radius: 12px;
+	}
+
+	.composer textarea {
+		/* 16px or the browser zooms the page when the field takes focus, which leaves
+		   the canvas at a scale nobody chose and the chrome half off screen. */
+		font-size: 16px;
+	}
+
+	.composer select,
+	.inspector input,
+	.inspector select {
+		min-height: 36px;
+		font-size: 13px;
+	}
+
+	.latest .dismiss,
+	.pin,
+	.chats .rail-head button {
+		width: 38px;
+		height: 38px;
+	}
+
+	/* No hover to reveal it, so it is simply there. */
+	.chat-row-wrap .close {
+		width: 34px;
+		height: 34px;
+		opacity: 1;
+	}
+
+	.chats .rail-head .kind {
+		height: 34px;
+		padding: 0 4px 0 8px;
+		font-size: 12px;
+	}
+
+	.inspector .boxes button,
+	.inspector .tones button,
+	.inspector .row.file button,
+	.inspector .acts button {
+		min-width: 38px;
+		min-height: 38px;
+	}
+
+	.inspector header .close {
+		width: 38px;
+		height: 38px;
+	}
+
+	.picker .entry {
+		min-height: 44px;
+	}
+
+	.picker header button {
+		min-height: 38px;
+	}
+
+	.turn-actions button {
+		min-height: 32px;
+		padding: 3px 10px;
+		font-size: 11px;
+	}
+
+	/* The board's own chrome is counter-scaled, so these are screen pixels at any zoom.
+	   24 rather than 44: the bar it sits in is 24 tall, and a target taller than the
+	   thing it belongs to would cover the board underneath it. */
+	.board-node > .chrome .hide {
+		width: 24px;
+		height: 24px;
+	}
+
+	/* Clear of a palette whose buttons are now 44px in a 52px bar; on a fine pointer
+	   58px is exactly under the 40px one. */
+	.notices {
+		top: 74px;
+	}
+
+	/* A 10px notch in a 14px column is not a target. */
+	.turnbar {
+		width: 24px;
+	}
+
+	.turnbar .turn {
+		width: 18px;
+		min-height: 8px;
+	}
+}
+
+/*
+ * The dock, once there is no longer room to keep it clear of both panels.
+ *
+ * Full width and no offset from centre: below this the panels are sheets that take turns
+ * with the canvas anyway, so there is nothing left for the dock to be beside.
+ */
+@media (max-width: 1100px) {
+	.dock {
+		left: max(12px, env(safe-area-inset-left));
+		right: max(12px, env(safe-area-inset-right));
+		width: auto;
+		transform: none;
+	}
+
+	/*
+	 * And the zoom controls go above it rather than into its bottom-right corner, which
+	 * is where a full-width dock now is. They are camera chrome and the dock is the
+	 * conversation, so this is the one place the two are allowed to stack: side by side
+	 * there is no longer the width for both.
+	 */
+	.zoombar {
+		right: max(12px, env(safe-area-inset-right));
+		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+	}
+}
+
+@media (max-width: 760px) {
+	/* The model, the thinking level and the mode do not fit on one line beside the send
+	   button at this width; wrapped, they are three rows of real controls instead of
+	   three ellipses. */
+	.composer .controls {
+		flex-wrap: wrap;
+	}
+
+	.composer select {
+		max-width: 46%;
+		flex: 1;
+	}
+
+	/*
+	 * The two panels become sheets: the full width of the screen, with the canvas behind
+	 * them rather than beside them. `--peek` goes to nothing — a sliver is something to
+	 * aim a cursor at, and there is no cursor here.
+	 */
+	.side,
+	.chat {
+		--peek: 0px;
+		left: max(8px, env(safe-area-inset-left));
+		/* `right` for the chat as well, which parks beside the timeline spine on a
+		   desktop — and the spine is gone below this width. */
+		right: max(8px, env(safe-area-inset-right));
+		/*
+		 * Both sheets stop above the dock, so the composer is never the thing a panel
+		 * covers: it is how you answer whatever you opened the panel to read. `--dock` is
+		 * the dock's measured height (`App` publishes it), because the dock holds a reply,
+		 * a permission question and an input bar in whatever combination is currently
+		 * true — the 88px fallback is the desktop constant, and it sat on the composer.
+		 */
+		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+		width: auto;
+	}
+
+	/* Each one still slides in from its own edge: a transform is the one property that
+	   costs nothing to animate. */
+	.side {
+		transform: translateX(calc(-100% - 16px));
+	}
+
+	.chat {
+		transform: translateX(calc(100% + 16px));
+	}
+
+	/*
+	 * A rail item turns on its side. The thumbnail is the board itself scaled by a fixed
+	 * 150px (`BoardRail`), so in a full-width sheet a column layout left two thirds of
+	 * every row empty — as a row, the 150px is the picture and the rest is the name.
+	 */
+	.rail-item {
+		flex-direction: row;
+		align-items: stretch;
+	}
+
+	.rail-item .thumb {
+		width: 150px;
+		flex: none;
+		border-right: 1px solid var(--line);
+		border-bottom: 0;
+		border-radius: 7px 0 0 7px;
+	}
+
+	.rail-item .label {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		justify-content: center;
+		padding: 8px 12px;
+	}
+
+	.side::after,
+	.chat::after {
+		display: none;
+	}
+
+	/*
+	 * The timeline spine goes. It is a column of 10px notches on the right edge, which
+	 * is both the hardest thing on screen to hit and the edge the transcript sheet now
+	 * arrives from; the same rewind, fork and restore live on each message in the
+	 * transcript, which is reachable (see `(hover: none)` above).
+	 */
+	.turnbar {
+		display: none;
+	}
+
+	.palette {
+		top: 8px;
+	}
+
+	/*
+	 * The inspector becomes a bottom sheet, and this is the one place the desktop's
+	 * reasoning does not survive the screen getting smaller.
+	 *
+	 * Top right is right on a laptop: it is out of the way of the boards and clear of the
+	 * chat panel's reach (§6.5). Across the top of a phone it is *in the way of the tap
+	 * that opened it* — you tap a component, a panel appears over the place your finger
+	 * just was, and your next tap lands on a class switch you never meant to touch. That
+	 * is not a hypothetical; it is what the first version of this rule did, and it wrote a
+	 * revision each time. At the bottom the sheet is where the hand already is and the
+	 * component it describes stays visible above it.
+	 *
+	 * It takes the zoom controls' place while it is up rather than stacking above them.
+	 * Zooming has fingers to do it with, so the camera buttons are the thing that can be
+	 * missing for a moment; two floating panels in one corner is neither of them usable.
+	 */
+	.inspector {
+		top: auto;
+		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+		right: max(8px, env(safe-area-inset-right));
+		left: max(8px, env(safe-area-inset-left));
+		width: auto;
+		max-height: 42vh;
+		overflow-y: auto;
+	}
+
+	.work:has(.inspector) .zoombar {
+		display: none;
+	}
+
+	.notices {
+		left: 12px;
+		right: 12px;
+		max-width: none;
+		transform: none;
+	}
 }

@@ -128,11 +128,23 @@ export class DeckAgent {
 		});
 	}
 
-	readonly parentId: string | undefined;
+	/** Mutable only through `orphan`: a subagent outlives the parent it reported to. */
+	parentId: string | undefined;
 	readonly kind: AgentKind;
 	private readonly resumeRef: string | undefined;
 	private readonly snapshots: SnapshotStore;
 	private currentMode: AgentMode | undefined;
+
+	/**
+	 * The parent this reported to is gone, so stop claiming it.
+	 *
+	 * Becomes a top-level chat rather than a row tagged with a name that no longer
+	 * resolves. Its transcript is untouched — that is the point of keeping it.
+	 */
+	orphan(parentId: string): void {
+		if (this.parentId !== parentId) return;
+		this.parentId = undefined;
+	}
 
 	/** Put a remembered canvas back: what the agent held, showed and called itself. */
 	private apply(snapshot: StageSnapshot | undefined): void {

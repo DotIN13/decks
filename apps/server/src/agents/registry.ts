@@ -110,6 +110,43 @@ export class Registry {
 		this.publish();
 	}
 
+	/**
+	 * Take an agent off the list.
+	 *
+	 * Refused while it is working: stopping a turn is `agent.abort`, and quietly killing a
+	 * session mid-reply loses whatever it was about to write to a board.
+	 *
+	 * Children are kept and promoted rather than removed with the parent. A subagent's row
+	 * is the only place its transcript can be opened (the reason it is a row at all), so
+	 * removing a parent must not take its children's work with it — they become top-level
+	 * chats instead of rows pointing at a parent that is gone.
+	 *
+	 * Nothing on disk is touched. The session file is the record of the conversation; this
+	 * closes a chat.
+	 */
+	remove(id: string): { removed: boolean; reason?: string } {
+		const index = this.agents.findIndex((agent) => agent.id === id);
+		if (index === -1) return { removed: false, reason: "That agent is not here." };
+		const agent = this.agents[index]!;
+		if (agent.running) return { removed: false, reason: `${agent.chat().name} is still working. Stop it first.` };
+
+		this.agents.splice(index, 1);
+		agent.dispose();
+		this.snapshots.forget(id);
+		for (const child of this.agents) child.orphan(id);
+
+		// The focus moves to whatever is nearest, or to a new agent on the next request —
+		// `focused()` creates on demand, so a deck is never agentless.
+		if (this.focusedId === id) {
+			const next = this.agents[index] ?? this.agents[index - 1];
+			this.focusedId = next?.id;
+			if (next) next.greet((message) => this.emit(message));
+		}
+		this.emit({ type: "agent.removed", id });
+		this.publish();
+		return { removed: true };
+	}
+
 	all(): readonly DeckAgent[] {
 		return this.agents;
 	}

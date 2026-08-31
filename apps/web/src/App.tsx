@@ -4,6 +4,7 @@ import type {
 	AgentModel,
 	AgentUsage,
 	Board,
+	BoardPatch,
 	Camera,
 	ChatItem,
 	DeckState,
@@ -12,13 +13,23 @@ import type {
 	ModelOption,
 	ThinkingLevel,
 } from "@decks/protocol";
+import MessageSquare from "lucide-solid/icons/message-square";
+import Minus from "lucide-solid/icons/minus";
+import Moon from "lucide-solid/icons/moon";
+import PanelLeft from "lucide-solid/icons/panel-left";
+import Plus from "lucide-solid/icons/plus";
+import Sun from "lucide-solid/icons/sun";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { BoardRail } from "./canvas/BoardRail.tsx";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
+import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
-import { DecksMark, MoonIcon, SunIcon } from "./icons.tsx";
+import { DecksMark, Icon } from "./icons.tsx";
+import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
+import { Inspector } from "./canvas/Inspector.tsx";
 import { Palette } from "./canvas/Palette.tsx";
+import { coalesce, needsReload } from "./canvas/patches.ts";
 import { Stage } from "./canvas/Stage.tsx";
 import { runStageCall } from "./canvas/stage-ops.ts";
 import { Bubbles } from "./chat/Bubbles.tsx";
@@ -27,9 +38,11 @@ import { Dialog } from "./chat/Dialog.tsx";
 import { Latest } from "./chat/Latest.tsx";
 import { Composer } from "./chat/Composer.tsx";
 import { TurnBar, turnsOf } from "./chat/TurnBar.tsx";
-import { boxOf, fit, INTERACT_ZOOM } from "./lib/camera.ts";
+import { boxOf, fit, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
 import { connect, type Socket } from "./lib/socket.ts";
-import { createPanels } from "./lib/panels.ts";
+import { embedPath, uploadAsset } from "./lib/upload.ts";
+import { canHover, createPanels } from "./lib/panels.ts";
+import { obscured, trackVisualViewport } from "./lib/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 
 interface Notice {
@@ -94,7 +107,14 @@ export function App() {
 	const [selected, setSelected] = createSignal<string | undefined>(undefined);
 	const [tool, setTool] = createSignal<Tool>("select");
 	const [component, setComponent] = createSignal<{ path: string; id: string } | undefined>(undefined);
-	const [picking, setPicking] = createSignal<((path: string | undefined) => void) | undefined>(undefined);
+	/**
+	 * The file picker's promise, and which board asked.
+	 *
+	 * The board is what a file uploaded *through* the picker needs: an embed is written
+	 * the way that board's document would address it (`embedPath`), so "add a photo from
+	 * this phone" cannot be answered without knowing where the answer is going.
+	 */
+	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; board?: string } | undefined>(undefined);
 	const panels = createPanels();
 	/** The turn the chat was opened at, from a click on the spine. */
 	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
@@ -142,6 +162,16 @@ export function App() {
 	/** Paths with a patch in flight, before the accepted rev is known. */
 	const patching = new Set<string>();
 	/**
+	 * Edits made while a patch was in flight, per path.
+	 *
+	 * A patch carries the rev it was composed against, so a second one sent before the
+	 * first is acknowledged names a revision that no longer exists and is refused —
+	 * correct for "the agent wrote this file underneath you" and absurd for "you
+	 * clicked three inspector buttons". They wait here and go as one batch against the
+	 * rev the acknowledgement brings back. See `canvas/patches.ts`.
+	 */
+	const queued = new Map<string, BoardPatch[]>();
+	/**
 	 * The revision each frame is pinned to, or 0 for "show the newest".
 	 *
 	 * A pin is what stops a reload. Our own edit is already in the frame's DOM, so the
@@ -163,12 +193,44 @@ export function App() {
 		setTimeout(() => setState("notices", (all) => all.filter((item) => item.id !== id)), linger);
 	};
 
+	/**
+	 * A notice that lasts as long as the work it describes.
+	 *
+	 * The timed notices above are for things that have already happened. An upload has
+	 * not: it takes as long as the file is big, and a message that expires after four
+	 * seconds while the bytes are still going is worse than none. So this one is held
+	 * open by the caller, rewritten as the work progresses, and replaced by an ordinary
+	 * timed notice when it ends.
+	 */
+	const working = (text: string) => {
+		const id = ++noticeId;
+		setState("notices", (all) => [...all, { id, level: "info" as const, text }]);
+		const drop = () => setState("notices", (all) => all.filter((item) => item.id !== id));
+		return {
+			update: (next: string) =>
+				setState("notices", (all) => all.map((item) => (item.id === id ? { ...item, text: next } : item))),
+			done: (final?: string, level: Notice["level"] = "info") => {
+				drop();
+				if (final) notice(level, final);
+			},
+		};
+	};
+
 	onMount(() => {
 		socket = connect(setConnected);
 		const off = socket.on((message) => {
 			switch (message.type) {
 				case "deck.state":
 					setState("deck", message.deck);
+					/*
+					 * The greeting is a refresh (§5), so nothing is in flight any more. Said
+					 * out loud because the patch queue depends on it: an edit made while a
+					 * patch is unacknowledged waits for that acknowledgement, and one lost to
+					 * a dropped socket would otherwise leave every later edit to that board
+					 * waiting for a message that is never coming.
+					 */
+					patching.clear();
+					queued.clear();
 					/*
 					 * Reconciled by path, not replaced.
 					 *
@@ -185,7 +247,15 @@ export function App() {
 					patching.delete(message.path);
 					if (message.refused) {
 						notice("warn", message.refused);
-						// Its optimistic DOM is now a lie: unpin and reload from the file.
+						// Its optimistic DOM is now a lie: unpin and reload from the file. What
+						// was queued behind it was composed against that same lie, so it goes
+						// too — one warning, not one per held-back click.
+						queued.delete(message.path);
+						// And the selection, which may name a component that was never renamed
+						// or a copy that was never made. The frame is about to reload with the
+						// file's own answer; a selection composed against the refused version of
+						// it would leave the inspector describing something that does not exist.
+						setComponent(undefined);
 						selfRevs.delete(message.path);
 						setFrameRevs(message.path, 0);
 						setState("nonces", message.path, (current = 0) => current + 1);
@@ -194,6 +264,18 @@ export function App() {
 					// Accepted: remember the rev our write produced so both echoes of it are
 					// recognised, and keep the pin so the frame holds the DOM it already has.
 					selfRevs.set(message.path, message.rev);
+					/*
+					 * Whatever arrived while this was in flight goes now, against the rev this
+					 * message carries — which is the only place the new rev is known this
+					 * early: `board.rev` in the store is not updated until `board.changed`
+					 * lands, one message later, so composing against it here would send a
+					 * stale patch to fix a stale patch.
+					 */
+					const waiting = queued.get(message.path);
+					if (waiting && waiting.length > 0) {
+						queued.delete(message.path);
+						sendPatches(message.path, message.rev, waiting);
+					}
 					return;
 				}
 
@@ -243,6 +325,21 @@ export function App() {
 						setSeenAt(Date.now());
 					}
 					setState({ chats: message.chats, focused, defaultKind: message.defaultKind });
+					return;
+				}
+
+				case "agent.removed": {
+					/*
+					 * Drop what was being kept for it. The `agents` frame that follows sets
+					 * the list and the focus, so this is only about not holding a transcript
+					 * for a chat that is gone — and about not showing its unread count on
+					 * whatever row happens to take its place.
+					 */
+					setState("transcripts", message.id, undefined as never);
+					setState("identities", message.id, undefined as never);
+					setState("contexts", message.id, undefined as never);
+					setState("inPlay", message.id, undefined as never);
+					setUnread(message.id, 0);
 					return;
 				}
 
@@ -411,7 +508,13 @@ export function App() {
 		return paths.filter((path) => known.has(path));
 	});
 
-	/** The focused agent's boards, in attach order — or the whole deck if it holds none. */
+	/**
+	 * The focused agent's boards, in attach order — or the whole deck if it holds none.
+	 *
+	 * The one place the empty-context fallback survives, and deliberately: the rail is how
+	 * you find a board, so it lists everything there is to find. The canvas is what an agent
+	 * put in play, so it lists nothing until something does.
+	 */
 	const railBoards = createMemo(() => {
 		if (held().length === 0) return state.boards;
 		const byPath = new Map(state.boards.map((board) => [board.path, board]));
@@ -422,14 +525,20 @@ export function App() {
 	});
 
 	/**
-	 * What is on the canvas: the focused agent's in-play set.
+	 * What is on the canvas: the focused agent's in-play set, and nothing else.
 	 *
-	 * An agent holding nothing shows the whole deck — without that, a fresh agent on a
-	 * deck full of work would open onto a blank canvas, which reads as data loss rather
-	 * than as an empty context.
+	 * An agent holding nothing shows *no* boards. The rail still lists the whole deck
+	 * (`railBoards` above), so nothing is hidden — what is empty is the canvas, which is
+	 * the honest reading of "this agent has not put anything in play".
+	 *
+	 * This used to fall back to the whole deck, on the argument that a fresh agent opening
+	 * onto a blank canvas reads as data loss. The argument was wrong about which state is
+	 * misleading: a canvas showing every board in the deck claims the agent is working from
+	 * all of them, and it made the first thing an agent did — narrowing to one board — look
+	 * like boards disappearing. An empty canvas beside a full rail says what is true, and
+	 * says it before anything has happened rather than after.
 	 */
 	const stageBoards = createMemo(() => {
-		if (held().length === 0) return state.boards;
 		const playing = new Set(state.focused ? state.inPlay[state.focused] ?? [] : []);
 		return state.boards.filter((board) => playing.has(board.path));
 	});
@@ -446,6 +555,36 @@ export function App() {
 		for (const listener of selectionListeners) listener();
 	});
 
+	/**
+	 * A batch of patches, down the socket, against a named revision.
+	 *
+	 * Split out from `editor.patch` because the queue above sends from a second place:
+	 * the acknowledgement of the patch that was in flight.
+	 */
+	const sendPatches = (path: string, rev: number, patches: BoardPatch[]) => {
+		patching.add(path);
+		/*
+		 * Pin to what the frame is showing *now*, before the write lands — and only if
+		 * it is not already pinned. Re-pinning on each edit moves the pin to the newest
+		 * rev while the document on screen is still the one it first loaded, so the URL
+		 * changes and the frame reloads: the flash came back on the second drag.
+		 *
+		 * An insert is the exception, and a duplicate with it: both have to actively
+		 * *unpin*. The pin's premise is that the frame's DOM is already correct because
+		 * the editor mutated it — true of a drag, false of a component that exists only
+		 * in the file, because the server mints the id and writes the markup (§6.5).
+		 * Pinned, a dropped file landed in `assets/`, landed in the board's source, and
+		 * appeared nowhere on screen until something else reloaded the frame. One reload
+		 * beats a component the user cannot see.
+		 */
+		if (needsReload(patches)) setFrameRevs(path, 0);
+		else if (!frameRevs[path]) {
+			const board = state.boards.find((candidate) => candidate.path === path);
+			if (board) setFrameRevs(path, board.rev);
+		}
+		socket.send({ type: "board.patch", path, rev, patches });
+	};
+
 	const editor: EditorHost = {
 		tool: () => tool(),
 		resetTool: () => setTool("select"),
@@ -461,27 +600,287 @@ export function App() {
 		patch: (path, patches) => {
 			const board = state.boards.find((candidate) => candidate.path === path);
 			if (!board) return;
-			patching.add(path);
-			// Pin to what the frame is showing *now*, before the write lands — and only if
-			// it is not already pinned. Re-pinning on each edit moves the pin to the newest
-			// rev while the document on screen is still the one it first loaded, so the URL
-			// changes and the frame reloads: the flash came back on the second drag.
-			if (!frameRevs[path]) setFrameRevs(path, board.rev);
-			socket.send({ type: "board.patch", path, rev: board.rev, patches });
+			// One patch at a time per board. The rest wait for the rev the acknowledgement
+			// brings, coalesced, because a burst of edits to one component is one edit as
+			// far as the file is concerned.
+			if (patching.has(path)) {
+				queued.set(path, coalesce([...(queued.get(path) ?? []), ...patches]));
+				return;
+			}
+			sendPatches(path, board.rev, patches);
 		},
 		undo: (path) => socket.send({ type: "board.undo", path }),
-		pickFile: () =>
+		pickFile: (board) =>
 			new Promise<string | undefined>((resolve) => {
-				setPicking(() => (picked: string | undefined) => {
-					setPicking(undefined);
-					resolve(picked);
+				setPicking({
+					board,
+					resolve: (picked: string | undefined) => {
+						setPicking(undefined);
+						resolve(picked);
+					},
 				});
 			}),
 		notice: (text) => notice("info", text),
 		// Editing follows the same threshold as pointer events: if the frame is inert
 		// because we are zoomed out, there is nothing to edit with.
 		enabled: () => camera().zoom >= INTERACT_ZOOM,
+		reveal: (path, box) => {
+			const board = state.boards.find((candidate) => candidate.path === path);
+			const stage = document.querySelector(".stage");
+			if (!board || !stage) return;
+			/*
+			 * The room to aim for. The bottom is the keyboard plus the dock that sits above
+			 * it — a caret tucked behind the input bar is as lost as one behind the keys —
+			 * and the top is the title bar the canvas already runs under.
+			 */
+			const dock = document.querySelector(".dock")?.getBoundingClientRect().height ?? 0;
+			setCamera(
+				keepVisible(
+					camera(),
+					{ width: stage.clientWidth, height: stage.clientHeight },
+					{ x: board.x + box.x, y: board.y + box.y, w: box.w, h: box.h },
+					{ top: 12, bottom: obscured().bottom + dock + 12 },
+				),
+			);
+		},
 	};
+
+	/**
+	 * The selected component as the inspector needs it (`canvas/inspect.ts`).
+	 *
+	 * Read from the live document rather than kept in the store: the board is
+	 * same-origin (§4) and the DOM is already the truth about what is on screen, so a
+	 * second copy of "what class does this have" would be one more thing to invalidate.
+	 * Re-read when the selection changes, when the board's revision changes (our own
+	 * write, or the agent's), and when a reload is forced — those three cover every way
+	 * the component under the selection can become something else.
+	 */
+	const [shape, setShape] = createSignal<Shape | undefined>(undefined);
+	createEffect(() => {
+		const selection = component();
+		if (!selection) {
+			setShape(undefined);
+			return;
+		}
+		// Read as dependencies, not for their values.
+		void state.boards.find((board) => board.path === selection.path)?.rev;
+		void state.nonces[selection.path];
+		setShape(readShape(selection.path, selection.id));
+	});
+
+	/**
+	 * An inspector edit: the live document, then the file.
+	 *
+	 * Both halves, because the frame is pinned to the revision it loaded (§7) — a patch
+	 * alone would be a change the user cannot see until somebody else writes the board.
+	 * The exception is a duplicate, whose markup exists only in the file; `patches.ts`
+	 * is where that unpins.
+	 */
+	const inspect = (edit: Edit) => {
+		const current = shape();
+		if (!current) return;
+		applyLive(current, edit);
+		editor.patch(current.path, patchesFor(current, edit));
+		if (edit.kind === "remove") {
+			setComponent(undefined);
+			return;
+		}
+		// A rename moves the selection with it: the id *is* how the component is
+		// addressed, here as in the file, and the old one now names nothing.
+		const id = edit.kind === "rename" ? edit.to : current.id;
+		if (edit.kind === "rename") setComponent({ path: current.path, id });
+		setShape(readShape(current.path, id));
+	};
+
+	/**
+	 * A file dragged in from the desktop, landing on a board as an embed (§3).
+	 *
+	 * The order matters and is the reason this is not two lines: the bytes have to be
+	 * *in* the deck before a board can point at them, so every file is uploaded first
+	 * and the inserts go out afterwards as **one** patch. One patch and not one each
+	 * because a patch carries the revision it was composed against — a second patch
+	 * sent before the first has come back would be refused as stale, and three files
+	 * dropped together would land as one.
+	 *
+	 * Uploads are sequential rather than parallel, so the progress line means
+	 * something: four bars all at 30% is not information anybody can act on.
+	 */
+	const dropOnBoard = async (path: string, files: File[], at: { x: number; y: number }) => {
+		const board = state.boards.find((candidate) => candidate.path === path);
+		if (!board) return;
+		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
+		// The insert variant specifically, so the summary below can read back `embed`.
+		const inserts: Extract<BoardPatch, { op: "insert" }>[] = [];
+		const failures: string[] = [];
+		let reused = 0;
+
+		/*
+		 * Laid out before anything is uploaded, and for the whole batch at once. The
+		 * shapes are read from the files locally — an image's own pixels, mostly — and
+		 * `flow` needs to see all of them to put them in a row that wraps at the board's
+		 * edge instead of a pile at the cursor.
+		 */
+		const boxes = flow(await Promise.all(files.map(shapeFor)), at, board.w);
+
+		for (const [index, file] of files.entries()) {
+			const of = files.length > 1 ? `${index + 1} of ${files.length} · ` : "";
+			try {
+				const asset = await uploadAsset(file, (fraction) =>
+					report.update(`${of}${file.name} — ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+				);
+				if (asset.reused) reused += 1;
+				inserts.push({
+					op: "insert",
+					// `image` and `embed` render the same markup; the kind is what names the
+					// component, so `image-1` in the file says what it is without opening it.
+					kind: isImage(file) ? "image" : "embed",
+					id: "",
+					at: boxes[index]!,
+					embed: embedPath(path, asset.path),
+				});
+			} catch (error) {
+				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+
+		if (inserts.length > 0) editor.patch(path, inserts);
+		const added =
+			inserts.length === 0
+				? ""
+				: `${inserts.length === 1 ? inserts[0]?.embed?.split("/").pop() : `${inserts.length} files`} added${reused > 0 ? ` (${reused} already in the deck)` : ""}`;
+		report.done([added, ...failures].filter(Boolean).join(" · ") || undefined, failures.length > 0 ? "warn" : "info");
+	};
+
+	/**
+	 * What a board frame hands back when files are dropped inside it (`file-drop.ts`).
+	 *
+	 * Per board, because the drop belongs to the board it landed on: the frame knows
+	 * where in its own document the cursor was, and those pixels are board pixels.
+	 */
+	const drops = (path: string): FileDropHost => ({
+		enabled: () => editor.enabled(),
+		drop: (files, at) => void dropOnBoard(path, files, at),
+	});
+
+	/**
+	 * One file from the device, copied into the deck, answered as an embed path.
+	 *
+	 * The other end of the file picker (`FilePicker`), and the whole of "getting a photo
+	 * off a phone onto a board": the upload route and the insert path were already there
+	 * for the desktop drag (§6.9), and a drag is the one gesture a touchscreen does not
+	 * have. So this is the same two steps in the other order — the bytes go into the deck
+	 * first, and the path comes back for the component that asked.
+	 */
+	const addFile = async (board: string | undefined, file: File): Promise<string | undefined> => {
+		const report = working(`Adding ${file.name}…`);
+		try {
+			const asset = await uploadAsset(file, (fraction) =>
+				report.update(`${file.name} — ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+			);
+			report.done(`${file.name} added${asset.reused ? " (already in the deck)" : ""}`);
+			// Relative to the board that asked, because a deck is self-contained and an
+			// absolute path is a board that breaks when the deck moves.
+			return board ? embedPath(board, asset.path) : asset.path;
+		} catch (error) {
+			report.done(`${file.name}: ${error instanceof Error ? error.message : String(error)}`, "warn");
+			return undefined;
+		}
+	};
+
+	/**
+	 * A file on the clipboard, landing on the selected board.
+	 *
+	 * The sibling of the drop path, and the one edge §8 listed against §6.9. A paste has no
+	 * cursor position — that is the whole difference from a drop — so it needs a rule
+	 * instead of a point: **the selected board, at the middle of it.** The selection is
+	 * the board the user is working on and it is already visible on screen, which makes
+	 * this the smallest rule that is never surprising; nothing is invented when there is
+	 * no selection, exactly as nothing is invented for a file dropped on empty canvas.
+	 *
+	 * A paste while something is focused belongs to that thing: the composer, an
+	 * inspector field, a run of text being retyped. A screenshot pasted into a sentence
+	 * you are writing is not an embed.
+	 */
+	const pasteOnBoard = (files: File[]) => {
+		if (files.length === 0) return;
+		const path = selected();
+		const board = path ? state.boards.find((candidate) => candidate.path === path) : undefined;
+		if (!board) {
+			notice("info", "Pick a board first — a pasted file becomes an embed, and an embed lives on a board.");
+			return;
+		}
+		if (!editor.enabled()) {
+			notice("info", "Zoom in until the board is live, then paste.");
+			return;
+		}
+		void dropOnBoard(board.path, files, { x: board.w / 2, y: board.h / 2 });
+	};
+
+	onMount(() => {
+		const onPaste = (event: ClipboardEvent) => {
+			// `closest` is asked for rather than assumed: a paste with nothing focused
+			// targets the document, which is not an element.
+			const target = event.target as HTMLElement | null;
+			if (target?.closest?.("input, textarea, [contenteditable]")) return;
+			const files = Array.from(event.clipboardData?.files ?? []);
+			if (files.length === 0) return;
+			event.preventDefault();
+			pasteOnBoard(files);
+		};
+		document.addEventListener("paste", onPaste);
+		onCleanup(() => document.removeEventListener("paste", onPaste));
+		// The visual viewport, so the dock stays above the on-screen keyboard.
+		onCleanup(trackVisualViewport());
+
+		/*
+		 * How tall the dock currently is, published for the stylesheet.
+		 *
+		 * The transcript sheet on a narrow screen sits above the dock, and the dock is a
+		 * stack of however many of "the last reply", "a permission question" and "the
+		 * input bar" are true right now. A constant would be wrong most of the time and
+		 * on top of the composer some of it, so the one thing that knows measures it.
+		 */
+		const dock = document.querySelector(".dock");
+		if (dock) {
+			const observer = new ResizeObserver(([entry]) => {
+				const height = Math.round(entry?.contentRect.height ?? 0);
+				document.documentElement.style.setProperty("--dock", `${height}px`);
+			});
+			observer.observe(dock);
+			onCleanup(() => observer.disconnect());
+		}
+	});
+
+	/*
+	 * The browser opens a dropped file by default, which would unload the app — socket,
+	 * camera, transcript and all — to show a picture. Guarded on the whole document
+	 * rather than over the canvas, because "anywhere" includes the chat column and the
+	 * gap between boards.
+	 *
+	 * Reaching here means the drop missed every live board, since a drop over one is
+	 * consumed inside that frame's document. The answer is a notice and nothing else:
+	 * an embed belongs to a board, and inventing a board to hold a file the user
+	 * dropped on empty canvas would be the app deciding something it was not asked to.
+	 */
+	onMount(() => {
+		onCleanup(
+			guardDocumentDrops(document, (at) => {
+				const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node");
+				// While the timeline is being previewed the frames take no pointer events, so
+				// every drop arrives here — and "zoom in" would be a lie about why.
+				if (state.preview) {
+					notice("info", "That is a board as it used to be. Let go of the timeline first.");
+					return;
+				}
+				notice(
+					"info",
+					over
+						? "Zoom in until the board is live, then drop the file on it."
+						: "Drop a file onto a board — an embed lives on a board, not on the canvas.",
+				);
+			}),
+		);
+	});
 
 	const turns = createMemo(() => turnsOf(transcript(), panels.right.open() ? Number.POSITIVE_INFINITY : seenAt()));
 
@@ -512,8 +911,41 @@ export function App() {
 					<span class="wordmark">Decks</span>
 				</span>
 				<span class="spacer" />
+				{/*
+					The two panels, reachable by tapping.
+
+					Only where the pointer cannot hover (`.touch-only`, a media query in
+					index.css): with a cursor the edges already summon them, and two more
+					buttons in the title bar would be a second way to do a thing that works.
+					Without one they are the *only* way — a finger cannot approach an edge —
+					so this is the difference between chrome that is away and chrome that is
+					gone. `aria-pressed` rather than a title that changes, because what the
+					button does never changes; only what it currently is does.
+				*/}
 				<button
-					class="icon-button"
+					class="icon-button touch-only"
+					type="button"
+					aria-pressed={panels.left.open()}
+					data-open={panels.left.open()}
+					title="Boards and chats"
+					aria-label="Boards and chats"
+					onClick={() => panels.left.toggle()}
+				>
+					<Icon of={PanelLeft} size={19} />
+				</button>
+				<button
+					class="icon-button touch-only"
+					type="button"
+					aria-pressed={panels.right.open()}
+					data-open={panels.right.open()}
+					title="The conversation"
+					aria-label="The conversation"
+					onClick={() => panels.right.toggle()}
+				>
+					<Icon of={MessageSquare} size={19} />
+				</button>
+				<button
+					class="icon-button theme"
 					type="button"
 					onClick={() => toggleScheme()}
 					title={scheme() === "dark" ? "Switch to light" : "Switch to dark"}
@@ -521,7 +953,7 @@ export function App() {
 				>
 					{/* The icon is the destination, not the current state: it is a button, and
 					    what a button shows should be what pressing it gets you. */}
-					{scheme() === "dark" ? <SunIcon /> : <MoonIcon />}
+					{scheme() === "dark" ? <Icon of={Sun} size={17} /> : <Icon of={Moon} size={17} />}
 				</button>
 			</header>
 
@@ -538,15 +970,45 @@ export function App() {
 					cursor={state.cursor}
 					onViewport={() => reportCamera(camera())}
 					editor={editor}
+					onTool={setTool}
+					drops={drops}
 					frameRevs={frameRevs}
 					preview={state.preview?.boards}
 				/>
 
-				<Palette tool={tool()} visible={camera().zoom >= INTERACT_ZOOM} onPick={setTool} />
+				<Palette
+					tool={tool()}
+					visible={camera().zoom >= INTERACT_ZOOM}
+					onPick={setTool}
+					onUndo={() => {
+						const path = selected() ?? component()?.path;
+						if (!path) {
+							notice("info", "Pick the board to undo on first.");
+							return;
+						}
+						socket.send({ type: "board.undo", path });
+					}}
+				/>
+
+				{/* The selection's properties. Same visibility rule as the palette — below
+				    `INTERACT_ZOOM` a board takes no pointer events and nothing can be
+				    selected — and off entirely while a past revision is being previewed,
+				    which is a read-only view of a board that no longer exists (§6.7). */}
+				<Inspector
+					shape={shape()}
+					visible={camera().zoom >= INTERACT_ZOOM && !state.preview}
+					onEdit={inspect}
+					pickFile={() => editor.pickFile(shape()?.path)}
+					onClose={() => setComponent(undefined)}
+				/>
 
 				<Show when={picking()}>
-					{(resolve) => (
-						<FilePicker onPick={(path) => resolve()(path)} onCancel={() => resolve()(undefined)} />
+					{(request) => (
+						<FilePicker
+							onPick={(path) => request().resolve(path)}
+							onCancel={() => request().resolve(undefined)}
+							onAdd={(file) => addFile(request().board, file)}
+						/>
 					)}
 				</Show>
 
@@ -565,6 +1027,7 @@ export function App() {
 						}}
 						defaultKind={state.defaultKind}
 						onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+						onRemove={(id) => socket.send({ type: "agent.remove", id })}
 						pinned={panels.left.pinned()}
 						onPin={panels.left.setPinned}
 					/>
@@ -627,8 +1090,15 @@ export function App() {
 				<div class="dock">
 					{/* First in the dock, so it sits above whatever else is in it rather than
 					    at a hardcoded offset that a taller stack would collide with. */}
+					{/* The gestures it names have to be gestures this device has: a phone has no
+					    wheel, no space bar and no keys to fit with, and a hint that lists them
+					    is a first-run message that teaches nothing. */}
 					<Show when={state.boards.length > 0}>
-						<div class="hint">two-finger scroll to pan · pinch or ⌘-wheel to zoom · space-drag anywhere · 0 fit all · 1 fit board</div>
+						<div class="hint">
+							{canHover()
+								? "two-finger scroll to pan · pinch or ⌘-wheel to zoom · space-drag anywhere · 0 fit all · 1 fit board"
+								: "drag to pan · pinch to zoom · tap a component to select it, again to retype it · drag a board by its title"}
+						</div>
 					</Show>
 
 					<Show when={state.dialog}>
@@ -681,11 +1151,25 @@ export function App() {
 						fit
 					</button>
 					<span class="level">{Math.round(camera().zoom * 100)}%</span>
-					<button type="button" onClick={() => setCamera((c) => ({ ...c, zoom: Math.min(4, c.zoom * 1.25) }))}>
-						+
+					{/* Titled, now that the glyph is gone: an icon-only button with no accessible
+					    name is a button screen readers and the browser checks both read as blank. */}
+					<button
+						class="icon-button"
+						type="button"
+						title="Zoom in (=)"
+						aria-label="Zoom in"
+						onClick={() => setCamera((c) => ({ ...c, zoom: Math.min(4, c.zoom * 1.25) }))}
+					>
+						<Icon of={Plus} />
 					</button>
-					<button type="button" onClick={() => setCamera((c) => ({ ...c, zoom: Math.max(0.02, c.zoom / 1.25) }))}>
-						−
+					<button
+						class="icon-button"
+						type="button"
+						title="Zoom out (-)"
+						aria-label="Zoom out"
+						onClick={() => setCamera((c) => ({ ...c, zoom: Math.max(0.02, c.zoom / 1.25) }))}
+					>
+						<Icon of={Minus} />
 					</button>
 				</div>
 
@@ -707,6 +1191,13 @@ export function App() {
 			</div>
 		</div>
 	);
+}
+
+/** A byte count as a person would say it, for a progress line. */
+function sizeLabel(bytes: number): string {
+	if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+	if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+	return `${bytes} B`;
 }
 
 function fitAll(boards: Board[], setCamera: (camera: Camera) => void): void {

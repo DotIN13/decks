@@ -60,6 +60,11 @@ await browser.close();
 
 - `say(name, ok, detail)` — one line of output; a failure sets a non-zero exit code.
 - `open({ width, height, scheme })` — a page with storage cleared and the boards mounted.
+- `open({ device: "iPhone 15" })` — the same, in a Playwright device context: `hasTouch`,
+  the pixel ratio and the user agent. `mobile.mjs` uses it and drives gestures with
+  `Input.dispatchTouchEvent` over a CDP session (`context.newCDPSession(page)`), never with
+  the mouse — a mouse hides exactly the bugs a touchscreen has, and two of the ones that
+  check now covers were invisible to every other check in here.
 - `boardPath(name)` / `read` / `write` / `changed(file, was)` — the fixture's files.
 - `socket()` — drive the protocol the way the client does (`board.play`, `board.patch`).
 - `ask(page, text)` / `idle(page)` — one agent turn. Never swallow the timeout: a prompt

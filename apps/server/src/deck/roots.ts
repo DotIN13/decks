@@ -4,13 +4,16 @@ import type { Root } from "@decks/protocol";
 import { expandUser } from "../config.ts";
 
 /**
- * Which paths may be served, and the one place that decides it.
+ * Which paths may be served — and the one that may be written — decided here and
+ * nowhere else.
  *
- * Every route that turns a URL into a file goes through here. Two rules, and
- * they are separate on purpose: a *board* may only come from inside the deck,
- * because a board is part of the deck; a *file* may come from any root the deck
+ * Every route that turns a URL into a file goes through here. Three rules, kept
+ * separate on purpose: a *board* may only come from inside the deck, because a
+ * board is part of the deck; a *file* may be read from any root the deck
  * declares, because the whole point of an embed is to show a document that lives
- * somewhere else.
+ * somewhere else; and a *write* may only land in the deck's `assets/`, because
+ * the one thing the app itself writes on the user's behalf is a file they dropped
+ * on a board.
  *
  * Symlinks are resolved before the comparison, not after. A link inside the deck
  * pointing at `~/.ssh` is otherwise a path that passes a string test and reads a
@@ -88,6 +91,33 @@ export function resolveRoots(deckRoot: string, declared: Array<{ path: string; w
 		roots.push({ path: real, writable: entry.writable, exists: existsSync(real) });
 	}
 	return { deck: realPathOf(deckRoot), roots };
+}
+
+/**
+ * Where a dropped file may be written, and the only write decision in the app.
+ *
+ * One directory — `<deck>/assets`, which is already "the images the boards use"
+ * (§2) — and one plain file name inside it. The name is *rejected* rather than
+ * cleaned here: `files/upload.ts` sanitises what the browser sent, and this is
+ * the second gate that turns a bug in that sanitiser into a refusal instead of a
+ * traversal. So no separators, no leading dot, nothing outside a conservative
+ * alphabet, whatever the client claimed the file was called.
+ *
+ * Symlinks are resolved before the containment tests, as everywhere else in this
+ * file, and both ends are tested: an `assets` that is a link out of the deck is
+ * as much a way out as a name that is.
+ */
+export function resolveAssetWrite(deckRoot: string, name: string): string {
+	if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) throw new PathRefused(name, "it is not a plain file name");
+	if (name.includes("..")) throw new PathRefused(name, "the name contains ..");
+	const realRoot = realPathOf(deckRoot);
+	const dir = realPathOf(join(deckRoot, "assets"));
+	if (!containedIn(realRoot, dir) || dir === realRoot) {
+		throw new PathRefused(name, "the deck's assets directory resolves outside the deck");
+	}
+	const target = realPathOf(join(dir, name));
+	if (!containedIn(dir, target) || target === dir) throw new PathRefused(name, "it resolves outside assets/");
+	return target;
 }
 
 /**

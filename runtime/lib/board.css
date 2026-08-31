@@ -147,7 +147,6 @@ body.board > * {
 /* --- components --------------------------------------------------------------- */
 
 .card,
-.panel,
 .sticky,
 .text,
 .callout,
@@ -164,13 +163,6 @@ body.board > * {
 	border-radius: var(--b-radius);
 	background: var(--b-bg);
 	box-shadow: var(--b-shadow);
-}
-
-.panel {
-	padding: calc(var(--b-unit) * 2);
-	border: 1px solid var(--b-border);
-	border-radius: var(--b-radius);
-	background: var(--b-bg-deep);
 }
 
 .sticky {
@@ -243,7 +235,6 @@ body.board > * {
 
 /* Headings inside a component: the component owns its spacing, not the document. */
 .card > :first-child,
-.panel > :first-child,
 .sticky > :first-child,
 .callout > :first-child,
 .embed > :first-child {
@@ -251,7 +242,6 @@ body.board > * {
 }
 
 .card > :last-child,
-.panel > :last-child,
 .sticky > :last-child,
 .callout > :last-child {
 	margin-bottom: 0;
@@ -363,52 +353,20 @@ table.table,
 	text-transform: uppercase;
 }
 
-/* --- connectors -------------------------------------------------------------- */
+/* --- diagrams ----------------------------------------------------------------- */
 
 /*
- * A connector is an SVG the size of the board, drawn by board.js from the two
- * components it names. It sits under everything and must never eat a click, or
- * the component it points at cannot be selected through it.
+ * There is no connector primitive, and that is the decision rather than a gap. A
+ * line routed between two named components at mount time has no position in the
+ * file, so nobody — agent or person — can say where it goes without running the
+ * page. A diagram is a component that states its own coordinates instead: an
+ * `<svg>` the author sized and positioned, styled from the tokens above like
+ * everything else. `skills/board-authoring` has the worked example.
  */
-svg.link {
-	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
-	overflow: visible;
-	pointer-events: none;
-}
-
-svg.link path {
-	fill: none;
-	stroke: var(--b-border-strong);
-	stroke-width: 2;
-}
 
 /*
- * The arrowhead is a `path` inside the same `svg.link`, so the rule above would
- * make it an unfilled outline — a CSS declaration beats the `fill` attribute the
- * marker sets on itself. It gets its own rule, and `currentColor` so a tinted
- * connector keeps its point.
- */
-svg.link marker path {
-	fill: currentColor;
-	stroke: none;
-}
-
-svg.link text {
-	fill: var(--b-muted);
-	font-family: var(--b-font);
-	font-size: 12px;
-}
-
-svg.link[data-tone="accent"] path {
-	stroke: var(--b-accent);
-}
-
-/*
- * A diagram is given a box and has to live in it, so the box centres it and
- * clips rather than letting a tall flowchart run out over the board.
+ * A mermaid diagram is given a box and has to live in it, so the box centres it
+ * and clips rather than letting a tall flowchart run out over the board.
  */
 [data-mermaid] {
 	display: flex;
@@ -493,6 +451,33 @@ svg.link[data-tone="accent"] path {
 	box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
 }
 
+/* A text or source file: the file itself, monospaced, filling the component. The
+   `pre` loses the standalone block's border and margin — the embed frame is already
+   the border, and a second one inside it reads as a box in a box. */
+.embed[data-kind="text"] > .embed-body {
+	background: var(--b-bg-deep);
+}
+
+.embed[data-kind="text"] > .embed-body > pre {
+	margin: 0;
+	padding: calc(var(--b-unit) * 1.5);
+	border: 0;
+	border-radius: 0;
+	background: none;
+	font-size: 12px;
+	tab-size: 4;
+	white-space: pre;
+}
+
+/* Truncated, or a file we can only name: the way out, at the end of the body. */
+.embed .more {
+	display: inline-block;
+	padding: calc(var(--b-unit) * 0.75) calc(var(--b-unit) * 1.5);
+	color: var(--b-muted);
+	font-family: var(--b-mono);
+	font-size: 11px;
+}
+
 /* An embed that could not be resolved says so, in place, with the path. */
 .embed[data-kind="missing"] > .embed-body,
 .embed[data-kind="file"] > .embed-body {
@@ -507,6 +492,29 @@ svg.link[data-tone="accent"] path {
 
 .embed[data-kind="missing"] {
 	border-style: dashed;
+}
+
+/* The chip for a file with no family: a name, what it is, and how to get it. Not
+   dashed — it resolved, it is simply not something a board can draw. */
+.embed[data-kind="file"] > .embed-body > a:first-child {
+	font-family: var(--b-mono);
+	font-size: 13px;
+	overflow-wrap: anywhere;
+}
+
+.embed[data-kind="file"] > .embed-body > .meta {
+	color: var(--b-muted);
+	font-size: 11px;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.embed[data-kind="file"] > .embed-body > .more {
+	align-self: start;
+	padding: 0;
+	color: var(--b-accent);
+	text-decoration: underline;
+	text-decoration-color: var(--b-border-strong);
 }
 
 /* --- selection (the editor's affordance; harmless when nothing is selected) --- */

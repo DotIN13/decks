@@ -1,10 +1,51 @@
 /**
- * The few icons the chrome needs, inline.
+ * The mark, drawn here; every other icon comes from Lucide.
  *
- * Inline rather than a sprite or a dependency: there are three of them, they inherit
- * `currentColor` so they follow the theme without being told about it, and an icon font
- * would be a network round trip for the first paint of the title bar.
+ * The logo is the one drawing that carries meaning nobody else's icon set has, so it
+ * stays hand-rolled — and it is the first paint of the title bar, which is a poor place
+ * to be waiting on anything. Everything else used to be a glyph character (`▹`, `×`,
+ * `↑`, `+`) picked for having no dependency, and the cost of that showed: a text glyph
+ * has a font's baseline and metrics rather than an icon's box, so each one needed its own
+ * `font-size` to look centred, and none of them could be given a consistent weight.
+ * Lucide's set is one grid, one joint style, and one stroke — imported per icon
+ * (`lucide-solid/icons/x`) so the bundle carries the twenty the chrome uses rather than
+ * the fifteen hundred that exist.
+ *
+ * `lucide-solid` rather than `lucide-static` because it is a real Solid component: it
+ * ships an uncompiled-JSX `solid` export condition that `vite-plugin-solid` compiles with
+ * the rest of the app, so an icon is a few DOM calls rather than a parsed SVG string.
  */
+import type { LucideIcon } from "lucide-solid";
+import { Dynamic } from "solid-js/web";
+
+/**
+ * One decision about stroke weight, made here.
+ *
+ * 1.25 rather than Lucide's default 2, and rather than a flat 1: the chrome draws icons
+ * at 14–17px, where Lucide's units are scaled by size/24 — so a stroke of 1 lands at
+ * 0.6 device pixels and antialiases into a grey suggestion of an icon, worst on the
+ * light theme where these sit in `--faint`. 1.25 keeps the thin, drawn-with-a-pen look
+ * the app's typography has and still resolves.
+ */
+const STROKE = 1.25;
+
+/** The default: an icon sitting in the 13px body text. Call sites beside something
+ *  bigger — the title bar, the palette — say so. */
+const SIZE = 15;
+
+/**
+ * Every Lucide icon in the app goes through here.
+ *
+ * A wrapper rather than props spread at each call site, because stroke weight is a
+ * property of the app and not of the button — and because the palette keeps its icons
+ * in an array, where a component reference is the natural thing to hold.
+ *
+ * `currentColor` is Lucide's own default, which is what keeps these following the theme
+ * without any of them being told a colour (`lib/theme.ts`).
+ */
+export function Icon(props: { of: LucideIcon; size?: number; class?: string }) {
+	return <Dynamic component={props.of} size={props.size ?? SIZE} strokeWidth={STROKE} class={props.class} />;
+}
 
 /**
  * The mark: boards of unequal size laid out on a canvas.
@@ -18,42 +59,6 @@ export function DecksMark() {
 			<rect x="1" y="2" width="7.5" height="6.5" rx="1.5" />
 			<rect x="10" y="2" width="5" height="12" rx="1.5" opacity="0.5" />
 			<rect x="1" y="10" width="7.5" height="4" rx="1.5" opacity="0.72" />
-		</svg>
-	);
-}
-
-export function SunIcon() {
-	return (
-		<svg
-			viewBox="0 0 24 24"
-			width="17"
-			height="17"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			aria-hidden="true"
-		>
-			<circle cx="12" cy="12" r="4.25" />
-			<path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.1 5.1l1.4 1.4M17.5 17.5l1.4 1.4M18.9 5.1l-1.4 1.4M6.5 17.5l-1.4 1.4" />
-		</svg>
-	);
-}
-
-export function MoonIcon() {
-	return (
-		<svg
-			viewBox="0 0 24 24"
-			width="17"
-			height="17"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-			aria-hidden="true"
-		>
-			<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
 		</svg>
 	);
 }

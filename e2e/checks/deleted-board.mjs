@@ -7,7 +7,7 @@
  * deleted.
  */
 import { rmSync } from "node:fs";
-import { boardPath, deckState, open, ready, say, settle, socket, write } from "../harness.mjs";
+import { boardPath, deckState, emptyCanvas, open, say, settle, socket, write } from "../harness.mjs";
 
 const ghost = await boardPath("ghost.html");
 write(
@@ -25,10 +25,11 @@ try {
 	// board — the state where a deletion used to blank everything.
 	await page.mouse.move(6, 480);
 	await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
-	await page.locator(".chats .rail-head button", { hasText: "+" }).click();
+	await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 	await settle(page, 1200);
 	await page.mouse.move(800, 500);
-	await ready(page);
+	// A fresh agent holds nothing, so nothing is on the canvas to begin with.
+	await emptyCanvas(page);
 
 	link.send({ type: "board.play", path: "boards/ghost.html" });
 	await page.waitForFunction(() => document.querySelectorAll(".board-node").length === 1, null, { timeout: 8000 });
@@ -41,23 +42,42 @@ try {
 	);
 
 	rmSync(ghost, { force: true });
-	await page.waitForFunction(() => document.querySelectorAll(".board-node").length > 1, null, { timeout: 15000 });
-	await ready(page);
+	/*
+	 * What must recover is the *rail*.
+	 *
+	 * An empty canvas here is correct now — the agent held one board and it is gone, so it
+	 * holds nothing and puts nothing in play. The bug this check exists for is the other
+	 * half: a dead path left in the context made the rail resolve to nothing as well, so
+	 * the deck itself looked deleted, and because the context was not empty the rail's
+	 * whole-deck fallback did not fire either. This asserted the canvas before, which is
+	 * the half that is no longer a fault.
+	 */
+	await page.waitForFunction(() => document.querySelectorAll(".rail-item").length > 1, null, { timeout: 15000 });
 
 	const after = await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
+	const rail = await page.evaluate(() => [...document.querySelectorAll(".rail-item .file")].map((n) => n.textContent).sort());
 	const deck = await deckState();
-	say("deleting the only held board does not blank the canvas", after.length > 0, after.join(" ") || "(blank)");
-	say("…it falls back to the whole deck, minus the ghost", after.join() === deck.boards.map((b) => b.path).sort().join(), after.join(" "));
-	say("the rail recovers too", (await page.evaluate(() => document.querySelectorAll(".rail-item").length)) > 0);
+	say("the agent holds nothing, so the canvas is empty", after.length === 0, after.join(" ") || "(empty)");
+	say("the rail recovers, and lists the deck without the ghost",
+		rail.join() === deck.boards.map((b) => b.path).sort().join(), rail.join(" "));
 	const pruned = link.last("context.changed");
 	say("the server published the prune", Boolean(pruned) && !pruned.boards.includes("boards/ghost.html"), `boards=[${(pruned?.boards ?? []).join(" ")}]`);
 
-	// A second page must agree — the server pruned it, not just this client.
+	/*
+	 * A second page must agree — the server pruned it, not just this client.
+	 *
+	 * Read off the rail rather than the canvas: a fresh load's focused agent holds nothing,
+	 * so its canvas is legitimately empty and would prove nothing either way.
+	 */
 	const fresh = await browser.newPage({ viewport: { width: 1200, height: 800 } });
 	await fresh.goto(page.url(), { waitUntil: "load" });
-	await fresh.waitForSelector(".board-node", { timeout: 15000 });
-	const reloaded = await fresh.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path));
-	say("a fresh load agrees", reloaded.length > 0, reloaded.join(" ") || "(blank)");
+	await fresh.waitForSelector(".rail-item", { timeout: 15000 });
+	const reloaded = await fresh.evaluate(() => [...document.querySelectorAll(".rail-item .file")].map((n) => n.textContent));
+	say(
+		"a fresh load agrees",
+		reloaded.length > 0 && !reloaded.includes("boards/ghost.html"),
+		reloaded.join(" ") || "(nothing)",
+	);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));
 } finally {

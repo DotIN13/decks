@@ -16,7 +16,7 @@ import { SnapshotStore } from "./snapshot.ts";
  * set arithmetic can be exercised on its own, which is where the invariant lives: what is
  * on the canvas is always a subset of what the agent is holding.
  */
-function agentOn(boards: string[]) {
+function agentOn(boards: string[], options: { parentId?: string } = {}) {
 	const root = mkdtempSync(join(tmpdir(), "decks-sets-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	for (const name of boards) {
@@ -35,7 +35,7 @@ function agentOn(boards: string[]) {
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color: "#000", kind: "pi", snapshots: new SnapshotStore() },
+		{ color: "#000", kind: "pi", snapshots: new SnapshotStore(), ...options },
 	);
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");
@@ -143,5 +143,21 @@ test("an agent left holding only a deleted board is holding nothing", () => {
 	agent.forget("boards/a.html");
 	assert.equal(context(), "");
 	assert.equal(inPlay(), "");
+	cleanup();
+});
+
+test("a subagent outlives the parent it reported to", () => {
+	const { agent, cleanup } = agentOn(["a.html"], { parentId: "parent-1" });
+	assert.equal(agent.parentId, "parent-1");
+
+	// Addressed to a specific parent: another chat closing is not this one's business.
+	agent.orphan("someone-else");
+	assert.equal(agent.parentId, "parent-1", "an unrelated removal changes nothing");
+
+	// Its own parent closing promotes it to a top-level chat rather than leaving it
+	// tagged with a name that no longer resolves.
+	agent.orphan("parent-1");
+	assert.equal(agent.parentId, undefined);
+	assert.equal(agent.chat().parentId, undefined, "and the row stops claiming it");
 	cleanup();
 });

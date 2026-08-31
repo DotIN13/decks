@@ -27,8 +27,12 @@ const CHECKS = [
 	{ file: "camera.mjs", needsAgent: false },
 	{ file: "keys.mjs", needsAgent: false },
 	{ file: "gestures.mjs", needsAgent: false },
+	{ file: "mobile.mjs", needsAgent: false },
 	{ file: "embed-scroll.mjs", needsAgent: false },
 	{ file: "editing.mjs", needsAgent: false },
+	{ file: "inspector.mjs", needsAgent: false },
+	{ file: "invented-component.mjs", needsAgent: false },
+	{ file: "file-drop.mjs", needsAgent: false },
 	{ file: "no-flicker.mjs", needsAgent: false },
 	{ file: "tiers.mjs", needsAgent: false },
 	{ file: "deleted-board.mjs", needsAgent: false },
@@ -53,7 +57,9 @@ const skipped = CHECKS.filter((check) => !selected.includes(check));
 const data = mkdtempSync(join(tmpdir(), "decks-e2e-"));
 cpSync(join(root, "example"), data, { recursive: true });
 // `example/decks/lib` is generated and gitignored, so a fresh clone has to be given one
-// or every board in the fixture loads without its stylesheet.
+// or every board in the fixture loads without its stylesheet. The server would now write
+// it on open (`App.refreshLib`), but the fixture is built before the server starts and a
+// check that fails because of a race in its own setup is the worst kind to debug.
 cpSync(join(root, "runtime", "lib"), join(data, "decks", "lib"), { recursive: true });
 // Revisions and agent transcripts from whoever ran the example deck last are not fixture.
 rmSync(join(data, "decks", ".decks"), { recursive: true, force: true });

@@ -1,10 +1,10 @@
 /**
  * The agent's half of the tiers: `attach` and `show` from inside `stage_eval`.
  *
- * Needs a model. The user-facing half — the ×, the rail click, the empty-context fallback
+ * Needs a model. The user-facing half — hiding, the rail click, the empty-context fallback
  * — is in tiers.mjs and needs nothing.
  */
-import { ask, deckState, open, ready, say, settle } from "../harness.mjs";
+import { ask, deckState, emptyCanvas, open, say, settle } from "../harness.mjs";
 
 const deck = await deckState();
 const two = deck.boards.map((board) => board.path).slice(0, 2);
@@ -16,10 +16,11 @@ const inRail = () => page.evaluate(() => [...document.querySelectorAll(".rail-it
 // A fresh agent, so nothing it holds is inherited.
 await page.mouse.move(6, 480);
 await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
-await page.locator(".chats .rail-head button", { hasText: "+" }).click();
+await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 await settle(page, 1200);
 await page.mouse.move(800, 500);
-await ready(page);
+// A fresh agent holds nothing, so its canvas is empty until it attaches something.
+await emptyCanvas(page);
 
 await ask(page, `With one stage_eval call, attach ${two[0]} and ${two[1]}, then return stage.inPlay().`);
 say("attaching narrows the canvas to what is held", (await onCanvas()).join() === two.join(), (await onCanvas()).join(" "));

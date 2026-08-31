@@ -10,7 +10,7 @@ const { browser, page, errors } = await open();
 // A fresh agent, so the spine starts empty however much this deck has been talked to.
 await page.mouse.move(6, 480);
 await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
-await page.locator(".chats .rail-head button", { hasText: "+" }).click();
+await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 await settle(page, 1200);
 await page.mouse.move(800, 500);
 say("no spine before anything is said", (await page.locator(".turnbar .turn").count()) === 0);

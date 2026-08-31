@@ -14,7 +14,7 @@ try {
 	// A fresh agent, so the history is this run's.
 	await page.mouse.move(6, 480);
 	await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
-	await page.locator(".chats .rail-head button", { hasText: "+" }).click();
+	await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 	await settle(page, 1200);
 	await page.mouse.move(800, 500);
 
@@ -23,7 +23,15 @@ try {
 
 	await ask(page, "Now change that sticky's text to 'second turn'. Briefly.");
 	const afterSecond = read(plan);
-	say("the second turn changed it again", /second turn/.test(afterSecond));
+	/*
+	 * Case-insensitive, because the text is the model's.
+	 *
+	 * The prompt asks for a sticky saying 'first turn' and a model may reasonably write
+	 * "First turn". What is being tested is the time machine, not whether the agent
+	 * preserved the case of a word — and a check that fails on that is a check that cries
+	 * wolf about a feature that works.
+	 */
+	say("the second turn changed it again", /second turn/i.test(afterSecond));
 
 	await page.locator(".turnbar .turn").first().click();
 	await page.waitForSelector(".chat .turn-row", { timeout: 8000 });
@@ -55,7 +63,11 @@ try {
 		const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');
 		return { src: frame?.getAttribute("src"), text: frame?.contentDocument?.querySelector('[data-id="timecheck"]')?.textContent?.trim() };
 	});
-	say("hovering rewind shows that point's boards", preview.text === "first turn", `text=${JSON.stringify(preview.text)}`);
+	say(
+		"hovering rewind shows that point's boards",
+		(preview.text ?? "").trim().toLowerCase() === "first turn",
+		`text=${JSON.stringify(preview.text)}`,
+	);
 	say("previewing writes nothing", read(plan) === afterSecond);
 
 	// Restore is deliberate, and it does write.
@@ -64,7 +76,7 @@ try {
 	await page.waitForFunction(() => true, null, { timeout: 1000 }).catch(() => {});
 	await settle(page, 1500);
 	const restored = read(plan);
-	say("restore boards writes that point back", /first turn/.test(restored) && !/second turn/.test(restored));
+	say("restore boards writes that point back", /first turn/i.test(restored) && !/second turn/i.test(restored));
 
 	// Rewinding truncates the conversation.
 	const before = await page.locator(".chat .stream > *").count();

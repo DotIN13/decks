@@ -46,3 +46,28 @@ export function boardHeaders(res: Response): void {
 	res.setHeader("X-Content-Type-Options", "nosniff");
 	res.setHeader("Cache-Control", "no-cache");
 }
+
+/**
+ * Headers for a file inside the deck that is *not* a board — an asset (§4).
+ *
+ * Boards get the app's origin because the app edits them. An asset has no such
+ * claim, and since the user can now drop one in, `assets/` holds files nobody in
+ * this codebase wrote: an uploaded `evil.html` served under `/api/board/` with
+ * board headers would be a stored cross-site script *on the app's own origin*, and
+ * `data-embed="../assets/evil.html"` puts the URL in a board file where somebody
+ * will eventually open it in a tab. So anything a browser *runs* gets the same
+ * `sandbox allow-scripts` a foreign file gets — it may still be an embed, it may
+ * still run, and it may not reach this app.
+ *
+ * The rest — images, PDFs, text — is unaffected, and so are the two things that
+ * must keep the origin: a board, and `lib/`. A CSP `sandbox` on a subresource is
+ * ignored by browsers (it applies to documents), so an SVG in an `<img>` still
+ * draws.
+ */
+export function assetHeaders(res: Response, path: string): void {
+	boardHeaders(res);
+	if (isExecutable(path)) {
+		res.setHeader("Content-Security-Policy", "sandbox allow-scripts");
+		res.setHeader("Referrer-Policy", "no-referrer");
+	}
+}

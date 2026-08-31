@@ -1,0 +1,351 @@
+/**
+ * The app on a phone: the gestures a hand has, and the chrome it can reach.
+ *
+ * Driven in a device context (`hasTouch`) with real touch events dispatched through CDP,
+ * because a mouse hides every bug this file is about. Before any of this existed a
+ * touchscreen had no pinch and no two-finger pan — two fingers were two independent
+ * one-finger pans, so pinching pulled the canvas about — and a one-finger drag over a
+ * *live* board moved nothing at all, which meant the canvas was frozen wherever a board
+ * was under your finger. Both are asserted here, on bare stage and over a board, since a
+ * board is a separate document and its gestures come out through `frame-gestures.ts`.
+ */
+import { open, say, settle } from "../harness.mjs";
+
+const { browser, page, context, errors } = await open({ device: "iPhone 15" });
+const cdp = await context.newCDPSession(page);
+
+const camera = () =>
+	page.evaluate(() => {
+		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
+			document.querySelector(".world").style.transform,
+		);
+		return { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) };
+	});
+
+const touch = (type, points) =>
+	cdp.send("Input.dispatchTouchEvent", { type, touchPoints: points.map((point, id) => ({ x: point.x, y: point.y, id })) });
+
+/** Two fingers, from one spread to another about a fixed centre. */
+const pinch = async (centre, from, to, steps = 12) => {
+	const pair = (spread) => [
+		{ x: centre.x - spread / 2, y: centre.y },
+		{ x: centre.x + spread / 2, y: centre.y },
+	];
+	await touch("touchStart", pair(from));
+	for (let step = 1; step <= steps; step++) {
+		await touch("touchMove", pair(from + ((to - from) * step) / steps));
+		await settle(page, 16);
+	}
+	await touch("touchEnd", []);
+	await settle(page, 80);
+};
+
+const swipe = async (fingers, delta, steps = 10) => {
+	let points = fingers;
+	await touch("touchStart", points);
+	for (let step = 0; step < steps; step++) {
+		points = points.map((point) => ({ x: point.x + delta.x / steps, y: point.y + delta.y / steps }));
+		await touch("touchMove", points);
+		await settle(page, 16);
+	}
+	await touch("touchEnd", []);
+	await settle(page, 80);
+};
+
+// --- 1. the input bar exists at all --------------------------------------------------
+/*
+ * The dock's width used to be `calc(100% - 650px)` — the room left beside two panels,
+ * which on a 390px screen is negative. The composer was 18 pixels across, with the
+ * placeholder broken one letter per line.
+ */
+const dock = await page.evaluate(() => {
+	const box = (selector) => {
+		const element = document.querySelector(selector);
+		if (!element) return null;
+		const rect = element.getBoundingClientRect();
+		return { w: Math.round(rect.width), h: Math.round(rect.height) };
+	};
+	return { composer: box(".composer"), field: box(".composer textarea"), send: box(".composer .send"), width: window.innerWidth };
+});
+say(
+	"the composer is as wide as the phone, not as wide as what is left over",
+	dock.composer.w > dock.width - 60 && dock.field.w > 240,
+	JSON.stringify(dock),
+);
+say("the send button is a fingertip target", dock.send.w >= 40 && dock.send.h >= 40, JSON.stringify(dock.send));
+
+// --- 2. pinch on bare stage ---------------------------------------------------------
+const start = await camera();
+await pinch({ x: 190, y: 320 }, 60, 260);
+const spread = await camera();
+say("pinching out zooms the canvas in", spread.zoom > start.zoom * 1.5, `${start.zoom.toFixed(3)} -> ${spread.zoom.toFixed(3)}`);
+await pinch({ x: 190, y: 320 }, 260, 90);
+say("pinching in zooms back out", (await camera()).zoom < spread.zoom, `${spread.zoom.toFixed(3)}`);
+
+// --- 3. two fingers moving together are a pan, not a double-speed one -----------------
+const before = await camera();
+await swipe(
+	[
+		{ x: 150, y: 300 },
+		{ x: 250, y: 300 },
+	],
+	{ x: 80, y: 0 },
+);
+const after = await camera();
+const travelled = (before.x - after.x) * before.zoom;
+say("two fingers moving together pan the canvas", Math.abs(travelled) > 20, `${travelled.toFixed(1)} screen px`);
+say("and hold the zoom while they do", Math.abs(after.zoom - before.zoom) < 1e-6, `${before.zoom} -> ${after.zoom}`);
+say(
+	"a two-finger pan travels the distance the fingers did, not twice it",
+	Math.abs(Math.abs(travelled) - 80) < 12,
+	`${travelled.toFixed(1)} for 80px of finger`,
+);
+
+// --- 4. the same gestures over a live board ------------------------------------------
+// Fly to one board and get past `INTERACT_ZOOM`, where its frame takes pointer events
+// and every gesture has to be forwarded back out of it.
+await page.evaluate(() => [...document.querySelectorAll(".rail-item")].find((item) => item.textContent.includes("plan.html"))?.click());
+await settle(page, 500);
+while ((await camera()).zoom < 0.6) {
+	await page.evaluate(() => document.querySelector('.zoombar [aria-label="Zoom in"]').click());
+	await settle(page, 60);
+}
+const over = await page.evaluate(() => {
+	const surface = document.querySelector('.board-node[data-path="boards/plan.html"] .surface');
+	const rect = surface.getBoundingClientRect();
+	return {
+		x: Math.min(window.innerWidth - 60, Math.max(60, rect.x + rect.width / 2)),
+		y: Math.min(window.innerHeight - 220, Math.max(140, rect.y + rect.height / 2)),
+	};
+});
+say("the gesture point is over a live board", await page.evaluate((at) => document.elementFromPoint(at.x, at.y)?.tagName === "IFRAME", over));
+
+const onBoard = await camera();
+await swipe([over], { x: 0, y: -60 });
+const panned = await camera();
+say(
+	"one finger over a board pans the canvas — it used to move nothing",
+	Math.abs((panned.y - onBoard.y) * onBoard.zoom - 60) < 12,
+	`${((panned.y - onBoard.y) * onBoard.zoom).toFixed(1)} screen px for 60px of finger`,
+);
+say("and does not carry the board off with it", Math.abs(panned.zoom - onBoard.zoom) < 1e-6);
+
+// Pinching over a board must hold the world point between the fingers, which is the
+// property `gestures.mjs` asserts for the wheel and the only one worth measuring here.
+// Measured through the camera rather than through the frame's box: the transform is what
+// the assertion is about, and reading it back needs no assumptions about the layout.
+const anchor = await page.evaluate((at) => {
+	const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
+		document.querySelector(".world").style.transform,
+	);
+	const camera = { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) };
+	const stage = document.querySelector(".stage").getBoundingClientRect();
+	const view = { width: stage.width, height: stage.height };
+	return {
+		x: (at.x - stage.left - view.width / 2) / camera.zoom + camera.x,
+		y: (at.y - stage.top - view.height / 2) / camera.zoom + camera.y,
+	};
+}, over);
+await pinch(over, 80, 220);
+const drift = await page.evaluate(
+	(world) => {
+		const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\) translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(
+			document.querySelector(".world").style.transform,
+		);
+		const camera = { zoom: Number(m[3]), x: -Number(m[4]), y: -Number(m[5]) };
+		const stage = document.querySelector(".stage").getBoundingClientRect();
+		return {
+			x: (world.x - camera.x) * camera.zoom + stage.width / 2 + stage.left,
+			y: (world.y - camera.y) * camera.zoom + stage.height / 2 + stage.top,
+		};
+	},
+	anchor,
+);
+const zoomedOverBoard = await camera();
+say("pinching over a board zooms the canvas", zoomedOverBoard.zoom > onBoard.zoom, `${onBoard.zoom.toFixed(3)} -> ${zoomedOverBoard.zoom.toFixed(3)}`);
+say(
+	"and holds the world point between the fingers",
+	Math.abs(drift.x - over.x) < 3 && Math.abs(drift.y - over.y) < 3,
+	`the point the pinch started on is now at ${drift.x.toFixed(1)}/${drift.y.toFixed(1)}, the fingers were at ${over.x}/${over.y}`,
+);
+
+// --- 5. tap to select, tap again to type ---------------------------------------------
+// Back to the whole board and just past `INTERACT_ZOOM`, so there is something small
+// enough to aim at and it is where the maths says it is.
+const frameBoard = async (name) => {
+	await page.evaluate((wanted) => [...document.querySelectorAll(".rail-item")].find((item) => item.textContent.includes(wanted))?.click(), name);
+	await page.waitForFunction(
+		(wanted) => document.querySelector(`.board-node[data-path="boards/${wanted}"] iframe`)?.contentWindow?.__boardReady === true,
+		name,
+		{ timeout: 15000 },
+	);
+	await settle(page, 300);
+	while ((await camera()).zoom < 0.55) {
+		await page.evaluate(() => document.querySelector('.zoombar [aria-label="Zoom in"]').click());
+		await settle(page, 60);
+	}
+};
+await frameBoard("plan.html");
+
+const run = await page.evaluate(() => {
+	const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');
+	const rect = frame.getBoundingClientRect();
+	const scale = rect.width / frame.clientWidth;
+	const at = (node) => {
+		const box = node.getBoundingClientRect();
+		return { x: rect.left + (box.x + Math.min(40, box.width / 2)) * scale, y: rect.top + (box.y + box.height / 2) * scale };
+	};
+	// A run the board's author named. `data-edit` is the whole address a retype carries
+	// (DESIGN §6.5), so a run without one is not editable by any gesture and tapping it
+	// twice would prove nothing.
+	const found = [...frame.contentDocument.querySelectorAll("[data-edit]")].find((node) => {
+		if (node.children.length > 0 || (node.textContent ?? "").trim().length < 5) return false;
+		const point = at(node);
+		return point.x > 40 && point.x < window.innerWidth - 40 && point.y > 120 && point.y < 300;
+	});
+	return found ? { id: found.closest("[data-id]").dataset.id, edit: found.dataset.edit, ...at(found) } : null;
+});
+if (!run) {
+	say("a run of text is on screen to tap", false, "nothing found — the camera moved somewhere unexpected");
+} else {
+	const tap = async () => {
+		await touch("touchStart", [{ x: run.x, y: run.y }]);
+		await touch("touchEnd", []);
+		await settle(page, 250);
+	};
+	await tap();
+	const selected = await page.evaluate(
+		() =>
+			document
+				.querySelector('.board-node[data-path="boards/plan.html"] iframe')
+				.contentDocument.querySelector(".decks-editing")?.dataset.id ?? null,
+	);
+	say("one tap selects the component under it", selected === run.id, `${selected} vs ${run.id}`);
+	say("and the inspector comes with it", await page.evaluate(() => Boolean(document.querySelector(".inspector"))));
+
+	// A double-tap is the browser's zoom gesture, so the second tap is the text edit.
+	await tap();
+	const typing = await page.evaluate(() =>
+		Boolean(
+			document
+				.querySelector('.board-node[data-path="boards/plan.html"] iframe')
+				.contentDocument.querySelector('[contenteditable="true"]'),
+		),
+	);
+	say("tapping it again starts typing over the run of text", typing, `over data-edit="${run.edit}"`);
+	await page.evaluate(() =>
+		document
+			.querySelector('.board-node[data-path="boards/plan.html"] iframe')
+			.contentDocument.querySelector('[contenteditable="true"]')
+			?.blur(),
+	);
+	await settle(page, 300);
+}
+
+// --- 6. a scroll an embed can take is still the embed's -------------------------------
+/*
+ * The rule the wheel path documents (§7), now for a finger: the canvas takes over at the
+ * end of the box, and a `touch-action: none` inside the frame means it has to be done by
+ * hand. The board with the embeds is the one this can be asked of.
+ */
+await frameBoard("sources.html");
+
+/** Where a scrollable embed body is, having first brought it into view. */
+const findEmbed = () =>
+	page.evaluate(() => {
+		const frame = document.querySelector('.board-node[data-path="boards/sources.html"] iframe');
+		const rect = frame.getBoundingClientRect();
+		const scale = rect.width / frame.clientWidth;
+		for (const body of frame.contentDocument.querySelectorAll(".embed-body")) {
+			const room = Math.round(body.scrollHeight - body.clientHeight);
+			if (room < 20) continue;
+			const box = body.getBoundingClientRect();
+			body.dataset.decksProbe = "true";
+			return {
+				point: { x: rect.left + (box.left + 40) * scale, y: rect.top + (box.top + 40) * scale },
+				room,
+				top: Math.round(body.scrollTop),
+			};
+		}
+		return null;
+	});
+
+/*
+ * Brought into view with a wheel pan, which is the one way a check can move the camera by
+ * an exact amount (`gestures.mjs` does the same): the fixture's embeds are wherever the
+ * board puts them, and at a zoom where a phone can read one, most of the board is off
+ * screen.
+ */
+const wheelPan = (dx, dy) =>
+	page.evaluate(
+		(delta) =>
+			document.querySelector(".stage").dispatchEvent(
+				new WheelEvent("wheel", { deltaX: delta.dx, deltaY: delta.dy, clientX: 190, clientY: 300, bubbles: true, cancelable: true }),
+			),
+		{ dx, dy },
+	);
+const wanted = { x: 190, y: 240 };
+let embed = await findEmbed();
+if (embed) {
+	await wheelPan(embed.point.x - wanted.x, embed.point.y - wanted.y);
+	await settle(page, 200);
+	embed = await findEmbed();
+}
+if (!embed) {
+	say("an embed with something to scroll is on screen", false, "none of them is both");
+} else {
+	const cameraWas = await camera();
+	await swipe([embed.point], { x: 0, y: -70 });
+	const scrolled = await page.evaluate(() =>
+		Math.round(
+			document
+				.querySelector('.board-node[data-path="boards/sources.html"] iframe')
+				.contentDocument.querySelector('[data-decks-probe="true"]').scrollTop,
+		),
+	);
+	const cameraNow = await camera();
+	say("a finger dragged up inside an embed scrolls the embed", scrolled > 10, `scrollTop ${embed.top} -> ${scrolled}`);
+	say(
+		"and leaves the camera where it was",
+		Math.abs(cameraNow.y - cameraWas.y) < 1 && Math.abs(cameraNow.x - cameraWas.x) < 1,
+		`${JSON.stringify(cameraWas)} -> ${JSON.stringify(cameraNow)}`,
+	);
+}
+
+// --- 7. the panels, which no finger can hover into ----------------------------------
+const openState = () =>
+	page.evaluate(() => ({
+		left: document.querySelector(".side")?.dataset.open,
+		right: document.querySelector(".chat")?.dataset.open,
+	}));
+say("both panels start away", JSON.stringify(await openState()) === '{"left":"false","right":"false"}', JSON.stringify(await openState()));
+
+await page.locator('.titlebar .icon-button[aria-label="Boards and chats"]').tap();
+await settle(page, 300);
+say("a tap on the title bar brings the boards out", (await openState()).left === "true", JSON.stringify(await openState()));
+
+await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
+await settle(page, 300);
+const both = await openState();
+say("opening the transcript closes the other one", both.right === "true" && both.left === "false", JSON.stringify(both));
+
+await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
+await settle(page, 300);
+say("and tapping it again puts it away", (await openState()).right === "false", JSON.stringify(await openState()));
+
+// --- 8. nothing in the chrome is smaller than a fingertip ---------------------------
+const small = await page.evaluate(() => {
+	const wanted = ".titlebar .icon-button, .palette button, .zoombar button, .composer .send";
+	return [...document.querySelectorAll(wanted)]
+		.filter((element) => element.getBoundingClientRect().width > 0)
+		.map((element) => ({
+			what: `${element.className || element.tagName} ${element.getAttribute("aria-label") ?? ""}`.trim(),
+			w: Math.round(element.getBoundingClientRect().width),
+			h: Math.round(element.getBoundingClientRect().height),
+		}))
+		.filter((entry) => entry.w < 40 || entry.h < 40);
+});
+say("every button in the chrome is at least 40px", small.length === 0, JSON.stringify(small));
+
+say("no page errors", errors.length === 0, errors.join(" | "));
+await browser.close();

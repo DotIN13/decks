@@ -1,8 +1,11 @@
 import type { Board, Camera } from "@decks/protocol";
+import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import { Icon } from "../icons.tsx";
 import { boardUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../lib/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
+import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
 import { paintFrame } from "../lib/theme.ts";
 
@@ -38,6 +41,8 @@ export function BoardFrame(props: {
 	editor: EditorHost;
 	/** Canvas gestures that start inside the frame and belong to the stage. */
 	gestures: FrameGestureHost;
+	/** A file dragged in from the desktop, which also arrives inside the frame. */
+	drops: FileDropHost;
 	/**
 	 * The revision this frame should display, when that is not the newest one — after
 	 * this browser's own edit, the DOM is already correct and reloading it would
@@ -52,9 +57,11 @@ export function BoardFrame(props: {
 }) {
 	let detachEditor: (() => void) | undefined;
 	let detachGestures: (() => void) | undefined;
+	let detachDrop: (() => void) | undefined;
 	onCleanup(() => {
 		detachEditor?.();
 		detachGestures?.();
+		detachDrop?.();
 	});
 
 	const [dragging, setDragging] = createSignal(false);
@@ -92,21 +99,51 @@ export function BoardFrame(props: {
 
 	const startDrag = (event: PointerEvent) => {
 		if (event.button !== 0) return;
-		event.stopPropagation();
+		const touched = event.pointerType === "touch";
+		/*
+		 * A finger on the title bar is reported to the stage before it is used here.
+		 *
+		 * With a mouse this gesture is the board's alone and the event is stopped: there
+		 * is one cursor and it is pressing this bar. A finger is not alone — the other one
+		 * may be about to pinch, and a pinch that happens to start over a title bar used
+		 * to drag the board instead of zooming, because both fingers were swallowed here
+		 * and the stage never learnt they existed. So on touch the event goes on up: the
+		 * stage counts the finger and is told the camera may not pan with it
+		 * (`claimTouch`), which leaves the board draggable by one finger and pinchable by
+		 * two. `pinching()` below is where the second finger takes the gesture back.
+		 */
+		if (touched) props.gestures.claimTouch(event.pointerId);
+		else event.stopPropagation();
 		event.preventDefault();
 		props.onSelect();
 
 		const handle = event.currentTarget as HTMLElement;
-		// Pointer capture, so a drag that outruns the cursor keeps dragging rather
-		// than stopping the moment the pointer leaves the 24px title bar.
-		handle.setPointerCapture(event.pointerId);
+		/*
+		 * Pointer capture, so a drag that outruns the cursor keeps dragging rather than
+		 * stopping the moment the pointer leaves the 24px title bar. Not on touch: the
+		 * stage captures the same finger to itself for the pan it might turn out to be,
+		 * and the last capture wins — so the drag listens on the window, which sees the
+		 * event wherever it is targeted.
+		 */
+		const listener: HTMLElement | Window = touched ? window : handle;
+		if (!touched) handle.setPointerCapture(event.pointerId);
 		setDragging(true);
 
 		const from = { x: event.clientX, y: event.clientY };
 		const origin = { x: props.board.x, y: props.board.y };
 		const zoom = props.camera.zoom;
+		let moved = false;
 
 		const move = (moveEvent: PointerEvent) => {
+			if (moveEvent.pointerId !== event.pointerId) return;
+			// A second finger means this was the start of a pinch, not of a move. The
+			// board goes back to where it was and the camera takes over.
+			if (touched && props.gestures.pinching()) {
+				setGhost(null);
+				finish(true);
+				return;
+			}
+			moved = true;
 			// Screen delta / zoom, because the board's coordinates are world units:
 			// at 0.25 zoom the pointer travels four pixels for every one it moves.
 			setGhost({
@@ -115,21 +152,25 @@ export function BoardFrame(props: {
 			});
 		};
 
-		const finish = () => {
-			handle.removeEventListener("pointermove", move);
-			handle.removeEventListener("pointerup", finish);
-			handle.removeEventListener("pointercancel", finish);
+		const finish = (abandon = false) => {
+			listener.removeEventListener("pointermove", move as EventListener);
+			listener.removeEventListener("pointerup", end as EventListener);
+			listener.removeEventListener("pointercancel", end as EventListener);
 			setDragging(false);
-			const landed = ghost();
+			const landed = abandon ? null : ghost();
 			// The ghost stays until the server's board.changed comes back with the
 			// new position, or the board would jump home for a frame.
-			if (landed) props.onMove(Math.round(landed.x), Math.round(landed.y));
+			if (landed && moved) props.onMove(Math.round(landed.x), Math.round(landed.y));
 			setGhost(null);
 		};
+		const end = (endEvent: PointerEvent) => {
+			if (endEvent.pointerId !== event.pointerId) return;
+			finish();
+		};
 
-		handle.addEventListener("pointermove", move);
-		handle.addEventListener("pointerup", finish);
-		handle.addEventListener("pointercancel", finish);
+		listener.addEventListener("pointermove", move as EventListener);
+		listener.addEventListener("pointerup", end as EventListener);
+		listener.addEventListener("pointercancel", end as EventListener);
 	};
 
 	return (
@@ -182,13 +223,14 @@ export function BoardFrame(props: {
 							class="hide"
 							type="button"
 							title="Take this board off the canvas. The agent keeps it in context."
+							aria-label="Take this board off the canvas"
 							onPointerDown={(event) => event.stopPropagation()}
 							onClick={(event) => {
 								event.stopPropagation();
 								hide()();
 							}}
 						>
-							×
+							<Icon of={X} size={14} />
 						</button>
 					)}
 				</Show>
@@ -199,13 +241,21 @@ export function BoardFrame(props: {
 				map rather than a document — its whole body is the drag handle. The title
 				bar alone is a 24px target that can sit behind a floating panel, and at that
 				distance there is nothing inside the board to click anyway.
+
+				**Except for a finger, which has no other way to pan.** One finger is the
+				canvas moving (`Stage`, `frame-gestures.ts`), and a board whose body picks
+				itself up would mean the gesture you use most does the thing you meant
+				least — dragging the deck apart while trying to look at it. So on touch a
+				board moves by its title bar at every zoom, which is the one target that
+				means "this board" and nothing else. The bar is counter-scaled, so it is 24
+				screen pixels however far out you are.
 			*/}
 			<div
 				class="surface"
 				style={{ width: `${props.board.w}px`, height: `${props.board.h}px` }}
 				onPointerDown={(event) => {
 					props.onSelect();
-					if (inert()) startDrag(event);
+					if (inert() && event.pointerType !== "touch") startDrag(event);
 				}}
 			>
 				<Show
@@ -231,8 +281,10 @@ export function BoardFrame(props: {
 							// listeners went with the old one.
 							detachEditor?.();
 							detachGestures?.();
+							detachDrop?.();
 							detachEditor = attachEditor(frame, props.board.path, props.editor);
 							detachGestures = attachFrameGestures(frame, props.gestures);
+							detachDrop = attachFrameDrop(frame, props.drops);
 						}}
 					/>
 				</Show>

@@ -4,6 +4,7 @@ import type { Board, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
 import { readBoardMeta } from "./meta.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
+import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
 
 /** Defaults for a board that says nothing about its own size. */
@@ -52,7 +53,7 @@ export class Deck {
 		const absolute = resolve(path);
 		mkdirSync(join(absolute, "boards"), { recursive: true });
 		mkdirSync(join(absolute, "assets"), { recursive: true });
-		copyDir(runtimeLib, join(absolute, "lib"));
+		syncRuntimeLib(runtimeLib, join(absolute, "lib"));
 		const deckFile = join(absolute, "deck.json");
 		if (!existsSync(deckFile)) {
 			writeFileSync(deckFile, serializeDeckFile({ version: 1, name: name ?? basename(absolute), boards: {}, roots: [] }));
@@ -285,13 +286,3 @@ function revisionOf(html: string): number {
 	return hash >>> 0;
 }
 
-function copyDir(from: string, to: string): void {
-	if (!existsSync(from)) return;
-	mkdirSync(to, { recursive: true });
-	for (const entry of readdirSync(from, { withFileTypes: true })) {
-		const source = join(from, entry.name);
-		const target = join(to, entry.name);
-		if (entry.isDirectory()) copyDir(source, target);
-		else writeFileSync(target, readFileSync(source));
-	}
-}

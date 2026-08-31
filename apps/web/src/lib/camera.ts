@@ -25,6 +25,22 @@ export interface Viewport {
 	height: number;
 }
 
+export interface Point {
+	x: number;
+	y: number;
+}
+
+/**
+ * How much room `fit` leaves around what it framed.
+ *
+ * A constant 96 is a third of a phone's width on each side — the deck fitted into the
+ * middle 25% of the screen, which reads as the app having failed to load rather than as
+ * breathing room. So the padding is a fraction of the smaller side, capped at the 96
+ * that a laptop has always had: at 1500x950 and on a tablet this is exactly 96, and it
+ * only gives way where there is nothing to give.
+ */
+export const breathingRoom = (view: Viewport) => Math.min(96, view.width / 8, view.height / 8);
+
 export function clampZoom(zoom: number): number {
 	return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
 }
@@ -67,8 +83,81 @@ export function pan(camera: Camera, dx: number, dy: number): Camera {
 	return { ...camera, x: camera.x - dx / camera.zoom, y: camera.y - dy / camera.zoom };
 }
 
+const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+const spread = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
+
+/**
+ * Two fingers: one step of a pinch, which is a pan and a zoom at once.
+ *
+ * `zoomAbout` holds a point that does not move — the cursor a wheel arrives at. Two
+ * fingers have no such point: the midpoint between them travels *and* the distance
+ * between them changes, and both mean something. So the anchor is the world point that
+ * was under the old midpoint, and the camera is solved for putting it under the new
+ * one at the new zoom. Pinching with both fingers moving the same way is then a pan,
+ * spreading them without moving their centre is a zoom, and doing both at once is what
+ * a hand actually does — one expression rather than a pan added to a zoom.
+ *
+ * Called with one *step* of the gesture (the previous pair of positions, and the
+ * current pair) rather than with the gesture's start. Incremental is what lets the
+ * zoom clamp without the gesture losing its place: at the limit the spread stops
+ * mattering and the midpoint still pans, and the fingers never end up describing a
+ * camera the canvas refused to reach.
+ */
+export function pinchCamera(camera: Camera, view: Viewport, from: [Point, Point], to: [Point, Point]): Camera {
+	const was = spread(from[0], from[1]);
+	const factor = was > 0.5 ? spread(to[0], to[1]) / was : 1;
+	const zoom = clampZoom(camera.zoom * factor);
+	const anchor = toWorld(camera, view, mid(from[0], from[1]));
+	const at = mid(to[0], to[1]);
+	return {
+		zoom,
+		x: anchor.x - (at.x - view.width / 2) / zoom,
+		y: anchor.y - (at.y - view.height / 2) / zoom,
+	};
+}
+
+/**
+ * The camera moved as little as it can to bring a world box into view.
+ *
+ * For the on-screen keyboard, which is the only thing that has ever needed it: a
+ * `contenteditable` in a board is focused, the keyboard takes the bottom half of the
+ * screen, and the words being typed are behind it. The room left over is the visual
+ * viewport (`window.visualViewport`), which arrives here as insets in screen pixels.
+ *
+ * It never zooms — a caret that jumps *and* changes size loses the place twice — and
+ * where the box is larger than the room, the near edges win: reading starts at the top
+ * left of a paragraph, so that is the corner worth guaranteeing.
+ */
+export function keepVisible(
+	camera: Camera,
+	view: Viewport,
+	box: { x: number; y: number; w: number; h: number },
+	inset: { top?: number; right?: number; bottom?: number; left?: number } = {},
+): Camera {
+	const at = toScreen(camera, view, box);
+	const width = box.w * camera.zoom;
+	const height = box.h * camera.zoom;
+	const left = inset.left ?? 0;
+	const top = inset.top ?? 0;
+	const right = view.width - (inset.right ?? 0);
+	const bottom = view.height - (inset.bottom ?? 0);
+
+	let dx = 0;
+	if (at.x + width > right) dx = right - (at.x + width);
+	if (at.x + dx < left) dx = left - at.x;
+	let dy = 0;
+	if (at.y + height > bottom) dy = bottom - (at.y + height);
+	if (at.y + dy < top) dy = top - at.y;
+
+	return dx === 0 && dy === 0 ? camera : pan(camera, dx, dy);
+}
+
 /** A camera that fits the given boxes, with room to breathe. */
-export function fit(boxes: Array<{ x: number; y: number; w: number; h: number }>, view: Viewport, padding = 96): Camera {
+export function fit(
+	boxes: Array<{ x: number; y: number; w: number; h: number }>,
+	view: Viewport,
+	padding = breathingRoom(view),
+): Camera {
 	if (boxes.length === 0 || view.width === 0 || view.height === 0) return { x: 0, y: 0, zoom: 1 };
 	const left = Math.min(...boxes.map((b) => b.x));
 	const top = Math.min(...boxes.map((b) => b.y));

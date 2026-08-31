@@ -53,7 +53,7 @@ say("it comes back when the column closes", (await dock()).present === true);
 
 await page.locator(".latest .dismiss").click();
 await settle(page, 300);
-say("the × waves it away", (await dock()).present === false);
+say("the dismiss button waves it away", (await dock()).present === false);
 
 // A new reply is a new glimpse: dismissing one must not silence the next.
 await ask(page, "Now say exactly: delta echo. Nothing else, and use no tools.");

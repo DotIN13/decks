@@ -7,10 +7,27 @@
  * does not pay for pdf.js and the agent does not have to remember which script
  * tag goes with which component.
  *
+ * **It draws nothing of its own.** It used to route an arrow between two components
+ * named by id, and that is gone on purpose: a line whose position is decided at mount
+ * time is a drawing the file does not state, so the file stopped being the whole truth
+ * about the board. Neither an agent nor a person could say where the line went without
+ * running the page, and there was nothing to edit. A diagram is now a component that
+ * owns its own geometry — an `<svg>` with coordinates its author chose — which is a
+ * thing both of them can read and change. See `skills/board-authoring`.
+ *
+ * **What it renders, it can be asked to render again.** A `[data-md]` or
+ * `[data-mermaid]` component is written as its source and mounted as the drawing made
+ * from it, so a moment later the file's own words are nowhere in the live document.
+ * That is why markdown used to be the one thing a user could not retype. The source is
+ * kept instead, and handed out through `window.__board` along with a re-render of a
+ * single component — which is what lets the editor open it, and what lets the frame
+ * stay on the revision it loaded instead of reloading a whole board for one panel.
+ *
  * It also owns the readiness flag. Every async mount is awaited, then
  * `window.__boardReady` goes true — which is what the app waits for before it
  * measures a board, and what the agent's Playwright waits for before it takes a
- * picture. Without it a screenshot is a race, and the race is usually lost.
+ * picture. Without it a screenshot is a race, and the race is usually lost. A
+ * re-render takes the flag down and puts it back for the same reason.
  */
 (() => {
 	"use strict";
@@ -171,6 +188,71 @@
 		}
 	}
 
+	/**
+	 * The source each rendered component was written from.
+	 *
+	 * A `WeakMap` and not an attribute: the source is the file's, and writing it into
+	 * the live DOM as a `data-source` would put a copy of it in the document the
+	 * inspector reads and the editor walks — a second truth to keep in step, in the one
+	 * place this project insists there is only one. A component the board removes takes
+	 * its entry with it.
+	 */
+	const sources = new WeakMap();
+
+	/** What a component's source is now: what it was retyped to, or what the file said. */
+	function sourceOf(element) {
+		const kept = sources.get(element);
+		return kept === undefined ? (element.textContent ?? "") : kept;
+	}
+
+	/**
+	 * Draw a `[data-md]` or `[data-mermaid]` component, and remember what from.
+	 *
+	 * The source is read out of the element the first time — after which the element no
+	 * longer holds it, because rendering is what replaced it. A failure is reported in
+	 * place and never rethrown: one diagram that will not parse must not take the board
+	 * down with it, and the source is kept either way, so it can be retyped into
+	 * something that does parse.
+	 */
+	async function drawSource(element, source) {
+		const raw = source === undefined ? sourceOf(element) : source;
+		sources.set(element, raw);
+		const diagram = element.dataset.mermaid !== undefined;
+		try {
+			if (diagram) await renderMermaid(element, raw);
+			else await renderMarkdown(element, raw);
+		} catch (error) {
+			const said = error instanceof Error ? error.message : String(error);
+			if (diagram) element.textContent = `mermaid: ${said}`;
+			console.warn(`[board] ${diagram ? "mermaid" : "markdown"}:`, error);
+		}
+	}
+
+	/**
+	 * Draw one component again, from a source the user has just changed.
+	 *
+	 * The alternative is reloading the frame, and the frame is deliberately pinned to
+	 * the revision it loaded so a user's own edit does not reload the board they are
+	 * editing (DESIGN §7) — a markdown panel that could only be re-rendered by reload
+	 * would flash the whole board on every keystroke's worth of commit.
+	 *
+	 * `__boardReady` goes down for as long as it takes, because everything that waits
+	 * for a board waits on that flag and a flag left true through a re-render is a
+	 * promise this file had quietly stopped keeping. `board:ready` is *not* dispatched
+	 * again: that event means the board finished loading, which happens once, and a
+	 * board's own `<script>` listening for it would run a second time.
+	 */
+	async function redraw(element, source) {
+		window.__boardReady = false;
+		document.body.dataset.ready = "false";
+		try {
+			await drawSource(element, source);
+		} finally {
+			window.__boardReady = true;
+			document.body.dataset.ready = "true";
+		}
+	}
+
 	// --- mermaid -----------------------------------------------------------------
 
 	let mermaidReady;
@@ -308,6 +390,52 @@
 		return { head, body, note: right };
 	}
 
+	/**
+	 * The extensions rendered as escaped preformatted text.
+	 *
+	 * Two families were originally one: `.txt` was handled inside the markdown branch
+	 * and everything else with a `.py` or a `.json` in it fell through to the generic
+	 * "here is a file" chip, which is a blank box with a name on it. Source is the
+	 * thing people most often want *on* a board next to a plan, so it is a family.
+	 *
+	 * Rendered with `textContent`, never `innerHTML`: a `.json` containing `<script>`
+	 * is a file with those characters in it, and a board is same-origin (DESIGN §4),
+	 * so parsing it as markup would be the one place foreign bytes could execute with
+	 * the app's authority.
+	 */
+	const TEXTUAL = new Set([
+		"txt", "text", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "ini", "cfg", "conf", "env",
+		"ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rb", "go", "rs", "java", "kt", "c", "h", "cc", "cpp", "hpp",
+		"cs", "swift", "php", "sh", "bash", "zsh", "fish", "sql", "css", "scss", "less", "diff", "patch",
+	]);
+
+	/** How much of a text file is drawn. A 50MB log must not become a 50MB DOM node. */
+	const TEXT_LIMIT = 256 * 1024;
+
+	/**
+	 * Which family an extension belongs to — the one place that decides.
+	 *
+	 * It was a ladder of `if`s inside the mount, which was fine until there were six
+	 * of them and the fallback stopped being an edge case: "anything" is the whole
+	 * point of an embed, so what happens to an unrecognised file is a family too.
+	 */
+	function familyOf(extension) {
+		if (["md", "markdown", "mdx"].includes(extension)) return "md";
+		if (extension === "pdf") return "pdf";
+		if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg", "bmp", "ico"].includes(extension)) return "image";
+		if (["html", "htm", "xhtml"].includes(extension)) return "html";
+		if (TEXTUAL.has(extension)) return "text";
+		return "file";
+	}
+
+	/** A byte count as a person would say it. */
+	function sizeLabel(bytes) {
+		if (!Number.isFinite(bytes) || bytes <= 0) return "";
+		if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+		if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+		return `${bytes} B`;
+	}
+
 	async function mountEmbed(host) {
 		const raw = host.dataset.embed;
 		const url = urlFor(raw);
@@ -325,32 +453,69 @@
 		 */
 		const extension = (String(raw).split("?")[0].split("#")[0].match(/\.([a-z0-9]+)$/i)?.[1] ?? "").toLowerCase();
 		const mode = host.dataset.mode ?? "live";
+		const family = familyOf(extension);
 
 		try {
-			if (["md", "markdown", "mdx", "txt", "text"].includes(extension)) {
+			if (family === "md") {
 				const { body, note } = chrome(host, "md", label);
 				const response = await fetch(url);
 				if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
 				const text = await response.text();
-				if (extension === "txt" || extension === "text") {
-					const pre = document.createElement("pre");
-					pre.textContent = text;
-					body.appendChild(pre);
-				} else {
-					await renderMarkdown(body, text);
-				}
+				await renderMarkdown(body, text);
 				note.textContent = `${text.split("\n").length} lines`;
 				return;
 			}
 
-			if (extension === "pdf") {
+			if (family === "text") {
+				const { body, note } = chrome(host, "text", label);
+				/*
+				 * Asked for by range, so the truncation happens on the wire rather than in
+				 * memory: `/api/board` and `/api/f` both send with `acceptRanges`, and a
+				 * board that fetched a 50MB log in full would stall every other mount
+				 * behind it — `__boardReady` waits for all of them.
+				 *
+				 * A server that ignores the header answers 200 with everything, so the
+				 * slice below is the second half of the same guard.
+				 */
+				const response = await fetch(url, { headers: { Range: `bytes=0-${TEXT_LIMIT - 1}` } });
+				if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+				const whole = await response.text();
+				const text = whole.slice(0, TEXT_LIMIT);
+				/*
+				 * A 206 does *not* mean truncated: a range wider than the file is answered
+				 * with the whole file and a 206 anyway, so every text embed claimed to be
+				 * "the first 256 KB". `Content-Range` carries the real total, and the
+				 * character-count fallback is for a server that ignored the header.
+				 */
+				const total = Number(String(response.headers.get("content-range") ?? "").split("/")[1]);
+				const partial = Number.isFinite(total) ? total > TEXT_LIMIT : whole.length >= TEXT_LIMIT;
+				const pre = document.createElement("pre");
+				// textContent: this is somebody else's file, and it is text.
+				pre.textContent = text;
+				body.appendChild(pre);
+				if (partial) {
+					const rest = document.createElement("a");
+					rest.className = "more";
+					rest.href = url;
+					rest.target = "_blank";
+					rest.rel = "noreferrer";
+					rest.textContent = "open the whole file";
+					body.appendChild(rest);
+				}
+				note.textContent = partial
+					? `first ${sizeLabel(TEXT_LIMIT)}${Number.isFinite(total) ? ` of ${sizeLabel(total)}` : ""}`
+					: `${text.split("\n").length} lines`;
+				return;
+			}
+
+			if (family === "pdf") {
 				const { body, note } = chrome(host, "pdf", label, "loading…");
 				const pages = await renderPdf(body, url, host.dataset.pages, host.clientWidth - 2);
 				note.textContent = host.dataset.pages ? `pages ${host.dataset.pages} of ${pages}` : pages;
 				return;
 			}
 
-			if (["png", "jpg", "jpeg", "gif", "webp", "avif", "svg"].includes(extension)) {
+			if (family === "image") {
 				const { body } = chrome(host, "image", label);
 				const img = document.createElement("img");
 				img.src = url;
@@ -359,7 +524,7 @@
 				return;
 			}
 
-			if (["html", "htm", "xhtml"].includes(extension)) {
+			if (family === "html") {
 				const { body, note } = chrome(host, "html", label, mode === "snapshot" ? "snapshot" : "live");
 				/*
 				 * The one place a board contains something it did not write.
@@ -380,7 +545,15 @@
 				return;
 			}
 
-			// Something else: say what it is and how big, rather than showing a blank.
+			/*
+			 * Anything else — a `.zip`, a `.sketch`, a file with no extension at all.
+			 *
+			 * This is the branch that decides whether "drop anything onto a board" is
+			 * true, so it is a component rather than an apology: the name, the size, the
+			 * kind, and two things to do with it. A blank box with a console warning
+			 * behind it was the previous answer, and a user looking at the board could
+			 * not tell it from a broken embed.
+			 */
 			const { body, note } = chrome(host, "file", label);
 			let size;
 			try {
@@ -389,7 +562,7 @@
 				const length = Number(head.headers.get("content-length"));
 				if (Number.isFinite(length) && length > 0) size = length;
 			} catch {
-				/* the card is worth showing even when the size is not known */
+				/* the chip is worth showing even when the size is not known */
 			}
 			const link = document.createElement("a");
 			link.href = url;
@@ -397,9 +570,20 @@
 			link.rel = "noreferrer";
 			link.textContent = label;
 			const meta = document.createElement("span");
-			meta.textContent = size ? `${(size / 1024).toFixed(0)} KB` : extension ? `.${extension}` : "file";
-			body.append(link, meta);
-			note.textContent = "open";
+			meta.className = "meta";
+			meta.textContent = [extension ? `${extension.toUpperCase()} file` : "file", sizeLabel(size)]
+				.filter(Boolean)
+				.join(" · ");
+			// `download` and not another `target=_blank`: for a type the browser cannot
+			// display, opening is a download that looks like a failed navigation, and for
+			// one it can, a person who wants the file wants the file.
+			const save = document.createElement("a");
+			save.className = "more";
+			save.href = url;
+			save.download = label;
+			save.textContent = "download";
+			body.append(link, meta, save);
+			note.textContent = extension || "file";
 		} catch (error) {
 			const { body } = chrome(host, "missing", label, "not available");
 			const message = document.createElement("span");
@@ -411,99 +595,6 @@
 		}
 	}
 
-	// --- connectors --------------------------------------------------------------
-
-	/**
-	 * Draw every `svg.link[data-from][data-to]` between the two components it names.
-	 *
-	 * Positions are read from the live layout rather than computed from the style
-	 * attributes, so a component whose height came from its own content — a card
-	 * that grew a line of text — still gets an arrow that touches it.
-	 */
-	function drawLinks() {
-		const board = document.body;
-		for (const svg of document.querySelectorAll("svg.link")) {
-			const from = document.querySelector(`[data-id="${cssEscape(svg.dataset.from ?? "")}"]`);
-			const to = document.querySelector(`[data-id="${cssEscape(svg.dataset.to ?? "")}"]`);
-			svg.innerHTML = "";
-			if (!from || !to || from === svg || to === svg) continue;
-
-			const a = box(from, board);
-			const b = box(to, board);
-			const [start, end] = nearestSides(a, b);
-			const bend = Math.max(24, Math.abs(end.x - start.x) / 2);
-			const horizontal = start.side === "left" || start.side === "right";
-			const c1 = horizontal ? { x: start.x + (start.side === "right" ? bend : -bend), y: start.y } : { x: start.x, y: start.y + (start.side === "bottom" ? bend : -bend) };
-			const c2 = horizontal ? { x: end.x + (end.side === "right" ? bend : -bend), y: end.y } : { x: end.x, y: end.y + (end.side === "bottom" ? bend : -bend) };
-
-			const ns = "http://www.w3.org/2000/svg";
-			const marker = document.createElementNS(ns, "marker");
-			const markerId = `arrow-${Math.random().toString(36).slice(2, 8)}`;
-			marker.setAttribute("id", markerId);
-			marker.setAttribute("viewBox", "0 0 10 10");
-			marker.setAttribute("refX", "9");
-			marker.setAttribute("refY", "5");
-			marker.setAttribute("markerWidth", "6");
-			marker.setAttribute("markerHeight", "6");
-			marker.setAttribute("orient", "auto-start-reverse");
-			const head = document.createElementNS(ns, "path");
-			head.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-			head.setAttribute("fill", "currentColor");
-			marker.appendChild(head);
-			const defs = document.createElementNS(ns, "defs");
-			defs.appendChild(marker);
-
-			const path = document.createElementNS(ns, "path");
-			path.setAttribute("d", `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`);
-			path.setAttribute("marker-end", `url(#${markerId})`);
-			// `currentColor` on the head, so an arrow tinted by CSS keeps its point.
-			path.style.color = getComputedStyle(path).stroke;
-
-			svg.append(defs, path);
-
-			const label = svg.dataset.label;
-			if (label) {
-				const text = document.createElementNS(ns, "text");
-				text.setAttribute("x", String((start.x + end.x) / 2));
-				text.setAttribute("y", String((start.y + end.y) / 2 - 6));
-				text.setAttribute("text-anchor", "middle");
-				text.textContent = label;
-				svg.appendChild(text);
-			}
-		}
-	}
-
-	function cssEscape(value) {
-		return window.CSS?.escape ? CSS.escape(value) : value.replace(/["\\]/g, "\\$&");
-	}
-
-	function box(element, board) {
-		const rect = element.getBoundingClientRect();
-		const origin = board.getBoundingClientRect();
-		return {
-			left: rect.left - origin.left,
-			top: rect.top - origin.top,
-			width: rect.width,
-			height: rect.height,
-			cx: rect.left - origin.left + rect.width / 2,
-			cy: rect.top - origin.top + rect.height / 2,
-		};
-	}
-
-	/** The pair of sides that face each other, so the line takes the short way. */
-	function nearestSides(a, b) {
-		const dx = b.cx - a.cx;
-		const dy = b.cy - a.cy;
-		if (Math.abs(dx) >= Math.abs(dy)) {
-			return dx >= 0
-				? [{ x: a.left + a.width, y: a.cy, side: "right" }, { x: b.left, y: b.cy, side: "left" }]
-				: [{ x: a.left, y: a.cy, side: "left" }, { x: b.left + b.width, y: b.cy, side: "right" }];
-		}
-		return dy >= 0
-			? [{ x: a.cx, y: a.top + a.height, side: "bottom" }, { x: b.cx, y: b.top, side: "top" }]
-			: [{ x: a.cx, y: a.top, side: "top" }, { x: b.cx, y: b.top + b.height, side: "bottom" }];
-	}
-
 	// --- go ----------------------------------------------------------------------
 
 	async function start() {
@@ -512,22 +603,14 @@
 
 		const work = [];
 
-		for (const element of document.querySelectorAll("[data-md]")) {
-			work.push(renderMarkdown(element, element.textContent ?? "").catch((error) => console.warn("[board] markdown:", error)));
-		}
-		for (const element of document.querySelectorAll("[data-mermaid]")) {
-			const source = element.textContent ?? "";
-			work.push(renderMermaid(element, source).catch((error) => {
-				element.textContent = `mermaid: ${error instanceof Error ? error.message : String(error)}`;
-				console.warn("[board] mermaid:", error);
-			}));
+		for (const element of document.querySelectorAll("[data-md], [data-mermaid]")) {
+			work.push(drawSource(element));
 		}
 		for (const element of document.querySelectorAll("[data-embed]")) {
 			work.push(mountEmbed(element));
 		}
 
 		await Promise.allSettled(work);
-		drawLinks();
 
 		// Fonts last: text laid out in a fallback face and then reflowed is the
 		// other half of a screenshot taken too early.
@@ -536,19 +619,20 @@
 		} catch {
 			/* not fatal */
 		}
-		drawLinks();
 
-		window.__board = { meta, redraw: drawLinks, mount: mountEmbed, markdown: renderMarkdown };
+		/*
+		 * What the app is allowed to ask of a mounted board.
+		 *
+		 * `mount` re-mounts an embed whose `data-embed` changed, `source` hands back the
+		 * words a rendered component was written from, and `redraw` draws it again from
+		 * words the user has just typed. `markdown` is here for a caller that has prose
+		 * and an element and no component to go with them.
+		 */
+		window.__board = { meta, mount: mountEmbed, markdown: renderMarkdown, source: sourceOf, redraw };
 		window.__boardReady = true;
 		document.body.dataset.ready = "true";
 		document.dispatchEvent(new CustomEvent("board:ready", { detail: { meta } }));
 	}
-
-	// Redraw connectors when the layout moves under them — a resized frame, a
-	// component the editor just dragged, an embed that finished loading tall.
-	const observer = new ResizeObserver(() => drawLinks());
-	addEventListener("load", () => observer.observe(document.body));
-	addEventListener("resize", () => drawLinks());
 
 	if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void start());
 	else void start();

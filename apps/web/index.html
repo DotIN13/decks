@@ -2,7 +2,20 @@
 <html lang="en" data-color-scheme="dark">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+		<!--
+			`viewport-fit=cover` is what lets the app paint into the notch and the home
+			indicator's strip, which the stylesheet then pads back out of with
+			`env(safe-area-inset-*)` — without it there are black bars and a canvas that
+			stops short of the screen.
+
+			`maximum-scale=1, user-scalable=no` used to be here and is deliberately gone.
+			It is ignored on iOS anyway, and where it is honoured it takes away the one
+			zoom a person with poor eyesight has over the *chrome* — the canvas has its
+			own, and the transcript does not. Double-tap zoom, which is the reason such a
+			line usually exists, is turned off where it would be in the way instead:
+			`touch-action` on the body, the stage and inside the board frames.
+		-->
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<title>Decks</title>
 	</head>
 	<body>

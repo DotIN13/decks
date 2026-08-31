@@ -5,14 +5,64 @@
 		<title>Auth refresh — risks</title>
 		<meta name="board" content='{"w":1400,"h":900,"bg":"dots"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
+		<style>
+			/*
+			 * The window diagram's own vocabulary, keyed on `.window` alone — the user may
+			 * have made this a card by the time anybody reads it.
+			 */
+			.window .band {
+				fill: var(--b-accent-soft);
+				stroke: none;
+			}
+			.window .axis,
+			.window .tick,
+			.window .mark {
+				fill: none;
+				stroke: var(--b-border-strong);
+				stroke-width: 1.5;
+			}
+			.window .mark.late {
+				stroke: var(--b-danger);
+			}
+			/*
+			 * The arrowhead is a path inside a `.mark`, and the rule above gives that
+			 * `fill: none` — a declaration beats the `fill` attribute a marker would set on
+			 * itself, so the head needs its own rule or it comes out as an outline.
+			 */
+			.window marker > path {
+				fill: var(--b-border-strong);
+				stroke: none;
+			}
+			.window marker#window-late > path {
+				fill: var(--b-danger);
+			}
+			.window text {
+				fill: var(--b-fg);
+				font-family: var(--b-font);
+				font-size: 12px;
+			}
+			.window text.axis-label {
+				fill: var(--b-faint);
+				font-family: var(--b-mono);
+				font-size: 10px;
+			}
+			.window text.late {
+				fill: var(--b-danger);
+			}
+			.window text.inside {
+				fill: var(--b-muted);
+				font-size: 11px;
+			}
+		</style>
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 640px">
-			<h2>What can still go wrong</h2>
-			<p style="color: var(--b-muted)">A diagram of the failing path, and what each fix costs.</p>
+			<h2 data-edit="heading-title">What can still go wrong</h2>
+			<p data-edit="heading-line" style="color: var(--b-muted)">A diagram of the failing path, and what each fix costs.</p>
 		</div>
 
-		<div class="panel" data-id="flow" style="left: 48px; top: 184px; width: 620px; height: 420px" data-mermaid>
+		<!-- Mermaid, the same mechanism as markdown: the source is the editable, named once. -->
+		<div class="card" data-id="flow" data-mermaid data-edit="flow-src" style="left: 48px; top: 184px; width: 620px; height: 420px">
 			flowchart TD
 				A["tab A: 401"] --> L{"lock free?"}
 				B["tab B: 401"] --> L
@@ -38,21 +88,58 @@
 		</div>
 
 		<div class="callout" data-id="worst" data-tone="danger" style="left: 760px; top: 344px; width: 620px">
-			<strong>The bad ending.</strong> The loser retries with <code>t0</code>, the family is
+			<strong data-edit="worst-label">The bad ending.</strong> The loser retries with <code>t0</code>, the family is
 			flagged as replayed, and every session in it is revoked — which is the logout we are trying
 			to avoid, arriving by a different door.
 		</div>
 
 		<div class="sticky" data-id="test" style="left: 720px; top: 552px; width: 280px">
-			Write the failing test first: two clients, one token, no sleep() anywhere.
+			<span data-edit="test-body">Write the failing test first: two clients, one token, no sleep() anywhere.</span>
 		</div>
 
 		<div class="sticky" data-id="ttl" style="left: 1040px; top: 560px; width: 300px">
-			TTL has to outlive a slow refresh and die before a stuck one. 5s?
+			<span data-edit="ttl-body">TTL has to outlive a slow refresh and die before a stuck one. 5s?</span>
 		</div>
 
-		<svg class="link" data-id="flow-costs" data-from="flow" data-to="costs"></svg>
-		<svg class="link" data-id="costs-worst" data-from="costs" data-to="worst" data-tone="accent"></svg>
+		<!--
+			The window, drawn to scale, because that is the whole argument.
+
+			A component that owns its own drawing and states every coordinate: 552 units of
+			the viewBox are 240ms, so tab B's 401 at 90ms sits where 90ms actually falls
+			rather than wherever a router would have put a line. Read the picture out of the
+			file; move a moment by changing one number.
+		-->
+		<div class="card window" data-id="window" style="left: 48px; top: 640px; width: 620px; height: 176px">
+			<h3 data-edit="window-title">The 240ms nobody owns</h3>
+			<svg viewBox="0 0 588 108" width="100%" height="108" role="img" aria-label="Tab A claims at 0ms, tab B sees a 401 at 90ms while the claim is still in flight, and t1 is stored at 240ms.">
+				<defs>
+					<marker id="window-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+						<path d="M 0 0 L 10 5 L 0 10 z" />
+					</marker>
+					<marker id="window-late" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+						<path d="M 0 0 L 10 5 L 0 10 z" />
+					</marker>
+				</defs>
+
+				<rect class="band" x="8" y="36" width="552" height="26" rx="4" />
+				<text class="inside" x="284" y="53" text-anchor="middle">every 401 in here carries a token already spent</text>
+
+				<path class="mark" d="M 8 4 V 32" marker-end="url(#window-tip)" />
+				<text x="16" y="18">tab A claims</text>
+				<path class="mark late" d="M 215 4 V 32" marker-end="url(#window-late)" />
+				<text class="late" x="223" y="18">tab B, 90ms in, still holding t0</text>
+				<path class="mark" d="M 560 4 V 32" marker-end="url(#window-tip)" />
+				<text x="552" y="18" text-anchor="end">t1 stored</text>
+
+				<path class="axis" d="M 8 62 H 572" marker-end="url(#window-tip)" />
+				<path class="tick" d="M 8 62 V 70 M 146 62 V 70 M 284 62 V 70 M 422 62 V 70 M 560 62 V 70" />
+				<text class="axis-label" x="8" y="86" text-anchor="middle">0</text>
+				<text class="axis-label" x="146" y="86" text-anchor="middle">60</text>
+				<text class="axis-label" x="284" y="86" text-anchor="middle">120</text>
+				<text class="axis-label" x="422" y="86" text-anchor="middle">180</text>
+				<text class="axis-label" x="560" y="86" text-anchor="middle">240ms</text>
+			</svg>
+		</div>
 
 		<script src="../lib/board.js"></script>
 	</body>

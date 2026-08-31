@@ -1,5 +1,5 @@
 /**
- * While a turn runs: the spine shows it, the composer says stop, and the chat stays shut.
+ * While a turn runs: the spine shows it, the composer offers stop, and the chat stays shut.
  *
  * Needs a model.
  */
@@ -10,7 +10,7 @@ const { browser, page, errors } = await open();
 // A fresh agent: whatever ran before may have left the focused one mid-conversation.
 await page.mouse.move(6, 480);
 await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
-await page.locator(".chats .rail-head button", { hasText: "+" }).click();
+await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 await settle(page, 1200);
 await page.mouse.move(800, 500);
 
@@ -31,7 +31,7 @@ for (let i = 0; i < 300; i += 1) {
 	await settle(page, 100);
 }
 say("the live turn pulses on the spine while it runs", sawRunningBlock);
-say("the send button reads stop while working", sawBusyComposer);
+say("the send button turns into the stop button while working", sawBusyComposer);
 say("and the chat still did not open itself", (await page.evaluate(() => document.querySelector(".chat")?.dataset.open)) === "false");
 
 say("no page errors", errors.length === 0, errors.join(" | "));

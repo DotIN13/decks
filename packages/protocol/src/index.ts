@@ -149,7 +149,7 @@ export interface ToolSummary {
 
 // --- editing -------------------------------------------------------------------
 
-export type ComponentKind = "sticky" | "card" | "text" | "arrow" | "image" | "embed" | "panel";
+export type ComponentKind = "sticky" | "card" | "text" | "image" | "embed";
 
 export interface Rect {
 	left: number;
@@ -166,11 +166,79 @@ export interface Rect {
  * refused write re-syncs it.
  */
 export type BoardPatch =
-	| { op: "insert"; kind: ComponentKind; id: string; at: Rect; text?: string; embed?: string }
-	| { op: "update"; id: string; style?: Partial<Rect>; class?: string; attrs?: Record<string, string> }
-	| { op: "text"; id: string; text: string }
+	/** `attrs` carries whatever else the new component needs named — a dropped PDF's `data-pages`. */
+	| { op: "insert"; kind: ComponentKind; id: string; at: Rect; text?: string; embed?: string; attrs?: Record<string, string> }
+	/** `null` in `attrs` *removes* the attribute, which is how a tone goes back to the default. */
+	| { op: "update"; id: string; style?: Partial<Rect>; class?: string; attrs?: Record<string, string | null> }
+	/**
+	 * Retype an editable run, addressed by the `data-edit` its author wrote on it.
+	 *
+	 * There is no component id here on purpose. A `data-edit` is unique within a board,
+	 * so naming the component as well would be a second address that can disagree with
+	 * the first — and the server has to resolve the element anyway to say which
+	 * component the edit landed in, which is what the summary and `ids` report.
+	 *
+	 * It replaces an index `path` into the component's element children, which existed
+	 * only because nothing in a board named its editable runs. Indices were computed
+	 * from the DOM and resolved against the file, so they addressed one thing in a
+	 * hand-written component and nothing at all in a rendered one — a `[data-md]`
+	 * panel's headings exist only in what `board.js` drew. An authored id is the same
+	 * name on both sides of the wire, and a board that does not carry one simply has no
+	 * retypeable text: there is no fallback, because a fallback would be the index path
+	 * again with its refusals moved later.
+	 *
+	 * The run may be the whole of a `[data-md]` or `[data-mermaid]` component, which is
+	 * how markdown became editable: its editable unit is its source, in one editor,
+	 * rather than a rendered block that is not in the file at all.
+	 */
+	| { op: "text"; edit: string; text: string }
 	| { op: "remove"; id: string }
+	/**
+	 * A copy of a component, offset, with a name derived from the original's.
+	 *
+	 * Its own op rather than an `insert` composed by the browser, because a card is a
+	 * heading and a paragraph and a list: the only copy that keeps that is a copy of
+	 * the source bytes, and only the server has those. The one op here that is not
+	 * idempotent — applying it twice means two copies, which is what it says.
+	 */
+	| { op: "duplicate"; id: string; offset?: { x: number; y: number } }
+	/**
+	 * Rename a component.
+	 *
+	 * Its own op rather than `attrs: { "data-id": … }`, because a name is not an
+	 * attribute like the others: it has to be a name a board can use, it has to be one
+	 * nothing else has, and the op has to answer with it. An id is how an agent refers
+	 * to a component, so the new name is in the summary it is told and in the ids the
+	 * patch reports (§6.5) — an agent holding the old one hears that it changed.
+	 */
+	| { op: "rename"; id: string; to: string }
 	| { op: "order"; id: string; to: "front" | "back" };
+
+/**
+ * The five component classes that mean the same thing — a box with prose in it —
+ * and so can be swapped for one another by the inspector (§6.5).
+ *
+ * This list is `board.css`'s, not this build's — the editor can only offer what the
+ * stylesheet already styles. That used to be a harder constraint than it is: `lib/` is
+ * copied into a deck, and the copy was once made at `Deck.create` and never touched
+ * again, so a class invented here was an unstyled box in every deck that already
+ * existed. Opening a deck now brings its `lib/` up to this build (`deck/lib-sync.ts`),
+ * so adding to this list means adding to `board.css` in the same commit and no longer
+ * means waiting a release. What has not changed: the list and the stylesheet are one
+ * decision, and a class in one and not the other is a control that does nothing.
+ * `kpi`, `table` and `chip`
+ * are deliberately absent — their CSS styles children the other five do not have,
+ * so swapping one in produces a component whose content no longer fits it.
+ */
+export const BOX_CLASSES = ["text", "sticky", "card", "callout"] as const;
+export type BoxClass = (typeof BOX_CLASSES)[number];
+
+/**
+ * `data-tone` as `board.css` reads it, and a callout is the only component that reads
+ * it — absent means the accent. Same reasoning as `BOX_CLASSES`: this is the
+ * stylesheet's list, and it stops where the stylesheet stops.
+ */
+export const CALLOUT_TONES = ["warn", "danger", "ok"] as const;
 
 /** What the agent is told the user changed, and what `stage.edits()` returns. */
 export interface UserEdit {
@@ -237,6 +305,14 @@ export type ClientMessage =
 	| { type: "camera.set"; camera: Camera }
 	| { type: "agent.create"; parentId?: string; kind?: AgentKind }
 	| { type: "agent.focus"; id: string }
+	/**
+	 * Take an agent off the list.
+	 *
+	 * The row goes; the conversation does not. Its transcript is a session file on disk
+	 * (`~/.pi/agent/sessions/…` or Claude's own store), so this closes a chat rather than
+	 * destroying its history.
+	 */
+	| { type: "agent.remove"; id: string }
 	| { type: "agent.prompt"; id: string; text: string }
 	| { type: "agent.abort"; id: string }
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
@@ -262,6 +338,8 @@ export type ServerMessage =
 			defaultKind: AgentKind;
 	  }
 	| { type: "agent.state"; id: string; state: AgentState }
+	/** An agent is off the list; anything the browser kept for it can go. */
+	| { type: "agent.removed"; id: string }
 	| { type: "agent.identity"; id: string; identity: Identity }
 	| { type: "agent.model"; id: string; model?: AgentModel }
 	| { type: "agent.usage"; id: string; usage: AgentUsage }
@@ -286,3 +364,30 @@ export type ServerMessage =
 
 /** Where the API lives, so the browser does not hard-code it in three places. */
 export const API_PREFIX = "/api";
+
+// --- files dropped in from outside ---------------------------------------------
+
+/**
+ * The most bytes one dropped file may be, known to both sides.
+ *
+ * The browser needs it to refuse a 400MB video before spending a minute sending
+ * it; the server needs it because a limit only the client enforces is not a
+ * limit. 32MB is a photograph or a long PDF and not a video, which is the kind
+ * of thing a board is for.
+ */
+export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
+
+/**
+ * Where a dropped file landed, as `POST /api/upload` answers.
+ *
+ * `path` is deck-relative — the same currency `stage.newBoard` and the file
+ * picker deal in — so the caller turns it into a board-relative `data-embed`
+ * itself rather than the server guessing which board asked.
+ */
+export interface UploadedAsset {
+	path: string;
+	name: string;
+	bytes: number;
+	/** True when an identical file was already there and this one was not written. */
+	reused: boolean;
+}

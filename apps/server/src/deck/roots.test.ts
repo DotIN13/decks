@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { containedIn, PathRefused, realPathOf, resolveFileRequest, resolveInDeck, resolveRoots, fileUrl } from "./roots.ts";
+import { containedIn, PathRefused, realPathOf, resolveAssetWrite, resolveFileRequest, resolveInDeck, resolveRoots, fileUrl } from "./roots.ts";
 
 /**
  * The guard is the security boundary of the app, so these tests are about what it
@@ -114,4 +114,52 @@ test("containment is by path segment, not by prefix", () => {
 test("a canonical file URL has no dot segments for a browser to eat", () => {
 	assert.equal(fileUrl("/Users/x/papers/a b.pdf"), "/api/f/Users/x/papers/a%20b.pdf");
 	assert.ok(!fileUrl("/Users/x/papers/a.pdf").includes(".."));
+});
+
+/*
+ * The write side. These are the tests that should fail if somebody loosens the
+ * name rule, because it is the only path in the app that ends in a file being
+ * created from something a client said.
+ */
+test("a dropped file may only be written into the deck's assets/", () => {
+	const { deck } = fixture();
+	assert.equal(resolveAssetWrite(deck, "photo.png"), join(deck, "assets", "photo.png"));
+	assert.equal(resolveAssetWrite(deck, "a-2.tar.gz"), join(deck, "assets", "a-2.tar.gz"));
+});
+
+test("every shape of escape from assets/ is refused", () => {
+	const { deck } = fixture();
+	for (const name of [
+		"../boards/a.html",
+		"..\\boards\\a.html",
+		"../../outside/secret.txt",
+		"sub/photo.png",
+		"/etc/passwd",
+		"..",
+		".",
+		".hidden",
+		".decks/revisions/x",
+		"photo.png\u0000.txt",
+		"",
+		"-leading-dash.png",
+	]) {
+		assert.throws(() => resolveAssetWrite(deck, name), PathRefused, `should refuse ${JSON.stringify(name)}`);
+	}
+});
+
+test("a symlink out of assets/ is refused, whichever end it is on", () => {
+	const { deck, outside } = fixture();
+	mkdirSync(join(deck, "assets"), { recursive: true });
+	// The name is a link to a file outside the deck: the string test passes and the
+	// realpath test is the one that has to catch it.
+	symlinkSync(join(outside, "secret.txt"), join(deck, "assets", "innocent.txt"));
+	assert.throws(() => resolveAssetWrite(deck, "innocent.txt"), PathRefused);
+
+	// And the directory itself is a link out of the deck.
+	const elsewhere = join(deck, "..", "elsewhere");
+	mkdirSync(elsewhere, { recursive: true });
+	const other = join(realPathOf(mkdtempSync(join(tmpdir(), "decks-guard-"))), "deck");
+	mkdirSync(other, { recursive: true });
+	symlinkSync(elsewhere, join(other, "assets"));
+	assert.throws(() => resolveAssetWrite(other, "photo.png"), PathRefused);
 });
