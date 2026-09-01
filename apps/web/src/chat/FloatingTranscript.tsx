@@ -1,5 +1,4 @@
 import type { ChatItem } from "@decks/protocol";
-import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { Markdown } from "./Markdown.tsx";
@@ -12,19 +11,20 @@ import { ToolChip } from "./ToolChip.tsx";
  * there is.
  *
  * There used to be two of these: a 380px sheet that slid in from the right edge with
- * the full history in it, and this, a translucent condensation of the newest turn
- * floating over the canvas. Two surfaces for one conversation, and the one that could
+ * the full history in it, and this, a dim condensation of the newest turn floating over
+ * the canvas. Two surfaces for one conversation, and the one that could
  * actually be read was the one nobody could find — the sheet was away by default,
  * summoned by a cursor approaching an edge, and everything it could do the float had a
  * dimmer, click-through version of. So the sheet is gone and the bubbles took its job:
  * the whole history, scrollable, with the time machine on each message where it always
  * was.
  *
- * What it keeps from the float is the look. Nothing here has a background of its own —
- * the bubbles are translucent and blurred, and the boards stay the thing underneath.
- * What it takes from the sheet is being *deliberate*: it opens when asked (the dock's
- * peek, the title-bar button, a click on the spine) and closes on the ×, rather than
- * appearing on its own for every turn. That matters more now that it can be scrolled
+ * What it keeps from the float is the shape. Nothing here has a background of its own —
+ * the rows are painted and the gaps between them are the boards, which is what keeps a
+ * column of replies from reading as a panel. What it takes from the sheet is being
+ * *deliberate*: it opens and closes from one button in the title bar, or with a swipe from
+ * the right edge and back out again, rather than appearing on its own for every turn.
+ * That matters more now that it can be scrolled
  * and clicked in, because a surface you can scroll is a surface that swallows the
  * canvas's wheel; one that arrives uninvited would swallow it uninvited.
  *
@@ -155,15 +155,6 @@ export function FloatingTranscript(props: {
 			data-open={props.open}
 			aria-label="The conversation"
 		>
-			<button
-				class="fclose"
-				type="button"
-				title="Close the conversation"
-				aria-label="Close the conversation"
-				onClick={() => props.onOpenChange(false)}
-			>
-				<Icon of={X} size={14} />
-			</button>
 			<div class="fsroll" ref={scroller} onScroll={onScroll}>
 				<Show when={rows().length === 0}>
 					<div class="fnotice">Nothing said yet — ask for something and it will show up here.</div>

@@ -102,13 +102,10 @@ export function Latest(props: {
 
 	return (
 		<Show when={!props.historyOpen && (shown() !== undefined || running().length > 0)}>
-			{/*
-				`latest` keeps its class for the two rules a class attribute says badly: the
-				`::-webkit-scrollbar` hide on the body below, and the `(pointer: coarse)` rule that
-				drops the blur — the expensive thing to recompose over a panning canvas.
-			*/}
+			{/* `latest` keeps its class for the one rule a class attribute says badly: the
+			    `::-webkit-scrollbar` hide on the body below. */}
 			<div
-				class="latest flex max-h-[7em] items-start gap-1 rounded-panel border border-line bg-panel py-[7px] pr-1.5 pl-2.5 shadow-panel backdrop-blur-md pointer-coarse:backdrop-blur-none"
+				class="latest flex max-h-[7em] items-start gap-1 rounded-panel border border-line bg-panel py-[7px] pr-1.5 pl-2.5 shadow-panel"
 				data-streaming={shown()?.streaming === true}
 			>
 				<div class="flex min-w-0 flex-1 flex-col gap-[3px]">

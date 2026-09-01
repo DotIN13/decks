@@ -85,11 +85,12 @@ say("…marks that block as the one shown", opened.current === 1);
 say("the transcript is taller than the history, so the rest means something", opened.overflow > 300, `${opened.overflow}px of overflow`);
 say("…and opens around that turn rather than at the bottom", opened.offset !== null && Math.abs(opened.offset) < 80, `${opened.offset}px from the top`);
 
-// The × is the way out now: the conversation is not summoned by proximity any more, so
-// moving the cursor away leaves it exactly where it is.
-await page.locator(".chat-float .fclose").click();
+// The title bar's button is the way out now: the conversation is not summoned by proximity
+// any more, so moving the cursor away leaves it exactly where it is, and the same control
+// that opened it is what closes it.
+await page.locator('.titlebar button[title="The conversation"]').click();
 await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "false", null, { timeout: 8000 });
-say("the close button puts it away", true);
+say("the title bar's button puts it away again", true);
 say("the marks clear once seen", (await page.evaluate(() => document.querySelectorAll('.turnbar .turn[data-unseen="true"]').length)) === 0);
 
 /*
@@ -113,7 +114,7 @@ const openColumn = async () => {
 	await settle(page, 700);
 };
 const closeColumn = async () => {
-	await page.locator(".chat-float .fclose").click();
+	await page.locator('.titlebar button[title="The conversation"]').click();
 	await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "false", null, { timeout: 8000 });
 };
 

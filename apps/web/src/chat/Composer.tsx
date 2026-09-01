@@ -131,7 +131,7 @@ export function Composer(props: {
 					keyboard is on a phone and where the canvas is everywhere else.
 				*/}
 				<div
-					class="absolute bottom-[calc(100%+6px)] left-2 z-[12] flex max-h-[230px] w-[min(360px,calc(100%-16px))] flex-col gap-0.5 overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel backdrop-blur-md"
+					class="absolute bottom-[calc(100%+6px)] left-2 z-[12] flex max-h-[230px] w-[min(360px,calc(100%-16px))] flex-col gap-0.5 overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
 					role="listbox"
 					aria-label="Commands"
 				>

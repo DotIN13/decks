@@ -316,6 +316,11 @@ if (!embed) {
 }
 
 // --- 7. the rail, which no finger can hover into, and the conversation --------------
+//
+// Two ways in for each: the title bar's buttons, and a swipe in from the edge the panel
+// lives on. The swipe is the one a phone teaches, and the one that has to be proved over a
+// board as well as over bare stage — a board is a separate document, so a gesture watched
+// on `window` would die exactly where the screen is fullest.
 const openState = () =>
 	page.evaluate(() => ({
 		left: document.querySelector(".side")?.dataset.open,
@@ -352,6 +357,73 @@ const middle = await page.evaluate(() => {
 await swipe([middle], { x: 260, y: 0 }, 12);
 await settle(page, 500);
 say("a swipe to the right edge puts the conversation away", (await openState()).right === "false", JSON.stringify(await openState()));
+
+/*
+ * And in from the edges, which is how the panels are opened rather than closed.
+ *
+ * The assertion that matters as much as the opening is that **the camera does not move**.
+ * A finger landing in the outermost 28px is held until the gesture says which of the two
+ * it is, because 44px of canvas lurching before the panel appears is worse than a pan that
+ * starts a little late (`canvas/edge-swipe.ts`).
+ */
+const size = page.viewportSize();
+const mid = Math.round(size.height / 2);
+
+const wasCamera = await camera();
+await swipe([{ x: 3, y: mid }], { x: 150, y: 0 }, 12);
+await settle(page, 400);
+say("a swipe in from the left edge brings the boards out", (await openState()).left === "true", JSON.stringify(await openState()));
+const afterLeft = await camera();
+say(
+	"…and the canvas did not lurch under it",
+	afterLeft.x === wasCamera.x && afterLeft.y === wasCamera.y,
+	`${wasCamera.x},${wasCamera.y} -> ${afterLeft.x},${afterLeft.y}`,
+);
+
+await swipe([{ x: size.width - 3, y: mid }], { x: -150, y: 0 }, 12);
+await settle(page, 400);
+const swiped = await openState();
+say("a swipe in from the right edge brings the conversation out", swiped.right === "true", JSON.stringify(swiped));
+say("…and takes the rail's place, on a screen too narrow for both", swiped.left === "false", JSON.stringify(swiped));
+
+await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
+await settle(page, 300);
+
+/*
+ * A drag that begins at the edge and goes *down* is not a drawer, and the claim on the
+ * finger has to be given back: otherwise the outermost 28px of the screen would be a strip
+ * the canvas cannot be panned from.
+ */
+const beforeDown = await camera();
+await swipe([{ x: 3, y: mid }], { x: 0, y: -200 }, 12);
+await settle(page, 400);
+const afterDown = await camera();
+say("a vertical drag from the edge is not a drawer", (await openState()).left === "false", JSON.stringify(await openState()));
+say("…and the canvas gets the finger back", afterDown.y !== beforeDown.y, `${beforeDown.y} -> ${afterDown.y}`);
+
+/*
+ * The same swipe over a live board. This is the case the gesture exists to survive: a
+ * board's pointer events never reach this document (DESIGN §4), so the fingers come out
+ * through `frame-gestures.ts` and both paths have to end in the same pool.
+ */
+await page.evaluate(() => document.querySelector(".rail-item")?.click());
+await settle(page, 2500);
+// Fitting a board leaves a margin, so the edge is still bare stage: pinch out until the
+// frame reaches it. Pinching rather than the zoom buttons because the inspector is a
+// bottom sheet on this screen and takes the zoombar's place while it is up.
+for (let attempt = 0; attempt < 4; attempt++) {
+	if ((await page.evaluate((y) => document.elementFromPoint(3, y)?.tagName.toLowerCase(), mid)) === "iframe") break;
+	await pinch({ x: Math.round(size.width / 2), y: mid }, 100, 260);
+	await settle(page, 400);
+}
+await settle(page, 800);
+const overBoard = await page.evaluate((y) => document.elementFromPoint(3, y)?.tagName.toLowerCase(), mid);
+say("zoomed in, the left edge is over a live board's frame", overBoard === "iframe", `${overBoard} at ${(await camera()).zoom.toFixed(2)}`);
+await swipe([{ x: 3, y: mid }], { x: 150, y: 0 }, 12);
+await settle(page, 400);
+say("the edge swipe works over a board too", (await openState()).left === "true", JSON.stringify(await openState()));
+await page.locator('.titlebar .icon-button[aria-label="Boards and chats"]').tap();
+await settle(page, 300);
 
 // --- 8. nothing in the chrome is smaller than a fingertip ---------------------------
 const small = await page.evaluate(() => {

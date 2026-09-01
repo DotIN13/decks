@@ -43,7 +43,7 @@ import { TurnBar, turnsOf, type Turn } from "./chat/TurnBar.tsx";
 import { boxOf, fit, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
 import { connect, type Socket } from "./lib/socket.ts";
 import { embedPath, uploadAsset } from "./lib/upload.ts";
-import { createPanels, NARROW } from "./lib/panels.ts";
+import { canHover, createPanels, NARROW } from "./lib/panels.ts";
 import { obscured, trackVisualViewport } from "./lib/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 
@@ -947,6 +947,26 @@ export function App() {
 		if (!wasOpen && window.innerWidth < NARROW) setChatFloat(false);
 	};
 
+	/**
+	 * Pull in from an edge and the panel on that side arrives (`canvas/edge-swipe.ts`).
+	 *
+	 * A swipe *opens*; it does not toggle. A gesture aimed at the edge the drawer comes
+	 * from means "bring it", and answering an open drawer by putting it away would make the
+	 * same motion mean two opposite things depending on state nobody is looking at. The
+	 * title bar's buttons stay the way back, and on a phone the sheet has its own swipe out
+	 * (`chat/swipe-close.ts`).
+	 *
+	 * Off where a cursor can hover: there the edges already summon the rail by proximity,
+	 * and a laptop with a touchscreen would have two rules for one edge.
+	 */
+	const edgeSwipe = {
+		enabled: () => !canHover(),
+		left: () => {
+			if (!panels.left.open()) toggleRail();
+		},
+		right: () => openChat(true),
+	};
+
 	const flyTo = (board: Board) => {
 		setSelected(board.path);
 		const stage = document.querySelector(".stage");
@@ -1065,6 +1085,7 @@ export function App() {
 					drops={drops}
 					frameRevs={frameRevs}
 					preview={state.preview?.boards}
+					onEdgeSwipe={edgeSwipe}
 				/>
 
 				<Palette
@@ -1279,12 +1300,7 @@ export function App() {
 					<For each={state.notices}>
 						{(item) => (
 							<div
-								/*
-								 * The blur goes on a coarse pointer: it is the expensive thing to
-								 * recompose over a panning canvas, and the panel is 88% opaque
-								 * anyway, so it is frosting rather than legibility.
-								 */
-								class="notice rounded-[10px] border border-line bg-panel px-3 py-[7px] text-[12px] shadow-panel backdrop-blur-md pointer-coarse:backdrop-blur-none data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
+								class="notice rounded-[10px] border border-line bg-panel px-3 py-[7px] text-[12px] shadow-panel data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
 								data-level={item.level}
 							>
 								{item.text}

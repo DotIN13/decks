@@ -6,6 +6,7 @@ import { notePointer } from "../lib/panels.ts";
 import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
 import type { FrameGestureHost } from "./frame-gestures.ts";
+import { createEdgeSwipe } from "./edge-swipe.ts";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 
 /** The palette's keys, in the order the palette draws them. */
@@ -53,6 +54,14 @@ export function Stage(props: {
 	frameRevs?: Record<string, number>;
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
+	/**
+	 * Swipe in from an edge to open a panel, where there is no cursor to reach with.
+	 *
+	 * Here rather than in `App` because a board is an iframe: the only place a finger over
+	 * a board and a finger over bare canvas look the same is the pool below
+	 * (`edge-swipe.ts`).
+	 */
+	onEdgeSwipe?: { left: () => void; right: () => void; enabled: () => boolean };
 }) {
 	let element!: HTMLDivElement;
 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
@@ -207,6 +216,12 @@ export function Stage(props: {
 	 */
 	const touches = createTouches();
 	const claimed = new Set<number>();
+	const edges = createEdgeSwipe({
+		width: () => view().width,
+		enabled: () => props.onEdgeSwipe?.enabled() ?? false,
+		openLeft: () => props.onEdgeSwipe?.left(),
+		openRight: () => props.onEdgeSwipe?.right(),
+	});
 	/** Fingers this document is carrying, as opposed to ones reported from a frame. */
 	const carried = new Set<number>();
 
@@ -229,23 +244,36 @@ export function Stage(props: {
 	const touch = (phase: "down" | "move" | "up", finger: Finger): TouchStep => {
 		if (phase === "down") {
 			touches.down(finger);
+			edges.down(finger);
 			setPanning(true);
 			return { kind: "idle" };
 		}
 		if (phase === "up") {
 			touches.up(finger.id);
 			claimed.delete(finger.id);
+			edges.up(finger.id);
 			if (touches.count() === 0) setPanning(false);
 			return { kind: "idle" };
 		}
 
+		/*
+		 * The drawer gets first refusal, and holds the finger while it is undecided.
+		 *
+		 * A pan that begins in the outermost 28px does not move the camera until the
+		 * gesture has said which of the two it is — 44px of lurch before a panel appears
+		 * is worse than 44px of a pan that starts late, and the panel is the rarer of the
+		 * two so it is the one that has to be unmistakable.
+		 */
+		const drawer = edges.move(finger);
+
 		const step = touches.move(finger);
 		if (step.kind === "pinch") {
 			claimed.clear();
+			edges.cancel();
 			props.setCamera(pinchCamera(props.camera, view(), step.from, step.to));
 			return step;
 		}
-		if (step.kind === "pan" && !claimed.has(finger.id)) props.setCamera(pan(props.camera, step.dx, step.dy));
+		if (step.kind === "pan" && !drawer && !claimed.has(finger.id)) props.setCamera(pan(props.camera, step.dx, step.dy));
 		return step;
 	};
 

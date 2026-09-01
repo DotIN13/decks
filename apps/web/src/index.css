@@ -119,7 +119,16 @@
 	--control-radius: 8px;
 	--bg: var(--color-grey-100);
 	--bg-deep: var(--color-grey-200);
-	--panel: rgb(255 255 255 / 88%);
+	/*
+	 * Opaque, where it used to be 88% over a blur.
+	 *
+	 * Frosted chrome is the fashion and it was the wrong call here: every panel floats over
+	 * a *canvas*, and a canvas is not a wallpaper — it is boards with text on them, at
+	 * whatever zoom the camera happens to be at. Whatever showed through was words at 40%
+	 * behind words at 100%, which reads as grime rather than as depth, and it moved when the
+	 * camera did. A panel that covers the boards is honest about covering them.
+	 */
+	--panel: var(--color-grey-50);
 	--fg: var(--color-grey-1100);
 	--muted: var(--color-grey-700);
 	--faint: var(--color-grey-600);
@@ -142,7 +151,7 @@
 [data-color-scheme="dark"] {
 	--bg: var(--color-grey-1100);
 	--bg-deep: var(--color-grey-1200);
-	--panel: rgb(36 36 36 / 88%);
+	--panel: var(--color-grey-1000);
 	--fg: var(--color-grey-100);
 	--muted: var(--color-grey-500);
 	--faint: var(--color-grey-600);
@@ -261,8 +270,7 @@ svg.lucide {
 .zoombar .icon-button,
 .ops header button,
 .inspector .row.file button,
-.inspector .acts button,
-.chat-float .fclose {
+.inspector .acts button {
 	display: grid;
 	width: var(--control);
 	height: var(--control);
@@ -304,7 +312,6 @@ svg.lucide {
 .ops header button:hover,
 .inspector .row.file button:hover,
 .inspector .acts button:hover,
-.chat-float .fclose:hover,
 .inspector header .close:hover,
 .chats .rail-head button:hover,
 .chat-row-wrap .close:hover,
@@ -588,7 +595,6 @@ svg.lucide {
 	border-radius: 12px;
 	background: var(--panel);
 	box-shadow: var(--shadow);
-	backdrop-filter: blur(12px);
 }
 
 .rail {
@@ -1121,19 +1127,19 @@ svg.lucide {
 
 /* --- the conversation, floating over the boards ----------------------------
  *
- * The whole transcript, translucent, over the boards — and the only one there is. The
- * 380px sheet that used to slide in from the right edge is gone, and the bubbles that
- * used to be a dim summary of its newest turn took its job: scrollable, clickable, with
- * the time machine on each message.
+ * The whole transcript, over the boards — and the only one there is. The 380px sheet that
+ * used to slide in from the right edge is gone, and the bubbles that used to be a dim
+ * summary of its newest turn took its job: scrollable, clickable, with the time machine on
+ * each message.
  *
- * Nothing here has a background of its own — the bubbles are painted, translucently, and
- * the boards stay the thing underneath. What changed with the sheet's departure is that
+ * Nothing here has a background of its own — the rows are painted and the gaps between
+ * them are the boards. What changed with the sheet's departure is that
  * the *column* is a pointer target now, not only its rows: it used to be
  * `pointer-events: none` so the gaps between bubbles passed clicks through, which is a
  * lovely property for a thing that appears on its own and a broken one for a thing you
  * have to scroll — the wheel over a gap went to the canvas, and the history under the
- * cursor did not move. Since it is opened deliberately and closed on the ×, taking the
- * pointer while it is up is the honest trade.
+ * cursor did not move. Since it is opened and closed deliberately, from the one button in
+ * the title bar, taking the pointer while it is up is the honest trade.
  */
 .chat-float {
 	position: absolute;
@@ -1143,13 +1149,11 @@ svg.lucide {
 	z-index: 9;
 	display: flex;
 	/*
-	 * The whole column sits at the bottom, which is what puts the × against the words.
+	 * The newest turn sits at the bottom, against the dock, and the history grows upwards.
 	 *
-	 * The rows were bottom-anchored on their own and the button was not, so with three turns
-	 * on screen it hung alone in an empty top-right corner with nothing to belong to. Anchoring
-	 * the *column* means the scroller is only as tall as its content until there is more of it
-	 * than fits, and the button rides on top of the newest turn — then rises to the top of its
-	 * own accord once the history fills the height.
+	 * Anchoring the *column* rather than its rows means the scroller is only as tall as its
+	 * content until there is more of it than fits: a single reply is one bubble above the
+	 * input bar, not one bubble stranded at the top of a full-height panel.
 	 */
 	justify-content: flex-end;
 	/*
@@ -1177,46 +1181,6 @@ svg.lucide {
    canvas that had stopped working for no visible reason. */
 .chat-float:not([data-open="true"]) {
 	visibility: hidden;
-}
-
-/*
- * The one control the conversation has, so it is drawn like one.
- *
- * It was a 22px circle at `--faint` over a 84%-opaque panel: legible against a board only
- * by luck, and indistinguishable from the tool pills it sits above. Now it is the same
- * 26px as the title bar's buttons, opaque, and the icon carries the contrast rather than
- * the border — which is what makes it read as a control instead of a smudge.
- */
-/*
- * The standard control, plus the one thing its position demands.
- *
- * It is the only icon button in the app with no container behind it — it floats over the
- * boards — so it brings its own surface: the row material the bubbles use, and their radius,
- * so it reads as belonging to the conversation rather than to the canvas under it.
- */
-.chat-float .fclose {
-	align-self: flex-end;
-	margin-right: var(--row-gutter);
-	margin-bottom: 6px;
-	border-radius: var(--row-radius);
-	background: color-mix(in oklab, var(--panel) 92%, transparent);
-	backdrop-filter: blur(12px);
-	box-shadow: var(--shadow-row);
-	pointer-events: auto;
-}
-
-.chat-float .fclose:hover {
-	background: var(--bg);
-}
-
-/* Reachable by Tab, and visibly so: it is the only way out of the conversation for a
-   keyboard, and it had no focus style at all. */
-.chat-float .fclose:focus-visible {
-	border-color: var(--color-accent);
-	background: var(--bg);
-	color: var(--fg);
-	outline: none;
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .chat-float .fsroll {
@@ -1283,18 +1247,24 @@ svg.lucide {
 	white-space: pre-wrap;
 	word-break: break-word;
 	box-shadow: var(--shadow-row);
-	/* Translucent and blurred, so the boards stay the thing under them. */
-	backdrop-filter: blur(14px);
 }
 
+/*
+ * Opaque, both of them, and the shadow is what lifts them off the boards.
+ *
+ * These were 84% and 88% over a 14px blur, which is the one place the frosting hurt most:
+ * a bubble is small, it sits directly on top of a board's own paragraphs, and a reply you
+ * are reading through a heading is a reply you read twice. Colour still tells the two
+ * apart, which is the part that was doing the work.
+ */
 .fbubble[data-who="user"] {
-	background: color-mix(in oklab, var(--color-accent) 84%, transparent);
+	background: var(--color-accent);
 	color: #fff;
 }
 
 .fbubble[data-who="agent"] {
 	border: 1px solid var(--line);
-	background: color-mix(in oklab, var(--panel) 88%, transparent);
+	background: var(--panel);
 	color: var(--fg);
 }
 
@@ -1454,8 +1424,8 @@ svg.lucide {
 	color: var(--muted);
 }
 
-/* `--line-strong`, not `--line`: over a translucent bubble the quieter one is invisible,
-   and a rule nobody can see is a block the reply wrote for nothing. */
+/* `--line-strong`, not `--line`: inside a bubble the quieter one is nearly invisible, and
+   a rule nobody can see is a block the reply wrote for nothing. */
 .md hr {
 	height: 0;
 	border: 0;
@@ -1527,8 +1497,7 @@ svg.lucide {
 	padding: 6px 12px;
 	border: 1px solid var(--line);
 	border-radius: var(--row-radius);
-	background: color-mix(in oklab, var(--panel) 80%, transparent);
-	backdrop-filter: blur(12px);
+	background: var(--panel);
 	box-shadow: var(--shadow-row);
 	color: var(--muted);
 	font-size: 12px;
@@ -1567,10 +1536,9 @@ svg.lucide {
 	color: var(--fg);
 }
 
-/* The chips inside are on the boards too, so they are as translucent as the row. */
+/* The chips inside are on the boards too, so they are lifted the same way the row is. */
 .ftools-group .fcalls .tool {
-	background: color-mix(in oklab, var(--panel) 88%, transparent);
-	backdrop-filter: blur(12px);
+	background: var(--panel);
 	box-shadow: var(--shadow-row);
 }
 
@@ -1579,7 +1547,7 @@ svg.lucide {
 	max-width: 92%;
 	padding: 7px 14px;
 	border-radius: var(--row-radius);
-	background: color-mix(in oklab, var(--panel) 72%, transparent);
+	background: var(--panel);
 	color: var(--muted);
 	font-size: 12px;
 	letter-spacing: 0.02em;
@@ -1895,7 +1863,6 @@ svg.lucide {
 	border: 0;
 	background: none;
 	box-shadow: none;
-	backdrop-filter: none;
 }
 
 .chats .rail-head {
@@ -2361,19 +2328,6 @@ svg.lucide {
 	/* A 40px bar cannot hold a 44px target. */
 	.app {
 		grid-template-rows: calc(52px + env(safe-area-inset-top)) 1fr;
-	}
-
-	/*
-	 * The blur behind the floating chrome is the expensive thing to recompose on a
-	 * phone: whatever moves under a sheet — a panning canvas above all — forces the
-	 * blur region to be re-rasterised at the device's pixel ratio, every frame. The
-	 * panels are already 88% opaque, so the blur is frosting rather than legibility,
-	 * and frosting is the one thing a drag can spare. Kept on fine pointers, where
-	 * the compositor is not on the same battery.
-	 */
-	.panel-float,
-	.rail {
-		backdrop-filter: none;
 	}
 
 

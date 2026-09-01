@@ -111,9 +111,10 @@ function touchGroups(): Group[] {
 			title: "Boards and the conversation",
 			rows: [
 				{ keys: "drag a board's title", what: "move the board" },
-				{ keys: "the panel button", what: "the boards and agents rail" },
-				{ keys: "the speech-bubble button", what: "the conversation" },
+				{ keys: "swipe in from the left edge", what: "the boards and agents rail" },
+				{ keys: "swipe in from the right edge", what: "the conversation" },
 				{ keys: "swipe the conversation right", what: "put it away" },
+				{ keys: "the two title-bar buttons", what: "the same two panels, either way" },
 				{ keys: "/", what: "commands, in the input bar" },
 			],
 		},

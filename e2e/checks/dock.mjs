@@ -49,13 +49,14 @@ say("clicking it opens the conversation", (await dock()).chatOpen === "true");
 say("…and the glimpse gets out of the way", (await dock()).present === false, "no duplicate of the same text");
 
 /*
- * Closed on the ×, not by moving the cursor away.
+ * Closed from the title bar, not by moving the cursor away.
  *
  * The conversation used to be a panel summoned by proximity to the right edge, so a mouse
  * move was enough to dismiss it. It is bubbles over the boards now, opened and closed
- * deliberately — which is the whole reason it can be scrolled and clicked in.
+ * deliberately — which is the whole reason it can be scrolled and clicked in. The one
+ * button does both: the column has no × of its own to compete with it.
  */
-await page.locator(".chat-float .fclose").click();
+await page.locator('.titlebar button[title="The conversation"]').click();
 await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "false", null, { timeout: 8000 });
 await settle(page, 400);
 say("it comes back when the conversation closes", (await dock()).present === true);
