@@ -1184,6 +1184,16 @@ svg.lucide {
 	z-index: 9;
 	display: flex;
 	/*
+	 * The whole column sits at the bottom, which is what puts the × against the words.
+	 *
+	 * The rows were bottom-anchored on their own and the button was not, so with three turns
+	 * on screen it hung alone in an empty top-right corner with nothing to belong to. Anchoring
+	 * the *column* means the scroller is only as tall as its content until there is more of it
+	 * than fits, and the button rides on top of the newest turn — then rises to the top of its
+	 * own accord once the history fills the height.
+	 */
+	justify-content: flex-end;
+	/*
 	 * The gutter the rows' shadows live in, counted into the column's own width.
 	 *
 	 * A scroll container clips: `overflow-y: auto` forces `overflow-x` to compute to `auto`
@@ -1210,51 +1220,63 @@ svg.lucide {
 	visibility: hidden;
 }
 
+/*
+ * The one control the conversation has, so it is drawn like one.
+ *
+ * It was a 22px circle at `--faint` over a 84%-opaque panel: legible against a board only
+ * by luck, and indistinguishable from the tool pills it sits above. Now it is the same
+ * 26px as the title bar's buttons, opaque, and the icon carries the contrast rather than
+ * the border — which is what makes it read as a control instead of a smudge.
+ */
 .chat-float .fclose {
 	align-self: flex-end;
 	margin-right: var(--row-gutter);
+	margin-bottom: 6px;
 	display: grid;
-	width: 22px;
-	height: 22px;
-	margin-bottom: 4px;
+	width: 26px;
+	height: 26px;
 	padding: 0;
 	border: 1px solid var(--line);
 	border-radius: 999px;
-	background: color-mix(in oklab, var(--panel) 84%, transparent);
+	background: var(--panel);
 	backdrop-filter: blur(12px);
-	box-shadow: var(--shadow);
-	color: var(--faint);
+	box-shadow: var(--shadow-row);
+	color: var(--muted);
 	cursor: pointer;
 	place-items: center;
 	pointer-events: auto;
+	transition:
+		background 120ms ease,
+		border-color 120ms ease,
+		color 120ms ease;
 }
 
 .chat-float .fclose:hover {
-	background: var(--panel);
+	border-color: var(--line-strong);
+	background: var(--bg);
 	color: var(--fg);
+}
+
+/* Reachable by Tab, and visibly so: it is the only way out of the conversation for a
+   keyboard, and it had no focus style at all. */
+.chat-float .fclose:focus-visible {
+	border-color: var(--color-accent);
+	background: var(--bg);
+	color: var(--fg);
+	outline: none;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .chat-float .fsroll {
 	display: flex;
 	overflow-y: auto;
-	flex: 1 1 auto;
+	/* Content-sized until there is more than fits, which is what the column above needs. */
+	flex: 0 1 auto;
 	flex-direction: column;
 	gap: 8px;
 	padding: var(--row-gutter);
 	overscroll-behavior: contain;
 	pointer-events: auto;
-}
-
-/*
- * The newest turn sits at the bottom, against the input bar, the way a chat does.
- *
- * An auto margin on the first row rather than `justify-content: flex-end` on the
- * scroller: an auto margin resolves to zero once the content overflows, so the top of a
- * long history stays reachable. `flex-end` on a scroll container is the classic way to
- * put the overflow somewhere nothing can scroll to.
- */
-.chat-float .fsroll > :first-child {
-	margin-top: auto;
 }
 
 /*
@@ -2636,10 +2658,17 @@ svg.lucide {
 /* --- the turn bar ------------------------------------------------------------ */
 
 /*
- * The spine: one block per turn, newest at the bottom, hard against the right edge.
+ * The spine: one block per turn, newest last, hard against the right edge.
  * It is how you get *back* to a turn — always there, always aimable — and the
- * conversation opens beside it rather than over it (`.chat-float` starts 26px in), so a
- * block stays clickable while you read.
+ * conversation opens beside it rather than over it, so a block stays clickable while you
+ * read.
+ *
+ * The stack grows from the **middle**, both ways. Pinned to the bottom it read as a stray
+ * mark in the corner rather than a scrollbar of the conversation: three turns were three
+ * specks above the dock, at the one height on that edge already crowded by the zoom
+ * controls. Centred, the stack has a fixed midpoint and lengthens symmetrically as the
+ * conversation does, which is legible at a glance and stays out of both corners. The order
+ * is untouched — oldest at the top, newest at the bottom, the way the bubbles read.
  */
 .turnbar {
 	position: absolute;
@@ -2650,7 +2679,7 @@ svg.lucide {
 	display: flex;
 	width: 14px;
 	flex-direction: column;
-	justify-content: flex-end;
+	justify-content: center;
 	padding: 3px 2px;
 	gap: 3px;
 }
