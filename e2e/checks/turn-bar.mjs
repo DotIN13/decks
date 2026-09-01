@@ -64,6 +64,43 @@ await settle(page, 800);
 say("three turns, three blocks", (await page.locator(".turnbar .turn").count()) === 3);
 
 // Click the first block: the history comes out at that turn, not at the bottom.
+/*
+ * Hovering a block says what the turn was, to the left of the bar.
+ *
+ * Ten pixels of colour is enough to count turns and aim at one, and no help in picking
+ * which. It used to be the `title` attribute — the browser's own tooltip, drawn under the
+ * cursor, which on this edge is over the block you are reading past. Never a hit target:
+ * the label hangs over the canvas, and one that swallowed the click under it would make
+ * the right edge unusable while the cursor rested here.
+ */
+await page.mouse.move(700, 450);
+await settle(page, 200);
+const tip = () =>
+	page.evaluate(() => {
+		const block = document.querySelector(".turnbar .turn");
+		const label = block?.querySelector("span");
+		if (!label) return null;
+		const style = getComputedStyle(label);
+		const a = label.getBoundingClientRect();
+		const b = block.getBoundingClientRect();
+		return {
+			opacity: style.opacity,
+			pointerEvents: style.pointerEvents,
+			text: label.textContent.trim(),
+			left: Math.round(b.left - a.right),
+			offCentre: Math.round(a.top + a.height / 2) - Math.round(b.top + b.height / 2),
+			onScreen: a.top >= 0 && a.bottom <= window.innerHeight && a.left >= 0,
+		};
+	});
+say("the label is there but not shown, with nothing hovered", (await tip())?.opacity === "0", JSON.stringify(await tip()));
+await page.locator(".turnbar .turn").first().hover();
+await settle(page, 300);
+const shown = await tip();
+say("hovering a block shows what the turn was", shown.opacity === "1" && shown.text.length > 0, JSON.stringify(shown));
+say("…to the left of the bar, clear of it", shown.left === 8, `${shown.left}px of gap`);
+say("…centred on its own block, and on screen", shown.offCentre === 0 && shown.onScreen, JSON.stringify(shown));
+say("…and it takes no clicks of its own", shown.pointerEvents === "none");
+
 await page.locator(".turnbar .turn").first().click();
 await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "true", null, { timeout: 8000 });
 await settle(page, 900);
