@@ -16,7 +16,7 @@ import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption,
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
 import { parseSlash } from "../agents/slash.ts";
 import { answerQuestions } from "./ask-user-question.ts";
-import { deckContext } from "../agents/context.ts";
+import { deckContext, runtimeDir } from "../agents/context.ts";
 import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";
@@ -173,6 +173,24 @@ export class ClaudeBackend implements AgentBackend {
 					"\n",
 				),
 			},
+			/*
+			 * Decks' own skills, as a local plugin.
+			 *
+			 * `AGENTS.md.tmpl` tells every agent to read the **board-authoring** skill before
+			 * building a board, and until now that instruction was only true on pi, which
+			 * takes `additionalSkillPaths` directly. A Claude agent called `Skill`, got an
+			 * error, and went hunting the filesystem with `find` for a directory it had been
+			 * told existed — so the one document that explains the component classes was
+			 * reachable by neither the tool that should load it nor the model that was told
+			 * to.
+			 *
+			 * The SDK has no skill-path option; a local plugin is the supported way in, and
+			 * `runtime/` is already shaped like one — `skills/<name>/SKILL.md` is exactly
+			 * where a plugin keeps them, so the manifest in `runtime/.claude-plugin/` is the
+			 * whole of what was missing. It contributes nothing else: there is no
+			 * `commands/`, `agents/` or `hooks/` beside them to pick up.
+			 */
+			plugins: [{ type: "local", path: runtimeDir() }],
 			mcpServers: { [stageServerName()]: stageMcpServer(this.context.tool) },
 			// Pre-approved: the canvas tool is how the agent answers, and a confirm in
 			// front of it would be a confirm in front of every reply.

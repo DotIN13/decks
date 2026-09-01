@@ -164,6 +164,53 @@ try {
 		(await page.locator(".inspector .tones").count()) === 0,
 	);
 
+	// --- and letting it go again, which is four gestures and not one -------------------
+
+	/*
+	 * Escape used to work in exactly the one place nobody presses it.
+	 *
+	 * `Editor` listens in the *board's* document, and selecting a component opens the
+	 * inspector — so the next thing a hand does is reach for the panel, which moves focus
+	 * out of the iframe. From then on the key arrived in the parent document, where nothing
+	 * was listening, and the only way out of a selection was the panel's own ×.
+	 */
+	await page.locator(".inspector header .what").click();
+	await page.keyboard.press("Escape");
+	await page.waitForTimeout(200);
+	say("Escape lets the selection go with focus outside the board's frame", (await inspector.count()) === 0);
+
+	/* A point that really is bare stage, asked of the page: the corners hold the inspector,
+	   the zoom controls and the spine, and a click on any of those is not "outside". */
+	const bareStage = async () =>
+		page.evaluate(() => {
+			for (let y = 120; y < window.innerHeight - 140; y += 20) {
+				for (let x = 80; x < window.innerWidth - 80; x += 20) {
+					if (document.elementFromPoint(x, y)?.classList.contains("stage")) return { x, y };
+				}
+			}
+			return null;
+		});
+	await pick("note");
+	const bare = await bareStage();
+	await page.mouse.click(bare.x, bare.y);
+	await page.waitForTimeout(200);
+	say("a press on bare canvas lets it go too", (await inspector.count()) === 0, JSON.stringify(bare));
+
+	await pick("note");
+	await page.locator(`.board-node[data-path="${path}"] .chrome`).click({ position: { x: 30, y: 8 } });
+	await page.waitForTimeout(200);
+	say("…as does a press on the board's own title", (await inspector.count()) === 0);
+
+	/*
+	 * And the panel itself does not, which is the constraint the other three are bounded
+	 * by: "click outside the component" must not include the one surface that exists to
+	 * describe it, or every attempt to use it would dismiss it.
+	 */
+	await pick("note");
+	await page.locator(".inspector").click({ position: { x: 8, y: 40 } });
+	await page.waitForTimeout(200);
+	say("a press on the inspector keeps the selection it describes", (await inspector.count()) === 1);
+
 	// --- appearance: the class, then the tone -----------------------------------------
 
 	await page.locator('.inspector button[data-box="callout"]').click();

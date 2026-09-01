@@ -859,6 +859,33 @@ export function App() {
 		};
 		document.addEventListener("paste", onPaste);
 		onCleanup(() => document.removeEventListener("paste", onPaste));
+
+		/*
+		 * Escape lets the selection go, from anywhere.
+		 *
+		 * It always did — inside the board's own document, where `Editor` listens (§6.5).
+		 * That is the one place the key was *never* pressed: selecting a component opens the
+		 * inspector, and the next thing a hand does is reach for it, which moves focus out
+		 * of the iframe. From then on the keypress arrived here, where nothing was listening,
+		 * and the only way out of a selection was the inspector's own ×.
+		 *
+		 * Two things own Escape ahead of this and keep it. A **field** — the composer clears
+		 * its draft, an inspector input reverts — because the selection is still there to let
+		 * go of afterwards, and losing a draft you were trying to keep is the worse outcome.
+		 * A **dialog**, because a question waiting for an answer is more urgent than a
+		 * selection, and answering it is what the key is for while one is up.
+		 */
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== "Escape" || event.defaultPrevented) return;
+			if (!component()) return;
+			if (state.dialog) return;
+			const target = event.target as HTMLElement | null;
+			if (target?.closest?.("input, textarea, select, [contenteditable]")) return;
+			event.preventDefault();
+			setComponent(undefined);
+		};
+		window.addEventListener("keydown", onKeyDown);
+		onCleanup(() => window.removeEventListener("keydown", onKeyDown));
 		// The visual viewport, so the dock stays above the on-screen keyboard.
 		onCleanup(trackVisualViewport());
 
@@ -1074,7 +1101,22 @@ export function App() {
 					camera={camera()}
 					setCamera={setCameraAndReport}
 					selected={selected()}
-					onSelect={setSelected}
+					/*
+					 * A press on the canvas outside the component lets it go.
+					 *
+					 * Every caller of this is the user pressing on bare stage or on a board's
+					 * own title bar, and both of those are "not the component" — so the
+					 * component selection goes with the board one rather than surviving it in
+					 * a panel still describing something nobody is pointing at. Pressing
+					 * *inside* a board is `Editor`'s to interpret, and it already clears the
+					 * selection for a press that lands on no component; the chrome panels are
+					 * not this handler's callers at all, which is what keeps a click on the
+					 * inspector from dismissing the thing it is about.
+					 */
+					onSelect={(path) => {
+						setSelected(path);
+						setComponent(undefined);
+					}}
 					onMove={move}
 					onHide={(path) => socket.send({ type: "board.hide", path })}
 					nonces={state.nonces}
