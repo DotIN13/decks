@@ -35,12 +35,18 @@ export function Dialog(props: {
 	};
 
 	return (
-		<div class="dialog-card">
+		/*
+		 * The accent-tinted border is the one thing that marks this as a *question* rather than
+		 * another floating panel, and `bg-bg` is opaque on purpose: a question you must answer
+		 * should have nothing competing behind it. `dialog-card` stays as a class so the dock's
+		 * `align-self: stretch` rule can still find it.
+		 */
+		<div class="dialog-card self-stretch rounded-panel border border-accent/40 bg-bg px-[11px] py-2.5 shadow-panel">
 			<Switch>
 				<Match when={props.prompt.method === "confirm"}>
-					<div class="q">{(props.prompt as { title: string }).title}</div>
-					<div class="m">{(props.prompt as { message: string }).message}</div>
-					<div class="actions">
+					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
+					<div class="mt-[3px] text-[12px] whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
+					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
 							Allow
 						</button>
@@ -51,8 +57,8 @@ export function Dialog(props: {
 				</Match>
 
 				<Match when={props.prompt.method === "select"}>
-					<div class="q">{(props.prompt as { title: string }).title}</div>
-					<div class="actions">
+					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
+					<div class="mt-2 flex flex-wrap gap-1.5">
 						<For each={(props.prompt as { options: string[] }).options}>
 							{(option, index) => (
 								<button type="button" data-primary={index() === 0} onClick={() => props.onAnswer({ value: option })}>
@@ -67,8 +73,9 @@ export function Dialog(props: {
 				</Match>
 
 				<Match when={props.prompt.method === "input" || props.prompt.method === "editor"}>
-					<div class="q">{(props.prompt as { title: string }).title}</div>
+					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
 					<input
+						class="mt-2 w-full rounded-control border border-line bg-bg-deep px-2 py-[5px]"
 						ref={focusOnMount}
 						value={text()}
 						placeholder={(props.prompt as { placeholder?: string }).placeholder ?? ""}
@@ -78,7 +85,7 @@ export function Dialog(props: {
 							if (event.key === "Escape") props.onAnswer({ cancelled: true });
 						}}
 					/>
-					<div class="actions">
+					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button type="button" data-primary="true" onClick={() => props.onAnswer({ value: text() })}>
 							Send
 						</button>
@@ -90,8 +97,8 @@ export function Dialog(props: {
 
 				{/* `custom` is a terminal screen; there is nothing here that could be one. */}
 				<Match when={props.prompt.method === "custom"}>
-					<div class="q">An extension asked for a terminal screen, which this app has no equivalent of.</div>
-					<div class="actions">
+					<div class="font-semibold">An extension asked for a terminal screen, which this app has no equivalent of.</div>
+					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
 							Dismiss
 						</button>
@@ -108,13 +115,19 @@ export function Dialog(props: {
 				 * The link opens the page; the field is where the browser's answer goes back.
 				 */}
 				<Match when={props.prompt.method === "login"}>
-					<div class="q">{(props.prompt as { title: string }).title}</div>
-					<div class="m">{(props.prompt as { message: string }).message}</div>
-					<a class="url" href={(props.prompt as { url: string }).url} target="_blank" rel="noreferrer">
+					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
+					<div class="mt-[3px] text-[12px] whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
+					{/* Breakable, so a 450-character OAuth URL can be read and copied in the dock. */}
+					<a
+						class="mt-[7px] block rounded-control border border-line bg-panel px-[9px] py-[7px] font-mono text-[11px] leading-normal break-all text-accent"
+						href={(props.prompt as { url: string }).url}
+						target="_blank"
+						rel="noreferrer"
+					>
 						{(props.prompt as { url: string }).url}
 					</a>
 					<input
-						class="code"
+						class="mt-2 w-full rounded-control border border-line bg-bg-deep px-2 py-[5px] font-mono text-[12px]"
 						ref={focusOnMount}
 						value={text()}
 						autocomplete="off"
@@ -128,7 +141,7 @@ export function Dialog(props: {
 							if (event.key === "Escape") props.onAnswer({ cancelled: true });
 						}}
 					/>
-					<div class="actions">
+					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button
 							type="button"
 							data-primary="true"
@@ -144,18 +157,18 @@ export function Dialog(props: {
 				</Match>
 
 				<Match when={props.prompt.method === "usage"}>
-					<div class="q">{(props.prompt as { title: string }).title}</div>
-					<div class="usage-rows">
+					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
+					<div class="mt-[7px] grid gap-1">
 						<For each={(props.prompt as { rows: { label: string; value: string }[] }).rows}>
 							{(row) => (
-								<div class="row">
-									<span class="label">{row.label}</span>
-									<span class="value">{row.value}</span>
+								<div class="flex justify-between gap-2.5 text-[12px]">
+									<span class="text-muted">{row.label}</span>
+									<span class="font-mono text-right">{row.value}</span>
 								</div>
 							)}
 						</For>
 					</div>
-					<div class="actions">
+					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
 							OK
 						</button>

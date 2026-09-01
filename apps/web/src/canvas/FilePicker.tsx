@@ -10,6 +10,10 @@ import Folder from "lucide-solid/icons/folder";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 
+/** Where you are, and where you would be if there were nothing here: the same quiet grey. */
+const WHERE = "overflow-hidden font-mono text-[11px] text-ellipsis whitespace-nowrap text-faint";
+const EMPTY = "p-2.5 text-[11px] text-faint";
+
 interface BrowseEntry {
 	name: string;
 	path: string;
@@ -100,17 +104,22 @@ export function FilePicker(props: {
 				if (event.target === event.currentTarget) props.onCancel();
 			}}
 		>
-			<div class="panel-float picker">
-				<header>
-					<Show when={listing()?.parent} fallback={<span class="where">roots</span>}>
+			{/* Wide enough to read a path on a laptop, never wider than the screen. */}
+			<div class="panel-float picker static flex max-h-[70%] w-[min(520px,calc(100vw-24px))] flex-col p-0">
+				<header class="flex items-center gap-2 border-b border-line px-2.5 py-2">
+					<Show when={listing()?.parent} fallback={<span class={WHERE}>roots</span>}>
 						{(parent) => (
-							<button type="button" onClick={() => setAt(parent())}>
+							<button
+								class="flex items-center gap-[3px] py-[3px] pr-[9px] pl-1.5 text-[11px] pointer-coarse:min-h-[38px]"
+								type="button"
+								onClick={() => setAt(parent())}
+							>
 								<Icon of={ChevronUp} size={14} />
 								up
 							</button>
 						)}
 					</Show>
-					<span class="where">{listing()?.path || "the deck and its roots"}</span>
+					<span class={WHERE}>{listing()?.path || "the deck and its roots"}</span>
 					<Show when={props.onAdd}>
 						{/*
 							Hidden input, visible button: a file input styles as whatever the
@@ -120,7 +129,9 @@ export function FilePicker(props: {
 						*/}
 						<input
 							ref={input}
-							class="from-device"
+							// Clipped rather than `display: none`, which would take it out of the
+							// accessibility tree along with the button that drives it.
+							class="pointer-events-none absolute h-px w-px overflow-hidden opacity-0 [clip-path:inset(50%)]"
 							type="file"
 							onChange={(event) => {
 								const file = event.currentTarget.files?.[0];
@@ -129,7 +140,7 @@ export function FilePicker(props: {
 							}}
 						/>
 						<button
-							class="add"
+							class="add ml-auto flex items-center gap-[3px] py-[3px] pr-[9px] pl-1.5 text-[11px] whitespace-nowrap disabled:cursor-default disabled:text-faint pointer-coarse:min-h-[38px]"
 							type="button"
 							title="Copy a file or photo from this device into the deck"
 							disabled={adding()}
@@ -141,21 +152,22 @@ export function FilePicker(props: {
 					</Show>
 				</header>
 
-				<div class="entries">
+				<div class="overflow-y-auto p-1.5">
 					<Show when={listing.error}>
-						<div class="empty">{String(listing.error)}</div>
+						<div class={EMPTY}>{String(listing.error)}</div>
 					</Show>
-					<For each={listing()?.entries ?? []} fallback={<div class="empty">nothing here</div>}>
+					<For each={listing()?.entries ?? []} fallback={<div class={EMPTY}>nothing here</div>}>
 						{(entry) => (
 							<button
 								type="button"
-								class="entry"
+								class="entry flex w-full cursor-pointer items-center gap-2 rounded-control border-0 bg-none px-2 py-[5px] text-left text-[12px] text-inherit hover:bg-line pointer-coarse:min-h-11"
 								onClick={() => (entry.kind === "dir" ? setAt(entry.path) : props.onPick(entry.path))}
 							>
-								<Icon of={iconFor(entry)} class="glyph" size={16} />
-								<span class="name">{entry.name}</span>
+								{/* The kind of thing a row is, in the same grey as the size on the other end. */}
+								<Icon of={iconFor(entry)} class="text-faint" size={16} />
+								<span class="flex-1">{entry.name}</span>
 								<Show when={entry.size !== undefined}>
-									<span class="size">{Math.max(1, Math.round((entry.size ?? 0) / 1024))} KB</span>
+									<span class="text-[11px] text-faint">{Math.max(1, Math.round((entry.size ?? 0) / 1024))} KB</span>
 								</Show>
 							</button>
 						)}

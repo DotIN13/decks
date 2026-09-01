@@ -123,20 +123,30 @@ export function Composer(props: {
 	});
 
 	return (
-		<section class="panel-float composer">
+		// `composer` stays: the narrow-width rules and the `(pointer: coarse)` sizing find it.
+		<section class="panel-float composer relative w-auto transform-none p-2">
 			<Show when={menuOpen()}>
-				<div class="slash-menu" role="listbox" aria-label="Commands">
+				{/*
+					The menu floats *above* the bar rather than below it, because below is where the
+					keyboard is on a phone and where the canvas is everywhere else.
+				*/}
+				<div
+					class="absolute bottom-[calc(100%+6px)] left-2 z-[12] flex max-h-[230px] w-[min(360px,calc(100%-16px))] flex-col gap-0.5 overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel backdrop-blur-md"
+					role="listbox"
+					aria-label="Commands"
+				>
 					<For each={matches()}>
 						{(command) => (
 							<button
+								class="flex cursor-pointer items-baseline gap-2.5 rounded-control border-0 bg-transparent px-[9px] py-[7px] text-left text-[13px] text-fg hover:bg-line"
 								type="button"
 								role="option"
 								title={command.hint}
 								onClick={() => pick(command)}
 							>
-								<span class="cmd">/{command.name}{command.arg ? ` ${command.arg}` : ""}</span>
+								<span class="flex-none font-mono text-accent">/{command.name}{command.arg ? ` ${command.arg}` : ""}</span>
 								<Show when={command.hint}>
-									<span class="hint">{command.hint}</span>
+									<span class="overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted">{command.hint}</span>
 								</Show>
 							</button>
 						)}
@@ -145,6 +155,12 @@ export function Composer(props: {
 			</Show>
 
 			<textarea
+				/*
+				 * 16px on a touch keyboard or the browser zooms the page when the field takes
+				 * focus, which leaves the canvas at a scale nobody chose and the chrome half
+				 * off screen.
+				 */
+				class="block max-h-[180px] w-full resize-none border-0 bg-none px-1.5 py-1 text-[13px] text-fg pointer-coarse:text-[16px] [field-sizing:content]"
 				ref={input}
 				rows="1"
 				// The field had no accessible name at all; the placeholder is not one.
@@ -165,7 +181,8 @@ export function Composer(props: {
 				}}
 			/>
 
-			<div class="controls">
+			{/* `controls` stays: the narrow-width rule stops it wrapping onto a second row. */}
+			<div class="controls flex items-center gap-1.5 pt-1.5">
 				<select
 					ref={picker}
 					value={current()}
@@ -210,7 +227,7 @@ export function Composer(props: {
 					</select>
 				</Show>
 
-				<span class="spacer" />
+				<span class="flex-1" />
 
 				<Show when={props.usage?.contextTokens != null && props.usage!.contextWindow > 0}>
 					<button class="usage" type="button" title="Session usage — click for details" onClick={props.onUsage}>

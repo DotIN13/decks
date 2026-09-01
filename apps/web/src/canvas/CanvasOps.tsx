@@ -132,25 +132,41 @@ export function CanvasOps(props: { onClose: () => void }) {
 				if (event.target === event.currentTarget) props.onClose();
 			}}
 		>
-			<div class="panel-float ops" role="dialog" aria-label="What you can do on the canvas">
-				<header>
-					<span class="where">on the canvas</span>
-					<span class="spacer" />
+			{/*
+				`ops` stays as a class for one reason: the single-column fallback below 560px is a
+				media query, and the rest of the sheet is ordinary layout that reads better as
+				utilities than as a stylesheet nobody needs to look up.
+
+				Opaque, unlike the panels whose class it borrows: this is two dense columns of
+				small text and there is nothing behind it worth reading through it.
+			*/}
+			<div
+				class="panel-float ops flex max-h-[78%] w-[min(560px,calc(100vw-24px))] static flex-col overflow-hidden bg-bg p-0"
+				role="dialog"
+				aria-label="What you can do on the canvas"
+			>
+				<header class="flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3 text-[11px] tracking-[0.04em] text-muted uppercase">
+					<span>on the canvas</span>
+					<span class="flex-1" />
 					<button class="icon-button" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
 						<Icon of={X} size={16} />
 					</button>
 				</header>
 
-				<div class="groups">
+				<div class="flex flex-col gap-3.5 overflow-y-auto overscroll-contain px-3 pt-2.5 pb-3">
 					<For each={groups()}>
 						{(group) => (
 							<section>
-								<h3>{group.title}</h3>
+								<h3 class="mt-0 mb-[5px] text-[12px] font-semibold text-fg">{group.title}</h3>
 								<For each={group.rows}>
 									{(row) => (
-										<div class="row">
-											<span class="keys">{row.keys}</span>
-											<span class="what">{row.what}</span>
+										// 13em of keys and a sentence beside it is two lines of neither on a
+										// phone, so the grid collapses to one column there.
+										<div
+											class="row grid grid-cols-[minmax(0,13em)_minmax(0,1fr)] gap-2.5 py-0.5 text-[12px] leading-[1.5] max-[560px]:grid-cols-[minmax(0,1fr)] max-[560px]:gap-0 max-[560px]:py-1"
+										>
+											<span class="font-mono text-[11px] text-fg [word-break:break-word]">{row.keys}</span>
+											<span class="text-muted">{row.what}</span>
 										</div>
 									)}
 								</For>
@@ -162,7 +178,9 @@ export function CanvasOps(props: { onClose: () => void }) {
 				{/* Said once, at the bottom, because it is the rule behind half the rows above:
 				    below `INTERACT_ZOOM` a board takes no pointer events at all. */}
 				<Show when={canHover()}>
-					<footer>Zoomed out far enough, a board is a tile on a map: drag it to move it, and zoom in to work inside it.</footer>
+					<footer class="border-t border-line px-3 py-[9px] text-[11px] leading-normal text-faint">
+						Zoomed out far enough, a board is a tile on a map: drag it to move it, and zoom in to work inside it.
+					</footer>
 				</Show>
 			</div>
 		</div>

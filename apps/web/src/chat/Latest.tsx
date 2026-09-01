@@ -102,11 +102,25 @@ export function Latest(props: {
 
 	return (
 		<Show when={!props.historyOpen && (shown() !== undefined || running().length > 0)}>
-			<div class="latest" data-streaming={shown()?.streaming === true}>
-				<div class="stack">
+			{/*
+				`latest` keeps its class for the two rules a class attribute says badly: the
+				`::-webkit-scrollbar` hide on the body below, and the `(pointer: coarse)` rule that
+				drops the blur — the expensive thing to recompose over a panning canvas.
+			*/}
+			<div
+				class="latest flex max-h-[7em] items-start gap-1 rounded-panel border border-line bg-panel py-[7px] pr-1.5 pl-2.5 shadow-panel backdrop-blur-md pointer-coarse:backdrop-blur-none"
+				data-streaming={shown()?.streaming === true}
+			>
+				<div class="flex min-w-0 flex-1 flex-col gap-[3px]">
 					<Show when={shown()}>
 						{(current) => (
-							<button class="body" type="button" ref={body} title="Open the conversation" onClick={() => props.onOpen()}>
+							<button
+								class="body max-h-[4.1em] cursor-pointer overflow-y-auto border-0 bg-none p-0 text-left text-[12px] leading-[1.35] whitespace-pre-wrap text-muted [overflow-wrap:anywhere] hover:text-fg"
+								type="button"
+								ref={body}
+								title="Open the conversation"
+								onClick={() => props.onOpen()}
+							>
 								{current().text}
 							</button>
 						)}
@@ -114,7 +128,12 @@ export function Latest(props: {
 
 					<Show when={busy()}>
 						{(tool) => (
-							<button class="working" type="button" title="Open the conversation" onClick={() => props.onOpen()}>
+							<button
+								class="working flex min-w-0 cursor-pointer items-center gap-1.5 border-0 bg-none p-0 text-[11px] text-muted"
+								type="button"
+								title="Open the conversation"
+								onClick={() => props.onOpen()}
+							>
 								<span class="state" />
 								<span class="name">{tool().name}</span>
 								<span class="what">{tool().title}</span>

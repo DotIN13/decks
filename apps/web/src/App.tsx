@@ -1268,17 +1268,23 @@ export function App() {
 					Toasts. Utilities rather than a stylesheet rule, because none of this is a
 					decision worth a name: it is a centred column of small cards over the canvas.
 
-					Two things stay in CSS and are worth knowing why. `notices` keeps its class so
-					the `(pointer: coarse)` and narrow-width rules can move it — a bar that grows
-					to 52px puts a 44px palette where 58px used to be clear — and `notice` keeps
-					its own so the same media query can drop the blur, which is the expensive
-					thing to recompose over a panning canvas.
+					The responsive rules are variants here rather than media queries in the
+					stylesheet, because a utility outranks anything in the components layer — a
+					`@media` block there would lose to the class beside it and silently do
+					nothing. `pointer-coarse` drops the column below a title bar that grows to
+					52px with a 44px palette in it, where 58px used to be clear; the narrow rule
+					lets it span the screen instead of centring inside it.
 				*/}
-				<div class="notices pointer-events-none absolute top-[58px] left-1/2 flex max-w-[560px] -translate-x-1/2 flex-col gap-1.5">
+				<div class="notices pointer-events-none absolute top-[58px] left-1/2 flex max-w-[560px] -translate-x-1/2 flex-col gap-1.5 pointer-coarse:top-[74px] max-[760px]:right-3 max-[760px]:left-3 max-[760px]:max-w-none max-[760px]:translate-x-0">
 					<For each={state.notices}>
 						{(item) => (
 							<div
-								class="notice rounded-[10px] border border-line bg-panel px-3 py-[7px] text-xs shadow-panel backdrop-blur-md data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
+								/*
+								 * The blur goes on a coarse pointer: it is the expensive thing to
+								 * recompose over a panning canvas, and the panel is 88% opaque
+								 * anyway, so it is frosting rather than legibility.
+								 */
+								class="notice rounded-[10px] border border-line bg-panel px-3 py-[7px] text-[12px] shadow-panel backdrop-blur-md pointer-coarse:backdrop-blur-none data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
 								data-level={item.level}
 							>
 								{item.text}

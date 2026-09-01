@@ -85,7 +85,7 @@ const original = `<!doctype html>
 		<section class="card flow" data-id="diagram" style="left: 48px; top: 320px; width: 380px; height: 220px">
 			<!--
 				A heading beside a drawing. It is a leaf holding words, so it retypes like any
-				other — which is the change from the `data-edit` era, where a run nobody had
+				other — which is the change from the era of named runs, where a run nobody had
 				named could not be typed into at all and the app could only say so.
 			-->
 			<h3>The claim</h3>

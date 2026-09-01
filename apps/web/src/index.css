@@ -154,6 +154,54 @@
 	color-scheme: dark;
 }
 
+/*
+ * The control scale, where a fingertip is what is pointing.
+ *
+ * Redefining the tokens does every control at once, which is the point of having them: named
+ * per surface before there was a shared rule, the ops sheet's close, the inspector's actions
+ * and the conversation's `×` all stayed at 28px on a touchscreen, under half the area a
+ * fingertip needs.
+ *
+ * Outside the component layer, with the other token definitions, and that placement is
+ * load-bearing: unlayered CSS beats every layer, so a `:root` override inside the layer would
+ * lose to the base values above it and touch targets would silently stay small.
+ */
+@media (pointer: coarse) {
+	:root {
+		--control: 44px;
+		--control-sm: 34px;
+	}
+}
+
+/*
+ * Everything below is the app's own component layer.
+ *
+ * `@layer components` and not bare CSS, and this is not tidiness — it is the only thing
+ * that makes a utility class work at all. Unlayered CSS beats *every* layer, so while these
+ * rules sat outside one, `class="bg-bg"` on a `.panel-float` lost to `background:
+ * var(--panel)` and the sheet came out translucent when it had asked to be opaque. Tailwind
+ * declares the order `theme, base, components, utilities`, so inside this layer a rule is
+ * still stronger than preflight and always weaker than a utility — which is the mental
+ * model a component author already has: reach for a utility, and it wins.
+ *
+ * What lives here rather than in a class attribute: geometry that reads `env()`,
+ * `--keyboard` and `--dock`; the shape rules built out of `:has()`; `::marker` and
+ * `::placeholder`; the shared vocabulary several components spell the same way
+ * (`.panel-float`, the two icon-button sizes, the conversation's rows); and every paragraph
+ * of reasoning that a `class=` attribute is a bad home for.
+ *
+ * **The corollary is the trap, and it is worth stating plainly: a `@media` block in here
+ * loses to a utility on the same element.** A layer's precedence does not change inside a
+ * media query — it is still the components layer — so `class="top-[58px]"` on the toasts
+ * beat `@media (pointer: coarse) { .notices { top: 74px } }` and the rule silently did
+ * nothing. Anything responsive about a utility-styled element has to be a variant in the
+ * markup (`pointer-coarse:`, `max-[760px]:`), which is why those read oddly long in
+ * `App.tsx` and `Inspector.tsx`. The alternative — leaving the base declaration here too —
+ * is fine, and is what the surfaces above with `env()` corners actually do; what does not
+ * work is one property stated in both places.
+ */
+@layer components {
+
 html,
 body,
 #root {
@@ -897,70 +945,6 @@ svg.lucide {
 	white-space: pre-wrap;
 }
 
-.dialog-card {
-	align-self: stretch;
-	padding: 10px 11px;
-	border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--line));
-	border-radius: 12px;
-	background: var(--bg);
-	box-shadow: var(--shadow);
-}
-
-.dialog-card .q {
-	font-weight: 600;
-}
-
-.dialog-card .m {
-	margin-top: 3px;
-	color: var(--muted);
-	font-size: 12px;
-	white-space: pre-wrap;
-}
-
-/* The sign-in URL: breakable, so it can be read and copied in the dock. */
-.dialog-card a.url {
-	display: block;
-	margin-top: 7px;
-	padding: 7px 9px;
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	background: var(--panel);
-	color: var(--color-accent);
-	font-family: var(--font-mono);
-	font-size: 11px;
-	line-height: 1.5;
-	word-break: break-all;
-}
-
-/* The usage figures, as a tidy label/value list. */
-.dialog-card .usage-rows {
-	display: grid;
-	margin-top: 7px;
-	gap: 4px;
-}
-
-.dialog-card .usage-rows .row {
-	display: flex;
-	justify-content: space-between;
-	gap: 10px;
-	font-size: 12px;
-}
-
-.dialog-card .usage-rows .label {
-	color: var(--muted);
-}
-
-.dialog-card .usage-rows .value {
-	font-family: var(--font-mono);
-	text-align: right;
-}
-
-.dialog-card .actions {
-	display: flex;
-	flex-wrap: wrap;
-	margin-top: 8px;
-	gap: 6px;
-}
 
 /*
  * A text button, and the rule the palette and the title bar have been keeping all along:
@@ -1010,22 +994,6 @@ svg.lucide {
 	opacity: 0.45;
 }
 
-.dialog-card input {
-	width: 100%;
-	margin-top: 8px;
-	padding: 5px 8px;
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	background: var(--bg-deep);
-	color: var(--fg);
-	font: inherit;
-}
-
-/* An OAuth code is an opaque string: monospace, so a mistyped character shows. */
-.dialog-card input.code {
-	font-family: var(--font-mono);
-	font-size: 12px;
-}
 
 /* --- the composer ----------------------------------------------------------- */
 
@@ -1075,119 +1043,34 @@ svg.lucide {
 	pointer-events: auto;
 }
 
-.composer {
-	position: relative;
-	width: auto;
-	padding: 8px;
-	transform: none;
-}
-
 /* What `/` completes to: a small menu floating above the input bar. */
-.slash-menu {
-	position: absolute;
-	bottom: calc(100% + 6px);
-	left: 8px;
-	z-index: 12;
-	display: flex;
-	width: min(360px, calc(100% - 16px));
-	max-height: 230px;
-	overflow-y: auto;
-	flex-direction: column;
-	padding: 5px;
-	border: 1px solid var(--line);
-	border-radius: 12px;
-	background: var(--panel);
-	box-shadow: var(--shadow);
-	backdrop-filter: blur(12px);
-	gap: 2px;
-}
-
-.slash-menu button {
-	display: flex;
-	gap: 10px;
-	align-items: baseline;
-	padding: 7px 9px;
-	border: 0;
-	border-radius: 8px;
-	background: none;
-	color: var(--fg);
-	font: inherit;
-	font-size: 13px;
-	text-align: left;
-	cursor: pointer;
-}
-
-.slash-menu button:hover {
-	background: var(--line);
-}
-
-.slash-menu .cmd {
-	flex: none;
-	font-family: var(--font-mono);
-	color: var(--color-accent);
-}
-
-.slash-menu .hint {
-	overflow: hidden;
-	color: var(--muted);
-	font-size: 12px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-/* The newest reply, flowing above the input bar. */
-.latest {
-	display: flex;
-	max-height: 7em;
-	align-items: flex-start;
-	padding: 7px 6px 7px 10px;
-	border: 1px solid var(--line);
-	border-radius: 12px;
-	background: var(--panel);
-	box-shadow: var(--shadow);
-	backdrop-filter: blur(12px);
-	gap: 4px;
-}
-
 /*
+ * The peek's own remainder, after `chat/Latest.tsx` took the rest.
+ *
  * What was said, and what is running, stacked.
  *
  * `min-width: 0` because this is a flex child holding text that must be allowed to
  * ellipsize — without it the working row's title sets the floor and pushes the whole strip
  * as wide as a shell command.
+ *
+ * The rest of the peek is in `chat/Latest.tsx`. What is left here is what a class attribute
+ * cannot say: a hidden scrollbar, and the colour the text takes while a reply is arriving.
  */
-.latest .stack {
-	display: flex;
-	min-width: 0;
-	flex: 1;
-	flex-direction: column;
-	gap: 3px;
-}
 
+/*
+ * The reply scrolls and says nothing about it.
+ *
+ * A scrollbar in a two-line strip over the canvas is chrome inside chrome, and the text
+ * follows the stream on its own while it arrives — so there is nothing to drag and no reason
+ * to draw a track. `::-webkit-scrollbar` below is the same statement for the engines that
+ * ignore `scrollbar-width`.
+ */
 .latest .body {
-	max-height: 4.1em;
-	padding: 0;
-	overflow-y: auto;
-	border: 0;
-	background: none;
-	color: var(--muted);
-	cursor: pointer;
-	font: inherit;
-	font-size: 12px;
-	line-height: 1.35;
-	text-align: left;
-	/* Model output, so newlines are meaningful and long words must not push the bar wide. */
-	overflow-wrap: anywhere;
-	white-space: pre-wrap;
 	scrollbar-width: none;
 }
 
 .latest .body::-webkit-scrollbar {
 	display: none;
-}
-
-.latest .body:hover {
-	color: var(--fg);
 }
 
 /* While it is still arriving, the text is the live thing on screen. */
@@ -1203,20 +1086,6 @@ svg.lucide {
  * tool already has in the transcript (`.tool[data-state="running"]`), so the same state
  * reads the same way in both places.
  */
-.latest .working {
-	display: flex;
-	min-width: 0;
-	align-items: center;
-	padding: 0;
-	border: 0;
-	background: none;
-	color: var(--muted);
-	cursor: pointer;
-	font: inherit;
-	font-size: 11px;
-	gap: 6px;
-	text-align: left;
-}
 
 .latest .working .state {
 	width: 6px;
@@ -1761,38 +1630,8 @@ svg.lucide {
 }
 
 
-/* Asked here rather than in the transcript, so it cannot be missed (DESIGN §6.8). */
-.dock .dialog-card {
-	align-self: stretch;
-}
-
-.composer textarea {
-	display: block;
-	width: 100%;
-	max-height: 180px;
-	padding: 4px 6px;
-	border: 0;
-	background: none;
-	color: var(--fg);
-	font: inherit;
-	font-size: 13px;
-	resize: none;
-	field-sizing: content;
-}
-
 .composer textarea:focus {
 	outline: none;
-}
-
-.composer .controls {
-	display: flex;
-	gap: 6px;
-	align-items: center;
-	padding-top: 6px;
-}
-
-.composer .controls .spacer {
-	flex: 1;
 }
 
 /*
@@ -1963,6 +1802,10 @@ svg.lucide {
  * against something else — the transcript panel opened when the cursor came within
  * `REACH` of the right edge, so anything closer pulled the panel over itself — and that
  * panel is gone; the number survives it because the spine still wants the room.
+ *
+ * Only the shell is here. Everything inside the panel is utilities in `Inspector.tsx`;
+ * what stays is the corner, which is stated twice — here, and again as a bottom sheet on
+ * a narrow screen — in `env()` and `--dock` terms a class attribute says badly.
  */
 .inspector {
 	top: 12px;
@@ -1973,174 +1816,6 @@ svg.lucide {
 	padding: 8px;
 	gap: 6px;
 	font-size: 12px;
-}
-
-.inspector header {
-	display: flex;
-	gap: 6px;
-	align-items: center;
-	padding-bottom: 6px;
-	border-bottom: 1px solid var(--line);
-}
-
-/* Lets the selection go, which Escape also does — see the comment on the button. */
-.inspector header .close:hover {
-	background: var(--line);
-	color: var(--fg);
-}
-
-/* Pushed to the far end of the header, which is the only thing it needs of its own. */
-.inspector header .close {
-	margin-left: auto;
-}
-
-.inspector header .what {
-	color: var(--faint);
-	font-size: 10px;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-}
-
-.inspector .row {
-	display: flex;
-	gap: 4px;
-	align-items: center;
-}
-
-.inspector .row .label {
-	width: 34px;
-	flex: 0 0 auto;
-	color: var(--faint);
-	font-size: 11px;
-}
-
-.inspector .row .value {
-	overflow: hidden;
-	flex: 1;
-	font-family: var(--font-mono);
-	font-size: 11px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-/*
- * Quiet until it is being used, like everything else in this panel.
- *
- * A 1px box around a name that is usually just read is a border earning nothing; the wash
- * says "editable" and the accent ring says "being edited", which is the only moment the
- * distinction matters.
- */
-.inspector input,
-.inspector select {
-	min-width: 0;
-	flex: 1;
-	padding: 3px 6px;
-	border: 0;
-	border-radius: var(--control-radius);
-	background: var(--line);
-	color: var(--fg);
-	font: inherit;
-	font-family: var(--font-mono);
-	font-size: 11px;
-	transition: background 120ms ease;
-}
-
-.inspector input:hover,
-.inspector select:hover {
-	background: var(--line-strong);
-}
-
-.inspector input:focus,
-.inspector select:focus {
-	background: var(--bg);
-	outline: 2px solid var(--color-accent);
-	outline-offset: -1px;
-}
-
-/* The four interchangeable box classes, named rather than drawn: an icon for
-   "callout" is a guess the user has to decode, and the words are what an agent would
-   have written in the file anyway. */
-.inspector .boxes {
-	flex-wrap: wrap;
-	gap: 3px;
-}
-
-/*
- * A segmented control, and the palette is already one.
- *
- * Four mutually exclusive choices with exactly one active is the same control as the tool
- * row, so it is drawn the same way: no borders, a wash under the cursor, and the accent
- * filling the one that is on. It used to be four bordered pills — the same information in a
- * shape the rest of the app does not use anywhere.
- */
-.inspector .boxes button {
-	padding: 4px 7px;
-	border: 0;
-	border-radius: var(--control-radius);
-	background: transparent;
-	color: var(--muted);
-	cursor: pointer;
-	font: inherit;
-	font-size: 11px;
-	transition:
-		background 120ms ease,
-		color 120ms ease;
-}
-
-.inspector .boxes button:hover {
-	background: var(--line);
-	color: var(--fg);
-}
-
-.inspector .boxes button[data-active="true"] {
-	background: var(--color-accent);
-	color: #fff;
-}
-
-/* A tone is a colour, so the control is the colour. */
-.inspector .tones button {
-	width: 15px;
-	height: 15px;
-	padding: 0;
-	border: 1px solid var(--line-strong);
-	border-radius: 999px;
-	cursor: pointer;
-}
-
-/* "Default" is the absence of `data-tone`, and the swatch says what the board will
-   draw rather than what the control is called — a callout with no tone is accent. Only
-   a callout has tones at all, which is why there is one default colour and not a rule
-   per family. */
-.inspector .tones button[data-tone="default"] {
-	background: var(--color-accent);
-}
-
-.inspector .tones button[data-tone="warn"] {
-	background: var(--color-warn);
-}
-.inspector .tones button[data-tone="danger"] {
-	background: var(--color-danger);
-}
-.inspector .tones button[data-tone="ok"] {
-	background: var(--color-ok);
-}
-
-.inspector .tones button[data-active="true"] {
-	box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--fg);
-}
-
-.inspector .acts {
-	padding-top: 6px;
-	border-top: 1px solid var(--line);
-}
-
-.inspector .acts .spacer {
-	flex: 1;
-}
-
-.inspector .acts button.danger:hover {
-	background: color-mix(in srgb, var(--color-danger) 18%, transparent);
-	color: var(--color-danger);
 }
 
 .picker-backdrop {
@@ -2154,209 +1829,11 @@ svg.lucide {
 
 /* --- what you can do on the canvas -------------------------------------------
  *
- * A cheat sheet behind the title bar's info button (`canvas/CanvasOps.tsx`). It borrows
- * the picker's backdrop rather than growing a second one: they are the same kind of thing —
- * a thing you open, read and dismiss — and one backdrop is one set of rules about how a
- * press outside dismisses it.
- *
- * Two columns, keys on the left in the mono face and the sentence on the right, because
- * that is the shape a person scans: down the left for the gesture they half-remember, or
- * down the right for the thing they want to do.
+ * A cheat sheet behind the title bar's info button (`canvas/CanvasOps.tsx`), which is now
+ * where all of its styling lives. It borrows the picker's backdrop rather than growing a
+ * second one: they are the same kind of thing — open, read, dismiss — and one backdrop is
+ * one set of rules about how a press outside dismisses it.
  */
-.ops {
-	position: static;
-	display: flex;
-	width: min(560px, calc(100vw - 24px));
-	max-height: 78%;
-	flex-direction: column;
-	padding: 0;
-	overflow: hidden;
-	/*
-	 * Opaque, unlike the panels it borrows its class from.
-	 *
-	 * `.panel-float` is translucent because it floats over work you still want to see. This
-	 * one is two dense columns of small text and there is nothing behind it worth reading
-	 * through it — the input bar and the zoom controls showing faintly through a table of
-	 * shortcuts is just noise in the gaps between rows.
-	 */
-	background: var(--bg);
-}
-
-.ops header {
-	display: flex;
-	gap: 8px;
-	align-items: center;
-	padding: 8px 10px 8px 12px;
-	border-bottom: 1px solid var(--line);
-	color: var(--muted);
-	font-size: 11px;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-}
-
-.ops header .spacer {
-	flex: 1;
-}
-
-.ops .groups {
-	display: flex;
-	overflow-y: auto;
-	flex-direction: column;
-	padding: 10px 12px 12px;
-	gap: 14px;
-	overscroll-behavior: contain;
-}
-
-.ops h3 {
-	margin: 0 0 5px;
-	color: var(--fg);
-	font-size: 12px;
-	font-weight: 600;
-}
-
-.ops .row {
-	display: grid;
-	grid-template-columns: minmax(0, 13em) minmax(0, 1fr);
-	gap: 10px;
-	padding: 2px 0;
-	font-size: 12px;
-	line-height: 1.5;
-}
-
-.ops .keys {
-	color: var(--fg);
-	font-family: var(--font-mono);
-	font-size: 11px;
-	word-break: break-word;
-}
-
-.ops .what {
-	color: var(--muted);
-}
-
-.ops footer {
-	padding: 9px 12px;
-	border-top: 1px solid var(--line);
-	color: var(--faint);
-	font-size: 11px;
-	line-height: 1.5;
-}
-
-/* One column on a phone: 13em of keys and a sentence beside it is two lines of neither. */
-@media (max-width: 560px) {
-	.ops .row {
-		grid-template-columns: minmax(0, 1fr);
-		gap: 0;
-		padding: 4px 0;
-	}
-}
-
-.picker {
-	position: static;
-	display: flex;
-	/* Wide enough to read a path on a laptop, never wider than the screen. */
-	width: min(520px, calc(100vw - 24px));
-	max-height: 70%;
-	flex-direction: column;
-	padding: 0;
-}
-
-.picker header {
-	display: flex;
-	gap: 8px;
-	align-items: center;
-	padding: 8px 10px;
-	border-bottom: 1px solid var(--line);
-}
-
-.picker header button {
-	display: flex;
-	align-items: center;
-	padding: 3px 9px 3px 6px;
-	gap: 3px;
-	font-size: 11px;
-}
-
-/*
- * Copying a file in from the device, beside the browse position.
- *
- * The input itself is never seen: a file input cannot be given an icon, styles as
- * whatever the platform decides, and the usual label-wrapping trick loses the focus
- * ring. `display: none` would take it out of the accessibility tree with the button that
- * drives it, so it is clipped instead.
- */
-.picker header .add {
-	margin-left: auto;
-	white-space: nowrap;
-}
-
-.picker header .add:disabled {
-	color: var(--faint);
-	cursor: default;
-}
-
-.picker input.from-device {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	overflow: hidden;
-	clip-path: inset(50%);
-	opacity: 0;
-	pointer-events: none;
-}
-
-.picker .where {
-	overflow: hidden;
-	color: var(--faint);
-	font-family: var(--font-mono);
-	font-size: 11px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.picker .entries {
-	overflow-y: auto;
-	padding: 6px;
-}
-
-.picker .entry {
-	display: flex;
-	width: 100%;
-	gap: 8px;
-	align-items: center;
-	padding: 5px 8px;
-	border: 0;
-	border-radius: var(--control-radius);
-	background: none;
-	color: inherit;
-	cursor: pointer;
-	font: inherit;
-	font-size: 12px;
-	text-align: left;
-}
-
-.picker .entry:hover {
-	background: var(--line);
-}
-
-/* The kind of thing a row is, in the same grey as the size on the other end. */
-.picker .entry .glyph {
-	color: var(--faint);
-}
-
-.picker .entry .name {
-	flex: 1;
-}
-
-.picker .entry .size,
-.picker .empty {
-	color: var(--faint);
-	font-size: 11px;
-}
-
-.picker .empty {
-	padding: 10px;
-}
 
 /* --- the chat list ---------------------------------------------------------- */
 
@@ -2895,24 +2372,10 @@ svg.lucide {
 	 * the compositor is not on the same battery.
 	 */
 	.panel-float,
-	.latest,
-	.rail,
-	.notice {
+	.rail {
 		backdrop-filter: none;
 	}
 
-	/*
-	 * The whole standard control grows, not just the two that used to be listed here.
-	 *
-	 * Named per surface before there was a shared rule, which meant the ops sheet's close,
-	 * the inspector's actions and the conversation's `×` stayed at 28px on a touchscreen —
-	 * under half the area a fingertip needs. Redefining the token does every one of them at
-	 * once, which is the point of having it.
-	 */
-	:root {
-		--control: 44px;
-		--control-sm: 34px;
-	}
 
 	.palette {
 		padding: 5px;
@@ -2943,15 +2406,7 @@ svg.lucide {
 		border-radius: 12px;
 	}
 
-	.composer textarea {
-		/* 16px or the browser zooms the page when the field takes focus, which leaves
-		   the canvas at a scale nobody chose and the chrome half off screen. */
-		font-size: 16px;
-	}
-
-	.composer select,
-	.inspector input,
-	.inspector select {
+	.composer select {
 		min-height: 36px;
 		font-size: 13px;
 	}
@@ -2976,27 +2431,6 @@ svg.lucide {
 		font-size: 12px;
 	}
 
-	.inspector .boxes button,
-	.inspector .tones button,
-	.inspector .row.file button,
-	.inspector .acts button {
-		min-width: 38px;
-		min-height: 38px;
-	}
-
-	.inspector header .close {
-		width: 38px;
-		height: 38px;
-	}
-
-	.picker .entry {
-		min-height: 44px;
-	}
-
-	.picker header button {
-		min-height: 38px;
-	}
-
 	.turn-actions button {
 		min-height: 32px;
 		padding: 3px 10px;
@@ -3009,12 +2443,6 @@ svg.lucide {
 	.board-node > .chrome .hide {
 		width: 24px;
 		height: 24px;
-	}
-
-	/* Clear of a palette whose buttons are now 44px in a 52px bar; on a fine pointer
-	   58px is exactly under the 40px one. */
-	.notices {
-		top: 74px;
 	}
 
 	/* A 10px notch in a 14px column is not a target. */
@@ -3176,11 +2604,5 @@ svg.lucide {
 	.work:has(.inspector) .zoombar {
 		display: none;
 	}
-
-	.notices {
-		left: 12px;
-		right: 12px;
-		max-width: none;
-		transform: none;
-	}
+}
 }

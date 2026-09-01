@@ -10,6 +10,37 @@ import { Icon } from "../icons.tsx";
 import { isPdf, type Edit, type Shape } from "./inspect.ts";
 
 /**
+ * The panel's own vocabulary, as class strings rather than stylesheet rules.
+ *
+ * Only the shell stays in CSS (`.inspector`): its corner is stated twice, once here and
+ * once as a bottom sheet on a narrow screen, in `env()` and `--dock` terms a class
+ * attribute says badly. Everything inside it is layout and one wash.
+ */
+const ROW = "row flex items-center gap-1";
+const LABEL = "w-[34px] flex-none text-[11px] text-faint";
+
+/*
+ * Quiet until it is being used, like everything else in this panel.
+ *
+ * A 1px box around a name that is usually just read is a border earning nothing; the wash
+ * says "editable" and the accent ring says "being edited", which is the only moment the
+ * distinction matters.
+ */
+const FIELD =
+	"min-w-0 flex-1 rounded-control border-0 bg-line px-1.5 py-[3px] font-mono text-[11px] text-fg transition-[background-color] duration-[120ms] ease-[ease] hover:bg-line-strong focus:bg-bg focus:outline-2 focus:-outline-offset-1 focus:outline-accent pointer-coarse:min-h-9 pointer-coarse:text-[13px]";
+
+/*
+ * A tone is a colour, so the control is the colour.
+ *
+ * "Default" is the absence of `data-tone`, and the swatch says what the board will draw
+ * rather than what the control is called — a callout with no tone is accent. Only a
+ * callout has tones at all, which is why there is one default colour and not a rule per
+ * family.
+ */
+const TONE =
+	"size-[15px] cursor-pointer rounded-full border border-line-strong p-0 data-[tone=default]:bg-accent data-[tone=ok]:bg-ok data-[tone=warn]:bg-warn data-[tone=danger]:bg-danger data-[active=true]:shadow-[0_0_0_2px_var(--panel),0_0_0_3px_var(--fg)] pointer-coarse:min-h-[38px] pointer-coarse:min-w-[38px]";
+
+/**
  * The selection's properties, floating beside the stage.
  *
  * Everything about a component that is not its position, its size or a run of its
@@ -58,6 +89,7 @@ export function Inspector(props: {
 	 */
 	const field = (name: string, value: () => string, commit: (next: string) => void, placeholder?: string) => (
 		<input
+			class={FIELD}
 			name={name}
 			type="text"
 			spellcheck={false}
@@ -85,10 +117,10 @@ export function Inspector(props: {
 		<Show when={props.visible && props.shape}>
 			{(shape) => (
 				<aside class="panel-float inspector" data-family={shape().family}>
-					<header>
+					<header class="flex items-center gap-1.5 border-b border-line pb-1.5">
 						{/* What it is, said in the board's own words: the class an agent would
 						    have written, or the tag when there is no class we know. */}
-						<span class="what">{shape().box ?? (shape().family === "embed" ? "embed" : shape().classes[0] ?? shape().tag)}</span>
+						<span class="what text-[10px] tracking-[0.06em] text-faint uppercase">{shape().box ?? (shape().family === "embed" ? "embed" : shape().classes[0] ?? shape().tag)}</span>
 						{field("name", () => shape().id, (next) => next && props.onEdit({ kind: "rename", to: next }))}
 						{/*
 							Escape clears the selection and a tap on bare canvas does too — but on a
@@ -96,7 +128,8 @@ export function Inspector(props: {
 							is advice about a part of the screen the sheet is covering.
 						*/}
 						<button
-							class="close"
+							// Pushed to the far end of the header, which is the only thing it needs of its own.
+							class="close ml-auto pointer-coarse:size-[38px]"
 							type="button"
 							title="Done (Esc)"
 							aria-label="Close the inspector"
@@ -106,11 +139,23 @@ export function Inspector(props: {
 						</button>
 					</header>
 
+					{/*
+						A segmented control, and the palette is already one.
+
+						Four mutually exclusive choices with exactly one active is the same control
+						as the tool row, so it is drawn the same way: no borders, a wash under the
+						cursor, and the accent filling the one that is on. It used to be four
+						bordered pills — the same information in a shape the rest of the app does
+						not use anywhere. Named rather than drawn, too: an icon for "callout" is a
+						guess the user has to decode, and the words are what an agent would have
+						written in the file anyway.
+					*/}
 					<Show when={shape().family === "box"}>
-						<div class="row boxes">
+						<div class={`${ROW} boxes flex-wrap gap-[3px]`}>
 							<For each={BOX_CLASSES}>
 								{(box) => (
 									<button
+										class="cursor-pointer rounded-control border-0 bg-transparent px-[7px] py-1 text-[11px] text-muted transition-[background-color,color] duration-[120ms] ease-[ease] hover:bg-line hover:text-fg data-[active=true]:bg-accent data-[active=true]:text-white pointer-coarse:min-h-[38px] pointer-coarse:min-w-[38px]"
 										type="button"
 										data-box={box}
 										data-active={shape().box === box}
@@ -128,11 +173,12 @@ export function Inspector(props: {
 					</Show>
 
 					<Show when={tones().length > 0}>
-						<div class="row tones">
-							<span class="label">tone</span>
+						<div class={`${ROW} tones`}>
+							<span class={LABEL}>tone</span>
 							{/* The default is a tone too — it is the absence of the attribute, and
 							    saying so is what makes going back possible. */}
 							<button
+								class={TONE}
 								type="button"
 								data-tone="default"
 								data-active={!shape().attrs["data-tone"]}
@@ -143,6 +189,7 @@ export function Inspector(props: {
 							<For each={tones()}>
 								{(tone) => (
 									<button
+										class={TONE}
 										type="button"
 										data-tone={tone}
 										data-active={shape().attrs["data-tone"] === tone}
@@ -158,9 +205,9 @@ export function Inspector(props: {
 					</Show>
 
 					<Show when={shape().family === "embed"}>
-						<div class="row file">
-							<span class="label">file</span>
-							<span class="value" title={source()}>
+						<div class={`${ROW} file`}>
+							<span class={LABEL}>file</span>
+							<span class="flex-1 overflow-hidden font-mono text-[11px] text-ellipsis whitespace-nowrap" title={source()}>
 								{source().split("/").pop() || "nothing"}
 							</span>
 							<button
@@ -181,8 +228,8 @@ export function Inspector(props: {
 						    "1,4-6" — this is the one embed property that was in the runtime
 						    from the start with no way to set it. */}
 						<Show when={isPdf(source())}>
-							<div class="row">
-								<span class="label">pages</span>
+							<div class={ROW}>
+								<span class={LABEL}>pages</span>
 								{field(
 									"pages",
 									() => shape().attrs["data-pages"] ?? "",
@@ -193,7 +240,7 @@ export function Inspector(props: {
 						</Show>
 					</Show>
 
-					<div class="row acts">
+					<div class={`${ROW} acts border-t border-line pt-1.5`}>
 						<button
 							type="button"
 							data-act="front"
@@ -221,11 +268,11 @@ export function Inspector(props: {
 						>
 							<Icon of={Copy} size={15} />
 						</button>
-						<span class="spacer" />
+						<span class="flex-1" />
 						<button
 							type="button"
 							data-act="remove"
-							class="danger"
+							class="hover:bg-danger/[0.18] hover:text-danger"
 							title="Delete (⌫)"
 							aria-label="Delete"
 							onClick={() => props.onEdit({ kind: "remove" })}
