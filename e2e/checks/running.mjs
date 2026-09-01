@@ -1,5 +1,6 @@
 /**
- * While a turn runs: the spine shows it, the composer offers stop, and the chat stays shut.
+ * While a turn runs: the spine shows it, the composer offers stop, and the conversation
+ * stays shut.
  *
  * Needs a model.
  */
@@ -32,7 +33,11 @@ for (let i = 0; i < 300; i += 1) {
 }
 say("the live turn pulses on the spine while it runs", sawRunningBlock);
 say("the send button turns into the stop button while working", sawBusyComposer);
-say("and the chat still did not open itself", (await page.evaluate(() => document.querySelector(".chat")?.dataset.open)) === "false");
+// It is opened deliberately or not at all — a turn arriving is what the dock's peek is for.
+say(
+	"and the conversation still did not open itself",
+	(await page.evaluate(() => document.querySelector(".chat-float")?.dataset.open ?? "false")) === "false",
+);
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

@@ -1,7 +1,7 @@
 /**
  * The dock: the last reply floating above the input bar (DESIGN §7).
  *
- * The chat column is away by default, which is the point of the app — but "you should not
+ * The conversation is away by default, which is the point of the app — but "you should not
  * need the transcript" is not "you should never see a word of it". This is the glimpse.
  */
 import { ask, idle, open, say, settle } from "../harness.mjs";
@@ -22,7 +22,7 @@ const dock = () =>
 			// Above the input bar, and close to it: one stack, not two floating things.
 			aboveComposerBy: l && c ? Math.round(c.top - l.bottom) : null,
 			insideDock: Boolean(document.querySelector(".dock .latest")),
-			chatOpen: document.querySelector(".chat")?.dataset.open,
+			chatOpen: document.querySelector(".chat-float")?.dataset.open,
 			// What is running now, on its own line under whatever was last said.
 			working: Boolean(document.querySelector(".latest .working")),
 			workingOn: document.querySelector(".latest .working .name")?.textContent ?? "",
@@ -40,19 +40,25 @@ say("…in the dock, not loose over the canvas", after.insideDock);
 say("…directly above it", after.aboveComposerBy !== null && after.aboveComposerBy >= 0 && after.aboveComposerBy < 24, `${after.aboveComposerBy}px`);
 say("…carrying what the agent actually said", /alpha bravo charlie/i.test(after.text), JSON.stringify(after.text.slice(0, 80)));
 say("…and marked as finished, not streaming", after.streaming === "false", `streaming=${after.streaming}`);
-say("the chat column stayed away", after.chatOpen === "false");
+say("the conversation stayed away", after.chatOpen === "false");
 
 // Clicking it is how you get the whole thing.
 await page.locator(".latest .body").click();
-await page.waitForFunction(() => document.querySelector(".chat")?.dataset.open === "true", null, { timeout: 8000 });
-say("clicking it opens the column", (await dock()).chatOpen === "true");
+await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "true", null, { timeout: 8000 });
+say("clicking it opens the conversation", (await dock()).chatOpen === "true");
 say("…and the glimpse gets out of the way", (await dock()).present === false, "no duplicate of the same text");
 
-// Away again, then dismissed.
-await page.mouse.move(700, 400);
-await page.waitForFunction(() => document.querySelector(".chat")?.dataset.open === "false", null, { timeout: 8000 });
+/*
+ * Closed on the ×, not by moving the cursor away.
+ *
+ * The conversation used to be a panel summoned by proximity to the right edge, so a mouse
+ * move was enough to dismiss it. It is bubbles over the boards now, opened and closed
+ * deliberately — which is the whole reason it can be scrolled and clicked in.
+ */
+await page.locator(".chat-float .fclose").click();
+await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "false", null, { timeout: 8000 });
 await settle(page, 400);
-say("it comes back when the column closes", (await dock()).present === true);
+say("it comes back when the conversation closes", (await dock()).present === true);
 
 await page.locator(".latest .dismiss").click();
 await settle(page, 300);

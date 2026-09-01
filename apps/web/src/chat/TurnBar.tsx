@@ -4,24 +4,24 @@ import { Index, Show } from "solid-js";
 /**
  * The conversation as a spine at the edge of the canvas.
  *
- * The chat panel is away by default (DESIGN §7), which leaves a question: how do you
+ * The conversation is away by default (DESIGN §7), which leaves a question: how do you
  * know anything was said, and how do you get back to the part you want? A scrollbar
  * of turns answers both. One block per turn, newest at the bottom, stacked against
  * the edge — it is always there, it costs a few pixels, and it says at a glance how
  * much has happened and whether something is happening now.
  *
- * Clicking a block opens the panel *around that turn* rather than at the bottom,
+ * Clicking a block opens the conversation *around that turn* rather than at the bottom,
  * because the reason to reach for a transcript is usually something specific that
  * scrolled away.
  */
 
 export interface Turn {
-	/** The id of the first item in the turn, which is what the panel scrolls to. */
+	/** The id of the first item in the turn, which is what the history scrolls to. */
 	id: string;
 	label: string;
 	tools: number;
 	state: "done" | "running" | "error";
-	/** Arrived while the panel was away. */
+	/** Arrived while the conversation was away. */
 	unseen: boolean;
 }
 
@@ -69,7 +69,7 @@ export function turnsOf(items: ChatItem[], seenBefore: number): Turn[] {
 
 export function TurnBar(props: {
 	turns: Turn[];
-	/** The turn the panel is currently showing, if it was opened at one. */
+	/** The turn the conversation is currently showing, if it was opened at one. */
 	at: string | undefined;
 	onPick: (turn: Turn) => void;
 }) {

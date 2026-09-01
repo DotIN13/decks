@@ -2,18 +2,21 @@ import type { ChatItem } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
+import { plainText } from "./markdown.ts";
 
 /**
  * The newest thing the agent said, floating over the canvas above the input bar.
  *
- * The chat column is away by default and that is the point of the app — boards are the
+ * The conversation is away by default and that is the point of the app — boards are the
  * medium, and you should not need the transcript to know what is happening. But "not
  * needing it" is not the same as "never seeing a word": a reply that names the board it
- * just wrote is worth a glance, and hunting for it in a hidden panel made the chat feel
+ * just wrote is worth a glance, and hunting for it behind a control made the chat feel
  * like the place the real work was.
  *
  * So the last reply flows here as it arrives, one or two lines of it, where the eye already
- * is. It is a read-only glimpse, not the transcript: click it to open the column properly.
+ * is. It is a read-only glimpse, not the transcript: **click it to open the full history**
+ * as bubbles over the boards (`FloatingTranscript`), which is also the main way in — the
+ * peek is what you notice, so the peek is what you should be able to click.
  *
  * ### What is said, and what is happening, are two rows
  *
@@ -26,14 +29,14 @@ import { Icon } from "../icons.tsx";
  * Now the two are separated. The **text** is the last thing the agent actually said and it
  * stays until it is replaced by more text, across as many user messages and tool calls as it
  * takes. The **work** is whatever is running right now, on its own line underneath with a
- * pulsing dot — the same idiom a running tool has in the column, so the two surfaces agree.
+ * pulsing dot — the same idiom a running tool has in the history, so the two surfaces agree.
  * Either can be present without the other: a first turn shows only work, and a finished
  * turn only text.
  */
 export function Latest(props: {
 	items: ChatItem[];
-	/** Hidden while the column is open, where the same text is already shown in full. */
-	columnOpen: boolean;
+	/** Hidden while the history is open, where the same text is already shown in full. */
+	historyOpen: boolean;
 	/** The id of a reply the user waved away. */
 	dismissed: string | undefined;
 	onOpen: () => void;
@@ -51,7 +54,14 @@ export function Latest(props: {
 		for (let index = props.items.length - 1; index >= 0; index -= 1) {
 			const item = props.items[index];
 			if (item?.kind !== "assistant") continue;
-			const text = item.text.trim();
+			/*
+			 * The words, with the markdown taken off.
+			 *
+			 * This is a two-line strip over the input bar, so it cannot draw a list or a
+			 * heading — but leaving raw `**` here while the bubble below renders it bold is
+			 * the app disagreeing with itself about the same sentence, in two places at once.
+			 */
+			const text = plainText(item.text).trim();
 			if (text) return { text, streaming: item.streaming === true, id: item.id };
 		}
 		return undefined;
@@ -91,12 +101,12 @@ export function Latest(props: {
 	});
 
 	return (
-		<Show when={!props.columnOpen && (shown() !== undefined || running().length > 0)}>
+		<Show when={!props.historyOpen && (shown() !== undefined || running().length > 0)}>
 			<div class="latest" data-streaming={shown()?.streaming === true}>
 				<div class="stack">
 					<Show when={shown()}>
 						{(current) => (
-							<button class="body" type="button" ref={body} title="Open the chat" onClick={() => props.onOpen()}>
+							<button class="body" type="button" ref={body} title="Open the conversation" onClick={() => props.onOpen()}>
 								{current().text}
 							</button>
 						)}
@@ -104,7 +114,7 @@ export function Latest(props: {
 
 					<Show when={busy()}>
 						{(tool) => (
-							<button class="working" type="button" title="Open the chat" onClick={() => props.onOpen()}>
+							<button class="working" type="button" title="Open the conversation" onClick={() => props.onOpen()}>
 								<span class="state" />
 								<span class="name">{tool().name}</span>
 								<span class="what">{tool().title}</span>

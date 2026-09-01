@@ -80,7 +80,7 @@ deck directory.
   boards in play, hold others in context, rearrange, name itself, draw its own avatar,
   hand work to a subagent.
 - **Boards are how the agent talks.** It answers your questions, lays out designs and
-  reports finished work on boards, so the canvas — not the chat column — is where you look
+  reports finished work on boards, so the canvas — not the conversation — is where you look
   to see what is happening. It holds a set of boards in context and chooses which of them
   to put in play; the chat says which board and why.
 - **Embeds.** A board can show your real documents — markdown, PDF with page ranges,
@@ -104,7 +104,7 @@ deck directory.
 - **Two runtimes.** An agent runs on [pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
   or on Claude Code, chosen when you create it and fixed for its life; `DECKS_BACKEND=pi|claude`
   sets what `+` gives you. Claude agents also carry a mode — ask first, edit freely, plan
-  only, auto — and their permission questions appear in the chat column rather than stopping
+  only, auto — and their permission questions appear above the input bar rather than stopping
   the turn silently. A Claude agent needs Claude Code on `PATH`, or `DECKS_CLAUDE_PATH`
   pointing at it.
 - **Agents are a chat list.** Each has the name it chose and the face it drew.

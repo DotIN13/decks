@@ -508,7 +508,7 @@ export class App {
 				type: "board.patched",
 				path,
 				rev: board.rev,
-				refused: "That board changed while you were editing it — re-reading it.",
+				refused: "That board changed while you were editing it, so it is being re-read.",
 			});
 			return;
 		}

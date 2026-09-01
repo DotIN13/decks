@@ -38,6 +38,19 @@
 	 * rule that adds it reads exactly as it did before it existed.
 	 */
 	--keyboard: 0px;
+	/*
+	 * The conversation's radius, in one place because every row shares it — bubbles either
+	 * way round, tool pills, notices, chips.
+	 *
+	 * A *fixed* radius rather than `999px`. Half the height reads beautifully on a row of
+	 * three words and badly on anything longer: the ends become semicircles as tall as the
+	 * text block, which eats the width a paragraph needs and leaves the first and last
+	 * lines floating inside a lens. 14px is round enough to read as a pill at one line and
+	 * still a rectangle-with-soft-corners at six, so one value covers the whole range and
+	 * nothing in the column has to be special-cased — including the bubbles carrying code,
+	 * which needed squaring off when the radius was a stadium.
+	 */
+	--row-radius: 14px;
 	--bg: var(--color-grey-100);
 	--bg-deep: var(--color-grey-200);
 	--panel: rgb(255 255 255 / 88%);
@@ -47,6 +60,15 @@
 	--line: rgb(0 0 0 / 10%);
 	--line-strong: rgb(0 0 0 / 20%);
 	--shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 8px 24px rgb(0 0 0 / 8%);
+	/*
+	 * The same shadow, sized for a row rather than a panel — see `.chat-float .fsroll`.
+	 *
+	 * `--shadow` reaches 24px, which is right under a 380px panel and wrong under a 40px
+	 * row: it is most of the row's own height, and it has to fit inside the padding of a
+	 * scroll container that clips. This one reaches 12px, which reads as lift on something
+	 * small and costs the column a third of the gutter.
+	 */
+	--shadow-row: 0 1px 2px rgb(0 0 0 / 8%), 0 3px 10px rgb(0 0 0 / 7%);
 	--stage: var(--color-grey-300);
 	color-scheme: light;
 }
@@ -61,6 +83,7 @@
 	--line: rgb(255 255 255 / 12%);
 	--line-strong: rgb(255 255 255 / 24%);
 	--shadow: 0 1px 2px rgb(0 0 0 / 50%), 0 10px 30px rgb(0 0 0 / 40%);
+	--shadow-row: 0 1px 2px rgb(0 0 0 / 45%), 0 3px 12px rgb(0 0 0 / 38%);
 	--stage: #101010;
 	color-scheme: dark;
 }
@@ -609,44 +632,12 @@ svg.lucide {
 	border-color: color-mix(in srgb, var(--color-danger) 50%, var(--line));
 }
 
-/* Sits in the dock above the input bar, so it never has to guess how tall the stack is —
-   and it is a first-run affordance, so it fades out rather than living there forever. */
-.hint {
-	animation: hint-fade 12s ease-in forwards;
-	color: var(--faint);
-	font-size: 11px;
-	text-align: center;
-	pointer-events: none;
-}
 
-@keyframes hint-fade {
-	0%, 60% { opacity: 1; }
-	100% { opacity: 0; }
-}
-
-/* --- the chat column -------------------------------------------------------- */
-
-.chat {
-	top: 12px;
-	right: 12px;
-	bottom: calc(88px + var(--keyboard) + env(safe-area-inset-bottom));
-	display: flex;
-	width: 380px;
-	flex-direction: column;
-	padding: 0;
-	gap: 0;
-	/* Fully away — the spine beside it is the handle, so there is no sliver to show. */
-	transform: translateX(calc(100% + 22px));
-}
-
-/*
- * The sliver says which panel it is, and the chat's says whether anything happened
- * while it was away — a dot on the edge, in the agent's own colour.
- */
-.side::after,
-.chat::after {
+/* The sliver says which panel it is: something to aim a cursor at. */
+.side::after {
 	position: absolute;
 	top: 50%;
+	right: 3px;
 	width: 3px;
 	height: 34px;
 	border-radius: 999px;
@@ -656,139 +647,17 @@ svg.lucide {
 	transition: opacity 150ms ease;
 }
 
-.side::after {
-	right: 3px;
-}
-
-.chat::after {
-	left: 3px;
-}
-
-.side[data-open="true"]::after,
-.chat[data-open="true"]::after {
+.side[data-open="true"]::after {
 	opacity: 0;
-}
-
-.chat[data-unread="true"]::after {
-	height: 10px;
-	width: 10px;
-	background: var(--color-accent);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 25%, transparent);
-}
-
-.chat .chat-head {
-	display: flex;
-	gap: 8px;
-	align-items: center;
-	padding: 8px 12px;
-	border-bottom: 1px solid var(--line);
-	color: var(--muted);
-	font-size: 11px;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-}
-
-.chat .chat-head .avatar {
-	display: grid;
-	width: 18px;
-	height: 18px;
-	border-radius: 999px;
-	color: #fff;
-	font-size: 10px;
-	place-items: center;
-	text-transform: none;
-}
-
-.chat .chat-head .spacer {
-	flex: 1;
-}
-
-.chat .stream {
-	display: flex;
-	overflow-y: auto;
-	flex: 1;
-	flex-direction: column;
-	padding: 10px;
-	gap: 8px;
-	overscroll-behavior: contain;
-}
-
-/*
- * The column overflows by design — that is what scrolling is for — and a flex column
- * shrinks its children to try to avoid it. Text-bearing bubbles resist through their
- * min-content height; a tool chip has `overflow: hidden` and nothing of its own to
- * push back with, so every one of them was squeezed to a line the moment the
- * transcript filled up.
- */
-.chat .stream > * {
-	flex: 0 0 auto;
-}
-
-.bubble {
-	max-width: 92%;
-	padding: 8px 11px;
-	border-radius: 12px;
-	font-size: 13px;
-	line-height: 1.45;
-	white-space: pre-wrap;
-	word-break: break-word;
-}
-
-.bubble[data-who="user"] {
-	align-self: flex-end;
-	background: var(--color-accent);
-	border-bottom-right-radius: 4px;
-	color: #fff;
-}
-
-.bubble[data-who="agent"] {
-	align-self: flex-start;
-	border: 1px solid var(--line);
-	background: var(--bg);
-	border-bottom-left-radius: 4px;
-}
-
-.bubble .caret {
-	display: inline-block;
-	width: 7px;
-	height: 13px;
-	background: currentColor;
-	opacity: 0.5;
-	translate: 0 2px;
-	animation: blink 1s steps(2, start) infinite;
-}
-
-@keyframes blink {
-	to {
-		visibility: hidden;
-	}
-}
-
-.bubble code,
-.bubble pre {
-	font-family: var(--font-mono);
-	font-size: 12px;
-}
-
-.bubble pre {
-	margin: 6px 0 0;
-	padding: 8px;
-	overflow-x: auto;
-	border-radius: 8px;
-	background: var(--bg-deep);
-}
-
-.bubble[data-who="user"] pre {
-	background: rgb(0 0 0 / 20%);
 }
 
 /*
  * A user message and the way back to it.
  *
  * The actions are hidden until the message is hovered: they are on every turn, and three
- * words under each one would make the column unreadable. `rewind` previews on hover, so
- * the row is deliberately not shown on touch-first widths (there is no hover to preview
- * with) — see the known edges in DESIGN §8.
+ * words under each one would make the history unreadable. `rewind` previews on hover, so
+ * on a touchscreen they are simply shown and the preview is what is lost — see the known
+ * edges in DESIGN §8.
  */
 .turn-row {
 	display: flex;
@@ -799,7 +668,7 @@ svg.lucide {
 	gap: 3px;
 }
 
-.turn-row > .bubble {
+.turn-row > .fbubble {
 	max-width: 100%;
 }
 
@@ -839,9 +708,10 @@ svg.lucide {
 }
 
 .thinking {
-	align-self: flex-start;
+	align-self: flex-end;
 	max-width: 92%;
-	padding: 0 4px;
+	padding: 0 14px;
+	text-align: right;
 	color: var(--faint);
 	font-size: 12px;
 }
@@ -867,7 +737,7 @@ svg.lucide {
 	align-self: stretch;
 	overflow: hidden;
 	border: 1px solid var(--line);
-	border-radius: 10px;
+	border-radius: var(--row-radius);
 	background: var(--bg);
 }
 
@@ -946,24 +816,6 @@ svg.lucide {
 	font-family: var(--font-mono);
 	font-size: 11px;
 	white-space: pre-wrap;
-}
-
-.chat-notice {
-	align-self: stretch;
-	padding: 6px 10px;
-	border-left: 2px solid var(--line-strong);
-	color: var(--muted);
-	font-size: 12px;
-	white-space: pre-wrap;
-}
-
-.chat-notice[data-level="warn"] {
-	border-left-color: var(--color-warn);
-}
-
-.chat-notice[data-level="error"] {
-	border-left-color: var(--color-danger);
-	color: var(--fg);
 }
 
 .dialog-card {
@@ -1049,6 +901,12 @@ svg.lucide {
 	color: #fff;
 }
 
+/* Sign in with nothing pasted yet: the button is there, and says it cannot go. */
+.dialog-card button:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+}
+
 .dialog-card input {
 	width: 100%;
 	margin-top: 8px;
@@ -1060,21 +918,20 @@ svg.lucide {
 	font: inherit;
 }
 
+/* An OAuth code is an opaque string: monospace, so a mistyped character shows. */
+.dialog-card input.code {
+	font-family: var(--font-mono);
+	font-size: 12px;
+}
+
 /* --- the composer ----------------------------------------------------------- */
 
-/*
- * Centred on the *free* space, not on the window.
- *
- * The rail takes 192px on the left and the chat column 404px on the right, so a
- * bar centred at 50% sits a hundred pixels off and slides under the transcript.
- * Half the difference between those two is the offset.
- */
 /*
  * The dock: the last reply, a question if one is waiting, and the input bar.
  *
  * One bottom-centred stack rather than three separately-positioned things, so a question
  * appearing pushes the reply up instead of landing on top of it, and none of them has to
- * know the height of the others. The offset from centre leaves the chat column room.
+ * know the height of the others.
  */
 .dock {
 	position: absolute;
@@ -1082,31 +939,27 @@ svg.lucide {
 	left: 50%;
 	display: flex;
 	/*
-	 * Centred on the window, not on the gap between the panels.
+	 * Centred on the window, not on the gap beside the rail.
 	 *
-	 * It used to sit at `calc(50% - 90px)`, which was exact rather than arbitrary: the
-	 * rail is 200px and the chat column 380px, and half that difference is 90px, so the
-	 * dock was centred in the room left between them. The trouble is that both panels
-	 * are away by default (§7) — so the measurement was right for the rare arrangement
+	 * It used to sit off-centre, which was exact rather than arbitrary — half the
+	 * difference between the two panels that used to flank it. The trouble is that they
+	 * are away by default (§7), so the measurement was right for the rare arrangement
 	 * and visibly off-centre for the usual one, which reads as a bug in the thing you
-	 * type into. Anchoring it to the panels' *state* instead would be worse: they open
-	 * on cursor proximity, so the input bar would slide sideways as you reached for
-	 * one.
+	 * type into. Anchoring it to the rail's *state* instead would be worse: it opens on
+	 * cursor proximity, so the input bar would slide sideways as you reached for it.
 	 *
-	 * The width had to change with it, and this is the part that is easy to get wrong:
-	 * `calc(100% - 650px)` was the room left beside *both* panels added together, which
-	 * is the right sum only for a dock free to sit off-centre. Centred, the dock has to
-	 * clear the wider panel on both sides, so the reservation is twice the chat column
-	 * (380px + its 12px margin + a 12px gutter). Measured rather than reasoned: at
-	 * 1500px the old sum left a dock spanning 390–1110 against a panel starting at
-	 * 1100 — a ten-pixel overlap that the off-centre version never had.
+	 * Centred, the dock has to clear the widest thing beside it on *both* sides, and
+	 * with the transcript sheet gone that thing is the 200px board rail (plus its 12px
+	 * margin and a 12px gutter) — hence twice 224. The conversation is no longer in this
+	 * sum at all: it floats over the boards and stops above the dock (`--dock`, measured
+	 * in `App`), so it has nothing to be cleared horizontally.
 	 *
-	 * Under about 800px that width is a negative number — the dock was 0 pixels across
+	 * Under about 770px that width is a negative number — the dock was 0 pixels across
 	 * on a phone, which is not a degraded input bar but an invisible one — so the clamp
 	 * stops it going below something usable. Under 1100px the media query at the end of
 	 * this file goes full-width instead, which is where that clamp stops mattering.
 	 */
-	width: min(720px, max(320px, calc(100% - 808px)));
+	width: min(720px, max(320px, calc(100% - 448px)));
 	flex-direction: column;
 	align-items: stretch;
 	gap: 8px;
@@ -1309,26 +1162,38 @@ svg.lucide {
 
 /* --- the conversation, floating over the boards ----------------------------
  *
- * The transcript sheet is away by default (§7); what floats instead is the
- * conversation itself, translucent, over the boards — the same move canvas-chat's
- * stream makes on its lessons. It appears when a new turn begins and follows it
- * while it streams; the × waves away that turn, and the next one comes back, so
- * closing it never makes the next reply invisible again.
+ * The whole transcript, translucent, over the boards — and the only one there is. The
+ * 380px sheet that used to slide in from the right edge is gone, and the bubbles that
+ * used to be a dim summary of its newest turn took its job: scrollable, clickable, with
+ * the time machine on each message.
  *
- * Nothing here has a background of its own: the bubbles are painted,
- * translucently, and the gaps between them pass clicks through to the boards
- * underneath (a row is a pointer target; the column is not). The spine at the
- * edge is still the handle, and a click on a bubble opens the sheet around that
- * turn.
+ * Nothing here has a background of its own — the bubbles are painted, translucently, and
+ * the boards stay the thing underneath. What changed with the sheet's departure is that
+ * the *column* is a pointer target now, not only its rows: it used to be
+ * `pointer-events: none` so the gaps between bubbles passed clicks through, which is a
+ * lovely property for a thing that appears on its own and a broken one for a thing you
+ * have to scroll — the wheel over a gap went to the canvas, and the history under the
+ * cursor did not move. Since it is opened deliberately and closed on the ×, taking the
+ * pointer while it is up is the honest trade.
  */
 .chat-float {
 	position: absolute;
 	top: 12px;
-	right: 26px;
-	bottom: calc(var(--dock, 88px) + 12px + var(--keyboard) + env(safe-area-inset-bottom));
+	right: 14px;
+	bottom: calc(var(--dock, 88px) + var(--row-gutter) + var(--keyboard) + env(safe-area-inset-bottom));
 	z-index: 9;
 	display: flex;
-	width: min(340px, calc(100vw - 104px));
+	/*
+	 * The gutter the rows' shadows live in, counted into the column's own width.
+	 *
+	 * A scroll container clips: `overflow-y: auto` forces `overflow-x` to compute to `auto`
+	 * too, so every row's shadow was sliced off in a straight vertical line down both edges
+	 * of the history — which is what made a column of floating rows read as a box with a
+	 * cut-out. The scroller carries this much padding instead, and the column is wider and
+	 * closer to the edge by the same amount, so the rows land where they always did.
+	 */
+	--row-gutter: 12px;
+	width: min(calc(360px + 2 * var(--row-gutter)), calc(100vw - 80px));
 	flex-direction: column;
 	opacity: 0;
 	pointer-events: none;
@@ -1339,8 +1204,15 @@ svg.lucide {
 	opacity: 1;
 }
 
+/* Closed, it is not there at all: an invisible surface that ate the wheel would be a
+   canvas that had stopped working for no visible reason. */
+.chat-float:not([data-open="true"]) {
+	visibility: hidden;
+}
+
 .chat-float .fclose {
 	align-self: flex-end;
+	margin-right: var(--row-gutter);
 	display: grid;
 	width: 22px;
 	height: 22px;
@@ -1365,17 +1237,49 @@ svg.lucide {
 .chat-float .fsroll {
 	display: flex;
 	overflow-y: auto;
+	flex: 1 1 auto;
 	flex-direction: column;
 	gap: 8px;
-	padding: 2px 0 8px;
+	padding: var(--row-gutter);
 	overscroll-behavior: contain;
-	/* The column is not a target; only its rows are — see the note above. */
-	pointer-events: none;
+	pointer-events: auto;
 }
 
+/*
+ * The newest turn sits at the bottom, against the input bar, the way a chat does.
+ *
+ * An auto margin on the first row rather than `justify-content: flex-end` on the
+ * scroller: an auto margin resolves to zero once the content overflows, so the top of a
+ * long history stays reachable. `flex-end` on a scroll container is the classic way to
+ * put the overflow somewhere nothing can scroll to.
+ */
+.chat-float .fsroll > :first-child {
+	margin-top: auto;
+}
+
+/*
+ * The history overflows by design — that is what scrolling is for — and a flex column
+ * shrinks its children to try to avoid it. Text-bearing bubbles resist through their
+ * min-content height; a tool chip has `overflow: hidden` and nothing of its own to push
+ * back with, so every one of them was squeezed to a line the moment the history filled
+ * up.
+ */
 .chat-float .fsroll > * {
 	flex: 0 0 auto;
-	pointer-events: auto;
+}
+
+/*
+ * Every row is on the right, whoever said it.
+ *
+ * The two-sided arrangement is what a messaging app does, and it earns its keep there
+ * because both sides are people. Here one side is *you* and the other is the agent
+ * working on the boards behind the column — and left-aligned agent bubbles put the reply
+ * on top of the canvas you are reading it against, with a ragged gutter down the middle
+ * of the history. One column against the edge keeps the boards clear and gives every row
+ * the same left margin to scan down.
+ */
+.chat-float .fsroll > * {
+	align-self: flex-end;
 }
 
 .chat-float button {
@@ -1384,34 +1288,47 @@ svg.lucide {
 	cursor: pointer;
 }
 
+/*
+ * One radius, everywhere.
+ *
+ * Each bubble used to square off one corner — bottom-right for yours, bottom-left for the
+ * agent's — the speech-bubble tail every chat app draws, which is how you tell the two
+ * sides apart at a glance. With both sides on the same edge the tail has nothing left to
+ * say, and two radii doing nothing is two radii to keep in step.
+ *
+ * Colour is what distinguishes them now, and it always was the part you actually read.
+ */
 .fbubble {
 	display: block;
 	max-width: 92%;
-	padding: 9px 12px;
+	padding: 9px 14px;
 	border: 0;
-	border-radius: 13px;
+	border-radius: var(--row-radius);
 	font-size: 13px;
 	line-height: 1.45;
 	white-space: pre-wrap;
 	word-break: break-word;
-	box-shadow: var(--shadow);
+	box-shadow: var(--shadow-row);
 	/* Translucent and blurred, so the boards stay the thing under them. */
 	backdrop-filter: blur(14px);
 }
 
 .fbubble[data-who="user"] {
-	align-self: flex-end;
 	background: color-mix(in oklab, var(--color-accent) 84%, transparent);
-	border-bottom-right-radius: 4px;
 	color: #fff;
 }
 
 .fbubble[data-who="agent"] {
-	align-self: flex-start;
 	border: 1px solid var(--line);
 	background: color-mix(in oklab, var(--panel) 88%, transparent);
-	border-bottom-left-radius: 4px;
 	color: var(--fg);
+}
+
+/* The caret that says a reply is still arriving. */
+@keyframes blink {
+	to {
+		visibility: hidden;
+	}
 }
 
 .fbubble .caret {
@@ -1430,32 +1347,215 @@ svg.lucide {
 	font-family: var(--font-mono);
 }
 
+/* Nested inside a bubble, so a step tighter than the row it sits in. */
 .fbubble pre {
 	overflow-x: auto;
-	margin: 6px 0 0;
+	margin: 0;
 	padding: 8px 10px;
-	border-radius: 8px;
+	border-radius: calc(var(--row-radius) - 6px);
 	background: var(--bg-deep);
 	font-size: 12px;
 	white-space: pre;
+}
+
+/* --- markdown inside a reply -------------------------------------------------
+ *
+ * The blocks `chat/Markdown.tsx` builds. Everything here is spacing and weight: the
+ * elements are real (`p`, `ul`, `blockquote`, `code`), so the browser does the typography
+ * and this only has to stop a document's worth of default margins from opening up inside a
+ * 360px bubble.
+ *
+ * The gap lives on the container rather than on each block's margin, so a bubble never
+ * starts or ends with dead space — the two things a chat bubble notices most.
+ */
+.md {
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
+}
+
+.md > * {
+	margin: 0;
+}
+
+/*
+ * A paragraph keeps its own line breaks.
+ *
+ * A single newline inside a paragraph is a line break in a chat message, not the collapsed
+ * whitespace it would be in a document — which is the one place markdown's rules are wrong
+ * about this medium, and `pre-wrap` is the whole of the disagreement.
+ */
+.md p,
+.md blockquote,
+.md li {
+	white-space: pre-wrap;
+}
+
+/* Weight and size, not an outline entry — see the note in `Markdown.tsx`. */
+.md .md-h {
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.md .md-h[data-level="1"] {
+	font-size: 15px;
+}
+
+.md .md-h[data-level="2"] {
+	font-size: 14px;
+}
+
+/* Three and deeper stop growing: below the body size a heading is just bold text, and in a
+   column this narrow that is all the distinction that survives anyway. */
+.md .md-h[data-level="3"],
+.md .md-h[data-level="4"],
+.md .md-h[data-level="5"],
+.md .md-h[data-level="6"] {
+	font-size: 13px;
+}
+
+/*
+ * A list stays a list, which takes two explicit statements here.
+ *
+ * `display: flex` reads as the obvious way to space the items and takes the bullets with
+ * it — a flex item is not a list item, so `::marker` stops being generated at all. The gap
+ * goes on the items instead. And `list-style` has to be *restored*: Tailwind's preflight
+ * (`@import "tailwindcss"`, the first line of this file) strips markers from every `ul` and
+ * `ol` in the document, which is the right default for chrome built out of lists and the
+ * wrong one for the only real prose in the app.
+ */
+.md ul,
+.md ol {
+	padding-left: 1.3em;
+	list-style-position: outside;
+}
+
+.md ul {
+	list-style-type: disc;
+}
+
+.md ol {
+	list-style-type: decimal;
+}
+
+/* A nested bullet gets its own mark as well as its own indent, so two levels read as two. */
+.md ul li[data-depth="1"] {
+	list-style-type: circle;
+}
+
+.md ul li[data-depth="2"],
+.md ul li[data-depth="3"] {
+	list-style-type: square;
+}
+
+.md li + li {
+	margin-top: 3px;
+}
+
+/*
+ * Nesting is an indent, because the parser flattens it (`markdown.ts`).
+ *
+ * A marker per level would need a real tree; an indent needs the depth the item already
+ * carries, and in a narrow column the indent is the part a reader is reading anyway.
+ */
+.md li[data-depth="1"] {
+	margin-left: 1.1em;
+}
+
+.md li[data-depth="2"] {
+	margin-left: 2.2em;
+}
+
+.md li[data-depth="3"] {
+	margin-left: 3.3em;
+}
+
+.md li::marker {
+	color: var(--faint);
+}
+
+.md blockquote {
+	padding-left: 9px;
+	border-left: 2px solid var(--line-strong);
+	color: var(--muted);
+}
+
+/* `--line-strong`, not `--line`: over a translucent bubble the quieter one is invisible,
+   and a rule nobody can see is a block the reply wrote for nothing. */
+.md hr {
+	height: 0;
+	border: 0;
+	border-top: 1px solid var(--line-strong);
+}
+
+/* Inline code, as against a fenced block: a tint, not a pane. */
+.md code {
+	padding: 1px 4px;
+	border-radius: 5px;
+	background: color-mix(in oklab, var(--fg) 9%, transparent);
+	font-family: var(--font-mono);
+	font-size: 12px;
+	word-break: break-word;
+}
+
+.md a {
+	color: inherit;
+	text-decoration: underline;
+	text-decoration-color: color-mix(in oklab, currentcolor 45%, transparent);
+	text-underline-offset: 2px;
+}
+
+.md a:hover {
+	text-decoration-color: currentcolor;
+}
+
+.md strong {
+	font-weight: 650;
+}
+
+.md s {
+	opacity: 0.65;
 }
 
 .fbubble[data-who="user"] pre {
 	background: rgb(0 0 0 / 22%);
 }
 
-/* A turn's tool calls, summed to one pill — the count is the point. */
+/*
+ * A turn's tool calls: one pill, and the calls themselves when asked for.
+ *
+ * The count is the point — a turn that edits files is mostly tool calls, and printing
+ * each one in full is a transcript nobody reads. But this is the only transcript there
+ * is now, so "3 tool calls" has to be something you can open; opening it stacks the same
+ * `.tool` chips the chat column used, output and all.
+ */
+.ftools-group {
+	display: flex;
+	align-self: flex-end;
+	max-width: 92%;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 6px;
+}
+
+.ftools-group .fcalls {
+	display: flex;
+	align-self: stretch;
+	flex-direction: column;
+	gap: 5px;
+}
+
 .ftools {
 	display: inline-flex;
 	gap: 7px;
 	align-items: center;
-	max-width: 92%;
-	padding: 6px 10px;
+	max-width: 100%;
+	padding: 6px 12px;
 	border: 1px solid var(--line);
-	border-radius: 999px;
+	border-radius: var(--row-radius);
 	background: color-mix(in oklab, var(--panel) 80%, transparent);
 	backdrop-filter: blur(12px);
-	box-shadow: var(--shadow);
+	box-shadow: var(--shadow-row);
 	color: var(--muted);
 	font-size: 12px;
 }
@@ -1488,10 +1588,23 @@ svg.lucide {
 	white-space: nowrap;
 }
 
+.ftools[data-open="true"] {
+	border-color: var(--line-strong);
+	color: var(--fg);
+}
+
+/* The chips inside are on the boards too, so they are as translucent as the row. */
+.ftools-group .fcalls .tool {
+	background: color-mix(in oklab, var(--panel) 88%, transparent);
+	backdrop-filter: blur(12px);
+	box-shadow: var(--shadow-row);
+}
+
 .fnotice {
-	align-self: stretch;
-	padding: 7px 12px;
-	border-radius: 9px;
+	align-self: flex-end;
+	max-width: 92%;
+	padding: 7px 14px;
+	border-radius: var(--row-radius);
 	background: color-mix(in oklab, var(--panel) 72%, transparent);
 	color: var(--muted);
 	font-size: 12px;
@@ -1506,21 +1619,38 @@ svg.lucide {
 	color: var(--color-danger);
 }
 
-/* The float lives beside the spine and is for cursors.
+/*
+ * On a phone the bubbles are the sheet.
  *
- * Without hover the sheets are reached for deliberately — there is no cursor to
- * bring them in, and a float that appears on its own over the canvas is a pane
- * nobody asked for. Below 760px the two panels take turns with the canvas and the
- * boards are precious; the sheet from the title bar is the whole conversation
- * there, as it always was. */
-@media (hover: none) {
-	.chat-float {
-		display: none;
-	}
-}
-
+ * They used to be `display: none` here, on the argument that a float appearing on its own
+ * over a small canvas is a pane nobody asked for and the 380px sheet was the conversation
+ * on a touchscreen anyway. Both halves of that are gone: the sheet is gone, and the float
+ * no longer appears on its own — it is opened from the title-bar button and closed on the
+ * ×. Hiding it now would leave a phone with no transcript at all.
+ *
+ * So it takes the sheet's geometry: the full width of the screen, past the spine (which is
+ * hidden below this width), and stopping above the dock so the input bar it belongs to
+ * stays reachable while you read.
+ */
 @media (max-width: 760px) {
 	.chat-float {
+		/* The gutter is inside these insets, so the rows still clear the screen edge by 8. */
+		right: max(0px, calc(env(safe-area-inset-right) - var(--row-gutter)));
+		left: max(0px, calc(env(safe-area-inset-left) - var(--row-gutter)));
+		width: auto;
+	}
+
+	/*
+	 * And the camera chrome stands aside while it is up.
+	 *
+	 * The palette is top-centred and the zoom controls bottom-right, both of which the
+	 * bubbles now cross at full width — the first reply landed on top of the tools and
+	 * neither was readable. The same trade the inspector already makes here: drawing and
+	 * zooming have fingers to do them with, so they are the thing that can be missing for
+	 * as long as you are reading. It is one tap on the × to get them back.
+	 */
+	.work:has(.chat-float[data-open="true"]) .palette,
+	.work:has(.chat-float[data-open="true"]) .zoombar {
 		display: none;
 	}
 }
@@ -1694,9 +1824,11 @@ svg.lucide {
  * land under the palette, and the palette is a row of 30px targets that a column of
  * fields does not belong in.
  *
- * `right: 30px` is load-bearing. The chat panel opens when the cursor comes within
- * `REACH` (26px) of the right edge (`lib/panels.ts`), so a panel any closer than that
- * would pull the transcript over itself the moment you reached for it.
+ * `right: 30px` clears the timeline spine, which is hard against that edge and is the
+ * one thing on this side that must stay aimable at all times. It used to be measured
+ * against something else — the transcript panel opened when the cursor came within
+ * `REACH` of the right edge, so anything closer pulled the panel over itself — and that
+ * panel is gone; the number survives it because the spine still wants the room.
  */
 .inspector {
 	top: 12px;
@@ -1890,6 +2022,105 @@ svg.lucide {
 	place-items: center;
 }
 
+/* --- what you can do on the canvas -------------------------------------------
+ *
+ * A cheat sheet behind the title bar's info button (`canvas/CanvasOps.tsx`). It borrows
+ * the picker's backdrop rather than growing a second one: they are the same kind of thing —
+ * a thing you open, read and dismiss — and one backdrop is one set of rules about how a
+ * press outside dismisses it.
+ *
+ * Two columns, keys on the left in the mono face and the sentence on the right, because
+ * that is the shape a person scans: down the left for the gesture they half-remember, or
+ * down the right for the thing they want to do.
+ */
+.ops {
+	position: static;
+	display: flex;
+	width: min(560px, calc(100vw - 24px));
+	max-height: 78%;
+	flex-direction: column;
+	padding: 0;
+	overflow: hidden;
+	/*
+	 * Opaque, unlike the panels it borrows its class from.
+	 *
+	 * `.panel-float` is translucent because it floats over work you still want to see. This
+	 * one is two dense columns of small text and there is nothing behind it worth reading
+	 * through it — the input bar and the zoom controls showing faintly through a table of
+	 * shortcuts is just noise in the gaps between rows.
+	 */
+	background: var(--bg);
+}
+
+.ops header {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	padding: 8px 10px 8px 12px;
+	border-bottom: 1px solid var(--line);
+	color: var(--muted);
+	font-size: 11px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.ops header .spacer {
+	flex: 1;
+}
+
+.ops .groups {
+	display: flex;
+	overflow-y: auto;
+	flex-direction: column;
+	padding: 10px 12px 12px;
+	gap: 14px;
+	overscroll-behavior: contain;
+}
+
+.ops h3 {
+	margin: 0 0 5px;
+	color: var(--fg);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.ops .row {
+	display: grid;
+	grid-template-columns: minmax(0, 13em) minmax(0, 1fr);
+	gap: 10px;
+	padding: 2px 0;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.ops .keys {
+	color: var(--fg);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	word-break: break-word;
+}
+
+.ops .what {
+	color: var(--muted);
+}
+
+.ops footer {
+	padding: 9px 12px;
+	border-top: 1px solid var(--line);
+	color: var(--faint);
+	font-size: 11px;
+	line-height: 1.5;
+}
+
+/* One column on a phone: 13em of keys and a sentence beside it is two lines of neither. */
+@media (max-width: 560px) {
+	.ops .row {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0;
+		padding: 4px 0;
+	}
+}
+
 .picker {
 	position: static;
 	display: flex;
@@ -2006,13 +2237,12 @@ svg.lucide {
 /* --- the chat list ---------------------------------------------------------- */
 
 /*
- * The two floating panels are away by default and come when reached for — the canvas
- * is the work, and the chrome should not sit on top of it while unused. A sliver
- * stays visible so there is something to aim at, and the transform is what moves:
- * one composited property, so a panel arriving never costs a layout.
+ * The board rail is away by default and comes when reached for — the canvas is the
+ * work, and the chrome should not sit on top of it while unused. A sliver stays visible
+ * so there is something to aim at, and the transform is what moves: one composited
+ * property, so a panel arriving never costs a layout.
  */
-.side,
-.chat {
+.side {
 	--peek: 10px;
 	z-index: 10;
 	opacity: 0.55;
@@ -2023,8 +2253,7 @@ svg.lucide {
 	pointer-events: none;
 }
 
-.side[data-open="true"],
-.chat[data-open="true"] {
+.side[data-open="true"] {
 	opacity: 1;
 	transform: none;
 	pointer-events: auto;
@@ -2388,13 +2617,6 @@ svg.lucide {
 	box-shadow: 0 0 0 2px var(--panel);
 }
 
-.chat .chat-head .avatar img {
-	width: 100%;
-	height: 100%;
-	border-radius: 999px;
-	object-fit: cover;
-}
-
 /*
  * A previewed past is marked and untouchable: it is a look, not a state.
  *
@@ -2415,8 +2637,9 @@ svg.lucide {
 
 /*
  * The spine: one block per turn, newest at the bottom, hard against the right edge.
- * It is the chat panel's handle — always there, always aimable — and the panel slides
- * in beside it rather than over it, so a block stays clickable while you read.
+ * It is how you get *back* to a turn — always there, always aimable — and the
+ * conversation opens beside it rather than over it (`.chat-float` starts 26px in), so a
+ * block stays clickable while you read.
  */
 .turnbar {
 	position: absolute;
@@ -2469,16 +2692,6 @@ svg.lucide {
 	background: var(--color-danger);
 }
 
-/* The panel parks beside the spine, not under it. */
-.chat {
-	right: 22px;
-}
-
-/* The chat's own sliver would only compete with the spine. */
-.chat::after {
-	display: none;
-}
-
 
 /* --- a phone, and a hand ------------------------------------------------------ */
 
@@ -2490,19 +2703,20 @@ svg.lucide {
  * and a touchscreen laptop has a coarse one on a large screen.
  *
  * - `(hover: none)` is **discoverability**. Everything this app reveals by approaching
- *   it — the two panels at the edges, the `×` on a board's title bar, the row of
+ *   it — the rail at the left edge, the `×` on a board's title bar, the row of
  *   `rewind · fork · restore boards` under a message — reveals itself to nothing at all
  *   on a touchscreen. So where there is no hover, those things are simply there, and the
- *   two panels grow the pair of buttons in the title bar that `.touch-only` marks.
+ *   rail grows the title-bar button that `.touch-only` marks.
  * - `(pointer: coarse)` is **size**. The chrome draws its icon buttons at 20–30px, which
  *   is right for a cursor and roughly half of what a fingertip can reliably hit. Nothing
  *   moves; the targets grow.
  * - A **width** breakpoint is used for exactly what is about width: the dock's clearance
- *   for the two panels, and the panels themselves becoming sheets. A 390px phone cannot
- *   hold 200px of rail, 380px of transcript and a canvas at the same time, so it holds
- *   one of them at a time (`lib/panels.ts` makes them mutually exclusive at the same
- *   threshold) and the boards keep the screen — which is §7's thesis, not a retreat from
- *   it: the chrome is away by default, and on a phone "away" simply has to mean gone.
+ *   for the rail, and the rail and the conversation becoming full-width sheets. A 390px
+ *   phone cannot hold 200px of rail, 340px of bubbles and a canvas at the same time, so
+ *   it holds one at a time (`App.openChat` and `App.toggleRail` close each other at the
+ *   same threshold, `NARROW`) and the boards keep the screen — which is §7's thesis, not
+ *   a retreat from it: the chrome is away by default, and on a phone "away" simply has
+ *   to mean gone.
  *
  * Nothing here is a separate mobile layout. Every rule is an override of the desktop
  * one, and above these thresholds the stylesheet is byte-for-byte the app it was.
@@ -2519,16 +2733,22 @@ svg.lucide {
 	display: none;
 }
 
+/*
+ * What is out, on the button that puts it there.
+ *
+ * Not inside `(hover: none)` any more: the conversation's button is there for every
+ * pointer — it has no edge to be summoned from since the transcript sheet went — and a
+ * toggle that never looks pressed is a toggle you have to click twice to understand.
+ */
+.titlebar .icon-button[data-open="true"] {
+	background: var(--line);
+	color: var(--fg);
+}
+
 @media (hover: none) {
 	.titlebar .icon-button.touch-only,
 	.palette button.touch-only {
 		display: grid;
-	}
-
-	/* Which panel is out, on the button that puts it there. */
-	.titlebar .icon-button[data-open="true"] {
-		background: var(--line);
-		color: var(--fg);
 	}
 
 	/* Separated from the tools: it acts on the board, not on the next thing you draw. */
@@ -2747,45 +2967,25 @@ svg.lucide {
 	}
 
 	/*
-	 * The two panels become sheets: the full width of the screen, with the canvas behind
-	 * them rather than beside them. `--peek` goes to nothing — a sliver is something to
-	 * aim a cursor at, and there is no cursor here.
+	 * The rail becomes a sheet, with the canvas behind it rather than beside it.
+	 * `--peek` goes to nothing — a sliver is something to aim a cursor at, and there is
+	 * no cursor here.
+	 *
+	 * A sidebar for the boards, not a takeover: at full width the rail was two-thirds
+	 * empty stretched across the screen, and a narrower panel leaves a strip of canvas
+	 * beside it — which is the difference between chrome and a wall. It reaches the
+	 * bottom of the screen, past the dock: the composer sits behind the sheet while it
+	 * is open, and 88px of empty chrome under the thing you opened is a phone's whole
+	 * lower third.
 	 */
-	.side,
-	.chat {
+	.side {
 		--peek: 0px;
 		left: max(8px, env(safe-area-inset-left));
-		/* `right` for the chat as well, which parks beside the timeline spine on a
-		   desktop — and the spine is gone below this width. */
-		right: max(8px, env(safe-area-inset-right));
-		/*
-		 * To the bottom of the screen, past the dock. The dock — the last reply, a
-		 * question, the input bar — is what made the sheets stop 88px up, which on a
-		 * phone is a large margin of mostly empty chrome under the thing you opened.
-		 * A sheet that reaches the bottom leaves no such gap. The composer sits behind
-		 * the sheet while it is open, which is the point: the sheet you opened *is*
-		 * the conversation, and it dismisses by a swipe or a tap on the title bar.
-		 */
-		bottom: max(8px, env(safe-area-inset-bottom));
-		width: auto;
-	}
-
-	/* A sidebar for the boards, not a takeover: the rail was two-thirds empty width
-	   stretched across the screen, and a narrower panel leaves a strip of canvas
-	   beside it — which is the difference between chrome and a wall. */
-	.side {
 		right: auto;
+		bottom: max(8px, env(safe-area-inset-bottom));
 		width: min(340px, 78vw);
-	}
-
-	/* Each one still slides in from its own edge: a transform is the one property that
-	   costs nothing to animate. */
-	.side {
+		/* A transform is the one property that costs nothing to animate. */
 		transform: translateX(calc(-100% - 16px));
-	}
-
-	.chat {
-		transform: translateX(calc(100% + 16px));
 	}
 
 	/*
@@ -2814,16 +3014,15 @@ svg.lucide {
 		padding: 8px 12px;
 	}
 
-	.side::after,
-	.chat::after {
+	.side::after {
 		display: none;
 	}
 
 	/*
-	 * The timeline spine goes. It is a column of 10px notches on the right edge, which
-	 * is both the hardest thing on screen to hit and the edge the transcript sheet now
-	 * arrives from; the same rewind, fork and restore live on each message in the
-	 * transcript, which is reachable (see `(hover: none)` above).
+	 * The timeline spine goes. It is a column of 10px notches on the right edge, which is
+	 * the hardest thing on screen to hit with a finger, and the same rewind, fork and
+	 * restore live on each message in the conversation — which is always shown on a
+	 * touchscreen (see `(hover: none)` above) rather than waiting for a hover.
 	 */
 	.turnbar {
 		display: none;

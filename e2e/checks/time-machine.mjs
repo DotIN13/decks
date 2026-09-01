@@ -4,7 +4,7 @@
  *
  * Needs a model, because the thing being travelled through is a real conversation.
  */
-import { ask, boardPath, open, read, say, settle } from "../harness.mjs";
+import { ask, boardPath, open, read, say, settle, socket } from "../harness.mjs";
 
 const plan = await boardPath("plan.html");
 const original = read(plan);
@@ -34,9 +34,23 @@ try {
 	say("the second turn changed it again", /second turn/i.test(afterSecond));
 
 	await page.locator(".turnbar .turn").first().click();
-	await page.waitForSelector(".chat .turn-row", { timeout: 8000 });
-	const rows = await page.locator(".chat .turn-row").count();
+	await page.waitForSelector(".chat-float .turn-row", { timeout: 8000 });
+	const rows = await page.locator(".chat-float .turn-row").count();
 	say("each user message is a point you can return to", rows >= 2, `${rows} messages with actions`);
+
+	/*
+	 * The board has to be on the canvas for there to be anything to preview.
+	 *
+	 * An agent holding nothing puts nothing on the canvas (§2), and this check starts a
+	 * fresh agent on purpose — so editing the board is not the same as showing it, and
+	 * every assertion below was reading `null`. Played over the socket rather than asked
+	 * for, because what is being tested is the time machine, not the agent's judgement
+	 * about what belongs on screen. `chrome.mjs` does the same thing for the same reason.
+	 */
+	const link = await socket();
+	link.send({ type: "board.play", path: "boards/plan.html" });
+	await page.waitForSelector('.board-node[data-path="boards/plan.html"] iframe', { timeout: 10000 });
+	await settle(page, 600);
 
 	// Hovering rewind on the *second* message shows the state after turn one.
 	//
@@ -47,7 +61,7 @@ try {
 	await page.evaluate(() => {
 		document.querySelector('.board-node[data-path="boards/plan.html"] iframe').contentWindow.__live = true;
 	});
-	const second = page.locator(".chat .turn-row").nth(1);
+	const second = page.locator(".chat-float .turn-row").nth(1);
 	await second.hover();
 	await second.locator(".turn-actions button", { hasText: "rewind" }).hover();
 	await page.waitForFunction(
@@ -79,13 +93,14 @@ try {
 	say("restore boards writes that point back", /first turn/i.test(restored) && !/second turn/i.test(restored));
 
 	// Rewinding truncates the conversation.
-	const before = await page.locator(".chat .stream > *").count();
-	const last = page.locator(".chat .turn-row").last();
+	const before = await page.locator(".chat-float .fsroll > *").count();
+	const last = page.locator(".chat-float .turn-row").last();
 	await last.hover();
 	await last.locator(".turn-actions button", { hasText: "rewind" }).click();
-	await page.waitForFunction((was) => document.querySelectorAll(".chat .stream > *").length < was, before, { timeout: 15000 });
-	say("rewinding cuts the transcript back", (await page.locator(".chat .stream > *").count()) < before, `${before} → ${await page.locator(".chat .stream > *").count()} items`);
+	await page.waitForFunction((was) => document.querySelectorAll(".chat-float .fsroll > *").length < was, before, { timeout: 15000 });
+	say("rewinding cuts the transcript back", (await page.locator(".chat-float .fsroll > *").count()) < before, `${before} → ${await page.locator(".chat-float .fsroll > *").count()} items`);
 
+	link.close();
 	say("no page errors", errors.length === 0, errors.join(" | "));
 } finally {
 	// The board is a fixture, and this check deliberately rewrites it.

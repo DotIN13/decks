@@ -1,6 +1,6 @@
 ---
 name: board-authoring
-description: How to write a board — the document and its metadata, positioning on the canvas, the built-in component classes (text, card, sticky, callout, kpi, table, chip), markdown, maths, Mermaid, embeds, diagrams you draw yourself, custom components of your own, and `data-edit`, which every run of words the user may retype has to carry. Read before answering on a board or building one with anything beyond cards and text.
+description: How to write a board — the document and its metadata, positioning on the canvas, the built-in component classes (text, card, sticky, callout, kpi, table, chip), markdown, maths, Mermaid, embeds, diagrams you draw yourself, custom components of your own, and which shapes the user can retype in place. Read before answering on a board or building one with anything beyond cards and text.
 ---
 
 # Board authoring
@@ -80,14 +80,14 @@ Every user-editable board component must:
 - be a direct child of `<body>`
 - have a meaningful, stable `data-id`
 - have its own position and width
-- carry a `data-edit` on every run of words the user should be able to retype
+- keep each string the user should retype separately in its own leaf element
 
 For example:
 
 ```html
 <section class="card" data-id="project-goal" style="left: 48px; top: 144px; width: 400px">
-	<h3 data-edit="project-goal-title">Goal</h3>
-	<p data-edit="project-goal-body">One session, one refresh.</p>
+	<h3>Goal</h3>
+	<p>One session, one refresh.</p>
 </section>
 ```
 
@@ -128,50 +128,60 @@ data-tone="ok"
 
 Omitting the tone uses the default accent treatment.
 
-## `data-edit` — the address of every retypeable run
+## What the user can retype
 
-A run of words is editable when, and only when, it carries a `data-edit`. The name is
-the whole address: the user double-clicks the words, the app sends
-`data-edit="goal-title"` and the new text, and the server splices that element's byte
-range in the file.
+A run of words is retypeable when its content is **words and marks**: text, and elements
+that are phrasing content — `<b>`, `<em>`, `<a>`, `<code>`, `<span>` and the rest of the
+inline set. The user double-clicks it and edits it in place as rich text; the app sends the
+component's id, the element's position inside it, and the element's new inner HTML, and the
+server splices that element's byte range in the file.
 
 ```html
-<h3 data-edit="goal-title">Goal</h3>
+<h3>Goal</h3>
+<p>See <a href="../docs/notes.md">the doc</a>, then <b>ship it</b>.</p>
 ```
 
-- **Required.** There is no inference and no fallback. A run with no `data-edit` cannot
-  be retyped, and a board written without them has no retypeable text at all.
-- **Unique within the board.** Two runs with one name make a retype of either ambiguous,
-  and it is refused rather than guessed at. Name them after the component they belong to
-  — `goal-title`, `goal-body`, `rollout-when-1`.
-- **On the leaf that holds the string**, not on a container. Three labelled numbers are
-  three named spans, not one named row containing them.
-- **`data-edit="false"` is not a name, and is refused** by both the app and the server.
-  Nothing needs sealing: leaving the attribute off is how you say text is not the user's
-  to retype. Use it for a computed value, a legend, a label that has to stay in step
-  with a chart's axis, or any line a script rewrites on mount.
+Both of those are one field. Nothing has to be named for it: there is no attribute to
+remember and no list to keep unique.
 
-A named run earns an affordance as well as an address: the app underlines it under the
-cursor, so the user can see where to type instead of double-clicking around to find out.
+- **A box of blocks is not a run.** A `<section>` holding an `<h3>` and a `<p>` is two runs
+  with a box around them, and the user gets each of them rather than one field over both.
+  Double-clicking the box itself says so instead of flattening what is inside it.
+- **A run is one field, marks and all.** Clicking a bold word inside a paragraph opens the
+  paragraph, because a field whose caret stops at a mark's edge is worse than no field. So
+  **keep the units the size you mean**: three labelled numbers in one row are edited
+  together, and as three separate leaves they are edited separately. That is the one thing
+  your markup decides about editing, and it is worth a thought per component.
+- **Text has to be in the file.** Not in CSS `content`, not in a JavaScript string, not in
+  an attribute: a patch splices the board's source, so text the file does not contain has
+  nowhere for an edit to land.
 
-Two rules `data-edit` cannot lift, because they are properties of applying an edit as a
-byte splice rather than policy:
+Whatever the browser hands back is normalised before it is written: only inline tags survive,
+`style` and `id` are dropped, `class` and `data-*` are kept, split marks are merged, and
+anything else is unwrapped to its words. So a paste from elsewhere lands as words with the
+marks it deserved and none of the styling it arrived with, and you will not find a browser's
+artefacts in a board file.
 
-- **A run must be a leaf.** An element with element children inside it — `<p>See <a
-  href="…">the doc</a></p>` — cannot be retyped as plain text, because that would throw
-  the markup away. Name the link's own text, or the paragraph's own `<span>`, instead.
-- **`[data-embed]` and `<svg>` content has no path into the file.** An embed shows
-  somebody else's file, so what there is to edit is the path, which the inspector
-  offers. A `<text>` inside a drawing is placed by the drawing's coordinates and is
-  never retypeable. `[data-md]` and `[data-mermaid]` are the exception and have their
-  own rule below.
+The app underlines a run under the cursor, so the user can see where to type instead of
+double-clicking around to find out.
+
+**This replaced `data-edit`**, a name you had to write on every retypeable run and keep
+unique within the board. If you are used to writing them, they are simply ignored now:
+harmless, and worth deleting when you are editing a board anyway. The name was a fine
+address and a poor gate — a board written without them had no retypeable text at all, and
+the only thing the app could say was "ask the agent for a data-edit on it".
+
+**`[data-embed]` and `<svg>` content is not retypeable.** An embed shows somebody else's
+file, so what there is to edit is the path, which the inspector offers. A `<text>` inside a
+drawing is placed by the drawing's own coordinates. `[data-md]` and `[data-mermaid]` are
+the exception and have their own rule below.
 
 ## Markdown and maths
 
 A component with `data-md` is rendered as markdown:
 
 ```html
-<div class="card" data-id="notes" data-md data-edit="notes-md" style="left: 48px; top: 144px; width: 520px">
+<div class="card" data-id="notes" data-md style="left: 48px; top: 144px; width: 520px">
 	Markdown content here.
 </div>
 ```
@@ -181,13 +191,14 @@ Markdown supports inline and display maths using `$…$` and `$$…$$`.
 Indent the content to match the surrounding HTML; the common indent is stripped before
 parsing.
 
-**The `data-edit` goes on the component, once, and the whole source is the editable
-unit.** A double-click opens the source in a monospace editor over the component, and a
-commit re-renders that one component. Do not name the blocks inside one: a rendered
-`<h2>` came from `## …` and has no byte range of its own in the file. Two consequences —
-a source containing raw HTML is refused, because the app only ever had the element's
-text with the tags already dropped; and the editor shows the source dedented, so keep
-the block's indentation regular and it comes back exactly as it was.
+**The whole source is the editable unit, and the component is what is addressed.** A
+double-click opens the source in a monospace editor over the component, and a commit
+re-renders that one component. The blocks inside are not separately editable: a rendered
+`<h2>` came from `## …` and has no byte range of its own in the file, which is exactly why
+the source is the unit. Two consequences — a source containing raw HTML is refused, because
+the app only ever had the element's text with the tags already dropped; and the editor
+shows the source dedented, so keep the block's indentation regular and it comes back
+exactly as it was.
 
 Use markdown for content that benefits from markdown rendering rather than merely as a
 shortcut for ordinary editable text.
@@ -200,7 +211,7 @@ Use `data-mermaid` for Mermaid diagrams:
 <div class="card"
      data-id="flow"
      data-mermaid
-     data-edit="flow-src"
+    
      style="left: 48px; top: 144px; width: 600px; height: 400px">
 	flowchart TD
 		A["tab A: 401"] --> L{"lock free?"}
@@ -209,7 +220,7 @@ Use `data-mermaid` for Mermaid diagrams:
 ```
 
 Give Mermaid components an explicit height so the diagram has a known rendering area.
-The `data-edit` works as it does for markdown: one name on the component, and the whole
+Editing works as it does for markdown: the component is what is addressed, and the whole
 source is what opens.
 
 Mermaid is the right answer for a flowchart whose shape you do not want to own. Draw the
@@ -239,7 +250,7 @@ the editor's geometry is `HTMLElement`'s and an `SVGElement` has none of it. Giv
 </style>
 
 <section class="card claim" data-id="claim" style="left: 1140px; top: 604px; width: 412px; height: 232px">
-	<h3 data-edit="claim-title">One claim, two tabs</h3>
+	<h3>One claim, two tabs</h3>
 	<svg viewBox="0 0 380 160" width="100%" height="160" role="img" aria-label="Both tabs ask; the lock admits one; the loser retries with its answer.">
 		<defs>
 			<marker id="claim-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
@@ -316,8 +327,8 @@ To keep a custom component editable:
 - make its outer element a direct child of `<body>`
 - give that outer element a `data-id`
 - keep user-editable wording in static HTML
-- place each independently editable string in its own leaf element, and give each one a
-  `data-edit` nothing else on the board has
+- put each string the user should retype *separately* in its own leaf element, since a run
+  of words is edited as one field
 
 Do not place editable text in CSS `content`, generated JavaScript strings, or attributes:
 a patch splices the board's source, so text that is not in the file has nowhere for an
@@ -330,15 +341,15 @@ the tone the inspector offers.
 
 ```html
 <section class="card phases" data-id="rollout" style="left: 48px; top: 168px; width: 420px">
-	<h3 data-edit="rollout-title">Rollout</h3>
-	<div class="phase"><span class="when" data-edit="rollout-when-1">week 1</span><span data-edit="rollout-what-1">Lock behind a flag</span></div>
-	<div class="phase"><span class="when" data-edit="rollout-when-2">week 2</span><span data-edit="rollout-what-2">Ramp to 10%</span></div>
-	<span class="computed" data-edit="false">2,455 so far</span>
+	<h3>Rollout</h3>
+	<div class="phase"><span class="when">week 1</span><span>Lock behind a flag</span></div>
+	<div class="phase"><span class="when">week 2</span><span>Ramp to 10%</span></div>
 </section>
 ```
 
-Every named run in it is a leaf, so the user can retype any of the five; the computed
-figure carries the reserved value, so it is left alone.
+The heading is one field and each `.phase` row is another, because a row of two `<span>`s is
+a run of words. If the two halves of a row should be retyped separately, they need to be in
+separate rows rather than separate spans.
 
 ## Libraries and scripts
 
@@ -381,9 +392,8 @@ color values.
 Check that:
 
 - every component has a meaningful `data-id`
-- every run of words the user may retype carries a `data-edit` nothing else on the board
-  has, including the source of every `[data-md]` and `[data-mermaid]` component
-- every named run is a leaf element, and nothing is named `false`
+- runs of words are the size the user should edit them in: one field per run, and separate
+  leaves for strings that should be retyped separately
 - components fit within the canvas without clipping
 - positioning is reasonably aligned and spaced
 - custom components keep a box class alongside their own

@@ -147,6 +147,8 @@ export function Composer(props: {
 			<textarea
 				ref={input}
 				rows="1"
+				// The field had no accessible name at all; the placeholder is not one.
+				aria-label="Message this agent"
 				placeholder="Draft something on a board, or ask…"
 				value={text()}
 				onInput={(event) => setText(event.currentTarget.value)}

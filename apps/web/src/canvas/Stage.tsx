@@ -73,6 +73,22 @@ export function Stage(props: {
 		const keydown = (event: KeyboardEvent) => {
 			const typing = (event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]");
 			if (typing) return;
+			/*
+			 * A key with a modifier on it is not one of ours.
+			 *
+			 * Every shortcut here is a bare key — `V S C T E` for the tools, `0 1 + -` for
+			 * the camera — and none of them wanted a modifier. Without this check the letters
+			 * matched anyway, so **⌘C stopped copying**: `event.key` is `"c"` whatever else is
+			 * held, so a copy switched the tool to *card* and then `preventDefault()` cancelled
+			 * the clipboard. Selecting a line of a reply and copying it did nothing at all, and
+			 * ⌘V, ⌘S, ⌘E and ⌘0 were quietly taken the same way.
+			 *
+			 * `frame-gestures.ts` has had this guard from the start, for the keys it forwards
+			 * out of a board — the asymmetry is what hid the bug: anything typed with a board
+			 * focused behaved, and only the app's own document swallowed the shortcut. Space
+			 * is inside the guard too, because ⌘Space belongs to the OS.
+			 */
+			if (event.metaKey || event.ctrlKey || event.altKey) return;
 			if (event.code === "Space") {
 				setSpaceHeld(true);
 				event.preventDefault();

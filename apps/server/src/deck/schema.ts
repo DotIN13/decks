@@ -57,7 +57,7 @@ export function parseDeckFile(text: string): ParsedDeckFile {
 			// A position that is not a pair of numbers is no position at all; the
 			// board still exists and gets placed by the auto-layout instead.
 			if (Number.isFinite(x) && Number.isFinite(y)) boards[normalizeBoardPath(path)] = { x, y };
-			else warnings.push(`deck.json: ignoring the position of "${path}" — x and y must be numbers.`);
+			else warnings.push(`deck.json: ignoring the position of "${path}". x and y must be numbers.`);
 		}
 		file.boards = boards;
 	}

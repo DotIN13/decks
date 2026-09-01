@@ -48,35 +48,36 @@
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 184px; top: 120px; width: 720px">
-			<h1 data-edit="heading-title">One refresh, two tabs</h1>
+			<h1>One refresh, two tabs</h1>
 			<p style="color: var(--b-muted)">
-				Drafted on the canvas. Every box here has a <code>data-id</code> and every run of words a
-				<code>data-edit</code>, which is how it gets retyped, pointed at, and commented on.
+				Drafted on the canvas. Every box here has a <code>data-id</code>, which is how it gets
+				pointed at and commented on, and every run of words sits in its own leaf element, which
+				is what makes it retypeable in place.
 			</p>
 		</div>
 
-		<div class="chip" data-id="status" data-edit="status-text" style="left: 1320px; top: 80px; width: 120px; height: 40px">draft · not agreed</div>
+		<div class="chip" data-id="status" style="left: 1320px; top: 80px; width: 120px; height: 40px">draft · not agreed</div>
 
 		<section class="card" data-id="goal" style="left: 48px; top: 168px; width: 380px">
-			<h3 data-edit="goal-title">Goal</h3>
-			<p data-edit="goal-body">
+			<h3>Goal</h3>
+			<p>
 				A second tab that wakes up must not spend a token the first tab already spent. One
 				session, two tabs, no re-login.
 			</p>
 		</section>
 
 		<section class="card" data-id="approach" style="left: 520px; top: 168px; width: 380px">
-			<h3 data-edit="approach-title">Approach</h3>
+			<h3>Approach</h3>
 			<p>Treat a refresh as a <strong>claim</strong>: first claim wins, the losers wait for its answer.</p>
 			<ul>
-				<li data-edit="approach-server">Server: short-lived lock per token family</li>
-				<li data-edit="approach-client">Client: one shared promise per tab group</li>
+				<li>Server: short-lived lock per token family</li>
+				<li>Client: one shared promise per tab group</li>
 			</ul>
 		</section>
 
 		<div class="sticky" data-id="risk" style="left: 992px; top: 168px; width: 256px; height: 136px">
-			<strong data-edit="risk-headline">The race is small</strong><br />
-			<span data-edit="risk-body">~240ms, but a laptop waking from sleep hits it nearly every time.</span>
+			<strong>The race is small</strong><br />
+			<span>~240ms, but a laptop waking from sleep hits it nearly every time.</span>
 		</div>
 
 		<div class="callout" data-id="decision" data-tone="warn" style="left: 48px; top: 452px; width: 852px">
@@ -85,22 +86,22 @@
 		</div>
 
 		<div class="kpi" data-id="kpi-failed" style="left: 992px; top: 452px; width: 220px">
-			<span class="value" data-edit="kpi-failed-value">2,455</span>
-			<span class="label" data-edit="kpi-failed-label">failed refreshes · worst week</span>
+			<span class="value">2,455</span>
+			<span class="label">failed refreshes · worst week</span>
 		</div>
 
 		<div class="kpi" data-id="kpi-users" style="left: 1264px; top: 452px; width: 220px">
-			<span class="value" data-edit="kpi-users-value">517</span>
-			<span class="label" data-edit="kpi-users-label">users affected</span>
+			<span class="value">517</span>
+			<span class="label">users affected</span>
 		</div>
 
 		<!--
 			Markdown, and the whole of its source is one editable: `board.js` keeps the words it
 			drew this from and hands them back, so double-clicking the panel opens the source
-			rather than the rendered heading under the pointer. One `data-edit` on the component
-			and not one per block — a rendered block is not a thing this file has.
+			rather than the rendered heading under the pointer. The component is what is
+			addressed, not a block inside it — a rendered block is not a thing this file has.
 		-->
-		<div class="card" data-id="sequence" data-md data-edit="sequence-md" style="left: 48px; top: 604px; width: 620px">
+		<div class="card" data-id="sequence" data-md style="left: 48px; top: 604px; width: 620px">
 			## The sequence
 
 			1. Tab A and tab B both see a 401.
@@ -115,11 +116,11 @@
 
 
 		<section class="card" data-id="next" style="left: 728px; top: 604px; width: 380px">
-			<h3 data-edit="next-title">Next</h3>
+			<h3>Next</h3>
 			<ul>
-				<li data-edit="next-1">Agree the rotation rule</li>
-				<li data-edit="next-2">Write the lock, with the TTL as a setting</li>
-				<li data-edit="next-3">Reproduce the race in a test before fixing it</li>
+				<li>Agree the rotation rule</li>
+				<li>Write the lock, with the TTL as a setting</li>
+				<li>Reproduce the race in a test before fixing it</li>
 			</ul>
 		</section>
 
@@ -133,7 +134,7 @@
 			instead of breaking it.
 		-->
 		<section class="card claim" data-id="claim" style="left: 1140px; top: 604px; width: 412px; height: 232px">
-			<h3 data-edit="claim-title">One claim, two tabs</h3>
+			<h3>One claim, two tabs</h3>
 			<svg viewBox="0 0 380 160" width="100%" height="160" role="img" aria-label="Both tabs see a 401 and ask; the lock admits one; the loser retries with its answer.">
 				<defs>
 					<marker id="claim-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">

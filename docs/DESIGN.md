@@ -160,7 +160,7 @@ reason.
 <meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}'>
 <link rel="stylesheet" href="../lib/board.css">
 <section class="card" data-id="goal" style="left:40px;top:40px;width:360px">
-  <h3 data-edit="goal-title">Goal</h3>
+  <h3>Goal</h3>
 </section>
 <div data-embed="../papers/oauth.pdf" data-pages="3-5" data-id="spec" …></div>
 <script src="../lib/board.js"></script>
@@ -171,12 +171,11 @@ reason.
 - **Every component carries `data-id`.** It is what makes a board addressable from
   three directions: the agent edits by unique anchor, the stage highlights by id, and
   a user's drag becomes a patch against an id rather than against a pixel.
-- **Every editable run of words carries `data-edit`**, unique within the board. A retype
-  is a patch against that name alone, and a run without one is not retypeable — the
-  convention is the whole mechanism, so the templates, the example deck and the authoring
-  skill all carry it. `data-edit` and not a nested `data-id` because the rule above is the
-  one that defines what a component *is*: a `data-id` inside another component is not a
-  component, and reusing the attribute for parts would blur the only line there is.
+- **A run of words the user can retype is a leaf**: an element holding text and no other
+  elements. Nothing declares it — the shape is the rule, and a retype is addressed by the
+  component's id plus the element-child indices walked in from it (§6.5). What the
+  authoring skill asks for in exchange is one string per leaf: three labelled numbers are
+  three spans, because a row holding three strings is not a leaf and cannot be typed into.
 - `<meta name="poster">` is optional and is the escape hatch for a board too
   expensive to mount at thumbnail size (§7).
 - **The component vocabulary is small, and it is `board.css`'s.** Five classes that mean
@@ -465,7 +464,7 @@ between them they cover most of every kind:
 | | | |
 |---|---|---|
 | **position, size** | drag, resize handle, arrow-key nudge | `update` with `style` |
-| **words** | double-click a named run and retype it, in place or in a source editor | `text`, addressed by `data-edit` |
+| **words** | double-click a run of words and retype it, marks and all, in place or in a source editor | `html` / `text`, addressed by `(id, path)` |
 | **everything else** | the inspector, floating for the selection | `update` with `class` / `attrs`, `rename`, `duplicate`, `order`, `remove` |
 
 Two of those ops existed and nothing reached them: `update` could already carry a
@@ -473,38 +472,103 @@ Two of those ops existed and nothing reached them: `update` could already carry 
 is therefore a UI over the protocol that was already there, and the protocol grew by
 two ops rather than by ten.
 
-**An editable run is one the author named, and the name is the whole address.** A
-`data-edit`, unique within a board, on the leaf element holding the words: a `text`
-patch carries that name and the new text and nothing else. The component is not in the
-patch — the server finds the run and walks up to the nearest `data-id` — because a
-second address in the same message is a second thing that can disagree with the first,
-and the server has to resolve the element anyway to say which component the edit landed
-in.
+**An editable run is a run of words, and its address is where it sits.** A patch carries
+the component's `data-id`, the element-child indices walked into it (`[]` is the component
+itself), the words the browser was showing, and the new content.
 
-Three decisions, in the order they were made.
+Three decisions, and the third of them reversed the second.
 
 *`data-edit`, not a nested `data-id`.* The protocol's one structural rule is that a
 component is a `data-id` on a child of the body, and that a `data-id` *inside* another
-component is therefore not a component — the card around it is. Reusing the attribute
-for parts would blur the only line that defines the vocabulary, and every place that
-resolves a component by id (`elementOf`, `findById`, the stage's highlight) would have
-had to learn "…but only at the top level".
+component is therefore not a component — the card around it is. Reusing the attribute for
+parts would blur the only line that defines the vocabulary, and every place that resolves a
+component by id (`elementOf`, `findById`, the stage's highlight) would have had to learn
+"…but only at the top level". So when runs needed naming, they got an attribute of their
+own.
 
-*A name, not an index path.* Typing used to carry `path: number[]`, the indices of the
-element children walked into from the component, because nothing in a board named its
-runs. The browser computed one from the element under the pointer and parse5 resolved it
-against the file: two derivations of one thing, which agree only where the DOM's shape
-*is* the file's. That held for a hand-written card and failed completely for anything
-`board.js` renders, so markdown was not editable at all — a path into what it drew
-addressed nothing in the file, and the editor had to refuse such a component up front.
-An authored id is the same string on both sides of the wire, so the failure mode moves
-from "silently addresses the wrong element as a board is edited" to "refuses a name
-nothing has". The one wrong answer it can give — two elements with one name — is checked
-rather than resolved to the first match, and `duplicate` mints new names for every run
-inside the copy so the app never creates that case itself. The cost is real and was
-accepted: **a board written before this convention has no retypeable text**, and there is
-no fallback path, because a fallback would be the index path again with its failures
-moved later.
+*A name, not an index path.* Typing carried `path: number[]` first, and it was replaced by
+an authored `data-edit` because a path is two derivations of one thing which agree only
+where the DOM's shape *is* the file's. That held for a hand-written card and failed
+completely for anything `board.js` renders: a path into a `[data-md]` panel's `<h2>`
+addressed nothing in the file, so markdown was not editable at all and the editor had to
+refuse such a component up front. The cost was stated and accepted at the time: **a board
+written before the convention had no retypeable text**, with no fallback, because a
+fallback would be the index path again with its failures moved later.
+
+*A path again, because the reason the name won no longer holds.* Rendered panels are now
+edited as their whole **source**, addressed as one component (below) — so a path is only
+ever resolved where the file's tree really is the DOM's, which is the condition it always
+needed. `data-edit` is gone, and three things went with it. A board nobody annotated now
+has retypeable text, which was the standing complaint the app could only answer with "ask
+the agent for a data-edit on it". `duplicate` no longer mints a fresh name for every run
+inside a copy, which it had to do because a name was unique to the whole board. And the
+`insert` templates no longer name the run they write, which they had to do so that
+double-clicking a new sticky's placeholder was not silently a no-op.
+
+What made it safe to go back is one field. A path is only correct against the file the DOM
+was built from, and the two can come apart: the agent rewrites a board while a frame is
+pinned to the revision it loaded (§7), and the same indices then point at an element the
+user never saw. So the patch carries `before`, the text that was on screen, and the server
+refuses if the file disagrees — whitespace-insensitively, because the file indents a
+paragraph across three lines and the browser hands back what it rendered, so the two never
+agree about spaces and always agree about words.
+
+It is the third guard and almost never fires, which is the point rather than a weakness. A
+stale rev is refused outright by the check that was already there, and a board the agent
+rewrote reloads the frame, which abandons the edit in progress. What is left is the window
+between those two — a rev this client legitimately holds against a DOM that has not caught
+up — and nothing but the content check can see it. The name scheme had no equivalent: its
+one wrong answer, two elements sharing a name, was resolved by counting matches rather than
+by checking what was there.
+
+The affordance follows the same rule. A dotted underline appears under the cursor on a leaf
+(`:not(:has(*))` in the frame's own stylesheet), with rendered panels underlined as a whole
+and their insides, embeds and `<svg>` content excluded at equal specificity so they win on
+order. It used to be `[data-edit]:hover`, which could not lie because the attribute *was*
+the address; this one can be wrong in one direction only — a leaf whose file content turns
+out to be markup a parser built no element for is offered and then refused, which is the
+same class of surprise as any optimistic UI and strictly rarer than the old "there is
+nothing to hover here at all".
+
+*Marks are part of the words, so the payload is markup.* A run like `See <a
+href="…">the doc</a>, then <b>ship it</b>` has no plain-text form: sending the words alone
+throws the link and the bold away, which is why an element with markup in it was refused
+outright at first — the client checked `children.length > 0` and the server checked for `<`
+in the byte range. Both are gone. The element is made `contenteditable` and the user treats
+the marks like text: select across a `<b>`, delete it, type through it, add one with the
+platform's own shortcut. What comes back is the element's **inner HTML** (`op: "html"`), and
+`text` stays for the one payload that really is plain — a rendered panel's source, where a
+`<` the user typed must not become a tag.
+
+Which raises the question the whole op turns on: `innerHTML` out of a `contenteditable` is
+*not* what an author would have written. Engines split and merge marks as the caret crosses
+them, leave `<b></b>` behind after a delete, emit a non-breaking space at an inline edge,
+wrap a line break in a `<div>`, and hand over whatever a paste brought — `style` attributes,
+classes, `<meta>`, `<o:p>`. Writing that into a file an agent reads back would undo the
+property this whole area exists for; the note in `escapeText` records that escaping `>`
+alone was enough to rewrite every line of a Mermaid diagram and make the diff unreadable.
+
+So there is a normaliser (`boards/inline-html.ts`), and it runs on the **server**. That
+placement is the one deliberate difference from "write the new inner HTML into the element":
+the rule about what a board file may contain belongs with the file, so there is a single
+implementation, it is testable without a DOM, and a client that is buggy or is not this app
+cannot write markup a board should not hold. It is a phrasing-content allowlist
+(`INLINE_TAGS`, in the protocol beside `BOX_CLASSES` because both sides ask about it),
+attributes filtered to `class`, `href`, `data-*` and a few more, split marks merged, doubled
+ones flattened, empty ones dropped, non-breaking spaces returned to spaces, `>` returned to
+itself, and everything else **unwrapped to its words** rather than dropped — because for both
+ways a foreign tag arrives, a paste and an engine's line break, the text is what the user
+meant and the element is not. The output is deterministic and idempotent, which is what lets
+a commit that only moved the caret produce no diff at all.
+
+Two consequences worth stating, since they are the cost of the model. **A run is one field,
+however many marks it is made of**: clicking a bold word inside a paragraph opens the
+paragraph, because a field whose caret stops at a mark's edge is worse than no field — so a
+row of two `<span>`s is edited together, and select-all in it means all of it. And **the
+underline had to move with the rule**: it asks `:not(:has(:not(<INLINE_TAGS>)))`, no
+descendant that is not phrasing content, which is exactly the question the server asks of the
+parse tree before it will write a run back. One question, one list, so the affordance cannot
+promise an edit the file then refuses.
 
 *Two editing surfaces, because there are two shapes.* Plain text keeps the in-place
 `contenteditable` it always had: that path preserves the file's own whitespace and
@@ -571,25 +635,14 @@ selector list without checking whether anything else granted it, and `body.board
 — so it is true only of a *nested* `class="panel"`, which was never a component anyway. The
 action was right and the stated failure was worse than the real one.
 
-**A `data-edit` earns a hover underline, and `"false"` is reserved.** The name is the
-whole address (§6.5), so an element carrying one is exactly an editable element — which
-is what makes the affordance safe to draw: a dotted underline under the cursor answers
-"can I type here" where the question is asked, and it cannot promise a retype that will
-then be refused. The other line of this branch arrived at the same underline from the
-opposite direction, as a *hint* over editability that stayed inferred, with
-`data-edit="false"` sealing an element and its subtree. The seal is discarded — under this
-rule there is nothing to seal, because a run with no name is already not editable — but
-`"false"` stays reserved and refused in both places (`Editor.nameOf`, `patch.retype`).
-That is not tidiness. With the name as the address, an author who wrote
-`data-edit="false"` meaning to turn editing off would create an editable run *called*
-`false`, which is the one way this attribute could do the opposite of what it says.
-
 **The inspector is a floating panel, not a sidebar.** It appears at the top right for
 the selection and only above `INTERACT_ZOOM`, the rule the palette already documents —
 below that a board is a tile on a map, its frame takes no pointer events, and there is
-nothing to select. `right: 30px` is load-bearing: the chat panel opens when the cursor
-comes within 26px of the right edge (`lib/panels.ts`), and a panel any closer would
-pull the transcript over itself as you reached for it. A permanent sidebar was the
+nothing to select. `right: 30px` clears the timeline spine, the one thing on that
+edge that has to stay aimable at all times. It used to be measured against something else —
+the transcript panel opened when the cursor came within 26px of the right edge, so anything
+closer pulled the panel over itself as you reached for it — and that panel is gone; the
+number survives it because the spine still wants the room. A permanent sidebar was the
 obvious alternative and it contradicts §7 — the chrome is away by default because the
 canvas is the work. A context menu was the other, and it is a second place to put the
 same rows, reachable only by knowing it is there; the keyboard covers the frequent ones
@@ -606,15 +659,13 @@ HTML: that is re-serialising by hand, and the agent is the fallback editor.
 **Two new ops, both of which had to be ops.** `duplicate` copies the component's own
 source bytes with a handful of attributes rewritten inside the copy, because that is the
 only copy that keeps a card's heading, its paragraph and its list — an `insert` composed
-by the browser would produce the palette's placeholder wearing a new name. Every
-`data-edit` inside the copy is renamed along with the `data-id`, which is not a nicety:
-two components sharing an editable name make a retype of either ambiguous, and it is the
-one way the app could create that case itself. The palette's `insert` writes a
-`data-edit` for the same reason from the other end — the first thing anybody does with a
-new sticky is double-click the placeholder, and a component that had to be named by an
-agent before it could be typed into would look broken. Its name is
-derived from the original's (`goal` → `goal-2`), since an id is the one thing in a
-board a person and an agent both address by hand. `rename` is an op rather than an
+by the browser would produce the palette's placeholder wearing a new name. The `data-id` is
+now the only attribute it rewrites: it used to have to mint a fresh `data-edit` for every
+run inside the copy, because a name was unique to the whole board and two components
+sharing one made a retype of either ambiguous. Two copies have two ids, so an address of
+`(id, path)` distinguishes them by construction. Its name is derived from the original's
+(`goal` → `goal-2`), since an id is the one thing in a board a person and an agent both
+address by hand. `rename` is an op rather than an
 `attrs: { "data-id": … }` write because a name is not an attribute like the others: it
 has to be one a board can use, it has to be one nothing else has, and the op has to
 answer with it. Renaming is worth having despite what it costs — an agent may hold the
@@ -722,7 +773,8 @@ the *turn ends*, on the `result` frame. Doing it where Pi does left every messag
 first with no id, and a message with no id has no rewind, no fork and no board restore.
 
 **The controls live on the user's messages**, one set per turn: `rewind · fork · restore
-boards`, revealed on hover. A user message is the point `navigateTree` accepts and the
+boards`, revealed on hover — on the floating bubbles now that those are the only transcript
+there is (§7), which is what stopped the time machine going with the chat column. A user message is the point `navigateTree` accepts and the
 thing a person recognises, so it is also the natural place to act from — and the server
 pairs each message with the session entry it became (`PiBackend.syncEntryIds`, the field
 `ChatItem.entryId`) precisely so it can be.
@@ -737,7 +789,7 @@ undoing it has to be possible too.
 
 There was a second control for a while — a bar of notches at the bottom right — and it was
 the same list of user messages drawn twice, thirty pixels from the spine. Removed. The
-spine keeps one job (open the chat at a turn) and the messages carry the actions.
+spine keeps one job (open the conversation at a turn) and the messages carry the actions.
 
 ### 6.8 Permissions belong to the runtime, and the app supplies the surface
 
@@ -756,11 +808,39 @@ the app unusable. `capabilities.modes` is empty for Pi, so the control is absent
 present and inert.
 
 Two things this got wrong first, both about visibility rather than policy. The question was
-drawn inside the chat column, which is away by default, so the first thing a Claude agent
+drawn inside the transcript, which is away by default, so the first thing a Claude agent
 asked stopped the turn for a reason nobody could see; it is in the dock above the input bar
 now (§7). And a pending question is replayed in the agent's greeting — it was sent once, to
 a browser that then reloaded, and the agent waited forever on an answer that could no longer
 arrive.
+
+**Signing in is the same surface, used for the app's own question.** `/login` on a Claude
+agent has three steps and an earlier version of it had none of them, which made it a command
+that could not finish what it started:
+
+1. **Which account.** `claude auth login` signs in to a subscription by default and takes
+   `--console` for an Anthropic API account (usage billing) instead — a different account
+   with different billing. Decks asks out loud, in a `select` above the input bar, because a
+   headless login that guessed would sign a Console user into the wrong place and only say
+   so a turn later, when the first request came back unauthorised.
+2. **The URL**, which the CLI writes as an OSC-8 hyperlink: the address appears in the
+   escape sequence *and* again as the visible text, separated by a BEL that `\S+` does not
+   stop at. Matching the raw line therefore returns both copies glued together — not a link
+   anybody can open. `claude/cli-output.ts` strips the escapes first, and its test asserts
+   the naive match really is twice as long.
+3. **Somewhere to paste the code.** What `auth login` actually runs is a paste-the-code
+   flow: it prints the URL, then sits on **stdin**. The child is spawned with a stdin pipe
+   and the login dialog carries a field; the exit code is what says whether the exchange
+   worked (0, credentials written; 1, with the CLI's own "Login failed: …" on stderr).
+
+The auth poll that closes the dialog on its own survives as a fallback, but only when the
+agent was *not* already signed in. Unconditional, it could not tell "signed in" from "was
+already signed in" — so running `/login` to move from a subscription to a Console account
+fired on the first tick, closed the dialog, and reported a sign-in that had not happened,
+leaving the person on the account they were trying to leave.
+
+Nothing is stored by Decks: the credentials are Claude's own, in the user's home, the way an
+interactive `claude` would keep them.
 
 ### 6.9 Files the user drops in
 
@@ -938,24 +1018,91 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
 - **The dock: the last reply, a question if one is waiting, and the input bar.** One
   bottom-centred stack rather than three separately-positioned things, so a question
   appearing pushes the reply up instead of landing on it, and none of them has to know how
-  tall the others are. The first-run hint sits in it too, which is what removed the
-  hardcoded `bottom: 92px` that a taller stack collided with.
+  tall the others are. That is also what removed the hardcoded `bottom: 92px` a taller stack
+  used to collide with; the dock now publishes its measured height as `--dock` instead.
+
+  A first-run hint listing the canvas gestures used to sit at the top of the stack. It is
+  gone: it was a line of chrome under every board on every visit, teaching two things
+  (two-finger scroll, pinch) that the trackpad already teaches on the first try, and naming
+  four more that nobody reads at the moment they would need them.
 
   The reply floating there is the concession the app owes its own thesis. Boards are the
-  medium and the chat column is away by default — but *not needing* the transcript is not
+  medium and the conversation is away by default — but *not needing* the transcript is not
   the same as never seeing a word of it, and a reply that names the board it just wrote is
   worth a glance. So the last one flows above the input bar as it arrives, following the
   text while it streams and returning to the top once it stops, because a finished message
   left scrolled to its end opens mid-sentence and reads as if the start had been lost.
-  Clicking it opens the column; the × waves it away, keyed by message id so dismissing one
-  reply does not silence the next.
+  Clicking it opens the whole history; the × waves it away, keyed by message id so
+  dismissing one reply does not silence the next.
 
   A question goes here too, and only here (§6.8). It used to be a card in the transcript on
   the argument that a question belongs to the conversation that raised it. That argument was
-  right and the placement was still wrong: the column is away, so the first thing a Claude
-  agent asked stopped the turn for a reason nobody could see. Above the input bar it is
-  where the user's hands already are, and it is not a modal — the canvas the question is
-  about stays visible.
+  right and the placement was still wrong: the transcript is away, so the first thing a
+  Claude agent asked stopped the turn for a reason nobody could see. Above the input bar it
+  is where the user's hands already are, and it is not a modal — the canvas the question is
+  about stays visible. Which is also why a field in one of these cards focuses itself: every
+  dialog that has one is asking for something to be typed or pasted *now* — a sign-in code,
+  a name — and a question over the input bar that needs a click before it will take a paste
+  is a question that looks broken.
+
+- **One transcript, and it is bubbles over the boards.** There were two: a 380px sheet that
+  slid in from the right edge with the full history in it, and a translucent condensation of
+  the newest turn floating over the canvas. Two surfaces for one conversation, and the one
+  that could actually be read was the one nobody could find — the sheet was away by default,
+  summoned by a cursor approaching an edge, and everything it could do the float had a
+  dimmer, click-through version of. So the sheet is gone and the bubbles took its job: the
+  whole history, scrollable, with `rewind · fork · restore boards` on each message and a
+  turn's tool calls collapsed to a pill that opens into the same chips the column used.
+
+  Two things had to change with it. It is **deliberate** now — opened from the dock's peek,
+  the title-bar button or a click on the spine, and closed on the × — rather than appearing
+  on its own for every turn, because a surface you can scroll is a surface that swallows the
+  canvas's wheel and one that arrives uninvited would swallow it uninvited. And the column
+  **takes the pointer** while it is up, where it used to be `pointer-events: none` with only
+  its rows as targets: that is a lovely property for something that appears by itself and a
+  broken one for something you have to scroll, since the wheel over a gap between bubbles
+  went to the canvas and the history under the cursor did not move.
+
+  The newest turn sits at the bottom, against the input bar, by an auto margin on the first
+  row rather than `justify-content: flex-end` on the scroller — an auto margin resolves to
+  zero once the content overflows, so the top of a long history stays reachable, where
+  `flex-end` puts the overflow somewhere nothing can scroll to.
+
+- **The agent's replies are markdown, and no HTML is built to render them.** Model output
+  used to be drawn as plain text, on the argument that markdown means HTML means sanitising
+  it — a dependency and an attack surface — to gain bold and bullets in a narrow column. The
+  argument was right about HTML and wrong about the conclusion: an agent writes lists,
+  headings and `code` constantly, and a reply showing its own asterisks makes the reader do
+  the parsing.
+
+  So the text becomes a **token tree** (`chat/markdown.ts`) and the app builds real elements
+  from it (`chat/Markdown.tsx`). There is no `innerHTML` on the path and no sanitiser,
+  because a string of markup is never constructed — every leaf is a string the browser
+  inserts as text. The one remaining way a document can be attacked through structured
+  output is a link target, so that is an allowlist of three schemes: `http:`, `https:`,
+  `mailto:`, and anything else stays the literal text it was. Relative targets are refused
+  along with `javascript:`, for a different reason — following one in a single-page app
+  unloads the socket, the camera and the transcript to show a file.
+
+  Three decisions in the parser are worth knowing:
+
+  - **`_` does not emphasise.** A deliberate break with markdown. Underscores in an agent's
+    replies are names — `file_path`, `MAX_DEPTH`, and above all Python's dunders, where
+    every rule that reads `__` as bold renders `__init__` as **init** and eats the two
+    characters carrying the meaning. No model reaches for `_` to emphasise; they all write
+    `*`. One marker family does emphasis and underscores are literal.
+  - **An unterminated fence is code to the end.** Replies stream, so the half-typed states
+    are the ones a reader watches: parsing an open fence as a paragraph shows three
+    backticks and a run of prose, then snaps into a code block when the closing fence lands.
+  - **A heading is weight, not an outline entry.** `<h1>`–`<h6>` would interleave each
+    reply's structure into the page's heading outline with every other reply in the history,
+    which is a worse document than no headings at all.
+
+  Your own messages stay verbatim. A reply is written *as* markdown; a message you typed is
+  the literal text that was sent, and transforming it would leave you unable to see what the
+  agent actually received. The dock's peek is the third case: too small to draw a list, so it
+  shows the same words with the syntax stripped (`plainText`) rather than raw `**` under a
+  bubble that renders it bold.
 - **A list that scrolls has to be allowed to shrink.** `.side` is the box with a height
   (`top`/`bottom`), and the rail inside it is `flex: 1` — but a flex child defaults to
   `min-height: auto`, which refuses to go below its content. So a rail of fourteen boards
@@ -1061,22 +1208,25 @@ board, talking to the agent and light editing", and everything below serves that
   window the keyboard is covering as `--keyboard`, which the bottom chrome adds to its own
   offset. There is no CSS unit for that inset, and `dvh` describes the wrong thing.
 
-- **Where a cursor cannot hover, the chrome is toggled.** The two floating panels arrive
-  when the cursor approaches an edge, and a finger cannot approach anything: on a phone
-  both panels were unreachable, and worse, a pan that began at the left edge summoned the
-  rail over the canvas mid-gesture. So under `(hover: none)` proximity is off entirely and
-  two buttons in the title bar open the panels, which honours §7's thesis better than an
-  edge that opens by accident. Below 760px they are sheets across the screen and **mutually
-  exclusive** — 200px of rail and 380px of transcript on a 390px phone is two panels and no
-  canvas — and both stop above the dock, so the composer is never what a panel covers.
-  Everything else that was revealed by hovering (a board's `×`, a message's `rewind · fork ·
-  restore boards`) is simply there.
+- **Where a cursor cannot hover, the chrome is toggled.** The board rail arrives when the
+  cursor approaches the left edge, and a finger cannot approach anything: on a phone it was
+  unreachable, and worse, a pan that began at that edge summoned the rail over the canvas
+  mid-gesture. So under `(hover: none)` proximity is off entirely and a button in the title
+  bar opens it, which honours §7's thesis better than an edge that opens by accident. The
+  conversation's button is beside it and is *not* touch-only: it has no edge to be summoned
+  from since the transcript sheet went, so it is the only handle it has and it is drawn for
+  every pointer. Below 760px both are full-width sheets and **mutually exclusive** — 200px
+  of rail and 340px of bubbles on a 390px phone is two surfaces and no canvas — and both
+  stop above the dock, so the composer is never what they cover. Everything else that was
+  revealed by hovering (a board's `×`, a message's `rewind · fork · restore boards`) is
+  simply there.
 
 - **Three media queries, asked about three different things.** `(hover: none)` is about
   *discoverability*, `(pointer: coarse)` is about *size* — nothing moves, the targets grow
   to 40–44px — and a width breakpoint is used only for what is genuinely about width: the
-  dock's clearance, and the panels becoming sheets. Nothing is a separate mobile layout;
-  every rule is an override, and above the thresholds the stylesheet is the app it was.
+  dock's clearance, and the rail and the conversation becoming sheets. Nothing is a separate
+  mobile layout; every rule is an override, and above the thresholds the stylesheet is the
+  app it was.
 
 - **The inspector becomes a bottom sheet, and it is the one place the desktop's reasoning
   does not survive the smaller screen.** Top right is right on a laptop (§6.5). Across the
@@ -1086,7 +1236,7 @@ board, talking to the agent and light editing", and everything below serves that
   already there and the component stays visible above it. It takes the zoom controls' place
   while it is up, because zooming has fingers to do it with.
 
-- **The dock was zero pixels wide.** `width: min(720px, calc(100% - 650px))` is the room
+- **The dock was zero pixels wide.** `width: min(720px, calc(100% - 650px))` was the room
   left beside two panels, and on a 390px screen that is a negative number: the composer was
   18px across with the placeholder broken one letter per line, and the send button was
   unreachable. This is the whole class of bug that only a real device viewport finds, which
@@ -1149,19 +1299,24 @@ section.
 - No session resume, so a restart is a fresh conversation and older sessions are reachable
   only through the Pi CLI. Drawing one would mean rebuilding a transcript from a session
   file — `agents/translator.ts` builds it from live events only.
-- Panel reveal is hover-driven, and where there is no hover the two panels are toggled
-  from the title bar instead and everything hover-revealed is simply shown (§7.1). What
+- The rail's reveal is hover-driven, and where there is no hover it is toggled from the
+  title bar instead and everything hover-revealed is simply shown (§7.1). What
   touch loses with it is the *preview*: `rewind` previews the boards on hover, so on a
   phone the tap is the whole gesture.
 - A diagram drawn as a bare top-level `<svg>` can be selected, renamed, copied and
   deleted but not dragged, resized or retyped — the editor's geometry is `HTMLElement`'s
   and an `SVGElement` has none of it (§6.5). Putting the drawing inside a box component
   is the answer the authoring skill gives, and it costs one wrapper.
-- A board written before `data-edit` has no retypeable text: the name is the whole
-  address and there is no fallback (§6.5). The templates, the example deck and the
-  authoring skill all carry the convention, so what is left is boards an older agent
-  wrote — for those, a retype is a sentence to the agent, which is also what adds the
-  names.
+- Text sitting directly in an element beside markup — the `See` in `<p>See <a>x</a></p>` —
+  has no address of its own, and editing that paragraph replaces the whole run. That is the
+  point of the run being one field, but it means the words either side of a mark cannot be
+  retyped in isolation, and a select-all in a row of two `<span>`s replaces both. The
+  authoring skill's "one string per leaf" advice is what keeps the units the size an author
+  meant.
+- A run is offered as editable from the DOM's shape and accepted from the file's, so a file
+  whose element holds something a parser built no element for — a comment — is offered and
+  then has that comment replaced by the commit. It replaced a worse edge: a board nobody had
+  annotated with `data-edit` had no retypeable text at all.
 - A markdown or Mermaid source containing raw HTML cannot be edited from the app. What
   `board.js` mounted was the element's `textContent`, with the tags already dropped, so
   the browser never had the file's bytes to send back; it is refused rather than

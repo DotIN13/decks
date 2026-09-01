@@ -20,8 +20,8 @@ import { isPdf, type Edit, type Shape } from "./inspect.ts";
  * It appears for the selection and only above `INTERACT_ZOOM`, the same rule the
  * palette follows: below that a board is a tile on a map, its frame takes no pointer
  * events, and there is nothing to select. Top right rather than beside the palette,
- * because the notices land under the palette — and just inside the chat panel's
- * reach, so hovering the inspector does not pull the transcript over it.
+ * because the notices land under the palette — and just inside the timeline spine, which
+ * is the one thing on that edge that has to stay aimable.
  *
  * **The rows are the stylesheet's vocabulary, not an invented one.** `board.css` has
  * four interchangeable box classes and a `data-tone`; `board.js` reads `data-embed`

@@ -16,6 +16,7 @@ import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../ag
 import { parseSlash } from "../agents/slash.ts";
 import { deckContext } from "../agents/context.ts";
 import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
+import { firstUrl, lastLine, plain } from "./cli-output.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";
 import { qualifiedToolName, stageMcpServer } from "./tools.ts";
 
@@ -46,16 +47,30 @@ const CLI_MODE: Record<AgentMode, PermissionMode> = {
 export const CLAUDE_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "plan", "auto"] };
 
 /**
+ * The two accounts Claude Code can be signed in to, and the flag that picks one.
+ *
+ * `claude auth login` defaults to the subscription and takes `--console` for an
+ * Anthropic API account (usage billing) instead — the same choice the interactive CLI
+ * puts on its first screen. Decks has to ask it out loud: a headless login that guessed
+ * would sign a Console user into the wrong account and only say so a turn later, when
+ * the first request came back unauthorised.
+ */
+const LOGIN_METHODS = [
+	{ label: "Claude subscription (Pro or Max)", flag: "--claudeai", noun: "subscription" },
+	{ label: "Anthropic API account (Console, usage billing)", flag: "--console", noun: "API account" },
+] as const;
+
+/**
  * The `/` commands a Claude agent can run, and every one is the deck's own.
  *
  * The CLI does not parse slash commands out of prompts it is handed — `/login` comes
  * back as the model answering "not available in this environment" — so there is no
- * pass-through here. What works headless is what Decks interprets: `/login` asks for
- * an Anthropic API key and applies it to this agent's sessions, `/logout` forgets it,
- * and the rest read state the backend already has.
+ * pass-through here. What works headless is what Decks interprets: `/login` drives the
+ * CLI's own `auth login` through the dock's dialogs, `/logout` runs `auth logout`, and
+ * the rest read state the backend already has.
  */
 export const CLAUDE_COMMANDS: SlashCommand[] = [
-	{ name: "login", hint: "Sign in with a Claude subscription" },
+	{ name: "login", hint: "Sign in with a subscription or an API account" },
 	{ name: "logout", hint: "Sign out of Claude" },
 	{ name: "status", hint: "Model, mode and auth state" },
 	{ name: "doctor", hint: "Check the Claude Code install" },
@@ -113,7 +128,7 @@ export class ClaudeBackend implements AgentBackend {
 	private async hintIfUnauthenticated(): Promise<void> {
 		if (process.env.ANTHROPIC_API_KEY) return;
 		const auth = await claudeAuthStatus();
-		if (!auth.loggedIn) this.context.notice("warn", "Claude isn't signed in — send /login to sign in with your subscription.");
+		if (!auth.loggedIn) this.context.notice("warn", "Claude isn't signed in. Send /login to sign in with your subscription.");
 	}
 
 	// --- the open query --------------------------------------------------------------
@@ -320,13 +335,25 @@ export class ClaudeBackend implements AgentBackend {
 	}
 
 	/**
-	 * Sign in with a Claude subscription.
+	 * Sign in, either way, without a terminal to do it in.
 	 *
-	 * The CLI refuses /login inside a headless session, but its own `auth login`
-	 * subcommand does not: it prints the subscription OAuth URL (and polls it) in any
-	 * environment. So the deck runs that process, surfaces its URL in the transcript,
-	 * and restarts the agent's session once sign-in completes — a new session reads
-	 * the credentials the login process wrote.
+	 * The CLI refuses `/login` inside a headless session, but its own `auth login`
+	 * subcommand does not — and what that subcommand actually does is a *paste-the-code*
+	 * flow: it prints an OAuth URL, then sits on **stdin** waiting for the code the
+	 * browser shows at the end. So there are three things the deck owes the person, and
+	 * an earlier version of this owed them all and paid none:
+	 *
+	 * 1. **Which account.** Subscription or Console are different sign-ins with different
+	 *    billing, and the flag is chosen before the process starts (`LOGIN_METHODS`).
+	 * 2. **The URL**, which arrives wrapped in an OSC-8 hyperlink — the URL is in the
+	 *    escape sequence *and* again as the visible text, so a regex over the raw line
+	 *    matches both at once and yields a doubled, unusable address (`cli-output.ts`).
+	 * 3. **Somewhere to paste the code.** The child is spawned with a stdin pipe for
+	 *    exactly this; with `"ignore"` the flow could only ever time out.
+	 *
+	 * An auth poll stays as a fallback, in case a flow ever completes in the browser
+	 * alone — but only when this agent was *not* already signed in, because otherwise it
+	 * cannot tell a new sign-in from the one already there.
 	 *
 	 * Nothing is stored by Decks itself: the credentials are Claude's own, in the
 	 * user's home, the way an interactive `claude` would keep them.
@@ -338,77 +365,138 @@ export class ClaudeBackend implements AgentBackend {
 			notice("error", "No Claude Code executable to authenticate.");
 			return;
 		}
-		notice("info", "Starting Claude's subscription login…");
-		const child = spawn(binary, ["auth", "login", "--claudeai"], { stdio: ["ignore", "pipe", "pipe"] });
+
+		const chosen = await this.context.bridge
+			.context()
+			.select("Sign in to Claude with…", LOGIN_METHODS.map((method) => method.label));
+		if (!chosen) {
+			notice("info", "/login cancelled.");
+			return;
+		}
+		const method = LOGIN_METHODS.find((candidate) => candidate.label === chosen) ?? LOGIN_METHODS[0];
+
+		// Read before anything is spawned: what "signed in" would *change* is the only
+		// thing that can be observed, and this is the other half of that comparison.
+		const before = await claudeAuthStatus();
+
+		notice("info", `Starting Claude's ${method.noun} login…`);
+		const child = spawn(binary, ["auth", "login", method.flag], { stdio: ["pipe", "pipe", "pipe"] });
 
 		// The URL prints immediately; wait for it rather than racing the process,
-		// because the modal is only worth showing once there is something to open.
+		// because the dialog is only worth showing once there is something to open.
 		let url: string | undefined;
 		let resolveUrl: () => void = () => {};
 		const urlReady = new Promise<void>((resolve) => (resolveUrl = resolve));
 		let stderr = "";
+		/** The last thing the CLI said that was not the URL or its own prompt. */
+		let lastSaid = "";
 		const seenLines = new Set<string>();
 		child.stdout.on("data", (data: Buffer) => {
-			for (const raw of data.toString().split(/\r?\n/)) {
-				const found = /https?:\/\/\S+/.exec(raw);
+			for (const raw of plain(data.toString()).split(/\r?\n/)) {
+				const found = firstUrl(raw);
 				if (found) {
 					if (!url) {
-						url = found[0];
+						url = found;
 						resolveUrl();
 					}
 					continue;
 				}
-				// The CLI's own "Opening browser…" lines, surfaced as they come.
 				const line = raw.trim();
-				if (line && !seenLines.has(line)) {
+				if (!line) continue;
+				// The CLI's own "Paste code here if prompted >" is the dialog's job now;
+				// echoing it into the transcript would be the same request twice, once
+				// somewhere nobody can answer it.
+				if (/paste code/i.test(line)) continue;
+				lastSaid = line;
+				// Its other lines ("Opening browser…"), surfaced as they come.
+				if (!seenLines.has(line)) {
 					seenLines.add(line);
 					notice("info", line);
 				}
 			}
 		});
 		child.stderr.on("data", (data: Buffer) => (stderr += data.toString()));
-		const exited = new Promise<void>((resolve) => child.on("exit", () => resolve()));
+		let exitCode: number | null = null;
+		const exited = new Promise<void>((resolve) =>
+			child.on("exit", (code) => {
+				exitCode = code;
+				resolve();
+			}),
+		);
 		await Promise.race([urlReady, exited, sleep(20_000)]);
 		if (!url) {
 			child.kill();
-			notice("error", stderr.trim().split("\n").at(-1) ?? "Claude's login would not start.");
+			notice("error", lastLine(stderr) || lastSaid || "Claude's login would not start.");
 			return;
 		}
 
-		// The modal: open the link, sign in, and Decks closes the dialog itself the
-		// moment the sign-in lands — the person should not have to come back and click.
+		// The dialog: open the link, sign in, paste what the browser gives back.
 		const modal = this.context.bridge.login(
 			url,
-			"Open the link and sign in with your Claude subscription — this dialog closes on its own once the sign-in lands.",
+			`Open the link and sign in with your ${method.noun}, then paste the code the browser gives you back here.`,
+			"Paste the code from the browser",
 		);
-		let signedIn = false;
-		const poll = setInterval(() => {
-			void claudeAuthStatus().then((auth) => {
-				if (!auth.loggedIn) return;
-				signedIn = true;
-				clearInterval(poll);
-				this.context.bridge.answer({ id: modal.id, confirmed: true });
-			});
-		}, 2500);
 
-		const confirmed = await modal.done;
-		clearInterval(poll);
-		if (!confirmed) {
+		/*
+		 * A watch for credentials appearing, and *only* where that would mean something.
+		 *
+		 * Both flows are paste-the-code flows, so this is a fallback rather than the path —
+		 * but a fallback that cannot tell "signed in" from "was already signed in" is worse
+		 * than none. Running `/login` to move from a subscription to a Console account
+		 * starts from `loggedIn: true`, so an unconditional poll fired on its first tick,
+		 * closed the dialog out from under the person, and reported a sign-in that had not
+		 * happened — leaving them on the account they were trying to leave. So it only runs
+		 * when there is a transition to see.
+		 */
+		const poll = before.loggedIn
+			? undefined
+			: setInterval(() => {
+					void claudeAuthStatus().then((auth) => {
+						if (!auth.loggedIn) return;
+						clearInterval(poll);
+						this.context.bridge.answer({ id: modal.id, confirmed: true });
+					});
+				}, 2500);
+
+		const answer = await modal.done;
+		if (poll) clearInterval(poll);
+		if (answer === false) {
 			child.kill();
 			notice("info", "/login cancelled.");
 			return;
 		}
-		// Confirmed by the poll, or by the click before it landed — hold off on the
-		// restart until the credentials file has actually flipped.
-		for (let attempt = 0; attempt < 6 && !signedIn; attempt++) {
-			signedIn = (await claudeAuthStatus()).loggedIn;
-			if (!signedIn) await sleep(1500);
+		if (typeof answer === "string") {
+			const code = answer.trim();
+			if (!code) {
+				child.kill();
+				notice("warn", "No code to finish the sign-in with. Send /login again.");
+				return;
+			}
+			// What the CLI has been waiting for since it printed the URL.
+			child.stdin?.write(`${code}\n`);
+			notice("info", "Finishing the sign-in…");
+			/*
+			 * The exit code is the answer, not the credentials file.
+			 *
+			 * The CLI exchanges the code, writes its credentials and exits 0, or prints its
+			 * own refusal ("Login failed: Request failed with status code 400") and exits 1.
+			 * Asking `auth status` afterwards instead cannot tell a successful re-login from
+			 * the session that was already there — the same confusion the poll above had.
+			 */
+			await Promise.race([exited, sleep(60_000)]);
+			if (exitCode === null) {
+				child.kill();
+				notice("error", "Claude's login did not finish. Send /login again.");
+				return;
+			}
+			if (exitCode !== 0) {
+				// The CLI's own sentence, where it has one ("Login failed: Request failed
+				// with status code 400"). Prefixing it said "failed" twice in one line.
+				notice("error", lastLine(stderr) || lastSaid || "Claude's login failed.");
+				return;
+			}
 		}
-		if (!signedIn) {
-			notice("warn", "Sign-in not detected yet — the session will pick it up on its next restart.");
-			return;
-		}
-		notice("info", "Signed in to Claude.");
+		notice("info", `Signed in to Claude with your ${method.noun}.`);
 		await this.restart();
 	}
 

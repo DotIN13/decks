@@ -45,11 +45,25 @@ export function coalesce(patches: BoardPatch[]): BoardPatch[] {
 			continue;
 		}
 
-		// Two retypings of the same run of text: the first never existed as far as the
-		// file is concerned. Compared by `edit` alone, which is the whole address now — a
-		// card's heading and its body are two names, not one name and two indices.
-		if (patch.op === "text" && last.op === "text" && last.edit === patch.edit) {
-			out[out.length - 1] = patch;
+		/*
+		 * Two retypings of the same run of words: the first never existed as far as the file
+		 * is concerned. The same run means the same op — a plain-text source and a rich run
+		 * are different payloads — and the same component, and the same path into it: a
+		 * card's heading and its body share an id and differ by one index.
+		 *
+		 * The merge keeps the **first** patch's `before` and the last one's text, which is
+		 * the part that is easy to get wrong. `before` is what the file is expected to hold,
+		 * and the file has seen none of these edits: A→B followed by B→C is A→C, and a
+		 * merged patch claiming the file says `B` would be refused by the very guard that
+		 * exists to catch a genuine race.
+		 */
+		if (
+			(patch.op === "text" || patch.op === "html") &&
+			last.op === patch.op &&
+			last.id === patch.id &&
+			samePath(last.path, patch.path)
+		) {
+			out[out.length - 1] = { ...patch, before: last.before };
 			continue;
 		}
 
@@ -70,3 +84,5 @@ export function coalesce(patches: BoardPatch[]): BoardPatch[] {
 export function needsReload(patches: BoardPatch[]): boolean {
 	return patches.some((patch) => patch.op === "insert" || patch.op === "duplicate");
 }
+
+const samePath = (a: number[], b: number[]) => a.length === b.length && a.every((index, at) => index === b[at]);

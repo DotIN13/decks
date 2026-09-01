@@ -13,6 +13,7 @@ import type {
 	ModelOption,
 	ThinkingLevel,
 } from "@decks/protocol";
+import Info from "lucide-solid/icons/info";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Minus from "lucide-solid/icons/minus";
 import Moon from "lucide-solid/icons/moon";
@@ -28,11 +29,11 @@ import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
 import { Inspector } from "./canvas/Inspector.tsx";
+import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import { Palette } from "./canvas/Palette.tsx";
 import { coalesce, needsReload } from "./canvas/patches.ts";
 import { Stage } from "./canvas/Stage.tsx";
 import { runStageCall } from "./canvas/stage-ops.ts";
-import { Bubbles } from "./chat/Bubbles.tsx";
 import { ChatList } from "./chat/ChatList.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
 import { FloatingTranscript } from "./chat/FloatingTranscript.tsx";
@@ -42,7 +43,7 @@ import { TurnBar, turnsOf, type Turn } from "./chat/TurnBar.tsx";
 import { boxOf, fit, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
 import { connect, type Socket } from "./lib/socket.ts";
 import { embedPath, uploadAsset } from "./lib/upload.ts";
-import { canHover, createPanels } from "./lib/panels.ts";
+import { createPanels, NARROW } from "./lib/panels.ts";
 import { obscured, trackVisualViewport } from "./lib/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 
@@ -139,13 +140,23 @@ export function App() {
 	 */
 	const [dismissed, setDismissed] = createSignal<string | undefined>(undefined);
 	/**
-	 * Whether the conversation floats over the canvas (see `FloatingTranscript`).
+	 * Whether the conversation is up (see `FloatingTranscript`).
 	 *
-	 * Owned here so the dock's peek can give way to it: a reply that is already
-	 * visible as a floating bubble is not also worth a separate bubble over the
-	 * composer.
+	 * This is *the* transcript now — the sheet that used to slide in from the right edge
+	 * is gone — so the flag is no longer only about the dock giving way to it. It is what
+	 * "the conversation is open" means everywhere: the dock's peek stands down, the spine
+	 * stops marking turns as unseen, and an arriving reply is not unread.
 	 */
 	const [chatFloat, setChatFloat] = createSignal(false);
+	/**
+	 * Whether the canvas cheat sheet is open (see `CanvasOps`).
+	 *
+	 * Reference material, behind a button. It was a permanent line of grey text under the
+	 * input bar once, and a tip rotating through the composer's placeholder after that —
+	 * both of which put a reference table where a person is working, so it was either always
+	 * in the way or arriving at a moment nobody asked for it.
+	 */
+	const [ops, setOps] = createSignal(false);
 	/**
 	 * Unread counts, kept here rather than on the server.
 	 *
@@ -393,7 +404,7 @@ export function App() {
 					 * that is because you are in another conversation or because the panel
 					 * is away. Your own messages are not news.
 					 */
-					const unseen = message.agentId !== state.focused || !panels.right.open();
+					const unseen = message.agentId !== state.focused || !chatFloat();
 					if (unseen && item.kind === "assistant") setUnread(message.agentId, (count = 0) => count + 1);
 					setState("transcripts", message.agentId, (items = []) => {
 						const index = items.findIndex((existing) => existing.id === item.id);
@@ -745,7 +756,7 @@ export function App() {
 			const of = files.length > 1 ? `${index + 1} of ${files.length} · ` : "";
 			try {
 				const asset = await uploadAsset(file, (fraction) =>
-					report.update(`${of}${file.name} — ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+					report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
 				);
 				if (asset.reused) reused += 1;
 				inserts.push({
@@ -794,7 +805,7 @@ export function App() {
 		const report = working(`Adding ${file.name}…`);
 		try {
 			const asset = await uploadAsset(file, (fraction) =>
-				report.update(`${file.name} — ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
+				report.update(`${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`),
 			);
 			report.done(`${file.name} added${asset.reused ? " (already in the deck)" : ""}`);
 			// Relative to the board that asked, because a deck is self-contained and an
@@ -825,7 +836,7 @@ export function App() {
 		const path = selected();
 		const board = path ? state.boards.find((candidate) => candidate.path === path) : undefined;
 		if (!board) {
-			notice("info", "Pick a board first — a pasted file becomes an embed, and an embed lives on a board.");
+			notice("info", "Pick a board first. A pasted file becomes an embed, and an embed lives on a board.");
 			return;
 		}
 		if (!editor.enabled()) {
@@ -854,10 +865,10 @@ export function App() {
 		/*
 		 * How tall the dock currently is, published for the stylesheet.
 		 *
-		 * The transcript sheet on a narrow screen sits above the dock, and the dock is a
-		 * stack of however many of "the last reply", "a permission question" and "the
-		 * input bar" are true right now. A constant would be wrong most of the time and
-		 * on top of the composer some of it, so the one thing that knows measures it.
+		 * The conversation stops above the dock, and the dock is a stack of however many of
+		 * "the last reply", "a permission question" and "the input bar" are true right now.
+		 * A constant would be wrong most of the time and on top of the composer some of it,
+		 * so the one thing that knows measures it.
 		 */
 		const dock = document.querySelector(".dock");
 		if (dock) {
@@ -873,8 +884,8 @@ export function App() {
 	/*
 	 * The browser opens a dropped file by default, which would unload the app — socket,
 	 * camera, transcript and all — to show a picture. Guarded on the whole document
-	 * rather than over the canvas, because "anywhere" includes the chat column and the
-	 * gap between boards.
+	 * rather than over the canvas, because "anywhere" includes the rail, the conversation
+	 * and the gap between boards.
 	 *
 	 * Reaching here means the drop missed every live board, since a drop over one is
 	 * consumed inside that frame's document. The answer is a notice and nothing else:
@@ -895,17 +906,46 @@ export function App() {
 					"info",
 					over
 						? "Zoom in until the board is live, then drop the file on it."
-						: "Drop a file onto a board — an embed lives on a board, not on the canvas.",
+						: "Drop a file onto a board. An embed lives on a board, not on the canvas.",
 				);
 			}),
 		);
 	});
 
-	const turns = createMemo(() => turnsOf(transcript(), panels.right.open() ? Number.POSITIVE_INFINITY : seenAt()));
+	const turns = createMemo(() => turnsOf(transcript(), chatFloat() ? Number.POSITIVE_INFINITY : seenAt()));
 
 	createEffect(() => {
-		if (!panels.right.open()) setSeenAt(Date.now());
+		if (!chatFloat()) setSeenAt(Date.now());
 	});
+
+	/**
+	 * Open the conversation, which is also the act of having read it.
+	 *
+	 * Every route in goes through here — the dock's peek, the title-bar button, a click on
+	 * the spine — so none of them can open it and leave an unread badge on the chat that is
+	 * on screen.
+	 */
+	const openChat = (open: boolean) => {
+		setChatFloat(open);
+		if (!open) return;
+		setSeenAt(Date.now());
+		if (state.focused) setUnread(state.focused, 0);
+		// 200px of rail and 340px of bubbles on a 390px phone is two surfaces and no
+		// canvas, so below `NARROW` they take turns. The rail's pinning goes with it: a
+		// pinned panel is one that stays, and one that stays under the thing on top of it
+		// is a panel nobody can see and cannot get rid of.
+		if (window.innerWidth < NARROW) {
+			panels.left.close();
+			if (panels.left.pinned()) panels.left.setPinned(false);
+		}
+	};
+
+	/** The board rail, closing the conversation behind it on a screen too narrow for both. */
+	const toggleRail = () => {
+		const wasOpen = panels.left.open();
+		panels.left.toggle();
+		if (!wasOpen && window.innerWidth < NARROW) setChatFloat(false);
+	};
 
 	const flyTo = (board: Board) => {
 		setSelected(board.path);
@@ -915,15 +955,16 @@ export function App() {
 	};
 
 	/**
-	 * Open the transcript sheet around a turn — the deck's scrub, shared by the
-	 * spine and the floating bubbles.
+	 * Open the conversation around a turn — the deck's scrub, which is what the spine is
+	 * for.
 	 *
-	 * Held rather than pinned: it stays while you read and leaves when you move
-	 * away, without becoming another piece of state to turn off.
+	 * `atTurn` carries a timestamp as well as an id so that clicking the same block twice
+	 * is a new request: the float keys its jump on both and would otherwise treat the
+	 * second click as one it had already carried out.
 	 */
 	const scrubToTurn = (turn: Turn) => {
 		setAtTurn({ id: turn.id, at: Date.now() });
-		panels.right.hold(true);
+		openChat(true);
 	};
 
 	return (
@@ -960,18 +1001,37 @@ export function App() {
 					data-open={panels.left.open()}
 					title="Boards and chats"
 					aria-label="Boards and chats"
-					onClick={() => panels.left.toggle()}
+					onClick={toggleRail}
 				>
 					<Icon of={PanelLeft} size={19} />
 				</button>
+				{/*
+					The conversation, which has no edge to be summoned from any more.
+
+					The board rail beside it is still `.touch-only` — a cursor approaching the
+					left edge brings that one in, so a button would be a second way to do a
+					thing that works. The transcript's edge went with the sheet, so this button
+					is the only handle it has and it is here for every pointer.
+				*/}
 				<button
-					class="icon-button touch-only"
+					class="icon-button"
 					type="button"
-					aria-pressed={panels.right.open()}
-					data-open={panels.right.open()}
+					aria-pressed={ops()}
+					data-open={ops()}
+					title="What you can do on the canvas"
+					aria-label="What you can do on the canvas"
+					onClick={() => setOps(!ops())}
+				>
+					<Icon of={Info} size={18} />
+				</button>
+				<button
+					class="icon-button"
+					type="button"
+					aria-pressed={chatFloat()}
+					data-open={chatFloat()}
 					title="The conversation"
 					aria-label="The conversation"
-					onClick={() => panels.right.toggle()}
+					onClick={() => openChat(!chatFloat())}
 				>
 					<Icon of={MessageSquare} size={19} />
 				</button>
@@ -1033,6 +1093,10 @@ export function App() {
 					onClose={() => setComponent(undefined)}
 				/>
 
+				<Show when={ops()}>
+					<CanvasOps onClose={() => setOps(false)} />
+				</Show>
+
 				<Show when={picking()}>
 					{(request) => (
 						<FilePicker
@@ -1078,16 +1142,17 @@ export function App() {
 					/>
 				</aside>
 
-				<Bubbles
-					agent={focusedChat()}
-					identity={state.focused ? state.identities[state.focused] : undefined}
+				{/*
+				 * The conversation: bubbles over the boards, and the only transcript there is.
+				 *
+				 * The 380px sheet that used to hold the full history is gone — see
+				 * `FloatingTranscript` — so everything that could only be done in it, the time
+				 * machine included, is addressed to a bubble now.
+				 */}
+				<FloatingTranscript
 					items={transcript()}
-					previewing={Boolean(state.preview)}
-					open={panels.right.open()}
-					pinned={panels.right.pinned()}
-					unread={Boolean(state.focused && unread[state.focused])}
-					onPin={panels.right.setPinned}
-					onClose={() => panels.right.close()}
+					open={chatFloat()}
+					onOpenChange={openChat}
 					scrollTo={atTurn()}
 					onPreview={(entryId) => {
 						if (!state.focused) return;
@@ -1114,33 +1179,14 @@ export function App() {
 					}}
 				/>
 
-				<FloatingTranscript
-					items={transcript()}
-					open={chatFloat()}
-					columnOpen={panels.right.open()}
-					onOpenChange={setChatFloat}
-					onScrub={scrubToTurn}
-				/>
-
 				{/*
 				 * The dock: what the agent last said, a question if one is waiting, and the
 				 * input bar. One bottom-centred stack, because these three are the same
-				 * conversation and they should not be in three different places.
+				 * conversation and they should not be in three different places — and a stack
+				 * rather than three offsets so that a question appearing pushes the reply up
+				 * instead of landing on it.
 				 */}
 				<div class="dock">
-					{/* First in the dock, so it sits above whatever else is in it rather than
-					    at a hardcoded offset that a taller stack would collide with. */}
-					{/* The gestures it names have to be gestures this device has: a phone has no
-					    wheel, no space bar and no keys to fit with, and a hint that lists them
-					    is a first-run message that teaches nothing. */}
-					<Show when={state.boards.length > 0}>
-						<div class="hint">
-							{canHover()
-								? "two-finger scroll to pan · pinch or ⌘-wheel to zoom · space-drag anywhere · 0 fit all · 1 fit board"
-								: "drag to pan · pinch to zoom · tap a component to select it, again to retype it · drag a board by its title"}
-						</div>
-					</Show>
-
 					<Show when={state.dialog}>
 						{(prompt) => (
 							<Dialog
@@ -1158,11 +1204,8 @@ export function App() {
 
 					<Latest
 						items={transcript()}
-						columnOpen={panels.right.open() || chatFloat()}
-						onOpen={() => {
-							panels.right.hold(true);
-							setSeenAt(Date.now());
-						}}
+						historyOpen={chatFloat()}
+						onOpen={() => openChat(true)}
 						dismissed={dismissed()}
 						onDismiss={(id) => setDismissed(id)}
 					/>

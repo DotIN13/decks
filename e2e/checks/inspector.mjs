@@ -63,27 +63,31 @@ const original = `<!doctype html>
 		-->
 		<svg class="link" data-id="stale-arrow" data-from="goal" data-to="note"></svg>
 		<section class="card" data-id="goal" style="left: 48px; top: 48px; width: 380px">
-			<h3 data-edit="goal-title">Goal</h3>
-			<p data-edit="goal-body">
+			<h3>Goal</h3>
+			<p>
 				A second tab that wakes up must not spend a token the first tab already
 				spent.
 			</p>
 		</section>
-		<div class="sticky" data-id="note" data-edit="note-text" style="left: 520px; top: 48px; width: 240px">Refresh races</div>
+		<div class="sticky" data-id="note" style="left: 520px; top: 48px; width: 240px">Refresh races</div>
 		<!--
 			Markdown, whose editable is its whole source and not the headings board.js drew
 			from it. Three tabs of indentation like the rest of the file, and a genuinely
 			empty line in the middle: the editor shows this dedented and puts the indentation
 			back, so a commit that changed nothing would write the same bytes.
 		-->
-		<div class="card" data-id="notes" data-md data-edit="notes-md" style="left: 520px; top: 140px; width: 420px; height: 170px">
+		<div class="card" data-id="notes" data-md style="left: 520px; top: 140px; width: 420px; height: 170px">
 			## What lands
 
 			1. The heading above is drawn, not written.
 			2. Only this line changes.
 		</div>
 		<section class="card flow" data-id="diagram" style="left: 48px; top: 320px; width: 380px; height: 220px">
-			<!-- Deliberately unnamed: a run with no data-edit is not retypeable, and says so. -->
+			<!--
+				A heading beside a drawing. It is a leaf holding words, so it retypes like any
+				other — which is the change from the `data-edit` era, where a run nobody had
+				named could not be typed into at all and the app could only say so.
+			-->
 			<h3>The claim</h3>
 			<svg viewBox="0 0 340 120" width="100%" height="120">
 				<rect x="1" y="8" width="96" height="34" rx="6" fill="none" stroke="#888888" />
@@ -163,7 +167,7 @@ try {
 	// --- appearance: the class, then the tone -----------------------------------------
 
 	await page.locator('.inspector button[data-box="callout"]').click();
-	const wantCallout = /<div class="callout" data-id="note" data-edit="note-text" style="left: 520px; top: 48px; width: 240px">Refresh races<\/div>/;
+	const wantCallout = /<div class="callout" data-id="note" style="left: 520px; top: 48px; width: 240px">Refresh races<\/div>/;
 	const toned = await until(fixture, wantCallout);
 	say(
 		"a sticky becomes a callout by its class alone",
@@ -178,7 +182,7 @@ try {
 	say("a callout is offered the tones it has", (await page.locator(".inspector .tones button").count()) === 4);
 
 	await page.locator('.inspector .tones button[data-tone="warn"]').click();
-	const wantTone = /<div class="callout" data-id="note" data-edit="note-text" style="[^"]*" data-tone="warn">/;
+	const wantTone = /<div class="callout" data-id="note" style="[^"]*" data-tone="warn">/;
 	const warned = await until(fixture, wantTone);
 	say(
 		"a tone is one attribute at the end of the tag",
@@ -187,7 +191,7 @@ try {
 	);
 
 	await page.locator('.inspector .tones button[data-tone="default"]').click();
-	const cleared = await until(fixture, /class="callout" data-id="note" data-edit="note-text" style="[^"]*">/);
+	const cleared = await until(fixture, /class="callout" data-id="note" style="[^"]*">/);
 	say(
 		"clearing the tone removes the attribute rather than emptying it",
 		!cleared.includes("data-tone") && cleared.includes('class="callout" data-id="note"'),
@@ -212,10 +216,10 @@ try {
 	await frame().locator('[data-id="goal"] h3').dblclick();
 	await page.keyboard.type("Ship it");
 	await page.keyboard.press("Meta+Enter");
-	const retyped = await until(fixture, /<h3 data-edit="goal-title">Ship it<\/h3>/);
+	const retyped = await until(fixture, /<h3>Ship it<\/h3>/);
 	say(
 		"a named run inside a card can be retyped in place",
-		retyped.includes('<h3 data-edit="goal-title">Ship it</h3>'),
+		retyped.includes('<h3>Ship it</h3>'),
 		retyped.split("\n").find((line) => line.includes("Ship it"))?.trim(),
 	);
 	say(
@@ -229,7 +233,7 @@ try {
 	const body = await until(fixture, /One session, two tabs\./);
 	say(
 		"the body is a second name, not a second index",
-		/<p data-edit="goal-body">\n\t\t\t\tOne session, two tabs\.\n\t\t\t<\/p>/.test(body),
+		/<p>\n\t\t\t\tOne session, two tabs\.\n\t\t\t<\/p>/.test(body),
 		body.split("\n").find((line) => line.includes("One session"))?.trim(),
 	);
 
@@ -240,15 +244,28 @@ try {
 	 * editable under it falls through to the stage's own shortcuts, and `V S C T E` arm the
 	 * palette, so the next click would insert a component instead of selecting one.
 	 */
-	const beforeUnnamed = read(fixture);
 	await frame().locator('[data-id="diagram"] h3').dblclick();
-	await page.keyboard.type("Zoo");
+	await page.keyboard.type("The claim, restated");
 	await page.keyboard.press("Meta+Enter");
-	await page.waitForTimeout(600);
+	const unnamed = await until(fixture, /<h3>The claim, restated<\/h3>/);
 	say(
-		"a run with no data-edit is not editable, and says why",
-		read(fixture) === beforeUnnamed &&
-			(await page.locator(".notice").allTextContents()).some((text) => text.includes("data-edit")),
+		"a run nobody named retypes, because being a leaf is the whole qualification",
+		unnamed.includes("<h3>The claim, restated</h3>"),
+		unnamed.split("\n").find((line) => line.includes("The claim"))?.trim(),
+	);
+
+	/*
+	 * And the box around it refuses, which is the other half of the same rule. A `.card`
+	 * holding a heading and an `<svg>` is not a leaf, so there is nothing a plain-text
+	 * replacement could be written into without throwing the drawing away.
+	 */
+	const beforeBox = read(fixture);
+	await frame().locator('[data-id="diagram"]').dblclick({ position: { x: 300, y: 4 } });
+	await page.waitForTimeout(700);
+	say(
+		"the box around it is not, and says why rather than flattening it",
+		read(fixture) === beforeBox &&
+			(await page.locator(".notice").allTextContents()).some((text) => text.includes("Double-click the words themselves")),
 		(await page.locator(".notice").allTextContents()).join(" | ") || "no notice",
 	);
 
@@ -331,9 +348,9 @@ try {
 		copied.split("\n").find((line) => line.includes('data-id="objective-2"'))?.trim(),
 	);
 	say(
-		"and it keeps what the component is made of, with every editable inside it renamed",
-		copied.includes('<h3 data-edit="goal-title">Ship it</h3>') && copied.includes('<h3 data-edit="goal-title-2">Ship it</h3>'),
-		(copied.match(/data-edit="goal-[^"]*"/g) ?? []).join(" "),
+		"and it keeps what the component is made of, with only its own name rewritten",
+		(copied.match(/<h3>Ship it<\/h3>/g) ?? []).length === 2 && !copied.includes("data-edit"),
+		`${(copied.match(/<h3>Ship it<\/h3>/g) ?? []).length} headings, data-edit present: ${copied.includes("data-edit")}`,
 	);
 
 	// --- order, and a delete that leaves the screen as well as the file ----------------

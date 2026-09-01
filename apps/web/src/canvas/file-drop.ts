@@ -194,7 +194,7 @@ export function attachFrameDrop(frame: HTMLIFrameElement, host: FileDropHost): (
  * The browser's default for a file dropped anywhere is to navigate to it, which
  * unloads the SPA — the socket, the camera, the transcript, all of it — to show a
  * PNG. That has to be refused globally rather than over the boards, because
- * "anywhere" includes the chat column, the rail and the gap between boards.
+ * "anywhere" includes the conversation, the rail and the gap between boards.
  *
  * A drop that reaches here missed every board, since a drop over a live frame is
  * consumed inside that frame's document. So this is also where the honest answer to

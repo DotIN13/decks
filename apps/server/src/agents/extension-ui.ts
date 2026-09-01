@@ -94,14 +94,16 @@ export class ExtensionUiBridge {
 	}
 
 	/**
-	 * A sign-in modal: the URL to open, and Done/Cancel to say how it went.
+	 * A sign-in dialog: the URL to open, and the code the browser gives back.
 	 *
-	 * The caller keeps the id so it can close the modal itself the moment the sign-in
-	 * is detected — a flow that finishes in the browser before the person clicks Done
-	 * should not wait for the click.
+	 * Three answers, because a real OAuth flow has three endings. A **string** is the
+	 * code the person pasted, which is what the CLI is sitting on stdin waiting for.
+	 * **`true`** is the caller closing its own dialog because the credentials landed
+	 * without a paste — it keeps the id for exactly that. **`false`** is cancelled, and
+	 * it is the fallback too, so an abandoned sign-in denies rather than hangs.
 	 */
-	login(url: string, message: string, options?: DialogOptions): { id: string; done: Promise<boolean> } {
-		return this.askRaw<boolean>({ method: "login", title: "Sign in to Claude", message, url }, false, options);
+	login(url: string, message: string, placeholder: string, options?: DialogOptions): { id: string; done: Promise<string | boolean> } {
+		return this.askRaw<string | boolean>({ method: "login", title: "Sign in to Claude", message, url, placeholder }, false, options);
 	}
 
 	/** A modal of informational figures, dismissed with OK (the value is never used). */

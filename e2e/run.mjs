@@ -32,6 +32,7 @@ const CHECKS = [
 	{ file: "editing.mjs", needsAgent: false },
 	{ file: "inspector.mjs", needsAgent: false },
 	{ file: "invented-component.mjs", needsAgent: false },
+	{ file: "rich-text.mjs", needsAgent: false },
 	{ file: "file-drop.mjs", needsAgent: false },
 	{ file: "no-flicker.mjs", needsAgent: false },
 	{ file: "tiers.mjs", needsAgent: false },

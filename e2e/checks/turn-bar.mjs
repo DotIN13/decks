@@ -1,5 +1,5 @@
 /**
- * The turn spine: one block per turn, click to open the chat around it.
+ * The turn spine: one block per turn, click to open the conversation around it.
  *
  * Needs a model: the blocks are turns.
  */
@@ -29,12 +29,12 @@ await settle(page, 800);
 
 const working = await page.evaluate(() => ({
 	blocks: document.querySelectorAll(".turnbar .turn").length,
-	chatOpen: document.querySelector(".chat")?.dataset.open,
+	chatOpen: document.querySelector(".chat-float")?.dataset.open ?? "false",
 	composerBusy: document.querySelector(".composer .send")?.dataset.busy,
 }));
 say("a turn appears on the spine", working.blocks === 1, `${working.blocks} block(s)`);
 say("the live turn shows as running", sawRunning);
-say("the chat does not barge in", working.chatOpen === "false");
+say("the conversation does not barge in", working.chatOpen === "false");
 say("the send button is back to send", working.composerBusy === "false", `busy=${working.composerBusy}`);
 
 await ask(page, "Now say the single word: omega");
@@ -47,15 +47,15 @@ say("each turn is its own block", after.blocks === 2, `${after.blocks} blocks`);
 say("turns you have not seen are marked", after.unseen >= 1, `${after.unseen} unseen`);
 
 /*
- * A reply long enough that the column can actually scroll.
+ * A reply long enough that the history can actually scroll.
  *
- * Everything below is about *where* the column is scrolled to, and with three one-word turns
+ * Everything below is about *where* the history is scrolled to, and with three one-word turns
  * there is nowhere to be: "at the turn you clicked" and "at the bottom" are the same pixel,
  * and the assertions pass whatever the code does. That is not hypothetical — this check
  * asserted "opens around that turn rather than at the bottom" for a long time while the
  * feature was in fact landing at the bottom, because it could never scroll.
  *
- * It also has to come *before* the first click, and the column must not be opened in the
+ * It also has to come *before* the first click, and the history must not be opened in the
  * meantime: the defect below only reproduces on a jump that starts from the bottom of a long
  * transcript, which is the ordinary case and was the one nobody could measure.
  */
@@ -63,14 +63,14 @@ await ask(page, "Count from 1 to 60. Just the numbers, one per line, nothing els
 await settle(page, 800);
 say("three turns, three blocks", (await page.locator(".turnbar .turn").count()) === 3);
 
-// Click the first block: the panel comes out at that turn, not at the bottom.
+// Click the first block: the history comes out at that turn, not at the bottom.
 await page.locator(".turnbar .turn").first().click();
-await page.waitForFunction(() => document.querySelector(".chat")?.dataset.open === "true", null, { timeout: 8000 });
+await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "true", null, { timeout: 8000 });
 await settle(page, 900);
 const opened = await page.evaluate(() => {
-	const chat = document.querySelector(".chat");
-	const stream = chat?.querySelector(".stream");
-	const first = stream?.querySelector('.bubble[data-who="user"]');
+	const chat = document.querySelector(".chat-float");
+	const stream = chat?.querySelector(".fsroll");
+	const first = stream?.querySelector('.fbubble[data-who="user"]');
 	const streamBox = stream?.getBoundingClientRect();
 	const firstBox = first?.getBoundingClientRect();
 	return {
@@ -80,18 +80,20 @@ const opened = await page.evaluate(() => {
 		overflow: stream ? Math.round(stream.scrollHeight - stream.clientHeight) : 0,
 	};
 });
-say("clicking a block opens the chat", opened.open === "true");
+say("clicking a block opens the conversation", opened.open === "true");
 say("…marks that block as the one shown", opened.current === 1);
-say("the transcript is taller than the column, so the rest means something", opened.overflow > 300, `${opened.overflow}px of overflow`);
+say("the transcript is taller than the history, so the rest means something", opened.overflow > 300, `${opened.overflow}px of overflow`);
 say("…and opens around that turn rather than at the bottom", opened.offset !== null && Math.abs(opened.offset) < 80, `${opened.offset}px from the top`);
 
-await page.mouse.move(700, 500);
-await page.waitForFunction(() => document.querySelector(".chat")?.dataset.open === "false", null, { timeout: 8000 });
-say("moving away closes it again", true);
+// The × is the way out now: the conversation is not summoned by proximity any more, so
+// moving the cursor away leaves it exactly where it is.
+await page.locator(".chat-float .fclose").click();
+await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "false", null, { timeout: 8000 });
+say("the close button puts it away", true);
 say("the marks clear once seen", (await page.evaluate(() => document.querySelectorAll('.turnbar .turn[data-unseen="true"]').length)) === 0);
 
 /*
- * The jump happens once, not every time the column opens.
+ * The jump happens once, not every time the history opens.
  *
  * `scrollTo` is not a one-shot: the spine reads it to mark which block you are looking at,
  * so `App` keeps it set and only clears it when the agent changes. The scrolling effect also
@@ -99,27 +101,26 @@ say("the marks clear once seen", (await page.evaluate(() => document.querySelect
  * replayed the jump to a turn clicked long ago. Scrolling down was pointless, because the
  * next frame threw you back up, and that is what made the transcript unusable.
  */
-const edge = page.viewportSize()?.width ?? 1500;
 const stream = () =>
 	page.evaluate(() => {
-		const box = document.querySelector(".chat .stream");
+		const box = document.querySelector(".chat-float .fsroll");
 		if (!box) return null;
 		return { top: Math.round(box.scrollTop), slack: Math.round(box.scrollHeight - box.scrollTop - box.clientHeight) };
 	});
 const openColumn = async () => {
-	await page.mouse.move(edge - 6, 480);
-	await page.waitForFunction(() => document.querySelector(".chat")?.dataset.open === "true", null, { timeout: 8000 });
+	await page.locator('.titlebar button[title="The conversation"]').click();
+	await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "true", null, { timeout: 8000 });
 	await settle(page, 700);
 };
 const closeColumn = async () => {
-	await page.mouse.move(700, 500);
-	await page.waitForFunction(() => document.querySelector(".chat")?.dataset.open === "false", null, { timeout: 8000 });
+	await page.locator(".chat-float .fclose").click();
+	await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "false", null, { timeout: 8000 });
 };
 
 await openColumn();
 // Read to the end, the way somebody would after being dropped at an old turn.
 await page.evaluate(() => {
-	const box = document.querySelector(".chat .stream");
+	const box = document.querySelector(".chat-float .fsroll");
 	if (box) box.scrollTop = box.scrollHeight;
 });
 await settle(page, 400);

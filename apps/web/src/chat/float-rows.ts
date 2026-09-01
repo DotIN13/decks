@@ -1,5 +1,8 @@
 import type { ChatItem } from "@decks/protocol";
 
+/** A tool call as the transcript carries it. */
+export type ToolItem = Extract<ChatItem, { kind: "tool" }>;
+
 /**
  * One bubble in the floating transcript, addressed to the turn it belongs to.
  *
@@ -9,8 +12,8 @@ import type { ChatItem } from "@decks/protocol";
  */
 export type FloatRow =
 	| { kind: "user"; id: string; turnId: string; text: string }
-	| { kind: "assistant"; id: string; turnId: string; text: string; streaming: boolean }
-	| { kind: "tools"; id: string; turnId: string; names: string[]; running: boolean; failed: boolean }
+	| { kind: "assistant"; id: string; turnId: string; text: string; streaming: boolean; thinking?: string }
+	| { kind: "tools"; id: string; turnId: string; calls: ToolItem[]; running: boolean; failed: boolean }
 	| { kind: "notice"; id: string; turnId: string; text: string; level: "info" | "warn" | "error" };
 
 /**
@@ -22,6 +25,12 @@ export type FloatRow =
  * slim lines. An assistant bubble that exists only between a turn starting and
  * its first token has nothing to float — it is skipped until there is text or
  * it is streaming.
+ *
+ * The collapsed row keeps the **whole call**, not just its name. The float is the
+ * only transcript there is now — the chat column it used to summarise is gone — so
+ * "3 tool calls" has to be something you can open, and what a person opens it for is
+ * the output. Collapsed is the default and the detail is one click away, which is the
+ * same bargain a tool chip has always made with its own output.
  */
 export function floatRows(items: ChatItem[]): FloatRow[] {
 	const rows: FloatRow[] = [];
@@ -32,7 +41,14 @@ export function floatRows(items: ChatItem[]): FloatRow[] {
 		if (item.kind === "user") turnId = item.id;
 		if (item.kind === "assistant") {
 			if (!item.text.trim() && !item.streaming) continue;
-			rows.push({ kind: "assistant", id: item.id, turnId, text: item.text, streaming: item.streaming === true });
+			rows.push({
+				kind: "assistant",
+				id: item.id,
+				turnId,
+				text: item.text,
+				streaming: item.streaming === true,
+				...(item.thinking?.trim() ? { thinking: item.thinking } : {}),
+			});
 			continue;
 		}
 		if (item.kind === "notice") {
@@ -48,7 +64,7 @@ export function floatRows(items: ChatItem[]): FloatRow[] {
 		if (last?.kind === "tools" && last.turnId === turnId) {
 			rows[rows.length - 1] = {
 				...last,
-				names: [...last.names, item.name],
+				calls: [...last.calls, item],
 				running: last.running || item.state === "running",
 				failed: last.failed || item.state === "error",
 			};
@@ -58,7 +74,7 @@ export function floatRows(items: ChatItem[]): FloatRow[] {
 			kind: "tools",
 			id: item.id,
 			turnId,
-			names: [item.name],
+			calls: [item],
 			running: item.state === "running",
 			failed: item.state === "error",
 		});

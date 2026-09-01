@@ -1,10 +1,14 @@
 /**
- * The title bar: the mark, the name, and a theme toggle that is an icon.
+ * The title bar: the mark, the name, the conversation, and a theme toggle that is an icon.
  *
- * The toggle is addressed as `.icon-button.theme` rather than as "the first icon button",
- * because it no longer is one: two panel toggles sit before it and they are there only
- * where the pointer cannot hover (`index.css`). That they are *absent* at this width is
- * asserted below — a desktop title bar with three buttons on it would be a regression.
+ * The theme toggle is addressed as `.icon-button.theme` rather than as "the first icon
+ * button", because it is not one: the conversation's button sits before it, and before
+ * that the board rail's — which is `.touch-only`, drawn only where the pointer cannot
+ * hover (`index.css`), because a cursor summons the rail from the left edge instead.
+ *
+ * The conversation has no such edge since the transcript sheet went, so its button is
+ * drawn at every width. Both facts are asserted below: the rail's toggle absent here, the
+ * conversation's present.
  */
 import { open, say } from "../harness.mjs";
 
@@ -22,8 +26,12 @@ const bar = await page.evaluate(() => {
 		buttonHasIcon: Boolean(button.querySelector("svg")),
 		buttonText: button.textContent.trim(),
 		fromRightEdge: Math.round(innerWidth - button.getBoundingClientRect().right),
-		// Present in the markup, and not drawn: the panels are reached by hovering here.
+		// Present in the markup, and not drawn: the rail is reached by hovering here.
 		touchOnly: [...titlebar.querySelectorAll(".touch-only")].map((element) => getComputedStyle(element).display),
+		chat: (() => {
+			const element = titlebar.querySelector('.icon-button[title="The conversation"]');
+			return element ? { display: getComputedStyle(element).display, touchOnly: element.classList.contains("touch-only") } : null;
+		})(),
 	};
 });
 say("the bar says only Decks", bar.text === "Decks", JSON.stringify(bar.text));
@@ -33,9 +41,14 @@ say("no directory is shown", !bar.text.includes("/"), bar.text);
 say("the toggle is an icon, not a word", bar.buttonHasIcon && bar.buttonText === "", `text=${JSON.stringify(bar.buttonText)}`);
 say("the toggle sits on the right", bar.fromRightEdge <= 16, `${bar.fromRightEdge}px from the edge`);
 say(
-	"the touch-only panel toggles are not drawn where there is a cursor",
-	bar.touchOnly.length === 2 && bar.touchOnly.every((display) => display === "none"),
+	"the rail's toggle is the only touch-only one, and is not drawn where there is a cursor",
+	bar.touchOnly.length === 1 && bar.touchOnly[0] === "none",
 	JSON.stringify(bar.touchOnly),
+);
+say(
+	"the conversation's button is drawn for a cursor too — it has no edge to be summoned from",
+	bar.chat !== null && bar.chat.display !== "none" && bar.chat.touchOnly === false,
+	JSON.stringify(bar.chat),
 );
 
 const shape = () =>

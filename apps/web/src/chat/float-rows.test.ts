@@ -13,7 +13,7 @@ test("user and assistant items become bubbles, tools collapse into one row", () 
 	assert.deepEqual(rows.map((row) => row.kind), ["user", "assistant", "tools", "user", "assistant"]);
 	const tools = rows[2];
 	assert.equal(tools?.kind, "tools");
-	if (tools?.kind === "tools") assert.deepEqual(tools.names, ["read_file", "write_file"]);
+	if (tools?.kind === "tools") assert.deepEqual(tools.calls.map((call) => call.name), ["read_file", "write_file"]);
 });
 
 test("tool rows remember the worst state — running or error", () => {

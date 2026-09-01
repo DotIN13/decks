@@ -1,4 +1,4 @@
-import type { BoardPatch, ComponentKind, Rect } from "@decks/protocol";
+import { INLINE_TAGS, type BoardPatch, type ComponentKind, type Rect } from "@decks/protocol";
 import { cameraMovedSince } from "./pan-signal.ts";
 
 /**
@@ -142,26 +142,49 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * An editable run says so under the cursor. (No backticks in here: this is a
 		 * template literal, and one would end it.)
 		 *
-		 * Kept from the other line of this branch, where the attribute was an optional
-		 * hint over inferred editability. It is a better affordance under this rule than
-		 * it was under that one: there, an underline could appear on a run the two hard
-		 * rules would then refuse — a leaf whose content is markup, a heading a
-		 * [data-md] only rendered — and promise something that would not happen. Here an
-		 * element carrying a data-edit is exactly an editable one, so the underline
-		 * cannot lie.
+		 * Inferred from the shape, and the shape is "a run of words rather than a layout of
+		 * blocks": an element with no descendant outside INLINE_TAGS. That is
+		 * :not(:has(:not(<the list>))) — no descendant that is not inline — which is exactly
+		 * the question the server asks of the parse tree before it will write a run back
+		 * (isRichRun in boards/inline-html.ts). One question, one list, so the underline
+		 * cannot promise an edit the file then refuses.
 		 *
-		 * The false exclusion is not a seal. Nothing is sealed any more; the value is
-		 * simply refused as an address (see patch.ts retype), so it must not be offered.
+		 * It used to be [data-edit]:hover, a name the author wrote, which made the promise
+		 * exact at the price of there being nothing to hover on a board nobody had annotated.
+		 * Then it was :not(:has(*)) — a leaf — which was right while only plain text could be
+		 * retyped and too narrow the moment a paragraph with a link in it became one field.
 		 *
-		 * Only on hover, and only an underline: the point is to answer "can I type here"
-		 * at the moment somebody wonders, not to draw boxes over a finished board. It
-		 * needs no zoom guard — below INTERACT_ZOOM the frame takes no pointer events, so
-		 * nothing in it can be hovered.
+		 * The exclusions come after, at equal specificity, so they win on order: what is on
+		 * screen inside a rendered panel is markup board.js drew and has no byte range in the
+		 * file, an embed is somebody else's document, and a word in a drawing is placed by
+		 * the drawing's own coordinates. A panel as a whole *is* editable, as its source.
+		 *
+		 * An inline element inside a run matches this too, so hovering a bold word underlines
+		 * both it and the paragraph around it. That is not a bug worth selector gymnastics:
+		 * the paragraph's underline already spans the word, and the pair renders as one line.
+		 *
+		 * Only on hover, and only an underline: the point is to answer "can I type here" at
+		 * the moment somebody wonders, not to draw boxes over a finished board. It needs no
+		 * zoom guard — below INTERACT_ZOOM the frame takes no pointer events, so nothing in
+		 * it can be hovered.
 		 */
-		[data-edit]:not([data-edit="false"]):hover {
+		[data-id] *:not(:has(:not(${INLINE_TAGS.join(", ")}))):hover,
+		[data-id]:not(:has(:not(${INLINE_TAGS.join(", ")}))):hover,
+		[data-md]:hover,
+		[data-mermaid]:hover {
 			text-decoration: underline dotted var(--b-faint, #9aa0aa);
 			text-underline-offset: 3px;
 			cursor: text;
+		}
+
+		[data-md] *:hover,
+		[data-mermaid] *:hover,
+		[data-embed]:hover,
+		[data-embed] *:hover,
+		svg:hover,
+		svg *:hover {
+			text-decoration: none;
+			cursor: inherit;
 		}
 	`;
 	doc.head.appendChild(style);
@@ -491,22 +514,26 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	// --- typing -------------------------------------------------------------------------
 
 	/**
-	 * What is being typed into, and how the patch will name it.
+	 * What is being typed into, and how the patch will address it.
 	 *
-	 * `edit` is the whole address: the `data-edit` its author wrote on the run, unique
-	 * within the board, and the same string on both sides of the wire (§6.5). It
-	 * replaced a path of child indices, which the browser computed and the server
-	 * resolved — two derivations of one thing, which agreed only for components whose
-	 * DOM shape was the file's.
+	 * `id` and `path` are the address: the component, and the element-child indices walked
+	 * into it. `before` is what was on screen when typing started, and the server compares
+	 * it against the file — a frame is pinned to the revision it loaded, so the same
+	 * indices can point somewhere else by the time the patch lands, and that comparison is
+	 * what turns a silent wrong write into a refusal.
 	 *
 	 * Two shapes, because there are two surfaces. A `run` is typed in place. A `source`
 	 * is the whole of a `[data-md]` or `[data-mermaid]` component, typed in a textarea
 	 * over it, and carries the `indent` its lines were stripped of so they can be put
 	 * back exactly where the file had them.
 	 */
+	interface Address {
+		id: string;
+		path: number[];
+	}
 	let editing:
-		| { kind: "run"; element: HTMLElement; edit: string; before: string }
-		| { kind: "source"; element: HTMLElement; area: HTMLTextAreaElement; edit: string; before: string; indent: string }
+		| ({ kind: "run"; element: HTMLElement; before: string; markup: string } & Address)
+		| ({ kind: "source"; element: HTMLElement; area: HTMLTextAreaElement; before: string; indent: string } & Address)
 		| undefined;
 
 	/** Whether a node is inside whatever is being typed into — including the textarea. */
@@ -531,12 +558,24 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 
 		if (active.kind === "run") {
 			active.element.contentEditable = "false";
-			const text = active.element.textContent ?? "";
-			if (!commit || text === active.before) {
-				active.element.textContent = active.before;
+			/*
+			 * The element's markup, not its text, because a run may have marks in it.
+			 *
+			 * `textContent` would flatten `See <a>the doc</a>` to `See the doc` and throw the
+			 * link away, which is why a marked-up run used to be refused rather than offered.
+			 * What goes down the wire is whatever the engine produced; `inline-html.ts` on the
+			 * server decides what a file may hold, so nothing here has to guess.
+			 *
+			 * `before` stays the *text*, because that is what the race guard compares — two
+			 * serialisations of one document differ in ways that mean nothing and agree about
+			 * words. `markup` is the separate question of whether this edit changed anything.
+			 */
+			const markup = active.element.innerHTML;
+			if (!commit || markup === active.markup) {
+				active.element.innerHTML = active.markup;
 				return;
 			}
-			host.patch(path, [{ op: "text", edit: active.edit, text }]);
+			host.patch(path, [{ op: "html", id: active.id, path: active.path, before: active.before, html: markup }]);
 			return;
 		}
 
@@ -557,7 +596,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * screen — for a rendered component only `board.js` can.
 		 */
 		void runtime()?.redraw?.(active.element, source);
-		host.patch(path, [{ op: "text", edit: active.edit, text: source }]);
+		host.patch(path, [{ op: "text", id: active.id, path: active.path, before: active.before, text: source }]);
 	};
 
 	/**
@@ -569,7 +608,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	 * editor holding what the author actually wrote is both simpler and the only version
 	 * that can add a line.
 	 */
-	const openSource = (element: HTMLElement, edit: string, mouse: boolean): boolean => {
+	const openSource = (element: HTMLElement, at: Address, mouse: boolean): boolean => {
 		const raw = runtime()?.source?.(element);
 		if (raw === undefined) {
 			// Only reachable before `board.js` has mounted, or in a board that loaded an
@@ -594,7 +633,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		doc.body.appendChild(area);
 		area.focus();
 		area.setSelectionRange(text.length, text.length);
-		editing = { kind: "source", element, area, edit, before: text, indent };
+		editing = { kind: "source", element, area, ...at, before: text, indent };
 		// The editor's own box, not the component's: on a phone the keyboard takes the
 		// bottom half of the screen and the thing being typed is what has to stay in view.
 		host.reveal(path, { x: box.left, y: box.top, w: box.width ?? 0, h: Math.max(box.height ?? 0, 180) });
@@ -602,23 +641,74 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	};
 
 	/**
-	 * The name an element carries, or `undefined` if it has none to carry.
+	 * Whether this element's content is a run of words rather than a layout of blocks.
 	 *
-	 * `"false"` is reserved and is never an address. The other line of this branch had
-	 * `data-edit="false"` seal an element and its subtree, over editability that was
-	 * otherwise inferred; that seal is discarded, because under this rule nothing is
-	 * editable unless it was named and so omitting the name already *is* the seal.
-	 *
-	 * The value is still refused rather than left undocumented, and this is the reason.
-	 * An author who read that other guidance would write `data-edit="false"` meaning to
-	 * turn editing off, and with the name *as* the address it would do the exact
-	 * opposite: mint an editable run called `false` that anybody can double-click. The
-	 * server refuses the same value (`retype` in patch.ts), so the reservation holds
-	 * whether or not it was this UI that sent the patch.
+	 * The browser's half of the question the server asks of the parse tree (`isRichRun` in
+	 * `boards/inline-html.ts`), off one shared list so the two cannot drift. A `<p>` holding
+	 * `<b>` and `<a>` is one run of rich text; a `<section>` holding an `<h3>` and a `<p>` is
+	 * two runs with a box around them, and writing one field over that would replace a
+	 * heading and a paragraph with a line.
 	 */
-	const nameOf = (element: HTMLElement): string | undefined => {
-		const name = element.dataset.edit;
-		return name === undefined || name === "false" ? undefined : name;
+	const inline = new Set<string>(INLINE_TAGS);
+	const isRun = (element: Element): boolean => {
+		for (const node of element.querySelectorAll("*")) {
+			if (!inline.has(node.tagName.toLowerCase())) return false;
+		}
+		return true;
+	};
+
+	/**
+	 * The whole run the pointer landed in, which is usually not the element it landed on.
+	 *
+	 * A double-click on a bold word lands on the `<b>`, and editing the `<b>` alone would be
+	 * a field you cannot type out of: the caret would stop at the mark's edges. The unit a
+	 * person means is the paragraph — so this climbs while the parent is *still* a run of
+	 * words, and stops at the first ancestor that is a layout.
+	 *
+	 * Which is also what keeps a card from being swallowed. Clicking its `<h3>` climbs one
+	 * step and stops, because the `<section>` around it holds a `<p>` as well; clicking a
+	 * sticky's own words stops at the component, whose path is `[]`.
+	 */
+	const runAt = (clicked: HTMLElement, component: HTMLElement): HTMLElement | undefined => {
+		if (!isRun(clicked)) return undefined;
+		let run = clicked;
+		while (run !== component) {
+			const parent = run.parentElement;
+			if (!parent || !component.contains(parent) || !isRun(parent)) break;
+			run = parent;
+		}
+		return run;
+	};
+
+	/**
+	 * Where an element sits inside its component, as element-child indices.
+	 *
+	 * The other half of an address the server resolves against the file, so it counts what
+	 * the file counts: *elements*, not nodes. Text nodes are precisely what a parse tree
+	 * and a DOM disagree about — the file indents its markup and the DOM keeps that
+	 * whitespace as siblings — and counting them would make the two derivations of one
+	 * address disagree on every board a person formatted.
+	 *
+	 * `[]` when the element *is* the component, which is the ordinary shape of a sticky:
+	 * its words are directly inside the element carrying the `data-id`.
+	 *
+	 * Nothing the editor appends can be counted by mistake. The handle and the source
+	 * textarea are children of `body`, outside every component, and the affordances that do
+	 * go inside a board are marked `data-decks-ui` and appended by the file-drop highlight
+	 * to `body` as well.
+	 */
+	const pathTo = (component: HTMLElement, element: HTMLElement): number[] | undefined => {
+		const path: number[] = [];
+		let cursor: HTMLElement = element;
+		while (cursor !== component) {
+			const parent = cursor.parentElement;
+			if (!parent) return undefined;
+			const index = [...parent.children].indexOf(cursor);
+			if (index === -1) return undefined;
+			path.unshift(index);
+			cursor = parent;
+		}
+		return path;
 	};
 
 	/**
@@ -631,10 +721,13 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	 * "Tap to select, tap again to edit" is the idiom every phone already teaches, and
 	 * it falls out of the selection rule rather than being a second mechanism.
 	 *
-	 * What is editable is what the file says is: an element carrying a `data-edit`, or a
-	 * rendered component whose source is one. A board written before that convention has
-	 * no retypeable text and is told so, which is the accepted price of an address that
-	 * cannot be computed from the DOM.
+	 * **What is editable is inferred, not declared.** A run of words — an element whose
+	 * content is phrasing content, marks and all — or a rendered component, whose editable
+	 * unit is its whole source. It used to be an element the author had named with a
+	 * `data-edit`, which meant a board nobody had annotated had no retypeable text at all
+	 * and the only thing the app could say was "ask the agent for a data-edit on it". The
+	 * address is `(component, path)` now, so "can this be retyped" is a question about the
+	 * shape of the thing rather than about whether somebody thought ahead.
 	 */
 	const beginEditing = (target: EventTarget | null, mouse: boolean): boolean => {
 		if (!host.enabled()) return false;
@@ -652,16 +745,15 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 */
 		const drawn = clicked.closest("[data-md], [data-mermaid]") as HTMLElement | null;
 		if (drawn && component.contains(drawn)) {
-			const named = nameOf(drawn);
-			if (!named) {
-				if (mouse) host.notice("That panel's source has no name in the file — ask the agent for a data-edit on it.");
-				return false;
-			}
-			return openSource(drawn, named, mouse);
+			// The panel itself, which the file *does* contain, even though nothing inside it
+			// does. That is the whole reason a rendered component is edited as its source.
+			const at = pathTo(component, drawn);
+			if (!at) return false;
+			return openSource(drawn, { id: component.dataset.id ?? "", path: at }, mouse);
 		}
 
 		if (component.dataset.embed !== undefined) {
-			host.notice("The board draws that from a file — change what it points at, or ask the agent.");
+			host.notice("The board draws that from a file. Change what it points at, or ask the agent.");
 			return false;
 		}
 		/*
@@ -682,34 +774,29 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * diagram inside a box component, whose own tag says nothing about what is under it.
 		 */
 		if (clicked.closest("svg")) {
-			if (mouse) host.notice("That word is placed by the drawing's own coordinates — ask the agent to change it.");
+			if (mouse) host.notice("That word is placed by the drawing's own coordinates. Ask the agent to change it.");
 			return false;
 		}
 
-		const run = clicked.closest("[data-edit]") as HTMLElement | null;
-		if (!run || !component.contains(run)) {
+		if (!component.contains(clicked)) return false;
+		/*
+		 * The whole run the pointer landed in — see `runAt`. A click on a bold word inside a
+		 * paragraph edits the paragraph, marks and all, because a field you cannot type out of
+		 * is worse than no field.
+		 */
+		const run = runAt(clicked, component);
+		if (!run) {
 			// Only worth saying to somebody who aimed: a tap on a card's padding is not a
 			// failed attempt to retype it, it is the tap that selected the card.
-			if (mouse) host.notice("Nothing here is named as editable — ask the agent for a data-edit on it.");
-			return false;
-		}
-		// A run of plain text, and nothing else: the server refuses to flatten markup, so
-		// offering to edit a paragraph with a link in it would be offering a refusal.
-		if (run.children.length > 0) {
-			if (mouse) host.notice("That run has markup inside it — the words themselves need naming, not the paragraph.");
-			return false;
-		}
-		// Said plainly rather than folded into the notice above, because the two are
-		// different mistakes: that one is an author who named the wrong element, this is
-		// one who wrote the reserved value meaning to seal. Not resolved by looking further
-		// up for a real name either — an author who wrote `false` here was aiming at *this*
-		// element, and quietly retyping its parent instead is the worse answer.
-		const name = nameOf(run);
-		if (name === undefined) {
-			if (mouse) host.notice('data-edit="false" is not a name — ask the agent to drop the attribute instead.');
+			if (mouse) host.notice("Double-click the words themselves, not the box around them.");
 			return false;
 		}
 		const before = run.textContent ?? "";
+		// A void element has nothing to replace, and an empty run has nothing on screen to
+		// have aimed at — both are a click that missed rather than an edit.
+		if (!before.trim()) return false;
+		const at = pathTo(component, run);
+		if (!at) return false;
 		run.contentEditable = "true";
 		run.focus();
 		/*
@@ -717,7 +804,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * fires `focusout` synchronously, and this handler commits on `focusout` — so a
 		 * state set first would be committed by the very act of starting to edit.
 		 */
-		editing = { kind: "run", element: run, edit: name, before };
+		editing = { kind: "run", element: run, id: component.dataset.id ?? "", path: at, before, markup: run.innerHTML };
 		const range = doc.createRange();
 		range.selectNodeContents(run);
 		win.getSelection()?.removeAllRanges();

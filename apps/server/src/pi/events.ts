@@ -92,7 +92,7 @@ export function handlePiEvent(t: Translator, event: AgentSessionEvent): void {
 			return;
 
 		case "auto_retry_start":
-			t.notice("warn", `${event.errorMessage} — retrying (${event.attempt}/${event.maxAttempts}).`);
+			t.notice("warn", `${event.errorMessage} Retrying (${event.attempt}/${event.maxAttempts}).`);
 			return;
 
 		default:

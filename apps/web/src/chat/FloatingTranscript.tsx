@@ -1,73 +1,78 @@
 import type { ChatItem } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
-import { splitFences } from "./Bubbles.tsx";
+import { Markdown } from "./Markdown.tsx";
 import { floatRows, type FloatRow } from "./float-rows.ts";
-import { turnsOf, type Turn } from "./TurnBar.tsx";
+import { attachSwipeClose } from "./swipe-close.ts";
+import { ToolChip } from "./ToolChip.tsx";
 
 /**
- * The conversation, floating over the boards as bubbles.
+ * The conversation, floating over the boards as bubbles — and the only transcript
+ * there is.
  *
- * The transcript sheet is away by default (DESIGN §7) — boards are the medium —
- * but "away" is not the same as "invisible": what the agent said should follow its
- * work across the canvas, translucently, without asking a panel to be open. So the
- * conversation floats there itself: user and assistant turns as blurred bubbles
- * over the boards, tool calls as one slim row each, the spine at the edge still the
- * handle it always was.
+ * There used to be two of these: a 380px sheet that slid in from the right edge with
+ * the full history in it, and this, a translucent condensation of the newest turn
+ * floating over the canvas. Two surfaces for one conversation, and the one that could
+ * actually be read was the one nobody could find — the sheet was away by default,
+ * summoned by a cursor approaching an edge, and everything it could do the float had a
+ * dimmer, click-through version of. So the sheet is gone and the bubbles took its job:
+ * the whole history, scrollable, with the time machine on each message where it always
+ * was.
  *
- * It appears when a new turn begins and follows it while it streams, then stays
- * until waved away; the × dismisses the *current* turn, and the next one comes
- * back — the rule canvas-chat's stream plays by, which is the rule this is, and
- * closing the float should not mean the next reply is invisible again.
+ * What it keeps from the float is the look. Nothing here has a background of its own —
+ * the bubbles are translucent and blurred, and the boards stay the thing underneath.
+ * What it takes from the sheet is being *deliberate*: it opens when asked (the dock's
+ * peek, the title-bar button, a click on the spine) and closes on the ×, rather than
+ * appearing on its own for every turn. That matters more now that it can be scrolled
+ * and clicked in, because a surface you can scroll is a surface that swallows the
+ * canvas's wheel; one that arrives uninvited would swallow it uninvited.
  *
- * Nothing here has a background of its own: the bubbles are translucent and the
- * gaps between them pass clicks through, so the boards underneath stay visible and
- * usable. A click on a bubble opens the sheet around that turn — the deck's scrub.
+ * The dock's peek (`Latest`) covers what the float used to cover by appearing on its
+ * own: the newest reply, one glance, over the input bar, without a panel.
  */
 export function FloatingTranscript(props: {
 	items: ChatItem[];
-	/** Whether the float is up. Owned by App, which also quiets the dock's peek while it is. */
+	/** Whether the history is up. Owned by App, which also quiets the dock's peek while it is. */
 	open: boolean;
-	/** The full sheet is up — the same words twice would be noise. */
-	columnOpen: boolean;
 	onOpenChange: (open: boolean) => void;
-	/** Reopen the transcript sheet at this turn. */
-	onScrub: (turn: Turn) => void;
+	/** An item to bring into view — the turn the spine was clicked at. */
+	scrollTo?: { id: string; at: number };
+	/**
+	 * The time machine, addressed to the message it belongs to.
+	 *
+	 * These live on the user's own messages rather than on a separate bar: the message
+	 * *is* the point you rewind to, and a second row of notches over the same list was
+	 * the same thing drawn twice.
+	 */
+	onPreview: (entryId: string | null) => void;
+	onRewind: (entryId: string) => void;
+	onFork: (entryId: string) => void;
+	onRestore: (entryId: string) => void;
 }) {
+	let sheet!: HTMLElement;
 	let scroller!: HTMLDivElement;
 	const [pinned, setPinned] = createSignal(true);
-	/** The turn the float was waved away at: it stays away for that turn only. */
-	const [dismissed, setDismissed] = createSignal("");
 
 	const rows = createMemo(() => floatRows(props.items));
-	const turns = createMemo(() => turnsOf(props.items, 0));
-	const turnById = createMemo(() => new Map(turns().map((turn) => [turn.id, turn])));
-	const newestTurn = createMemo(() => turns().at(-1)?.id ?? "");
+	/** Which item each row belongs to, so `entryId` can be found for a user bubble. */
+	const itemById = createMemo(() => new Map(props.items.map((item) => [item.id, item])));
 
 	/*
-	 * A new turn opens the float and brings itself into view. The learner should
-	 * never have to go looking for what the agent just said.
+	 * A swipe toward the right edge puts the history away, and releasing mid-gesture
+	 * puts it back — the same rule iOS and Android use for a sheet. Vertical drags are
+	 * never touched, so scrolling the history still scrolls.
 	 */
-	let seen = "";
-	createEffect(() => {
-		const turn = newestTurn();
-		if (!turn || turn === seen) return;
-		seen = turn;
-		setPinned(true);
-		if (props.open) return;
-		if (props.columnOpen || turn === dismissed()) return;
-		props.onOpenChange(true);
-		requestAnimationFrame(() => {
-			if (scroller) scroller.scrollTop = scroller.scrollHeight;
-		});
+	onMount(() => {
+		const detach = attachSwipeClose(sheet, () => props.open, () => props.onOpenChange(false));
+		onCleanup(detach);
 	});
 
 	/*
 	 * Follow the stream while it grows — and only while it grows: a stream that
 	 * scrolls itself while you are reading three replies back is the single most
-	 * annoying thing a chat surface does, so reading up unpins and a new turn
-	 * re-pins, exactly as the sheet does.
+	 * annoying thing a chat surface does. Reading up unpins; scrolling back to the
+	 * bottom re-pins.
 	 */
 	createEffect(() => {
 		if (!props.open || !scroller) return;
@@ -83,70 +88,137 @@ export function FloatingTranscript(props: {
 		});
 	});
 
+	/*
+	 * Opening at the bottom, unless it was opened *at* something.
+	 *
+	 * A fresh open should show the newest turn — that is what the peek was showing
+	 * when it was clicked.
+	 */
+	createEffect(() => {
+		if (!props.open) return;
+		setPinned(true);
+		requestAnimationFrame(() => {
+			if (scroller) scroller.scrollTop = scroller.scrollHeight;
+		});
+	});
+
+	/**
+	 * The scroll request already carried out, so it is not carried out again.
+	 *
+	 * `scrollTo` is not a one-shot event — it is also what the spine reads to mark the
+	 * block you are looking at, so `App` keeps it set. Without this guard every reopen and
+	 * every arriving message replayed a jump to a turn clicked long ago, and scrolling back
+	 * down was pointless because the next frame threw you up again. Keyed on `at` as well
+	 * as `id`, so clicking the same block twice is a new request and does return to it.
+	 */
+	let travelled: string | undefined;
+	createEffect(() => {
+		const target = props.scrollTo;
+		if (!target || !props.open || !scroller) return;
+		const key = `${target.id}:${target.at}`;
+		if (travelled === key) return;
+		props.items.length;
+		requestAnimationFrame(() => {
+			const element = scroller.querySelector(`[data-item="${cssEscape(target.id)}"]`);
+			// Not marked as travelled: the history can be open before it has arrived, and
+			// this effect re-runs when the items do. Marking here would swallow the one
+			// request that was going to work.
+			if (!element) return;
+			travelled = key;
+			setPinned(false);
+			/*
+			 * Instant, not smooth. A jump almost always starts from the bottom — you have
+			 * been watching the reply arrive — so the first frames of a smooth scroll are
+			 * still *at* the bottom, `onScroll` reads slack ≈ 0, re-pins, and the
+			 * follow-the-bottom effect above yanks it straight back down.
+			 */
+			element.scrollIntoView({ block: "start", behavior: "auto" });
+		});
+	});
+
 	const onScroll = () => {
 		const slack = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
 		setPinned(slack < 40);
 	};
 
 	return (
-		<Show when={rows().length > 0 && !props.columnOpen}>
-			<section class="chat-float" data-open={props.open} aria-label="The conversation, floating">
-				<button
-					class="fclose"
-					type="button"
-					title="Hide the floating chat — it comes back for the next turn"
-					aria-label="Hide the floating chat"
-					onClick={() => {
-						setDismissed(newestTurn());
-						props.onOpenChange(false);
-					}}
-				>
-					<Icon of={X} size={14} />
-				</button>
-				<div class="fsroll" ref={scroller} onScroll={onScroll}>
-					<For each={rows()}>
-						{(row) => <Row row={row} turn={turnById().get(row.turnId)} onScrub={props.onScrub} />}
-					</For>
-				</div>
-			</section>
-		</Show>
+		/*
+		 * Always rendered, even with nothing in it.
+		 *
+		 * It used to appear only once there was a row to show, which was right while it
+		 * arrived on its own and wrong now that there is a button for it: a control that
+		 * does nothing on a fresh agent is a control that looks broken. Empty, it says so.
+		 */
+		<section
+			class="chat-float"
+			ref={sheet}
+			data-open={props.open}
+			aria-label="The conversation"
+		>
+			<button
+				class="fclose"
+				type="button"
+				title="Close the conversation"
+				aria-label="Close the conversation"
+				onClick={() => props.onOpenChange(false)}
+			>
+				<Icon of={X} size={14} />
+			</button>
+			<div class="fsroll" ref={scroller} onScroll={onScroll}>
+				<Show when={rows().length === 0}>
+					<div class="fnotice">Nothing said yet — ask for something and it will show up here.</div>
+				</Show>
+				<For each={rows()}>
+					{(row) => (
+						<Row
+							row={row}
+							entryId={
+								row.kind === "user"
+									? (itemById().get(row.id) as Extract<ChatItem, { kind: "user" }> | undefined)?.entryId
+									: undefined
+							}
+							onPreview={props.onPreview}
+							onRewind={props.onRewind}
+							onFork={props.onFork}
+							onRestore={props.onRestore}
+						/>
+					)}
+				</For>
+			</div>
+		</section>
 	);
 }
 
-/**
- * One floating bubble.
- *
- * Everything is a button where there is something to rewind to; the turn it opens
- * is the conversation address of the row, not the row itself — a reply is read in
- * the sheet, which is where its actions live.
- */
-function Row(props: { row: FloatRow; turn: Turn | undefined; onScrub: (turn: Turn) => void }) {
-	const scrub = () => {
-		const turn = props.turn;
-		if (turn) props.onScrub(turn);
-	};
+/** One floating bubble, and whatever it is a way into. */
+function Row(props: {
+	row: FloatRow;
+	/** The session entry a user message became — the address a rewind is sent to. */
+	entryId: string | undefined;
+	onPreview: (entryId: string | null) => void;
+	onRewind: (entryId: string) => void;
+	onFork: (entryId: string) => void;
+	onRestore: (entryId: string) => void;
+}) {
 	return (
 		<Switch>
 			<Match when={props.row.kind === "user"}>
-				<button class="fbubble" data-who="user" type="button" onClick={scrub} onWheel={wheel} title="Open the conversation at this turn">
-					{(props.row as Extract<FloatRow, { kind: "user" }>).text}
-				</button>
+				<UserTurn
+					row={props.row as Extract<FloatRow, { kind: "user" }>}
+					entryId={props.entryId}
+					onPreview={props.onPreview}
+					onRewind={props.onRewind}
+					onFork={props.onFork}
+					onRestore={props.onRestore}
+				/>
 			</Match>
 			<Match when={props.row.kind === "assistant"}>
-				<button class="fbubble" data-who="agent" type="button" onClick={scrub} onWheel={wheel} title="Open the conversation at this turn">
-					<For each={splitFences((props.row as Extract<FloatRow, { kind: "assistant" }>).text)}>
-						{(block) => (block.code ? <pre>{block.text}</pre> : <span>{block.text}</span>)}
-					</For>
-					<Show when={(props.row as Extract<FloatRow, { kind: "assistant" }>).streaming}>
-						<span class="caret" />
-					</Show>
-				</button>
+				<Assistant row={props.row as Extract<FloatRow, { kind: "assistant" }>} />
 			</Match>
 			<Match when={props.row.kind === "tools"}>
-				<Tools row={props.row as Extract<FloatRow, { kind: "tools" }>} onScrub={scrub} />
+				<Tools row={props.row as Extract<FloatRow, { kind: "tools" }>} />
 			</Match>
 			<Match when={props.row.kind === "notice"}>
-				<div class="fnotice" data-level={(props.row as Extract<FloatRow, { kind: "notice" }>).level} onWheel={wheel}>
+				<div class="fnotice" data-item={props.row.id} data-level={(props.row as Extract<FloatRow, { kind: "notice" }>).level}>
 					{(props.row as Extract<FloatRow, { kind: "notice" }>).text}
 				</div>
 			</Match>
@@ -154,32 +226,149 @@ function Row(props: { row: FloatRow; turn: Turn | undefined; onScrub: (turn: Tur
 	);
 }
 
-/** A turn's tool calls, one slim row; the count is the point, the last call the colour. */
-function Tools(props: { row: Extract<FloatRow, { kind: "tools" }>; onScrub: () => void }) {
-	const last = () => props.row.names.at(-1) ?? "";
-	const label = () =>
-		props.row.names.length === 1
-			? `1 tool call · ${last()}`
-			: `${props.row.names.length} tool calls · ${last()}`;
+/**
+ * What the agent said, and what it was thinking if it says.
+ *
+ * Thinking is a disclosure rather than text, and collapsed by default: it is long, it is
+ * not addressed to the reader, and a history that showed it in full would be a history
+ * where the reply is the small part.
+ */
+function Assistant(props: { row: Extract<FloatRow, { kind: "assistant" }> }) {
+	const [showThinking, setShowThinking] = createSignal(false);
+
 	return (
-		<button class="ftools" data-state={props.row.running ? "running" : props.row.failed ? "error" : "done"} type="button" onClick={props.onScrub} onWheel={wheel} title="Open the conversation at this turn">
-			<span class="fdot" />
-			<span class="fcount">{props.row.names.length}</span>
-			<span class="fname">{last()}</span>
-			<span class="fmore">{props.row.names.length > 1 ? "calls" : "call"}</span>
-		</button>
+		<>
+			<Show when={props.row.thinking}>
+				{(thinking) => (
+					<div class="thinking">
+						<button type="button" onClick={() => setShowThinking(!showThinking())}>
+							{showThinking() ? "hide thinking" : "thinking…"}
+						</button>
+						<Show when={showThinking()}>
+							<div class="body">{thinking()}</div>
+						</Show>
+					</div>
+				)}
+			</Show>
+
+			{/*
+			 * The agent's words are markdown; yours are not.
+			 *
+			 * A reply is written *as* markdown — lists, headings, `code` — and showing its
+			 * asterisks makes the reader do the parsing. A message you typed is different: it
+			 * is the literal text that was sent, and quietly transforming it would leave you
+			 * unable to see what the agent actually received. So one side renders and the
+			 * other stays verbatim, which is also why only this branch has a `Markdown`.
+			 */}
+			<div class="fbubble" data-who="agent" data-item={props.row.id}>
+				<Markdown text={props.row.text} trailing={props.row.streaming ? <span class="caret" /> : undefined} />
+			</div>
+		</>
 	);
 }
 
 /**
- * The wheel, taken over wherever a bubble is under the cursor.
+ * A user message, and the way back to it.
  *
- * The float lets clicks through between bubbles, which means it is not itself a
- * pointer target and cannot be relied on to catch the wheel — so the bubbles take
- * it themselves, scroll the stream, and let nothing pass to the boards underneath.
+ * The actions appear on hover and only once the message has an `entryId` — the server
+ * pairs each one with the session entry it became, and until that has happened there is
+ * nothing to address a rewind to. (On a touchscreen they are always shown: `hidden until
+ * hovered` is hidden forever there, and this is the only route to the time machine.)
+ *
+ * Hovering **rewind** previews immediately: the canvas renders that point from the
+ * revision store, and leaving puts it back. No dwell delay, because you only get here by
+ * reaching for the action itself.
  */
-function wheel(event: WheelEvent): void {
-	event.preventDefault();
-	const scroller = (event.currentTarget as HTMLElement).parentElement;
-	if (scroller) scroller.scrollTop += event.deltaY;
+function UserTurn(props: {
+	row: Extract<FloatRow, { kind: "user" }>;
+	entryId: string | undefined;
+	onPreview: (entryId: string | null) => void;
+	onRewind: (entryId: string) => void;
+	onFork: (entryId: string) => void;
+	onRestore: (entryId: string) => void;
+}) {
+	return (
+		<div class="turn-row" data-item={props.row.id}>
+			<div class="fbubble" data-who="user">
+				{props.row.text}
+			</div>
+			<Show when={props.entryId}>
+				{(entryId) => (
+					<div class="turn-actions">
+						<button
+							type="button"
+							title="Put the conversation back to just before this message. Hover to see the boards as they were."
+							onMouseEnter={() => props.onPreview(entryId())}
+							onMouseLeave={() => props.onPreview(null)}
+							onFocus={() => props.onPreview(entryId())}
+							onBlur={() => props.onPreview(null)}
+							onClick={() => {
+								props.onPreview(null);
+								props.onRewind(entryId());
+							}}
+						>
+							rewind
+						</button>
+						<button
+							type="button"
+							title="Carry on from here in a new chat, keeping this one as it is"
+							onClick={() => props.onFork(entryId())}
+						>
+							fork
+						</button>
+						<button
+							type="button"
+							title="Write the boards back to how they were at this point. The conversation stays where it is."
+							onClick={() => props.onRestore(entryId())}
+						>
+							restore boards
+						</button>
+					</div>
+				)}
+			</Show>
+		</div>
+	);
+}
+
+/**
+ * A turn's tool calls: one slim pill, and the calls themselves when asked for.
+ *
+ * A turn that edits files is mostly tool calls, and printing each one in full is a
+ * transcript nobody reads — so the count is the default and the last call's name is the
+ * colour. Opening it hands each call to the same `ToolChip` the column used, which is
+ * where a call's output has always lived.
+ */
+function Tools(props: { row: Extract<FloatRow, { kind: "tools" }> }) {
+	const [open, setOpen] = createSignal(false);
+	const last = () => props.row.calls.at(-1)?.name ?? "";
+	const count = () => props.row.calls.length;
+
+	return (
+		<div class="ftools-group" data-item={props.row.id}>
+			<button
+				class="ftools"
+				data-state={props.row.running ? "running" : props.row.failed ? "error" : "done"}
+				data-open={open()}
+				type="button"
+				title={open() ? "Collapse these tool calls" : "Show these tool calls"}
+				aria-expanded={open()}
+				onClick={() => setOpen(!open())}
+			>
+				<span class="fdot" />
+				<span class="fcount">{count()}</span>
+				<span class="fname">{last()}</span>
+				<span class="fmore">{count() > 1 ? "calls" : "call"}</span>
+			</button>
+			<Show when={open()}>
+				<div class="fcalls">
+					<For each={props.row.calls}>{(call) => <ToolChip item={call} />}</For>
+				</div>
+			</Show>
+		</div>
+	);
+}
+
+/** An item id is user data; escape it before it goes in a selector. */
+function cssEscape(value: string): string {
+	return typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(value) : value.replace(/["\\]/g, "\\$&");
 }

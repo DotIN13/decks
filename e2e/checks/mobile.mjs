@@ -195,15 +195,18 @@ const run = await page.evaluate(() => {
 		const box = node.getBoundingClientRect();
 		return { x: rect.left + (box.x + Math.min(40, box.width / 2)) * scale, y: rect.top + (box.y + box.height / 2) * scale };
 	};
-	// A run the board's author named. `data-edit` is the whole address a retype carries
-	// (DESIGN §6.5), so a run without one is not editable by any gesture and tapping it
-	// twice would prove nothing.
-	const found = [...frame.contentDocument.querySelectorAll("[data-edit]")].find((node) => {
+	/*
+	 * A leaf holding words, which is what makes a run retypeable (DESIGN §6.5). Asked of the
+	 * shape rather than of an attribute: it used to look for `[data-edit]`, a name the
+	 * board's author had to write, and a run without one was not editable by any gesture.
+	 */
+	const found = [...frame.contentDocument.querySelectorAll("[data-id] *, [data-id]")].find((node) => {
 		if (node.children.length > 0 || (node.textContent ?? "").trim().length < 5) return false;
+		if (node.closest("[data-md], [data-mermaid], [data-embed], svg")) return false;
 		const point = at(node);
 		return point.x > 40 && point.x < window.innerWidth - 40 && point.y > 120 && point.y < 300;
 	});
-	return found ? { id: found.closest("[data-id]").dataset.id, edit: found.dataset.edit, ...at(found) } : null;
+	return found ? { id: found.closest("[data-id]").dataset.id, tag: found.tagName.toLowerCase(), ...at(found) } : null;
 });
 if (!run) {
 	say("a run of text is on screen to tap", false, "nothing found — the camera moved somewhere unexpected");
@@ -232,7 +235,7 @@ if (!run) {
 				.contentDocument.querySelector('[contenteditable="true"]'),
 		),
 	);
-	say("tapping it again starts typing over the run of text", typing, `over data-edit="${run.edit}"`);
+	say("tapping it again starts typing over the run of text", typing, `over the <${run.tag}> in #${run.id}`);
 	await page.evaluate(() =>
 		document
 			.querySelector('.board-node[data-path="boards/plan.html"] iframe')
@@ -312,13 +315,13 @@ if (!embed) {
 	);
 }
 
-// --- 7. the panels, which no finger can hover into ----------------------------------
+// --- 7. the rail, which no finger can hover into, and the conversation --------------
 const openState = () =>
 	page.evaluate(() => ({
 		left: document.querySelector(".side")?.dataset.open,
-		right: document.querySelector(".chat")?.dataset.open,
+		right: document.querySelector(".chat-float")?.dataset.open,
 	}));
-say("both panels start away", JSON.stringify(await openState()) === '{"left":"false","right":"false"}', JSON.stringify(await openState()));
+say("both start away", JSON.stringify(await openState()) === '{"left":"false","right":"false"}', JSON.stringify(await openState()));
 
 await page.locator('.titlebar .icon-button[aria-label="Boards and chats"]').tap();
 await settle(page, 300);
@@ -332,6 +335,23 @@ say("opening the transcript closes the other one", both.right === "true" && both
 await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
 await settle(page, 300);
 say("and tapping it again puts it away", (await openState()).right === "false", JSON.stringify(await openState()));
+
+/*
+ * A swipe toward the right edge is the other way out — the gesture a phone already
+ * teaches for a sheet, and the one thing about the conversation that a finger can do and a
+ * cursor cannot. It has to survive the bubbles being a scroller: a *vertical* drag inside
+ * them belongs to the history, so only horizontal travel takes the sheet.
+ */
+await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
+await settle(page, 400);
+say("…and it opens again", (await openState()).right === "true", JSON.stringify(await openState()));
+const middle = await page.evaluate(() => {
+	const box = document.querySelector(".chat-float .fsroll").getBoundingClientRect();
+	return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
+});
+await swipe([middle], { x: 260, y: 0 }, 12);
+await settle(page, 500);
+say("a swipe to the right edge puts the conversation away", (await openState()).right === "false", JSON.stringify(await openState()));
 
 // --- 8. nothing in the chrome is smaller than a fingertip ---------------------------
 const small = await page.evaluate(() => {

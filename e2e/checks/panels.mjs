@@ -1,5 +1,5 @@
 /**
- * The floating panels: away by default, out when reached for (DESIGN §7).
+ * The floating board rail: away by default, out when reached for (DESIGN §7).
  *
  * The reveal is proximity-based, so these are the one place a short fixed wait is right —
  * what is being waited on is a CSS transition, which has a duration and no event worth
@@ -22,8 +22,22 @@ const onScreen = (selector) =>
 		};
 	}, selector);
 
+/*
+ * From a neutral cursor, because (0,0) is not neutral.
+ *
+ * Playwright's virtual mouse starts at the top-left corner, which is *inside* the 26px
+ * the rail watches for — and Chrome dispatches a move at the resting position when the
+ * page lays out under it. So "away by default" failed about half the time, and the app was
+ * right each time: something was reaching for the left edge. Moving to the middle first is
+ * how the question gets asked honestly. (The reach itself is asserted below, deliberately.)
+ */
+await page.mouse.move(700, 480);
+await settle(page, 260);
+
 say("the agent list is away by default", (await isOpen(".side")) === false, JSON.stringify(await onScreen(".side")));
-say("the chat is away by default", (await isOpen(".chat")) === false, JSON.stringify(await onScreen(".chat")));
+// The conversation is not a panel any more — it is bubbles over the boards, opened
+// deliberately rather than summoned by a cursor near an edge.
+say("the conversation is away by default", (await isOpen(".chat-float")) === false);
 const sliver = await onScreen(".side");
 say("a sliver of the agent list is still visible", sliver.visibleWidth > 4 && sliver.visibleWidth < 40, `${sliver.visibleWidth}px showing`);
 

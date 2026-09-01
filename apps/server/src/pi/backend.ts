@@ -159,7 +159,7 @@ export class PiBackend implements AgentBackend {
 				return;
 			case "name": {
 				if (!args.trim()) {
-					notice("warn", "Usage: /name <name> — rename this agent.");
+					notice("warn", "Usage: /name <name> to rename this agent.");
 					return;
 				}
 				this.setName(args.trim());

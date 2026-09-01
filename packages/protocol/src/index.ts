@@ -199,27 +199,64 @@ export type BoardPatch =
 	/** `null` in `attrs` *removes* the attribute, which is how a tone goes back to the default. */
 	| { op: "update"; id: string; style?: Partial<Rect>; class?: string; attrs?: Record<string, string | null> }
 	/**
-	 * Retype an editable run, addressed by the `data-edit` its author wrote on it.
+	 * Retype a run of text, addressed by where it *is* rather than by a name.
 	 *
-	 * There is no component id here on purpose. A `data-edit` is unique within a board,
-	 * so naming the component as well would be a second address that can disagree with
-	 * the first — and the server has to resolve the element anyway to say which
-	 * component the edit landed in, which is what the summary and `ids` report.
+	 * `id` is the component and `path` is the element-child indices walked into from it —
+	 * `[]` is the component itself, `[0]` its first element child. One address, not two:
+	 * the path is meaningless without the component, so the pair cannot disagree with
+	 * itself the way an id plus an independent name could.
 	 *
-	 * It replaces an index `path` into the component's element children, which existed
-	 * only because nothing in a board named its editable runs. Indices were computed
-	 * from the DOM and resolved against the file, so they addressed one thing in a
-	 * hand-written component and nothing at all in a rendered one — a `[data-md]`
-	 * panel's headings exist only in what `board.js` drew. An authored id is the same
-	 * name on both sides of the wire, and a board that does not carry one simply has no
-	 * retypeable text: there is no fallback, because a fallback would be the index path
-	 * again with its refusals moved later.
+	 * `before` is the text the browser was showing, and it is what makes a *derived*
+	 * address safe to use. A path is only correct against the file the DOM was built from,
+	 * and the two can come apart: the agent rewrites a board while a frame is pinned to the
+	 * revision it loaded (§7), and the same indices then point at an element the user never
+	 * saw. The server compares and refuses.
 	 *
-	 * The run may be the whole of a `[data-md]` or `[data-mermaid]` component, which is
-	 * how markdown became editable: its editable unit is its source, in one editor,
-	 * rather than a rendered block that is not in the file at all.
+	 * It is the third guard, not the first — which is why it almost never fires. A patch
+	 * carries the revision it was composed against and a stale one is refused outright, and
+	 * a board the agent rewrote reloads the frame, which abandons the edit in progress. What
+	 * is left is the window between those two: a rev this client legitimately holds, against
+	 * a DOM that has not caught up yet. Nothing but the content check can see that, and what
+	 * it prevents is the only genuinely unacceptable outcome here — the user's words written
+	 * silently into a component they were not looking at.
+	 *
+	 * **It replaces `data-edit`**, a name the author wrote on every editable run, which
+	 * was the address for a while and is gone. A name is a fine address and a poor
+	 * *gate*: nothing was editable unless an agent had thought to name it, so a board
+	 * written without the convention had no retypeable text at all and the app could only
+	 * say "ask the agent for a data-edit on it". It also had to be unique per board, which
+	 * `duplicate` paid for by minting fresh names for every run inside a copy.
+	 *
+	 * The reason the name won the first time no longer holds. A path was rejected because
+	 * it addressed nothing inside a `[data-md]` panel, whose DOM `board.js` draws and the
+	 * file does not contain — and rendered panels are now edited as their whole *source*,
+	 * addressed as one component. So a path is only ever resolved where the file's tree
+	 * really is the DOM's, which is the condition it always needed.
 	 */
-	| { op: "text"; edit: string; text: string }
+	| { op: "text"; id: string; path: number[]; before: string; text: string }
+	/**
+	 * Retype a run of words that has marks in it, addressed the same way.
+	 *
+	 * The same address as `text` and a different payload: `html` is the element's new
+	 * *inner HTML*, because a run like `See <a href="…">the doc</a>, then <b>ship it</b>` has
+	 * no plain-text form. `text` would flatten it and throw the link and the bold away,
+	 * which is why an element with markup in it used to be refused outright.
+	 *
+	 * So the browser makes the element `contenteditable` and the user treats the marks like
+	 * text: select across a `<b>`, delete it, type through it. What comes back is whatever
+	 * the engine produced, and `boards/inline-html.ts` decides what a board file may hold —
+	 * a phrasing-content allowlist, attributes filtered, split marks merged, empty ones
+	 * dropped, non-breaking spaces returned to spaces, everything else unwrapped to its
+	 * words. That runs on the *server*: the rule about what a file may contain belongs with
+	 * the file, so there is one implementation of it and a client that is buggy or is not
+	 * this app cannot write markup a board should not hold.
+	 *
+	 * `before` is the element's text as the browser had it, not its HTML — the same race
+	 * guard as `text` uses, and compared as text on both sides because two serialisations of
+	 * one document differ in ways that mean nothing (`<br>` against `<br />`) and agree
+	 * about words.
+	 */
+	| { op: "html"; id: string; path: number[]; before: string; html: string }
 	| { op: "remove"; id: string }
 	/**
 	 * A copy of a component, offset, with a name derived from the original's.
@@ -260,6 +297,28 @@ export type BoardPatch =
  */
 export const BOX_CLASSES = ["text", "sticky", "card", "callout"] as const;
 export type BoxClass = (typeof BOX_CLASSES)[number];
+
+/**
+ * The tags a run of words may be made of, shared because both sides ask about them.
+ *
+ * HTML's phrasing content, minus everything interactive, embedded, or capable of running
+ * something. Two questions are answered from this one list, and they have to agree:
+ *
+ * - **The browser** decides what to make `contenteditable`, and draws the underline that
+ *   says so, from "does this element contain anything that is not on this list".
+ * - **The server** decides what a `html` patch may write into a board file, from the same
+ *   question asked of the parse tree, and unwraps anything else to its words
+ *   (`boards/inline-html.ts`).
+ *
+ * A tag on one list and not the other would be an affordance that promises a refusal, or a
+ * refusal for something the app just offered — which is exactly the failure the old
+ * `data-edit` underline was designed around. So there is one list, here, next to the other
+ * piece of board vocabulary both sides share.
+ */
+export const INLINE_TAGS = [
+	"a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "dfn", "em", "i", "kbd",
+	"mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup", "time", "u", "var", "wbr",
+] as const;
 
 /**
  * `data-tone` as `board.css` reads it, and a callout is the only component that reads
@@ -313,8 +372,15 @@ export type ExtensionUiPrompt =
 	| { id: string; method: "input"; title: string; placeholder?: string }
 	| { id: string; method: "editor"; title: string; prefill?: string }
 	| { id: string; method: "custom"; lines: WidgetLine[] }
-	/** Sign-in: a URL to open, and a way back to say it is done. */
-	| { id: string; method: "login"; title: string; message: string; url: string }
+	/**
+	 * Sign-in: a URL to open, and the code the browser hands back.
+	 *
+	 * Claude Code's OAuth flow is a paste-the-code flow — it prints a URL and then waits
+	 * on stdin — so a login dialog that only said "done" could never finish one. The
+	 * answer is the code (`{ value }`); `{ confirmed: true }` is the app closing the
+	 * dialog itself because the credentials landed without one.
+	 */
+	| { id: string; method: "login"; title: string; message: string; url: string; placeholder?: string }
 	/** Informational figures, dismissed with OK. */
 	| { id: string; method: "usage"; title: string; rows: { label: string; value: string }[] };
 

@@ -35,8 +35,8 @@ Every board is a whole document that must render on its own. Start from this sha
 	</head>
 	<body class="board">
 		<section class="card" data-id="goal" style="left: 48px; top: 48px; width: 380px">
-			<h3 data-edit="goal-title">Goal</h3>
-			<p data-edit="goal-body">One sentence that would survive being read out loud.</p>
+			<h3>Goal</h3>
+			<p>One sentence that would survive being read out loud.</p>
 		</section>
 		<script src="../lib/board.js"></script>
 	</body>
@@ -51,11 +51,12 @@ Five rules, and they matter more than they look:
 2. **Give every component a `data-id`.** It is how you edit precisely later, how the
    canvas points the user at one box, and how they comment on it. Ids are stable
    names, not numbers: `goal`, `risk-refresh`, `next-steps`.
-3. **Give every run of words a `data-edit`**, unique within the board, on the leaf
-   element that holds them: `<h3 data-edit="goal-title">`. That name is the whole
-   address when the user double-clicks those words and retypes them — a run without one
-   cannot be retyped, and there is no fallback. A `[data-md]` or `[data-mermaid]`
-   component gets one on the component itself, because its editable is its whole source.
+3. **A run of words is one editable field.** The user double-clicks it and retypes it in
+   place, marks and all: `<p>See <a href="…">the doc</a>, then <b>ship it</b>.</p>` is one
+   field, and so is `<h3>Goal</h3>`. A box holding blocks is not — a `<section>` with an
+   `<h3>` and a `<p>` in it is two runs. Nothing has to be named for any of this; it is a
+   property of the shape. What your markup does decide is the *size* of each field, so put
+   strings the user should retype separately in separate leaves.
 4. **Size the board in `<meta name="board">`** to fit what you put on it. Content does
    not scroll — the canvas is the scrolling — so a board that is too small clips.
 5. **Two files in the head, always.** `board.css` and `board.js`; `board.js` loads

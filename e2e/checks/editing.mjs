@@ -19,7 +19,7 @@ const original = `<!doctype html>
 	</head>
 	<body class="board">
 		<section class="card" data-id="what-a-deck-is" style="left: 48px; top: 48px; width: 480px">
-			<h3 data-edit="what-a-deck-is-title">What a deck is</h3>
+			<h3>What a deck is</h3>
 		</section>
 		<script src="../lib/board.js"></script>
 	</body>

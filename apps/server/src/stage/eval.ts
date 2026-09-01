@@ -89,7 +89,7 @@ export async function runEval(code: string, stage: unknown, timeoutMs = TIMEOUT_
 
 class EvalTimeout extends Error {
 	constructor(ms: number) {
-		super(`Still running after ${ms / 1000}s — the wait was abandoned, but the code was not stopped (it cannot be).`);
+		super(`Still running after ${ms / 1000}s. The wait was abandoned, but the code was not stopped (it cannot be).`);
 		this.name = "EvalTimeout";
 	}
 }

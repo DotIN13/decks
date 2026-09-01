@@ -50,22 +50,62 @@ test("nothing merges across an op that is not an update", () => {
 	);
 });
 
-test("retyping the same run twice keeps the last version only", () => {
+/*
+ * And the merge keeps the *first* `before`, which is the half that is easy to get wrong.
+ *
+ * `before` says what the file is expected to hold, and the file has seen none of the edits
+ * in a burst. A→B then B→C is A→C; a merged patch claiming the file says `B` would be
+ * refused by the very guard that exists to catch a real race with the agent.
+ */
+test("retyping the same run twice keeps the last version and the original before", () => {
 	const merged = coalesce([
-		{ op: "text", edit: "goal-title", text: "Shi" },
-		{ op: "text", edit: "goal-title", text: "Ship it" },
+		{ op: "text", id: "goal", path: [0], before: "Ship", text: "Shi" },
+		{ op: "text", id: "goal", path: [0], before: "Shi", text: "Ship it" },
 	]);
-	assert.deepEqual(merged, [{ op: "text", edit: "goal-title", text: "Ship it" }]);
+	assert.deepEqual(merged, [{ op: "text", id: "goal", path: [0], before: "Ship", text: "Ship it" }]);
 });
 
 test("a card's heading and its body are two runs and both are kept", () => {
-	// Two names rather than one name and two indices, so this is a comparison of one
-	// field: what the two sides of the wire agree on is the whole address.
+	// One id and two paths, so the comparison is of both halves of the address.
 	const merged = coalesce([
-		{ op: "text", edit: "goal-title", text: "Heading" },
-		{ op: "text", edit: "goal-body", text: "Body" },
+		{ op: "text", id: "goal", path: [0], before: "a", text: "Heading" },
+		{ op: "text", id: "goal", path: [1], before: "b", text: "Body" },
 	]);
 	assert.equal(merged.length, 2);
+});
+
+test("the same indices under different components are different runs", () => {
+	const merged = coalesce([
+		{ op: "text", id: "goal", path: [0], before: "a", text: "One" },
+		{ op: "text", id: "risk", path: [0], before: "b", text: "Two" },
+	]);
+	assert.equal(merged.length, 2);
+});
+
+test("a path of a different depth is a different run, not a longer one", () => {
+	const merged = coalesce([
+		{ op: "text", id: "goal", path: [], before: "a", text: "One" },
+		{ op: "text", id: "goal", path: [0], before: "b", text: "Two" },
+	]);
+	assert.equal(merged.length, 2);
+});
+
+test("a rich run and a plain source are different payloads and never merge", () => {
+	// Same component, same path, different op: one is a `[data-md]` panel's source and the
+	// other a paragraph's markup, and merging them would send one as the other.
+	const merged = coalesce([
+		{ op: "text", id: "notes", path: [], before: "a", text: "## a" },
+		{ op: "html", id: "notes", path: [], before: "a", html: "<b>a</b>" },
+	]);
+	assert.equal(merged.length, 2);
+});
+
+test("two edits to the same rich run merge, keeping the original before", () => {
+	const merged = coalesce([
+		{ op: "html", id: "intro", path: [0], before: "See the doc", html: "See <b>the</b> doc" },
+		{ op: "html", id: "intro", path: [0], before: "See the doc", html: "See <b>the doc</b>" },
+	]);
+	assert.deepEqual(merged, [{ op: "html", id: "intro", path: [0], before: "See the doc", html: "See <b>the doc</b>" }]);
 });
 
 test("only an insert or a duplicate needs the frame reloaded", () => {

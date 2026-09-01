@@ -1,5 +1,6 @@
 import { BOX_CLASSES, type BoardPatch, type ComponentKind, type Rect } from "@decks/protocol";
 import { parse } from "parse5";
+import { isRichRun, normalizeInline, textOfInline } from "./inline-html.ts";
 import type { DefaultTreeAdapterMap } from "parse5";
 
 type Element = DefaultTreeAdapterMap["element"];
@@ -33,11 +34,9 @@ export interface PatchOutcome {
 	/**
 	 * The component each patch ended up acting on, in order.
 	 *
-	 * Rarely the id the patch named: an insert arrives unnamed, a duplicate mints a
-	 * name from the original's, a rename ends on the new one, and a `text` op names no
-	 * component at all — it names a `data-edit`, and the component is whichever one
-	 * that run turned out to be inside. This is what the edit is *called* afterwards,
-	 * which is what an agent needs in order to address it.
+	 * Rarely the id the patch named: an insert arrives unnamed, a duplicate mints a name
+	 * from the original's, and a rename ends on the new one. This is what the edit is
+	 * *called* afterwards, which is what an agent needs in order to address it.
 	 */
 	ids: string[];
 }
@@ -89,9 +88,7 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 		if (findById(document, patch.id)) throw new PatchRefused(`there is already a component called ${patch.id}`);
 		const at = body.sourceCodeLocation.endTag.startOffset;
 		const indent = indentOf(html, at);
-		// The run this component's text lives in is named here rather than in `render`,
-		// because only this side of the call has the file to check the name against.
-		const markup = `${render(patch, indent, freeName(editNames(html), `${patch.id}-${patch.kind === "sticky" || patch.kind === "text" ? "text" : "title"}`))}\n${indent}`;
+		const markup = `${render(patch, indent)}\n${indent}`;
 		// The embed is named in the summary because that summary is what the agent is
 		// told (§6.5): "added embed #embed-2" leaves it unable to see the file the user
 		// just dropped without re-reading the board to find out what it points at.
@@ -103,15 +100,7 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 		};
 	}
 
-	/*
-	 * Retyping is the one op that does not name a component.
-	 *
-	 * It names a `data-edit`, which its author wrote on the run of text itself, and the
-	 * component is read back off the file — the nearest ancestor with a `data-id`. That
-	 * is the direction the ownership actually runs: the browser knows which words were
-	 * double-clicked, and only the file knows what those words are part of.
-	 */
-	if (patch.op === "text") return retype(html, document, patch.edit, patch.text);
+	if (patch.op === "text" || patch.op === "html") return retype(html, document, patch);
 
 	const element = findById(document, patch.id);
 	if (!element) throw new PatchRefused(`no component with data-id="${patch.id}"`);
@@ -172,21 +161,15 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 			if (!idAt) throw new PatchRefused(`cannot locate the name of #${patch.id}`);
 			edits.push({ from: idAt.startOffset - start, to: idAt.endOffset - start, text: attr("data-id", to) });
 			/*
-			 * And every `data-edit` inside it, which is the half a copy cannot skip.
+			 * The `data-id` is the only name a copy has to change.
 			 *
-			 * A `data-edit` is unique within a board and a `text` patch addresses one by
-			 * that name alone, so a copy that kept the original's would give two components
-			 * the same editable: retyping either would resolve to whichever came first in
-			 * the file, and the server would have no way to tell which one the user
-			 * double-clicked. The names are minted against the whole board and against each
-			 * other, because a component may hold several runs off the same base.
+			 * It used to have to rename every `data-edit` inside the copy as well: a retype
+			 * addressed a run by a name unique to the whole board, so a copy that kept the
+			 * original's names gave two components the same editable and the server could
+			 * not tell which one had been double-clicked. A retype is addressed by
+			 * `(component, path)` now, and a copy of a component has its own id, so the two
+			 * copies are distinguishable by construction and there is nothing to mint.
 			 */
-			const takenEdits = editNames(html);
-			for (const [name, spot] of editAttributes(element)) {
-				const renamed = numbered(takenEdits, name);
-				takenEdits.add(renamed);
-				edits.push({ from: spot.startOffset - start, to: spot.endOffset - start, text: attr("data-edit", renamed) });
-			}
 			const offset = patch.offset ?? { x: 16, y: 16 };
 			const styleAt = location.attrs?.style;
 			if (styleAt) {
@@ -214,7 +197,7 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 
 		case "rename": {
 			if (!/^[A-Za-z][\w-]*$/.test(patch.to)) {
-				throw new PatchRefused(`"${patch.to}" is not a name a board can use — letters, digits and dashes`);
+				throw new PatchRefused(`"${patch.to}" is not a name a board can use: letters, digits and dashes`);
 			}
 			if (patch.to === patch.id) return { html, summary: `#${patch.id} kept its name`, id: patch.id };
 			if (findById(document, patch.to)) throw new PatchRefused(`there is already a component called ${patch.to}`);
@@ -275,69 +258,90 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 // --- retyping --------------------------------------------------------------------
 
 /**
- * Write a run of text back into the file, addressed by its `data-edit`.
+ * Write a run of text back into the file, addressed by where it is.
  *
- * The run is a leaf the author marked, and the component it belongs to is read off the
- * file rather than sent — see the note at the call site. Everything that can go wrong
- * here is refused with a reason instead of guessed at, because the browser has already
- * shown the user the edit and a refusal re-reads the frame (§6.5): a name nothing has,
- * a name two things have, and content that is markup rather than text.
+ * `(id, path)` locates it: the component, then the element-child indices walked in from
+ * there. Everything that can go wrong is refused with a reason rather than guessed at,
+ * because the browser has already shown the user the edit and a refusal re-reads the
+ * frame (§6.5).
+ *
+ * The refusals fall into two kinds, and the difference matters. A path that does not
+ * resolve, or lands on something with markup in it, is a *shape* the file does not have.
+ * A `before` that does not match is a *race*: the frame is pinned to the revision it
+ * loaded, so the DOM the path came from can be older than the file, and the same indices
+ * can point at a different element than the user was looking at. Only the second one is
+ * about time, and it is the one that used to be able to write silently into the wrong
+ * place.
  */
-function retype(html: string, document: Node, edit: string, incoming: string): { html: string; summary: string; id: string } {
+function retype(
+	html: string,
+	document: Node,
+	patch: Extract<BoardPatch, { op: "text" | "html" }>,
+): { html: string; summary: string; id: string } {
+	const { id, path, before } = patch;
+	const incoming = patch.op === "text" ? patch.text : patch.html;
+	const component = findById(document, id);
+	if (!component) throw new PatchRefused(`no component with data-id="${id}"`);
+
+	const target = elementAt(component, path);
+	if (!target) throw new PatchRefused(`#${id} has nothing at ${describePath(path)} any more`);
+
 	/*
-	 * `"false"` is reserved, and is never an address.
+	 * What shape the target has to be, which is the whole difference between the two ops.
 	 *
-	 * The other line of this branch had `data-edit` as an optional *hint* — editability
-	 * stayed inferred, the attribute bought a hover affordance, and `data-edit="false"`
-	 * sealed an element and its subtree, refused here by a `refuseIfSealed` that is gone
-	 * with the index path it walked. That mechanism was discarded rather than merged:
-	 * under this one nothing is editable unless the author named it, so omitting the name
-	 * *is* the seal and a seal has nothing left to do.
+	 * `text` replaces the range with plain words, so the range has to *be* plain words: a
+	 * leaf, judged against the file rather than the screen. That is also the check that lets
+	 * a `[data-md]` panel be addressed, since its children on screen are what `board.js` drew
+	 * and in the file it is one element holding markdown.
 	 *
-	 * What does not go away is the author who read that guidance. Writing
-	 * `data-edit="false"` to turn editing off would, with the name as the address, do the
-	 * exact opposite — create an editable run *called* `false`, retypeable by anyone who
-	 * double-clicks it. So the value is refused in both places, here and in
-	 * `Editor.beginEditing`, rather than merely left undocumented.
+	 * `html` replaces the range with a run of marked-up words, so what it needs is that the
+	 * range is a run and not a layout: every element in it phrasing content. A `<section>`
+	 * holding an `<h3>` and a `<p>` is refused, because writing one field over it would
+	 * replace a heading and a paragraph with a line.
 	 */
-	if (edit === "false") {
-		throw new PatchRefused(`data-edit="false" is not a name — omit the attribute to make a run uneditable`);
+	if (patch.op === "text") {
+		if (elementChildren(target).length > 0) {
+			throw new PatchRefused(`${describeTarget(id, path, target)} contains markup; edit it with the file tools instead`);
+		}
+	} else if (!isRichRun(target)) {
+		throw new PatchRefused(`${describeTarget(id, path, target)} holds blocks rather than words; edit it with the file tools instead`);
 	}
-	const found = findByEdit(document, edit);
-	if (found.length === 0) throw new PatchRefused(`nothing on this board is called data-edit="${edit}"`);
-	/*
-	 * Two runs with one name is the author's mistake, and it is the mistake this
-	 * addressing scheme can make: with an index path a wrong answer was impossible and
-	 * a refusal was common, and with a name the reverse. So it is checked rather than
-	 * resolved to the first match — writing the user's words into a component they were
-	 * not looking at is the worst available outcome.
-	 */
-	if (found.length > 1) {
-		throw new PatchRefused(`data-edit="${edit}" is on ${found.length} elements — an editable name has to be unique in a board`);
-	}
-	const target = found[0]!;
-	const component = componentOf(target);
-	if (!component) throw new PatchRefused(`data-edit="${edit}" is not inside a component`);
-	const id = attributeValue(component, "data-id")!;
 
 	const spot = target.sourceCodeLocation;
-	if (!spot?.startTag) throw new PatchRefused(`cannot locate data-edit="${edit}" in the source`);
-	if (!spot.endTag) throw new PatchRefused(`data-edit="${edit}" is a void element and has no text`);
+	if (!spot?.startTag) throw new PatchRefused(`cannot locate ${describeTarget(id, path, target)} in the source`);
+	if (!spot.endTag) throw new PatchRefused(`${describeTarget(id, path, target)} is a void element and has no text`);
 	const from = spot.startTag.endOffset;
 	const to = spot.endTag.startOffset;
 	/*
-	 * Text only, and this is the check that keeps that true.
+	 * A second check on the same property, because the first one cannot see everything.
 	 *
-	 * A run made of markup — `<p>See <a>the doc</a></p>` — cannot be replaced by plain
-	 * text without throwing the markup away, so the author marks the leaf instead. It
-	 * catches a `[data-md]` whose source contains raw HTML too, for the same reason
-	 * rather than a different one: the browser only ever had that element's
-	 * `textContent`, which is the source with the tags already dropped, so writing it
-	 * back is the same loss.
+	 * `elementChildren` counts elements the parser built. A comment, or a stray `<` the
+	 * tokenizer did not make an element of, leaves no element child and still means the
+	 * range is not plain text. Only `text` needs it; `html` is allowed markup by definition
+	 * and the normaliser decides which.
 	 */
-	if (/<[a-z!/]/i.test(html.slice(from, to))) {
-		throw new PatchRefused(`data-edit="${edit}" contains markup; edit it with the file tools instead`);
+	if (patch.op === "text" && /<[a-z!/]/i.test(html.slice(from, to))) {
+		throw new PatchRefused(`${describeTarget(id, path, target)} contains markup; edit it with the file tools instead`);
 	}
+
+	/*
+	 * The guard, and the reason a path is safe to use as an address.
+	 *
+	 * Compared as *text* on both sides, with whitespace collapsed. The browser sends what it
+	 * had on screen and the file holds its markup, so a byte comparison would refuse every
+	 * edit to a paragraph with a link in it, and every leaf holding an `&amp;`. Whitespace
+	 * goes for the same reason: the file indents a paragraph across three lines and the
+	 * browser hands back what it rendered, so the two never agree about spaces.
+	 *
+	 * What is left is disagreement about the *words* — the agent rewrote the component while
+	 * the frame was pinned, so these indices now point somewhere the user never looked.
+	 * Refusing is the whole answer: the client re-reads the board, and the user retypes on
+	 * top of what is actually there.
+	 */
+	if (collapse(textOfInline(html.slice(from, to))) !== collapse(before)) {
+		throw new PatchRefused(`${describeTarget(id, path, target)} is not what it was when you started typing`);
+	}
+
 	/*
 	 * The whitespace around the old text is kept, and only the text between it is
 	 * replaced.
@@ -362,16 +366,60 @@ function retype(html: string, document: Node, edit: string, incoming: string): {
 	 * A markdown source is the multi-line case, and the editor sends it indented to
 	 * match the block it came out of: the first line's indent and the last line's
 	 * newline are what this trim takes off, and every line between keeps the
-	 * indentation the file already had, so changing one line of a rendered component is a one-line
-	 * diff.
+	 * indentation the file already had, so changing one line of a rendered component is
+	 * a one-line diff.
 	 */
-	const text = lead || trail ? incoming.trim() : incoming;
-	const where = target === component ? `#${id}` : `the <${target.tagName}> in #${id}`;
+	const trimmed = lead || trail ? incoming.trim() : incoming;
+	/*
+	 * `text` is escaped here and `html` is normalised there.
+	 *
+	 * Two payloads, two conversions, and they must not be swapped: escaping a run of marked
+	 * up words would write `&lt;b&gt;` into the file, and writing plain text through the
+	 * normaliser would silently interpret a `<` the user typed as the start of a tag.
+	 */
+	const content = patch.op === "text" ? escapeText(trimmed) : normalizeInline(trimmed);
 	return {
-		html: html.slice(0, from + lead.length) + escapeText(text) + html.slice(to - trail.length),
-		summary: `retyped ${where}`,
+		html: html.slice(0, from + lead.length) + content + html.slice(to - trail.length),
+		summary: `retyped ${describeTarget(id, path, target)}`,
 		id,
 	};
+}
+
+/** The element `path` walks to from `component`, or nothing if the file has no such shape. */
+function elementAt(component: Element, path: number[]): Element | undefined {
+	let cursor: Element = component;
+	for (const index of path) {
+		const next = elementChildren(cursor)[index];
+		if (!next) return undefined;
+		cursor = next;
+	}
+	return cursor;
+}
+
+/**
+ * A node's element children, which is what a path counts.
+ *
+ * Elements and not `childNodes`, because the browser's `children` is elements too and
+ * the two derivations of one address have to count the same things. Text nodes are
+ * exactly what differs between a file and the DOM it parsed into.
+ */
+function elementChildren(node: Node): Element[] {
+	return ((node as { childNodes?: Node[] }).childNodes ?? []).filter((child) => (child as Element).tagName) as Element[];
+}
+
+/** Whitespace collapsed, so a comparison is about words rather than about indentation. */
+function collapse(text: string): string {
+	return text.replace(/\s+/g, " ").trim();
+}
+
+/** A path as a person would say it, for a refusal that has to be acted on. */
+function describePath(path: number[]): string {
+	return path.length === 0 ? "its own text" : `child ${path.join(" › ")}`;
+}
+
+/** What was addressed, named the way the file names it. */
+function describeTarget(id: string, path: number[], target: Element): string {
+	return path.length === 0 ? `#${id}` : `the <${target.tagName}> at ${describePath(path)} of #${id}`;
 }
 
 // --- attributes ------------------------------------------------------------------
@@ -492,10 +540,9 @@ function splice(text: string, edits: Array<{ from: number; to: number; text: str
 /**
  * A sibling of a name, never the name: `goal` -> `goal-2`, `sticky-1` -> `sticky-2`.
  *
- * What a copy is called, for a component and for every editable run inside it. Derived
- * from the original rather than minted from the kind, because a copy of `risk-refresh`
- * called `sticky-7` tells nobody what it is — and these names are the one thing in a
- * board a person and an agent both address by hand.
+ * What a copy is called. Derived from the original rather than minted from the kind,
+ * because a copy of `risk-refresh` called `sticky-7` tells nobody what it is — and a
+ * `data-id` is the one name in a board a person and an agent both address by hand.
  */
 function numbered(taken: Set<string>, from: string): string {
 	const base = from.replace(/-\d+$/, "");
@@ -506,41 +553,24 @@ function numbered(taken: Set<string>, from: string): string {
 	throw new PatchRefused("a thousand copies of that is enough");
 }
 
-/** `wanted` when nothing has it, and a numbered sibling of it when something does. */
-function freeName(taken: Set<string>, wanted: string): string {
-	return taken.has(wanted) ? numbered(taken, wanted) : wanted;
-}
-
 /*
- * Read with a regex rather than off the parse tree, deliberately: these two answer
- * "what names are taken", which is a question about the whole file including the parts
- * a splice is about to move, and a parse is the expensive way to ask it.
+ * Read with a regex rather than off the parse tree, deliberately: it answers "what names
+ * are taken", which is a question about the whole file including the parts a splice is
+ * about to move, and a parse is the expensive way to ask it.
  */
 const idNames = (html: string) => new Set([...html.matchAll(/data-id="([^"]+)"/g)].map((match) => match[1]!));
-const editNames = (html: string) => new Set([...html.matchAll(/data-edit="([^"]+)"/g)].map((match) => match[1]!));
-
-/** Every `data-edit` in a subtree, with the byte range of the attribute that carries it. */
-function editAttributes(root: Element): Array<[string, { startOffset: number; endOffset: number }]> {
-	const out: Array<[string, { startOffset: number; endOffset: number }]> = [];
-	for (const element of [root, ...findAll(root, () => true)]) {
-		const name = attributeValue(element, "data-edit");
-		const spot = element.sourceCodeLocation?.attrs?.["data-edit"];
-		if (name !== undefined && spot) out.push([name, spot]);
-	}
-	return out;
-}
 
 // --- new components ----------------------------------------------------------------
 
 /**
  * The markup a palette tool inserts. Formatted as a person would write it.
  *
- * `edit` names the run of text it writes, so a component inserted from the palette is
- * retypeable the moment it exists. Without it the first thing a user does with a new
- * sticky — double-click the placeholder and type — would do nothing, and they would
- * have no way to find out why.
+ * Nothing here names its run of text. It used to: a retype was addressed by a `data-edit`
+ * unique to the board, so a component inserted without one could be double-clicked and
+ * would silently do nothing. A run is addressed by where it sits now, so a new sticky is
+ * retypeable because it holds text, which is the only thing it ever needed to be.
  */
-function render(patch: Extract<BoardPatch, { op: "insert" }>, indent: string, edit: string): string {
+function render(patch: Extract<BoardPatch, { op: "insert" }>, indent: string): string {
 	const { kind, id, at, text, embed } = patch;
 	const style = [
 		`left: ${Math.round(at.left)}px`,
@@ -560,11 +590,11 @@ function render(patch: Extract<BoardPatch, { op: "insert" }>, indent: string, ed
 
 	switch (kind) {
 		case "card":
-			return `${indent}<section class="card" data-id="${id}"${extra} style="${style}">\n${indent}\t<h3 data-edit="${edit}">${body}</h3>\n${indent}</section>`;
+			return `${indent}<section class="card" data-id="${id}"${extra} style="${style}">\n${indent}\t<h3>${body}</h3>\n${indent}</section>`;
 		case "sticky":
-			return `${indent}<div class="sticky" data-id="${id}" data-edit="${edit}"${extra} style="${style}">${body}</div>`;
+			return `${indent}<div class="sticky" data-id="${id}"${extra} style="${style}">${body}</div>`;
 		case "text":
-			return `${indent}<div class="text" data-id="${id}" data-edit="${edit}"${extra} style="${style}">${body}</div>`;
+			return `${indent}<div class="text" data-id="${id}"${extra} style="${style}">${body}</div>`;
 		case "image":
 		case "embed":
 			return `${indent}<div class="embed" data-id="${id}" data-embed="${embed ?? ""}"${extra} style="${style}"></div>`;
@@ -609,48 +639,11 @@ function find(node: Node, predicate: (node: Element) => boolean): Element | unde
 	return undefined;
 }
 
-/** Every element matching, unlike `find` — because "how many" is the question sometimes. */
-function findAll(node: Node, predicate: (node: Element) => boolean): Element[] {
-	const out: Element[] = [];
-	for (const child of (node as { childNodes?: Node[] }).childNodes ?? []) {
-		const element = child as Element;
-		if (element.tagName && predicate(element)) out.push(element);
-		out.push(...findAll(child, predicate));
-	}
-	return out;
-}
-
 const hasAttribute = (element: Element, name: string, value: string) =>
 	element.attrs?.some((attribute) => attribute.name === name && attribute.value === value) ?? false;
 
 function findById(node: Node, id: string): Element | undefined {
 	return find(node, (element) => hasAttribute(element, "data-id", id));
-}
-
-/** Every element carrying this `data-edit`. More than one is a refusal, not a choice. */
-function findByEdit(node: Node, edit: string): Element[] {
-	return findAll(node, (element) => hasAttribute(element, "data-edit", edit));
-}
-
-/**
- * The component an editable run belongs to: the nearest ancestor with a `data-id`.
- *
- * A run may *be* the component — a `[data-md]` component's editable is its whole source —
- * so the element itself counts. Nothing here checks that the component is a child of
- * the body: the browser decides what it lets a user select, and a file this walks is
- * the file an agent wrote, so a stricter rule here would only produce a refusal whose
- * cause is invisible in the markup.
- */
-function componentOf(element: Element): Element | undefined {
-	let cursor: Element | undefined = element;
-	// Stops at the document, which has no tag and no attributes: an editable run outside
-	// every component walks all the way out rather than reading `attrs` off a node that
-	// has none.
-	while (cursor?.tagName) {
-		if (attributeValue(cursor, "data-id") !== undefined) return cursor;
-		cursor = (cursor.parentNode as Element | undefined) ?? undefined;
-	}
-	return undefined;
 }
 
 function reparse(html: string, id: string): Element {
