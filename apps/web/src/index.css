@@ -1,6 +1,54 @@
 @import "tailwindcss";
 
 /*
+ * The app's tokens, handed to Tailwind so utilities speak the design language.
+ *
+ * Tailwind has been in this build from the start and not one utility class used it, which
+ * is the worst of both: preflight's resets applied — it is what strips `list-style` from
+ * every list, which the markdown renderer has to put back — and nothing was gained. This
+ * `@theme` is what makes it worth its place: `bg-panel`, `text-muted`, `rounded-control`
+ * and `size-control` now mean the same thing in a component as `var(--panel)` means in
+ * this file, so the two systems cannot drift apart.
+ *
+ * **`inline` is load-bearing.** Without it Tailwind emits `var(--color-panel)` and freezes
+ * the value it had at build time, which would break the one thing these tokens exist for:
+ * `[data-color-scheme="dark"]` swaps them at runtime. `inline` makes a utility emit
+ * `var(--panel)` directly, so it re-resolves under whichever scheme is on.
+ *
+ * Only what a component would reasonably reach for. The grey ramp underneath stays private
+ * — a component asking for `--color-grey-700` rather than `muted` is a component deciding
+ * something the token was invented to decide.
+ */
+@theme inline {
+	--color-bg: var(--bg);
+	--color-bg-deep: var(--bg-deep);
+	--color-panel: var(--panel);
+	--color-stage: var(--stage);
+	--color-fg: var(--fg);
+	--color-muted: var(--muted);
+	--color-faint: var(--faint);
+	--color-line: var(--line);
+	--color-line-strong: var(--line-strong);
+	--color-accent: var(--color-accent);
+	--color-ok: var(--color-ok);
+	--color-warn: var(--color-warn);
+	--color-danger: var(--color-danger);
+
+	/* The control scale from the title bar and the palette (see the note on `--control`). */
+	--spacing-control: var(--control);
+	--spacing-control-sm: var(--control-sm);
+	--radius-control: var(--control-radius);
+	--radius-row: var(--row-radius);
+	/* `.panel-float`'s corner, named so a one-off surface can match it without copying 12. */
+	--radius-panel: 12px;
+
+	--shadow-panel: var(--shadow);
+	--shadow-row: var(--shadow-row);
+
+	--font-mono: var(--font-mono);
+}
+
+/*
  * The app's own tokens.
  *
  * The same ramp `runtime/lib/board.css` uses, so a board on the stage and the
@@ -661,35 +709,7 @@ svg.lucide {
 	text-align: center;
 }
 
-.notices {
-	position: absolute;
-	top: 58px;
-	left: 50%;
-	display: flex;
-	max-width: 560px;
-	flex-direction: column;
-	transform: translateX(-50%);
-	gap: 6px;
-	pointer-events: none;
-}
 
-.notice {
-	padding: 7px 12px;
-	border: 1px solid var(--line);
-	border-radius: 10px;
-	background: var(--panel);
-	box-shadow: var(--shadow);
-	backdrop-filter: blur(12px);
-	font-size: 12px;
-}
-
-.notice[data-level="warn"] {
-	border-color: color-mix(in srgb, var(--color-warn) 50%, var(--line));
-}
-
-.notice[data-level="error"] {
-	border-color: color-mix(in srgb, var(--color-danger) 50%, var(--line));
-}
 
 
 /* The sliver says which panel it is: something to aim a cursor at. */

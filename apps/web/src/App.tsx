@@ -1264,8 +1264,27 @@ export function App() {
 					onPick={scrubToTurn}
 				/>
 
-				<div class="notices">
-					<For each={state.notices}>{(item) => <div class="notice" data-level={item.level}>{item.text}</div>}</For>
+				{/*
+					Toasts. Utilities rather than a stylesheet rule, because none of this is a
+					decision worth a name: it is a centred column of small cards over the canvas.
+
+					Two things stay in CSS and are worth knowing why. `notices` keeps its class so
+					the `(pointer: coarse)` and narrow-width rules can move it — a bar that grows
+					to 52px puts a 44px palette where 58px used to be clear — and `notice` keeps
+					its own so the same media query can drop the blur, which is the expensive
+					thing to recompose over a panning canvas.
+				*/}
+				<div class="notices pointer-events-none absolute top-[58px] left-1/2 flex max-w-[560px] -translate-x-1/2 flex-col gap-1.5">
+					<For each={state.notices}>
+						{(item) => (
+							<div
+								class="notice rounded-[10px] border border-line bg-panel px-3 py-[7px] text-xs shadow-panel backdrop-blur-md data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
+								data-level={item.level}
+							>
+								{item.text}
+							</div>
+						)}
+					</For>
 				</div>
 
 			</div>
