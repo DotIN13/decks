@@ -289,6 +289,16 @@ export class Registry {
 			...(this.focusedId ? { focused: this.focusedId } : {}),
 		});
 		for (const agent of this.agents) agent.greet(reply);
+		/*
+		 * A deck restored from the store starts no runtimes, so no agent exists to
+		 * produce the `models` catalogue that a fresh deck's first agent produces at
+		 * boot — and without it every dormant chat's picker says nothing until some
+		 * new agent starts. The focused chat is the one the browser opens to talk
+		 * to; waking it here brings the catalogue (and its own model) with it.
+		 * `start()` is memoised, so an agent already starting is a no-op.
+		 */
+		const focus = this.get(this.focusedId);
+		if (focus) void focus.start();
 	}
 
 	/** A different deck is a different set of agents: a session's cwd cannot move. */

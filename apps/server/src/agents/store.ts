@@ -1,6 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AgentKind, ChatItem } from "@decks/protocol";
+import type { AgentKind, AgentModel, ChatItem } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 
 /**
@@ -49,6 +49,8 @@ export interface AgentRecord {
 	context: string[];
 	inPlay: string[];
 	createdAt: number;
+	/** The model (and thinking level) the chat was last on, so a dormant row can still say what it will use. */
+	model?: AgentModel;
 	/** Ordering, and what `prune` keeps. */
 	lastAt: number;
 }

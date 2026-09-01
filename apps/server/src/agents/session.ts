@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import type {
 	AgentCapabilities,
 	AgentChat,
 	AgentKind,
 	AgentMode,
+	AgentModel,
 	AgentState,
 	Camera,
 	ChatItem,
@@ -43,6 +45,8 @@ export class DeckAgent {
 	private starting: Promise<void> | undefined;
 	private failure: string | undefined;
 	private state: AgentState = "idle";
+	/** The last model the runtime reported, kept for the record — and for a dormant chat, which has no runtime to ask. */
+	private lastModel: AgentModel | undefined;
 	private identity: Identity;
 	/**
 	 * The model list, kept as well as sent.
@@ -101,12 +105,13 @@ export class DeckAgent {
 			 * (`agents/store.ts`). Its presence is also what makes the agent dormant: it
 			 * exists, it can be read, and it starts nothing until it is prompted.
 			 */
-			restored?: { id: string; items: ChatItem[]; context: string[]; inPlay: string[]; avatar?: string; createdAt: number };
+			restored?: { id: string; items: ChatItem[]; context: string[]; inPlay: string[]; avatar?: string; createdAt: number; model?: AgentModel };
 		},
 	) {
 		this.id = options.restored?.id ?? randomUUID();
 		this.store = options.store;
 		this.restored = options.restored !== undefined;
+		this.lastModel = options.restored?.model ?? sessionModelOf(options.resumeRef);
 		this.createdAt = options.restored?.createdAt ?? Date.now();
 		this.identity = { name: options.name ?? "Agent", color: options.color };
 		if (options.restored?.avatar) this.identity = { ...this.identity, avatar: options.restored.avatar };
@@ -309,6 +314,7 @@ export class DeckAgent {
 			context: [...this.held],
 			inPlay: [...this.playing],
 			createdAt: this.createdAt,
+			...(this.lastModel ? { model: this.lastModel } : {}),
 			// The last thing actually said, not the time of this write — it is what the list
 			// is ordered by and what `prune` keeps, so a flush on shutdown must not make an
 			// old chat look like the newest one.
@@ -373,9 +379,13 @@ export class DeckAgent {
 				// A resumed session had a canvas; without this it opens holding nothing,
 				// which reads as the boards having been lost.
 				this.apply(this.snapshots.latest(this.id));
+				this.lastModel = backend.model();
 				this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
 				this.emit({ type: "agent.model", id: this.id, model: backend.model() });
 				void this.publishModels();
+				// A restored chat now carries a live model; put it on the record so the
+				// next boot can greet it from the store instead of from the runtime.
+				this.save();
 			})
 			.catch((error: unknown) => {
 				/*
@@ -527,12 +537,16 @@ export class DeckAgent {
 	async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
 		await this.start();
 		await this.backend?.setModel(provider, model, thinking);
+		this.lastModel = this.backend?.model();
 		this.emit({ type: "agent.model", id: this.id, model: this.backend?.model() });
+		this.save();
 	}
 
 	setThinking(level: ThinkingLevel): void {
 		this.backend?.setThinking(level);
+		this.lastModel = this.backend?.model();
 		this.emit({ type: "agent.model", id: this.id, model: this.backend?.model() });
+		this.save();
 	}
 
 	/** The agent naming itself, from M3's `stage.me.setName`. */
@@ -579,6 +593,7 @@ export class DeckAgent {
 		reply({ type: "agent.state", id: this.id, state: this.state });
 		reply({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
 		if (this.backend) reply({ type: "agent.model", id: this.id, model: this.backend.model() });
+		else if (this.lastModel) reply({ type: "agent.model", id: this.id, model: this.lastModel });
 		if (this.modelOptions.length > 0) reply({ type: "models", models: this.modelOptions });
 		// A question asked before this browser existed still needs answering, or the agent
 		// that asked it waits forever.
@@ -611,4 +626,42 @@ export class DeckAgent {
  */
 function capabilitiesOf(kind: AgentKind): AgentCapabilities {
 	return kind === "claude" ? CLAUDE_CAPABILITIES : PI_CAPABILITIES;
+}
+
+/**
+ * The model a pi session was last on, read from its file.
+ *
+ * A chat restored from before the record carried a model has no way to say what it uses
+ * except its own runtime — and starting a runtime just to ask is what dormancy exists to
+ * avoid. Pi's session file records <code>model_change</code> and
+ * <code>thinking_level_change</code> entries, so the last of each is the answer, read
+ * without waking anything. Fail-safe by design: any parse problem means “unknown”, which
+ * is the same answer a chat with no session file gives.
+ */
+function sessionModelOf(path: string | undefined): AgentModel | undefined {
+	if (!path || !path.endsWith(".jsonl")) return undefined;
+	try {
+		const lines = readFileSync(path, "utf8").split("\n");
+		let provider: string | undefined;
+		let model: string | undefined;
+		let thinking: ThinkingLevel | undefined;
+		for (const line of lines) {
+			if (!line.trim()) continue;
+			let entry: { type?: string; provider?: string; modelId?: string; thinkingLevel?: ThinkingLevel };
+			try {
+				entry = JSON.parse(line) as typeof entry;
+			} catch {
+				continue;
+			}
+			if (entry.type === "model_change" && entry.provider && entry.modelId) {
+				provider = entry.provider;
+				model = entry.modelId;
+			} else if (entry.type === "thinking_level_change" && entry.thinkingLevel) {
+				thinking = entry.thinkingLevel;
+			}
+		}
+		return provider && model ? { provider, model, thinking: thinking ?? "medium" } : undefined;
+	} catch {
+		return undefined;
+	}
 }

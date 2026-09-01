@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { ServerMessage } from "@decks/protocol";
+import type { AgentModel, ChatItem, ServerMessage } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import { DeckAgent } from "./session.ts";
@@ -17,7 +17,14 @@ import { AgentStore } from "./store.ts";
  * set arithmetic can be exercised on its own, which is where the invariant lives: what is
  * on the canvas is always a subset of what the agent is holding.
  */
-function agentOn(boards: string[], options: { parentId?: string } = {}) {
+function agentOn(
+	boards: string[],
+	options: {
+		parentId?: string;
+		resumeRef?: string;
+		restored?: { id: string; items: ChatItem[]; context: string[]; inPlay: string[]; avatar?: string; createdAt: number; model?: AgentModel };
+	} = {},
+) {
 	const root = mkdtempSync(join(tmpdir(), "decks-sets-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	for (const name of boards) {
@@ -46,6 +53,56 @@ function agentOn(boards: string[], options: { parentId?: string } = {}) {
 	const last = () => sent.filter((message) => message.type === "context.changed").at(-1);
 	return { agent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
+
+	test("a dormant chat greets the model it was restored with", () => {
+		const { agent, cleanup } = agentOn([], {
+			restored: {
+				id: "restored-1",
+				items: [{ kind: "user", id: "m1", text: "hello", at: 1 }],
+				context: [],
+				inPlay: [],
+				createdAt: 1,
+				model: { provider: "claude", model: "claude-sonnet-4", thinking: "low" },
+			},
+		});
+		const sent: ServerMessage[] = [];
+		agent.greet((message) => sent.push(message));
+		const model = sent.find((message): message is Extract<ServerMessage, { type: "agent.model" }> => message.type === "agent.model");
+		assert.ok(model, "greet should report a model for a dormant chat");
+		assert.deepEqual(model.model, { provider: "claude", model: "claude-sonnet-4", thinking: "low" });
+		cleanup();
+	});
+
+	test("a dormant chat without a recorded model recovers it from its pi session file", () => {
+		const root = mkdtempSync(join(tmpdir(), "decks-session-model-"));
+		const session = join(root, "resume.jsonl");
+		writeFileSync(
+			session,
+			[
+				JSON.stringify({ type: "session", version: 1, cwd: root }),
+				JSON.stringify({ type: "model_change", provider: "opencode-go", modelId: "deepseek-v4-flash" }),
+				JSON.stringify({ type: "thinking_level_change", thinkingLevel: "high" }),
+				JSON.stringify({ type: "model_change", provider: "opencode-go", modelId: "deepseek-v4-flash" }),
+			].join("\n"),
+		);
+		const { agent, cleanup } = agentOn([], {
+			resumeRef: session,
+			restored: {
+				id: "restored-2",
+				items: [{ kind: "user", id: "m1", text: "hello", at: 1 }],
+				context: [],
+				inPlay: [],
+				createdAt: 1,
+			},
+		});
+		const sent: ServerMessage[] = [];
+		agent.greet((message) => sent.push(message));
+		const model = sent.find((message): message is Extract<ServerMessage, { type: "agent.model" }> => message.type === "agent.model");
+		assert.ok(model, "greet should report the model recovered from the session file");
+		assert.deepEqual(model.model, { provider: "opencode-go", model: "deepseek-v4-flash", thinking: "high" });
+		cleanup();
+		rmSync(root, { recursive: true, force: true });
+	});
 
 test("holding a board puts it on the canvas; the canvas is a subset of what is held", () => {
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html", "c.html"]);
