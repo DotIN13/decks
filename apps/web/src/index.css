@@ -51,6 +51,24 @@
 	 * which needed squaring off when the radius was a stadium.
 	 */
 	--row-radius: 14px;
+	/*
+	 * The control scale, taken from the title bar and the tool palette.
+	 *
+	 * Those two are the app's reference for what a control looks like here: a fixed square
+	 * with the icon gridded into the middle, no border of its own, quiet at rest, and a wash
+	 * of `--line` under the cursor — the container carries the border, the control carries
+	 * the intent. Everything else had drifted: what is conceptually *one* button existed at
+	 * 20, 22, 26, 28 and 30px with radii of 6, 7, 8 and 999, so a panel's close button and a
+	 * toolbar's tool were visibly different species.
+	 *
+	 * Two sizes rather than one, because a 28px target inside a 200px list row dominates it:
+	 * `--control` for toolbars, panel headers and the conversation, `--control-sm` for a
+	 * control that lives inside a dense row. One radius for both — a square's corner does not
+	 * need to scale, and one number is the simplification worth having.
+	 */
+	--control: 28px;
+	--control-sm: 22px;
+	--control-radius: 8px;
 	--bg: var(--color-grey-100);
 	--bg-deep: var(--color-grey-200);
 	--panel: rgb(255 255 255 / 88%);
@@ -144,17 +162,58 @@ svg.lucide {
  * `.zoombar button` already sets a padding and would otherwise win.
  */
 .titlebar .icon-button,
-.zoombar .icon-button {
+.zoombar .icon-button,
+.ops header button,
+.inspector .row.file button,
+.inspector .acts button,
+.chat-float .fclose {
 	display: grid;
-	width: 28px;
-	height: 28px;
+	width: var(--control);
+	height: var(--control);
 	padding: 0;
+	border: 0;
+	border-radius: var(--control-radius);
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	place-items: center;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
+}
+
+/*
+ * The small one, for a control that shares a row with a list item's own content: a chat
+ * row's `×`, the peek's dismiss, the two headers' buttons.
+ */
+.inspector header .close,
+.chats .rail-head button,
+.chat-row-wrap .close,
+.latest .dismiss {
+	display: grid;
+	width: var(--control-sm);
+	height: var(--control-sm);
+	padding: 0;
+	border: 0;
+	border-radius: var(--control-radius);
+	background: none;
 	color: var(--faint);
+	cursor: pointer;
 	place-items: center;
 }
 
+/* One hover for both, which is the palette's: a wash, not a border and not a jump. */
 .titlebar .icon-button:hover,
-.zoombar .icon-button:hover {
+.zoombar .icon-button:hover,
+.ops header button:hover,
+.inspector .row.file button:hover,
+.inspector .acts button:hover,
+.chat-float .fclose:hover,
+.inspector header .close:hover,
+.chats .rail-head button:hover,
+.chat-row-wrap .close:hover,
+.latest .dismiss:hover {
+	background: var(--line);
 	color: var(--fg);
 }
 
@@ -219,10 +278,10 @@ svg.lucide {
 .chats .rail-head .kind {
 	position: relative;
 	display: flex;
-	height: 22px;
+	height: var(--control-sm);
 	align-items: center;
 	padding: 0 3px 0 6px;
-	border-radius: 6px;
+	border-radius: var(--control-radius);
 	color: var(--faint);
 	cursor: pointer;
 	font-size: 10px;
@@ -576,7 +635,7 @@ svg.lucide {
 .titlebar button {
 	padding: 4px 8px;
 	border: 0;
-	border-radius: 7px;
+	border-radius: var(--control-radius);
 	background: transparent;
 	color: var(--fg);
 	cursor: pointer;
@@ -687,7 +746,7 @@ svg.lucide {
 .turn-actions button {
 	padding: 1px 6px;
 	border: 0;
-	border-radius: 6px;
+	border-radius: var(--control-radius);
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
@@ -883,22 +942,46 @@ svg.lucide {
 	gap: 6px;
 }
 
+/*
+ * A text button, and the rule the palette and the title bar have been keeping all along:
+ * **the container carries the border, the control does not.**
+ *
+ * These were 1px boxes on `--bg`, which put an outline around every answer in a card that
+ * already has one, and made a dialog's buttons a different species from the tool row's. A
+ * wash of `--line` is the same affordance with none of the ruling, and it leaves the accent
+ * fill free to mean the one thing it should: this is the answer that acts.
+ */
 .dialog-card button,
-.composer button {
+.composer button,
+.picker header button {
 	padding: 4px 10px;
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	background: var(--bg);
+	border: 0;
+	border-radius: var(--control-radius);
+	background: var(--line);
 	color: var(--fg);
 	cursor: pointer;
 	font: inherit;
 	font-size: 12px;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
 }
 
-.dialog-card button[data-primary="true"] {
-	border-color: transparent;
+.dialog-card button:hover,
+.composer button:hover,
+.picker header button:hover {
+	background: var(--line-strong);
+}
+
+.dialog-card button[data-primary="true"],
+.picker header .add {
 	background: var(--color-accent);
 	color: #fff;
+}
+
+.dialog-card button[data-primary="true"]:hover,
+.picker header .add:hover {
+	background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
 }
 
 /* Sign in with nothing pasted yet: the button is there, and says it cannot go. */
@@ -1142,19 +1225,6 @@ svg.lucide {
 	color: var(--faint);
 }
 
-.latest .dismiss {
-	display: grid;
-	width: 20px;
-	height: 20px;
-	padding: 0;
-	border: 0;
-	border-radius: 6px;
-	background: none;
-	color: var(--faint);
-	cursor: pointer;
-	place-items: center;
-}
-
 .latest .dismiss:hover {
 	background: var(--line);
 	color: var(--fg);
@@ -1228,33 +1298,26 @@ svg.lucide {
  * 26px as the title bar's buttons, opaque, and the icon carries the contrast rather than
  * the border — which is what makes it read as a control instead of a smudge.
  */
+/*
+ * The standard control, plus the one thing its position demands.
+ *
+ * It is the only icon button in the app with no container behind it — it floats over the
+ * boards — so it brings its own surface: the row material the bubbles use, and their radius,
+ * so it reads as belonging to the conversation rather than to the canvas under it.
+ */
 .chat-float .fclose {
 	align-self: flex-end;
 	margin-right: var(--row-gutter);
 	margin-bottom: 6px;
-	display: grid;
-	width: 26px;
-	height: 26px;
-	padding: 0;
-	border: 1px solid var(--line);
-	border-radius: 999px;
-	background: var(--panel);
+	border-radius: var(--row-radius);
+	background: color-mix(in oklab, var(--panel) 92%, transparent);
 	backdrop-filter: blur(12px);
 	box-shadow: var(--shadow-row);
-	color: var(--muted);
-	cursor: pointer;
-	place-items: center;
 	pointer-events: auto;
-	transition:
-		background 120ms ease,
-		border-color 120ms ease,
-		color 120ms ease;
 }
 
 .chat-float .fclose:hover {
-	border-color: var(--line-strong);
 	background: var(--bg);
-	color: var(--fg);
 }
 
 /* Reachable by Tab, and visibly so: it is the only way out of the conversation for a
@@ -1712,25 +1775,54 @@ svg.lucide {
 	flex: 1;
 }
 
+/*
+ * The pickers are chips, not form fields.
+ *
+ * Three bordered boxes with the platform's own chevrons were the least Decks-like thing on
+ * screen: they read as a settings form bolted under the input, next to a palette whose
+ * controls have no borders at all. A wash of `--line` is enough to say "this is a control"
+ * — the same thing the title bar's open button says — and it puts the emphasis back on the
+ * words you are typing, which is what the dock is for.
+ */
 .composer select {
 	max-width: 200px;
+	min-height: var(--control-sm);
 	padding: 3px 6px;
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	background: var(--bg);
+	border: 0;
+	border-radius: var(--control-radius);
+	background: var(--line);
 	color: var(--muted);
+	cursor: pointer;
 	font: inherit;
 	font-size: 11px;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
+}
+
+.composer select:hover {
+	background: var(--line-strong);
+	color: var(--fg);
+}
+
+.composer select:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 1px;
 }
 
 /*
  * A circle, now that it is one icon rather than the word "send" or the word "stop".
  * Square and centred so the two never change the bar's height between turns.
  */
+/*
+ * Round, where every other control here is a soft square. The one deliberate exception:
+ * everything else in this bar toggles or picks, and this one *commits* — the shape says so
+ * before the icon does, and it is the only filled control in the dock.
+ */
 .composer .send {
 	display: grid;
-	width: 26px;
-	height: 26px;
+	width: var(--control);
+	height: var(--control);
 	padding: 0;
 	border-radius: 999px;
 	place-items: center;
@@ -1761,7 +1853,7 @@ svg.lucide {
 	padding: 1px 3px;
 	border: 0;
 	background: none;
-	border-radius: 6px;
+	border-radius: var(--control-radius);
 	font-family: var(--font-mono);
 	font-size: 10px;
 }
@@ -1872,23 +1964,14 @@ svg.lucide {
 }
 
 /* Lets the selection go, which Escape also does — see the comment on the button. */
-.inspector header .close {
-	display: grid;
-	width: 22px;
-	height: 22px;
-	margin-left: auto;
-	padding: 0;
-	border: 0;
-	border-radius: 6px;
-	background: none;
-	color: var(--faint);
-	cursor: pointer;
-	place-items: center;
-}
-
 .inspector header .close:hover {
 	background: var(--line);
 	color: var(--fg);
+}
+
+/* Pushed to the far end of the header, which is the only thing it needs of its own. */
+.inspector header .close {
+	margin-left: auto;
 }
 
 .inspector header .what {
@@ -1920,24 +2003,38 @@ svg.lucide {
 	white-space: nowrap;
 }
 
+/*
+ * Quiet until it is being used, like everything else in this panel.
+ *
+ * A 1px box around a name that is usually just read is a border earning nothing; the wash
+ * says "editable" and the accent ring says "being edited", which is the only moment the
+ * distinction matters.
+ */
 .inspector input,
 .inspector select {
 	min-width: 0;
 	flex: 1;
 	padding: 3px 6px;
-	border: 1px solid var(--line);
-	border-radius: 6px;
-	background: var(--bg);
+	border: 0;
+	border-radius: var(--control-radius);
+	background: var(--line);
 	color: var(--fg);
 	font: inherit;
 	font-family: var(--font-mono);
 	font-size: 11px;
+	transition: background 120ms ease;
+}
+
+.inspector input:hover,
+.inspector select:hover {
+	background: var(--line-strong);
 }
 
 .inspector input:focus,
 .inspector select:focus {
-	border-color: var(--color-accent);
-	outline: none;
+	background: var(--bg);
+	outline: 2px solid var(--color-accent);
+	outline-offset: -1px;
 }
 
 /* The four interchangeable box classes, named rather than drawn: an icon for
@@ -1948,23 +2045,34 @@ svg.lucide {
 	gap: 3px;
 }
 
+/*
+ * A segmented control, and the palette is already one.
+ *
+ * Four mutually exclusive choices with exactly one active is the same control as the tool
+ * row, so it is drawn the same way: no borders, a wash under the cursor, and the accent
+ * filling the one that is on. It used to be four bordered pills — the same information in a
+ * shape the rest of the app does not use anywhere.
+ */
 .inspector .boxes button {
-	padding: 3px 6px;
-	border: 1px solid var(--line);
-	border-radius: 6px;
+	padding: 4px 7px;
+	border: 0;
+	border-radius: var(--control-radius);
 	background: transparent;
 	color: var(--muted);
 	cursor: pointer;
 	font: inherit;
-	font-size: 10px;
+	font-size: 11px;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
 }
 
 .inspector .boxes button:hover {
 	background: var(--line);
+	color: var(--fg);
 }
 
 .inspector .boxes button[data-active="true"] {
-	border-color: transparent;
 	background: var(--color-accent);
 	color: #fff;
 }
@@ -2008,26 +2116,6 @@ svg.lucide {
 
 .inspector .acts .spacer {
 	flex: 1;
-}
-
-.inspector .row.file button,
-.inspector .acts button {
-	display: grid;
-	width: 26px;
-	height: 26px;
-	padding: 0;
-	border: 0;
-	border-radius: 7px;
-	background: transparent;
-	color: var(--muted);
-	cursor: pointer;
-	place-items: center;
-}
-
-.inspector .row.file button:hover,
-.inspector .acts button:hover {
-	background: var(--line);
-	color: var(--fg);
 }
 
 .inspector .acts button.danger:hover {
@@ -2164,14 +2252,8 @@ svg.lucide {
 .picker header button {
 	display: flex;
 	align-items: center;
-	padding: 2px 8px 2px 5px;
+	padding: 3px 9px 3px 6px;
 	gap: 3px;
-	border: 1px solid var(--line);
-	border-radius: 7px;
-	background: var(--bg);
-	color: var(--fg);
-	cursor: pointer;
-	font: inherit;
 	font-size: 11px;
 }
 
@@ -2224,7 +2306,7 @@ svg.lucide {
 	align-items: center;
 	padding: 5px 8px;
 	border: 0;
-	border-radius: 7px;
+	border-radius: var(--control-radius);
 	background: none;
 	color: inherit;
 	cursor: pointer;
@@ -2339,11 +2421,11 @@ svg.lucide {
  */
 .pin {
 	display: inline-grid;
-	width: 20px;
-	height: 20px;
+	width: var(--control-sm);
+	height: var(--control-sm);
 	padding: 0;
 	border: 0;
-	border-radius: 6px;
+	border-radius: var(--control-radius);
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
@@ -2361,20 +2443,6 @@ svg.lucide {
 
 .pin[data-on="true"] {
 	color: var(--color-accent);
-}
-
-.chats .rail-head button {
-	display: inline-grid;
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	border: 0;
-	border-radius: 6px;
-	background: none;
-	color: var(--muted);
-	cursor: pointer;
-	place-items: center;
-	vertical-align: middle;
 }
 
 .chats .rail-head button:hover {
@@ -2470,22 +2538,6 @@ svg.lucide {
 	background: var(--line);
 }
 
-.chat-row-wrap .close {
-	display: grid;
-	width: 20px;
-	height: 20px;
-	padding: 0;
-	border: 0;
-	border-radius: 6px;
-	opacity: 0;
-	background: none;
-	color: var(--faint);
-	cursor: pointer;
-	flex: none;
-	place-items: center;
-	transition: opacity 120ms ease;
-}
-
 /*
  * Its slot is held whether or not it is showing, so a row does not reflow under the cursor
  * and the name truncates at the same place either way.
@@ -2493,6 +2545,13 @@ svg.lucide {
  * Shown on approach, like the board's own ×, and kept when focused by the keyboard — which
  * is the only way to reach it without a pointer.
  */
+/* Hidden until the row is approached, and never squeezed by the name beside it. */
+.chat-row-wrap .close {
+	opacity: 0;
+	flex: none;
+	transition: opacity 120ms ease;
+}
+
 .chat-row-wrap:hover .close,
 .chat-row-wrap .close:focus-visible {
 	opacity: 1;
@@ -2822,10 +2881,17 @@ svg.lucide {
 		backdrop-filter: none;
 	}
 
-	.titlebar .icon-button,
-	.zoombar .icon-button {
-		width: 44px;
-		height: 44px;
+	/*
+	 * The whole standard control grows, not just the two that used to be listed here.
+	 *
+	 * Named per surface before there was a shared rule, which meant the ops sheet's close,
+	 * the inspector's actions and the conversation's `×` stayed at 28px on a touchscreen —
+	 * under half the area a fingertip needs. Redefining the token does every one of them at
+	 * once, which is the point of having it.
+	 */
+	:root {
+		--control: 44px;
+		--control-sm: 34px;
 	}
 
 	.palette {
