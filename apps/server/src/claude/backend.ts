@@ -9,11 +9,13 @@ import {
 	type Options,
 	type PermissionMode,
 	type Query,
+	type SDKControlGetUsageResponse,
 	type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
 import { parseSlash } from "../agents/slash.ts";
+import { answerQuestions } from "./ask-user-question.ts";
 import { deckContext } from "../agents/context.ts";
 import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
@@ -200,7 +202,6 @@ export class ClaudeBackend implements AgentBackend {
 					}
 					if (message.type === "result") {
 						this.streaming = false;
-						void this.refreshUsage();
 						/*
 						 * Pair the transcript with the session file *here*, not where the
 						 * shell does it.
@@ -211,8 +212,18 @@ export class ClaudeBackend implements AgentBackend {
 						 * found nothing to pair. Every message after the first was left
 						 * without an id, and a message with no id has no rewind, no fork
 						 * and no board restore.
+						 *
+						 * The usage read is in the chain rather than beside it, and that
+						 * ordering is the whole of whether the meter appears. `turnEnded`
+						 * emits `agent.usage` from the cached figures, so a fire-and-forget
+						 * refresh lost the race every time: the browser was told
+						 * `{ contextTokens: null, contextWindow: 0 }` and nothing ever
+						 * corrected it, so the composer's meter — which needs both — never
+						 * drew for a Claude agent while pi's always did.
 						 */
-						void this.syncEntryIds().then(() => this.context.turnEnded?.());
+						void this.syncEntryIds()
+							.then(() => this.refreshUsage())
+							.then(() => this.context.turnEnded?.());
 					}
 					handleClaudeMessage(translator, state, message);
 				}
@@ -286,6 +297,9 @@ export class ClaudeBackend implements AgentBackend {
 	private async ask(toolName: string, input: Record<string, unknown>): Promise<
 		{ behavior: "allow"; updatedInput: Record<string, unknown> } | { behavior: "deny"; message: string }
 	> {
+		// `AskUserQuestion` is not a permission question, it *is* the question
+		// (`ask-user-question.ts`).
+		if (toolName === "AskUserQuestion") return answerQuestions(input, (request) => this.context.bridge.choose(request));
 		const detail = describe(input);
 		// The bridge's own fallback for a confirm is `false`, which is the answer this
 		// wants: an abandoned question denies rather than waves a command through.
@@ -294,6 +308,25 @@ export class ClaudeBackend implements AgentBackend {
 			.confirm(`Claude wants to run ${toolName}`, detail ? `${detail}\n\nAllow it?` : "Allow it?");
 		return allowed ? { behavior: "allow", updatedInput: input } : { behavior: "deny", message: "The user denied this." };
 	}
+
+	/**
+	 * The agent asking the *user* something, rather than asking permission.
+	 *
+	 * This arrives through `canUseTool` like every other tool, and treating it as one is
+	 * what made it useless: Decks showed "Claude wants to run AskUserQuestion — allow it?",
+	 * you clicked yes, and the CLI ran a tool whose answers nobody had supplied. The turn
+	 * carried on as though nothing had been asked, which is exactly what it looked like.
+	 *
+	 * **The host is the renderer, and `updatedInput` is the channel.** The tool's own
+	 * schema says so — `answers` is described as "user answers collected by the permission
+	 * component" — so the contract is: draw the questions, put the choices back on the
+	 * input, allow it, and the CLI hands them to the model as the tool's result. Keyed by
+	 * the question text, which is what the output is keyed by.
+	 *
+	 * Asked one at a time. A question may be one of four, and four stacked dialogs in a
+	 * dock 88px tall is a dock nobody can read; sequential is also the only order in which
+	 * a later question can be worth answering after an earlier one.
+	 */
 
 	// --- the conversation -------------------------------------------------------------
 
@@ -598,20 +631,38 @@ export class ClaudeBackend implements AgentBackend {
 		return this.lastUsage;
 	}
 
-	/** The session's usage and cost, in a modal the browser shows. */
+	/**
+	 * The session's usage and cost, in a modal the browser shows.
+	 *
+	 * Read fresh rather than from the cache: the modal is opened deliberately, so the one
+	 * moment it is worth a round trip to the CLI is this one — the cached figures are as
+	 * old as the last turn, and a session left idle for an hour would report an hour-old
+	 * plan window.
+	 *
+	 * The plan windows are what a subscription actually runs out of, and the reason to
+	 * open this at all on one. They are absent for an API account, Bedrock and Vertex —
+	 * `rate_limits_available` says so — and the rows are simply left out rather than shown
+	 * as dashes, because a row that can never have a value is a question the modal answers
+	 * with nothing.
+	 */
 	async usageModal(): Promise<void> {
+		await this.refreshUsage();
 		const usage = this.lastUsage;
+		const plan = await this.planUsage();
+		const windows = plan?.rate_limits_available ? plan.rate_limits : undefined;
 		await this.context.bridge.usage("Claude session", [
 			{
 				label: "Context",
-				value:
-					usage?.contextWindow
-						? `${Math.round(((usage.contextTokens ?? 0) / usage.contextWindow) * 100)}% (${usage.contextTokens ?? "?"} / ${usage.contextWindow} tokens)`
-						: "—",
+				value: usage?.contextWindow
+					? `${Math.round(((usage.contextTokens ?? 0) / usage.contextWindow) * 100)}% (${usage.contextTokens ?? "?"} / ${usage.contextWindow} tokens)`
+					: "—",
 			},
 			{ label: "Cost", value: `$${(usage?.cost ?? 0).toFixed(4)}` },
 			{ label: "Model", value: this.currentModel ?? "default" },
-		],);
+			...(plan?.subscription_type ? [{ label: "Plan", value: plan.subscription_type }] : []),
+			...window(windows?.five_hour, "5 hours"),
+			...window(windows?.seven_day, "7 days"),
+		]);
 	}
 
 	/** Read after each turn, because Decks' `usage()` is synchronous and this is not. */
@@ -621,12 +672,40 @@ export class ClaudeBackend implements AgentBackend {
 			this.lastUsage = {
 				contextTokens: usage.totalTokens,
 				contextWindow: usage.maxTokens,
-				// The CLI reports cost through `/usage`, which is a separate and
-				// experimental call; nothing here would be more honest than zero.
-				cost: this.lastUsage?.cost ?? 0,
+				cost: (await this.spend()) ?? this.lastUsage?.cost ?? 0,
 			};
 		} catch {
 			/* a query that has ended has no usage, which is not an error worth raising */
+		}
+	}
+
+	/**
+	 * What the session has cost, from the call behind the CLI's own `/usage`.
+	 *
+	 * Reported as zero until now, on the grounds that the call is experimental — which
+	 * left the meter saying "3% ctx" beside a pi agent saying "3% ctx · $0.0018", and a
+	 * cost of zero is not more honest than no figure, it is a wrong one.
+	 *
+	 * Held at arm's length, because the SDK's own name for it is an instruction:
+	 * `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`. Probed for rather than
+	 * called, so an SDK that drops or renames it degrades to the previous figure instead of
+	 * throwing inside a turn — the same reason `usageModal` treats the plan windows as a
+	 * bonus rather than a field.
+	 */
+	private async spend(): Promise<number | undefined> {
+		const usage = await this.planUsage();
+		const cost = usage?.session?.total_cost_usd;
+		return typeof cost === "number" && Number.isFinite(cost) ? cost : undefined;
+	}
+
+	/** The whole of what `/usage` knows, or nothing at all. */
+	private async planUsage(): Promise<SDKControlGetUsageResponse | undefined> {
+		const read = (this.session as Partial<Query>).usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET;
+		if (typeof read !== "function") return undefined;
+		try {
+			return await read.call(this.session);
+		} catch {
+			return undefined;
 		}
 	}
 
@@ -911,4 +990,18 @@ function describe(input: Record<string, unknown>): string {
 		if (typeof value === "string" && value.trim()) return `${key}: ${value.trim().slice(0, 300)}`;
 	}
 	return "";
+}
+
+/**
+ * One plan window as a row, or no row at all.
+ *
+ * `utilization` is nullable independently of the window existing — the CLI reports the
+ * window with an unknown figure while it is still being fetched — and "88% of 5 hours,
+ * resets 14:20" is the whole of what the number is for.
+ */
+function window(limit: { utilization?: number | null; resets_at?: string | null } | null | undefined, label: string): Array<{ label: string; value: string }> {
+	if (!limit || typeof limit.utilization !== "number") return [];
+	const resets = limit.resets_at ? new Date(limit.resets_at) : undefined;
+	const at = resets && !Number.isNaN(resets.getTime()) ? `, resets ${resets.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "";
+	return [{ label: `Last ${label}`, value: `${Math.round(limit.utilization)}% used${at}` }];
 }

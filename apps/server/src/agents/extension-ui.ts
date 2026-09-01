@@ -112,6 +112,22 @@ export class ExtensionUiBridge {
 	}
 
 	/**
+	 * A question whose options carry their own reasons (`choose` in the protocol).
+	 *
+	 * Not on `context()`: this one has no counterpart in Pi's UI surface, so putting it
+	 * there would be inventing a method for extensions that no extension can call. Its
+	 * caller is `claude/backend.ts`, answering `AskUserQuestion`.
+	 *
+	 * `undefined` is abandoned — and abandoning a question is not choosing its first
+	 * option, so the fallback says nothing rather than something.
+	 */
+	choose(
+		question: { title: string; message?: string; options: { label: string; description?: string }[]; multiple?: boolean; other?: boolean },
+	): Promise<string | undefined> {
+		return this.ask<string | undefined>({ method: "choose", ...question }, undefined);
+	}
+
+	/**
 	 * The object handed to `bindExtensions`.
 	 *
 	 * Cast at the call site, deliberately — see the note at the top of this file.

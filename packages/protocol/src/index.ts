@@ -373,6 +373,28 @@ export type ExtensionUiPrompt =
 	| { id: string; method: "editor"; title: string; prefill?: string }
 	| { id: string; method: "custom"; lines: WidgetLine[] }
 	/**
+	 * A question with reasons attached, which `select` cannot carry.
+	 *
+	 * Claude Code's `AskUserQuestion` is the caller: two to four options, each with a
+	 * sentence saying what choosing it would mean, and that sentence is the part worth
+	 * reading — "Hybrid" and "All utilities" are indistinguishable without it. `select`
+	 * has bare strings and no room to put one.
+	 *
+	 * The answer is `{ value }` in both shapes: for `multiple`, the picked labels joined
+	 * with ", ", which is the format the tool's own output specifies for a multi-select.
+	 * `other` adds a free-text escape, because a question with four answers and no way to
+	 * say "none of those" is a question that traps you.
+	 */
+	| {
+			id: string;
+			method: "choose";
+			title: string;
+			message?: string;
+			options: { label: string; description?: string }[];
+			multiple?: boolean;
+			other?: boolean;
+	  }
+	/**
 	 * Sign-in: a URL to open, and the code the browser hands back.
 	 *
 	 * Claude Code's OAuth flow is a paste-the-code flow — it prints a URL and then waits

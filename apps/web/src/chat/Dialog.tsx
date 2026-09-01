@@ -1,5 +1,5 @@
 import type { ExtensionUiPrompt } from "@decks/protocol";
-import { createSignal, For, Match, Switch } from "solid-js";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 /**
  * A runtime asking the user something (DESIGN §6.8).
@@ -23,6 +23,15 @@ export function Dialog(props: {
 	const [text, setText] = createSignal(
 		props.prompt.method === "editor" ? (props.prompt.prefill ?? "") : "",
 	);
+
+	/** The `choose` prompt, cast the way the rest of this file casts. */
+	const choose = () => props.prompt as Extract<ExtensionUiPrompt, { method: "choose" }>;
+	/** Ticked labels, for a question that takes more than one. */
+	const [ticked, setTicked] = createSignal<string[]>([]);
+	const toggle = (label: string) =>
+		setTicked((was) => (was.includes(label) ? was.filter((entry) => entry !== label) : [...was, label]));
+	/** Typing an answer the options do not have. */
+	const [otherOpen, setOtherOpen] = createSignal(false);
 
 	/**
 	 * Focus a field as its card appears — see the note at the top of this file.
@@ -66,6 +75,89 @@ export function Dialog(props: {
 								</button>
 							)}
 						</For>
+						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
+							Cancel
+						</button>
+					</div>
+				</Match>
+
+				{/*
+					A question with reasons attached — Claude Code's `AskUserQuestion`.
+					
+					One button per option, stacked rather than in a row, because the sentence under
+					each label is the part worth reading and a row has nowhere to put it. A single
+					choice answers on the click; a multi-select ticks and waits for Done, since
+					"which of these" has no answer until you have stopped choosing.
+				*/}
+				<Match when={props.prompt.method === "choose"}>
+					{/* The tool's own 12-character chip: what the question is *about*, above what it asks. */}
+					<Show when={choose().message}>
+						{(header) => (
+							<div class="mb-1 text-[10px] tracking-[0.06em] text-faint uppercase">{header()}</div>
+						)}
+					</Show>
+					<div class="font-semibold">{choose().title}</div>
+
+					<div class="mt-2 flex flex-col gap-1">
+						<For each={choose().options}>
+							{(option) => (
+								<button
+									class="flex w-full flex-col items-start gap-0.5 px-2.5 py-2 text-left data-[on=true]:outline-2 data-[on=true]:-outline-offset-2 data-[on=true]:outline-accent"
+									type="button"
+									data-on={choose().multiple ? ticked().includes(option.label) : undefined}
+									aria-pressed={choose().multiple ? ticked().includes(option.label) : undefined}
+									onClick={() => (choose().multiple ? toggle(option.label) : props.onAnswer({ value: option.label }))}
+								>
+									<span class="text-fg">{option.label}</span>
+									<Show when={option.description}>
+										<span class="text-[11px] leading-normal whitespace-normal text-muted">{option.description}</span>
+									</Show>
+								</button>
+							)}
+						</For>
+					</div>
+
+					{/*
+						The escape the tool promises and does not provide: "There should be no
+						'Other' option, that will be provided automatically" — automatically means
+						here. A question with four answers and no way to say "none of those" is a
+						question that traps you.
+					*/}
+					<Show when={otherOpen()}>
+						<input
+							class="mt-2 w-full rounded-control border border-line bg-bg-deep px-2 py-[5px]"
+							ref={focusOnMount}
+							value={text()}
+							placeholder="Something else…"
+							onInput={(event) => setText(event.currentTarget.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter" && text().trim()) props.onAnswer({ value: text().trim() });
+								if (event.key === "Escape") setOtherOpen(false);
+							}}
+						/>
+					</Show>
+
+					<div class="mt-2 flex flex-wrap gap-1.5">
+						<Show when={choose().multiple && !otherOpen()}>
+							<button
+								type="button"
+								data-primary="true"
+								disabled={ticked().length === 0}
+								onClick={() => props.onAnswer({ value: ticked().join(", ") })}
+							>
+								Done
+							</button>
+						</Show>
+						<Show when={otherOpen()}>
+							<button type="button" data-primary="true" disabled={!text().trim()} onClick={() => props.onAnswer({ value: text().trim() })}>
+								Send
+							</button>
+						</Show>
+						<Show when={choose().other && !otherOpen()}>
+							<button type="button" onClick={() => setOtherOpen(true)}>
+								Other…
+							</button>
+						</Show>
 						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
 							Cancel
 						</button>
