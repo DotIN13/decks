@@ -81,6 +81,23 @@ export interface AgentCapabilities {
 	modes: AgentMode[];
 }
 
+/**
+ * One thing typing `/` in the composer completes to.
+ *
+ * Named the way the runtime types it — capital ``L`` in "login", no leading slash —
+ * and described by the backend that serves it, so the menu and the machine never
+ * drift apart. `arg` is an example of what a command takes after its own name,
+ * shown as a placeholder when the command is inserted.
+ */
+export interface SlashCommand {
+	/** E.g. "login" — typed and sent as "/login". */
+	name: string;
+	/** One line on what it does, for the menu. */
+	hint?: string;
+	/** An example argument, e.g. "[notes]" for "/compact [notes]". */
+	arg?: string;
+}
+
 /** One row in the chat list: an agent, as a messaging app would draw it. */
 export interface AgentChat {
 	id: string;
@@ -97,6 +114,8 @@ export interface AgentChat {
 	contextCount: number;
 	kind: AgentKind;
 	capabilities: AgentCapabilities;
+	/** What `/` completes to in the composer, supplied by the backend. */
+	commands: SlashCommand[];
 	/** Absent when the runtime has no modes. */
 	mode?: AgentMode;
 	/**
@@ -293,7 +312,11 @@ export type ExtensionUiPrompt =
 	| { id: string; method: "confirm"; title: string; message: string }
 	| { id: string; method: "input"; title: string; placeholder?: string }
 	| { id: string; method: "editor"; title: string; prefill?: string }
-	| { id: string; method: "custom"; lines: WidgetLine[] };
+	| { id: string; method: "custom"; lines: WidgetLine[] }
+	/** Sign-in: a URL to open, and a way back to say it is done. */
+	| { id: string; method: "login"; title: string; message: string; url: string }
+	/** Informational figures, dismissed with OK. */
+	| { id: string; method: "usage"; title: string; rows: { label: string; value: string }[] };
 
 export type ExtensionUiAnswer =
 	| { id: string; value: string }
@@ -327,6 +350,8 @@ export type ClientMessage =
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
 	| { type: "agent.thinking"; id: string; thinking: ThinkingLevel }
 	| { type: "agent.setMode"; id: string; mode: AgentMode }
+	/** Ask the focused agent's runtime for its usage, in a modal. */
+	| { type: "agent.usage"; id: string }
 	| { type: "stage.result"; result: StageResult }
 	| { type: "extension.ui.answer"; answer: ExtensionUiAnswer }
 	| { type: "rewind.preview"; id: string; entryId: string | null }
@@ -352,7 +377,7 @@ export type ServerMessage =
 	| { type: "agent.identity"; id: string; identity: Identity }
 	| { type: "agent.model"; id: string; model?: AgentModel }
 	| { type: "agent.usage"; id: string; usage: AgentUsage }
-	| { type: "models"; models: ModelOption[] }
+	| { type: "models"; agentId: string; models: ModelOption[] }
 	| { type: "timeline.preview"; agentId: string; entryId: string | null; boards: Record<string, string> }
 	| { type: "chat.history"; agentId: string; items: ChatItem[] }
 	| { type: "chat.item"; agentId: string; item: ChatItem }

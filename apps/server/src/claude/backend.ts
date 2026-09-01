@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import {
 	forkSession,
 	getSessionMessages,
@@ -10,10 +11,11 @@ import {
 	type Query,
 	type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
+import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
+import { parseSlash } from "../agents/slash.ts";
 import { deckContext } from "../agents/context.ts";
-import { claudeAvailability, claudeExecutable } from "./available.ts";
+import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";
 import { qualifiedToolName, stageMcpServer } from "./tools.ts";
 
@@ -42,6 +44,25 @@ const CLI_MODE: Record<AgentMode, PermissionMode> = {
 };
 
 export const CLAUDE_CAPABILITIES: AgentCapabilities = { modes: ["manual", "acceptEdits", "plan", "auto"] };
+
+/**
+ * The `/` commands a Claude agent can run, and every one is the deck's own.
+ *
+ * The CLI does not parse slash commands out of prompts it is handed — `/login` comes
+ * back as the model answering "not available in this environment" — so there is no
+ * pass-through here. What works headless is what Decks interprets: `/login` asks for
+ * an Anthropic API key and applies it to this agent's sessions, `/logout` forgets it,
+ * and the rest read state the backend already has.
+ */
+export const CLAUDE_COMMANDS: SlashCommand[] = [
+	{ name: "login", hint: "Sign in with a Claude subscription" },
+	{ name: "logout", hint: "Sign out of Claude" },
+	{ name: "status", hint: "Model, mode and auth state" },
+	{ name: "doctor", hint: "Check the Claude Code install" },
+	{ name: "cost", hint: "Spend and context for this session" },
+	{ name: "compact", hint: "Compress the conversation", arg: "[notes]" },
+	{ name: "help", hint: "The commands Decks understands" },
+];
 
 /**
  * Boards are the medium, so edits inside the deck proceed unasked.
@@ -82,7 +103,17 @@ export class ClaudeBackend implements AgentBackend {
 		if (!availability.available) throw new Error(availability.reason);
 		const backend = new ClaudeBackend(context);
 		await backend.startQuery(context.resumeRef);
+		// A Claude install with no credentials fails on its first real turn; say where
+		// /login lives before that happens. Fire-and-forget: it is a hint, not a gate.
+		void backend.hintIfUnauthenticated();
 		return backend;
+	}
+
+	/** One notice, when this agent has no way to authenticate yet. */
+	private async hintIfUnauthenticated(): Promise<void> {
+		if (process.env.ANTHROPIC_API_KEY) return;
+		const auth = await claudeAuthStatus();
+		if (!auth.loggedIn) this.context.notice("warn", "Claude isn't signed in — send /login to sign in with your subscription.");
 	}
 
 	// --- the open query --------------------------------------------------------------
@@ -229,9 +260,184 @@ export class ClaudeBackend implements AgentBackend {
 	// --- the conversation -------------------------------------------------------------
 
 	async prompt(text: string): Promise<void> {
+		/*
+		 * A prompt that starts with `/` is a command. The CLI executes most of them
+		 * itself — /compact, /doctor, /cost run inside the session and answer back
+		 * through the stream — and the ones that need a terminal do not: /login and
+		 * /logout are refused "in this environment", so Decks runs the CLI's own
+		 * `auth login` subcommand instead, whose subscription flow prints a sign-in
+		 * URL to complete in any browser. /status reads state the backend already
+		 * has. Only /help and /status are the deck's own words.
+		 */
+		const command = parseSlash(text);
+		if (command) {
+			await this.runSlash(command.name, command.args);
+			return;
+		}
 		this.streaming = true;
 		this.context.translator.setState("thinking");
 		this.push(text);
+	}
+
+	/** What typing `/` completes to, for the composer's menu. */
+	commands(): SlashCommand[] {
+		return CLAUDE_COMMANDS;
+	}
+
+	private async runSlash(name: string, args: string): Promise<void> {
+		const { notice } = this.context;
+		switch (name) {
+			case "login":
+				await this.slashLogin();
+				return;
+			case "logout":
+				await this.slashLogout();
+				return;
+			case "status": {
+				const auth = await claudeAuthStatus();
+				notice(
+					"info",
+					`Claude Code · model ${this.currentModel ?? "default"} · mode ${this.currentMode ?? "default"} · ${
+						auth.loggedIn ? `signed in (${auth.label})` : "not signed in"
+					}`,
+				);
+				return;
+			}
+			case "help":
+				notice(
+					"info",
+					this.commands().map((slash) => `/${slash.name}${slash.arg ? ` ${slash.arg}` : ""} — ${slash.hint ?? ""}`).join("\n") || "No commands.",
+				);
+				return;
+			case "cost":
+				await this.usageModal();
+				return;
+			default:
+				// The CLI's own commands — /compact, /doctor — run inside the
+				// session and answer back through the stream.
+				this.push(`/${name}${args ? ` ${args}` : ""}`);
+		}
+	}
+
+	/**
+	 * Sign in with a Claude subscription.
+	 *
+	 * The CLI refuses /login inside a headless session, but its own `auth login`
+	 * subcommand does not: it prints the subscription OAuth URL (and polls it) in any
+	 * environment. So the deck runs that process, surfaces its URL in the transcript,
+	 * and restarts the agent's session once sign-in completes — a new session reads
+	 * the credentials the login process wrote.
+	 *
+	 * Nothing is stored by Decks itself: the credentials are Claude's own, in the
+	 * user's home, the way an interactive `claude` would keep them.
+	 */
+	private async slashLogin(): Promise<void> {
+		const { notice } = this.context;
+		const binary = claudeExecutable() ?? claudeBundledExecutable();
+		if (!binary) {
+			notice("error", "No Claude Code executable to authenticate.");
+			return;
+		}
+		notice("info", "Starting Claude's subscription login…");
+		const child = spawn(binary, ["auth", "login", "--claudeai"], { stdio: ["ignore", "pipe", "pipe"] });
+
+		// The URL prints immediately; wait for it rather than racing the process,
+		// because the modal is only worth showing once there is something to open.
+		let url: string | undefined;
+		let resolveUrl: () => void = () => {};
+		const urlReady = new Promise<void>((resolve) => (resolveUrl = resolve));
+		let stderr = "";
+		const seenLines = new Set<string>();
+		child.stdout.on("data", (data: Buffer) => {
+			for (const raw of data.toString().split(/\r?\n/)) {
+				const found = /https?:\/\/\S+/.exec(raw);
+				if (found) {
+					if (!url) {
+						url = found[0];
+						resolveUrl();
+					}
+					continue;
+				}
+				// The CLI's own "Opening browser…" lines, surfaced as they come.
+				const line = raw.trim();
+				if (line && !seenLines.has(line)) {
+					seenLines.add(line);
+					notice("info", line);
+				}
+			}
+		});
+		child.stderr.on("data", (data: Buffer) => (stderr += data.toString()));
+		const exited = new Promise<void>((resolve) => child.on("exit", () => resolve()));
+		await Promise.race([urlReady, exited, sleep(20_000)]);
+		if (!url) {
+			child.kill();
+			notice("error", stderr.trim().split("\n").at(-1) ?? "Claude's login would not start.");
+			return;
+		}
+
+		// The modal: open the link, sign in, and Decks closes the dialog itself the
+		// moment the sign-in lands — the person should not have to come back and click.
+		const modal = this.context.bridge.login(
+			url,
+			"Open the link and sign in with your Claude subscription — this dialog closes on its own once the sign-in lands.",
+		);
+		let signedIn = false;
+		const poll = setInterval(() => {
+			void claudeAuthStatus().then((auth) => {
+				if (!auth.loggedIn) return;
+				signedIn = true;
+				clearInterval(poll);
+				this.context.bridge.answer({ id: modal.id, confirmed: true });
+			});
+		}, 2500);
+
+		const confirmed = await modal.done;
+		clearInterval(poll);
+		if (!confirmed) {
+			child.kill();
+			notice("info", "/login cancelled.");
+			return;
+		}
+		// Confirmed by the poll, or by the click before it landed — hold off on the
+		// restart until the credentials file has actually flipped.
+		for (let attempt = 0; attempt < 6 && !signedIn; attempt++) {
+			signedIn = (await claudeAuthStatus()).loggedIn;
+			if (!signedIn) await sleep(1500);
+		}
+		if (!signedIn) {
+			notice("warn", "Sign-in not detected yet — the session will pick it up on its next restart.");
+			return;
+		}
+		notice("info", "Signed in to Claude.");
+		await this.restart();
+	}
+
+	/** Sign out, the same way: the CLI's own `auth logout`, outside the session. */
+	private async slashLogout(): Promise<void> {
+		const { code, stderr } = await runClaudeCommand(["auth", "logout"]);
+		if (code === 0) this.context.notice("info", "Signed out of Claude.");
+		else if (stderr.trim()) this.context.notice("warn", stderr.trim().split("\n").slice(-1)[0] ?? "Could not sign out.");
+		else this.context.notice("info", "Claude was not signed in.");
+	}
+
+	/**
+	 * Reopen the query against the same session, picking up new options (a key).
+	 *
+	 * The same dance a rewind does: close the old stream, start a new one against the
+	 * same session id, then let the old one go.
+	 */
+	private async restart(): Promise<void> {
+		const previous = this.session;
+		this.closed = true;
+		this.wake?.();
+		this.queue = [];
+		await this.startQuery(this.sessionRef());
+		if (this.currentMode !== DEFAULT_MODE) await this.setMode(this.currentMode);
+		try {
+			await previous.return(undefined);
+		} catch {
+			/* a query that has already ended is not a problem worth raising */
+		}
 	}
 
 	async abort(): Promise<void> {
@@ -279,6 +485,22 @@ export class ClaudeBackend implements AgentBackend {
 
 	usage(): AgentUsage | null {
 		return this.lastUsage;
+	}
+
+	/** The session's usage and cost, in a modal the browser shows. */
+	async usageModal(): Promise<void> {
+		const usage = this.lastUsage;
+		await this.context.bridge.usage("Claude session", [
+			{
+				label: "Context",
+				value:
+					usage?.contextWindow
+						? `${Math.round(((usage.contextTokens ?? 0) / usage.contextWindow) * 100)}% (${usage.contextTokens ?? "?"} / ${usage.contextWindow} tokens)`
+						: "—",
+			},
+			{ label: "Cost", value: `$${(usage?.cost ?? 0).toFixed(4)}` },
+			{ label: "Model", value: this.currentModel ?? "default" },
+		],);
 	}
 
 	/** Read after each turn, because Decks' `usage()` is synchronous and this is not. */
@@ -490,6 +712,45 @@ function stageServerName(): string {
  * `off` and `minimal` have no effort counterpart — the CLI's lowest is `low` — so they map
  * to nothing rather than to a level that would spend more than was asked for.
  */
+/** The CLI's own auth subcommand, to be run outside any session. */
+function runClaudeCommand(args: string[], timeoutMs = 30_000): Promise<{ code: number | null; stdout: string; stderr: string }> {
+	return new Promise((resolve) => {
+		const binary = claudeExecutable() ?? claudeBundledExecutable();
+		if (!binary) {
+			resolve({ code: 1, stdout: "", stderr: "No Claude Code executable found." });
+			return;
+		}
+		const child = spawn(binary, args, { stdio: ["ignore", "pipe", "pipe"] });
+		let stdout = "";
+		let stderr = "";
+		child.stdout.on("data", (data: Buffer) => (stdout += data.toString()));
+		child.stderr.on("data", (data: Buffer) => (stderr += data.toString()));
+		const timer = setTimeout(() => child.kill(), timeoutMs);
+		child.on("exit", (code) => {
+			clearTimeout(timer);
+			resolve({ code, stdout, stderr });
+		});
+	});
+}
+
+/** Whether the CLI's own credentials file says signed in, and how. */
+async function claudeAuthStatus(): Promise<{ loggedIn: boolean; label: string }> {
+	try {
+		const { stdout } = await runClaudeCommand(["auth", "status"]);
+		const data = JSON.parse(stdout) as { loggedIn?: boolean; authMethod?: string; apiProvider?: string };
+		return {
+			loggedIn: data.loggedIn === true,
+			label: [data.authMethod, data.apiProvider].filter(Boolean).join(" · "),
+		};
+	} catch {
+		return { loggedIn: false, label: "" };
+	}
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function effortOf(level: ThinkingLevel | undefined): "low" | "medium" | "high" | "xhigh" | "max" | undefined {
 	switch (level) {
 		case "low":

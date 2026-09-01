@@ -39,6 +39,22 @@ export function handleClaudeMessage(t: Translator, state: ClaudeStreamState, mes
 			// rather than a type of its own.
 			if (message.subtype === "init") t.setState("thinking");
 			else if (message.subtype === "compact_boundary") t.notice("info", "Compacted the conversation.");
+			else if (message.subtype === "local_command_output") {
+				// How a slash command answers: /login's device-code URL lands here line by
+				// line, /doctor and /status print their diagnostics here too.
+				const text = (message as { content?: unknown }).content;
+				const lines = typeof text === "string" ? text.trim().split(/\n+/) : [];
+				for (const line of lines.slice(0, 6)) if (line.trim()) t.notice("info", line.trim());
+			}
+			return;
+		}
+
+		case "auth_status": {
+			// The CLI announces that it is authenticating, for someone to complete the
+			// device-code flow /login started. The output lines carry the URL and code.
+			const auth = message as Extract<SDKMessage, { type: "auth_status" }>;
+			if (auth.error) t.notice("warn", `Claude auth: ${auth.error}`);
+			for (const line of auth.output) if (line.trim()) t.notice("info", line.trim());
 			return;
 		}
 

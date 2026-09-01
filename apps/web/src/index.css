@@ -986,6 +986,44 @@ svg.lucide {
 	white-space: pre-wrap;
 }
 
+/* The sign-in URL: breakable, so it can be read and copied in the dock. */
+.dialog-card a.url {
+	display: block;
+	margin-top: 7px;
+	padding: 7px 9px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--color-accent);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	line-height: 1.5;
+	word-break: break-all;
+}
+
+/* The usage figures, as a tidy label/value list. */
+.dialog-card .usage-rows {
+	display: grid;
+	margin-top: 7px;
+	gap: 4px;
+}
+
+.dialog-card .usage-rows .row {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	font-size: 12px;
+}
+
+.dialog-card .usage-rows .label {
+	color: var(--muted);
+}
+
+.dialog-card .usage-rows .value {
+	font-family: var(--font-mono);
+	text-align: right;
+}
+
 .dialog-card .actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -1082,10 +1120,63 @@ svg.lucide {
 }
 
 .composer {
-	position: static;
+	position: relative;
 	width: auto;
 	padding: 8px;
 	transform: none;
+}
+
+/* What `/` completes to: a small menu floating above the input bar. */
+.slash-menu {
+	position: absolute;
+	bottom: calc(100% + 6px);
+	left: 8px;
+	z-index: 12;
+	display: flex;
+	width: min(360px, calc(100% - 16px));
+	max-height: 230px;
+	overflow-y: auto;
+	flex-direction: column;
+	padding: 5px;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--panel);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(12px);
+	gap: 2px;
+}
+
+.slash-menu button {
+	display: flex;
+	gap: 10px;
+	align-items: baseline;
+	padding: 7px 9px;
+	border: 0;
+	border-radius: 8px;
+	background: none;
+	color: var(--fg);
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.slash-menu button:hover {
+	background: var(--line);
+}
+
+.slash-menu .cmd {
+	flex: none;
+	font-family: var(--font-mono);
+	color: var(--color-accent);
+}
+
+.slash-menu .hint {
+	overflow: hidden;
+	color: var(--muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 /* The newest reply, flowing above the input bar. */
@@ -1216,6 +1307,225 @@ svg.lucide {
 	color: var(--fg);
 }
 
+/* --- the conversation, floating over the boards ----------------------------
+ *
+ * The transcript sheet is away by default (§7); what floats instead is the
+ * conversation itself, translucent, over the boards — the same move canvas-chat's
+ * stream makes on its lessons. It appears when a new turn begins and follows it
+ * while it streams; the × waves away that turn, and the next one comes back, so
+ * closing it never makes the next reply invisible again.
+ *
+ * Nothing here has a background of its own: the bubbles are painted,
+ * translucently, and the gaps between them pass clicks through to the boards
+ * underneath (a row is a pointer target; the column is not). The spine at the
+ * edge is still the handle, and a click on a bubble opens the sheet around that
+ * turn.
+ */
+.chat-float {
+	position: absolute;
+	top: 12px;
+	right: 26px;
+	bottom: calc(var(--dock, 88px) + 12px + var(--keyboard) + env(safe-area-inset-bottom));
+	z-index: 9;
+	display: flex;
+	width: min(340px, calc(100vw - 104px));
+	flex-direction: column;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 160ms ease;
+}
+
+.chat-float[data-open="true"] {
+	opacity: 1;
+}
+
+.chat-float .fclose {
+	align-self: flex-end;
+	display: grid;
+	width: 22px;
+	height: 22px;
+	margin-bottom: 4px;
+	padding: 0;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: color-mix(in oklab, var(--panel) 84%, transparent);
+	backdrop-filter: blur(12px);
+	box-shadow: var(--shadow);
+	color: var(--faint);
+	cursor: pointer;
+	place-items: center;
+	pointer-events: auto;
+}
+
+.chat-float .fclose:hover {
+	background: var(--panel);
+	color: var(--fg);
+}
+
+.chat-float .fsroll {
+	display: flex;
+	overflow-y: auto;
+	flex-direction: column;
+	gap: 8px;
+	padding: 2px 0 8px;
+	overscroll-behavior: contain;
+	/* The column is not a target; only its rows are — see the note above. */
+	pointer-events: none;
+}
+
+.chat-float .fsroll > * {
+	flex: 0 0 auto;
+	pointer-events: auto;
+}
+
+.chat-float button {
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.fbubble {
+	display: block;
+	max-width: 92%;
+	padding: 9px 12px;
+	border: 0;
+	border-radius: 13px;
+	font-size: 13px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	word-break: break-word;
+	box-shadow: var(--shadow);
+	/* Translucent and blurred, so the boards stay the thing under them. */
+	backdrop-filter: blur(14px);
+}
+
+.fbubble[data-who="user"] {
+	align-self: flex-end;
+	background: color-mix(in oklab, var(--color-accent) 84%, transparent);
+	border-bottom-right-radius: 4px;
+	color: #fff;
+}
+
+.fbubble[data-who="agent"] {
+	align-self: flex-start;
+	border: 1px solid var(--line);
+	background: color-mix(in oklab, var(--panel) 88%, transparent);
+	border-bottom-left-radius: 4px;
+	color: var(--fg);
+}
+
+.fbubble .caret {
+	display: inline-block;
+	width: 7px;
+	height: 13px;
+	margin-left: 2px;
+	background: currentColor;
+	opacity: 0.5;
+	translate: 0 2px;
+	animation: blink 1s steps(2, start) infinite;
+}
+
+.fbubble code,
+.fbubble pre {
+	font-family: var(--font-mono);
+}
+
+.fbubble pre {
+	overflow-x: auto;
+	margin: 6px 0 0;
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: var(--bg-deep);
+	font-size: 12px;
+	white-space: pre;
+}
+
+.fbubble[data-who="user"] pre {
+	background: rgb(0 0 0 / 22%);
+}
+
+/* A turn's tool calls, summed to one pill — the count is the point. */
+.ftools {
+	display: inline-flex;
+	gap: 7px;
+	align-items: center;
+	max-width: 92%;
+	padding: 6px 10px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: color-mix(in oklab, var(--panel) 80%, transparent);
+	backdrop-filter: blur(12px);
+	box-shadow: var(--shadow);
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.ftools .fdot {
+	width: 7px;
+	height: 7px;
+	flex: none;
+	border-radius: 999px;
+	background: var(--faint);
+}
+
+.ftools[data-state="running"] .fdot {
+	background: var(--color-warn);
+	animation: pulse 1.2s ease-in-out infinite;
+}
+
+.ftools[data-state="error"] .fdot {
+	background: var(--color-danger);
+}
+
+.ftools .fcount,
+.ftools .fmore {
+	color: var(--faint);
+}
+
+.ftools .fname {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.fnotice {
+	align-self: stretch;
+	padding: 7px 12px;
+	border-radius: 9px;
+	background: color-mix(in oklab, var(--panel) 72%, transparent);
+	color: var(--muted);
+	font-size: 12px;
+	letter-spacing: 0.02em;
+}
+
+.fnotice[data-level="warn"] {
+	color: color-mix(in srgb, var(--color-warn) 70%, var(--fg));
+}
+
+.fnotice[data-level="error"] {
+	color: var(--color-danger);
+}
+
+/* The float lives beside the spine and is for cursors.
+ *
+ * Without hover the sheets are reached for deliberately — there is no cursor to
+ * bring them in, and a float that appears on its own over the canvas is a pane
+ * nobody asked for. Below 760px the two panels take turns with the canvas and the
+ * boards are precious; the sheet from the title bar is the whole conversation
+ * there, as it always was. */
+@media (hover: none) {
+	.chat-float {
+		display: none;
+	}
+}
+
+@media (max-width: 760px) {
+	.chat-float {
+		display: none;
+	}
+}
+
+
 /* Asked here rather than in the transcript, so it cannot be missed (DESIGN §6.8). */
 .dock .dialog-card {
 	align-self: stretch;
@@ -1290,6 +1600,23 @@ svg.lucide {
 	color: var(--faint);
 	font-family: var(--font-mono);
 	font-size: 10px;
+}
+
+/* It is a button now (a click opens the usage modal) but should still read as a
+   meter, not a control: no box, just the figures, and a hover that says it is
+   tappable. */
+.composer button.usage {
+	padding: 1px 3px;
+	border: 0;
+	background: none;
+	border-radius: 6px;
+	font-family: var(--font-mono);
+	font-size: 10px;
+}
+
+.composer button.usage:hover {
+	background: var(--line);
+	color: var(--fg);
 }
 
 /* An agent pointing at something on a board. */

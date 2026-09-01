@@ -81,6 +81,41 @@ export function Dialog(props: {
 						</button>
 					</div>
 				</Match>
+
+				<Match when={props.prompt.method === "login"}>
+					<div class="q">{(props.prompt as { title: string }).title}</div>
+					<div class="m">{(props.prompt as { message: string }).message}</div>
+					<a class="url" href={(props.prompt as { url: string }).url} target="_blank" rel="noreferrer">
+						{(props.prompt as { url: string }).url}
+					</a>
+					<div class="actions">
+						<button type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
+							Done — I've signed in
+						</button>
+						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
+							Cancel
+						</button>
+					</div>
+				</Match>
+
+				<Match when={props.prompt.method === "usage"}>
+					<div class="q">{(props.prompt as { title: string }).title}</div>
+					<div class="usage-rows">
+						<For each={(props.prompt as { rows: { label: string; value: string }[] }).rows}>
+							{(row) => (
+								<div class="row">
+									<span class="label">{row.label}</span>
+									<span class="value">{row.value}</span>
+								</div>
+							)}
+						</For>
+					</div>
+					<div class="actions">
+						<button type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
+							OK
+						</button>
+					</div>
+				</Match>
 			</Switch>
 		</div>
 	);

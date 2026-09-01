@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { CLAUDE_PATH_ENV, claudeAvailability, claudeExecutable } from "./available.ts";
+import { CLAUDE_BUNDLED_ENV, CLAUDE_PATH_ENV, claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 
 /**
  * Finding the CLI, which the SDK will not do for us.
@@ -46,10 +46,23 @@ test("PATH is searched when nothing is set", () => {
 });
 
 test("nothing found says what to do about it", () => {
-	withEnv({ PATH: "", [CLAUDE_PATH_ENV]: undefined }, () => {
+	// The bundled binary is disabled explicitly, or this machine's own install would
+	// answer instead of the "nothing found" branch.
+	withEnv({ PATH: "", [CLAUDE_PATH_ENV]: undefined, [CLAUDE_BUNDLED_ENV]: "0" }, () => {
 		const availability = claudeAvailability();
 		assert.equal(availability.available, false);
 		assert.match(availability.reason ?? "", /Install Claude Code/);
 		assert.match(availability.reason ?? "", new RegExp(CLAUDE_PATH_ENV), "and names the variable to set");
+	});
+});
+
+test("the SDK's own bundled binary counts as available", (t) => {
+	if (!claudeBundledExecutable()) {
+		t.skip("no bundled Claude Code on this machine");
+		return;
+	}
+	withEnv({ PATH: "", [CLAUDE_PATH_ENV]: undefined, [CLAUDE_BUNDLED_ENV]: undefined }, () => {
+		assert.equal(claudeExecutable(), undefined, "nothing on PATH");
+		assert.equal(claudeAvailability().available, true, "but the bundle exists, so the agent can start");
 	});
 });

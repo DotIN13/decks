@@ -7,8 +7,9 @@ import {
 	SessionManager,
 	type AgentSession,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
+import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
+import { parseSlash } from "../agents/slash.ts";
 import { decksStage } from "./extension.ts";
 import { deckContext, skillsDir } from "../agents/context.ts";
 import { handlePiEvent } from "./events.ts";
@@ -26,6 +27,21 @@ import { handlePiEvent } from "./events.ts";
  */
 /** Pi has no notion of asking first: that is an extension's business (§6.8). */
 export const PI_CAPABILITIES: AgentCapabilities = { modes: [] };
+
+/**
+ * The `/` commands Decks interprets for a pi agent.
+ *
+ * The things pi keeps in its TUI, which a headless session here has no other way to
+ * say. Anything else is handed through to pi's core, which parses extension
+ * commands, `/skill:name` and prompt templates of its own (§6.8).
+ */
+export const PI_COMMANDS: SlashCommand[] = [
+	{ name: "compact", hint: "Condense the conversation", arg: "[notes]" },
+	{ name: "session", hint: "Session file, id and what is in it" },
+	{ name: "cost", hint: "How much this session has spent" },
+	{ name: "name", hint: "Rename this agent", arg: "<name>" },
+	{ name: "help", hint: "The commands Decks understands" },
+];
 
 export class PiBackend implements AgentBackend {
 	readonly capabilities = PI_CAPABILITIES;
@@ -101,10 +117,64 @@ export class PiBackend implements AgentBackend {
 	// --- the conversation ---------------------------------------------------------
 
 	async prompt(text: string): Promise<void> {
+		/*
+		 * A prompt that starts with `/` is a command here. A few are the deck's own —
+		 * the things pi keeps in its TUI, which a headless session has no other way to
+		 * say — and everything else is handed through untouched: pi's core already
+		 * parses extension commands, `/skill:name` and prompt templates out of prompts,
+		 * and that surface is its business, not ours.
+		 */
+		const command = parseSlash(text);
+		if (command) {
+			await this.runSlash(command.name, command.args);
+			return;
+		}
 		// Mid-stream input steers rather than queues: the user is watching the thing
 		// they are correcting, and "wait until it finishes" is rarely what they meant.
 		if (this.session.isStreaming) await this.session.prompt(text, { streamingBehavior: "steer" });
 		else await this.session.prompt(text);
+	}
+
+	/** What typing `/` completes to, for the composer's menu. */
+	commands(): SlashCommand[] {
+		return PI_COMMANDS;
+	}
+
+	private async runSlash(name: string, args: string): Promise<void> {
+		const { notice } = this.context;
+		switch (name) {
+			case "compact":
+				await this.session.compact(args || undefined);
+				return;
+			case "session": {
+				const branch = this.session?.sessionManager.getBranch() ?? [];
+				notice(
+					"info",
+					`Session ${this.session?.sessionName ?? this.session?.sessionId ?? ""} · ${this.sessionRef() ?? "no file yet"} · ${branch.length} entries`,
+				);
+				return;
+			}
+			case "cost":
+				await this.usageModal();
+				return;
+			case "name": {
+				if (!args.trim()) {
+					notice("warn", "Usage: /name <name> — rename this agent.");
+					return;
+				}
+				this.setName(args.trim());
+				notice("info", `Renamed to ${args.trim()}.`);
+				return;
+			}
+			case "help":
+				notice(
+					"info",
+					this.commands().map((command) => `/${command.name}${command.arg ? ` ${command.arg}` : ""} — ${command.hint ?? ""}`).join("\n") || "No commands.",
+				);
+				return;
+			default:
+				notice("warn", `Unknown command /${name}. Try /help.`);
+		}
 	}
 
 	async abort(): Promise<void> {
@@ -161,6 +231,28 @@ export class PiBackend implements AgentBackend {
 			contextWindow: record.contextWindow ?? this.session.model?.contextWindow ?? 0,
 			cost: this.session.getSessionStats().cost,
 		};
+	}
+
+	/** The session's usage, in a modal the browser shows. */
+	async usageModal(): Promise<void> {
+		const usage = this.usage();
+		const model = this.session?.model;
+		const tokens = usage?.contextTokens ?? null;
+		const window = usage?.contextWindow ?? 0;
+		await this.context.bridge.usage("Pi session", [
+			{
+				label: "Context",
+				value:
+					window > 0
+						? `${Math.round(((tokens ?? 0) / window) * 100)}% (${tokens ?? "?"} / ${window} tokens)`
+						: tokens === null
+							? "—"
+							: `${tokens} tokens`,
+			},
+			{ label: "Cost", value: `$${(usage?.cost ?? 0).toFixed(4)}` },
+			{ label: "Model", value: model ? `${model.provider}/${model.id}` : "—" },
+			{ label: "Session", value: this.session?.sessionName ?? this.session?.sessionId ?? "—" },
+		]);
 	}
 
 	// --- identity ------------------------------------------------------------------

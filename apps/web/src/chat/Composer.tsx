@@ -1,4 +1,4 @@
-import type { AgentMode, AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
+import type { AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Square from "lucide-solid/icons/square";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
@@ -26,7 +26,11 @@ export function Composer(props: {
 	busy: boolean;
 	model: AgentModel | undefined;
 	models: ModelOption[];
+	/** What `/` completes to on the focused agent's runtime. */
+	commands: SlashCommand[];
 	usage: AgentUsage | undefined;
+	/** Clicking the meter: the runtime's usage in a modal. */
+	onUsage: () => void;
 	/**
 	 * What the agent's runtime asks before acting, and the modes it has.
 	 *
@@ -45,7 +49,39 @@ export function Composer(props: {
 	let input!: HTMLTextAreaElement;
 	let picker!: HTMLSelectElement;
 
+	/** A draft that is exactly `/` followed by a command fragment, while nothing is typed after it. */
+	const SLASH = /^\/([a-z0-9_-]*)$/i;
+	const fragment = createMemo(() => {
+		const match = SLASH.exec(text());
+		return match ? match[1]!.toLowerCase() : "";
+	});
+	const matches = createMemo(() => {
+		// Only a draft that actually starts with `/` is a command draft; anything
+		// else is prose and gets no menu.
+		if (!text().startsWith("/")) return [];
+		if (!fragment()) return props.commands;
+		return props.commands.filter((command) => command.name.startsWith(fragment()));
+	});
+	const menuOpen = createMemo(() => matches().length > 0);
+
+	const pick = (command: SlashCommand) => {
+		// The argument placeholder stays for them to type over; a bare command sends
+		// fine as-is.
+		const value = `/${command.name}${command.arg ? ` ${command.arg}` : " "}`;
+		setText(value);
+		input.value = value;
+		input.focus();
+	};
+
 	const send = () => {
+		// Enter with a command menu open completes the command instead of sending the
+		// fragment — "/lo" Enter is "login", not an unknown command. A command typed
+		// in full is already exact, so Enter sends it.
+		const menu = matches();
+		if (menu.length > 0 && menu[0]!.name !== fragment()) {
+			pick(menu[0]!);
+			return;
+		}
 		const value = text().trim();
 		if (!value) return;
 		props.onSend(value);
@@ -88,6 +124,26 @@ export function Composer(props: {
 
 	return (
 		<section class="panel-float composer">
+			<Show when={menuOpen()}>
+				<div class="slash-menu" role="listbox" aria-label="Commands">
+					<For each={matches()}>
+						{(command) => (
+							<button
+								type="button"
+								role="option"
+								title={command.hint}
+								onClick={() => pick(command)}
+							>
+								<span class="cmd">/{command.name}{command.arg ? ` ${command.arg}` : ""}</span>
+								<Show when={command.hint}>
+									<span class="hint">{command.hint}</span>
+								</Show>
+							</button>
+						)}
+					</For>
+				</div>
+			</Show>
+
 			<textarea
 				ref={input}
 				rows="1"
@@ -95,6 +151,11 @@ export function Composer(props: {
 				value={text()}
 				onInput={(event) => setText(event.currentTarget.value)}
 				onKeyDown={(event) => {
+					if (event.key === "Escape") {
+						setText("");
+						input.value = "";
+						return;
+					}
 					if (event.key === "Enter" && !event.shiftKey) {
 						event.preventDefault();
 						send();
@@ -150,10 +211,10 @@ export function Composer(props: {
 				<span class="spacer" />
 
 				<Show when={props.usage?.contextTokens != null && props.usage!.contextWindow > 0}>
-					<span class="usage">
+					<button class="usage" type="button" title="Session usage — click for details" onClick={props.onUsage}>
 						{Math.round((props.usage!.contextTokens! / props.usage!.contextWindow) * 100)}% ctx
 						{props.usage!.cost > 0 ? ` · $${props.usage!.cost.toFixed(3)}` : ""}
-					</span>
+					</button>
 				</Show>
 
 				{/*

@@ -1,4 +1,4 @@
-import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, ThinkingLevel } from "@decks/protocol";
+import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import type { StageAgentHooks, StageTool } from "../stage/tool.ts";
 import type { ExtensionUiBridge } from "./extension-ui.ts";
@@ -67,6 +67,12 @@ export interface AgentBackend {
 	abort(): Promise<void>;
 	readonly isStreaming: boolean;
 
+	/**
+	 * What typing `/` in the composer can do on this runtime. The deck interprets
+	 * some of them itself; the rest pass through to the runtime as prompts.
+	 */
+	commands(): SlashCommand[];
+
 	model(): AgentModel | undefined;
 	setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void>;
 	setThinking(level: ThinkingLevel): void;
@@ -75,6 +81,8 @@ export interface AgentBackend {
 	mode?(): AgentMode | undefined;
 	models(): Promise<ModelOption[]>;
 	usage(): AgentUsage | null;
+	/** The runtime's own usage and cost, in a modal the browser shows. */
+	usageModal?(): Promise<void>;
 
 	/** The name the agent gave itself, if it has (M3: `stage.me.setName`). */
 	name(): string | undefined;

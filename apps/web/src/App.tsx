@@ -35,9 +35,10 @@ import { runStageCall } from "./canvas/stage-ops.ts";
 import { Bubbles } from "./chat/Bubbles.tsx";
 import { ChatList } from "./chat/ChatList.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
+import { FloatingTranscript } from "./chat/FloatingTranscript.tsx";
 import { Latest } from "./chat/Latest.tsx";
 import { Composer } from "./chat/Composer.tsx";
-import { TurnBar, turnsOf } from "./chat/TurnBar.tsx";
+import { TurnBar, turnsOf, type Turn } from "./chat/TurnBar.tsx";
 import { boxOf, fit, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
 import { connect, type Socket } from "./lib/socket.ts";
 import { embedPath, uploadAsset } from "./lib/upload.ts";
@@ -69,7 +70,7 @@ export function App() {
 		focused?: string;
 		identities: Record<string, Identity>;
 		transcripts: Record<string, ChatItem[]>;
-		models: ModelOption[];
+		modelsByAgent: Record<string, ModelOption[]>;
 		/** The model (and its thinking level) each agent is on, by agent id. */
 		agentModel: Record<string, AgentModel | undefined>;
 		/** The context/cost meter for each agent, by id. */
@@ -97,7 +98,7 @@ export function App() {
 		chats: [],
 		identities: {},
 		transcripts: {} as Record<string, ChatItem[]>,
-		models: [],
+		modelsByAgent: {} as Record<string, ModelOption[]>,
 		agentModel: {} as Record<string, AgentModel | undefined>,
 		agentUsage: {} as Record<string, AgentUsage | undefined>,
 		contexts: {} as Record<string, string[]>,
@@ -137,6 +138,14 @@ export function App() {
 	 * next one — the point of the glimpse is that the *newest* thing is there.
 	 */
 	const [dismissed, setDismissed] = createSignal<string | undefined>(undefined);
+	/**
+	 * Whether the conversation floats over the canvas (see `FloatingTranscript`).
+	 *
+	 * Owned here so the dock's peek can give way to it: a reply that is already
+	 * visible as a floating bubble is not also worth a separate bubble over the
+	 * composer.
+	 */
+	const [chatFloat, setChatFloat] = createSignal(false);
 	/**
 	 * Unread counts, kept here rather than on the server.
 	 *
@@ -345,6 +354,7 @@ export function App() {
 					setState("inPlay", message.id, undefined as never);
 					setState("agentModel", message.id, undefined as never);
 					setState("agentUsage", message.id, undefined as never);
+					setState("modelsByAgent", message.id, undefined as never);
 					setUnread(message.id, 0);
 					return;
 				}
@@ -366,7 +376,10 @@ export function App() {
 					return;
 
 				case "models":
-					setState("models", message.models);
+					// One list per agent: the runtime each agent runs on answers its own, and
+					// a global list would show the last agent to start on everyone — a row
+					// for Claude listing the models of a pi agent that started after it.
+					setState("modelsByAgent", message.agentId, message.models);
 					return;
 
 				case "chat.history":
@@ -901,6 +914,18 @@ export function App() {
 		setCamera(fit([boxOf(board)], { width: stage.clientWidth, height: stage.clientHeight }));
 	};
 
+	/**
+	 * Open the transcript sheet around a turn — the deck's scrub, shared by the
+	 * spine and the floating bubbles.
+	 *
+	 * Held rather than pinned: it stays while you read and leaves when you move
+	 * away, without becoming another piece of state to turn off.
+	 */
+	const scrubToTurn = (turn: Turn) => {
+		setAtTurn({ id: turn.id, at: Date.now() });
+		panels.right.hold(true);
+	};
+
 	return (
 		<div class="app">
 			<header class="titlebar">
@@ -1089,6 +1114,14 @@ export function App() {
 					}}
 				/>
 
+				<FloatingTranscript
+					items={transcript()}
+					open={chatFloat()}
+					columnOpen={panels.right.open()}
+					onOpenChange={setChatFloat}
+					onScrub={scrubToTurn}
+				/>
+
 				{/*
 				 * The dock: what the agent last said, a question if one is waiting, and the
 				 * input bar. One bottom-centred stack, because these three are the same
@@ -1125,7 +1158,7 @@ export function App() {
 
 					<Latest
 						items={transcript()}
-						columnOpen={panels.right.open()}
+						columnOpen={panels.right.open() || chatFloat()}
 						onOpen={() => {
 							panels.right.hold(true);
 							setSeenAt(Date.now());
@@ -1137,8 +1170,10 @@ export function App() {
 					<Composer
 					busy={busy()}
 					model={state.focused ? state.agentModel[state.focused] : undefined}
-					models={state.models}
+					models={state.focused ? state.modelsByAgent[state.focused] ?? [] : []}
+					commands={focusedChat()?.commands ?? []}
 					usage={state.focused ? state.agentUsage[state.focused] : undefined}
+					onUsage={() => socket.send({ type: "agent.usage", id: state.focused ?? "" })}
 					modes={focusedChat()?.capabilities?.modes ?? []}
 					mode={focusedChat()?.mode}
 					onMode={(mode) => socket.send({ type: "agent.setMode", id: state.focused ?? "", mode })}
@@ -1183,12 +1218,7 @@ export function App() {
 				<TurnBar
 					turns={turns()}
 					at={atTurn()?.id}
-					onPick={(turn) => {
-						setAtTurn({ id: turn.id, at: Date.now() });
-						// Held rather than pinned: it stays while you read and leaves when you
-						// move away, without becoming another piece of state to turn off.
-						panels.right.hold(true);
-					}}
+					onPick={scrubToTurn}
 				/>
 
 				<div class="notices">

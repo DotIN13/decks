@@ -294,6 +294,13 @@ export class App {
 				return;
 			}
 
+			case "agent.usage": {
+				const agent = this.agents.get(message.id);
+				if (!agent) return;
+				void agent.usageModal();
+				return;
+			}
+
 			case "agent.setMode": {
 				const agent = this.agents.get(message.id);
 				if (!agent) return;

@@ -298,7 +298,7 @@ function Assistant(props: { item: Extract<ChatItem, { kind: "assistant" }> }) {
 }
 
 /** Fenced code out, everything else through untouched. */
-function splitFences(text: string): Array<{ code: boolean; text: string }> {
+export function splitFences(text: string): Array<{ code: boolean; text: string }> {
 	const blocks: Array<{ code: boolean; text: string }> = [];
 	const pattern = /```[\w-]*\n?([\s\S]*?)(?:```|$)/g;
 	let last = 0;

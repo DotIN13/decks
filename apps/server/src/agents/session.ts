@@ -12,11 +12,12 @@ import type {
 	Identity,
 	ModelOption,
 	ServerMessage,
+	SlashCommand,
 	ThinkingLevel,
 } from "@decks/protocol";
-import { CLAUDE_CAPABILITIES, ClaudeBackend } from "../claude/backend.ts";
+import { CLAUDE_CAPABILITIES, CLAUDE_COMMANDS, ClaudeBackend } from "../claude/backend.ts";
 import type { Deck } from "../deck/loader.ts";
-import { PI_CAPABILITIES, PiBackend } from "../pi/backend.ts";
+import { PI_CAPABILITIES, PI_COMMANDS, PiBackend } from "../pi/backend.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, type DelegateReport, type DelegateSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
@@ -404,10 +405,16 @@ export class DeckAgent {
 		if (!this.backend) return;
 		try {
 			this.modelOptions = await this.backend.models();
-			this.emit({ type: "models", models: this.modelOptions });
+			this.emit({ type: "models", agentId: this.id, models: this.modelOptions });
 		} catch (error) {
 			this.translator.notice("warn", `Could not list models: ${(error as Error).message}`);
 		}
+	}
+
+	/** The backend's usage and cost, in a modal — the /cost command's surface, or the meter's click. */
+	async usageModal(): Promise<void> {
+		if (!this.backend) return;
+		await this.backend.usageModal?.();
 	}
 
 	async prompt(text: string): Promise<void> {
@@ -581,6 +588,7 @@ export class DeckAgent {
 			contextCount: this.held.length,
 			kind: this.kind,
 			capabilities: this.backend?.capabilities ?? capabilitiesOf(this.kind),
+			commands: this.backend?.commands() ?? commandsOf(this.kind),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
 			// Restored and untouched: readable, but nothing is running until it is prompted.
 			...(this.restored && !this.starting ? { dormant: true as const } : {}),
@@ -594,7 +602,7 @@ export class DeckAgent {
 		reply({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
 		if (this.backend) reply({ type: "agent.model", id: this.id, model: this.backend.model() });
 		else if (this.lastModel) reply({ type: "agent.model", id: this.id, model: this.lastModel });
-		if (this.modelOptions.length > 0) reply({ type: "models", models: this.modelOptions });
+		if (this.modelOptions.length > 0) reply({ type: "models", agentId: this.id, models: this.modelOptions });
 		// A question asked before this browser existed still needs answering, or the agent
 		// that asked it waits forever.
 		for (const prompt of this.bridge.outstanding()) reply({ type: "extension.ui.prompt", prompt });
@@ -626,6 +634,16 @@ export class DeckAgent {
  */
 function capabilitiesOf(kind: AgentKind): AgentCapabilities {
 	return kind === "claude" ? CLAUDE_CAPABILITIES : PI_CAPABILITIES;
+}
+
+/**
+ * The `/` commands a dormant chat offers without waking its runtime.
+ *
+ * Mirrors what each backend's `commands()` answers when it is running — a dormant
+ * chat has no backend to ask, and the menu should not change when one is resumed.
+ */
+function commandsOf(kind: AgentKind): SlashCommand[] {
+	return kind === "claude" ? CLAUDE_COMMANDS : PI_COMMANDS;
 }
 
 /**

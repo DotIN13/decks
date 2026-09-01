@@ -54,11 +54,11 @@ export class ExtensionUiBridge {
 
 	constructor(private readonly hooks: ExtensionUiHooks) {}
 
-	private ask<T>(draft: PromptDraft, fallback: T, options?: DialogOptions): Promise<T> {
+	private askRaw<T>(draft: PromptDraft, fallback: T, options?: DialogOptions): { id: string; done: Promise<T> } {
 		const id = randomUUID();
 		const prompt = { ...draft, id } as ExtensionUiPrompt;
 
-		return new Promise<T>((resolve) => {
+		const done = new Promise<T>((resolve) => {
 			let settled = false;
 			const finish = (value: unknown) => {
 				if (settled) return;
@@ -76,6 +76,12 @@ export class ExtensionUiBridge {
 
 			this.hooks.prompt(prompt);
 		});
+
+		return { id, done };
+	}
+
+	private ask<T>(draft: PromptDraft, fallback: T, options?: DialogOptions): Promise<T> {
+		return this.askRaw(draft, fallback, options).done;
 	}
 
 	/** An answer from the browser. Unknown ids are ignored: the question is gone. */
@@ -85,6 +91,22 @@ export class ExtensionUiBridge {
 		if ("cancelled" in answer) pending.resolve(pending.fallback);
 		else if ("confirmed" in answer) pending.resolve(answer.confirmed);
 		else pending.resolve(answer.value);
+	}
+
+	/**
+	 * A sign-in modal: the URL to open, and Done/Cancel to say how it went.
+	 *
+	 * The caller keeps the id so it can close the modal itself the moment the sign-in
+	 * is detected — a flow that finishes in the browser before the person clicks Done
+	 * should not wait for the click.
+	 */
+	login(url: string, message: string, options?: DialogOptions): { id: string; done: Promise<boolean> } {
+		return this.askRaw<boolean>({ method: "login", title: "Sign in to Claude", message, url }, false, options);
+	}
+
+	/** A modal of informational figures, dismissed with OK (the value is never used). */
+	usage(title: string, rows: { label: string; value: string }[]): Promise<void> {
+		return this.ask<void>({ method: "usage", title, rows }, undefined);
 	}
 
 	/**
