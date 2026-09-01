@@ -109,7 +109,22 @@ export class ClaudeBackend implements AgentBackend {
 	private storedName: string | undefined;
 	private title: string | undefined;
 
-	private constructor(private readonly context: AgentBackendContext) {}
+	private constructor(private readonly context: AgentBackendContext) {
+		/*
+		 * A resumed conversation opens on the model and mode it was last held in.
+		 *
+		 * `startQuery` already passes both to the SDK; what was missing was anything to
+		 * pass. `currentModel` started undefined, so `available[0]` — Claude Code's
+		 * "default" entry — won every time, and a chat left on Opus came back on whatever
+		 * the CLI picks. Assigned here rather than in `startQuery` because that runs again
+		 * after a rewind, and by then these hold the live answer.
+		 */
+		if (context.model?.provider === PROVIDER) {
+			this.currentModel = context.model.model;
+			this.currentThinking = context.model.thinking;
+		}
+		if (context.mode) this.currentMode = context.mode;
+	}
 
 	static async create(context: AgentBackendContext): Promise<ClaudeBackend> {
 		const availability = claudeAvailability();
@@ -211,8 +226,16 @@ export class ClaudeBackend implements AgentBackend {
 
 		try {
 			this.available = await this.session.supportedModels();
-			const initial = this.available.find((model) => model.value === this.currentModel) ?? this.available[0];
-			this.currentModel ??= initial?.value;
+			/*
+			 * What it actually opened on, which is not always what was asked for.
+			 *
+			 * A stored model can have been renamed or lost its entitlement between runs, and
+			 * the CLI answers such a request by falling back rather than failing. Reporting
+			 * the fallback is the honest reading — `model()` feeds the picker, and a picker
+			 * showing a model the turn will not use is worse than one that moved.
+			 */
+			const known = this.available.some((model) => model.value === this.currentModel);
+			if (!known) this.currentModel = this.available[0]?.value;
 		} catch (error) {
 			notice("warn", `Could not list Claude's models: ${(error as Error).message}`);
 		}

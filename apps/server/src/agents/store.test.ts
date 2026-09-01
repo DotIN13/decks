@@ -172,3 +172,76 @@ test("a write leaves no temporary file behind", () => {
 	assert.deepEqual(files.sort(), ["chat.json", "meta.json"]);
 	cleanup();
 });
+
+/**
+ * The model survives the round trip.
+ *
+ * It did not, and nothing caught it because both sides were tested and the seam between
+ * them was not: `record()` wrote `model` to `meta.json` and `validate()` never read it
+ * back, so every restart handed a restored chat `undefined` and its runtime opened on
+ * whatever it defaults to. A chat left on `deepseek-v4-pro` came back on
+ * `deepseek-v4-flash`; a Claude chat left on Opus came back on "default".
+ */
+test("the model and the mode come back, because a resumed chat is opened on them", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	const record: AgentRecord = {
+		id: "one",
+		kind: "claude",
+		name: "Iris",
+		color: "#3b5cf6",
+		context: [],
+		inPlay: [],
+		createdAt: 1,
+		lastAt: 2,
+		model: { provider: "anthropic", model: "opus[1m]", thinking: "high" },
+		mode: "acceptEdits",
+	};
+	store.write(record, []);
+
+	const back = store.read("one")?.record;
+	assert.deepEqual(back?.model, { provider: "anthropic", model: "opus[1m]", thinking: "high" });
+	assert.equal(back?.mode, "acceptEdits");
+	cleanup();
+});
+
+/**
+ * And a stored model that is not one is no model.
+ *
+ * These go straight into two runtimes' session options. A pair with no provider would be
+ * asked for as `undefined/gpt-4`, and a thinking level from a build that has since renamed
+ * one would be handed to an API that rejects it — so a half-written record degrades to
+ * "the runtime picks", which is the answer a chat with no record already gives.
+ */
+test("a malformed model is dropped rather than passed on", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	const folder = join(deck.path, ".decks", "agents", "two");
+	mkdirSync(folder, { recursive: true });
+	writeFileSync(
+		join(folder, "meta.json"),
+		JSON.stringify({
+			kind: "pi",
+			name: "Ada",
+			createdAt: 1,
+			lastAt: 2,
+			model: { model: "deepseek-v4-pro", thinking: "wildly" },
+			mode: "whatever",
+		}),
+	);
+
+	const back = store.read("two")?.record;
+	assert.equal(back?.model, undefined, "no provider, so no model");
+	assert.equal(back?.mode, undefined, "not one of the four modes");
+
+	writeFileSync(
+		join(folder, "meta.json"),
+		JSON.stringify({ kind: "pi", name: "Ada", createdAt: 1, lastAt: 2, model: { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "wildly" } }),
+	);
+	assert.deepEqual(
+		store.read("two")?.record.model,
+		{ provider: "opencode-go", model: "deepseek-v4-pro", thinking: "medium" },
+		"a real pair with an unknown thinking level keeps the pair and takes the middle",
+	);
+	cleanup();
+});

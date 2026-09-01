@@ -101,18 +101,40 @@ export class DeckAgent {
 			store: AgentStore;
 			/** The agent this one was forked from, so its canvas can be inherited. */
 			forkedFrom?: { agentId: string; at: number };
+			/** The model and mode to open on, handed down rather than read off disk — see `Registry.create`. */
+			model?: AgentModel;
+			mode?: AgentMode;
 			/**
 			 * Everything a chat needs to be a row again without its runtime running
 			 * (`agents/store.ts`). Its presence is also what makes the agent dormant: it
 			 * exists, it can be read, and it starts nothing until it is prompted.
 			 */
-			restored?: { id: string; items: ChatItem[]; context: string[]; inPlay: string[]; avatar?: string; createdAt: number; model?: AgentModel };
+			restored?: {
+				id: string;
+				items: ChatItem[];
+				context: string[];
+				inPlay: string[];
+				avatar?: string;
+				createdAt: number;
+				model?: AgentModel;
+				mode?: AgentMode;
+			};
 		},
 	) {
 		this.id = options.restored?.id ?? randomUUID();
 		this.store = options.store;
 		this.restored = options.restored !== undefined;
-		this.lastModel = options.restored?.model ?? sessionModelOf(options.resumeRef);
+		/*
+		 * What the conversation was last on, before any runtime exists to ask.
+		 *
+		 * Two jobs, and for a long time it only did the first: it is what a dormant row
+		 * *says* it will use, and it is what the runtime is actually *opened on* when the
+		 * row is finally prompted (`start`). Without the second the display was a promise
+		 * the runtime broke — a chat left on `deepseek-v4-pro` came back saying so and
+		 * then answered from pi's configured default the moment you typed.
+		 */
+		this.lastModel = options.restored?.model ?? options.model ?? sessionModelOf(options.resumeRef);
+		this.currentMode = options.restored?.mode ?? options.mode;
 		this.createdAt = options.restored?.createdAt ?? Date.now();
 		this.identity = { name: options.name ?? "Agent", color: options.color };
 		if (options.restored?.avatar) this.identity = { ...this.identity, avatar: options.restored.avatar };
@@ -316,6 +338,7 @@ export class DeckAgent {
 			inPlay: [...this.playing],
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
+			...(this.currentMode ? { mode: this.currentMode } : {}),
 			// The last thing actually said, not the time of this write — it is what the list
 			// is ordered by and what `prune` keeps, so a flush on shutdown must not make an
 			// old chat look like the newest one.
@@ -367,6 +390,12 @@ export class DeckAgent {
 			tool,
 			stageAgent: this.stageHooks(),
 			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
+			// Opened *on* the model and mode the conversation was last using, rather than
+			// asked what it happened to default to. Both runtimes take them at session
+			// creation, which is why this is a field here and not a `setModel` afterwards:
+			// a second call would write a model change into a session that never changed.
+			...(this.lastModel ? { model: this.lastModel } : {}),
+			...(this.currentMode ? { mode: this.currentMode } : {}),
 		};
 
 		const create: Promise<AgentBackend> =
@@ -572,6 +601,15 @@ export class DeckAgent {
 
 	get color(): string {
 		return this.identity.color;
+	}
+
+	/** What it is on now, live if it is running and from the record if it is not. */
+	get model(): AgentModel | undefined {
+		return this.backend?.model() ?? this.lastModel;
+	}
+
+	get mode(): AgentMode | undefined {
+		return this.backend?.mode?.() ?? this.currentMode;
 	}
 
 	/** One row in the chat list. Unread is the browser's business, not ours. */

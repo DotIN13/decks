@@ -86,11 +86,31 @@ export class PiBackend implements AgentBackend {
 
 		this.modelRuntime = await ModelRuntime.create();
 
+		/*
+		 * The model the conversation was last held in, if it is still available.
+		 *
+		 * Pi's own default — `settings`, else the first available model — is the right
+		 * answer for a *new* session and the wrong one for a resumed conversation: opening
+		 * a session file written by `deepseek-v4-pro` on whatever the settings say now
+		 * changes the model mid-conversation without saying so. `SessionManager.open`
+		 * restores the transcript and not the model, which is why this is passed in.
+		 *
+		 * `getModel` returning nothing is the ordinary case of credentials having gone, or
+		 * a model id that no longer exists. Then it is left out and pi picks, which is
+		 * exactly the fallback it already has for a new session.
+		 */
+		const wanted = this.context.model;
+		const resumeModel = wanted ? this.modelRuntime.getModel(wanted.provider, wanted.model) : undefined;
+		if (wanted && !resumeModel) {
+			notice("warn", `${wanted.provider}/${wanted.model} is not available any more, so this chat continues on the default model.`);
+		}
+
 		const { session, modelFallbackMessage } = await createAgentSession({
 			cwd,
 			agentDir,
 			modelRuntime: this.modelRuntime,
 			resourceLoader: loader,
+			...(resumeModel ? { model: resumeModel, thinkingLevel: wanted!.thinking } : {}),
 			// A fork opens the file it was branched into; everything else starts fresh.
 			sessionManager: this.context.resumeRef ? SessionManager.open(this.context.resumeRef) : SessionManager.create(cwd),
 		});

@@ -360,6 +360,12 @@ export class App {
 						resumeRef,
 						kind: agent.kind,
 						...(at ? { forkedFrom: { agentId: agent.id, at } } : {}),
+						// And the model it was being held in. A fork continues one
+						// conversation; answering the rest of it from a different model is a
+						// change nobody asked for, and on Claude there is no session file to
+						// recover the choice from.
+						...(agent.model ? { model: agent.model } : {}),
+						...(agent.mode ? { mode: agent.mode } : {}),
 					});
 					this.agents.focus(child.id);
 				});

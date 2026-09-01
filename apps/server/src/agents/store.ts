@@ -1,6 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AgentKind, AgentModel, ChatItem } from "@decks/protocol";
+import { type AgentKind, type AgentMode, type AgentModel, type ChatItem, type ThinkingLevel } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 
 /**
@@ -51,6 +51,8 @@ export interface AgentRecord {
 	createdAt: number;
 	/** The model (and thinking level) the chat was last on, so a dormant row can still say what it will use. */
 	model?: AgentModel;
+	/** What it last asked before acting. Claude Code only; `capabilities.modes` is empty for pi. */
+	mode?: AgentMode;
 	/** Ordering, and what `prune` keeps. */
 	lastAt: number;
 }
@@ -194,6 +196,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 		return Number.isFinite(parsed) ? parsed : fallback;
 	};
 	const created = finite(source.createdAt, Date.now());
+	const model = modelOf(source.model);
 	return {
 		id,
 		kind: source.kind === "claude" ? "claude" : "pi",
@@ -205,6 +208,29 @@ function validate(raw: unknown, id: string): AgentRecord {
 		context: strings(source.context),
 		inPlay: strings(source.inPlay),
 		createdAt: created,
+		...(model ? { model } : {}),
+		...(MODES.includes(source.mode as AgentMode) ? { mode: source.mode as AgentMode } : {}),
 		lastAt: finite(source.lastAt, created),
 	};
+}
+
+const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+const MODES: AgentMode[] = ["manual", "acceptEdits", "plan", "auto"];
+
+/**
+ * The stored model, if it is one.
+ *
+ * A provider and a model id and nothing else — a half-written pair is no answer, because
+ * `setModel` takes both and a runtime asked for `undefined/gpt-4` would refuse. The
+ * thinking level is checked against the list rather than trusted: it is fed to two
+ * runtimes' APIs, and a value from an older build that has since been renamed should
+ * degrade to the middle rather than be passed through.
+ */
+function modelOf(raw: unknown): AgentModel | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
+	const source = raw as Record<string, unknown>;
+	const { provider, model, thinking } = source;
+	if (typeof provider !== "string" || !provider) return undefined;
+	if (typeof model !== "string" || !model) return undefined;
+	return { provider, model, thinking: THINKING.includes(thinking as ThinkingLevel) ? (thinking as ThinkingLevel) : "medium" };
 }

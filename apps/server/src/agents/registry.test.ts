@@ -254,3 +254,52 @@ test("a deck opened for the first time restores nothing and reports so", () => {
 	assert.equal(registryOn(deck).registry.restore(), 0);
 	cleanup();
 });
+
+/**
+ * The model reaches the runtime, not only the row.
+ *
+ * The bug this covers had three layers and each one alone looked fine: `session.record()`
+ * wrote the model, `store.validate()` dropped it on read, `Registry.restore` never
+ * forwarded it, and `start()` asked the backend what it had opened on instead of telling
+ * it. The two ends were unit-tested — a record with a model, a session greeted with one —
+ * and every seam between them was not, which is why a chat kept coming back on
+ * `deepseek-v4-flash`.
+ *
+ * Asserted on the greeting, because that is where a browser learns what a dormant row is
+ * on, *and* on the context the backend would be built with, because that is the half that
+ * makes the display true.
+ */
+test("a restored chat is opened on the model the conversation was last held in", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.write(
+		{
+			id: "held",
+			kind: "pi",
+			resumeRef: "/sessions/held.jsonl",
+			name: "Ada",
+			color: "#3b5cf6",
+			context: [],
+			inPlay: [],
+			createdAt: 1,
+			lastAt: 2,
+			model: { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "high" },
+		},
+		[{ kind: "user", id: "u1", at: 2, text: "what is the plan" }],
+	);
+
+	const { registry, sent } = registryOn(deck);
+	assert.equal(registry.restore(), 1);
+
+	const greeted: ServerMessage[] = [];
+	registry.get("held")?.greet((message) => greeted.push(message));
+	const model = greeted.find((message): message is Extract<ServerMessage, { type: "agent.model" }> => message.type === "agent.model");
+	assert.deepEqual(model?.model, { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "high" }, "the row says what it will use");
+
+	// And the record it writes back keeps it, so the next restart says the same thing
+	// rather than losing it one boot later.
+	registry.get("held")?.dispose();
+	assert.deepEqual(store.read("held")?.record.model, { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "high" });
+	assert.equal(sent.length > 0, true);
+	cleanup();
+});

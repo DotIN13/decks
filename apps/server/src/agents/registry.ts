@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { AgentChat, AgentKind, Camera, ChatItem, ServerMessage } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentMode, AgentModel, Camera, ChatItem, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import type { DelegateReport, DelegateSpec } from "../stage/tool.ts";
@@ -79,8 +79,28 @@ export class Registry {
 			kind?: AgentKind;
 			color?: string;
 			forkedFrom?: { agentId: string; at: number };
+			/**
+			 * The model to open on, for a chat that is continuing someone else's conversation.
+			 *
+			 * A fork's, in practice. Separate from `restored.model` because they answer to
+			 * different owners: that one is this chat's own history read back off disk, this
+			 * one is the parent's live choice being handed down. A fork of an Opus
+			 * conversation that opened on the default model was answering the same
+			 * conversation in a different voice.
+			 */
+			model?: AgentModel;
+			mode?: AgentMode;
 			/** Set only by `restore`: a chat from a previous run, with nothing running behind it. */
-			restored?: { id: string; items: ChatItem[]; context: string[]; inPlay: string[]; avatar?: string; createdAt: number };
+			restored?: {
+				id: string;
+				items: ChatItem[];
+				context: string[];
+				inPlay: string[];
+				avatar?: string;
+				createdAt: number;
+				model?: AgentModel;
+				mode?: AgentMode;
+			};
 		} = {},
 	): DeckAgent {
 		const agent = new DeckAgent(
@@ -139,6 +159,11 @@ export class Registry {
 					inPlay: record.inPlay,
 					...(record.avatar ? { avatar: record.avatar } : {}),
 					createdAt: record.createdAt,
+					// The model and the mode the chat was last on. Forwarding them is the whole
+					// point of storing them: a restored chat opens its runtime on the model the
+					// conversation was using, not on whatever the runtime defaults to.
+					...(record.model ? { model: record.model } : {}),
+					...(record.mode ? { mode: record.mode } : {}),
 				},
 			});
 		}
