@@ -70,8 +70,10 @@ export function App() {
 		identities: Record<string, Identity>;
 		transcripts: Record<string, ChatItem[]>;
 		models: ModelOption[];
-		model?: AgentModel;
-		usage?: AgentUsage;
+		/** The model (and its thinking level) each agent is on, by agent id. */
+		agentModel: Record<string, AgentModel | undefined>;
+		/** The context/cost meter for each agent, by id. */
+		agentUsage: Record<string, AgentUsage | undefined>;
 		dialog?: ExtensionUiPrompt;
 		/** Boards each agent is holding, from `context.changed`. */
 		contexts: Record<string, string[]>;
@@ -96,6 +98,8 @@ export function App() {
 		identities: {},
 		transcripts: {} as Record<string, ChatItem[]>,
 		models: [],
+		agentModel: {} as Record<string, AgentModel | undefined>,
+		agentUsage: {} as Record<string, AgentUsage | undefined>,
 		contexts: {} as Record<string, string[]>,
 		inPlay: {} as Record<string, string[]>,
 		nonces: {} as Record<string, number>,
@@ -339,6 +343,8 @@ export function App() {
 					setState("identities", message.id, undefined as never);
 					setState("contexts", message.id, undefined as never);
 					setState("inPlay", message.id, undefined as never);
+					setState("agentModel", message.id, undefined as never);
+					setState("agentUsage", message.id, undefined as never);
 					setUnread(message.id, 0);
 					return;
 				}
@@ -352,11 +358,11 @@ export function App() {
 					return;
 
 				case "agent.model":
-					setState("model", message.model);
+					setState("agentModel", message.id, message.model);
 					return;
 
 				case "agent.usage":
-					setState("usage", message.usage);
+					setState("agentUsage", message.id, message.usage);
 					return;
 
 				case "models":
@@ -1130,9 +1136,9 @@ export function App() {
 
 					<Composer
 					busy={busy()}
-					model={state.model}
+					model={state.focused ? state.agentModel[state.focused] : undefined}
 					models={state.models}
-					usage={state.usage}
+					usage={state.focused ? state.agentUsage[state.focused] : undefined}
 					modes={focusedChat()?.capabilities?.modes ?? []}
 					mode={focusedChat()?.mode}
 					onMode={(mode) => socket.send({ type: "agent.setMode", id: state.focused ?? "", mode })}
