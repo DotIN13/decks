@@ -2,13 +2,15 @@
  * The title bar: the mark, the name, the conversation, and a theme toggle that is an icon.
  *
  * The theme toggle is addressed as `.icon-button.theme` rather than as "the first icon
- * button", because it is not one: the conversation's button sits before it, and before
- * that the board rail's — which is `.touch-only`, drawn only where the pointer cannot
- * hover (`index.css`), because a cursor summons the rail from the left edge instead.
+ * button", because it is not one: four surfaces have a button before it — the agents, the
+ * boards they are holding, every board in the deck, and the conversation.
  *
- * The conversation has no such edge since the transcript sheet went, so its button is
- * drawn at every width. Both facts are asserted below: the rail's toggle absent here, the
- * conversation's present.
+ * **Nothing in the bar is `.touch-only` any more**, and that is what is asserted here.
+ * The panel toggle used to be, on the argument that a cursor summoned the panel from the
+ * left edge and a second way to do a working thing is clutter. Proximity is gone
+ * (`lib/panels.ts`) — it cannot coexist with pills in the corner the panel comes out of —
+ * so these buttons are the only handle the panels have, and being the only handle they are
+ * drawn for everyone.
  */
 import { open, say } from "../harness.mjs";
 
@@ -26,12 +28,12 @@ const bar = await page.evaluate(() => {
 		buttonHasIcon: Boolean(button.querySelector("svg")),
 		buttonText: button.textContent.trim(),
 		fromRightEdge: Math.round(innerWidth - button.getBoundingClientRect().right),
-		// Present in the markup, and not drawn: the rail is reached by hovering here.
 		touchOnly: [...titlebar.querySelectorAll(".touch-only")].map((element) => getComputedStyle(element).display),
-		chat: (() => {
-			const element = titlebar.querySelector('.icon-button[title="The conversation"]');
-			return element ? { display: getComputedStyle(element).display, touchOnly: element.classList.contains("touch-only") } : null;
-		})(),
+		/** The four surfaces, each with a handle here and nowhere else. */
+		surfaces: ["The agents", "Boards this agent is holding", "Every board in the deck", "The conversation"].map((title) => {
+			const element = titlebar.querySelector(`.icon-button[title="${title}"]`);
+			return element ? { title, display: getComputedStyle(element).display, touchOnly: element.classList.contains("touch-only") } : { title, missing: true };
+		}),
 	};
 });
 say("the bar says only Decks", bar.text === "Decks", JSON.stringify(bar.text));
@@ -40,15 +42,11 @@ say("the wordmark reads Decks", bar.wordmark === "Decks");
 say("no directory is shown", !bar.text.includes("/"), bar.text);
 say("the toggle is an icon, not a word", bar.buttonHasIcon && bar.buttonText === "", `text=${JSON.stringify(bar.buttonText)}`);
 say("the toggle sits on the right", bar.fromRightEdge <= 16, `${bar.fromRightEdge}px from the edge`);
+say("nothing in the bar is hidden from a cursor any more", bar.touchOnly.length === 0, JSON.stringify(bar.touchOnly));
 say(
-	"the rail's toggle is the only touch-only one, and is not drawn where there is a cursor",
-	bar.touchOnly.length === 1 && bar.touchOnly[0] === "none",
-	JSON.stringify(bar.touchOnly),
-);
-say(
-	"the conversation's button is drawn for a cursor too — it has no edge to be summoned from",
-	bar.chat !== null && bar.chat.display !== "none" && bar.chat.touchOnly === false,
-	JSON.stringify(bar.chat),
+	"all four surfaces have a button, drawn at every width",
+	bar.surfaces.every((entry) => !entry.missing && entry.display !== "none" && entry.touchOnly === false),
+	JSON.stringify(bar.surfaces),
 );
 
 const shape = () =>

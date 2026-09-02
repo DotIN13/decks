@@ -6,8 +6,9 @@ import type { Finger } from "./touch.ts";
  * The two panels have a button each in the title bar, which is how a finger reached them
  * until now — correct, and two taps up at the top of a phone for something the hand is
  * already holding the bottom of. Every mobile OS teaches the same gesture instead: pull in
- * from the edge the drawer is on. Left is the agents and their boards; right is the
- * conversation, which is where it sits on a wide screen too.
+ * from the edge the drawer is on. Left is the agents; right is the conversation, which is
+ * where it sits on a wide screen too. The boards an agent is holding have a button of their
+ * own — one edge cannot carry two drawers without asking which one you meant.
  *
  * **Only the reduced finger stream, so this works over a board as well as over the stage.**
  * A board is an iframe and its pointer events never reach this document (§4), so an edge
@@ -42,7 +43,17 @@ export interface EdgeSwipeHost {
 }
 
 export interface EdgeSwipe {
-	down: (finger: Finger) => void;
+	/**
+	 * A finger landed, with how many are now down in total.
+	 *
+	 * Asked rather than counted. This kept its own tally and the tally drifted: a gesture
+	 * that begins on the stage and ends over a board has its `pointerup` delivered to one
+	 * document and not the other, so an `up` could go missing and leave the count at one
+	 * forever — after which every single-finger swipe looked like the second finger of a
+	 * pinch and was ignored. The pool in `Stage` is the one place that knows, because every
+	 * document feeds it.
+	 */
+	down: (finger: Finger, fingers: number) => void;
 	/**
 	 * Feed a moved finger.
 	 *
@@ -66,15 +77,13 @@ interface Candidate {
 export function createEdgeSwipe(host: EdgeSwipeHost): EdgeSwipe {
 	/** At most one, because a drawer pulled by two fingers is a pinch. */
 	let candidate: (Candidate & { id: number }) | undefined;
-	let fingers = 0;
 
 	const cancel = () => {
 		candidate = undefined;
 	};
 
 	return {
-		down: (finger) => {
-			fingers += 1;
+		down: (finger, fingers) => {
 			// A second finger means the canvas: whatever the first was doing, it is a pinch
 			// now, and `Stage` clears its claims for the same reason.
 			if (fingers > 1) return cancel();
@@ -110,7 +119,6 @@ export function createEdgeSwipe(host: EdgeSwipeHost): EdgeSwipe {
 		},
 
 		up: (id) => {
-			fingers = Math.max(0, fingers - 1);
 			if (candidate?.id === id) cancel();
 		},
 

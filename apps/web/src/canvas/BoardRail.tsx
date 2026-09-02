@@ -20,23 +20,28 @@ import { paintFrame } from "../lib/theme.ts";
  * margin — so it holds for a deck of four boards or four hundred, and it follows the
  * scroll instead of the array.
  *
- * From M3 this shows the focused agent's context set rather than the whole deck.
+ * It shows the focused agent's context set, and *only* that. It used to fall back to
+ * listing the whole deck whenever the agent held nothing, which made one list mean two
+ * things depending on state nobody was looking at — "these are the boards in play" and
+ * "these are all the boards there are" drawn identically. Finding a board in the deck is
+ * the all-canvases modal's job now (`AllBoards`), so this one can say what is true: an
+ * agent holding nothing is holding nothing, and it says so in a sentence.
  */
 const WIDTH = 150;
 
 export function BoardRail(props: {
 	boards: Board[];
 	current?: string;
-	/** Whether these are the agent's held boards or just everything in the deck. */
-	held?: boolean;
 	/** Which of them the agent has put on the canvas. */
 	inPlay?: string[];
 	onPick: (board: Board) => void;
+	/** The way out to the whole deck, from the one place someone looking for a board is. */
+	onAll: () => void;
 }) {
 	return (
 		<section class="rail">
-			<div class="rail-head" title={props.held ? "Boards the agent is holding in context" : "Every board in the deck"}>
-				<span>{props.held ? "in context" : "boards"}</span>
+			<div class="rail-head" title="Boards the focused agent is holding in context">
+				<span>in context</span>
 				<span>{props.boards.length}</span>
 			</div>
 			<div class="items">
@@ -47,17 +52,40 @@ export function BoardRail(props: {
 							current={props.current === board.path}
 							// Held but not on the canvas: the agent is working from it without
 							// asking the user to look at it.
-							offCanvas={Boolean(props.held) && !(props.inPlay ?? []).includes(board.path)}
+							offCanvas={!(props.inPlay ?? []).includes(board.path)}
 							onPick={() => props.onPick(board)}
 						/>
 					)}
 				</For>
+				{/*
+					An empty context is a real state and the commonest one on a fresh deck, so it
+					says so and points at the surface that has something in it — a panel that is
+					blank for a good reason still looks broken if it does not give the reason.
+				*/}
+				<Show when={props.boards.length === 0}>
+					<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
+						This agent is not holding any boards yet. Ask it for one, or{" "}
+						<button class="cursor-pointer border-0 bg-none p-0 text-[12px] text-accent underline" type="button" onClick={props.onAll}>
+							browse the deck
+						</button>
+						.
+					</p>
+				</Show>
 			</div>
 		</section>
 	);
 }
 
-function RailItem(props: { board: Board; current: boolean; offCanvas?: boolean; onPick: () => void }) {
+/**
+ * One board, drawn as itself.
+ *
+ * Exported because the all-canvases modal (`AllBoards`) shows the same thing — a board is a
+ * board whether you found it in the context panel or by searching the deck, and two ways of
+ * drawing one is two things to keep in step. It roots its observer at the nearest `.items`,
+ * so any scroller reusing it should carry that class; without one it falls back to the
+ * viewport, which over-mounts a little rather than breaking.
+ */
+export function RailItem(props: { board: Board; current: boolean; offCanvas?: boolean; onPick: () => void }) {
 	let host!: HTMLDivElement;
 	const [near, setNear] = createSignal(false);
 

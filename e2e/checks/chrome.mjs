@@ -5,7 +5,7 @@
  *
  * Needs a model — the tool chips being measured are real tool calls.
  */
-import { ask, boardPath, open, read, say, settle, socket } from "../harness.mjs";
+import { ask, boardPath, open, openPanel, read, say, settle, socket } from "../harness.mjs";
 
 const plan = await boardPath("plan.html");
 
@@ -13,8 +13,7 @@ const { browser, page, errors } = await open();
 say("the bottom history bar is gone", (await page.locator(".timeline").count()) === 0);
 
 // A fresh agent, so this run does not inherit anyone else's turns.
-await page.mouse.move(6, 480);
-await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
+await openPanel(page, "agents");
 await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 await settle(page, 1200);
 await page.mouse.move(800, 500);

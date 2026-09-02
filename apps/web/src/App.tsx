@@ -17,6 +17,8 @@ import Info from "lucide-solid/icons/info";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Minus from "lucide-solid/icons/minus";
 import Moon from "lucide-solid/icons/moon";
+import Layers from "lucide-solid/icons/layers";
+import LayoutGrid from "lucide-solid/icons/layout-grid";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
 import Sun from "lucide-solid/icons/sun";
@@ -25,6 +27,8 @@ import { createStore, reconcile } from "solid-js/store";
 import { BoardRail } from "./canvas/BoardRail.tsx";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
+import { AgentPills } from "./chat/AgentPills.tsx";
+import { AllBoards } from "./canvas/AllBoards.tsx";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
@@ -37,7 +41,6 @@ import { runStageCall } from "./canvas/stage-ops.ts";
 import { ChatList } from "./chat/ChatList.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
 import { FloatingTranscript } from "./chat/FloatingTranscript.tsx";
-import { Latest } from "./chat/Latest.tsx";
 import { Composer } from "./chat/Composer.tsx";
 import { TurnBar, turnsOf, type Turn } from "./chat/TurnBar.tsx";
 import { boxOf, fit, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
@@ -133,12 +136,14 @@ export function App() {
 	 */
 	const [seenAt, setSeenAt] = createSignal(Date.now());
 	/**
-	 * A reply the user has waved away, by id.
+	 * A reply the user has waved away: the message id, per agent.
 	 *
 	 * Kept per message rather than as a flag, so dismissing this one does not also hide the
-	 * next one — the point of the glimpse is that the *newest* thing is there.
+	 * next one — the point of the glimpse is that the *newest* thing is there. And per agent
+	 * rather than one at a time, because the pills show several at once (`AgentPills`) and
+	 * one shared slot meant reading one agent's reply hid another's.
 	 */
-	const [dismissed, setDismissed] = createSignal<string | undefined>(undefined);
+	const [dismissed, setDismissed] = createStore<Record<string, string | undefined>>({});
 	/**
 	 * Whether the conversation is up (see `FloatingTranscript`).
 	 *
@@ -148,6 +153,8 @@ export function App() {
 	 * stops marking turns as unseen, and an arriving reply is not unread.
 	 */
 	const [chatFloat, setChatFloat] = createSignal(false);
+	/** The all-canvases modal (`canvas/AllBoards.tsx`), which is a thing you do and then stop. */
+	const [allBoards, setAllBoards] = createSignal(false);
 	/**
 	 * Whether the canvas cheat sheet is open (see `CanvasOps`).
 	 *
@@ -539,14 +546,16 @@ export function App() {
 	});
 
 	/**
-	 * The focused agent's boards, in attach order — or the whole deck if it holds none.
+	 * The focused agent's boards, in attach order, and nothing else.
 	 *
-	 * The one place the empty-context fallback survives, and deliberately: the rail is how
-	 * you find a board, so it lists everything there is to find. The canvas is what an agent
-	 * put in play, so it lists nothing until something does.
+	 * The fallback to the whole deck is gone with the panel that needed it. It was there
+	 * because the rail was the only way to find a board, so it had to list everything there
+	 * was to find — which meant one list meaning two different things depending on state
+	 * nobody was looking at. Finding a board is the all-canvases modal's job now
+	 * (`canvas/AllBoards.tsx`), so this can say what is true: an agent holding nothing shows
+	 * nothing, and the panel says so in a sentence.
 	 */
-	const railBoards = createMemo(() => {
-		if (held().length === 0) return state.boards;
+	const contextBoards = createMemo(() => {
 		const byPath = new Map(state.boards.map((board) => [board.path, board]));
 		return held().flatMap((path) => {
 			const board = byPath.get(path);
@@ -957,21 +966,38 @@ export function App() {
 		if (!open) return;
 		setSeenAt(Date.now());
 		if (state.focused) setUnread(state.focused, 0);
-		// 200px of rail and 340px of bubbles on a 390px phone is two surfaces and no
-		// canvas, so below `NARROW` they take turns. The rail's pinning goes with it: a
-		// pinned panel is one that stays, and one that stays under the thing on top of it
-		// is a panel nobody can see and cannot get rid of.
-		if (window.innerWidth < NARROW) {
-			panels.left.close();
-			if (panels.left.pinned()) panels.left.setPinned(false);
-		}
+		if (window.innerWidth < NARROW) onlyOne("chat");
 	};
 
-	/** The board rail, closing the conversation behind it on a screen too narrow for both. */
-	const toggleRail = () => {
-		const wasOpen = panels.left.open();
-		panels.left.toggle();
-		if (!wasOpen && window.innerWidth < NARROW) setChatFloat(false);
+	/**
+	 * On a narrow screen the three surfaces take turns.
+	 *
+	 * 200px of panel and 340px of bubbles on a 390px phone is two surfaces and no canvas,
+	 * and there are three of them now rather than two — so rather than each opener knowing
+	 * about the others, they all say which one they are and this closes the rest. Above
+	 * `NARROW` nothing is closed: a laptop has room for a panel beside the conversation, and
+	 * taking one away would be the app tidying up after a choice the user just made.
+	 */
+	const onlyOne = (keep: "agents" | "context" | "chat") => {
+		if (keep !== "agents") panels.agents.set(false);
+		if (keep !== "context") panels.context.set(false);
+		if (keep !== "chat") setChatFloat(false);
+	};
+
+	/**
+	 * One of the two panels, closing whatever it would otherwise sit on top of.
+	 *
+	 * The other panel goes at *every* width, not only on a phone: both are the same 200px of
+	 * the same corner, so two open at once is one behind the other — a panel nobody can see
+	 * and cannot get rid of. Which makes the pair read as what they are, a choice of view
+	 * rather than two independent switches, and `aria-pressed` on each says so.
+	 */
+	const togglePanel = (name: "agents" | "context") => {
+		const opening = !panels[name].open();
+		panels[name].toggle();
+		if (!opening) return;
+		panels[name === "agents" ? "context" : "agents"].set(false);
+		if (window.innerWidth < NARROW) setChatFloat(false);
 	};
 
 	/**
@@ -983,13 +1009,17 @@ export function App() {
 	 * title bar's buttons stay the way back, and on a phone the sheet has its own swipe out
 	 * (`chat/swipe-close.ts`).
 	 *
-	 * Off where a cursor can hover: there the edges already summon the rail by proximity,
-	 * and a laptop with a touchscreen would have two rules for one edge.
+	 * Off where a cursor can hover: the title bar's buttons are right there beside each
+	 * other, and a laptop with a touchscreen would have two rules for one edge.
+	 *
+	 * The left edge brings the **agents**, which is the panel that edge held when there was
+	 * only one — the boards have a button of their own now, and a screen edge cannot carry
+	 * two drawers without asking which one you meant.
 	 */
 	const edgeSwipe = {
 		enabled: () => !canHover(),
 		left: () => {
-			if (!panels.left.open()) toggleRail();
+			if (!panels.agents.open()) togglePanel("agents");
 		},
 		right: () => openChat(true),
 	};
@@ -1031,34 +1061,59 @@ export function App() {
 				</span>
 				<span class="spacer" />
 				{/*
-					The two panels, reachable by tapping.
+					The three ways to look at the deck, in the order you reach for them: who is
+					working, what they are working from, and what else there is.
 
-					Only where the pointer cannot hover (`.touch-only`, a media query in
-					index.css): with a cursor the edges already summon them, and two more
-					buttons in the title bar would be a second way to do a thing that works.
-					Without one they are the *only* way — a finger cannot approach an edge —
-					so this is the difference between chrome that is away and chrome that is
-					gone. `aria-pressed` rather than a title that changes, because what the
-					button does never changes; only what it currently is does.
+					For every pointer, not just a finger. These used to be one `.touch-only`
+					button, on the argument that a cursor near the left edge already summoned the
+					panel and a second way to do a working thing is clutter. The argument fell
+					with proximity itself (`lib/panels.ts`): a panel that arrives when the cursor
+					drifts left cannot coexist with pills in that same corner, so the buttons are
+					now the only handle either panel has — and being the only handle, they belong
+					in front of everyone.
+
+					`aria-pressed` rather than a title that changes, because what each button
+					*does* never changes; only what it currently is does.
 				*/}
 				<button
-					class="icon-button touch-only"
+					class="icon-button"
 					type="button"
-					aria-pressed={panels.left.open()}
-					data-open={panels.left.open()}
-					title="Boards and chats"
-					aria-label="Boards and chats"
-					onClick={toggleRail}
+					aria-pressed={panels.agents.open()}
+					data-open={panels.agents.open()}
+					title="The agents"
+					aria-label="The agents"
+					onClick={() => togglePanel("agents")}
 				>
 					<Icon of={PanelLeft} size={19} />
+				</button>
+				<button
+					class="icon-button"
+					type="button"
+					aria-pressed={panels.context.open()}
+					data-open={panels.context.open()}
+					title="Boards this agent is holding"
+					aria-label="Boards this agent is holding"
+					onClick={() => togglePanel("context")}
+				>
+					<Icon of={Layers} size={19} />
+				</button>
+				<button
+					class="icon-button"
+					type="button"
+					aria-pressed={allBoards()}
+					data-open={allBoards()}
+					title="Every board in the deck"
+					aria-label="Every board in the deck"
+					onClick={() => setAllBoards(!allBoards())}
+				>
+					<Icon of={LayoutGrid} size={18} />
 				</button>
 				{/*
 					The conversation, which has no edge to be summoned from any more.
 
-					The board rail beside it is still `.touch-only` — a cursor approaching the
-					left edge brings that one in, so a button would be a second way to do a
-					thing that works. The transcript's edge went with the sheet, so this button
-					is the only handle it has and it is here for every pointer.
+					The panels beside it are buttons for the same reason this one is: the
+					transcript's edge went with the sheet and the panels' went with proximity, so
+					the title bar is where all four of them live.
 				*/}
 				<button
 					class="icon-button"
@@ -1170,7 +1225,15 @@ export function App() {
 					)}
 				</Show>
 
-				<aside class="panel-float side" data-open={panels.left.open()}>
+				{/*
+				 * Two panels where there was one, in the same corner and one at a time.
+				 *
+				 * The agent list and the boards an agent is holding were stacked inside a single
+				 * surface, so opening either brought both — you scrolled past six chats to see a
+				 * thumbnail, or past four thumbnails to switch agent. They answer different
+				 * questions and now they are asked separately.
+				 */}
+				<aside class="panel-float side" data-open={panels.agents.open()}>
 					<ChatList
 						chats={state.chats}
 						identities={state.identities}
@@ -1186,24 +1249,67 @@ export function App() {
 						defaultKind={state.defaultKind}
 						onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 						onRemove={(id) => socket.send({ type: "agent.remove", id })}
-						pinned={panels.left.pinned()}
-						onPin={panels.left.setPinned}
 					/>
+				</aside>
 
+				<aside class="panel-float side context" data-open={panels.context.open()}>
 					<BoardRail
-						boards={railBoards()}
+						boards={contextBoards()}
 						current={selected()}
-						held={held().length > 0}
 						inPlay={state.focused ? state.inPlay[state.focused] ?? [] : []}
 						onPick={(board) => {
-							// A click on the rail is how the user puts a board on the canvas. It
+							// A click on a thumbnail is how the user puts a board on the canvas. It
 							// moves the camera because they asked for it — the rule that nothing
 							// moves on its own is about the agent, not about your own clicks.
 							socket.send({ type: "board.play", path: board.path });
 							flyTo(board);
 						}}
+						onAll={() => setAllBoards(true)}
 					/>
 				</aside>
+
+				{/*
+				 * What the agents are doing, when the list that would have said so is closed.
+				 *
+				 * The same corner the panel comes out of, so hiding the list leaves the agents
+				 * where they were rather than moving them across the screen. Not hidden while the
+				 * conversation is up, unlike the peek it replaces: that one shared the dock with
+				 * it and said the same thing twice, these are on the opposite edge and carry
+				 * agents the conversation is not showing.
+				 */}
+				<Show when={!panels.agents.open()}>
+					<AgentPills
+						chats={state.chats}
+						transcripts={state.transcripts}
+						identities={state.identities}
+						focused={state.focused}
+						dismissed={dismissed}
+						onFocus={(id) => {
+							setState("focused", id);
+							setUnread(id, 0);
+							setAtTurn(undefined);
+							setSeenAt(Date.now());
+							socket.send({ type: "agent.focus", id });
+						}}
+						onOpen={() => openChat(true)}
+						onDismiss={(agentId, itemId) => setDismissed(agentId, itemId)}
+					/>
+				</Show>
+
+				{/* Everything in the deck, searchable, over the canvas rather than beside it. */}
+				<Show when={allBoards()}>
+					<AllBoards
+						boards={state.boards}
+						current={selected()}
+						inPlay={state.focused ? state.inPlay[state.focused] ?? [] : []}
+						onPick={(board) => {
+							socket.send({ type: "board.play", path: board.path });
+							flyTo(board);
+							setAllBoards(false);
+						}}
+						onClose={() => setAllBoards(false)}
+					/>
+				</Show>
 
 				{/*
 				 * The conversation: bubbles over the boards, and the only transcript there is.
@@ -1264,14 +1370,6 @@ export function App() {
 							/>
 						)}
 					</Show>
-
-					<Latest
-						items={transcript()}
-						historyOpen={chatFloat()}
-						onOpen={() => openChat(true)}
-						dismissed={dismissed()}
-						onDismiss={(id) => setDismissed(id)}
-					/>
 
 					<Composer
 					busy={busy()}

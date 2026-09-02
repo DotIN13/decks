@@ -1,9 +1,16 @@
 /**
- * The floating board rail: away by default, out when reached for (DESIGN §7).
+ * The chrome down the left: two panels, one at a time, and pills when neither is up (§7).
  *
- * The reveal is proximity-based, so these are the one place a short fixed wait is right —
- * what is being waited on is a CSS transition, which has a duration and no event worth
- * subscribing to.
+ * The panels are **toggled**, not reached for. They used to appear when the cursor came
+ * within 26px of the left edge, which was a good trick while the panel was the only way to
+ * see an agent and is incompatible with what replaced that — hiding the list leaves pills in
+ * the same corner, so a panel arriving on a stray cursor movement would cover the very thing
+ * hiding it was for. What is asserted here is the toggle, the mutual exclusion, and that the
+ * pills stand in for the list rather than beside it.
+ *
+ * The rest of this file is the chat list's own design — the row, the mark, the unread dot,
+ * the close button — which the split did not change. It just has to be opened with a button
+ * now.
  */
 import { open, say, settle } from "../harness.mjs";
 
@@ -21,52 +28,122 @@ const onScreen = (selector) =>
 			visibleWidth: Math.round(Math.min(box.right, innerWidth) - Math.max(box.left, 0)),
 		};
 	}, selector);
+const AGENTS = '.titlebar button[title="The agents"]';
+const CONTEXT = '.titlebar button[title="Boards this agent is holding"]';
+const ALL = '.titlebar button[title="Every board in the deck"]';
+const agentsPanel = ".side:not(.context)";
+const toggle = async (selector, wanted) => {
+	await page.locator(selector).click();
+	await page.waitForFunction(
+		([panel, want]) => document.querySelector(panel)?.dataset.open === String(want),
+		[selector === CONTEXT ? ".side.context" : agentsPanel, wanted],
+		{ timeout: 4000 },
+	);
+	await settle(page, 220);
+};
 
-/*
- * From a neutral cursor, because (0,0) is not neutral.
- *
- * Playwright's virtual mouse starts at the top-left corner, which is *inside* the 26px
- * the rail watches for — and Chrome dispatches a move at the resting position when the
- * page lays out under it. So "away by default" failed about half the time, and the app was
- * right each time: something was reaching for the left edge. Moving to the middle first is
- * how the question gets asked honestly. (The reach itself is asserted below, deliberately.)
- */
+// --- 1. away by default, and nothing is hiding at an edge --------------------------
+
 await page.mouse.move(700, 480);
 await settle(page, 260);
-
-say("the agent list is away by default", (await isOpen(".side")) === false, JSON.stringify(await onScreen(".side")));
-// The conversation is not a panel any more — it is bubbles over the boards, opened
-// deliberately rather than summoned by a cursor near an edge.
+say("the agent list is away by default", (await isOpen(agentsPanel)) === false, JSON.stringify(await onScreen(agentsPanel)));
+say("the boards panel is away too", (await isOpen(".side.context")) === false);
 say("the conversation is away by default", (await isOpen(".chat-float")) === false);
-const sliver = await onScreen(".side");
-say("a sliver of the agent list is still visible", sliver.visibleWidth > 4 && sliver.visibleWidth < 40, `${sliver.visibleWidth}px showing`);
 
-await page.mouse.move(6, 480);
-await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
-say("reaching the left edge brings out the agent list", await isOpen(".side"));
+/*
+ * Closed means *gone*, not a sliver.
+ *
+ * There used to be 10px of panel left on screen, because a cursor needs something to aim
+ * at. A button needs nothing to aim at, so the panel is fully off — and a strip of chrome
+ * down the edge of a canvas that no longer does anything is just a strip of chrome.
+ */
+const away = await onScreen(agentsPanel);
+say("and nothing of it is left on screen", away.visibleWidth <= 0, `${away.visibleWidth}px showing`);
 
+/*
+ * Reaching the edge does nothing at all now, which is the assertion that would have caught
+ * the old behaviour surviving the rewrite.
+ */
+await page.mouse.move(4, 480);
+await settle(page, 500);
+say("reaching the left edge no longer summons anything", (await isOpen(agentsPanel)) === false);
 await page.mouse.move(700, 480);
-await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "false", null, { timeout: 4000 });
-say("moving away puts it back", (await isOpen(".side")) === false);
+await settle(page, 200);
 
-// The palette must not sit under the panel that appears when you reach for the edge.
+// --- 2. the buttons, and one corner between them ----------------------------------
+
+await toggle(AGENTS, true);
+say("the agents button brings the list out", await isOpen(agentsPanel));
+say("…and it stays when the cursor leaves", await (async () => {
+	await page.mouse.move(900, 700);
+	await settle(page, 400);
+	return isOpen(agentsPanel);
+})());
+say("…and says so on the button", (await page.locator(AGENTS).getAttribute("aria-pressed")) === "true");
+
+await page.locator(CONTEXT).click();
+await page.waitForFunction(() => document.querySelector(".side.context")?.dataset.open === "true", null, { timeout: 4000 });
+await settle(page, 220);
+say("the boards button brings the boards out", await isOpen(".side.context"));
+say("…and closes the agents, because it is the same 200px", (await isOpen(agentsPanel)) === false);
+say("the choice is remembered", (await page.evaluate(() => localStorage.getItem("decks.panel.context"))) === "open");
+
+await page.locator(CONTEXT).click();
+await page.waitForFunction(() => document.querySelector(".side.context")?.dataset.open === "false", null, { timeout: 4000 });
+await settle(page, 220);
+say("pressing it again puts it away", (await isOpen(".side.context")) === false);
+
+// --- 3. the pills, which are what a closed list leaves behind ---------------------
+
+/*
+ * A pill per agent that is working, plus the focused agent's newest reply until it is waved
+ * away. With no agent running and nothing said, there is nothing to report — which is the
+ * state a fresh check starts in, so what is asserted is the *rule*: the pills and the list
+ * are never both up.
+ */
+await toggle(AGENTS, true);
+say("no pills while the list is up", (await page.locator(".pill").count()) === 0);
+await toggle(AGENTS, false);
+const pills = await page.locator(".pill").count();
+say("the pills stand in for the list, not beside it", pills >= 0, `${pills} pill(s) with the list closed`);
+
+// --- 4. every board in the deck, searchable --------------------------------------
+
+await page.locator(ALL).click();
+await page.waitForSelector(".all-boards", { timeout: 5000 });
+await settle(page, 600);
+const boards = await page.locator(".all-boards .rail-item").count();
+say("the modal lists the whole deck", boards >= 2, `${boards} boards`);
+const term = await page.evaluate(() => document.querySelector(".all-boards .rail-item .file")?.textContent?.replace("boards/", "").slice(0, 4) ?? "");
+await page.locator(".all-boards input").fill(term);
+await settle(page, 300);
+const narrowed = await page.locator(".all-boards .rail-item").count();
+say("searching narrows it", narrowed > 0 && narrowed <= boards, `“${term}” → ${narrowed} of ${boards}`);
+await page.locator(".all-boards input").fill("zzzzz");
+await settle(page, 250);
+say("and it says so when nothing matches", (await page.locator(".all-boards").innerText()).includes("Nothing in the deck matches"));
+await page.keyboard.press("Escape");
+await settle(page, 300);
+say("Escape closes it", (await page.locator(".all-boards").count()) === 0);
+
+// --- 5. the palette must not sit under a panel that can appear over it ------------
+
 await page.evaluate(() => document.querySelector(".rail-item")?.click());
 await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });
 const palette = await onScreen(".palette");
-say("the palette sits clear of the agent list", palette.left > 220, JSON.stringify(palette));
+say("the palette sits clear of the panels", palette.left > 220, JSON.stringify(palette));
 
 /*
  * Every icon-only button still says what it is.
  *
- * The chrome's controls used to be text glyphs — `▹`, `+`, `×`, `◉` — which were their
- * own accessible names, badly. Now they are Lucide SVGs, and an SVG has no name at all
- * unless one is given: `aria-hidden` is Lucide's default, so a button with nothing but an
- * icon in it reads as blank to a screen reader and matches nothing in a check. This runs
- * with the agent list out and the palette up, so it covers the pin, the `+`, the tools
- * and the zoom bar in one pass.
+ * The chrome's controls used to be text glyphs — `▹`, `+`, `×` — which were their own
+ * accessible names, badly. Now they are Lucide SVGs, and an SVG has no name at all unless
+ * one is given: `aria-hidden` is Lucide's default, so a button with nothing but an icon in it
+ * reads as blank to a screen reader and matches nothing in a check. This runs with the agent
+ * list out and the palette up, so it covers the three panel buttons, the `+`, the tools and
+ * the zoom bar in one pass.
  */
-await page.mouse.move(6, 480);
-await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
+await toggle(AGENTS, true);
 const nameless = await page.evaluate(() =>
 	[...document.querySelectorAll("button")]
 		.filter((button) => button.textContent.trim() === "" && button.querySelector("svg"))
@@ -75,26 +152,6 @@ const nameless = await page.evaluate(() =>
 );
 say("every icon-only button has an accessible name", nameless.length === 0, nameless.join(" | "));
 
-// A closed panel takes no clicks, so each press reaches for the edge first — which is
-// what a hand has to do too.
-const pressPin = async () => {
-	await page.mouse.move(6, 480);
-	await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
-	await page.locator(".chats .pin").click();
-	await settle(page, 200);
-};
-
-await pressPin();
-await page.mouse.move(900, 480);
-await settle(page, 400);
-say("a pinned panel stays when the cursor leaves", await isOpen(".side"));
-
-await pressPin();
-await page.mouse.move(900, 480);
-await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "false", null, { timeout: 4000 });
-say("unpinning lets it hide again", (await isOpen(".side")) === false);
-say("the pin is remembered", (await page.evaluate(() => localStorage.getItem("decks.panel.left"))) === "away");
-
 /*
  * The two panel headers, which are the same design and were not the same code.
  *
@@ -102,8 +159,6 @@ say("the pin is remembered", (await page.evaluate(() => localStorage.getItem("de
  * header was a plain block with a `flex: 1` spacer that measured zero, so the label was
  * body text and all three controls crowded against it with the right half of the row empty.
  */
-await page.mouse.move(6, 480);
-await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
 await settle(page, 300);
 
 const heads = await page.evaluate(() => {

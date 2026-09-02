@@ -5,7 +5,7 @@ import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import Plus from "lucide-solid/icons/plus";
 import { For, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
-import { AgentMark } from "./agent-marks.tsx";
+import { AgentFace, AgentMark, agentState } from "./agent-marks.tsx";
 
 /**
  * The agents, as a messaging app's conversation list.
@@ -27,8 +27,6 @@ export function ChatList(props: {
 	onNew: (kind?: AgentKind) => void;
 	/** What the server hands a new agent unless told otherwise. */
 	defaultKind: AgentKind;
-	pinned: boolean;
-	onPin: (pinned: boolean) => void;
 }) {
 	/** Parents first, each followed by its children — the order people expect. */
 	const ordered = () => {
@@ -96,19 +94,6 @@ export function ChatList(props: {
 							</For>
 						</select>
 					</span>
-					<button
-						class="pin"
-						type="button"
-						data-on={props.pinned}
-						title={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
-						aria-label={props.pinned ? "Let this panel hide again" : "Keep this panel open"}
-						onClick={() => props.onPin(!props.pinned)}
-					>
-						{/* The dot, not a pin glyph: filled is pinned, hollow is not. A pin icon
-						    needs a second icon or a colour to say which state it is in; a filled
-						    circle beside a hollow one is the state, at 12px and in one character. */}
-						{props.pinned ? "◉" : "○"}
-					</button>
 				</span>
 			</div>
 			<div class="chat-rows">
@@ -138,7 +123,7 @@ export function ChatList(props: {
 									data-child={Boolean(chat.parentId)}
 									onClick={() => props.onFocus(chat.id)}
 								>
-									<Avatar chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} />
+									<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} />
 									<span class="who">
 										<span class="top">
 											{/*
@@ -159,7 +144,7 @@ export function ChatList(props: {
 														{props.chats.find((other) => other.id === chat.parentId)?.name ?? "parent"}
 													</span>{" "}
 												</Show>
-												{chat.state === "idle" ? (chat.lastLine ?? (chat.dormant ? "not resumed yet" : "no messages yet")) : working(chat.state)}
+												{chat.state === "idle" ? (chat.lastLine ?? (chat.dormant ? "not resumed yet" : "no messages yet")) : agentState(chat.state)}
 											</span>
 										</span>
 									</span>
@@ -204,43 +189,4 @@ export function ChatList(props: {
 	);
 }
 
-function Avatar(props: { chat: AgentChat; identity: Identity | undefined; unread: number }) {
-	const colour = () => props.identity?.color ?? "var(--color-accent)";
-	const avatar = () => props.identity?.avatar;
-	return (
-		/*
-		 * A wrapper, because the count sits on the corner of the avatar and the avatar
-		 * itself clips to its circle — that `overflow: hidden` is what rounds an image
-		 * avatar, so a badge inside it would be cut in half.
-		 */
-		<span class="face">
-			<span class="avatar" data-state={props.chat.state} style={{ background: avatar() ? "transparent" : colour(), "--dot": colour() }}>
-				<Show when={avatar()} fallback={(props.identity?.name ?? props.chat.name).slice(0, 1).toUpperCase()}>
-					{(src) => <img src={src()} alt="" />}
-				</Show>
-			</span>
-			{/*
-			 * A dot, not a count. A 16px numbered badge on a 26px avatar covers the face it
-			 * is reporting on — and the number was never the point: what a person does with
-			 * it is "that one has something", which a dot says at a fifth of the area. The
-			 * count stays in the title for anyone who wants it.
-			 */}
-			<Show when={props.unread > 0}>
-				<span class="unread" title={props.unread === 1 ? "1 unread message" : `${props.unread} unread messages`} />
-			</Show>
-		</span>
-	);
-}
-
-/** "thinking", not "streaming": what the state means to someone watching. */
-function working(state: AgentChat["state"]): string {
-	switch (state) {
-		case "tool":
-			return "working…";
-		case "waiting":
-			return "waiting for you";
-		default:
-			return "thinking…";
-	}
-}
 

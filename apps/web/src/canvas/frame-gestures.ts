@@ -77,13 +77,6 @@ export interface FrameGestureHost {
 	/** Whether the stage is currently letting the frame have pointer events at all. */
 	interactive(): boolean;
 	/**
-	 * Where the pointer is, in the parent document's coordinates.
-	 *
-	 * The floating panels appear when the cursor reaches a screen edge, and they can
-	 * only know that if somebody tells them while the cursor is over a board.
-	 */
-	pointer(x: number, y: number): void;
-	/**
 	 * A camera shortcut pressed while focus was inside a board.
 	 *
 	 * Returns whether it meant something, so the frame knows whether to swallow it.
@@ -388,14 +381,6 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		doc.removeEventListener("pointercancel", onTouchUp, true);
 	};
 
-	// Reported, not acted on: this is only so the edge panels know where the cursor is.
-	const onPointerMoveReport = (event: PointerEvent) => {
-		const at = toStage(event.clientX, event.clientY);
-		const stage = frame.ownerDocument.querySelector(".stage")?.getBoundingClientRect();
-		host.pointer(at.x + (stage?.left ?? 0), at.y + (stage?.top ?? 0));
-	};
-
-	doc.addEventListener("pointermove", onPointerMoveReport, { passive: true, capture: true });
 	doc.addEventListener("wheel", onWheel, { passive: false, capture: true });
 	doc.addEventListener("keydown", onKeyDown, true);
 	doc.addEventListener("keyup", onKeyUp, true);
@@ -418,7 +403,6 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	win.addEventListener("blur", onBlur);
 
 	return () => {
-		doc.removeEventListener("pointermove", onPointerMoveReport, true);
 		doc.removeEventListener("wheel", onWheel, true);
 		doc.removeEventListener("keydown", onKeyDown, true);
 		doc.removeEventListener("keyup", onKeyUp, true);

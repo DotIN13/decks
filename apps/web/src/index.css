@@ -293,7 +293,7 @@ svg.lucide {
 .inspector header .close,
 .chats .rail-head button,
 .chat-row-wrap .close,
-.latest .dismiss {
+.pill .dismiss {
 	display: grid;
 	width: var(--control-sm);
 	height: var(--control-sm);
@@ -315,7 +315,7 @@ svg.lucide {
 .inspector header .close:hover,
 .chats .rail-head button:hover,
 .chat-row-wrap .close:hover,
-.latest .dismiss:hover {
+.pill .dismiss:hover {
 	background: var(--line);
 	color: var(--fg);
 }
@@ -766,24 +766,6 @@ svg.lucide {
 
 
 
-/* The sliver says which panel it is: something to aim a cursor at. */
-.side::after {
-	position: absolute;
-	top: 50%;
-	right: 3px;
-	width: 3px;
-	height: 34px;
-	border-radius: 999px;
-	background: var(--line-strong);
-	content: "";
-	transform: translateY(-50%);
-	transition: opacity 150ms ease;
-}
-
-.side[data-open="true"]::after {
-	opacity: 0;
-}
-
 /*
  * A user message and the way back to it.
  *
@@ -1050,50 +1032,47 @@ svg.lucide {
 }
 
 /* What `/` completes to: a small menu floating above the input bar. */
-/*
- * The peek's own remainder, after `chat/Latest.tsx` took the rest.
+/* --- what the agents are doing -----------------------------------------------
  *
- * What was said, and what is running, stacked.
- *
- * `min-width: 0` because this is a flex child holding text that must be allowed to
- * ellipsize — without it the working row's title sets the floor and pushes the whole strip
- * as wide as a shell command.
- *
- * The rest of the peek is in `chat/Latest.tsx`. What is left here is what a class attribute
- * cannot say: a hidden scrollbar, and the colour the text takes while a reply is arriving.
+ * Pills in the top-left corner, where the agent list comes out of
+ * (`chat/AgentPills.tsx`). What is left here is what a class attribute cannot say: a hidden
+ * scrollbar, the colour the words take while a reply is arriving, and the dot.
  */
 
 /*
- * The reply scrolls and says nothing about it.
+ * A reply scrolls and says nothing about it.
  *
- * A scrollbar in a two-line strip over the canvas is chrome inside chrome, and the text
+ * A scrollbar in a three-line pill over the canvas is chrome inside chrome, and the text
  * follows the stream on its own while it arrives — so there is nothing to drag and no reason
  * to draw a track. `::-webkit-scrollbar` below is the same statement for the engines that
  * ignore `scrollbar-width`.
  */
-.latest .body {
+.pill .body {
 	scrollbar-width: none;
 }
 
-.latest .body::-webkit-scrollbar {
+.pill .body::-webkit-scrollbar {
 	display: none;
 }
 
 /* While it is still arriving, the text is the live thing on screen. */
-.latest[data-streaming="true"] .body {
+.pill[data-state="streaming"] .body {
 	color: var(--fg);
+}
+
+/* The one whose composer you are typing into, said quietly: a pill is small, and a border
+   is the whole of what it has to say it with. */
+.pill[data-current="true"] {
+	border-color: var(--line-strong);
 }
 
 /*
  * The tool in flight, under whatever was last said.
  *
- * One line, always: a strip over the canvas that grows with the length of a command is a
- * strip that moves the input bar around. The dot and the animation are the ones a running
- * tool already has in the transcript (`.tool[data-state="running"]`), so the same state
- * reads the same way in both places.
+ * The dot and the animation are the ones a running tool already has in the transcript
+ * (`.tool[data-state="running"]`), so the same state reads the same way in both places.
  */
-
-.latest .working .state {
+.pill .working .dot {
 	width: 6px;
 	height: 6px;
 	flex: none;
@@ -1102,25 +1081,7 @@ svg.lucide {
 	animation: pulse 1.2s ease-in-out infinite;
 }
 
-.latest .working .name {
-	flex: none;
-	color: var(--fg);
-	font-variant-numeric: tabular-nums;
-}
-
-.latest .working .what {
-	overflow: hidden;
-	color: var(--faint);
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.latest .working .more {
-	flex: none;
-	color: var(--faint);
-}
-
-.latest .dismiss:hover {
+.pill .dismiss:hover {
 	background: var(--line);
 	color: var(--fg);
 }
@@ -1811,10 +1772,46 @@ svg.lucide {
  * so there is something to aim at, and the transform is what moves: one composited
  * property, so a panel arriving never costs a layout.
  */
+.side[data-open="true"] {
+	opacity: 1;
+	transform: none;
+	pointer-events: auto;
+}
+
+/*
+ * One corner, two panels, one at a time.
+ *
+ * `.side` is the box; which of the two is in it is `App`'s business, and the rule it keeps
+ * is that opening either closes the other — the same 200px of screen cannot hold both, and
+ * a panel behind a panel is one nobody can see and cannot get rid of.
+ *
+ * It slides rather than appears, and the transform is what moves: one composited property,
+ * so a panel arriving never costs a layout. Closed it is fully off — the sliver that used to
+ * stay behind was something to aim a *cursor* at, and there is nothing to aim at any more
+ * now that the way in is a button (`lib/panels.ts`).
+ */
 .side {
-	--peek: 10px;
+	top: 12px;
+	/*
+	 * As tall as what is in it, up to the room there is.
+	 *
+	 * It used to reach the bottom always, which was right when it held two lists stacked and
+	 * wrong now that it holds one: three agents in a full-height panel is a wall of empty
+	 * chrome down the side of the canvas, and the canvas is the work. `max-height` rather
+	 * than `bottom` is the whole difference — the inner list still scrolls when there is more
+	 * of it than fits, because `flex: 1` and `min-height: 0` do not care which of the two
+	 * bounded it.
+	 */
+	max-height: calc(100% - 24px - var(--keyboard) - env(safe-area-inset-bottom));
+	left: max(12px, env(safe-area-inset-left));
 	z-index: 10;
-	opacity: 0.55;
+	display: flex;
+	width: 200px;
+	flex-direction: column;
+	padding: 0;
+	gap: 0;
+	opacity: 0;
+	transform: translateX(calc(-100% - 24px));
 	transition:
 		transform 190ms cubic-bezier(0.22, 0.8, 0.24, 1),
 		opacity 190ms ease;
@@ -1828,38 +1825,24 @@ svg.lucide {
 	pointer-events: auto;
 }
 
-.side {
-	top: 12px;
-	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
-	left: max(12px, env(safe-area-inset-left));
-	display: flex;
-	width: 200px;
-	flex-direction: column;
-	padding: 0;
-	gap: 0;
-	transform: translateX(calc(-100% - 12px + var(--peek)));
-}
-
-.side .chats {
-	display: flex;
-	min-height: 0;
-	/*
-	 * A little under half, rather than 55%: the boards rail below is the one that grows
-	 * with the deck, and an agent list is usually two or three rows. It still scrolls
-	 * (`.chat-rows`), so this is about who gets the spare room, not about a limit.
-	 */
-	max-height: 42%;
-	flex-direction: column;
-	border-bottom: 1px solid var(--line);
-}
-
+/*
+ * Each panel fills its own box now.
+ *
+ * The agent list used to be capped at 42% of the panel because the boards rail was
+ * underneath it in the same one, and the two were competing for the height. They are
+ * separate surfaces, so neither has to give the other room.
+ */
+.side .chats,
 .side .rail {
 	position: static;
 	width: auto;
-	/* Same reason as `.rail .items`: without this the rail takes its content's height
-	   and overflows `.side`, which is the box that is actually bounded. */
+	/* Without this the content takes its own height and overflows `.side`, which is the
+	   box that is actually bounded. */
 	min-height: 0;
+	max-height: none;
 	flex: 1;
+	flex-direction: column;
+	display: flex;
 	border: 0;
 	background: none;
 	box-shadow: none;
@@ -1875,40 +1858,6 @@ svg.lucide {
  * a column. Inline keeps the row, the grid still centres the icon in its square, and the
  * chat header — which *is* a flex row — blockifies it back on its own.
  */
-/*
- * The pin is a character, not an icon, so it needs its own size back.
- *
- * The square and the centring stay — that is the tap target the touch pass gave it,
- * and it holds a glyph as happily as an SVG. What had to come back is `font-size`:
- * the icon sweep dropped it along with every other glyph-era rule, and `◉` inherited
- * the panel header's size, which drew a dot half again too big for the row.
- */
-.pin {
-	display: inline-grid;
-	width: var(--control-sm);
-	height: var(--control-sm);
-	padding: 0;
-	border: 0;
-	border-radius: var(--control-radius);
-	background: none;
-	color: var(--faint);
-	cursor: pointer;
-	font: inherit;
-	font-size: 12px;
-	line-height: 1;
-	place-items: center;
-	vertical-align: middle;
-}
-
-.pin:hover {
-	background: var(--line);
-	color: var(--fg);
-}
-
-.pin[data-on="true"] {
-	color: var(--color-accent);
-}
-
 .chats .rail-head button:hover {
 	background: var(--line);
 }
@@ -2044,27 +1993,35 @@ svg.lucide {
 	text-align: left;
 }
 
-.chat-row .avatar {
+/*
+ * An agent's face, at whichever size the thing drawing it asked for.
+ *
+ * Not scoped to `.chat-row` any more: the same face is a row in the list and an 18px mark on
+ * a pill over the canvas (`chat/AgentPills.tsx`), and two drawings of one agent is two things
+ * to keep in step. `--face` is the one number that differs, set by `AgentFace`, and the
+ * initial scales off it so a small face is not a large letter in a small circle.
+ */
+.avatar {
 	position: relative;
 	display: grid;
 	overflow: hidden;
-	width: 26px;
-	height: 26px;
+	width: var(--face, 26px);
+	height: var(--face, 26px);
 	flex: 0 0 auto;
 	border-radius: 999px;
 	color: #fff;
-	font-size: 11px;
+	font-size: calc(var(--face, 26px) * 0.42);
 	place-items: center;
 }
 
-.chat-row .avatar img {
+.avatar img {
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
 }
 
 /* Working shows as a ring on the face, not a second row of furniture. */
-.chat-row .avatar[data-state]:not([data-state="idle"])::after {
+.avatar[data-state]:not([data-state="idle"])::after {
 	position: absolute;
 	border: 2px solid var(--dot);
 	border-radius: 999px;
@@ -2129,13 +2086,13 @@ svg.lucide {
  * highlight is a translucent tint over the same panel, so the ring reads as a gap either
  * way and needs no rule per state.
  */
-.chat-row .face {
+.face {
 	position: relative;
 	display: grid;
 	flex: 0 0 auto;
 }
 
-.chat-row .unread {
+.unread {
 	position: absolute;
 	/*
 	 * On the arc, not at the corner of the box.
@@ -2365,8 +2322,7 @@ svg.lucide {
 		font-size: 13px;
 	}
 
-	.latest .dismiss,
-	.pin,
+	.pill .dismiss,
 	.chats .rail-head button {
 		width: 38px;
 		height: 38px;
@@ -2464,22 +2420,18 @@ svg.lucide {
 	}
 
 	/*
-	 * The rail becomes a sheet, with the canvas behind it rather than beside it.
-	 * `--peek` goes to nothing — a sliver is something to aim a cursor at, and there is
-	 * no cursor here.
+	 * A panel becomes a sheet, with the canvas behind it rather than beside it.
 	 *
-	 * A sidebar for the boards, not a takeover: at full width the rail was two-thirds
-	 * empty stretched across the screen, and a narrower panel leaves a strip of canvas
-	 * beside it — which is the difference between chrome and a wall. It reaches the
-	 * bottom of the screen, past the dock: the composer sits behind the sheet while it
-	 * is open, and 88px of empty chrome under the thing you opened is a phone's whole
-	 * lower third.
+	 * A sidebar, not a takeover: at full width the rail was two-thirds empty stretched
+	 * across the screen, and a narrower panel leaves a strip of canvas beside it — which is
+	 * the difference between chrome and a wall. It reaches the bottom of the screen, past
+	 * the dock: the composer sits behind the sheet while it is open, and 88px of empty
+	 * chrome under the thing you opened is a phone's whole lower third.
 	 */
 	.side {
-		--peek: 0px;
 		left: max(8px, env(safe-area-inset-left));
 		right: auto;
-		bottom: max(8px, env(safe-area-inset-bottom));
+		max-height: calc(100% - 16px - var(--keyboard) - env(safe-area-inset-bottom));
 		width: min(340px, 78vw);
 		/* A transform is the one property that costs nothing to animate. */
 		transform: translateX(calc(-100% - 16px));
@@ -2509,10 +2461,6 @@ svg.lucide {
 		flex-direction: column;
 		justify-content: center;
 		padding: 8px 12px;
-	}
-
-	.side::after {
-		display: none;
 	}
 
 	/*

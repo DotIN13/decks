@@ -2,7 +2,6 @@ import type { Board, Camera } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, onMount } from "solid-js";
 import { boxOf, fit, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
 import { BoardFrame } from "./BoardFrame.tsx";
-import { notePointer } from "../lib/panels.ts";
 import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
 import type { FrameGestureHost } from "./frame-gestures.ts";
@@ -244,7 +243,9 @@ export function Stage(props: {
 	const touch = (phase: "down" | "move" | "up", finger: Finger): TouchStep => {
 		if (phase === "down") {
 			touches.down(finger);
-			edges.down(finger);
+			// After `touches.down`, so the count includes this finger: one is a drawer, two
+			// are a pinch.
+			edges.down(finger, touches.count());
 			setPanning(true);
 			return { kind: "idle" };
 		}
@@ -322,7 +323,6 @@ export function Stage(props: {
 		space: (held) => setSpaceHeld(held),
 		spaceHeld: () => spaceHeld(),
 		interactive: () => props.camera.zoom >= INTERACT_ZOOM,
-		pointer: (x) => notePointer(x),
 		key: (name) => shortcut(name),
 	};
 

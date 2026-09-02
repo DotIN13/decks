@@ -7,7 +7,7 @@
  * however far you scrolled.
  */
 import { rmSync } from "node:fs";
-import { boardPath, deckState, open, say, settle, socket, write } from "../harness.mjs";
+import { boardPath, deckState, open, openPanel, say, settle, socket, write } from "../harness.mjs";
 
 const EXTRA = 12;
 const made = [];
@@ -38,8 +38,8 @@ for (const path of wanted) link.send({ type: "board.play", path });
 const { browser, page, errors } = await open({ width: 1400, height: 800 });
 try {
 	await page.waitForFunction((count) => document.querySelectorAll(".rail-item").length >= count, EXTRA, { timeout: 20000 });
-	await page.mouse.move(6, 400);
-	await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
+	// The boards live in the context panel, which is the one this check is about.
+	await openPanel(page, "context");
 	await settle(page, 400);
 
 	const geometry = () =>
@@ -124,8 +124,7 @@ try {
 	 */
 	await page.locator(".side .rail .rail-item").first().click();
 	await settle(page, 900);
-	await page.mouse.move(6, 400);
-	await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
+	await openPanel(page, "agents");
 	await settle(page, 300);
 
 	const ring = await page.evaluate(() => {

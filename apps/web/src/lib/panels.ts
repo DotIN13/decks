@@ -1,53 +1,37 @@
-import { createSignal, onCleanup } from "solid-js";
+import { createSignal } from "solid-js";
 
 /**
- * The floating board rail, and when it is there.
+ * The floating panels, and whether each one is there.
  *
- * The canvas is the point of this app, so the chrome is away by default and comes
- * when it is wanted. Stage Manager's trick is the one worth copying: a sliver at the
- * edge, and the cursor approaching that edge brings the panel in. No button to find,
- * nothing covering the work while you are not using it.
+ * Two of them now — the agents and the focused agent's canvases — where there used to be
+ * one holding both, and each has a button of its own in the title bar. That split is the
+ * design: an agent list and a set of boards are two different questions, and a panel
+ * answering both is one you open for half a reason and then close.
  *
- * Proximity is measured in JavaScript rather than with an invisible hover strip. A
- * strip wide enough to aim at is also a strip that swallows clicks on whatever is
- * under it — the zoom controls and the timeline live in exactly those corners — and
- * `pointer-events: none` would stop it detecting hover at all. Arithmetic on
- * `pointermove` has neither problem.
+ * **Proximity is gone, and its absence is the point.** This used to copy Stage Manager: a
+ * sliver at the edge, and a cursor approaching that edge brought the panel in. It was a
+ * good trick for a panel that was the only way to see an agent, and it is incompatible with
+ * what replaced that — hiding the list now leaves *pills* in the same corner
+ * (`chat/AgentPills.tsx`), so a panel that arrived whenever the cursor drifted left would
+ * cover the very thing hiding it was for, and the button would disagree with the screen. A
+ * panel you asked for stays until you say otherwise; that is also what pinning was for, so
+ * pinning went with it.
  *
- * It used to be two — the rail on the left and a 380px transcript sheet on the right —
- * and the sheet is gone: the conversation floats over the boards instead
- * (`chat/FloatingTranscript.tsx`), opened deliberately rather than summoned by a cursor
- * near an edge. What is left is general enough to stay general, because the mechanism is
- * the interesting part and it was never specific to which side.
+ * Persisted per browser, because a panel you opened deliberately and lost to a reload is a
+ * panel you have to keep re-opening, and the whole point of a toggle is that it holds.
  *
- * The panel can also be **pinned**, because a panel that vanishes when the cursor
- * leaves is a panel you cannot work in: dragging a board out of the rail takes longer
- * than the cursor stays. Pinning persists per browser.
- *
- * **A finger cannot approach an edge.** There is no cursor to be near with, and the
- * only `pointermove` a touchscreen sends is one during a drag — so on a phone the
- * proximity rule made the panel unreachable, and worse than unreachable: a pan that
- * happened to begin at the left edge summoned the rail over the canvas mid-gesture. So
- * where the pointer cannot hover, proximity is off entirely and the panel is toggled
- * from a button in the title bar (`toggle`).
- *
- * The rail and the conversation are **mutually exclusive** on a screen too narrow to
- * hold both — 200px of rail and 340px of bubbles on a 390px phone is two surfaces and no
- * canvas. That rule lives in `App` now rather than here: one of the two is no longer a
- * panel, and a panel should not be given a reference to something that is not one.
- * `NARROW` is exported for it.
+ * The panels and the conversation are **mutually exclusive** on a screen too narrow to hold
+ * them beside the canvas — 200px of rail and 340px of bubbles on a 390px phone is two
+ * surfaces and no canvas. That rule lives in `App`, which is the only place that knows about
+ * all three; `NARROW` is exported for it.
  */
 
-/** How close to the edge counts as reaching for the panel. */
-const REACH = 26;
-/** How far past a panel's own width the cursor must go before it leaves again. */
-const SLACK = 48;
 /**
- * Below this the rail and the conversation cannot share the screen with the canvas, so
+ * Below this the panels and the conversation cannot share the screen with the canvas, so
  * they take turns.
  *
- * A width, unusually — most of the decisions in this file are about the input device and
- * ask `(hover: none)` — because this one really is about how many pixels there are.
+ * A width, unusually — most of the decisions about chrome here ask `(hover: none)` instead —
+ * because this one really is about how many pixels there are.
  */
 export const NARROW = 760;
 
@@ -61,132 +45,46 @@ export function canHover(): boolean {
 	}
 }
 
-export type Side = "left" | "right";
+/** Which panel. Named for what it holds rather than which edge it is on. */
+export type PanelName = "agents" | "context";
+
+export interface Panel {
+	open: () => boolean;
+	set: (open: boolean) => void;
+	toggle: () => void;
+}
+
+const KEY = (name: PanelName) => `decks.panel.${name}`;
 
 /**
- * Everything that wants to know where the pointer is.
+ * Away on a fresh browser, both of them.
  *
- * The window's own `pointermove` is not enough: a board is an iframe, and pointer
- * events inside one do not cross into the parent — so a panel opened at the edge
- * stayed open for as long as the cursor was over a board, which is most of the time.
- * The board frames report their position through `notePointer` (see
- * `canvas/frame-gestures.ts`), and this is where both sources meet.
+ * The canvas is the work and the chrome is not, so nothing covers a board until it is asked
+ * for. The buttons are in the title bar rather than behind a gesture, so "away" is not the
+ * same as "hidden" — which is what it was when the only way in was to guess that the left
+ * edge was live.
  */
-const reporters = new Set<(x: number) => void>();
-
-/** Tell the panels where the pointer is, in the parent document's coordinates. */
-export function notePointer(x: number): void {
-	for (const report of reporters) report(x);
-}
-
-interface Panel {
-	open: () => boolean;
-	pinned: () => boolean;
-	setPinned: (pinned: boolean) => void;
-	/** Opened or closed by a tap, which is how a touchscreen asks for either. */
-	toggle: () => void;
-	close: () => void;
-}
-
-const KEY = (side: Side) => `decks.panel.${side}`;
-
-function stored(side: Side): boolean {
+function stored(name: PanelName): boolean {
 	try {
-		return localStorage.getItem(KEY(side)) === "pinned";
+		return localStorage.getItem(KEY(name)) === "open";
 	} catch {
 		return false;
 	}
 }
 
-function createPanel(side: Side, selector: string, width: () => number): Panel {
-	const [near, setNear] = createSignal(false);
-	const [tapped, setTapped] = createSignal(false);
-	const [pinned, setPinnedSignal] = createSignal(stored(side));
-	/**
-	 * True while the panel holds *keyboard* focus, so tabbing into it works.
-	 *
-	 * `:focus-visible`, not plain focus: clicking a button inside the panel focuses it,
-	 * and treating that as "someone is using this" meant a panel never hid again after
-	 * a single click. The browser already knows the difference between arriving by Tab
-	 * and arriving by mouse; this asks it rather than guessing.
-	 */
-	const [focused, setFocused] = createSignal(false);
-
-	const measure = (x: number) => {
-		const edge = side === "left" ? x : window.innerWidth - x;
-		// Two thresholds, not one: opening takes a deliberate reach for the edge, and
-		// closing takes leaving the panel properly. One threshold flickers when the
-		// cursor sits on the boundary.
-		if (edge <= REACH) return true;
-		if (edge > width() + SLACK) return false;
-		return undefined;
+function createPanel(name: PanelName): Panel {
+	const [open, setOpen] = createSignal(stored(name));
+	const set = (next: boolean) => {
+		setOpen(next);
+		try {
+			localStorage.setItem(KEY(name), next ? "open" : "away");
+		} catch {
+			/* private browsing: the choice just does not persist */
+		}
 	};
-
-	const report = (x: number) => {
-		// A finger has no hover, and its only `pointermove` is part of a drag: reading
-		// one as "reaching for the edge" opens a panel in the middle of a pan.
-		if (!canHover()) return;
-		const verdict = measure(x);
-		if (verdict === undefined) return;
-		setNear(verdict);
-	};
-	reporters.add(report);
-	onCleanup(() => reporters.delete(report));
-
-	const onPointerMove = (event: PointerEvent) => report(event.clientX);
-
-	// A cursor that leaves the window entirely has left the panel too.
-	const onLeave = () => setNear(false);
-
-	const onFocusChange = () => {
-		const active = document.activeElement;
-		const inside = Boolean(active && active !== document.body && active.closest(selector));
-		setFocused(inside && matchesFocusVisible(active));
-	};
-
-	window.addEventListener("pointermove", onPointerMove, { passive: true });
-	window.addEventListener("blur", onLeave);
-	document.addEventListener("pointerleave", onLeave);
-	document.addEventListener("focusin", onFocusChange);
-	document.addEventListener("focusout", onFocusChange);
-
-	onCleanup(() => {
-		window.removeEventListener("pointermove", onPointerMove);
-		window.removeEventListener("blur", onLeave);
-		document.removeEventListener("pointerleave", onLeave);
-		document.removeEventListener("focusin", onFocusChange);
-		document.removeEventListener("focusout", onFocusChange);
-	});
-
-	return {
-		open: () => pinned() || near() || focused() || tapped(),
-		pinned,
-		setPinned: (next) => {
-			setPinnedSignal(next);
-			try {
-				localStorage.setItem(KEY(side), next ? "pinned" : "away");
-			} catch {
-				/* private browsing: the choice just does not persist */
-			}
-		},
-		toggle: () => setTapped((was) => !was),
-		close: () => setTapped(false),
-	};
+	return { open, set, toggle: () => set(!open()) };
 }
 
-/** `:focus-visible` where it exists, and "no" where it does not. */
-function matchesFocusVisible(element: Element | null): boolean {
-	if (!element) return false;
-	try {
-		return element.matches(":focus-visible");
-	} catch {
-		return false;
-	}
-}
-
-/** The panel's width, kept here so the proximity maths matches the stylesheet. */
-export const PANEL_WIDTH = { left: 200 } as const;
-
-export function createPanels(): { left: Panel } {
-	return { left: createPanel("left", ".side", () => PANEL_WIDTH.left) };
+export function createPanels(): Record<PanelName, Panel> {
+	return { agents: createPanel("agents"), context: createPanel("context") };
 }

@@ -7,7 +7,7 @@
  * deleted.
  */
 import { rmSync } from "node:fs";
-import { boardPath, deckState, emptyCanvas, open, say, settle, socket, write } from "../harness.mjs";
+import { boardPath, deckState, emptyCanvas, open, openAllBoards, openPanel, say, settle, socket, write } from "../harness.mjs";
 
 const ghost = await boardPath("ghost.html");
 write(
@@ -23,8 +23,7 @@ const { browser, page, errors } = await open({ width: 1500, height: 950 });
 try {
 	// A fresh agent holds nothing, so playing one board leaves it holding exactly that
 	// board — the state where a deletion used to blank everything.
-	await page.mouse.move(6, 480);
-	await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
+	await openPanel(page, "agents");
 	await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 	await settle(page, 1200);
 	await page.mouse.move(800, 500);
@@ -51,28 +50,52 @@ try {
 	 * the deck itself looked deleted, and because the context was not empty the rail's
 	 * whole-deck fallback did not fire either. This asserted the canvas before, which is
 	 * the half that is no longer a fault.
+	 *
+	 * And the fallback is gone with the panel split, so the surface that proves the deck
+	 * survived is the all-canvases modal: an empty *context* panel is now the correct answer
+	 * to "the agent held one board and it is gone", and it would prove nothing about whether
+	 * the other boards are still there.
 	 */
-	await page.waitForFunction(() => document.querySelectorAll(".rail-item").length > 1, null, { timeout: 15000 });
+	await openAllBoards(page);
+	/*
+	 * Waited on the ghost's *absence*, not on a count.
+	 *
+	 * The deck's own board list is fetched after this rather than before: read too early it
+	 * still holds the ghost — the file was removed a moment ago and the server has not been
+	 * told yet — so a count taken from it is a target the modal can never reach.
+	 */
+	await page.waitForFunction(
+		() => {
+			const items = [...document.querySelectorAll(".all-boards .rail-item .file")].map((n) => n.textContent);
+			return items.length > 0 && !items.includes("boards/ghost.html");
+		},
+		null,
+		{ timeout: 15000 },
+	);
+	const deck = await deckState();
 
 	const after = await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
-	const rail = await page.evaluate(() => [...document.querySelectorAll(".rail-item .file")].map((n) => n.textContent).sort());
-	const deck = await deckState();
+	const listed = await page.evaluate(() => [...document.querySelectorAll(".all-boards .rail-item .file")].map((n) => n.textContent).sort());
 	say("the agent holds nothing, so the canvas is empty", after.length === 0, after.join(" ") || "(empty)");
-	say("the rail recovers, and lists the deck without the ghost",
-		rail.join() === deck.boards.map((b) => b.path).sort().join(), rail.join(" "));
+	say("the deck itself is intact, without the ghost in it",
+		listed.join() === deck.boards.map((b) => b.path).sort().join(), listed.join(" "));
 	const pruned = link.last("context.changed");
 	say("the server published the prune", Boolean(pruned) && !pruned.boards.includes("boards/ghost.html"), `boards=[${(pruned?.boards ?? []).join(" ")}]`);
+	await page.keyboard.press("Escape");
+	await settle(page, 250);
 
 	/*
 	 * A second page must agree — the server pruned it, not just this client.
 	 *
-	 * Read off the rail rather than the canvas: a fresh load's focused agent holds nothing,
+	 * Read off the deck rather than the canvas: a fresh load's focused agent holds nothing,
 	 * so its canvas is legitimately empty and would prove nothing either way.
 	 */
 	const fresh = await browser.newPage({ viewport: { width: 1200, height: 800 } });
 	await fresh.goto(page.url(), { waitUntil: "load" });
-	await fresh.waitForSelector(".rail-item", { timeout: 15000 });
-	const reloaded = await fresh.evaluate(() => [...document.querySelectorAll(".rail-item .file")].map((n) => n.textContent));
+	await fresh.waitForSelector(".composer textarea", { timeout: 15000 });
+	await openAllBoards(fresh);
+	await fresh.waitForSelector(".all-boards .rail-item", { timeout: 15000 });
+	const reloaded = await fresh.evaluate(() => [...document.querySelectorAll(".all-boards .rail-item .file")].map((n) => n.textContent));
 	say(
 		"a fresh load agrees",
 		reloaded.length > 0 && !reloaded.includes("boards/ghost.html"),

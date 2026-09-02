@@ -4,13 +4,12 @@
  *
  * Needs a model.
  */
-import { open, say, settle } from "../harness.mjs";
+import { open, openPanel, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 
 // A fresh agent: whatever ran before may have left the focused one mid-conversation.
-await page.mouse.move(6, 480);
-await page.waitForFunction(() => document.querySelector(".side")?.dataset.open === "true", null, { timeout: 4000 });
+await openPanel(page, "agents");
 await page.locator('.chats .rail-head button[title="Start another agent"]').click();
 await settle(page, 1200);
 await page.mouse.move(800, 500);

@@ -315,27 +315,35 @@ if (!embed) {
 	);
 }
 
-// --- 7. the rail, which no finger can hover into, and the conversation --------------
+// --- 7. the panels, and the conversation ---------------------------------------------
 //
-// Two ways in for each: the title bar's buttons, and a swipe in from the edge the panel
-// lives on. The swipe is the one a phone teaches, and the one that has to be proved over a
-// board as well as over bare stage — a board is a separate document, so a gesture watched
-// on `window` would die exactly where the screen is fullest.
+// Two ways in: the title bar's buttons, and a swipe in from the edge. The swipe is the one a
+// phone teaches, and the one that has to be proved over a board as well as over bare stage —
+// a board is a separate document, so a gesture watched on `window` would die exactly where
+// the screen is fullest. The left edge brings the **agents**: the boards have a button of
+// their own now, and one edge cannot carry two drawers without asking which you meant.
 const openState = () =>
 	page.evaluate(() => ({
-		left: document.querySelector(".side")?.dataset.open,
+		left: document.querySelector(".side:not(.context)")?.dataset.open,
+		boards: document.querySelector(".side.context")?.dataset.open,
 		right: document.querySelector(".chat-float")?.dataset.open,
 	}));
-say("both start away", JSON.stringify(await openState()) === '{"left":"false","right":"false"}', JSON.stringify(await openState()));
+const away = await openState();
+say("all three start away", away.left === "false" && away.boards === "false" && away.right === "false", JSON.stringify(away));
 
-await page.locator('.titlebar .icon-button[aria-label="Boards and chats"]').tap();
+await page.locator('.titlebar .icon-button[aria-label="The agents"]').tap();
 await settle(page, 300);
-say("a tap on the title bar brings the boards out", (await openState()).left === "true", JSON.stringify(await openState()));
+say("a tap on the title bar brings the agents out", (await openState()).left === "true", JSON.stringify(await openState()));
+
+await page.locator('.titlebar .icon-button[aria-label="Boards this agent is holding"]').tap();
+await settle(page, 300);
+const swapped = await openState();
+say("the boards take their place, not a second sheet beside them", swapped.boards === "true" && swapped.left === "false", JSON.stringify(swapped));
 
 await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
 await settle(page, 300);
 const both = await openState();
-say("opening the transcript closes the other one", both.right === "true" && both.left === "false", JSON.stringify(both));
+say("opening the transcript closes whichever panel was up", both.right === "true" && both.left === "false" && both.boards === "false", JSON.stringify(both));
 
 await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
 await settle(page, 300);
@@ -366,7 +374,15 @@ say("a swipe to the right edge puts the conversation away", (await openState()).
  * it is, because 44px of canvas lurching before the panel appears is worse than a pan that
  * starts a little late (`canvas/edge-swipe.ts`).
  */
-const size = page.viewportSize();
+/*
+ * The *layout* viewport, asked of the page.
+ *
+ * `page.viewportSize()` is 393 on this device and `window.innerWidth` is 435 — Playwright's
+ * mobile emulation lays the page out wider than the visual viewport and scales it down. Touch
+ * coordinates are layout pixels, so `viewportSize().width - 3` is 45px short of the edge the
+ * app watches, which is a gesture aimed at the middle of nothing.
+ */
+const size = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
 const mid = Math.round(size.height / 2);
 
 const wasCamera = await camera();
@@ -422,7 +438,7 @@ say("zoomed in, the left edge is over a live board's frame", overBoard === "ifra
 await swipe([{ x: 3, y: mid }], { x: 150, y: 0 }, 12);
 await settle(page, 400);
 say("the edge swipe works over a board too", (await openState()).left === "true", JSON.stringify(await openState()));
-await page.locator('.titlebar .icon-button[aria-label="Boards and chats"]').tap();
+await page.locator('.titlebar .icon-button[aria-label="The agents"]').tap();
 await settle(page, 300);
 
 // --- 8. nothing in the chrome is smaller than a fingertip ---------------------------

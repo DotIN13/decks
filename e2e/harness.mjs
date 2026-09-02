@@ -243,6 +243,31 @@ export async function resetStage() {
 	return deck.boards.map((board) => board.path);
 }
 
+/**
+ * Bring out one of the two left panels.
+ *
+ * They are toggled from the title bar rather than reached for with the cursor (DESIGN §7),
+ * and they share a corner — opening either closes the other — so every check that wants one
+ * asks the same way. It lived in seven files as `mouse.move(6, 480)` plus a wait, which is
+ * seven places to change when the way in changes, and it just did.
+ */
+export async function openPanel(page, name) {
+	const title = name === "context" ? "Boards this agent is holding" : "The agents";
+	const selector = name === "context" ? ".side.context" : ".side:not(.context)";
+	if (await page.evaluate((s) => document.querySelector(s)?.dataset.open === "true", selector)) return;
+	await page.locator(`.titlebar button[title="${title}"]`).click();
+	await page.waitForFunction((s) => document.querySelector(s)?.dataset.open === "true", selector, { timeout: 6000 });
+	// The panel slides; 190ms is the transition and a click landing mid-slide misses.
+	await page.waitForTimeout(260);
+}
+
+/** Every board in the deck, in the modal that lists them — the way to find one now. */
+export async function openAllBoards(page) {
+	await page.locator('.titlebar button[title="Every board in the deck"]').click();
+	await page.waitForSelector(".all-boards", { timeout: 6000 });
+	await page.waitForTimeout(300);
+}
+
 /** A short settle for things with no observable signal — a CSS transition, mostly. */
 export function settle(page, ms = 350) {
 	return page.waitForTimeout(ms);
