@@ -261,6 +261,26 @@ export async function openPanel(page, name) {
 	await page.waitForTimeout(260);
 }
 
+/**
+ * Start another agent from the panel's `+`.
+ *
+ * The `+` opens a menu of the two runtimes rather than making one on the default — new agent
+ * and which runtime are the same question, since a live session cannot swap the process
+ * behind it. Seven checks pressed the `+` and expected a row; they get a menu, so the two
+ * steps live here rather than in seven places.
+ *
+ * Returns once the row exists, because every caller's next line assumes it does.
+ */
+export async function newAgent(page, kind = "pi") {
+	await openPanel(page, "agents");
+	const before = await page.evaluate(() => document.querySelectorAll(".chat-row").length);
+	await page.locator('.chats .rail-head button[title="Start another agent"]').click();
+	await page.waitForSelector('.chats [role="menu"]', { timeout: 6000 });
+	await page.locator('.chats [role="menu"] [role="menuitem"]', { hasText: kind }).click();
+	await page.waitForFunction((was) => document.querySelectorAll(".chat-row").length > was, before, { timeout: 15000 });
+	await page.waitForTimeout(400);
+}
+
 /** Every board in the deck, in the modal that lists them — the way to find one now. */
 export async function openAllBoards(page) {
 	await page.locator('.titlebar button[title="Every board in the deck"]').click();

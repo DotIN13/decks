@@ -3,13 +3,12 @@
  *
  * Needs a model: the blocks are turns.
  */
-import { ask, idle, open, openPanel, say, settle } from "../harness.mjs";
+import { ask, idle, newAgent, open, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 
 // A fresh agent, so the spine starts empty however much this deck has been talked to.
-await openPanel(page, "agents");
-await page.locator('.chats .rail-head button[title="Start another agent"]').click();
+await newAgent(page);
 await settle(page, 1200);
 await page.mouse.move(800, 500);
 say("no spine before anything is said", (await page.locator(".turnbar .turn").count()) === 0);

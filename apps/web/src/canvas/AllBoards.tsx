@@ -20,6 +20,13 @@ import { RailItem } from "./BoardRail.tsx";
  * reason the ops sheet does — open, search, dismiss is one set of rules about how a press
  * outside dismisses it.
  *
+ * **Nothing here is dimmed.** The context panel fades a board it is holding but not showing,
+ * because there "held" and "up" are two different states worth telling apart. Browsing the
+ * deck they are not: every board is equally a board, and marking the ones not currently on
+ * the canvas made the whole list 45% opaque — a list that looks switched off rather than one
+ * you are reading. The one under the cursor gets a border instead, which is the only thing
+ * you can put round a picture without changing what is in it.
+ *
  * Search is over the title and the path, substring and case-insensitive. Not fuzzy: a deck's
  * boards are named by the person who asked for them, so the thing they type is usually a
  * word that is actually in the name, and fuzzy matching mostly earns its keep by finding
@@ -29,8 +36,6 @@ export function AllBoards(props: {
 	boards: Board[];
 	/** Which board the canvas is centred on, so the row can say so. */
 	current?: string;
-	/** Which of them the focused agent has in play; the rest are a click away from being. */
-	inPlay: string[];
 	onPick: (board: Board) => void;
 	onClose: () => void;
 }) {
@@ -100,19 +105,18 @@ export function AllBoards(props: {
 				{/*
 					`items` is not decoration: `RailItem` roots its viewport observer at the nearest
 					one, so this is what bounds how many boards are live documents at a time.
+
+					`min-h-0` is what makes the scroll real, and its absence was two bugs in one. A
+					flex child defaults to `min-height: auto` and refuses to shrink below its
+					content, so a deck of two dozen grew this box past the modal — which has
+					`overflow-hidden`, so the rows past the second were **clipped and unreachable**,
+					not scrolled to. And with the box as tall as its content, every board was within
+					the observer's margin, so all 24 were live documents at once.
 				*/}
-				<div class="items grid grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-2 overflow-y-auto overscroll-contain p-3">
+				<div class="items grid min-h-0 grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-2 overflow-y-auto overscroll-contain p-3">
 					<For each={found()}>
 						{(board) => (
-							<RailItem
-								board={board}
-								current={props.current === board.path}
-								// Not on the canvas yet, which is what clicking it changes. The context
-								// panel means something narrower by the same mark — held but not shown —
-								// and here it is simply "this is not up".
-								offCanvas={!props.inPlay.includes(board.path)}
-								onPick={() => props.onPick(board)}
-							/>
+							<RailItem board={board} current={props.current === board.path} onPick={() => props.onPick(board)} />
 						)}
 					</For>
 				</div>

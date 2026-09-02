@@ -1,5 +1,6 @@
 import type { Board } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { claimThumb } from "./thumb-budget.ts";
 import { boardUrl, deckFileUrl } from "../lib/api.ts";
 import { paintFrame } from "../lib/theme.ts";
 
@@ -87,25 +88,36 @@ export function BoardRail(props: {
  */
 export function RailItem(props: { board: Board; current: boolean; offCanvas?: boolean; onPick: () => void }) {
 	let host!: HTMLDivElement;
-	const [near, setNear] = createSignal(false);
+	const budget = claimThumb();
 
 	onMount(() => {
 		const observer = new IntersectionObserver(
-			// Tracked rather than latched: a `near` that only ever turns on means every
-			// item scrolled past stays a live document for the rest of the session, so the
-			// cost of a long rail grows with how much of it you have looked at. The margin
-			// is what stops this thrashing — an item just off the edge stays mounted.
+			// Tracked rather than latched: a `near` that only ever turns on means every item
+			// scrolled past stays a live document for the rest of the session, so the cost of a
+			// long rail grows with how much of it you have looked at.
+			//
+			// This says who is live; `thumb-budget.ts` says how many may *start* at once. The
+			// margin is one row rather than 300px, which in a grid was every item at once — the
+			// modal fits twenty-four boards inside 400px, so "near" meant "all of them".
 			(entries) => {
-				for (const entry of entries) setNear(entry.isIntersecting);
+				for (const entry of entries) budget.want(entry.isIntersecting);
 			},
-			{ root: host.closest(".items"), rootMargin: "300px" },
+			{ root: host.closest(".items"), rootMargin: "120px" },
 		);
 		observer.observe(host);
 		onCleanup(() => observer.disconnect());
 	});
 
 	const scale = () => WIDTH / Math.max(1, props.board.w);
-	const live = () => near() && !props.board.poster;
+	/*
+	 * A poster is an image the board offered instead of itself, so it is never a document —
+	 * and `loaded()` is reported for it straight away, or a screen of postered boards would
+	 * hold the loading budget shut against the ones that do need it.
+	 */
+	const live = () => budget.live() && !props.board.poster;
+	createEffect(() => {
+		if (props.board.poster && budget.live()) budget.loaded();
+	});
 
 	/**
 	 * The revision the thumbnail is showing, brought up to date on a trailing delay.
@@ -151,7 +163,11 @@ export function RailItem(props: { board: Board; current: boolean; offCanvas?: bo
 						// looks, and a thumbnail is the same board seen from further away.
 						style={{ transform: `scale(${scale()})` }}
 						scrolling="no"
-						onLoad={(event) => paintFrame(event.currentTarget)}
+						onLoad={(event) => {
+							paintFrame(event.currentTarget);
+							// Frees the loading budget for whoever is queued behind this one.
+							budget.loaded();
+						}}
 					/>
 				</Show>
 			</div>

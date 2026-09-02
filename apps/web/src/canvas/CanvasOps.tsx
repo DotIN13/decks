@@ -1,7 +1,8 @@
 import X from "lucide-solid/icons/x";
-import { For, Show } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { canHover } from "../lib/panels.ts";
+import { tokens } from "./keycaps.ts";
 
 /**
  * What you can do to the canvas, in one place you can open and close.
@@ -71,7 +72,8 @@ function pointerGroups(): Group[] {
 			rows: [
 				{ keys: "drag a board's title", what: "move the board" },
 				{ keys: "the board's ×", what: "take it off the canvas, keeping it in context" },
-				{ keys: "reach the left edge", what: "the boards and agents rail comes out" },
+				{ keys: "the panel buttons", what: "the agents · the boards they are holding" },
+				{ keys: "the grid button", what: "every board in the deck, searchable" },
 				{ keys: "the speech-bubble button", what: "the conversation, opened and closed" },
 				{ keys: "click a turn on the right spine", what: "the conversation at that turn" },
 				{ keys: "/", what: "commands, in the input bar" },
@@ -166,7 +168,34 @@ export function CanvasOps(props: { onClose: () => void }) {
 										<div
 											class="row grid grid-cols-[minmax(0,13em)_minmax(0,1fr)] gap-2.5 py-0.5 text-[12px] leading-[1.5] max-[560px]:grid-cols-[minmax(0,1fr)] max-[560px]:gap-0 max-[560px]:py-1"
 										>
-											<span class="font-mono text-[11px] text-fg [word-break:break-word]">{row.keys}</span>
+											<span class="flex flex-wrap items-center gap-1">
+												<For each={tokens(row.keys)}>
+													{(token) => (
+														<Switch>
+															{/*
+																A keycap: bordered, raised a hair off the panel by one
+																line of shadow, and never narrower than it is tall — so
+																`0` and `⌘D` read as the same family of object rather
+																than a square and a rectangle.
+															*/}
+															<Match when={"cap" in token && token.cap}>
+																{(cap) => (
+																	<kbd class="inline-grid min-w-[1.7em] place-items-center rounded-[5px] border border-line-strong bg-bg-deep px-1.5 py-px font-mono text-[11px] leading-[1.5] text-fg shadow-[0_1px_0_var(--line-strong)]">
+																		{cap()}
+																	</kbd>
+																)}
+															</Match>
+															{/* "either of these": the dot is the renderer's, not the data's. */}
+															<Match when={"or" in token}>
+																<span class="px-px text-faint">·</span>
+															</Match>
+															<Match when={"word" in token && token.word}>
+																{(word) => <span class="text-muted">{word()}</span>}
+															</Match>
+														</Switch>
+													)}
+												</For>
+											</span>
 											<span class="text-muted">{row.what}</span>
 										</div>
 									)}

@@ -197,41 +197,56 @@ say(
 	`agents ${heads.agents.labelSize}/${heads.agents.labelTransform} vs boards ${heads.boards.labelSize}/${heads.boards.labelTransform}`,
 );
 
-// The runtime chip: what `+` will create, shown as that runtime's mark.
-const chip = await page.evaluate(() => {
-	const kind = document.querySelector(".chats .rail-head .kind");
-	const mark = kind.querySelector("svg[data-agent]");
-	const chevron = [...kind.querySelectorAll("svg")].find((svg) => !svg.dataset.agent);
-	return {
-		agent: mark?.dataset.agent,
-		// The mark is the same width whichever runtime it is, so the chevron sits against
-		// it — a text label showing "pi" while "claude" existed left a gap here.
-		markToChevron: mark && chevron ? Math.round(chevron.getBoundingClientRect().left - mark.getBoundingClientRect().right) : null,
-		selectCovers: (() => {
-			const box = kind.getBoundingClientRect();
-			const select = kind.querySelector("select").getBoundingClientRect();
-			return Math.round(select.width) === Math.round(box.width) && Math.round(select.height) === Math.round(box.height);
-		})(),
-		named: kind.querySelector("select").getAttribute("aria-label"),
-	};
-});
-say("the chip shows the mark of what + will create", chip.agent === "pi", String(chip.agent));
-say("…with the chevron against it", chip.markToChevron !== null && chip.markToChevron >= 0 && chip.markToChevron <= 4, `${chip.markToChevron}px`);
-say("…and the real control still covers it", chip.selectCovers);
-say("…and is still named for a screen reader", Boolean(chip.named), chip.named ?? "");
+/*
+ * The `+` asks which runtime, rather than a chip beside it answering separately.
+ *
+ * There used to be two controls for one decision: a `+` that made an agent on the default
+ * runtime and a chip that made one on whichever you picked — so the chip was a `+` that also
+ * chose, and the `+` was a chip that could not. The runtime has to be chosen before the agent
+ * exists (a live session cannot swap the process behind it), which makes "new agent" and
+ * "which runtime" the same question.
+ */
+say("the separate runtime chip is gone", (await page.evaluate(() => document.querySelectorAll(".chats .rail-head .kind").length)) === 0);
+say("the + is a menu button, and says so", (await page.locator('.chats .rail-head button[title="Start another agent"]').getAttribute("aria-haspopup")) === "menu");
 
-// Choosing a runtime creates an agent on it. It stays reachable by keyboard because the
-// select is only invisible, not replaced.
 const before = await page.evaluate(() => document.querySelectorAll(".chat-row").length);
-await page.selectOption(".chats .rail-head .kind select", "claude");
+await page.locator('.chats .rail-head button[title="Start another agent"]').click();
+await page.waitForSelector('.chats [role="menu"]', { timeout: 4000 });
+const offered = await page.evaluate(() =>
+	[...document.querySelectorAll('.chats [role="menu"] [role="menuitem"]')].map((item) => ({
+		text: item.textContent.trim(),
+		mark: item.querySelector("svg[data-agent]")?.dataset.agent,
+		markWidth: Math.round(item.querySelector("svg[data-agent]")?.getBoundingClientRect().width ?? 0),
+		// A tick on the one the `+` would have made on its own, before it asked.
+		ticked: item.querySelectorAll("svg").length > 1,
+	})),
+);
+say("it offers both runtimes, each with its own mark", offered.length === 2 && offered.every((entry) => entry.mark), JSON.stringify(offered));
+// Drawn, not merely present: an `<svg>` beside a `flex-1` label shrinks to nothing given
+// the chance, and did — 0×13, a mark with a height and no width.
+say("…and the marks have a width", offered.every((entry) => entry.markWidth >= 10), JSON.stringify(offered.map((e) => e.markWidth)));
+say("…and marks the default among them", offered.filter((entry) => entry.ticked).length === 1, JSON.stringify(offered.map((e) => e.ticked)));
+
+await page.locator('.chats [role="menu"] [role="menuitem"]', { hasText: "claude" }).click();
 await page.waitForFunction((was) => document.querySelectorAll(".chat-row").length > was, before, { timeout: 8000 });
+say("the menu closes on a choice", (await page.evaluate(() => document.querySelectorAll('.chats [role="menu"]').length)) === 0);
 // Read from `data-agent` rather than from text: the badge is a mark now.
 const kinds = await page.evaluate(() => [...document.querySelectorAll(".chat-row .runtime svg")].map((s) => s.dataset.agent));
 say("choosing a runtime creates an agent on it", kinds.includes("claude"), kinds.join(" "));
-say(
-	"…and the chip goes back to the default",
-	(await page.evaluate(() => document.querySelector(".chats .rail-head .kind svg[data-agent]")?.dataset.agent)) === "pi",
-);
+
+/*
+ * And a press anywhere else puts it away.
+ *
+ * A menu that needs its own button pressed again is a menu you have to remember you opened —
+ * and this one sits over a list of chats, so the press that dismisses it is usually a press
+ * meant for something underneath.
+ */
+await page.locator('.chats .rail-head button[title="Start another agent"]').click();
+await page.waitForSelector('.chats [role="menu"]', { timeout: 4000 });
+await page.mouse.click(760, 620);
+await settle(page, 200);
+say("…and a press elsewhere closes it without choosing", (await page.evaluate(() => document.querySelectorAll('.chats [role="menu"]').length)) === 0);
+say("…leaving the list as it was", (await page.evaluate(() => document.querySelectorAll(".chat-row").length)) === before + 1);
 
 /*
  * The mark leads the row, and the two runtimes' marks are optically the same size.

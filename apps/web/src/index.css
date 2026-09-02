@@ -367,48 +367,6 @@ svg.lucide {
 	flex: 1;
 }
 
-/* Sits with the + rather than beside it: one control, two parts. */
-/*
- * What `+` will create: the runtime's mark, with the real select laid over it.
- *
- * A `<select>` sizes itself to its *widest* option, so a text label showing "pi" while
- * "claude" existed left a gap before the chevron. A mark is the same width whichever runtime
- * it is, which ends that problem rather than compensating for it.
- *
- * Quiet until hovered, like the two buttons beside it: a persistent fill made the widest
- * control in the row also the loudest.
- */
-.chats .rail-head .kind {
-	position: relative;
-	display: flex;
-	height: var(--control-sm);
-	align-items: center;
-	padding: 0 3px 0 6px;
-	border-radius: var(--control-radius);
-	color: var(--faint);
-	cursor: pointer;
-	font-size: 10px;
-	gap: 1px;
-}
-
-.chats .rail-head .kind:hover {
-	background: var(--line);
-	color: var(--fg);
-}
-
-/* Still the thing that is clicked, and still keyboard-reachable — just not the thing that
-   is seen. */
-.chats .rail-head .kind select {
-	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
-	border: 0;
-	opacity: 0;
-	cursor: pointer;
-	font: inherit;
-}
-
 
 .titlebar .brand {
 	display: flex;
@@ -676,17 +634,33 @@ svg.lucide {
 	text-align: left;
 }
 
-/* Held but not on the canvas: dimmed, because the agent is working from it without
-   asking you to look at it. */
-.rail-item[data-off-canvas="true"] {
+/*
+ * Held but not on the canvas: dimmed, because the agent is working from it without asking
+ * you to look at it.
+ *
+ * Only in the context panel, which is the surface where "held" and "shown" are two different
+ * things. Browsing the deck it meant nothing — every board is equally a board there, and
+ * marking the ones not currently up made forty thumbnails 45% opaque, which is a list that
+ * looks switched off rather than a list you are reading.
+ */
+.side .rail-item[data-off-canvas="true"] {
 	opacity: 0.45;
 }
 
-.rail-item[data-off-canvas="true"]:hover {
+/*
+ * The one under the cursor, said with a border rather than by dimming the rest.
+ *
+ * A thumbnail is a picture and a border is the one thing you can put round a picture that
+ * does not change what is in it — an opacity or a wash would be the app editing the board it
+ * is showing you.
+ */
+.rail-item:hover {
+	border-color: var(--line-strong);
 	opacity: 1;
 }
 
-.rail-item[data-current="true"] {
+.rail-item[data-current="true"],
+.rail-item[data-current="true"]:hover {
 	border-color: var(--color-accent);
 	box-shadow: 0 0 0 1px var(--color-accent);
 }
@@ -1853,6 +1827,18 @@ svg.lucide {
 }
 
 /*
+ * The `+` and the menu it opens, which hangs off it rather than off the header.
+ *
+ * `relative` here and not on `.rail-head`: the header is 200px of panel and the menu is
+ * ~132px, so anchoring to the header would leave it floating in the middle of a row it has
+ * nothing to do with. Anchored to the button, its right edge lines up with the button's.
+ */
+.chats .rail-head .new {
+	position: relative;
+	display: flex;
+}
+
+/*
  * `inline-grid`, not `grid`: the agent list's head is a line of inline boxes rather than
  * a flex row, so a block-level button on it stacked the `+`, the runtime and the pin into
  * a column. Inline keeps the row, the grid still centres the icon in its square, and the
@@ -2274,9 +2260,9 @@ svg.lucide {
 		opacity: 1;
 	}
 
-	/* A held-but-not-played board is dimmed and un-dimmed by hovering it. Without the
-	   second half, "dimmed" is just harder to read. */
-	.rail-item[data-off-canvas="true"] {
+	/* Nothing un-dims it here, so it is dimmed less: on a touchscreen there is no hover to
+	   bring it back with, and "dimmed" with no way out is just harder to read. */
+	.side .rail-item[data-off-canvas="true"] {
 		opacity: 0.62;
 	}
 }
@@ -2333,12 +2319,6 @@ svg.lucide {
 		width: 34px;
 		height: 34px;
 		opacity: 1;
-	}
-
-	.chats .rail-head .kind {
-		height: 34px;
-		padding: 0 4px 0 8px;
-		font-size: 12px;
 	}
 
 	.turn-actions button {

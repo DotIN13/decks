@@ -1301,7 +1301,6 @@ export function App() {
 					<AllBoards
 						boards={state.boards}
 						current={selected()}
-						inPlay={state.focused ? state.inPlay[state.focused] ?? [] : []}
 						onPick={(board) => {
 							socket.send({ type: "board.play", path: board.path });
 							flyTo(board);

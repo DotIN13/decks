@@ -4,7 +4,7 @@
  * Needs a model. The user-facing half — hiding, the rail click, the empty-context fallback
  * — is in tiers.mjs and needs nothing.
  */
-import { ask, deckState, emptyCanvas, open, openPanel, say, settle } from "../harness.mjs";
+import { ask, deckState, emptyCanvas, newAgent, open, say, settle } from "../harness.mjs";
 
 const deck = await deckState();
 const two = deck.boards.map((board) => board.path).slice(0, 2);
@@ -14,8 +14,7 @@ const onCanvas = () => page.evaluate(() => [...document.querySelectorAll(".board
 const inRail = () => page.evaluate(() => [...document.querySelectorAll(".rail-item .file")].map((n) => n.textContent).sort());
 
 // A fresh agent, so nothing it holds is inherited.
-await openPanel(page, "agents");
-await page.locator('.chats .rail-head button[title="Start another agent"]').click();
+await newAgent(page);
 await settle(page, 1200);
 await page.mouse.move(800, 500);
 // A fresh agent holds nothing, so its canvas is empty until it attaches something.

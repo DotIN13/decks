@@ -5,7 +5,7 @@
  * socket — no model needed. The agent-side half (`attach`/`show` from `stage_eval`) is
  * checked in stage-api.mjs, which does need one.
  */
-import { deckState, emptyCanvas, open, openAllBoards, openPanel, say, settle, socket } from "../harness.mjs";
+import { deckState, emptyCanvas, newAgent, open, openAllBoards, openPanel, say, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const paths = deck.boards.map((board) => board.path).sort();
@@ -27,8 +27,7 @@ const inModal = () => page.evaluate(() => [...document.querySelectorAll(".all-bo
  * now, which lets both surfaces say what is true rather than one of them saying two things
  * depending on state nobody is looking at: the panel is empty, the modal is the whole deck.
  */
-await openPanel(page, "agents");
-await page.locator('.chats .rail-head button[title="Start another agent"]').click();
+await newAgent(page);
 await settle(page, 1200);
 await emptyCanvas(page);
 say("an agent holding nothing puts nothing on the canvas", (await onCanvas()).length === 0, (await onCanvas()).join(" ") || "(empty)");

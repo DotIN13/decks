@@ -1,13 +1,15 @@
 /**
  * The board list scrolls, and its thumbnails follow the scroll (DESIGN §7).
  *
- * Two bugs met here: the rail was `flex: 1` with `min-height: auto`, so it took its
- * content's full height and ran off the bottom of the screen instead of scrolling; and
- * live thumbnails were capped by *index*, so past the eighth board they stayed blank
- * however far you scrolled.
+ * Three bugs met here. The rail was `flex: 1` with `min-height: auto`, so it took its
+ * content's full height and ran off the bottom of the screen instead of scrolling. Live
+ * thumbnails were capped by *index*, so past the eighth board they stayed blank however far
+ * you scrolled. And the all-canvases modal's grid had the same `min-height: auto` — but
+ * inside a box with `overflow: hidden`, so the rows past the second were not merely awkward
+ * to reach, they were **clipped away entirely**.
  */
 import { rmSync } from "node:fs";
-import { boardPath, deckState, open, openPanel, say, settle, socket, write } from "../harness.mjs";
+import { boardPath, deckState, open, openAllBoards, openPanel, say, settle, socket, write } from "../harness.mjs";
 
 const EXTRA = 12;
 const made = [];
@@ -157,6 +159,58 @@ try {
 		`${ring.left}px left, ${ring.right}px right, for a ${ring.spread}px ring`,
 	);
 	say("…nor at the top of the list", ring.top >= ring.spread, `${ring.top}px above`);
+
+	/*
+	 * The same list in the modal, which had the same bug with a worse ending.
+	 *
+	 * `.side .rail .items` has its `min-height: 0` in the stylesheet; the modal's grid is
+	 * utilities and did not, and the modal clips rather than scrolls — so a deck of a dozen
+	 * showed two rows and hid the rest with no scrollbar to say so.
+	 */
+	await openAllBoards(page);
+	await page.waitForFunction((count) => document.querySelectorAll(".all-boards .rail-item").length >= count, EXTRA, { timeout: 15000 });
+	await settle(page, 600);
+	const modal = await page.evaluate(() => {
+		const items = document.querySelector(".all-boards .items");
+		const box = document.querySelector(".all-boards").getBoundingClientRect();
+		return {
+			scrollable: items.scrollHeight > items.clientHeight + 1,
+			overflow: items.scrollHeight - items.clientHeight,
+			insideTheModal: Math.round(items.getBoundingClientRect().bottom) <= Math.round(box.bottom) + 1,
+		};
+	});
+	say("the browse grid scrolls rather than clipping what it cannot fit", modal.scrollable, `${modal.overflow}px of overflow`);
+	say("…and stays inside the modal", modal.insideTheModal);
+
+	/*
+	 * And the boards arrive two at a time rather than all at once.
+	 *
+	 * A dozen documents parsing `board.css`, `board.js`, KaTeX and Mermaid in one frame is a
+	 * dozen times the work with none of it visible sooner: unbounded, the modal took 410ms to
+	 * appear at all, against 118ms queued. Sampled while it fills, because the thing being
+	 * asserted only exists mid-flight (`canvas/thumb-budget.ts`).
+	 */
+	await page.keyboard.press("Escape");
+	await settle(page, 400);
+	const loading = await page.evaluate(() => {
+		const peak = { value: 0 };
+		const look = () => {
+			const starting = [...document.querySelectorAll(".all-boards .rail-item .thumb iframe")].filter((frame) => {
+				try {
+					return frame.contentDocument?.readyState !== "complete";
+				} catch {
+					return false;
+				}
+			}).length;
+			peak.value = Math.max(peak.value, starting);
+		};
+		const timer = setInterval(look, 16);
+		document.querySelector('.titlebar button[title="Every board in the deck"]').click();
+		return new Promise((resolve) => setTimeout(() => { clearInterval(timer); resolve(peak.value); }, 1200));
+	});
+	say("no more than a couple of boards are ever starting at once", loading <= 4, `${loading} at the busiest moment`);
+	await page.keyboard.press("Escape");
+	await settle(page, 300);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));
 } finally {

@@ -4,7 +4,7 @@
  *
  * Needs a model, because the thing being travelled through is a real conversation.
  */
-import { ask, boardPath, open, openPanel, read, say, settle, socket } from "../harness.mjs";
+import { ask, boardPath, newAgent, open, read, say, settle, socket } from "../harness.mjs";
 
 const plan = await boardPath("plan.html");
 const original = read(plan);
@@ -12,8 +12,7 @@ const original = read(plan);
 const { browser, page, errors } = await open();
 try {
 	// A fresh agent, so the history is this run's.
-	await openPanel(page, "agents");
-	await page.locator('.chats .rail-head button[title="Start another agent"]').click();
+	await newAgent(page);
 	await settle(page, 1200);
 	await page.mouse.move(800, 500);
 

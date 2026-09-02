@@ -7,7 +7,7 @@
  * deleted.
  */
 import { rmSync } from "node:fs";
-import { boardPath, deckState, emptyCanvas, open, openAllBoards, openPanel, say, settle, socket, write } from "../harness.mjs";
+import { boardPath, deckState, emptyCanvas, newAgent, open, openAllBoards, say, settle, socket, write } from "../harness.mjs";
 
 const ghost = await boardPath("ghost.html");
 write(
@@ -23,8 +23,7 @@ const { browser, page, errors } = await open({ width: 1500, height: 950 });
 try {
 	// A fresh agent holds nothing, so playing one board leaves it holding exactly that
 	// board — the state where a deletion used to blank everything.
-	await openPanel(page, "agents");
-	await page.locator('.chats .rail-head button[title="Start another agent"]').click();
+	await newAgent(page);
 	await settle(page, 1200);
 	await page.mouse.move(800, 500);
 	// A fresh agent holds nothing, so nothing is on the canvas to begin with.

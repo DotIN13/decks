@@ -1,9 +1,9 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
-import ChevronDown from "lucide-solid/icons/chevron-down";
+import Check from "lucide-solid/icons/check";
 import X from "lucide-solid/icons/x";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import Plus from "lucide-solid/icons/plus";
-import { For, Show } from "solid-js";
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { AgentFace, AgentMark, agentState } from "./agent-marks.tsx";
 
@@ -38,6 +38,21 @@ export function ChatList(props: {
 	/** The first chat restored from a previous run, which is where the divider goes. */
 	const firstDormant = () => ordered().find((chat) => chat.dormant)?.id;
 
+	/**
+	 * Whether the `+` is showing its two runtimes.
+	 *
+	 * Closed on a press anywhere else, because a menu that needs its own button pressed
+	 * again to go away is a menu you have to remember you opened.
+	 */
+	const [picking, setPicking] = createSignal(false);
+	onMount(() => {
+		const away = (event: PointerEvent) => {
+			if (!(event.target as HTMLElement | null)?.closest?.(".chats .new")) setPicking(false);
+		};
+		document.addEventListener("pointerdown", away);
+		onCleanup(() => document.removeEventListener("pointerdown", away));
+	});
+
 	return (
 		<section class="chats">
 			<div class="rail-head">
@@ -48,51 +63,71 @@ export function ChatList(props: {
 				 * is its sibling rather than its child — so it measured zero and all three
 				 * controls piled up against the label.
 				 */}
+				{/*
+					One control, not two.
+					
+					There used to be a `+` beside a runtime chip, which is two controls for one
+					decision: the `+` made an agent on the default runtime and the chip made one on
+					whichever you picked, so the chip was a `+` that also chose and the `+` was a
+					chip that could not. Two buttons, one of them a worse version of the other.
+
+					So the `+` opens the choice. The runtime has to be picked before the agent
+					exists — a live session cannot swap the process behind it, and pretending
+					otherwise would silently start a new conversation — which makes "new agent" and
+					"which runtime" the same question, asked once.
+				*/}
 				<span class="tools">
-					<button
-						type="button"
-						title="Start another agent"
-						aria-label="Start another agent"
-						onClick={() => props.onNew()}
-					>
-						<Icon of={Plus} size={16} />
-					</button>
-					{/*
-					 * The runtime is picked before the agent exists because it cannot be
-					 * changed afterwards: a live session cannot swap the process behind it,
-					 * and pretending otherwise would silently start a new conversation.
-					 */}
-					{/*
-					 * The label is drawn, and the native select laid transparently over it.
-					 *
-					 * A `<select>` sizes itself to its *widest* option, so showing "pi" while
-					 * "claude" exists left a gap between the value and the chevron — the same
-					 * dangling look the row badge had. Drawing the label means the chip is the
-					 * width of what it says, and the chevron is the app's own icon rather than
-					 * whatever the platform draws.
-					 */}
-					<span class="kind" data-kind={props.defaultKind}>
-						<AgentMark agent={props.defaultKind} size={13} />
-						<Icon of={ChevronDown} size={12} />
-						<select
-							title="Which runtime a new agent starts on"
-							aria-label="Which runtime a new agent starts on"
-							onChange={(event) => {
-								const kind = event.currentTarget.value as AgentKind;
-								props.onNew(kind);
-								// Left showing the default rather than the last choice: this is a
-								// button that happens to have options, not a setting.
-								event.currentTarget.value = props.defaultKind;
-							}}
+					<span class="new">
+						<button
+							type="button"
+							aria-haspopup="menu"
+							aria-expanded={picking()}
+							data-open={picking()}
+							title="Start another agent"
+							aria-label="Start another agent"
+							onClick={() => setPicking((was) => !was)}
 						>
-							<For each={["pi", "claude"] as AgentKind[]}>
-								{(kind) => (
-									<option value={kind} selected={kind === props.defaultKind}>
-										new {kind} agent
-									</option>
-								)}
-							</For>
-						</select>
+							<Icon of={Plus} size={16} />
+						</button>
+
+						<Show when={picking()}>
+							{/*
+								Below the button and to its right edge, in a panel of its own: the header
+								is 200px wide and the menu is not, so anchoring it to the `+` keeps it
+								from hanging off the panel on one side or the other.
+							*/}
+							<div
+								class="absolute top-[calc(100%+4px)] right-0 z-[12] flex w-max min-w-[132px] flex-col gap-0.5 rounded-panel border border-line bg-panel p-1 shadow-panel"
+								role="menu"
+								ref={(element) => queueMicrotask(() => element.querySelector("button")?.focus())}
+								onKeyDown={(event) => {
+									if (event.key === "Escape") setPicking(false);
+								}}
+							>
+								<For each={["pi", "claude"] as AgentKind[]}>
+									{(kind) => (
+										<button
+											class="flex cursor-pointer items-center gap-2 rounded-control border-0 bg-transparent px-2 py-1.5 text-left text-[12px] text-fg hover:bg-line"
+											type="button"
+											role="menuitem"
+											onClick={() => {
+												setPicking(false);
+												props.onNew(kind);
+											}}
+										>
+											{/* `flex-none`: an `<svg>` in a flex row will shrink to nothing beside a
+											    `flex-1` label, and did — 0×13, a mark with a height and no width. */}
+											<AgentMark class="flex-none" agent={kind} size={13} />
+											<span class="flex-1">{kind}</span>
+											{/* Which one the `+` would have made on its own, before it asked. */}
+											<Show when={kind === props.defaultKind}>
+												<Icon of={Check} class="text-faint" size={13} />
+											</Show>
+										</button>
+									)}
+								</For>
+							</div>
+						</Show>
 					</span>
 				</span>
 			</div>
