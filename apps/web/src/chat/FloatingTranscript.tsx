@@ -1,4 +1,7 @@
 import type { ChatItem } from "@decks/protocol";
+import ArchiveRestore from "lucide-solid/icons/archive-restore";
+import GitBranch from "lucide-solid/icons/git-branch";
+import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { Markdown } from "./Markdown.tsx";
@@ -266,6 +269,13 @@ function Assistant(props: { row: Extract<FloatRow, { kind: "assistant" }> }) {
  * nothing to address a rewind to. (On a touchscreen they are always shown: `hidden until
  * hovered` is hidden forever there, and this is the only route to the time machine.)
  *
+ * **Icons, not words.** They were "rewind", "fork" and "restore boards" at 10px, which is
+ * three phrases of grey text under every message you have ever sent — a second transcript
+ * running down the history, in a smaller font, saying the same three things over and over.
+ * The icons are the same size as the rest of the chrome's, they read as controls rather than
+ * as more prose, and the sentence each one was standing in for is in its tooltip, where it is
+ * read once rather than continuously.
+ *
  * Hovering **rewind** previews immediately: the canvas renders that point from the
  * revision store, and leaving puts it back. No dwell delay, because you only get here by
  * reaching for the action itself.
@@ -288,7 +298,9 @@ function UserTurn(props: {
 					<div class="turn-actions">
 						<button
 							type="button"
-							title="Put the conversation back to just before this message. Hover to see the boards as they were."
+							data-act="rewind"
+							title="Rewind to just before this message. Hover to see the boards as they were."
+							aria-label="Rewind to just before this message"
 							onMouseEnter={() => props.onPreview(entryId())}
 							onMouseLeave={() => props.onPreview(null)}
 							onFocus={() => props.onPreview(entryId())}
@@ -298,21 +310,25 @@ function UserTurn(props: {
 								props.onRewind(entryId());
 							}}
 						>
-							rewind
+							<Icon of={RotateCcw} size={13} />
 						</button>
 						<button
 							type="button"
+							data-act="fork"
 							title="Carry on from here in a new chat, keeping this one as it is"
+							aria-label="Fork a new chat from here"
 							onClick={() => props.onFork(entryId())}
 						>
-							fork
+							<Icon of={GitBranch} size={13} />
 						</button>
 						<button
 							type="button"
+							data-act="restore"
 							title="Write the boards back to how they were at this point. The conversation stays where it is."
+							aria-label="Restore the boards to this point"
 							onClick={() => props.onRestore(entryId())}
 						>
-							restore boards
+							<Icon of={ArchiveRestore} size={13} />
 						</button>
 					</div>
 				)}

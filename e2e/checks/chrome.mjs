@@ -93,11 +93,21 @@ const turn = await page.evaluate(() => {
 	const row = document.querySelector(".chat-float .turn-row");
 	return {
 		itemId: row?.dataset.item,
-		actions: [...(row?.querySelectorAll(".turn-actions button") ?? [])].map((b) => b.textContent),
+		/*
+		 * Read from `data-act`, not from the text: they are icons now. Three phrases of grey
+		 * text under every message ever sent was a second transcript running down the history,
+		 * so what each one means moved into its tooltip — which is also the accessible name,
+		 * asserted below.
+		 */
+		actions: [...(row?.querySelectorAll(".turn-actions button") ?? [])].map((b) => b.dataset.act),
+		named: [...(row?.querySelectorAll(".turn-actions button") ?? [])].every((b) => (b.getAttribute("aria-label") ?? "").length > 0),
+		iconOnly: [...(row?.querySelectorAll(".turn-actions button") ?? [])].every((b) => b.textContent.trim() === "" && b.querySelector("svg")),
 		hiddenByDefault: row ? Number(getComputedStyle(row.querySelector(".turn-actions")).opacity) : null,
 	};
 });
-say("the user message carries the time machine", turn.actions.join(" · ") === "rewind · fork · restore boards", turn.actions.join(" · "));
+say("the user message carries the time machine", turn.actions.join(" · ") === "rewind · fork · restore", turn.actions.join(" · "));
+say("…as icons rather than three phrases of prose", turn.iconOnly);
+say("…each still named for a screen reader", turn.named);
 say("the actions are hidden until hovered", turn.hiddenByDefault === 0, `opacity ${turn.hiddenByDefault}`);
 
 /*
@@ -116,7 +126,7 @@ await settle(page, 600);
 // Hovering rewind previews instantly; the transcript is not dimmed.
 const before = read(plan);
 await page.locator(".chat-float .turn-row").first().hover();
-await page.locator(".chat-float .turn-actions button", { hasText: "rewind" }).first().hover();
+await page.locator('.chat-float .turn-actions button[data-act="rewind"]').first().hover();
 await page.waitForFunction(() => document.querySelector(".stage")?.dataset.previewing === "true", null, { timeout: 8000 });
 const previewing = await page.evaluate(() => ({
 	stage: document.querySelector(".stage")?.dataset.previewing,

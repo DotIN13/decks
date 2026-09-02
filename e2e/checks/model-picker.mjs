@@ -54,6 +54,26 @@ if (!other) {
 		after.value === other && other.startsWith(`${after.group}/`),
 		`${after.group} / ${after.value}`,
 	);
+	/*
+	 * The switch is in the conversation, because which model said a thing is part of what
+	 * happened.
+	 *
+	 * A long chat can span three of them, and the picker in the dock only ever shows the one
+	 * in use *now* — so without a line in the transcript the reply above a switch and the
+	 * reply below it look like the same voice. Read from the history rather than from a toast:
+	 * it is a notice in the conversation, so it lands at the point it happened and is in the
+	 * copy on disk.
+	 */
+	await page.locator('.titlebar button[title="The conversation"]').click();
+	await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "true", null, { timeout: 8000 });
+	await settle(page, 600);
+	const notices = await page.locator(".chat-float .fnotice").allInnerTexts();
+	const model = other.split("/").slice(1).join("/");
+	say("the switch is recorded in the conversation", notices.some((text) => text.startsWith("Model:")), JSON.stringify(notices));
+	say("…naming the model it moved to", notices.some((text) => text.includes(model)), `looking for ${model}`);
+	await page.locator('.titlebar button[title="The conversation"]').click();
+	await settle(page, 300);
+
 	// Put it back: leaving the agent on a provider without credentials makes the next
 	// check's turn fail instantly, which reads as a bug in the app.
 	await page.selectOption(".composer select", picker.selectedValue);

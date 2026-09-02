@@ -771,15 +771,28 @@ svg.lucide {
 	opacity: 1;
 }
 
+/*
+ * Icons, gridded into a square, at the size the small controls elsewhere use.
+ *
+ * They were three phrases of 10px grey text — "rewind", "fork", "restore boards" — under
+ * every message ever sent, which is a second transcript running down the history saying the
+ * same three things over and over. What each one means is in its tooltip now: read once
+ * rather than continuously.
+ */
 .turn-actions button {
-	padding: 1px 6px;
+	display: grid;
+	width: 22px;
+	height: 22px;
+	padding: 0;
 	border: 0;
 	border-radius: var(--control-radius);
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
-	font: inherit;
-	font-size: 10px;
+	place-items: center;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
 }
 
 .turn-actions button:hover {
@@ -788,8 +801,9 @@ svg.lucide {
 }
 
 /* Hovering this one shows the past on the canvas, so it says so in the same colour the
-   boards are outlined in. */
-.turn-actions button:first-child:hover {
+   boards are outlined in. Addressed by what it does rather than by being first: three
+   identical squares are not tellable apart by position. */
+.turn-actions button[data-act="rewind"]:hover {
 	background: color-mix(in srgb, var(--color-warn) 22%, transparent);
 	color: var(--fg);
 }

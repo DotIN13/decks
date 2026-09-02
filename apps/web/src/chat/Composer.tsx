@@ -44,10 +44,35 @@ export function Composer(props: {
 	onAbort: () => void;
 	onModel: (provider: string, model: string) => void;
 	onThinking: (level: ThinkingLevel) => void;
+	/**
+	 * Words the deck has put here, rather than typed: the message a rewind took back.
+	 *
+	 * Carries a stamp as well as the text so that rewinding to the same message twice is two
+	 * requests — an effect on the text alone would treat the second as one it had already
+	 * carried out, which is the same reason `atTurn` carries one.
+	 */
+	draft: { text: string; at: number } | undefined;
 }) {
 	const [text, setText] = createSignal("");
 	let input!: HTMLTextAreaElement;
 	let picker!: HTMLSelectElement;
+
+	/*
+	 * A draft handed over replaces what is in the field, and takes the caret.
+	 *
+	 * Replaces rather than appends: the message it is handing back is the one that was just
+	 * taken out of the conversation, so the field is where it *was* going to be edited. And
+	 * focused at the end of it, because the next thing to happen is somebody changing a word.
+	 */
+	createEffect(() => {
+		const handed = props.draft;
+		if (!handed) return;
+		setText(handed.text);
+		if (!input) return;
+		input.value = handed.text;
+		input.focus();
+		input.setSelectionRange(handed.text.length, handed.text.length);
+	});
 
 	/** A draft that is exactly `/` followed by a command fragment, while nothing is typed after it. */
 	const SLASH = /^\/([a-z0-9_-]*)$/i;

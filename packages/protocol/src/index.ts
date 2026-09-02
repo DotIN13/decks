@@ -482,6 +482,16 @@ export type ServerMessage =
 	| { type: "extension.ui.prompt"; prompt: ExtensionUiPrompt }
 	| { type: "extension.ui.prompt.closed"; id: string }
 	| { type: "notice"; level: "info" | "warn" | "error"; text: string }
+	/**
+	 * Words for the input bar, put there by the deck rather than typed.
+	 *
+	 * One sender: a rewind. The usual reason to rewind is to say the thing differently, so
+	 * the message that was rewound comes back in the composer to be edited — which is where
+	 * it was always meant to go (the server has passed `editorText` back since rewinding
+	 * existed) and where it never went, so it was announced in a notice instead and the
+	 * whole message sat in a toast.
+	 */
+	| { type: "composer.draft"; text: string }
 	| { type: "error"; text: string };
 
 /** Where the API lives, so the browser does not hard-code it in three places. */

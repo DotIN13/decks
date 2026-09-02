@@ -570,17 +570,57 @@ export class DeckAgent {
 		this.translator.setState("idle");
 	}
 
+	/**
+	 * Change the model, and say so in the conversation.
+	 *
+	 * The transcript is the record of what happened, and *which model said it* is part of
+	 * what happened — a long chat can span three of them, and the answer that surprised you
+	 * reads differently once you know it came from a different one. The picker in the dock
+	 * only ever shows the model in use *now*, so without this the switch leaves no trace at
+	 * all: the reply above it and the reply below it look like the same voice.
+	 *
+	 * A notice rather than a kind of its own, because it is the same shape as everything else
+	 * the deck says about itself — it lands at the point it happened, it is in the display
+	 * copy on disk (`agents/store.ts`), and it needs no new drawing.
+	 *
+	 * Said only when something actually changed. Both callers are a `<select>`, which fires
+	 * on every commit including one that lands on the value it already had, and a line per
+	 * non-change is a transcript that logs the furniture.
+	 */
 	async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
 		await this.start();
+		const before = this.backend?.model();
 		await this.backend?.setModel(provider, model, thinking);
 		this.lastModel = this.backend?.model();
+		this.noteModel(before, this.lastModel);
 		this.emit({ type: "agent.model", id: this.id, model: this.backend?.model() });
 		this.save();
 	}
 
+	/**
+	 * One line about a model change, or nothing.
+	 *
+	 * Reads the *reported* model on both sides rather than what was asked for: a runtime that
+	 * falls back — a model that has lost its credentials, a thinking level clamped to what the
+	 * model supports — should have the transcript say what it actually got.
+	 */
+	private noteModel(before: AgentModel | undefined, after: AgentModel | undefined): void {
+		if (!after) return;
+		const name = (model: AgentModel) => `${model.provider}/${model.model}`;
+		if (before && name(before) === name(after)) {
+			if (before.thinking === after.thinking) return;
+			this.translator.notice("info", `Thinking: ${before.thinking} → ${after.thinking}`);
+			return;
+		}
+		const arrow = before ? `${name(before)} → ${name(after)}` : name(after);
+		this.translator.notice("info", `Model: ${arrow}${after.thinking ? ` · thinking ${after.thinking}` : ""}`);
+	}
+
 	setThinking(level: ThinkingLevel): void {
+		const before = this.backend?.model();
 		this.backend?.setThinking(level);
 		this.lastModel = this.backend?.model();
+		this.noteModel(before, this.lastModel);
 		this.emit({ type: "agent.model", id: this.id, model: this.backend?.model() });
 		this.save();
 	}

@@ -61,7 +61,7 @@ try {
 	});
 	const second = page.locator(".chat-float .turn-row").nth(1);
 	await second.hover();
-	await second.locator(".turn-actions button", { hasText: "rewind" }).hover();
+	await second.locator('.turn-actions button[data-act="rewind"]').hover();
 	await page.waitForFunction(
 		() => {
 			const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');
@@ -84,7 +84,7 @@ try {
 
 	// Restore is deliberate, and it does write.
 	await second.hover();
-	await second.locator(".turn-actions button", { hasText: "restore boards" }).click();
+	await second.locator('.turn-actions button[data-act="restore"]').click();
 	await page.waitForFunction(() => true, null, { timeout: 1000 }).catch(() => {});
 	await settle(page, 1500);
 	const restored = read(plan);
@@ -93,10 +93,31 @@ try {
 	// Rewinding truncates the conversation.
 	const before = await page.locator(".chat-float .fsroll > *").count();
 	const last = page.locator(".chat-float .turn-row").last();
+	const rewound = (await last.locator(".fbubble").innerText()).trim();
 	await last.hover();
-	await last.locator(".turn-actions button", { hasText: "rewind" }).click();
+	await last.locator('.turn-actions button[data-act="rewind"]').click();
 	await page.waitForFunction((was) => document.querySelectorAll(".chat-float .fsroll > *").length < was, before, { timeout: 15000 });
 	say("rewinding cuts the transcript back", (await page.locator(".chat-float .fsroll > *").count()) < before, `${before} → ${await page.locator(".chat-float .fsroll > *").count()} items`);
+
+	/*
+	 * The message comes back in the input bar, and *only* there.
+	 *
+	 * The server has passed `editorText` back since rewinding existed and it never reached
+	 * the composer — so it was announced instead, and the notice carried the whole message:
+	 * a paragraph in a toast, saying what the transcript above it already said, while the one
+	 * place it would have been useful sat empty. The usual reason to rewind is to say the
+	 * thing differently.
+	 */
+	await settle(page, 600);
+	const draft = await page.locator(".composer textarea").inputValue();
+	say("the rewound message comes back in the input bar", draft === rewound, JSON.stringify(draft.slice(0, 60)));
+	const toasts = await page.locator(".notice").allInnerTexts();
+	say("…and the notice just says it happened", toasts.some((text) => text.trim() === "Rewound."), JSON.stringify(toasts));
+	say(
+		"…without repeating the message in a toast",
+		toasts.every((text) => !text.includes(rewound.slice(0, 24))),
+		JSON.stringify(toasts),
+	);
 
 	link.close();
 	say("no page errors", errors.length === 0, errors.join(" | "));

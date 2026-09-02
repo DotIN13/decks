@@ -332,12 +332,20 @@ export class App {
 				if (!agent) return;
 				void agent.rewindTo(message.entryId).then((result) => {
 					this.agents.publish();
-					if (result.cancelled) reply({ type: "notice", level: "info", text: "Rewind cancelled." });
-					else if (result.editorText) {
-						// The rewound message goes back in the composer: the usual reason to
-						// rewind is to say it differently.
-						reply({ type: "notice", level: "info", text: `Rewound. Your message: ${result.editorText}` });
+					if (result.cancelled) {
+						reply({ type: "notice", level: "info", text: "Rewind cancelled." });
+						return;
 					}
+					/*
+					 * The rewound message goes back in the composer, which is what the deck has
+					 * been passing `editorText` around for since rewinding existed — and where it
+					 * never actually went. It was announced instead, so the notice carried the
+					 * whole message: a paragraph in a toast, saying a thing the transcript above
+					 * it already said, and the one place it would have been useful — the input
+					 * bar, ready to be said differently — was empty.
+					 */
+					reply({ type: "notice", level: "info", text: "Rewound." });
+					if (result.editorText) reply({ type: "composer.draft", text: result.editorText });
 				});
 				return;
 			}

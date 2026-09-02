@@ -146,6 +146,13 @@ export function App() {
 	/** The all-canvases modal (`canvas/AllBoards.tsx`), which is a thing you do and then stop. */
 	const [allBoards, setAllBoards] = createSignal(false);
 	/**
+	 * Words the server has handed to the input bar: the message a rewind took back.
+	 *
+	 * Stamped, so rewinding twice to the same message is two handovers rather than one the
+	 * composer has already acted on.
+	 */
+	const [draft, setDraft] = createSignal<{ text: string; at: number } | undefined>(undefined);
+	/**
 	 * Whether the canvas cheat sheet is open (see `CanvasOps`).
 	 *
 	 * Reference material, behind a button. It was a permanent line of grey text under the
@@ -475,6 +482,10 @@ export function App() {
 
 				case "notice":
 					notice(message.level, message.text);
+					return;
+
+				case "composer.draft":
+					setDraft({ text: message.text, at: Date.now() });
 					return;
 				case "error":
 					notice("error", message.text);
@@ -1334,6 +1345,7 @@ export function App() {
 					</Show>
 
 					<Composer
+					draft={draft()}
 					busy={busy()}
 					model={state.focused ? state.agentModel[state.focused] : undefined}
 					models={state.focused ? state.modelsByAgent[state.focused] ?? [] : []}
