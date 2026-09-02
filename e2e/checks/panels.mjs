@@ -212,7 +212,43 @@ say("it offers both runtimes, each with its own mark", offered.length === 2 && o
 say("…and the marks have a width", offered.every((entry) => entry.markWidth >= 10), JSON.stringify(offered.map((e) => e.markWidth)));
 say("…and marks the default among them", offered.filter((entry) => entry.ticked).length === 1, JSON.stringify(offered.map((e) => e.ticked)));
 
-await page.locator('.chats [role="menu"] [role="menuitem"]', { hasText: "claude" }).click();
+/*
+ * The highlight is the *row*, and the row is what a press lands on.
+ *
+ * The header's own `+` is styled by `.chats .rail-head button` — a descendant selector, which
+ * cannot tell a control from a control's contents — so every menu item was being squeezed
+ * into the same 22px square: the hover wash was a square behind the runtime mark, with the
+ * name and the tick outside it and nothing to press but the icon.
+ */
+const geometry = await page.evaluate(() => {
+	const menu = document.querySelector('.chats [role="menu"]');
+	const style = getComputedStyle(menu);
+	const inner = menu.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight);
+	return [...menu.querySelectorAll('[role="menuitem"]')].map((item) => {
+		const box = item.getBoundingClientRect();
+		const mark = item.querySelector("svg[data-agent]")?.getBoundingClientRect();
+		return {
+			width: Math.round(box.width),
+			fillsRow: Math.round(box.width) >= Math.round(inner),
+			/* The mark is a part of the row rather than the whole of it. */
+			markShare: mark ? Math.round((mark.width / box.width) * 100) : 100,
+		};
+	});
+});
+say("each item fills the menu's width", geometry.every((item) => item.fillsRow), JSON.stringify(geometry));
+say("…so the mark is one thing in a row, not the row", geometry.every((item) => item.markShare < 40), JSON.stringify(geometry.map((i) => i.markShare)));
+
+/* Hovered by its *words*, away from the icon, because that is where the old wash stopped. */
+const item = page.locator('.chats [role="menu"] [role="menuitem"]').first();
+const resting = await item.evaluate((element) => getComputedStyle(element).backgroundColor);
+await page.locator('.chats [role="menu"] [role="menuitem"] span').first().hover();
+await settle(page, 200);
+const washed = await item.evaluate((element) => getComputedStyle(element).backgroundColor);
+say("hovering the words washes the whole row", washed !== resting, `${resting} → ${washed}`);
+
+/* And a press at the row's far edge chooses, which the square could not be pressed at. */
+const edge = await page.locator('.chats [role="menu"] [role="menuitem"]', { hasText: "claude" }).boundingBox();
+await page.mouse.click(edge.x + edge.width - 8, edge.y + edge.height / 2);
 await page.waitForFunction((was) => document.querySelectorAll(".chat-row").length > was, before, { timeout: 8000 });
 say("the menu closes on a choice", (await page.evaluate(() => document.querySelectorAll('.chats [role="menu"]').length)) === 0);
 // Read from `data-agent` rather than from text: the badge is a mark now.

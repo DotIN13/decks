@@ -96,8 +96,14 @@ export function ChatList(props: {
 								is 200px wide and the menu is not, so anchoring it to the `+` keeps it
 								from hanging off the panel on one side or the other.
 							*/}
+							{/*
+								`menu` is not decoration: the header's own `+` is styled by
+								`.chats .rail-head button`, a descendant selector that cannot tell a
+								control from a control's contents, so the stylesheet excludes anything
+								inside this — see the note there.
+							*/}
 							<div
-								class="absolute top-[calc(100%+4px)] right-0 z-[12] flex w-max min-w-[132px] flex-col gap-0.5 rounded-panel border border-line bg-panel p-1 shadow-panel"
+								class="menu absolute top-[calc(100%+4px)] right-0 z-[12] flex w-max min-w-[136px] flex-col gap-0.5 rounded-panel border border-line bg-panel p-1 shadow-panel"
 								role="menu"
 								ref={(element) => queueMicrotask(() => element.querySelector("button")?.focus())}
 								onKeyDown={(event) => {
@@ -107,7 +113,9 @@ export function ChatList(props: {
 								<For each={["pi", "claude"] as AgentKind[]}>
 									{(kind) => (
 										<button
-											class="flex cursor-pointer items-center gap-2 rounded-control border-0 bg-transparent px-2 py-1.5 text-left text-[12px] text-fg hover:bg-line"
+											// `w-full`: the highlight is the row, so the row is what the press
+											// lands on — a button sized to its text is a menu you have to aim at.
+											class="flex w-full cursor-pointer items-center gap-2 rounded-control border-0 bg-transparent px-2 py-1.5 text-left text-[12px] text-fg hover:bg-line"
 											type="button"
 											role="menuitem"
 											onClick={() => {

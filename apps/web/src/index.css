@@ -288,10 +288,15 @@ svg.lucide {
 
 /*
  * The small one, for a control that shares a row with a list item's own content: a chat
- * row's `×`, the peek's dismiss, the two headers' buttons.
+ * row's `×`, and the panel header's `+`.
+ *
+ * `:not(.menu *)` because the `+` opens a menu that lives *inside* the header, and a
+ * descendant selector cannot tell a control from a control's contents. Without it every menu
+ * item was squeezed into the same 22px square — so the row's hover wash was a square behind
+ * the runtime mark, with the name and the tick outside it and nothing to press but the icon.
  */
 .inspector header .close,
-.chats .rail-head button,
+.chats .rail-head button:not(.menu *),
 .chat-row-wrap .close {
 	display: grid;
 	width: var(--control-sm);
@@ -312,7 +317,7 @@ svg.lucide {
 .inspector .row.file button:hover,
 .inspector .acts button:hover,
 .inspector header .close:hover,
-.chats .rail-head button:hover,
+.chats .rail-head button:not(.menu *):hover,
 .chat-row-wrap .close:hover {
 	background: var(--line);
 	color: var(--fg);
