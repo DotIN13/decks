@@ -40,7 +40,7 @@ const CHECKS = [
 	{ file: "rail-scroll.mjs", needsAgent: false },
 	{ file: "thumbs.mjs", needsAgent: false },
 	{ file: "model-picker.mjs", needsAgent: false },
-	{ file: "pills.mjs", needsAgent: true },
+	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "turn-bar.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },

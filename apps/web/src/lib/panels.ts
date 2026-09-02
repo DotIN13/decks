@@ -8,14 +8,12 @@ import { createSignal } from "solid-js";
  * design: an agent list and a set of boards are two different questions, and a panel
  * answering both is one you open for half a reason and then close.
  *
- * **Proximity is gone, and its absence is the point.** This used to copy Stage Manager: a
- * sliver at the edge, and a cursor approaching that edge brought the panel in. It was a
- * good trick for a panel that was the only way to see an agent, and it is incompatible with
- * what replaced that — hiding the list now leaves *pills* in the same corner
- * (`chat/AgentPills.tsx`), so a panel that arrived whenever the cursor drifted left would
- * cover the very thing hiding it was for, and the button would disagree with the screen. A
- * panel you asked for stays until you say otherwise; that is also what pinning was for, so
- * pinning went with it.
+ * **Proximity is gone.** This used to copy Stage Manager: a sliver at the edge, and a cursor
+ * approaching that edge brought the panel in. A good trick for a panel that hid itself, and
+ * the wrong one for a panel that is now the *only* place an agent's state is shown — a
+ * surface you rely on should not come and go with where the cursor happens to be, and a
+ * button that disagrees with the screen is worse than no button. A panel you asked for stays
+ * until you say otherwise; that is also what pinning was for, so pinning went with it.
  *
  * Persisted per browser, because a panel you opened deliberately and lost to a reload is a
  * panel you have to keep re-opening, and the whole point of a toggle is that it holds.

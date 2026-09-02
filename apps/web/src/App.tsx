@@ -27,7 +27,6 @@ import { createStore, reconcile } from "solid-js/store";
 import { BoardRail } from "./canvas/BoardRail.tsx";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
-import { AgentPills } from "./chat/AgentPills.tsx";
 import { AllBoards } from "./canvas/AllBoards.tsx";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
@@ -135,15 +134,6 @@ export function App() {
 	 * comparison is skipped entirely rather than being kept up to date — see `turns`.
 	 */
 	const [seenAt, setSeenAt] = createSignal(Date.now());
-	/**
-	 * A reply the user has waved away: the message id, per agent.
-	 *
-	 * Kept per message rather than as a flag, so dismissing this one does not also hide the
-	 * next one — the point of the glimpse is that the *newest* thing is there. And per agent
-	 * rather than one at a time, because the pills show several at once (`AgentPills`) and
-	 * one shared slot meant reading one agent's reply hid another's.
-	 */
-	const [dismissed, setDismissed] = createStore<Record<string, string | undefined>>({});
 	/**
 	 * Whether the conversation is up (see `FloatingTranscript`).
 	 *
@@ -1267,34 +1257,6 @@ export function App() {
 						onAll={() => setAllBoards(true)}
 					/>
 				</aside>
-
-				{/*
-				 * What the agents are doing, when the list that would have said so is closed.
-				 *
-				 * The same corner the panel comes out of, so hiding the list leaves the agents
-				 * where they were rather than moving them across the screen. Not hidden while the
-				 * conversation is up, unlike the peek it replaces: that one shared the dock with
-				 * it and said the same thing twice, these are on the opposite edge and carry
-				 * agents the conversation is not showing.
-				 */}
-				<Show when={!panels.agents.open()}>
-					<AgentPills
-						chats={state.chats}
-						transcripts={state.transcripts}
-						identities={state.identities}
-						focused={state.focused}
-						dismissed={dismissed}
-						onFocus={(id) => {
-							setState("focused", id);
-							setUnread(id, 0);
-							setAtTurn(undefined);
-							setSeenAt(Date.now());
-							socket.send({ type: "agent.focus", id });
-						}}
-						onOpen={() => openChat(true)}
-						onDismiss={(agentId, itemId) => setDismissed(agentId, itemId)}
-					/>
-				</Show>
 
 				{/* Everything in the deck, searchable, over the canvas rather than beside it. */}
 				<Show when={allBoards()}>

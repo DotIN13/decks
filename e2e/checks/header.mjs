@@ -8,9 +8,8 @@
  * **Nothing in the bar is `.touch-only` any more**, and that is what is asserted here.
  * The panel toggle used to be, on the argument that a cursor summoned the panel from the
  * left edge and a second way to do a working thing is clutter. Proximity is gone
- * (`lib/panels.ts`) — it cannot coexist with pills in the corner the panel comes out of —
- * so these buttons are the only handle the panels have, and being the only handle they are
- * drawn for everyone.
+ * (`lib/panels.ts`), so these buttons are the only handle the panels have — and being the
+ * only handle they are drawn for everyone.
  */
 import { open, say } from "../harness.mjs";
 

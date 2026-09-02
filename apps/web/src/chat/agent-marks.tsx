@@ -73,10 +73,10 @@ export function AgentMark(props: { agent: AgentKind; size?: number; class?: stri
 /**
  * An agent's face: its avatar or its initial, with its state as a ring.
  *
- * Here rather than in `ChatList`, where it was, because it is drawn in two places now —
- * a row in the list and a pill over the canvas (`AgentPills`) — and two drawings of one
- * agent is the drift every other note in this file argues against. The only difference
- * between the two is `size`, which the ring and the initial scale from.
+ * Here rather than in `ChatList`, where it was: it was drawn in two places for a while, and
+ * `size` is the only thing that differed between them — the ring and the initial scale off
+ * it. Kept general now that only the list uses it, because a face at one size is a face at
+ * any size, and the alternative is finding this out again.
  */
 export function AgentFace(props: { chat: AgentChat; identity: Identity | undefined; unread?: number; size?: number }) {
 	const size = () => props.size ?? 26;

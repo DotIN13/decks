@@ -1,12 +1,11 @@
 /**
- * The chrome down the left: two panels, one at a time, and pills when neither is up (§7).
+ * The chrome down the left: two panels, one at a time, both behind a button (§7).
  *
  * The panels are **toggled**, not reached for. They used to appear when the cursor came
- * within 26px of the left edge, which was a good trick while the panel was the only way to
- * see an agent and is incompatible with what replaced that — hiding the list leaves pills in
- * the same corner, so a panel arriving on a stray cursor movement would cover the very thing
- * hiding it was for. What is asserted here is the toggle, the mutual exclusion, and that the
- * pills stand in for the list rather than beside it.
+ * within 26px of the left edge, which was a good trick while a panel hid itself and the
+ * wrong one now that the agent list is the only place an agent's state is shown — a surface
+ * you rely on should not come and go with where the cursor happens to be. What is asserted
+ * here is the toggle, the mutual exclusion, and that reaching the edge does nothing.
  *
  * The rest of this file is the chat list's own design — the row, the mark, the unread dot,
  * the close button — which the split did not change. It just has to be opened with a button
@@ -93,21 +92,7 @@ await page.waitForFunction(() => document.querySelector(".side.context")?.datase
 await settle(page, 220);
 say("pressing it again puts it away", (await isOpen(".side.context")) === false);
 
-// --- 3. the pills, which are what a closed list leaves behind ---------------------
-
-/*
- * A pill per agent that is working, plus the focused agent's newest reply until it is waved
- * away. With no agent running and nothing said, there is nothing to report — which is the
- * state a fresh check starts in, so what is asserted is the *rule*: the pills and the list
- * are never both up.
- */
-await toggle(AGENTS, true);
-say("no pills while the list is up", (await page.locator(".pill").count()) === 0);
-await toggle(AGENTS, false);
-const pills = await page.locator(".pill").count();
-say("the pills stand in for the list, not beside it", pills >= 0, `${pills} pill(s) with the list closed`);
-
-// --- 4. every board in the deck, searchable --------------------------------------
+// --- 3. every board in the deck, searchable --------------------------------------
 
 await page.locator(ALL).click();
 await page.waitForSelector(".all-boards", { timeout: 5000 });
@@ -126,7 +111,7 @@ await page.keyboard.press("Escape");
 await settle(page, 300);
 say("Escape closes it", (await page.locator(".all-boards").count()) === 0);
 
-// --- 5. the palette must not sit under a panel that can appear over it ------------
+// --- 4. the palette must not sit under a panel that can appear over it ------------
 
 await page.evaluate(() => document.querySelector(".rail-item")?.click());
 await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });

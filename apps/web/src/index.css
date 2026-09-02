@@ -292,8 +292,7 @@ svg.lucide {
  */
 .inspector header .close,
 .chats .rail-head button,
-.chat-row-wrap .close,
-.pill .dismiss {
+.chat-row-wrap .close {
 	display: grid;
 	width: var(--control-sm);
 	height: var(--control-sm);
@@ -314,8 +313,7 @@ svg.lucide {
 .inspector .acts button:hover,
 .inspector header .close:hover,
 .chats .rail-head button:hover,
-.chat-row-wrap .close:hover,
-.pill .dismiss:hover {
+.chat-row-wrap .close:hover {
 	background: var(--line);
 	color: var(--fg);
 }
@@ -1006,60 +1004,6 @@ svg.lucide {
 }
 
 /* What `/` completes to: a small menu floating above the input bar. */
-/* --- what the agents are doing -----------------------------------------------
- *
- * Pills in the top-left corner, where the agent list comes out of
- * (`chat/AgentPills.tsx`). What is left here is what a class attribute cannot say: a hidden
- * scrollbar, the colour the words take while a reply is arriving, and the dot.
- */
-
-/*
- * A reply scrolls and says nothing about it.
- *
- * A scrollbar in a three-line pill over the canvas is chrome inside chrome, and the text
- * follows the stream on its own while it arrives — so there is nothing to drag and no reason
- * to draw a track. `::-webkit-scrollbar` below is the same statement for the engines that
- * ignore `scrollbar-width`.
- */
-.pill .body {
-	scrollbar-width: none;
-}
-
-.pill .body::-webkit-scrollbar {
-	display: none;
-}
-
-/* While it is still arriving, the text is the live thing on screen. */
-.pill[data-state="streaming"] .body {
-	color: var(--fg);
-}
-
-/* The one whose composer you are typing into, said quietly: a pill is small, and a border
-   is the whole of what it has to say it with. */
-.pill[data-current="true"] {
-	border-color: var(--line-strong);
-}
-
-/*
- * The tool in flight, under whatever was last said.
- *
- * The dot and the animation are the ones a running tool already has in the transcript
- * (`.tool[data-state="running"]`), so the same state reads the same way in both places.
- */
-.pill .working .dot {
-	width: 6px;
-	height: 6px;
-	flex: none;
-	border-radius: 50%;
-	background: var(--color-warn);
-	animation: pulse 1.2s ease-in-out infinite;
-}
-
-.pill .dismiss:hover {
-	background: var(--line);
-	color: var(--fg);
-}
-
 /* --- the conversation, floating over the boards ----------------------------
  *
  * The whole transcript, over the boards — and the only one there is. The 380px sheet that
@@ -2308,7 +2252,6 @@ svg.lucide {
 		font-size: 13px;
 	}
 
-	.pill .dismiss,
 	.chats .rail-head button {
 		width: 38px;
 		height: 38px;
