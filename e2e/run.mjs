@@ -38,6 +38,7 @@ const CHECKS = [
 	{ file: "tiers.mjs", needsAgent: false },
 	{ file: "deleted-board.mjs", needsAgent: false },
 	{ file: "rail-scroll.mjs", needsAgent: false },
+	{ file: "thumbs.mjs", needsAgent: false },
 	{ file: "model-picker.mjs", needsAgent: false },
 	{ file: "pills.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },

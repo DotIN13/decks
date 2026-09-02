@@ -1,6 +1,23 @@
 import type { Board } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { claimThumb } from "./thumb-budget.ts";
+import { hasPicture, picture, takePicture } from "./thumb-cache.ts";
+
+/** How long after load to let `board.js` finish drawing before photographing a board. */
+const SETTLE = 700;
+
+/**
+ * `requestIdleCallback`, or a timer where there is none (Safari).
+ *
+ * The timeout is what stops a busy tab from never taking a picture at all, and the fallback
+ * is deliberately longer than the settle: without idle to wait for, later is better.
+ */
+const whenIdle = (run: () => void): number =>
+	typeof requestIdleCallback === "function" ? requestIdleCallback(run, { timeout: 4000 }) : (setTimeout(run, 1500) as unknown as number);
+const cancelWhenIdle = (handle: number): void => {
+	if (typeof cancelIdleCallback === "function") cancelIdleCallback(handle);
+	else clearTimeout(handle);
+};
 import { boardUrl, deckFileUrl } from "../lib/api.ts";
 import { paintFrame } from "../lib/theme.ts";
 
@@ -85,10 +102,18 @@ export function BoardRail(props: {
  * drawing one is two things to keep in step. It roots its observer at the nearest `.items`,
  * so any scroller reusing it should carry that class; without one it falls back to the
  * viewport, which over-mounts a little rather than breaking.
+ *
+ * `cache` opts it into photographs (`thumb-cache.ts`): the browse modal sets it, the context
+ * panel does not. There the boards are the ones an agent is rewriting, so a picture would be
+ * out of date before it landed and re-taken on every revision — a live document costs one
+ * document and is right by construction.
  */
-export function RailItem(props: { board: Board; current: boolean; offCanvas?: boolean; onPick: () => void }) {
+export function RailItem(props: { board: Board; current: boolean; offCanvas?: boolean; cache?: boolean; onPick: () => void }) {
 	let host!: HTMLDivElement;
+	let frame: HTMLIFrameElement | undefined;
 	const budget = claimThumb();
+	/** The photograph of this exact revision, if one has been taken. */
+	const shot = () => (props.cache ? picture(props.board) : undefined);
 
 	onMount(() => {
 		const observer = new IntersectionObserver(
@@ -110,13 +135,42 @@ export function RailItem(props: { board: Board; current: boolean; offCanvas?: bo
 
 	const scale = () => WIDTH / Math.max(1, props.board.w);
 	/*
-	 * A poster is an image the board offered instead of itself, so it is never a document —
-	 * and `loaded()` is reported for it straight away, or a screen of postered boards would
-	 * hold the loading budget shut against the ones that do need it.
+	 * A poster is an image the board offered instead of itself, and a photograph is one this
+	 * app took — either way there is no document to mount, and `loaded()` is reported straight
+	 * away or a screen of them would hold the loading budget shut against the boards that do
+	 * need it.
 	 */
-	const live = () => budget.live() && !props.board.poster;
+	const live = () => budget.live() && !props.board.poster && !shot();
 	createEffect(() => {
-		if (props.board.poster && budget.live()) budget.loaded();
+		if ((props.board.poster || shot()) && budget.live()) budget.loaded();
+	});
+
+	/*
+	 * The photograph is taken on idle, once the document has settled.
+	 *
+	 * On idle because it is ~160ms of main thread — small enough for the browser to fit into a
+	 * gap, and not small enough to spend during a scroll. After a settle because `board.js`
+	 * renders markdown, maths and diagrams *after* load, so a picture taken on the load event
+	 * is a picture of a board half-drawn.
+	 *
+	 * Taken while the thumbnail is still live rather than as it is released, which was the
+	 * other candidate: releasing would have to wait for the picture, so the document it was
+	 * meant to dispose of would live *longer* than before. This reaches the same cache and
+	 * disposes on time.
+	 */
+	createEffect(() => {
+		if (!props.cache || !ready() || hasPicture(props.board)) return;
+		const board = props.board;
+		let idle: number | undefined;
+		const settle = setTimeout(() => {
+			idle = whenIdle(() => {
+				if (frame?.contentDocument) void takePicture(frame, board);
+			});
+		}, SETTLE);
+		onCleanup(() => {
+			clearTimeout(settle);
+			if (idle !== undefined) cancelWhenIdle(idle);
+		});
 	});
 
 	/**
@@ -129,6 +183,8 @@ export function RailItem(props: { board: Board; current: boolean; offCanvas?: bo
 	 * document load per drop, flashing in the rail. Coalescing means one reload after the
 	 * hand comes to rest, which is all a thumbnail is for.
 	 */
+	/** Whether this thumbnail's document has finished loading, so it can be photographed. */
+	const [ready, setReady] = createSignal(false);
 	const [shownRev, setShownRev] = createSignal(props.board.rev);
 	let settle: ReturnType<typeof setTimeout> | undefined;
 	createEffect(() => {
@@ -152,8 +208,13 @@ export function RailItem(props: { board: Board; current: boolean; offCanvas?: bo
 				<Show when={props.board.poster}>
 					{(poster) => <img src={deckFileUrl(poster(), props.board.rev)} alt={props.board.title} style={{ width: "100%" }} />}
 				</Show>
+				{/* A photograph of this revision: no document, and exactly as fresh as the file. */}
+				<Show when={shot()}>
+					{(src) => <img class="thumb-shot" src={src()} alt={`${props.board.title} (thumbnail)`} style={{ width: "100%" }} />}
+				</Show>
 				<Show when={live()}>
 					<iframe
+						ref={frame}
 						title={`${props.board.title} (thumbnail)`}
 						src={boardUrl({ path: props.board.path, rev: shownRev() })}
 						width={props.board.w}
@@ -167,6 +228,7 @@ export function RailItem(props: { board: Board; current: boolean; offCanvas?: bo
 							paintFrame(event.currentTarget);
 							// Frees the loading budget for whoever is queued behind this one.
 							budget.loaded();
+							setReady(true);
 						}}
 					/>
 				</Show>

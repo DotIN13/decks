@@ -36,6 +36,8 @@ export function AllBoards(props: {
 	boards: Board[];
 	/** Which board the canvas is centred on, so the row can say so. */
 	current?: string;
+	/** What the focused agent is holding, which is what must not be photographed. */
+	held: string[];
 	onPick: (board: Board) => void;
 	onClose: () => void;
 }) {
@@ -116,7 +118,15 @@ export function AllBoards(props: {
 				<div class="items grid min-h-0 grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-2 overflow-y-auto overscroll-contain p-3">
 					<For each={found()}>
 						{(board) => (
-							<RailItem board={board} current={props.current === board.path} onPick={() => props.onPick(board)} />
+							<RailItem
+									board={board}
+									current={props.current === board.path}
+									// Photographed and kept (`thumb-cache.ts`), unless an agent is holding
+									// it: those are the boards being rewritten, so a picture would be stale
+									// before it landed and re-taken on every revision.
+									cache={!props.held.includes(board.path)}
+									onPick={() => props.onPick(board)}
+								/>
 						)}
 					</For>
 				</div>
