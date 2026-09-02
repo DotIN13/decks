@@ -10,6 +10,7 @@ import {
 	type PermissionMode,
 	type Query,
 	type SDKControlGetUsageResponse,
+	type SDKRateLimitInfo,
 	type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
@@ -110,6 +111,8 @@ export class ClaudeBackend implements AgentBackend {
 	private lastUsage: AgentUsage | null = null;
 	private storedName: string | undefined;
 	private title: string | undefined;
+	/** Which limit window has already been warned about, so it is said once and not per turn. */
+	private warnedAbout: string | undefined;
 
 	private constructor(private readonly context: AgentBackendContext) {
 		/*
@@ -202,6 +205,21 @@ export class ClaudeBackend implements AgentBackend {
 			...(resume ? { resume } : {}),
 			...(this.currentModel ? { model: this.currentModel } : {}),
 			...(effortOf(this.currentThinking) ? { effort: effortOf(this.currentThinking) } : {}),
+			/*
+			 * Which subscription this session spends (`claude/accounts.ts`).
+			 *
+			 * A symlink, so re-pointing it switches the account *inside* this session — the
+			 * CLI re-reads its credentials per request, so the next turn uses whoever the link
+			 * points at now. Absent when no account has been added, which leaves the CLI on
+			 * its own `~/.claude` exactly as before.
+			 *
+			 * `env` REPLACES the subprocess environment rather than extending it, so
+			 * `process.env` is spread: without it the CLI would start with no `PATH` and no
+			 * `HOME`.
+			 */
+			...(this.context.accounts?.activeConfigDir()
+				? { env: { ...process.env, CLAUDE_CONFIG_DIR: this.context.accounts.activeConfigDir() } }
+				: {}),
 			stderr: (data: string) => {
 				// The CLI's own diagnostics, which are usually about credentials.
 				if (data.trim()) notice("warn", data.trim().split("\n").slice(-1)[0] ?? "");
@@ -218,6 +236,14 @@ export class ClaudeBackend implements AgentBackend {
 					if (message.type === "system" && message.subtype === "init") {
 						this.sessionId = message.session_id;
 					}
+					/*
+					 * The subscription ran out, or is about to.
+					 *
+					 * `rate_limit_event` is the CLI's own signal and carries the window that ran
+					 * out and when it lifts — so this is read rather than inferred from a failed
+					 * turn, and `allowed_warning` gives a heads-up before anything breaks.
+					 */
+					if (message.type === "rate_limit_event") this.onRateLimit(message.rate_limit_info);
 					if (message.type === "result") {
 						this.streaming = false;
 						/*
@@ -449,12 +475,31 @@ export class ClaudeBackend implements AgentBackend {
 		}
 		const method = LOGIN_METHODS.find((candidate) => candidate.label === chosen) ?? LOGIN_METHODS[0];
 
-		// Read before anything is spawned: what "signed in" would *change* is the only
-		// thing that can be observed, and this is the other half of that comparison.
-		const before = await claudeAuthStatus();
+		/*
+		 * Signed in to a directory of its own, so this *adds* an account rather than replacing
+		 * one (`claude/accounts.ts`).
+		 *
+		 * Which is the whole of how several subscriptions come to be signed in at once: the
+		 * CLI writes its credentials wherever `CLAUDE_CONFIG_DIR` points, so pointing it
+		 * somewhere new each time leaves the previous account exactly as it was — including
+		 * the CLI's own `~/.claude`, which this never touches.
+		 */
+		const accounts = this.context.accounts;
+		const into = accounts && "begin" in accounts ? (accounts as { begin(): { id: string; configDir: string } }).begin() : undefined;
+
+		/*
+		 * Read before anything is spawned: what "signed in" would *change* is the only thing
+		 * that can be observed, and this is the other half of that comparison. Asked of the
+		 * new directory, which is empty — so `loggedIn` is false and the fallback poll below
+		 * is armed, which is right: any credentials appearing there are this login's.
+		 */
+		const before = await claudeAuthStatus(into?.configDir);
 
 		notice("info", `Starting Claude's ${method.noun} login…`);
-		const child = spawn(binary, ["auth", "login", method.flag], { stdio: ["pipe", "pipe", "pipe"] });
+		const child = spawn(binary, ["auth", "login", method.flag], {
+			stdio: ["pipe", "pipe", "pipe"],
+			...(into ? { env: { ...process.env, CLAUDE_CONFIG_DIR: into.configDir } } : {}),
+		});
 
 		// The URL prints immediately; wait for it rather than racing the process,
 		// because the dialog is only worth showing once there is something to open.
@@ -525,7 +570,7 @@ export class ClaudeBackend implements AgentBackend {
 		const poll = before.loggedIn
 			? undefined
 			: setInterval(() => {
-					void claudeAuthStatus().then((auth) => {
+					void claudeAuthStatus(into?.configDir).then((auth) => {
 						if (!auth.loggedIn) return;
 						clearInterval(poll);
 						this.context.bridge.answer({ id: modal.id, confirmed: true });
@@ -569,6 +614,25 @@ export class ClaudeBackend implements AgentBackend {
 				notice("error", lastLine(stderr) || lastSaid || "Claude's login failed.");
 				return;
 			}
+		}
+		/*
+		 * Who was just signed in, read back out of the CLI.
+		 *
+		 * The identity is what makes the list readable — a column of uuids is not an account
+		 * list — and it comes from `auth status` against that directory rather than from
+		 * anything Decks parsed out of the login, so it says what the CLI says.
+		 */
+		if (into && accounts && "remember" in accounts) {
+			const identity = await claudeIdentity(into.configDir);
+			const remembered = (accounts as { remember(account: { id: string; email?: string; orgName?: string; plan?: string }): { email?: string } }).remember({
+				id: into.id,
+				...identity,
+			});
+			notice("info", `Signed in as ${remembered.email ?? `your ${method.noun}`}, and now using it.`);
+			this.context.accountsChanged?.();
+			// No restart: the account is a symlink every session reads through, so this one
+			// picks it up on its next request (`claude/accounts.ts`).
+			return;
 		}
 		notice("info", `Signed in to Claude with your ${method.noun}.`);
 		await this.restart();
@@ -681,6 +745,92 @@ export class ClaudeBackend implements AgentBackend {
 			...window(windows?.five_hour, "5 hours"),
 			...window(windows?.seven_day, "7 days"),
 		]);
+	}
+
+	/**
+	 * A subscription reaching its limit, and the next one taking over.
+	 *
+	 * The switch is one `rename` of a symlink and the CLI picks it up on its next request, so
+	 * the conversation is not interrupted to change accounts — which is the whole point of
+	 * doing it this way rather than reopening the session.
+	 *
+	 * **Whether the turn is re-sent is decided by whether anything happened in it.** A limit
+	 * that lands before the agent has done anything is a turn that can simply be tried again
+	 * on the new account. A limit that lands after three tool calls and a board write is not:
+	 * Decks agents edit files, so replaying that turn could write the same board twice. So the
+	 * account moves either way and the *prompt* is only re-sent when the turn was still
+	 * untouched; otherwise the deck says what happened and leaves the resend to the person,
+	 * who can see on the boards what got as far as being written.
+	 */
+	private onRateLimit(info: SDKRateLimitInfo): void {
+		const { notice } = this.context;
+		const accounts = this.context.accounts;
+
+		if (info.status === "allowed_warning") {
+			/*
+			 * Said once per window, not once per event.
+			 *
+			 * The CLI emits this whenever the figure moves, which near a limit is every turn —
+			 * and a warning repeated every turn is one nobody reads. The window it is about is
+			 * the key, so a fresh warning about the *seven-day* limit still gets through after
+			 * one about the five-hour limit.
+			 */
+			const window = info.rateLimitType ?? "limit";
+			if (this.warnedAbout !== window) {
+				this.warnedAbout = window;
+				const share = typeof info.utilization === "number" ? ` (${Math.round(info.utilization)}% used)` : "";
+				notice("warn", `This Claude subscription is close to its ${limitWindow(window)} limit${share}.`);
+			}
+			return;
+		}
+		if (info.status !== "rejected") {
+			// Back under the limit: the next warning about this window is worth hearing again.
+			this.warnedAbout = undefined;
+			return;
+		}
+
+		const spent = accounts?.active();
+		const reset = resetWords(info.resetsAt);
+		if (!accounts) {
+			notice("error", `This Claude subscription has reached its ${limitWindow(info.rateLimitType)} limit${reset}.`);
+			return;
+		}
+
+		const { moved, nextReset } = accounts.rotate(spent?.id, info.resetsAt, info.rateLimitType);
+		// The list moved either way — a spent account is now marked spent, which the panel
+		// shows with its reset time.
+		this.context.accountsChanged?.();
+		if (!moved) {
+			const wait = nextReset ? resetWords(nextReset) : reset;
+			notice(
+				"error",
+				spent
+					? `Every Claude account has reached its limit${wait}. Add another in settings, or wait.`
+					: `This Claude subscription has reached its ${limitWindow(info.rateLimitType)} limit${reset}. Add another account in settings to switch automatically.`,
+			);
+			return;
+		}
+
+		/*
+		 * The turn that was refused, and whether it is safe to try again.
+		 *
+		 * `this.streaming` is still true here — the refusal arrives before the result — so
+		 * what is asked is whether the turn *did* anything, which the translator knows because
+		 * every tool call and every board write went through it.
+		 */
+		const touched = this.context.translator.turnTouchedAnything();
+		const from = spent?.email ?? "this subscription";
+		const to = moved.email ?? "another account";
+		if (touched) {
+			notice(
+				"warn",
+				`${from} reached its ${limitWindow(info.rateLimitType)} limit${reset}. Switched to ${to}. This turn had already started work, so send it again to carry on.`,
+			);
+			return;
+		}
+		notice("info", `${from} reached its ${limitWindow(info.rateLimitType)} limit${reset}. Switched to ${to} and carrying on.`);
+		const again = this.context.translator.lastUserText();
+		if (again) this.push(again);
 	}
 
 	/** Read after each turn, because Decks' `usage()` is synchronous and this is not. */
@@ -921,14 +1071,22 @@ function stageServerName(): string {
  * to nothing rather than to a level that would spend more than was asked for.
  */
 /** The CLI's own auth subcommand, to be run outside any session. */
-function runClaudeCommand(args: string[], timeoutMs = 30_000): Promise<{ code: number | null; stdout: string; stderr: string }> {
+function runClaudeCommand(
+	args: string[],
+	timeoutMs = 30_000,
+	/** Which account to ask about; omitted means the CLI's own `~/.claude`. */
+	configDir?: string,
+): Promise<{ code: number | null; stdout: string; stderr: string }> {
 	return new Promise((resolve) => {
 		const binary = claudeExecutable() ?? claudeBundledExecutable();
 		if (!binary) {
 			resolve({ code: 1, stdout: "", stderr: "No Claude Code executable found." });
 			return;
 		}
-		const child = spawn(binary, args, { stdio: ["ignore", "pipe", "pipe"] });
+		const child = spawn(binary, args, {
+			stdio: ["ignore", "pipe", "pipe"],
+			...(configDir ? { env: { ...process.env, CLAUDE_CONFIG_DIR: configDir } } : {}),
+		});
 		let stdout = "";
 		let stderr = "";
 		child.stdout.on("data", (data: Buffer) => (stdout += data.toString()));
@@ -942,9 +1100,9 @@ function runClaudeCommand(args: string[], timeoutMs = 30_000): Promise<{ code: n
 }
 
 /** Whether the CLI's own credentials file says signed in, and how. */
-async function claudeAuthStatus(): Promise<{ loggedIn: boolean; label: string }> {
+async function claudeAuthStatus(configDir?: string): Promise<{ loggedIn: boolean; label: string }> {
 	try {
-		const { stdout } = await runClaudeCommand(["auth", "status"]);
+		const { stdout } = await runClaudeCommand(["auth", "status"], 30_000, configDir);
 		const data = JSON.parse(stdout) as { loggedIn?: boolean; authMethod?: string; apiProvider?: string };
 		return {
 			loggedIn: data.loggedIn === true,
@@ -1022,4 +1180,61 @@ function window(limit: { utilization?: number | null; resets_at?: string | null 
 	const resets = limit.resets_at ? new Date(limit.resets_at) : undefined;
 	const at = resets && !Number.isNaN(resets.getTime()) ? `, resets ${resets.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "";
 	return [{ label: `Last ${label}`, value: `${Math.round(limit.utilization)}% used${at}` }];
+}
+
+/** The window a limit is about, in words rather than the wire's name for it. */
+function limitWindow(type: string | undefined): string {
+	switch (type) {
+		case "five_hour":
+			return "5-hour";
+		case "seven_day":
+			return "weekly";
+		case "seven_day_opus":
+			return "weekly Opus";
+		case "seven_day_sonnet":
+			return "weekly Sonnet";
+		case "overage":
+		case "seven_day_overage_included":
+			return "overage";
+		default:
+			return "usage";
+	}
+}
+
+/**
+ * When a limit lifts, said the way a person would say it.
+ *
+ * A bare timestamp is not information at a glance, and the reset is usually today — so a
+ * time is enough, and a date is only added when it is not today. Empty when there is no
+ * reset to report, because "resets undefined" is worse than saying nothing.
+ */
+function resetWords(at: number | undefined): string {
+	if (!at || !Number.isFinite(at)) return "";
+	const when = new Date(at);
+	if (Number.isNaN(when.getTime())) return "";
+	const today = new Date().toDateString() === when.toDateString();
+	const time = when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+	return today ? ` (resets ${time})` : ` (resets ${when.toLocaleDateString([], { month: "short", day: "numeric" })} at ${time})`;
+}
+
+/**
+ * Who a config directory is signed in as, from the CLI's own `auth status`.
+ *
+ * Exported because the account list needs it for every row, including the CLI's own — and
+ * that is the one that must be read rather than remembered: somebody who runs
+ * `claude auth login` in a terminal has changed it without Decks hearing about it.
+ */
+export async function claudeIdentity(configDir?: string): Promise<{ email?: string; orgName?: string; plan?: string }> {
+	try {
+		const { stdout } = await runClaudeCommand(["auth", "status"], 30_000, configDir);
+		const data = JSON.parse(stdout) as { loggedIn?: boolean; email?: string; orgName?: string; subscriptionType?: string };
+		if (data.loggedIn !== true) return {};
+		return {
+			...(data.email ? { email: data.email } : {}),
+			...(data.orgName ? { orgName: data.orgName } : {}),
+			...(data.subscriptionType ? { plan: data.subscriptionType } : {}),
+		};
+	} catch {
+		return {};
+	}
 }

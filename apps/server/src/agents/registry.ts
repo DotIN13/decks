@@ -3,6 +3,7 @@ import type { AgentChat, AgentKind, AgentMode, AgentModel, Camera, ChatItem, Ser
 import type { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import type { DelegateReport, DelegateSpec } from "../stage/tool.ts";
+import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { SnapshotStore } from "./snapshot.ts";
 import { AgentStore } from "./store.ts";
@@ -51,6 +52,10 @@ export class Registry {
 			camera(): Camera;
 			recordRevision(path: string): string | undefined;
 			boardPathOf(file: string): string | undefined;
+			/** The Claude subscriptions this install can use, for the backends that can. */
+			accounts?: ClaudeAccountSwitcher;
+			/** Tell the browser the list moved, after a login or an automatic switch. */
+			accountsChanged?(): void;
 		},
 	) {
 		this.store = new AgentStore(deck);
@@ -117,6 +122,8 @@ export class Registry {
 			},
 			{
 				...options,
+				...(this.host.accounts ? { accounts: this.host.accounts } : {}),
+				...(this.host.accountsChanged ? { accountsChanged: this.host.accountsChanged } : {}),
 				color: options.color ?? COLORS[this.agents.length % COLORS.length]!,
 				kind: options.kind ?? this.host.defaultKind,
 				snapshots: this.snapshots,

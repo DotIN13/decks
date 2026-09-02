@@ -297,7 +297,8 @@ svg.lucide {
  */
 .inspector header .close,
 .chats .rail-head button:not(.menu *),
-.chat-row-wrap .close {
+.chat-row-wrap .close,
+.account-row .close {
 	display: grid;
 	width: var(--control-sm);
 	height: var(--control-sm);
@@ -318,7 +319,8 @@ svg.lucide {
 .inspector .acts button:hover,
 .inspector header .close:hover,
 .chats .rail-head button:not(.menu *):hover,
-.chat-row-wrap .close:hover {
+.chat-row-wrap .close:hover,
+.account-row .close:hover {
 	background: var(--line);
 	color: var(--fg);
 }
@@ -1787,6 +1789,37 @@ svg.lucide {
 
 .chats .rail-head {
 	padding: 8px 10px 6px;
+}
+
+/*
+ * One Claude subscription in the settings panel (`chat/Settings.tsx`).
+ *
+ * Two things a class attribute says badly. The row's `×` is the one the chat list already
+ * has — out of the way until the row is hovered, because a column of delete buttons reads as
+ * a list of things to remove — and the active row's tint, which is the same wash a focused
+ * chat gets so "this is the one" looks the same in both lists.
+ */
+.account-row {
+	border-radius: var(--control-radius);
+}
+
+.account-row[data-current="true"] {
+	background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.account-row .close {
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.account-row:hover .close,
+.account-row:focus-within .close {
+	opacity: 1;
+}
+
+/* The state word, sized to sit under the name rather than beside it. */
+.account-row .state {
+	font-variant-numeric: tabular-nums;
 }
 
 /*

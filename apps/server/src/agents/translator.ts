@@ -103,6 +103,34 @@ export class Translator {
 		return this.items.filter((item): item is Extract<ChatItem, { kind: "user" }> => item.kind === "user");
 	}
 
+	/** What was asked most recently, for a turn that has to be sent again. */
+	lastUserText(): string | undefined {
+		return this.userMessages().at(-1)?.text;
+	}
+
+	/**
+	 * Whether the current turn has done anything yet.
+	 *
+	 * Asked before re-sending a turn that a rate limit refused (`claude/backend.ts`): a turn
+	 * that had not started is safe to try again on another account, and one that had already
+	 * called tools is not, because Decks agents write boards and a replayed turn could write
+	 * the same one twice.
+	 *
+	 * "Anything" is anything after the newest user message — a tool call, or words the agent
+	 * had already said. Read from the transcript rather than counted separately, because the
+	 * transcript is what actually happened and a counter is a second thing to keep in step.
+	 */
+	turnTouchedAnything(): boolean {
+		const from = this.items.map((item) => item.kind).lastIndexOf("user");
+		if (from < 0) return this.items.length > 0;
+		return this.items.slice(from + 1).some((item) => {
+			if (item.kind === "tool") return true;
+			// An assistant bubble exists with empty text between a turn starting and its first
+			// token, so an empty one is not evidence that anything was said.
+			return item.kind === "assistant" && item.text.trim().length > 0;
+		});
+	}
+
 	/**
 	 * Note which session entry a user message became.
 	 *

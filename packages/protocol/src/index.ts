@@ -136,6 +136,29 @@ export interface Identity {
 	color: string;
 }
 
+/**
+ * One Claude subscription this install can use.
+ *
+ * Several can be signed in at once, one is active, and reaching a rate limit moves the
+ * active one along (`claude/accounts.ts`). No credentials cross this wire — an account is a
+ * handle, an identity read back out of the CLI, and whether it is currently spent.
+ */
+export interface ClaudeAccount {
+	id: string;
+	email?: string;
+	orgName?: string;
+	/** `Claude Pro`, `Claude Max`, … as the CLI words it. */
+	plan?: string;
+	/** The CLI's own `~/.claude` login, which Decks can use but must not delete. */
+	isDefault?: true;
+	/** Signed in and usable. False for a row the CLI reports as signed out. */
+	signedIn: boolean;
+	/** Epoch ms when its limit is expected to lift, if it is known to be spent. */
+	limitedUntil?: number;
+	/** Which window ran out — `five_hour`, `seven_day`, … */
+	limitType?: string;
+}
+
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 /** A model the user may pick, as the picker needs it. */
@@ -442,6 +465,14 @@ export type ClientMessage =
 	| { type: "agent.usage"; id: string }
 	| { type: "stage.result"; result: StageResult }
 	| { type: "extension.ui.answer"; answer: ExtensionUiAnswer }
+	/** Read the account list — the settings panel asking on open. */
+	| { type: "claude.accounts" }
+	/** Sign in to another Claude account, which adds it to the list. */
+	| { type: "claude.accounts.add" }
+	/** Use this one from now on, chosen by hand. */
+	| { type: "claude.accounts.use"; id: string }
+	/** Forget one, and its credentials. Refused for the CLI's own login. */
+	| { type: "claude.accounts.forget"; id: string }
 	| { type: "rewind.preview"; id: string; entryId: string | null }
 	| { type: "rewind.to"; id: string; entryId: string }
 	| { type: "fork.from"; id: string; entryId: string }
@@ -492,6 +523,8 @@ export type ServerMessage =
 	 * whole message sat in a toast.
 	 */
 	| { type: "composer.draft"; text: string }
+	/** The install's Claude subscriptions, and which one is in force. */
+	| { type: "claude.accounts"; accounts: ClaudeAccount[]; active: string }
 	| { type: "error"; text: string };
 
 /** Where the API lives, so the browser does not hard-code it in three places. */

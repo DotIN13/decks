@@ -23,6 +23,7 @@ import { createStageTool, type DelegateReport, type DelegateSpec, type StageSnap
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { SnapshotStore } from "./snapshot.ts";
+import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
 import { Translator } from "./translator.ts";
 
@@ -48,6 +49,9 @@ export class DeckAgent {
 	private state: AgentState = "idle";
 	/** The last model the runtime reported, kept for the record — and for a dormant chat, which has no runtime to ask. */
 	private lastModel: AgentModel | undefined;
+	/** Shared with every other agent: one active subscription for the install. */
+	private readonly accounts: ClaudeAccountSwitcher | undefined;
+	private readonly accountsChanged: (() => void) | undefined;
 	private identity: Identity;
 	/**
 	 * The model list, kept as well as sent.
@@ -104,6 +108,9 @@ export class DeckAgent {
 			/** The model and mode to open on, handed down rather than read off disk — see `Registry.create`. */
 			model?: AgentModel;
 			mode?: AgentMode;
+			/** The install's Claude subscriptions (`claude/accounts.ts`). */
+			accounts?: ClaudeAccountSwitcher;
+			accountsChanged?(): void;
 			/**
 			 * Everything a chat needs to be a row again without its runtime running
 			 * (`agents/store.ts`). Its presence is also what makes the agent dormant: it
@@ -142,6 +149,8 @@ export class DeckAgent {
 		this.resumeRef = options.resumeRef;
 		this.kind = options.kind;
 		this.snapshots = options.snapshots;
+		this.accounts = options.accounts;
+		this.accountsChanged = options.accountsChanged;
 		// A fork opens a conversation that already happened, so it should open with the
 		// canvas that conversation had rather than an empty context.
 		if (options.forkedFrom) {
@@ -396,6 +405,9 @@ export class DeckAgent {
 			// a second call would write a model change into a session that never changed.
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
+			// The install's Claude subscriptions, so a limit can move to the next one.
+			...(this.accounts ? { accounts: this.accounts } : {}),
+			...(this.accountsChanged ? { accountsChanged: this.accountsChanged } : {}),
 		};
 
 		const create: Promise<AgentBackend> =

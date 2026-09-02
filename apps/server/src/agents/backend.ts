@@ -61,6 +61,41 @@ export interface AgentBackendContext {
 	model?: AgentModel;
 	/** What it last asked before acting, on a runtime that has modes. */
 	mode?: AgentMode;
+	/**
+	 * The Claude subscriptions this install can use (`claude/accounts.ts`).
+	 *
+	 * On the context rather than reached for globally, because it is the *shell's* — one
+	 * store for the install, handed to whichever backends can use it. Pi ignores it: its
+	 * credentials are `pi auth`'s business and it has no equivalent of a plan window.
+	 */
+	accounts?: ClaudeAccountSwitcher;
+	/** Tell the browser the account list moved, after a login or a switch. */
+	accountsChanged?(): void;
+}
+
+/**
+ * What a backend needs from the account store, and nothing more.
+ *
+ * Narrowed to an interface here rather than importing the class, so `agents/` does not
+ * depend on `claude/` — the shell knows there is a thing that can rotate an account, and
+ * only `claude/backend.ts` knows what one is.
+ */
+export interface ClaudeAccountSwitcher {
+	/** What `CLAUDE_CONFIG_DIR` should be, or nothing to leave the CLI on its own default. */
+	activeConfigDir(): string | undefined;
+	/** Which account is in force, for the sentence a switch says. */
+	active(): { id: string; email?: string } | undefined;
+	/**
+	 * Give up on the account that just refused and take the next one.
+	 *
+	 * Returns the account moved to, or the soonest any of them will be usable again when
+	 * they are all spent.
+	 */
+	rotate(
+		except: string | undefined,
+		resetsAt: number | undefined,
+		limitType: string | undefined,
+	): { moved?: { id: string; email?: string }; nextReset?: number };
 }
 
 /**

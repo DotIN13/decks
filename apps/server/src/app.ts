@@ -8,6 +8,8 @@ import { applyPatches, mintId, PatchRefused } from "./boards/patch.ts";
 import { Revisions } from "./boards/snapshots.ts";
 import { renderTemplate, slugFor, type BoardKind } from "./boards/templates.ts";
 import { StageService } from "./stage/service.ts";
+import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./claude/accounts.ts";
+import { claudeIdentity } from "./claude/backend.ts";
 import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
@@ -39,6 +41,8 @@ export class App {
 	private lastCamera: Camera = { x: 0, y: 0, zoom: 1 };
 	/** Stage calls waiting for the browser to carry them out. */
 	private readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout }>();
+	/** The Claude subscriptions this install can use, shared by every Claude agent. */
+	private readonly claudeAccounts: ClaudeAccounts;
 
 	private constructor(
 		readonly config: Config,
@@ -54,6 +58,15 @@ export class App {
 			camera: () => this.lastCamera,
 			agents: () => this.agents.summaries(),
 		});
+		/*
+		 * The Claude subscriptions this install can use (`claude/accounts.ts`).
+		 *
+		 * On the install's data directory rather than the deck: an account is a property of
+		 * the machine, like the credentials it stands for. Swept on open, so a login that was
+		 * abandoned halfway leaves no directory behind.
+		 */
+		this.claudeAccounts = new ClaudeAccounts(config.dataDir);
+		this.claudeAccounts.sweep();
 		this.agents = new Registry(
 			deck,
 			(message) => this.send(message),
@@ -64,8 +77,56 @@ export class App {
 				camera: () => this.lastCamera,
 				recordRevision: (path) => this.recordRevision(path),
 				boardPathOf: (file) => this.boardPathOf(file),
+				accounts: this.claudeAccounts,
+				accountsChanged: () => void this.publishAccounts(),
 			},
 		);
+	}
+
+	/**
+	 * The account list, with every identity read fresh from the CLI.
+	 *
+	 * Read rather than remembered, because the CLI's own login can change without Decks
+	 * hearing about it — somebody running `claude auth login` in a terminal, or a token that
+	 * expired. A list that reported a stale email would be worse than one that took a moment.
+	 *
+	 * Broadcast when nobody asked in particular (a switch, a new login), because two tabs on
+	 * one deck share these accounts.
+	 */
+	private async publishAccounts(reply?: (message: ServerMessage) => void): Promise<void> {
+		const stored = this.claudeAccounts.list();
+		const active = this.claudeAccounts.activeId();
+		const accounts = await Promise.all(
+			stored.map(async (account) => {
+				const isDefault = account.id === DEFAULT_ACCOUNT;
+				const identity = await claudeIdentity(isDefault ? undefined : this.claudeAccounts.configDir(account.id));
+				const signedIn = Boolean(identity.email || identity.plan);
+				return {
+					id: account.id,
+					...(isDefault ? { isDefault: true as const } : {}),
+					signedIn,
+					// What the CLI says now, falling back to what was recorded when it was added —
+					// so a row still has a name if `auth status` is slow or the token has lapsed.
+					...(identity.email ?? account.email ? { email: identity.email ?? account.email } : {}),
+					...(identity.orgName ?? account.orgName ? { orgName: identity.orgName ?? account.orgName } : {}),
+					...(identity.plan ?? account.plan ? { plan: identity.plan ?? account.plan } : {}),
+					...(account.limitedUntil ? { limitedUntil: account.limitedUntil } : {}),
+					...(account.limitType ? { limitType: account.limitType } : {}),
+				};
+			}),
+		);
+		// Recorded so a row keeps its name when the CLI is next slow to answer.
+		const mine = accounts.find((account) => account.isDefault);
+		if (mine?.signedIn) {
+			this.claudeAccounts.describeDefault({
+				...(mine.email ? { email: mine.email } : {}),
+				...(mine.orgName ? { orgName: mine.orgName } : {}),
+				...(mine.plan ? { plan: mine.plan } : {}),
+			});
+		}
+		const frame: ServerMessage = { type: "claude.accounts", accounts, active };
+		if (reply) reply(frame);
+		else this.send(frame);
 	}
 
 	/**
@@ -414,6 +475,47 @@ export class App {
 				// The answer carries no agent id — a dialog id is unique across them —
 				// so it goes to every agent and the one holding that question takes it.
 				for (const agent of this.agents.all()) agent.answerDialog(message.answer);
+				return;
+			}
+
+			case "claude.accounts":
+				void this.publishAccounts(reply);
+				return;
+
+			case "claude.accounts.add": {
+				/*
+				 * The login runs on an *agent*, because it is the agent's dialog bridge that
+				 * asks for the code — the flow needs somewhere to put a modal and somewhere to
+				 * report to, and the conversation is both.
+				 *
+				 * A Claude agent, specifically: a pi agent has no Claude login to run. Focused
+				 * first, since that is the conversation the person is looking at.
+				 */
+				const claude = [this.agents.focused(), ...this.agents.all()].find((agent) => agent.kind === "claude");
+				if (!claude) {
+					reply({ type: "notice", level: "warn", text: "Start a Claude agent first — signing in runs through one." });
+					return;
+				}
+				void claude.prompt("/login");
+				return;
+			}
+
+			case "claude.accounts.use": {
+				const moved = this.claudeAccounts.use(message.id);
+				if (!moved) {
+					reply({ type: "notice", level: "warn", text: "That account is not on the list any more." });
+					return;
+				}
+				// The switch is the symlink; every running session reads through it, so there is
+				// nothing to restart.
+				this.send({ type: "notice", level: "info", text: `Now using ${moved.email ?? "that account"}.` });
+				void this.publishAccounts();
+				return;
+			}
+
+			case "claude.accounts.forget": {
+				this.claudeAccounts.forget(message.id);
+				void this.publishAccounts();
 				return;
 			}
 

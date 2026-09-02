@@ -74,6 +74,30 @@ say(
 );
 say("the send button is a fingertip target", dock.send.w >= 40 && dock.send.h >= 40, JSON.stringify(dock.send));
 
+/*
+ * And the title bar still holds them all.
+ *
+ * Its buttons are 44px on a touchscreen and there are seven of them now — the two panels,
+ * the deck, the cheat sheet, the conversation, settings, the theme — against a layout
+ * viewport of ~490px. There is room for about one more, and the failure mode is silent: a
+ * button pushed off the right edge, or one landing on top of the wordmark. Asserted so the
+ * eighth is a failing check rather than something noticed in a screenshot.
+ */
+const bar = await page.evaluate(() => {
+	const titlebar = document.querySelector(".titlebar");
+	const brand = titlebar.querySelector(".brand").getBoundingClientRect();
+	const boxes = [...titlebar.querySelectorAll(".icon-button")].map((button) => button.getBoundingClientRect());
+	return {
+		buttons: boxes.length,
+		width: Math.round(titlebar.clientWidth),
+		overflows: titlebar.scrollWidth > titlebar.clientWidth,
+		offRight: boxes.filter((box) => box.right > titlebar.clientWidth + 1).length,
+		onTheBrand: boxes.filter((box) => box.left < brand.right).length,
+	};
+});
+say("the title bar holds its buttons without overflowing", !bar.overflows && bar.offRight === 0, JSON.stringify(bar));
+say("…and none of them lands on the wordmark", bar.onTheBrand === 0, JSON.stringify(bar));
+
 // --- 2. pinch on bare stage ---------------------------------------------------------
 const start = await camera();
 await pinch({ x: 190, y: 320 }, 60, 260);
@@ -454,6 +478,7 @@ const small = await page.evaluate(() => {
 		.filter((entry) => entry.w < 40 || entry.h < 40);
 });
 say("every button in the chrome is at least 40px", small.length === 0, JSON.stringify(small));
+
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

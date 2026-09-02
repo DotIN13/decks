@@ -7,6 +7,7 @@ import type {
 	BoardPatch,
 	Camera,
 	ChatItem,
+	ClaudeAccount,
 	DeckState,
 	ExtensionUiPrompt,
 	Identity,
@@ -18,6 +19,7 @@ import MessageSquare from "lucide-solid/icons/message-square";
 import Minus from "lucide-solid/icons/minus";
 import Moon from "lucide-solid/icons/moon";
 import Layers from "lucide-solid/icons/layers";
+import SettingsIcon from "lucide-solid/icons/settings";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
@@ -28,6 +30,7 @@ import { BoardRail } from "./canvas/BoardRail.tsx";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
 import { AllBoards } from "./canvas/AllBoards.tsx";
+import { Settings } from "./chat/Settings.tsx";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
@@ -95,6 +98,10 @@ export function App() {
 		 * user actually clicks the notch.
 		 */
 		preview?: { entryId: string; boards: Record<string, string> };
+		/** The Claude subscriptions this install can use (`chat/Settings.tsx`). */
+		accounts: ClaudeAccount[];
+		/** Which of them is spending. `default` is the CLI's own login. */
+		activeAccount: string;
 	}>({
 		boards: [],
 		notices: [],
@@ -108,6 +115,8 @@ export function App() {
 		inPlay: {} as Record<string, string[]>,
 		nonces: {} as Record<string, number>,
 		defaultKind: "pi" as AgentKind,
+		accounts: [] as ClaudeAccount[],
+		activeAccount: "default",
 	});
 
 	const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
@@ -145,6 +154,8 @@ export function App() {
 	const [chatFloat, setChatFloat] = createSignal(false);
 	/** The all-canvases modal (`canvas/AllBoards.tsx`), which is a thing you do and then stop. */
 	const [allBoards, setAllBoards] = createSignal(false);
+	/** Settings: the Claude subscriptions this install can use (`chat/Settings.tsx`). */
+	const [settings, setSettings] = createSignal(false);
 	/**
 	 * Words the server has handed to the input bar: the message a rewind took back.
 	 *
@@ -486,6 +497,10 @@ export function App() {
 
 				case "composer.draft":
 					setDraft({ text: message.text, at: Date.now() });
+					return;
+
+				case "claude.accounts":
+					setState({ accounts: message.accounts, activeAccount: message.active });
 					return;
 				case "error":
 					notice("error", message.text);
@@ -1139,6 +1154,23 @@ export function App() {
 					<Icon of={MessageSquare} size={19} />
 				</button>
 				<button
+					class="icon-button"
+					type="button"
+					aria-pressed={settings()}
+					data-open={settings()}
+					title="Settings"
+					aria-label="Settings"
+					onClick={() => {
+						const opening = !settings();
+						setSettings(opening);
+						// Read on open rather than kept in step: every identity in the list comes
+						// from the CLI, and the CLI's own login can change without the deck hearing.
+						if (opening) socket.send({ type: "claude.accounts" });
+					}}
+				>
+					<Icon of={SettingsIcon} size={18} />
+				</button>
+				<button
 					class="icon-button theme"
 					type="button"
 					onClick={() => toggleScheme()}
@@ -1268,6 +1300,17 @@ export function App() {
 						onAll={() => setAllBoards(true)}
 					/>
 				</aside>
+
+				<Show when={settings()}>
+					<Settings
+						accounts={state.accounts}
+						active={state.activeAccount}
+						onAdd={() => socket.send({ type: "claude.accounts.add" })}
+						onUse={(id) => socket.send({ type: "claude.accounts.use", id })}
+						onForget={(id) => socket.send({ type: "claude.accounts.forget", id })}
+						onClose={() => setSettings(false)}
+					/>
+				</Show>
 
 				{/* Everything in the deck, searchable, over the canvas rather than beside it. */}
 				<Show when={allBoards()}>
