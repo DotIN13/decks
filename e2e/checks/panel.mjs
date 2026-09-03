@@ -41,7 +41,7 @@ try {
 	 * aim at, and a button is that something — so the panel draws nothing, which is also
 	 * what makes the inset zero without anybody having to remember to say so.
 	 */
-	const toggle = page.locator('.pill button[aria-label="Boards"], .pill button[title^="Boards"]').first();
+	const toggle = page.locator('.pill button[aria-label$="the boards panel"]').first();
 	await toggle.click();
 	await page.waitForFunction(() => !document.querySelector("[data-inset='left']"), null, { timeout: 4000 });
 	say("folded, the panel is not in the document at all", (await mounted()) === 0);

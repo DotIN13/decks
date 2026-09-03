@@ -31,17 +31,34 @@ const onStageWheel = (options) =>
 		document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { ...o, bubbles: true, cancelable: true }));
 	}, options);
 
-// 1. The same delta must move the camera by the same amount, wherever the cursor is.
+/*
+ * 1. The same delta must move the camera by the same amount, wherever the cursor is.
+ *
+ * Fitted before each of the two measurements, and that is not ceremony: the first wheel
+ * *pans*, which can carry the board being aimed at out of the viewport — and a frame that
+ * leaves the viewport unmounts its document, so the second measurement went looking for an
+ * iframe that had been disposed of a moment earlier. Fitting between them makes the two
+ * halves of the comparison start from the same place, which is what the comparison claims
+ * anyway.
+ */
+const refit = async () => {
+	await page.keyboard.press("0");
+	await settle(page, 300);
+};
+
+await refit();
 const a0 = await camera();
 await onStageWheel({ deltaX: 0, deltaY: 150, clientX: 800, clientY: 500 });
 await settle(page, 200);
 const a1 = await camera();
 const overStage = { dx: a1.x - a0.x, dy: a1.y - a0.y };
 
+await refit();
+const a1b = await camera();
 await inFrameWheel({ deltaX: 0, deltaY: 150, clientX: 200, clientY: 200 });
 await settle(page, 200);
 const a2 = await camera();
-const overBoard = { dx: a2.x - a1.x, dy: a2.y - a1.y };
+const overBoard = { dx: a2.x - a1b.x, dy: a2.y - a1b.y };
 say(
 	"a pan over a board moves the camera exactly as far as over bare stage",
 	Math.abs(overStage.dy - overBoard.dy) < 0.5 && Math.abs(overStage.dx - overBoard.dx) < 0.5,

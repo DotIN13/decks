@@ -37,7 +37,16 @@ while (Date.now() < deadline) {
 }
 for (const path of wanted) link.send({ type: "board.play", path });
 
-const { browser, page, errors } = await open({ width: 1400, height: 800 });
+/*
+ * A short window, deliberately.
+ *
+ * The check is about a list that is taller than its box, and the fixture has five boards —
+ * which do not overflow 800px of panel at 28px a row, so the premise silently stopped
+ * being true and the assertion compared 598 with 598. Shrinking the window is the honest
+ * way to create the condition, and it is also the case that matters: a laptop lid is what
+ * makes a list scroll, not a large deck.
+ */
+const { browser, page, errors } = await open({ width: 1400, height: 420 });
 try {
 	await page.waitForFunction((count) => document.querySelectorAll(".board-row").length >= count, EXTRA, { timeout: 20000 });
 	// The boards live in the context panel, which is the one this check is about.

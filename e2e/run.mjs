@@ -110,6 +110,17 @@ cpSync(join(root, "runtime", "lib"), join(data, "decks", "lib"), { recursive: tr
 // Revisions and agent transcripts from whoever ran the example deck last are not fixture.
 rmSync(join(data, "decks", ".decks"), { recursive: true, force: true });
 rmSync(join(data, "decks", ".pi"), { recursive: true, force: true });
+/*
+ * And the signed-in accounts, for the same reason as the two above.
+ *
+ * `example/claude-accounts` is gitignored — this repo has a commit named "Never commit the
+ * signed-in Claude accounts" — but it exists on any machine where somebody has logged in
+ * from the example deck, and the copy above takes `example/` wholesale. So the fixture
+ * arrived with a real account and an `active` symlink already in it, and `accounts.mjs`
+ * failed three assertions about what a *fresh install* looks like. A check that depends on
+ * whoever last used the example deck passes or fails by accident.
+ */
+rmSync(join(data, "claude-accounts"), { recursive: true, force: true });
 
 const server = spawn("npm", ["run", "dev"], {
 	cwd: root,

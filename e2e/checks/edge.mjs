@@ -37,11 +37,18 @@ try {
 	// summoned may overlap, and one that arrives on its own may not.
 	say("…and floating means it is not an inset", now.insetRight === "0px", now.insetRight);
 
-	// Selecting is also an explicit act, and it is the more recent one.
+	/*
+	 * Selecting is also an explicit act, and it is the more recent one.
+	 *
+	 * `[data-id="goal"]` rather than the first `[data-id]` on the board: the first is the
+	 * heading, which the editor does not treat as a selectable box, so the click landed and
+	 * nothing was selected. A named component is also a better failure message than an
+	 * index when the fixture changes.
+	 */
 	await page.locator('.board-node[data-path="boards/plan.html"] .chrome').first().click();
 	await page.keyboard.press("1");
 	await page.waitForTimeout(900);
-	await page.frameLocator('.board-node[data-path="boards/plan.html"] iframe').locator("[data-id]").first().click();
+	await page.frameLocator('.board-node[data-path="boards/plan.html"] iframe').locator('[data-id="goal"]').click();
 	await page.waitForSelector(".inspector", { timeout: 6000 });
 	now = await state();
 	say("selecting hands the edge to the inspector", now.inspector && !now.shown, JSON.stringify(now));
@@ -63,7 +70,7 @@ try {
 	 * The conversation wins, the inspector yields, and **the selection survives** — losing a
 	 * selected box because you wanted to read the chat would be a bad trade.
 	 */
-	await page.frameLocator('.board-node[data-path="boards/plan.html"] iframe').locator("[data-id]").first().click();
+	await page.frameLocator('.board-node[data-path="boards/plan.html"] iframe').locator('[data-id="goal"]').click();
 	await page.waitForSelector(".inspector", { timeout: 6000 });
 	await button.click();
 	await page.waitForSelector("[data-shown='true']", { timeout: 4000 });

@@ -296,7 +296,14 @@ export async function openPanel(page, tab = "context") {
 	if (tab === "agents") return openAgents(page);
 	const open = () => page.evaluate(() => Boolean(document.querySelector("[data-inset='left']")));
 	if (!(await open())) {
-		await page.locator('.pill button[aria-label="Boards"], .pill button[title^="Boards"]').first().click();
+		/*
+		 * Matched on the end of the label, because the whole of it says what pressing the
+		 * button *does* — "Show the boards panel" or "Hide the boards panel" — which is right
+		 * for a screen reader and means an exact match would only ever find one of the two
+		 * states. An earlier version asked for `aria-label="Boards"`, matched nothing, and
+		 * fell through to a tool button, which failed with a story about a sticky note.
+		 */
+		await page.locator('.pill button[aria-label$="the boards panel"]').first().click();
 		await page.waitForFunction(() => Boolean(document.querySelector("[data-inset='left']")), null, { timeout: 6000 });
 	}
 	await page.getByRole("tab", { name: tab === "deck" ? /deck/i : /context/i }).click();
@@ -385,19 +392,46 @@ export async function openHistory(page) {
  * Returns once the row exists, because every caller's next line assumes it does.
  */
 export async function newAgent(page, kind = "pi") {
-	await openPanel(page, "agents");
-	const before = await page.evaluate(() => document.querySelectorAll(".chat-row").length);
-	await page.locator('.chats .rail-head button[title="Start another agent"]').click();
-	await page.waitForSelector('.chats [role="menu"]', { timeout: 6000 });
-	await page.locator('.chats [role="menu"] [role="menuitem"]', { hasText: kind }).click();
-	await page.waitForFunction((was) => document.querySelectorAll(".chat-row").length > was, before, { timeout: 15000 });
-	await page.waitForTimeout(400);
+	/*
+	 * From the selector under the agent's own name, which is where the list went.
+	 *
+	 * It used to be a `+` in the header of the agents *panel*, and the panel is gone: a
+	 * list you switch with is a selector, so it hangs off the thing it selects. The `New
+	 * agent` row is split in two — the label starts one on the default runtime, and a chevron
+	 * beside it opens the choice — because the runtime cannot change afterwards and this is
+	 * the only moment it can be picked.
+	 *
+	 * Rows are counted in the menu rather than as `.chat-row`, since the menu is the only
+	 * place a full list of agents now exists.
+	 */
+	await openAgents(page);
+	const rows = () => page.locator('.popover [data-row]').count();
+	const before = await rows();
+	await page.locator('.popover [data-row]').last().click();
+	await page.waitForSelector(".popover", { timeout: 6000 });
+	const wanted = page.locator('.popover [data-row]').filter({ hasText: new RegExp(kind, "i") });
+	if ((await wanted.count()) > 0) await wanted.first().click();
+	// The menu closes on the pick, so the new agent is counted with it re-opened.
+	await page.waitForTimeout(600);
+	await openAgents(page);
+	await page.waitForFunction(
+		(was) => document.querySelectorAll(".popover [data-row]").length > was,
+		before,
+		{ timeout: 15000 },
+	);
+	await page.keyboard.press("Escape");
+	await page.waitForTimeout(300);
 }
 
-/** Every board in the deck, in the modal that lists them — the way to find one now. */
+/**
+ * Every board in the deck — the Deck tab, which is where the modal went.
+ *
+ * The modal covered the canvas you were looking at in order to help you find something on
+ * it. `⌘K` is the shortcut for the same thing.
+ */
 export async function openAllBoards(page) {
-	await page.locator('.titlebar button[title="Every board in the deck"]').click();
-	await page.waitForSelector(".all-boards", { timeout: 6000 });
+	await openPanel(page, "deck");
+	await page.waitForSelector(".board-row, .rail-item", { timeout: 6000 });
 	await page.waitForTimeout(300);
 }
 

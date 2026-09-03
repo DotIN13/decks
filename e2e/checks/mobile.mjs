@@ -69,7 +69,7 @@ const dock = await page.evaluate(() => {
 });
 say(
 	"the composer is as wide as the phone, not as wide as what is left over",
-	dock.dockbox.w > dock.width - 60 && dock.field.w > 240,
+	dock.composer.w > dock.width - 60 && dock.field.w > 240,
 	JSON.stringify(dock),
 );
 say("the send button is a fingertip target", dock.send.w >= 40 && dock.send.h >= 40, JSON.stringify(dock.send));
@@ -363,7 +363,7 @@ say("the conversation starts away", away.right === false, JSON.stringify(away));
  * panel and one conversation. 264px of panel and 320px of cards on a 390px screen is two
  * surfaces and no canvas, which is the whole reason for the rule.
  */
-await page.locator('.pill button[aria-label="Boards"]').tap();
+await page.locator('.pill button[aria-label$="the boards panel"]').tap();
 await settle(page, 320);
 say("a tap on the pill brings the boards sheet out", (await openState()).boards === true, JSON.stringify(await openState()));
 
@@ -465,7 +465,7 @@ say("zoomed in, the left edge is over a live board's frame", overBoard === "ifra
 await swipe([{ x: 3, y: mid }], { x: 150, y: 0 }, 12);
 await settle(page, 400);
 say("the edge swipe works over a board too", (await openState()).left === "true", JSON.stringify(await openState()));
-await page.locator('.pill button[aria-label="Boards"]').tap();
+await page.locator('.pill button[aria-label$="the boards panel"]').tap();
 await settle(page, 300);
 
 // --- 8. nothing in the chrome is smaller than a fingertip ---------------------------

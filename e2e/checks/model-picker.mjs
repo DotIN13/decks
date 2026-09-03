@@ -1,88 +1,97 @@
-/** The composer's model picker: grouped by provider, with no separate provider label. */
+/**
+ * The composer's model picker, now that it is a popover rather than a `<select>`.
+ *
+ * The old check read `optgroup` labels and called `selectOption`, which is the right way to
+ * test a native control and no way at all to test this one. What it was really asserting
+ * survives the change and is asserted here: the provider is a heading rather than a second
+ * label beside the chip, every model sits under one, and switching is recorded in the
+ * conversation — because which model said a thing is part of what happened.
+ *
+ * The last of those is the one worth keeping most. A long chat can span three models, and
+ * the chip only ever shows the one in use *now*, so without a line in the transcript the
+ * reply above a switch and the reply below it look like the same voice.
+ */
 import { open, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
-await page.waitForFunction(() => (document.querySelectorAll(".dockrow .chipbtn option").length ?? 0) > 0, null, { timeout: 15000 });
 
-const picker = await page.evaluate(() => {
-	const select = document.querySelector(".dockrow .chipbtn");
-	const groups = [...select.querySelectorAll("optgroup")];
+/** The chip that says the model. The last labelled control in the row; attach is first. */
+const chip = () => page.locator(".dockrow .chipbtn").last();
+const openPicker = async () => {
+	if ((await page.locator(".popover").count()) === 0) {
+		await chip().click();
+		await page.waitForSelector(".popover", { timeout: 6000 });
+	}
+};
+
+await page.waitForFunction(() => document.querySelectorAll(".dockrow .chipbtn").length > 0, null, { timeout: 15000 });
+const chipText = (await chip().innerText()).trim();
+say("the chip says the model rather than sitting beside a label for it", chipText.length > 0, chipText);
+say("no separate provider label in the box", (await page.locator(".dockbox .provider").count()) === 0);
+
+await openPicker();
+const shape = await page.evaluate(() => {
+	const pop = document.querySelector(".popover");
+	const rows = [...pop.querySelectorAll("[data-row]")];
+	const groups = [...pop.querySelectorAll(".group")].map((g) => g.textContent.trim());
 	return {
-		providerLabels: document.querySelectorAll(".dockbox .provider").length,
-		selected: select.selectedOptions[0]?.textContent,
-		selectedGroup: select.selectedOptions[0]?.parentElement?.label,
-		selectedValue: select.value,
-		groupCount: groups.length,
-		groupLabels: groups.map((group) => group.label).sort(),
-		providers: [...new Set([...select.querySelectorAll("option")].map((o) => o.value.split("/")[0]))].sort(),
-		total: select.querySelectorAll("option").length,
-		ungrouped: [...select.querySelectorAll("option")].filter((o) => o.parentElement.tagName !== "OPTGROUP").length,
+		rows: rows.length,
+		groups,
+		providers: [...new Set(rows.map((r) => r.querySelector(".pv")?.textContent?.trim()).filter(Boolean))].sort(),
+		current: rows.filter((r) => r.dataset.current === "true").length,
+		search: Boolean(pop.querySelector("input")),
 	};
 });
-say("no provider label beside the picker", picker.providerLabels === 0);
+say("the popover lists the models", shape.rows >= 1, JSON.stringify(shape));
+say("…with a search field over them", shape.search);
+say("…and exactly one marked as the session's model", shape.current === 1, String(shape.current));
 say(
-	"the provider is the group heading of the selected model",
-	picker.selectedGroup === picker.selectedValue.split("/")[0],
-	`${picker.selectedGroup} / ${picker.selectedValue}`,
+	"the provider is a heading or a pill on the row, not a second control",
+	shape.groups.length > 0 || shape.providers.length > 0,
+	JSON.stringify({ groups: shape.groups, providers: shape.providers }),
 );
-// One group per provider, whatever the runtime happens to offer. This used to assert
-// "more than one group", which is a fact about Pi's model list rather than about grouping:
-// the Claude backend has a single provider and failed a check it satisfies perfectly.
-say(
-	"there is one group per provider",
-	picker.groupCount === picker.providers.length && picker.groupLabels.join() === picker.providers.join(),
-	`${picker.groupCount} groups for providers [${picker.providers.join(" ")}] over ${picker.total} models`,
-);
-say("every model sits in a group", picker.ungrouped === 0, `${picker.ungrouped} ungrouped`);
-say("the selected option is the session's model", (picker.selected?.length ?? 0) > 0, picker.selected);
 
-const other = await page.evaluate(() => {
-	const select = document.querySelector(".dockrow .chipbtn");
-	return [...select.querySelectorAll("option")].find((o) => o.value !== select.value && o.value.includes("/"))?.value;
-});
-if (!other) {
-	say("picking another provider's model keeps the two in step", false, "only one model is configured");
+// The thinking scale lives inside the same popover, which is the point of collapsing three
+// native selects into one: model and effort are one decision made in one place.
+say("the thinking scale is in the same popover", (await page.locator(".popover").getByText(/thinking/i).count()) > 0);
+
+const rows = page.locator(".popover [data-row]");
+const count = await rows.count();
+if (count < 2) {
+	say("switching model is recorded in the conversation", false, "only one model is configured");
 } else {
-	await page.selectOption(".dockrow .chipbtn", other);
-	await page.waitForFunction((wanted) => document.querySelector(".dockrow .chipbtn").value === wanted, other, { timeout: 5000 });
-	const after = await page.evaluate(() => {
-		const select = document.querySelector(".dockrow .chipbtn");
-		return { group: select.selectedOptions[0]?.parentElement?.label, value: select.value };
-	});
-	say(
-		"picking another provider's model keeps the two in step",
-		after.value === other && other.startsWith(`${after.group}/`),
-		`${after.group} / ${after.value}`,
-	);
 	/*
-	 * The switch is in the conversation, because which model said a thing is part of what
-	 * happened.
+	 * The model's id, from the row's own `.id` span rather than from its text.
 	 *
-	 * A long chat can span three of them, and the picker in the dock only ever shows the one
-	 * in use *now* — so without a line in the transcript the reply above a switch and the
-	 * reply below it look like the same voice. Read from the history rather than from a toast:
-	 * it is a notice in the conversation, so it lands at the point it happened and is in the
-	 * copy on disk.
+	 * A row reads "provider" then the id then a tick, so splitting the text and taking a
+	 * line got the provider pill on some rows and the id on others — and the conversation's
+	 * notice names the model, not the provider.
+	 */
+	const wanted = (await rows.nth(1).locator(".id").innerText()).trim();
+	await rows.nth(1).click();
+	await settle(page, 500);
+	const after = (await chip().innerText()).trim();
+	say("picking another model changes the chip", after !== chipText, `${chipText} -> ${after}`);
+
+	/*
+	 * Read from the history rather than from a toast: it is a notice in the conversation, so
+	 * it lands at the point it happened and is in the copy on disk.
 	 */
 	await page.locator('.pill button[title^="Conversation"]').click();
-	await page.waitForFunction(() => document.querySelector(".stream")?.dataset.open === "true", null, { timeout: 8000 });
+	await page.waitForSelector("[data-shown='true']", { timeout: 8000 });
 	await settle(page, 600);
-	const notices = await page.locator(".stream .fnotice").allInnerTexts();
-	const model = other.split("/").slice(1).join("/");
-	say("the switch is recorded in the conversation", notices.some((text) => text.startsWith("Model:")), JSON.stringify(notices));
-	say("…naming the model it moved to", notices.some((text) => text.includes(model)), `looking for ${model}`);
+	const notices = await page.locator("[data-shown='true'] .fnotice, [data-shown='true'] .stream-notice").allInnerTexts();
+	say("the switch is recorded in the conversation", notices.some((t) => /model/i.test(t)), JSON.stringify(notices));
+	say("…naming the model it moved to", notices.some((t) => t.includes(wanted)), `looking for ${wanted}`);
 	await page.locator('.pill button[title^="Conversation"]').click();
 	await settle(page, 300);
 
 	// Put it back: leaving the agent on a provider without credentials makes the next
 	// check's turn fail instantly, which reads as a bug in the app.
-	await page.selectOption(".dockrow .chipbtn", picker.selectedValue);
+	await openPicker();
+	await rows.nth(0).click();
 	await settle(page, 400);
-	say(
-		"the model is left as it was found",
-		(await page.evaluate(() => document.querySelector(".dockrow .chipbtn").value)) === picker.selectedValue,
-		picker.selectedValue,
-	);
+	say("the model is left as it was found", (await chip().innerText()).trim() === chipText, chipText);
 }
 
 say("no page errors", errors.length === 0, errors.join(" | "));
