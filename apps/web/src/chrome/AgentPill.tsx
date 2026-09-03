@@ -322,7 +322,8 @@ export function AgentPill(props: {
 				<Icon of={PanelLeft} size={15} />
 			</button>
 
-			<span class="pill-sep" aria-hidden="true" />
+			{/* Hairlines are decoration, and the first thing to go when the line is short. */}
+			<span class="pill-sep max-[520px]:hidden" aria-hidden="true" />
 
 			{/*
 			 * The active agent, with the same ring it would carry in the corner — which is also
@@ -348,7 +349,17 @@ export function AgentPill(props: {
 				{(chat) => (
 					<span class="flex flex-none items-center gap-[7px] pl-0.5">
 						<AgentFace chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} />
-						<span class="max-w-[160px] truncate text-[12px] font-semibold">{name()}</span>
+						{/*
+							The name goes on a phone; the face stays.
+
+							At 393px with 44px touch targets the pill came to 305px and ran 42px
+							into the corner cluster — two floats overlapping, which is the one
+							thing a floating chrome must not do. The name is the cheapest 67px
+							in it: the avatar still says whose window this is, its ring still
+							says what the agent is doing, and the dropdown spells the name out
+							the moment you reach for it.
+						*/}
+						<span class="max-w-[160px] truncate text-[12px] font-semibold max-[520px]:hidden">{name()}</span>
 					</span>
 				)}
 			</Show>
@@ -451,6 +462,27 @@ export function AgentPill(props: {
 							</button>
 						)}
 					</For>
+					{/*
+						Undo joins them under 520px, where it leaves the line.
+
+						It is not a tool — it does not change what a click on the canvas does —
+						but this menu is the editing chrome on a touchscreen, and a rule plus a
+						row is cheaper than 53px of a 320px line. The button stays in the pill at
+						every width that can hold it, because reaching for undo through a menu is
+						worse than reaching for it directly.
+					*/}
+					<Show when={props.onUndo}>
+						{(undo) => (
+							<>
+								<span class="rule hidden max-[520px]:block" />
+								<button type="button" role="menuitem" data-row data-flat="true" onClick={() => undo()()} class="hidden max-[520px]:flex">
+									<Icon of={Undo2} size={14} class="flex-none text-muted" />
+									<span class="lb flex-1 font-normal">Undo the last edit</span>
+									<span class="meta flex-none text-[10px]">⌘Z</span>
+								</button>
+							</>
+						)}
+					</Show>
 				</Popover>
 			</span>
 
@@ -465,10 +497,10 @@ export function AgentPill(props: {
 			<Show when={props.onUndo}>
 				{(undo) => (
 					<>
-						<span class="pill-sep" aria-hidden="true" />
+						<span class="pill-sep max-[520px]:hidden" aria-hidden="true" />
 						<button
 							type="button"
-							class="iconbtn"
+							class="iconbtn max-[520px]:hidden"
 							title="Undo the last edit to this board (⌘Z)"
 							aria-label="Undo the last edit to this board"
 							onClick={() => undo()()}

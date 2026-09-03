@@ -95,11 +95,24 @@ const bar = await page.evaluate(() => {
 		buttons: boxes.length,
 		width: innerWidth,
 		offRight: boxes.filter((box) => box.right > innerWidth + 1).length,
-		overlap: rects.length === 2 ? Math.round(rects[0].right - rects[1].left) : null,
-		toolsVisible: document.querySelectorAll(".palette button").length,
+		clear: rects.length === 2 ? Math.round(rects[1].left - rects[0].right) : null,
+		// *Visible*, not present: the group folds with `display: none`, and
+		// `querySelectorAll` counts what is hidden as happily as what is not — which is how
+		// this check reported five tools on a phone that was showing none.
+		toolsVisible: [...document.querySelectorAll(".palette button")].filter((b) => b.offsetParent !== null).length,
 	};
 });
-say("both clusters fit the line, with nothing off the right edge", bar.offRight === 0 && bar.overlap < 0, JSON.stringify(bar));
+/*
+ * The two clusters must not touch, which is a stronger claim than "both fit".
+ *
+ * They are floats over a canvas, and two floats overlapping is the one thing a floating
+ * chrome cannot do — there is no z-order that makes it read as anything but a bug. On a
+ * 393px screen with 44px touch targets the left pill came to 305px and ran 42px into the
+ * corner; the name and the hairlines came out of the line, and undo moved into the tools
+ * menu, to buy that back.
+ */
+say("both clusters fit the line, with nothing off the right edge", bar.offRight === 0, JSON.stringify(bar));
+say("…and the two of them do not touch", bar.clear >= 0, `${bar.clear}px between them`);
 say("the tools fold away on a phone rather than pushing the corner off", bar.toolsVisible === 0, JSON.stringify(bar));
 
 // --- 2. pinch on bare stage ---------------------------------------------------------

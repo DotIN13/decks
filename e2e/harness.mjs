@@ -395,28 +395,31 @@ export async function newAgent(page, kind = "pi") {
 	/*
 	 * From the selector under the agent's own name, which is where the list went.
 	 *
-	 * It used to be a `+` in the header of the agents *panel*, and the panel is gone: a
-	 * list you switch with is a selector, so it hangs off the thing it selects. The `New
-	 * agent` row is split in two — the label starts one on the default runtime, and a chevron
-	 * beside it opens the choice — because the runtime cannot change afterwards and this is
-	 * the only moment it can be picked.
+	 * It used to be a `+` in the header of the agents *panel*, and the panel is gone: a list
+	 * you switch with is a selector, so it hangs off the thing it selects.
 	 *
-	 * Rows are counted in the menu rather than as `.chat-row`, since the menu is the only
-	 * place a full list of agents now exists.
+	 * The `New agent` row is two controls. The label starts one on the default runtime; the
+	 * chevron beside it opens `New claude agent` / `New pi agent`, because the runtime cannot
+	 * change afterwards and that is the only moment it can be chosen. So this always goes
+	 * through the chevron and names the runtime — asking for the default by clicking the
+	 * label would make the check's `kind` argument a lie whenever the default changed.
 	 */
 	await openAgents(page);
-	const rows = () => page.locator('.popover [data-row]').count();
-	const before = await rows();
-	await page.locator('.popover [data-row]').last().click();
-	await page.waitForSelector(".popover", { timeout: 6000 });
-	const wanted = page.locator('.popover [data-row]').filter({ hasText: new RegExp(kind, "i") });
-	if ((await wanted.count()) > 0) await wanted.first().click();
-	// The menu closes on the pick, so the new agent is counted with it re-opened.
-	await page.waitForTimeout(600);
+	const rows = () => page.locator(".popover [data-row]");
+	const agentsBefore = await page.evaluate(
+		() => document.querySelectorAll('.popover [data-row][data-flat="true"]').length,
+	);
+	await rows().last().click();
+	await page.locator(".popover [data-row]").filter({ hasText: new RegExp(`^New ${kind} agent`, "i") }).first().click();
+	/*
+	 * Counted with the menu re-opened, because picking closes it — and counted as agent
+	 * *rows* rather than every `[data-row]`, since the `New agent` pair are rows too.
+	 */
+	await page.waitForTimeout(500);
 	await openAgents(page);
 	await page.waitForFunction(
-		(was) => document.querySelectorAll(".popover [data-row]").length > was,
-		before,
+		(was) => document.querySelectorAll('.popover [data-row][data-flat="true"]').length > was,
+		agentsBefore,
 		{ timeout: 15000 },
 	);
 	await page.keyboard.press("Escape");
