@@ -137,6 +137,46 @@
 	}
 
 	/*
+	 * The hover card: always in the document, and only ever unhidden.
+	 *
+	 * Opacity alone, and `visibility` deliberately left out of it.
+	 *
+	 * The obvious pairing is `visibility: hidden` with `visibility 0s linear 120ms` so the
+	 * box leaves the tree at the end of the fade. It does not work: Chromium will not
+	 * transition a discrete property without `transition-behavior: allow-discrete`, so the
+	 * card stayed `visible` indefinitely and the declaration was decoration. What it was
+	 * *for* is already covered twice over — `pointer-events: none` means the transparent box
+	 * takes no clicks, and `aria-hidden` on the element means nothing reads it out. One
+	 * property doing one thing is better than three arranged to look thorough.
+	 *
+	 * **`left` and `top` only transition while it is shown.** Hidden, the card has to jump to
+	 * its new corner: the alternative is a first appearance that slides in from wherever it
+	 * was last left. Shown, those two properties are what carries it from one face to the
+	 * next — which is why the stack holds its exit for 80ms rather than hiding between two
+	 * adjacent faces.
+	 */
+	.agent-hover {
+		opacity: 0;
+		transition: opacity 120ms ease;
+	}
+
+	.agent-hover[data-shown="true"] {
+		opacity: 1;
+		transition:
+			opacity 100ms ease,
+			left 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+			top 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+
+	/* A card that slides is motion for its own sake to anyone who has asked for less of it;
+	   the fade is short enough to keep, and the travel is what goes. */
+	@media (prefers-reduced-motion: reduce) {
+		.agent-hover[data-shown="true"] {
+			transition: opacity 100ms ease;
+		}
+	}
+
+	/*
 	 * The press target around a face in the stack.
 	 *
 	 * A wrapper rather than making the face itself a `<button>`, because the hover card and

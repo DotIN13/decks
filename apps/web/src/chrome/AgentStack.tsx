@@ -1,5 +1,5 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, onCleanup, Show } from "solid-js";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 import { AgentFace, AgentMenu } from "./AgentPill.tsx";
 import { agentOrder, agentStatus, stackFaces, statusWords } from "./agent-order.ts";
@@ -43,10 +43,62 @@ export function AgentStack(props: {
 
 	/** Which face the pointer (or the keyboard) is on, and where it is on screen. */
 	const [over, setOver] = createSignal<{ id: string; at: DOMRect } | undefined>();
-	const hovered = () => props.chats.find((chat) => chat.id === over()?.id);
+	/*
+	 * The last face it was on, kept after the pointer leaves.
+	 *
+	 * The card fades out rather than vanishing, and a card whose content is cleared the
+	 * instant it starts fading is a card that fades out blank. So `over` says whether it is
+	 * *shown* and this says what is *in* it.
+	 */
+	const [last, setLast] = createSignal<{ id: string; at: DOMRect } | undefined>();
+	/*
+	 * What the card holds: the face under the pointer, then the last one it was on, then —
+	 * before any hover at all — the first face in the stack.
+	 *
+	 * The fallback is what makes "always mounted" true rather than nearly true. Without it
+	 * the card is built on the *first* hover and only cheap on every one after, which is the
+	 * hover that gets judged. With it the box exists and has been measured and placed before
+	 * the pointer arrives, so the first show is the same as the fifth.
+	 */
+	const showing = () => {
+		const id = (over() ?? last())?.id;
+		return props.chats.find((chat) => chat.id === id) ?? split().shown[0];
+	};
 
-	const enter = (id: string, event: { currentTarget: Element }) => setOver({ id, at: event.currentTarget.getBoundingClientRect() });
-	const leave = (id: string) => setOver((was) => (was?.id === id ? undefined : was));
+	/*
+	 * Leaving is deferred by a frame or two; arriving cancels it.
+	 *
+	 * Moving the pointer from one face to the next fires `pointerleave` on the first *before*
+	 * `pointerenter` on the second, so clearing on leave made the card blink out and back in
+	 * between two adjacent faces — which is exactly the journey the transition exists to
+	 * make smooth. Holding the exit for 80ms means a move between faces never hides it at
+	 * all, and leaving the stack still puts it away promptly.
+	 */
+	/*
+	 * Where the card sits before anyone has hovered: under the first face.
+	 *
+	 * Measured from the DOM rather than remembered, because the stack's own width changes as
+	 * agents come and go. It only matters for the frames before the first `pointerenter`,
+	 * and it is the difference between the first card appearing where it belongs and sliding
+	 * in from the last place it happened to be placed.
+	 */
+	let strip: HTMLElement | undefined;
+	const initialAnchor = () => strip?.querySelector("button")?.getBoundingClientRect() ?? new DOMRect();
+
+	let exit: ReturnType<typeof setTimeout> | undefined;
+	const enter = (id: string, event: { currentTarget: Element }) => {
+		if (exit !== undefined) clearTimeout(exit);
+		const at = { id, at: event.currentTarget.getBoundingClientRect() };
+		setOver(at);
+		setLast(at);
+	};
+	const leave = (id: string) => {
+		if (exit !== undefined) clearTimeout(exit);
+		exit = setTimeout(() => setOver((was) => (was?.id === id ? undefined : was)), 80);
+	};
+	onCleanup(() => {
+		if (exit !== undefined) clearTimeout(exit);
+	});
 
 	return (
 		<Show when={ordered().length > 0}>
@@ -55,7 +107,7 @@ export function AgentStack(props: {
 			 * strip of chrome, and the one thing a screen reader needs before it reads three
 			 * buttons is what they are three of.
 			 */}
-			<span class="agent-stack" role="group" aria-label="Agents wanting your attention">
+			<span class="agent-stack" role="group" aria-label="Agents wanting your attention" ref={strip}>
 				<For each={split().shown}>
 					{(chat) => {
 						const status = () => agentStatus(chat.state, props.unread[chat.id] ?? 0);
@@ -123,13 +175,22 @@ export function AgentStack(props: {
 				</Show>
 			</span>
 
-			<Show when={hovered()}>
+			{/*
+				One card, mounted for as long as the stack is, and only unhidden on hover.
+				*
+				* Not `<Show when={hovered()}>`: that built the thing at the moment of pointing,
+				* which is a component created, a box measured and two frames waited before
+				* anything was on screen. No delay figure fixes that — it was 400ms, then 120,
+				* and it still read as the app hesitating.
+			*/}
+			<Show when={showing()}>
 				{(chat) => (
 					<AgentHoverCard
 						chat={chat()}
 						identity={props.identities[chat().id]}
 						unread={props.unread[chat().id] ?? 0}
-						anchor={over()?.at ?? new DOMRect()}
+						anchor={(over() ?? last())?.at ?? initialAnchor()}
+						shown={over() !== undefined}
 					/>
 				)}
 			</Show>

@@ -1,6 +1,7 @@
 import type { AgentChat, Identity } from "@decks/protocol";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { Portal } from "solid-js/web";
 import { Icon } from "../icons.tsx";
 import { AgentFace } from "./AgentPill.tsx";
 import { agentStatus, since, statusWords } from "./agent-order.ts";
@@ -31,30 +32,21 @@ export function AgentHoverCard(props: {
 	/** The face's box in viewport coordinates. The card hangs 8px under it, centred. */
 	anchor: DOMRect;
 	/**
-	 * How long the pointer has to stay before it appears.
+	 * Whether it is up.
 	 *
-	 * 120ms, which is about as short as a delay can be while still doing its job — stopping
-	 * a pointer crossing the corner on its way to the zoom chip from summoning three cards
-	 * in passing. It was 400, which is the number tooltips use, and on a control you are
-	 * *aiming at* that reads as the app thinking about it: you have already decided to look
-	 * at the face, and the card is the answer to a question you asked by pointing.
-	 *
-	 * The delay is the card's own rather than the stack's, so the caller only has to say
-	 * *which* face is hovered and never has to own a timer.
+	 * The card is **always mounted** and this only unhides it, which is the whole reason it
+	 * feels immediate. Mounting on hover meant a component created, a layout measured and
+	 * two frames waited before anything appeared, and no delay figure could fix that — it
+	 * was 400ms, then 120, and it still read as the app thinking about it. Nothing is built
+	 * at the moment of pointing now; the box is already there and already the right size.
 	 */
-	delay?: number;
+	shown: boolean;
 }) {
-	const [ready, setReady] = createSignal(false);
 	const [at, setAt] = createSignal<{ left: number; top: number } | undefined>();
 	let card: HTMLDivElement | undefined;
 
 	const status = () => agentStatus(props.chat.state, props.unread);
 	const name = () => props.identity?.name ?? props.chat.name;
-
-	onMount(() => {
-		const timer = setTimeout(() => setReady(true), props.delay ?? 120);
-		onCleanup(() => clearTimeout(timer));
-	});
 
 	/*
 	 * Measured after mount rather than placed in CSS, for the same reason `Popover` is: the
@@ -75,27 +67,42 @@ export function AgentHoverCard(props: {
 		setAt({ left, top });
 	};
 
+	/*
+	 * Placed whenever the face under the pointer changes, and whenever the name in it does.
+	 *
+	 * One frame, not two: the card exists already, so the only thing worth waiting for is
+	 * the new text having changed its width. Reading `props.anchor` and `name()` here is
+	 * what makes this run — moving from one face to the next is a new anchor, and the
+	 * transition in `agents.css` turns the difference into a slide rather than a jump.
+	 */
 	createEffect(() => {
-		if (!ready()) return;
-		// Two frames: one for the card to exist, one for the fonts to have settled its height.
-		requestAnimationFrame(() => {
-			place();
-			requestAnimationFrame(place);
-		});
+		props.anchor;
+		name();
+		requestAnimationFrame(place);
+	});
+
+	onMount(() => {
 		window.addEventListener("resize", place);
 		onCleanup(() => window.removeEventListener("resize", place));
 	});
 
 	return (
-		<Show when={ready()}>
+		/*
+		 * Portaled, for the reason `Popover` is: a `position: fixed` box inside a transformed
+		 * ancestor is placed against that ancestor, and nothing about the corner promises to
+		 * stay untransformed.
+		 */
+		<Portal>
 			<div
 				ref={card}
+				data-shown={props.shown ? "true" : "false"}
+				aria-hidden={!props.shown}
 				/*
 				 * `pointer-events-none`: it is a hover card and not a menu, so there is nothing
 				 * in it to press — and a 220px box floating over the canvas that swallowed
 				 * clicks would be a dead patch beside the corner.
 				 */
-				class="popover pointer-events-none flex w-[220px] flex-col gap-[5px] rounded-[10px] px-2.5 py-[9px]"
+				class="popover agent-hover pointer-events-none flex w-[220px] flex-col gap-[5px] rounded-[10px] px-2.5 py-[9px]"
 				role="tooltip"
 				style={{
 					left: `${at()?.left ?? 0}px`,
@@ -135,6 +142,6 @@ export function AgentHoverCard(props: {
 					Click to switch to {name()}
 				</div>
 			</div>
-		</Show>
+		</Portal>
 	);
 }
