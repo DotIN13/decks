@@ -1,6 +1,7 @@
 import type { Board, Camera } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, onMount } from "solid-js";
-import { boxOf, fit, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
+import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
+import { canvasBox } from "../lib/insets.ts";
 import { BoardFrame } from "./BoardFrame.tsx";
 import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
@@ -66,6 +67,17 @@ export function Stage(props: {
 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
 	const [panning, setPanning] = createSignal(false);
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
+
+	/*
+	 * Fit into the canvas column rather than into the whole stage.
+	 *
+	 * Every `fit` on this page goes through here, which is the point: the stage element is
+	 * the full window, and half of what it framed used to end up behind a panel. What the
+	 * boards should be framed into is the window minus the chrome standing beside it, and
+	 * `lib/insets.ts` is the only thing that knows how much that is.
+	 */
+	const frame = (boxes: Array<{ x: number; y: number; w: number; h: number }>) =>
+		fitInto(boxes, view(), canvasBox(view()));
 
 	onMount(() => {
 		const measure = () => {
@@ -140,11 +152,11 @@ export function Stage(props: {
 		}
 		switch (key) {
 			case "0":
-				props.setCamera(fit(props.boards.map(boxOf), view()));
+				props.setCamera(frame(props.boards.map(boxOf)));
 				return true;
 			case "1": {
 				const board = props.boards.find((candidate) => candidate.path === props.selected) ?? props.boards[0];
-				if (board) props.setCamera(fit([boxOf(board)], view()));
+				if (board) props.setCamera(frame([boxOf(board)]));
 				return true;
 			}
 			case "+":
@@ -391,7 +403,7 @@ export function Stage(props: {
 	createEffect(() => {
 		if (fitted || props.boards.length === 0 || view().width === 0) return;
 		fitted = true;
-		props.setCamera(fit(props.boards.map(boxOf), view()));
+		props.setCamera(frame(props.boards.map(boxOf)));
 	});
 
 	return (
@@ -427,7 +439,7 @@ export function Stage(props: {
 							onSelect={() => props.onSelect(board.path)}
 							onMove={(x, y) => props.onMove(board.path, x, y)}
 							{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
-							onOpen={() => props.setCamera(fit([boxOf(board)], view()))}
+							onOpen={() => props.setCamera(frame([boxOf(board)]))}
 						/>
 					)}
 				</For>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { breathingRoom, clampZoom, fit, keepVisible, MAX_ZOOM, MIN_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
+import { breathingRoom, clampZoom, EDGE_FLOOR, fit, fitInto, keepVisible, MAX_ZOOM, MIN_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
 
 const view = { width: 1200, height: 800 };
 
@@ -129,4 +129,50 @@ test("a box too big for the room left is aligned to its top left, where reading 
 	const moved = keepVisible(camera, view, tall, { top: 40, bottom: 300 });
 	const top = toScreen(moved, view, { x: tall.x, y: tall.y });
 	assert.ok(Math.abs(top.y - 40) < 1e-6, `the top of the box is at ${top.y}`);
+});
+
+/*
+ * `fitInto` — fitting into the canvas column rather than into the window.
+ *
+ * The regression these guard is the one `EDGE_FLOOR` is named for: padding counted on top
+ * of the panels, so a flown-to board landed under `INTERACT_ZOOM` and could not be clicked.
+ */
+test("fitInto with no chrome is fit", () => {
+	const view = { width: 1400, height: 900 };
+	const box = { x: 0, y: 0, w: 700, h: 450 };
+	const a = fit([box], view);
+	const b = fitInto([box], view, { x: 0, y: 0, width: 1400, height: 900 });
+	assert.equal(b.zoom, a.zoom);
+	assert.equal(b.x, a.x);
+	assert.equal(b.y, a.y);
+});
+
+test("fitInto zooms to the region, not the window", () => {
+	const view = { width: 1400, height: 900 };
+	const box = { x: 0, y: 0, w: 1000, h: 500 };
+	const region = { x: 276, y: 52, width: 800, height: 800 };
+	const camera = fitInto([box], view, region);
+	// 800 wide minus a 24px floor each side, over 1000 of board.
+	assert.equal(camera.zoom, (800 - EDGE_FLOOR * 2) / 1000);
+});
+
+test("fitInto puts the content in the middle of the region, not of the window", () => {
+	const view = { width: 1400, height: 900 };
+	const box = { x: 0, y: 0, w: 200, h: 200 };
+	// A left panel only: the region's centre is left of the window's, so the camera has to
+	// look right of the content for the content to appear centred in the region.
+	const region = { x: 400, y: 0, width: 1000, height: 900 };
+	const camera = fitInto([box], view, region);
+	const screenCentreOfRegion = region.x + region.width / 2;
+	const at = toScreen(camera, view, { x: 100, y: 100 });
+	assert.ok(Math.abs(at.x - screenCentreOfRegion) < 0.001, `content centred at ${at.x}, region at ${screenCentreOfRegion}`);
+});
+
+test("a board flown to inside the chrome stays above INTERACT_ZOOM", () => {
+	// The actual failure: 1400x900 window, 264px panel and a 320px inspector, one 1600px
+	// board. With `breathingRoom` added on top of the panels this came out at 0.42.
+	const view = { width: 1400, height: 900 };
+	const region = { x: 288, y: 52, width: 1400 - 288 - 344, height: 900 - 52 - 12 };
+	const camera = fitInto([{ x: 0, y: 0, w: 1600, h: 1000 }], view, region);
+	assert.ok(camera.zoom >= 0.4, `zoom ${camera.zoom}`);
 });

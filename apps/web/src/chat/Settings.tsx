@@ -78,7 +78,7 @@ export function Settings(props: {
 				role="dialog"
 				aria-label="Settings"
 			>
-				<header class="flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3 text-[11px] tracking-[0.04em] text-muted uppercase">
+				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
 					<span>Claude accounts</span>
 					<span class="flex-1" />
 					<button class="icon-button" type="button" title="Close" aria-label="Close" onClick={props.onClose}>

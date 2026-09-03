@@ -86,9 +86,23 @@ export function watchInsets(root: HTMLElement = document.body): void {
 			if (edge === "bottom") next.bottom = Math.max(next.bottom, view.height - r.top);
 		}
 		const now = insets();
-		if (now.left !== next.left || now.right !== next.right || now.top !== next.top || now.bottom !== next.bottom) {
-			setInsets(next);
-		}
+		if (now.left === next.left && now.right === next.right && now.top === next.top && now.bottom === next.bottom) return;
+		setInsets(next);
+		/*
+		 * Published as custom properties as well as a signal, so that the parts of the
+		 * layout which are genuinely CSS can stay CSS.
+		 *
+		 * The dock is the reason: it centres on the canvas column, and expressing that as
+		 * `calc()` over these four numbers means the browser animates the slide and reflows
+		 * it on resize without a single line of JavaScript in the path. A component that
+		 * needs to *decide* something reads the signal; a rule that needs to *measure*
+		 * something reads these.
+		 */
+		const root = document.documentElement.style;
+		root.setProperty("--inset-left", `${next.left}px`);
+		root.setProperty("--inset-right", `${next.right}px`);
+		root.setProperty("--inset-top", `${next.top}px`);
+		root.setProperty("--inset-bottom", `${next.bottom}px`);
 	};
 
 	const sync = () => {

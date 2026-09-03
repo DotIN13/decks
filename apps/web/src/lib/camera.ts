@@ -169,4 +169,50 @@ export function fit(
 	return { x: (left + right) / 2, y: (top + bottom) / 2, zoom };
 }
 
+/**
+ * The smallest gap left between a board and the chrome beside it.
+ *
+ * This constant is a bug fix with a name. `fit` pads by `breathingRoom`, up to 96px a
+ * side, which is right when the whole window is the canvas — and wrong once the chrome
+ * insets it, because then the padding is counted *on top of* a 264px panel and a 240px
+ * inspector. A board flown to on a laptop landed at 42%, below `INTERACT_ZOOM`, where a
+ * board takes no pointer events: clicking the thing you had just asked to look at did
+ * nothing at all.
+ *
+ * **The chrome is the breathing room.** So when there is chrome to subtract, all that is
+ * wanted is a floor — enough that a board does not appear to touch a panel's edge.
+ */
+export const EDGE_FLOOR = 24;
+
+/**
+ * A camera that fits the boxes into a *region* of the viewport rather than into all of it.
+ *
+ * The region is the canvas column: the window minus whatever the chrome is covering, which
+ * `lib/insets.ts` measures. Two things follow, and only the first is obvious.
+ *
+ * The zoom comes from the region, not the window — otherwise `fit` frames boards into a
+ * width that includes 500px of panel and half of what it framed is behind one.
+ *
+ * And the camera has to be *offset*, which is the part that is easy to miss: `camera.x` is
+ * the world point under the centre of the **viewport**, but what should sit at the centre
+ * of the region is the content. When the region is off-centre — a left panel and no right
+ * one — those are different points, and the difference is a screen distance, so it divides
+ * by the zoom to become a world one.
+ */
+export function fitInto(
+	boxes: Array<{ x: number; y: number; w: number; h: number }>,
+	view: Viewport,
+	region: { x: number; y: number; width: number; height: number },
+): Camera {
+	if (boxes.length === 0 || region.width === 0 || region.height === 0) return { x: 0, y: 0, zoom: 1 };
+	const inset = region.width < view.width || region.height < view.height;
+	const padding = inset ? EDGE_FLOOR : breathingRoom(view);
+	const framed = fit(boxes, { width: region.width, height: region.height }, padding);
+	return {
+		zoom: framed.zoom,
+		x: framed.x - (region.x + region.width / 2 - view.width / 2) / framed.zoom,
+		y: framed.y - (region.y + region.height / 2 - view.height / 2) / framed.zoom,
+	};
+}
+
 export const boxOf = (board: Board) => ({ x: board.x, y: board.y, w: board.w, h: board.h });

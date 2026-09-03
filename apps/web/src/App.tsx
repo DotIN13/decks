@@ -45,7 +45,8 @@ import { Dialog } from "./chat/Dialog.tsx";
 import { FloatingTranscript } from "./chat/FloatingTranscript.tsx";
 import { Composer } from "./chat/Composer.tsx";
 import { TurnBar, turnsOf, type Turn } from "./chat/TurnBar.tsx";
-import { boxOf, fit, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
+import { boxOf, fitInto, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
+import { canvasBox, watchInsets } from "./lib/insets.ts";
 import { connect, type Socket } from "./lib/socket.ts";
 import { embedPath, uploadAsset } from "./lib/upload.ts";
 import { canHover, createPanels, NARROW } from "./lib/panels.ts";
@@ -254,6 +255,15 @@ export function App() {
 			},
 		};
 	};
+
+	/*
+	 * Start measuring the chrome.
+	 *
+	 * Before the socket, deliberately: the first `deck.state` can arrive with boards in it
+	 * and trigger the opening fit, and a fit that runs before anything has been measured
+	 * frames into the whole window and then never runs again.
+	 */
+	onMount(() => watchInsets());
 
 	onMount(() => {
 		socket = connect(setConnected);
@@ -1044,7 +1054,8 @@ export function App() {
 		setSelected(board.path);
 		const stage = document.querySelector(".stage");
 		if (!stage) return;
-		setCamera(fit([boxOf(board)], { width: stage.clientWidth, height: stage.clientHeight }));
+		const view = { width: stage.clientWidth, height: stage.clientHeight };
+		setCamera(fitInto([boxOf(board)], view, canvasBox(view)));
 	};
 
 	/**
@@ -1481,5 +1492,6 @@ function sizeLabel(bytes: number): string {
 function fitAll(boards: Board[], setCamera: (camera: Camera) => void): void {
 	const stage = document.querySelector(".stage");
 	if (!stage) return;
-	setCamera(fit(boards.map(boxOf), { width: stage.clientWidth, height: stage.clientHeight }));
+	const view = { width: stage.clientWidth, height: stage.clientHeight };
+	setCamera(fitInto(boards.map(boxOf), view, canvasBox(view)));
 }

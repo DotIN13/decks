@@ -148,8 +148,8 @@ export function CanvasOps(props: { onClose: () => void }) {
 				role="dialog"
 				aria-label="What you can do on the canvas"
 			>
-				<header class="flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3 text-[11px] tracking-[0.04em] text-muted uppercase">
-					<span>on the canvas</span>
+				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
+					<span>On the canvas</span>
 					<span class="flex-1" />
 					<button class="icon-button" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
 						<Icon of={X} size={16} />

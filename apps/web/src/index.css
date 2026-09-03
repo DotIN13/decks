@@ -608,9 +608,18 @@ svg.lucide {
 	justify-content: space-between;
 	gap: 6px;
 	color: var(--faint);
-	font-size: 11px;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
+	/*
+	 * Sentence case, and this is the settled rule rather than a preference.
+	 *
+	 * It was 11px uppercase at 0.04em, which is one of six places in this app that used
+	 * the same treatment for three different jobs — a decorative kicker, a label someone
+	 * reads in order to act, and a live count. At that tracking the eye reads letters
+	 * rather than words, and some screen readers announce a long uppercase run letter by
+	 * letter. See `.label` and `.meta` in `styles/chrome.css`, which is what replaced it:
+	 * 11.5px, weight 500, no tracking, and split by job.
+	 */
+	font-size: 11.5px;
+	font-weight: 500;
 }
 
 .rail .rail-head {
@@ -1014,30 +1023,39 @@ svg.lucide {
 .dock {
 	position: absolute;
 	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
-	left: 50%;
+	/* Centred on the canvas column, not on the window — see the note below. */
+	left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
+	/* It slides when a panel opens. Fast enough not to be a wait, slow enough to read as
+	   the bar moving rather than jumping to a new place. */
+	transition: left 160ms ease;
 	display: flex;
 	/*
-	 * Centred on the window, not on the gap beside the rail.
+	 * Centred on the canvas column: the window minus whatever the chrome is covering.
 	 *
-	 * It used to sit off-centre, which was exact rather than arbitrary — half the
-	 * difference between the two panels that used to flank it. The trouble is that they
-	 * are away by default (§7), so the measurement was right for the rare arrangement
-	 * and visibly off-centre for the usual one, which reads as a bug in the thing you
-	 * type into. Anchoring it to the rail's *state* instead would be worse: it opens on
-	 * cursor proximity, so the input bar would slide sideways as you reached for it.
+	 * It used to be centred on the *window* with twice-224px subtracted from its width —
+	 * a constant standing in for the board rail plus its margins. That was exact for one
+	 * arrangement and wrong for every other, and it is the mistake `lib/insets.ts` exists
+	 * to stop: a panel's width stated twice drifts the first time someone changes its
+	 * padding.
 	 *
-	 * Centred, the dock has to clear the widest thing beside it on *both* sides, and
-	 * with the transcript sheet gone that thing is the 200px board rail (plus its 12px
-	 * margin and a 12px gutter) — hence twice 224. The conversation is no longer in this
-	 * sum at all: it floats over the boards and stops above the dock (`--dock`, measured
-	 * in `App`), so it has nothing to be cleared horizontally.
+	 * Anchoring it to a panel's *state* used to be worse than the constant, because the
+	 * panel opened on cursor proximity and the bar would have slid sideways as you
+	 * reached for it. Proximity is gone — the panel has a button now — so a slide is a
+	 * response to something you pressed, which is legible, and 160ms is enough to read it
+	 * as movement.
 	 *
-	 * Under about 770px that width is a negative number — the dock was 0 pixels across
-	 * on a phone, which is not a degraded input bar but an invisible one — so the clamp
-	 * stops it going below something usable. Under 1100px the media query at the end of
-	 * this file goes full-width instead, which is where that clamp stops mattering.
+	 * **The conversation is deliberately not in this sum.** It floats over the boards
+	 * rather than insetting them, so summoning it never moves the bar. Only the left
+	 * panel and the inspector are subtracted, because those two stand *beside* the
+	 * canvas — and the inspector arrives on its own, which is the whole reason it insets
+	 * and the conversation does not.
+	 *
+	 * The 64px is a gutter, and the clamp is a floor: under about 770px the subtraction
+	 * goes negative, and a dock 0 pixels across is not a degraded input bar but an
+	 * invisible one. Under 1100px the media query at the end of this file goes full-width
+	 * instead, which is where the floor stops mattering.
 	 */
-	width: min(720px, max(320px, calc(100% - 448px)));
+	width: min(720px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));
 	flex-direction: column;
 	align-items: stretch;
 	gap: 8px;
@@ -1947,9 +1965,10 @@ svg.lucide {
 	gap: 8px;
 	margin: 10px 2px 4px;
 	color: var(--muted);
-	font-size: 10px;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
+	/* Sentence case — see the note on `.rail-head`. The hairline after it does the
+	   separating that the tracking was failing to do. */
+	font-size: 11.5px;
+	font-weight: 500;
 }
 
 .chats .earlier::after {

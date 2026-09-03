@@ -93,7 +93,7 @@ export function Dialog(props: {
 					{/* The tool's own 12-character chip: what the question is *about*, above what it asks. */}
 					<Show when={choose().message}>
 						{(header) => (
-							<div class="mb-1 text-[10px] tracking-[0.06em] text-faint uppercase">{header()}</div>
+							<div class="meta mb-1">{header()}</div>
 						)}
 					</Show>
 					<div class="font-semibold">{choose().title}</div>
