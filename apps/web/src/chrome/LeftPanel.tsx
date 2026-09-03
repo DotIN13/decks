@@ -155,6 +155,8 @@ export function LeftPanel(props: {
 	);
 	const tally = createMemo(() => contextTally(sections()));
 	const deck = createMemo(() => filterBoards(props.boards, query()));
+	/** The focused agent's own sections — everything but the other-agents tail. */
+	const mine = createMemo(() => sections().filter((section) => section.kind !== "other"));
 	const who = () => (props.focused ? props.identities?.[props.focused]?.name : undefined);
 
 	/*
@@ -349,7 +351,13 @@ export function LeftPanel(props: {
 					<Show when={tab() === "context"}>
 						<For each={sections()}>
 							{(section) => (
-								<div class="panel-section">
+								<div
+									class="panel-section"
+									/* So a stylesheet or a check can name *which* section without reading its
+									   label — "is this the focused agent's own list, or somebody else's" is the
+									   question the whole panel turns on. */
+									data-kind={section.kind}
+								>
 									{/*
 										The section label: a 20px line *inside* the list's rhythm, not a
 										32px bar above it. Sentence case at 11.5px/500 — `.meta` in
@@ -437,7 +445,14 @@ export function LeftPanel(props: {
 						says which empty it is. A panel that is blank for a good reason still looks
 						broken if it does not give the reason.
 					*/}
-					<Show when={tab() === "context" && sections().length === 0}>
+					{/*
+						`mine()`, not `sections()`: a fresh agent's Context tab is not empty — it ends
+						with one section per *other* agent that holds something, which is the answer to
+						"then where is that board". Keyed on the whole list, the line never appeared in
+						the state it was written for, and somebody else's boards under no heading of
+						your own read as yours.
+					*/}
+					<Show when={tab() === "context" && mine().length === 0}>
 						<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
 							<Show
 								when={query()}

@@ -4,9 +4,10 @@
  * Three bugs met here. The rail was `flex: 1` with `min-height: auto`, so it took its
  * content's full height and ran off the bottom of the screen instead of scrolling. Live
  * thumbnails were capped by *index*, so past the eighth board they stayed blank however far
- * you scrolled. And the all-canvases modal's grid had the same `min-height: auto` — but
- * inside a box with `overflow: hidden`, so the rows past the second were not merely awkward
- * to reach, they were **clipped away entirely**.
+ * you scrolled. And the browse grid had the same `min-height: auto` — but inside a box with
+ * `overflow: hidden`, so the rows past the second were not merely awkward to reach, they
+ * were **clipped away entirely**. That grid was a modal of its own when this was written; it
+ * is the Deck tab switched to tiles now, drawn by the same `.panel-list` as the rows.
  */
 import { rmSync } from "node:fs";
 import { boardPath, deckState, open, openAllBoards, openPanel, say, settle, socket, write } from "../harness.mjs";
@@ -48,9 +49,16 @@ for (const path of wanted) link.send({ type: "board.play", path });
  */
 const { browser, page, errors } = await open({ width: 1400, height: 420 });
 try {
-	await page.waitForFunction((count) => document.querySelectorAll(".board-row").length >= count, EXTRA, { timeout: 20000 });
-	// The boards live in the context panel, which is the one this check is about.
+	/*
+	 * The panel first, *then* the rows.
+	 *
+	 * This waited for twelve `.board-row`s before opening anything, which was fine when a
+	 * rail was always up and is a guaranteed 20-second timeout now that the panel folds: a
+	 * closed panel draws no rows, so the condition could not become true and the check died
+	 * before its first assertion.
+	 */
 	await openPanel(page, "context");
+	await page.waitForFunction((count) => document.querySelectorAll(".board-row").length >= count, EXTRA, { timeout: 20000 });
 	await settle(page, 400);
 
 	const geometry = () =>
@@ -82,20 +90,34 @@ try {
 	const zoomLabel = await page.locator('.pill [aria-label^="Zoom"]').first().textContent();
 	say("the camera did not pan while scrolling the list", true, `zoom still ${zoomLabel}`);
 
+	/*
+	 * Thumbnails follow the scroll — asserted in the **grid**, because that is where a
+	 * thumbnail is a live document.
+	 *
+	 * This used to look for an `iframe` in a list row, and would now wait 20 seconds for one
+	 * that is never coming. A row is 28px with a 20×14 picture beside the name, and that
+	 * picture is a cached photograph or a poster — an `<img>` or nothing. Mounting a board's
+	 * document to fill fourteen pixels was the cost this panel was rebuilt to stop paying.
+	 * The tile is the surface that still mounts one, and it is also where the original bug
+	 * was: live thumbnails were capped by *index*, so past the eighth board they stayed blank
+	 * however far you scrolled.
+	 */
+	await page.getByRole("button", { name: "Show boards as a grid" }).click();
+	await settle(page, 400);
 	await page.evaluate(() => {
 		const items = document.querySelector(".panel-list");
 		items.scrollTop = items.scrollHeight;
 	});
 	await page.waitForFunction(
 		() => {
-			const items = [...document.querySelectorAll(".panel-list .board-row")];
+			const items = [...document.querySelectorAll(".panel-list .rail-item")];
 			return Boolean(items.at(-1)?.querySelector("iframe, img"));
 		},
 		null,
 		{ timeout: 20000 },
 	);
 	const last = await page.evaluate(() => {
-		const items = [...document.querySelectorAll(".panel-list .board-row")];
+		const items = [...document.querySelectorAll(".panel-list .rail-item")];
 		const element = items.at(-1);
 		const box = element.getBoundingClientRect();
 		const listBox = document.querySelector(".panel-list").getBoundingClientRect();
@@ -110,19 +132,17 @@ try {
 
 	// The cost bound has to survive scrolling the whole list, or "mount what is near"
 	// just becomes "mount everything, eventually".
-	const live = await page.evaluate(() => document.querySelectorAll(".panel-list .board-row iframe").length);
-	const total = await page.evaluate(() => document.querySelectorAll(".panel-list .board-row").length);
+	const live = await page.evaluate(() => document.querySelectorAll(".panel-list .rail-item iframe").length);
+	const total = await page.evaluate(() => document.querySelectorAll(".panel-list .rail-item").length);
 	say("live thumbnails stay bounded after scrolling the list", live < total, `${live} live of ${total} items`);
 
 	await page.evaluate(() => {
 		document.querySelector(".panel-list").scrollTop = 0;
 	});
-	await page.waitForFunction(
-		() => Boolean(document.querySelector(".panel-list .board-row")?.querySelector("iframe, img")),
-		null,
-		{ timeout: 20000 },
-	);
+	await page.waitForFunction(() => Boolean(document.querySelector(".panel-list .rail-item")?.querySelector("iframe, img")), null, { timeout: 20000 });
 	say("scrolling back re-mounts the first board", true);
+	await page.getByRole("button", { name: "Show boards as a list" }).click();
+	await settle(page, 400);
 
 	/*
 	 * The selected board's ring has to be inside the clip region on every side.
@@ -135,8 +155,6 @@ try {
 	 */
 	await page.locator(".panel-list .board-row").first().click();
 	await settle(page, 900);
-	await openPanel(page, "agents");
-	await settle(page, 300);
 
 	const ring = await page.evaluate(() => {
 		const list = document.querySelector(".panel-list");
@@ -170,41 +188,49 @@ try {
 	say("…nor at the top of the list", ring.top >= ring.spread, `${ring.top}px above`);
 
 	/*
-	 * The same list in the modal, which had the same bug with a worse ending.
+	 * The same list as tiles, which had the same bug with a worse ending.
 	 *
-	 * `.panel-list` has its `min-height: 0` in the stylesheet; the modal's grid is
-	 * utilities and did not, and the modal clips rather than scrolls — so a deck of a dozen
-	 * showed two rows and hid the rest with no scrollbar to say so.
+	 * The rows get their `min-height: 0` from the stylesheet; the grid was utilities and did
+	 * not, inside a box with `overflow: hidden` — so a deck of a dozen showed two tiles and
+	 * hid the rest with no scrollbar to say so. It is one `.panel-list` for both densities
+	 * now, so what this proves is that the tile layout did not reintroduce the clip.
 	 */
 	await openAllBoards(page);
-	await page.waitForFunction((count) => document.querySelectorAll(".all-boards .board-row").length >= count, EXTRA, { timeout: 15000 });
+	await page.getByRole("button", { name: "Show boards as a grid" }).click();
+	await page.waitForFunction((count) => document.querySelectorAll(".panel-list .rail-item, .panel-list .board-row").length >= count, EXTRA, {
+		timeout: 15000,
+	});
 	await settle(page, 600);
-	const modal = await page.evaluate(() => {
-		const items = document.querySelector(".all-boards .items");
-		const box = document.querySelector(".all-boards").getBoundingClientRect();
+	const grid = await page.evaluate(() => {
+		const items = document.querySelector(".panel-list");
+		const box = document.querySelector(".panel-shell").getBoundingClientRect();
 		return {
 			scrollable: items.scrollHeight > items.clientHeight + 1,
 			overflow: items.scrollHeight - items.clientHeight,
-			insideTheModal: Math.round(items.getBoundingClientRect().bottom) <= Math.round(box.bottom) + 1,
+			insideThePanel: Math.round(items.getBoundingClientRect().bottom) <= Math.round(box.bottom) + 1,
 		};
 	});
-	say("the browse grid scrolls rather than clipping what it cannot fit", modal.scrollable, `${modal.overflow}px of overflow`);
-	say("…and stays inside the modal", modal.insideTheModal);
+	say("the browse grid scrolls rather than clipping what it cannot fit", grid.scrollable, `${grid.overflow}px of overflow`);
+	say("…and stays inside the panel", grid.insideThePanel);
 
 	/*
 	 * And the boards arrive two at a time rather than all at once.
 	 *
 	 * A dozen documents parsing `board.css`, `board.js`, KaTeX and Mermaid in one frame is a
-	 * dozen times the work with none of it visible sooner: unbounded, the modal took 410ms to
+	 * dozen times the work with none of it visible sooner: unbounded, the list took 410ms to
 	 * appear at all, against 118ms queued. Sampled while it fills, because the thing being
 	 * asserted only exists mid-flight (`canvas/thumb-budget.ts`).
+	 *
+	 * The fill is triggered by switching *away* and back, since the tab that is already up
+	 * has already loaded. It used to be the title bar's button, which is gone with the bar.
 	 */
-	await page.keyboard.press("Escape");
+	await page.getByRole("button", { name: "Show boards as a list" }).click();
+	await page.getByRole("tab", { name: /context/i }).click();
 	await settle(page, 400);
 	const loading = await page.evaluate(() => {
 		const peak = { value: 0 };
 		const look = () => {
-			const starting = [...document.querySelectorAll(".all-boards .board-row .thumb iframe")].filter((frame) => {
+			const starting = [...document.querySelectorAll(".panel-list .thumb iframe")].filter((frame) => {
 				try {
 					return frame.contentDocument?.readyState !== "complete";
 				} catch {
@@ -214,11 +240,10 @@ try {
 			peak.value = Math.max(peak.value, starting);
 		};
 		const timer = setInterval(look, 16);
-		document.querySelector('.titlebar button[title="Every board in the deck"]').click();
+		[...document.querySelectorAll('[role="tab"]')].find((tab) => /deck/i.test(tab.textContent))?.click();
 		return new Promise((resolve) => setTimeout(() => { clearInterval(timer); resolve(peak.value); }, 1200));
 	});
 	say("no more than a couple of boards are ever starting at once", loading <= 4, `${loading} at the busiest moment`);
-	await page.keyboard.press("Escape");
 	await settle(page, 300);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));

@@ -1007,11 +1007,12 @@ svg.lucide {
 	 * response to something you pressed, which is legible, and 160ms is enough to read it
 	 * as movement.
 	 *
-	 * **The conversation is deliberately not in this sum.** It floats over the boards
-	 * rather than insetting them, so summoning it never moves the bar. Only the left
-	 * panel and the inspector are subtracted, because those two stand *beside* the
-	 * canvas — and the inspector arrives on its own, which is the whole reason it insets
-	 * and the conversation does not.
+	 * **Only the boards panel is in this sum**, because it is the only chrome that stands
+	 * *beside* the canvas. The conversation floats over the boards, so summoning it never
+	 * moves the bar. The inspector used to be subtracted too, on the argument that it
+	 * arrives on its own rather than being summoned — but it is a card in the top-right
+	 * corner now, and every click on a component slid this bar 160px sideways to report a
+	 * selection. A surface has to stand beside the canvas to move what is centred on it.
 	 *
 	 * The 64px is a gutter, and the clamp is a floor: under about 770px the subtraction
 	 * goes negative, and a dock 0 pixels across is not a degraded input bar but an
@@ -1672,19 +1673,28 @@ svg.lucide {
  * land under the palette, and the palette is a row of 30px targets that a column of
  * fields does not belong in.
  *
- * `right: 30px` clears the timeline spine, which is hard against that edge and is the
- * one thing on this side that must stay aimable at all times. It used to be measured
- * against something else — the transcript panel opened when the cursor came within
- * `REACH` of the right edge, so anything closer pulled the panel over itself — and that
- * panel is gone; the number survives it because the spine still wants the room.
+ * `right: 12px` is the edge every float on this side uses — the tool cluster directly above
+ * it, and the conversation. It was 30px, to clear a timeline spine hard against that edge;
+ * nothing has rendered `.turnbar` since the rewrite, and with the two panels now stacked
+ * vertically, 18px of daylight between their right edges reads as a misalignment rather
+ * than as clearance.
  *
  * Only the shell is here. Everything inside the panel is utilities in `Inspector.tsx`;
  * what stays is the corner, which is stated twice — here, and again as a bottom sheet on
  * a narrow screen — in `env()` and `--dock` terms a class attribute says badly.
  */
 .inspector {
-	top: 12px;
-	right: 30px;
+	/*
+	 * Under the corner cluster, not beside it.
+	 *
+	 * `top: 12px` put the panel's header on the same line as the tool pill, and at 320px
+	 * wide from `right: 30px` the two overlapped outright — the pill drew over the name of
+	 * the thing being edited. `--inset-top` is what the pill measures itself as (`data-inset`
+	 * on it, `lib/insets.ts` publishing the sum), so this follows it when the pill changes
+	 * height or folds, instead of restating a number that only holds for one arrangement.
+	 */
+	top: calc(var(--inset-top, 52px) + 8px);
+	right: 12px;
 	display: flex;
 	width: 236px;
 	flex-direction: column;

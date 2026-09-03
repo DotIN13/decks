@@ -145,8 +145,7 @@ export function Corner(props: {
 				>
 					<button type="button" role="menuitem" data-row data-flat="true" onClick={() => props.onFit()}>
 						<Icon of={Maximize} size={13} class="flex-none text-muted" />
-						<span class="lb flex-1 font-normal">Fit what is on the canvas</span>
-						<span class="meta flex-none text-[10px]">0</span>
+						<span class="lb flex-1 font-normal">Fit boards</span>
 					</button>
 
 					<For each={STOPS}>
@@ -169,12 +168,14 @@ export function Corner(props: {
 					{/* The two steps, so the menu is also the place a trackpad-less machine
 					    zooms. The factor is the wheel's own, not a rounder number, so pressing
 					    a row and rolling a wheel land on the same stops. */}
-					<button type="button" role="menuitem" data-row data-flat="true" onClick={() => props.onZoom(clamp(props.zoom * STEP))}>
+					{/* `data-keep-open`: a stepper is pressed more than once, so the menu it lives in
+					    has to survive the press. Every other row here closes it. */}
+					<button type="button" role="menuitem" data-row data-keep-open data-flat="true" onClick={() => props.onZoom(clamp(props.zoom * STEP))}>
 						<Icon of={ZoomIn} size={13} class="flex-none text-muted" />
 						<span class="lb flex-1 font-normal">Zoom in</span>
 						<span class="meta flex-none text-[10px]">⌘=</span>
 					</button>
-					<button type="button" role="menuitem" data-row data-flat="true" onClick={() => props.onZoom(clamp(props.zoom / STEP))}>
+					<button type="button" role="menuitem" data-row data-keep-open data-flat="true" onClick={() => props.onZoom(clamp(props.zoom / STEP))}>
 						<Icon of={ZoomOut} size={13} class="flex-none text-muted" />
 						<span class="lb flex-1 font-normal">Zoom out</span>
 						<span class="meta flex-none text-[10px]">⌘-</span>

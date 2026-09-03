@@ -34,16 +34,15 @@ const LABEL = "w-[34px] flex-none text-[11px] text-faint";
  * Whether the panel is a bottom sheet rather than a float in the corner.
  *
  * `index.css` already makes it one under 760px and does it properly, in `env()` and
- * `--dock` terms. This signal exists because **two things about a sheet cannot be said in
- * CSS at all.** It must not carry `data-inset`, since `lib/insets.ts` subtracts whatever the
- * chrome declares and a sheet covers the canvas rather than standing beside it —
- * subtracting one once fitted a 1600px board into the strip above it at 3.7%. And it must
- * not carry this file's `w-[320px]`, because a utility beats the component layer *inside* a
- * media query as well as outside one (see the long note at the top of `index.css`), so the
- * `width: auto` the sheet asks for would silently lose to the width the corner asks for.
+ * `--dock` terms. This signal exists because one thing about a sheet cannot be said in CSS
+ * at all: it must not carry this file's `w-[320px]`, because a utility beats the component
+ * layer *inside* a media query as well as outside one (see the long note at the top of
+ * `index.css`), so the `width: auto` the sheet asks for would silently lose to the width the
+ * corner asks for.
  *
- * One signal for both, deliberately: they are the same fact, and two conditions for one
- * fact is how you end up with a panel that is a sheet and an inset at the same time.
+ * It used to decide `data-inset` as well — neither arrangement declares one now, so the
+ * question does not arise. What is left of that story is worth keeping: subtracting a sheet
+ * once fitted a 1600px board into the strip of canvas above it, at 3.7%.
  *
  * At module scope, like `lib/edge.ts`'s signals and for the same reason — one query, read by
  * every mount, and a `createSignal` outside a reactive root is fine where a `createMemo`
@@ -366,10 +365,22 @@ export function Inspector(props: {
 				<aside
 					class={`panel-float inspector ${sheet() ? "" : "w-[320px]"}`}
 					data-family={shape().family}
-					/* Declared, not measured: `lib/insets.ts` finds this and subtracts it, so the
-					   camera frames boards into the width that is left. A sheet declares nothing —
-					   see the note on `sheet` above. */
-					data-inset={sheet() ? undefined : "right"}
+					/*
+					 * No `data-inset`, in either arrangement.
+					 *
+					 * It used to declare `right`, and `lib/insets.ts` subtracted its width: the
+					 * panel was a full-height column beside the canvas, so the dock centred on
+					 * what was left and `fit` framed into it. It is a card in the top-right
+					 * corner now — under the tool cluster, 320px by about 200 — and subtracting
+					 * that width slid the input bar 160px sideways every time you clicked a
+					 * component, which is a whole canvas reflowing to report a selection.
+					 *
+					 * Nothing else in that corner insets either: the cluster above it declares
+					 * `top`, and its popovers declare nothing. The right edge is still *yielded*
+					 * to this panel — the conversation stands down for it, in `lib/edge.ts` —
+					 * which is the arrangement that actually needed enforcing, and it is a
+					 * different mechanism from the one that moves the canvas.
+					 */
 				>
 					<header class="flex items-center gap-1.5">
 						{/*

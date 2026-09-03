@@ -55,8 +55,22 @@ try {
 	// buttons in a corner that already has three.
 	await page.locator('.pill button[aria-label="More"]').click();
 	await page.waitForSelector(".popover", { timeout: 4000 });
-	const rows = await page.locator(".popover [data-row] .lb").allTextContents();
-	say("the overflow holds the cheat sheet, the settings and the theme", rows.length === 3 && /canvas/i.test(rows[0]) && /settings/i.test(rows[1]) && /light|dark/i.test(rows[2]), rows.join(" | "));
+	/*
+	 * The *visible* rows. Two more live in this menu on a phone — a new board and clearing
+	 * the canvas, which leave the corner's line under 520px — and `allTextContents` reads
+	 * them whether they are displayed or not, which is the same trap that had this suite
+	 * counting five tools on a screen showing none.
+	 */
+	const rows = await page.evaluate(() =>
+		[...document.querySelectorAll(".popover [data-row]")]
+			.filter((row) => row.offsetParent !== null)
+			.map((row) => row.querySelector(".lb")?.textContent?.trim() ?? ""),
+	);
+	say(
+		"the overflow holds the cheat sheet, the settings and the theme",
+		rows.length === 3 && /canvas/i.test(rows[0]) && /settings/i.test(rows[1]) && /light|dark/i.test(rows[2]),
+		rows.join(" | "),
+	);
 	await page.keyboard.press("Escape");
 
 	/*

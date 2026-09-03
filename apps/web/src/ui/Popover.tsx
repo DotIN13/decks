@@ -97,6 +97,37 @@ export function Popover(props: {
 			place();
 			requestAnimationFrame(place);
 		});
+		/*
+		 * Picking a row closes the menu.
+		 *
+		 * It used to be the caller's job, and only `AgentPill` did it — so the corner's
+		 * overflow stayed open behind whatever its rows had opened. That is worse than
+		 * untidy: this component owns Escape while it is open and calls `preventDefault`, so
+		 * a menu left open under the Settings modal *swallowed the key that closes the
+		 * modal*. The keyboard had no way out of a dialog, and the cause was two surfaces
+		 * up.
+		 *
+		 * `click` rather than `pointerdown`, so it lands after the row's own handler and a
+		 * keyboard's Enter counts too.
+		 *
+		 * Three rows do not close it, and each exclusion is a row that is not a choice:
+		 *
+		 * - `data-keep-open` — the zoom steppers, since pressing "Zoom in" three times is the
+		 *   point of having them in a menu;
+		 * - `aria-haspopup="menu"` — a row that opens a menu of its own, or picking inside a
+		 *   submenu would take its parent with it;
+		 * - **`aria-expanded`** — a disclosure *within* this menu, like the runtime chevron
+		 *   beside "New agent", which reveals two more rows in place. Missing this one closed
+		 *   the agent menu on the press that was meant to open its second half, and took
+		 *   `newAgent` in the e2e suite with it: "New pi agent" had become unreachable.
+		 */
+		const picked = (event: MouseEvent) => {
+			const row = (event.target as HTMLElement | null)?.closest?.("[data-row]");
+			if (!row || row.hasAttribute("data-keep-open") || row.hasAttribute("aria-expanded")) return;
+			if (row.getAttribute("aria-haspopup") === "menu") return;
+			change(false);
+		};
+
 		const away = (event: PointerEvent) => {
 			const target = event.target as Node | null;
 			if (card?.contains(target ?? null) || trigger?.contains(target ?? null)) return;
@@ -126,10 +157,12 @@ export function Popover(props: {
 		};
 		document.addEventListener("pointerdown", away);
 		document.addEventListener("keydown", keys);
+		document.addEventListener("click", picked);
 		window.addEventListener("resize", place);
 		onCleanup(() => {
 			document.removeEventListener("pointerdown", away);
 			document.removeEventListener("keydown", keys);
+			document.removeEventListener("click", picked);
 			window.removeEventListener("resize", place);
 		});
 	});

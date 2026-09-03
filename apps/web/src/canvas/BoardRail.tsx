@@ -142,6 +142,10 @@ export function RailItem(props: { board: Board; current: boolean; offCanvas?: bo
 	return (
 		<button
 			class="rail-item"
+			/* Which board this is, for the same reason `.board-node` carries one: a tile shows a
+			   picture and a title, so without this the only way to say "the tile for
+			   `boards/plan.html`" is to match on prose. */
+			data-path={props.board.path}
 			data-current={props.current}
 			data-off-canvas={props.offCanvas}
 			title={props.offCanvas ? `${props.board.title} — held, not on the canvas. Click to show it.` : props.board.title}

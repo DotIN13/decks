@@ -3,8 +3,8 @@ import { createSignal, onCleanup } from "solid-js";
 /**
  * How much of the window the chrome is covering, on each edge.
  *
- * The chrome declares itself — `data-inset="left"` on the boards panel, `"right"` on the
- * inspector, `"top"` on the two top clusters — and this **measures** what it declared. That
+ * The chrome declares itself — `data-inset="left"` on the boards panel, `"top"` on the two
+ * top clusters — and this **measures** what it declared. That
  * is the whole point and it is worth being blunt about it: the width of a panel must not be
  * stated twice. A constant beside a stylesheet drifts the first time someone changes the
  * padding, and every camera bug that follows looks like a camera bug.
@@ -17,13 +17,20 @@ import { createSignal, onCleanup } from "solid-js";
  *
  * The floating conversation. It is a column of cards over the boards with click-through
  * gaps, and a board is allowed to sit under it — see `boards/the-conversation-panel-drawn`.
- * The rule the boards settle on: *a surface that arrives on its own must be subtracted; a
- * surface you summoned may overlap.* The inspector appears on selection whether you asked
- * or not, so it insets; the conversation you pressed a button for, so it does not.
  *
- * A bottom sheet on a phone is not an inset either. It covers the canvas rather than
- * standing beside it, and subtracting it fitted a 1600px board into the strip above the
- * sheet at 3.7%.
+ * The inspector, which used to be the `"right"` in that list. The rule was *a surface that
+ * arrives on its own must be subtracted; a surface you summoned may overlap*, and on that
+ * reading the inspector qualified: it appears when you select something, asked for or not.
+ * What the reading missed is that it is no longer a column — it is a 320px card in the
+ * top-right corner, under the tool cluster — and subtracting its width moved the input bar
+ * 160px sideways on every click on a component. So the rule the chrome actually keeps is
+ * about geometry, not intent: **a surface that stands beside the canvas is subtracted; one
+ * that floats over a corner of it is not.** The boards panel is a column and insets; the
+ * cluster and the inspector float and do not.
+ *
+ * A bottom sheet on a phone is not an inset either, for the same reason. It covers the
+ * canvas rather than standing beside it, and subtracting it fitted a 1600px board into the
+ * strip above the sheet at 3.7%.
  */
 export interface Insets {
 	left: number;

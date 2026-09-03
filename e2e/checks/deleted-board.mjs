@@ -51,9 +51,9 @@ try {
 	 * the half that is no longer a fault.
 	 *
 	 * And the fallback is gone with the panel split, so the surface that proves the deck
-	 * survived is the all-canvases modal: an empty *context* panel is now the correct answer
-	 * to "the agent held one board and it is gone", and it would prove nothing about whether
-	 * the other boards are still there.
+	 * survived is the Deck tab — an all-canvases modal when this was written: an empty
+	 * *context* list is now the correct answer to "the agent held one board and it is gone",
+	 * and it would prove nothing about whether the other boards are still there.
 	 */
 	await openAllBoards(page);
 	/*
@@ -61,12 +61,12 @@ try {
 	 *
 	 * The deck's own board list is fetched after this rather than before: read too early it
 	 * still holds the ghost — the file was removed a moment ago and the server has not been
-	 * told yet — so a count taken from it is a target the modal can never reach.
+	 * told yet — so a count taken from it is a target the list can never reach.
 	 */
 	await page.waitForFunction(
 		() => {
-			const items = [...document.querySelectorAll(".all-boards .board-row .file")].map((n) => n.textContent);
-			return items.length > 0 && !items.includes("boards/ghost.html");
+			const items = [...document.querySelectorAll(".panel-list .board-row .nm")].map((n) => n.textContent);
+			return items.length > 0 && !items.includes("ghost.html");
 		},
 		null,
 		{ timeout: 15000 },
@@ -74,15 +74,12 @@ try {
 	const deck = await deckState();
 
 	const after = await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
-	const listed = await page.evaluate(() => [...document.querySelectorAll(".all-boards .board-row .file")].map((n) => n.textContent).sort());
+	const listed = await page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .nm")].map((n) => n.textContent).sort());
 	say("the agent holds nothing, so the canvas is empty", after.length === 0, after.join(" ") || "(empty)");
 	say("the deck itself is intact, without the ghost in it",
-		listed.join() === deck.boards.map((b) => b.path).sort().join(), listed.join(" "));
+		listed.join() === deck.boards.map((b) => b.path.split("/").pop()).sort().join(), listed.join(" "));
 	const pruned = link.last("context.changed");
 	say("the server published the prune", Boolean(pruned) && !pruned.boards.includes("boards/ghost.html"), `boards=[${(pruned?.boards ?? []).join(" ")}]`);
-	await page.keyboard.press("Escape");
-	await settle(page, 250);
-
 	/*
 	 * A second page must agree — the server pruned it, not just this client.
 	 *
@@ -93,11 +90,11 @@ try {
 	await fresh.goto(page.url(), { waitUntil: "load" });
 	await fresh.waitForSelector(".dockfield", { timeout: 15000 });
 	await openAllBoards(fresh);
-	await fresh.waitForSelector(".all-boards .board-row", { timeout: 15000 });
-	const reloaded = await fresh.evaluate(() => [...document.querySelectorAll(".all-boards .board-row .file")].map((n) => n.textContent));
+	await fresh.waitForSelector(".panel-list .board-row", { timeout: 15000 });
+	const reloaded = await fresh.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .nm")].map((n) => n.textContent));
 	say(
 		"a fresh load agrees",
-		reloaded.length > 0 && !reloaded.includes("boards/ghost.html"),
+		reloaded.length > 0 && !reloaded.includes("ghost.html"),
 		reloaded.join(" ") || "(nothing)",
 	);
 

@@ -33,8 +33,9 @@ try {
 	await page.waitForSelector("[data-shown='true']", { timeout: 4000 });
 	let now = await state();
 	say("the button shows the conversation", now.button === "true" && now.shown, JSON.stringify(now));
-	// It floats, so it is deliberately *not* subtracted from the canvas: a surface you
-	// summoned may overlap, and one that arrives on its own may not.
+	// It floats over the boards rather than standing beside them, so it is deliberately not
+	// subtracted from the canvas — see the note on the inspector below, which is the same
+	// rule read the other way.
 	say("…and floating means it is not an inset", now.insetRight === "0px", now.insetRight);
 
 	/*
@@ -53,7 +54,21 @@ try {
 	now = await state();
 	say("selecting hands the edge to the inspector", now.inspector && !now.shown, JSON.stringify(now));
 	say("…and the button says yielded, not off", now.button === "yield", now.button);
-	say("…and the inspector *is* an inset, because it arrived on its own", now.insetRight !== "0px", now.insetRight);
+	/*
+	 * And the inspector is **not** an inset either, which is a change of rule.
+	 *
+	 * It used to be, on the argument that it arrives on its own rather than being summoned,
+	 * and the conversation may overlap because you asked for it. That reading held while the
+	 * panel was a full-height column beside the canvas. It is a 320px card in the top-right
+	 * corner now, under the tool cluster, and subtracting its width re-centred the dock — so
+	 * every click on a component slid the input bar 160px sideways to report a selection.
+	 *
+	 * So the rule the chrome keeps is about geometry rather than intent: a surface that
+	 * stands *beside* the canvas is subtracted, one that floats over a corner of it is not.
+	 * The right edge is still *yielded* to this panel, which is the assertion above and a
+	 * different mechanism entirely.
+	 */
+	say("…and it is not an inset: it floats in a corner rather than standing beside the canvas", now.insetRight === "0px", now.insetRight);
 
 	await page.keyboard.press("Escape");
 	await page.waitForSelector("[data-shown='true']", { timeout: 4000 });

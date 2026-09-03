@@ -15,9 +15,12 @@ import { createSignal } from "solid-js";
  * Nothing has to be invalidated, because nothing is ever wrong — a picture that no longer
  * matches its board is simply a key nobody asks for.
  *
- * Used in the all-canvases modal only. The context panel keeps live documents on purpose:
- * those are the boards an agent is rewriting right now, so a photograph of one would be out
- * of date before it landed and re-taken on every revision.
+ * Used by the tiles — the panel's grid density, either tab. It was the all-canvases modal's
+ * only, on the argument that the context list must keep live documents because those are the
+ * boards an agent is rewriting. The `path@rev` key is what makes that unnecessary: an edited
+ * board misses the cache whoever is holding it, so a photograph never claims a board has
+ * stopped changing. A *row* is a different matter and does not come here at all — 28px with a
+ * 20×14 picture beside the name, and nowhere to put a document even if it wanted one.
  *
  * ### Why it can afford to be synchronous work at all
  *

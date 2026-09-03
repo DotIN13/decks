@@ -314,10 +314,10 @@
 		width: 100%;
 		height: 24px;
 		align-items: center;
-		padding: 0 7px;
+		padding: 0 8px;
 		gap: 7px;
 		border: 0;
-		border-radius: 6px;
+		border-radius: var(--control-radius);
 		background: var(--line);
 		color: var(--muted);
 		cursor: pointer;
@@ -402,25 +402,34 @@
 		box-shadow: none;
 	}
 
+	/* Exactly a header's geometry: same height, same padding, same corner. A run of tool
+	   lines is one list whether each entry is a summary or a call, and a 22px row indented
+	   4px next to a 24px row padded 7px is the "varies" the user was pointing at. */
 	.stream-tool-kids .tool > .row,
 	.stream-tools > .tool > .row {
-		height: 22px;
+		height: 24px;
 		min-height: 0;
-		/* Flush with the card's own text on the left, so the calls and the reply share an
-		   edge. The right-hand padding is for the chevron only. */
-		padding: 0 4px 0 0;
+		padding: 0 8px;
 		gap: 7px;
 		border-radius: var(--control-radius);
 		font-size: 10.5px;
 	}
 
-	/* Room for the output when it is opened, which is the one thing the row may grow for. */
-	/* The output, when a line is opened: indented under it, and the one place a fill is
-	   right — it is a block of somebody else's text and needs an edge to be read against. */
+	/*
+	 * The output, when a line is opened: the same wash, the same corner, under the row it
+	 * belongs to.
+	 *
+	 * `index.css` gives this a `--bg-deep` fill and a hairline across the top, which was a
+	 * third grey and a fourth edge in a block that has one of each. Both go: the mono face
+	 * and the indent are what mark it as somebody else's text, and it is capped and
+	 * scrollable so a stack trace cannot make the turn twice as tall as the reply.
+	 */
 	.stream-tool-kids .tool > pre,
 	.stream-tools > .tool > pre {
+		max-height: 220px;
 		margin: 2px 0 4px;
 		padding: 6px 8px;
+		border-top: 0;
 		border-radius: var(--control-radius);
 		background: var(--line);
 		font-size: 10.5px;
@@ -444,11 +453,34 @@
 		white-space: nowrap;
 	}
 
-	/* The only fill in the row, and only while the pointer is on it: a hairline-free wash
-	   that says the line opens, extended a little past the text so it reads as a target. */
+	/*
+	 * Inside an opened group, no state dot.
+	 *
+	 * A group only ever holds calls that went as expected — that is what makes them
+	 * groupable — so the header saying "10 done" has already said it, and ten saturated
+	 * green discs under it are ten copies of the same word in the loudest colour the panel
+	 * has. A bare row keeps its dot, because that row is outside a group precisely because
+	 * its state is the news: it is running, or it failed.
+	 */
+	.stream-tool-kids .tool > .row > .state {
+		display: none;
+	}
+
+	/*
+	 * The wash, on hover and while open — one grey, drawn inside the row's own box.
+	 *
+	 * It was a `box-shadow: 0 0 0 4px` spread as well, to reach past the text: that draws the
+	 * fill 4px outside the border box, so a hovered row was visibly wider *and* rounder than
+	 * the header above it. Same corner as everything else here, and the 8px of padding is
+	 * what gives the target its width.
+	 *
+	 * Open counts as well as hover, because with the output showing, the row is the thing
+	 * you press to put it away and it should not go flat the moment the pointer leaves.
+	 */
 	.stream-tool-kids .tool > .row:hover,
-	.stream-tools > .tool > .row:hover {
-		box-shadow: 0 0 0 4px var(--line);
+	.stream-tools > .tool > .row:hover,
+	.stream-tool-kids .tool > .row[data-open="true"],
+	.stream-tools > .tool > .row[data-open="true"] {
 		background: var(--line);
 	}
 
