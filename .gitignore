@@ -20,3 +20,8 @@ dist/
 # Local screenshot helpers, kept out of the tree because nothing references them.
 /check.mjs
 /shot.mjs
+
+# Signed-in Claude accounts, written into whatever data directory is in use — including
+# example/, which `npm run dev:example` points at. Real OAuth credentials and session
+# keys, so this is not source and must never be committed.
+/example/claude-accounts/
