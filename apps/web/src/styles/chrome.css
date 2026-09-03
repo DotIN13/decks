@@ -316,6 +316,147 @@
 	}
 
 	/*
+	 * A row with an action at its end: switch to this agent, or close it; use this account,
+	 * or forget it.
+	 *
+	 * A `<button>` cannot hold a `<button>`, so a row with an × is two controls side by side
+	 * in a box — and that box, not the row, is then the thing the list draws. Both places
+	 * that needed it had found that out separately, which is why it is here: the accounts
+	 * modal spelled the whole arrangement out in `index.css`, and the agent dropdown was
+	 * about to be a third spelling of it.
+	 *
+	 * **The wash belongs to the box.** Painted on the row instead it stops short of the
+	 * box's right edge by the width of the action — a lit rectangle with a cold strip after
+	 * it, and the × the strip exists for sitting outside the thing it belongs to. So the row
+	 * underneath stops painting itself, and `:has` lets the box light up for the row's own
+	 * `data-current` without that state having to move off the row it describes.
+	 */
+	:is(.popover, .rowlist) .row-act {
+		display: flex;
+		align-items: center;
+		padding-right: 4px;
+		border-radius: 7px;
+		gap: 2px;
+	}
+
+	/*
+	 * Not a row whose action is refused, and not one that cannot be picked either — a wash on
+	 * something that will not respond is the affordance lying. The account in use is the case:
+	 * its row is `disabled` and it is already tinted.
+	 */
+	:is(.popover, .rowlist) .row-act:is(:hover, :focus-within):not(:has(> [data-row][disabled])) {
+		background: var(--line);
+	}
+
+	:is(.popover, .rowlist) .row-act:has(> [data-row][data-current="true"]) {
+		background: var(--line);
+	}
+
+	:is(.popover, .rowlist) .row-act > [data-row]:hover,
+	:is(.popover, .rowlist) .row-act > [data-row]:focus-visible,
+	:is(.popover, .rowlist) .row-act > [data-row][data-current="true"] {
+		background: transparent;
+	}
+
+	/*
+	 * The action itself. Out of the way until the row is approached, because a column of ×
+	 * reads as a list of things to remove rather than a list of things to pick.
+	 *
+	 * Two arrangements, and the row chooses between them by what it puts in the box:
+	 *
+	 * - **Its own slot**, held whether or not the × is showing, so nothing at all moves under
+	 *   the cursor. Right for a row with two lines of content, like an account: the × sits
+	 *   beside both of them, and a slot that opened on approach would shove the second line.
+	 * - **A slot that opens on approach** — mark the run of words at the end of the row
+	 *   `data-yield` and they give ground for the × when it arrives, rather than a square
+	 *   standing empty until it does. Right for a row whose last column is one short status,
+	 *   like an agent: 22px reserved there is a ragged gutter down the whole list, and 22px
+	 *   of words sliding left is a smaller price than that.
+	 *
+	 * Either way both are up together once the × is up. It replaced the words for a while and
+	 * that was worse: the status is the thing you were reading, and swapping it for a button
+	 * takes the row's only fact away at the moment you are deciding what to do with it.
+	 */
+	:is(.popover, .rowlist) .row-act > .close {
+		display: grid;
+		width: var(--control-sm);
+		height: var(--control-sm);
+		flex: none;
+		padding: 0;
+		border: 0;
+		border-radius: var(--control-radius);
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+		opacity: 0;
+		place-items: center;
+		transition:
+			opacity 120ms ease,
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	/* `:focus-within` on the box, so roving onto the row with the keyboard is what reveals
+	   it — the row is where Delete is handled, and an invisible key is not a shortcut. */
+	:is(.popover, .rowlist) .row-act:is(:hover, :focus-within) > .close {
+		opacity: 1;
+	}
+
+	:is(.popover, .rowlist) .row-act > .close:hover {
+		background: color-mix(in srgb, var(--fg) 12%, transparent);
+		color: var(--fg);
+	}
+
+	:is(.popover, .rowlist) .row-act > .close:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
+	}
+
+	/*
+	 * The slot that opens, and it only exists where there is a pointer to open it.
+	 *
+	 * `display` rather than `opacity`, which is the whole difference from the arrangement
+	 * above: a hidden square still occupies its 22px, and not occupying them is the point.
+	 * The words then reflow left by that much as the × arrives — the one thing that moves
+	 * here, and it moves because the alternative is a gutter that never stops being there.
+	 */
+	@media (hover: hover) {
+		:is(.popover, .rowlist) .row-act:has([data-yield]) > .close {
+			display: none;
+		}
+
+		:is(.popover, .rowlist) .row-act:has([data-yield]):is(:hover, :focus-within) > .close {
+			display: grid;
+		}
+	}
+
+	/*
+	 * On a touch screen, always — there is nothing to approach with.
+	 *
+	 * `:hover` never happens there, so an × that waits to be approached is an × that never
+	 * arrives. Which leaves the slot standing open, and on a phone that is right anyway: the
+	 * row is 34px of touch target with room for both, and nothing is being pointed at to
+	 * justify hiding either.
+	 */
+	@media (hover: none) {
+		:is(.popover, .rowlist) .row-act > .close {
+			opacity: 1;
+		}
+
+		/*
+		 * And a row with no × holds the space one would take, so the last column is a column.
+		 *
+		 * On a pointer this is free — at rest no row has an × and they all end in the same
+		 * place — but with every × drawn at once, the rows that cannot be closed were the only
+		 * ones whose words ran to the edge. Which is the ragged gutter this whole arrangement
+		 * exists to avoid, inverted.
+		 */
+		:is(.popover, .rowlist) .row-act:has([data-yield]):not(:has(> .close)) {
+			padding-right: calc(var(--control-sm) + 6px);
+		}
+	}
+
+	/*
 	 * A column of those rows outside a menu. No card of its own — whatever it is inside has
 	 * one — so this is only the rhythm: the same 2px between rows that a popover has, because
 	 * two rows 6px apart read as two objects and these are one list.

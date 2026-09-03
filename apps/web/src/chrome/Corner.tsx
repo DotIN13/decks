@@ -53,6 +53,8 @@ export function Corner(props: {
 	unread: Record<string, number>;
 	onFocus: (id: string) => void;
 	onNew: (kind?: AgentKind) => void;
+	/** Passed through to the `+n` chip's dropdown, which is the pill's list. */
+	onClose: (id: string) => void;
 	defaultKind: AgentKind;
 	/** The camera's scale, 1 being 100%. */
 	zoom: number;
@@ -105,6 +107,7 @@ export function Corner(props: {
 				unread={props.unread}
 				onFocus={props.onFocus}
 				onNew={props.onNew}
+				onClose={props.onClose}
 				defaultKind={props.defaultKind}
 			/>
 

@@ -168,3 +168,28 @@ export function since(at: number | undefined, now: number = Date.now()): string 
 	if (hours < 24) return `${hours}h`;
 	return `${Math.round(hours / 24)}d`;
 }
+
+/**
+ * The × on a row: its tooltip if this chat can be closed, and nothing at all if it cannot.
+ *
+ * Here rather than in the markup because it is a *server* rule, and the row has to know it
+ * to draw itself honestly: `Registry.remove` refuses while `agent.running`, which is
+ * `state !== "idle"` — so every state but one. `waiting` is the trap. Nothing is being
+ * computed, so it looks closable, and the server counts it as running because a question is
+ * still outstanding.
+ *
+ * **`undefined` means no button, not a disabled one.** A row mid-turn keeps its status words
+ * instead — "typing…", "waiting for you" — and those *are* the reason it cannot be closed,
+ * said better than a greyed-out × with the same fact in a tooltip. Drawing a control that
+ * cannot be pressed is worth it when its absence would be a mystery, and this absence is
+ * explained by the words it left in place.
+ *
+ * "The transcript stays on disk" is the important half of the one sentence there is. This is
+ * `agent.remove`: the row goes and the session file stays where its runtime keeps it, so the
+ * honest verb is *close* rather than delete — and the tooltip has to say which one it is,
+ * because there is no undo in the list to find out with.
+ */
+export function closeWords(state: AgentState, name: string): string | undefined {
+	if (state !== "idle") return undefined;
+	return `Close ${name} — the transcript stays on disk. Delete does the same.`;
+}

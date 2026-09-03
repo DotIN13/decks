@@ -1,7 +1,7 @@
 import type { AgentChat, AgentState } from "@decks/protocol";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agentList, agentOrder, agentStatus, since, stackFaces, STACK_CAP } from "./agent-order.ts";
+import { agentList, agentOrder, agentStatus, closeWords, since, stackFaces, STACK_CAP } from "./agent-order.ts";
 
 /*
  * The corner subtracts one thing — the agent whose window this already is — and orders the
@@ -101,4 +101,25 @@ test("how long ago, in the room a corner has", () => {
 	assert.equal(since(now - 120_000, now), "2m");
 	assert.equal(since(now - 3 * 3_600_000, now), "3h");
 	assert.equal(since(now - 50 * 3_600_000, now), "2d");
+});
+
+test("a chat can be closed when it is idle, and only then", () => {
+	/*
+	 * The one that matters: `Registry.remove` refuses anything with a runtime mid-turn, so
+	 * the row's × has to be drawn from the same rule or it offers something the server will
+	 * decline. `waiting` is the trap — nothing is being *computed*, so it looks closable, and
+	 * the server counts it as running because a question is still outstanding.
+	 */
+	assert.equal(typeof closeWords("idle", "writer"), "string");
+	for (const state of ["thinking", "streaming", "tool", "waiting"] as const) {
+		assert.equal(closeWords(state, "writer"), undefined, `${state} is running as far as the registry is concerned`);
+	}
+
+	/*
+	 * Nothing where there is no button, rather than a sentence a disabled one would carry.
+	 * The row keeps its status words in that case and they are the reason, so a second
+	 * phrasing of "still working" would be a fact told twice and read once.
+	 */
+	assert.match(closeWords("idle", "writer") ?? "", /^Close writer/, "it names which of six rows it belongs to");
+	assert.match(closeWords("idle", "writer") ?? "", /stays on disk/, "close, not delete — and there is no undo in the list");
 });

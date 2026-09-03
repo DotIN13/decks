@@ -177,10 +177,13 @@ function Row(props: { account: ClaudeAccount; active: boolean; onUse: () => void
 	return (
 		/*
 		 * The wrapper draws the row and the × sits inside it, because a button inside a button
-		 * is invalid markup — the same arrangement `.chat-row-wrap` uses, and for the same
-		 * reason.
+		 * is invalid markup. That arrangement is `.row-act` in `chrome.css` now — the agent
+		 * dropdown wanted the same thing, and this file's version of it was the reason the
+		 * wash, the reveal and the 22px slot had to be argued twice. What is left on
+		 * `.account-row` is only what is true of *accounts*: the accent tint on the one in
+		 * use, and the fact that its row is disabled without being dimmed.
 		 */
-		<div class="account-row flex items-center gap-1" data-current={props.active}>
+		<div class="account-row row-act" data-current={props.active}>
 			<button class="min-w-0 flex-1" type="button" data-row disabled={!props.account.signedIn || props.active} title={title()} onClick={props.onUse}>
 				<span class="lb w-full items-baseline">
 					<span class="truncate">{name()}</span>

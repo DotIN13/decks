@@ -10,12 +10,13 @@ import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
 import StickyNote from "lucide-solid/icons/sticky-note";
 import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
+import X from "lucide-solid/icons/x";
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { AgentMark } from "../chat/agent-marks.tsx";
 import type { Tool } from "../canvas/Editor.ts";
 import { Icon } from "../icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
-import { agentList, agentStatus, rowWords } from "./agent-order.ts";
+import { agentList, agentStatus, closeWords, rowWords } from "./agent-order.ts";
 
 /**
  * The top-left cluster: the panel, the agent, the tools, undo.
@@ -128,12 +129,26 @@ export function AgentFace(props: {
  * the `+n` chip in the top-right stack. One list, two ways in — so it is a component with a
  * `trigger` rather than markup inside the pill, and `AgentStack` borrows it.
  *
- * No last line on a row, and no close button. The rows say *state*, not content: a 264px
- * row with a truncated sentence in it is the chat list, which is what the hover card and
- * the boards panel are for. And a `×` per row could not be reached from the keyboard —
- * `Popover` treats Tab on a row as "pick this one and close", which is the completion
- * behaviour that makes the list usable without a mouse and is worth more than a second
- * control per row. Closing a chat stays in the panel's list, where it always was.
+ * No last line on a row. The rows say *state*, not content: a 264px row with a truncated
+ * sentence in it is the chat list, which is what the hover card and the boards panel are
+ * for.
+ *
+ * ### The × per row, and where the keyboard argument went
+ *
+ * This list said "no close button" until now, and the reason was real: `Popover` treats Tab
+ * on a row as "pick this one and close", which is the completion behaviour that makes the
+ * list usable without a mouse — so a second control on the line is a control Tab can never
+ * reach. What that argument left out is that **the panel it deferred to no longer exists.**
+ * The rewrite deleted the chat list, and `agent.remove` went from "somewhere else" to
+ * nowhere: a live protocol message, handled by the server, with no caller in the app and
+ * its old stylesheet (`.chat-row-wrap .close`) still sitting in `index.css`. There was no
+ * way to close a chat at all.
+ *
+ * So the × is here, and the keyboard is answered rather than traded away: **Delete or
+ * Backspace on the roving row closes it**, and the × is not a `[data-row]`, so the arrows
+ * still step one line at a time instead of alternating name, ×, name, ×. Both routes ask
+ * `closing()` first — the registry refuses a chat whose runtime is mid-turn, and a control
+ * that knows it will fail should say so before the press, not after.
  */
 export function AgentMenu(props: {
 	chats: AgentChat[];
@@ -143,6 +158,8 @@ export function AgentMenu(props: {
 	onFocus: (id: string) => void;
 	/** `kind` is the runtime, chosen here because it cannot change afterwards. */
 	onNew: (kind?: AgentKind) => void;
+	/** Take a chat off the list. The transcript is a file on disk and stays there. */
+	onClose: (id: string) => void;
 	/** What the server hands a new agent unless told otherwise. */
 	defaultKind: AgentKind;
 	/** The control that opens it, given `Popover`'s api so it can draw itself pressed. */
@@ -181,25 +198,86 @@ export function AgentMenu(props: {
 				{(chat) => {
 					const status = () => agentStatus(chat.state, props.unread[chat.id] ?? 0);
 					const name = () => props.identities[chat.id]?.name ?? chat.name;
+					/** The tooltip if this chat can be closed, and `undefined` if it cannot. */
+					const close = () => closeWords(chat.state, name());
 					return (
-						<button
-							type="button"
-							role="menuitem"
-							data-row
-							data-flat="true"
-							data-agent="true"
-							data-status={status()}
-							/* Washed rather than ticked: the row is describing the window you are
-							   already in, and a tick would imply the list is a setting. */
-							data-current={props.focused === chat.id ? "true" : undefined}
-							onClick={() => pick(() => props.onFocus(chat.id))}
-						>
-							<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} size={20} ring={1.5} />
-							{/* `block`, because `.lb` is a flex row and `text-overflow` does not apply to one —
-							    a long name would have overflowed the row rather than ellipsing. */}
-							<span class="lb block truncate">{name()}</span>
-							<span class="meta flex-none text-[10px] tabular-nums">{rowWords(status(), chat.state, chat.lastAt)}</span>
-						</button>
+						/*
+						 * The row and its × in one box, which is `.row-act` in `chrome.css` — a
+						 * `<button>` cannot contain a `<button>`, and the wash has to belong to the
+						 * box or it stops 22px short of the row's own right edge.
+						 */
+						<div class="row-act">
+							<button
+								type="button"
+								role="menuitem"
+								data-row
+								data-flat="true"
+								data-agent="true"
+								data-status={status()}
+								/* Washed rather than ticked: the row is describing the window you are
+								   already in, and a tick would imply the list is a setting. */
+								data-current={props.focused === chat.id ? "true" : undefined}
+								class="min-w-0 flex-1"
+								onClick={() => pick(() => props.onFocus(chat.id))}
+								/*
+								 * Delete is the × for the keyboard, and it is on the row because the row
+								 * is what the arrows rove onto. `Popover`'s own handler reads Escape and
+								 * the arrows off the document and ignores these two, so nothing has to
+								 * be coordinated — but the event still stops here, or a Backspace meant
+								 * for a chat would also be the browser's go-back.
+								 */
+								onKeyDown={(event) => {
+									if (event.key !== "Delete" && event.key !== "Backspace") return;
+									event.preventDefault();
+									event.stopPropagation();
+									if (close()) props.onClose(chat.id);
+								}}
+							>
+								<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} size={20} ring={1.5} />
+								{/* `block`, because `.lb` is a flex row and `text-overflow` does not apply to one —
+								    a long name would have overflowed the row rather than ellipsing. */}
+								<span class="lb block truncate">{name()}</span>
+								{/*
+									`data-yield` says these words give ground for the × rather than a square
+									standing empty beside them until it arrives: the last column of a row is one
+									short status, and 22px reserved there is a ragged gutter down the whole list.
+									So the slot opens on approach and the words slide left by it — see `.row-act`
+									in `chrome.css`, which is also where the touch case lives, since there is
+									nothing to approach with on a phone and the slot simply stays open.
+								*/}
+								<span class="meta flex-none text-[10px] tabular-nums" data-yield>{rowWords(status(), chat.state, chat.lastAt)}</span>
+							</button>
+
+							{/*
+								Not a `[data-row]`, and that is the whole reason the arrows still work: the
+								rove list is built from that attribute, so an × carrying it would make every
+								journey through the list twice as long. It is also why picking it does not
+								close the menu — `Popover` closes on a row click and this is not one — which
+								is right on its own terms, since closing three chats is one visit to the list.
+
+								**Absent, rather than disabled, on a chat that cannot be closed.** The
+								registry refuses anything mid-turn, and the row already says why: it keeps its
+								words instead of swapping them for a greyed-out button whose tooltip repeats
+								"still working". A control that cannot be pressed is worth drawing when its
+								absence would be a mystery, and "typing…" is not a mystery.
+							*/}
+							<Show when={close()}>
+								{(words) => (
+									<button
+										class="close"
+										type="button"
+										title={words()}
+										aria-label={`Close ${name()}`}
+										onClick={(event) => {
+											event.stopPropagation();
+											props.onClose(chat.id);
+										}}
+									>
+										<Icon of={X} size={13} />
+									</button>
+								)}
+							</Show>
+						</div>
 					);
 				}}
 			</For>
@@ -277,6 +355,7 @@ export function AgentPill(props: {
 	unread: Record<string, number>;
 	onFocus: (id: string) => void;
 	onNew: (kind?: AgentKind) => void;
+	onClose: (id: string) => void;
 	defaultKind: AgentKind;
 	/** Whether the boards panel is showing. A button, not a hover — folded means gone. */
 	boardsOpen: boolean;
@@ -382,6 +461,7 @@ export function AgentPill(props: {
 				unread={props.unread}
 				onFocus={props.onFocus}
 				onNew={props.onNew}
+				onClose={props.onClose}
 				defaultKind={props.defaultKind}
 				label="Agents"
 				trigger={(api) => (

@@ -340,8 +340,7 @@ svg.lucide {
  */
 .inspector header .close,
 .chats .rail-head button:not(.menu *),
-.chat-row-wrap .close,
-.account-row .close {
+.chat-row-wrap .close {
 	display: grid;
 	width: var(--control-sm);
 	height: var(--control-sm);
@@ -360,8 +359,7 @@ svg.lucide {
 .inspector .acts button:hover,
 .inspector header .close:hover,
 .chats .rail-head button:not(.menu *):hover,
-.chat-row-wrap .close:hover,
-.account-row .close:hover {
+.chat-row-wrap .close:hover {
 	background: var(--line);
 	color: var(--fg);
 }
@@ -1811,38 +1809,17 @@ svg.lucide {
 }
 
 /*
- * One Claude subscription in the settings panel (`chat/Settings.tsx`).
+ * One Claude subscription in the settings panel (`chat/Settings.tsx`) — the one in use,
+ * tinted rather than washed, which is the same mark a focused chat row carries so "this is
+ * the one" looks the same in both lists.
  *
- * Two things a class attribute says badly. The row's `×` is the one the chat list already
- * has — out of the way until the row is hovered, because a column of delete buttons reads as
- * a list of things to remove — and the active row's tint, which is the same wash a focused
- * chat gets so "this is the one" looks the same in both lists.
+ * Everything else this row used to spell out is `.row-act` in `chrome.css` now: the box the
+ * × sits in, the wash on that box rather than on the button inside it, the 22px slot held
+ * whether or not the × is showing, and the reveal on approach. Two surfaces had found the
+ * same arrangement independently; the second one is what made it worth naming.
  */
-.account-row {
-	border-radius: var(--control-radius);
-}
-
 .account-row[data-current="true"] {
 	background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-}
-
-/*
- * The hover wash belongs to the whole row, not to the button inside it.
- *
- * The row is a button and an × side by side, so a wash on the button stopped 40px short of
- * the row's own right edge — a lit rectangle with a cold strip after it, and the × the strip
- * exists for sitting outside the thing it belongs to. Painted here, the row lights up as one
- * object and the button underneath stops painting itself.
- *
- * Neither the current row nor an unusable one takes it: the first is already tinted, and a
- * wash on a row that will not respond is the affordance lying.
- */
-.account-row:hover:not([data-current="true"]):not(:has([data-row]:disabled)) {
-	background: var(--line);
-}
-
-.account-row [data-row]:hover {
-	background: transparent;
 }
 
 /*
@@ -1854,16 +1831,6 @@ svg.lucide {
  * says it is not a thing to press.
  */
 .account-row[data-current="true"] [data-row][disabled] {
-	opacity: 1;
-}
-
-.account-row .close {
-	opacity: 0;
-	transition: opacity 120ms ease;
-}
-
-.account-row:hover .close,
-.account-row:focus-within .close {
 	opacity: 1;
 }
 

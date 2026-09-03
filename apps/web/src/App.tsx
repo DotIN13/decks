@@ -1121,6 +1121,19 @@ export function App() {
 		socket.send({ type: "agent.focus", id });
 	};
 
+	/*
+	 * Close a chat — the × on a row in the agent list.
+	 *
+	 * Nothing is cleaned up here on purpose. The server answers with `agent.removed`, which
+	 * is where the transcript, identity and context kept for that id are dropped, and then
+	 * an `agents` frame that carries the new list *and the new focus* — the registry moves it
+	 * to the nearest row, so guessing at one here would be a second opinion about which
+	 * conversation you are now in. A refusal comes back as a notice, which is the case the
+	 * row's × is disabled to avoid: `closing()` in `agent-order.ts` draws it from the same
+	 * rule `Registry.remove` enforces.
+	 */
+	const closeAgent = (id: string) => socket.send({ type: "agent.remove", id });
+
 	const flyTo = (board: Board) => {
 		setSelected(board.path);
 		const stage = document.querySelector(".stage");
@@ -1209,6 +1222,7 @@ export function App() {
 					unread={unread}
 					onFocus={focusAgent}
 					onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+					onClose={closeAgent}
 					defaultKind={state.defaultKind}
 					boardsOpen={boardsOpen()}
 					onToggleBoards={() => showBoards(!boardsOpen())}
@@ -1231,6 +1245,7 @@ export function App() {
 					unread={unread}
 					onFocus={focusAgent}
 					onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+					onClose={closeAgent}
 					defaultKind={state.defaultKind}
 					zoom={camera().zoom}
 					onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))}
