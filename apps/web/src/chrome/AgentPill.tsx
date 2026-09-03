@@ -214,17 +214,28 @@ export function AgentMenu(props: {
 			 * the menu the arrow keys could not reach. Both halves carry `data-row`, so the
 			 * keyboard roves onto either and the highlight is the popover's own.
 			 */}
+			{/*
+				`w-auto` on both halves, which is the whole reason this line works.
+
+				`.popover [data-row]` is `width: 100%`, so that an ordinary row fills the card —
+				and two rows sharing a line each claimed all of it. `flex-none` then held the
+				runtime button at 250px while the label shrank to its `+` icon, which is what
+				"New / pi / agent" stacked in three lines actually was.
+
+				`whitespace-nowrap` on the label for the same reason in miniature: "New agent" is
+				two words and there is no width at which breaking them is better than eliding.
+			*/}
 			<div class="flex items-center gap-1">
-				<button type="button" role="menuitem" data-row data-flat="true" class="min-w-0 flex-1" onClick={() => pick(() => props.onNew(props.defaultKind))}>
+				<button type="button" role="menuitem" data-row data-flat="true" class="w-auto min-w-0 flex-1" onClick={() => pick(() => props.onNew(props.defaultKind))}>
 					<Icon of={Plus} size={13} class="flex-none text-muted" />
-					<span class="lb font-normal">New agent</span>
+					<span class="lb font-normal whitespace-nowrap">New agent</span>
 				</button>
 				<button
 					type="button"
 					role="menuitem"
 					data-row
 					data-flat="true"
-					class="flex-none px-2 text-[11px] text-faint"
+					class="w-auto flex-none px-2 text-[11px] whitespace-nowrap text-faint"
 					aria-expanded={picking()}
 					aria-label={`Runtime for a new agent — ${props.defaultKind}`}
 					title="The runtime cannot change once an agent exists"

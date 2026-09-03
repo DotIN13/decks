@@ -45,8 +45,13 @@
 		 * both edges — which is what makes a column of floating cards read as a box with a
 		 * cut-out. The scroller carries this much padding instead, and the column is wider and
 		 * closer to the edge by the same amount, so the cards land where the board drew them.
+		 *
+		 * **24px, because that is how far the shadow reaches.** `--shadow` is
+		 * `0 8px 24px`, so a 12px gutter clipped the outer two thirds of it and the column
+		 * still read as a box with its corners sliced off — less obviously than before, which
+		 * is worse. The number here has to be the blur radius, not a guess at it.
 		 */
-		--gutter: 12px;
+		--gutter: 24px;
 		position: absolute;
 		z-index: 9;
 		top: calc(64px - var(--gutter));

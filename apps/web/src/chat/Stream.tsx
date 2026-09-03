@@ -119,6 +119,40 @@ export function Stream(props: {
 	});
 
 	/*
+	 * The wheel scrolls the column from anywhere over it, not only over a card.
+	 *
+	 * The column is `pointer-events: none` with the cards `auto`, which is what lets the
+	 * 10px gaps pass clicks through to the board underneath — and it is also why a wheel in
+	 * one of those gaps zoomed the canvas instead of scrolling the conversation. An element
+	 * that is not a hit-test target does not receive a wheel event either, so there is no
+	 * handler to put on it.
+	 *
+	 * So the listener is on the window, in the capture phase, and it asks the one question
+	 * `pointer-events` cannot express: *is the pointer inside the column's box?* If it is,
+	 * the scroll belongs to the conversation and the stage must not also see it. Clicks are
+	 * untouched, so dragging a board through a gap still works.
+	 */
+	onMount(() => {
+		const wheel = (event: WheelEvent) => {
+			if (!historyShown() || !column || !scroller) return;
+			const box = column.getBoundingClientRect();
+			if (event.clientX < box.left || event.clientX > box.right) return;
+			if (event.clientY < box.top || event.clientY > box.bottom) return;
+			// Only when there is somewhere to go: at either end the canvas should still zoom,
+			// which is the same courtesy `overscroll-behavior: contain` asks for.
+			const room = scroller.scrollHeight - scroller.clientHeight;
+			if (room <= 0) return;
+			const at = scroller.scrollTop;
+			if ((event.deltaY < 0 && at <= 0) || (event.deltaY > 0 && at >= room - 1)) return;
+			event.preventDefault();
+			event.stopPropagation();
+			scroller.scrollTop = at + event.deltaY;
+		};
+		window.addEventListener("wheel", wheel, { capture: true, passive: false });
+		onCleanup(() => window.removeEventListener("wheel", wheel, { capture: true }));
+	});
+
+	/*
 	 * Escape puts it away, wherever the focus is.
 	 *
 	 * On the window rather than on the column: the thing you were doing when you decided to
