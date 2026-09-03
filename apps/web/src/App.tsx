@@ -156,8 +156,15 @@ export function App() {
 	 * Whether the boards panel is there. One signal where `lib/panels.ts` had two, because
 	 * there is one panel now — and a plain signal rather than that module's persisted pair,
 	 * since what it was mostly doing was closing one panel when the other opened.
+	 *
+	 * **Open where it is a panel, closed where it is a sheet.** Above 1100px it stands beside
+	 * the canvas and costs 264px of a wide window, which is a fair trade for knowing what the
+	 * agent is holding. Below that it is a sheet *over* the canvas, and a canvas app that
+	 * opens with something covering the canvas is answering a question nobody asked — on a
+	 * 393px screen the sheet took the left two thirds, and a pinch aimed at a board landed on
+	 * a list of filenames.
 	 */
-	const [boardsOpen, setBoardsOpen] = createSignal(true);
+	const [boardsOpen, setBoardsOpen] = createSignal(window.innerWidth > 1100);
 	/** Settings: the Claude subscriptions this install can use (`chat/Settings.tsx`). */
 	const [settings, setSettings] = createSignal(false);
 	/**
@@ -1028,6 +1035,29 @@ export function App() {
 	const narrow = () => window.innerWidth < NARROW;
 
 	/*
+	 * On a narrow screen the two surfaces take turns, whichever way they were opened.
+	 *
+	 * 264px of sheet and 320px of conversation on a 393px screen is two surfaces and no
+	 * canvas. The swipes used to be the only place this was enforced, because they were the
+	 * only openers `App` could see — the history button lives in `Corner` and calls
+	 * `lib/edge.ts` directly. So the rule went where the *state* is instead of where the
+	 * buttons are: an effect watching whether the conversation is up.
+	 *
+	 * One direction only, deliberately. Closing the panel cannot reopen the conversation, so
+	 * there is no cycle to guard against — and the other direction is handled by the one
+	 * setter the panel has, below.
+	 */
+	createEffect(() => {
+		if (historyShown() && narrow()) setBoardsOpen(false);
+	});
+
+	/** Open the panel, and on a phone put the conversation away to make room. */
+	const showBoards = (open: boolean) => {
+		setBoardsOpen(open);
+		if (open && narrow()) closeHistory();
+	};
+
+	/*
 	 * `⌘K` — which is what the full-screen board browser became.
 	 *
 	 * That modal covered the canvas you were looking at in order to help you find something
@@ -1043,7 +1073,7 @@ export function App() {
 		const keys = (event: KeyboardEvent) => {
 			if (event.key !== "k" || !(event.metaKey || event.ctrlKey) || event.altKey) return;
 			event.preventDefault();
-			setBoardsOpen(true);
+			showBoards(true);
 			setFindAt(Date.now());
 		};
 		window.addEventListener("keydown", keys);
@@ -1064,14 +1094,9 @@ export function App() {
 	 */
 	const edgeSwipe = {
 		enabled: () => !canHover(),
-		left: () => {
-			setBoardsOpen(true);
-			if (narrow()) closeHistory();
-		},
-		right: () => {
-			openHistory();
-			if (narrow()) setBoardsOpen(false);
-		},
+		left: () => showBoards(true),
+		// The effect above closes the panel; a swipe only has to say what it wants.
+		right: () => openHistory(),
 	};
 
 	/**
@@ -1185,7 +1210,7 @@ export function App() {
 					onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					defaultKind={state.defaultKind}
 					boardsOpen={boardsOpen()}
-					onToggleBoards={() => setBoardsOpen(!boardsOpen())}
+					onToggleBoards={() => showBoards(!boardsOpen())}
 					tool={tool()}
 					onTool={setTool}
 					onUndo={() => {
@@ -1282,7 +1307,7 @@ export function App() {
 					focused={state.focused}
 					identities={state.identities}
 					open={boardsOpen()}
-					onOpenChange={setBoardsOpen}
+					onOpenChange={showBoards}
 					findAt={findAt()}
 					onPick={(board) => {
 						socket.send({ type: "board.play", path: board.path });

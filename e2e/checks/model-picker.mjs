@@ -61,13 +61,13 @@ if (count < 2) {
 	say("switching model is recorded in the conversation", false, "only one model is configured");
 } else {
 	/*
-	 * The model's id, from the row's own `.id` span rather than from its text.
+	 * The model's name, which is the span after the provider pill.
 	 *
-	 * A row reads "provider" then the id then a tick, so splitting the text and taking a
-	 * line got the provider pill on some rows and the id on others — and the conversation's
-	 * notice names the model, not the provider.
+	 * There is no `.id` class — an earlier version of this check assumed one and then waited
+	 * thirty seconds for it. `.pv` is the provider and the name is the flexible span beside
+	 * it.
 	 */
-	const wanted = (await rows.nth(1).locator(".id").innerText()).trim();
+	const wanted = (await rows.nth(1).locator(".pv + span").innerText()).trim();
 	await rows.nth(1).click();
 	await settle(page, 500);
 	const after = (await chip().innerText()).trim();
@@ -82,7 +82,18 @@ if (count < 2) {
 	await settle(page, 600);
 	const notices = await page.locator("[data-shown='true'] .fnotice, [data-shown='true'] .stream-notice").allInnerTexts();
 	say("the switch is recorded in the conversation", notices.some((t) => /model/i.test(t)), JSON.stringify(notices));
-	say("…naming the model it moved to", notices.some((t) => t.includes(wanted)), `looking for ${wanted}`);
+	/*
+	 * Matched case-insensitively and loosely on purpose: the notice's wording is the
+	 * server's, and a check that demands an exact sentence fails the next time somebody
+	 * improves it. What must not regress is that the transcript says *which* model, because
+	 * the chip only shows the one in use now — without the line, the reply above a switch
+	 * and the reply below it read as the same voice.
+	 */
+	say(
+		"…naming the model it moved to",
+		notices.some((t) => t.toLowerCase().includes(wanted.toLowerCase())),
+		`looking for ${wanted} in ${JSON.stringify(notices)}`,
+	);
 	await page.locator('.pill button[title^="Conversation"]').click();
 	await settle(page, 300);
 

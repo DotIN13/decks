@@ -9,7 +9,7 @@
  * was under your finger. Both are asserted here, on bare stage and over a board, since a
  * board is a separate document and its gestures come out through `frame-gestures.ts`.
  */
-import { open, say, settle } from "../harness.mjs";
+import { open, openPanel, say, settle } from "../harness.mjs";
 
 const { browser, page, context, errors } = await open({ device: "iPhone 15" });
 const cdp = await context.newCDPSession(page);
@@ -145,12 +145,30 @@ say(
 // --- 4. the same gestures over a live board ------------------------------------------
 // Fly to one board and get past `INTERACT_ZOOM`, where its frame takes pointer events
 // and every gesture has to be forwarded back out of it.
+/*
+ * Zoom in until a board is interactive, and give up rather than spin.
+ *
+ * Two loops here used to click `.pill [aria-label^="Zoom"]` until the zoom rose past a
+ * threshold. That selector is the zoom *chip*, and the chip opens a menu — it does not zoom
+ * — so the condition could never become true and the check sat in an unbounded `while` for
+ * twenty-three minutes, which in a suite reads as a hang rather than a failure.
+ *
+ * `=` is the stage's own zoom-in key, so this asks the app the way a person would. The bound
+ * is the point as much as the key is: a loop in a check needs somewhere to stop, or the next
+ * selector that goes stale costs a run instead of a line.
+ */
+const zoomTo = async (wanted) => {
+	for (let step = 0; step < 40; step++) {
+		if ((await camera()).zoom >= wanted) return true;
+		await page.keyboard.press("=");
+		await settle(page, 60);
+	}
+	return (await camera()).zoom >= wanted;
+};
+
 await page.evaluate(() => [...document.querySelectorAll(".board-row")].find((item) => item.textContent.includes("plan.html"))?.click());
 await settle(page, 500);
-while ((await camera()).zoom < 0.6) {
-	await page.evaluate(() => document.querySelector('.pill [aria-label^="Zoom"]').click());
-	await settle(page, 60);
-}
+say("the canvas reaches editing zoom on a phone", await zoomTo(0.6), `${(await camera()).zoom.toFixed(2)}`);
 const over = await page.evaluate(() => {
 	const surface = document.querySelector('.board-node[data-path="boards/plan.html"] .surface');
 	const rect = surface.getBoundingClientRect();
@@ -214,17 +232,37 @@ say(
 // Back to the whole board and just past `INTERACT_ZOOM`, so there is something small
 // enough to aim at and it is where the maths says it is.
 const frameBoard = async (name) => {
-	await page.evaluate((wanted) => [...document.querySelectorAll(".board-row")].find((item) => item.textContent.includes(wanted))?.click(), name);
+	/*
+	 * Open the sheet to reach the row, then put it away again.
+	 *
+	 * The panel starts closed on a phone — it is a sheet over the canvas there, and a canvas
+	 * app should not open with something covering the canvas — so there was no `.board-row`
+	 * to click and the `?.click()` did nothing silently. Nothing was selected, `1` fitted
+	 * whichever board came first instead, and the frame this check wanted had unmounted by
+	 * the time it looked for it.
+	 *
+	 * And it has to close again before anything is aimed at: the sheet covers the left two
+	 * thirds of a 393px screen, which is where the board now is.
+	 */
+	await openPanel(page, "deck");
+	await page.locator(".board-row").filter({ hasText: name }).first().click();
 	await page.waitForFunction(
 		(wanted) => document.querySelector(`.board-node[data-path="boards/${wanted}"] iframe`)?.contentWindow?.__boardReady === true,
 		name,
 		{ timeout: 15000 },
 	);
-	await settle(page, 300);
-	while ((await camera()).zoom < 0.55) {
-		await page.evaluate(() => document.querySelector('.pill [aria-label^="Zoom"]').click());
-		await settle(page, 60);
-	}
+	await page.locator('.pill button[aria-label$="the boards panel"]').tap();
+	await settle(page, 320);
+	/*
+	 * `1` fits the selected board rather than stepping the zoom up.
+	 *
+	 * Stepping zooms about the viewport centre, so twelve steps drift — the board ends up
+	 * past an edge and the next assertion goes looking for a run of text that is off screen.
+	 * Fitting is one move to a known frame, and it is also what a person would press.
+	 */
+	await page.keyboard.press("1");
+	await settle(page, 500);
+	if ((await camera()).zoom < 0.55) await zoomTo(0.55);
 };
 await frameBoard("plan.html");
 
@@ -397,14 +435,14 @@ say("and tapping it again puts it away", (await openState()).right === false, JS
  */
 await page.locator('.pill button[title^="Conversation"]').tap();
 await settle(page, 400);
-say("…and it opens again", (await openState()).right === "true", JSON.stringify(await openState()));
+say("…and it opens again", (await openState()).right, JSON.stringify(await openState()));
 const middle = await page.evaluate(() => {
 	const box = document.querySelector(".stream .stream-roll").getBoundingClientRect();
 	return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
 });
 await swipe([middle], { x: 260, y: 0 }, 12);
 await settle(page, 500);
-say("a swipe to the right edge puts the conversation away", (await openState()).right === "false", JSON.stringify(await openState()));
+say("a swipe to the right edge puts the conversation away", !(await openState()).right, JSON.stringify(await openState()));
 
 /*
  * And in from the edges, which is how the panels are opened rather than closed.
@@ -428,7 +466,7 @@ const mid = Math.round(size.height / 2);
 const wasCamera = await camera();
 await swipe([{ x: 3, y: mid }], { x: 150, y: 0 }, 12);
 await settle(page, 400);
-say("a swipe in from the left edge brings the boards out", (await openState()).left === "true", JSON.stringify(await openState()));
+say("a swipe in from the left edge brings the boards out", (await openState()).boards, JSON.stringify(await openState()));
 const afterLeft = await camera();
 say(
 	"…and the canvas did not lurch under it",
@@ -439,8 +477,8 @@ say(
 await swipe([{ x: size.width - 3, y: mid }], { x: -150, y: 0 }, 12);
 await settle(page, 400);
 const swiped = await openState();
-say("a swipe in from the right edge brings the conversation out", swiped.right === "true", JSON.stringify(swiped));
-say("…and takes the rail's place, on a screen too narrow for both", swiped.left === "false", JSON.stringify(swiped));
+say("a swipe in from the right edge brings the conversation out", swiped.right, JSON.stringify(swiped));
+say("…and takes the sheet's place, on a screen too narrow for both", !swiped.boards, JSON.stringify(swiped));
 
 await page.locator('.pill button[title^="Conversation"]').tap();
 await settle(page, 300);
@@ -454,7 +492,7 @@ const beforeDown = await camera();
 await swipe([{ x: 3, y: mid }], { x: 0, y: -200 }, 12);
 await settle(page, 400);
 const afterDown = await camera();
-say("a vertical drag from the edge is not a drawer", (await openState()).left === "false", JSON.stringify(await openState()));
+say("a vertical drag from the edge is not a drawer", !(await openState()).boards, JSON.stringify(await openState()));
 say("…and the canvas gets the finger back", afterDown.y !== beforeDown.y, `${beforeDown.y} -> ${afterDown.y}`);
 
 /*
@@ -477,7 +515,7 @@ const overBoard = await page.evaluate((y) => document.elementFromPoint(3, y)?.ta
 say("zoomed in, the left edge is over a live board's frame", overBoard === "iframe", `${overBoard} at ${(await camera()).zoom.toFixed(2)}`);
 await swipe([{ x: 3, y: mid }], { x: 150, y: 0 }, 12);
 await settle(page, 400);
-say("the edge swipe works over a board too", (await openState()).left === "true", JSON.stringify(await openState()));
+say("the edge swipe works over a board too", (await openState()).boards, JSON.stringify(await openState()));
 await page.locator('.pill button[aria-label$="the boards panel"]').tap();
 await settle(page, 300);
 

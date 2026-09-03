@@ -294,7 +294,16 @@ export async function resetStage() {
  */
 export async function openPanel(page, tab = "context") {
 	if (tab === "agents") return openAgents(page);
-	const open = () => page.evaluate(() => Boolean(document.querySelector("[data-inset='left']")));
+	/*
+	 * By the element, not by `data-inset`.
+	 *
+	 * Above 1100px the panel declares `data-inset="left"` so the camera subtracts it; below
+	 * that it is a sheet *over* the canvas and deliberately declares nothing — subtracting a
+	 * sheet once fitted a 1600px board into the strip beside it at 3.7%. So the attribute is
+	 * exactly the thing that differs between the two, and waiting on it meant this timed out
+	 * on every phone.
+	 */
+	const open = () => page.evaluate(() => Boolean(document.querySelector(".panel-shell")));
 	if (!(await open())) {
 		/*
 		 * Matched on the end of the label, because the whole of it says what pressing the
@@ -304,7 +313,7 @@ export async function openPanel(page, tab = "context") {
 		 * fell through to a tool button, which failed with a story about a sticky note.
 		 */
 		await page.locator('.pill button[aria-label$="the boards panel"]').first().click();
-		await page.waitForFunction(() => Boolean(document.querySelector("[data-inset='left']")), null, { timeout: 6000 });
+		await page.waitForFunction(() => Boolean(document.querySelector(".panel-shell")), null, { timeout: 6000 });
 	}
 	await page.getByRole("tab", { name: tab === "deck" ? /deck/i : /context/i }).click();
 	// The rows are drawn from a signal, and a click landing in the same frame as the switch

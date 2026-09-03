@@ -258,6 +258,28 @@
 	}
 
 	/*
+	 * The stack is a readout on a laptop and absent on a touchscreen, and that is a trade.
+	 *
+	 * A face is 24px and the stack overlaps them at a 22px pitch, which is right for a
+	 * glance and impossible for a fingertip: a 44px target on a 22px pitch means the leftmost
+	 * face's hit area covers the next one entirely, so the others become unreachable. Every
+	 * way of keeping them tappable costs more than it is worth — 44px pitch and no overlap
+	 * puts the corner at 208px against a pill of 184px on a 393px line, and the two clusters
+	 * overlap again.
+	 *
+	 * So on a coarse pointer the faces go and the dropdown carries the agents, where a row is
+	 * 34px and has the name written out. What is lost is the other agents' status at a
+	 * glance; what is kept is the *active* agent's, which is in the pill with its ring, and
+	 * that is the one the window belongs to.
+	 */
+	@media (pointer: coarse) {
+		.agent-stack {
+			display: none;
+		}
+	}
+
+
+	/*
 	 * `+n`. A hairline circle rather than a fourth face, because it is a count and not an
 	 * agent — and it opens the same dropdown the pill's chevron does. One list, two ways in.
 	 */
