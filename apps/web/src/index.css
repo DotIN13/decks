@@ -1631,14 +1631,17 @@ svg.lucide {
  * agent list — you could not move to the palette without calling up the panel that
  * then covered it.
  */
-.palette {
-	top: 12px;
-	left: 50%;
-	display: flex;
-	padding: 4px;
-	gap: 2px;
-	transform: translateX(-50%);
-}
+/*
+ * The tool group, which is no longer a float of its own.
+ *
+ * It was `.panel-float.palette`, absolutely positioned at `top: 12px; left: 50%` with a
+ * translate — the free-standing palette that sat under the title bar. The tools live inside
+ * the top-left pill now, so those four declarations are not merely redundant: keeping the
+ * class as a handle for the canvas checks re-applied them, and the group jumped out of the
+ * pill's flex line and landed back at the centre of the window, on top of the agent's name.
+ *
+ * What is left is the vocabulary of the buttons themselves, which the pill reuses as-is.
+ */
 
 .palette button {
 	display: grid;

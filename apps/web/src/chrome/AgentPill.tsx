@@ -288,7 +288,21 @@ export function AgentPill(props: {
 		 * measures whatever carries the attribute, so the pill may grow a control without
 		 * anything else in the app being told.
 		 */
-		<div class="float pill absolute top-3 left-3 z-20" data-inset="top">
+		<div
+			/*
+			 * `w-max`, not the shrink-to-fit an absolute box gets by default.
+			 *
+			 * Shrink-to-fit is `min(max(min-content, available), max-content)`, and the name in
+			 * here is `truncate` — so its *min*-content is nearly zero and the browser was
+			 * entitled to squeeze it to a couple of letters while the tools carried on at their
+			 * natural size. The result read as the tools being drawn on top of the agent's name.
+			 * `max-content` says: give every child the room it asked for, and let the pill be as
+			 * wide as that comes to. The name's own `max-w` is what stops a long one running
+			 * away with the line.
+			 */
+			class="float pill absolute top-3 left-3 z-20 w-max"
+			data-inset="top"
+		>
 			{/*
 			 * The panel, as a button.
 			 *
@@ -310,8 +324,21 @@ export function AgentPill(props: {
 
 			<span class="pill-sep" aria-hidden="true" />
 
-			{/* The active agent, with the same ring it would carry in the corner — which is
-			    also why it has no face over there. A face in two corners is one too many. */}
+			{/*
+			 * The active agent, with the same ring it would carry in the corner — which is also
+			 * why it has no face over there. A face in two corners is one too many.
+			 *
+			 * `flex-none` on the group and a `max-w` on the name, rather than `min-w-0` and
+			 * letting it shrink. The pill is absolutely positioned with no width, so its width
+			 * is shrink-to-fit — and an `overflow: hidden` child with `min-width: 0` inside one
+			 * contributes *nothing* to that calculation. The pill sized itself as if the name
+			 * were not there and laid the tools out on top of it: "Claude" came out as two
+			 * clipped letters under the select tool.
+			 *
+			 * So the name takes the room it needs and stops at 160px, which is about twenty
+			 * characters. Past that a name is not being read but recognised, and the dropdown
+			 * spells it out in full.
+			*/}
 			<Show
 				when={active()}
 				fallback={
@@ -319,9 +346,9 @@ export function AgentPill(props: {
 				}
 			>
 				{(chat) => (
-					<span class="flex min-w-0 items-center gap-[7px] pl-0.5">
+					<span class="flex flex-none items-center gap-[7px] pl-0.5">
 						<AgentFace chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} />
-						<span class="truncate text-[12px] font-semibold">{name()}</span>
+						<span class="max-w-[160px] truncate text-[12px] font-semibold">{name()}</span>
 					</span>
 				)}
 			</Show>
