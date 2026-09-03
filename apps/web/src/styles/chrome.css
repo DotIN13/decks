@@ -178,6 +178,21 @@
 	 * A heavier shadow than a `.float`: this is summoned *over* surfaces that are
 	 * themselves floating, and two objects on the same rung read as one object.
 	 */
+	/*
+	 * `.floatcard` is the *look*; `.popover` is a **menu**.
+	 *
+	 * They were one class, and that cost a real bug twice over. The agent hover card wanted
+	 * the same card — a border, a radius, the menu shadow — so it wore `.popover`; and once
+	 * that card became always-mounted rather than built on hover, `document.querySelector(
+	 * ".popover")` was true at all times. The conversation's Escape guard concluded a menu
+	 * was open and stopped closing it, and four e2e helpers that wait for a menu to appear
+	 * found the tooltip instead and inspected an empty card.
+	 *
+	 * Splitting them puts the distinction where it cannot be got wrong: anything that wants
+	 * the card takes `.floatcard`, and `.popover` means a thing you interact with — which is
+	 * the only sort worth asking "is one open?" about.
+	 */
+	.floatcard,
 	.popover {
 		position: fixed;
 		z-index: 40;

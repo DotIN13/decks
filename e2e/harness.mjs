@@ -295,15 +295,18 @@ export async function resetStage() {
 export async function openPanel(page, tab = "context") {
 	if (tab === "agents") return openAgents(page);
 	/*
-	 * By the element, not by `data-inset`.
+	 * By `data-open`, which is the panel's own answer to the question.
 	 *
-	 * Above 1100px the panel declares `data-inset="left"` so the camera subtracts it; below
-	 * that it is a sheet *over* the canvas and deliberately declares nothing — subtracting a
-	 * sheet once fitted a 1600px board into the strip beside it at 3.7%. So the attribute is
-	 * exactly the thing that differs between the two, and waiting on it meant this timed out
-	 * on every phone.
+	 * This has moved twice, and both moves were the panel changing what "open" *is*. It
+	 * started as `data-inset="left"` — wrong, because below 1100px the panel is a sheet and
+	 * deliberately declares no inset, so this timed out on every phone. Then it was the
+	 * element's presence — wrong too, once the panel stayed mounted in order to animate out.
+	 *
+	 * `data-open` is the attribute the component sets for exactly this, and it is true in
+	 * both arrangements. The lesson worth keeping: a test should ask a surface what state it
+	 * is in, not infer it from a side effect of that state.
 	 */
-	const open = () => page.evaluate(() => Boolean(document.querySelector(".panel-shell")));
+	const open = () => page.evaluate(() => document.querySelector(".panel-shell")?.dataset.open === "true");
 	if (!(await open())) {
 		/*
 		 * Matched on the end of the label, because the whole of it says what pressing the
@@ -313,7 +316,9 @@ export async function openPanel(page, tab = "context") {
 		 * fell through to a tool button, which failed with a story about a sticky note.
 		 */
 		await page.locator('.pill button[aria-label$="the boards panel"]').first().click();
-		await page.waitForFunction(() => Boolean(document.querySelector(".panel-shell")), null, { timeout: 6000 });
+		await page.waitForFunction(() => document.querySelector(".panel-shell")?.dataset.open === "true", null, { timeout: 6000 });
+		// It slides; a click landing mid-slide misses the row it was aimed at.
+		await page.waitForTimeout(220);
 	}
 	await page.getByRole("tab", { name: tab === "deck" ? /deck/i : /context/i }).click();
 	// The rows are drawn from a signal, and a click landing in the same frame as the switch

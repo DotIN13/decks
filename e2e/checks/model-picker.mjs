@@ -89,10 +89,21 @@ if (count < 2) {
 	 * the chip only shows the one in use now — without the line, the reply above a switch
 	 * and the reply below it read as the same voice.
 	 */
+	/*
+	 * Matched on the model's first word, and that is deliberate rather than lazy.
+	 *
+	 * The notice names the model's **id** — `anthropic/opus[1m]` — while the row names its
+	 * **label**, `Opus (1M context)`, because a label is what a person picks from and an id
+	 * is what the server was told. Neither is wrong and the UI never shows the id, so there
+	 * is nothing in the DOM to compare exactly against. The first word is what the two share,
+	 * and what must not regress is that the transcript says *which* model rather than only
+	 * that one changed.
+	 */
+	const token = wanted.split(/[\s(]/)[0].toLowerCase();
 	say(
 		"…naming the model it moved to",
-		notices.some((t) => t.toLowerCase().includes(wanted.toLowerCase())),
-		`looking for ${wanted} in ${JSON.stringify(notices)}`,
+		notices.some((t) => /model/i.test(t) && t.toLowerCase().includes(token)),
+		`looking for "${token}" in ${JSON.stringify(notices)}`,
 	);
 	await page.locator('.pill button[title^="Conversation"]').click();
 	await settle(page, 300);

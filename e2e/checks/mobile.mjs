@@ -403,7 +403,8 @@ if (!embed) {
 // their own now, and one edge cannot carry two drawers without asking which you meant.
 const openState = () =>
 	page.evaluate(() => ({
-		boards: Boolean(document.querySelector(".panel-shell")),
+		// `data-open`, not presence: the panel stays mounted so it can animate out.
+		boards: document.querySelector(".panel-shell")?.dataset.open === "true",
 		right: (document.querySelector("[data-shown]")?.dataset.shown ?? "false") === "true",
 	}));
 const away = await openState();

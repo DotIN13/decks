@@ -37,16 +37,39 @@ try {
 	/*
 	 * Folded means gone, and the camera is told.
 	 *
-	 * There is no 40px strip. It existed because a hover-summoned panel needed something to
-	 * aim at, and a button is that something — so the panel draws nothing, which is also
-	 * what makes the inset zero without anybody having to remember to say so.
+	 * There is no 40px strip: it existed because a hover-summoned panel needed something to
+	 * aim at, and a button is that something.
+	 *
+	 * "Gone" is now a slide rather than an unmount — the element has to survive in order to
+	 * animate out, and a panel that vanishes is a panel with no exit. So the assertions are
+	 * about the two things that actually matter and *were* previously guaranteed by the
+	 * unmount: it declares no inset, so the camera takes the whole window back, and it takes
+	 * no clicks, so a board along the left edge is still reachable through where it was.
 	 */
 	const toggle = page.locator('.pill button[aria-label$="the boards panel"]').first();
 	await toggle.click();
 	await page.waitForFunction(() => !document.querySelector("[data-inset='left']"), null, { timeout: 4000 });
-	say("folded, the panel is not in the document at all", (await mounted()) === 0);
-	say("…and the inset it declared goes with it", (await inset()) === "0px", await inset());
+	say("folded, it declares no inset", (await mounted()) === 0);
+	say("…and the camera has the whole window back", (await inset()) === "0px", await inset());
+	say(
+		"…and it takes no clicks where it used to be",
+		await page.evaluate(() => getComputedStyle(document.querySelector(".panel-shell")).pointerEvents === "none"),
+	);
 	say("no 40px strip left behind", (await page.locator(".panel-strip, .strip").count()) === 0);
+
+	/*
+	 * And it comes back, inset and all.
+	 *
+	 * This is the regression the slide introduced and the reason it is asserted separately:
+	 * measured by its painted rect, a panel that had just been asked to open was still
+	 * translated off-screen when its `data-inset` returned, so the camera recorded nothing —
+	 * and a transform is not a resize, so nothing measured it again. The canvas kept the
+	 * whole window for the rest of the session.
+	 */
+	await toggle.click();
+	await page.waitForSelector("[data-inset='left']", { timeout: 4000 });
+	await page.waitForTimeout(300);
+	say("unfolded, the camera is told again", (await inset()) === "276px", await inset());
 
 	// ⌘K brings it back on the Deck tab with the cursor in the field: what the modal became.
 	await page.keyboard.press("Meta+k");

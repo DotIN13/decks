@@ -109,7 +109,9 @@ export function Corner(props: {
 			/>
 
 			<Show when={anyActive()}>
-				<span class="pill-sep" aria-hidden="true" />
+				{/* Between the faces and the camera — and gone with the faces, which leave on a
+				    coarse pointer. A hairline with nothing on one side of it is not a divider. */}
+				<span class="pill-sep pointer-coarse:hidden" aria-hidden="true" />
 			</Show>
 
 			{/*
@@ -180,7 +182,7 @@ export function Corner(props: {
 				</Popover>
 			</span>
 
-			<span class="pill-sep" aria-hidden="true" />
+			<span class="pill-sep max-[520px]:hidden" aria-hidden="true" />
 
 			{/*
 			 * What the canvas holds: one board more, or none at all.
@@ -196,7 +198,7 @@ export function Corner(props: {
 			 */}
 			<button
 				type="button"
-				class="iconbtn"
+				class="iconbtn max-[520px]:hidden"
 				title="A new board, on the canvas"
 				aria-label="A new board, on the canvas"
 				onClick={() => props.onNewBoard()}
@@ -205,7 +207,7 @@ export function Corner(props: {
 			</button>
 			<button
 				type="button"
-				class="iconbtn"
+				class="iconbtn max-[520px]:hidden"
 				disabled={props.onCanvas === 0}
 				title={
 					props.onCanvas === 0
@@ -263,6 +265,42 @@ export function Corner(props: {
 					</button>
 				)}
 			>
+				{/*
+					The same two, as rows, on a screen too narrow for them.
+
+					Four 44px buttons and a chip do not fit a 393px line beside a 184px pill —
+					adding them to the corner is what pushed the two clusters back into overlap,
+					which is the one thing a floating chrome cannot do. So on a phone they fold
+					in here, where the app's own controls already are, and the menu is the only
+					thing that grows.
+				*/}
+				<button
+					type="button"
+					data-row
+					data-flat="true"
+					class="hidden max-[520px]:flex"
+					onClick={() => props.onNewBoard()}
+				>
+					<span class="ic">
+						<Icon of={FilePlus} size={15} />
+					</span>
+					<span class="lb">A new board</span>
+				</button>
+				<button
+					type="button"
+					data-row
+					data-flat="true"
+					class="hidden max-[520px]:flex"
+					disabled={props.onCanvas === 0}
+					onClick={() => props.onClearStage()}
+				>
+					<span class="ic">
+						<Icon of={Eraser} size={15} />
+					</span>
+					<span class="lb">Clear the canvas</span>
+				</button>
+				<span class="rule hidden max-[520px]:block" />
+
 				<For each={props.overflow}>
 					{(item) => (
 						<button type="button" data-row data-flat={item.note ? undefined : "true"} onClick={item.onPick}>

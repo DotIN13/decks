@@ -172,15 +172,16 @@ export function Stream(props: {
 		const keys = (event: KeyboardEvent) => {
 			if (event.key !== "Escape" || event.defaultPrevented || !historyShown()) return;
 			/*
-			 * A *menu*, not any `.popover`.
+			 * A menu open over the column owns Escape first — `Popover` closes on the same key
+			 * and does not stop the event, so one press would otherwise take the menu *and*
+			 * the surface it belongs to.
 			 *
-			 * The agent hover card wears the same class — it wants the same card and the same
-			 * shadow — and it is mounted for the whole session now rather than built on hover.
-			 * So `.popover` was always present, and Escape stopped closing the conversation
-			 * entirely. `role` is the honest discriminator: a menu is a thing you interact with
-			 * and it owns the key while it is open; a tooltip is not.
+			 * `.popover` is exactly the right question again now that it means a menu. It used
+			 * to mean "a card that floats", which the always-mounted agent tooltip also is, and
+			 * this guard was therefore true forever: Escape stopped closing the conversation at
+			 * all. See the note on `.floatcard` in `styles/chrome.css`.
 			 */
-			if (document.querySelector('.popover[role="menu"]')) return;
+			if (document.querySelector(".popover")) return;
 			event.preventDefault();
 			closeHistory();
 		};

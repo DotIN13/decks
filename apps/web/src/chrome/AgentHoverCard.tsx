@@ -102,7 +102,7 @@ export function AgentHoverCard(props: {
 				 * in it to press — and a 220px box floating over the canvas that swallowed
 				 * clicks would be a dead patch beside the corner.
 				 */
-				class="popover agent-hover pointer-events-none flex w-[220px] flex-col gap-[5px] rounded-[10px] px-2.5 py-[9px]"
+				class="floatcard agent-hover pointer-events-none flex w-[220px] flex-col gap-[5px] rounded-[10px] px-2.5 py-[9px]"
 				role="tooltip"
 				style={{
 					left: `${at()?.left ?? 0}px`,
