@@ -20,11 +20,22 @@ import solid from "vite-plugin-solid";
  */
 const API_PORT = Number(process.env.DECKS_PORT ?? 4329);
 const WEB_PORT = Number(process.env.DECKS_WEB_PORT ?? 4328);
+/*
+ * Loopback unless asked otherwise, which is the right default for a dev server.
+ *
+ * `DECKS_WEB_HOST=0.0.0.0` makes it reachable from the network — useful for looking at the
+ * app on a phone, and worth doing deliberately rather than by default: this server has no
+ * authentication, and the deck it is showing is whatever `DECKS_DATA_DIR` points at.
+ *
+ * Only the web port needs exposing. The API is reached through Vite's proxy, which connects
+ * from the server side, so `DECKS_HOST` can stay on loopback and the websocket still works.
+ */
+const WEB_HOST = process.env.DECKS_WEB_HOST ?? "127.0.0.1";
 
 export default defineConfig({
 	plugins: [solid(), tailwind()],
 	server: {
-		host: "127.0.0.1",
+		host: WEB_HOST,
 		port: WEB_PORT,
 		strictPort: true,
 		proxy: {
