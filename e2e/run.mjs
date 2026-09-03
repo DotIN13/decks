@@ -22,8 +22,15 @@ const root = resolve(here, "..");
 
 /** `needsAgent` means it starts a turn, so it needs a model configured and will cost tokens. */
 const CHECKS = [
-	{ file: "header.mjs", needsAgent: false },
-	{ file: "panels.mjs", needsAgent: false },
+	/*
+	 * `header.mjs` and `panels.mjs` are gone, replaced rather than ported: the title bar
+	 * they tested does not exist, and "two panels, one at a time" is one panel with a tab
+	 * strip. `turn-bar.mjs` went with the spine itself.
+	 */
+	{ file: "clusters.mjs", needsAgent: false },
+	{ file: "panel.mjs", needsAgent: false },
+	{ file: "edge.mjs", needsAgent: false },
+	{ file: "dock.mjs", needsAgent: false },
 	{ file: "camera.mjs", needsAgent: false },
 	{ file: "keys.mjs", needsAgent: false },
 	{ file: "gestures.mjs", needsAgent: false },
@@ -43,7 +50,6 @@ const CHECKS = [
 	{ file: "accounts.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
-	{ file: "turn-bar.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },
 	{ file: "time-machine.mjs", needsAgent: true },
 	{ file: "chrome.mjs", needsAgent: true },
@@ -56,6 +62,20 @@ const selected = CHECKS.filter((check) => {
 	return withAgent || !check.needsAgent;
 });
 const skipped = CHECKS.filter((check) => !selected.includes(check));
+
+/*
+ * The ports, from the environment.
+ *
+ * They were fixed at 4329/4328, which was fine while there was one deck on a machine and
+ * is not now: a suite cannot run while a live deck holds the port, and `strictPort` makes
+ * that a failure rather than a quiet move. `harness.mjs` has always read
+ * `DECKS_E2E_API`/`DECKS_E2E_WEB`; this passes the same numbers to the server it spawns,
+ * so the two halves finally agree.
+ */
+const API_PORT = Number(process.env.DECKS_E2E_API_PORT ?? 4329);
+const WEB_PORT = Number(process.env.DECKS_E2E_WEB_PORT ?? 4328);
+const API_URL = `http://127.0.0.1:${API_PORT}`;
+const WEB_URL = `http://127.0.0.1:${WEB_PORT}`;
 
 const data = mkdtempSync(join(tmpdir(), "decks-e2e-"));
 cpSync(join(root, "example"), data, { recursive: true });
@@ -70,7 +90,17 @@ rmSync(join(data, "decks", ".pi"), { recursive: true, force: true });
 
 const server = spawn("npm", ["run", "dev"], {
 	cwd: root,
-	env: { ...process.env, DECKS_DATA_DIR: data, DECKS_E2E_MARKER: "decks-e2e" },
+	env: {
+		...process.env,
+		DECKS_DATA_DIR: data,
+		DECKS_E2E_MARKER: "decks-e2e",
+		DECKS_PORT: String(API_PORT),
+		DECKS_WEB_PORT: String(WEB_PORT),
+		// The checks talk to these, and a mismatch between what is spawned and what is
+		// polled is a 90-second wait ending in "did not come up".
+		DECKS_E2E_API: API_URL,
+		DECKS_E2E_WEB: WEB_URL,
+	},
 	stdio: ["ignore", "pipe", "pipe"],
 });
 const log = [];
@@ -106,7 +136,7 @@ try {
 	const serving = await deckPath();
 	if (!serving || !serving.startsWith(data)) {
 		throw new Error(
-			`something else is already serving 127.0.0.1:4329 — it has ${serving ?? "an unknown deck"} open, not the fixture at ${data}. Stop it and run again.`,
+			`something else is already serving ${API_URL} — it has ${serving ?? "an unknown deck"} open, not the fixture at ${data}. Stop it and run again.`,
 		);
 	}
 	console.log(`fixture: ${data}`);
@@ -164,8 +194,8 @@ async function waitForServer() {
 	const deadline = Date.now() + 90000;
 	while (Date.now() < deadline) {
 		if (server.exitCode !== null) throw new Error(`dev server exited with ${server.exitCode}`);
-		const api = await ping("http://127.0.0.1:4329/api/deck");
-		const web = await ping("http://127.0.0.1:4328/");
+		const api = await ping(`${API_URL}/api/deck`);
+		const web = await ping(`${WEB_URL}/`);
 		if (api && web) return;
 		await new Promise((resolve) => setTimeout(resolve, 400));
 	}
@@ -174,7 +204,7 @@ async function waitForServer() {
 
 async function deckPath() {
 	try {
-		const response = await fetch("http://127.0.0.1:4329/api/deck");
+		const response = await fetch(`${API_URL}/api/deck`);
 		if (!response.ok) return undefined;
 		return (await response.json())?.deck?.path;
 	} catch {
@@ -195,7 +225,15 @@ function runCheck(file) {
 	return new Promise((done) => {
 		const child = spawn(process.execPath, [file], {
 			cwd: root,
-			env: { ...process.env, DECKS_E2E_MARKER: "decks-e2e" },
+			/*
+			 * The URLs go to the checks too, not only to the server.
+			 *
+			 * `harness.mjs` reads them, and every check goes through `open()` — so without
+			 * them here a run on non-default ports spawns the fixture correctly and then has
+			 * twenty-five checks navigate to whatever is on 4328, which is either nothing or,
+			 * worse, somebody's live deck.
+			 */
+			env: { ...process.env, DECKS_E2E_MARKER: "decks-e2e", DECKS_E2E_API: API_URL, DECKS_E2E_WEB: WEB_URL },
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		let output = "";

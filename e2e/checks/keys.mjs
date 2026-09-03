@@ -7,18 +7,18 @@
 import { open, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
-const zoom = async () => Number((await page.locator(".zoombar .level").textContent()).replace("%", ""));
+const zoom = async () => Number((await page.locator('.pill [aria-label^="Zoom"]').first().textContent()).replace("%", ""));
 const waitForZoomChange = async (was) => {
 	await page.waitForFunction(
-		(previous) => Number((document.querySelector(".zoombar .level")?.textContent ?? "").replace("%", "")) !== previous,
+		(previous) => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "").replace(/[^0-9.]/g, "")) !== previous,
 		was,
 		{ timeout: 5000 },
 	);
 	return zoom();
 };
 
-await page.evaluate(() => document.querySelector(".rail-item")?.click());
-await page.waitForFunction(() => Number((document.querySelector(".zoombar .level")?.textContent ?? "0%").replace("%", "")) > 40, null, { timeout: 8000 });
+await page.evaluate(() => document.querySelector(".board-row")?.click());
+await page.waitForFunction(() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")) > 40, null, { timeout: 8000 });
 
 // Empty board space, not a component: clicking a component is handled by the editor,
 // which calls preventDefault and so keeps focus where it was. Bare board gives the

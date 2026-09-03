@@ -11,7 +11,7 @@ const two = deck.boards.map((board) => board.path).slice(0, 2);
 
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 const onCanvas = () => page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
-const inRail = () => page.evaluate(() => [...document.querySelectorAll(".rail-item .file")].map((n) => n.textContent).sort());
+const inRail = () => page.evaluate(() => [...document.querySelectorAll(".board-row .file")].map((n) => n.textContent).sort());
 
 // A fresh agent, so nothing it holds is inherited.
 await newAgent(page);

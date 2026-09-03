@@ -13,9 +13,9 @@ const paths = deck.boards.map((board) => board.path).sort();
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 const onCanvas = () => page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
 /** The context panel's list, which is the focused agent's held set and nothing else. */
-const inRail = () => page.evaluate(() => [...document.querySelectorAll(".side .rail-item .file")].map((n) => n.textContent).sort());
+const inRail = () => page.evaluate(() => [...document.querySelectorAll(".side .board-row .file")].map((n) => n.textContent).sort());
 /** The whole deck, in the modal that lists it. */
-const inModal = () => page.evaluate(() => [...document.querySelectorAll(".all-boards .rail-item .file")].map((n) => n.textContent).sort());
+const inModal = () => page.evaluate(() => [...document.querySelectorAll(".all-boards .board-row .file")].map((n) => n.textContent).sort());
 
 /*
  * A fresh agent holds nothing, so it puts nothing on the canvas. The canvas used to fall
@@ -34,7 +34,7 @@ say("an agent holding nothing puts nothing on the canvas", (await onCanvas()).le
 
 await openPanel(page, "context");
 say("…and the context panel lists nothing either", (await inRail()).length === 0, (await inRail()).join(" ") || "(empty)");
-say("…saying so rather than looking broken", (await page.locator(".side.context").innerText()).includes("not holding any boards"));
+say("…saying so rather than looking broken", (await page.locator("[data-inset='left']").innerText()).includes("not holding any boards"));
 
 await openAllBoards(page);
 say("the whole deck is in the modal, which is where you find a board", (await inModal()).join() === paths.join(), (await inModal()).join(" "));
@@ -64,7 +64,7 @@ say("…without dropping it from the agent's context", (await inRail()).length =
 
 // Clicking a thumbnail in the context panel puts it back.
 await openPanel(page, "context");
-await page.locator(`.side .rail-item:has(.file:text-is("${first}"))`).click();
+await page.locator(`.side .board-row:has(.file:text-is("${first}"))`).click();
 await page.waitForFunction((wanted) => Boolean(document.querySelector(`.board-node[data-path="${wanted}"]`)), first, { timeout: 8000 });
 await page.mouse.move(800, 500);
 say("clicking a rail item plays it", (await onCanvas()).includes(first), (await onCanvas()).join(" "));

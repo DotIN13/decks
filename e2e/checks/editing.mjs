@@ -45,7 +45,7 @@ try {
 
 	// Zoom in so the frame is live and the palette appears.
 	await page.evaluate((wanted) => {
-		[...document.querySelectorAll(".rail-item")].find((i) => i.textContent.includes(wanted))?.click();
+		[...document.querySelectorAll(".board-row")].find((i) => i.textContent.includes(wanted))?.click();
 	}, "editing-fixture");
 	await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });
 	say("the palette appears at editing zoom", await page.locator(".palette").isVisible());

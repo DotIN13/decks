@@ -65,7 +65,7 @@ try {
 	 */
 	await page.waitForFunction(
 		() => {
-			const items = [...document.querySelectorAll(".all-boards .rail-item .file")].map((n) => n.textContent);
+			const items = [...document.querySelectorAll(".all-boards .board-row .file")].map((n) => n.textContent);
 			return items.length > 0 && !items.includes("boards/ghost.html");
 		},
 		null,
@@ -74,7 +74,7 @@ try {
 	const deck = await deckState();
 
 	const after = await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
-	const listed = await page.evaluate(() => [...document.querySelectorAll(".all-boards .rail-item .file")].map((n) => n.textContent).sort());
+	const listed = await page.evaluate(() => [...document.querySelectorAll(".all-boards .board-row .file")].map((n) => n.textContent).sort());
 	say("the agent holds nothing, so the canvas is empty", after.length === 0, after.join(" ") || "(empty)");
 	say("the deck itself is intact, without the ghost in it",
 		listed.join() === deck.boards.map((b) => b.path).sort().join(), listed.join(" "));
@@ -93,8 +93,8 @@ try {
 	await fresh.goto(page.url(), { waitUntil: "load" });
 	await fresh.waitForSelector(".composer textarea", { timeout: 15000 });
 	await openAllBoards(fresh);
-	await fresh.waitForSelector(".all-boards .rail-item", { timeout: 15000 });
-	const reloaded = await fresh.evaluate(() => [...document.querySelectorAll(".all-boards .rail-item .file")].map((n) => n.textContent));
+	await fresh.waitForSelector(".all-boards .board-row", { timeout: 15000 });
+	const reloaded = await fresh.evaluate(() => [...document.querySelectorAll(".all-boards .board-row .file")].map((n) => n.textContent));
 	say(
 		"a fresh load agrees",
 		reloaded.length > 0 && !reloaded.includes("boards/ghost.html"),

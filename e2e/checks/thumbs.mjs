@@ -50,7 +50,7 @@ try {
 	/** What each thumbnail in the modal currently is: a document, a photograph, or nothing. */
 	const shapes = () =>
 		page.evaluate(() =>
-			[...document.querySelectorAll(".all-boards .rail-item")].map((item) => ({
+			[...document.querySelectorAll(".all-boards .board-row")].map((item) => ({
 				path: item.querySelector(".file")?.textContent ?? "?",
 				kind: item.querySelector("iframe") ? "document" : item.querySelector(".thumb-shot") ? "photograph" : "blank",
 			})),
@@ -59,7 +59,7 @@ try {
 
 	// --- 1. the first look is live documents, as it always was ------------------------
 	await openAllBoards(page);
-	await page.waitForFunction(() => document.querySelectorAll(".all-boards .rail-item iframe").length > 0, null, { timeout: 15000 });
+	await page.waitForFunction(() => document.querySelectorAll(".all-boards .board-row iframe").length > 0, null, { timeout: 15000 });
 	say("the first look at a board is the board itself", (await count("document")) > 0, JSON.stringify(await shapes()));
 
 	/*
@@ -134,7 +134,7 @@ try {
 	write(file, read(file).replace("A sticky note", "An edited sticky note"));
 	await page.waitForFunction(
 		(path) => {
-			const item = [...document.querySelectorAll(".all-boards .rail-item")].find((entry) => entry.querySelector(".file")?.textContent === path);
+			const item = [...document.querySelectorAll(".all-boards .board-row")].find((entry) => entry.querySelector(".file")?.textContent === path);
 			return Boolean(item?.querySelector("iframe"));
 		},
 		target,
@@ -152,10 +152,10 @@ try {
 	await settle(page, 300);
 	for (const path of wanted.slice(0, 3)) link.send({ type: "board.play", path });
 	await openPanel(page, "context");
-	await page.waitForFunction(() => document.querySelectorAll(".side .rail-item").length >= 3, null, { timeout: 15000 });
+	await page.waitForFunction(() => document.querySelectorAll(".side .board-row").length >= 3, null, { timeout: 15000 });
 	await settle(page, 4000);
 	const panel = await page.evaluate(() => ({
-		documents: document.querySelectorAll(".side .rail-item iframe").length,
+		documents: document.querySelectorAll(".side .board-row iframe").length,
 		photographs: document.querySelectorAll(".side .thumb-shot").length,
 	}));
 	say("the context panel keeps live documents", panel.documents > 0, JSON.stringify(panel));

@@ -8,8 +8,8 @@
 import { open, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
-await page.evaluate(() => document.querySelector(".rail-item").click());
-await page.waitForFunction(() => Number((document.querySelector(".zoombar .level")?.textContent ?? "0%").replace("%", "")) > 40, null, { timeout: 8000 });
+await page.evaluate(() => document.querySelector(".board-row").click());
+await page.waitForFunction(() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")) > 40, null, { timeout: 8000 });
 
 const camera = () =>
 	page.evaluate(() => {

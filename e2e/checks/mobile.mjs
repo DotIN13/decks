@@ -128,10 +128,10 @@ say(
 // --- 4. the same gestures over a live board ------------------------------------------
 // Fly to one board and get past `INTERACT_ZOOM`, where its frame takes pointer events
 // and every gesture has to be forwarded back out of it.
-await page.evaluate(() => [...document.querySelectorAll(".rail-item")].find((item) => item.textContent.includes("plan.html"))?.click());
+await page.evaluate(() => [...document.querySelectorAll(".board-row")].find((item) => item.textContent.includes("plan.html"))?.click());
 await settle(page, 500);
 while ((await camera()).zoom < 0.6) {
-	await page.evaluate(() => document.querySelector('.zoombar [aria-label="Zoom in"]').click());
+	await page.evaluate(() => document.querySelector('.pill [aria-label^="Zoom"]').click());
 	await settle(page, 60);
 }
 const over = await page.evaluate(() => {
@@ -197,7 +197,7 @@ say(
 // Back to the whole board and just past `INTERACT_ZOOM`, so there is something small
 // enough to aim at and it is where the maths says it is.
 const frameBoard = async (name) => {
-	await page.evaluate((wanted) => [...document.querySelectorAll(".rail-item")].find((item) => item.textContent.includes(wanted))?.click(), name);
+	await page.evaluate((wanted) => [...document.querySelectorAll(".board-row")].find((item) => item.textContent.includes(wanted))?.click(), name);
 	await page.waitForFunction(
 		(wanted) => document.querySelector(`.board-node[data-path="boards/${wanted}"] iframe`)?.contentWindow?.__boardReady === true,
 		name,
@@ -205,7 +205,7 @@ const frameBoard = async (name) => {
 	);
 	await settle(page, 300);
 	while ((await camera()).zoom < 0.55) {
-		await page.evaluate(() => document.querySelector('.zoombar [aria-label="Zoom in"]').click());
+		await page.evaluate(() => document.querySelector('.pill [aria-label^="Zoom"]').click());
 		await settle(page, 60);
 	}
 };
@@ -349,7 +349,7 @@ if (!embed) {
 const openState = () =>
 	page.evaluate(() => ({
 		left: document.querySelector(".side:not(.context)")?.dataset.open,
-		boards: document.querySelector(".side.context")?.dataset.open,
+		boards: document.querySelector("[data-inset='left']")?.dataset.open,
 		right: document.querySelector(".chat-float")?.dataset.open,
 	}));
 const away = await openState();
@@ -446,7 +446,7 @@ say("…and the canvas gets the finger back", afterDown.y !== beforeDown.y, `${b
  * board's pointer events never reach this document (DESIGN §4), so the fingers come out
  * through `frame-gestures.ts` and both paths have to end in the same pool.
  */
-await page.evaluate(() => document.querySelector(".rail-item")?.click());
+await page.evaluate(() => document.querySelector(".board-row")?.click());
 await settle(page, 2500);
 // Fitting a board leaves a margin, so the edge is still bare stage: pinch out until the
 // frame reaches it. Pinching rather than the zoom buttons because the inspector is a

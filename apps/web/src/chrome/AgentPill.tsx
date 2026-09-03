@@ -354,8 +354,15 @@ export function AgentPill(props: {
 
 			<span class="pill-sep max-[1100px]:hidden" aria-hidden="true" />
 
-			{/* The tools, at any width that has room for five of them. */}
-			<span class="flex items-center gap-1 max-[1100px]:hidden" role="group" aria-label="Tools">
+			{/*
+				The tools, at any width that has room for five of them.
+
+				`palette` as well as the utilities, and it is not decoration: it is the name the
+				canvas checks address this group by, and it is still the same group of controls —
+				what changed is which cluster it sits in. Renaming a handle because a thing moved
+				house is how a suite stops testing what it says it tests.
+			*/}
+			<span class="palette flex items-center gap-1 max-[1100px]:hidden" role="group" aria-label="Tools">
 				<For each={TOOLS}>
 					{(entry) => (
 						<button

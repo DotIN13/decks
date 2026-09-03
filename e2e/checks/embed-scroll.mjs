@@ -9,11 +9,11 @@ import { open, say, settle } from "../harness.mjs";
 const { browser, page, errors } = await open();
 
 const showSources = async () => {
-	await page.evaluate(() => [...document.querySelectorAll(".rail-item")].find((i) => i.textContent.includes("sources"))?.click());
+	await page.evaluate(() => [...document.querySelectorAll(".board-row")].find((i) => i.textContent.includes("sources"))?.click());
 	await page.waitForFunction(
 		() => {
 			const frame = document.querySelector('.board-node[data-path="boards/sources.html"] iframe');
-			return frame?.contentWindow?.__boardReady === true && Number((document.querySelector(".zoombar .level")?.textContent ?? "0%").replace("%", "")) > 40;
+			return frame?.contentWindow?.__boardReady === true && Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")) > 40;
 		},
 		null,
 		{ timeout: 15000 },
@@ -22,7 +22,7 @@ const showSources = async () => {
 await showSources();
 
 const world = () => page.evaluate(() => document.querySelector(".world").style.transform);
-const zoom = async () => Number((await page.locator(".zoombar .level").textContent()).replace("%", ""));
+const zoom = async () => Number((await page.locator('.pill [aria-label^="Zoom"]').first().textContent()).replace("%", ""));
 
 /** Where a component inside a board sits on screen, in the parent's coordinates. */
 const screenPoint = (id, dx, dy) =>
@@ -94,7 +94,7 @@ await page.keyboard.down("Control");
 await page.mouse.move(at.x, at.y);
 await page.mouse.wheel(0, -120);
 await page.keyboard.up("Control");
-await page.waitForFunction((was) => Number((document.querySelector(".zoombar .level")?.textContent ?? "").replace("%", "")) !== was, z0, { timeout: 5000 });
+await page.waitForFunction((was) => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "").replace(/[^0-9.]/g, "")) !== was, z0, { timeout: 5000 });
 say("a pinch inside an embed zooms the canvas", (await zoom()) !== z0, `${z0}% → ${await zoom()}%`);
 
 say("no page errors", errors.length === 0, errors.join(" | "));

@@ -54,7 +54,7 @@ try {
 	// Zoom in, as a user reaching for a board does: below INTERACT_ZOOM the frame is
 	// inert and takes no drops at all.
 	await page.evaluate(() => {
-		[...document.querySelectorAll(".rail-item")].find((i) => i.textContent.includes("drop-fixture"))?.click();
+		[...document.querySelectorAll(".board-row")].find((i) => i.textContent.includes("drop-fixture"))?.click();
 	});
 	await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });
 

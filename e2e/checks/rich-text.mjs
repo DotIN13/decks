@@ -82,7 +82,7 @@ try {
 	 * below it. Clicking the rail item is the user's own way of asking for one board.
 	 */
 	await page.evaluate(() => {
-		[...document.querySelectorAll(".rail-item")].find((item) => item.textContent.includes("rich-fixture"))?.click();
+		[...document.querySelectorAll(".board-row")].find((item) => item.textContent.includes("rich-fixture"))?.click();
 	});
 	await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });
 	await page.waitForTimeout(400);

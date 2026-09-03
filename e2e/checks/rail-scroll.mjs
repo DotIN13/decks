@@ -39,7 +39,7 @@ for (const path of wanted) link.send({ type: "board.play", path });
 
 const { browser, page, errors } = await open({ width: 1400, height: 800 });
 try {
-	await page.waitForFunction((count) => document.querySelectorAll(".rail-item").length >= count, EXTRA, { timeout: 20000 });
+	await page.waitForFunction((count) => document.querySelectorAll(".board-row").length >= count, EXTRA, { timeout: 20000 });
 	// The boards live in the context panel, which is the one this check is about.
 	await openPanel(page, "context");
 	await settle(page, 400);
@@ -70,7 +70,7 @@ try {
 	say("a wheel over the list scrolls it", scrolled.scrollTop > 0, `scrollTop ${first.scrollTop} -> ${scrolled.scrollTop}`);
 
 	// The canvas must not have panned instead.
-	const zoomLabel = await page.locator(".zoombar .level").textContent();
+	const zoomLabel = await page.locator('.pill [aria-label^="Zoom"]').first().textContent();
 	say("the camera did not pan while scrolling the list", true, `zoom still ${zoomLabel}`);
 
 	await page.evaluate(() => {
@@ -79,14 +79,14 @@ try {
 	});
 	await page.waitForFunction(
 		() => {
-			const items = [...document.querySelectorAll(".side .rail .rail-item")];
+			const items = [...document.querySelectorAll(".side .rail .board-row")];
 			return Boolean(items.at(-1)?.querySelector("iframe, img"));
 		},
 		null,
 		{ timeout: 20000 },
 	);
 	const last = await page.evaluate(() => {
-		const items = [...document.querySelectorAll(".side .rail .rail-item")];
+		const items = [...document.querySelectorAll(".side .rail .board-row")];
 		const element = items.at(-1);
 		const box = element.getBoundingClientRect();
 		const listBox = document.querySelector(".side .rail .items").getBoundingClientRect();
@@ -101,15 +101,15 @@ try {
 
 	// The cost bound has to survive scrolling the whole list, or "mount what is near"
 	// just becomes "mount everything, eventually".
-	const live = await page.evaluate(() => document.querySelectorAll(".side .rail .rail-item iframe").length);
-	const total = await page.evaluate(() => document.querySelectorAll(".side .rail .rail-item").length);
+	const live = await page.evaluate(() => document.querySelectorAll(".side .rail .board-row iframe").length);
+	const total = await page.evaluate(() => document.querySelectorAll(".side .rail .board-row").length);
 	say("live thumbnails stay bounded after scrolling the list", live < total, `${live} live of ${total} items`);
 
 	await page.evaluate(() => {
 		document.querySelector(".side .rail .items").scrollTop = 0;
 	});
 	await page.waitForFunction(
-		() => Boolean(document.querySelector(".side .rail .rail-item")?.querySelector("iframe, img")),
+		() => Boolean(document.querySelector(".side .rail .board-row")?.querySelector("iframe, img")),
 		null,
 		{ timeout: 20000 },
 	);
@@ -124,14 +124,14 @@ try {
 	 * which is where a scroll container clips; measuring against the content box says
 	 * nothing, and told me the fix had not worked when it had.
 	 */
-	await page.locator(".side .rail .rail-item").first().click();
+	await page.locator(".side .rail .board-row").first().click();
 	await settle(page, 900);
 	await openPanel(page, "agents");
 	await settle(page, 300);
 
 	const ring = await page.evaluate(() => {
 		const list = document.querySelector(".side .rail .items");
-		const current = document.querySelector('.side .rail .rail-item[data-current="true"]');
+		const current = document.querySelector('.side .rail .board-row[data-current="true"]');
 		if (!current) return { current: false };
 		const style = getComputedStyle(list);
 		const box = list.getBoundingClientRect();
@@ -168,7 +168,7 @@ try {
 	 * showed two rows and hid the rest with no scrollbar to say so.
 	 */
 	await openAllBoards(page);
-	await page.waitForFunction((count) => document.querySelectorAll(".all-boards .rail-item").length >= count, EXTRA, { timeout: 15000 });
+	await page.waitForFunction((count) => document.querySelectorAll(".all-boards .board-row").length >= count, EXTRA, { timeout: 15000 });
 	await settle(page, 600);
 	const modal = await page.evaluate(() => {
 		const items = document.querySelector(".all-boards .items");
@@ -195,7 +195,7 @@ try {
 	const loading = await page.evaluate(() => {
 		const peak = { value: 0 };
 		const look = () => {
-			const starting = [...document.querySelectorAll(".all-boards .rail-item .thumb iframe")].filter((frame) => {
+			const starting = [...document.querySelectorAll(".all-boards .board-row .thumb iframe")].filter((frame) => {
 				try {
 					return frame.contentDocument?.readyState !== "complete";
 				} catch {

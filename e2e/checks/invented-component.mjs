@@ -71,7 +71,7 @@ try {
 		{ timeout: 20000 },
 	);
 	await page.evaluate((wanted) => {
-		[...document.querySelectorAll(".rail-item")].find((item) => item.textContent.includes(wanted))?.click();
+		[...document.querySelectorAll(".board-row")].find((item) => item.textContent.includes(wanted))?.click();
 	}, "invented-fixture");
 	await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });
 

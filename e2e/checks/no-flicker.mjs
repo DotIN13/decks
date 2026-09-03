@@ -15,7 +15,7 @@ const { browser, page, errors } = await open();
 try {
 	await page.locator('.board-node[data-path="boards/plan.html"] .chrome').first().click();
 	await page.keyboard.press("1");
-	await page.waitForFunction(() => Number((document.querySelector(".zoombar .level")?.textContent ?? "0%").replace("%", "")) > 40, null, { timeout: 8000 });
+	await page.waitForFunction(() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")) > 40, null, { timeout: 8000 });
 
 	const plant = () => page.evaluate((s) => { document.querySelector(s).contentWindow.__keep = "alive"; }, selector);
 	const alive = () => page.evaluate((s) => document.querySelector(s).contentWindow.__keep ?? null, selector);

@@ -124,7 +124,7 @@ try {
 		{ timeout: 20000 },
 	);
 	await page.evaluate((wanted) => {
-		[...document.querySelectorAll(".rail-item")].find((item) => item.textContent.includes(wanted))?.click();
+		[...document.querySelectorAll(".board-row")].find((item) => item.textContent.includes(wanted))?.click();
 	}, "inspector-fixture");
 	await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });
 
@@ -498,7 +498,7 @@ try {
 
 	await page.keyboard.press("0");
 	await page.waitForFunction(
-		() => Number((document.querySelector(".zoombar .level")?.textContent ?? "100%").replace("%", "")) < 50,
+		() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "100%").replace(/[^0-9.]/g, "")) < 50,
 		null,
 		{ timeout: 5000 },
 	);
