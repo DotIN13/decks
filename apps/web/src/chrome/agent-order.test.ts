@@ -4,10 +4,11 @@ import { test } from "node:test";
 import { agentList, agentOrder, agentStatus, since, stackFaces, STACK_CAP } from "./agent-order.ts";
 
 /*
- * The corner's two rules are both subtractions — no idle agents, and not the one you are
- * already in — and both of them are the kind of thing that gets quietly re-added by
- * someone making the list "complete". So they are asserted here rather than trusted to the
- * comment that explains them.
+ * The corner subtracts one thing — the agent whose window this already is — and orders the
+ * rest by how much they want you. It used to subtract idle agents too, and that changed
+ * once it was running: three idle agents and an empty corner reads as broken rather than
+ * as quiet. Urgency survives as order rather than as membership, so the tests below check
+ * the order carefully and the exclusion only once.
  */
 
 /** A chat with only the fields the ordering reads, and the required ones filled in. */
@@ -39,17 +40,17 @@ test("done is derived, not reported", () => {
 	assert.equal(agentStatus("tool", 5), "working");
 });
 
-test("asking, then finished, then busy", () => {
+test("asking, then finished, then busy, then idle", () => {
 	const chats = [chat("busy", "tool"), chat("read", "idle"), chat("green", "idle"), chat("asking", "waiting")];
-	assert.deepEqual(ids(agentOrder(chats, { green: 1 })), ["asking", "green", "busy"]);
+	assert.deepEqual(ids(agentOrder(chats, { green: 1 })), ["asking", "green", "busy", "read"]);
 });
 
-test("an idle agent is not in the corner at all", () => {
+test("an idle agent is in the corner, and last", () => {
 	const chats = [chat("quiet", "idle"), chat("busy", "thinking")];
-	assert.deepEqual(ids(agentOrder(chats, {})), ["busy"]);
-	// Reading it is what retires it: the same agent, once its unread is cleared, leaves.
+	assert.deepEqual(ids(agentOrder(chats, {})), ["busy", "quiet"]);
+	// Unread promotes it to `done` and therefore above the busy one; reading it puts it back.
 	assert.deepEqual(ids(agentOrder(chats, { quiet: 3 })), ["quiet", "busy"]);
-	assert.deepEqual(ids(agentOrder(chats, { quiet: 0 })), ["busy"]);
+	assert.deepEqual(ids(agentOrder(chats, { quiet: 0 })), ["busy", "quiet"]);
 });
 
 test("the agent whose window this is has no face in the corner", () => {
@@ -81,8 +82,15 @@ test("the dropdown is what exists, not what is happening", () => {
 	const chats = [chat("busy", "tool"), chat("quiet", "idle", 10), chat("asking", "waiting"), chat("here", "streaming")];
 	// Everyone, idle included, with the focused agent pinned to the top.
 	assert.deepEqual(ids(agentList(chats, {}, "here")), ["here", "asking", "busy", "quiet"]);
-	// And below the pin the order is exactly the corner's, so a face is in the same place twice.
-	assert.deepEqual(ids(agentList(chats, {}, "here")).slice(1, 3), ids(agentOrder(chats, {}, "here")));
+	/*
+	 * And below the pin the dropdown *is* the corner — the same agents in the same order.
+	 *
+	 * That is a stronger claim than it used to be. While the corner excluded idle agents the
+	 * two lists could only agree on a prefix; now they differ by exactly one row, the pinned
+	 * one, so a face is in the same relative place in both and switching by either route
+	 * feels like the same list.
+	 */
+	assert.deepEqual(ids(agentList(chats, {}, "here")).slice(1), ids(agentOrder(chats, {}, "here")));
 });
 
 test("how long ago, in the room a corner has", () => {

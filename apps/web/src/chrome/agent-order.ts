@@ -62,8 +62,23 @@ export const STACK_CAP = 3;
  * signal it already has; a missing entry is zero.
  */
 export function agentOrder(chats: AgentChat[], unread: Record<string, number>, focusedId?: string): AgentChat[] {
+	/*
+	 * Every other agent, idle included — and the idle ones are drawn dimmed, as the dropdown
+	 * draws them.
+	 *
+	 * This started as *active only*, on the argument that a corner which fills itself and
+	 * empties itself is chrome you can trust: a face there always meant something wanted
+	 * you. The trouble showed up the moment it was running — three agents, all idle, and a
+	 * corner with nothing in it reads as a corner that is broken rather than as a corner
+	 * with nothing to say. An empty state that looks like a bug is not worth the purity.
+	 *
+	 * So the queue becomes a roster, and urgency survives as *order* rather than as
+	 * membership: asking first, then done, then working, then idle by how recently it ran.
+	 * The signal is still in the ring — dimmed and ringless is unmistakably "nothing here" —
+	 * and the cap keeps the corner from growing past three faces and a count.
+	 */
 	return sortByUrgency(
-		chats.filter((chat) => chat.id !== focusedId && agentStatus(chat.state, unread[chat.id] ?? 0) !== "idle"),
+		chats.filter((chat) => chat.id !== focusedId),
 		unread,
 	);
 }

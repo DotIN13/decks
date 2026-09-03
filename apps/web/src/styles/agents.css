@@ -129,8 +129,9 @@
 		}
 	}
 
-	/* Idle is only ever drawn in the dropdown, and drawn as an absence: no ring, and half
-	   opacity on the face and its name — see the row rules below. */
+	/* Idle is drawn as an absence, in the corner and the dropdown alike: no ring, and half
+	   opacity on the face and its name — see the row rules below. It used to be excluded from
+	   the corner entirely, and an empty corner read as a broken one. */
 	.agent-face[data-status="idle"] {
 		opacity: 0.5;
 	}
