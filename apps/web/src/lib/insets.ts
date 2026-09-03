@@ -74,16 +74,37 @@ export function watchInsets(root: HTMLElement = document.body): void {
 		for (const el of tracked) {
 			const edge = (el as HTMLElement).dataset.inset as keyof Insets | undefined;
 			if (!edge) continue;
-			const r = el.getBoundingClientRect();
-			// A hidden or slid-away surface measures nothing, so nothing has to deregister it.
-			if (r.width === 0 || r.height === 0) continue;
-			// Distance from its own edge to the far side of the element, plus its margin —
-			// which is why this reads the rect rather than the offsetWidth: a panel inset 12px
-			// from the edge is 12px of gutter the canvas cannot use either.
-			if (edge === "left") next.left = Math.max(next.left, r.right);
-			if (edge === "right") next.right = Math.max(next.right, view.width - r.left);
-			if (edge === "top") next.top = Math.max(next.top, r.bottom);
-			if (edge === "bottom") next.bottom = Math.max(next.bottom, view.height - r.top);
+			/*
+			 * The *layout* box, not the painted one — `offsetLeft`/`offsetTop` ignore
+			 * transforms where `getBoundingClientRect` does not.
+			 *
+			 * That distinction is the whole of a bug. The panel is slid out with a `translate`
+			 * rather than unmounted, so it animates; measured by its painted rect, a panel
+			 * that had just been asked to open was still off-screen at the moment its
+			 * `data-inset` came back, so the camera recorded nothing — and the ResizeObserver
+			 * never fired again, because a transform is not a resize. The canvas kept the
+			 * whole window for the rest of the session.
+			 *
+			 * Layout coordinates say where a surface *is* rather than where it is currently
+			 * drawn, which is also the honest answer for a camera: a panel arriving is a panel
+			 * the boards should already be making room for.
+			 *
+			 * These elements are all `position: fixed` with no positioned ancestor, so their
+			 * offsets are viewport coordinates.
+			 */
+			const box = el as HTMLElement;
+			const width = box.offsetWidth;
+			const height = box.offsetHeight;
+			// A surface that is `display: none` measures nothing, so nothing has to
+			// deregister it — but one that is merely slid away still counts, which is the
+			// point of reading the layout box.
+			if (width === 0 || height === 0) continue;
+			// Its own edge to the far side of it, gutter included: a panel inset 12px from the
+			// window is 12px the canvas cannot use either.
+			if (edge === "left") next.left = Math.max(next.left, box.offsetLeft + width);
+			if (edge === "right") next.right = Math.max(next.right, view.width - box.offsetLeft);
+			if (edge === "top") next.top = Math.max(next.top, box.offsetTop + height);
+			if (edge === "bottom") next.bottom = Math.max(next.bottom, view.height - box.offsetTop);
 		}
 		const now = insets();
 		if (now.left === next.left && now.right === next.right && now.top === next.top && now.bottom === next.bottom) return;

@@ -444,6 +444,23 @@ export type ClientMessage =
 	/** Put a board on the canvas / take it off again. The context is untouched either way. */
 	| { type: "board.play"; path: string }
 	| { type: "board.hide"; path: string }
+	/**
+	 * A new, empty board, put on the canvas.
+	 *
+	 * The server has been able to write one from a template since agents needed it; this is
+	 * the same call reached from a button, because "I want somewhere to put this" is a thing
+	 * a person has as often as an agent does, and asking for it in words was the only way.
+	 *
+	 * No title. A board named by a dialog before it has anything on it is a naming decision
+	 * taken at the worst possible moment — it arrives as `Untitled`, and its heading is a
+	 * field you can retype like any other.
+	 *
+	 * `kind` is a template name and the server owns the list (`boards/templates.ts` validates
+	 * it); it is a bare `string` here because the protocol package cannot depend on the
+	 * server, and an unknown one falls back to `blank` rather than failing — the worst
+	 * outcome of a typo should be an empty board.
+	 */
+	| { type: "board.create"; kind?: string }
 	| { type: "board.comment"; path: string; id: string; text: string }
 	| { type: "camera.set"; camera: Camera }
 	| { type: "agent.create"; parentId?: string; kind?: AgentKind }

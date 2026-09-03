@@ -55,6 +55,7 @@ export function ModelPicker(props: {
 		return props.models.filter((option) => `${option.provider}/${option.model}`.toLowerCase().includes(needle));
 	});
 
+
 	const pick = (option: ModelOption) => {
 		// The level comes across only as far as the new model allows (`thinking.ts`).
 		props.onModel(option.provider, option.model, nearestLevel(props.model?.thinking, levelsFor(option)));
@@ -116,7 +117,25 @@ export function ModelPicker(props: {
 				/>
 			</label>
 
-			<div class="flex max-h-[220px] flex-col overflow-y-auto">
+			{/*
+				The list, and its *height* is what was wrong with it.
+
+				`max-h-[220px]` fitted seven of thirteen rows and cut the eighth in half, so the
+				card was a letterbox over a list you had to scroll to see any of. The cap is a
+				fraction of the window now with a ceiling: 56vh shows about fourteen rows on a
+				laptop while leaving room for the search field above and the thinking scale
+				below, and on a short window it gives way rather than pushing them off.
+
+				`min-h-0` because this is a flex child that scrolls — without it the flex
+				algorithm hands it its content height and the `overflow` never engages, which is
+				the other way a list like this ends up the wrong size.
+
+				The provider stays on every row. It was briefly a group heading instead, on the
+				argument that thirteen identical chips are noise; they are, but the repetition
+				is also what makes the column scannable when two providers offer models with
+				similar names, and it was not what was cramped.
+			*/}
+			<div class="flex max-h-[min(56vh,440px)] min-h-0 flex-col overflow-y-auto">
 				<Show when={matches().length > 0} fallback={<p class="meta m-0 px-2 py-2.5">No model matches that</p>}>
 					<For each={matches()}>
 						{(option) => (

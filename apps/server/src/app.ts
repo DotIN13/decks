@@ -6,7 +6,7 @@ import type { BoardPatch, Camera, ClientMessage, ServerMessage, StageCall } from
 import { Registry } from "./agents/registry.ts";
 import { applyPatches, mintId, PatchRefused } from "./boards/patch.ts";
 import { Revisions } from "./boards/snapshots.ts";
-import { renderTemplate, slugFor, type BoardKind } from "./boards/templates.ts";
+import { isBoardKind, renderTemplate, slugFor, type BoardKind } from "./boards/templates.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./claude/accounts.ts";
 import { claudeIdentity } from "./claude/backend.ts";
@@ -298,6 +298,26 @@ export class App {
 			case "board.hide": {
 				const agent = this.agents.focused();
 				agent.setInPlay(agent.inPlay.filter((path) => path !== message.path));
+				return;
+			}
+
+			/*
+			 * A new board, and it goes straight onto the canvas.
+			 *
+			 * Created *and* played, because the two are one act: nobody asks for a board in
+			 * order to leave it in the deck. Attached too — `setInPlay` puts it in the focused
+			 * agent's context — so the agent you are talking to can see the thing you just
+			 * made without being told about it.
+			 *
+			 * An unknown `kind` becomes `blank` rather than an error. This arrives from a
+			 * button today, and the worst outcome of a bad template name should be an empty
+			 * board rather than a refusal.
+			 */
+			case "board.create": {
+				const kind = isBoardKind(message.kind) ? message.kind : "blank";
+				const path = this.newBoard({ title: "Untitled", kind });
+				const agent = this.agents.focused();
+				agent.setInPlay([...agent.inPlay, path]);
 				return;
 			}
 

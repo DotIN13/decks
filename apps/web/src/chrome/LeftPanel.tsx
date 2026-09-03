@@ -205,13 +205,24 @@ export function LeftPanel(props: {
 	};
 
 	return (
-		<Show when={props.open}>
+		<>
 			<aside
 				/*
 				 * `data-inset` on the panel and *not* on the sheet — the one attribute in this
 				 * component that changes what the camera believes. See `lib/insets.ts`.
 				 */
-				data-inset={sheet() ? undefined : "left"}
+				/*
+				 * `data-inset` only while it is open *and* beside the canvas.
+				 *
+				 * The element is in the document either way now, so the attribute is the only
+				 * thing telling the camera whether there is a panel to subtract — and a closed
+				 * panel still has a box, because it is slid out rather than removed. A sheet
+				 * never declares one: subtracting one fitted a 1600px board into the strip
+				 * beside it at 3.7%.
+				 */
+				data-inset={props.open && !sheet() ? "left" : undefined}
+				data-open={props.open ? "true" : "false"}
+				aria-hidden={!props.open}
 				data-sheet={sheet() ? "true" : undefined}
 				aria-label="Boards"
 				class={`float panel-shell fixed z-10 flex w-[264px] max-w-[86vw] flex-col p-2 ${
@@ -489,7 +500,7 @@ export function LeftPanel(props: {
 					</div>
 				</div>
 			</aside>
-		</Show>
+		</>
 	);
 }
 

@@ -135,7 +135,7 @@ export function AgentStack(props: {
 									props.onFocus(chat.id);
 								}}
 							>
-								<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} />
+								<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} size={26} />
 							</button>
 						);
 					}}

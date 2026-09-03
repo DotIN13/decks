@@ -141,6 +141,19 @@
 		outline-offset: 1px;
 	}
 
+	/*
+	 * Inside a pill, a chip is as tall as the buttons beside it.
+	 *
+	 * `--control-md` is 26px because a labelled control is read far more often than it is
+	 * pressed, and that is right in the dock where the chip stands alone under the text. In a
+	 * 40px pill next to 28px icon buttons the same 26px reads as a short row — which is what
+	 * made the top-right cluster look shallower than the top-left one despite both being
+	 * 40px boxes.
+	 */
+	.pill .chipbtn {
+		height: var(--control);
+	}
+
 	/* Anything but the ordinary setting is a standing change, so it is tinted rather than
 	   merely labelled — you should be able to see that a session is in plan mode without
 	   reading the word. */
@@ -176,6 +189,16 @@
 		box-shadow: var(--shadow-menu);
 		color: var(--fg);
 		font-size: 12px;
+		/*
+		 * A ceiling, so no card can be taller than the window it is placed in.
+		 *
+		 * `ui/Popover` clamps the *top* into view, which is the right thing to do and not
+		 * enough on its own: a card taller than the viewport then hangs off the bottom with
+		 * its last rows unreachable. The lists inside cap themselves as well — the model list
+		 * at 56vh — and this is the guard for the ones that forget to.
+		 */
+		max-height: calc(100vh - 24px);
+		overflow-y: auto;
 	}
 
 	/* A row you can pick. `data-row` is what the keyboard roves over. */

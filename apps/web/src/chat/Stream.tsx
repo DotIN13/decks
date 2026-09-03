@@ -171,7 +171,16 @@ export function Stream(props: {
 	onMount(() => {
 		const keys = (event: KeyboardEvent) => {
 			if (event.key !== "Escape" || event.defaultPrevented || !historyShown()) return;
-			if (document.querySelector(".popover")) return;
+			/*
+			 * A *menu*, not any `.popover`.
+			 *
+			 * The agent hover card wears the same class — it wants the same card and the same
+			 * shadow — and it is mounted for the whole session now rather than built on hover.
+			 * So `.popover` was always present, and Escape stopped closing the conversation
+			 * entirely. `role` is the honest discriminator: a menu is a thing you interact with
+			 * and it owns the key while it is open; a tooltip is not.
+			 */
+			if (document.querySelector('.popover[role="menu"]')) return;
 			event.preventDefault();
 			closeHistory();
 		};

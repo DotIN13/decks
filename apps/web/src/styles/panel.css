@@ -127,12 +127,64 @@
 	}
 
 	/* The foot: what the list adds up to, and how it is drawn. */
+	/*
+	 * Coming and going.
+	 *
+	 * The panel used to be unmounted when folded, which made an exit animation impossible —
+	 * there was nothing left to animate. It is in the document at every width now and
+	 * `data-open` is what moves it, so both directions are the same two properties running
+	 * backwards.
+	 *
+	 * `translate` and not `left`: it is a composited property, so a panel arriving never
+	 * costs a layout — the same reason the old floating rail moved with a transform. And the
+	 * distance is its own width plus the gutter, so it leaves the screen rather than stopping
+	 * at the edge of it.
+	 *
+	 * `pointer-events` is the part that matters for correctness. A slid-away panel still has
+	 * a box over the canvas, and without this it would swallow clicks meant for boards along
+	 * the left edge — which is worse than no animation at all. `visibility` is deliberately
+	 * not used: Chromium will not transition a discrete property without
+	 * `transition-behavior: allow-discrete`, so it would flip at the start of the exit and
+	 * the panel would vanish rather than leave.
+	 */
+	.panel-shell {
+		transition:
+			translate 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+			opacity 140ms ease;
+	}
+
+	.panel-shell[data-open="false"] {
+		translate: calc(-100% - 16px) 0;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	/* A sheet slides from the screen's own edge, where a panel slides from its gutter. */
+	.panel-shell[data-open="false"][data-sheet="true"] {
+		translate: -100% 0;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.panel-shell {
+			transition: opacity 140ms ease;
+		}
+	}
+
+	/*
+	 * The foot, and the arithmetic that keeps its hairline clear of the control on it.
+	 *
+	 * It was 24px with a `border-top`, and `box-sizing: border-box` — so the content box was
+	 * 23px and the 24px density toggle inside it overflowed by one pixel and sat *on* the
+	 * line, which is what made the two read as colliding. 30px leaves the toggle 2px of air
+	 * above and below the rule: enough that the line belongs to the foot rather than to the
+	 * control.
+	 */
 	.panel-foot {
 		display: flex;
 		flex: none;
 		align-items: center;
 		box-sizing: border-box;
-		height: 24px;
+		height: 30px;
 		margin-top: 8px;
 		padding: 0 4px;
 		gap: 4px;

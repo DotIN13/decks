@@ -129,12 +129,17 @@
 		}
 	}
 
-	/* Idle is drawn as an absence, in the corner and the dropdown alike: no ring, and half
-	   opacity on the face and its name — see the row rules below. It used to be excluded from
-	   the corner entirely, and an empty corner read as a broken one. */
-	.agent-face[data-status="idle"] {
-		opacity: 0.5;
-	}
+	/*
+	 * Idle is drawn as an absence — and the absence is the *ring*, not the face.
+	 *
+	 * The face used to be at half opacity too, which was one signal too many: an avatar is
+	 * an identity, and fading it says "this agent is less real" rather than "this agent is
+	 * not doing anything". The missing ring already says the second thing, and it says it
+	 * without making a face you are meant to recognise harder to recognise.
+	 *
+	 * The dropdown still dims the *name* beside it (see the row rules below), where the
+	 * contrast with an active row is the whole point of the list.
+	 */
 
 	/*
 	 * The hover card: always in the document, and only ever unhidden.
@@ -224,6 +229,14 @@
 	 * `-2px` on everything after the first, and the z-indexes descend, so the urgent face —
 	 * which `agentOrder` puts first — is the one on top with its circle whole. Three faces
 	 * plus the chip take 106px of the pill, which is the room the board budgeted for them.
+	 */
+	/*
+	 * 26px faces in the corner, not 24.
+	 *
+	 * The pill is 40px and its other children are 26 and 28, so 24px faces left the
+	 * top-right cluster reading *shorter* than the one on the left even though the two boxes
+	 * are the same height — the mass inside it was smaller and the eye measures the mass. 26
+	 * is the labelled-control height, which is what the zoom chip beside them uses.
 	 */
 	.agent-stack {
 		display: flex;

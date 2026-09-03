@@ -1233,7 +1233,26 @@ export function App() {
 					defaultKind={state.defaultKind}
 					zoom={camera().zoom}
 					onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))}
+					/*
+					 * Fit what is *on the canvas*, not the whole deck.
+					 *
+					 * `stageBoards()` is already the focused agent's in-play set, so this was
+					 * right — but the menu row said "Fit the whole deck", and a label that
+					 * disagrees with the button is worse than either being wrong on its own. The
+					 * deck can be 112 boards; the canvas is what you are looking at, and fitting
+					 * it is what "where am I" means.
+					 */
 					onFit={() => fitAll(stageBoards(), setCamera)}
+					onNewBoard={() => socket.send({ type: "board.create" })}
+					/*
+					 * Off the canvas, one message per board, and *not* out of the context.
+					 * `board.hide` has always drawn that line — the context is the agent's, and
+					 * tidying the view must not strip what it is working from.
+					 */
+					onClearStage={() => {
+						for (const board of stageBoards()) socket.send({ type: "board.hide", path: board.path });
+					}}
+					onCanvas={stageBoards().length}
 					overflow={[
 						{ label: "What you can do on the canvas", icon: Info, onPick: () => setOps(true) },
 						{

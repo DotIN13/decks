@@ -3,6 +3,8 @@ import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Maximize from "lucide-solid/icons/maximize";
 import MessageSquare from "lucide-solid/icons/message-square";
+import Eraser from "lucide-solid/icons/eraser";
+import FilePlus from "lucide-solid/icons/file-plus";
 import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import ZoomIn from "lucide-solid/icons/zoom-in";
 import ZoomOut from "lucide-solid/icons/zoom-out";
@@ -57,6 +59,18 @@ export function Corner(props: {
 	onZoom: (zoom: number) => void;
 	/** Frame the whole deck — the `0` key's job, and the first row of the menu. */
 	onFit: () => void;
+	/** A new, empty board, straight onto the canvas. */
+	onNewBoard: () => void;
+	/**
+	 * Take every board off the canvas.
+	 *
+	 * Off the canvas and *not* out of the agent's context — the context is the agent's, and
+	 * nobody should be able to strip what it is working from by tidying the view. That is
+	 * the same distinction `board.hide` has always drawn, said with a button.
+	 */
+	onClearStage: () => void;
+	/** Whether there is anything up there to clear. */
+	onCanvas: number;
 	/** The `⋯` menu, which is the integrator's: it collects whatever has folded. */
 	/**
 	 * The three secondary controls, as menu rows at every width.
@@ -129,7 +143,7 @@ export function Corner(props: {
 				>
 					<button type="button" role="menuitem" data-row data-flat="true" onClick={() => props.onFit()}>
 						<Icon of={Maximize} size={13} class="flex-none text-muted" />
-						<span class="lb flex-1 font-normal">Fit the whole deck</span>
+						<span class="lb flex-1 font-normal">Fit what is on the canvas</span>
 						<span class="meta flex-none text-[10px]">0</span>
 					</button>
 
@@ -165,6 +179,44 @@ export function Corner(props: {
 					</button>
 				</Popover>
 			</span>
+
+			<span class="pill-sep" aria-hidden="true" />
+
+			{/*
+			 * What the canvas holds: one board more, or none at all.
+			 *
+			 * Beside the camera rather than in the overflow, because these two are about the
+			 * *canvas* and the overflow is about the app — the cheat sheet, the settings, the
+			 * theme. Adding a board and clearing the stage are the two things you do to a
+			 * canvas that are not looking at it.
+			 *
+			 * Clearing is disabled with nothing up rather than hidden. A control that comes
+			 * and goes with the state it acts on is a control you have to hunt for at exactly
+			 * the moment you want it, and the count in the title is what says why it is off.
+			 */}
+			<button
+				type="button"
+				class="iconbtn"
+				title="A new board, on the canvas"
+				aria-label="A new board, on the canvas"
+				onClick={() => props.onNewBoard()}
+			>
+				<Icon of={FilePlus} size={15} />
+			</button>
+			<button
+				type="button"
+				class="iconbtn"
+				disabled={props.onCanvas === 0}
+				title={
+					props.onCanvas === 0
+						? "Nothing is on the canvas"
+						: `Take all ${props.onCanvas} boards off the canvas — they stay in the agent's context`
+				}
+				aria-label="Clear the canvas"
+				onClick={() => props.onClearStage()}
+			>
+				<Icon of={Eraser} size={15} />
+			</button>
 
 			<span class="pill-sep max-[1100px]:hidden" aria-hidden="true" />
 
