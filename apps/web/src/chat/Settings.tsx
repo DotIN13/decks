@@ -81,12 +81,18 @@ export function Settings(props: {
 				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
 					<span>Claude accounts</span>
 					<span class="flex-1" />
-					<button class="icon-button" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
-						<Icon of={X} size={16} />
+					{/* `.iconbtn`, the app's icon control. It said `icon-button` — a class the rewrite
+					    replaced and nothing defines any more, so the × was an unstyled bare button
+					    with no target, no hover and no corner. */}
+					<button class="iconbtn [--control:24px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+						<Icon of={X} size={15} />
 					</button>
 				</header>
 
-				<div class="flex flex-col gap-1 overflow-y-auto overscroll-contain p-2">
+				{/* `rowlist`, so each account is the same row as a described choice anywhere else in
+				    the app — `styles/chrome.css` owns the grid, the corner, the hover and the
+				    `.lb`/`.nt` type scale. */}
+				<div class="rowlist overflow-y-auto overscroll-contain p-2">
 					<For each={props.accounts}>
 						{(account) => (
 							<Row
@@ -104,11 +110,7 @@ export function Settings(props: {
 						Signing in adds an account rather than replacing one: the CLI writes its
 						credentials wherever it is pointed, so each login gets a directory of its own.
 					*/}
-					<button
-						class="flex cursor-pointer items-center gap-1.5 rounded-control border-0 bg-line px-2.5 py-1.5 text-[12px] text-fg hover:bg-line-strong"
-						type="button"
-						onClick={props.onAdd}
-					>
+					<button class="btn" type="button" onClick={props.onAdd}>
 						<Icon of={Plus} size={14} />
 						Add an account
 					</button>
@@ -120,12 +122,12 @@ export function Settings(props: {
 					<Show
 						when={props.accounts.find((account) => account.id === props.active && !account.signedIn)}
 						fallback={
-							<span class="text-[11px] text-faint">
+							<span class="meta">
 								{props.accounts.length === 1 ? "One account — add another to switch when it runs out" : "Switches on its own when one runs out"}
 							</span>
 						}
 					>
-						<span class="text-[11px] text-warn">The account in use is signed out. Add it again, or pick another.</span>
+						<span class="meta text-warn">The account in use is signed out. Add it again, or pick another.</span>
 					</Show>
 				</footer>
 			</div>
@@ -179,18 +181,12 @@ function Row(props: { account: ClaudeAccount; active: boolean; onUse: () => void
 		 * reason.
 		 */
 		<div class="account-row flex items-center gap-1" data-current={props.active}>
-			<button
-				class="flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-px rounded-control border-0 bg-transparent px-2.5 py-2 text-left hover:bg-line disabled:cursor-default disabled:opacity-55 disabled:hover:bg-transparent"
-				type="button"
-				disabled={!props.account.signedIn || props.active}
-				title={title()}
-				onClick={props.onUse}
-			>
-				<span class="flex w-full items-baseline gap-2">
-					<span class="truncate text-[13px] text-fg">{name()}</span>
-					<Show when={props.account.plan}>{(plan) => <span class="flex-none text-[11px] text-faint">{plan()}</span>}</Show>
+			<button class="min-w-0 flex-1" type="button" data-row disabled={!props.account.signedIn || props.active} title={title()} onClick={props.onUse}>
+				<span class="lb w-full items-baseline">
+					<span class="truncate">{name()}</span>
+					<Show when={props.account.plan}>{(plan) => <span class="meta flex-none">{plan()}</span>}</Show>
 				</span>
-				<span class="flex w-full items-baseline gap-1.5 text-[11px]">
+				<span class="nt flex w-full items-baseline gap-1.5">
 					{/* Before the organisation, and dimmer: what the row *is* comes before what the
 					    account belongs to, and neither should out-shout the email above them. */}
 					<Show when={whose()}>{(said) => <span class="flex-none text-faint">{said()}</span>}</Show>

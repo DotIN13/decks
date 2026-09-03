@@ -151,8 +151,10 @@ export function CanvasOps(props: { onClose: () => void }) {
 				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
 					<span>On the canvas</span>
 					<span class="flex-1" />
-					<button class="icon-button" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
-						<Icon of={X} size={16} />
+					{/* `.iconbtn`: `icon-button` is a class the rewrite replaced and nothing defines,
+					    so this × was a bare button with no target and no hover. */}
+					<button class="iconbtn [--control:24px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+						<Icon of={X} size={15} />
 					</button>
 				</header>
 

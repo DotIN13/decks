@@ -216,8 +216,17 @@
 		overflow-y: auto;
 	}
 
-	/* A row you can pick. `data-row` is what the keyboard roves over. */
-	.popover [data-row] {
+	/*
+	 * A row you can pick. `data-row` is what the keyboard roves over.
+	 *
+	 * `.rowlist` as well as `.popover`, so a described choice in a *dialog* is the same object
+	 * as a described choice in a menu — same grid, same 7px corner, same hover wash, same
+	 * `.lb`/`.nt` pair. The question over the input bar used to draw its own: a full-width
+	 * slab filled with `--line` at rest, which read as four disabled fields rather than as
+	 * four things to press, and was a second answer to a question this file had already
+	 * answered.
+	 */
+	:is(.popover, .rowlist) [data-row] {
 		display: grid;
 		width: 100%;
 		align-items: start;
@@ -233,23 +242,50 @@
 		text-align: left;
 	}
 
-	.popover [data-row]:hover,
-	.popover [data-row]:focus-visible {
+	:is(.popover, .rowlist) [data-row]:hover,
+	:is(.popover, .rowlist) [data-row]:focus-visible {
 		background: var(--line);
 		outline: none;
 	}
 
-	.popover [data-row][data-current="true"] {
+	:is(.popover, .rowlist) [data-row][data-current="true"] {
 		background: var(--line);
 	}
 
-	.popover [data-row] > .ic {
+	/*
+	 * A row that cannot be picked — the account already in use, a model with no key.
+	 *
+	 * It stays in the list and says so, rather than disappearing: a list that hides what you
+	 * cannot choose is a list you cannot reason about. No hover wash, because a wash on a row
+	 * that will not respond is the affordance lying.
+	 */
+	:is(.popover, .rowlist) [data-row][disabled] {
+		cursor: default;
+		opacity: 0.55;
+	}
+
+	:is(.popover, .rowlist) [data-row][disabled]:hover {
+		background: transparent;
+	}
+
+	/*
+	 * No icon, no icon column.
+	 *
+	 * Every row in a menu has one, so the 16px track is free there. A dialog's options do
+	 * not — "Temporal" and "date-fns" are not things with pictures — and reserving the track
+	 * anyway indents a whole list by 25px against the question above it.
+	 */
+	:is(.popover, .rowlist) [data-row]:not(:has(> .ic)) {
+		grid-template-columns: 1fr;
+	}
+
+	:is(.popover, .rowlist) [data-row] > .ic {
 		grid-row: span 2;
 		padding-top: 1px;
 		color: var(--muted);
 	}
 
-	.popover [data-row] > .lb {
+	:is(.popover, .rowlist) [data-row] > .lb {
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -264,14 +300,14 @@
 	 * This is the reason a mode is a menu and not a segmented control: "edit freely" does
 	 * not say by itself that commands still ask, and the place to say so is here.
 	 */
-	.popover [data-row] > .nt {
+	:is(.popover, .rowlist) [data-row] > .nt {
 		color: var(--faint);
 		font-size: 11px;
 		line-height: 1.4;
 	}
 
 	/* A single-line row, for lists rather than described choices. */
-	.popover [data-row][data-flat="true"] {
+	:is(.popover, .rowlist) [data-row][data-flat="true"] {
 		display: flex;
 		height: 30px;
 		align-items: center;
@@ -279,7 +315,18 @@
 		padding: 0 8px;
 	}
 
-	.popover .rule {
+	/*
+	 * A column of those rows outside a menu. No card of its own — whatever it is inside has
+	 * one — so this is only the rhythm: the same 2px between rows that a popover has, because
+	 * two rows 6px apart read as two objects and these are one list.
+	 */
+	.rowlist {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	:is(.popover, .rowlist) .rule {
 		height: 1px;
 		margin: 6px 4px;
 		background: var(--line);
@@ -287,11 +334,77 @@
 
 	/* A label over a group of rows. Sentence case, never uppercase — see the note in
 	   `index.css` about what replaced the eyebrows. */
-	.popover .group {
+	:is(.popover, .rowlist) .group {
 		padding: 5px 8px 3px;
 		color: var(--faint);
 		font-size: 11px;
 		font-weight: 500;
+	}
+
+	/*
+	 * A button with words on it: the answer to a question, the action in a modal.
+	 *
+	 * The app had no such class. Every surface that needed one — the question over the input
+	 * bar, the accounts modal, the file picker's header — was reaching a bare `<button>`
+	 * through a selector list in `index.css` that still named `.composer`, a class nothing has
+	 * rendered since the rewrite. So the three of them agreed by accident and could stop
+	 * agreeing without anybody touching them.
+	 *
+	 * The same anatomy as `.iconbtn` and `.chipbtn`, which is the point: `--control` for the
+	 * height so a fingertip gets 44px from the one place that decides that, `--control-radius`
+	 * for the corner, and **the container carries the border, not the control** — a wash of
+	 * `--line` is the whole affordance, and it leaves the accent fill free to mean the one
+	 * thing it should, which is *this is the answer that acts*.
+	 */
+	.btn {
+		display: inline-flex;
+		flex: none;
+		box-sizing: border-box;
+		height: var(--control, 28px);
+		align-items: center;
+		padding: 0 11px;
+		gap: 6px;
+		border: 0;
+		border-radius: var(--control-radius, 6px);
+		background: var(--line);
+		color: var(--fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12px;
+		white-space: nowrap;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.btn:hover {
+		background: var(--line-strong);
+	}
+
+	.btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* The one that acts. One per row of them, or the accent has stopped meaning anything. */
+	.btn[data-primary="true"] {
+		background: var(--color-accent);
+		color: #fff;
+	}
+
+	.btn[data-primary="true"]:hover {
+		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
+	}
+
+	/*
+	 * Present and refusing, rather than absent.
+	 *
+	 * "Sign in" with nothing pasted yet has to stay where it is: a button that appears when
+	 * the field is filled moves the row it is in at the moment you are aiming at it.
+	 */
+	.btn[disabled] {
+		cursor: not-allowed;
+		opacity: 0.45;
 	}
 
 	/*

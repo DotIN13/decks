@@ -1367,6 +1367,9 @@ export function App() {
 				 */}
 				<Stream
 					items={transcript()}
+					state={focusedChat()?.state ?? "idle"}
+					name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
+					agent={focusedChat()?.kind ?? state.defaultKind}
 					{...(atTurn() ? { scrollTo: atTurn()! } : {})}
 					previewing={state.preview?.entryId ?? null}
 					onPreview={(entryId) => {

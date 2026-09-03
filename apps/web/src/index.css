@@ -934,8 +934,13 @@ svg.lucide {
  * wash of `--line` is the same affordance with none of the ruling, and it leaves the accent
  * fill free to mean the one thing it should: this is the answer that acts.
  */
-.dialog-card button,
-.composer button,
+/*
+ * What is left of that list: the file picker's two header chips, at 11px rather than the
+ * control scale. Everything else that used it — the question over the input bar, the accounts
+ * modal — wears `.btn` from `styles/chrome.css` now, which is the same anatomy as `.iconbtn`
+ * and `.chipbtn` and takes its height from `--control`. `.composer` was in the selector too,
+ * and nothing has rendered that class since the rewrite.
+ */
 .picker header button {
 	padding: 4px 10px;
 	border: 0;
@@ -950,25 +955,22 @@ svg.lucide {
 		color 120ms ease;
 }
 
-.dialog-card button:hover,
-.composer button:hover,
 .picker header button:hover {
 	background: var(--line-strong);
 }
 
-.dialog-card button[data-primary="true"],
 .picker header .add {
 	background: var(--color-accent);
 	color: #fff;
 }
 
-.dialog-card button[data-primary="true"]:hover,
 .picker header .add:hover {
 	background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
 }
 
-/* Sign in with nothing pasted yet: the button is there, and says it cannot go. */
-.dialog-card button:disabled {
+/* The picker's "from this device" while a copy is in flight. `.btn[disabled]` covers the
+   dialogs, which is where "the button is there and says it cannot go" was written. */
+.picker header button:disabled {
 	cursor: not-allowed;
 	opacity: 0.45;
 }
@@ -1822,6 +1824,37 @@ svg.lucide {
 
 .account-row[data-current="true"] {
 	background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+/*
+ * The hover wash belongs to the whole row, not to the button inside it.
+ *
+ * The row is a button and an × side by side, so a wash on the button stopped 40px short of
+ * the row's own right edge — a lit rectangle with a cold strip after it, and the × the strip
+ * exists for sitting outside the thing it belongs to. Painted here, the row lights up as one
+ * object and the button underneath stops painting itself.
+ *
+ * Neither the current row nor an unusable one takes it: the first is already tinted, and a
+ * wash on a row that will not respond is the affordance lying.
+ */
+.account-row:hover:not([data-current="true"]):not(:has([data-row]:disabled)) {
+	background: var(--line);
+}
+
+.account-row [data-row]:hover {
+	background: transparent;
+}
+
+/*
+ * The account in use is dimmed by nothing.
+ *
+ * Its row is `disabled` — you cannot switch to what you are already on — and the row
+ * vocabulary draws a disabled row at 55%, which is right for a model with no key and wrong
+ * here: this is the one row in the list that is *in force*, and the tint behind it already
+ * says it is not a thing to press.
+ */
+.account-row[data-current="true"] [data-row][disabled] {
+	opacity: 1;
 }
 
 .account-row .close {

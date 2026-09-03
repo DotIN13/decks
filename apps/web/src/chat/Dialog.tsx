@@ -1,5 +1,7 @@
 import type { ExtensionUiPrompt } from "@decks/protocol";
+import Check from "lucide-solid/icons/check";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { Icon } from "../icons.tsx";
 
 /**
  * A runtime asking the user something (DESIGN §6.8).
@@ -45,21 +47,27 @@ export function Dialog(props: {
 
 	return (
 		/*
-		 * The accent-tinted border is the one thing that marks this as a *question* rather than
-		 * another floating panel, and `bg-bg` is opaque on purpose: a question you must answer
-		 * should have nothing competing behind it. `dialog-card` stays as a class so the dock's
-		 * `align-self: stretch` rule can still find it.
+		 * `.float` and `rounded-row`, which is exactly what the composer directly below it wears
+		 * — the same surface colour, the same hairline, the same shadow rung and the same 14px
+		 * corner — because the two are one column and a question is the row above the row you
+		 * type in. It had a `--radius-panel` corner on `--bg` before, one step off the box it
+		 * sits on top of.
+		 *
+		 * The accent-tinted border is the one thing left that marks this as a *question* rather
+		 * than another float, and it overrides `.float`'s hairline rather than adding to it.
+		 * `dialog-card` stays as a class so the dock's `align-self: stretch` rule can still
+		 * find it.
 		 */
-		<div class="dialog-card self-stretch rounded-panel border border-accent/40 bg-bg px-[11px] py-2.5 shadow-panel">
+		<div class="dialog-card float self-stretch rounded-row border-accent/40 px-2.5 py-2.5">
 			<Switch>
 				<Match when={props.prompt.method === "confirm"}>
 					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
 					<div class="mt-[3px] text-[12px] whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
 					<div class="mt-2 flex flex-wrap gap-1.5">
-						<button type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
+						<button class="btn" type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
 							Allow
 						</button>
-						<button type="button" onClick={() => props.onAnswer({ confirmed: false })}>
+						<button class="btn" type="button" onClick={() => props.onAnswer({ confirmed: false })}>
 							Deny
 						</button>
 					</div>
@@ -70,12 +78,12 @@ export function Dialog(props: {
 					<div class="mt-2 flex flex-wrap gap-1.5">
 						<For each={(props.prompt as { options: string[] }).options}>
 							{(option, index) => (
-								<button type="button" data-primary={index() === 0} onClick={() => props.onAnswer({ value: option })}>
+								<button class="btn" type="button" data-primary={index() === 0} onClick={() => props.onAnswer({ value: option })}>
 									{option}
 								</button>
 							)}
 						</For>
-						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
+						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
 							Cancel
 						</button>
 					</div>
@@ -98,19 +106,35 @@ export function Dialog(props: {
 					</Show>
 					<div class="font-semibold">{choose().title}</div>
 
-					<div class="mt-2 flex flex-col gap-1">
+					{/*
+						`.rowlist` and `data-row`: the same object as a described choice in a menu —
+						`styles/chrome.css` owns the grid, the 7px corner, the hover wash and the
+						`.lb`/`.nt` pair. These used to be full-width slabs filled with `--line` at
+						rest, which read as four disabled fields rather than four things to press, and
+						was a second answer to a question that file had already answered.
+
+						A tick in the icon column when it takes more than one, and *only* then: for a
+						single choice the click is the answer, so a checkbox would be a control that
+						shows what you already did and then vanishes with the card.
+					*/}
+					<div class="rowlist mt-2">
 						<For each={choose().options}>
 							{(option) => (
 								<button
-									class="flex w-full flex-col items-start gap-0.5 px-2.5 py-2 text-left data-[on=true]:outline-2 data-[on=true]:-outline-offset-2 data-[on=true]:outline-accent"
 									type="button"
-									data-on={choose().multiple ? ticked().includes(option.label) : undefined}
+									data-row
+									data-current={choose().multiple && ticked().includes(option.label) ? "true" : undefined}
 									aria-pressed={choose().multiple ? ticked().includes(option.label) : undefined}
 									onClick={() => (choose().multiple ? toggle(option.label) : props.onAnswer({ value: option.label }))}
 								>
-									<span class="text-fg">{option.label}</span>
+									<Show when={choose().multiple}>
+										<span class="ic">
+											<Icon of={Check} size={14} class={ticked().includes(option.label) ? "" : "opacity-0"} />
+										</span>
+									</Show>
+									<span class="lb">{option.label}</span>
 									<Show when={option.description}>
-										<span class="text-[11px] leading-normal whitespace-normal text-muted">{option.description}</span>
+										<span class="nt whitespace-normal">{option.description}</span>
 									</Show>
 								</button>
 							)}
@@ -124,22 +148,28 @@ export function Dialog(props: {
 						question that traps you.
 					*/}
 					<Show when={otherOpen()}>
-						<input
-							class="mt-2 w-full rounded-control border border-line bg-bg-deep px-2 py-[5px]"
-							ref={focusOnMount}
-							value={text()}
-							placeholder="Something else…"
-							onInput={(event) => setText(event.currentTarget.value)}
-							onKeyDown={(event) => {
-								if (event.key === "Enter" && text().trim()) props.onAnswer({ value: text().trim() });
-								if (event.key === "Escape") setOtherOpen(false);
-							}}
-						/>
+						{/* `.field`, like every other place in the app that takes a typed value: a wash
+						    rather than a box, and an accent ring *inset* on focus. The browser's own
+						    focus ring was drawing a 2px black rectangle around a white field in the
+						    middle of the dock. */}
+						<label class="field mt-2 w-full [--field:28px]">
+							<input
+								ref={focusOnMount}
+								value={text()}
+								placeholder="Something else…"
+								onInput={(event) => setText(event.currentTarget.value)}
+								onKeyDown={(event) => {
+									if (event.key === "Enter" && text().trim()) props.onAnswer({ value: text().trim() });
+									if (event.key === "Escape") setOtherOpen(false);
+								}}
+							/>
+						</label>
 					</Show>
 
 					<div class="mt-2 flex flex-wrap gap-1.5">
 						<Show when={choose().multiple && !otherOpen()}>
 							<button
+								class="btn"
 								type="button"
 								data-primary="true"
 								disabled={ticked().length === 0}
@@ -149,16 +179,16 @@ export function Dialog(props: {
 							</button>
 						</Show>
 						<Show when={otherOpen()}>
-							<button type="button" data-primary="true" disabled={!text().trim()} onClick={() => props.onAnswer({ value: text().trim() })}>
+							<button class="btn" type="button" data-primary="true" disabled={!text().trim()} onClick={() => props.onAnswer({ value: text().trim() })}>
 								Send
 							</button>
 						</Show>
 						<Show when={choose().other && !otherOpen()}>
-							<button type="button" onClick={() => setOtherOpen(true)}>
+							<button class="btn" type="button" onClick={() => setOtherOpen(true)}>
 								Other…
 							</button>
 						</Show>
-						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
+						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
 							Cancel
 						</button>
 					</div>
@@ -166,22 +196,23 @@ export function Dialog(props: {
 
 				<Match when={props.prompt.method === "input" || props.prompt.method === "editor"}>
 					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
-					<input
-						class="mt-2 w-full rounded-control border border-line bg-bg-deep px-2 py-[5px]"
-						ref={focusOnMount}
-						value={text()}
-						placeholder={(props.prompt as { placeholder?: string }).placeholder ?? ""}
-						onInput={(event) => setText(event.currentTarget.value)}
-						onKeyDown={(event) => {
-							if (event.key === "Enter") props.onAnswer({ value: text() });
-							if (event.key === "Escape") props.onAnswer({ cancelled: true });
-						}}
-					/>
+					<label class="field mt-2 w-full [--field:28px]">
+						<input
+							ref={focusOnMount}
+							value={text()}
+							placeholder={(props.prompt as { placeholder?: string }).placeholder ?? ""}
+							onInput={(event) => setText(event.currentTarget.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter") props.onAnswer({ value: text() });
+								if (event.key === "Escape") props.onAnswer({ cancelled: true });
+							}}
+						/>
+					</label>
 					<div class="mt-2 flex flex-wrap gap-1.5">
-						<button type="button" data-primary="true" onClick={() => props.onAnswer({ value: text() })}>
+						<button class="btn" type="button" data-primary="true" onClick={() => props.onAnswer({ value: text() })}>
 							Send
 						</button>
-						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
+						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
 							Cancel
 						</button>
 					</div>
@@ -191,7 +222,7 @@ export function Dialog(props: {
 				<Match when={props.prompt.method === "custom"}>
 					<div class="font-semibold">An extension asked for a terminal screen, which this app has no equivalent of.</div>
 					<div class="mt-2 flex flex-wrap gap-1.5">
-						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
+						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
 							Dismiss
 						</button>
 					</div>
@@ -210,31 +241,36 @@ export function Dialog(props: {
 					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
 					<div class="mt-[3px] text-[12px] whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
 					{/* Breakable, so a 450-character OAuth URL can be read and copied in the dock. */}
+					{/* A wash rather than a bordered box on a bordered card, and the same corner as the
+					    field under it. Breakable, so a 450-character OAuth URL can be read and copied
+					    in the dock. */}
 					<a
-						class="mt-[7px] block rounded-control border border-line bg-panel px-[9px] py-[7px] font-mono text-[11px] leading-normal break-all text-accent"
+						class="mt-[7px] block rounded-control bg-line px-[9px] py-[7px] font-mono text-[11px] leading-normal break-all text-accent hover:bg-line-strong"
 						href={(props.prompt as { url: string }).url}
 						target="_blank"
 						rel="noreferrer"
 					>
 						{(props.prompt as { url: string }).url}
 					</a>
-					<input
-						class="mt-2 w-full rounded-control border border-line bg-bg-deep px-2 py-[5px] font-mono text-[12px]"
-						ref={focusOnMount}
-						value={text()}
-						autocomplete="off"
-						spellcheck={false}
-						placeholder={(props.prompt as { placeholder?: string }).placeholder ?? "Paste the code from the browser"}
-						onInput={(event) => setText(event.currentTarget.value)}
-						onKeyDown={(event) => {
-							// Enter on a code that is not there yet would cancel the sign-in by
-							// answering it emptily, so it only sends once there is something to send.
-							if (event.key === "Enter" && text().trim()) props.onAnswer({ value: text() });
-							if (event.key === "Escape") props.onAnswer({ cancelled: true });
-						}}
-					/>
+					<label class="field mt-2 w-full font-mono [--field:28px]">
+						<input
+							ref={focusOnMount}
+							value={text()}
+							autocomplete="off"
+							spellcheck={false}
+							placeholder={(props.prompt as { placeholder?: string }).placeholder ?? "Paste the code from the browser"}
+							onInput={(event) => setText(event.currentTarget.value)}
+							onKeyDown={(event) => {
+								// Enter on a code that is not there yet would cancel the sign-in by
+								// answering it emptily, so it only sends once there is something to send.
+								if (event.key === "Enter" && text().trim()) props.onAnswer({ value: text() });
+								if (event.key === "Escape") props.onAnswer({ cancelled: true });
+							}}
+						/>
+					</label>
 					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button
+							class="btn"
 							type="button"
 							data-primary="true"
 							disabled={!text().trim()}
@@ -242,7 +278,7 @@ export function Dialog(props: {
 						>
 							Sign in
 						</button>
-						<button type="button" onClick={() => props.onAnswer({ cancelled: true })}>
+						<button class="btn" type="button" onClick={() => props.onAnswer({ cancelled: true })}>
 							Cancel
 						</button>
 					</div>
@@ -250,18 +286,24 @@ export function Dialog(props: {
 
 				<Match when={props.prompt.method === "usage"}>
 					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
+					{/*
+						A label and a number per line, with the numbers in the app's tabular figures so
+						the column lines up on the digits rather than on the widths of the words. The
+						label takes `.label`'s size and colour, which is what every other
+						read-only pair in the app uses.
+					*/}
 					<div class="mt-[7px] grid gap-1">
 						<For each={(props.prompt as { rows: { label: string; value: string }[] }).rows}>
 							{(row) => (
-								<div class="flex justify-between gap-2.5 text-[12px]">
-									<span class="text-muted">{row.label}</span>
-									<span class="font-mono text-right">{row.value}</span>
+								<div class="flex items-baseline justify-between gap-2.5">
+									<span class="label">{row.label}</span>
+									<span class="font-mono text-[12px] tabular-nums">{row.value}</span>
 								</div>
 							)}
 						</For>
 					</div>
 					<div class="mt-2 flex flex-wrap gap-1.5">
-						<button type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
+						<button class="btn" type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
 							OK
 						</button>
 					</div>

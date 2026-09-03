@@ -1,10 +1,12 @@
-import type { ChatItem } from "@decks/protocol";
+import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { closeHistory, historyShown } from "../lib/edge.ts";
 import { floatRows } from "./float-rows.ts";
+import { WorkingSign } from "./StatusLine.tsx";
+import { signPlacement } from "./working-sign.ts";
 import { attachSwipeClose } from "./swipe-close.ts";
 import { Turn, type AgentPart, type TurnCard } from "./Turn.tsx";
 
@@ -41,6 +43,12 @@ import { Turn, type AgentPart, type TurnCard } from "./Turn.tsx";
  */
 export function Stream(props: {
 	items: ChatItem[];
+	/** What the focused agent is doing, for the sign at the foot. */
+	state: AgentState;
+	/** Whose work it is — only spoken when the agent is the one waiting. */
+	name: string;
+	/** Which runtime, for its own mark. */
+	agent: AgentKind;
 	/** An item to bring into view — the turn the spine was clicked at. */
 	scrollTo?: { id: string; at: number };
 	/** The entry the canvas is currently previewing, if any. Puts the way out on its card. */
@@ -62,6 +70,21 @@ export function Stream(props: {
 	const [pinned, setPinned] = createSignal(true);
 	/** How many cards are below the fold, which is what the jump pill counts. */
 	const [behind, setBehind] = createSignal(0);
+
+	/*
+	 * Whether the tail of the column is already answering "is anything happening".
+	 *
+	 * A streaming reply has a caret blinking at the end of its text, which is the same
+	 * message the sign carries and is *in the place the words are arriving* — so the sign
+	 * stands down and lets the card have it. Between turns there is no card yet, and that is
+	 * where a sign earns its keep: "running tools…" for four minutes with nothing to read is
+	 * exactly the state a column would otherwise report as silence.
+	 */
+	const arriving = () => {
+		const last = cards().at(-1);
+		return last?.kind === "agent" && last.parts.some((part) => part.kind === "text" && part.streaming);
+	};
+	const signing = () => signPlacement(props.state, { historyOpen: true, arriving: arriving() }) === "column";
 
 	const rows = createMemo(() => floatRows(props.items));
 	const itemById = createMemo(() => new Map(props.items.map((item) => [item.id, item])));
@@ -377,6 +400,24 @@ export function Stream(props: {
 						</>
 					)}
 				</Index>
+
+				{/*
+				 * The working sign, in the flow rather than as a float of its own.
+				 *
+				 * A card, in the same family as the turn cards and in the position the arriving
+				 * turn will take — so when the reply starts, the card that replaces this one is
+				 * already where the eye is. A second pill floating over the column would have been
+				 * a third thing on screen saying what the column is for.
+				 *
+				 * Inside the roll, so it scrolls with the conversation and the autoscroll keeps it
+				 * in view; `aria-live` is on the dock's copy, which is the one a screen reader
+				 * should hear, so this one is quiet.
+				 */}
+				<Show when={signing()}>
+					<div class="stream-card stream-working" data-working="true">
+						<WorkingSign state={props.state} name={props.name} agent={props.agent} />
+					</div>
+				</Show>
 			</div>
 
 			{/*

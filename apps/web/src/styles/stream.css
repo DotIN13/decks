@@ -560,6 +560,26 @@
 	}
 
 	/*
+	 * The working sign where the column shows it: a card, not a pill.
+	 *
+	 * It sits in the position the arriving turn will take, so the reply that replaces it lands
+	 * where the eye already is — which is the whole argument for putting it here rather than
+	 * floating a second copy of the dock's pill over the column. So it takes the turn card's
+	 * geometry from `.stream-card` and only says what is different: the mark and the words on
+	 * one line, muted, and `max-content` so a two-word sign is not a full-width card with an
+	 * inch of empty panel after it.
+	 */
+	.stream-working {
+		display: flex;
+		width: max-content;
+		max-width: 100%;
+		align-items: center;
+		gap: 7px;
+		color: var(--muted);
+		font-size: 12px;
+	}
+
+	/*
 	 * The day boundary, in sentence case.
 	 *
 	 * This is what replaces the uppercase eyebrow the chat list used ("EARLIER", 10px, tracked
@@ -674,8 +694,12 @@
 	 * `var(--mark, …)`, an *identity* colour set inline by `StatusLine`, so an agent that had
 	 * been given green got a green mark blooming over the input bar. The runtime is the thing
 	 * the drawing is of, and it is the only thing the drawing should be coloured by.
+	 *
+	 * Keyed on `[data-busy]` — the attribute the mark itself carries — rather than on the pill
+	 * around it, because the sign has two homes now: over the composer, and at the foot of the
+	 * conversation. A rule that named one of them would have left the other one grey.
 	 */
-	.statusline[data-working="true"] .mark[data-agent="claude"] {
+	svg[data-agent="claude"][data-busy] {
 		color: #d97757;
 	}
 
@@ -686,7 +710,7 @@
 	 * taking the muted text colour instead would be the one mark in the app drawn in
 	 * something that is neither its own colour nor the text's.
 	 */
-	.statusline[data-working="true"] .mark[data-agent="pi"] {
+	svg[data-agent="pi"][data-busy] {
 		color: var(--color-accent);
 	}
 
