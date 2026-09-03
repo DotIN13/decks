@@ -45,6 +45,9 @@ import { Dialog } from "./chat/Dialog.tsx";
 import { FloatingTranscript } from "./chat/FloatingTranscript.tsx";
 import { Composer } from "./chat/Composer.tsx";
 import { TurnBar, turnsOf, type Turn } from "./chat/TurnBar.tsx";
+import { AgentPill } from "./chrome/AgentPill.tsx";
+import { Corner } from "./chrome/Corner.tsx";
+import { LeftPanel } from "./chrome/LeftPanel.tsx";
 import { boxOf, fitInto, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
 import { canvasBox, watchInsets } from "./lib/insets.ts";
 import { connect, type Socket } from "./lib/socket.ts";
@@ -155,6 +158,12 @@ export function App() {
 	const [chatFloat, setChatFloat] = createSignal(false);
 	/** The all-canvases modal (`canvas/AllBoards.tsx`), which is a thing you do and then stop. */
 	const [allBoards, setAllBoards] = createSignal(false);
+	/*
+	 * Whether the boards panel is there. One signal where `lib/panels.ts` had two, because
+	 * there is one panel now — and a plain signal rather than that module's persisted pair,
+	 * since what it was mostly doing was closing one panel when the other opened.
+	 */
+	const [boardsOpen, setBoardsOpen] = createSignal(true);
 	/** Settings: the Claude subscriptions this install can use (`chat/Settings.tsx`). */
 	const [settings, setSettings] = createSignal(false);
 	/**
@@ -1050,6 +1059,27 @@ export function App() {
 		right: () => openChat(true),
 	};
 
+	/**
+	 * Switch to an agent.
+	 *
+	 * Named, where it used to be written inline in the agents panel, because there are
+	 * three ways in now — the pill's dropdown, a face in the top-right stack, and the `+n`
+	 * chip — and three copies of seven steps is three chances to forget one.
+	 *
+	 * Switching moves the canvas, the camera, the panel, the transcript and the draft
+	 * together, which is the whole reason there is no separate "observe": following an
+	 * agent *is* switching to it.
+	 */
+	const focusAgent = (id: string) => {
+		setState("focused", id);
+		setUnread(id, 0);
+		setAtTurn(undefined);
+		setSeenAt(Date.now());
+		// A component selected in a board another agent was holding is not your selection.
+		setComponent(undefined);
+		socket.send({ type: "agent.focus", id });
+	};
+
 	const flyTo = (board: Board) => {
 		setSelected(board.path);
 		const stage = document.querySelector(".stage");
@@ -1073,126 +1103,19 @@ export function App() {
 
 	return (
 		<div class="app">
-			<header class="titlebar">
-				{/* The connection state used to be its own dot beside the deck name. With the
-				    name and the path gone the dot would be the only thing left to explain,
-				    so it lives in the mark's colour instead — nothing is lost, and there is
-				    one thing on the left rather than three. */}
-				<span
-					class="brand"
-					data-off={!connected()}
-					title={connected() ? "Decks" : "Decks — not connected to the server"}
-				>
-					<DecksMark />
-					<span class="wordmark">Decks</span>
-				</span>
-				<span class="spacer" />
-				{/*
-					The three ways to look at the deck, in the order you reach for them: who is
-					working, what they are working from, and what else there is.
-
-					For every pointer, not just a finger. These used to be one `.touch-only`
-					button, on the argument that a cursor near the left edge already summoned the
-					panel and a second way to do a working thing is clutter. The argument fell
-					with proximity itself (`lib/panels.ts`): a panel that arrives when the cursor
-					drifts left cannot coexist with pills in that same corner, so the buttons are
-					now the only handle either panel has — and being the only handle, they belong
-					in front of everyone.
-
-					`aria-pressed` rather than a title that changes, because what each button
-					*does* never changes; only what it currently is does.
-				*/}
-				<button
-					class="icon-button"
-					type="button"
-					aria-pressed={panels.agents.open()}
-					data-open={panels.agents.open()}
-					title="The agents"
-					aria-label="The agents"
-					onClick={() => togglePanel("agents")}
-				>
-					<Icon of={PanelLeft} size={19} />
-				</button>
-				<button
-					class="icon-button"
-					type="button"
-					aria-pressed={panels.context.open()}
-					data-open={panels.context.open()}
-					title="Boards this agent is holding"
-					aria-label="Boards this agent is holding"
-					onClick={() => togglePanel("context")}
-				>
-					<Icon of={Layers} size={19} />
-				</button>
-				<button
-					class="icon-button"
-					type="button"
-					aria-pressed={allBoards()}
-					data-open={allBoards()}
-					title="Every board in the deck"
-					aria-label="Every board in the deck"
-					onClick={() => setAllBoards(!allBoards())}
-				>
-					<Icon of={LayoutGrid} size={18} />
-				</button>
-				{/*
-					The conversation, which has no edge to be summoned from any more.
-
-					The panels beside it are buttons for the same reason this one is: the
-					transcript's edge went with the sheet and the panels' went with proximity, so
-					the title bar is where all four of them live.
-				*/}
-				<button
-					class="icon-button"
-					type="button"
-					aria-pressed={ops()}
-					data-open={ops()}
-					title="What you can do on the canvas"
-					aria-label="What you can do on the canvas"
-					onClick={() => setOps(!ops())}
-				>
-					<Icon of={Info} size={18} />
-				</button>
-				<button
-					class="icon-button"
-					type="button"
-					aria-pressed={chatFloat()}
-					data-open={chatFloat()}
-					title="The conversation"
-					aria-label="The conversation"
-					onClick={() => openChat(!chatFloat())}
-				>
-					<Icon of={MessageSquare} size={19} />
-				</button>
-				<button
-					class="icon-button"
-					type="button"
-					aria-pressed={settings()}
-					data-open={settings()}
-					title="Settings"
-					aria-label="Settings"
-					onClick={() => {
-						const opening = !settings();
-						setSettings(opening);
-						// Read on open rather than kept in step: every identity in the list comes
-						// from the CLI, and the CLI's own login can change without the deck hearing.
-						if (opening) socket.send({ type: "claude.accounts" });
-					}}
-				>
-					<Icon of={SettingsIcon} size={18} />
-				</button>
-				<button
-					class="icon-button theme"
-					type="button"
-					onClick={() => toggleScheme()}
-					title={scheme() === "dark" ? "Switch to light" : "Switch to dark"}
-					aria-label={scheme() === "dark" ? "Switch to light" : "Switch to dark"}
-				>
-					{/* The icon is the destination, not the current state: it is a button, and
-					    what a button shows should be what pressing it gets you. */}
-					{scheme() === "dark" ? <Icon of={Sun} size={17} /> : <Icon of={Moon} size={17} />}
-				</button>
-			</header>
+			{/*
+				No title bar.
+				*
+				* A canvas app should not spend a strip of every window on a logo, and the deck
+				* mark was the only thing in it that could not be reached some other way. What
+				* replaced its seven buttons: the two panel toggles became one button in the
+				* pill below, the board browser became a tab in the panel it used to cover, the
+				* conversation became the corner's history button, and the cheat sheet, the
+				* settings and the theme became the three rows of the corner's overflow.
+				*
+				* The connection state went with the mark. It shows in the agent's own face
+				* instead — a socket that is down is an agent that cannot be doing anything.
+			*/}
 
 			<div class="work">
 				<Stage
@@ -1229,10 +1152,27 @@ export function App() {
 					onEdgeSwipe={edgeSwipe}
 				/>
 
-				<Palette
+				{/*
+					The two top clusters, and the tools are inside the left one.
+
+					`Palette` is gone as a free-standing float: it was already top-centre, and
+					what it lacked was a row to be part of. With the bar deleted it sits at the
+					same height as the agent and the camera, top centre goes empty — which is
+					where notices land, and they had been dodging it — and there is one
+					`data-inset="top"` where there were two.
+				*/}
+				<AgentPill
+					chats={state.chats}
+					identities={state.identities}
+					focused={state.focused}
+					unread={unread}
+					onFocus={focusAgent}
+					onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+					defaultKind={state.defaultKind}
+					boardsOpen={boardsOpen()}
+					onToggleBoards={() => setBoardsOpen(!boardsOpen())}
 					tool={tool()}
-					visible={camera().zoom >= INTERACT_ZOOM}
-					onPick={setTool}
+					onTool={setTool}
 					onUndo={() => {
 						const path = selected() ?? component()?.path;
 						if (!path) {
@@ -1241,6 +1181,37 @@ export function App() {
 						}
 						socket.send({ type: "board.undo", path });
 					}}
+				/>
+
+				<Corner
+					chats={state.chats}
+					identities={state.identities}
+					focused={state.focused}
+					unread={unread}
+					onFocus={focusAgent}
+					onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+					defaultKind={state.defaultKind}
+					zoom={camera().zoom}
+					onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))}
+					onFit={() => fitAll(stageBoards(), setCamera)}
+					overflow={[
+						{ label: "What you can do on the canvas", icon: Info, onPick: () => setOps(true) },
+						{
+							label: "Settings",
+							icon: SettingsIcon,
+							onPick: () => {
+								setSettings(true);
+								// Read on open rather than kept in step: every identity in the list comes
+								// from the CLI, and the CLI's own login can change without the deck hearing.
+								socket.send({ type: "claude.accounts" });
+							},
+						},
+						{
+							label: scheme() === "dark" ? "Switch to light" : "Switch to dark",
+							icon: scheme() === "dark" ? Sun : Moon,
+							onPick: () => toggleScheme(),
+						},
+					]}
 				/>
 
 				{/* The selection's properties. Same visibility rule as the palette — below
@@ -1277,40 +1248,32 @@ export function App() {
 				 * thumbnail, or past four thumbnails to switch agent. They answer different
 				 * questions and now they are asked separately.
 				 */}
-				<aside class="panel-float side" data-open={panels.agents.open()}>
-					<ChatList
-						chats={state.chats}
-						identities={state.identities}
-						focused={state.focused}
-						unread={unread}
-						onFocus={(id) => {
-							setState("focused", id);
-							setUnread(id, 0);
-							setAtTurn(undefined);
-							setSeenAt(Date.now());
-							socket.send({ type: "agent.focus", id });
-						}}
-						defaultKind={state.defaultKind}
-						onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
-						onRemove={(id) => socket.send({ type: "agent.remove", id })}
-					/>
-				</aside>
+				{/*
+					One panel where there were two asides and a modal.
 
-				<aside class="panel-float side context" data-open={panels.context.open()}>
-					<BoardRail
-						boards={contextBoards()}
-						current={selected()}
-						inPlay={state.focused ? state.inPlay[state.focused] ?? [] : []}
-						onPick={(board) => {
-							// A click on a thumbnail is how the user puts a board on the canvas. It
-							// moves the camera because they asked for it — the rule that nothing
-							// moves on its own is about the agent, not about your own clicks.
-							socket.send({ type: "board.play", path: board.path });
-							flyTo(board);
-						}}
-						onAll={() => setAllBoards(true)}
-					/>
-				</aside>
+					The agent list moved into the pill's dropdown — a list you switch *with* is a
+					selector, and a selector belongs on the thing it selects — and the board
+					browser became this panel's second tab instead of a full-screen sheet over the
+					canvas you were trying to look at.
+
+					Mounted while folded, deliberately: it registers `⌘\`, and a `<Show>` here
+					would take the shortcut away in exactly the state it exists for.
+				*/}
+				<LeftPanel
+					boards={state.boards}
+					current={selected()}
+					inPlay={state.focused ? state.inPlay[state.focused] ?? [] : []}
+					holdings={state.contexts}
+					focused={state.focused}
+					identities={state.identities}
+					open={boardsOpen()}
+					onOpenChange={setBoardsOpen}
+					onPick={(board) => {
+						socket.send({ type: "board.play", path: board.path });
+						flyTo(board);
+					}}
+				/>
+
 
 				<Show when={settings()}>
 					<Settings
@@ -1420,32 +1383,8 @@ export function App() {
 					/>
 				</div>
 
-				<div class="panel-float zoombar">
-					<button type="button" title="Fit all (0)" onClick={() => fitAll(stageBoards(), setCamera)}>
-						fit
-					</button>
-					<span class="level">{Math.round(camera().zoom * 100)}%</span>
-					{/* Titled, now that the glyph is gone: an icon-only button with no accessible
-					    name is a button screen readers and the browser checks both read as blank. */}
-					<button
-						class="icon-button"
-						type="button"
-						title="Zoom in (=)"
-						aria-label="Zoom in"
-						onClick={() => setCamera((c) => ({ ...c, zoom: Math.min(4, c.zoom * 1.25) }))}
-					>
-						<Icon of={Plus} />
-					</button>
-					<button
-						class="icon-button"
-						type="button"
-						title="Zoom out (-)"
-						aria-label="Zoom out"
-						onClick={() => setCamera((c) => ({ ...c, zoom: Math.max(0.02, c.zoom / 1.25) }))}
-					>
-						<Icon of={Minus} />
-					</button>
-				</div>
+				{/* No zoombar. "Where am I looking" is a menu chip in the top-right cluster
+				    now, which is one place for it and gives the bottom-right corner back. */}
 
 				<TurnBar
 					turns={turns()}

@@ -1,4 +1,5 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
+import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Maximize from "lucide-solid/icons/maximize";
 import MessageSquare from "lucide-solid/icons/message-square";
@@ -57,7 +58,16 @@ export function Corner(props: {
 	/** Frame the whole deck — the `0` key's job, and the first row of the menu. */
 	onFit: () => void;
 	/** The `⋯` menu, which is the integrator's: it collects whatever has folded. */
-	onOverflow: () => void;
+	/**
+	 * The three secondary controls, as menu rows at every width.
+	 *
+	 * Passed in rather than built here, because what belongs in an overflow is a question
+	 * about the *app* — the canvas cheat sheet, the settings, the theme — and this
+	 * component's business is the corner. A callback would have been the smaller API and
+	 * the wrong one: it leaves the caller to invent a second menu, and then there are two
+	 * menus in one corner disagreeing about their shadows.
+	 */
+	overflow: Array<{ label: string; icon: LucideIcon; note?: string; onPick: () => void }>;
 }) {
 	const percent = () => Math.round(props.zoom * 100);
 	const clamp = (zoom: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
@@ -181,9 +191,38 @@ export function Corner(props: {
 
 			{/* Everything that folded, plus the deck's own commands. Its contents are the
 			    integrator's — this is the handle. */}
-			<button type="button" class="iconbtn" aria-haspopup="menu" title="More" aria-label="More" onClick={() => props.onOverflow()}>
-				<Icon of={MoreHorizontal} size={15} />
-			</button>
+			<Popover
+				placement="bottom-end"
+				label="More"
+				class="w-[248px]"
+				trigger={(api) => (
+					<button
+						ref={api.ref}
+						type="button"
+						class="iconbtn"
+						aria-haspopup="menu"
+						aria-expanded={api.open}
+						data-on={api.open ? "soft" : undefined}
+						title="More"
+						aria-label="More"
+						onClick={api.toggle}
+					>
+						<Icon of={MoreHorizontal} size={15} />
+					</button>
+				)}
+			>
+				<For each={props.overflow}>
+					{(item) => (
+						<button type="button" data-row data-flat={item.note ? undefined : "true"} onClick={item.onPick}>
+							<span class="ic">
+								<Icon of={item.icon} size={15} />
+							</span>
+							<span class="lb">{item.label}</span>
+							<Show when={item.note}>{(note) => <span class="nt">{note()}</span>}</Show>
+						</button>
+					)}
+				</For>
+			</Popover>
 		</div>
 	);
 }
