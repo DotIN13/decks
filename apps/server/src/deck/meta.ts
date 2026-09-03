@@ -20,6 +20,28 @@ const TITLE = /<title[^>]*>([\s\S]*?)<\/title>/i;
 const META = /<meta\s+[^>]*name\s*=\s*["']([\w-]+)["'][^>]*>/gi;
 const CONTENT = /content\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
 
+/**
+ * An attribute value as the browser would see it.
+ *
+ * The board templates write this tag single-quoted, so the JSON inside keeps its own
+ * double quotes and needs nothing doing to it. But a board written by hand — or by an
+ * editor that normalises quotes — arrives double-quoted, and then the only legal way to
+ * carry `{"w":800}` is `content="{&quot;w&quot;:800}"`. That parsed as invalid JSON and was
+ * swallowed by the `catch` below, so the board silently rendered at the default size and
+ * the file looked correct to anyone reading it.
+ *
+ * Five entities, because those are the five a serialiser may produce in an attribute.
+ */
+function unescapeAttribute(value: string): string {
+	return value
+		.replace(/&quot;/g, '"')
+		.replace(/&apos;/g, "'")
+		.replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">")
+		.replace(/&amp;/g, "&");
+}
+
 export function readBoardMeta(html: string): BoardMeta {
 	const meta: BoardMeta = {};
 
@@ -43,7 +65,7 @@ export function readBoardMeta(html: string): BoardMeta {
 		// Written by hand as often as by an agent, so a broken one is ignored
 		// rather than fatal — the board still renders at the default size.
 		try {
-			const parsed = JSON.parse(value) as { w?: unknown; h?: unknown; bg?: unknown };
+			const parsed = JSON.parse(unescapeAttribute(value)) as { w?: unknown; h?: unknown; bg?: unknown };
 			if (Number.isFinite(Number(parsed.w))) meta.w = Number(parsed.w);
 			if (Number.isFinite(Number(parsed.h))) meta.h = Number(parsed.h);
 			if (typeof parsed.bg === "string") meta.bg = parsed.bg;

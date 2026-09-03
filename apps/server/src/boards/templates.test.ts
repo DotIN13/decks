@@ -45,3 +45,4 @@ test("a kind has to be one of the shapes", () => {
 	assert.equal(isBoardKind("slideshow"), false);
 	assert.equal(isBoardKind(undefined), false);
 });
+

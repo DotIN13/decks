@@ -98,7 +98,17 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 		// is the harness's own noise, not the app's.
 		if (!/localStorage/.test(error.message)) errors.push(error.message);
 	});
+	/*
+	 * Top frame only, and that guard is load-bearing.
+	 *
+	 * An init script runs in *every* frame, and a board is served from `/api/board/...`
+	 * into a same-origin iframe — so this cleared `localStorage` again every time a
+	 * thumbnail mounted, wiping whatever the app had persisted since the page loaded. The
+	 * symptom was a panel that forgot its tab and its fold partway through a check, which
+	 * reads as a bug in the panel.
+	 */
 	await page.addInitScript((wanted) => {
+		if (window.top !== window.self) return;
 		try {
 			localStorage.clear();
 			localStorage.setItem("decks.scheme", wanted);

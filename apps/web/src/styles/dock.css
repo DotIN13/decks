@@ -1,0 +1,421 @@
+/*
+ * The input bar's own vocabulary: the box, the controls row inside it, and the row under it.
+ *
+ * **To wire this up, `index.css` needs `@import "./styles/dock.css";` beside the
+ * `chrome.css` import at the top.** Imported there rather than from `Composer.tsx` on
+ * purpose: `@layer` order is fixed by the order the layers are first seen, and a stylesheet
+ * that Vite injects from a module graph arrives whenever the module does — which would put
+ * these rules in a components layer of their own, ordered against Tailwind's by accident.
+ * One import in one file keeps the layering a fact rather than a coincidence.
+ *
+ * The shape this file dresses is picone's, and the load-bearing part of it is a division
+ * into two registers. **Inside** the box, under the text: attach, mode, model, send — every
+ * one of them changes what the *next* turn does, so they belong to the draft and move with
+ * it as it grows. **Outside** the box, below: the keyboard hints and the context dial —
+ * neither changes anything, one teaches the keyboard and the other reports what the turn
+ * you already have has cost. That is why the dial left the controls row, where a percentage
+ * chip used to sit competing with the model and the send button for a glance it does not
+ * deserve; and it is why the hint row had to exist first, because until there was a second
+ * row the usage number had nowhere else to be.
+ *
+ * What is here and what is not, per the rule `chrome.css` states: **material here, layout in
+ * the markup.** A size that several components have to agree on, a state that needs a
+ * selector CSS has and a class attribute does not (`:focus`, `::before`, `::placeholder`),
+ * and a shape spelled the same way twice — those are here. Where things sit, and how they
+ * space out, is Tailwind next to the markup that describes it.
+ *
+ * And the corollary from `index.css`, which bites hardest in this file: **an `@media` block
+ * in the components layer loses to a utility on the same element.** Every rule below that is
+ * inside one sets a property no utility touches — the two control-size custom properties,
+ * and the send button's own square. Anything responsive about a utility-styled element is a
+ * variant in the markup instead, which is why the hint row's ranks read as
+ * `max-[620px]:hidden` over there rather than as a media query here.
+ */
+@layer components {
+	/*
+	 * The box you type into: a `.float` with a wider corner and one more state.
+	 *
+	 * 14px rather than `.float`'s 12 — `--row-radius`, the same corner the conversation's
+	 * bubbles take, because this is the row the *next* bubble is being written in and the
+	 * two should read as one column.
+	 */
+	.dockbox {
+		border-radius: var(--row-radius);
+		transition:
+			border-color 120ms ease,
+			box-shadow 120ms ease;
+	}
+
+	/*
+	 * Focus is a tinted border and a soft halo, not a ring.
+	 *
+	 * A hard 2px accent outline is what every other control here takes on focus, and it is
+	 * wrong on this one: the box is up to 720px of white, and a saturated line all the way
+	 * around that much of it reads as an error state rather than as a caret. Three pixels
+	 * of 12% accent bleeding off the edge says the same thing quietly, and it composes with
+	 * the shadow the box already has instead of replacing it.
+	 *
+	 * `:has(.dockfield:focus)` rather than `:focus-within`, which was the first attempt:
+	 * the mode chip and the model chip are inside the box too, and lighting the whole box
+	 * up when somebody tabs to a picker says "you are typing" when they are not.
+	 */
+	.dockbox:has(.dockfield:focus) {
+		border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+		box-shadow:
+			0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent),
+			var(--shadow);
+	}
+
+	/*
+	 * The field itself. The largest type in the chrome, because it is the only part of it
+	 * you write rather than read.
+	 *
+	 * `field-sizing: content` is what grows it; the min and max heights are utilities in
+	 * the markup, being layout. What is here is the part a utility has no selector for.
+	 */
+	.dockfield {
+		border: 0;
+		background: none;
+		color: var(--fg);
+		font: inherit;
+		font-size: 13px;
+		line-height: 1.45;
+		outline: none;
+		resize: none;
+	}
+
+	.dockfield::placeholder {
+		color: var(--faint);
+	}
+
+	/*
+	 * The controls row, and the two sizes the board fixes for it.
+	 *
+	 * Set as custom properties rather than as widths, so `.iconbtn` and `.chipbtn` come
+	 * from `chrome.css` unmodified and there is still exactly one definition of what an
+	 * icon button is. 26px because these sit inside a card rather than in a toolbar — the
+	 * same reasoning `--control-md` was invented for, applied to the icon-only button next
+	 * to the labelled ones so that the three read as one row of three.
+	 */
+	.dockrow {
+		--control: 26px;
+		--control-md: 26px;
+		--control-radius: 7px;
+	}
+
+	/*
+	 * A fingertip needs more, and nothing else on the element sets these — which is the
+	 * only reason a media query is allowed to say so here.
+	 *
+	 * 34 rather than the 44 the toolbars take: this row is inside a card whose padding is
+	 * 10px, and three 44px targets plus a 44px send button is a bar taller than the text
+	 * it belongs to.
+	 */
+	@media (pointer: coarse) {
+		.dockrow {
+			--control: 34px;
+			--control-md: 34px;
+		}
+	}
+
+	/*
+	 * Send, and stop, at the far end.
+	 *
+	 * Round where everything else in the bar is a soft square, and the only filled control
+	 * in it: this one *commits*, and the shape says so before the icon does. 30px rather
+	 * than the row's 26 for the same reason — it is the button you are aiming at.
+	 *
+	 * One element for both meanings, with the geometry stated once, so the bar cannot
+	 * reflow when a turn starts or ends. Two buttons that swapped places would move the
+	 * thing you were about to press.
+	 */
+	.sendbtn {
+		display: grid;
+		flex: none;
+		place-items: center;
+		width: 30px;
+		height: 30px;
+		padding: 0;
+		border: 0;
+		border-radius: 999px;
+		background: var(--color-accent);
+		color: #fff;
+		cursor: pointer;
+		transition:
+			background-color 120ms ease,
+			opacity 120ms ease;
+	}
+
+	@media (pointer: coarse) {
+		.sendbtn {
+			width: 40px;
+			height: 40px;
+		}
+	}
+
+	.sendbtn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	/* Stop is danger-coloured; it is the one control here that undoes rather than does. */
+	.sendbtn[data-stop="true"] {
+		background: var(--color-danger);
+	}
+
+	.sendbtn[disabled] {
+		background: var(--line);
+		color: var(--faint);
+		cursor: default;
+	}
+
+	/*
+	 * The hint row, outside the box.
+	 *
+	 * Each hint is its own element with a rank, which is two fixes in one. As bare text in
+	 * a flex row every word and every `<kbd>` was a separate flex item with a gap beside
+	 * it, so the sentence came apart at "Enter | to | send"; and whole *phrases* are what
+	 * should disappear as the bar narrows, because half a hint is worse than no hint. The
+	 * ranks are variants in the markup, since only a utility can win against a utility.
+	 */
+	.hintrow {
+		color: var(--faint);
+		font-size: 11px;
+	}
+
+	.hint {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 4px;
+		white-space: nowrap;
+	}
+
+	/*
+	 * The separator is drawn by the hint that *follows* it, which is what makes hiding one
+	 * safe: a dot owned by the gap would be left behind by whichever neighbour went away,
+	 * and a row ending in a dangling `·` looks like a bug in the app rather than a
+	 * concession to the width.
+	 */
+	.hint + .hint::before {
+		margin-right: 4px;
+		color: var(--line-strong);
+		content: "·";
+	}
+
+	.hintrow kbd {
+		display: inline-grid;
+		box-sizing: border-box;
+		min-width: 16px;
+		height: 15px;
+		padding: 0 4px;
+		border: 1px solid var(--line-strong);
+		border-radius: 4px;
+		background: var(--panel);
+		color: var(--muted);
+		font: inherit;
+		font-size: 10px;
+		place-items: center;
+	}
+
+	/*
+	 * The dial: how full the context is, as a ring at the end of the hint row.
+	 *
+	 * Ambient rather than alarming — it fills as the conversation grows and only changes
+	 * colour when it is worth doing something about. `--dial` carries the ring's own colour
+	 * so the number and the arc move together through the three levels without either
+	 * being stated twice.
+	 */
+	.dial {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 5px;
+		padding: 1px 4px;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+		font: inherit;
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+		--dial: var(--color-accent);
+	}
+
+	.dial:hover,
+	.dial[aria-expanded="true"] {
+		background: var(--line);
+		color: var(--fg);
+	}
+
+	.dial:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* Amber over 70%, red over 85%: the two points where the next long turn is the one
+	   that gets truncated, so the colour arrives before the trouble does. */
+	.dial[data-level="warn"] {
+		color: var(--color-warn);
+		--dial: var(--color-warn);
+	}
+
+	.dial[data-level="high"] {
+		color: var(--color-danger);
+		--dial: var(--color-danger);
+	}
+
+	.dial .track {
+		stroke: var(--line-strong);
+	}
+
+	.dial .fill {
+		stroke: var(--dial);
+	}
+
+	/*
+	 * The provider, as a pill in front of the model's own name.
+	 *
+	 * `gpt-4` exists under three providers and the name alone does not say which one a turn
+	 * will be billed to, so the provider is not decoration — but it is also not what you
+	 * are scanning for, hence a wash and the faint colour rather than a second bold word.
+	 */
+	.popover .pv {
+		flex: none;
+		padding: 1px 5px;
+		border-radius: 4px;
+		background: var(--line);
+		color: var(--faint);
+		font-size: 10px;
+	}
+
+	/*
+	 * The thinking scale, which is a `.seg` with one thing changed.
+	 *
+	 * `.seg`'s chosen tab is a raised panel-coloured chip, which reads perfectly among two
+	 * or three options and disappears among seven at 10px — the eye has to compare shadows
+	 * across the row to find it. Filled with the accent instead, so the current level is
+	 * findable in one glance, which is the only thing this row is ever asked.
+	 */
+	.seg[data-scale="true"] > button[data-on="true"] {
+		background: var(--color-accent);
+		color: #fff;
+		box-shadow: none;
+	}
+
+	/*
+	 * The numbers behind the dial: a key on the left, a figure on the right.
+	 *
+	 * Tabular figures because these are read as a column — 68,400 over 200,000 — and
+	 * proportional digits make two aligned numbers look misaligned.
+	 */
+	.popover .kv {
+		display: flex;
+		align-items: center;
+		padding: 4px 8px;
+		gap: 8px;
+		color: var(--muted);
+		font-size: 11px;
+	}
+
+	.popover .kv > .k {
+		flex: 1;
+		color: var(--faint);
+	}
+
+	.popover .kv > .v {
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* The same percentage as the ring, in the one place there is room to say it in full. */
+	.popover .big {
+		color: var(--fg);
+		font-size: 22px;
+		font-weight: 650;
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* The track under it: the ring unrolled, for a reading the arc can only approximate. */
+	.popover .track {
+		height: 5px;
+		border-radius: 999px;
+		background: var(--line);
+	}
+
+	.popover .track > i {
+		display: block;
+		height: 5px;
+		border-radius: 999px;
+		background: var(--color-accent);
+	}
+
+	/*
+	 * An action at the bottom of a popover, and the shape of one that is not built yet.
+	 *
+	 * Disabled rather than absent, and this is a deliberate call: compaction is the obvious
+	 * thing to want from a context reading, and a popup that shows you 86% with nothing to
+	 * do about it invites the question every time it is opened. The row answers it — the
+	 * `title` says the server cannot do this yet — where a missing row would only leave the
+	 * reader looking for it.
+	 */
+	.popover .act {
+		display: flex;
+		width: 100%;
+		height: 30px;
+		align-items: center;
+		padding: 0 8px;
+		gap: 8px;
+		border: 0;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12px;
+		text-align: left;
+	}
+
+	.popover .act:not([disabled]):hover {
+		background: var(--line);
+	}
+
+	.popover .act[disabled] {
+		color: var(--faint);
+		cursor: not-allowed;
+	}
+
+	/* The switch, drawn rather than borrowed: this is the only one in the app so far, and
+	   `[data-on]` is off for the same reason the row above it is disabled. */
+	.popover .sw {
+		box-sizing: border-box;
+		width: 26px;
+		height: 15px;
+		flex: none;
+		margin-left: auto;
+		padding: 2px;
+		border-radius: 999px;
+		background: var(--line-strong);
+		transition: background-color 120ms ease;
+	}
+
+	.popover .sw[data-on="true"] {
+		background: var(--color-accent);
+	}
+
+	.popover .sw > i {
+		display: block;
+		width: 11px;
+		height: 11px;
+		border-radius: 999px;
+		background: var(--panel);
+		transition: margin-left 120ms ease;
+	}
+
+	.popover .sw[data-on="true"] > i {
+		margin-left: 11px;
+	}
+}

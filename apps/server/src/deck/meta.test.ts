@@ -28,10 +28,25 @@ test("broken board meta is ignored rather than fatal", () => {
 });
 
 test("attribute order and quoting do not matter", () => {
-	const meta = readBoardMeta(`<meta content="{&quot;w&quot;:800}" name="board">`);
-	// Entity-encoded JSON is not parsed — the size falls back — but nothing throws
-	// and the rest of the head is still read.
-	assert.equal(meta.w, undefined);
+	/*
+	 * This test used to assert the opposite — that entity-encoded JSON fell back to the
+	 * default size — which documented a limitation as though it were a requirement. It is
+	 * not: `content="{&quot;w&quot;:800}"` is the *only* legal way a double-quoted
+	 * attribute can carry that JSON, so a board written by hand, or by an editor that
+	 * normalises quotes, silently lost its size while the file looked correct.
+	 */
+	const encoded = readBoardMeta(`<meta content="{&quot;w&quot;:800}" name="board">`);
+	assert.equal(encoded.w, 800);
 	const plain = readBoardMeta(`<meta content='{"w":800}' name="board">`);
 	assert.equal(plain.w, 800);
+});
+
+test("a numeric character reference is decoded too", () => {
+	assert.equal(readBoardMeta(`<meta name="board" content="{&#34;w&#34;:120}">`).w, 120);
+});
+
+test("a board that is still broken falls back rather than throwing", () => {
+	// The point of unescaping is not to accept anything: half a tag is still half a tag.
+	assert.equal(readBoardMeta(`<meta name="board" content="{&quot;w&quot;:}">`).w, undefined);
+	assert.equal(readBoardMeta(`<meta name="board" content="not json at all">`).w, undefined);
 });

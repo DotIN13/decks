@@ -1,0 +1,311 @@
+/*
+ * The agent faces: the circle, its ring, and the stack they make in the corner.
+ *
+ * Only what several components spell the same way — a face is drawn in four places (the
+ * top-left pill, the top-right stack, a dropdown row, the hover card) and the one thing
+ * that differs between them is its diameter, so `--face` and `--ring` are the whole API and
+ * everything else is here once. Layout — where a face sits, what it sits beside — is a
+ * class attribute in the component, next to the markup it describes; see the note at the
+ * top of `chrome.css`, which this file is a continuation of.
+ *
+ * Inside `@layer components`, like every other rule in this app, so that a utility on the
+ * same element still wins. And **no `@media` block for anything a utility also sets**: a
+ * layer keeps its precedence inside a media query, so `max-[1100px]:hidden` in the markup
+ * beats a `@media` rule in here every time. The one media block below sets `animation`,
+ * which no utility here touches.
+ */
+@layer components {
+	/*
+	 * The ring is an `outline` with an `outline-offset`, not a two-layer `box-shadow`.
+	 *
+	 * This is the whole point of the drawing and it is worth being blunt about it: an
+	 * offset region is genuinely *transparent*, so what shows between the avatar and its
+	 * circle is whatever is behind them — the pill, the canvas, the face behind it. The
+	 * alternative was `box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--status)`, and
+	 * its inner layer has to be painted with *something*; the panel's colour is what makes
+	 * it look invisible. That is a cut-out rather than daylight, and it is the thing that
+	 * stops the circle reading as a circle. One declaration instead of two stacked
+	 * shadows, and the same trick every focus ring in this app already uses.
+	 *
+	 * It also changes what separates two stacked faces. With the gap painted, each face sat
+	 * in a disc of panel colour and the boundary was a clean arc; now the boundary is the
+	 * *ring*, so the rings interleave and the one behind is crossed by the one in front.
+	 * Which is why `agent-order.ts` sorts by urgency: leftmost is topmost, so the face that
+	 * is asking you something is the one whose circle stays closed all the way round.
+	 */
+	.agent-face {
+		position: relative;
+		display: grid;
+		box-sizing: border-box;
+		width: var(--face, 24px);
+		height: var(--face, 24px);
+		flex: none;
+		border-radius: 999px;
+		/* The fill is *who*; the ring is *what*. Both channels used to be spent on identity. */
+		background: var(--fill, var(--color-accent));
+		color: #fff;
+		font-size: calc(var(--face, 24px) * 0.44);
+		font-weight: 600;
+		place-items: center;
+		/* Not a jump when a turn ends: the colour crossfades like every other control here. */
+		transition: outline-color 120ms ease;
+	}
+
+	/*
+	 * The avatar image rounds itself rather than being clipped by its parent.
+	 *
+	 * `overflow: hidden` on the face would have been the obvious way, and it also clips
+	 * pseudo-elements — which would have eaten the focus ring below. The image fills a box
+	 * that is already a circle, so rounding the image is the same picture with nothing
+	 * clipped.
+	 */
+	.agent-face > img {
+		width: 100%;
+		height: 100%;
+		border-radius: 999px;
+		object-fit: cover;
+	}
+
+	/*
+	 * One place where a state becomes a colour, read by both the ring and the swatch.
+	 *
+	 * The tokens and nothing else: `--color-accent` for working, `--color-ok` for done,
+	 * `--color-warn` for waiting. A second green is how a palette starts drifting — and two
+	 * of these are worth knowing about. `--color-warn` is gold rather than the orange the
+	 * board's prose calls it, and working blue *is* the accent, so a selected board, the
+	 * send button and a busy agent share a token. Both are palette decisions rather than
+	 * corner ones, and both are this one line if they are ever to change.
+	 */
+	:is(.agent-face, .agent-swatch, [data-row])[data-status="working"] {
+		--status: var(--color-accent);
+	}
+
+	:is(.agent-face, .agent-swatch, [data-row])[data-status="done"] {
+		--status: var(--color-ok);
+	}
+
+	:is(.agent-face, .agent-swatch, [data-row])[data-status="waiting"] {
+		--status: var(--color-warn);
+	}
+
+	:is(.agent-face, .agent-swatch, [data-row])[data-status="idle"] {
+		--status: var(--faint);
+	}
+
+	/*
+	 * Ringed unless idle, and the thickness and the offset are the same number.
+	 *
+	 * They have to be, or the gap stops looking like a gap: 2px of stroke with 1px of
+	 * daylight reads as a fat border. `--ring` is 2 on a 24px face and 1.5 on the 20px one
+	 * in a menu row, which is the only reason it is a variable.
+	 *
+	 * Pi's identity colour is the same blue as `working` — `#3b5cf6`, the accent — so on a
+	 * working Pi the fill and the ring are one colour, and **the 2px of transparent gap is
+	 * the only reason its ring reads at all**. With the gap painted in the panel's colour
+	 * it would read too, which is exactly the trap: it would look fine in the light theme,
+	 * fine in the dark one, and wrong the moment a face overlaps another.
+	 */
+	.agent-face[data-status]:not([data-status="idle"]) {
+		outline: var(--ring, 2px) solid var(--status);
+		outline-offset: var(--ring, 2px);
+	}
+
+	/* Working pulses, and it is the only motion in the corner — motion is what "still
+	   going" means. Waiting is steady on purpose: nothing is happening, and the stillness
+	   *is* the message. */
+	.agent-face[data-status="working"] {
+		animation: ring-pulse 1.2s ease-in-out infinite;
+	}
+
+	/*
+	 * `pulse` in `index.css` fades an element's opacity, which is right for a 7px dot and
+	 * wrong here — it would fade the avatar and the letter in it too, so the agent's
+	 * identity would flicker to report its state. Animating the outline's colour leaves
+	 * the face alone and moves only the channel that is carrying the message.
+	 */
+	@keyframes ring-pulse {
+		50% {
+			outline-color: color-mix(in srgb, var(--status) 22%, transparent);
+		}
+	}
+
+	/* Idle is only ever drawn in the dropdown, and drawn as an absence: no ring, and half
+	   opacity on the face and its name — see the row rules below. */
+	.agent-face[data-status="idle"] {
+		opacity: 0.5;
+	}
+
+	/*
+	 * The press target around a face in the stack.
+	 *
+	 * A wrapper rather than making the face itself a `<button>`, because the hover card and
+	 * the pill draw the same circle and neither of them is pressable — one shape, and the
+	 * component that needs a click puts a button round it. The button is exactly the face's
+	 * box, so the ring still overflows it (a button does not clip) and the stack's overlap
+	 * arithmetic is unchanged.
+	 */
+	.agent-facebtn {
+		position: relative;
+		display: grid;
+		flex: none;
+		padding: 0;
+		border: 0;
+		border-radius: 999px;
+		background: none;
+		cursor: pointer;
+		font: inherit;
+		place-items: center;
+	}
+
+	/*
+	 * Focus is a second ring *outside* the status ring, not a replacement for it.
+	 *
+	 * `outline` is already spent, and an element gets one — so a focus outline here would
+	 * overwrite the colour that is the entire signal. A `::after` at 3px beyond the status
+	 * ring says "this is where the keyboard is" without taking anything away, and it is the
+	 * same construction `index.css` uses on `.avatar`.
+	 */
+	.agent-facebtn:focus-visible {
+		outline: none;
+	}
+
+	.agent-facebtn:focus-visible::after {
+		position: absolute;
+		border: 2px solid var(--color-accent);
+		border-radius: 999px;
+		content: "";
+		inset: calc(-3px - var(--ring, 2px) * 2);
+	}
+
+	/*
+	 * The stack: a 22px pitch on a 24px avatar, leftmost topmost.
+	 *
+	 * `-2px` on everything after the first, and the z-indexes descend, so the urgent face —
+	 * which `agentOrder` puts first — is the one on top with its circle whole. Three faces
+	 * plus the chip take 106px of the pill, which is the room the board budgeted for them.
+	 */
+	.agent-stack {
+		display: flex;
+		align-items: center;
+		padding: 0 4px;
+	}
+
+	.agent-stack > * + * {
+		margin-left: -2px;
+	}
+
+	/* The chip has no ring of its own, so it has to give back the room the ring in front of
+	   it is standing in — otherwise it looks glued to the last face. */
+	.agent-stack > .agent-more {
+		margin-left: 6px;
+	}
+
+	.agent-stack > :nth-child(1) {
+		z-index: 4;
+	}
+
+	.agent-stack > :nth-child(2) {
+		z-index: 3;
+	}
+
+	.agent-stack > :nth-child(3) {
+		z-index: 2;
+	}
+
+	.agent-stack > :nth-child(4) {
+		z-index: 1;
+	}
+
+	/*
+	 * `+n`. A hairline circle rather than a fourth face, because it is a count and not an
+	 * agent — and it opens the same dropdown the pill's chevron does. One list, two ways in.
+	 */
+	.agent-more {
+		position: relative;
+		display: grid;
+		box-sizing: border-box;
+		width: var(--face, 24px);
+		height: var(--face, 24px);
+		flex: none;
+		padding: 0;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--panel);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: 10px;
+		font-weight: 600;
+		place-items: center;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.agent-more:hover {
+		background: var(--line);
+		color: var(--fg);
+	}
+
+	.agent-more:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	/*
+	 * A dropdown row.
+	 *
+	 * The popover's own flat row (`[data-flat="true"]` in `chrome.css`) one notch taller: a
+	 * 20px face with a ring standing 3.5px off it needs 34px of row, and at 30 the rings of
+	 * two neighbouring agents touch. Everything else — the highlight, the keyboard roving,
+	 * the `.lb` name at 12px semibold — is the popover's, because an agent list that styled
+	 * its own rows would be a second menu vocabulary.
+	 */
+	.popover [data-row][data-agent] {
+		height: 34px;
+		gap: 10px;
+	}
+
+	.popover [data-row][data-agent] > .lb {
+		flex: 1;
+		min-width: 0;
+	}
+
+	/* Every agent, including the idle ones, at half — which is the division of labour said
+	   in one declaration: the corner is what is happening, this is what exists. The state
+	   text is already `--faint` and stays legible, because "idle · 3h" is the only content
+	   in the row that explains why the rest of it is dimmed. */
+	.popover [data-row][data-agent][data-status="idle"] > .lb,
+	.popover [data-row][data-agent][data-status="idle"] > .agent-face {
+		opacity: 0.5;
+	}
+
+	/*
+	 * The colour, restated as a shape, in the hover card.
+	 *
+	 * The card names the state in words *and* shows its colour, which makes it the legend
+	 * for the corner. A ring around nothing would have been the tidier echo of the face
+	 * above it; a filled 7px dot is what reads at that size.
+	 */
+	.agent-swatch {
+		width: 7px;
+		height: 7px;
+		flex: none;
+		border-radius: 999px;
+		background: var(--status, var(--faint));
+	}
+
+	/*
+	 * No pulse for anyone who asked for less motion.
+	 *
+	 * The ring still carries its colour, so nothing is lost but the movement — which is the
+	 * honest trade here, unlike a spinner where the motion *is* the content. Safe as a
+	 * `@media` block because `animation` is not a property any utility in this markup sets;
+	 * see the warning at the top of this file.
+	 */
+	@media (prefers-reduced-motion: reduce) {
+		.agent-face[data-status="working"] {
+			animation: none;
+		}
+	}
+}
