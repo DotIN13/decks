@@ -110,17 +110,50 @@ for (const stream of [server.stdout, server.stderr]) {
 }
 
 let exitCode = 0;
+let stopped = false;
 const stop = () => {
+	if (stopped) return;
+	stopped = true;
+	/*
+	 * SIGKILL, and not SIGTERM first.
+	 *
+	 * `npm run dev` is a wrapper around `concurrently` around two more processes, and
+	 * `concurrently` does not pass a TERM down to children it started through npm scripts —
+	 * so a polite stop left the server and Vite holding their ports, and the *next* run
+	 * found "something else is already serving" and refused. Correctly, and confusingly,
+	 * because the something else was the previous run.
+	 *
+	 * There is nothing here worth shutting down gracefully: a dev server over a throwaway
+	 * fixture, and the fixture is deleted on the next line. `detached` above is what gives
+	 * the whole tree one negative pid to send this to.
+	 */
 	try {
-		process.kill(-server.pid, "SIGTERM");
+		process.kill(-server.pid, "SIGKILL");
 	} catch {
-		server.kill("SIGTERM");
+		try {
+			server.kill("SIGKILL");
+		} catch {
+			/* already gone */
+		}
 	}
 	rmSync(data, { recursive: true, force: true });
 };
+
+/*
+ * Every way this process can end, the tree goes with it.
+ *
+ * `finally` covers a thrown check and `SIGINT` covers a ⌃C, but neither covers being killed
+ * from outside — which is how an interrupted run left a server behind and then broke the
+ * next two runs before anyone worked out why.
+ */
+process.on("exit", stop);
 process.on("SIGINT", () => {
 	stop();
 	process.exit(130);
+});
+process.on("SIGTERM", () => {
+	stop();
+	process.exit(143);
 });
 
 try {
