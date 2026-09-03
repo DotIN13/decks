@@ -67,15 +67,15 @@ await page.evaluate(() => {
 	look();
 });
 
-await page.locator(".composer textarea").fill("Read boards/plan.html and give me its title, briefly.");
-await page.locator(".composer textarea").press("Enter");
-await page.waitForFunction(() => document.querySelector(".composer .send")?.dataset.busy === "true", null, { timeout: 20000 });
+await page.locator(".dockfield").fill("Read boards/plan.html and give me its title, briefly.");
+await page.locator(".dockfield").press("Enter");
+await page.waitForFunction(() => document.querySelector(".sendbtn")?.dataset.busy === "true", null, { timeout: 20000 });
 await settle(page, 400);
 const during = await row();
 say("the row says it is working while it works", /thinking|working|waiting/.test(during.last), JSON.stringify(during.last));
 say("…and its face wears the state as a ring", during.ringed && during.state !== "idle", JSON.stringify(during));
 
-await page.waitForFunction(() => document.querySelector(".composer .send")?.dataset.busy !== "true", null, { timeout: 300000 });
+await page.waitForFunction(() => document.querySelector(".sendbtn")?.dataset.busy !== "true", null, { timeout: 300000 });
 await settle(page, 1500);
 
 const watched = await page.evaluate(() => ({ words: [...window.__rowWatch.words], ringed: window.__rowWatch.ringed }));

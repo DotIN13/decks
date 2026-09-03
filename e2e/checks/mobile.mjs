@@ -65,11 +65,11 @@ const dock = await page.evaluate(() => {
 		const rect = element.getBoundingClientRect();
 		return { w: Math.round(rect.width), h: Math.round(rect.height) };
 	};
-	return { composer: box(".composer"), field: box(".composer textarea"), send: box(".composer .send"), width: window.innerWidth };
+	return { composer: box(".dockbox"), field: box(".dockfield"), send: box(".sendbtn"), width: window.innerWidth };
 });
 say(
 	"the composer is as wide as the phone, not as wide as what is left over",
-	dock.composer.w > dock.width - 60 && dock.field.w > 240,
+	dock.dockbox.w > dock.width - 60 && dock.field.w > 240,
 	JSON.stringify(dock),
 );
 say("the send button is a fingertip target", dock.send.w >= 40 && dock.send.h >= 40, JSON.stringify(dock.send));
@@ -77,26 +77,30 @@ say("the send button is a fingertip target", dock.send.w >= 40 && dock.send.h >=
 /*
  * And the title bar still holds them all.
  *
- * Its buttons are 44px on a touchscreen and there are seven of them now — the two panels,
- * the deck, the cheat sheet, the conversation, settings, the theme — against a layout
- * viewport of ~490px. There is room for about one more, and the failure mode is silent: a
- * button pushed off the right edge, or one landing on top of the wordmark. Asserted so the
- * eighth is a failing check rather than something noticed in a screenshot.
+ * The two clusters have to fit a line that a title bar never had to.
+ *
+ * There is no title bar: it held seven buttons against a layout viewport of ~490px, with
+ * room for about one more and a silent failure mode — a button pushed off the right edge,
+ * or one landing on top of the wordmark. The clusters cannot overflow in the same way,
+ * because the tools fold into a menu under 1100px and the three secondary controls are menu
+ * rows at every width. That folding is what is asserted, since the whole point of it is
+ * that a phone gets a line it can hold.
  */
 const bar = await page.evaluate(() => {
-	const titlebar = document.querySelector(".titlebar");
-	const brand = titlebar.querySelector(".brand").getBoundingClientRect();
-	const boxes = [...titlebar.querySelectorAll(".icon-button")].map((button) => button.getBoundingClientRect());
+	const clusters = [...document.querySelectorAll("[data-inset='top']")];
+	const boxes = clusters.flatMap((c) => [...c.querySelectorAll("button")]).map((b) => b.getBoundingClientRect());
+	const rects = clusters.map((c) => c.getBoundingClientRect());
 	return {
+		clusters: clusters.length,
 		buttons: boxes.length,
-		width: Math.round(titlebar.clientWidth),
-		overflows: titlebar.scrollWidth > titlebar.clientWidth,
-		offRight: boxes.filter((box) => box.right > titlebar.clientWidth + 1).length,
-		onTheBrand: boxes.filter((box) => box.left < brand.right).length,
+		width: innerWidth,
+		offRight: boxes.filter((box) => box.right > innerWidth + 1).length,
+		overlap: rects.length === 2 ? Math.round(rects[0].right - rects[1].left) : null,
+		toolsVisible: document.querySelectorAll(".palette button").length,
 	};
 });
-say("the title bar holds its buttons without overflowing", !bar.overflows && bar.offRight === 0, JSON.stringify(bar));
-say("…and none of them lands on the wordmark", bar.onTheBrand === 0, JSON.stringify(bar));
+say("both clusters fit the line, with nothing off the right edge", bar.offRight === 0 && bar.overlap < 0, JSON.stringify(bar));
+say("the tools fold away on a phone rather than pushing the corner off", bar.toolsVisible === 0, JSON.stringify(bar));
 
 // --- 2. pinch on bare stage ---------------------------------------------------------
 const start = await camera();
@@ -348,30 +352,29 @@ if (!embed) {
 // their own now, and one edge cannot carry two drawers without asking which you meant.
 const openState = () =>
 	page.evaluate(() => ({
-		left: document.querySelector(".side:not(.context)")?.dataset.open,
-		boards: document.querySelector("[data-inset='left']")?.dataset.open,
-		right: document.querySelector(".chat-float")?.dataset.open,
+		boards: Boolean(document.querySelector(".panel-shell")),
+		right: (document.querySelector("[data-shown]")?.dataset.shown ?? "false") === "true",
 	}));
 const away = await openState();
-say("all three start away", away.left === "false" && away.boards === "false" && away.right === "false", JSON.stringify(away));
+say("the conversation starts away", away.right === false, JSON.stringify(away));
 
-await page.locator('.titlebar .icon-button[aria-label="The agents"]').tap();
-await settle(page, 300);
-say("a tap on the title bar brings the agents out", (await openState()).left === "true", JSON.stringify(await openState()));
+/*
+ * Two surfaces take turns now, not three: the agents became a dropdown, so there is one
+ * panel and one conversation. 264px of panel and 320px of cards on a 390px screen is two
+ * surfaces and no canvas, which is the whole reason for the rule.
+ */
+await page.locator('.pill button[aria-label="Boards"]').tap();
+await settle(page, 320);
+say("a tap on the pill brings the boards sheet out", (await openState()).boards === true, JSON.stringify(await openState()));
 
-await page.locator('.titlebar .icon-button[aria-label="Boards this agent is holding"]').tap();
-await settle(page, 300);
-const swapped = await openState();
-say("the boards take their place, not a second sheet beside them", swapped.boards === "true" && swapped.left === "false", JSON.stringify(swapped));
-
-await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
-await settle(page, 300);
+await page.locator('.pill button[title^="Conversation"]').tap();
+await settle(page, 320);
 const both = await openState();
-say("opening the transcript closes whichever panel was up", both.right === "true" && both.left === "false" && both.boards === "false", JSON.stringify(both));
+say("opening the conversation puts the sheet away", both.right === true && both.boards === false, JSON.stringify(both));
 
-await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
-await settle(page, 300);
-say("and tapping it again puts it away", (await openState()).right === "false", JSON.stringify(await openState()));
+await page.locator('.pill button[title^="Conversation"]').tap();
+await settle(page, 320);
+say("and tapping it again puts it away", (await openState()).right === false, JSON.stringify(await openState()));
 
 /*
  * A swipe toward the right edge is the other way out — the gesture a phone already
@@ -379,11 +382,11 @@ say("and tapping it again puts it away", (await openState()).right === "false", 
  * cursor cannot. It has to survive the bubbles being a scroller: a *vertical* drag inside
  * them belongs to the history, so only horizontal travel takes the sheet.
  */
-await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
+await page.locator('.pill button[title^="Conversation"]').tap();
 await settle(page, 400);
 say("…and it opens again", (await openState()).right === "true", JSON.stringify(await openState()));
 const middle = await page.evaluate(() => {
-	const box = document.querySelector(".chat-float .fsroll").getBoundingClientRect();
+	const box = document.querySelector(".stream .stream-roll").getBoundingClientRect();
 	return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
 });
 await swipe([middle], { x: 260, y: 0 }, 12);
@@ -426,7 +429,7 @@ const swiped = await openState();
 say("a swipe in from the right edge brings the conversation out", swiped.right === "true", JSON.stringify(swiped));
 say("…and takes the rail's place, on a screen too narrow for both", swiped.left === "false", JSON.stringify(swiped));
 
-await page.locator('.titlebar .icon-button[aria-label="The conversation"]').tap();
+await page.locator('.pill button[title^="Conversation"]').tap();
 await settle(page, 300);
 
 /*
@@ -450,7 +453,7 @@ await page.evaluate(() => document.querySelector(".board-row")?.click());
 await settle(page, 2500);
 // Fitting a board leaves a margin, so the edge is still bare stage: pinch out until the
 // frame reaches it. Pinching rather than the zoom buttons because the inspector is a
-// bottom sheet on this screen and takes the zoombar's place while it is up.
+// bottom sheet on this screen, where the inspector used to have the corner to itself.
 for (let attempt = 0; attempt < 4; attempt++) {
 	if ((await page.evaluate((y) => document.elementFromPoint(3, y)?.tagName.toLowerCase(), mid)) === "iframe") break;
 	await pinch({ x: Math.round(size.width / 2), y: mid }, 100, 260);
@@ -462,12 +465,16 @@ say("zoomed in, the left edge is over a live board's frame", overBoard === "ifra
 await swipe([{ x: 3, y: mid }], { x: 150, y: 0 }, 12);
 await settle(page, 400);
 say("the edge swipe works over a board too", (await openState()).left === "true", JSON.stringify(await openState()));
-await page.locator('.titlebar .icon-button[aria-label="The agents"]').tap();
+await page.locator('.pill button[aria-label="Boards"]').tap();
 await settle(page, 300);
 
 // --- 8. nothing in the chrome is smaller than a fingertip ---------------------------
 const small = await page.evaluate(() => {
-	const wanted = ".titlebar .icon-button, .palette button, .zoombar button, .composer .send";
+	/*
+	 * Everything a finger has to hit. The title bar and the zoombar are gone, so the list is
+	 * the two clusters, the tools wherever they currently live, and the send button.
+	 */
+	const wanted = "[data-inset='top'] button, .palette button, .sendbtn";
 	return [...document.querySelectorAll(wanted)]
 		.filter((element) => element.getBoundingClientRect().width > 0)
 		.map((element) => ({

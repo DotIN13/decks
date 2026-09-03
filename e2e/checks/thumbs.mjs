@@ -152,11 +152,11 @@ try {
 	await settle(page, 300);
 	for (const path of wanted.slice(0, 3)) link.send({ type: "board.play", path });
 	await openPanel(page, "context");
-	await page.waitForFunction(() => document.querySelectorAll(".side .board-row").length >= 3, null, { timeout: 15000 });
+	await page.waitForFunction(() => document.querySelectorAll(".panel-list .board-row").length >= 3, null, { timeout: 15000 });
 	await settle(page, 4000);
 	const panel = await page.evaluate(() => ({
-		documents: document.querySelectorAll(".side .board-row iframe").length,
-		photographs: document.querySelectorAll(".side .thumb-shot").length,
+		documents: document.querySelectorAll(".panel-list .board-row iframe").length,
+		photographs: document.querySelectorAll(".panel-list .thumb-shot").length,
 	}));
 	say("the context panel keeps live documents", panel.documents > 0, JSON.stringify(panel));
 	say("…and never shows a photograph", panel.photographs === 0, JSON.stringify(panel));

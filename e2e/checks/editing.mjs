@@ -91,7 +91,7 @@ try {
 	);
 	say(
 		"the tool returns to select after an insert",
-		await page.evaluate(() => document.querySelector('.palette button[data-active="true"]')?.title?.startsWith("Select") ?? false),
+		await page.evaluate(() => document.querySelector('.palette button[data-on="true"]')?.title?.startsWith("Select") ?? false),
 	);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));

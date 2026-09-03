@@ -15,7 +15,7 @@
  * Accounts are stored per *install* rather than per deck, so this writes under the fixture's
  * data directory and takes it away again.
  */
-import { deckState, open, say, settle } from "../harness.mjs";
+import { deckState, hasOverflowRow, open, openOverflow, say, settle } from "../harness.mjs";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -27,8 +27,8 @@ const { browser, page, errors } = await open();
 await settle(page, 1500);
 
 // --- the panel -------------------------------------------------------------------
-say("there is a settings button", (await page.locator('.titlebar button[title="Settings"]').count()) === 1);
-await page.locator('.titlebar button[title="Settings"]').click();
+say("settings is a row in the corner's overflow", await hasOverflowRow(page, /settings/i));
+await openOverflow(page, /settings/i);
 await page.waitForSelector(".settings", { timeout: 6000 });
 await page.waitForTimeout(1500);
 
@@ -96,7 +96,7 @@ writeFileSync(
 // The panel asks on open, so close and reopen to read the new list.
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
-await page.locator('.titlebar button[title="Settings"]').click();
+await openOverflow(page, /settings/i);
 await page.waitForSelector(".settings", { timeout: 6000 });
 await page.waitForTimeout(2000);
 const after = await page.evaluate(() =>
@@ -127,7 +127,7 @@ say("…with the added ones removable and the CLI's own not", after.filter((r) =
 rmSync(join(accountsDir, ids[0], ".credentials.json"), { force: true });
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
-await page.locator('.titlebar button[title="Settings"]').click();
+await openOverflow(page, /settings/i);
 await page.waitForSelector(".settings", { timeout: 6000 });
 await page.waitForTimeout(2000);
 const signedOut = await page.evaluate(() =>

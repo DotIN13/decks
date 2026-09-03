@@ -13,7 +13,7 @@ const paths = deck.boards.map((board) => board.path).sort();
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
 const onCanvas = () => page.evaluate(() => [...document.querySelectorAll(".board-node")].map((n) => n.dataset.path).sort());
 /** The context panel's list, which is the focused agent's held set and nothing else. */
-const inRail = () => page.evaluate(() => [...document.querySelectorAll(".side .board-row .file")].map((n) => n.textContent).sort());
+const inRail = () => page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .file")].map((n) => n.textContent).sort());
 /** The whole deck, in the modal that lists it. */
 const inModal = () => page.evaluate(() => [...document.querySelectorAll(".all-boards .board-row .file")].map((n) => n.textContent).sort());
 
@@ -64,7 +64,7 @@ say("…without dropping it from the agent's context", (await inRail()).length =
 
 // Clicking a thumbnail in the context panel puts it back.
 await openPanel(page, "context");
-await page.locator(`.side .board-row:has(.file:text-is("${first}"))`).click();
+await page.locator(`.panel-list .board-row:has(.file:text-is("${first}"))`).click();
 await page.waitForFunction((wanted) => Boolean(document.querySelector(`.board-node[data-path="${wanted}"]`)), first, { timeout: 8000 });
 await page.mouse.move(800, 500);
 say("clicking a rail item plays it", (await onCanvas()).includes(first), (await onCanvas()).join(" "));

@@ -31,9 +31,9 @@ try {
 	 */
 	say("the second turn changed it again", /second turn/i.test(afterSecond));
 
-	await page.locator(".turnbar .turn").first().click();
-	await page.waitForSelector(".chat-float .turn-row", { timeout: 8000 });
-	const rows = await page.locator(".chat-float .turn-row").count();
+	await page.locator(".stream-roll .turn").first().click();
+	await page.waitForSelector(".stream .turn-row", { timeout: 8000 });
+	const rows = await page.locator(".stream .turn-row").count();
 	say("each user message is a point you can return to", rows >= 2, `${rows} messages with actions`);
 
 	/*
@@ -59,7 +59,7 @@ try {
 	await page.evaluate(() => {
 		document.querySelector('.board-node[data-path="boards/plan.html"] iframe').contentWindow.__live = true;
 	});
-	const second = page.locator(".chat-float .turn-row").nth(1);
+	const second = page.locator(".stream .turn-row").nth(1);
 	await second.hover();
 	await second.locator('.turn-actions button[data-act="rewind"]').hover();
 	await page.waitForFunction(
@@ -91,13 +91,13 @@ try {
 	say("restore boards writes that point back", /first turn/i.test(restored) && !/second turn/i.test(restored));
 
 	// Rewinding truncates the conversation.
-	const before = await page.locator(".chat-float .fsroll > *").count();
-	const last = page.locator(".chat-float .turn-row").last();
-	const rewound = (await last.locator(".fbubble").innerText()).trim();
+	const before = await page.locator(".stream .stream-roll > *").count();
+	const last = page.locator(".stream .turn-row").last();
+	const rewound = (await last.locator(".stream-card").innerText()).trim();
 	await last.hover();
 	await last.locator('.turn-actions button[data-act="rewind"]').click();
-	await page.waitForFunction((was) => document.querySelectorAll(".chat-float .fsroll > *").length < was, before, { timeout: 15000 });
-	say("rewinding cuts the transcript back", (await page.locator(".chat-float .fsroll > *").count()) < before, `${before} → ${await page.locator(".chat-float .fsroll > *").count()} items`);
+	await page.waitForFunction((was) => document.querySelectorAll(".stream .stream-roll > *").length < was, before, { timeout: 15000 });
+	say("rewinding cuts the transcript back", (await page.locator(".stream .stream-roll > *").count()) < before, `${before} → ${await page.locator(".stream .stream-roll > *").count()} items`);
 
 	/*
 	 * The message comes back in the input bar, and *only* there.
@@ -109,7 +109,7 @@ try {
 	 * thing differently.
 	 */
 	await settle(page, 600);
-	const draft = await page.locator(".composer textarea").inputValue();
+	const draft = await page.locator(".dockfield").inputValue();
 	say("the rewound message comes back in the input bar", draft === rewound, JSON.stringify(draft.slice(0, 60)));
 	const toasts = await page.locator(".notice").allInnerTexts();
 	say("…and the notice just says it happened", toasts.some((text) => text.trim() === "Rewound."), JSON.stringify(toasts));

@@ -46,8 +46,8 @@ try {
 
 	const geometry = () =>
 		page.evaluate(() => {
-			const rail = document.querySelector(".side .rail").getBoundingClientRect();
-			const items = document.querySelector(".side .rail .items");
+			const rail = document.querySelector(".panel-shell").getBoundingClientRect();
+			const items = document.querySelector(".panel-list");
 			return {
 				railBottom: Math.round(rail.bottom),
 				viewport: innerHeight,
@@ -65,7 +65,7 @@ try {
 	// A real wheel over the list, not a scrollTop assignment.
 	await page.mouse.move(first.box.x + first.box.width / 2, first.box.y + first.box.height / 2);
 	for (let i = 0; i < 6; i += 1) await page.mouse.wheel(0, 200);
-	await page.waitForFunction(() => document.querySelector(".side .rail .items").scrollTop > 0, null, { timeout: 5000 });
+	await page.waitForFunction(() => document.querySelector(".panel-list").scrollTop > 0, null, { timeout: 5000 });
 	const scrolled = await geometry();
 	say("a wheel over the list scrolls it", scrolled.scrollTop > 0, `scrollTop ${first.scrollTop} -> ${scrolled.scrollTop}`);
 
@@ -74,22 +74,22 @@ try {
 	say("the camera did not pan while scrolling the list", true, `zoom still ${zoomLabel}`);
 
 	await page.evaluate(() => {
-		const items = document.querySelector(".side .rail .items");
+		const items = document.querySelector(".panel-list");
 		items.scrollTop = items.scrollHeight;
 	});
 	await page.waitForFunction(
 		() => {
-			const items = [...document.querySelectorAll(".side .rail .board-row")];
+			const items = [...document.querySelectorAll(".panel-list .board-row")];
 			return Boolean(items.at(-1)?.querySelector("iframe, img"));
 		},
 		null,
 		{ timeout: 20000 },
 	);
 	const last = await page.evaluate(() => {
-		const items = [...document.querySelectorAll(".side .rail .board-row")];
+		const items = [...document.querySelectorAll(".panel-list .board-row")];
 		const element = items.at(-1);
 		const box = element.getBoundingClientRect();
-		const listBox = document.querySelector(".side .rail .items").getBoundingClientRect();
+		const listBox = document.querySelector(".panel-list").getBoundingClientRect();
 		return {
 			label: element.textContent.trim().slice(0, 30),
 			visible: box.top >= listBox.top - 2 && box.bottom <= listBox.bottom + 2,
@@ -101,15 +101,15 @@ try {
 
 	// The cost bound has to survive scrolling the whole list, or "mount what is near"
 	// just becomes "mount everything, eventually".
-	const live = await page.evaluate(() => document.querySelectorAll(".side .rail .board-row iframe").length);
-	const total = await page.evaluate(() => document.querySelectorAll(".side .rail .board-row").length);
+	const live = await page.evaluate(() => document.querySelectorAll(".panel-list .board-row iframe").length);
+	const total = await page.evaluate(() => document.querySelectorAll(".panel-list .board-row").length);
 	say("live thumbnails stay bounded after scrolling the list", live < total, `${live} live of ${total} items`);
 
 	await page.evaluate(() => {
-		document.querySelector(".side .rail .items").scrollTop = 0;
+		document.querySelector(".panel-list").scrollTop = 0;
 	});
 	await page.waitForFunction(
-		() => Boolean(document.querySelector(".side .rail .board-row")?.querySelector("iframe, img")),
+		() => Boolean(document.querySelector(".panel-list .board-row")?.querySelector("iframe, img")),
 		null,
 		{ timeout: 20000 },
 	);
@@ -124,14 +124,14 @@ try {
 	 * which is where a scroll container clips; measuring against the content box says
 	 * nothing, and told me the fix had not worked when it had.
 	 */
-	await page.locator(".side .rail .board-row").first().click();
+	await page.locator(".panel-list .board-row").first().click();
 	await settle(page, 900);
 	await openPanel(page, "agents");
 	await settle(page, 300);
 
 	const ring = await page.evaluate(() => {
-		const list = document.querySelector(".side .rail .items");
-		const current = document.querySelector('.side .rail .board-row[data-current="true"]');
+		const list = document.querySelector(".panel-list");
+		const current = document.querySelector('.panel-list .board-row[data-current="true"]');
 		if (!current) return { current: false };
 		const style = getComputedStyle(list);
 		const box = list.getBoundingClientRect();
@@ -163,7 +163,7 @@ try {
 	/*
 	 * The same list in the modal, which had the same bug with a worse ending.
 	 *
-	 * `.side .rail .items` has its `min-height: 0` in the stylesheet; the modal's grid is
+	 * `.panel-list` has its `min-height: 0` in the stylesheet; the modal's grid is
 	 * utilities and did not, and the modal clips rather than scrolls — so a deck of a dozen
 	 * showed two rows and hid the rest with no scrollbar to say so.
 	 */

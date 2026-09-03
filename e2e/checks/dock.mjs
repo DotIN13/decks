@@ -17,8 +17,8 @@ try {
 
 	const shape = await page.evaluate(() => {
 		const dock = document.querySelector(".dock");
-		const box = dock?.querySelector(".composer-box, .box");
-		const hints = dock?.querySelector(".composer-hints, .hints");
+		const box = dock?.querySelector(".dockbox");
+		const hints = dock?.querySelector(".hintrow");
 		const inBox = box ? [...box.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? b.title ?? "") : [];
 		return {
 			boxTop: box ? Math.round(box.getBoundingClientRect().y) : null,
@@ -41,7 +41,7 @@ try {
 	say("the dock is centred on the canvas column", Math.abs(centred.dockMid - centred.columnMid) <= 2, JSON.stringify(centred));
 
 	// The model picker: a chip that says the model, and a real popover behind it.
-	const model = page.locator(".dock button").filter({ hasText: /./ }).first();
+	const model = page.locator(".dockrow .chipbtn").last();
 	await model.click();
 	await page.waitForSelector(".popover", { timeout: 4000 });
 	const items = await page.locator(".popover [data-row]").count();
@@ -61,10 +61,10 @@ try {
 
 	// Ranked hints: whole phrases drop out as the bar narrows, because half a hint is worse
 	// than none. The lowest-ranked one goes first.
-	const wide = await page.locator(".dock kbd").count();
-	await page.setViewportSize({ width: 620, height: 900 });
+	const wide = await page.locator(".hintrow .hint").count();
+	await page.setViewportSize({ width: 440, height: 900 });
 	await page.waitForTimeout(400);
-	const narrow = await page.locator(".dock kbd").count();
+	const narrow = await page.evaluate(() => [...document.querySelectorAll(".hintrow .hint")].filter((el) => getComputedStyle(el).display !== "none").length);
 	say("the hints shed whole phrases as the bar narrows", narrow < wide, `${wide} -> ${narrow}`);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));

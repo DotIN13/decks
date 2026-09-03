@@ -91,7 +91,7 @@ try {
 	 */
 	const fresh = await browser.newPage({ viewport: { width: 1200, height: 800 } });
 	await fresh.goto(page.url(), { waitUntil: "load" });
-	await fresh.waitForSelector(".composer textarea", { timeout: 15000 });
+	await fresh.waitForSelector(".dockfield", { timeout: 15000 });
 	await openAllBoards(fresh);
 	await fresh.waitForSelector(".all-boards .board-row", { timeout: 15000 });
 	const reloaded = await fresh.evaluate(() => [...document.querySelectorAll(".all-boards .board-row .file")].map((n) => n.textContent));

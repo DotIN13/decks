@@ -249,28 +249,34 @@ export async function resetStage() {
 	const wanted = deck.boards.map((board) => board.path);
 	const link = await socket();
 	/*
-	 * Confirmed rather than assumed, and retried until it is.
+	 * Confirmed, for the *focused* agent, and retried until it is.
 	 *
-	 * This used to send the plays and wait 400ms. That is long enough once the server has
-	 * settled and not long enough for the *first* check of a run: `board.play` is attributed
-	 * to the focused agent, and a fresh server is still starting one — so the plays landed
-	 * on nobody, the canvas stayed empty, and the check failed thirty seconds later waiting
-	 * for a board that was never coming. Two checks in a row, always the first two, which is
-	 * exactly what a race at startup looks like and exactly what it gets blamed on last.
+	 * This used to send the plays and wait 400ms. Long enough once the server has settled
+	 * and not for the first check of a run: `board.play` is attributed to the focused agent,
+	 * and a fresh server is still starting one — so the plays landed on nobody, the canvas
+	 * stayed empty, and the check failed thirty seconds later waiting for a board that was
+	 * never coming. Always the first two checks, which is what a race at startup looks like
+	 * and what it gets blamed on last.
 	 *
-	 * `context.changed` carries the in-play set, so there is a real answer to wait for.
+	 * Waiting for any `context.changed` was not enough either. A restored session and a new
+	 * agent both send one, so the last message could describe an agent the browser is not
+	 * looking at — the plays were real and on the wrong canvas. So the agent is named: the
+	 * greeting says who is focused, and this waits for that one's in-play set.
 	 */
-	const deadline = Date.now() + 20000;
+	const deadline = Date.now() + 25000;
 	let landed = [];
+	let agent;
 	while (Date.now() < deadline) {
-		for (const path of wanted) link.send({ type: "board.play", path });
+		agent = link.last("agents")?.focused ?? agent;
+		if (agent) for (const path of wanted) link.send({ type: "board.play", path });
 		await new Promise((resolve) => setTimeout(resolve, 400));
-		landed = link.last("context.changed")?.inPlay ?? [];
-		if (wanted.every((path) => landed.includes(path))) break;
+		landed = link.received.filter((m) => m.type === "context.changed" && m.agentId === agent).at(-1)?.inPlay ?? [];
+		if (agent && wanted.every((path) => landed.includes(path))) break;
 	}
 	link.close();
+	if (!agent) throw new Error("resetStage: the server never said which agent is focused");
 	if (!wanted.every((path) => landed.includes(path))) {
-		throw new Error(`resetStage: ${landed.length} of ${wanted.length} boards reached the canvas — the server may still be starting an agent`);
+		throw new Error(`resetStage: ${landed.length} of ${wanted.length} boards reached ${agent}'s canvas`);
 	}
 	return wanted;
 }
@@ -309,6 +315,30 @@ export async function openAgents(page) {
 	if (await page.locator(".popover").count()) return;
 	await page.locator('.pill button[aria-label^="Switch agent"], .pill button[aria-haspopup="menu"]').first().click();
 	await page.waitForSelector(".popover", { timeout: 6000 });
+}
+
+/**
+ * Open the corner's overflow and click a row.
+ *
+ * The cheat sheet, the settings and the theme were three buttons in the title bar; they are
+ * three menu rows now, at every width. A check that wants one asks for it by its words
+ * rather than by its position, because the order is a design decision that may move and the
+ * words are the thing a person reads.
+ */
+export async function openOverflow(page, label) {
+	await page.locator('.pill button[aria-label="More"]').click();
+	await page.waitForSelector(".popover", { timeout: 4000 });
+	await page.locator(".popover [data-row]").filter({ hasText: label }).first().click();
+}
+
+/** Whether the overflow offers a row, without picking it. */
+export async function hasOverflowRow(page, label) {
+	await page.locator('.pill button[aria-label="More"]').click();
+	await page.waitForSelector(".popover", { timeout: 4000 });
+	const found = (await page.locator(".popover [data-row]").filter({ hasText: label }).count()) > 0;
+	await page.keyboard.press("Escape");
+	await page.waitForTimeout(120);
+	return found;
 }
 
 /**

@@ -2,13 +2,13 @@
 import { open, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1600, height: 1000 });
-await page.waitForFunction(() => (document.querySelectorAll(".composer select option").length ?? 0) > 0, null, { timeout: 15000 });
+await page.waitForFunction(() => (document.querySelectorAll(".dockrow .chipbtn option").length ?? 0) > 0, null, { timeout: 15000 });
 
 const picker = await page.evaluate(() => {
-	const select = document.querySelector(".composer select");
+	const select = document.querySelector(".dockrow .chipbtn");
 	const groups = [...select.querySelectorAll("optgroup")];
 	return {
-		providerLabels: document.querySelectorAll(".composer .provider").length,
+		providerLabels: document.querySelectorAll(".dockbox .provider").length,
 		selected: select.selectedOptions[0]?.textContent,
 		selectedGroup: select.selectedOptions[0]?.parentElement?.label,
 		selectedValue: select.value,
@@ -37,16 +37,16 @@ say("every model sits in a group", picker.ungrouped === 0, `${picker.ungrouped} 
 say("the selected option is the session's model", (picker.selected?.length ?? 0) > 0, picker.selected);
 
 const other = await page.evaluate(() => {
-	const select = document.querySelector(".composer select");
+	const select = document.querySelector(".dockrow .chipbtn");
 	return [...select.querySelectorAll("option")].find((o) => o.value !== select.value && o.value.includes("/"))?.value;
 });
 if (!other) {
 	say("picking another provider's model keeps the two in step", false, "only one model is configured");
 } else {
-	await page.selectOption(".composer select", other);
-	await page.waitForFunction((wanted) => document.querySelector(".composer select").value === wanted, other, { timeout: 5000 });
+	await page.selectOption(".dockrow .chipbtn", other);
+	await page.waitForFunction((wanted) => document.querySelector(".dockrow .chipbtn").value === wanted, other, { timeout: 5000 });
 	const after = await page.evaluate(() => {
-		const select = document.querySelector(".composer select");
+		const select = document.querySelector(".dockrow .chipbtn");
 		return { group: select.selectedOptions[0]?.parentElement?.label, value: select.value };
 	});
 	say(
@@ -64,23 +64,23 @@ if (!other) {
 	 * it is a notice in the conversation, so it lands at the point it happened and is in the
 	 * copy on disk.
 	 */
-	await page.locator('.titlebar button[title="The conversation"]').click();
-	await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "true", null, { timeout: 8000 });
+	await page.locator('.pill button[title^="Conversation"]').click();
+	await page.waitForFunction(() => document.querySelector(".stream")?.dataset.open === "true", null, { timeout: 8000 });
 	await settle(page, 600);
-	const notices = await page.locator(".chat-float .fnotice").allInnerTexts();
+	const notices = await page.locator(".stream .fnotice").allInnerTexts();
 	const model = other.split("/").slice(1).join("/");
 	say("the switch is recorded in the conversation", notices.some((text) => text.startsWith("Model:")), JSON.stringify(notices));
 	say("…naming the model it moved to", notices.some((text) => text.includes(model)), `looking for ${model}`);
-	await page.locator('.titlebar button[title="The conversation"]').click();
+	await page.locator('.pill button[title^="Conversation"]').click();
 	await settle(page, 300);
 
 	// Put it back: leaving the agent on a provider without credentials makes the next
 	// check's turn fail instantly, which reads as a bug in the app.
-	await page.selectOption(".composer select", picker.selectedValue);
+	await page.selectOption(".dockrow .chipbtn", picker.selectedValue);
 	await settle(page, 400);
 	say(
 		"the model is left as it was found",
-		(await page.evaluate(() => document.querySelector(".composer select").value)) === picker.selectedValue,
+		(await page.evaluate(() => document.querySelector(".dockrow .chipbtn").value)) === picker.selectedValue,
 		picker.selectedValue,
 	);
 }

@@ -21,8 +21,8 @@ await page.mouse.move(800, 500);
 await ask(page, "Read each of boards/plan.html, boards/risks.html and boards/sources.html with the read tool, one call each, then say 'done' and nothing else.");
 
 // A click on the spine opens the conversation at that turn.
-await page.locator(".turnbar .turn").first().click();
-await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.open === "true", null, { timeout: 8000 });
+await page.locator(".stream-roll .turn").first().click();
+await page.waitForFunction(() => document.querySelector(".stream")?.dataset.open === "true", null, { timeout: 8000 });
 
 /*
  * The tool calls are one pill until asked for.
@@ -31,10 +31,10 @@ await page.waitForFunction(() => document.querySelector(".chat-float")?.dataset.
  * a count — and the count has to open, or the output would be somewhere with no route to
  * it now that the chat column is gone.
  */
-say("a run of tool calls collapses to one pill", (await page.locator(".chat-float .ftools").count()) > 0);
-await page.locator(".chat-float .ftools").first().click();
-await page.waitForSelector(".chat-float .tool", { timeout: 10000 });
-say("…that opens to the calls themselves", (await page.locator(".chat-float .fcalls .tool").count()) > 0);
+say("a run of tool calls collapses to one pill", (await page.locator(".stream .ftools").count()) > 0);
+await page.locator(".stream .ftools").first().click();
+await page.waitForSelector(".stream .tool", { timeout: 10000 });
+say("…that opens to the calls themselves", (await page.locator(".stream .fcalls .tool").count()) > 0);
 
 /*
  * Overflow is forced rather than hoped for: the squeeze only happened once the content was
@@ -44,8 +44,8 @@ say("…that opens to the calls themselves", (await page.locator(".chat-float .f
  * today's layout happens to look right.
  */
 const chips = await page.evaluate(() => {
-	const panel = document.querySelector(".chat-float");
-	const stream = panel.querySelector(".fsroll");
+	const panel = document.querySelector(".stream");
+	const stream = panel.querySelector(".stream-roll");
 	panel.style.height = "190px";
 	panel.style.bottom = "auto";
 	const measure = () => [...stream.querySelectorAll(".tool")].map((t) => Math.round(t.getBoundingClientRect().height));
@@ -55,7 +55,7 @@ const chips = await page.evaluate(() => {
 
 	// The guard removed for a moment: every row in the scroller free to shrink.
 	const undo = document.createElement("style");
-	undo.textContent = ".chat-float .fsroll > *, .chat-float .ftools-group > *, .chat-float .fcalls > * { flex: 1 1 auto !important; }";
+	undo.textContent = ".stream .stream-roll > *, .stream .ftools-group > *, .stream .fcalls > * { flex: 1 1 auto !important; }";
 	document.head.appendChild(undo);
 	const squeezed = measure();
 	undo.remove();
@@ -84,13 +84,13 @@ say(
 );
 
 await settle(page, 600);
-await page.locator(".chat-float .tool .row").first().click();
-await page.waitForSelector(".chat-float .tool pre", { timeout: 5000 });
-say("a chip still expands to its output", (await page.locator(".chat-float .tool pre").count()) > 0);
+await page.locator(".stream .tool .row").first().click();
+await page.waitForSelector(".stream .tool pre", { timeout: 5000 });
+say("a chip still expands to its output", (await page.locator(".stream .tool pre").count()) > 0);
 
 // The user message carries the actions, and an entry id.
 const turn = await page.evaluate(() => {
-	const row = document.querySelector(".chat-float .turn-row");
+	const row = document.querySelector(".stream .turn-row");
 	return {
 		itemId: row?.dataset.item,
 		/*
@@ -125,13 +125,13 @@ await settle(page, 600);
 
 // Hovering rewind previews instantly; the transcript is not dimmed.
 const before = read(plan);
-await page.locator(".chat-float .turn-row").first().hover();
-await page.locator('.chat-float .turn-actions button[data-act="rewind"]').first().hover();
+await page.locator(".stream .turn-row").first().hover();
+await page.locator('.stream .turn-actions button[data-act="rewind"]').first().hover();
 await page.waitForFunction(() => document.querySelector(".stage")?.dataset.previewing === "true", null, { timeout: 8000 });
 const previewing = await page.evaluate(() => ({
 	stage: document.querySelector(".stage")?.dataset.previewing,
 	src: document.querySelector(".board-node iframe")?.getAttribute("src"),
-	transcriptOpacity: Number(getComputedStyle(document.querySelector(".chat-float .fsroll > *")).opacity),
+	transcriptOpacity: Number(getComputedStyle(document.querySelector(".stream .stream-roll > *")).opacity),
 }));
 say("hovering rewind previews the boards at once", (previewing.src ?? "").startsWith("/api/revision/"), `src=${previewing.src}`);
 say("the transcript is not dimmed under the cursor", previewing.transcriptOpacity === 1, `opacity ${previewing.transcriptOpacity}`);
@@ -151,11 +151,11 @@ await page.evaluate(() => {
 	window.__churn = 0;
 	new MutationObserver((records) => {
 		for (const record of records) window.__churn += record.addedNodes.length + record.removedNodes.length;
-	}).observe(document.querySelector(".turnbar"), { childList: true, subtree: true });
+	}).observe(document.querySelector(".stream-roll"), { childList: true, subtree: true });
 });
-await page.locator(".turnbar .turn").first().hover();
+await page.locator(".stream-roll .turn").first().hover();
 await settle(page, 3000);
-const churn = await page.evaluate(() => ({ churn: window.__churn, hovered: document.querySelectorAll(".turnbar .turn:hover").length }));
+const churn = await page.evaluate(() => ({ churn: window.__churn, hovered: document.querySelectorAll(".stream-roll .turn:hover").length }));
 say("hovering a spine block does not rebuild it", churn.churn === 0 && churn.hovered === 1, `${churn.churn} node changes, ${churn.hovered} hovered`);
 
 link.close();
