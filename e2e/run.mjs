@@ -15,7 +15,6 @@ import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resetStage } from "./harness.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
@@ -77,6 +76,30 @@ const WEB_PORT = Number(process.env.DECKS_E2E_WEB_PORT ?? 4328);
 const API_URL = `http://127.0.0.1:${API_PORT}`;
 const WEB_URL = `http://127.0.0.1:${WEB_PORT}`;
 
+/*
+ * Into *this* process's environment as well, and that is not belt-and-braces.
+ *
+ * `harness.mjs` reads `DECKS_E2E_API` at import time, and this file imports it for
+ * `resetStage` — which it then calls before every check. Passing the URLs only to the
+ * server it spawns and the checks it forks left the runner's own copy of the harness
+ * pointed at the default port, so `resetStage` played the fixture's boards onto whatever
+ * deck happened to be on 4329. On a machine with a live Decks open, that is somebody's
+ * real canvas: every board in their deck, put in play by a test run, and no check ever saw
+ * a board because the plays landed somewhere else entirely.
+ *
+ * Set before the import below is used, so there is one source of these two numbers.
+ */
+process.env.DECKS_E2E_API = API_URL;
+process.env.DECKS_E2E_WEB = WEB_URL;
+
+/*
+ * Imported here rather than at the top, because `harness.mjs` reads those two variables
+ * once, at *its* import time. A static import runs before the two lines above, so the
+ * runner's own copy of the harness would still hold the defaults — which is the bug those
+ * lines were written to fix, arriving one statement too late to fix it.
+ */
+const { resetStage } = await import("./harness.mjs");
+
 const data = mkdtempSync(join(tmpdir(), "decks-e2e-"));
 cpSync(join(root, "example"), data, { recursive: true });
 // `example/decks/lib` is generated and gitignored, so a fresh clone has to be given one
@@ -90,6 +113,15 @@ rmSync(join(data, "decks", ".pi"), { recursive: true, force: true });
 
 const server = spawn("npm", ["run", "dev"], {
 	cwd: root,
+	/*
+	 * Its own process group, which is what makes `stop()` able to reach the whole tree.
+	 *
+	 * `npm run dev` is a wrapper around `concurrently` around two more processes. Killing
+	 * the pid we hold kills the wrapper and orphans the rest, and the orphans keep the
+	 * ports — so the next run finds a stranger's deck on 4329 and refuses. With this, one
+	 * negative pid addresses all of them.
+	 */
+	detached: true,
 	env: {
 		...process.env,
 		DECKS_DATA_DIR: data,
