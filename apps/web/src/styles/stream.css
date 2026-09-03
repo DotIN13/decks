@@ -160,12 +160,18 @@
 		pointer-events: auto;
 	}
 
-	/* And the menu the time machine opens, which is rendered inside the column beside its
-	   trigger: `pointer-events` inherits, so without this the popover was drawn and could not
-	   be clicked. */
-	.stream .popover {
-		pointer-events: auto;
-	}
+	/*
+	 * The menu the time machine opens.
+	 *
+	 * `ui/Popover` portals its card to the body now — it had to, because a `position: fixed`
+	 * element inside a transformed ancestor is placed against that ancestor and the dock
+	 * carries a `translateX(-50%)`. So this rule no longer has anything to match: the card is
+	 * not a descendant of the column and does not inherit its `pointer-events: none`.
+	 *
+	 * Kept as a note rather than deleted silently, because the *reason* it existed is still
+	 * true — a menu drawn inside this column would be unclickable — and the next person to
+	 * render one in place rather than through the portal will want to have read this.
+	 */
 
 	/*
 	 * A card: opaque, a hairline, one soft shadow, and the same 12px corner every other float
@@ -370,13 +376,80 @@
 		border-left: 1px solid var(--line);
 	}
 
-	/* A tool row inside a card is a wash, not a second float. The chips carry `--bg` and a
-	   hairline of their own from `index.css`; what they must not carry in here is a shadow,
-	   because two lifted objects on the same rung read as one. */
+	/*
+	 * A tool row inside a card is a **wash**, not a small card of its own.
+	 *
+	 * `index.css` styles `.tool` for the column it grew up in: a 14px radius, a hairline, a
+	 * `--bg` fill and 6px of vertical padding. Inside a 320px card that is a second bordered
+	 * object nested in a bordered object — three concentric rounded rectangles by the time
+	 * you count the column — and it is what "ugly toolcalls" meant. The conversation board
+	 * draws a 24px row: a wash, no border, the small radius, a dot, the call in mono.
+	 *
+	 * Restyled here rather than changed in `index.css`, because that file still dresses the
+	 * same component for the surfaces that have not been rebuilt.
+	 *
+	 * And **no fill of its own**: a wash with a corner radius inside a card with a corner
+	 * radius is a pill inside a pill, which is the thing that looked bad. A tool call is a
+	 * *line in the turn* — the same standing as the sentence under it — so it gets no
+	 * background, no border and no radius, and the dot and the mono type are what mark it
+	 * out. The wash comes back on hover, where it means "this one opens".
+	 */
 	.stream-tool-kids .tool,
 	.stream-tools > .tool {
-		background: var(--bg);
+		border: 0;
+		border-radius: 0;
+		background: none;
 		box-shadow: none;
+	}
+
+	.stream-tool-kids .tool > .row,
+	.stream-tools > .tool > .row {
+		height: 22px;
+		min-height: 0;
+		/* Flush with the card's own text on the left, so the calls and the reply share an
+		   edge. The right-hand padding is for the chevron only. */
+		padding: 0 4px 0 0;
+		gap: 7px;
+		border-radius: var(--control-radius);
+		font-size: 10.5px;
+	}
+
+	/* Room for the output when it is opened, which is the one thing the row may grow for. */
+	/* The output, when a line is opened: indented under it, and the one place a fill is
+	   right — it is a block of somebody else's text and needs an edge to be read against. */
+	.stream-tool-kids .tool > pre,
+	.stream-tools > .tool > pre {
+		margin: 2px 0 4px;
+		padding: 6px 8px;
+		border-radius: var(--control-radius);
+		background: var(--line);
+		font-size: 10.5px;
+	}
+
+	.stream-tool-kids .tool > .row .name,
+	.stream-tools > .tool > .row .name {
+		flex: none;
+		font-size: 10.5px;
+	}
+
+	/* The call itself, in mono and taking the room: it is the part that identifies the row,
+	   and the tool's own name is a category. */
+	.stream-tool-kids .tool > .row .title,
+	.stream-tools > .tool > .row .title {
+		flex: 1;
+		overflow: hidden;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* The only fill in the row, and only while the pointer is on it: a hairline-free wash
+	   that says the line opens, extended a little past the text so it reads as a target. */
+	.stream-tool-kids .tool > .row:hover,
+	.stream-tools > .tool > .row:hover {
+		box-shadow: 0 0 0 4px var(--line);
+		background: var(--line);
 	}
 
 	/* Thinking: a disclosure, and quiet. Not addressed to the reader, and a card that showed

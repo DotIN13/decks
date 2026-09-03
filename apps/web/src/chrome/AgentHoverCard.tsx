@@ -33,9 +33,14 @@ export function AgentHoverCard(props: {
 	/**
 	 * How long the pointer has to stay before it appears.
 	 *
-	 * 400ms, so crossing the corner on the way to the zoom chip does not summon four of
-	 * them. The delay is the card's own rather than the stack's, so the caller only has to
-	 * say *which* face is hovered and never has to own a timer.
+	 * 120ms, which is about as short as a delay can be while still doing its job — stopping
+	 * a pointer crossing the corner on its way to the zoom chip from summoning three cards
+	 * in passing. It was 400, which is the number tooltips use, and on a control you are
+	 * *aiming at* that reads as the app thinking about it: you have already decided to look
+	 * at the face, and the card is the answer to a question you asked by pointing.
+	 *
+	 * The delay is the card's own rather than the stack's, so the caller only has to say
+	 * *which* face is hovered and never has to own a timer.
 	 */
 	delay?: number;
 }) {
@@ -47,7 +52,7 @@ export function AgentHoverCard(props: {
 	const name = () => props.identity?.name ?? props.chat.name;
 
 	onMount(() => {
-		const timer = setTimeout(() => setReady(true), props.delay ?? 400);
+		const timer = setTimeout(() => setReady(true), props.delay ?? 120);
 		onCleanup(() => clearTimeout(timer));
 	});
 

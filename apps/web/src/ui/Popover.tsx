@@ -1,4 +1,5 @@
 import { createEffect, createSignal, onCleanup, Show, type JSX } from "solid-js";
+import { Portal } from "solid-js/web";
 
 /**
  * One popover, for all five of them.
@@ -143,6 +144,22 @@ export function Popover(props: {
 				ref: (el) => (trigger = el),
 			})}
 			<Show when={open()}>
+				{/*
+				 * Into the body, and this is not tidiness — it is the difference between the
+				 * card appearing under its trigger and appearing 478px away.
+				 *
+				 * The card is `position: fixed` and placed from `getBoundingClientRect`, which
+				 * is viewport-relative. But a fixed element inside a **transformed** ancestor is
+				 * positioned against that ancestor instead of the viewport, and the dock carries
+				 * `translateX(-50%)` to centre itself — so the model picker was laid out in the
+				 * dock's coordinate space and landed up and to the right of everything.
+				 *
+				 * A portal is the fix rather than compensating for the transform, because the
+				 * next surface to grow one would break this again silently. Dismissal already
+				 * listens on the document and asks `card.contains`, so nothing here depends on
+				 * where the node sits.
+				 */}
+				<Portal>
 				<div
 					ref={card}
 					class={`popover ${props.class ?? ""}`}
@@ -157,6 +174,7 @@ export function Popover(props: {
 				>
 					{props.children}
 				</div>
+				</Portal>
 			</Show>
 		</>
 	);
