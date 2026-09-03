@@ -1,6 +1,6 @@
 import type { Board, Camera } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { boardUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../lib/camera.ts";
@@ -76,7 +76,8 @@ export function BoardFrame(props: {
 		const url = boardUrl({ path: props.board.path, rev });
 		return props.nonce ? `${url}&r=${props.nonce}` : url;
 	};
-	const inert = () => props.camera.zoom < INTERACT_ZOOM;
+	const zoom = createMemo(() => props.camera.zoom);
+	const inert = createMemo(() => zoom() < INTERACT_ZOOM);
 
 	/**
 	 * Point the frame at a URL, but only when that URL actually changed.
@@ -206,10 +207,10 @@ export function BoardFrame(props: {
 			<div
 				class="chrome"
 				style={{
-					transform: `scale(${1 / props.camera.zoom})`,
+					transform: `scale(${1 / zoom()})`,
 					"transform-origin": "0 100%",
-					width: `${props.board.w * props.camera.zoom}px`,
-					top: `${-(24 + 2 / props.camera.zoom)}px`,
+					width: `${props.board.w * zoom()}px`,
+					top: `${-(24 + 2 / zoom())}px`,
 					height: "24px",
 				}}
 				onPointerDown={startDrag}
@@ -299,7 +300,7 @@ export function BoardFrame(props: {
 						style={{
 							left: `${cursor().x}px`,
 							top: `${cursor().y}px`,
-							transform: `scale(${1 / props.camera.zoom})`,
+							transform: `scale(${1 / zoom()})`,
 							"--cursor-color": cursor().color,
 						}}
 					>

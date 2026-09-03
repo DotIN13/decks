@@ -121,6 +121,7 @@ export function App() {
 	});
 
 	const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
+	const zoomInteractive = createMemo(() => camera().zoom >= INTERACT_ZOOM);
 	const [connected, setConnected] = createSignal(false);
 	const [selected, setSelected] = createSignal<string | undefined>(undefined);
 	const [tool, setTool] = createSignal<Tool>("select");
@@ -698,7 +699,7 @@ export function App() {
 		notice: (text) => notice("info", text),
 		// Editing follows the same threshold as pointer events: if the frame is inert
 		// because we are zoomed out, there is nothing to edit with.
-		enabled: () => camera().zoom >= INTERACT_ZOOM,
+		enabled: () => zoomInteractive(),
 		reveal: (path, box) => {
 			const board = state.boards.find((candidate) => candidate.path === path);
 			const stage = document.querySelector(".stage");
@@ -745,7 +746,7 @@ export function App() {
 	 * showing an inspector for something that had stopped being selectable.
 	 */
 	createEffect(() => {
-		setInspectable(shape() !== undefined && camera().zoom >= INTERACT_ZOOM && !state.preview);
+		setInspectable(shape() !== undefined && zoomInteractive() && !state.preview);
 	});
 	createEffect(() => {
 		const selection = component();
@@ -1279,7 +1280,7 @@ export function App() {
 				    which is a read-only view of a board that no longer exists (§6.7). */}
 				<Inspector
 					shape={shape()}
-					visible={camera().zoom >= INTERACT_ZOOM && !state.preview}
+					visible={zoomInteractive() && !state.preview}
 					onEdit={inspect}
 					pickFile={() => editor.pickFile(shape()?.path)}
 					onClose={() => setComponent(undefined)}

@@ -92,11 +92,18 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	const win = view;
 
 	/** Board pixels -> stage pixels, and where the frame sits on screen. */
+	// Cached once: clientWidth never changes, and the stage's screen offset is stable
+	// between resizes (it fills the viewport). Reading these on every event forced
+	// a DOM query + two layout calls at 60–120 Hz.
+	const cachedClientWidth = frame.clientWidth;
+	const stageR = frame.ownerDocument.querySelector(".stage")?.getBoundingClientRect();
+	const cachedStageLeft = stageR?.left ?? 0;
+	const cachedStageTop = stageR?.top ?? 0;
+
 	const geometry = () => {
 		const rect = frame.getBoundingClientRect();
-		const scale = frame.clientWidth > 0 ? rect.width / frame.clientWidth : 1;
-		const stage = frame.ownerDocument.querySelector(".stage")?.getBoundingClientRect();
-		return { rect, scale, stageLeft: stage?.left ?? 0, stageTop: stage?.top ?? 0 };
+		const scale = cachedClientWidth > 0 ? rect.width / cachedClientWidth : 1;
+		return { rect, scale, stageLeft: cachedStageLeft, stageTop: cachedStageTop };
 	};
 
 	const toStage = (clientX: number, clientY: number) => {

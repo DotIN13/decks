@@ -64,6 +64,10 @@ export function Stage(props: {
 	onEdgeSwipe?: { left: () => void; right: () => void; enabled: () => boolean };
 }) {
 	let element!: HTMLDivElement;
+	let worldEl!: HTMLDivElement;
+	let localCamera = props.camera;
+	let rafId: number | undefined;
+	let pendingCamera: Camera | undefined;
 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
 	const [panning, setPanning] = createSignal(false);
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
@@ -129,6 +133,35 @@ export function Stage(props: {
 
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
 
+	const writeTransform = (cam: Camera) => {
+		const v = view();
+		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
+	};
+
+	const pushCamera = (cam: Camera) => {
+		localCamera = cam;
+		writeTransform(cam);
+		pendingCamera = cam;
+		if (rafId === undefined) {
+			rafId = requestAnimationFrame(() => {
+				rafId = undefined;
+				props.setCamera(pendingCamera!);
+				pendingCamera = undefined;
+			});
+		}
+	};
+
+	// Sync from external camera changes (fit, server, initial load) and viewport resizes.
+	// Gesture handlers use pushCamera directly for the fast path.
+	createEffect(() => {
+		localCamera = props.camera;
+		writeTransform(props.camera);
+	});
+
+	onCleanup(() => {
+		if (rafId !== undefined) cancelAnimationFrame(rafId);
+	});
+
 	/**
 	 * The camera shortcuts, in one place.
 	 *
@@ -152,19 +185,19 @@ export function Stage(props: {
 		}
 		switch (key) {
 			case "0":
-				props.setCamera(frame(props.boards.map(boxOf)));
+				pushCamera(frame(props.boards.map(boxOf)));
 				return true;
 			case "1": {
 				const board = props.boards.find((candidate) => candidate.path === props.selected) ?? props.boards[0];
-				if (board) props.setCamera(frame([boxOf(board)]));
+				if (board) pushCamera(frame([boxOf(board)]));
 				return true;
 			}
 			case "+":
 			case "=":
-				props.setCamera(zoomAbout(props.camera, view(), centre(), 1.2));
+				pushCamera(zoomAbout(localCamera, view(), centre(), 1.2));
 				return true;
 			case "-":
-				props.setCamera(zoomAbout(props.camera, view(), centre(), 1 / 1.2));
+				pushCamera(zoomAbout(localCamera, view(), centre(), 1 / 1.2));
 				return true;
 			default:
 				return false;
@@ -192,10 +225,10 @@ export function Stage(props: {
 			 * pinch is right and one notch of the wheel jumps 2.7x.
 			 */
 			const factor = Math.min(1.3, Math.max(1 / 1.3, Math.exp(-gesture.deltaY / 300)));
-			props.setCamera(zoomAbout(props.camera, view(), { x: gesture.x, y: gesture.y }, factor));
+			pushCamera(zoomAbout(localCamera, view(), { x: gesture.x, y: gesture.y }, factor));
 			return;
 		}
-		props.setCamera(pan(props.camera, -gesture.deltaX, -gesture.deltaY));
+		pushCamera(pan(localCamera, -gesture.deltaX, -gesture.deltaY));
 	};
 
 	const onWheel = (event: WheelEvent) => {
@@ -283,10 +316,10 @@ export function Stage(props: {
 		if (step.kind === "pinch") {
 			claimed.clear();
 			edges.cancel();
-			props.setCamera(pinchCamera(props.camera, view(), step.from, step.to));
+			pushCamera(pinchCamera(localCamera, view(), step.from, step.to));
 			return step;
 		}
-		if (step.kind === "pan" && !drawer && !claimed.has(finger.id)) props.setCamera(pan(props.camera, step.dx, step.dy));
+		if (step.kind === "pan" && !drawer && !claimed.has(finger.id)) pushCamera(pan(localCamera, step.dx, step.dy));
 		return step;
 	};
 
@@ -331,10 +364,10 @@ export function Stage(props: {
 		touch,
 		claimTouch: (id) => claimed.add(id),
 		pinching: () => touches.count() > 1,
-		pan: (dx, dy) => props.setCamera(pan(props.camera, dx, dy)),
+		pan: (dx, dy) => pushCamera(pan(localCamera, dx, dy)),
 		space: (held) => setSpaceHeld(held),
 		spaceHeld: () => spaceHeld(),
-		interactive: () => props.camera.zoom >= INTERACT_ZOOM,
+		interactive: () => localCamera.zoom >= INTERACT_ZOOM,
 		key: (name) => shortcut(name),
 	};
 
@@ -362,7 +395,7 @@ export function Stage(props: {
 
 		let last = { x: event.clientX, y: event.clientY };
 		const move = (moveEvent: PointerEvent) => {
-			props.setCamera(pan(props.camera, moveEvent.clientX - last.x, moveEvent.clientY - last.y));
+			pushCamera(pan(localCamera, moveEvent.clientX - last.x, moveEvent.clientY - last.y));
 			last = { x: moveEvent.clientX, y: moveEvent.clientY };
 		};
 		const finish = () => {
@@ -418,9 +451,7 @@ export function Stage(props: {
 		>
 			<div
 				class="world"
-				style={{
-					transform: `translate(${view().width / 2}px, ${view().height / 2}px) scale(${props.camera.zoom}) translate(${-props.camera.x}px, ${-props.camera.y}px)`,
-				}}
+				ref={worldEl}
 			>
 				<For each={props.boards} fallback={null}>
 					{(board) => (
@@ -439,7 +470,7 @@ export function Stage(props: {
 							onSelect={() => props.onSelect(board.path)}
 							onMove={(x, y) => props.onMove(board.path, x, y)}
 							{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
-							onOpen={() => props.setCamera(frame([boxOf(board)]))}
+							onOpen={() => pushCamera(frame([boxOf(board)]))}
 						/>
 					)}
 				</For>
