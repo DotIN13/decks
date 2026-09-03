@@ -1,5 +1,5 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 
 /**
  * A mark for each runtime: Claude's burst and the Pi glyph.
@@ -35,6 +35,62 @@ const PI_P = "M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z
 const PI_DOT = "M517.36 400 H634.72 V634.72 H517.36 Z";
 const PI_INK = { x: 165.29, y: 165.29, w: 469.43, h: 469.43 };
 
+/*
+ * ### Working: a second drawing per runtime, not the still one in motion
+ *
+ * This app had the still mark scaled and faded on a 1.8s loop — one element, no second
+ * drawing, and the argument for it was that a single shape can breathe. It can, and what it
+ * looks like is a flower opening and closing: Claude's burst is a ten-pointed star, and
+ * pulsing a star in an identity colour reads as a decorative bloom rather than as a machine
+ * doing something. Picone draws each runtime *working* in its own idiom instead (§58), and
+ * those are the two marks below.
+ */
+
+/**
+ * The frames Claude's asterisk grows through — and back down again.
+ *
+ * Picone's note, kept because it is the reason there are ten and not six: six frames looping
+ * straight back to the dot flickered, since the jump from the largest glyph to the smallest
+ * is a hard cut every cycle, which the eye reads as a fault rather than as motion. Growing
+ * and shrinking through the same frames makes it breathe, and at 180ms a frame the cycle is
+ * 1.8s rather than 0.7.
+ *
+ * They are text, and they are stacked: ten `<text>` nodes, each visible for a tenth of the
+ * cycle, offset by its own delay. It has to be a stack because the frames are *different
+ * glyphs* — only CSS can step between them without a re-render, and a turn that runs four
+ * minutes has to cost what one that runs four seconds costs.
+ */
+const FRAMES = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"];
+/** How long each frame is held. Ten of these is one cycle. */
+const FRAME_MS = 180;
+/**
+ * The box the glyph frames are scaled from.
+ *
+ * Not the em box: a font's ink is smaller than the size it is set at, and picone measured
+ * the moving mark at 67% of the frame against the still mark's 75% before this number
+ * existed. Found by measuring, because nothing about a font can be derived from here.
+ */
+const GLYPH_INK = { x: 0, y: 0, w: 17.9, h: 17.9 };
+
+/**
+ * Pi working: its logo reduced to 4×4 character cells, which build in reading order and fall
+ * away again — what a terminal does while it draws.
+ */
+const TILES: Array<[number, number]> = [
+	[0, 0],
+	[6, 0],
+	[12, 0],
+	[0, 6],
+	[12, 6],
+	[0, 12],
+	[6, 12],
+	[18, 12],
+	[0, 18],
+	[18, 18],
+];
+/** Ten tiles of 5 with 1 between them: 23 units square. */
+const TILE_INK = { x: 0, y: 0, w: 23, h: 23 };
+
 /**
  * The mark for a runtime, at a given size.
  *
@@ -42,9 +98,16 @@ const PI_INK = { x: 165.29, y: 165.29, w: 469.43, h: 469.43 };
  * button whose accessible name already says which agent it is, and the header's chip carries
  * its own. An icon that names itself twice is worse than one that does not name itself.
  */
-export function AgentMark(props: { agent: AgentKind; size?: number; class?: string }) {
+export function AgentMark(props: { agent: AgentKind; size?: number; class?: string; busy?: boolean }) {
 	const size = () => props.size ?? 14;
-	const ink = () => (props.agent === "claude" ? CLAUDE_INK : PI_INK);
+	const claude = () => props.agent === "claude";
+	/*
+	 * Four drawings, four ink boxes — which is the whole reason this indirection exists. A
+	 * working mark is a *different drawing* at a different natural size, so if it took the
+	 * still mark's box the sign would change size at the moment a turn started, which is the
+	 * one moment nothing should move but the mark itself.
+	 */
+	const ink = () => (props.busy ? (claude() ? GLYPH_INK : TILE_INK) : claude() ? CLAUDE_INK : PI_INK);
 	// The longer side is what fills the frame, so a wide mark and a square one sit at the
 	// same optical size rather than the same width.
 	const scale = () => INK[props.agent] / Math.max(ink().w, ink().h);
@@ -59,14 +122,56 @@ export function AgentMark(props: { agent: AgentKind; size?: number; class?: stri
 			viewBox="0 0 24 24"
 			fill="currentColor"
 			data-agent={props.agent}
+			/* Empty-string-or-absent, so the stylesheet can key on `[data-busy]` without
+			   matching the literal "false" a boolean attribute would print. */
+			data-busy={props.busy ? "" : undefined}
 			aria-hidden="true"
 		>
 			<g transform={`translate(${left()} ${top()}) scale(${scale()}) translate(${-ink().x} ${-ink().y})`}>
-				<Show when={props.agent === "claude"} fallback={<><path fill-rule="evenodd" d={PI_P} /><path d={PI_DOT} /></>}>
-					<path d={CLAUDE_PATH} />
+				<Show when={props.busy} fallback={<Still agent={props.agent} />}>
+					<Show
+						when={claude()}
+						fallback={
+							<For each={TILES}>
+								{([x, y], index) => (
+									<rect class="pi-tile" x={x} y={y} width={5} height={5} style={{ "animation-delay": `${index() * 55}ms` }} />
+								)}
+							</For>
+						}
+					>
+						<For each={FRAMES}>
+							{(frame, index) => (
+								<text
+									class="claude-frame"
+									x={GLYPH_INK.w / 2}
+									y={GLYPH_INK.h / 2}
+									style={{ "animation-delay": `${index() * FRAME_MS}ms` }}
+								>
+									{frame}
+								</text>
+							)}
+						</For>
+					</Show>
 				</Show>
 			</g>
 		</svg>
+	);
+}
+
+/** The published symbol for a runtime, at rest. */
+function Still(props: { agent: AgentKind }) {
+	return (
+		<Show
+			when={props.agent === "claude"}
+			fallback={
+				<>
+					<path fill-rule="evenodd" d={PI_P} />
+					<path d={PI_DOT} />
+				</>
+			}
+		>
+			<path d={CLAUDE_PATH} />
+		</Show>
 	);
 }
 

@@ -664,53 +664,123 @@
 
 	.statusline .mark {
 		flex: none;
-		color: var(--mark, currentColor);
-	}
-
-	/* Claude's mark in Claude's own orange — the one place in the app where a drawing is not
-	   simply the colour of the text beside it, because a thing in motion may as well say whose
-	   motion it is. An identity colour, when there is one, still wins. */
-	.statusline .mark[data-agent="claude"] {
-		color: var(--mark, #d97757);
 	}
 
 	/*
-	 * Breathing, not spinning, and not looping back to the start.
+	 * The mark in motion is the runtime's own colour: Claude's orange, Pi's blue.
 	 *
-	 * Picone's asterisk grows through six glyphs and shrinks back rather than snapping to the
-	 * dot, because the snap read as a fault where the breath reads as motion. Same curve here,
-	 * same 1.8s, on one element: this mark is a single drawing, so scale and opacity say it
-	 * without ten stacked frames. Nothing re-renders either way — a turn that runs four
-	 * minutes costs what one that runs four seconds costs.
+	 * The one place in this app where a drawing is not simply the colour of the text beside
+	 * it — a thing in motion may as well say whose motion it is (picone §58). It used to read
+	 * `var(--mark, …)`, an *identity* colour set inline by `StatusLine`, so an agent that had
+	 * been given green got a green mark blooming over the input bar. The runtime is the thing
+	 * the drawing is of, and it is the only thing the drawing should be coloured by.
 	 */
-	@keyframes stream-breathe {
-		0%,
-		100% {
-			opacity: 0.5;
-			scale: 0.8;
-		}
-
-		50% {
-			opacity: 1;
-			scale: 1.1;
-		}
-	}
-
-	.statusline[data-working="true"] .mark {
-		animation: stream-breathe 1.8s ease-in-out infinite;
+	.statusline[data-working="true"] .mark[data-agent="claude"] {
+		color: #d97757;
 	}
 
 	/*
-	 * Motion off, and the mark still *visible* — which is the trap picone hit: `animation:
-	 * none` on an element whose first keyframe is `opacity: 0.5` leaves a half-there icon, and
-	 * on one that starts at 0 leaves nothing at all. So the resting values are stated here
-	 * too. The column's slide goes; its fade stays, because a fade is not travel.
+	 * Pi in the accent blue, which is a deliberate divergence: picone leaves its tiles as
+	 * `currentColor`. Here that blue *is* Pi's identity colour — `styles/agents.css` says so
+	 * where it explains why a working Pi's ring needs a transparent gap to read at all — so
+	 * taking the muted text colour instead would be the one mark in the app drawn in
+	 * something that is neither its own colour nor the text's.
+	 */
+	.statusline[data-working="true"] .mark[data-agent="pi"] {
+		color: var(--color-accent);
+	}
+
+	/* --- the two working marks (ported from picone's `styles/app.css`) -------- */
+
+	/*
+	 * Pi builds. Ten character cells appear in reading order and fall away again, which is
+	 * what a terminal does while it draws: 55ms of stagger per cell in the markup, one 1.35s
+	 * cycle here. `transform-box: fill-box` is load-bearing — without it an SVG `<rect>`
+	 * scales about the *viewBox* origin, so the grid would swing rather than each cell
+	 * growing in place.
+	 */
+	.pi-tile {
+		transform-box: fill-box;
+		transform-origin: center;
+	}
+
+	svg[data-agent][data-busy] .pi-tile {
+		animation: pi-build 1.35s cubic-bezier(0.22, 0.8, 0.3, 1) infinite;
+	}
+
+	@keyframes pi-build {
+		0% {
+			opacity: 0.08;
+			transform: scale(0.25);
+		}
+
+		20%,
+		55% {
+			opacity: 1;
+			transform: scale(1);
+		}
+
+		78% {
+			opacity: 0.15;
+			transform: scale(0.55);
+		}
+
+		100% {
+			opacity: 0.08;
+			transform: scale(0.25);
+		}
+	}
+
+	/*
+	 * Claude cycles. Ten glyphs — `· ✢ ✳ ✶ ✻ ✽` and back down — stacked at the same point,
+	 * each shown for a tenth of the cycle by its own delay. `steps(1, end)` because a frame
+	 * either is or is not: interpolating opacity would cross-fade two asterisks into a blur
+	 * that is neither.
+	 */
+	.claude-frame {
+		fill: currentColor;
+		font-family: var(--font-mono);
+		font-size: 20px;
+		dominant-baseline: central;
+		text-anchor: middle;
+		opacity: 0;
+		animation: claude-cycle 1800ms steps(1, end) infinite;
+	}
+
+	@keyframes claude-cycle {
+		0%,
+		9.999% {
+			opacity: 1;
+		}
+
+		10%,
+		100% {
+			opacity: 0;
+		}
+	}
+
+	/*
+	 * Motion off, and the mark still *visible* — which is the trap picone hit and wrote down:
+	 * `animation: none` on an element whose first keyframe is `opacity: 0.08` leaves a
+	 * ghost, and on one that starts at 0 leaves nothing at all. So a stopped Pi is its whole
+	 * grid at full strength, and a stopped Claude is the one frame it rests on. The column's
+	 * slide goes; its fade stays, because a fade is not travel.
 	 */
 	@media (prefers-reduced-motion: reduce) {
-		.statusline[data-working="true"] .mark {
+		svg[data-agent][data-busy] .pi-tile {
 			animation: none;
 			opacity: 1;
-			scale: 1;
+			transform: none;
+		}
+
+		.claude-frame {
+			animation: none;
+			opacity: 0;
+		}
+
+		/* The widest of the ten, so a still sign is still a mark rather than a dot. */
+		.claude-frame:nth-child(6) {
+			opacity: 1;
 		}
 
 		.stream {

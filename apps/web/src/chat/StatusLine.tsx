@@ -33,8 +33,6 @@ export function StatusLine(props: {
 	name: string;
 	/** Which runtime, for its own mark. */
 	agent: AgentKind;
-	/** The agent's colour (`Identity.color`), if it has one, for the mark in motion. */
-	color?: string;
 }) {
 	const words = (): string | undefined => {
 		switch (props.state) {
@@ -60,7 +58,7 @@ export function StatusLine(props: {
 		 * full-width and mostly empty, and an empty strip across the canvas that swallowed
 		 * clicks would be a 28px band above the composer where the boards stopped answering.
 		 */
-		<div class="pointer-events-none flex h-[28px] items-center" aria-live="polite">
+		<div class="statusrow pointer-events-none flex h-[28px] items-center" aria-live="polite">
 			<Show when={words()}>
 				{(said) => (
 					<button
@@ -68,21 +66,28 @@ export function StatusLine(props: {
 						type="button"
 						data-working={working()}
 						title="Show the conversation"
-						style={props.color ? { "--mark": props.color } : undefined}
 						onClick={toggleHistory}
 					>
 						{/*
 						 * The agent's own mark, moving — rather than a generic spinner, so the sign
 						 * says whose work it is as well as that there is some (picone §58).
 						 *
-						 * One element breathing, where picone stacks ten frames with staggered delays.
-						 * It needed the stack because its frames are *different glyphs* and only CSS
-						 * could pick between them without a re-render; a mark that is one drawing can
-						 * be scaled and faded in place, which costs one element and cannot fall out of
-						 * step. Either way the important half holds: a turn that runs four minutes
-						 * costs the same as one that runs four seconds, because nothing re-renders.
+						 * Picone's actual marks, and not the still one animated. This was one element
+						 * on a scale-and-fade loop, on the argument that a single drawing can breathe
+						 * without a second one: what it looked like was a flower opening and closing,
+						 * because Claude's burst is a ten-pointed star and the loop was tinted with
+						 * the agent's identity colour. So a working Claude is the asterisk its own CLI
+						 * cycles, stepping through ten glyphs, and a working Pi builds its logo out of
+						 * character cells in reading order. The cost is unchanged and it is the part
+						 * that matters: the animation is CSS on a fixed stack, so a turn that runs
+						 * four minutes costs what one that runs four seconds costs.
+						 *
+						 * No identity colour on it either. The mark in motion is the *runtime's* — the
+						 * one place in this app where a drawing is not the colour of the text beside
+						 * it — and an agent whose colour happened to be green got a green bloom over
+						 * the input bar. Whose turn it is, is what the words say.
 						 */}
-						<AgentMark agent={props.agent} class="mark" size={13} />
+						<AgentMark agent={props.agent} class="mark" size={13} busy={working()} />
 						<span>{said()}</span>
 					</button>
 				)}

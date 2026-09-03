@@ -1425,7 +1425,6 @@ export function App() {
 						state={focusedChat()?.state ?? "idle"}
 						name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
 						agent={focusedChat()?.kind ?? state.defaultKind}
-						{...(state.identities[state.focused ?? ""]?.color ? { color: state.identities[state.focused ?? ""]!.color } : {})}
 					/>
 
 					<Composer
