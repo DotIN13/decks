@@ -125,11 +125,20 @@ export function Stream(props: {
 	 * dismiss the history was probably not in it. A popover open over the column owns Escape
 	 * first, though — `Popover` closes on the same key and does not stop the event, so one
 	 * press would otherwise take the menu *and* the surface it belongs to.
+	 *
+	 * **`defaultPrevented` is what stops one press doing two things**, and the failure it
+	 * fixes is a good one. `App` clears the component selection on Escape; clearing it hands
+	 * the right edge back to the history, so `historyShown()` becomes true — and then this
+	 * listener, running later in the *same* event, saw a history that was up and closed it.
+	 * One keypress dismissed the inspector and the conversation, and the conversation had
+	 * never been asked to go. The first handler to act claims the key, which is the
+	 * convention `App`'s own handler already follows.
 	 */
 	onMount(() => {
 		const keys = (event: KeyboardEvent) => {
-			if (event.key !== "Escape" || !historyShown()) return;
+			if (event.key !== "Escape" || event.defaultPrevented || !historyShown()) return;
 			if (document.querySelector(".popover")) return;
+			event.preventDefault();
 			closeHistory();
 		};
 		window.addEventListener("keydown", keys);

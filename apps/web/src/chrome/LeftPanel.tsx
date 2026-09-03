@@ -307,7 +307,13 @@ export function LeftPanel(props: {
 					id={`${ids}-list`}
 					role="tabpanel"
 					aria-labelledby={`${ids}-tab-${tab()}`}
-					class="panel-list"
+					/*
+					 * `items` as well as `panel-list`, and it is not decoration: `RailItem` roots
+					 * its viewport observer at the nearest `.items`, so a grid tile can tell
+					 * whether it is on screen. Without it the observer falls back to the window
+					 * and mounts a document for every board in the deck at once.
+					 */
+					class="panel-list items"
 					data-density={density()}
 					onKeyDown={rove}
 				>
@@ -325,9 +331,38 @@ export function LeftPanel(props: {
 										<span class="flex-1" />
 										<span class="tabular-nums">{section.rows.length}</span>
 									</div>
-									<For each={section.rows}>
-										{(row) =>
-											density() === "grid" ? (
+									{/*
+										The branch is outside the `For`, and it has to be.
+										*
+										* `For` maps its items once each and calls the callback untracked — that
+										* is what makes it keyed rather than re-rendering — so a `density()`
+										* read *inside* the callback is a read nothing is listening to. The
+										* rows kept the shape they were first drawn with and the toggle in the
+										* foot did nothing but change one attribute.
+										*
+										* Two `For`s rather than a `Show` per row: the choice is the list's,
+										* not each row's, so paying for it per row would be paying for it
+										* seventy-eight times to answer the same question.
+									*/}
+									<Show
+										when={density() === "grid"}
+										fallback={
+											<For each={section.rows}>
+												{(row) => (
+													<BoardRow
+														board={row.board}
+														current={props.current === row.board.path}
+														dim={row.dim}
+														onCanvas={row.onCanvas}
+														tint={row.tint}
+														onPick={() => props.onPick(row.board)}
+													/>
+												)}
+											</For>
+										}
+									>
+										<For each={section.rows}>
+											{(row) => (
 												<BoardTile
 													board={row.board}
 													current={props.current === row.board.path}
@@ -335,41 +370,37 @@ export function LeftPanel(props: {
 													tint={row.tint}
 													onPick={() => props.onPick(row.board)}
 												/>
-											) : (
-												<BoardRow
-													board={row.board}
-													current={props.current === row.board.path}
-													dim={row.dim}
-													onCanvas={row.onCanvas}
-													tint={row.tint}
-													onPick={() => props.onPick(row.board)}
-												/>
-											)
-										}
-									</For>
+											)}
+										</For>
+									</Show>
 								</div>
 							)}
 						</For>
 					</Show>
 
 					<Show when={tab() === "deck"}>
-						<For each={deck()}>
-							{(board) =>
-								density() === "grid" ? (
-									<BoardTile board={board} current={props.current === board.path} onPick={() => props.onPick(board)} />
-								) : (
-									<BoardRow
-										board={board}
-										current={props.current === board.path}
-										// Nothing is dimmed here. Browsing the deck, "held" and "up" are
-										// not two states worth telling apart — marking the ones not on the
-										// canvas made the whole list look switched off rather than read.
-										onCanvas={(props.inPlay ?? []).includes(board.path)}
-										onPick={() => props.onPick(board)}
-									/>
-								)
+						<Show
+							when={density() === "grid"}
+							fallback={
+								<For each={deck()}>
+									{(board) => (
+										<BoardRow
+											board={board}
+											current={props.current === board.path}
+											// Nothing is dimmed here. Browsing the deck, "held" and "up" are
+											// not two states worth telling apart — marking the ones not on the
+											// canvas made the whole list look switched off rather than read.
+											onCanvas={(props.inPlay ?? []).includes(board.path)}
+											onPick={() => props.onPick(board)}
+										/>
+									)}
+								</For>
 							}
-						</For>
+						>
+							<For each={deck()}>
+								{(board) => <BoardTile board={board} current={props.current === board.path} onPick={() => props.onPick(board)} />}
+							</For>
+						</Show>
 					</Show>
 
 					{/*

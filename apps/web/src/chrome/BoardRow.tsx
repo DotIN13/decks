@@ -1,5 +1,6 @@
 import type { Board } from "@decks/protocol";
 import { Show } from "solid-js";
+import { RailItem } from "../canvas/BoardRail.tsx";
 import { picture } from "../canvas/thumb-cache.ts";
 import { deckFileUrl } from "../lib/api.ts";
 import { basename } from "./panel-groups.ts";
@@ -80,27 +81,24 @@ export function BoardRow(props: {
  * picture — which is the part with an argument behind it — is the same picture. The grid is
  * worth having for a context of seven boards an agent chose, and not for seventy-eight; that
  * is why it is a toggle in the foot and not the default.
+ *
+ * ### This is the one place that commissions a photograph
+ *
+ * And it has to be, or nothing does. A thumbnail in this app is the board itself, scaled
+ * down: `RailItem` mounts the real document in an iframe, waits for `board.js` to finish
+ * drawing markdown and maths, and photographs it on idle into `thumb-cache`. That used to
+ * happen in the full-screen browse modal, which was the only surface doing it — and the
+ * modal lost its trigger when the title bar went, so the cache stopped being filled and
+ * every 20×14 row in the list drew an empty rectangle for ever.
+ *
+ * So the grid delegates to `RailItem` rather than drawing its own picture. One
+ * implementation of "a board, photographed", already budgeted so a screen of them does not
+ * mount seventy-eight documents at once, and already covered by the thumbnail checks. The
+ * 20×14 rows then draw from the cache it fills, which is why browsing the deck once is what
+ * makes the Context tab look like something.
  */
 export function BoardTile(props: { board: Board; current?: boolean; dim?: boolean; tint?: string; onPick: () => void }) {
-	const shot = () => shotOf(props.board);
-	return (
-		<button
-			class="board-tile"
-			type="button"
-			data-row
-			data-current={props.current ? "true" : undefined}
-			data-dim={props.dim ? "true" : undefined}
-			aria-current={props.current ? "true" : undefined}
-			title={props.board.title}
-			onClick={props.onPick}
-			style={props.tint ? { "border-color": props.tint } : undefined}
-		>
-			<span class="im">
-				<Show when={shot()}>{(src) => <img src={src()} alt="" />}</Show>
-			</span>
-			<span class="cap">{basename(props.board.path)}</span>
-		</button>
-	);
+	return <RailItem board={props.board} current={props.current ?? false} offCanvas={props.dim} cache onPick={props.onPick} />;
 }
 
 /**
