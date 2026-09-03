@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/chrome.css";
 
 /*
  * The app's tokens, handed to Tailwind so utilities speak the design language.
@@ -36,7 +37,9 @@
 
 	/* The control scale from the title bar and the palette (see the note on `--control`). */
 	--spacing-control: var(--control);
+	--spacing-control-md: var(--control-md);
 	--spacing-control-sm: var(--control-sm);
+	--spacing-field: var(--field);
 	--radius-control: var(--control-radius);
 	--radius-row: var(--row-radius);
 	/* `.panel-float`'s corner, named so a one-off surface can match it without copying 12. */
@@ -44,6 +47,7 @@
 
 	--shadow-panel: var(--shadow);
 	--shadow-row: var(--shadow-row);
+	--shadow-menu: var(--shadow-menu);
 
 	--font-mono: var(--font-mono);
 }
@@ -115,7 +119,21 @@
 	 * need to scale, and one number is the simplification worth having.
 	 */
 	--control: 28px;
+	/*
+	 * Two more, and the reason each earns its place.
+	 *
+	 * `--control-md` is a *labelled* control — the mode and model chips in the dock, the
+	 * zoom readout in the corner. It is shorter than a toolbar button because it is wider:
+	 * a 28px-tall pill with a word in it reads as a button you are meant to hunt for, and
+	 * these are read far more often than they are pressed.
+	 *
+	 * `--field` is a number or a name you type. 24px, and it is the one size on this scale
+	 * chosen by the thing inside it rather than the thing around it: four of them fit a
+	 * 320px panel in one row at 24, and not at 26.
+	 */
+	--control-md: 26px;
 	--control-sm: 22px;
+	--field: 24px;
 	--control-radius: 8px;
 	--bg: var(--color-grey-100);
 	--bg-deep: var(--color-grey-200);
@@ -144,6 +162,13 @@
 	 * small and costs the column a third of the gutter.
 	 */
 	--shadow-row: 0 1px 2px rgb(0 0 0 / 8%), 0 3px 10px rgb(0 0 0 / 7%);
+	/*
+	 * The third rung, for anything summoned over the floats: menus, popovers, the agent
+	 * hover card. Three layers where `--shadow` has two — a summoned surface has to read as
+	 * being above a panel that is itself above the canvas, and there are only so many ways
+	 * to say "higher" without a border.
+	 */
+	--shadow-menu: 0 1px 1px rgb(0 0 0 / 6%), 0 4px 10px rgb(0 0 0 / 10%), 0 16px 36px rgb(0 0 0 / 12%);
 	--stage: var(--color-grey-300);
 	color-scheme: light;
 }
@@ -159,6 +184,7 @@
 	--line-strong: rgb(255 255 255 / 24%);
 	--shadow: 0 1px 2px rgb(0 0 0 / 50%), 0 10px 30px rgb(0 0 0 / 40%);
 	--shadow-row: 0 1px 2px rgb(0 0 0 / 45%), 0 3px 12px rgb(0 0 0 / 38%);
+	--shadow-menu: 0 1px 1px rgb(0 0 0 / 50%), 0 4px 12px rgb(0 0 0 / 55%), 0 18px 44px rgb(0 0 0 / 50%);
 	--stage: #101010;
 	color-scheme: dark;
 }

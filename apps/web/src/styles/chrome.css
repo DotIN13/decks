@@ -1,0 +1,372 @@
+/*
+ * The shared vocabulary of the chrome — the shapes several components spell the same way.
+ *
+ * The rule this file exists to enforce: **a shape stated twice is a shape that drifts.**
+ * `.icon-button` used to be defined once under `.titlebar` and again under `.zoombar`, with
+ * different sizes, and the two corners of the same window stopped matching. Everything here
+ * is one definition, and a component reaches for it by name.
+ *
+ * What is *not* here: layout. Where a thing sits, how its children space out, whether it
+ * grows — that is a class attribute in the component, in Tailwind, next to the markup it
+ * describes. This file is the material; the components are the building.
+ *
+ * Inside `@layer components`, like everything else in this app's CSS, so that a utility on
+ * the same element still wins. See the long note in `index.css` — and its corollary: no
+ * `@media` blocks in here for anything a utility also sets.
+ */
+@layer components {
+	/*
+	 * A surface floating over the canvas.
+	 *
+	 * Opaque, a hairline, one soft shadow. Not translucent and not blurred: `index.css`
+	 * refuses frosted glass in writing, and the reason applies to every one of these —
+	 * 40% words over 100% words reads as grime, and it moves when the camera does.
+	 */
+	.float {
+		border: 1px solid var(--line);
+		border-radius: var(--radius-panel, 12px);
+		background: var(--panel);
+		box-shadow: var(--shadow);
+	}
+
+	/* A cluster of controls, 40px tall, the shape of both top corners. */
+	.pill {
+		display: flex;
+		align-items: center;
+		height: 40px;
+		padding: 0 6px;
+		gap: 4px;
+	}
+
+	/* The divider inside a pill: one hairline, 20px of it, with its own breathing room. */
+	.pill-sep {
+		width: 1px;
+		height: 20px;
+		margin: 0 4px;
+		flex: none;
+		background: var(--line);
+	}
+
+	/*
+	 * The icon button, once.
+	 *
+	 * `data-on` is the standing state — a tool that is selected, a panel that is open — and
+	 * it is the accent fill rather than a tint, because those are the controls whose state
+	 * you need to read from across the window. `data-on="soft"` is the quieter version for
+	 * a control that is merely *held*, and `data-on="yield"` is the third state the history
+	 * button needs: wanted, but not currently on the edge.
+	 */
+	.iconbtn {
+		display: grid;
+		flex: none;
+		place-items: center;
+		width: var(--control, 28px);
+		height: var(--control, 28px);
+		padding: 0;
+		border: 0;
+		border-radius: var(--control-radius, 6px);
+		background: transparent;
+		color: var(--muted);
+		cursor: pointer;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.iconbtn:hover {
+		background: var(--line);
+		color: var(--fg);
+	}
+
+	.iconbtn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	.iconbtn[data-on="true"] {
+		background: var(--color-accent);
+		color: #fff;
+	}
+
+	.iconbtn[data-on="soft"] {
+		background: var(--line);
+		color: var(--fg);
+	}
+
+	.iconbtn[data-on="yield"] {
+		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+		color: var(--color-accent);
+	}
+
+	.iconbtn[disabled] {
+		color: var(--faint);
+		cursor: default;
+		opacity: 0.5;
+	}
+
+	/*
+	 * A labelled control: an icon, a word, and usually a chevron.
+	 *
+	 * The mode and model pickers in the dock, and the zoom readout in the corner. A wash
+	 * rather than a border, which is the same thing the palette's controls say — and it is
+	 * what replaced three native `<select>`s, whose platform chevrons were the least
+	 * Decks-like thing on screen.
+	 */
+	.chipbtn {
+		display: flex;
+		flex: none;
+		align-items: center;
+		height: var(--control-md, 26px);
+		padding: 0 8px;
+		gap: 5px;
+		border: 0;
+		border-radius: var(--control-radius, 7px);
+		background: var(--line);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: 11px;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.chipbtn:hover {
+		background: var(--line-strong);
+		color: var(--fg);
+	}
+
+	.chipbtn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* Anything but the ordinary setting is a standing change, so it is tinted rather than
+	   merely labelled — you should be able to see that a session is in plan mode without
+	   reading the word. */
+	.chipbtn[data-on="true"] {
+		background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		color: var(--color-accent);
+	}
+
+	/* A second fact on the same chip — the thinking level beside the model. */
+	.chipbtn > .sub {
+		color: var(--faint);
+	}
+
+	.chipbtn > .chev {
+		flex: none;
+		opacity: 0.6;
+	}
+
+	/*
+	 * The popover card, and its rows. One shape for all five of them (`ui/Popover.tsx`).
+	 *
+	 * A heavier shadow than a `.float`: this is summoned *over* surfaces that are
+	 * themselves floating, and two objects on the same rung read as one object.
+	 */
+	.popover {
+		position: fixed;
+		z-index: 40;
+		box-sizing: border-box;
+		padding: 6px;
+		border: 1px solid var(--line-strong);
+		border-radius: 12px;
+		background: var(--panel);
+		box-shadow: var(--shadow-menu);
+		color: var(--fg);
+		font-size: 12px;
+	}
+
+	/* A row you can pick. `data-row` is what the keyboard roves over. */
+	.popover [data-row] {
+		display: grid;
+		width: 100%;
+		align-items: start;
+		padding: 7px 8px;
+		gap: 2px 9px;
+		grid-template-columns: 16px 1fr;
+		border: 0;
+		border-radius: 7px;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		text-align: left;
+	}
+
+	.popover [data-row]:hover,
+	.popover [data-row]:focus-visible {
+		background: var(--line);
+		outline: none;
+	}
+
+	.popover [data-row][data-current="true"] {
+		background: var(--line);
+	}
+
+	.popover [data-row] > .ic {
+		grid-row: span 2;
+		padding-top: 1px;
+		color: var(--muted);
+	}
+
+	.popover [data-row] > .lb {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		color: var(--fg);
+		font-size: 12px;
+		font-weight: 600;
+	}
+
+	/*
+	 * The note under a row.
+	 *
+	 * This is the reason a mode is a menu and not a segmented control: "edit freely" does
+	 * not say by itself that commands still ask, and the place to say so is here.
+	 */
+	.popover [data-row] > .nt {
+		color: var(--faint);
+		font-size: 11px;
+		line-height: 1.4;
+	}
+
+	/* A single-line row, for lists rather than described choices. */
+	.popover [data-row][data-flat="true"] {
+		display: flex;
+		height: 30px;
+		align-items: center;
+		gap: 7px;
+		padding: 0 8px;
+	}
+
+	.popover .rule {
+		height: 1px;
+		margin: 6px 4px;
+		background: var(--line);
+	}
+
+	/* A label over a group of rows. Sentence case, never uppercase — see the note in
+	   `index.css` about what replaced the eyebrows. */
+	.popover .group {
+		padding: 5px 8px 3px;
+		color: var(--faint);
+		font-size: 11px;
+		font-weight: 500;
+	}
+
+	/*
+	 * A number or a name you can type: a wash that says "editable" and an accent ring that
+	 * says "being edited", which is the only moment the two need distinguishing. A 1px box
+	 * around a value that is usually only read is a border earning nothing.
+	 */
+	.field {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		align-items: center;
+		box-sizing: border-box;
+		height: var(--field, 24px);
+		padding: 0 6px;
+		gap: 4px;
+		border: 0;
+		border-radius: 5px;
+		background: var(--line);
+		color: var(--fg);
+		font: inherit;
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		transition: background-color 120ms ease;
+	}
+
+	.field:hover {
+		background: var(--line-strong);
+	}
+
+	.field:focus-within,
+	.field:focus {
+		background: var(--bg);
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
+	}
+
+	.field > .k {
+		flex: none;
+		color: var(--faint);
+	}
+
+	.field > input {
+		min-width: 0;
+		flex: 1;
+		border: 0;
+		background: none;
+		color: inherit;
+		font: inherit;
+		font-variant-numeric: inherit;
+		outline: none;
+	}
+
+	/* The label of a scrubbable field: dragging it changes the number. */
+	.field > .k[data-scrub="true"] {
+		cursor: ew-resize;
+		user-select: none;
+	}
+
+	/* A segmented control: pick one of a few, all visible. */
+	.seg {
+		display: flex;
+		flex: none;
+		padding: 2px;
+		gap: 2px;
+		border-radius: 6px;
+		background: var(--line);
+	}
+
+	.seg > button {
+		flex: 1;
+		height: 20px;
+		border: 0;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: 10px;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.seg > button[data-on="true"] {
+		background: var(--panel);
+		color: var(--fg);
+		font-weight: 600;
+		box-shadow: var(--shadow-row);
+	}
+
+	/*
+	 * A section label inside a panel, and the metadata line beside it.
+	 *
+	 * **Never uppercase.** Ten-pixel caps at 0.16em tracking is wide enough that the eye
+	 * reads letters rather than words, and some screen readers announce a long uppercase
+	 * run letter by letter. Sentence case at 11.5px, weight 500, no tracking — and the two
+	 * classes are split by job: `.label` for something you read in order to act, `.meta`
+	 * for something that tells you where you are.
+	 */
+	.label,
+	.meta {
+		font-size: 11.5px;
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+	}
+
+	.label {
+		color: var(--muted);
+	}
+
+	.meta {
+		color: var(--faint);
+	}
+}
