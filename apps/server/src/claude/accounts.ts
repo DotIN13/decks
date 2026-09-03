@@ -172,6 +172,25 @@ export class ClaudeAccounts {
 		}
 	}
 
+	/**
+	 * Take the symlink away, for when the account in force is the CLI's own.
+	 *
+	 * `activeConfigDir()` returns nothing for `default`, so a link left over from the last
+	 * account is never *read* — but it is still a link on disk pointing at a directory that
+	 * has usually just been deleted, and the next person to look at
+	 * `claude-accounts/` finds a dangling one and has to work out whether it matters.
+	 *
+	 * `rmSync` on a symlink removes the link and not its target, which is what makes this
+	 * safe to call while another account still owns the directory it points at.
+	 */
+	private unlink(): void {
+		try {
+			rmSync(this.link, { force: true });
+		} catch {
+			/* nothing there, which is the outcome wanted */
+		}
+	}
+
 	private read(): Index {
 		let raw: unknown;
 		try {
@@ -273,11 +292,21 @@ export class ClaudeAccounts {
 	 * A second sign-in to an account already on the list *replaces* it rather than joining
 	 * it. Two rows for one email is a list that cannot be reasoned about, and the second
 	 * sign-in is the fresher set of credentials.
+	 *
+	 * **Except the CLI's own row, which is never the duplicate that gets removed.** It is
+	 * synthesised by `list()` and re-labelled by `describeDefault()` on every publish, so
+	 * dropping it here removed it for exactly as long as it took the panel to read the list
+	 * again — and what came back was a second row with the same email, one with a × and one
+	 * without, for a single subscription. Signing in as the account the CLI is already on is
+	 * `abandon()`'s case, not this one; the caller decides which, because only it can ask the
+	 * CLI whether that login is currently signed in at all.
 	 */
 	remember(account: Omit<ClaudeAccount, "addedAt"> & { addedAt?: number }): ClaudeAccount {
 		const index = this.read();
 		const entry: ClaudeAccount = { ...account, addedAt: account.addedAt ?? Date.now() };
-		const duplicate = entry.email ? index.accounts.find((other) => other.email === entry.email && other.id !== entry.id) : undefined;
+		const duplicate = entry.email
+			? index.accounts.find((other) => other.email === entry.email && other.id !== entry.id && other.id !== DEFAULT_ACCOUNT)
+			: undefined;
 		if (duplicate) {
 			// The directory of the row being replaced is dropped with it, or it would sit
 			// there holding credentials nothing can reach.
@@ -289,6 +318,29 @@ export class ClaudeAccounts {
 		this.write(index);
 		this.point(entry.id);
 		return entry;
+	}
+
+	/**
+	 * Give up on an account that was begun but must not join the list.
+	 *
+	 * The case is signing in as the subscription the CLI is *already* signed in as: the login
+	 * worked and wrote real credentials, but they are a second copy of the first row's, and
+	 * one subscription drawn as two accounts is a list that cannot be reasoned about — two
+	 * identical rows, one removable and one not, and a rotation that "switches" to the same
+	 * rate limit it just left.
+	 *
+	 * So the directory goes and the row is never written; what is left in force is the CLI's
+	 * own login, which is that same subscription by a shorter route. Returns the row the
+	 * caller ends up on, so it has something to say.
+	 */
+	abandon(id: string): ClaudeAccount {
+		this.discard(id);
+		const index = this.read();
+		index.accounts = index.accounts.filter((account) => account.id !== id);
+		index.active = DEFAULT_ACCOUNT;
+		this.write(index);
+		this.unlink();
+		return this.list().find((account) => account.id === DEFAULT_ACCOUNT) ?? { id: DEFAULT_ACCOUNT, addedAt: 0 };
 	}
 
 	/**
@@ -312,7 +364,10 @@ export class ClaudeAccounts {
 			 * unlimited one first; failing that, whichever is left.
 			 */
 			index.active = this.pick(this.list(), undefined)?.id ?? DEFAULT_ACCOUNT;
+			// Repointed at the next account, or taken away — falling back to `default` used to
+			// leave the link pointing at the directory this call is about to delete.
 			if (index.active !== DEFAULT_ACCOUNT) this.point(index.active);
+			else this.unlink();
 		}
 		this.write(index);
 		this.discard(id);
@@ -368,8 +423,21 @@ export class ClaudeAccounts {
 		 * *forever* because the number was missing is an account nothing will use again. An
 		 * hour is short enough to be self-correcting and long enough to stop a switch loop.
 		 */
-		found.limitedUntil = resetsAt && Number.isFinite(resetsAt) ? resetsAt : Date.now() + 60 * 60 * 1000;
-		if (limitType) found.limitType = limitType;
+		const until = resetsAt && Number.isFinite(resetsAt) ? resetsAt : Date.now() + 60 * 60 * 1000;
+		/*
+		 * Every row with that email, not only the one that refused.
+		 *
+		 * A rate limit belongs to the *subscription*, and one subscription can still be two
+		 * rows on an install that made the pair before `abandon()` existed — the CLI's own
+		 * login and a copy of it added by hand. Marking only the row that refused left the
+		 * twin looking available, so the next choice switched to the same account that had
+		 * just run out, was refused again, and only then moved on.
+		 */
+		const sharing = found.email ? index.accounts.filter((account) => account.email === found.email) : [found];
+		for (const account of sharing) {
+			account.limitedUntil = until;
+			if (limitType) account.limitType = limitType;
+		}
 		this.write(index);
 	}
 

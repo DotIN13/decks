@@ -121,6 +121,25 @@ say(
 );
 say("…with the added ones removable and the CLI's own not", after.filter((r) => r.removable).length === 2);
 /*
+ * And the row without a × says why it has none.
+ *
+ * "Claude Code's own login" used to be a *fallback* for the row's name, so it appeared only
+ * when the CLI reported no email — the one case where the row is already unmistakable. With
+ * an email to show, the row read as an ordinary account that happened to have no delete
+ * button, and somebody who had signed in to that same subscription by hand was looking at
+ * two identical rows, one removable and one not.
+ */
+say(
+	"the CLI's own row says what it is, so the missing × has a reason",
+	/Claude Code's own login/.test(after.find((r) => !r.removable)?.text ?? ""),
+	JSON.stringify(after.find((r) => !r.removable)?.text),
+);
+say(
+	"…and the added ones do not claim to be it",
+	after.filter((r) => r.removable).every((r) => !/Claude Code's own login/.test(r.text)),
+	JSON.stringify(after.filter((r) => r.removable).map((r) => r.text)),
+);
+/*
  * An account with no token behind it says so rather than being hidden, and cannot be
  * switched to — that is what stops a rate limit turning into an auth failure.
  */

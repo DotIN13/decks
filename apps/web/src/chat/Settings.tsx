@@ -140,6 +140,37 @@ function Row(props: { account: ClaudeAccount; active: boolean; onUse: () => void
 	};
 	/** What to call it: the email, or something honest when the CLI has not said. */
 	const name = () => props.account.email ?? (props.account.isDefault ? "Claude Code's own login" : "an account with no name yet");
+	/**
+	 * Why this row has no ×, said on the row.
+	 *
+	 * "Claude Code's own login" used to be a *fallback* for the name — so it only ever
+	 * appeared when the CLI reported no email, which is the one case where the row is already
+	 * unmistakable. With an email to show, the row read as an ordinary account that happened
+	 * to have no delete button, and the missing button looked arbitrary. It is the one fact
+	 * about this row a person needs: these credentials are the CLI's, and
+	 * `claude auth logout` is where they are given up.
+	 */
+	const whose = () => (props.account.isDefault && props.account.email ? "Claude Code's own login" : undefined);
+	/**
+	 * The row's tooltip: what pressing it does, and — on the CLI's own row — why there is
+	 * nothing to press to remove it.
+	 *
+	 * A sentence rather than a second control, because the honest answer is a shell command
+	 * this app should not be running on your behalf: it would sign you out of `claude`
+	 * everywhere on the machine, from a panel that looks like it is about Decks.
+	 */
+	const title = () => {
+		const act = props.active
+			? "The account in use now"
+			: props.account.signedIn
+				? `Use ${name()} from now on`
+				: props.account.isDefault
+					? "Claude Code is signed out — sign in with claude auth login"
+					: "Signed out — add it again to use it";
+		return props.account.isDefault
+			? `${act}. These are Claude Code's own credentials, so Decks cannot remove them: claude auth logout gives them up.`
+			: act;
+	};
 
 	return (
 		/*
@@ -152,13 +183,7 @@ function Row(props: { account: ClaudeAccount; active: boolean; onUse: () => void
 				class="flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-px rounded-control border-0 bg-transparent px-2.5 py-2 text-left hover:bg-line disabled:cursor-default disabled:opacity-55 disabled:hover:bg-transparent"
 				type="button"
 				disabled={!props.account.signedIn || props.active}
-				title={
-					props.active
-						? "The account in use now"
-						: props.account.signedIn
-							? `Use ${name()} from now on`
-							: "Signed out — add it again to use it"
-				}
+				title={title()}
 				onClick={props.onUse}
 			>
 				<span class="flex w-full items-baseline gap-2">
@@ -166,6 +191,14 @@ function Row(props: { account: ClaudeAccount; active: boolean; onUse: () => void
 					<Show when={props.account.plan}>{(plan) => <span class="flex-none text-[11px] text-faint">{plan()}</span>}</Show>
 				</span>
 				<span class="flex w-full items-baseline gap-1.5 text-[11px]">
+					{/* Before the organisation, and dimmer: what the row *is* comes before what the
+					    account belongs to, and neither should out-shout the email above them. */}
+					<Show when={whose()}>{(said) => <span class="flex-none text-faint">{said()}</span>}</Show>
+					{/* Only between two things: the app's separator everywhere else, and without it two
+					    greys sit 6px apart and read as one run of words. */}
+					<Show when={whose() && props.account.orgName}>
+						<span class="flex-none text-faint">·</span>
+					</Show>
 					<Show when={props.account.orgName}>
 						{(org) => <span class="truncate text-muted">{org()}</span>}
 					</Show>

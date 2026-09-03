@@ -624,6 +624,35 @@ export class ClaudeBackend implements AgentBackend {
 		 */
 		if (into && accounts && "remember" in accounts) {
 			const identity = await claudeIdentity(into.configDir);
+			/*
+			 * Is this the subscription the CLI is already signed in as?
+			 *
+			 * Asked of the CLI's own directory, live, rather than of the label the store keeps
+			 * for that row — because the label survives a `claude auth logout`, and refusing to
+			 * add an account on the strength of a login that is no longer there would leave
+			 * somebody with a signed-out first row and no way to add the credentials that would
+			 * fix it. An email from `auth status` means signed in now.
+			 */
+			const mine = await claudeIdentity();
+			const alreadyMine = Boolean(identity.email && mine.email && identity.email === mine.email);
+			if (alreadyMine && "abandon" in accounts) {
+				/*
+				 * One subscription, one row — and the row it keeps is the CLI's own, which cannot
+				 * go stale and is the same account by a shorter route. The credentials this login
+				 * just wrote are a second copy of `~/.claude`'s, so they go with the directory.
+				 *
+				 * This is the bug that produced two identical rows, one with a × and one without:
+				 * the copy was added, `remember()` removed the CLI's row as a duplicate, and the
+				 * next read of the panel put that row straight back.
+				 */
+				(accounts as { abandon(id: string): unknown }).abandon(into.id);
+				notice(
+					"info",
+					`${identity.email} is already this machine's Claude Code login, so it stays as the first account rather than becoming a second copy of itself. Nothing changed.`,
+				);
+				this.context.accountsChanged?.();
+				return;
+			}
 			const remembered = (accounts as { remember(account: { id: string; email?: string; orgName?: string; plan?: string }): { email?: string } }).remember({
 				id: into.id,
 				...identity,

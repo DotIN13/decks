@@ -333,3 +333,97 @@ test("recording the default account's name does not forget that it ran out", () 
 	assert.equal(accounts.nextAvailable(other)?.id, undefined, "nothing to move to, rather than back to the spent one");
 	cleanup();
 });
+
+/*
+ * The pair that could not be told apart, and could not be got rid of.
+ *
+ * Signing in as the subscription the CLI is *already* on used to produce two rows with the
+ * same email — one removable and one not — because `remember()` dropped the CLI's row as a
+ * duplicate and `describeDefault()` put it back on the next read of the panel. The store's
+ * half of the fix is these two: the CLI's row is never the duplicate that gets removed, and
+ * `abandon()` is what a caller uses when the login it just did turns out to be that account.
+ */
+test("the CLI's own row is never removed as a duplicate of an added account", () => {
+	const { accounts, cleanup } = store();
+	accounts.describeDefault({ email: "me@example.com", orgName: "Somewhere", plan: "enterprise" });
+
+	// The same email, added by hand. Whatever else happens, the first row stays.
+	add(accounts, "me@example.com");
+
+	const ids = accounts.list().map((account) => account.id);
+	assert.equal(ids[0], DEFAULT_ACCOUNT, "still the head of the list");
+	assert.equal(
+		accounts.list().find((account) => account.id === DEFAULT_ACCOUNT)?.email,
+		"me@example.com",
+		"and still labelled, rather than dropped and re-synthesised nameless",
+	);
+	cleanup();
+});
+
+test("abandoning a login leaves the CLI's own account in force and no dangling link", () => {
+	const { accounts, dir, cleanup } = store();
+	accounts.describeDefault({ email: "me@example.com" });
+	const other = add(accounts, "other@example.com");
+	assert.equal(accounts.activeId(), other, "the added account is in force");
+
+	// The login that turns out to be the CLI's own subscription.
+	const { id, configDir } = accounts.begin();
+	writeFileSync(join(configDir, ".credentials.json"), JSON.stringify({ claudeAiOauth: { accessToken: "not-a-real-token" } }));
+	const landed = accounts.abandon(id);
+
+	assert.equal(landed.id, DEFAULT_ACCOUNT, "and says which row you ended up on");
+	assert.equal(accounts.activeId(), DEFAULT_ACCOUNT, "that subscription, by the shorter route");
+	assert.equal(existsSync(configDir), false, "the second copy of the credentials is gone");
+	assert.deepEqual(
+		accounts.list().map((account) => account.id),
+		[DEFAULT_ACCOUNT, other],
+		"no third row for an account that was never added",
+	);
+	assert.equal(accounts.activeConfigDir(), undefined, "the CLI uses its own directory again");
+	assert.equal(pointsAt(dir), undefined, "and the symlink is taken away rather than left dangling");
+	cleanup();
+});
+
+test("forgetting the account in force clears the symlink when it falls back to the CLI's own", () => {
+	const { accounts, dir, cleanup } = store();
+	const only = add(accounts, "me@example.com");
+	assert.equal(pointsAt(dir), join(dir, "claude-accounts", only));
+
+	accounts.forget(only);
+
+	assert.equal(accounts.activeId(), DEFAULT_ACCOUNT);
+	/*
+	 * The link used to be left pointing at the directory this call had just deleted.
+	 * `activeConfigDir()` returns nothing for `default`, so nothing read it — but a dangling
+	 * symlink in a credentials directory is a thing somebody has to work out later.
+	 */
+	assert.equal(pointsAt(dir), undefined, "no link at all, rather than one pointing at nothing");
+	cleanup();
+});
+
+/*
+ * A rate limit belongs to the subscription, not to the row.
+ *
+ * One subscription can still be two rows on an install that made the pair before
+ * `abandon()` existed. Marking only the row that refused left its twin looking available,
+ * so the next choice switched to the same account that had just run out.
+ */
+test("a limit is recorded against every row with that email", () => {
+	const { accounts, cleanup } = store();
+	accounts.describeDefault({ email: "me@example.com" });
+	const copy = add(accounts, "me@example.com");
+	const other = add(accounts, "other@example.com");
+	const resets = Date.now() + 60 * 60 * 1000;
+
+	accounts.markLimited(copy, resets, "five_hour");
+
+	const limited = accounts.list().filter((account) => account.limitedUntil === resets);
+	assert.deepEqual(
+		limited.map((account) => account.id).sort(),
+		[DEFAULT_ACCOUNT, copy].sort(),
+		"both rows for that one subscription",
+	);
+	assert.equal(accounts.list().find((account) => account.id === other)?.limitedUntil, undefined, "and nothing else");
+	assert.equal(accounts.nextAvailable(copy)?.id, other, "so the next choice is a different subscription");
+	cleanup();
+});
