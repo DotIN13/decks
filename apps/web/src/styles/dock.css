@@ -301,14 +301,36 @@
 	 * `gpt-4` exists under three providers and the name alone does not say which one a turn
 	 * will be billed to, so the provider is not decoration — but it is also not what you
 	 * are scanning for, hence a wash and the faint colour rather than a second bold word.
+	 *
+	 * **Capped, because it is the shorter of the two names and was taking the longer one's
+	 * room.** A provider is a slug somebody else chose — `opencode-go`, `openrouter` — and at
+	 * 320px of card every character of it is a character the model's own name loses.
+	 *
+	 * 72px is measured rather than picked, and it is a *ceiling* rather than a target — every
+	 * provider name in play fits inside it whole. Measured at this font: `xai` 23px, `mistral`
+	 * 39, `openai` and `google` 40, `anthropic` 51, `deepseek` 53, `openrouter` 58,
+	 * `opencode-go` 68. The cap is the longest of those plus a character of slack, because a
+	 * name that fits today should not start eliding on a machine whose font metrics round the
+	 * other way.
+	 *
+	 * So nothing real is clipped, and something longer than any of these — a slug with a path
+	 * in it — stops before it has eaten the room the model's own name needs. What the cap
+	 * takes, the pill's `title` still has.
+	 *
+	 * `flex: none` so it is never squeezed *below* its content either: the ellipsis is a
+	 * ceiling, not a negotiation with the name beside it.
 	 */
 	.popover .pv {
+		max-width: 72px;
 		flex: none;
 		padding: 1px 5px;
+		overflow: hidden;
 		border-radius: 4px;
 		background: var(--line);
 		color: var(--faint);
 		font-size: 10px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	/*

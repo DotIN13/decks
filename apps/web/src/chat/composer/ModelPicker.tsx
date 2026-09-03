@@ -118,24 +118,33 @@ export function ModelPicker(props: {
 			</label>
 
 			{/*
-				The list, and its *height* is what was wrong with it.
+				The list, and its *height* has been wrong twice, in opposite directions.
 
-				`max-h-[220px]` fitted seven of thirteen rows and cut the eighth in half, so the
-				card was a letterbox over a list you had to scroll to see any of. The cap is a
-				fraction of the window now with a ceiling: 56vh shows about fourteen rows on a
-				laptop while leaving room for the search field above and the thinking scale
-				below, and on a short window it gives way rather than pushing them off.
+				`max-h-[220px]` was the first: seven of thirteen rows, so the card was a letterbox
+				over a list you had to scroll to see any of. Raising the cap to 56vh/440px fixed
+				that and caused the second, which is worse and was invisible in the numbers — the
+				box was a **flex column**, so 23 rows of 30px were *shrunk* to 19px to fit inside
+				it. Every row lost a third of its height, the list stopped scrolling because its
+				contents now fitted, and the card was still 554px of window. A tall card full of
+				squashed rows: the cap and the row height were fighting and the cap won.
 
-				`min-h-0` because this is a flex child that scrolls — without it the flex
-				algorithm hands it its content height and the `overflow` never engages, which is
-				the other way a list like this ends up the wrong size.
+				So the row height is `min-height` now (`chrome.css`), and this is a plain block
+				that scrolls rather than a flex column — nothing here needs to be a flex parent,
+				and being one is what let the box overrule its contents. `min-h-0` went with it:
+				it was there to make `overflow` engage on a flex *child*, which this no longer is.
 
-				The provider stays on every row. It was briefly a group heading instead, on the
-				argument that thirteen identical chips are noise; they are, but the repetition
-				is also what makes the column scannable when two providers offer models with
-				similar names, and it was not what was cramped.
+				**Ten rows** at the ceiling, which is why it is 300px and not 320: a cap that is a
+				multiple of the row height ends on a row rather than through one. The `vh` term is
+				what a short window uses instead — about six rows at 620px — so the list gives way
+				there rather than pushing the search field and the thinking scale off the top, and
+				the part-row it leaves is the scroll cue.
+
+				The provider stays on every row, and is capped in width rather than dropped when
+				there is only one of them. It was briefly a group heading instead, and briefly
+				conditional; both traded a fact that is always true for a layout that is only
+				sometimes tidy.
 			*/}
-			<div class="flex max-h-[min(56vh,440px)] min-h-0 flex-col overflow-y-auto">
+			<div class="max-h-[min(33vh,300px)] overflow-y-auto">
 				<Show when={matches().length > 0} fallback={<p class="meta m-0 px-2 py-2.5">No model matches that</p>}>
 					<For each={matches()}>
 						{(option) => (
@@ -148,7 +157,19 @@ export function ModelPicker(props: {
 								aria-checked={isCurrent(option)}
 								onClick={() => pick(option)}
 							>
-								<span class="pv">{option.provider}</span>
+								{/*
+									Always drawn, and bounded rather than conditional.
+
+									It was briefly hidden when only one provider was signed in, on the grounds
+									that twenty-three copies of the same word disambiguate nothing. But which
+									provider a turn is billed to is not only interesting when there is a choice
+									— it is the kind of fact you check *because* you cannot remember, and a
+									chip that comes and goes with the shape of the list is one you cannot rely
+									on being there. So the cost is paid where it was actually incurred: the
+									pill is capped in `dock.css`, so a long provider name cannot go on eating
+									the row the names need.
+								*/}
+								<span class="pv" title={option.provider}>{option.provider}</span>
 								<span class="min-w-0 flex-1 truncate">{option.label}</span>
 								<Show when={isCurrent(option)}>
 									<Icon of={Check} size={13} class="shrink-0 text-accent" />

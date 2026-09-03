@@ -40,15 +40,73 @@ const shape = await page.evaluate(() => {
 		providers: [...new Set(rows.map((r) => r.querySelector(".pv")?.textContent?.trim()).filter(Boolean))].sort(),
 		current: rows.filter((r) => r.dataset.current === "true").length,
 		search: Boolean(pop.querySelector("input")),
+		/* Every row has a name as well as a provider. */
+		named: rows.every((r) => (r.querySelector("span:not(.pv)")?.textContent ?? "").trim().length > 0),
+		/*
+		 * The provider pill, and its width. It is capped at 72px because it is the *shorter* of
+		 * the two names on the row and should not be able to take the longer one's room — but
+		 * the cap is a ceiling above every real provider name (`opencode-go`, the longest in
+		 * play, is 68px), so it bites only on a slug with a path in it.
+		 */
+		chips: rows.filter((r) => r.querySelector(".pv")).length,
+		chipWidths: [...new Set(rows.map((r) => r.querySelector(".pv")).filter(Boolean).map((c) => Math.round(c.getBoundingClientRect().width)))],
+		clipped: [...pop.querySelectorAll(".pv")].filter((c) => c.scrollWidth > c.clientWidth + 1).length,
+		/* Whatever the cap does take, the title still has. */
+		titled: [...pop.querySelectorAll(".pv")].every((c) => (c.title ?? "").length > 0),
+		/* The row height, which a capped flex list used to shrink — 30px became 19. */
+		heights: [...new Set(rows.map((r) => Math.round(r.getBoundingClientRect().height)))],
+		/* The list scrolls rather than squeezing its rows to fit. */
+		scrolls: (() => {
+			const box = [...pop.children].find((c) => c.className.includes("max-h"));
+			return box ? box.scrollHeight > box.clientHeight + 1 : null;
+		})(),
+		popover: Math.round(pop.getBoundingClientRect().height),
+		window: window.innerHeight,
 	};
 });
 say("the popover lists the models", shape.rows >= 1, JSON.stringify(shape));
 say("…with a search field over them", shape.search);
 say("…and exactly one marked as the session's model", shape.current === 1, String(shape.current));
+say("…and every row names its model", shape.named);
+/*
+ * The provider is on *every* row, whether or not more than one is signed in.
+ *
+ * It was briefly conditional, and that was the wrong trade: which provider a turn is billed
+ * to is the kind of fact you check because you cannot remember it, and a chip that comes and
+ * goes with the shape of the list is one you cannot rely on being there. The cost it was
+ * hidden to avoid is paid by capping it instead.
+ */
+say("the provider is on every row", shape.chips === shape.rows, `${shape.chips} of ${shape.rows}`);
 say(
-	"the provider is a heading or a pill on the row, not a second control",
-	shape.groups.length > 0 || shape.providers.length > 0,
-	JSON.stringify({ groups: shape.groups, providers: shape.providers }),
+	"…capped so the model's own name keeps the room",
+	shape.chipWidths.every((w) => w <= 72),
+	JSON.stringify(shape.chipWidths),
+);
+/*
+ * And the cap is above every provider name that actually exists, so a real one is never
+ * elided: `opencode-go` is the longest in play at 68px. A cap that clips the names it was
+ * sized for is a cap that was guessed at.
+ */
+say("…and above every name in the list, so none of them is elided", shape.clipped === 0, `${shape.clipped} clipped`);
+say("…with the whole name in its title, since the cap may have taken the tail", shape.titled);
+
+/*
+ * The two ways this list has been the wrong size, both asserted at once.
+ *
+ * It was a flex column with a max-height, so 23 rows of 30px were *shrunk* to 19px to fit —
+ * which also stopped it scrolling, since its contents then fitted. A row height is not a
+ * suggestion, and a capped list either scrolls or is not capped.
+ */
+say("the rows keep their height", shape.heights.every((h) => h >= 28), JSON.stringify(shape.heights));
+say(
+	"…and a list too long for the cap scrolls instead of squeezing them",
+	shape.scrolls === null || shape.rows * 30 <= shape.popover || shape.scrolls,
+	JSON.stringify({ rows: shape.rows, scrolls: shape.scrolls }),
+);
+say(
+	"…and the card is not most of the window",
+	shape.popover <= shape.window * 0.6,
+	`${shape.popover} of ${shape.window}`,
 );
 
 // The thinking scale lives inside the same popover, which is the point of collapsing three
@@ -61,13 +119,14 @@ if (count < 2) {
 	say("switching model is recorded in the conversation", false, "only one model is configured");
 } else {
 	/*
-	 * The model's name, which is the span after the provider pill.
+	 * The model's name: the row's own span, which is *not* the provider pill.
 	 *
 	 * There is no `.id` class — an earlier version of this check assumed one and then waited
-	 * thirty seconds for it. `.pv` is the provider and the name is the flexible span beside
-	 * it.
+	 * thirty seconds for it. It then read `.pv + span`, which was worse: it depended on the
+	 * provider pill existing, and the pill is only drawn when more than one provider is
+	 * signed in. On a deck with one it waited thirty seconds for that instead.
 	 */
-	const wanted = (await rows.nth(1).locator(".pv + span").innerText()).trim();
+	const wanted = (await rows.nth(1).locator("span:not(.pv)").first().innerText()).trim();
 	await rows.nth(1).click();
 	await settle(page, 500);
 	const after = (await chip().innerText()).trim();

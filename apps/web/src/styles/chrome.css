@@ -306,10 +306,20 @@
 		line-height: 1.4;
 	}
 
-	/* A single-line row, for lists rather than described choices. */
+	/*
+	 * A single-line row, for lists rather than described choices.
+	 *
+	 * `min-height` and `flex: none`, not `height` — and both of those are a bug fix rather
+	 * than taste. A capped list that scrolls is a flex column in at least one place (the
+	 * model picker), and `height` in a flex column is a *hypothetical* size: 23 rows of 30px
+	 * inside a 440px box are shrunk to fit it. They came out at **19px**, the list never
+	 * scrolled because its content now fitted, and the rule that says how tall a row is had
+	 * been quietly overruled by the box around it.
+	 */
 	:is(.popover, .rowlist) [data-row][data-flat="true"] {
 		display: flex;
-		height: 30px;
+		min-height: 30px;
+		flex: none;
 		align-items: center;
 		gap: 7px;
 		padding: 0 8px;
