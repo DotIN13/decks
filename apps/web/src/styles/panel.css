@@ -1,0 +1,327 @@
+/*
+ * The left panel's own shapes: the list, its section lines, and a board drawn small.
+ *
+ * The split this file lives on is the one `styles/chrome.css` states: **shapes several
+ * places spell the same way live in CSS; layout lives in a class attribute next to the
+ * markup.** So the row, the thumbnail and the tile are here — a board row appears in two
+ * lists and will appear in a third — while where the panel sits, how its header stacks and
+ * what the header's gaps are are Tailwind utilities in `chrome/LeftPanel.tsx`.
+ *
+ * Nothing here re-states something `chrome.css` already says. The tabs are its `.seg`, the
+ * search field its `.field`, the section labels its `.meta`, the panel body its `.float`;
+ * inventing `.panel-tabs` beside `.seg` is how two corners of the same window stop matching.
+ *
+ * ### The rhythm, and why the numbers are what they are
+ *
+ * **One scale: 4, 8, 12.** Every vertical gap in the panel is one of those three — 8px
+ * between the tabs and the field, 12px from the header to the list, 8px between sections,
+ * 2px between rows within one, 8px above the foot. (2px is inside a group rather than
+ * between two, which is the one place the scale does not reach: rows in a section are a
+ * single object, and 4px between them made a list of five look like five lists of one.)
+ * Padding *inside* a control is not part of that scale — it is whatever centres the
+ * control's contents, which is 6px in a 28px row.
+ *
+ * What this replaced was crowded on top and sparse underneath: an 88px header of three
+ * stacked bars, and under it 32px rows carrying a 10px glyph. Both halves are fixed by the
+ * same move. The header loses its caps eyebrow — a *bar* rather than air, which is how it
+ * gets shorter while every control in it gets taller — and the eyebrow comes back as a 20px
+ * line inside the list, where it belongs, since "on the canvas · 3" is a fact about the rows
+ * under it. The row loses 4px and gains a picture.
+ *
+ * Imported from `LeftPanel.tsx` so the panel carries its own styles. Beside `chrome.css` in
+ * `index.css`'s `@import`s would be equally right, and is where this should move if a second
+ * component ever needs these classes without the panel.
+ */
+@layer components {
+	/*
+	 * The shell. 264px, pinned to the left edge, from under the top-left pill to the bottom
+	 * margin — the geometry is in the component, and only the two forms it takes are here.
+	 *
+	 * Under 1100px it is a **sheet**: hard against the edge, square on that side, and — the
+	 * part that matters — carrying no `data-inset`. A sheet covers the canvas rather than
+	 * standing beside it, and subtracting one from the camera's box fitted a 1600px board
+	 * into the leftover strip at 3.7%.
+	 */
+	.panel-shell {
+		box-sizing: border-box;
+	}
+
+	.panel-shell[data-sheet="true"] {
+		border-bottom: 0;
+		border-left: 0;
+		border-radius: 0 var(--radius-panel, 12px) 0 0;
+	}
+
+	/*
+	 * The list, and the only scroller in the panel.
+	 *
+	 * `min-height: 0` is what makes the scroll real: a flex child defaults to
+	 * `min-height: auto` and refuses to shrink below its content, so a deck of seventy-eight
+	 * would grow the panel off the bottom of the screen instead of scrolling — `overflow-y`
+	 * never engages on a box that is never smaller than what is inside it. It was two bugs
+	 * in one in `AllBoards`, where the rows past the second were clipped and unreachable.
+	 *
+	 * 2px of padding so a focus ring and the current tile's 1px halo are not clipped:
+	 * setting `overflow-y` makes `overflow-x` compute to `auto` too, so anything painted
+	 * outside a child's box goes with it.
+	 */
+	.panel-list {
+		display: flex;
+		min-height: 0;
+		flex: 1;
+		flex-direction: column;
+		padding: 2px;
+		overflow-y: auto;
+		gap: 2px;
+		overscroll-behavior: contain;
+	}
+
+	/*
+	 * The grid: the same boards as pictures, two across.
+	 *
+	 * Worth having for the seven boards an agent chose and not for the seventy-eight in the
+	 * deck, which is why it is a toggle in the foot rather than the default — at 92px of
+	 * thumbnail the old rail showed five of seventy-eight and needed fourteen screens for
+	 * the rest, and that is the whole reason a modal had to exist.
+	 */
+	.panel-list[data-density="grid"] {
+		display: grid;
+		align-content: start;
+		gap: 8px;
+		grid-template-columns: 1fr 1fr;
+	}
+
+	/*
+	 * A section is `display: contents` so its rows are children of the list itself.
+	 *
+	 * Otherwise the grid would lay out three section boxes rather than nine tiles, and the
+	 * list's gap would apply between groups instead of between rows. The cost is that the
+	 * 8px between sections has to hang off the label rather than the wrapper, which is what
+	 * the rule below does.
+	 */
+	.panel-section {
+		display: contents;
+	}
+
+	/*
+	 * The section label: a 20px line inside the list, sentence case, with its count at the
+	 * far end. Wears `.meta` for the type, which is where "never uppercase" is argued.
+	 */
+	.panel-meta {
+		display: flex;
+		flex: none;
+		align-items: center;
+		box-sizing: border-box;
+		height: 20px;
+		padding: 0 4px;
+		gap: 4px;
+	}
+
+	/* 6px, on top of the list's own 2px gap: 8px between one section and the next. */
+	.panel-section + .panel-section .panel-meta {
+		margin-top: 6px;
+	}
+
+	.panel-list[data-density="grid"] .panel-meta {
+		grid-column: 1 / -1;
+	}
+
+	/* The foot: what the list adds up to, and how it is drawn. */
+	.panel-foot {
+		display: flex;
+		flex: none;
+		align-items: center;
+		box-sizing: border-box;
+		height: 24px;
+		margin-top: 8px;
+		padding: 0 4px;
+		gap: 4px;
+		border-top: 1px solid var(--line);
+	}
+
+	/*
+	 * One board, as a line.
+	 *
+	 * A wash on hover and on the current one, rather than a border: the row is text on the
+	 * panel's own background, and a 1px box around a line of text is a border earning
+	 * nothing — the same argument `.field` makes. The current row is *also* semibold, so
+	 * which one you are looking at survives a colour scheme where the wash is 6% of nothing.
+	 */
+	.board-row {
+		display: flex;
+		flex: none;
+		align-items: center;
+		box-sizing: border-box;
+		width: 100%;
+		height: 28px;
+		padding: 0 6px;
+		gap: 8px;
+		border: 0;
+		border-radius: var(--control-radius, 8px);
+		background: transparent;
+		color: var(--fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12px;
+		text-align: left;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.board-row:hover {
+		background: var(--line);
+	}
+
+	/*
+	 * An inset ring, not an offset one. The list is a scroll container, so an outline drawn
+	 * outside the row is an outline clipped on the left and right edges.
+	 */
+	.board-row:focus-visible,
+	.board-tile:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -2px;
+	}
+
+	.board-row[data-current="true"] {
+		background: var(--line);
+		font-weight: 600;
+	}
+
+	/* Held but not shown. The old rail said this with 45% opacity on a picture, which made a
+	   list look switched off; on a text row it is simply the fainter colour. */
+	.board-row[data-dim="true"] > .nm {
+		color: var(--faint);
+	}
+
+	.board-row > .nm {
+		overflow: hidden;
+		min-width: 0;
+		flex: 1;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* On the canvas. Six pixels of accent, at the end of the row. */
+	.board-row > .dot {
+		width: 6px;
+		height: 6px;
+		flex: none;
+		border-radius: 999px;
+		background: var(--color-accent);
+	}
+
+	/*
+	 * The picture, 20×14.
+	 *
+	 * The border is doing more work than the fill: at this size a bordered rectangle already
+	 * reads as a board, which is what lets the row look right before any picture exists.
+	 * `object-position: 0 0` because a board is written top-left first — a centre crop of a
+	 * 1400×900 board is the middle of it, which is usually the least characteristic part.
+	 */
+	.board-thumb {
+		position: relative;
+		display: block;
+		overflow: hidden;
+		box-sizing: border-box;
+		width: 20px;
+		height: 14px;
+		flex: none;
+		border: 1px solid var(--line-strong);
+		border-radius: 2px;
+		background: var(--bg-deep);
+		transition: border-color 120ms ease;
+	}
+
+	.board-thumb > img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: 0 0;
+	}
+
+	/* The current board's picture takes the accent; another agent's takes that agent's
+	   identity colour, which the component sets inline and so wins over both. */
+	.board-row[data-current="true"] .board-thumb {
+		border-color: var(--color-accent);
+	}
+
+	/*
+	 * The same board as a tile. A border here rather than a wash, because this one *is* a
+	 * picture and a border is the only thing you can put round a picture without changing
+	 * what is in it.
+	 */
+	.board-tile {
+		display: flex;
+		overflow: hidden;
+		box-sizing: border-box;
+		flex-direction: column;
+		padding: 0;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--bg);
+		color: var(--fg);
+		cursor: pointer;
+		font: inherit;
+		text-align: left;
+		transition:
+			border-color 120ms ease,
+			box-shadow 120ms ease;
+	}
+
+	.board-tile:hover {
+		border-color: var(--line-strong);
+	}
+
+	.board-tile[data-current="true"] {
+		border-color: var(--color-accent);
+		box-shadow: 0 0 0 1px var(--color-accent);
+	}
+
+	.board-tile > .im {
+		position: relative;
+		display: block;
+		overflow: hidden;
+		height: 62px;
+		border-bottom: 1px solid var(--line);
+		background: var(--bg-deep);
+	}
+
+	.board-tile > .im > img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: 0 0;
+	}
+
+	.board-tile > .cap {
+		overflow: hidden;
+		padding: 4px 6px;
+		font-size: 10.5px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.board-tile[data-dim="true"] > .cap {
+		color: var(--faint);
+	}
+
+	/*
+	 * A finger is not a cursor: 28px is a comfortable row to click and a small one to tap,
+	 * so it grows where there is no hover. This is safe as a media query *only* because
+	 * nothing in the markup sets the row's height with a utility — a `@media` block inside
+	 * `@layer components` loses to a utility on the same element, which is the trap
+	 * `index.css` spells out at length.
+	 */
+	@media (pointer: coarse) {
+		.board-row {
+			height: 36px;
+		}
+
+		.panel-list {
+			gap: 4px;
+		}
+	}
+}

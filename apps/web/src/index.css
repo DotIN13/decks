@@ -1,5 +1,18 @@
 @import "tailwindcss";
+/*
+ * The app's own stylesheets, in cascade order.
+ *
+ * Here rather than as `import "./styles/panel.css"` beside the component that uses it,
+ * which is the tempting arrangement and the wrong one: both files declare rules inside
+ * `@layer components`, so which of them wins a tie is decided by source order — and a
+ * JavaScript import makes that order depend on which module the bundler reached first.
+ * Stated here it is a property of this file, which is where someone would look for it.
+ *
+ * `chrome.css` is the shared material and comes first, so an area file can override it.
+ */
 @import "./styles/chrome.css";
+@import "./styles/agents.css";
+@import "./styles/panel.css";
 
 /*
  * The app's tokens, handed to Tailwind so utilities speak the design language.

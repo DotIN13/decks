@@ -260,23 +260,28 @@
 	 * two neighbouring agents touch. Everything else — the highlight, the keyboard roving,
 	 * the `.lb` name at 12px semibold — is the popover's, because an agent list that styled
 	 * its own rows would be a second menu vocabulary.
+	 *
+	 * `[data-flat="true"]` is in the selector so the height *beats* `chrome.css`'s own 30px
+	 * rather than merely tying with it. At equal specificity the winner would be whichever
+	 * of the two files the integrator imports second, and a row height is not a thing that
+	 * should depend on the order of two `@import` lines.
 	 */
-	.popover [data-row][data-agent] {
+	.popover [data-row][data-flat="true"][data-agent] {
 		height: 34px;
 		gap: 10px;
 	}
 
-	.popover [data-row][data-agent] > .lb {
-		flex: 1;
+	.popover [data-row][data-flat="true"][data-agent] > .lb {
 		min-width: 0;
+		flex: 1;
 	}
 
 	/* Every agent, including the idle ones, at half — which is the division of labour said
 	   in one declaration: the corner is what is happening, this is what exists. The state
 	   text is already `--faint` and stays legible, because "idle · 3h" is the only content
 	   in the row that explains why the rest of it is dimmed. */
-	.popover [data-row][data-agent][data-status="idle"] > .lb,
-	.popover [data-row][data-agent][data-status="idle"] > .agent-face {
+	.popover [data-row][data-flat="true"][data-agent][data-status="idle"] > .lb,
+	.popover [data-row][data-flat="true"][data-agent][data-status="idle"] > .agent-face {
 		opacity: 0.5;
 	}
 
