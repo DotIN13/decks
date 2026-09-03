@@ -13,6 +13,9 @@
 @import "./styles/chrome.css";
 @import "./styles/agents.css";
 @import "./styles/panel.css";
+@import "./styles/inspector.css";
+@import "./styles/stream.css";
+@import "./styles/dock.css";
 
 /*
  * The app's tokens, handed to Tailwind so utilities speak the design language.
@@ -302,11 +305,12 @@ svg.lucide {
  *
  * Named rather than inferred, because the sizing is the point: a fixed square with the
  * icon gridded into the middle, instead of the `font-size` each of these used to carry
- * to talk a text glyph into looking centred. The two selectors are spelled out because
- * `.zoombar button` already sets a padding and would otherwise win.
+ * to talk a text glyph into looking centred.
+ *
+ * The new chrome spells this `.iconbtn` and states it once, in `styles/chrome.css`. What
+ * is left here are the surfaces that have not been rebuilt — the cheat sheet and the
+ * inspector's own two rows — and they should join it when they are.
  */
-.titlebar .icon-button,
-.zoombar .icon-button,
 .ops header button,
 .inspector .row.file button,
 .inspector .acts button {
@@ -350,9 +354,7 @@ svg.lucide {
 	place-items: center;
 }
 
-/* One hover for both, which is the palette's: a wash, not a border and not a jump. */
-.titlebar .icon-button:hover,
-.zoombar .icon-button:hover,
+/* One hover for all of them, which is the palette's: a wash, not a border and not a jump. */
 .ops header button:hover,
 .inspector .row.file button:hover,
 .inspector .acts button:hover,
@@ -364,23 +366,23 @@ svg.lucide {
 	color: var(--fg);
 }
 
+/*
+ * One area, full height. There is no title bar to reserve a row for.
+ *
+ * This was a two-row grid, and deleting the header without changing it put `.work` into
+ * the 40px row the bar used to hold — so the canvas was 40px tall and the dock, anchored
+ * to its bottom, hung off the top of the window. The chrome floats over the canvas now,
+ * and floating means there is nothing to lay out around.
+ *
+ * The notch is handled where it is now relevant: each floating cluster pads itself by
+ * `env(safe-area-inset-*)`, which is also what makes them right in landscape, where the
+ * inset is on the side rather than the top.
+ */
 .app {
-	display: grid;
+	position: relative;
 	height: 100%;
-	/* The title bar grows into the notch rather than hiding under it; on everything
-	   without one the inset is 0 and this is the 40px it always was. */
-	grid-template-rows: calc(40px + env(safe-area-inset-top)) 1fr;
 }
 
-.titlebar {
-	display: flex;
-	gap: 12px;
-	align-items: center;
-	padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
-	border-bottom: 1px solid var(--line);
-	background: var(--bg);
-	-webkit-app-region: drag;
-}
 
 /*
  * The runtime's mark, leading the row.
@@ -412,30 +414,10 @@ svg.lucide {
 }
 
 
-.titlebar .brand {
-	display: flex;
-	align-items: center;
-	color: var(--fg);
-	gap: 8px;
-}
 
-.titlebar .brand[data-off="true"] {
-	color: var(--color-danger);
-}
 
-.titlebar .brand svg {
-	display: block;
-	flex: none;
-}
 
-.titlebar .wordmark {
-	font-weight: 600;
-	letter-spacing: -0.01em;
-}
 
-.titlebar .spacer {
-	flex: 1;
-}
 
 .dot {
 	width: 8px;
@@ -448,8 +430,18 @@ svg.lucide {
 	background: var(--color-danger);
 }
 
+/*
+ * The canvas and everything floating over it, filling the window.
+ *
+ * `inset: 0` and not `height: 100%`, because every child of this is absolutely positioned
+ * — the stage, all the floats, the dock — so as a block in normal flow it measured *zero*
+ * high. Under the old two-row grid it was a grid item and got its height from `1fr`, which
+ * hid the problem; deleting the title bar exposed it, and the symptom was the dock hanging
+ * off the top of the window with the canvas invisible behind it.
+ */
 .work {
-	position: relative;
+	position: absolute;
+	inset: 0;
 	overflow: hidden;
 }
 
@@ -750,48 +742,6 @@ svg.lucide {
 	font-family: var(--font-mono);
 	font-size: 10px;
 }
-
-.zoombar {
-	right: 26px;
-	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
-	display: flex;
-	align-items: center;
-	padding: 4px;
-	gap: 2px;
-}
-
-.zoombar button,
-.titlebar button {
-	padding: 4px 8px;
-	border: 0;
-	border-radius: var(--control-radius);
-	background: transparent;
-	color: var(--fg);
-	cursor: pointer;
-	font: inherit;
-}
-
-.zoombar button:hover,
-.titlebar button:hover {
-	background: var(--line);
-}
-
-.titlebar .icon-button {
-	/* The bar is a drag handle in a desktop shell, which would otherwise swallow the
-	   click before the button sees it. */
-	-webkit-app-region: no-drag;
-}
-
-.zoombar .level {
-	min-width: 52px;
-	color: var(--muted);
-	font-family: var(--font-mono);
-	font-size: 11px;
-	text-align: center;
-}
-
-
-
 
 /*
  * A user message and the way back to it.
@@ -1549,9 +1499,6 @@ svg.lucide {
 	 * as long as you are reading. It is one tap on the × to get them back.
 	 */
 	.work:has(.chat-float[data-open="true"]) .palette,
-	.work:has(.chat-float[data-open="true"]) .zoombar {
-		display: none;
-	}
 }
 
 
@@ -2274,10 +2221,9 @@ svg.lucide {
 /*
  * Two controls exist only for a pointer that cannot hover: the panel toggles in the
  * title bar and the palette's undo. Spelled out per selector rather than as a bare
- * `.touch-only`, because `.titlebar .icon-button` and `.palette button` both set
+ * `.touch-only`, because `.palette button` sets
  * `display` themselves and would win against one class.
  */
-.titlebar .icon-button.touch-only,
 .palette button.touch-only {
 	display: none;
 }
@@ -2289,13 +2235,8 @@ svg.lucide {
  * pointer — it has no edge to be summoned from since the transcript sheet went — and a
  * toggle that never looks pressed is a toggle you have to click twice to understand.
  */
-.titlebar .icon-button[data-open="true"] {
-	background: var(--line);
-	color: var(--fg);
-}
 
 @media (hover: none) {
-	.titlebar .icon-button.touch-only,
 	.palette button.touch-only {
 		display: grid;
 	}
@@ -2337,19 +2278,8 @@ svg.lucide {
 		height: 44px;
 	}
 
-	.zoombar {
-		padding: 3px;
-	}
 
-	.zoombar button {
-		min-width: 44px;
-		min-height: 44px;
-		padding: 4px 12px;
-	}
 
-	.zoombar .level {
-		min-width: 46px;
-	}
 
 	.composer .send {
 		width: 44px;
@@ -2419,10 +2349,6 @@ svg.lucide {
 	 * conversation, so this is the one place the two are allowed to stack: side by side
 	 * there is no longer the width for both.
 	 */
-	.zoombar {
-		right: max(12px, env(safe-area-inset-right));
-		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
-	}
 }
 
 @media (max-width: 760px) {
@@ -2536,8 +2462,5 @@ svg.lucide {
 		overflow-y: auto;
 	}
 
-	.work:has(.inspector) .zoombar {
-		display: none;
-	}
 }
 }

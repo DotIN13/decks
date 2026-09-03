@@ -1,4 +1,4 @@
-import { BOX_CLASSES, type BoardPatch, type BoxClass } from "@decks/protocol";
+import { BOX_CLASSES, type BoardPatch, type BoxClass, type Rect } from "@decks/protocol";
 
 /**
  * What the selected component *is*, and what an inspector edit does to it.
@@ -50,6 +50,22 @@ export interface Shape {
 }
 
 export type Edit =
+	/**
+	 * Where the component is and how big it is — the inspector's four fields.
+	 *
+	 * The one edit here a *gesture* could already make: this is byte-for-byte the patch a
+	 * drag or a resize sends (`Editor.ts`), because it is the same fact about the same
+	 * component and a second way of saying it would be a second way of getting it wrong.
+	 * `Partial<Rect>` rather than the whole of it, so a field writes only its own
+	 * declaration and the server keeps the rest of the `style` attribute as its author
+	 * wrote it.
+	 *
+	 * Numbers only, which is why there is no way *back* to `height: auto`: `restyle` on the
+	 * server replaces declarations and appends new ones, and removing one is not something
+	 * `BoardPatch` can express. Typing a number over `auto` works; going back is the
+	 * agent's job, and the panel says so by offering no control for it.
+	 */
+	| { kind: "geometry"; to: Partial<Rect> }
 	| { kind: "box"; to: BoxClass }
 	| { kind: "attr"; name: string; value: string | null }
 	| { kind: "rename"; to: string }
@@ -138,6 +154,8 @@ export function readShape(path: string, id: string): Shape | undefined {
 /** The patch an edit becomes. Declarative, and the same shape a gesture sends (§6.5). */
 export function patchesFor(shape: Shape, edit: Edit): BoardPatch[] {
 	switch (edit.kind) {
+		case "geometry":
+			return [{ op: "update", id: shape.id, style: edit.to }];
 		case "box":
 			return [{ op: "update", id: shape.id, class: swapBox(shape.classes, edit.to) }];
 		case "attr":
@@ -174,6 +192,17 @@ export function applyLive(shape: Shape, edit: Edit): boolean {
 	const board = (frame.win as Window & { __board?: { mount?: (host: Element) => void } }).__board;
 
 	switch (edit.kind) {
+		case "geometry":
+			/*
+			 * Written as inline styles one declaration at a time, exactly as a drag writes
+			 * them — which is also what makes the field self-correcting: the inspector reads
+			 * its numbers back off this element, so the value shown is always the value the
+			 * document has rather than a copy the panel is keeping.
+			 */
+			for (const [name, value] of Object.entries(edit.to)) {
+				if (typeof value === "number" && Number.isFinite(value)) element.style.setProperty(name, `${value}px`);
+			}
+			return true;
 		case "box":
 			// `setAttribute` and not `className`, which on an SVG element is not a string.
 			element.setAttribute("class", swapBox(shape.classes, edit.to));

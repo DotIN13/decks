@@ -1,0 +1,127 @@
+/*
+ * The shapes the inspector spells more than once.
+ *
+ * Almost everything the panel needs was already shared vocabulary by the time this file
+ * existed: `.field` and `.seg` and `.label` are in `styles/chrome.css`, `.float` is the
+ * corner it floats in, and the shell's own geometry — which is stated twice, once top right
+ * and once as a bottom sheet — is in `index.css` where `env()` and `--dock` can be said
+ * properly. What is left here is the handful of rules that are *this* panel's and are used
+ * by more than one element in it, which is the line the user drew: shared and repeated goes
+ * in a stylesheet, one-off and all layout goes in a class attribute next to the markup.
+ *
+ * Imported from `Inspector.tsx` rather than from `index.css`, because the panel is the only
+ * thing that wants any of it and a stylesheet nobody can point at is a stylesheet that
+ * outlives its component.
+ */
+
+/*
+ * The layer order, restated — and it is load-bearing rather than tidy.
+ *
+ * CSS fixes a layer's position at its **first** appearance, and `index.tsx` imports `App`
+ * before it imports `index.css`, so this file's stylesheet is injected before Tailwind's.
+ * Without this line `components` would be the first layer named and Tailwind's own
+ * `@layer theme, base, components, utilities` would append the other three *after* it: the
+ * whole app's component layer would lose to preflight, and `.tone`'s border would be
+ * stripped by the same reset that takes `list-style` off a list. Naming the order first
+ * costs nothing when it agrees with Tailwind's, which it must.
+ */
+@layer theme, base, components, utilities;
+
+@layer components {
+	/*
+	 * A tone is a colour, so the control is the colour.
+	 *
+	 * Five of these in a row and only the hue differs, which is exactly the case a class
+	 * earns: it was five copies of a fourteen-utility string, one per swatch, and the
+	 * `data-[tone=…]` variants meant the colours were named in the markup where nothing
+	 * else about the palette is.
+	 *
+	 * "Default" is the *absence* of `data-tone` — a callout with no tone draws in the
+	 * accent — and the swatch says what the board will draw rather than what the control is
+	 * called. Only a callout has tones at all, which is why there is one default colour
+	 * here and not a rule per family.
+	 */
+	.tone {
+		box-sizing: border-box;
+		width: 15px;
+		height: 15px;
+		padding: 0;
+		border: 1px solid var(--line-strong);
+		border-radius: 999px;
+		cursor: pointer;
+	}
+
+	.tone[data-tone="default"] {
+		background: var(--color-accent);
+	}
+
+	.tone[data-tone="ok"] {
+		background: var(--color-ok);
+	}
+
+	.tone[data-tone="warn"] {
+		background: var(--color-warn);
+	}
+
+	.tone[data-tone="danger"] {
+		background: var(--color-danger);
+	}
+
+	/* A ring in the panel's own colour, then the foreground: two rings so the chosen swatch
+	   reads against a wash of any hue, including one close to the panel itself. */
+	.tone[data-active="true"] {
+		box-shadow:
+			0 0 0 2px var(--panel),
+			0 0 0 3px var(--fg);
+	}
+
+	.tone:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	/*
+	 * A 15px disc is a colour, not a target.
+	 *
+	 * A `@media` block in this layer would normally be the trap `index.css` warns about — it
+	 * loses to a utility on the same element — but it is safe *here* precisely because no
+	 * utility in `Inspector.tsx` sets a minimum size on a swatch. The alternative, five
+	 * `pointer-coarse:min-h-[38px]` copies in the markup, is the duplication this file
+	 * exists to remove.
+	 */
+	@media (pointer: coarse) {
+		.tone {
+			min-width: 38px;
+			min-height: 38px;
+			border-radius: 8px;
+		}
+	}
+
+	/*
+	 * The label of a scrubbable field, while it is being pulled.
+	 *
+	 * `chrome.css` gives the handle its `ew-resize` cursor and its `user-select: none` at
+	 * rest, which is the affordance; this is the feedback. Four of them sit 4px apart in one
+	 * 24px row, and once the pointer has left the panel — which it does immediately, because
+	 * the gesture is horizontal and the panel is 320px wide — the accent is the only thing
+	 * saying *which* number is moving. `data-scrubbing` is set by `scrub.ts` on the element
+	 * it captured the pointer with, so it cannot disagree with the drag.
+	 */
+	.field > .k[data-scrubbing="true"] {
+		color: var(--color-accent);
+	}
+
+	/*
+	 * A field whose value is not a number: `height` on a box that sizes from its own
+	 * content, which is most of them.
+	 *
+	 * Dimmer than a number and in the panel's proportional face rather than its tabular one,
+	 * because `auto` is not a quantity and lining it up in the numeric column would be a
+	 * claim that it is. Typing over it works and is the whole point — the word is a
+	 * placeholder for a number nobody has needed yet, not a mode.
+	 */
+	.field > input[data-auto="true"] {
+		color: var(--faint);
+		font-variant-numeric: normal;
+	}
+}

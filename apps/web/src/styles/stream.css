@@ -1,0 +1,610 @@
+/*
+ * The conversation, floating: the shapes the column and its cards spell the same way.
+ *
+ * What is here rather than in a `class=` attribute, by the same split the rest of the app
+ * uses (see `chrome.css`, and the long note in `index.css`): the geometry that has to read
+ * `--dock`, `--keyboard` and `env()`; the shapes repeated by three or more elements; the
+ * hover-reveal rules that need a parent selector; and the paragraphs of reasoning a class
+ * attribute is a bad home for. Layout — where a thing sits inside its own card, how its
+ * children space out, and everything responsive — is a utility in the markup.
+ *
+ * Inside `@layer components`, like every stylesheet in this app, so a utility on the same
+ * element still wins. **The corollary is load-bearing here:** a `@media` block in this file
+ * loses to a utility, so the full-width-sheet behaviour under 1100px is a `max-[1100px]:`
+ * variant in `Stream.tsx` and not a media query down here. The two media blocks that *are*
+ * here — coarse pointers and reduced motion — set properties no utility touches.
+ */
+@layer components {
+	/*
+	 * A column of cards over the boards, and not a panel.
+	 *
+	 * No background, no border, no pointer events. The cards below take their own, so the
+	 * 10px gaps between turns are still canvas: you can drag a board through one. The trade
+	 * that buys — the wheel over a *gap* scrolls the canvas rather than the history — is the
+	 * one the boards asked for, and the cards are most of the column's area anyway.
+	 *
+	 * `justify-content: flex-end` on the column rather than on the scroller inside it: a
+	 * flex container that both scrolls and justifies to the end clips its own overflow at the
+	 * top in every browser that has shipped. Anchoring the column instead leaves the scroller
+	 * content-sized until there is more than fits, which is also what makes one reply a
+	 * single card above the input bar rather than one card stranded at the top of a
+	 * full-height frame.
+	 *
+	 * The geometry: 320px of card at `right: 12`, from `top: 64` — under the corner cluster —
+	 * down to 12px above the status row. The top and the right are offset by the gutter below,
+	 * because the box is bigger than the cards by exactly that much on those two edges; the
+	 * bottom is not, because what the 12px is measured from there is the *dock's* top edge
+	 * rather than the window, and the gutter is the gap.
+	 */
+	.stream {
+		/*
+		 * The gutter the cards' shadows live in, counted into the column's own box.
+		 *
+		 * A scroll container clips: `overflow-y: auto` forces `overflow-x` to compute to
+		 * `auto` too, so every card's shadow was sliced off in a straight vertical line down
+		 * both edges — which is what makes a column of floating cards read as a box with a
+		 * cut-out. The scroller carries this much padding instead, and the column is wider and
+		 * closer to the edge by the same amount, so the cards land where the board drew them.
+		 */
+		--gutter: 12px;
+		position: absolute;
+		z-index: 9;
+		top: calc(64px - var(--gutter));
+		right: calc(12px - var(--gutter));
+		bottom: calc(var(--dock, 88px) + 12px + var(--keyboard) + env(safe-area-inset-bottom));
+		display: flex;
+		box-sizing: border-box;
+		width: calc(320px + 2 * var(--gutter));
+		max-width: 100vw;
+		flex-direction: column;
+		justify-content: flex-end;
+		opacity: 0;
+		pointer-events: none;
+		/* Opacity and an 8px slide, on the cards rather than on a panel — there is no panel
+		   to slide. The column has no paint of its own, so moving it *is* moving them. */
+		translate: 0 8px;
+		/* `transform` is in here for the swipe: `swipe-close` drags with it and clears it on
+		   release, and without a transition the column snapped back rather than settling. */
+		transition:
+			opacity 160ms ease,
+			translate 160ms ease,
+			transform 160ms ease;
+	}
+
+	/*
+	 * `none`, not `0 0`, and this one is a trap worth naming.
+	 *
+	 * Any `translate` other than `none` makes the column a containing block for
+	 * `position: fixed` descendants — which the time machine's popover is. With `0 0` here the
+	 * menu was positioned against the column instead of the window, and then clipped by the
+	 * scroller's own overflow. `none` interpolates as zero, so the slide still animates.
+	 */
+	.stream[data-shown="true"] {
+		opacity: 1;
+		translate: none;
+	}
+
+	/* Away, it is not there at all: an invisible surface that ate the wheel would be a canvas
+	   that had stopped working for no visible reason. */
+	.stream:not([data-shown="true"]) {
+		visibility: hidden;
+	}
+
+	/* The × rides the top of the stack, since a column of cards has no title bar to put one
+	   in. Hidden until the pointer is in the column — it is the third way to dismiss this
+	   after the corner button and Escape, not the first — and always there for a keyboard,
+	   which is what `focus-within` is doing. */
+	.stream-head {
+		display: flex;
+		flex: none;
+		justify-content: flex-end;
+		padding: 0 var(--gutter);
+		opacity: 0;
+		transition: opacity 120ms ease;
+	}
+
+	.stream:hover .stream-head,
+	.stream:focus-within .stream-head {
+		opacity: 1;
+	}
+
+	.stream-roll {
+		position: relative;
+		display: flex;
+		/* Content-sized until there is more than fits, which is what the column above needs. */
+		flex: 0 1 auto;
+		flex-direction: column;
+		/* The only gap in the column, and it is a click-through target for a pointer. */
+		gap: 10px;
+		padding: var(--gutter);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		/*
+		 * No scrollbar. The column is a stack of objects over a canvas rather than a pane, and
+		 * a track drawn down the inside of it would be the one straight edge in a surface whose
+		 * whole argument is that it does not have one. The jump pill is the affordance that
+		 * replaces it, and it says something a scrollbar cannot: how many turns you are behind.
+		 */
+		scrollbar-width: none;
+	}
+
+	.stream-roll::-webkit-scrollbar {
+		display: none;
+	}
+
+	/*
+	 * The column overflows by design — that is what scrolling is for — and a flex column
+	 * shrinks its children to try to avoid it. Text-bearing cards resist through their
+	 * min-content height; a tool row has `overflow: hidden` and nothing of its own to push
+	 * back with, so every one of them was squeezed to a line the moment the column filled up.
+	 */
+	.stream-roll > * {
+		flex: 0 0 auto;
+	}
+
+	/*
+	 * Only the painted things take the pointer.
+	 *
+	 * Named one by one rather than as `.stream-roll > *`, because your own turn is a
+	 * full-width *row* with a narrow bubble in it: making the row a target would put an
+	 * invisible 320px-wide plate over the canvas beside every message you have sent.
+	 */
+	.stream-card,
+	.stream-bubble,
+	.stream-rw {
+		pointer-events: auto;
+	}
+
+	/* And the menu the time machine opens, which is rendered inside the column beside its
+	   trigger: `pointer-events` inherits, so without this the popover was drawn and could not
+	   be clicked. */
+	.stream .popover {
+		pointer-events: auto;
+	}
+
+	/*
+	 * A card: opaque, a hairline, one soft shadow, and the same 12px corner every other float
+	 * in the app has. A bubble rounder than the panels reads as a different program.
+	 *
+	 * **Opaque, and no ladder with age.** `index.css` refuses frosted glass in writing — 40%
+	 * words behind 100% words reads as grime, and it moves when the camera does — and a
+	 * floating transcript is the exact case that argument was about. The `canvas-chat` version
+	 * this idea comes from also steps older turns back in opacity so the board shows through;
+	 * that is the same grime by a gentler name, and it buys nothing, because the newest card
+	 * is at the foot of the column where the eye already is.
+	 */
+	.stream-card {
+		box-sizing: border-box;
+		padding: 9px 11px;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-panel, 12px);
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		color: var(--fg);
+		/* The one surface in the chrome read in paragraphs rather than glanced at. */
+		font-size: 12px;
+		line-height: 1.5;
+		word-break: break-word;
+	}
+
+	/*
+	 * Your own turn: narrower, right-aligned, tinted.
+	 *
+	 * The asymmetry used to be *box or no box* — the agent's replies were flat markdown
+	 * because the panel behind them was the box. Floating, there is nothing behind them, so it
+	 * moves to **width and tint**: yours takes 88% of the column and the accent wash, the
+	 * agent's takes all 320 in the panel's colour.
+	 */
+	.stream-mine {
+		--mine: var(--color-accent-soft);
+		--mine-fg: var(--color-grey-1100);
+		display: flex;
+		align-items: flex-start;
+		justify-content: flex-end;
+		gap: 6px;
+	}
+
+	/* The soft accent is a *light* tint; on the dark scheme it is a bright plate with light
+	   text on it. The dark value is the one the board drew rather than a mix of the light one,
+	   which came out either invisible or violet. */
+	[data-color-scheme="dark"] .stream-mine {
+		--mine: #2b3a63;
+		--mine-fg: var(--color-grey-100);
+	}
+
+	.stream-bubble {
+		box-sizing: border-box;
+		max-width: 88%;
+		padding: 8px 11px;
+		/* A tint alone loses its edge over a light board, so the border is not decoration:
+		   it is what keeps the bubble a bubble when the thing behind it is white. */
+		border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+		border-radius: var(--radius-panel, 12px);
+		background: var(--mine);
+		box-shadow: var(--shadow);
+		color: var(--mine-fg);
+		font-size: 12px;
+		line-height: 1.5;
+		/* Verbatim, so the line breaks you typed are the line breaks the agent was sent. */
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	/*
+	 * The time machine, at the bubble's top-left and outside the tint.
+	 *
+	 * Hidden by opacity rather than by absence, which is the accessible half of the trick: it
+	 * stays in the tab order, so a keyboard reaches it by tabbing rather than by knowing it is
+	 * there. Shown while its own menu is open, because a control that vanishes under the popup
+	 * it opened leaves the popup belonging to nothing.
+	 */
+	.stream-rw {
+		display: grid;
+		width: 22px;
+		height: 22px;
+		flex: none;
+		margin-top: 4px;
+		padding: 0;
+		border: 1px solid var(--line);
+		border-radius: 7px;
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+		color: var(--muted);
+		cursor: pointer;
+		opacity: 0;
+		place-items: center;
+		transition:
+			opacity 120ms ease,
+			color 120ms ease;
+	}
+
+	.stream-mine:hover .stream-rw,
+	.stream-mine:focus-within .stream-rw,
+	.stream-rw[data-open="true"] {
+		opacity: 1;
+	}
+
+	.stream-rw:hover {
+		color: var(--fg);
+	}
+
+	.stream-rw:focus-visible {
+		opacity: 1;
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* No hovering on a touchscreen, and this is the only route to the time machine — so it is
+	   simply there. After the rules above, so it wins. */
+	@media (pointer: coarse) {
+		.stream-rw {
+			opacity: 1;
+		}
+	}
+
+	/* --- what the agent did, inside its card ---------------------------------- */
+
+	.stream-tools {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+
+	/*
+	 * The header over a run of finished calls: a chevron, the count in semibold, then the
+	 * distinct names in mono and faint.
+	 *
+	 * A wash rather than a border, because it sits *inside* a card that already has one — a
+	 * bordered row in a bordered box is the box-in-a-box this column is trying not to be. The
+	 * count is the part in weight: it is the number you are deciding whether to open.
+	 */
+	.stream-tool-head {
+		display: flex;
+		width: 100%;
+		height: 24px;
+		align-items: center;
+		padding: 0 7px;
+		gap: 7px;
+		border: 0;
+		border-radius: 6px;
+		background: var(--line);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: 11px;
+		text-align: left;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.stream-tool-head:hover {
+		background: var(--line-strong);
+		color: var(--fg);
+	}
+
+	.stream-tool-head:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	.stream-tool-head .n {
+		flex: none;
+		font-weight: 600;
+	}
+
+	.stream-tool-head .names {
+		overflow: hidden;
+		flex: 1;
+		color: var(--faint);
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* Turned, not swapped for a second icon — the convention `.tool` set. */
+	.stream-tool-head .twist {
+		flex: none;
+		color: var(--faint);
+		transition: transform 120ms ease;
+	}
+
+	.stream-tool-head[aria-expanded="true"] .twist {
+		transform: rotate(90deg);
+	}
+
+	/* Opened, the calls are indented behind a hairline: they belong *to* the header, and an
+	   indent says so without giving each row a box of its own. */
+	.stream-tool-kids {
+		display: flex;
+		margin: 5px 0 0 10px;
+		padding-left: 8px;
+		flex-direction: column;
+		gap: 4px;
+		border-left: 1px solid var(--line);
+	}
+
+	/* A tool row inside a card is a wash, not a second float. The chips carry `--bg` and a
+	   hairline of their own from `index.css`; what they must not carry in here is a shadow,
+	   because two lifted objects on the same rung read as one. */
+	.stream-tool-kids .tool,
+	.stream-tools > .tool {
+		background: var(--bg);
+		box-shadow: none;
+	}
+
+	/* Thinking: a disclosure, and quiet. Not addressed to the reader, and a card that showed
+	   it in full would be a card where the reply is the small part. */
+	.stream-thinking {
+		color: var(--faint);
+		font-size: 11.5px;
+	}
+
+	.stream-thinking > button {
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+		font: inherit;
+		text-decoration: underline dotted;
+	}
+
+	.stream-thinking > button:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.stream-thinking > .body {
+		margin-top: 4px;
+		padding-left: 8px;
+		border-left: 2px solid var(--line);
+		white-space: pre-wrap;
+	}
+
+	/* A fenced block inside a card: a step deeper than the card it sits in, and never wider
+	   than it — a reply that pasted a 200-column log must not stretch the column. */
+	.stream-card .md pre {
+		overflow-x: auto;
+		margin: 0;
+		padding: 8px 10px;
+		border-radius: 6px;
+		background: var(--bg-deep);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		white-space: pre;
+	}
+
+	/* The caret that says a reply is still arriving. Its own keyframes rather than the
+	   conversation's old ones, so this stylesheet stands on its own. */
+	@keyframes stream-blink {
+		to {
+			visibility: hidden;
+		}
+	}
+
+	.stream-card .caret {
+		display: inline-block;
+		width: 6px;
+		height: 12px;
+		margin-left: 2px;
+		background: currentColor;
+		opacity: 0.5;
+		translate: 0 2px;
+		animation: stream-blink 1s steps(2, start) infinite;
+	}
+
+	/* A notice is a card too — a failure to launch is exactly the thing worth being able to
+	   scroll back to — but it is the quietest one. */
+	.stream-notice {
+		color: var(--muted);
+	}
+
+	.stream-notice[data-level="warn"] {
+		color: color-mix(in srgb, var(--color-warn) 70%, var(--fg));
+	}
+
+	.stream-notice[data-level="error"] {
+		color: var(--color-danger);
+	}
+
+	/*
+	 * The day boundary, in sentence case.
+	 *
+	 * This is what replaces the uppercase eyebrow the chat list used ("EARLIER", 10px, tracked
+	 * to 0.08em): ten-pixel caps are wide enough that the eye reads letters rather than words,
+	 * and some screen readers announce a long uppercase run letter by letter.
+	 *
+	 * A chip rather than a label with a rule running off it, which is what that eyebrow was: a
+	 * bare hairline over the canvas lands on top of whatever board is behind the column and
+	 * reads as that board's own rule. Everything else in here is opaque; so is this.
+	 */
+	.stream-day {
+		align-self: center;
+		padding: 2px 9px;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+		color: var(--muted);
+		font-size: 11px;
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+	}
+
+	/*
+	 * The way back to the foot, once you have read away from it.
+	 *
+	 * Overlaid on the bottom of the column rather than given a row of its own: a pill that
+	 * appeared *between* the last card and the status line would shorten the scroller at the
+	 * moment you scrolled, which moves the thing you are reading. It sits in the gutter, which
+	 * is empty by construction.
+	 */
+	.stream-jump {
+		position: absolute;
+		bottom: var(--gutter);
+		left: 50%;
+		display: flex;
+		height: 26px;
+		align-items: center;
+		padding: 0 11px;
+		gap: 5px;
+		border: 1px solid var(--line);
+		border-radius: 13px;
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: 11px;
+		pointer-events: auto;
+		translate: -50% 0;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.stream-jump:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.stream-jump:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* --- the status line, over the input bar ---------------------------------- */
+
+	/*
+	 * Painted like a row of the history — the same hairline, the same shadow, a 14px corner —
+	 * because that is what it stands in for while the history is away. And it is a button: the
+	 * one thing to do about "it is working" is go and watch.
+	 */
+	.statusline {
+		display: flex;
+		height: 28px;
+		align-items: center;
+		padding: 0 11px 0 9px;
+		gap: 7px;
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		background: var(--panel);
+		box-shadow: var(--shadow);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12px;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.statusline:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.statusline:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	.statusline .mark {
+		flex: none;
+		color: var(--mark, currentColor);
+	}
+
+	/* Claude's mark in Claude's own orange — the one place in the app where a drawing is not
+	   simply the colour of the text beside it, because a thing in motion may as well say whose
+	   motion it is. An identity colour, when there is one, still wins. */
+	.statusline .mark[data-agent="claude"] {
+		color: var(--mark, #d97757);
+	}
+
+	/*
+	 * Breathing, not spinning, and not looping back to the start.
+	 *
+	 * Picone's asterisk grows through six glyphs and shrinks back rather than snapping to the
+	 * dot, because the snap read as a fault where the breath reads as motion. Same curve here,
+	 * same 1.8s, on one element: this mark is a single drawing, so scale and opacity say it
+	 * without ten stacked frames. Nothing re-renders either way — a turn that runs four
+	 * minutes costs what one that runs four seconds costs.
+	 */
+	@keyframes stream-breathe {
+		0%,
+		100% {
+			opacity: 0.5;
+			scale: 0.8;
+		}
+
+		50% {
+			opacity: 1;
+			scale: 1.1;
+		}
+	}
+
+	.statusline[data-working="true"] .mark {
+		animation: stream-breathe 1.8s ease-in-out infinite;
+	}
+
+	/*
+	 * Motion off, and the mark still *visible* — which is the trap picone hit: `animation:
+	 * none` on an element whose first keyframe is `opacity: 0.5` leaves a half-there icon, and
+	 * on one that starts at 0 leaves nothing at all. So the resting values are stated here
+	 * too. The column's slide goes; its fade stays, because a fade is not travel.
+	 */
+	@media (prefers-reduced-motion: reduce) {
+		.statusline[data-working="true"] .mark {
+			animation: none;
+			opacity: 1;
+			scale: 1;
+		}
+
+		.stream {
+			translate: none;
+		}
+	}
+}

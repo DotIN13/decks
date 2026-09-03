@@ -30,17 +30,35 @@
  * and the send button's own square. Anything responsive about a utility-styled element is a
  * variant in the markup instead, which is why the hint row's ranks read as
  * `max-[620px]:hidden` over there rather than as a media query here.
+ *
+ * ### One thing this file cannot fix, and where it has to be fixed
+ *
+ * All three popovers in the bar are `position: fixed` cards placed in viewport coordinates
+ * by `ui/Popover.tsx`. `.dock` in `index.css` centres itself with
+ * `left: 50%; transform: translateX(-50%)`, and **any transform other than `none` makes an
+ * element the containing block for its fixed descendants** — so above 1100px, where that
+ * transform is live, the cards resolve their `left`/`top` against the dock instead of the
+ * window and land the dock's own offset away from their triggers. Nothing inside the dock
+ * can undo an ancestor's transform, which is why this is a note rather than a rule.
+ *
+ * The fix is one line in `.dock`, and it is a drop-in: centre by auto margins —
+ * `left: 0; right: 0; margin-inline: auto` with the width it already has — and drop
+ * `left: 50%` and the transform. The width computes against the same containing block
+ * either way, so nothing moves; the dock simply stops being a coordinate system.
  */
 @layer components {
 	/*
-	 * The box you type into: a `.float` with a wider corner and one more state.
+	 * The box you type into: a `.float` with one more state.
 	 *
-	 * 14px rather than `.float`'s 12 — `--row-radius`, the same corner the conversation's
-	 * bubbles take, because this is the row the *next* bubble is being written in and the
-	 * two should read as one column.
+	 * Its corner is 14px rather than `.float`'s 12 — the same `rounded-row` the
+	 * conversation's bubbles take, because this is the row the *next* bubble is being
+	 * written in and the two should read as one column. Stated as a utility in the markup
+	 * and not here, so it cannot depend on whether this file is imported before or after
+	 * `chrome.css`: two rules of equal specificity in one layer are decided by source
+	 * order, and a 12px corner arriving because of an import order is the kind of bug
+	 * nobody thinks to look for.
 	 */
 	.dockbox {
-		border-radius: var(--row-radius);
 		transition:
 			border-color 120ms ease,
 			box-shadow 120ms ease;

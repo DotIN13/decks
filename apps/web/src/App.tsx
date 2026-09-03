@@ -26,7 +26,6 @@ import Plus from "lucide-solid/icons/plus";
 import Sun from "lucide-solid/icons/sun";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { BoardRail } from "./canvas/BoardRail.tsx";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
 import { AllBoards } from "./canvas/AllBoards.tsx";
@@ -36,19 +35,19 @@ import { DecksMark, Icon } from "./icons.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
 import { Inspector } from "./canvas/Inspector.tsx";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
-import { Palette } from "./canvas/Palette.tsx";
 import { coalesce, needsReload } from "./canvas/patches.ts";
 import { Stage } from "./canvas/Stage.tsx";
 import { runStageCall } from "./canvas/stage-ops.ts";
-import { ChatList } from "./chat/ChatList.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
-import { FloatingTranscript } from "./chat/FloatingTranscript.tsx";
-import { Composer } from "./chat/Composer.tsx";
 import { TurnBar, turnsOf, type Turn } from "./chat/TurnBar.tsx";
+import { Composer } from "./chat/composer/Composer.tsx";
+import { StatusLine } from "./chat/StatusLine.tsx";
+import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
 import { boxOf, fitInto, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
+import { setInspectable } from "./lib/edge.ts";
 import { canvasBox, watchInsets } from "./lib/insets.ts";
 import { connect, type Socket } from "./lib/socket.ts";
 import { embedPath, uploadAsset } from "./lib/upload.ts";
@@ -730,6 +729,22 @@ export function App() {
 	 * the component under the selection can become something else.
 	 */
 	const [shape, setShape] = createSignal<Shape | undefined>(undefined);
+
+	/*
+	 * Tell the right edge whether the inspector has anything to describe.
+	 *
+	 * Here rather than in the inspector, because "describable" is all three of these at
+	 * once: a component is selected, the camera is close enough for a board to take pointer
+	 * events at all, and no past revision is being previewed. The panel knows the first;
+	 * only this component knows all three.
+	 *
+	 * And it is an effect rather than a call inside `setComponent`, because the zoom and the
+	 * preview can turn it off without the selection changing — the edge would otherwise keep
+	 * showing an inspector for something that had stopped being selectable.
+	 */
+	createEffect(() => {
+		setInspectable(shape() !== undefined && camera().zoom >= INTERACT_ZOOM && !state.preview);
+	});
 	createEffect(() => {
 		const selection = component();
 		if (!selection) {
@@ -1308,11 +1323,21 @@ export function App() {
 				 * `FloatingTranscript` — so everything that could only be done in it, the time
 				 * machine included, is addressed to a bubble now.
 				 */}
-				<FloatingTranscript
+				{/*
+				 * The conversation: opaque cards over the boards, full height on the right.
+				 *
+				 * Not a panel and deliberately not an inset — the gaps between cards pass
+				 * clicks through to whatever board is underneath, and a board is allowed to sit
+				 * below it. The rule: a surface that arrives on its own must be subtracted, and
+				 * one you summoned may overlap. Which is also why the inspector *is* an inset.
+				 *
+				 * Whether it is up is `lib/edge.ts`'s business, not this component's, because
+				 * the same edge is wanted by the inspector and only one of them may have it.
+				 */}
+				<Stream
 					items={transcript()}
-					open={chatFloat()}
-					onOpenChange={openChat}
-					scrollTo={atTurn()}
+					{...(atTurn() ? { scrollTo: atTurn()! } : {})}
+					previewing={state.preview?.entryId ?? null}
 					onPreview={(entryId) => {
 						if (!state.focused) return;
 						if (!entryId) {
@@ -1339,11 +1364,15 @@ export function App() {
 				/>
 
 				{/*
-				 * The dock: what the agent last said, a question if one is waiting, and the
-				 * input bar. One bottom-centred stack, because these three are the same
-				 * conversation and they should not be in three different places — and a stack
-				 * rather than three offsets so that a question appearing pushes the reply up
-				 * instead of landing on it.
+				 * The dock: a question if one is waiting, the status row, and the input bar.
+				 *
+				 * One bottom-centred stack, because these are the same conversation and should
+				 * not be in three different places — and a stack rather than three offsets so
+				 * that a question appearing pushes the rest up instead of landing on it.
+				 *
+				 * The status row keeps its height whether or not it has anything to say, which
+				 * is the whole reason it is a row and not a chip that comes and goes: the box
+				 * you type into must not move between turns.
 				 */}
 				<div class="dock">
 					<Show when={state.dialog}>
@@ -1361,36 +1390,66 @@ export function App() {
 						)}
 					</Show>
 
+					<StatusLine
+						state={focusedChat()?.state ?? "idle"}
+						name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
+						agent={focusedChat()?.kind ?? state.defaultKind}
+						{...(state.identities[state.focused ?? ""]?.color ? { color: state.identities[state.focused ?? ""]!.color } : {})}
+					/>
+
 					<Composer
-					draft={draft()}
-					busy={busy()}
-					model={state.focused ? state.agentModel[state.focused] : undefined}
-					models={state.focused ? state.modelsByAgent[state.focused] ?? [] : []}
-					commands={focusedChat()?.commands ?? []}
-					usage={state.focused ? state.agentUsage[state.focused] : undefined}
-					onUsage={() => socket.send({ type: "agent.usage", id: state.focused ?? "" })}
-					modes={focusedChat()?.capabilities?.modes ?? []}
-					mode={focusedChat()?.mode}
-					onMode={(mode) => socket.send({ type: "agent.setMode", id: state.focused ?? "", mode })}
-					onSend={(text) => socket.send({ type: "agent.prompt", id: state.focused ?? "", text })}
-					onAbort={() => socket.send({ type: "agent.abort", id: state.focused ?? "" })}
-					onModel={(provider, model) =>
-						socket.send({ type: "agent.setModel", id: state.focused ?? "", provider, model })
-					}
+						draft={draft()}
+						busy={busy()}
+						model={state.focused ? state.agentModel[state.focused] : undefined}
+						models={state.focused ? state.modelsByAgent[state.focused] ?? [] : []}
+						commands={focusedChat()?.commands ?? []}
+						usage={state.focused ? state.agentUsage[state.focused] : undefined}
+						onUsage={() => socket.send({ type: "agent.usage", id: state.focused ?? "" })}
+						modes={focusedChat()?.capabilities?.modes ?? []}
+						mode={focusedChat()?.mode}
+						onMode={(mode) => socket.send({ type: "agent.setMode", id: state.focused ?? "", mode })}
+						onSend={(text) => socket.send({ type: "agent.prompt", id: state.focused ?? "", text })}
+						onAbort={() => socket.send({ type: "agent.abort", id: state.focused ?? "" })}
+						/*
+						 * `thinking` comes back with the model now. Switching to a model that does
+						 * not offer the level you were on keeps the nearest one it does, and that
+						 * decision is made in the picker — so it has to travel with the choice, or
+						 * the server would hear two messages and apply them in either order.
+						 */
+						onModel={(provider, model, thinking) =>
+							socket.send({
+								type: "agent.setModel",
+								id: state.focused ?? "",
+								provider,
+								model,
+								...(thinking ? { thinking } : {}),
+							})
+						}
 						onThinking={(thinking: ThinkingLevel) =>
 							socket.send({ type: "agent.thinking", id: state.focused ?? "", thinking })
 						}
+						/*
+						 * The paperclip opens the same picker the inspector's embed row does, and
+						 * what it hands back is a deck path — so what it inserts is an `@` mention
+						 * of a file, which is the one thing in this app a message can point at.
+						 */
+						onAttach={() => {
+							void editor.pickFile(selected()).then((path) => {
+								if (path) setDraft({ text: `@${path} `, at: Date.now() });
+							});
+						}}
 					/>
 				</div>
+
 
 				{/* No zoombar. "Where am I looking" is a menu chip in the top-right cluster
 				    now, which is one place for it and gives the bottom-right corner back. */}
 
-				<TurnBar
-					turns={turns()}
-					at={atTurn()?.id}
-					onPick={scrubToTurn}
-				/>
+				{/* No turn bar. It was a column of notches down the edge of the window, one per
+				    turn, addressing the same messages the conversation already lists — and now
+				    that a bubble carries its own rewind button, it was the same list drawn
+				    twice. `scrubToTurn` survives it, because a notice can still ask to be
+				    shown a turn. */}
 
 				{/*
 					Toasts. Utilities rather than a stylesheet rule, because none of this is a
