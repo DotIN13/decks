@@ -78,6 +78,18 @@ export function toggleHistory(): void {
 	setClaim("history");
 }
 
+/**
+ * Show the conversation, whether or not it is already up.
+ *
+ * For the callers that mean "bring it" rather than "flip it": a swipe in from the right
+ * edge, and a click that asks to be shown a particular turn. A toggle would make those
+ * gestures mean *hide* half the time, chosen by state nobody is looking at.
+ */
+export function openHistory(): void {
+	setWanted(true);
+	setClaim("history");
+}
+
 /** The history was dismissed — by its own control, by Escape, or by a swipe. */
 export function closeHistory(): void {
 	setWanted(false);

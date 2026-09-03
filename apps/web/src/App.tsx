@@ -28,7 +28,6 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { createStore, reconcile } from "solid-js/store";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
-import { AllBoards } from "./canvas/AllBoards.tsx";
 import { Settings } from "./chat/Settings.tsx";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
@@ -39,7 +38,6 @@ import { coalesce, needsReload } from "./canvas/patches.ts";
 import { Stage } from "./canvas/Stage.tsx";
 import { runStageCall } from "./canvas/stage-ops.ts";
 import { Dialog } from "./chat/Dialog.tsx";
-import { TurnBar, turnsOf, type Turn } from "./chat/TurnBar.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
 import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
@@ -47,11 +45,11 @@ import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
 import { boxOf, fitInto, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
-import { setInspectable } from "./lib/edge.ts";
+import { closeHistory, historyShown, openHistory, setInspectable, toggleHistory } from "./lib/edge.ts";
 import { canvasBox, watchInsets } from "./lib/insets.ts";
 import { connect, type Socket } from "./lib/socket.ts";
 import { embedPath, uploadAsset } from "./lib/upload.ts";
-import { canHover, createPanels, NARROW } from "./lib/panels.ts";
+import { canHover, NARROW } from "./lib/panels.ts";
 import { obscured, trackVisualViewport } from "./lib/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 
@@ -135,7 +133,6 @@ export function App() {
 	 * this phone" cannot be answered without knowing where the answer is going.
 	 */
 	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; board?: string } | undefined>(undefined);
-	const panels = createPanels();
 	/** The turn the chat was opened at, from a click on the spine. */
 	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
 	/**
@@ -154,9 +151,7 @@ export function App() {
 	 * "the conversation is open" means everywhere: the dock's peek stands down, the spine
 	 * stops marking turns as unseen, and an arriving reply is not unread.
 	 */
-	const [chatFloat, setChatFloat] = createSignal(false);
 	/** The all-canvases modal (`canvas/AllBoards.tsx`), which is a thing you do and then stop. */
-	const [allBoards, setAllBoards] = createSignal(false);
 	/*
 	 * Whether the boards panel is there. One signal where `lib/panels.ts` had two, because
 	 * there is one panel now — and a plain signal rather than that module's persisted pair,
@@ -437,7 +432,7 @@ export function App() {
 					 * that is because you are in another conversation or because the panel
 					 * is away. Your own messages are not news.
 					 */
-					const unseen = message.agentId !== state.focused || !chatFloat();
+					const unseen = message.agentId !== state.focused || !historyShown();
 					if (unseen && item.kind === "assistant") setUnread(message.agentId, (count = 0) => count + 1);
 					setState("transcripts", message.agentId, (items = []) => {
 						const index = items.findIndex((existing) => existing.id === item.id);
@@ -998,80 +993,85 @@ export function App() {
 		);
 	});
 
-	const turns = createMemo(() => turnsOf(transcript(), chatFloat() ? Number.POSITIVE_INFINITY : seenAt()));
-
+	/*
+	 * Opening the conversation is the act of having read it.
+	 *
+	 * An effect rather than a step inside every opener, which is what it used to be — there
+	 * were three routes in and each had to remember to clear the badge. Now `lib/edge.ts`
+	 * owns whether the column is up, and this watches that one fact: however it came to be
+	 * open, the agent on screen stops being unread.
+	 *
+	 * Which matters more than tidiness, because unread is no longer only a badge. A face in
+	 * the top-right corner is *green* while a finished turn has not been read, and that is
+	 * the whole signal — so a missed clear leaves a light on for something you are looking
+	 * at.
+	 */
 	createEffect(() => {
-		if (!chatFloat()) setSeenAt(Date.now());
+		if (!historyShown()) {
+			setSeenAt(Date.now());
+			return;
+		}
+		if (state.focused) setUnread(state.focused, 0);
 	});
 
 	/**
-	 * Open the conversation, which is also the act of having read it.
+	 * On a narrow screen the panel and the conversation take turns.
 	 *
-	 * Every route in goes through here — the dock's peek, the title-bar button, a click on
-	 * the spine — so none of them can open it and leave an unread badge on the chat that is
-	 * on screen.
+	 * 264px of panel and 320px of cards on a 390px phone is two surfaces and no canvas.
+	 * Above `NARROW` nothing is closed: a laptop has room for a panel beside the
+	 * conversation, and taking one away would be the app tidying up after a choice the user
+	 * had just made.
+	 *
+	 * Two surfaces where there were three, because the agents are a dropdown now rather than
+	 * a panel — so the rule that used to need a `keep` argument is two `if`s.
 	 */
-	const openChat = (open: boolean) => {
-		setChatFloat(open);
-		if (!open) return;
-		setSeenAt(Date.now());
-		if (state.focused) setUnread(state.focused, 0);
-		if (window.innerWidth < NARROW) onlyOne("chat");
-	};
+	const narrow = () => window.innerWidth < NARROW;
+
+	/*
+	 * `⌘K` — which is what the full-screen board browser became.
+	 *
+	 * That modal covered the canvas you were looking at in order to help you find something
+	 * on it, and the Deck tab is where it went. So the shortcut opens the panel, switches to
+	 * that tab and puts the cursor in the search field: the same three keystrokes-worth of
+	 * intent, without a sheet over the work.
+	 *
+	 * The composer's placeholder has promised this since before there was anything behind
+	 * it, which is the other reason it is here rather than on a list of things to do.
+	 */
+	const [findAt, setFindAt] = createSignal(0);
+	onMount(() => {
+		const keys = (event: KeyboardEvent) => {
+			if (event.key !== "k" || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+			event.preventDefault();
+			setBoardsOpen(true);
+			setFindAt(Date.now());
+		};
+		window.addEventListener("keydown", keys);
+		onCleanup(() => window.removeEventListener("keydown", keys));
+	});
 
 	/**
-	 * On a narrow screen the three surfaces take turns.
+	 * Pull in from an edge and the surface on that side arrives (`canvas/edge-swipe.ts`).
 	 *
-	 * 200px of panel and 340px of bubbles on a 390px phone is two surfaces and no canvas,
-	 * and there are three of them now rather than two — so rather than each opener knowing
-	 * about the others, they all say which one they are and this closes the rest. Above
-	 * `NARROW` nothing is closed: a laptop has room for a panel beside the conversation, and
-	 * taking one away would be the app tidying up after a choice the user just made.
-	 */
-	const onlyOne = (keep: "agents" | "context" | "chat") => {
-		if (keep !== "agents") panels.agents.set(false);
-		if (keep !== "context") panels.context.set(false);
-		if (keep !== "chat") setChatFloat(false);
-	};
-
-	/**
-	 * One of the two panels, closing whatever it would otherwise sit on top of.
-	 *
-	 * The other panel goes at *every* width, not only on a phone: both are the same 200px of
-	 * the same corner, so two open at once is one behind the other — a panel nobody can see
-	 * and cannot get rid of. Which makes the pair read as what they are, a choice of view
-	 * rather than two independent switches, and `aria-pressed` on each says so.
-	 */
-	const togglePanel = (name: "agents" | "context") => {
-		const opening = !panels[name].open();
-		panels[name].toggle();
-		if (!opening) return;
-		panels[name === "agents" ? "context" : "agents"].set(false);
-		if (window.innerWidth < NARROW) setChatFloat(false);
-	};
-
-	/**
-	 * Pull in from an edge and the panel on that side arrives (`canvas/edge-swipe.ts`).
-	 *
-	 * A swipe *opens*; it does not toggle. A gesture aimed at the edge the drawer comes
-	 * from means "bring it", and answering an open drawer by putting it away would make the
-	 * same motion mean two opposite things depending on state nobody is looking at. The
-	 * title bar's buttons stay the way back, and on a phone the sheet has its own swipe out
+	 * A swipe *opens*; it does not toggle. A gesture aimed at the edge a drawer comes from
+	 * means "bring it", and answering an open drawer by putting it away would make one
+	 * motion mean two opposite things depending on state nobody is looking at. The buttons
+	 * in the two clusters stay the way back, and on a phone the sheet has its own swipe out
 	 * (`chat/swipe-close.ts`).
 	 *
-	 * Off where a cursor can hover: the title bar's buttons are right there beside each
-	 * other, and a laptop with a touchscreen would have two rules for one edge.
-	 *
-	 * The left edge brings the **agents**, which is the panel that edge held when there was
-	 * only one — the boards have a button of their own now, and a screen edge cannot carry
-	 * two drawers without asking which one you meant.
+	 * Off where a cursor can hover: the buttons are right there, and a laptop with a
+	 * touchscreen would have two rules for one edge.
 	 */
 	const edgeSwipe = {
 		enabled: () => !canHover(),
 		left: () => {
-			if (!panels.agents.open()) togglePanel("agents");
+			setBoardsOpen(true);
+			if (narrow()) closeHistory();
 		},
-		right: () => openChat(true),
+		right: () => {
+			openHistory();
+			if (narrow()) setBoardsOpen(false);
+		},
 	};
 
 	/**
@@ -1111,9 +1111,9 @@ export function App() {
 	 * is a new request: the float keys its jump on both and would otherwise treat the
 	 * second click as one it had already carried out.
 	 */
-	const scrubToTurn = (turn: Turn) => {
+	const scrubToTurn = (turn: { id: string }) => {
 		setAtTurn({ id: turn.id, at: Date.now() });
-		openChat(true);
+		openHistory();
 	};
 
 	return (
@@ -1283,6 +1283,7 @@ export function App() {
 					identities={state.identities}
 					open={boardsOpen()}
 					onOpenChange={setBoardsOpen}
+					findAt={findAt()}
 					onPick={(board) => {
 						socket.send({ type: "board.play", path: board.path });
 						flyTo(board);
@@ -1301,20 +1302,6 @@ export function App() {
 					/>
 				</Show>
 
-				{/* Everything in the deck, searchable, over the canvas rather than beside it. */}
-				<Show when={allBoards()}>
-					<AllBoards
-						boards={state.boards}
-						current={selected()}
-						held={[...held()]}
-						onPick={(board) => {
-							socket.send({ type: "board.play", path: board.path });
-							flyTo(board);
-							setAllBoards(false);
-						}}
-						onClose={() => setAllBoards(false)}
-					/>
-				</Show>
 
 				{/*
 				 * The conversation: bubbles over the boards, and the only transcript there is.

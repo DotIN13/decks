@@ -3,7 +3,7 @@ import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Rows3 from "lucide-solid/icons/rows-3";
 import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
-import { createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { BoardRow, BoardTile } from "./BoardRow.tsx";
 import { contextSections, contextTally, filterBoards } from "./panel-groups.ts";
@@ -97,6 +97,14 @@ export function LeftPanel(props: {
 	onPick: (board: Board) => void;
 	/** What is typed, for a caller that wants to keep it — `⌘K` opening on a query, say. */
 	onSearch?: (query: string) => void;
+	/**
+	 * A stamp that means "find a board now": open the Deck tab and take the cursor.
+	 *
+	 * `⌘K` is the caller. A stamp rather than a boolean because pressing it twice in a row
+	 * is two requests, and a flag would make the second one look like a state the panel was
+	 * already in — the same reason `draft` and `scrollTo` carry one.
+	 */
+	findAt?: number;
 }) {
 	const ids = createUniqueId();
 	const [ownTab, setOwnTab] = createSignal<PanelTab>("context");
@@ -108,6 +116,16 @@ export function LeftPanel(props: {
 	const density = () => props.density ?? ownDensity();
 	let list: HTMLDivElement | undefined;
 	let field: HTMLInputElement | undefined;
+
+	createEffect(() => {
+		if (!props.findAt) return;
+		goTab("deck");
+		// After the tab switch has rendered the field, or there is nothing to focus yet.
+		requestAnimationFrame(() => {
+			field?.focus();
+			field?.select();
+		});
+	});
 
 	const goTab = (next: PanelTab) => {
 		setOwnTab(next);

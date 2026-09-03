@@ -21,78 +21,22 @@ const cancelWhenIdle = (handle: number): void => {
 import { boardUrl, deckFileUrl } from "../lib/api.ts";
 import { paintFrame } from "../lib/theme.ts";
 
-/**
- * The rail: every board in the deck, small.
- *
- * There is no thumbnail service, by design (DESIGN §6.6) — a rail item is the
- * board itself, scaled down, mounted when it scrolls into view. That means a
- * thumbnail is never stale and never a job that has to finish before you can see
- * your deck. The cost is a live document per item, so two things bound it: only
- * what is near the visible part of the list mounts, and a board can hand over a
- * `<meta name="poster">` image instead, which is the escape hatch for one that is
- * expensive to render.
- *
- * "Near the visible part" used to be "among the first eight", which is not the same
- * thing: past the eighth board the thumbnail stayed blank however far you scrolled.
- * The bound now comes from the geometry — what fits in the list box plus a screen of
- * margin — so it holds for a deck of four boards or four hundred, and it follows the
- * scroll instead of the array.
- *
- * It shows the focused agent's context set, and *only* that. It used to fall back to
- * listing the whole deck whenever the agent held nothing, which made one list mean two
- * things depending on state nobody was looking at — "these are the boards in play" and
- * "these are all the boards there are" drawn identically. Finding a board in the deck is
- * the all-canvases modal's job now (`AllBoards`), so this one can say what is true: an
- * agent holding nothing is holding nothing, and it says so in a sentence.
- */
+/** The width a thumbnail is drawn at, which is what its scale is computed from. */
 const WIDTH = 150;
 
-export function BoardRail(props: {
-	boards: Board[];
-	current?: string;
-	/** Which of them the agent has put on the canvas. */
-	inPlay?: string[];
-	onPick: (board: Board) => void;
-	/** The way out to the whole deck, from the one place someone looking for a board is. */
-	onAll: () => void;
-}) {
-	return (
-		<section class="rail">
-			<div class="rail-head" title="Boards the focused agent is holding in context">
-				<span>in context</span>
-				<span>{props.boards.length}</span>
-			</div>
-			<div class="items">
-				<For each={props.boards}>
-					{(board) => (
-						<RailItem
-							board={board}
-							current={props.current === board.path}
-							// Held but not on the canvas: the agent is working from it without
-							// asking the user to look at it.
-							offCanvas={!(props.inPlay ?? []).includes(board.path)}
-							onPick={() => props.onPick(board)}
-						/>
-					)}
-				</For>
-				{/*
-					An empty context is a real state and the commonest one on a fresh deck, so it
-					says so and points at the surface that has something in it — a panel that is
-					blank for a good reason still looks broken if it does not give the reason.
-				*/}
-				<Show when={props.boards.length === 0}>
-					<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
-						This agent is not holding any boards yet. Ask it for one, or{" "}
-						<button class="cursor-pointer border-0 bg-none p-0 text-[12px] text-accent underline" type="button" onClick={props.onAll}>
-							browse the deck
-						</button>
-						.
-					</p>
-				</Show>
-			</div>
-		</section>
-	);
-}
+/*
+ * What is left of the board rail: one thumbnail.
+ *
+ * The panel that used to wrap these is gone — `chrome/LeftPanel` replaced it, along with
+ * the agents panel beside it and the full-screen browser over it. What could not go is
+ * this: a thumbnail here is the board itself, mounted in an iframe, left to finish drawing
+ * its markdown and maths, and photographed on idle into `thumb-cache`. That is the only
+ * thing in the app that fills the cache, and every 20x14 row in the panel draws from it.
+ *
+ * The file keeps its name and `.rail-item` keeps its class, because both are load-bearing
+ * elsewhere — the thumbnail checks address them, and renaming a selector to tidy a file is
+ * how a green suite stops meaning anything.
+ */
 
 /**
  * One board, drawn as itself.
