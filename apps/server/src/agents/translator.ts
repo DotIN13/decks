@@ -279,6 +279,16 @@ export class Translator {
  */
 export function titleFor(name: string, args: unknown): string {
 	const a = (args ?? {}) as Record<string, unknown>;
+	/*
+	 * `mcp__<server>__<tool>` is one tool with a routing prefix on it, and the switch below
+	 * cares about the tool.
+	 *
+	 * Decks' own `stage_eval` arrives as `mcp__decks__stage_eval`, matched nothing, and fell
+	 * to the default — which looks for any string argument under 120 characters and finds
+	 * none, because the argument is a program. So the row that says what the agent just did
+	 * to your canvas was the one row in the conversation with nothing in its description.
+	 */
+	const tool = /^mcp__[^_]+(?:_[^_]+)*__(.+)$/.exec(name)?.[1] ?? name;
 	const first = (...keys: string[]) => {
 		for (const key of keys) {
 			const value = a[key];
@@ -287,7 +297,7 @@ export function titleFor(name: string, args: unknown): string {
 		return undefined;
 	};
 
-	switch (name) {
+	switch (tool) {
 		case "read":
 		case "write":
 		case "edit":

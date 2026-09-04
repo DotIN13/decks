@@ -31,10 +31,17 @@
 	 * full-height frame.
 	 *
 	 * The geometry: 320px of card at `right: 12`, from `top: 64` — under the corner cluster —
-	 * down to 12px above the status row. The top and the right are offset by the gutter below,
-	 * because the box is bigger than the cards by exactly that much on those two edges; the
-	 * bottom is not, because what the 12px is measured from there is the *dock's* top edge
-	 * rather than the window, and the gutter is the gap.
+	 * down to 8px above the dock. The top and the right are offset by the gutter below, because
+	 * the box is bigger than the cards by exactly that much on those two edges; the bottom is
+	 * not, because what the 8px is measured from there is the *dock's* top edge rather than the
+	 * window, and the gutter is already the gap.
+	 *
+	 * **8px rather than 12, and the reserve above it is gone too.** The bottom card used to
+	 * stand 72px off the input bar: 24px of gutter, 12px here, and 36px of dock held for a
+	 * working sign that cannot appear while this column is up (`StatusLine.tsx`). Two of those
+	 * three were paid for nothing, and the conversation read as a panel parked somewhere near
+	 * the composer rather than the thing you are typing into. 32px is what is left, and the
+	 * 24px of it is shadow room.
 	 */
 	.stream {
 		/*
@@ -56,7 +63,7 @@
 		z-index: 9;
 		top: calc(64px - var(--gutter));
 		right: calc(12px - var(--gutter));
-		bottom: calc(var(--dock, 88px) + 12px + var(--keyboard) + env(safe-area-inset-bottom));
+		bottom: calc(var(--dock, 88px) + 8px + var(--keyboard) + env(safe-area-inset-bottom));
 		display: flex;
 		box-sizing: border-box;
 		width: calc(320px + 2 * var(--gutter));
@@ -95,23 +102,15 @@
 		visibility: hidden;
 	}
 
-	/* The × rides the top of the stack, since a column of cards has no title bar to put one
-	   in. Hidden until the pointer is in the column — it is the third way to dismiss this
-	   after the corner button and Escape, not the first — and always there for a keyboard,
-	   which is what `focus-within` is doing. */
-	.stream-head {
-		display: flex;
-		flex: none;
-		justify-content: flex-end;
-		padding: 0 var(--gutter);
-		opacity: 0;
-		transition: opacity 120ms ease;
-	}
-
-	.stream:hover .stream-head,
-	.stream:focus-within .stream-head {
-		opacity: 1;
-	}
+	/*
+	 * `.stream-head` is gone: the column has no × of its own.
+	 *
+	 * It was a hover-revealed button at the top of the stack, on the argument that a column
+	 * of cards has no title bar to hang one on. The corner's conversation button is the
+	 * answer to that — it opens this and it closes it — and a surface with two dismiss
+	 * controls has one too many. Escape and a right-swipe are the other ways out, and
+	 * neither needs a rule in here.
+	 */
 
 	.stream-roll {
 		position: relative;
@@ -184,9 +183,22 @@
 	 * that is the same grime by a gentler name, and it buys nothing, because the newest card
 	 * is at the foot of the column where the eye already is.
 	 */
+	/*
+	 * `9px 11px 11px`, and the extra pixel at the foot is not a typo.
+	 *
+	 * CSS pads from the *line box*, and a line box is not symmetrical around the words in it:
+	 * in this font at 12px the box reaches 11px above the baseline while the letters reach 9,
+	 * and both stop 3px below it. So equal padding paints 14¼px of air above the text and
+	 * 12½ below — measured, by screenshotting a card and counting rows of pixels — and the
+	 * card reads as sitting low in its own box. Every card in the column, every time, which
+	 * is why it was noticeable long before anyone could say what it was.
+	 *
+	 * A pixel and a bit is the whole of the correction, and it goes at the bottom rather than
+	 * coming off the top so that the cards do not shrink. 13¼ above, 13½ below.
+	 */
 	.stream-card {
 		box-sizing: border-box;
-		padding: 9px 11px;
+		padding: 9px 11px 11px;
 		border: 1px solid var(--line);
 		border-radius: var(--radius-panel, 12px);
 		background: var(--panel);
@@ -223,10 +235,11 @@
 		--mine-fg: var(--color-grey-100);
 	}
 
+	/* Your own turn, and the same asymmetry: see `.stream-card` above for the arithmetic. */
 	.stream-bubble {
 		box-sizing: border-box;
 		max-width: 88%;
-		padding: 8px 11px;
+		padding: 8px 11px 10px;
 		/* A tint alone loses its edge over a light board, so the border is not decoration:
 		   it is what keeps the bubble a bubble when the thing behind it is white. */
 		border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
@@ -295,193 +308,252 @@
 
 	/* --- what the agent did, inside its card ---------------------------------- */
 
+	/* --- tool calls -------------------------------------------------------------
+	 *
+	 * A **log**, not a list of widgets: a status glyph, the tool, its subject, and nothing
+	 * else until asked. The shape is picone's `ToolCallView`, down to the arithmetic of the
+	 * indents; what differs is the column, which is 320px here rather than 820, so every size
+	 * is a step smaller — and that Decks has a *group* row, which picone has no need for.
+	 *
+	 * One row, three uses: a call, a group of finished calls, and a call nested inside that
+	 * group. They are the same markup and the same rules, which is the point — a group that
+	 * looked like a header had rows of a different species hanging under it the moment you
+	 * opened it.
+	 */
 	.stream-tools {
 		display: flex;
 		flex-direction: column;
-		gap: 5px;
+		/* 2px, not 5: these are lines in a log, and a log's lines touch. The row's own 24px
+		   of height is what separates them, and the hover wash is what groups a line's words. */
+		gap: 2px;
+	}
+
+	.tool {
+		align-self: stretch;
 	}
 
 	/*
-	 * The header over a run of finished calls: a chevron, the count in semibold, then the
-	 * distinct names in mono and faint.
+	 * No fill, no border, no radius at rest.
 	 *
-	 * A wash rather than a border, because it sits *inside* a card that already has one — a
-	 * bordered row in a bordered box is the box-in-a-box this column is trying not to be. The
-	 * count is the part in weight: it is the number you are deciding whether to open.
+	 * A wash with a corner inside a card with a corner is a pill inside a pill, which is what
+	 * "ugly toolcalls" meant. A tool call is a *line in the turn* — the same standing as the
+	 * sentence under it — so what marks it out is the glyph and the mono type. The wash comes
+	 * back on hover and while open, where it means "this one opens".
 	 */
-	.stream-tool-head {
+	.tool > .row {
 		display: flex;
 		width: 100%;
-		height: 24px;
+		min-height: 24px;
 		align-items: center;
-		padding: 0 8px;
-		gap: 7px;
+		padding: 0 6px;
+		gap: 8px;
 		border: 0;
-		border-radius: var(--control-radius);
-		background: var(--line);
-		color: var(--muted);
+		border-radius: 5px;
+		background: none;
+		color: inherit;
 		cursor: pointer;
 		font: inherit;
-		font-size: 11px;
 		text-align: left;
-		transition:
-			background-color 120ms ease,
-			color 120ms ease;
+		transition: background-color 120ms ease;
 	}
 
-	.stream-tool-head:hover {
-		background: var(--line-strong);
-		color: var(--fg);
+	/* A row with nothing behind it is not a control. It keeps the cursor it had before
+	   anything was clickable, and the chevron is absent rather than dimmed. */
+	.tool > .row:disabled {
+		cursor: default;
 	}
 
-	.stream-tool-head:focus-visible {
+	.tool > .row:hover:not(:disabled),
+	.tool > .row[data-open="true"] {
+		background: var(--line);
+	}
+
+	.tool > .row:focus-visible {
 		outline: 2px solid var(--color-accent);
-		outline-offset: 1px;
+		outline-offset: -1px;
 	}
 
-	.stream-tool-head .n {
+	/*
+	 * The status cell: 12px whatever is in it.
+	 *
+	 * A spinner is 9px, a done dot is 5 and the alert is 11, and a cell that sized itself to
+	 * its glyph would give the column a ragged left edge — the names have to start at the
+	 * same x or the list stops reading as a list.
+	 */
+	.tool > .row > .state {
+		display: inline-flex;
+		width: 12px;
 		flex: none;
-		font-weight: 600;
+		align-items: center;
+		justify-content: center;
+		color: var(--faint);
 	}
 
-	.stream-tool-head .names {
+	/*
+	 * Done is a 5px dot, and it is deliberately the quietest thing in the row.
+	 *
+	 * `--line-strong`, not green. Most calls succeed, so a saturated disc per row is a column
+	 * of green telling you nothing you did not assume — and it was loud enough that an opened
+	 * group had to *hide* its children's dots to be readable, which meant the rows inside a
+	 * group were a different object from the rows outside it. Quiet here buys that back.
+	 */
+	.tool[data-state="done"] > .row > .state::before {
+		width: 5px;
+		height: 5px;
+		border-radius: 999px;
+		background: var(--line-strong);
+		content: "";
+	}
+
+	/*
+	 * Running is a spinner, because the message is "not finished yet" and motion is the only
+	 * way to say that without words. It replaces a dot that pulsed amber — which read as a
+	 * warning, and amber means "waiting for you" everywhere else in this app.
+	 *
+	 * picone's ring, its stroke and its period: 1.5px, 0.67s, the accent over a 30% wash of
+	 * itself. Reduced motion slows it to 2s rather than stopping it, which is the honest
+	 * trade when the motion *is* the content — a still spinner says nothing at all.
+	 */
+	.tool[data-state="running"] > .row > .state::before {
+		width: 9px;
+		height: 9px;
+		box-sizing: border-box;
+		border: 1.5px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+		border-top-color: var(--color-accent);
+		border-radius: 999px;
+		animation: tool-spin 0.67s linear infinite;
+		content: "";
+	}
+
+	@keyframes tool-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tool[data-state="running"] > .row > .state::before {
+			animation-duration: 2s;
+		}
+	}
+
+	/*
+	 * Failure gets a *shape*, not a colour — a triangle, drawn by the component.
+	 *
+	 * It is the one state in the row you must not miss, and a 5px disc in red is a 5px disc
+	 * to anyone who cannot tell red from grey. The colour is here and the description takes
+	 * it too, because "read → no such file" is one fact and half of it is in each column.
+	 */
+	.tool[data-state="error"] > .row > .state {
+		color: var(--color-danger);
+	}
+
+	.tool[data-state="error"] > .row .title {
+		color: var(--color-danger);
+	}
+
+	/*
+	 * The name: an identifier, so mono — and uppercase, which is what stops a 10px word from
+	 * reading as the sentence rather than the label on it.
+	 *
+	 * `flex: 0 1 auto` with a 42% ceiling, because an MCP tool is called
+	 * `mcp__decks__stage_eval` and would otherwise take a 320px row on its own. It gives way
+	 * before the description does; the description is the part that says *which* call.
+	 */
+	.tool > .row .name {
 		overflow: hidden;
-		flex: 1;
+		min-width: 0;
+		max-width: 42%;
+		flex: 0 1 auto;
 		color: var(--faint);
 		font-family: var(--font-mono);
-		font-size: 10.5px;
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.04em;
+		text-overflow: ellipsis;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+
+	/* The description — the path, the command, the pattern. Arguments are code, so it keeps
+	   the mono face and gives up the weight; it is the widest thing in the row. */
+	.tool > .row .title {
+		overflow: hidden;
+		min-width: 0;
+		flex: 1;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 11px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
-	/* Turned, not swapped for a second icon — the convention `.tool` set. */
-	.stream-tool-head .twist {
+	/* Pictures a call returned, which the output cannot show. Beside the chevron because it
+	   is a fact about the result rather than about the call. */
+	.tool > .row .imgs {
 		flex: none;
 		color: var(--faint);
+		font-size: 10px;
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* At the right end, where a disclosure belongs: a column of them is something the eye can
+	   run down. Turned rather than swapped for a second glyph — this app's convention. */
+	.tool > .row .twist {
+		flex: none;
+		color: var(--faint);
+		opacity: 0.5;
 		transition: transform 120ms ease;
 	}
 
-	.stream-tool-head[aria-expanded="true"] .twist {
+	.tool > .row[data-open="true"] .twist {
 		transform: rotate(90deg);
 	}
 
-	/* Opened, the calls are indented behind a hairline: they belong *to* the header, and an
-	   indent says so without giving each row a box of its own. */
-	.stream-tool-kids {
+	/*
+	 * What hangs off a row: the calls inside a group, and a call's own output.
+	 *
+	 * The left edges are arithmetic rather than a look, and they are picone's. The row is 6px
+	 * of padding, a 12px status cell and an 8px gap, so its name starts 26px in — and
+	 * `12 + 14` puts everything underneath in that same column. The rule lands on 12px, the
+	 * centre of the glyph above it, so a block reads as hanging off that row rather than
+	 * sitting beside it.
+	 */
+	.tool-kids,
+	.tool > pre {
+		margin: 2px 0 4px 12px;
+		padding-left: 14px;
+		box-shadow: inset 1px 0 0 0 var(--line);
+	}
+
+	.tool-kids {
 		display: flex;
-		margin: 5px 0 0 10px;
-		padding-left: 8px;
 		flex-direction: column;
-		gap: 4px;
-		border-left: 1px solid var(--line);
+		gap: 2px;
 	}
 
 	/*
-	 * A tool row inside a card is a **wash**, not a small card of its own.
-	 *
-	 * `index.css` styles `.tool` for the column it grew up in: a 14px radius, a hairline, a
-	 * `--bg` fill and 6px of vertical padding. Inside a 320px card that is a second bordered
-	 * object nested in a bordered object — three concentric rounded rectangles by the time
-	 * you count the column — and it is what "ugly toolcalls" meant. The conversation board
-	 * draws a 24px row: a wash, no border, the small radius, a dot, the call in mono.
-	 *
-	 * Restyled here rather than changed in `index.css`, because that file still dresses the
-	 * same component for the surfaces that have not been rebuilt.
-	 *
-	 * And **no fill of its own**: a wash with a corner radius inside a card with a corner
-	 * radius is a pill inside a pill, which is the thing that looked bad. A tool call is a
-	 * *line in the turn* — the same standing as the sentence under it — so it gets no
-	 * background, no border and no radius, and the dot and the mono type are what mark it
-	 * out. The wash comes back on hover, where it means "this one opens".
+	 * The output: the mono face and the indent are what mark it as somebody else's text, so
+	 * it needs no fill and no rule across the top — both of which it used to have, a third
+	 * grey and a fourth edge in a block that has one of each. Capped and scrollable, so a
+	 * stack trace cannot make a turn twice as tall as the reply it belongs to.
 	 */
-	.stream-tool-kids .tool,
-	.stream-tools > .tool {
-		border: 0;
-		border-radius: 0;
-		background: none;
-		box-shadow: none;
-	}
-
-	/* Exactly a header's geometry: same height, same padding, same corner. A run of tool
-	   lines is one list whether each entry is a summary or a call, and a 22px row indented
-	   4px next to a 24px row padded 7px is the "varies" the user was pointing at. */
-	.stream-tool-kids .tool > .row,
-	.stream-tools > .tool > .row {
-		height: 24px;
-		min-height: 0;
-		padding: 0 8px;
-		gap: 7px;
-		border-radius: var(--control-radius);
-		font-size: 10.5px;
-	}
-
-	/*
-	 * The output, when a line is opened: the same wash, the same corner, under the row it
-	 * belongs to.
-	 *
-	 * `index.css` gives this a `--bg-deep` fill and a hairline across the top, which was a
-	 * third grey and a fourth edge in a block that has one of each. Both go: the mono face
-	 * and the indent are what mark it as somebody else's text, and it is capped and
-	 * scrollable so a stack trace cannot make the turn twice as tall as the reply.
-	 */
-	.stream-tool-kids .tool > pre,
-	.stream-tools > .tool > pre {
+	.tool > pre {
 		max-height: 220px;
-		margin: 2px 0 4px;
-		padding: 6px 8px;
-		border-top: 0;
-		border-radius: var(--control-radius);
-		background: var(--line);
-		font-size: 10.5px;
-	}
-
-	.stream-tool-kids .tool > .row .name,
-	.stream-tools > .tool > .row .name {
-		flex: none;
-		font-size: 10.5px;
-	}
-
-	/* The call itself, in mono and taking the room: it is the part that identifies the row,
-	   and the tool's own name is a category. */
-	.stream-tool-kids .tool > .row .title,
-	.stream-tools > .tool > .row .title {
-		flex: 1;
-		overflow: hidden;
+		padding-top: 1px;
+		padding-bottom: 2px;
+		overflow: auto;
+		border: 0;
+		background: none;
+		color: var(--muted);
 		font-family: var(--font-mono);
 		font-size: 10.5px;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	/*
-	 * Inside an opened group, no state dot.
-	 *
-	 * A group only ever holds calls that went as expected — that is what makes them
-	 * groupable — so the header saying "10 done" has already said it, and ten saturated
-	 * green discs under it are ten copies of the same word in the loudest colour the panel
-	 * has. A bare row keeps its dot, because that row is outside a group precisely because
-	 * its state is the news: it is running, or it failed.
-	 */
-	.stream-tool-kids .tool > .row > .state {
-		display: none;
-	}
-
-	/*
-	 * The wash, on hover and while open — one grey, drawn inside the row's own box.
-	 *
-	 * It was a `box-shadow: 0 0 0 4px` spread as well, to reach past the text: that draws the
-	 * fill 4px outside the border box, so a hovered row was visibly wider *and* rounder than
-	 * the header above it. Same corner as everything else here, and the 8px of padding is
-	 * what gives the target its width.
-	 *
-	 * Open counts as well as hover, because with the output showing, the row is the thing
-	 * you press to put it away and it should not go flat the moment the pointer leaves.
-	 */
-	.stream-tool-kids .tool > .row:hover,
-	.stream-tools > .tool > .row:hover,
-	.stream-tool-kids .tool > .row[data-open="true"],
-	.stream-tools > .tool > .row[data-open="true"] {
-		background: var(--line);
+		line-height: 1.55;
+		overflow-wrap: anywhere;
+		/* Reserved whether or not this one scrolls, so an output that does and one that does
+		   not wrap at the same column. */
+		scrollbar-gutter: stable;
+		white-space: pre-wrap;
 	}
 
 	/* Thinking: a disclosure, and quiet. Not addressed to the reader, and a card that showed
@@ -534,14 +606,27 @@
 		}
 	}
 
+	/*
+	 * The caret, sized and placed in **em**, so that it lands on the text's ink rather than
+	 * near it — and, more to the point, so that it stays inside the line box.
+	 *
+	 * It was `height: 12px; translate: 0 2px`, and the translate is the bug: a transform
+	 * paints outside the box without growing it, so a card with a caret in it had two pixels
+	 * of ink below where the line ended and looked short of padding along its bottom edge,
+	 * every time a reply was arriving. Measured in this font at 12px, the text's ink runs
+	 * from 9px above the baseline to 3px below it — one em tall, sitting a quarter of an em
+	 * under the baseline — which is exactly what these two lines say. So the caret spans the
+	 * same band as the letters beside it, the line box already reserves the descent it needs,
+	 * and the card's padding is the padding on all four sides.
+	 */
 	.stream-card .caret {
 		display: inline-block;
 		width: 6px;
-		height: 12px;
+		height: 1em;
 		margin-left: 2px;
 		background: currentColor;
 		opacity: 0.5;
-		translate: 0 2px;
+		vertical-align: -0.25em;
 		animation: stream-blink 1s steps(2, start) infinite;
 	}
 
@@ -562,17 +647,25 @@
 	/*
 	 * The working sign where the column shows it: a card, not a pill.
 	 *
-	 * It sits in the position the arriving turn will take, so the reply that replaces it lands
-	 * where the eye already is — which is the whole argument for putting it here rather than
-	 * floating a second copy of the dock's pill over the column. So it takes the turn card's
-	 * geometry from `.stream-card` and only says what is different: the mark and the words on
-	 * one line, muted, and `max-content` so a two-word sign is not a full-width card with an
-	 * inch of empty panel after it.
+	 * It sits at the foot of the queue, in the position the arriving turn will take, so the
+	 * reply that replaces it lands where the eye already is — which is the whole argument for
+	 * putting it here rather than floating a second copy of the dock's pill over the column. So
+	 * it takes the turn card's geometry from `.stream-card` and only says what is different:
+	 * the mark and the words on one line, muted, and `max-content` so a two-word sign is not a
+	 * full-width card with an inch of empty panel after it.
+	 *
+	 * **Right-aligned**, which is the one thing about it that is not the turn card's. A
+	 * `max-content` card in a stretch column sits at the left edge, under the agent's replies,
+	 * where it reads as the beginning of one — a stub of a message that never grows. On the
+	 * right it is on the same edge as the thing that caused it: your message, and the input bar
+	 * below the column. So the queue reads as *you asked, and it is working on it*, and the
+	 * agent's edge stays for what the agent actually said.
 	 */
 	.stream-working {
 		display: flex;
 		width: max-content;
 		max-width: 100%;
+		align-self: flex-end;
 		align-items: center;
 		gap: 7px;
 		color: var(--muted);
@@ -682,8 +775,25 @@
 		outline-offset: 1px;
 	}
 
-	.statusline .mark {
+	/*
+	 * The mark, nudged a pixel down — which is the difference between centred and *looking*
+	 * centred.
+	 *
+	 * `align-items: center` lines a glyph up with the middle of the text's **font box**, and
+	 * a font box is not symmetrical: at 12px this one runs 11px above the baseline and 3px
+	 * below, so its middle is 4px up while the middle of the *ink* — what your eye reads as
+	 * the centre of the words — is 3px up. One pixel, and it is the pixel that made Claude's
+	 * asterisk look like it was floating above "running tools…".
+	 *
+	 * A paint-only shift, so nothing reflows, and it is on `.mark` rather than on one sign:
+	 * both surfaces draw both runtimes, and the marks themselves are centred in their own
+	 * boxes to within a third of a pixel (measured, by rasterising them) — so this is the
+	 * whole of the correction for all four drawings.
+	 */
+	.statusline .mark,
+	.stream-working .mark {
 		flex: none;
+		translate: 0 1px;
 	}
 
 	/*

@@ -108,7 +108,25 @@ export function ModeMenu(props: {
 					return (
 					<button
 						ref={api.ref}
-						class="chipbtn min-w-0"
+						/*
+						 * This chip does not give ground — until there is nothing else left to take.
+						 *
+						 * `dock.css` lets both chips in this row shrink, so a long model name can no
+						 * longer push the send button out of the box. But flex shares a shortfall out
+						 * in proportion, and a proportion of a shortfall is a *fraction of a pixel*:
+						 * with the model chip set to absorb a hundred times its share, this one was
+						 * still left 0.08px short of its own text on a 390px phone — and 0.08px is
+						 * not 0.08px of text, because the browser drops whole glyphs to make room for
+						 * an ellipsis. "edit freely" came out "edit fre…" for a rounding error.
+						 *
+						 * So above 380px it is rigid and the model name is the only thing that
+						 * shortens, which is the right order anyway: the mode is two short words and
+						 * the words are its whole value. Below 380px it becomes flexible again,
+						 * because on a screen that narrow an ellipsis is a better outcome than a
+						 * control pushed off the edge — and the label's own cap keeps its worst case
+						 * knowable whatever a runtime decides to call a mode.
+						 */
+						class="chipbtn min-w-0 shrink-0 max-[380px]:shrink"
 						type="button"
 						/* Anything but `ask first` is a standing change to how the session behaves,
 						   so it is tinted rather than merely labelled — you should be able to see
@@ -121,7 +139,10 @@ export function ModeMenu(props: {
 						onClick={api.toggle}
 					>
 						<Icon of={current().icon} size={13} />
-						<span class="truncate">{current().label}</span>
+						{/* 132px, about twenty characters: "bypass permissions" is eighteen. A mode
+						    name comes from the runtime, so the cap is what makes the width of this
+						    chip a thing the row can count on. */}
+						<span class="max-w-[132px] truncate">{current().label}</span>
 						<Icon of={ChevronDown} size={10} class="chev" />
 					</button>
 					);

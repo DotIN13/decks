@@ -359,15 +359,17 @@ export async function resetStage() {
 }
 
 /**
- * Bring out the boards panel, on the tab a check wants.
+ * Bring out the boards panel.
  *
- * There is one panel now where there were two, and the agents are no longer one of them —
- * a list you switch *with* is a selector, so it hangs off the avatar in the top-left pill.
- * So `"context"` and `"deck"` are tabs of one surface and `"agents"` is `openAgents`.
+ * There is one panel now where there were two, and one *list* in it where there were two
+ * tabs: on the canvas, held, and the rest of the deck, in one scroller. So `"context"` and
+ * `"deck"` are the same thing and both are accepted and ignored — the callers that pass them
+ * are asking for the panel, which is what they get. `"agents"` is the selector in the pill
+ * and still goes to `openAgents`.
  *
  * Written here rather than in each check for the reason it always was: it lived in seven
- * files as `mouse.move(6, 480)` plus a wait, which is seven places to change when the way
- * in changes — and it has now changed twice.
+ * files as `mouse.move(6, 480)` plus a wait, which is seven places to change when the way in
+ * changes — and it has now changed three times.
  */
 export async function openPanel(page, tab = "context") {
 	if (tab === "agents") return openAgents(page);
@@ -397,10 +399,6 @@ export async function openPanel(page, tab = "context") {
 		// It slides; a click landing mid-slide misses the row it was aimed at.
 		await page.waitForTimeout(220);
 	}
-	await page.getByRole("tab", { name: tab === "deck" ? /deck/i : /context/i }).click();
-	// The rows are drawn from a signal, and a click landing in the same frame as the switch
-	// hits whichever list was there before it.
-	await page.waitForTimeout(160);
 }
 
 /**
@@ -522,13 +520,15 @@ export async function newAgent(page, kind = "pi") {
 }
 
 /**
- * Every board in the deck — the Deck tab, which is where the modal went.
+ * Every board in the deck — which is the panel's list, all of it.
  *
- * The modal covered the canvas you were looking at in order to help you find something on
- * it. `⌘K` is the shortcut for the same thing.
+ * There is no browser to open and no tab to switch to: the deck is the third section of the
+ * one list, under whatever the focused agent is holding. Kept as a name because the checks
+ * that call it are asking a question — "is every board reachable from here" — that is still
+ * worth asking under that name.
  */
 export async function openAllBoards(page) {
-	await openPanel(page, "deck");
+	await openPanel(page);
 	await page.waitForSelector(".board-row, .rail-item", { timeout: 6000 });
 	await page.waitForTimeout(300);
 }

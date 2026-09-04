@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -103,6 +103,48 @@ test("a board that has been deleted leaves the deck", () => {
 	rmSync(join(root, "boards", "a.html"));
 	assert.equal(deck.refresh("boards/a.html"), undefined);
 	assert.equal(deck.boards.length, 0);
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("removing a board deletes the file, forgets it, and takes its position with it", () => {
+	const root = emptyDeck();
+	writeFileSync(join(root, "boards", "a.html"), board("A"));
+	writeFileSync(join(root, "boards", "b.html"), board("B"));
+	const deck = Deck.open(root);
+	deck.setPosition("boards/a.html", 40, 80);
+	deck.setPosition("boards/b.html", 900, 80);
+
+	assert.equal(deck.remove("boards/a.html"), true);
+	assert.equal(existsSync(join(root, "boards", "a.html")), false, "the file is gone");
+	assert.equal(deck.board("boards/a.html"), undefined);
+	assert.deepEqual(deck.boards.map((one) => one.path), ["boards/b.html"]);
+
+	const arrangement = JSON.parse(readFileSync(join(root, "deck.json"), "utf8"));
+	assert.deepEqual(Object.keys(arrangement.boards), ["boards/b.html"], "a deleted board keeps no position");
+	assert.deepEqual(arrangement.boards["boards/b.html"], { x: 900, y: 80 }, "and the survivor keeps its own");
+
+	assert.equal(deck.remove("boards/a.html"), false, "removing it twice is not an error, it is nothing");
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("removing from a deck with no arrangement does not write one", () => {
+	const root = emptyDeck(false);
+	writeFileSync(join(root, "boards", "a.html"), board("A"));
+	const deck = Deck.open(root);
+	assert.equal(deck.remove("boards/a.html"), true);
+	assert.equal(existsSync(join(root, "deck.json")), false, "opening a deck must not write to it, and neither must this");
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("a path that climbs out of the deck cannot be removed", () => {
+	const root = emptyDeck();
+	const outside = join(root, "..", `escape-${Date.now()}.html`);
+	writeFileSync(outside, board("Outside"));
+	const deck = Deck.open(root);
+	assert.throws(() => deck.remove("../escape.html"));
+	assert.throws(() => deck.remove("boards/../../escape.html"));
+	assert.equal(existsSync(outside), true, "the file outside the deck is untouched");
+	rmSync(outside, { force: true });
 	rmSync(root, { recursive: true, force: true });
 });
 

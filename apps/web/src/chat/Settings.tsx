@@ -3,6 +3,8 @@ import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
 import { For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
+import { AlertSettings } from "./AlertSettings.tsx";
+import type { AlertPrefs } from "../lib/alerts.ts";
 
 /**
  * The Claude subscriptions this install can use.
@@ -34,6 +36,9 @@ import { Icon } from "../icons.tsx";
  * worth showing, and hiding it would leave the list disagreeing with what you remember doing.
  */
 export function Settings(props: {
+	/** What the app may interrupt you with (`AlertSettings.tsx`). */
+	prefs: AlertPrefs;
+	onPrefs: (prefs: AlertPrefs) => void;
 	accounts: ClaudeAccount[];
 	/** The id of the one in force. */
 	active: string;
@@ -79,7 +84,11 @@ export function Settings(props: {
 				aria-label="Settings"
 			>
 				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
-					<span>Claude accounts</span>
+					{/* "Settings" rather than "Claude accounts": the row in the corner's overflow has
+					    always said Settings, and there are two things in here now. Each section keeps
+					    its own heading in the scroller, which is where a name belongs once there is
+					    more than one of them. */}
+					<span>Settings</span>
 					<span class="flex-1" />
 					{/* `.iconbtn`, the app's icon control. It said `icon-button` — a class the rewrite
 					    replaced and nothing defines any more, so the × was an unstyled bare button
@@ -89,10 +98,21 @@ export function Settings(props: {
 					</button>
 				</header>
 
-				{/* `rowlist`, so each account is the same row as a described choice anywhere else in
-				    the app — `styles/chrome.css` owns the grid, the corner, the hover and the
-				    `.lb`/`.nt` type scale. */}
-				<div class="rowlist overflow-y-auto overscroll-contain p-2">
+				<div class="overflow-y-auto overscroll-contain p-2">
+					{/*
+						Notifications first, accounts second, and the order is not alphabetical: this is
+						the part somebody opens the modal to change, and accounts is the part they set
+						up once. The footer belongs to accounts, which is the other reason accounts is
+						last.
+					*/}
+					<AlertSettings prefs={props.prefs} onChange={props.onPrefs} />
+
+					<div class="label px-1 pt-4 pb-1.5">Claude accounts</div>
+
+					{/* `rowlist`, so each account is the same row as a described choice anywhere else in
+					    the app — `styles/chrome.css` owns the grid, the corner, the hover and the
+					    `.lb`/`.nt` type scale. */}
+					<div class="rowlist">
 					<For each={props.accounts}>
 						{(account) => (
 							<Row
@@ -103,6 +123,7 @@ export function Settings(props: {
 							/>
 						)}
 					</For>
+					</div>
 				</div>
 
 				<footer class="flex items-center gap-2 border-t border-line px-2 py-2">

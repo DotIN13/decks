@@ -118,7 +118,7 @@ const STEP = 1;
  * properties panel grew is cut: the Board/Component tabs (the selection says which), the
  * collapsible sections (four rows do not need folding), the background and theme segments
  * (board meta, not a selection's properties), the file path and revision (the ⋯ menu's job),
- * the Deck tab (the left panel's). 424px becomes about 140px, and a small inspector is *why*
+ * the left panel's list. 424px becomes about 140px, and a small inspector is *why*
  * the right edge is free for the conversation — the same change wearing its second hat.
  *
  * It appears for the selection and only above `INTERACT_ZOOM`, the same rule the palette

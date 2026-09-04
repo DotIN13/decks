@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
@@ -158,6 +158,34 @@ export class Deck {
 		}
 		this.boardsByPath.set(path, board);
 		return board;
+	}
+
+	/**
+	 * Delete a board's file and forget it. `true` if there was one to delete.
+	 *
+	 * Here rather than in `App` because this class is the only thing that knows a
+	 * deck-relative path's file *and* holds the map that path appears in — a delete written
+	 * anywhere else is an `unlink` plus two things to remember. `fileOf` is what makes it
+	 * safe: it resolves through `resolveInDeck`, which throws on anything that climbs out of
+	 * the deck, so a path from the wire cannot reach a file this deck does not own.
+	 *
+	 * The arrangement is rewritten only if it mentioned this board. A deck with no
+	 * `deck.json` is a valid deck — opening one must not write to it, and neither should
+	 * deleting from one that never had positions to lose.
+	 *
+	 * Nothing here touches `.decks/revisions`. The versions of a deleted board stay on disk
+	 * under their shas, which is the whole of what makes this recoverable by hand; the caller
+	 * records one last revision before calling, so the bytes that were on screen are among
+	 * them.
+	 */
+	remove(boardPath: string): boolean {
+		const path = normalizeBoardPath(boardPath);
+		const absolute = this.fileOf(path);
+		const existed = existsSync(absolute);
+		if (existed) rmSync(absolute);
+		this.boardsByPath.delete(path);
+		if (this.file.boards?.[path]) this.save();
+		return existed;
 	}
 
 	/** Move a board and write the arrangement down. */

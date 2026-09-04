@@ -1,9 +1,14 @@
 import type { Board } from "@decks/protocol";
-import { Show } from "solid-js";
+import Trash2 from "lucide-solid/icons/trash-2";
+import { createSignal, onCleanup, Show } from "solid-js";
 import { RailItem } from "../canvas/BoardRail.tsx";
 import { picture } from "../canvas/thumb-cache.ts";
+import { Icon } from "../icons.tsx";
 import { deckFileUrl } from "../lib/api.ts";
 import { basename } from "./panel-groups.ts";
+
+/** How long an armed delete waits for the second press before forgetting it was asked. */
+const ARMED_MS = 4000;
 
 /**
  * One board, as a line: a 20×14 picture of it, its filename, and a dot if it is up.
@@ -46,31 +51,118 @@ export function BoardRow(props: {
 	dim?: boolean;
 	/** In play: the accent dot at the right end. */
 	onCanvas?: boolean;
-	/** Another agent's identity colour, on the thumbnail's border. See `panel-groups.ts`. */
-	tint?: string;
+	/**
+	 * Delete the board's file. Absent means the row has no delete on it.
+	 *
+	 * The row does not do it on the first press — see `press` below — so this is called only
+	 * once the person has said it twice.
+	 */
+	onDelete?: () => void;
 	onPick: () => void;
 }) {
+	/*
+	 * Deleting takes two presses of the same button, and this is the bit in between.
+	 *
+	 * Every other × in this app removes something recoverable: closing a chat leaves the
+	 * transcript on disk, forgetting an account leaves a login you can do again, hiding a
+	 * board leaves the board. This one unlinks a file somebody wrote, in a list of seventy-
+	 * eight rows, from a button that is 22px wide and appears under the pointer on approach.
+	 * A modal for it would be the heavier answer and a worse one — the question is about
+	 * *this row*, and a dialog takes the row off the screen to ask it.
+	 *
+	 * So the first press arms and says so, and the second one within four seconds does it.
+	 * Leaving the row disarms it, because "somewhere else" is the plainest way of saying no.
+	 */
+	const [armed, setArmed] = createSignal(false);
+	let waiting: ReturnType<typeof setTimeout> | undefined;
+	const disarm = () => {
+		clearTimeout(waiting);
+		setArmed(false);
+	};
+	onCleanup(disarm);
+	const press = () => {
+		if (!armed()) {
+			setArmed(true);
+			clearTimeout(waiting);
+			waiting = setTimeout(() => setArmed(false), ARMED_MS);
+			return;
+		}
+		disarm();
+		props.onDelete?.();
+	};
+	const name = () => basename(props.board.path);
+
 	return (
-		<button
-			class="board-row"
-			type="button"
-			/* What the list's arrow keys rove over — the same contract `ui/Popover.tsx` uses. */
-			data-row
-			data-current={props.current ? "true" : undefined}
-			data-dim={props.dim ? "true" : undefined}
-			/* Not `aria-selected`: this is a button that plays a board, not an option in a
-			   listbox, and `aria-current` is the attribute for "the one you are looking at". */
-			aria-current={props.current ? "true" : undefined}
-			title={props.dim ? `${props.board.title} — held, not on the canvas. Click to show it.` : props.board.title}
-			onClick={props.onPick}
-		>
-			<BoardThumb board={props.board} tint={props.tint} />
-			<span class="nm">{basename(props.board.path)}</span>
-			<Show when={props.onCanvas}>
-				{/* Decorative: "on the canvas" is already said by the section this row is in. */}
-				<span class="dot" aria-hidden="true" />
+		/*
+		 * A box holding the row and the button, rather than a button inside the row: a
+		 * `<button>` in a `<button>` is invalid, and the two mean different things. The same
+		 * arrangement a menu row uses for its × (`.row-act` in `chrome.css`), spelled again in
+		 * `panel.css` because that one's scope restyles anything wearing `data-row`.
+		 */
+		<div class="board-act" onPointerLeave={disarm} onFocusOut={(event) => {
+			// Focus that lands somewhere else in the same box — the row to the button — is not
+			// leaving, and disarming on it would make the keyboard route impossible.
+			if (!event.currentTarget.contains(event.relatedTarget as Node | null)) disarm();
+		}}>
+			<button
+				class="board-row"
+				type="button"
+				/* What the list's arrow keys rove over — the same contract `ui/Popover.tsx` uses. */
+				data-row
+				data-current={props.current ? "true" : undefined}
+				data-dim={props.dim ? "true" : undefined}
+				/* Not `aria-selected`: this is a button that plays a board, not an option in a
+				   listbox, and `aria-current` is the attribute for "the one you are looking at". */
+				aria-current={props.current ? "true" : undefined}
+				title={props.dim ? `${props.board.title} — held, not on the canvas. Click to show it.` : props.board.title}
+				onClick={props.onPick}
+				/* Delete from the keyboard, the way the agent list does it: the row is what the
+				   arrows are on, so the row is where the key has to be heard. Two presses here
+				   as well — the same arming, so the rule does not depend on how you asked. */
+				onKeyDown={(event) => {
+					if (event.key === "Escape" && armed()) {
+						event.preventDefault();
+						event.stopPropagation();
+						disarm();
+						return;
+					}
+					if (!props.onDelete) return;
+					if (event.key !== "Delete" && event.key !== "Backspace") return;
+					event.preventDefault();
+					event.stopPropagation();
+					press();
+				}}
+			>
+				<BoardThumb board={props.board} />
+				<span class="nm">{name()}</span>
+				<Show when={props.onCanvas}>
+					{/* Decorative: "on the canvas" is already said by the section this row is in. */}
+					<span class="dot" aria-hidden="true" />
+				</Show>
+			</button>
+
+			<Show when={props.onDelete}>
+				<button
+					class="board-del"
+					type="button"
+					data-armed={armed() ? "true" : undefined}
+					title={armed() ? `Press again to delete ${name()} — the file goes with it` : `Delete ${name()} from the deck`}
+					aria-label={armed() ? `Delete ${name()} — press again to confirm` : `Delete ${name()}`}
+					onClick={(event) => {
+						event.stopPropagation();
+						press();
+					}}
+					onKeyDown={(event) => {
+						if (event.key !== "Escape" || !armed()) return;
+						event.preventDefault();
+						event.stopPropagation();
+						disarm();
+					}}
+				>
+					<Icon of={Trash2} size={12} />
+				</button>
 			</Show>
-		</button>
+		</div>
 	);
 }
 
@@ -95,9 +187,9 @@ export function BoardRow(props: {
  * implementation of "a board, photographed", already budgeted so a screen of them does not
  * mount seventy-eight documents at once, and already covered by the thumbnail checks. The
  * 20×14 rows then draw from the cache it fills, which is why browsing the deck once is what
- * makes the Context tab look like something.
+ * makes the panel's rows look like something.
  */
-export function BoardTile(props: { board: Board; current?: boolean; dim?: boolean; tint?: string; onPick: () => void }) {
+export function BoardTile(props: { board: Board; current?: boolean; dim?: boolean; onPick: () => void }) {
 	return <RailItem board={props.board} current={props.current ?? false} offCanvas={props.dim} cache onPick={props.onPick} />;
 }
 
@@ -106,11 +198,16 @@ export function BoardTile(props: { board: Board; current?: boolean; dim?: boolea
  *
  * Exported so a row somewhere else — a search result, an `@board` mention — can draw a board
  * the same way rather than inventing a second small thumbnail.
+ *
+ * The border used to be tintable, so a board another agent held could wear that agent's
+ * colour. The panel no longer lists anybody else's holdings, so there was one caller and
+ * it passed nothing: a parameter kept for a case that cannot arise is a parameter the next
+ * reader has to rule out.
  */
-export function BoardThumb(props: { board: Board; tint?: string; class?: string }) {
+export function BoardThumb(props: { board: Board; class?: string }) {
 	const shot = () => shotOf(props.board);
 	return (
-		<span class={`board-thumb ${props.class ?? ""}`} style={props.tint ? { "border-color": props.tint } : undefined}>
+		<span class={`board-thumb ${props.class ?? ""}`}>
 			{/* `alt=""` on purpose: the filename is right beside it, and "the-shell.html
 			    (thumbnail)" read out after "the-shell.html" is noise. */}
 			<Show when={shot()}>{(src) => <img src={src()} alt="" />}</Show>

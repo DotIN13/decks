@@ -14,10 +14,9 @@
  * because there is no CSS unit for this — `dvh` describes the whole viewport, not the
  * inset, and would move the dock by resizing the app.
  *
- * The same property does a second job for free: pinch-zooming the *page* (which the
- * canvas allows, since `viewport-fit=cover` and a scalable viewport are what make text
- * legible for someone who needs it larger) also shrinks the visual viewport, and the
- * dock follows it down rather than sitting off screen.
+ * The same property does a second job for free: anything that shrinks the visual viewport
+ * — the keyboard, and a page zoom on a browser that still allows one — moves the dock with
+ * it rather than leaving it off screen.
  */
 
 /** How much of the layout viewport the browser is covering, in CSS pixels. */
@@ -58,5 +57,31 @@ export function trackVisualViewport(): () => void {
 		view.removeEventListener("resize", apply);
 		view.removeEventListener("scroll", apply);
 		root.style.removeProperty("--keyboard");
+	};
+}
+
+/**
+ * Refuse to zoom the page, on the browsers that ignore being told not to.
+ *
+ * `user-scalable=no` in the viewport meta is honoured by Android and ignored by iOS Safari,
+ * which has fired `gesturestart` / `gesturechange` / `gestureend` for a pinch since long
+ * before it stopped honouring the meta. Cancelling those is the only thing left that stops
+ * a two-finger pinch scaling the app.
+ *
+ * It does not touch the canvas. The board pinch is built on pointer and touch events
+ * (`canvas/touch.ts`, `canvas/frame-gestures.ts`) and Safari fires both streams for the same
+ * fingers, so the gesture that zooms the boards is unaffected — which is the whole point of
+ * this: one pinch, one thing zoomed, and it is the thing under your fingers.
+ *
+ * Registered non-passive, because a passive listener cannot cancel anything, and on the
+ * *document* rather than the app root: a gesture that begins over a board's frame is still
+ * Safari's page zoom, and the frame is a separate document with its own root.
+ */
+export function blockPageZoom(): () => void {
+	const stop = (event: Event) => event.preventDefault();
+	const events = ["gesturestart", "gesturechange", "gestureend"];
+	for (const name of events) document.addEventListener(name, stop, { passive: false });
+	return () => {
+		for (const name of events) document.removeEventListener(name, stop);
 	};
 }

@@ -28,16 +28,50 @@ await ask(page, "Read each of boards/plan.html, boards/risks.html and boards/sou
 await openHistory(page);
 
 /*
- * The tool calls are one pill until asked for.
+ * The tool calls are one row until asked for.
  *
- * A turn that edits files is mostly tool calls, so the history collapses a run of them to
- * a count — and the count has to open, or the output would be somewhere with no route to
- * it now that the chat column is gone.
+ * A turn that edits files is mostly tool calls, so the history collapses a run of them to a
+ * count — and the count has to open, or the output would be somewhere with no route to it
+ * now that the chat column is gone.
+ *
+ * `[data-group]` rather than a class of its own: the group used to be a filled pill,
+ * `.stream-tool-head`, and it is the same `.tool` row as its children now — same glyph, same
+ * mono name, same chevron at the right end. The attribute exists so a check can say *which*
+ * row it means without the row looking different to say it.
  */
-say("a run of tool calls collapses to one pill", (await page.locator(".stream .stream-tool-head").count()) > 0);
-await page.locator(".stream .stream-tool-head").first().click();
-await page.waitForSelector(".stream .tool", { timeout: 10000 });
-say("…that opens to the calls themselves", (await page.locator(".stream .stream-tool-kids .tool").count()) > 0);
+say("a run of tool calls collapses to one row", (await page.locator(".stream .tool[data-group]").count()) > 0);
+await page.locator(".stream .tool[data-group] > .row").first().click();
+await page.waitForSelector(".stream .tool-kids .tool", { timeout: 10000 });
+const nested = await page.locator(".stream .tool[data-group] .tool-kids .tool").count();
+say("…that opens to the calls themselves, nested under it", nested > 0, `${nested} nested`);
+/*
+ * And they are the same object as the row above them. The group was a species of its own
+ * while it was a pill, which showed the moment it opened: a filled header with three unfilled
+ * rows hanging off it.
+ */
+const sameShape = await page.evaluate(() => {
+	const head = document.querySelector('.stream .tool[data-group] > .row');
+	const kid = document.querySelector(".stream .tool-kids .tool > .row");
+	if (!head || !kid) return null;
+	const read = (row) => {
+		const style = getComputedStyle(row);
+		const name = getComputedStyle(row.querySelector(".name"));
+		return {
+			height: Math.round(row.getBoundingClientRect().height),
+			radius: style.borderRadius,
+			mono: name.fontFamily.includes("Mono"),
+			caps: name.textTransform,
+			chevronLast: row.lastElementChild?.classList.contains("twist") ?? false,
+		};
+	};
+	return { head: read(head), kid: read(kid) };
+});
+say(
+	"a group and a call are the same row",
+	sameShape !== null && JSON.stringify(sameShape.head) === JSON.stringify(sameShape.kid),
+	JSON.stringify(sameShape),
+);
+say("…in mono, uppercase, with the chevron at the end", sameShape?.kid.mono && sameShape?.kid.caps === "uppercase" && sameShape?.kid.chevronLast, JSON.stringify(sameShape?.kid));
 
 /*
  * Overflow is forced rather than hoped for: the squeeze only happened once the content was
@@ -58,7 +92,7 @@ const chips = await page.evaluate(() => {
 
 	// The guard removed for a moment: every row in the scroller free to shrink.
 	const undo = document.createElement("style");
-	undo.textContent = ".stream .stream-roll > *, .stream .stream-tools > *, .stream .stream-tool-kids > * { flex: 1 1 auto !important; }";
+	undo.textContent = ".stream .stream-roll > *, .stream .stream-tools > *, .stream .tool-kids > * { flex: 1 1 auto !important; }";
 	document.head.appendChild(undo);
 	const squeezed = measure();
 	undo.remove();
@@ -76,9 +110,9 @@ say("every tool chip keeps its height", chips.count > 0 && chips.fixed.every((h)
  * A chip used to be a direct child of the scroller, where `flex: 0 0 auto` was the only
  * thing between it and being squeezed to a line: it has `overflow: hidden` and so no
  * content-based minimum of its own to push back with. It is a grandchild now, inside the
- * `.stream-tool-kids` its run collapses into, and that group *does* have a content-based
- * minimum — the sum of the chips' own heights. So the floor is structural rather than a
- * single declaration, and removing the declaration no longer reproduces the bug.
+ * `.tool-kids` its run collapses into, and that group *does* have a content-based minimum —
+ * the sum of the chips' own heights. So the floor is structural rather than a single
+ * declaration, and removing the declaration no longer reproduces the bug.
  */
 say(
 	"…even with every row in the scroller free to shrink",
@@ -87,7 +121,7 @@ say(
 );
 
 await settle(page, 600);
-await page.locator(".stream .tool .row").first().click();
+await page.locator(".stream .tool > .row:not([disabled])").first().click();
 await page.waitForSelector(".stream .tool pre", { timeout: 5000 });
 say("a chip still expands to its output", (await page.locator(".stream .tool pre").count()) > 0);
 

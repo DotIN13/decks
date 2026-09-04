@@ -75,6 +75,20 @@ say(
 say("the send button is a fingertip target", dock.send.w >= 40 && dock.send.h >= 40, JSON.stringify(dock.send));
 
 /*
+ * And no keyboard hints under it.
+ *
+ * Every phrase in that row names a key — ⏎, ⇧+⏎, /, Esc — and a phone has none of them
+ * until a keyboard is up, at which point the row is behind it. 18px of unreadable advice
+ * directly above the one control that matters on a small screen. `pointer-coarse:hidden`
+ * rather than a width, because a narrow window on a laptop still has the keys.
+ */
+const hints = await page.evaluate(() => {
+	const row = document.querySelector(".hintrow");
+	return { present: Boolean(row), shown: row ? getComputedStyle(row).display !== "none" : false };
+});
+say("no keyboard hints under the box on a touchscreen", hints.shown === false, JSON.stringify(hints));
+
+/*
  * And the title bar still holds them all.
  *
  * The two clusters have to fit a line that a title bar never had to.
@@ -437,6 +451,43 @@ say("and tapping it again puts it away", (await openState()).right === false, JS
 await page.locator('.pill button[title^="Conversation"]').tap();
 await settle(page, 400);
 say("…and it opens again", (await openState()).right, JSON.stringify(await openState()));
+/*
+ * Before the swipe that closes it: the history has to *scroll* under a finger, and from
+ * anywhere in the sheet rather than only from a card.
+ *
+ * The column takes no pointer events and its cards take their own, so the gaps between
+ * turns stay canvas — right beside the canvas, wrong over it. On a phone this is a
+ * full-width sheet with nothing reachable behind it, and a thumb landing in a gap did
+ * nothing at all: "the history will not scroll", when in fact it scrolled fine from the
+ * middle of a card. Below 1100px the roll takes the pointer (`Stream.tsx`).
+ *
+ * The cards are the harness's own, because a fresh agent has said nothing and a scroller
+ * with nothing in it cannot be scrolled. What is under test is which element the finger
+ * lands on, not what the transcript happens to hold.
+ */
+const gutter = await page.evaluate(() => {
+	const roll = document.querySelector(".stream .stream-roll");
+	for (let i = 0; i < 14; i++) {
+		const filler = document.createElement("div");
+		filler.className = "stream-card";
+		filler.dataset.harness = "filler";
+		filler.textContent = `Filler ${i + 1} — long enough to take a line or two of the column.`;
+		roll.append(filler);
+	}
+	roll.scrollTop = roll.scrollHeight;
+	const box = roll.getBoundingClientRect();
+	return { room: roll.scrollHeight - roll.clientHeight, top: roll.scrollTop, at: { x: Math.round(box.left + 8), y: Math.round(box.top + box.height / 2) } };
+});
+await swipe([gutter.at], { x: 0, y: 180 }, 12);
+const scrolledHistory = await page.evaluate(() => Math.round(document.querySelector(".stream .stream-roll").scrollTop));
+say(
+	"a finger anywhere in the conversation scrolls it, not only on a card",
+	gutter.room > 100 && scrolledHistory < gutter.top - 50,
+	`scrollTop ${gutter.top} -> ${scrolledHistory}, ${gutter.room}px of room`,
+);
+await page.evaluate(() => document.querySelectorAll('[data-harness="filler"]').forEach((node) => node.remove()));
+await settle(page, 200);
+
 const middle = await page.evaluate(() => {
 	const box = document.querySelector(".stream .stream-roll").getBoundingClientRect();
 	return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
@@ -517,6 +568,79 @@ say("zoomed in, the left edge is over a live board's frame", overBoard === "ifra
 await swipe([{ x: 3, y: mid }], { x: 150, y: 0 }, 12);
 await settle(page, 400);
 say("the edge swipe works over a board too", (await openState()).boards, JSON.stringify(await openState()));
+await page.locator('.pill button[aria-label$="the boards panel"]').tap();
+await settle(page, 300);
+
+// --- 7b. the panel's own header is a fingertip's, not a cursor's ---------------------
+/*
+ * A 28px search field is right beside a cursor, where the panel is a dense list and its
+ * header should not compete with it. On a phone the same header is a *sheet's* and the only
+ * control above a scrolling list, and 28px is a thumb's-width of guesswork.
+ *
+ * The tab strip that used to be up here is gone — one list, three headings — so what is left
+ * to size is the field, the foot and the two toggles in it.
+ *
+ * The 16px on the input is the one number here that is not about looks: below 16, iOS zooms
+ * the page when a field takes focus, which leaves the canvas at a scale nobody chose and the
+ * chrome half off screen. The composer's field has carried that number for the same reason.
+ */
+await openPanel(page, "deck");
+const header = await page.evaluate(() => {
+	const box = (selector) => {
+		const element = document.querySelector(selector);
+		return element ? Math.round(element.getBoundingClientRect().height) : 0;
+	};
+	return {
+		tabs: document.querySelectorAll('[role="tab"]').length,
+		field: box(".panel-shell .field"),
+		font: Math.round(parseFloat(getComputedStyle(document.querySelector(".panel-shell .field input")).fontSize)),
+		foot: box(".panel-foot"),
+		toggle: box(".panel-foot .seg button"),
+	};
+});
+say("no tab strip to aim at, on a phone least of all", header.tabs === 0, JSON.stringify(header));
+say("the panel's search field is a finger tall", header.field >= 36, JSON.stringify(header));
+say("…and its foot, which has two more targets in it", header.foot >= 40 && header.toggle >= 28, JSON.stringify(header));
+say("the search input is 16px, so focusing it does not zoom the page", header.font >= 16, JSON.stringify(header));
+
+/*
+ * Both marks on a row, side by side, because a thumb never hovers.
+ *
+ * Beside a cursor the bin stands *in* the dot's column and the dot gives way to it on
+ * approach. There is no approach here, so hiding the dot behind a permanently visible bin
+ * would lose the one thing that says a board is on the canvas.
+ */
+const marks = await page.evaluate(() => {
+	const row = document.querySelector(".board-act:has(.dot)");
+	if (!row) return null;
+	const dot = row.querySelector(".dot").getBoundingClientRect();
+	const bin = row.querySelector(".board-del").getBoundingClientRect();
+	return {
+		dot: getComputedStyle(row.querySelector(".dot"), "::before").opacity,
+		bin: getComputedStyle(row.querySelector(".board-del")).opacity,
+		apart: Math.round(bin.left - dot.right),
+	};
+});
+say(
+	"a row on the canvas shows its dot and its bin, side by side",
+	marks === null || (marks.dot === "1" && marks.bin === "1" && marks.apart >= 0),
+	JSON.stringify(marks),
+);
+
+/*
+ * And the page itself does not zoom: one pinch, and the thing it zooms is the canvas.
+ *
+ * The meta is honoured by Android and ignored by iOS, which is why the gesture events are
+ * refused as well — that is the half this can actually exercise in Chromium.
+ */
+const zoomable = await page.evaluate(() => {
+	const meta = document.querySelector('meta[name="viewport"]')?.content ?? "";
+	const event = new Event("gesturestart", { cancelable: true, bubbles: true });
+	document.dispatchEvent(event);
+	return { meta, refused: event.defaultPrevented };
+});
+say("the viewport says the page is not scalable", /user-scalable=no/.test(zoomable.meta) && /maximum-scale=1/.test(zoomable.meta), zoomable.meta);
+say("…and a pinch gesture aimed at the page is refused", zoomable.refused, JSON.stringify(zoomable));
 await page.locator('.pill button[aria-label$="the boards panel"]').tap();
 await settle(page, 300);
 

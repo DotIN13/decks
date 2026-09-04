@@ -221,11 +221,11 @@ try {
 	 * appear at all, against 118ms queued. Sampled while it fills, because the thing being
 	 * asserted only exists mid-flight (`canvas/thumb-budget.ts`).
 	 *
-	 * The fill is triggered by switching *away* and back, since the tab that is already up
-	 * has already loaded. It used to be the title bar's button, which is gone with the bar.
+	 * The fill is triggered by putting the list into rows and then back into a grid, so every
+	 * tile mounts in one frame. It used to switch tabs — there are none — and before that it
+	 * was the title bar's button, which went with the bar.
 	 */
 	await page.getByRole("button", { name: "Show boards as a list" }).click();
-	await page.getByRole("tab", { name: /context/i }).click();
 	await settle(page, 400);
 	const loading = await page.evaluate(() => {
 		const peak = { value: 0 };
@@ -240,7 +240,7 @@ try {
 			peak.value = Math.max(peak.value, starting);
 		};
 		const timer = setInterval(look, 16);
-		[...document.querySelectorAll('[role="tab"]')].find((tab) => /deck/i.test(tab.textContent))?.click();
+		document.querySelector('button[aria-label="Show boards as a grid"]')?.click();
 		return new Promise((resolve) => setTimeout(() => { clearInterval(timer); resolve(peak.value); }, 1200));
 	});
 	say("no more than a couple of boards are ever starting at once", loading <= 4, `${loading} at the busiest moment`);

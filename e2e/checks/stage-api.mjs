@@ -19,15 +19,17 @@ const onCanvas = () => page.evaluate(() => [...document.querySelectorAll(".board
 // `.file`, which the panel's rows have never rendered; the two lists were compared as two
 // empty arrays and matched.
 /*
- * The focused agent's own rows in the Context tab.
+ * The focused agent's own rows: the panel's first two sections.
  *
- * `.nm` because that is the class a row says its basename in; `:not([data-kind="other"])`
- * because the tab ends with a section per *other* agent that holds something, and a
- * selector that takes every row reads somebody else's holdings as this agent's. It used to
- * ask for `.board-row .file`, which the panel has never rendered.
+ * `.nm` because that is the class a row says its basename in — it used to ask for
+ * `.board-row .file`, which the panel has never rendered. `:not([data-kind="deck"])` is what
+ * separates "what this agent holds" from "what there is" now that the Context and Deck tabs
+ * are three headings in one list.
  */
 const inPanel = () =>
-	page.evaluate(() => [...document.querySelectorAll('.panel-section:not([data-kind="other"]) .board-row .nm')].map((n) => n.textContent).sort());
+	page.evaluate(() =>
+		[...document.querySelectorAll('.panel-section:not([data-kind="deck"]) .board-row .nm')].map((n) => n.textContent).sort(),
+	);
 
 // A fresh agent, so nothing it holds is inherited.
 await newAgent(page);

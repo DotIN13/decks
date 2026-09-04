@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Decks — something is waiting">
+	<!--
+		The same mark with an unread dot, swapped in by `lib/favicon.ts` when an alert
+		arrives at a tab you are not looking at.
+
+		The dot is punched out of the boards with a mask rather than drawn on top of them:
+		the favicon has no background of its own, so a ring of "page colour" around the dot
+		would be a ring of whatever the tab strip happens to be. A hole is the only separator
+		that is right on every browser theme.
+	-->
+	<style>
+		.a { fill: #f2f3f5 }
+		.b { fill: #9a9ea6 }
+		.c { fill: #c3c7cd }
+		@media (prefers-color-scheme: light) {
+			.a { fill: #161616 }
+			.b { fill: #7b7f86 }
+			.c { fill: #4a4d53 }
+		}
+	</style>
+	<mask id="hole">
+		<rect x="0" y="0" width="32" height="32" fill="#fff" />
+		<circle cx="25" cy="25" r="9.5" fill="#000" />
+	</mask>
+	<g mask="url(#hole)">
+		<rect class="a" x="2" y="4" width="15" height="13" rx="3" />
+		<rect class="b" x="20" y="4" width="10" height="24" rx="3" />
+		<rect class="c" x="2" y="20" width="15" height="8" rx="3" />
+	</g>
+	<circle cx="25" cy="25" r="6.5" fill="#3b5cf6" />
+</svg>

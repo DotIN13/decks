@@ -56,19 +56,30 @@ try {
 	await page.locator('.pill button[aria-label="More"]').click();
 	await page.waitForSelector(".popover", { timeout: 4000 });
 	/*
-	 * The *visible* rows. Two more live in this menu on a phone — a new board and clearing
-	 * the canvas, which leave the corner's line under 520px — and `allTextContents` reads
-	 * them whether they are displayed or not, which is the same trap that had this suite
-	 * counting five tools on a screen showing none.
+	 * The *visible* rows. Three more live in this menu on a phone — fit, a new board and
+	 * clearing the canvas, which leave the corner's line under 640px — and `allTextContents`
+	 * reads them whether they are displayed or not, which is the same trap that had this
+	 * suite counting five tools on a screen showing none.
+	 *
+	 * Asserted as the **last three** rather than as the whole list, because the context
+	 * reading moved into this menu and puts a "Usage and limits" row above them once the
+	 * agent has reported one. A fresh agent has not, so a length check would pass here and
+	 * fail the first time somebody ran this after a turn — which is the worst kind of green.
 	 */
 	const rows = await page.evaluate(() =>
 		[...document.querySelectorAll(".popover [data-row]")]
 			.filter((row) => row.offsetParent !== null)
 			.map((row) => row.querySelector(".lb")?.textContent?.trim() ?? ""),
 	);
+	const app = rows.slice(-3);
 	say(
-		"the overflow holds the cheat sheet, the settings and the theme",
-		rows.length === 3 && /canvas/i.test(rows[0]) && /settings/i.test(rows[1]) && /light|dark/i.test(rows[2]),
+		"the overflow ends with the cheat sheet, the settings and the theme",
+		app.length === 3 && /canvas/i.test(app[0]) && /settings/i.test(app[1]) && /light|dark/i.test(app[2]),
+		rows.join(" | "),
+	);
+	say(
+		"…and nothing above them but a context reading, if there is one",
+		rows.slice(0, -3).every((row) => /usage/i.test(row)),
 		rows.join(" | "),
 	);
 	await page.keyboard.press("Escape");

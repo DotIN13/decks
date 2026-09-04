@@ -33,6 +33,19 @@ try {
 	await page.waitForSelector("[data-shown='true']", { timeout: 4000 });
 	let now = await state();
 	say("the button shows the conversation", now.button === "true" && now.shown, JSON.stringify(now));
+
+	/*
+	 * And it is the only control that dismisses it.
+	 *
+	 * The column used to carry an × of its own, revealed on hover at the top of the stack.
+	 * One surface with two dismiss controls is one too many — the button that opened this is
+	 * the button that closes it, which is what `data-on` on it says — so the × is gone and
+	 * this asserts the absence, because a hover-revealed control is exactly the kind of thing
+	 * that comes back by accident. Escape and a right-swipe are the other two ways out and
+	 * neither is a control; both are asserted elsewhere in this file and in `mobile.mjs`.
+	 */
+	const inColumn = await page.evaluate(() => document.querySelectorAll(".stream button[aria-label*='lose' i], .stream .stream-head").length);
+	say("the conversation has no close button of its own", inColumn === 0, String(inColumn));
 	// It floats over the boards rather than standing beside them, so it is deliberately not
 	// subtracted from the canvas — see the note on the inspector below, which is the same
 	// rule read the other way.
@@ -91,7 +104,17 @@ try {
 	await page.waitForSelector("[data-shown='true']", { timeout: 4000 });
 	now = await state();
 	say("the most recent act wins, and the inspector yields", now.shown && !now.inspector, JSON.stringify(now));
-	await page.locator("[data-shown='true'] button[aria-label*='lose'], [data-shown='true'] button[title*='lose']").first().click().catch(() => page.keyboard.press("Escape"));
+	/*
+	 * Closed with the corner button, because that is now the only control that closes it.
+	 *
+	 * This used to click the column's own ×, falling back to Escape if it could not find
+	 * one. Both halves of that are wrong here now: the × is gone, and Escape is the *other*
+	 * case — with a component selected it clears the selection and calls `preventDefault`,
+	 * so the conversation's own handler stands down and this assertion would be about a
+	 * selection that no longer exists. One press of the button, which is the gesture a
+	 * person has.
+	 */
+	await button.click();
 	await page.waitForTimeout(500);
 	now = await state();
 	say("…and closing it hands the edge straight back, selection intact", now.inspector && !now.shown, JSON.stringify(now));

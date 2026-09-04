@@ -122,6 +122,34 @@
 	}
 
 	/*
+	 * A chip in this row gives ground; a chip in a pill does not.
+	 *
+	 * `.chipbtn` is `flex: none` (`chrome.css`), which is right where it was written: the
+	 * corner's pill is `w-max`, so a chip that could shrink would be a chip shrinking for no
+	 * reason. This row is the other case — a fixed-width card with a model name in it, and a
+	 * model name is whatever the runtime calls it. `claude-opus-4-1-20250805-extended-thinking`
+	 * made a 357px chip, which on a 390px phone pushed the send button 153px past the right
+	 * edge of the box: the one control in the bar that has to be reachable, off the screen.
+	 *
+	 * Both call sites already asked for this — the two triggers carry `min-w-0` and their
+	 * labels carry `truncate`, which do nothing at all against `flex-shrink: 0`. So the fix
+	 * belongs here, where the contradiction is, rather than as a `shrink` utility bolted onto
+	 * each of them.
+	 *
+	 * The label needs its own `min-width: 0` for the same reason the button did: a flex item
+	 * will not go below its min-content width unless it is told it may, and `truncate` has no
+	 * effect on a box that is never narrower than its text.
+	 */
+	.dockrow .chipbtn {
+		flex: 0 1 auto;
+		min-width: 0;
+	}
+
+	.dockrow .chipbtn > span {
+		min-width: 0;
+	}
+
+	/*
 	 * A fingertip needs more, and nothing else on the element sets these — which is the
 	 * only reason a media query is allowed to say so here.
 	 *
@@ -237,63 +265,14 @@
 	}
 
 	/*
-	 * The dial: how full the context is, as a ring at the end of the hint row.
+	 * The context ring is gone from here.
 	 *
-	 * Ambient rather than alarming — it fills as the conversation grows and only changes
-	 * colour when it is worth doing something about. `--dial` carries the ring's own colour
-	 * so the number and the arc move together through the three levels without either
-	 * being stated twice.
+	 * It was `.dial` — a 16px arc and a percentage at the end of the hint row, ambient and
+	 * only alarming over 70%. The reading now lives in the corner's `⋯` as a row of numbers
+	 * (`chrome/ContextSummary.tsx`) and the warning lives on the `⋯` button itself, which is
+	 * `.iconbtn[data-level]` in `chrome.css`. Nothing here draws a ring any more, so the
+	 * fifty lines that did are deleted rather than kept warm.
 	 */
-	.dial {
-		display: flex;
-		flex: none;
-		align-items: center;
-		gap: 5px;
-		padding: 1px 4px;
-		border: 0;
-		border-radius: 6px;
-		background: none;
-		color: var(--faint);
-		cursor: pointer;
-		font: inherit;
-		font-size: 11px;
-		font-variant-numeric: tabular-nums;
-		transition:
-			background-color 120ms ease,
-			color 120ms ease;
-		--dial: var(--color-accent);
-	}
-
-	.dial:hover,
-	.dial[aria-expanded="true"] {
-		background: var(--line);
-		color: var(--fg);
-	}
-
-	.dial:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 1px;
-	}
-
-	/* Amber over 70%, red over 85%: the two points where the next long turn is the one
-	   that gets truncated, so the colour arrives before the trouble does. */
-	.dial[data-level="warn"] {
-		color: var(--color-warn);
-		--dial: var(--color-warn);
-	}
-
-	.dial[data-level="high"] {
-		color: var(--color-danger);
-		--dial: var(--color-danger);
-	}
-
-	.dial .track {
-		stroke: var(--line-strong);
-	}
-
-	.dial .fill {
-		stroke: var(--dial);
-	}
 
 	/*
 	 * The provider, as a pill in front of the model's own name.
@@ -393,6 +372,16 @@
 		background: var(--color-accent);
 	}
 
+	/* The same two thresholds the `⋯` button uses, so an amber corner does not open onto a
+	   blue bar. `contextLevel` in `chrome/ContextSummary.tsx` is where 70 and 85 are decided. */
+	.popover .track[data-level="warn"] > i {
+		background: var(--color-warn);
+	}
+
+	.popover .track[data-level="high"] > i {
+		background: var(--color-danger);
+	}
+
 	/*
 	 * An action at the bottom of a popover, and the shape of one that is not built yet.
 	 *
@@ -428,25 +417,36 @@
 		cursor: not-allowed;
 	}
 
-	/* The switch, drawn rather than borrowed: this is the only one in the app so far, and
-	   `[data-on]` is off for the same reason the row above it is disabled. */
-	.popover .sw {
+	/*
+	 * The switch, drawn rather than borrowed.
+	 *
+	 * It was written as `.popover .sw` for a menu row and then never used by one — dead CSS
+	 * describing a control the app did not have. The notifications grid is its first caller
+	 * (`chat/AlertSettings.tsx`, three of them), so the `.popover` prefix came off rather than
+	 * a second one going on: a switch is a control, not a property of the menu it was
+	 * invented in.
+	 */
+	.sw {
 		box-sizing: border-box;
+		/* It is a real `<button>` at its one call site, so the three declarations a browser
+		   would otherwise supply have to be undone here rather than at the markup. */
+		appearance: none;
+		border: 0;
+		cursor: pointer;
 		width: 26px;
 		height: 15px;
 		flex: none;
-		margin-left: auto;
 		padding: 2px;
 		border-radius: 999px;
 		background: var(--line-strong);
 		transition: background-color 120ms ease;
 	}
 
-	.popover .sw[data-on="true"] {
+	.sw[data-on="true"] {
 		background: var(--color-accent);
 	}
 
-	.popover .sw > i {
+	.sw > i {
 		display: block;
 		width: 11px;
 		height: 11px;
@@ -455,7 +455,7 @@
 		transition: margin-left 120ms ease;
 	}
 
-	.popover .sw[data-on="true"] > i {
+	.sw[data-on="true"] > i {
 		margin-left: 11px;
 	}
 }

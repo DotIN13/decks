@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Decks">
+	<!--
+		The app's mark, from `src/icons.tsx`: boards of unequal size laid out on a canvas.
+		Deliberately not a grid of equal squares — a deck is an arrangement somebody chose,
+		and the asymmetry is the only thing that says so at 16px.
+
+		Two differences from the in-app drawing, both forced by the size. The faint boards
+		are opaque fills rather than `opacity`, because a 50% alpha over a tab strip whose
+		colour we do not know is a different grey on every browser; and they are lifted from
+		0.5/0.72 to roughly 0.62/0.80 of the way to the ink, since a 5px rect at 16px has no
+		room to be subtle.
+
+		The ink itself follows the *browser's* scheme rather than the app's. A favicon is
+		painted onto the tab strip, and the tab strip belongs to the browser: an app in light
+		mode inside a dark-themed Chrome still needs a light mark. `prefers-color-scheme`
+		inside an SVG is honoured by Firefox and Chromium; Safari ignores it and takes the
+		first declaration, which is why the dark ink is the default and the light override
+		comes second.
+	-->
+	<style>
+		.a { fill: #f2f3f5 }
+		.b { fill: #9a9ea6 }
+		.c { fill: #c3c7cd }
+		@media (prefers-color-scheme: light) {
+			.a { fill: #161616 }
+			.b { fill: #7b7f86 }
+			.c { fill: #4a4d53 }
+		}
+	</style>
+	<rect class="a" x="2" y="4" width="15" height="13" rx="3" />
+	<rect class="b" x="20" y="4" width="10" height="24" rx="3" />
+	<rect class="c" x="2" y="20" width="15" height="8" rx="3" />
+</svg>

@@ -107,14 +107,29 @@
 	 * The section label: a 20px line inside the list, sentence case, with its count at the
 	 * far end. Wears `.meta` for the type, which is where "never uppercase" is argued.
 	 */
+	/*
+	 * The section label, and its count in the right-hand column.
+	 *
+	 * 6px on the right rather than 4, because that column is shared: a section's number, a
+	 * row's on-canvas dot and a row's delete all stand in the same 20px at the same distance
+	 * from the edge, so the right side of this panel is one line down the page rather than
+	 * three things that nearly agree.
+	 */
 	.panel-meta {
 		display: flex;
 		flex: none;
 		align-items: center;
 		box-sizing: border-box;
 		height: 20px;
-		padding: 0 4px;
+		padding: 0 6px 0 4px;
 		gap: 4px;
+	}
+
+	.panel-meta > .n {
+		display: grid;
+		width: 20px;
+		flex: none;
+		place-items: center;
 	}
 
 	/* 6px, on top of the list's own 2px gap: 8px between one section and the next. */
@@ -192,6 +207,20 @@
 	}
 
 	/*
+	 * Taller under a finger, because the two toggles in it are.
+	 *
+	 * The header grew to 36px tabs and a 40px field on a coarse pointer (`LeftPanel.tsx`),
+	 * and a 30px foot with 20px squares in it under that reads as a strip the panel forgot.
+	 * Nothing else in here is a target, so this is the whole of it: the row, and the buttons
+	 * are sized by utilities beside the markup that describes them.
+	 */
+	@media (pointer: coarse) {
+		.panel-foot {
+			height: 44px;
+		}
+	}
+
+	/*
 	 * One board, as a line.
 	 *
 	 * A wash on hover and on the current one, rather than a border: the row is text on the
@@ -254,13 +283,161 @@
 		white-space: nowrap;
 	}
 
-	/* On the canvas. Six pixels of accent, at the end of the row. */
+	/*
+	 * A row with a delete at the end of it.
+	 *
+	 * The same object a menu row is — a box holding the row and one small button, so that
+	 * pressing the button is not pressing the row, and so that a `<button>` is not nested
+	 * inside a `<button>`. It is spelled again here rather than reusing `.row-act` from
+	 * `chrome.css` because that one is scoped to `:is(.popover, .rowlist)`, whose `[data-row]`
+	 * is a 16px/1fr grid with 7px of padding: pulling this list into that scope would restyle
+	 * all seventy-eight board rows as menu rows.
+	 *
+	 * The wash moves to the box, and the row inside it goes transparent. Two nested washes is
+	 * a darker rectangle inside a lighter one, which reads as a row inside a row.
+	 */
+	/*
+	 * `position: relative`, because the delete is *in* the row rather than beside it.
+	 *
+	 * It used to be a flex sibling, which cost the row 22px of its width whether or not
+	 * anything was showing — and put the on-canvas dot 24px left of the section counts above
+	 * it, so the panel had two right edges. Out of flow, the bin stands in the dot's own
+	 * column: approach a row and the dot gives way to it, in the same place, at the same
+	 * size. Nothing moves, and there is one right edge.
+	 */
+	.board-act {
+		position: relative;
+		display: flex;
+		flex: none;
+		align-items: center;
+		border-radius: var(--control-radius, 8px);
+		transition: background-color 120ms ease;
+	}
+
+	.board-act:hover,
+	.board-act:has(> .board-row[data-current="true"]) {
+		background: var(--line);
+	}
+
+	.board-act > .board-row:hover,
+	.board-act > .board-row[data-current="true"] {
+		background: transparent;
+	}
+
+	.board-act > .board-row {
+		min-width: 0;
+		flex: 1;
+	}
+
+	/*
+	 * Out of the way until the row is approached — a column of bins reads as a list of things
+	 * to throw away rather than a list of boards. `:focus-within` on the box, so roving onto
+	 * the row with the keyboard reveals it too: Delete is handled on the row, and an
+	 * invisible key is not a shortcut.
+	 */
+	.board-del {
+		position: absolute;
+		top: 50%;
+		right: 6px;
+		display: grid;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+		opacity: 0;
+		place-items: center;
+		translate: 0 -50%;
+		transition:
+			opacity 120ms ease,
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.board-act:is(:hover, :focus-within) > .board-del {
+		opacity: 1;
+	}
+
+	.board-del:hover {
+		background: color-mix(in srgb, var(--fg) 12%, transparent);
+		color: var(--fg);
+	}
+
+	.board-del:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
+	}
+
+	/*
+	 * Armed: asked once, waiting for the second press.
+	 *
+	 * Danger red and *held visible* whatever the pointer is doing, because the one state in
+	 * which this button must not fade back into the row is the one where a press deletes a
+	 * file. The words are in the tooltip and the accessible name; the colour is what a reader
+	 * who is already looking at it gets.
+	 */
+	.board-del[data-armed="true"] {
+		opacity: 1;
+		background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+		color: var(--color-danger);
+	}
+
+	/*
+	 * Nothing to approach with on a phone, so the bin is simply there — and the dot with it.
+	 *
+	 * The swap above is a hover, which a thumb never performs; without this the dot would be
+	 * permanently hidden behind a permanently visible bin. So on a coarse pointer they are
+	 * two columns rather than one: the bin keeps the edge, and the row is padded far enough
+	 * to put the dot beside it instead of underneath.
+	 */
+	@media (pointer: coarse) {
+		.board-del {
+			width: 28px;
+			height: 28px;
+			opacity: 1;
+		}
+
+		.board-act > .board-row {
+			padding-right: 34px;
+		}
+
+		.board-act:is(:hover, :focus-within) > .board-row > .dot::before {
+			opacity: 1;
+		}
+	}
+
+	/*
+	 * On the canvas: six pixels of accent, in the right-hand column.
+	 *
+	 * The disc is drawn by the pseudo-element and the slot is 20px, so the dot and the bin
+	 * that replaces it occupy exactly the same box — the swap on hover is a swap and not a
+	 * reflow.
+	 */
 	.board-row > .dot {
+		display: grid;
+		width: 20px;
+		height: 20px;
+		flex: none;
+		place-items: center;
+	}
+
+	.board-row > .dot::before {
 		width: 6px;
 		height: 6px;
-		flex: none;
 		border-radius: 999px;
 		background: var(--color-accent);
+		content: "";
+		transition: opacity 120ms ease;
+	}
+
+	/* Approached, the dot gives the column to the bin. Both would be two marks in one place
+	   saying different things — and the dot is the one you can do without for a moment,
+	   because the row it is on is the row under your cursor. */
+	.board-act:is(:hover, :focus-within) > .board-row > .dot::before {
+		opacity: 0;
 	}
 
 	/*

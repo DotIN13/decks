@@ -461,6 +461,20 @@ export type ClientMessage =
 	 * outcome of a typo should be an empty board.
 	 */
 	| { type: "board.create"; kind?: string }
+	/**
+	 * Delete a board's file from the deck.
+	 *
+	 * The one message in this protocol that destroys something a person wrote, so it is worth
+	 * being exact about what it is not. It is **not** `board.hide`, which takes a board off
+	 * the canvas and leaves the agent holding it; and it is not the opposite of
+	 * `board.create`, which is only ever "a new file appeared". This unlinks the HTML.
+	 *
+	 * What survives is the content-addressed copy in `.decks/revisions` — every version the
+	 * server has seen of that path, including the last one, is still on disk under its sha.
+	 * That is a recovery of last resort rather than an undo: nothing in the app puts a
+	 * deleted board back, and the arrangement in `deck.json` goes with it.
+	 */
+	| { type: "board.delete"; path: string }
 	| { type: "board.comment"; path: string; id: string; text: string }
 	| { type: "camera.set"; camera: Camera }
 	| { type: "agent.create"; parentId?: string; kind?: AgentKind }

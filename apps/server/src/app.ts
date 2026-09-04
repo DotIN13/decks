@@ -321,6 +321,11 @@ export class App {
 				return;
 			}
 
+			case "board.delete": {
+				this.deleteBoard(message.path, reply);
+				return;
+			}
+
 			case "agent.create": {
 				const agent = this.agents.create({
 					...(message.parentId ? { parentId: message.parentId } : {}),
@@ -598,6 +603,43 @@ export class App {
 		const board = this.deck.refresh(path);
 		if (board) this.send({ type: "board.changed", path, rev: board.rev, board });
 		return path;
+	}
+
+	/**
+	 * Delete a board: keep a copy of what it said, unlink it, and tell everyone.
+	 *
+	 * The order is the whole of it. **A last revision first**, because the point of
+	 * `.decks/revisions` is that a version the server has seen is on disk under its sha —
+	 * and the version that matters most is the one somebody just deleted. If the file has
+	 * been edited outside the app since the last record, that edit is otherwise the one
+	 * version never kept.
+	 *
+	 * Then `Deck.remove`, which owns both the file and the map it is in, and which refuses a
+	 * path that climbs out of the deck. Then the agents, because a dead path left in a
+	 * context silently empties the rail and the canvas (`DeckAgent.forget`) — the watcher
+	 * would do this ~80ms later off the filesystem event, and doing it here means the row is
+	 * gone under the cursor that pressed it rather than after a visible beat. The message it
+	 * sends is the same message the watcher would, so the duplicate that follows is a no-op.
+	 *
+	 * A refusal is a notice to the browser that asked, not a throw: this arrives from a
+	 * button, and the two ways it fails — a path with no board, and a file the OS will not
+	 * unlink — are both things the person pressing it should read rather than a stack trace
+	 * in a log they do not have.
+	 */
+	private deleteBoard(path: string, reply: (message: ServerMessage) => void): void {
+		if (!this.deck.board(path)) {
+			reply({ type: "notice", level: "warn", text: `There is no board at ${path} to delete.` });
+			return;
+		}
+		this.recordRevision(path);
+		try {
+			this.deck.remove(path);
+		} catch (error) {
+			reply({ type: "notice", level: "error", text: `Could not delete ${path}: ${(error as Error).message}` });
+			return;
+		}
+		this.agents.boardRemoved(path);
+		this.send({ type: "board.changed", path, rev: 0, removed: true });
 	}
 
 	/** Store a board's current bytes as a revision; used right after an agent writes. */

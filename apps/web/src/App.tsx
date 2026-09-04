@@ -2,6 +2,7 @@ import type {
 	AgentKind,
 	AgentChat,
 	AgentModel,
+	AgentState,
 	AgentUsage,
 	Board,
 	BoardPatch,
@@ -50,7 +51,22 @@ import { canvasBox, watchInsets } from "./lib/insets.ts";
 import { connect, type Socket } from "./lib/socket.ts";
 import { embedPath, uploadAsset } from "./lib/upload.ts";
 import { canHover, NARROW } from "./lib/panels.ts";
-import { obscured, trackVisualViewport } from "./lib/viewport.ts";
+import { blockPageZoom, obscured, trackVisualViewport } from "./lib/viewport.ts";
+import {
+	type AlertKind,
+	type AlertPrefs,
+	type Presence,
+	finished,
+	inView,
+	loadPrefs,
+	savePrefs,
+	shouldNotify,
+	shouldSound,
+	startedAsking,
+} from "./lib/alerts.ts";
+import { setUnattended as paintBadge } from "./lib/favicon.ts";
+import { post as postBanner } from "./lib/notify.ts";
+import { play as playCue, unlockOnGesture } from "./lib/sound.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 
 interface Notice {
@@ -267,6 +283,102 @@ export function App() {
 		};
 	};
 
+	// --- alerts: a cue, a banner, and a dot on the tab -------------------------------
+
+	/**
+	 * What the app is allowed to interrupt you with. The policy is in `lib/alerts.ts`.
+	 *
+	 * Held here rather than in the module because Settings has to redraw when it changes and
+	 * a module-level `let` is not reactive. The module owns the *rules* and the shape of what
+	 * is stored; this owns the copy the components read.
+	 */
+	const [prefs, setPrefsSignal] = createSignal<AlertPrefs>(loadPrefs());
+	const setPrefs = (next: AlertPrefs) => {
+		setPrefsSignal(next);
+		savePrefs(next);
+	};
+
+	/** Whether the person is demonstrably in front of this tab. Two facts, not one. */
+	const [presence, setPresence] = createSignal<Presence>({ visible: true, focused: true });
+	/**
+	 * How many alerts have landed since you last looked at this window.
+	 *
+	 * Not the same number as any agent's unread count, and deliberately: unread is about a
+	 * *conversation* and survives switching tabs, while this is about the *window* and is
+	 * cleared by coming back to it. Coming back is looking.
+	 */
+	const [unattended, setUnattended] = createSignal(0);
+
+	createEffect(() => paintBadge(unattended()));
+
+	onMount(() => {
+		const sync = () => {
+			const now = { visible: document.visibilityState === "visible", focused: document.hasFocus() };
+			setPresence(now);
+			if (inView(now)) setUnattended(0);
+		};
+		sync();
+		/*
+		 * Three listeners, because the two facts move independently: `visibilitychange` fires
+		 * for switching tabs and for minimising, and `focus`/`blur` for moving to another
+		 * window with this tab still on screen. A banner is wrong in both cases and only one
+		 * of the events covers each.
+		 */
+		window.addEventListener("focus", sync);
+		window.addEventListener("blur", sync);
+		document.addEventListener("visibilitychange", sync);
+		onCleanup(() => {
+			window.removeEventListener("focus", sync);
+			window.removeEventListener("blur", sync);
+			document.removeEventListener("visibilitychange", sync);
+		});
+	});
+
+	/* Browsers start an audio context suspended until the page has been touched. */
+	onMount(() => onCleanup(unlockOnGesture()));
+
+	/** What to call an agent in a banner, without making the sentence about an id. */
+	const nameOf = (id: string | undefined) => (id ? (state.identities[id]?.name ?? "An agent") : "An agent");
+
+	/**
+	 * Raise one alert: the cue, the badge, and — only if you are elsewhere — the banner.
+	 *
+	 * The three are deliberately not the same condition. The sound plays whether or not you
+	 * are looking, because being in the room is the common case for "it finished". The badge
+	 * counts only what you have *not* seen. The banner is suppressed while the page is in
+	 * view, since an OS notification over a window you are reading is telling you something
+	 * that is already on your screen.
+	 */
+	const raise = (kind: AlertKind, banner: { title: string; body?: string; tag?: string; agent?: string }) => {
+		const current = prefs();
+		if (shouldSound(kind, current)) playCue(current.sound[kind], current.volume);
+		const here = presence();
+		if (!inView(here)) setUnattended((count) => count + 1);
+		if (!shouldNotify(kind, current, here)) return;
+		postBanner({
+			title: banner.title,
+			body: banner.body,
+			tag: banner.tag,
+			onClick: () => {
+				setUnattended(0);
+				// Clicking "Ada finished" and landing on somebody else's conversation is the one
+				// way this can be actively unhelpful, so the click switches as well as focuses.
+				if (banner.agent && banner.agent !== state.focused) focusAgent(banner.agent);
+				openHistory();
+			},
+		});
+	};
+
+	/**
+	 * The state each agent was last in, so a change can be told from a restatement.
+	 *
+	 * A plain `Map` rather than store state: nothing renders from it, and it must be read and
+	 * written in the same tick the message arrives — a signal read here would see whatever
+	 * the last flush left. Reconnection replays every agent's state, which is exactly the
+	 * case `finished()` refuses on the grounds that the previous value is unknown.
+	 */
+	const lastState = new Map<string, AgentState>();
+
 	/*
 	 * Start measuring the chrome.
 	 *
@@ -403,6 +515,9 @@ export function App() {
 					setState("agentUsage", message.id, undefined as never);
 					setState("modelsByAgent", message.id, undefined as never);
 					setUnread(message.id, 0);
+					// A new agent must not inherit a dead one's last state and be told it just
+					// finished; ids are unique, but the map would otherwise grow for the session.
+					lastState.delete(message.id);
 					return;
 				}
 
@@ -410,9 +525,29 @@ export function App() {
 					setState("identities", message.id, message.identity);
 					return;
 
-				case "agent.state":
+				case "agent.state": {
+					const was = lastState.get(message.id);
+					lastState.set(message.id, message.state);
 					setState("chats", (chats) => chats.map((chat) => (chat.id === message.id ? { ...chat, state: message.state } : chat)));
+					/*
+					 * The moment a face turns green (`chrome/agent-order.ts`), said out loud.
+					 *
+					 * Keyed on the *transition* rather than the value, so a reconnection — which
+					 * replays the state of every agent on the deck — does not ring five times.
+					 */
+					if (finished(was, message.state)) {
+						raise("done", {
+							title: `${nameOf(message.id)} finished`,
+							// The deck's name, so a banner from one of three windows says which one.
+							body: state.deck?.name,
+							tag: `done:${message.id}`,
+							agent: message.id,
+						});
+					} else if (startedAsking(was, message.state)) {
+						raise("ask", { title: `${nameOf(message.id)} is waiting for you`, tag: `ask:${message.id}`, agent: message.id });
+					}
 					return;
+				}
 
 				case "agent.model":
 					setState("agentModel", message.id, message.model);
@@ -506,6 +641,18 @@ export function App() {
 					setState("dialog", message.prompt);
 					// Drawn in the dock, above the input bar, so it needs nothing dragged
 					// open to be seen.
+					/*
+					 * The other half of `ask`, and the half that actually fires today: no backend
+					 * sets the `waiting` state yet, but every question an agent asks arrives here.
+					 * Both routes are wired because the state is the one that will survive — see
+					 * `agent-order.ts`, which has ringed `waiting` since before anything set it.
+					 */
+					raise("ask", {
+						title: "A question is waiting",
+						body: "title" in message.prompt ? message.prompt.title : undefined,
+						tag: `prompt:${message.prompt.id}`,
+						agent: state.focused,
+					});
 					return;
 
 				case "extension.ui.prompt.closed":
@@ -514,6 +661,9 @@ export function App() {
 
 				case "notice":
 					notice(message.level, message.text);
+					// Only `error`. A warning is a thing worth reading when you get to it, and an
+					// app that makes a noise for every one of those is an app people mute.
+					if (message.level === "error") raise("problem", { title: "Something went wrong", body: message.text, tag: "problem" });
 					return;
 
 				case "composer.draft":
@@ -525,6 +675,7 @@ export function App() {
 					return;
 				case "error":
 					notice("error", message.text);
+					raise("problem", { title: "Something went wrong", body: message.text, tag: "problem" });
 					return;
 				default:
 					return;
@@ -950,6 +1101,8 @@ export function App() {
 		onCleanup(() => window.removeEventListener("keydown", onKeyDown));
 		// The visual viewport, so the dock stays above the on-screen keyboard.
 		onCleanup(trackVisualViewport());
+		// And one pinch, zooming one thing: the boards, not the app around them.
+		onCleanup(blockPageZoom());
 
 		/*
 		 * How tall the dock currently is, published for the stylesheet.
@@ -1062,9 +1215,9 @@ export function App() {
 	 * `⌘K` — which is what the full-screen board browser became.
 	 *
 	 * That modal covered the canvas you were looking at in order to help you find something
-	 * on it, and the Deck tab is where it went. So the shortcut opens the panel, switches to
-	 * that tab and puts the cursor in the search field: the same three keystrokes-worth of
-	 * intent, without a sheet over the work.
+	 * on it. The panel's list is where it went — the whole deck, in three sections — so the
+	 * shortcut opens the panel and puts the cursor in the search field: the same intent,
+	 * without a sheet over the work. It used to have to pick a tab as well.
 	 *
 	 * The composer's placeholder has promised this since before there was anything behind
 	 * it, which is the other reason it is here rather than on a list of things to do.
@@ -1269,6 +1422,12 @@ export function App() {
 						for (const board of stageBoards()) socket.send({ type: "board.hide", path: board.path });
 					}}
 					onCanvas={stageBoards().length}
+					/*
+					 * The context reading, which used to be a dial under the input bar. It is a
+					 * row of numbers in `⋯` now, and the corner's own button wears the warning.
+					 */
+					usage={state.focused ? state.agentUsage[state.focused] : undefined}
+					onUsage={() => socket.send({ type: "agent.usage", id: state.focused ?? "" })}
 					overflow={[
 						{ label: "What you can do on the canvas", icon: Info, onPick: () => setOps(true) },
 						{
@@ -1324,12 +1483,13 @@ export function App() {
 				 * questions and now they are asked separately.
 				 */}
 				{/*
-					One panel where there were two asides and a modal.
+					One panel where there were two asides and a modal — and one list in it.
 
 					The agent list moved into the pill's dropdown — a list you switch *with* is a
-					selector, and a selector belongs on the thing it selects — and the board
-					browser became this panel's second tab instead of a full-screen sheet over the
-					canvas you were trying to look at.
+					selector, and a selector belongs on the thing it selects — and the board browser
+					stopped being a full-screen sheet over the canvas you were trying to look at.
+					It was this panel's second tab for a while; it is the third section of its one
+					list now, because Context and Deck were never two collections (`panel-groups.ts`).
 
 					Mounted while folded, deliberately: it registers `⌘\`, and a `<Show>` here
 					would take the shortcut away in exactly the state it exists for.
@@ -1340,7 +1500,6 @@ export function App() {
 					inPlay={state.focused ? state.inPlay[state.focused] ?? [] : []}
 					holdings={state.contexts}
 					focused={state.focused}
-					identities={state.identities}
 					open={boardsOpen()}
 					onOpenChange={showBoards}
 					findAt={findAt()}
@@ -1348,11 +1507,23 @@ export function App() {
 						socket.send({ type: "board.play", path: board.path });
 						flyTo(board);
 					}}
+					/*
+					 * Delete the file. The row asks twice before this is called (`BoardRow.tsx`).
+					 *
+					 * Nothing is cleaned up here on purpose: the board leaves the deck when the
+					 * server says `board.changed … removed`, which is the same message the watcher
+					 * sends when a board is deleted from a shell — so there is one path out of the
+					 * deck rather than an optimistic one beside it. The selection and the canvas
+					 * follow from that, where they already did.
+					 */
+					onDelete={(board) => socket.send({ type: "board.delete", path: board.path })}
 				/>
 
 
 				<Show when={settings()}>
 					<Settings
+						prefs={prefs()}
+						onPrefs={setPrefs}
 						accounts={state.accounts}
 						active={state.activeAccount}
 						onAdd={() => socket.send({ type: "claude.accounts.add" })}
@@ -1452,8 +1623,6 @@ export function App() {
 						model={state.focused ? state.agentModel[state.focused] : undefined}
 						models={state.focused ? state.modelsByAgent[state.focused] ?? [] : []}
 						commands={focusedChat()?.commands ?? []}
-						usage={state.focused ? state.agentUsage[state.focused] : undefined}
-						onUsage={() => socket.send({ type: "agent.usage", id: state.focused ?? "" })}
 						modes={focusedChat()?.capabilities?.modes ?? []}
 						mode={focusedChat()?.mode}
 						onMode={(mode) => socket.send({ type: "agent.setMode", id: state.focused ?? "", mode })}

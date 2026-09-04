@@ -1,4 +1,4 @@
-import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentUsage, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Maximize from "lucide-solid/icons/maximize";
@@ -14,6 +14,8 @@ import { historyButton, toggleHistory } from "../lib/edge.ts";
 import { Popover } from "../ui/Popover.tsx";
 import { AgentStack } from "./AgentStack.tsx";
 import { agentOrder } from "./agent-order.ts";
+import { contextLevel } from "./context-usage.ts";
+import { ContextSummary } from "./ContextSummary.tsx";
 
 /**
  * The top-right cluster: who is working, how close you are, and the way into the
@@ -59,7 +61,7 @@ export function Corner(props: {
 	/** The camera's scale, 1 being 100%. */
 	zoom: number;
 	onZoom: (zoom: number) => void;
-	/** Frame the whole deck — the `0` key's job, and the first row of the menu. */
+	/** Frame what is on the canvas — the `0` key's job, and the button beside the readout. */
 	onFit: () => void;
 	/** A new, empty board, straight onto the canvas. */
 	onNewBoard: () => void;
@@ -73,6 +75,16 @@ export function Corner(props: {
 	onClearStage: () => void;
 	/** Whether there is anything up there to clear. */
 	onCanvas: number;
+	/**
+	 * How full the focused agent's context is, and what it has cost. Drawn inside `⋯`.
+	 *
+	 * It used to be a ring under the input bar. The menu is where a number you read rather
+	 * than act on belongs — see `ContextSummary.tsx` — and the only part that has to stay
+	 * outside is the warning, which is why the trigger below takes its level.
+	 */
+	usage?: AgentUsage;
+	/** The runtime's own usage report, from the row at the foot of that summary. */
+	onUsage: () => void;
 	/** The `⋯` menu, which is the integrator's: it collects whatever has folded. */
 	/**
 	 * The three secondary controls, as menu rows at every width.
@@ -146,11 +158,6 @@ export function Corner(props: {
 						</button>
 					)}
 				>
-					<button type="button" role="menuitem" data-row data-flat="true" onClick={() => props.onFit()}>
-						<Icon of={Maximize} size={13} class="flex-none text-muted" />
-						<span class="lb flex-1 font-normal">Fit boards</span>
-					</button>
-
 					<For each={STOPS}>
 						{(stop) => (
 							<button
@@ -186,7 +193,30 @@ export function Corner(props: {
 				</Popover>
 			</span>
 
-			<span class="pill-sep max-[520px]:hidden" aria-hidden="true" />
+			{/*
+			 * Fit, as a button rather than a row in the zoom menu.
+			 *
+			 * It was the menu's first row, which put the one camera control people reach for
+			 * *by name* two clicks and a read behind a percentage — and hid it entirely under
+			 * 1100px, where the readout folds away and a trackpad is least likely. It is the
+			 * `0` key's twin, and the keyless devices are exactly the ones that need it drawn.
+			 *
+			 * Beside the readout and inside the camera group, because "how close am I" and
+			 * "frame what is up" are the same question asked twice; it folds into `⋯` at 640px
+			 * with the other two, where a fourth 44px target would push the pill into the
+			 * agent cluster.
+			 */}
+			<button
+				type="button"
+				class="iconbtn max-[640px]:hidden"
+				title="Fit the boards on the canvas (0)"
+				aria-label="Fit the boards on the canvas"
+				onClick={() => props.onFit()}
+			>
+				<Icon of={Maximize} size={15} />
+			</button>
+
+			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
 
 			{/*
 			 * What the canvas holds: one board more, or none at all.
@@ -202,7 +232,7 @@ export function Corner(props: {
 			 */}
 			<button
 				type="button"
-				class="iconbtn max-[520px]:hidden"
+				class="iconbtn max-[640px]:hidden"
 				title="A new board, on the canvas"
 				aria-label="A new board, on the canvas"
 				onClick={() => props.onNewBoard()}
@@ -211,7 +241,7 @@ export function Corner(props: {
 			</button>
 			<button
 				type="button"
-				class="iconbtn max-[520px]:hidden"
+				class="iconbtn max-[640px]:hidden"
 				disabled={props.onCanvas === 0}
 				title={
 					props.onCanvas === 0
@@ -261,7 +291,21 @@ export function Corner(props: {
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-on={api.open ? "soft" : undefined}
-						title="More"
+						/*
+						 * The context warning, on the outside of the menu it moved into.
+						 *
+						 * Amber over 70% and red over 85%, on the glyph itself. A dial under the
+						 * input bar told you this without being asked; a menu cannot, and a full
+						 * context that only announces itself once you happen to open `⋯` is the
+						 * one reading this app should never make you go and look for. Nothing at
+						 * all below 70%, so the corner is unmarked in the ordinary case.
+						 */
+						data-level={contextLevel(props.usage)}
+						title={
+							contextLevel(props.usage)
+								? `More — the context is ${Math.round(((props.usage?.contextTokens ?? 0) / (props.usage?.contextWindow || 1)) * 100)}% full`
+								: "More"
+						}
 						aria-label="More"
 						onClick={api.toggle}
 					>
@@ -270,7 +314,18 @@ export function Corner(props: {
 				)}
 			>
 				{/*
-					The same two, as rows, on a screen too narrow for them.
+					How full the context is, first, because it is the only thing in this menu that
+					is *news*. The rest — the canvas buttons that folded, the cheat sheet, the
+					settings, the theme — is a list of places to go, and a reading you might act on
+					should not be under one.
+				*/}
+				<Show when={props.usage}>
+					<ContextSummary usage={props.usage} onUsage={props.onUsage} />
+					<span class="rule" />
+				</Show>
+
+				{/*
+					The same three, as rows, on a screen too narrow for them.
 
 					Four 44px buttons and a chip do not fit a 393px line beside a 184px pill —
 					adding them to the corner is what pushed the two clusters back into overlap,
@@ -282,7 +337,19 @@ export function Corner(props: {
 					type="button"
 					data-row
 					data-flat="true"
-					class="hidden max-[520px]:flex"
+					class="hidden max-[640px]:flex"
+					onClick={() => props.onFit()}
+				>
+					<span class="ic">
+						<Icon of={Maximize} size={15} />
+					</span>
+					<span class="lb">Fit the boards</span>
+				</button>
+				<button
+					type="button"
+					data-row
+					data-flat="true"
+					class="hidden max-[640px]:flex"
 					onClick={() => props.onNewBoard()}
 				>
 					<span class="ic">
@@ -294,7 +361,7 @@ export function Corner(props: {
 					type="button"
 					data-row
 					data-flat="true"
-					class="hidden max-[520px]:flex"
+					class="hidden max-[640px]:flex"
 					disabled={props.onCanvas === 0}
 					onClick={() => props.onClearStage()}
 				>
@@ -303,7 +370,7 @@ export function Corner(props: {
 					</span>
 					<span class="lb">Clear the canvas</span>
 				</button>
-				<span class="rule hidden max-[520px]:block" />
+				<span class="rule hidden max-[640px]:block" />
 
 				<For each={props.overflow}>
 					{(item) => (

@@ -105,6 +105,27 @@
 	}
 
 	/*
+	 * A reading carried on the glyph: the context, over 70% and over 85%.
+	 *
+	 * The corner's `⋯` is the only button that wears this. The number itself moved into that
+	 * menu (`chrome/ContextSummary.tsx`), and a full context that only announces itself once
+	 * you happen to open a menu is the one thing a reading like this must not become — so the
+	 * alarm stays outside and the numbers go in. Colour only: no dot, no badge, nothing that
+	 * changes the size of a control in a line of them.
+	 *
+	 * After `[data-on]` on purpose. An open menu paints its trigger, and the fact that you
+	 * are looking at the menu is the more useful thing to say than the level you opened it to
+	 * read; `data-on` is set only while it is open, so the two never disagree for long.
+	 */
+	.iconbtn[data-level="warn"]:not([data-on]) {
+		color: var(--color-warn);
+	}
+
+	.iconbtn[data-level="high"]:not([data-on]) {
+		color: var(--color-danger);
+	}
+
+	/*
 	 * A labelled control: an icon, a word, and usually a chevron.
 	 *
 	 * The mode and model pickers in the dock, and the zoom readout in the corner. A wash
@@ -285,7 +306,12 @@
 		color: var(--muted);
 	}
 
-	:is(.popover, .rowlist) [data-row] > .lb {
+	/* `.alerts-k` is the same object outside a row: a name with a sentence under it, in the
+	   notifications grid (`chat/AlertSettings.tsx`). Added to the selector rather than given
+	   its own copy of these six declarations, because two type scales that are meant to match
+	   and are written twice do not stay matched. */
+	:is(.popover, .rowlist) [data-row] > .lb,
+	.alerts-k > .lb {
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -300,7 +326,8 @@
 	 * This is the reason a mode is a menu and not a segmented control: "edit freely" does
 	 * not say by itself that commands still ask, and the place to say so is here.
 	 */
-	:is(.popover, .rowlist) [data-row] > .nt {
+	:is(.popover, .rowlist) [data-row] > .nt,
+	.alerts-k > .nt {
 		color: var(--faint);
 		font-size: 11px;
 		line-height: 1.4;

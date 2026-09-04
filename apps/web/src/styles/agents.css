@@ -112,9 +112,16 @@
 
 	/* Working pulses, and it is the only motion in the corner — motion is what "still
 	   going" means. Waiting is steady on purpose: nothing is happening, and the stillness
-	   *is* the message. */
+	   *is* the message.
+
+	   **A breath, not a blink.** 1.2s was the dot's period, borrowed — right for a 7px
+	   speck that has to be noticed, wrong for a 24px ring that is *always* there while a
+	   turn runs: at that rate a face in the corner of your eye reads as an alarm, and a
+	   turn is minutes long. 2.4s is about a resting breath, which is the thing it is
+	   imitating. The dots in `index.css` keep their own faster period on purpose — they
+	   mark one tool call, not a whole turn. */
 	.agent-face[data-status="working"] {
-		animation: ring-pulse 1.2s ease-in-out infinite;
+		animation: ring-pulse 2.4s ease-in-out infinite;
 	}
 
 	/*

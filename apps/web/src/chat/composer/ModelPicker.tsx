@@ -75,7 +75,30 @@ export function ModelPicker(props: {
 				return (
 					<button
 						ref={api.ref}
-						class="chipbtn min-w-0"
+						/*
+						 * `shrink-[100]`: when the row runs out of room, this is the chip that gives.
+						 *
+						 * `dock.css` lets both chips shrink, and by default they give ground in
+						 * proportion to their width — so a squeeze that took 186px off a model name
+						 * still took 22px off "edit freely" and left it reading "edi…". The mode is
+						 * two short words and the *word* is the whole of its value; a model name is
+						 * long and its head is enough to recognise it by.
+						 *
+						 * A hundred is not a measurement, it is an *order*: flexbox has no way to say
+						 * "take it all from this one first", and a ratio this lopsided is the nearest
+						 * thing. It is not a way of saying "never" either — an item that reaches its
+						 * own minimum is frozen and the rest is redistributed, so a runtime with an
+						 * absurdly long mode name still gets a mode chip that gives ground once the
+						 * model chip has nothing left.
+						 *
+						 * Why it has to be lopsided rather than merely weighted: a 390px phone is 15px
+						 * short of what this row wants with the ordinary "Default (recommended)" in it
+						 * — 15px that used to be send button hanging outside the box. At 6:1 the mode
+						 * chip's share of that was *one pixel*, and one pixel is not one pixel of
+						 * text: the browser drops whole glyphs to fit an ellipsis, so "edit freely"
+						 * came out "edit fre…" for want of a rounding error.
+						 */
+						class="chipbtn min-w-0 shrink-[100]"
 						type="button"
 						disabled={props.disabled || props.models.length === 0}
 						aria-haspopup="menu"
@@ -85,7 +108,26 @@ export function ModelPicker(props: {
 						onClick={api.toggle}
 					>
 						<Icon of={Sparkles} size={13} />
-						<span class="truncate">{label()}</span>
+						{/*
+							180px, which is about twenty-eight characters at 11px.
+
+							Shrinking keeps the bar intact when the row runs out of room; this is the
+							other half, for when it does not. `claude-opus-4-1-20250805-extended-thinking`
+							fits a 720px box without overflowing anything and still takes half of it — a
+							chip that wide reads as the subject of the row rather than as one of its
+							three settings, and it pushes the mode chip and the attach button into the
+							far corner from the text they belong to.
+
+							One cap and not two. A second, tighter one for narrow screens was written
+							and taken out again: at 104px it kept both chips whole on a 390px phone with
+							a long name in the bar, and clipped "Default (recommended)" — the name most
+							people actually see — for no reason at all. The narrow case is what the
+							shrinking above is *for*, and it only bites when the row genuinely runs out.
+
+							Past the cap the tail goes; the whole name is in the tooltip, and spelled
+							out in the list below.
+						*/}
+						<span class="max-w-[180px] truncate">{label()}</span>
 						{/* The level only when there is one to show. "off" is a real answer and
 						    stays; a model with no scale at all has nothing to say here. */}
 						<Show when={levels().length > 0 ? props.model?.thinking : undefined}>

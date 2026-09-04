@@ -8,14 +8,56 @@
 			`env(safe-area-inset-*)` — without it there are black bars and a canvas that
 			stops short of the screen.
 
-			`maximum-scale=1, user-scalable=no` used to be here and is deliberately gone.
-			It is ignored on iOS anyway, and where it is honoured it takes away the one
-			zoom a person with poor eyesight has over the *chrome* — the canvas has its
-			own, and the transcript does not. Double-tap zoom, which is the reason such a
-			line usually exists, is turned off where it would be in the way instead:
-			`touch-action` on the body, the stage and inside the board frames.
+			`maximum-scale=1, user-scalable=no` is back, and this is the second time it has
+			changed its mind, so both arguments are worth having written down. **Against:**
+			it takes away the one zoom a person with poor eyesight has over the *chrome*, and
+			the canvas's own zoom does not help them read a transcript. **For, and this is
+			the call:** on a touchscreen the page and the canvas both answer a pinch, so the
+			gesture that is *meant* to zoom the boards would sometimes zoom the app instead —
+			leaving the chrome at 1.4× with the input bar half off the screen and no obvious
+			way back. A control that does two things depending on which one won the frame is
+			worse than a control that does one.
+
+			iOS ignores both of these words, so `blockPageZoom` in `lib/viewport.ts` refuses
+			Safari's `gesture*` events as well; double-tap zoom is off through `touch-action`
+			on the body, the stage and inside the board frames.
 		-->
-		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+
+		<!--
+			The mark, as a favicon. Four files, and they are not redundant.
+
+			`favicon.svg` is the one nearly every browser uses: one file at every size, and
+			its ink follows `prefers-color-scheme` *inside the SVG*, because the tab strip
+			belongs to the browser rather than to the app — a dark-themed Chrome showing a
+			light-themed Decks still needs a pale mark.
+
+			`favicon-32.png` is the fallback for browsers that ignore SVG icons, and it cannot
+			adapt, so it is the opaque tile rather than the bare mark: a dark rounded square
+			reads on a tab strip of any colour, where fixed ink would vanish on one of the two.
+
+			`apple-touch-icon.png` is square and full-bleed on purpose. iOS applies its own
+			squircle mask, so a pre-rounded icon is rounded twice and shows its corners; the
+			art is inset instead, inside iOS's own safe area.
+
+			The manifest is what makes "add to home screen" produce an app rather than a
+			screenshot of a browser — worth having on a page that already suppresses zoom and
+			paints out into the notch. `lib/favicon.ts` swaps the icon at runtime when an
+			alert lands in a tab you are not looking at.
+		-->
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="manifest" href="/site.webmanifest" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="Decks" />
+		<!-- `black-translucent` is what lets the page paint under the status bar, which is the
+		     same bargain `viewport-fit=cover` makes above. -->
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<!-- The colour the browser paints its own chrome with, per scheme: the app's `--bg`. -->
+		<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafafa" />
+		<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#161616" />
+
 		<title>Decks</title>
 	</head>
 	<body>

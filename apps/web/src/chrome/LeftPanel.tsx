@@ -1,4 +1,4 @@
-import type { Board, Identity } from "@decks/protocol";
+import type { Board } from "@decks/protocol";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Rows3 from "lucide-solid/icons/rows-3";
 import Search from "lucide-solid/icons/search";
@@ -6,10 +6,10 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { BoardRow, BoardTile } from "./BoardRow.tsx";
-import { contextSections, contextTally, filterBoards } from "./panel-groups.ts";
+import { panelSections, panelTally } from "./panel-groups.ts";
 
 /**
- * The left panel: one surface, two tabs, and a button that makes it go away.
+ * The left panel: one surface, **one list**, and a button that makes it go away.
  *
  * It replaces three things. The floating context rail, the floating agents panel and the
  * full-screen `AllBoards` modal all answered "what is on this canvas, and what else is
@@ -18,10 +18,20 @@ import { contextSections, contextTally, filterBoards } from "./panel-groups.ts";
  * enforced in code and invisible on screen, which is why the third surface had nowhere to
  * live and became a modal over the canvas you were looking at.
  *
- * So: **Context**, which leads because it *is* the canvas written down, and **Deck**, which
- * is every board there is. Agents are not a third tab — a list you switch *with* is a
- * selector, not a browser, and it now hangs off the thing it selects (the avatar in the
- * top-left pill). What is left here are the two lists you *read*.
+ * For a while the answer was a real tab strip: **Context** and **Deck**. That was one
+ * surface too few and one list too many — everything in Context was also in Deck, so the two
+ * tabs were the same list with a line drawn through it, and finding a board began with
+ * guessing which side of the line the app had put it on *this second*.
+ *
+ * So there is one scroller with three headings in it — **on the canvas**, **held, not
+ * shown**, **in the deck** — and one search field over all of it. `panel-groups.ts` owns the
+ * grouping and argues it; what is left here is the surface. Agents were never a tab either:
+ * a list you switch *with* is a selector, and it hangs off the thing it selects (the avatar
+ * in the top-left pill).
+ *
+ * The first two sections are the **focused agent's**, all of them and nothing else — no
+ * other agent's holdings appear anywhere, and a board somebody else is holding is simply in
+ * the deck like any other. So nothing on this screen has to ask whose a row is.
  *
  * ### Folded means gone
  *
@@ -61,7 +71,6 @@ import { contextSections, contextTally, filterBoards } from "./panel-groups.ts";
  * search matches — is in `panel-groups.ts`, where it can be tested without a DOM.
  */
 
-export type PanelTab = "context" | "deck";
 /** How the list draws each board: a line, or a picture with a caption. */
 export type Density = "list" | "grid";
 
@@ -69,36 +78,46 @@ export type Density = "list" | "grid";
 const SHEET = 1100;
 
 export function LeftPanel(props: {
-	/** The whole deck, for the Deck tab. */
+	/** Every board there is. The list is all of them, in three sections. */
 	boards: Board[];
 	/** The board the canvas is centred on. */
 	current?: string;
 	/** The focused agent's in-play set: what is actually on the canvas. */
 	inPlay?: string[];
-	/** Agent id → the paths it holds, in attach order. Every agent, not just the focused one. */
+	/** Agent id → the paths it holds, in attach order. `focused` picks this apart. */
 	holdings: Record<string, string[]>;
-	/** Whose context the first tab is showing. */
+	/** Whose canvas and shelf the first two sections are. */
 	focused?: string;
-	/** Names and colours: the third section's label, and its rows' thumbnail borders. */
-	identities?: Record<string, Identity>;
 	/** Folded is gone. Owned by the pill's button, so the two can never disagree. */
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	/** Which tab, if the caller wants to remember it. Uncontrolled when absent. */
-	tab?: PanelTab;
-	onTabChange?: (tab: PanelTab) => void;
 	/**
-	 * How the *showing* tab draws its boards. Reported back with the tab it belongs to,
-	 * because it is remembered per tab: seven boards an agent chose are worth seeing as
-	 * pictures and seventy-eight are not, so Context can stay a grid while Deck is a list.
+	 * How the list draws its boards. Uncontrolled when absent.
+	 *
+	 * One setting for one list. It used to be remembered per tab — seven boards an agent
+	 * chose are worth seeing as pictures and seventy-eight are not — and with the tabs gone
+	 * that argument goes with them: the sections are the same list, and a density that
+	 * changed halfway down it would be two lists again.
 	 */
 	density?: Density;
-	onDensity?: (density: Density, tab: PanelTab) => void;
+	onDensity?: (density: Density) => void;
 	onPick: (board: Board) => void;
+	/**
+	 * Delete a board's file. Absent means no row has a delete on it.
+	 *
+	 * Every row has it, in all three sections: a board is a board wherever it is listed, and
+	 * a rule that depends on which heading it is under is a rule to remember. The row does
+	 * the asking — two presses, `BoardRow.tsx` — so by the time this is called it has been
+	 * said twice.
+	 *
+	 * The grid has none: a tile is `RailItem`, the same component the canvas uses, and a
+	 * destructive control there would be one on the thumbnails as well.
+	 */
+	onDelete?: (board: Board) => void;
 	/** What is typed, for a caller that wants to keep it — `⌘K` opening on a query, say. */
 	onSearch?: (query: string) => void;
 	/**
-	 * A stamp that means "find a board now": open the Deck tab and take the cursor.
+	 * A stamp that means "find a board now": take the cursor into the search field.
 	 *
 	 * `⌘K` is the caller. A stamp rather than a boolean because pressing it twice in a row
 	 * is two requests, and a flag would make the second one look like a state the panel was
@@ -107,36 +126,28 @@ export function LeftPanel(props: {
 	findAt?: number;
 }) {
 	const ids = createUniqueId();
-	const [ownTab, setOwnTab] = createSignal<PanelTab>("context");
 	const [ownDensity, setOwnDensity] = createSignal<Density>("list");
 	const [query, setQuery] = createSignal("");
 	const sheet = createSheet();
 
-	const tab = () => props.tab ?? ownTab();
 	const density = () => props.density ?? ownDensity();
 	let list: HTMLDivElement | undefined;
 	let field: HTMLInputElement | undefined;
 
+	/* `⌘K` used to open a tab as well as take the cursor. There is one list now, so finding
+	   a board is typing at it — and the query it lands on is whatever was already there. */
 	createEffect(() => {
 		if (!props.findAt) return;
-		goTab("deck");
-		// After the tab switch has rendered the field, or there is nothing to focus yet.
+		// Next frame, or there is nothing to focus yet on a panel that was closed.
 		requestAnimationFrame(() => {
 			field?.focus();
 			field?.select();
 		});
 	});
 
-	const goTab = (next: PanelTab) => {
-		setOwnTab(next);
-		props.onTabChange?.(next);
-		// The search belongs to the list under it, so switching lists clears it. A query left
-		// over from the other tab is a filter you cannot see the cause of.
-		type("");
-	};
 	const goDensity = (next: Density) => {
 		setOwnDensity(next);
-		props.onDensity?.(next, tab());
+		props.onDensity?.(next);
 	};
 	const type = (next: string) => {
 		setQuery(next);
@@ -144,20 +155,15 @@ export function LeftPanel(props: {
 	};
 
 	const sections = createMemo(() =>
-		contextSections({
+		panelSections({
 			boards: props.boards,
 			focused: props.focused,
 			holdings: props.holdings,
 			inPlay: props.inPlay,
-			identities: props.identities,
 			query: query(),
 		}),
 	);
-	const tally = createMemo(() => contextTally(sections()));
-	const deck = createMemo(() => filterBoards(props.boards, query()));
-	/** The focused agent's own sections — everything but the other-agents tail. */
-	const mine = createMemo(() => sections().filter((section) => section.kind !== "other"));
-	const who = () => (props.focused ? props.identities?.[props.focused]?.name : undefined);
+	const tally = createMemo(() => panelTally(sections()));
 
 	/*
 	 * `⌘\`, and the one guard it needs.
@@ -234,45 +240,19 @@ export function LeftPanel(props: {
 				}`}
 			>
 				{/*
-					The header, on the 4 / 8 / 12 scale — the only scale in here, and every gap in
-					this component is one of those three numbers.
+					The header: a search field, and nothing above it.
 
-					24px tabs, 8px, a 28px field, 12px to the list. It is *shorter* than the 88px
-					it replaces while every control in it is taller, because what was removed is a
-					bar rather than air: the caps eyebrow that used to sit above the list is now a
-					line inside it. (The rhythm table's "72px header" adds the tab buttons at 24
-					and forgets the strip's 2px of padding; built, it is 76px.)
+					There was a tab strip here — Context and Deck — and it is gone; `panel-groups.ts`
+					argues why. What it leaves behind is a header that is one control tall and a
+					list that has to be scrolled rather than switched.
+
+					On the 4 / 8 / 12 scale, which is the only scale in here: a 28px field and 12px
+					to the list, 40px and taller type under a finger. 24px was right beside a cursor
+					— the panel is a dense list and its header should not compete with it — and
+					under half a fingertip on a phone, where this is a *sheet's* header and the only
+					control above a scrolling list.
 				*/}
 				<div class="flex flex-none flex-col gap-2 pb-3">
-					<div class="seg w-full" role="tablist" aria-label="Boards panel">
-						<For each={["context", "deck"] as PanelTab[]}>
-							{(name) => (
-								<button
-									type="button"
-									role="tab"
-									id={`${ids}-tab-${name}`}
-									aria-selected={tab() === name}
-									aria-controls={`${ids}-list`}
-									/* One tab stop for the strip, arrows within it — the ARIA tabs pattern,
-									   and the reason the panel is three stops rather than five. */
-									tabindex={tab() === name ? 0 : -1}
-									data-on={tab() === name}
-									class="h-6 text-[11px]"
-									onClick={() => goTab(name)}
-									onKeyDown={(event) => {
-										if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-										event.preventDefault();
-										const next: PanelTab = name === "context" ? "deck" : "context";
-										goTab(next);
-										(event.currentTarget.parentElement?.querySelector(`#${ids}-tab-${next}`) as HTMLElement | null)?.focus();
-									}}
-								>
-									{name === "context" ? "Context" : "Deck"}
-								</button>
-							)}
-						</For>
-					</div>
-
 					{/*
 						`.field` is 24px by default; the header's rhythm wants 28, and a utility beats
 						the layer it is defined in — which is the whole reason that layer exists.
@@ -282,18 +262,20 @@ export function LeftPanel(props: {
 						vertical, and a `flex-basis: 0` beats a stated height — so the field measured
 						its input's min-content and came out 19px instead of 28.
 					*/}
-					<label class="field h-7 flex-none gap-1.5 rounded-md">
+					<label class="field h-7 flex-none gap-1.5 rounded-md pointer-coarse:h-10 pointer-coarse:gap-2 pointer-coarse:px-2.5">
 						<Icon of={Search} class="flex-none text-faint" size={13} />
+						{/*
+							16px on a touch keyboard, like the composer's field and for the same reason:
+							below 16 the browser zooms the page when the input takes focus, which leaves
+							the canvas at a scale nobody chose and the chrome half off screen. It is the
+							one number in this component that is not about how it looks.
+						*/}
 						<input
 							ref={field}
 							type="text"
 							spellcheck={false}
-							class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
-							placeholder={
-								tab() === "context"
-									? `Search ${who() ? `${who()}’s ` : ""}${tally().held} board${tally().held === 1 ? "" : "s"}`
-									: `Search ${props.boards.length} boards`
-							}
+							class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
+							placeholder={`Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`}
 							value={query()}
 							onInput={(event) => type(event.currentTarget.value)}
 							onKeyDown={(event) => {
@@ -320,7 +302,7 @@ export function LeftPanel(props: {
 							    24px field — so this one is sized by a utility instead. */}
 							<button
 								type="button"
-								class="iconbtn size-5 flex-none rounded-sm"
+								class="iconbtn size-5 flex-none rounded-sm pointer-coarse:size-8"
 								aria-label="Clear the search"
 								onClick={() => {
 									type("");
@@ -336,8 +318,6 @@ export function LeftPanel(props: {
 				<div
 					ref={list}
 					id={`${ids}-list`}
-					role="tabpanel"
-					aria-labelledby={`${ids}-tab-${tab()}`}
 					/*
 					 * `items` as well as `panel-list`, and it is not decoration: `RailItem` roots
 					 * its viewport observer at the nearest `.items`, so a grid tile can tell
@@ -348,8 +328,7 @@ export function LeftPanel(props: {
 					data-density={density()}
 					onKeyDown={rove}
 				>
-					<Show when={tab() === "context"}>
-						<For each={sections()}>
+					<For each={sections()}>
 							{(section) => (
 								<div
 									class="panel-section"
@@ -363,10 +342,12 @@ export function LeftPanel(props: {
 										32px bar above it. Sentence case at 11.5px/500 — `.meta` in
 										`styles/chrome.css` is that decision, made once.
 									*/}
-									<div class="panel-meta meta" style={section.tint ? { color: section.tint } : undefined}>
+									{/* `.n` is the right-hand column the rows' dots and bins also stand in —
+									    see `panel.css`. One column down the right edge, whatever is in it. */}
+									<div class="panel-meta meta">
 										<span class="truncate">{section.label}</span>
 										<span class="flex-1" />
-										<span class="tabular-nums">{section.rows.length}</span>
+										<span class="n tabular-nums">{section.rows.length}</span>
 									</div>
 									{/*
 										The branch is outside the `For`, and it has to be.
@@ -391,7 +372,7 @@ export function LeftPanel(props: {
 														current={props.current === row.board.path}
 														dim={row.dim}
 														onCanvas={row.onCanvas}
-														tint={row.tint}
+														{...(props.onDelete ? { onDelete: () => props.onDelete?.(row.board) } : {})}
 														onPick={() => props.onPick(row.board)}
 													/>
 												)}
@@ -404,7 +385,6 @@ export function LeftPanel(props: {
 													board={row.board}
 													current={props.current === row.board.path}
 													dim={row.dim}
-													tint={row.tint}
 													onPick={() => props.onPick(row.board)}
 												/>
 											)}
@@ -412,89 +392,46 @@ export function LeftPanel(props: {
 									</Show>
 								</div>
 							)}
-						</For>
-					</Show>
-
-					<Show when={tab() === "deck"}>
-						<Show
-							when={density() === "grid"}
-							fallback={
-								<For each={deck()}>
-									{(board) => (
-										<BoardRow
-											board={board}
-											current={props.current === board.path}
-											// Nothing is dimmed here. Browsing the deck, "held" and "up" are
-											// not two states worth telling apart — marking the ones not on the
-											// canvas made the whole list look switched off rather than read.
-											onCanvas={(props.inPlay ?? []).includes(board.path)}
-											onPick={() => props.onPick(board)}
-										/>
-									)}
-								</For>
-							}
-						>
-							<For each={deck()}>
-								{(board) => <BoardTile board={board} current={props.current === board.path} onPick={() => props.onPick(board)} />}
-							</For>
-						</Show>
-					</Show>
+					</For>
 
 					{/*
 						An empty list is a real state and the commonest one on a fresh deck, so it
 						says which empty it is. A panel that is blank for a good reason still looks
 						broken if it does not give the reason.
+
+						There is one of these now where there were two — a deck with no boards in it,
+						and a search that matched none of them. The third case the tabs needed, "this
+						agent holds nothing", is not an empty state at all any more: the list carries
+						on into the deck below it.
 					*/}
-					{/*
-						`mine()`, not `sections()`: a fresh agent's Context tab is not empty — it ends
-						with one section per *other* agent that holds something, which is the answer to
-						"then where is that board". Keyed on the whole list, the line never appeared in
-						the state it was written for, and somebody else's boards under no heading of
-						your own read as yours.
-					*/}
-					<Show when={tab() === "context" && mine().length === 0}>
+					<Show when={sections().length === 0}>
 						<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
-							<Show
-								when={query()}
-								fallback={
-									<>
-										{who() ?? "This agent"} is not holding any boards yet. Ask for one, or{" "}
-										<button class="cursor-pointer border-0 bg-none p-0 text-[12px] text-accent underline" type="button" onClick={() => goTab("deck")}>
-											browse the deck
-										</button>
-										.
-									</>
-								}
-							>
-								Nothing in this context matches “{query().trim()}”. The{" "}
-								<button class="cursor-pointer border-0 bg-none p-0 text-[12px] text-accent underline" type="button" onClick={() => goTab("deck")}>
-									Deck tab
-								</button>{" "}
-								searches all {props.boards.length}.
-							</Show>
-						</p>
-					</Show>
-					<Show when={tab() === "deck" && deck().length === 0}>
-						<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
-							{props.boards.length === 0 ? "This deck has no boards yet. Ask for one." : `Nothing in the deck matches “${query().trim()}”.`}
+							{props.boards.length === 0
+								? "This deck has no boards yet. Ask for one."
+								: `Nothing in the deck matches “${query().trim()}”.`}
 						</p>
 					</Show>
 				</div>
 
 				{/* The foot: what the list adds up to, and how it is drawn. 24px, 8px above it. */}
 				<div class="panel-foot meta">
+					{/*
+						What the list adds up to: its size, and how much of it is the agent's.
+
+						While a search is running it says how many of the deck matched, because that
+						is the number that changed. The held count rides along when there is one —
+						the sections say it too, but they scroll and this does not.
+					*/}
 					<span class="truncate">
-						{tab() === "context"
-							? `${tally().held} held · ${tally().onCanvas} on canvas`
-							: deck().length === props.boards.length
-								? `${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`
-								: `${deck().length} of ${props.boards.length} match`}
+						{tally().shown === props.boards.length
+							? `${props.boards.length} board${props.boards.length === 1 ? "" : "s"}${tally().held > 0 ? ` · ${tally().held} held` : ""}`
+							: `${tally().shown} of ${props.boards.length} match`}
 					</span>
 					<span class="flex-1" />
 					<div class="seg">
 						<button
 							type="button"
-							class="grid place-items-center px-1.5"
+							class="grid place-items-center px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
 							data-on={density() === "list"}
 							aria-label="Show boards as a list"
 							aria-pressed={density() === "list"}
@@ -504,7 +441,7 @@ export function LeftPanel(props: {
 						</button>
 						<button
 							type="button"
-							class="grid place-items-center px-1.5"
+							class="grid place-items-center px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
 							data-on={density() === "grid"}
 							aria-label="Show boards as a grid"
 							aria-pressed={density() === "grid"}

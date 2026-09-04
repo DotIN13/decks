@@ -1,6 +1,5 @@
 import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
-import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { closeHistory, historyShown } from "../lib/edge.ts";
@@ -335,27 +334,37 @@ export function Stream(props: {
 			aria-label="The conversation"
 		>
 			{/*
-			 * Its own way out, just above the topmost card.
+			 * No × of its own, deliberately.
 			 *
-			 * The column has no title bar to hang an × on — it is a stack of cards, not a panel
-			 * — so the control rides the top of the stack and appears when the pointer is in the
-			 * column. `closeHistory`, not a local flag: dismissing it here and dismissing it from
-			 * the corner button have to mean the same thing, including the part where a dismissed
-			 * history does not come back when a selection goes away.
+			 * There was one riding the top of the stack, revealed on hover, on the argument that
+			 * a column of cards has no title bar to hang one on. **The button that opened this
+			 * is the button that closes it** — one control, in the corner, pressed and pressed
+			 * again, which is what `data-on` on it has been saying all along. A second × on the
+			 * surface itself was a second answer to a question already answered, and it cost the
+			 * top of the newest card a hover target that did nothing else.
+			 *
+			 * Two other ways out survive, and neither is a control: Escape, and a swipe toward
+			 * the right edge on a touchscreen. Both go through `closeHistory`, so the corner
+			 * button always agrees with the screen.
 			 */}
-			<div class="stream-head">
-				<button
-					class="iconbtn pointer-events-auto [--control:22px] pointer-coarse:[--control:34px]"
-					type="button"
-					aria-label="Close the conversation"
-					title="Close the conversation"
-					onClick={closeHistory}
-				>
-					<Icon of={X} size={13} />
-				</button>
-			</div>
-
-			<div class="stream-roll" ref={scroller} onScroll={measure}>
+			{/*
+			 * `pointer-events-auto` on the roll below 1100px, where the column is a sheet.
+			 *
+			 * The column takes no pointer events and its cards take their own, so the gaps
+			 * between turns are still canvas — you can drag a board through one. That is the
+			 * right trade beside the canvas and the wrong one over it: on a phone this is a
+			 * full-width sheet, the canvas behind it is neither visible nor reachable, and a
+			 * finger landing in a gap did nothing at all. Which is what "the history will not
+			 * scroll" was — it scrolled fine from a card, and a card is not what a thumb hits.
+			 *
+			 * The roll rather than the whole column, so the empty space *above* the topmost
+			 * card — the column is anchored to the bottom — stays canvas even in sheet mode.
+			 * And a utility rather than a `@media` block in `stream.css`, because the base
+			 * `pointer-events: none` is in the components layer and a media query in there
+			 * would lose to it… no: it would lose to any utility, which is the same rule read
+			 * from the other end. The strong half has to be the variant.
+			 */}
+			<div class="stream-roll max-[1100px]:pointer-events-auto" ref={scroller} onScroll={measure}>
 				{/*
 				 * Empty, it says so. The column used to appear only once there was something in
 				 * it, which was right while it arrived on its own and wrong now that there is a
@@ -410,11 +419,15 @@ export function Stream(props: {
 				 * a third thing on screen saying what the column is for.
 				 *
 				 * Inside the roll, so it scrolls with the conversation and the autoscroll keeps it
-				 * in view; `aria-live` is on the dock's copy, which is the one a screen reader
-				 * should hear, so this one is quiet.
+				 * in view. **And it is the live region while it is up.** The dock's row is not in
+				 * the document at all while the conversation is open, so the note that used to be
+				 * here — "`aria-live` is on the dock's copy" — described a region that was empty
+				 * whenever this card existed, which is to say a turn nobody was told about.
+				 * `working-sign.ts` is what makes one region rather than two: exactly one of the
+				 * two surfaces draws a sign, ever.
 				 */}
 				<Show when={signing()}>
-					<div class="stream-card stream-working" data-working="true">
+					<div class="stream-card stream-working" data-working="true" aria-live="polite">
 						<WorkingSign state={props.state} name={props.name} agent={props.agent} />
 					</div>
 				</Show>

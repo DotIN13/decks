@@ -1,10 +1,9 @@
-import type { AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { AgentMode, AgentModel, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Square from "lucide-solid/icons/square";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { Icon } from "../../icons.tsx";
-import { ContextDial } from "./ContextDial.tsx";
 import { Hints } from "./Hints.tsx";
 import { ModeMenu } from "./ModeMenu.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
@@ -19,12 +18,13 @@ import { ModelPicker } from "./ModelPicker.tsx";
  * it and move with it as it grows, which is the argument for putting controls inside a text
  * box at all rather than in a toolbar beside it.
  *
- * *Outside* the box and below it: the keyboard hints on the left and the context dial on the
- * right. Neither changes anything. One teaches the keyboard and the other reports what the
- * turn you **already have** has cost. That is why the dial is no longer a percentage chip in
- * the controls row, where it competed with the model and the send button for a glance it
- * does not deserve — and it is why the hint row had to come first, because until there was a
- * second row the usage number had nowhere else to be.
+ * *Outside* the box and below it: the keyboard hints, and nothing else. They change nothing;
+ * they teach the keys. The context dial was the other half of this row, on the same argument
+ * — a reading of what the turn you **already have** has cost, which had no business among
+ * controls that decide the next one — and it has since gone one step further out, into the
+ * corner's `⋯`, where the things you go and look up live. So the second register is one
+ * sentence wide now, and on a touchscreen it is not there at all: every hint in it names a
+ * key that a phone does not have.
  *
  * Everything the three native `<select>`s used to do is now three popovers over one
  * primitive (`ui/Popover.tsx`), and everything the old bar did behaviourally is unchanged:
@@ -37,9 +37,6 @@ export function Composer(props: {
 	models: ModelOption[];
 	/** What `/` completes to on the focused agent's runtime. */
 	commands: SlashCommand[];
-	usage: AgentUsage | undefined;
-	/** The runtime's own usage report. Reached from inside the dial's popover now. */
-	onUsage: () => void;
 	/**
 	 * What the agent's runtime asks before acting, and the modes it has.
 	 *
@@ -73,6 +70,43 @@ export function Composer(props: {
 }) {
 	const [text, setText] = createSignal("");
 	let input!: HTMLTextAreaElement;
+
+	/*
+	 * Growing the box: `field-sizing` where there is one, and a measurement where there is not.
+	 *
+	 * `field-sizing: content` is the whole of how this field grows, and it is a Chromium
+	 * feature — WebKit does not implement it. So on an iPhone, which is the *one* place this
+	 * matters most, the bar was one line tall for ever: you typed a paragraph into a 22px slot
+	 * and could see the last few words of it. The desktop, being Chromium, looked perfect.
+	 *
+	 * Asked of the browser rather than of the platform, because the fallback should switch
+	 * itself off the day WebKit ships the property, and a user-agent test never does. Where
+	 * the property exists this code does nothing at all: no measuring, no inline height, and
+	 * the CSS keeps doing the job it already did.
+	 *
+	 * `height: auto` before reading `scrollHeight` is not a flourish — with an inline height
+	 * already set from the last keystroke, the scroll height is that height and the box can
+	 * only ever grow. The `max-h` utility caps it and the textarea scrolls past the cap, so
+	 * six lines remains six lines.
+	 */
+	const growsItself = typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("field-sizing", "content");
+	const fit = () => {
+		if (growsItself || !input) return;
+		input.style.height = "auto";
+		input.style.height = `${input.scrollHeight}px`;
+	};
+	/*
+	 * One effect for every path that changes the words, because there are five of them: a
+	 * keystroke, a command picked from the menu, a draft handed back by a rewind, Escape
+	 * clearing the field, and a send. They all set this signal, so tracking it is tracking
+	 * all of them — and it runs after the DOM has the new value, which is when a measurement
+	 * is worth taking.
+	 */
+	createEffect(() => {
+		void text();
+		fit();
+	});
+	onMount(fit);
 
 	/*
 	 * A draft handed over replaces what is in the field, and takes the caret.
@@ -322,13 +356,24 @@ export function Composer(props: {
 			</div>
 
 			{/*
-			 * The second register: what the keyboard can do, and what the conversation has
-			 * spent. Outside the box, because neither of them changes what the next turn does.
+			 * The second register: what the keyboard can do. Outside the box, because it does
+			 * not change what the next turn does.
+			 *
+			 * **Nothing on a touchscreen.** Every hint in it names a key — ⏎, ⇧+⏎, /, Esc — and
+			 * a phone has none of them until a keyboard is up, at which point the row is behind
+			 * it. It was 18px of unreadable advice above the one control that matters on a small
+			 * screen, and dropping it takes 26px out of the dock, which the conversation above
+			 * gets back.
+			 *
+			 * `pointer-coarse` and not a width: a narrow window on a laptop still has the keys,
+			 * and the hints are still worth having there.
+			 *
+			 * The context dial used to sit at the right end of this row. It is in the corner's
+			 * `⋯` now (`chrome/ContextSummary.tsx`) — which is also why this row can go on a
+			 * phone at all, rather than staying for the one thing in it that was not a keycap.
 			 */}
-			<div class="hintrow flex h-[18px] items-center gap-2 px-1.5">
+			<div class="hintrow flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden">
 				<Hints menuOpen={menuOpen()} />
-				<span class="flex-1" />
-				<ContextDial usage={props.usage} onUsage={props.onUsage} />
 			</div>
 		</section>
 	);

@@ -1,10 +1,11 @@
 /**
- * The one boards panel: two tabs, a button, and folded means gone.
+ * The one boards panel: one list, a button, and folded means gone.
  *
  * It replaced three surfaces — a floating context rail, a floating agents panel that could
- * not be open at the same time, and a full-screen browser over the canvas. The first two
- * being mutually exclusive in code and unrelated on screen is what this design calls a tab
- * strip with the strip left out, so the strip is the thing to assert.
+ * not be open at the same time, and a full-screen browser over the canvas — and then, for a
+ * while, it had a tab strip of its own. That is gone too: Context and Deck were the same
+ * list with a line through it, so what this asserts is the *absence* of the strip and the
+ * presence of all three sections in one scroller.
  *
  * The other half is the camera. A panel *beside* the canvas declares `data-inset="left"`
  * and the camera subtracts it; a sheet *over* the canvas must not, because subtracting one
@@ -20,18 +21,80 @@ try {
 
 	say("the panel is up, and declares its width", (await mounted()) === 1 && (await inset()) === "276px", await inset());
 
-	const tabs = await page.getByRole("tab").allTextContents();
-	say("two tabs, context first because it is the canvas", tabs.length === 2 && /context/i.test(tabs[0]) && /deck/i.test(tabs[1]), tabs.join(" | "));
-	say("no agents tab — a list you switch with is a selector", !tabs.some((t) => /agent/i.test(t)));
+	say("no tab strip: there is one list", (await page.getByRole("tab").count()) === 0);
 
-	// The Deck tab is where the full-screen browser went.
-	await page.getByRole("tab", { name: /deck/i }).click();
-	await page.waitForTimeout(200);
+	/*
+	 * Every board is in it, whoever is holding what. A fresh agent holds nothing, so this is
+	 * the deck section on its own — which is the point of the change: the panel is never a
+	 * list of nothing with the rest of the deck one tab away.
+	 */
 	const rows = await page.locator(".board-row").count();
-	say("the deck tab lists every board", rows >= 4, String(rows));
+	say("the list is the whole deck", rows >= 4, String(rows));
+	/*
+	 * The headings, and the two things worth asserting about them: they are in the one order
+	 * — what you are looking at, what is held for you, then the rest — and between them they
+	 * account for every board exactly once. Which headings are *present* depends on what the
+	 * agent happens to hold, so that is not the assertion; this fixture's agent holds every
+	 * board and puts them all in play, so "On the canvas" alone is a correct picture of it.
+	 */
+	const kinds = await page.evaluate(() => [...document.querySelectorAll(".panel-section")].map((section) => section.dataset.kind));
+	const order = ["canvas", "held", "deck"];
+	say(
+		"the sections are in canvas → held → deck order",
+		kinds.every((kind, index) => index === 0 || order.indexOf(kind) > order.indexOf(kinds[index - 1])),
+		kinds.join(" → ") || "(none)",
+	);
+	const once = await page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .nm")].map((n) => n.textContent));
+	say("…and every board is under exactly one of them", once.length === new Set(once).size && once.length === rows, `${once.length} rows, ${new Set(once).size} distinct`);
+
+	/*
+	 * One column down the right edge: a section's count, a row's on-canvas dot and its delete
+	 * all stand in the same 20px. The bin used to be a flex sibling, which cost the row its
+	 * width and put the dot 24px inboard of the counts above it.
+	 *
+	 * And the swap: approaching a row hides the dot and shows the bin *in its place*, so the
+	 * name beside them does not move. That last part is the assertion that matters — a row
+	 * that reflows under the cursor is a row you cannot aim at.
+	 */
+	const column = await page.evaluate(() => {
+		const mid = (el) => { const b = el.getBoundingClientRect(); return Math.round((b.left + b.right) / 2); };
+		const row = document.querySelector(".board-act:has(.dot)") ?? document.querySelector(".board-act");
+		return {
+			count: mid(document.querySelector(".panel-meta .n")),
+			dot: row.querySelector(".dot") ? mid(row.querySelector(".dot")) : null,
+			bin: mid(row.querySelector(".board-del")),
+		};
+	});
+	say(
+		"the count, the dot and the bin share one column",
+		column.count === column.bin && (column.dot === null || column.dot === column.bin),
+		JSON.stringify(column),
+	);
+
+	const swap = await (async () => {
+		const row = page.locator(".board-act:has(.dot)").first();
+		if ((await row.count()) === 0) return null;
+		const read = () => row.evaluate((el) => ({
+			dot: getComputedStyle(el.querySelector(".dot"), "::before").opacity,
+			bin: getComputedStyle(el.querySelector(".board-del")).opacity,
+			name: Math.round(el.querySelector(".nm").getBoundingClientRect().width),
+		}));
+		const before = await read();
+		await row.hover();
+		await page.waitForTimeout(220);
+		const after = await read();
+		return { before, after };
+	})();
+	say(
+		"approaching a row swaps the dot for the bin, in the same place",
+		swap === null || (swap.before.dot === "1" && swap.before.bin === "0" && swap.after.dot === "0" && swap.after.bin === "1"),
+		JSON.stringify(swap),
+	);
+	say("…and nothing under the cursor moves", swap === null || swap.before.name === swap.after.name, JSON.stringify(swap));
+
 	await page.locator('[data-inset="left"] input').fill("risk");
 	await page.waitForTimeout(250);
-	say("…and the field filters it", (await page.locator(".board-row").count()) === 1, String(await page.locator(".board-row").count()));
+	say("the one field filters the whole list", (await page.locator(".board-row").count()) === 1, String(await page.locator(".board-row").count()));
 	await page.locator('[data-inset="left"] input').fill("");
 
 	/*
@@ -71,11 +134,11 @@ try {
 	await page.waitForTimeout(300);
 	say("unfolded, the camera is told again", (await inset()) === "276px", await inset());
 
-	// ⌘K brings it back on the Deck tab with the cursor in the field: what the modal became.
+	// ⌘K brings it back with the cursor in the field: what the modal became, minus the tab.
 	await page.keyboard.press("Meta+k");
 	await page.waitForSelector("[data-inset='left']", { timeout: 4000 });
 	const focused = await page.evaluate(() => document.activeElement?.getAttribute("placeholder") ?? "");
-	say("⌘K opens it on the deck tab with the cursor in the search field", /search/i.test(focused), focused);
+	say("⌘K opens it with the cursor in the search field", /search/i.test(focused), focused);
 
 	/*
 	 * Under 1100px it is a sheet, and a sheet is not an inset.

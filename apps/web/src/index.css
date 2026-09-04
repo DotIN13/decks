@@ -417,16 +417,16 @@ svg.lucide {
 
 
 
-.dot {
-	width: 8px;
-	height: 8px;
-	border-radius: 999px;
-	background: var(--color-ok);
-}
-
-.dot[data-off="true"] {
-	background: var(--color-danger);
-}
+/*
+ * A bare `.dot` lived here — 8px, green, red when `[data-off]` — for the connection light in
+ * a title bar this app no longer has. Two elements wear the class now: the collaborator
+ * cursor, which draws its own below, and the panel row's on-canvas mark, which draws a 6px
+ * accent disc in a pseudo-element. The row's slot went 20px wide so a delete button could
+ * stand in exactly its place, and this rule promptly painted that whole slot green.
+ *
+ * Deleted rather than narrowed: a global class name with a colour in it and no owner is a
+ * booby trap for the next component that needs the word "dot".
+ */
 
 /*
  * The canvas and everything floating over it, filling the window.
@@ -837,72 +837,19 @@ svg.lucide {
 	white-space: pre-wrap;
 }
 
-.tool {
-	align-self: stretch;
-	overflow: hidden;
-	border: 1px solid var(--line);
-	border-radius: var(--row-radius);
-	background: var(--bg);
-}
-
-.tool > .row {
-	display: flex;
-	width: 100%;
-	gap: 8px;
-	align-items: center;
-	padding: 6px 9px;
-	border: 0;
-	background: none;
-	color: inherit;
-	cursor: pointer;
-	font: inherit;
-	text-align: left;
-}
-
-.tool > .row .name {
-	color: var(--muted);
-	font-family: var(--font-mono);
-	font-size: 11px;
-}
-
-.tool > .row .title {
-	overflow: hidden;
-	flex: 1;
-	font-family: var(--font-mono);
-	font-size: 11px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-/* The chevron that says the row opens. Turned, not swapped for a second icon. */
-.tool > .row .twist {
-	color: var(--faint);
-	transition: transform 120ms ease;
-}
-
-.tool > .row[data-open="true"] .twist {
-	transform: rotate(90deg);
-}
-
-.tool > .row .state {
-	width: 7px;
-	height: 7px;
-	border-radius: 999px;
-	background: var(--color-grey-500);
-}
-
-.tool[data-state="running"] > .row .state {
-	background: var(--color-warn);
-	animation: pulse 1.2s ease-in-out infinite;
-}
-
-.tool[data-state="done"] > .row .state {
-	background: var(--color-ok);
-}
-
-.tool[data-state="error"] > .row .state {
-	background: var(--color-danger);
-}
+/*
+ * The tool row's styles are in `styles/stream.css`, not here.
+ *
+ * They were here, dressing the chat column this app used to have: a 14px radius, a hairline,
+ * a `--bg` fill, a 7px dot that pulsed amber while a call ran. The column is gone and the
+ * conversation that replaced it overrode nearly every line of it, which is two descriptions
+ * of one component in two files and the reason the rows looked like boxes inside boxes. One
+ * home now, next to the rest of the conversation, and it is picone-shaped: a spinner while a
+ * call runs, a quiet dot when it is over, the name in mono, the chevron at the right end.
+ *
+ * `@keyframes pulse` stays — the tool row no longer uses it, but the float rows and the turn
+ * bar still do.
+ */
 
 @keyframes pulse {
 	50% {
@@ -910,17 +857,6 @@ svg.lucide {
 	}
 }
 
-.tool > pre {
-	max-height: 260px;
-	margin: 0;
-	padding: 8px 10px;
-	overflow: auto;
-	border-top: 1px solid var(--line);
-	background: var(--bg-deep);
-	font-family: var(--font-mono);
-	font-size: 11px;
-	white-space: pre-wrap;
-}
 
 
 /*
@@ -985,6 +921,19 @@ svg.lucide {
  */
 .dock {
 	position: absolute;
+	/*
+	 * Above the conversation, which is `z-index: 9`.
+	 *
+	 * The column floats over the boards and stops 8px short of this bar, so the two only
+	 * meet when a card is mid-slide or the window is short — and when they met, the history
+	 * won, because this had no z-index at all and a positioned element without one paints at
+	 * 0. The bar you type into is not something a transcript may cover.
+	 *
+	 * 10 and not 11: the boards panel is 10 and comes later in the document, so on a phone —
+	 * where it is a full-height sheet — it still covers this, which is the arrangement the
+	 * sheet was drawn for.
+	 */
+	z-index: 10;
 	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
 	/* Centred on the canvas column, not on the window — see the note below. */
 	left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
@@ -1805,6 +1754,137 @@ svg.lucide {
 
 .chats .rail-head {
 	padding: 8px 10px 6px;
+}
+
+/*
+ * The notifications grid in Settings (`chat/AlertSettings.tsx`).
+ *
+ * Three columns, and the two on the right are fixed widths so a header can name them once.
+ * That is the whole reason this is a grid rather than three flex rows: a switch beside a
+ * dropdown is a switch that could mean either "play this" or "show a banner", and the only
+ * cheap way to say which is a column heading that lines up with the controls under it.
+ *
+ * 108px is the width of the widest cue name plus its chevron, and 30px is the switch plus a
+ * pixel of air. Both are hard numbers because a column that resizes with its contents cannot
+ * have a heading over it.
+ */
+.alerts {
+	display: grid;
+	align-items: center;
+	grid-template-columns: 1fr 108px 30px;
+	gap: 12px 10px;
+	padding: 2px 4px 4px;
+}
+
+/* The heading over a column of controls: centred on the control, not on the cell's text. */
+.alerts-h {
+	color: var(--faint);
+	font-size: 10px;
+	text-align: center;
+}
+
+/* A name with a sentence under it. Shares `.lb`/`.nt` with a described row — see the note
+   on those selectors in `styles/chrome.css`. */
+.alerts-k {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 2px;
+}
+
+/*
+ * The line about whether a banner can appear at all.
+ *
+ * Not a `.callout` and not a notice: it is a standing fact about this browser on this origin
+ * rather than something that just happened, and it is read once and then ignored. A tinted
+ * strip with the bell in it is enough to find, and quiet enough not to be answered.
+ */
+.alerts-perm {
+	display: flex;
+	align-items: center;
+	margin: 0 4px 10px;
+	padding: 7px 9px;
+	gap: 8px;
+	border-radius: var(--row-radius);
+	background: var(--line);
+	color: var(--fg);
+	font-size: 11px;
+	line-height: 1.45;
+}
+
+.alerts-perm > svg {
+	flex: none;
+	color: var(--faint);
+	/* The bell sits on the first line of a sentence that may wrap to three. */
+	align-self: flex-start;
+	margin-top: 1px;
+}
+
+.alerts-perm code {
+	font-family: var(--font-mono);
+	font-size: 10px;
+}
+
+/*
+ * A switch the browser will refuse to honour, drawn as what it is: a setting that is on and
+ * not in force.
+ *
+ * Still pressable rather than disabled, because the reason it cannot work is usually the
+ * *origin* — the same deck opened on `localhost` an hour later will honour it, and a
+ * preference somebody has to set again after moving windows is a preference they stop
+ * setting. The strip above says why.
+ */
+.sw[data-moot] {
+	opacity: 0.45;
+}
+
+/*
+ * Centred in its column, said here rather than by a `margin-left: auto` on the switch.
+ *
+ * That auto-margin was on `.sw` itself — right for the menu row it was drawn for and wrong
+ * in a grid cell, where it pushed the switch two pixels off the centre of the heading above
+ * it. Two pixels is exactly enough for a column to stop looking like a column.
+ */
+.alerts > .sw {
+	justify-self: center;
+}
+
+/*
+ * Under a thumb, at the app's own touch scale.
+ *
+ * 26×15 is a fine switch for a mouse and an unhittable one for a finger — under the 24px
+ * the rest of this app has settled on for coarse pointers. The two segment rows grow with
+ * it, since a volume you set by pressing "Quiet" and getting "Off" is worse than no volume
+ * control at all.
+ */
+@media (pointer: coarse) {
+	.alerts {
+		grid-template-columns: 1fr 116px 40px;
+	}
+
+	.alerts > .sw {
+		width: 36px;
+		height: 21px;
+		padding: 3px;
+	}
+
+	.alerts > .sw > i {
+		width: 15px;
+		height: 15px;
+	}
+
+	.alerts > .sw[data-on="true"] > i {
+		margin-left: 15px;
+	}
+
+	.alerts .chipbtn {
+		--control-md: 34px;
+	}
+
+	.alerts .seg > button {
+		height: 30px;
+		font-size: 11px;
+	}
 }
 
 /*

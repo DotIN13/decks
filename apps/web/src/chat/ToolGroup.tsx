@@ -46,16 +46,22 @@ export function ToolGroup(props: { calls: ToolItem[] }) {
 }
 
 /**
- * The header over the calls that went as expected.
+ * The header over the calls that went as expected — and it is one of those rows itself.
  *
  * "4 tools" when that is the whole story, "2 done" when something is still going or went
  * wrong below it — the second wording exists because a bare count over a live row invites
  * the reading "4 tools, one of which is that one", and it is not: the count is of the ones
  * you cannot see.
  *
- * A button, with `aria-expanded`, because it is a disclosure and a keyboard has to be able
- * to reach it. The chevron turns rather than being swapped for a second icon, which is the
- * convention `ToolChip` set.
+ * **The same row, not a header of its own.** It used to be a filled grey pill, which made a
+ * group a different species from the calls inside it — and the moment it opened you had a
+ * pill with three unpilled rows hanging under it. Now it wears `.tool` like everything else:
+ * the count sits in the name's slot, the distinct names sit in the description's, and the
+ * chevron is at the right end where a call's is. What is left to say "these belong to that"
+ * is the indent, which is all it needs.
+ *
+ * `data-state="done"` is not decoration either: a group only ever holds calls that finished
+ * cleanly — that is what makes them groupable — so it takes the same quiet dot they do.
  */
 function Group(props: { calls: ToolItem[]; alone: boolean }) {
 	const [open, setOpen] = createSignal(false);
@@ -68,26 +74,33 @@ function Group(props: { calls: ToolItem[]; alone: boolean }) {
 	const word = () => (props.alone ? (count() === 1 ? "tool" : "tools") : "done");
 
 	return (
-		<div>
+		/* `data-group` names the row for a check without giving it a look of its own —
+		   from the outside it is a `.tool` like every other row here, which is the point. */
+		<div class="tool" data-group data-state="done">
 			<button
-				class="stream-tool-head"
+				class="row"
 				type="button"
+				data-open={open()}
 				aria-expanded={open()}
 				aria-label={`${count()} finished tool calls: ${summary().names.join(", ")}`}
 				title={open() ? "Hide these calls" : "Show these calls"}
 				onClick={() => setOpen(!open())}
 			>
-				<Icon of={ChevronRight} class="twist" size={12} />
-				<span class="n">
+				<span class="state" aria-hidden="true" />
+				<span class="name">
 					{count()} {word()}
 				</span>
-				<span class="names">{names()}</span>
+				<span class="title">{names()}</span>
+				<Icon of={ChevronRight} class="twist" size={12} />
 			</button>
-			{/* Indented behind a hairline: the rows belong *to* the header, and an indent says
-			    that with no border of their own — three bordered rows inside a bordered card
-			    is the box-in-a-box the whole column is trying not to be. */}
+			{/*
+			 * Opened, the calls are *nested* and otherwise unchanged: same row, same glyphs,
+			 * same type, hanging off a rule that lands under the header's own state cell. Three
+			 * bordered rows inside a bordered card is the box-in-a-box this column is trying not
+			 * to be, so the indent is the whole of the difference.
+			 */}
 			<Show when={open()}>
-				<div class="stream-tool-kids">
+				<div class="tool-kids">
 					<Index each={props.calls}>{(call) => <ToolChip item={call()} />}</Index>
 				</div>
 			</Show>
