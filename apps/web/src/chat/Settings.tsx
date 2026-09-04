@@ -78,79 +78,85 @@ export function Settings(props: {
 				if (event.target === event.currentTarget) props.onClose();
 			}}
 		>
-			<div
-				class="panel-float settings static flex max-h-[80%] w-[min(520px,calc(100vw-24px))] flex-col overflow-hidden bg-bg p-0"
-				role="dialog"
-				aria-label="Settings"
-			>
-				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
-					{/* "Settings" rather than "Claude accounts": the row in the corner's overflow has
-					    always said Settings, and there are two things in here now. Each section keeps
-					    its own heading in the scroller, which is where a name belongs once there is
-					    more than one of them. */}
-					<span>Settings</span>
+			<div class="panel-float settings static flex max-h-[84%] w-[min(560px,calc(100vw-24px))] flex-col overflow-hidden p-0" role="dialog" aria-label="Settings">
+				{/*
+					A title, not a section label.
+					
+					The header used to say "Claude accounts" in the 10px `.label` the panels use for a
+					heading *inside* a list — which was right when the modal was one list and wrong the
+					moment it was two. A window has a name at the size of a name, and the groups below
+					carry the section headings now.
+				*/}
+				<header class="set-head">
+					<span class="set-head-title">Settings</span>
 					<span class="flex-1" />
-					{/* `.iconbtn`, the app's icon control. It said `icon-button` — a class the rewrite
-					    replaced and nothing defines any more, so the × was an unstyled bare button
-					    with no target, no hover and no corner. */}
-					<button class="iconbtn [--control:24px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+					<button class="iconbtn [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
 						<Icon of={X} size={15} />
 					</button>
 				</header>
 
-				<div class="overflow-y-auto overscroll-contain p-2">
-					{/*
-						Notifications first, accounts second, and the order is not alphabetical: this is
-						the part somebody opens the modal to change, and accounts is the part they set
-						up once. The footer belongs to accounts, which is the other reason accounts is
-						last.
-					*/}
+				{/*
+					Grouped rows on a recessed ground, which is the shape every settings screen worth
+					copying has converged on — and it is this app's own shape too: a `--panel` surface
+					standing on `--bg-deep` is what a float is against the canvas.
+
+					Notifications first, accounts second, and the order is not alphabetical: this is the
+					part somebody opens the modal to change, and accounts is the part they set up once.
+				*/}
+				<div class="set-body">
 					<AlertSettings prefs={props.prefs} onChange={props.onPrefs} />
 
-					<div class="label px-1 pt-4 pb-1.5">Claude accounts</div>
+					<section class="set-group" data-group="accounts">
+						<header>
+							<span class="set-title">Claude accounts</span>
+							{/*
+								The group's own state, where a footer note used to be. A sentence about
+								accounts belongs to the accounts group rather than to the window, which is
+								what made it look like a status line for the whole modal.
+							*/}
+							<Show
+								when={props.accounts.find((account) => account.id === props.active && !account.signedIn)}
+								fallback={
+									<span class="set-note">
+										{props.accounts.length === 1 ? "Add another to switch when this one runs out." : "Switches on its own when one runs out."}
+									</span>
+								}
+							>
+								<span class="set-note text-warn">The account in use is signed out. Add it again, or pick another.</span>
+							</Show>
+						</header>
 
-					{/* `rowlist`, so each account is the same row as a described choice anywhere else in
-					    the app — `styles/chrome.css` owns the grid, the corner, the hover and the
-					    `.lb`/`.nt` type scale. */}
-					<div class="rowlist">
-					<For each={props.accounts}>
-						{(account) => (
-							<Row
-								account={account}
-								active={props.active === account.id}
-								onUse={() => props.onUse(account.id)}
-								onForget={() => props.onForget(account.id)}
-							/>
-						)}
-					</For>
-					</div>
+						{/* `rowlist`, so each account is the same row as a described choice anywhere else in
+						    the app — `styles/chrome.css` owns the grid, the corner, the hover and the
+						    `.lb`/`.nt` type scale. */}
+						<div class="rowlist set-rows">
+							<For each={props.accounts}>
+								{(account) => (
+									<Row
+										account={account}
+										active={props.active === account.id}
+										onUse={() => props.onUse(account.id)}
+										onForget={() => props.onForget(account.id)}
+									/>
+								)}
+							</For>
+						</div>
+
+						{/*
+							Inside the group rather than in a window footer, because signing in is a thing
+							you do *to this list*. The footer it left behind held one button and one
+							sentence, both about accounts, on a bar that spanned a modal which is mostly
+							not about accounts.
+
+							Signing in adds an account rather than replacing one: the CLI writes its
+							credentials wherever it is pointed, so each login gets a directory of its own.
+						*/}
+						<button class="set-add" type="button" onClick={props.onAdd}>
+							<Icon of={Plus} size={14} />
+							Add an account
+						</button>
+					</section>
 				</div>
-
-				<footer class="flex items-center gap-2 border-t border-line px-2 py-2">
-					{/*
-						Signing in adds an account rather than replacing one: the CLI writes its
-						credentials wherever it is pointed, so each login gets a directory of its own.
-					*/}
-					<button class="btn" type="button" onClick={props.onAdd}>
-						<Icon of={Plus} size={14} />
-						Add an account
-					</button>
-					<span class="flex-1" />
-					{/*
-						The account in use being unusable is the one state worth saying twice: nothing
-						will run at all, and the row's own word for it is small and easy to miss.
-					*/}
-					<Show
-						when={props.accounts.find((account) => account.id === props.active && !account.signedIn)}
-						fallback={
-							<span class="meta">
-								{props.accounts.length === 1 ? "One account — add another to switch when it runs out" : "Switches on its own when one runs out"}
-							</span>
-						}
-					>
-						<span class="meta text-warn">The account in use is signed out. Add it again, or pick another.</span>
-					</Show>
-				</footer>
 			</div>
 		</div>
 	);

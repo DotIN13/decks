@@ -62,20 +62,29 @@ test("a tab in the background but focused, and vice versa, are both 'not in view
 test("silence is a choice, and so is the volume", () => {
 	const muted = { ...DEFAULT_PREFS, volume: 0 };
 	assert.equal(shouldSound("done", muted), false);
-	const off = { ...DEFAULT_PREFS, sound: { ...DEFAULT_PREFS.sound, done: "none" as const } };
+	const off = { ...DEFAULT_PREFS, sound: { ...DEFAULT_PREFS.sound, done: "none" } };
 	assert.equal(shouldSound("done", off), false);
 	assert.equal(shouldSound("ask", off), true, "one kind at a time");
 });
 
 test("saved preferences are merged per field, so an older blob is not a hole", () => {
 	// Written before `problem` existed, and with a volume somebody hand-edited out of range.
-	const old = JSON.stringify({ volume: 9, sound: { done: "ping" }, notify: { done: false } });
+	const old = JSON.stringify({ volume: 9, sound: { done: "bip-bop-04" }, notify: { done: false } });
 	const prefs = loadPrefs(() => old);
-	assert.equal(prefs.sound.done, "ping", "what was saved");
+	assert.equal(prefs.sound.done, "bip-bop-04", "what was saved");
 	assert.equal(prefs.sound.problem, DEFAULT_PREFS.sound.problem, "what was not");
 	assert.equal(prefs.notify.done, false, "false is a value, not a missing one");
 	assert.equal(prefs.notify.ask, DEFAULT_PREFS.notify.ask);
 	assert.equal(prefs.volume, DEFAULT_PREFS.volume, "9 is not a volume");
+});
+
+test("a cue this build no longer has falls back rather than 404ing into silence", () => {
+	// The synthesised set was called `chime` / `knock` / `drop`. A browser that used this
+	// feature before the sound library landed has those in localStorage right now.
+	const stale = JSON.stringify({ volume: 0.7, sound: { done: "chime", ask: "knock", problem: "drop" }, notify: { done: true, ask: true, problem: true } });
+	const prefs = loadPrefs(() => stale);
+	assert.deepEqual(prefs.sound, DEFAULT_PREFS.sound, "all three, silently repaired");
+	assert.equal(prefs.notify.problem, true, "…without losing the switches beside them");
 });
 
 test("nothing saved, and nonsense saved, both give the defaults rather than throwing", () => {

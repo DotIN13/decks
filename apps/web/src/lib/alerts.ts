@@ -1,5 +1,5 @@
 import type { AgentState } from "@decks/protocol";
-import type { SoundChoice } from "./sound.ts";
+import { isSound, SILENT, type SoundChoice } from "./sound.ts";
 
 /**
  * What the app interrupts you for, and the rules about when.
@@ -70,8 +70,14 @@ export interface AlertPrefs {
  * is the only one that does not resolve, and `problem` is the only one that falls.
  */
 export const DEFAULT_PREFS: AlertPrefs = {
-	volume: 0.7,
-	sound: { done: "chime", ask: "knock", problem: "drop" },
+	volume: 0.65,
+	/*
+	 * opencode's own three, kept rather than re-chosen: `staplebops-01` for a finished turn,
+	 * `staplebops-02` for a question, `nope-03` for a failure. Two from one family and the
+	 * third from another is the right shape — the two you hear all day are siblings, and the
+	 * one that means something went wrong is audibly not one of them.
+	 */
+	sound: { done: "staplebops-01", ask: "staplebops-02", problem: "nope-03" },
 	notify: { done: true, ask: true, problem: false },
 };
 
@@ -99,8 +105,16 @@ export function loadPrefs(read: () => string | null = () => safeGet(KEY)): Alert
 	const sound = {} as Record<AlertKind, SoundChoice>;
 	const notify = {} as Record<AlertKind, boolean>;
 	for (const kind of ALERT_KINDS) {
+		/*
+		 * Checked against the set this build actually has, not merely "is a string".
+		 *
+		 * The cues used to be synthesised and were called `chime`, `knock` and `drop`; a browser
+		 * that saved those would now be asking for `/sounds/chime.mp3`, which is a 404 and then
+		 * silence — a preference that looks set and plays nothing. An unknown name falls back to
+		 * the default, which is audibly the right failure.
+		 */
 		const choice = blob.sound?.[kind];
-		sound[kind] = typeof choice === "string" ? (choice as SoundChoice) : DEFAULT_PREFS.sound[kind];
+		sound[kind] = isSound(choice) ? choice : DEFAULT_PREFS.sound[kind];
 		const flag = blob.notify?.[kind];
 		notify[kind] = typeof flag === "boolean" ? flag : DEFAULT_PREFS.notify[kind];
 	}
@@ -162,7 +176,7 @@ export function inView(presence: Presence): boolean {
 
 /** Sound plays regardless of presence — the argument is in this file's header. */
 export function shouldSound(kind: AlertKind, prefs: AlertPrefs): boolean {
-	return prefs.volume > 0 && prefs.sound[kind] !== "none";
+	return prefs.volume > 0 && prefs.sound[kind] !== SILENT;
 }
 
 /** A banner only for something you cannot already see. */

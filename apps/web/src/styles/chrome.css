@@ -306,12 +306,12 @@
 		color: var(--muted);
 	}
 
-	/* `.alerts-k` is the same object outside a row: a name with a sentence under it, in the
-	   notifications grid (`chat/AlertSettings.tsx`). Added to the selector rather than given
-	   its own copy of these six declarations, because two type scales that are meant to match
-	   and are written twice do not stay matched. */
+	/* `.set-k` is the same object outside a row: a name with a sentence under it, in a settings
+	   group (`chat/Settings.tsx`). Added to the selector rather than given its own copy of these
+	   six declarations, because two type scales that are meant to match and are written twice do
+	   not stay matched. */
 	:is(.popover, .rowlist) [data-row] > .lb,
-	.alerts-k > .lb {
+	.set-k > .lb {
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -327,7 +327,7 @@
 	 * not say by itself that commands still ask, and the place to say so is here.
 	 */
 	:is(.popover, .rowlist) [data-row] > .nt,
-	.alerts-k > .nt {
+	.set-k > .nt {
 		color: var(--faint);
 		font-size: 11px;
 		line-height: 1.4;

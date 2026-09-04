@@ -1,75 +1,67 @@
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { CUE_IDS, CUES, cue, cueLength, hz } from "./sound.ts";
+import { isSound, SILENT, SOUND_FAMILIES, SOUND_IDS, soundLabel, soundName, soundUrl } from "./sound.ts";
 
 /*
- * The audible half cannot be asserted here — a test that claims the browser made a noise is
- * a test of the browser. What *can* be asserted is everything the cues are made of, and it
- * is the part that goes wrong silently: a pitch that resolves to the wrong octave is a cue
- * that still plays, just badly, and nobody files that as a bug.
+ * The cues are files now, so the assertion worth having is that the list and the directory
+ * agree. Everything else in this module is naming, and naming is only interesting where a
+ * saved preference could name something that is not there — which is exactly the state a
+ * browser is in after this build, since the ids changed under it.
  */
 
-test("pitches are equal temperament with A4 at 440", () => {
-	assert.equal(hz("A4"), 440);
-	assert.equal(Math.round(hz("A5")), 880);
-	assert.equal(Math.round(hz("A3")), 220);
-	assert.equal(Math.round(hz("C4")), 262, "middle C");
-	assert.equal(Math.round(hz("G5")), 784);
-	assert.equal(Math.round(hz("D6")), 1175);
+const sounds = join(dirname(fileURLToPath(import.meta.url)), "../../public/sounds");
+const onDisk = readdirSync(sounds)
+	.filter((name) => name.endsWith(".mp3"))
+	.map((name) => name.replace(/\.mp3$/, ""))
+	.sort();
+
+test("every id has a file and every file has an id", () => {
+	// The one that catches a half-finished vendoring, in either direction: a picker row that
+	// 404s, or forty-five files of which the app can only reach forty.
+	assert.deepEqual([...SOUND_IDS].sort(), onDisk);
+	assert.equal(SOUND_IDS.length, 45, "opencode's whole set");
 });
 
-test("sharps and flats are the same key", () => {
-	assert.equal(hz("A#4"), hz("Bb4"));
-	assert.ok(hz("C#5") > hz("C5"));
-	assert.throws(() => hz("H4"), /not a pitch/);
-	assert.throws(() => hz("440"), /not a pitch/);
-});
-
-test("every id in the list is a cue, and every cue is in the list", () => {
-	assert.deepEqual(
-		CUES.map((item) => item.id),
-		[...CUE_IDS],
+test("the families add up to the list", () => {
+	assert.equal(
+		SOUND_FAMILIES.reduce((total, family) => total + family.count, 0),
+		SOUND_IDS.length,
 	);
-	for (const id of CUE_IDS) assert.ok(cue(id), id);
-	assert.equal(cue("none"), undefined);
-	assert.equal(cue(undefined), undefined);
-});
-
-test("silence is zero length, so a preview has nothing to wait for", () => {
-	assert.equal(cueLength("none"), 0);
-	assert.equal(cueLength(undefined), 0);
-});
-
-test("no cue outstays its welcome", () => {
-	// Heard several hundred times a day by somebody who leaves this open. 400ms is the line.
-	for (const item of CUES) assert.ok(cueLength(item.id) <= 400, `${item.id} is ${cueLength(item.id)}ms`);
-});
-
-test("the three shapes say three different things", () => {
-	const shape = (id: (typeof CUE_IDS)[number]) => {
-		const notes = cue(id)?.notes ?? [];
-		if (notes.length < 2) return "single";
-		const first = hz(notes[0]!.pitch);
-		const last = hz(notes.at(-1)!.pitch);
-		if (last > first) return "rising";
-		if (last < first) return "falling";
-		return "level";
-	};
-	assert.equal(shape("chime"), "rising", "finished: the phrase resolves and stops asking");
-	assert.equal(shape("bloop"), "rising");
-	assert.equal(shape("knock"), "level", "a question has nowhere to go");
-	assert.equal(shape("drop"), "falling", "wrong");
-	assert.equal(shape("alarm"), "falling");
-});
-
-test("notes are ordered and none of them is silent", () => {
-	for (const item of CUES) {
-		let last = -1;
-		for (const note of item.notes) {
-			assert.ok(note.at >= last, `${item.id} notes out of order`);
-			last = note.at;
-			assert.ok(note.ms > 0 && note.gain > 0 && note.gain <= 1, `${item.id} has a note that cannot be heard`);
-			assert.doesNotThrow(() => hz(note.pitch), `${item.id}: ${note.pitch}`);
-		}
+	for (const family of SOUND_FAMILIES) {
+		const mine = SOUND_IDS.filter((id) => id.startsWith(`${family.id}-`));
+		assert.equal(mine.length, family.count, family.id);
 	}
+});
+
+test("ids are numbered from 01 with a leading zero, which is how the files are named", () => {
+	assert.ok(SOUND_IDS.includes("staplebops-01"));
+	assert.ok(SOUND_IDS.includes("nope-12"));
+	assert.ok(!SOUND_IDS.includes("nope-1"));
+	assert.ok(!SOUND_IDS.includes("staplebops-08"), "there are seven of those, not eight");
+});
+
+test("a url is the id, so a saved preference stays legible", () => {
+	assert.equal(soundUrl("staplebops-01"), "/sounds/staplebops-01.mp3");
+	assert.equal(soundUrl(SILENT), undefined);
+	assert.equal(soundUrl("chime"), undefined, "a cue from the synthesised set that no longer exists");
+});
+
+test("an unknown name is not a sound, which is what stops a 404 being a silent setting", () => {
+	assert.ok(isSound("bip-bop-07"));
+	assert.ok(isSound(SILENT));
+	assert.ok(!isSound("chime"), "the old synthesised ids");
+	assert.ok(!isSound("../../etc/passwd"));
+	assert.ok(!isSound(undefined));
+	assert.ok(!isSound(7));
+});
+
+test("the picker splits a name; the chip joins it", () => {
+	assert.deepEqual(soundLabel("staplebops-01"), { family: "Staplebops", number: "01" });
+	assert.deepEqual(soundLabel("bip-bop-10"), { family: "Bip bop", number: "10" }, "the family name has its own hyphen in it");
+	assert.equal(soundName("bip-bop-10"), "Bip bop 10");
+	assert.equal(soundName(SILENT), "Silent");
+	assert.equal(soundName(undefined), "Silent");
 });

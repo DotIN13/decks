@@ -20,9 +20,9 @@ const { browser, page, errors } = await open();
 /*
  * Wrap the socket and the audio context before the app starts.
  *
- * `window.__ws` is how a frame is delivered; `window.__notes` records every oscillator the
- * app starts, which is the only observable evidence that a cue played — an `AudioContext` in
- * headless Chromium makes no sound and reports nothing about what it was asked to make.
+ * `window.__ws` is how a frame is delivered; `window.__played` records the url of every cue
+ * the app tries to play, which is the only observable evidence a sound happened — headless
+ * Chromium has no audio device.
  */
 await page.addInitScript(() => {
 	if (window.top !== window.self) return;
@@ -33,22 +33,21 @@ await page.addInitScript(() => {
 			window.__ws = this;
 		}
 	};
-	window.__notes = [];
-	const RealAudio = window.AudioContext;
-	window.AudioContext = class extends RealAudio {
-		constructor(...args) {
-			super(...args);
-			const make = this.createOscillator.bind(this);
-			this.createOscillator = () => {
-				const osc = make();
-				const start = osc.start.bind(osc);
-				osc.start = (...at) => {
-					window.__notes.push(Math.round(osc.frequency.value));
-					return start(...at);
-				};
-				return osc;
-			};
-		}
+	/*
+	 * Every cue the app tries to play, by url.
+	 *
+	 * The cues are `<audio>` elements loading files from `/sounds` now, so `play()` on the
+	 * prototype is the one place they all pass through — and the url is a far better witness
+	 * than "a sound happened": it says *which* cue, so a check can assert that picking
+	 * `bip-bop-04` previews `bip-bop-04` rather than merely making a noise. Headless Chromium
+	 * has no audio device, so the promise rejects; that is the app's own swallowed case and
+	 * it does not stop the src being recorded.
+	 */
+	window.__played = [];
+	const realPlay = HTMLMediaElement.prototype.play;
+	HTMLMediaElement.prototype.play = function play(...args) {
+		window.__played.push((this.currentSrc || this.src || "").replace(/^https?:\/\/[^/]+/, ""));
+		return realPlay.apply(this, args);
 	};
 });
 await page.reload({ waitUntil: "load" });
@@ -59,7 +58,7 @@ const tab = () =>
 	page.evaluate(() => ({
 		title: document.title,
 		icon: document.head.querySelector('link[rel="icon"][type="image/svg+xml"]')?.getAttribute("href"),
-		notes: window.__notes.length,
+		played: window.__played.length,
 	}));
 /** Pretend the window went behind another one. `hasFocus` is a function, so it can be told. */
 const leave = () => page.evaluate(() => ((document.hasFocus = () => false), window.dispatchEvent(new Event("blur"))));
@@ -79,6 +78,23 @@ say("…a raster fallback for the browsers that ignore it", head.png === "/favic
 say("…an apple-touch icon, for a deck added to a home screen", head.apple === "/apple-touch-icon.png", head.apple);
 say("…and a manifest", head.manifest === "/site.webmanifest", head.manifest);
 say("a theme colour per scheme, not one for both", head.themes.length === 2 && head.themes.every((media) => /prefers-color-scheme/.test(media ?? "")), JSON.stringify(head.themes));
+
+/*
+ * Black ink by default, pale under `prefers-color-scheme: dark`.
+ *
+ * The order in the file is the whole assertion. Safari ignores the media query and takes the
+ * first declaration, so whichever way round these are written one browser gets the
+ * unconditional one — and it has to be the black one, because Safari ships a light tab strip
+ * and a pale mark on it is invisible where black on a dark strip is at worst dim.
+ */
+const svg = await (await fetch(`${WEB}/favicon.svg`)).text();
+// Inside the `<style>` block only. The comment above it discusses `prefers-color-scheme` by
+// name, so searching the whole document finds the prose and proves nothing.
+const ink = svg.slice(svg.indexOf("<style>"), svg.indexOf("</style>"));
+const firstFill = /\.a\s*\{\s*fill:\s*(#[0-9a-f]{6})/i.exec(ink)?.[1]?.toLowerCase();
+say("the favicon's default ink is black", firstFill === "#161616", firstFill);
+say("…and the pale version is the override, not the default", ink.indexOf("prefers-color-scheme") > ink.indexOf(".a {"), `query at ${ink.indexOf("prefers-color-scheme")} of ${ink.length}`);
+say("…so the browser that ignores the query gets black", /prefers-color-scheme:\s*dark/.test(ink), "the query asks for dark; ignoring it leaves the black default");
 
 /*
  * Every icon the head or the manifest names is fetched, because a 404 favicon is invisible:
@@ -109,7 +125,8 @@ await settle(page, 400);
 const first = await tab();
 say("finishing counts the tab up", first.title === "(1) Decks", first.title);
 say("…and puts a dot on the mark", first.icon === "/favicon-badge.svg", first.icon);
-say("…and plays a cue", first.notes > 0, `${first.notes} oscillators`);
+const firstCue = await page.evaluate(() => window.__played.at(-1));
+say("…and plays the cue configured for finishing", /\/sounds\/staplebops-01\.mp3$/.test(firstCue ?? ""), firstCue);
 
 // Being told "idle" again is not finishing again. This is what a reconnection looks like,
 // and it is why the rule is written on the transition rather than on the value.
@@ -130,13 +147,13 @@ say("coming back to the window is reading it", back.title === "Decks" && back.ic
 
 // --- in view: the cue plays, the tab stays clean --------------------------------------
 
-const before = (await tab()).notes;
+const before = (await tab()).played;
 await feed({ type: "agent.state", id: "probe", state: "thinking" });
 await settle(page, 100);
 await feed({ type: "agent.state", id: "probe", state: "idle" });
 await settle(page, 400);
 const seen = await tab();
-say("a cue still plays when you are looking", seen.notes > before, `${before} → ${seen.notes}`);
+say("a cue still plays when you are looking", seen.played > before, `${before} → ${seen.played}`);
 say("…but nothing is counted, because you saw it", seen.title === "Decks" && seen.icon === "/favicon.svg", seen.title);
 
 // --- the settings ---------------------------------------------------------------------
@@ -147,65 +164,125 @@ await page.locator(".popover [data-row]").filter({ hasText: /settings/i }).first
 await page.waitForSelector(".settings", { timeout: 6000 });
 await settle(page, 500);
 
-const grid = await page.evaluate(() => {
-	const mid = (el) => {
-		const box = el.getBoundingClientRect();
-		return Math.round(box.left + box.width / 2);
-	};
-	const heads = [...document.querySelectorAll(".alerts-h")];
+/*
+ * The redesign, asserted as a shape rather than as pixels.
+ *
+ * The first version of this panel was a three-column grid, and the assertion here was that
+ * the two column headings stayed centred on the controls under them to within a pixel — a
+ * check that existed only because the design needed the headings to mean anything. Grouping
+ * by *what the app does* removed the need for both, so what is checked now is the grouping
+ * itself: two notification groups, one control per row, and every row's control the same kind
+ * as its neighbours'.
+ */
+const panel = await page.evaluate(() => {
+	const groups = [...document.querySelectorAll(".set-group")].map((group) => ({
+		name: group.dataset.group,
+		title: group.querySelector(".set-title")?.textContent,
+		rows: [...group.querySelectorAll(".set-row")].map((row) => ({
+			label: row.querySelector(".set-k > .lb")?.textContent,
+			note: row.querySelector(".set-k > .nt")?.textContent ?? null,
+			controls: [...row.children].filter((child) => !child.classList.contains("set-k")).map((child) => child.className.split(" ")[0]),
+		})),
+	}));
 	return {
-		heads: heads.map((el) => el.textContent),
-		headMids: heads.map(mid),
-		chips: [...document.querySelectorAll(".alerts > .chipbtn")].map(mid),
-		switches: [...document.querySelectorAll(".alerts > .sw")].map(mid),
-		kinds: [...document.querySelectorAll(".alerts-k > .lb")].map((el) => el.textContent),
-		notes: [...document.querySelectorAll(".alerts-k > .nt")].length,
-		perm: document.querySelector(".alerts-perm")?.innerText.replace(/\s+/g, " ").trim(),
+		groups,
+		strip: document.querySelector(".set-strip")?.innerText.replace(/\s+/g, " ").trim() ?? null,
+		title: document.querySelector(".set-head-title")?.textContent,
+		add: document.querySelector(".set-group[data-group='accounts'] .set-add")?.innerText.trim(),
+		footer: document.querySelectorAll(".settings > footer").length,
 	};
 });
-say("Settings has a notifications section with the three kinds", grid.kinds.length === 4 && grid.kinds[3] === "Volume", JSON.stringify(grid.kinds));
-say("…each with a sentence saying what it means", grid.notes === 4);
-say("…and two labelled columns", JSON.stringify(grid.heads) === JSON.stringify(["Sound", "Banner"]), JSON.stringify(grid.heads));
-/*
- * The columns have to line up with what is under them, or the heading is decoration: a
- * switch beside a dropdown could plausibly mean either, and this is the only thing that says
- * which. One pixel of slack for a sub-pixel grid track.
- */
-say(
-	"…that line up with the controls under them",
-	grid.chips.every((x) => Math.abs(x - grid.headMids[0]) <= 1) && grid.switches.every((x) => Math.abs(x - grid.headMids[1]) <= 1),
-	`sound ${grid.headMids[0]} vs ${grid.chips.join()} · banner ${grid.headMids[1]} vs ${grid.switches.join()}`,
-);
-say("…and a line about whether a banner can appear at all", /banner/i.test(grid.perm ?? ""), grid.perm);
+say("the window has a title rather than a section label", panel.title === "Settings", panel.title);
+say("three groups: sounds, banners, accounts", JSON.stringify(panel.groups.map((g) => g.name)) === JSON.stringify(["sounds", "banners", "accounts"]), JSON.stringify(panel.groups.map((g) => g.title)));
 
-// Picking a sound writes the preference and previews it.
-const wasNotes = (await tab()).notes;
-await page.locator(".alerts > .chipbtn").first().click();
-await page.waitForSelector(".popover", { timeout: 4000 });
-const choices = await page.locator(".popover [data-row] .lb").allTextContents();
-say("the sound picker offers silence first, then the cues", choices[0] === "Silent" && choices.length >= 5, choices.join(" "));
-await page.locator(".popover [data-row]").filter({ hasText: /^Ping$/ }).first().click();
+const sounds = panel.groups[0];
+const banners = panel.groups[1];
+say("sounds has a row per kind, plus the volume", sounds.rows.length === 4 && sounds.rows[3]?.label === "Volume", JSON.stringify(sounds.rows.map((r) => r.label)));
+say("…and every kind carries the sentence that explains it", sounds.rows.every((row) => (row.note ?? "").length > 10), JSON.stringify(sounds.rows.map((r) => r.note?.slice(0, 20))));
+say("banners has the same three kinds, in the same order", JSON.stringify(banners.rows.map((r) => r.label)) === JSON.stringify(sounds.rows.slice(0, 3).map((r) => r.label)), JSON.stringify(banners.rows.map((r) => r.label)));
+/*
+ * The sentence is printed once. Repeating it under the switches would be the spreadsheet
+ * again with extra words — it describes the event, and the event is the same one.
+ */
+say("…without repeating the sentences", banners.rows.every((row) => row.note === null), JSON.stringify(banners.rows.map((r) => r.note)));
+/*
+ * One control per row, and all of a group's the same kind. This is what makes a column
+ * heading unnecessary: nothing in Sounds is a switch and nothing in Banners is a chip.
+ */
+say("one control per row, everywhere", panel.groups.every((group) => group.rows.every((row) => row.controls.length === 1)), JSON.stringify(panel.groups.map((g) => g.rows.map((r) => r.controls))));
+say("…all of Banners' being switches", banners.rows.every((row) => row.controls[0] === "sw"), JSON.stringify(banners.rows.map((r) => r.controls[0])));
+say("…and Sounds' being cue chips, bar the volume", sounds.rows.slice(0, 3).every((row) => row.controls[0] === "chipbtn") && sounds.rows[3]?.controls[0] === "seg", JSON.stringify(sounds.rows.map((r) => r.controls[0])));
+say("the permission line lives inside the group it constrains", /banner/i.test(panel.strip ?? ""), panel.strip?.slice(0, 70));
+say("adding an account is the last row of its own group, not a window footer", /Add an account/.test(panel.add ?? "") && panel.footer === 0, `${panel.add} · ${panel.footer} footers`);
+
+// --- the cue picker: forty-five sounds, previewed ------------------------------------
+
+const wasPlayed = (await tab()).played;
+await page.locator(".set-row .set-cue").first().click();
+await page.waitForSelector(".set-sounds", { timeout: 4000 });
+const picker = await page.evaluate(() => ({
+	families: [...document.querySelectorAll(".set-sounds .grp")].map((el) => el.textContent),
+	numbers: document.querySelectorAll(".set-sounds .set-cues > [data-row]").length,
+	first: document.querySelector(".set-sounds [data-row] .lb")?.textContent,
+	current: document.querySelector(".set-sounds .set-cues > [data-row][data-current='true']")?.textContent,
+	scrolls: (() => {
+		const el = document.querySelector(".set-sounds");
+		return el.scrollHeight > el.clientHeight;
+	})(),
+}));
+say("the picker offers the whole library", picker.numbers === 45, `${picker.numbers} cues`);
+say("…in five named families", picker.families.length === 5, JSON.stringify(picker.families));
+say("…with silence first, before any of them", picker.first === "Silent", picker.first);
+say("…the one in force marked", picker.current === "01", picker.current);
+say("…and it is a grid rather than a scroll of forty-five rows", picker.scrolls === true && picker.numbers === 45, "capped height, five per line");
+
+/*
+ * Pressing one previews it *and leaves the menu open*, which is what turns picking a
+ * notification sound from a guess into listening to four and keeping one. The names say
+ * nothing — `nope-03` against `nope-07` — so this is the only way anybody could choose.
+ */
+await page.locator(".set-sounds .set-cues > [data-row]").nth(3).click();
 await settle(page, 400);
 const afterPick = await page.evaluate(() => ({
-	chip: document.querySelector(".alerts > .chipbtn")?.innerText.trim(),
+	open: Boolean(document.querySelector(".set-sounds")),
+	last: window.__played.at(-1),
+	chip: document.querySelector(".set-row .set-cue")?.innerText.trim(),
 	saved: JSON.parse(localStorage.getItem("decks.alerts") ?? "{}"),
-	notes: window.__notes.length,
+	played: window.__played.length,
 }));
-say("picking a cue shows it on the chip", afterPick.chip === "Ping", afterPick.chip);
-say("…plays it, so it can be heard before it is committed to", afterPick.notes > wasNotes, `${wasNotes} → ${afterPick.notes}`);
-say("…and saves it", afterPick.saved?.sound?.done === "ping", JSON.stringify(afterPick.saved?.sound));
+say("pressing a cue plays that exact cue", /\/sounds\/staplebops-04\.mp3$/.test(afterPick.last ?? ""), afterPick.last);
+say("…and leaves the menu open, so the next one can be heard too", afterPick.open === true);
+say("…shows it on the chip in words", afterPick.chip === "Staplebops 04", afterPick.chip);
+say("…and saves the id, which is the filename", afterPick.saved?.sound?.done === "staplebops-04", JSON.stringify(afterPick.saved?.sound));
+say("the preview happened", afterPick.played > wasPlayed, `${wasPlayed} → ${afterPick.played}`);
 
-// Off is a real setting: the choices are kept and all three go quiet.
-await page.locator(".alerts .seg > button").filter({ hasText: /^Off$/ }).click();
+await page.keyboard.press("Escape");
+await settle(page, 250);
+
+// --- off is a real setting -----------------------------------------------------------
+
+await page.locator(".set-vol > button").filter({ hasText: /^Off$/ }).click();
 await settle(page, 300);
-const quiet = await page.evaluate(() => ({ saved: JSON.parse(localStorage.getItem("decks.alerts") ?? "{}"), notes: window.__notes.length }));
+const quiet = await page.evaluate(() => ({ saved: JSON.parse(localStorage.getItem("decks.alerts") ?? "{}"), played: window.__played.length }));
 await feed({ type: "agent.state", id: "probe", state: "tool" });
 await settle(page, 100);
 await feed({ type: "agent.state", id: "probe", state: "idle" });
 await settle(page, 400);
-const stillQuiet = await page.evaluate(() => window.__notes.length);
-say("volume off silences the next cue", stillQuiet === quiet.notes, `${quiet.notes} → ${stillQuiet}`);
-say("…without forgetting which cue each kind had", quiet.saved?.sound?.done === "ping" && quiet.saved?.volume === 0, JSON.stringify(quiet.saved));
+const stillQuiet = await page.evaluate(() => window.__played.length);
+say("volume off silences the next cue", stillQuiet === quiet.played, `${quiet.played} → ${stillQuiet}`);
+say("…without forgetting which cue each kind had", quiet.saved?.sound?.done === "staplebops-04" && quiet.saved?.volume === 0, JSON.stringify(quiet.saved));
+
+/*
+ * And the library is on disk where the ids say it is. A 404 here is silence, which is the
+ * one failure mode of this feature that produces no error anywhere.
+ */
+const cueMisses = [];
+for (const id of ["staplebops-01", "staplebops-02", "nope-03", "bip-bop-10", "yup-06", "alert-10", "nope-12"]) {
+	const response = await fetch(`${WEB}/sounds/${id}.mp3`);
+	if (!response.ok) cueMisses.push(`${id} → ${response.status}`);
+}
+say("every default and every family's last cue is a file", cueMisses.length === 0, cueMisses.join(", "));
+say("the vendored set carries opencode's licence beside it", (await fetch(`${WEB}/sounds/LICENSE`)).ok);
 
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();

@@ -1757,72 +1757,245 @@ svg.lucide {
 }
 
 /*
- * The notifications grid in Settings (`chat/AlertSettings.tsx`).
+ * The settings window: a title, a recessed body, and groups of rows.
+ * `chat/Settings.tsx` and `chat/AlertSettings.tsx`.
  *
- * Three columns, and the two on the right are fixed widths so a header can name them once.
- * That is the whole reason this is a grid rather than three flex rows: a switch beside a
- * dropdown is a switch that could mean either "play this" or "show a banner", and the only
- * cheap way to say which is a column heading that lines up with the controls under it.
- *
- * 108px is the width of the widest cue name plus its chevron, and 30px is the switch plus a
- * pixel of air. Both are hard numbers because a column that resizes with its contents cannot
- * have a heading over it.
+ * This vocabulary replaced a three-column grid whose header row named the columns. The grid
+ * measured correctly and read like a spreadsheet — and the header was the tell: a control
+ * that needs a column heading to say what it does is a control in the wrong place. Grouping
+ * by *what the app does* instead means every control in a group means the same thing, the
+ * group says it once in its own title, and a row is read left to right and finished.
  */
-.alerts {
-	display: grid;
+
+/* A window's name, at the size of a name. `.label` is 10px and belongs to a heading *inside*
+   a list, which is what this used to be wearing. */
+.set-head {
+	display: flex;
+	flex: none;
 	align-items: center;
-	grid-template-columns: 1fr 108px 30px;
-	gap: 12px 10px;
-	padding: 2px 4px 4px;
+	gap: 8px;
+	padding: 9px 9px 9px 14px;
+	border-bottom: 1px solid var(--line);
 }
 
-/* The heading over a column of controls: centred on the control, not on the cell's text. */
-.alerts-h {
+.set-head-title {
+	color: var(--fg);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+/* The recessed ground the groups stand on — the same relation a float has to the canvas. */
+.set-body {
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding: 12px;
+	background: var(--bg-deep);
+}
+
+.set-group {
+	overflow: hidden;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+}
+
+.set-group + .set-group {
+	margin-top: 12px;
+}
+
+/*
+ * The group's heading, and a sentence beside it saying what the whole group does.
+ *
+ * `baseline` rather than `center`: the two are different sizes, and centring them puts the
+ * sentence's x-height above the title's.
+ */
+.set-group > header {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 2px 8px;
+	padding: 10px 12px 9px;
+}
+
+.set-title {
+	color: var(--fg);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.set-note {
 	color: var(--faint);
-	font-size: 10px;
-	text-align: center;
+	font-size: 11px;
 }
 
-/* A name with a sentence under it. Shares `.lb`/`.nt` with a described row — see the note
-   on those selectors in `styles/chrome.css`. */
-.alerts-k {
+/*
+ * One row: what it is on the left, the one control that changes it on the right.
+ *
+ * The hairline is a top `box-shadow` rather than a border so it does not add a pixel to the
+ * row's height, and it is on *every* row including the first — which is the line under the
+ * group heading, drawn once instead of twice.
+ */
+.set-row {
+	display: flex;
+	min-height: 40px;
+	align-items: center;
+	padding: 8px 12px;
+	gap: 12px;
+	box-shadow: inset 0 1px 0 0 var(--line);
+}
+
+/* A name with a sentence under it. Shares `.lb`/`.nt` with a described row — see the note on
+   those selectors in `styles/chrome.css`. */
+.set-k {
 	display: flex;
 	min-width: 0;
+	flex: 1;
 	flex-direction: column;
 	gap: 2px;
 }
 
+/* The cue chip, wide enough for `Staplebops 01` and fixed, so three of them line up. */
+.set-cue {
+	width: 116px;
+	justify-content: space-between;
+}
+
+/* The volume, which is the one control too wide to be a chip. */
+.set-vol {
+	width: 196px;
+}
+
 /*
- * The line about whether a banner can appear at all.
+ * On a narrow window the volume drops under its own label.
  *
- * Not a `.callout` and not a notice: it is a standing fact about this browser on this origin
- * rather than something that just happened, and it is read once and then ignored. A tinted
- * strip with the bell in it is enough to find, and quiet enough not to be answered.
+ * 196px of control beside a sentence on a 366px modal leaves about 130px for the words, and
+ * the note wrapped to four lines against a one-line control — a row that is mostly the gap
+ * between its two halves. Only this row wraps: `:has` is what lets the rule say "the row with
+ * the wide control in it" rather than making every row reflowable and hoping.
  */
-.alerts-perm {
+@media (max-width: 420px) {
+	.set-row:has(> .set-vol) {
+		flex-wrap: wrap;
+	}
+
+	.set-row > .set-vol {
+		width: 100%;
+	}
+}
+
+/*
+ * A standing fact about this browser, inside the group it constrains.
+ *
+ * Not a `.callout` and not a notice: it is not something that just happened, and it is read
+ * once and then ignored. Drawn only when there is something to say — see `PermissionLine`.
+ */
+.set-strip {
 	display: flex;
-	align-items: center;
-	margin: 0 4px 10px;
-	padding: 7px 9px;
+	align-items: flex-start;
+	padding: 9px 12px;
 	gap: 8px;
-	border-radius: var(--row-radius);
-	background: var(--line);
+	box-shadow: inset 0 1px 0 0 var(--line);
+	background: color-mix(in srgb, var(--color-warn) 10%, transparent);
 	color: var(--fg);
 	font-size: 11px;
 	line-height: 1.45;
 }
 
-.alerts-perm > svg {
-	flex: none;
-	color: var(--faint);
-	/* The bell sits on the first line of a sentence that may wrap to three. */
-	align-self: flex-start;
-	margin-top: 1px;
+.set-strip[data-tone="ask"] {
+	background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 
-.alerts-perm code {
+.set-strip > svg {
+	flex: none;
+	margin-top: 1px;
+	color: var(--faint);
+}
+
+.set-strip code {
 	font-family: var(--font-mono);
 	font-size: 10px;
+}
+
+/* The account rows sit in the group's body, so the list's own padding comes off. */
+.set-rows {
+	padding: 4px;
+	box-shadow: inset 0 1px 0 0 var(--line);
+}
+
+/*
+ * "Add an account" as the last row of the group rather than a button on a window footer.
+ *
+ * Full width and flat, which is the shape a "one more" row has everywhere: it belongs to the
+ * list above it, and a bordered button would read as the window's primary action.
+ */
+.set-add {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	padding: 10px 12px;
+	gap: 7px;
+	border: 0;
+	background: transparent;
+	box-shadow: inset 0 1px 0 0 var(--line);
+	color: var(--muted);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	transition:
+		background-color 120ms ease,
+		color 120ms ease;
+}
+
+.set-add:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+/*
+ * The cue picker: forty-five sounds as five families of numbers.
+ *
+ * A flat list of forty-five rows is a scroll nobody reads to the end, and the names say
+ * nothing — `nope-03` against `nope-07` is not a choice that can be made by reading. As a grid
+ * of numbers under a family heading it is one glance per family and a press to hear one, which
+ * is the only way anybody could actually choose.
+ */
+.popover.set-sounds {
+	width: 214px;
+	max-height: min(340px, 60vh);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.popover.set-sounds .grp {
+	display: block;
+	padding: 8px 6px 4px;
+	color: var(--faint);
+	font-size: 10px;
+}
+
+.set-cues {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: 3px;
+}
+
+/* Beats `:is(.popover, .rowlist) [data-row]`, which would make each number a full-width row. */
+.popover.set-sounds .set-cues > [data-row] {
+	display: flex;
+	min-height: 0;
+	height: 28px;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	color: var(--muted);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+
+.popover.set-sounds .set-cues > [data-row][data-current="true"] {
+	color: #fff;
+	background: var(--color-accent);
 }
 
 /*
@@ -1832,58 +2005,50 @@ svg.lucide {
  * Still pressable rather than disabled, because the reason it cannot work is usually the
  * *origin* — the same deck opened on `localhost` an hour later will honour it, and a
  * preference somebody has to set again after moving windows is a preference they stop
- * setting. The strip above says why.
+ * setting. The strip at the top of the group says why.
  */
 .sw[data-moot] {
 	opacity: 0.45;
 }
 
 /*
- * Centred in its column, said here rather than by a `margin-left: auto` on the switch.
- *
- * That auto-margin was on `.sw` itself — right for the menu row it was drawn for and wrong
- * in a grid cell, where it pushed the switch two pixels off the centre of the heading above
- * it. Two pixels is exactly enough for a column to stop looking like a column.
- */
-.alerts > .sw {
-	justify-self: center;
-}
-
-/*
  * Under a thumb, at the app's own touch scale.
  *
- * 26×15 is a fine switch for a mouse and an unhittable one for a finger — under the 24px
- * the rest of this app has settled on for coarse pointers. The two segment rows grow with
- * it, since a volume you set by pressing "Quiet" and getting "Off" is worse than no volume
- * control at all.
+ * 26x15 is a fine switch for a mouse and an unhittable one for a finger — under the 24px the
+ * rest of this app has settled on for coarse pointers. The chips and the volume grow with it,
+ * since a volume you set by pressing "Quiet" and getting "Off" is worse than no control.
  */
 @media (pointer: coarse) {
-	.alerts {
-		grid-template-columns: 1fr 116px 40px;
+	.set-row {
+		min-height: 48px;
 	}
 
-	.alerts > .sw {
+	.set-row > .sw {
 		width: 36px;
 		height: 21px;
 		padding: 3px;
 	}
 
-	.alerts > .sw > i {
+	.set-row > .sw > i {
 		width: 15px;
 		height: 15px;
 	}
 
-	.alerts > .sw[data-on="true"] > i {
+	.set-row > .sw[data-on="true"] > i {
 		margin-left: 15px;
 	}
 
-	.alerts .chipbtn {
+	.set-row .chipbtn {
 		--control-md: 34px;
 	}
 
-	.alerts .seg > button {
+	.set-row .seg > button {
 		height: 30px;
 		font-size: 11px;
+	}
+
+	.popover.set-sounds .set-cues > [data-row] {
+		height: 34px;
 	}
 }
 

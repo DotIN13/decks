@@ -66,7 +66,7 @@ import {
 } from "./lib/alerts.ts";
 import { setUnattended as paintBadge } from "./lib/favicon.ts";
 import { post as postBanner } from "./lib/notify.ts";
-import { play as playCue, unlockOnGesture } from "./lib/sound.ts";
+import { play as playCue, preload as preloadCues } from "./lib/sound.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 
 interface Notice {
@@ -334,8 +334,22 @@ export function App() {
 		});
 	});
 
-	/* Browsers start an audio context suspended until the page has been touched. */
-	onMount(() => onCleanup(unlockOnGesture()));
+	/*
+	 * Fetch the three configured cues on the first gesture.
+	 *
+	 * Not at mount: a cue is ~8kB and this is the least important thing on the page, so it
+	 * should not be competing with the deck for the first paint. On the first real interaction
+	 * it is free, and it is well before an agent can have finished anything. Over the network
+	 * the alternative is a first "it finished" that lands a round trip after you have looked.
+	 */
+	onMount(() => {
+		const warm = () => preloadCues(Object.values(prefs().sound));
+		const events = ["pointerdown", "keydown", "touchstart"] as const;
+		for (const name of events) window.addEventListener(name, warm, { once: true, passive: true });
+		onCleanup(() => {
+			for (const name of events) window.removeEventListener(name, warm);
+		});
+	});
 
 	/** What to call an agent in a banner, without making the sentence about an id. */
 	const nameOf = (id: string | undefined) => (id ? (state.identities[id]?.name ?? "An agent") : "An agent");
