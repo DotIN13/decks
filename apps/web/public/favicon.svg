@@ -12,19 +12,23 @@
 
 		The ink itself follows the *browser's* scheme rather than the app's. A favicon is
 		painted onto the tab strip, and the tab strip belongs to the browser: an app in light
-		mode inside a dark-themed Chrome still needs a light mark. `prefers-color-scheme`
-		inside an SVG is honoured by Firefox and Chromium; Safari ignores it and takes the
-		first declaration, which is why the dark ink is the default and the light override
-		comes second.
+		mode inside a dark-themed Chrome still needs a pale mark.
+
+		**Black is the default and the pale version is the override.** `prefers-color-scheme`
+		inside an SVG is honoured by Firefox and Chromium, and Safari ignores the query
+		entirely and takes the first declaration — so whichever way round these are written,
+		one browser gets the unconditional one. Black is the better thing to hand it: a light
+		tab strip is what Safari ships with, and a pale mark on it is invisible, where black on
+		a dark strip is at worst dim.
 	-->
 	<style>
-		.a { fill: #f2f3f5 }
-		.b { fill: #9a9ea6 }
-		.c { fill: #c3c7cd }
-		@media (prefers-color-scheme: light) {
-			.a { fill: #161616 }
-			.b { fill: #7b7f86 }
-			.c { fill: #4a4d53 }
+		.a { fill: #161616 }
+		.b { fill: #7b7f86 }
+		.c { fill: #4a4d53 }
+		@media (prefers-color-scheme: dark) {
+			.a { fill: #f2f3f5 }
+			.b { fill: #9a9ea6 }
+			.c { fill: #c3c7cd }
 		}
 	</style>
 	<rect class="a" x="2" y="4" width="15" height="13" rx="3" />

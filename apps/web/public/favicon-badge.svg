@@ -9,13 +9,13 @@
 		that is right on every browser theme.
 	-->
 	<style>
-		.a { fill: #f2f3f5 }
-		.b { fill: #9a9ea6 }
-		.c { fill: #c3c7cd }
-		@media (prefers-color-scheme: light) {
-			.a { fill: #161616 }
-			.b { fill: #7b7f86 }
-			.c { fill: #4a4d53 }
+		.a { fill: #161616 }
+		.b { fill: #7b7f86 }
+		.c { fill: #4a4d53 }
+		@media (prefers-color-scheme: dark) {
+			.a { fill: #f2f3f5 }
+			.b { fill: #9a9ea6 }
+			.c { fill: #c3c7cd }
 		}
 	</style>
 	<mask id="hole">
