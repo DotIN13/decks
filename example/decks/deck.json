@@ -2,6 +2,10 @@
   "version": 1,
   "name": "Example",
   "boards": {
+    "boards/how-deep-is-the-deep-sea.html": {
+      "x": 0,
+      "y": 2440
+    },
     "boards/plan.html": {
       "x": 0,
       "y": 0
