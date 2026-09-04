@@ -4,7 +4,7 @@
  *
  * Needs a model, because the thing being travelled through is a real conversation.
  */
-import { ask, boardPath, newAgent, open, read, say, settle, socket } from "../harness.mjs";
+import { ask, boardPath, newAgent, open, openHistory, read, say, settle, socket } from "../harness.mjs";
 
 const plan = await boardPath("plan.html");
 const original = read(plan);
@@ -31,10 +31,24 @@ try {
 	 */
 	say("the second turn changed it again", /second turn/i.test(afterSecond));
 
-	await page.locator(".stream-roll .turn").first().click();
-	await page.waitForSelector(".stream .turn-row", { timeout: 8000 });
-	const rows = await page.locator(".stream .turn-row").count();
-	say("each user message is a point you can return to", rows >= 2, `${rows} messages with actions`);
+	/*
+	 * `.stream-mine` is a user message, and the handle on it is `.stream-rw`.
+	 *
+	 * This check used to click a spine block to open the history and then read `.turn-row`,
+	 * a row with three labelled buttons under every message. Both are gone: the spine went
+	 * with the title bar, and the three phrases of grey text became one button that opens a
+	 * menu — three phrases under every message ever sent was a second transcript running
+	 * down the history.
+	 */
+	await openHistory(page);
+	await page.waitForSelector(".stream .stream-mine", { timeout: 8000 });
+	const mine = page.locator(".stream .stream-mine");
+	const rows = await mine.count();
+	say("each user message is a point you can return to", rows >= 2, `${rows} messages with a handle`);
+	say(
+		"…and the handle is one button, not a row of phrases",
+		(await mine.first().locator(".stream-rw").count()) === 1,
+	);
 
 	/*
 	 * The board has to be on the canvas for there to be anything to preview.
@@ -59,9 +73,11 @@ try {
 	await page.evaluate(() => {
 		document.querySelector('.board-node[data-path="boards/plan.html"] iframe').contentWindow.__live = true;
 	});
-	const second = page.locator(".stream .turn-row").nth(1);
+	const second = mine.nth(1);
 	await second.hover();
-	await second.locator('.turn-actions button[data-act="rewind"]').hover();
+	// Hovering the handle previews, with no dwell delay: you only get there by reaching for
+	// it. The menu it would open is not needed for a preview, and that is the point.
+	await second.locator(".stream-rw").hover();
 	await page.waitForFunction(
 		() => {
 			const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');
@@ -82,20 +98,26 @@ try {
 	);
 	say("previewing writes nothing", read(plan) === afterSecond);
 
-	// Restore is deliberate, and it does write.
-	await second.hover();
-	await second.locator('.turn-actions button[data-act="restore"]').click();
-	await page.waitForFunction(() => true, null, { timeout: 1000 }).catch(() => {});
+	/*
+	 * Restore is deliberate, and it does write — so it is a row in the menu rather than
+	 * something a hover can do. `Restore` only appears while a preview is up, which is why
+	 * the handle is hovered before the menu is opened.
+	 */
+	await second.locator(".stream-rw").click();
+	await page.waitForSelector(".popover", { timeout: 6000 });
+	await page.locator(".popover [data-row]").filter({ hasText: /^Restore/ }).first().click();
 	await settle(page, 1500);
 	const restored = read(plan);
 	say("restore boards writes that point back", /first turn/i.test(restored) && !/second turn/i.test(restored));
 
 	// Rewinding truncates the conversation.
 	const before = await page.locator(".stream .stream-roll > *").count();
-	const last = page.locator(".stream .turn-row").last();
-	const rewound = (await last.locator(".stream-card").innerText()).trim();
+	const last = mine.last();
+	const rewound = (await last.locator(".stream-bubble").innerText()).trim();
 	await last.hover();
-	await last.locator('.turn-actions button[data-act="rewind"]').click();
+	await last.locator(".stream-rw").click();
+	await page.waitForSelector(".popover", { timeout: 6000 });
+	await page.locator(".popover [data-row]").filter({ hasText: /^Rewind/ }).first().click();
 	await page.waitForFunction((was) => document.querySelectorAll(".stream .stream-roll > *").length < was, before, { timeout: 15000 });
 	say("rewinding cuts the transcript back", (await page.locator(".stream .stream-roll > *").count()) < before, `${before} → ${await page.locator(".stream .stream-roll > *").count()} items`);
 

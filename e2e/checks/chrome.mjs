@@ -1,11 +1,15 @@
 /**
  * The conversation's chrome: a run of tool calls opens to real chips, those chips keep
- * their height, the time machine lives on the user's message, and hovering a spine block
- * does not rebuild it.
+ * their height, the time machine lives on the user's message, and hovering a card does not
+ * rebuild the column.
  *
  * Needs a model — the tool chips being measured are real tool calls.
+ *
+ * Written against the spine and `.turn-row` originally, and both are gone: the spine went
+ * with the title bar, and the three labelled buttons under every message became one handle
+ * that opens a menu. The properties are the same; only the surfaces they live on moved.
  */
-import { ask, boardPath, newAgent, open, read, say, settle, socket } from "../harness.mjs";
+import { ask, boardPath, newAgent, open, openHistory, read, say, settle, socket } from "../harness.mjs";
 
 const plan = await boardPath("plan.html");
 
@@ -20,9 +24,8 @@ await page.mouse.move(800, 500);
 // Enough tool calls to overflow the column — the case that squeezed the chips.
 await ask(page, "Read each of boards/plan.html, boards/risks.html and boards/sources.html with the read tool, one call each, then say 'done' and nothing else.");
 
-// A click on the spine opens the conversation at that turn.
-await page.locator(".stream-roll .turn").first().click();
-await page.waitForFunction(() => document.querySelector(".stream")?.dataset.open === "true", null, { timeout: 8000 });
+// The corner's button opens the conversation; `data-shown` is the panel's own answer.
+await openHistory(page);
 
 /*
  * The tool calls are one pill until asked for.
@@ -31,10 +34,10 @@ await page.waitForFunction(() => document.querySelector(".stream")?.dataset.open
  * a count — and the count has to open, or the output would be somewhere with no route to
  * it now that the chat column is gone.
  */
-say("a run of tool calls collapses to one pill", (await page.locator(".stream .ftools").count()) > 0);
-await page.locator(".stream .ftools").first().click();
+say("a run of tool calls collapses to one pill", (await page.locator(".stream .stream-tool-head").count()) > 0);
+await page.locator(".stream .stream-tool-head").first().click();
 await page.waitForSelector(".stream .tool", { timeout: 10000 });
-say("…that opens to the calls themselves", (await page.locator(".stream .fcalls .tool").count()) > 0);
+say("…that opens to the calls themselves", (await page.locator(".stream .stream-tool-kids .tool").count()) > 0);
 
 /*
  * Overflow is forced rather than hoped for: the squeeze only happened once the content was
@@ -55,7 +58,7 @@ const chips = await page.evaluate(() => {
 
 	// The guard removed for a moment: every row in the scroller free to shrink.
 	const undo = document.createElement("style");
-	undo.textContent = ".stream .stream-roll > *, .stream .ftools-group > *, .stream .fcalls > * { flex: 1 1 auto !important; }";
+	undo.textContent = ".stream .stream-roll > *, .stream .stream-tools > *, .stream .stream-tool-kids > * { flex: 1 1 auto !important; }";
 	document.head.appendChild(undo);
 	const squeezed = measure();
 	undo.remove();
@@ -73,7 +76,7 @@ say("every tool chip keeps its height", chips.count > 0 && chips.fixed.every((h)
  * A chip used to be a direct child of the scroller, where `flex: 0 0 auto` was the only
  * thing between it and being squeezed to a line: it has `overflow: hidden` and so no
  * content-based minimum of its own to push back with. It is a grandchild now, inside the
- * `.ftools-group` its run collapses into, and that group *does* have a content-based
+ * `.stream-tool-kids` its run collapses into, and that group *does* have a content-based
  * minimum — the sum of the chips' own heights. So the floor is structural rather than a
  * single declaration, and removing the declaration no longer reproduces the bug.
  */
@@ -88,27 +91,36 @@ await page.locator(".stream .tool .row").first().click();
 await page.waitForSelector(".stream .tool pre", { timeout: 5000 });
 say("a chip still expands to its output", (await page.locator(".stream .tool pre").count()) > 0);
 
-// The user message carries the actions, and an entry id.
+/*
+ * The user's message carries the time machine, and it is *one* handle now.
+ *
+ * Three buttons became one that opens a menu, and the reason is the same one that made them
+ * icons in the first place: three phrases of grey text under every message ever sent was a
+ * second transcript running down the history. So what is asserted is what survived the
+ * change — the handle is on the user's message and not the agent's, it is an icon with a
+ * name a screen reader can read, it is out of the way until the message is approached, and
+ * the message carries the entry id the whole feature is addressed by.
+ */
 const turn = await page.evaluate(() => {
-	const row = document.querySelector(".stream .turn-row");
+	const row = document.querySelector(".stream .stream-mine");
+	const handle = row?.querySelector(".stream-rw");
 	return {
 		itemId: row?.dataset.item,
-		/*
-		 * Read from `data-act`, not from the text: they are icons now. Three phrases of grey
-		 * text under every message ever sent was a second transcript running down the history,
-		 * so what each one means moved into its tooltip — which is also the accessible name,
-		 * asserted below.
-		 */
-		actions: [...(row?.querySelectorAll(".turn-actions button") ?? [])].map((b) => b.dataset.act),
-		named: [...(row?.querySelectorAll(".turn-actions button") ?? [])].every((b) => (b.getAttribute("aria-label") ?? "").length > 0),
-		iconOnly: [...(row?.querySelectorAll(".turn-actions button") ?? [])].every((b) => b.textContent.trim() === "" && b.querySelector("svg")),
-		hiddenByDefault: row ? Number(getComputedStyle(row.querySelector(".turn-actions")).opacity) : null,
+		handles: document.querySelectorAll(".stream .stream-mine .stream-rw").length,
+		mine: document.querySelectorAll(".stream .stream-mine").length,
+		onAgentCards: document.querySelectorAll(".stream .stream-card .stream-rw").length,
+		named: (handle?.getAttribute("aria-label") ?? "").length > 0,
+		menu: handle?.getAttribute("aria-haspopup"),
+		iconOnly: Boolean(handle && handle.textContent.trim() === "" && handle.querySelector("svg")),
+		hiddenByDefault: handle ? Number(getComputedStyle(handle).opacity) : null,
 	};
 });
-say("the user message carries the time machine", turn.actions.join(" · ") === "rewind · fork · restore", turn.actions.join(" · "));
-say("…as icons rather than three phrases of prose", turn.iconOnly);
-say("…each still named for a screen reader", turn.named);
-say("the actions are hidden until hovered", turn.hiddenByDefault === 0, `opacity ${turn.hiddenByDefault}`);
+say("every message of yours carries the time machine", turn.mine > 0 && turn.handles === turn.mine, `${turn.handles} of ${turn.mine}`);
+say("…and no reply of the agent's does", turn.onAgentCards === 0, `${turn.onAgentCards} on agent cards`);
+say("…addressed by the entry id the message carries", Boolean(turn.itemId), String(turn.itemId));
+say("…as one icon that opens a menu, rather than three phrases of prose", turn.iconOnly && turn.menu === "menu");
+say("…still named for a screen reader", turn.named);
+say("the handle is out of the way until the message is approached", turn.hiddenByDefault === 0, `opacity ${turn.hiddenByDefault}`);
 
 /*
  * A board has to be in play for there to be a preview.
@@ -123,10 +135,10 @@ link.send({ type: "board.play", path: "boards/plan.html" });
 await page.waitForSelector('.board-node[data-path="boards/plan.html"] iframe', { timeout: 10000 });
 await settle(page, 600);
 
-// Hovering rewind previews instantly; the transcript is not dimmed.
+// Hovering the handle previews instantly; the transcript is not dimmed.
 const before = read(plan);
-await page.locator(".stream .turn-row").first().hover();
-await page.locator('.stream .turn-actions button[data-act="rewind"]').first().hover();
+await page.locator(".stream .stream-mine").first().hover();
+await page.locator(".stream .stream-mine .stream-rw").first().hover();
 await page.waitForFunction(() => document.querySelector(".stage")?.dataset.previewing === "true", null, { timeout: 8000 });
 const previewing = await page.evaluate(() => ({
 	stage: document.querySelector(".stage")?.dataset.previewing,
@@ -145,18 +157,24 @@ await page.waitForFunction(
 );
 say("leaving puts the live boards back", true);
 
-// The spine does not churn under the cursor. This was a 500ms interval rebuilding the
-// blocks, which made them flicker whenever the pointer rested on one.
+/*
+ * The column does not churn under the cursor.
+ *
+ * This was a 500ms interval rebuilding the spine's blocks, which made them flicker whenever
+ * the pointer rested on one. The spine is gone; the property is not — the cards are what the
+ * pointer rests on now, and a card that rebuilds under it takes the handle you were reaching
+ * for with it.
+ */
 await page.evaluate(() => {
 	window.__churn = 0;
 	new MutationObserver((records) => {
 		for (const record of records) window.__churn += record.addedNodes.length + record.removedNodes.length;
 	}).observe(document.querySelector(".stream-roll"), { childList: true, subtree: true });
 });
-await page.locator(".stream-roll .turn").first().hover();
+await page.locator(".stream-roll .stream-mine").first().hover();
 await settle(page, 3000);
-const churn = await page.evaluate(() => ({ churn: window.__churn, hovered: document.querySelectorAll(".stream-roll .turn:hover").length }));
-say("hovering a spine block does not rebuild it", churn.churn === 0 && churn.hovered === 1, `${churn.churn} node changes, ${churn.hovered} hovered`);
+const churn = await page.evaluate(() => ({ churn: window.__churn, hovered: document.querySelectorAll(".stream-roll .stream-mine:hover").length }));
+say("hovering a message does not rebuild the column", churn.churn === 0 && churn.hovered === 1, `${churn.churn} node changes, ${churn.hovered} hovered`);
 
 link.close();
 say("no page errors", errors.length === 0, errors.join(" | "));

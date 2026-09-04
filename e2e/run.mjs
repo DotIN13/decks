@@ -8,6 +8,7 @@
  *
  *   npm run test:e2e                  # everything that does not need a model
  *   DECKS_E2E_AGENT=1 npm run test:e2e   # including the checks that prompt an agent
+ *   DECKS_E2E_MODEL="muse-spark" DECKS_E2E_AGENT=1 npm run test:e2e   # …on a named model
  *   npm run test:e2e -- keys gestures    # just these
  */
 import { spawn } from "node:child_process";
@@ -217,7 +218,10 @@ try {
 		);
 	}
 	console.log(`fixture: ${data}`);
-	console.log(`running ${selected.length} check(s)${skipped.length ? `, skipping ${skipped.length}` : ""}\n`);
+	console.log(`running ${selected.length} check(s)${skipped.length ? `, skipping ${skipped.length}` : ""}`);
+	// Said out loud, because it is the difference between a free run and a metered one.
+	if (withAgent) console.log(`model: ${process.env.DECKS_E2E_MODEL || "whatever the runtime defaults to"}`);
+	console.log("");
 
 	let pass = 0;
 	let fail = 0;
@@ -238,6 +242,17 @@ try {
 		const seconds = ((Date.now() - at) / 1000).toFixed(1);
 		const status = counts.fail === 0 && result.code === 0 ? "ok" : "FAILED";
 		console.log(`${status === "ok" ? "  ok  " : "  FAIL"} ${check.file.padEnd(20)} ${String(counts.pass).padStart(2)} passed  ${seconds}s`);
+		/*
+		 * Every line, on request — because "10 passed" is not the same as "10 things were
+		 * true", and the difference matters most in the five files that need a model: an
+		 * assertion whose subject never appeared can pass by reading `undefined`, and the
+		 * only way to see that is to read what it printed beside itself.
+		 */
+		if (process.env.DECKS_E2E_VERBOSE === "1") {
+			for (const line of result.output.split("\n")) {
+				if (/^(PASS|FAIL)/.test(line)) console.log(`        ${line}`);
+			}
+		}
 		if (status !== "ok") {
 			failedFiles.push(check.file);
 			for (const line of result.output.split("\n")) {

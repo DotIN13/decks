@@ -20,6 +20,21 @@ import { chromium, devices } from "playwright";
 export const WEB = process.env.DECKS_E2E_WEB ?? "http://127.0.0.1:4328";
 export const API = process.env.DECKS_E2E_API ?? "http://127.0.0.1:4329";
 
+/**
+ * The model the checks that spend tokens should spend them on, from `DECKS_E2E_MODEL`.
+ *
+ * A search string rather than a `provider/id`, because that is what the picker takes and
+ * because an id is the one part of a model nobody can remember — `muse contributor` finds
+ * `opencode-go / Muse Spark 1.2 Contributor` whatever its slug turns out to be. Unset, every
+ * turn runs on whatever the runtime's default is, which is what happened before this existed
+ * and is fine for a one-off.
+ *
+ * It matters because these five files are the only ones that cost anything: a deck signed
+ * into a proxy with a free tier and a metered one should be able to say which of them the
+ * suite is allowed to burn.
+ */
+export const MODEL = process.env.DECKS_E2E_MODEL ?? "";
+
 let failures = 0;
 
 /** Report one check. A failure sets the exit code, so a runner can trust it. */
@@ -202,20 +217,82 @@ export async function changed(file, was, { timeout = 15000 } = {}) {
 	throw new Error(`${file} did not change within ${timeout}ms`);
 }
 
-/** Wait for the focused agent to go idle — i.e. the turn finished. */
+/**
+ * Wait for the focused agent to go idle — i.e. the turn finished.
+ *
+ * Asked of the **stop button**, which is the app's own answer: the composer draws one
+ * control with two meanings, and `data-stop` is on it exactly while `chat.state !== "idle"`
+ * — the same condition the server calls `running`. So this waits on the thing the user
+ * waits on rather than on a class of its own.
+ *
+ * It used to read `.composer .send`'s `data-busy`. Neither the class nor the attribute has
+ * existed since the rewrite, so it resolved `undefined === "false"` → false and every
+ * agent-driven check hung until its timeout. That is the whole reason these five files had
+ * never run: not the model, the selector.
+ */
 export async function idle(page, { timeout = 600000 } = {}) {
-	await page.waitForFunction(() => document.querySelector(".composer .send")?.dataset.busy === "false", null, {
+	await page.waitForFunction(() => document.querySelector('.sendbtn[data-stop="true"]') === null, null, {
 		timeout,
 	});
+}
+
+/**
+ * Put the focused agent on `DECKS_E2E_MODEL`, through the picker, the way a person would.
+ *
+ * Called by `ask`, so every turn in the suite is on the model the run was told to spend —
+ * including the turns of agents a check creates itself, which is the case an env var alone
+ * cannot cover: a new agent takes the runtime's default, not the last thing you picked.
+ *
+ * It is a no-op when the chip already says the right thing, so a check that asks three times
+ * pays for one switch. The switch is recorded in the conversation (that is the point of
+ * recording it), so it lands *before* the first user message rather than in the middle of a
+ * transcript a check is counting.
+ */
+export async function useModel(page, wanted = MODEL) {
+	if (!wanted) return undefined;
+	const chip = page.locator(".dockrow .chipbtn").last();
+	await chip.waitFor({ state: "visible", timeout: 20000 });
+	const before = (await chip.innerText()).trim();
+	/*
+	 * Compared on letters and digits alone, because the two strings are not the same kind of
+	 * name: `wanted` is matched against the model's **id** by the picker's own search
+	 * (`opencode-go/muse-spark-1.2-contributor`), and the chip shows its **label**
+	 * (`Muse Spark 1.2 Contributor`). Left as a regex over the raw text, `muse-spark` never
+	 * matches `Muse Spark` and the switch happens again before every single turn.
+	 */
+	const bare = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+	if (bare(before).includes(bare(wanted))) return before;
+
+	await chip.click();
+	await page.waitForSelector(".popover input", { timeout: 8000 });
+	await page.locator(".popover input").fill(wanted);
+	const row = page.locator(".popover [data-row]").first();
+	await row.waitFor({ state: "visible", timeout: 8000 });
+	const label = (await row.innerText()).trim();
+	await row.click();
+	// The chip is the app's own answer about which model is in force, so wait for it rather
+	// than for a timer: `agent.setModel` is a round trip and the picker closes optimistically.
+	await page.waitForFunction(
+		(was) => {
+			const chips = document.querySelectorAll(".dockrow .chipbtn");
+			return (chips[chips.length - 1]?.textContent ?? "") !== was;
+		},
+		before,
+		{ timeout: 20000 },
+	);
+	return label;
 }
 
 /** Send one prompt and wait out the turn. Never swallow the timeout: a prompt typed into
  *  a still-running turn truncates it, and the truncated reply then looks like a bug. */
 export async function ask(page, text, { timeout = 600000 } = {}) {
-	await page.locator(".composer textarea").fill(text);
-	await page.locator(".composer textarea").press("Enter");
-	await page.waitForFunction(() => document.querySelector(".composer .send")?.dataset.busy === "true", null, {
-		timeout: 15000,
+	await useModel(page);
+	await page.locator(".dockfield").fill(text);
+	await page.locator(".dockfield").press("Enter");
+	// The turn has to be seen *starting*, or a prompt that never left the box reads as a
+	// turn that answered instantly and every assertion after it is about the turn before.
+	await page.waitForFunction(() => document.querySelector('.sendbtn[data-stop="true"]') !== null, null, {
+		timeout: 20000,
 	});
 	await idle(page, { timeout });
 }
@@ -388,6 +465,10 @@ export async function pickTool(page, title) {
  * `data-shown` rather than a class, because the column is mounted whether or not it has the
  * right edge — `lib/edge.ts` decides who does, and "mounted" and "shown" are different
  * questions now that the inspector can borrow the edge from it.
+ *
+ * `time-machine` and `chrome` call this now. They used to click a block on the *spine* to
+ * open the history at a turn, and the spine went with the title bar — so they were clicking
+ * nothing and timing out before their first assertion.
  */
 export async function openHistory(page) {
 	if ((await page.locator("[data-shown='true']").count()) > 0) return;

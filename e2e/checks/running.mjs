@@ -1,6 +1,6 @@
 /**
- * While a turn runs: the spine shows it, the composer offers stop, the working sign moves,
- * and the conversation stays shut.
+ * While a turn runs: the composer offers stop, the working sign moves and says what it is
+ * doing, and the conversation stays shut.
  *
  * Needs a model. That is the whole reason the working sign is asserted *here*, in a file that
  * costs tokens to run: the sign only exists mid-turn, so a check that does not start one has
@@ -8,7 +8,7 @@
  * marks with the still mark scaled and faded on a loop — which is a flower opening and
  * closing, and nobody found out until it was on screen.
  */
-import { newAgent, open, say, settle } from "../harness.mjs";
+import { newAgent, open, say, settle, useModel } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 
@@ -17,6 +17,9 @@ await newAgent(page);
 await settle(page, 1200);
 await page.mouse.move(800, 500);
 
+// The model this run is allowed to spend, before anything is sent. `ask` does this for the
+// other checks; this one types into the box itself, because it has to watch the turn start.
+await useModel(page);
 await page.locator(".dockfield").fill("Read boards/plan.html and say its title, nothing else.");
 await page.locator(".dockfield").press("Enter");
 
@@ -27,7 +30,7 @@ await page.locator(".dockfield").press("Enter");
  * it draws — thinking, streaming, running tools — are each a moment long on a short turn, and
  * a second pass would be looking after the turn had ended.
  */
-let sawRunningBlock = false;
+let sawDockSign = false;
 let sawBusyComposer = false;
 /** The working sign, as it was at the busiest moment we caught it. */
 let sign = null;
@@ -36,8 +39,15 @@ for (let i = 0; i < 300; i += 1) {
 		const mark = document.querySelector(".statusline[data-working='true'] .mark");
 		const moving = mark?.querySelector("text, rect");
 		return {
-			running: document.querySelectorAll('.stream-roll .turn[data-state="running"]').length,
-			busy: document.querySelector(".sendbtn")?.dataset.busy,
+			/*
+			 * The dock's chip, which is where a running turn shows while the conversation is
+			 * shut. It replaced the spine — this check used to count
+			 * `.stream-roll .turn[data-state="running"]`, and the spine was deleted in the
+			 * rewrite, so the count was of nothing and could only ever be zero.
+			 */
+			dock: document.querySelectorAll('.statusline[data-working="true"]').length,
+			// One control, two meanings: `data-stop` is on it exactly while the agent is not idle.
+			busy: document.querySelector('.sendbtn[data-stop="true"]') !== null,
 			row: Math.round(document.querySelector(".statusrow")?.getBoundingClientRect().height ?? -1),
 			sign: mark
 				? {
@@ -54,13 +64,13 @@ for (let i = 0; i < 300; i += 1) {
 				: null,
 		};
 	});
-	if (now.running > 0) sawRunningBlock = true;
-	if (now.busy === "true") sawBusyComposer = true;
+	if (now.dock > 0) sawDockSign = true;
+	if (now.busy) sawBusyComposer = true;
 	if (now.sign) sign = now.sign;
-	if (sawRunningBlock && sawBusyComposer && sign) break;
+	if (sawDockSign && sawBusyComposer && sign) break;
 	await settle(page, 100);
 }
-say("the live turn pulses on the spine while it runs", sawRunningBlock);
+say("a running turn shows in the dock while the conversation is shut", sawDockSign);
 say("the send button turns into the stop button while working", sawBusyComposer);
 
 // --- the working sign ---------------------------------------------------------------
@@ -89,9 +99,15 @@ say(
 	String(sign?.colour),
 );
 // It is opened deliberately or not at all — a turn arriving is what the dock's peek is for.
+/*
+ * `data-shown`, which is what the panel actually publishes. It was `data-open` here, an
+ * attribute nothing sets — so the assertion read `undefined ?? "false"` and passed by
+ * default, which is the worst way for a check to pass: it would have gone on passing if the
+ * conversation had thrown itself open on every turn.
+ */
 say(
 	"and the conversation still did not open itself",
-	(await page.evaluate(() => document.querySelector(".stream")?.dataset.open ?? "false")) === "false",
+	(await page.evaluate(() => document.querySelector(".stream")?.dataset.shown ?? "false")) === "false",
 );
 
 /*
