@@ -1491,15 +1491,14 @@ svg.lucide {
 	}
 
 	/*
-	 * And the camera chrome stands aside while it is up.
+	 * Nothing here has to stand aside for the sheet.
 	 *
-	 * The palette is top-centred and the zoom controls bottom-right, both of which the
-	 * bubbles now cross at full width — the first reply landed on top of the tools and
-	 * neither was readable. The same trade the inspector already makes here: drawing and
-	 * zooming have fingers to do them with, so they are the thing that can be missing for
-	 * as long as you are reading. It is one tap on the × to get them back.
+	 * There was a rule clearing the camera chrome while the chat was up, and it never
+	 * parsed: a selector list ending in a comma with no block. Both of its targets have
+	 * since gone anyway — the palette hides itself under 1100px (`max-[1100px]:hidden`
+	 * on the element, so it is already gone at this width) and the zoom controls were
+	 * removed outright (`No zoombar`, `App.tsx`). Completing it would be a no-op.
 	 */
-	.work:has(.chat-float[data-open="true"]) .palette,
 }
 
 
