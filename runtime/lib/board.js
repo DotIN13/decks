@@ -390,6 +390,162 @@
 		return { head, body, note: right };
 	}
 
+	/** A delta big enough to be a mistake or a prank is not a gesture. */
+	const CLAMP = 2000;
+	const clampDelta = (value) => Math.max(-CLAMP, Math.min(CLAMP, value));
+
+	/**
+	 * Finger ids for embeds, from a range no real pointer will use.
+	 *
+	 * The stage pools fingers by id from every document it can see, so a guest's own
+	 * `pointerId` — which starts at 1 in its document, like everyone else's — would be
+	 * the same finger as a thumb on the board next to it, and a pinch made of the two
+	 * would be one finger teleporting. Counted here rather than per embed, so two embeds
+	 * cannot collide either.
+	 */
+	let nextEmbedFinger = 900001;
+
+	/**
+	 * An HTML embed, and the gesture that cannot get out of it.
+	 *
+	 * `frame-gestures.ts` forwards a wheel out of a *board* by listening inside the
+	 * board's own document, which same origin allows (DESIGN §4). An HTML embed is one
+	 * document deeper and sandboxed, so nobody can listen inside it: a two-finger scroll
+	 * over an embedded page arrives there and stops, and the canvas — which pans by
+	 * handling wheel itself rather than by scrolling anything — never learns the gesture
+	 * happened. The board could not be dragged by that patch of itself either, which is
+	 * the same bug wearing a different hat.
+	 *
+	 * Two answers, and an embed gets whichever one it earns:
+	 *
+	 * - **A veil**, for a page that has never heard of Decks. A transparent sheet in
+	 *   *this* document covers the frame, so wheel and pointer land where the canvas can
+	 *   already see them; a click lifts it, and it comes back when the pointer leaves the
+	 *   box. That last part is the whole design: an embedded prototype has to be usable,
+	 *   and a scroll must not be swallowed by something you are merely passing over.
+	 *   Leaving is the release gesture because Escape cannot be — once focus is inside
+	 *   the frame its keys belong to its document too, which is where this started.
+	 * - **The bridge**, for a page that opts in with `lib/embed-guest.js`. It applies the
+	 *   same rule one level down — a scroll its own boxes can take is theirs, the rest is
+	 *   posted up — and this side replays it as a wheel over the frame, which
+	 *   `frame-gestures.ts` then forwards without ever knowing it was synthetic. A guest
+	 *   needs no veil and no click, so announcing itself takes the veil away.
+	 *
+	 * Touch goes the same way and cannot go the same route: a fabricated `pointerdown`
+	 * would reach the board's editor as well as the canvas, so fingers arrive as a
+	 * `decks:embed-finger` event that only `frame-gestures.ts` reads, while a fabricated
+	 * wheel is indistinguishable from a real one to the only listener that wants it.
+	 *
+	 * Only messages from this frame's own window are read, and only the three shapes below.
+	 * An embed is quarantined content; a postMessage channel into the app's document is
+	 * exactly the sort of thing that must not quietly become a remote control.
+	 */
+	function guardEmbed(host, body, frame) {
+		/** This embed's own finger ids -> the ones the stage is told about. */
+		const fingers = new Map();
+
+		const veil = document.createElement("div");
+		veil.className = "embed-veil";
+		const hint = document.createElement("div");
+		hint.className = "embed-hint";
+
+		const live = () => host.classList.contains("embed-live");
+		const set = (on) => {
+			host.classList.toggle("embed-live", on);
+			hint.textContent = on ? "interacting · leave to pan" : "click to interact";
+		};
+
+		veil.addEventListener("click", () => set(true));
+		hint.addEventListener("click", (event) => {
+			event.stopPropagation();
+			set(!live());
+		});
+		body.addEventListener("pointerleave", () => set(false));
+		document.addEventListener("pointerdown", (event) => {
+			if (!host.contains(event.target)) set(false);
+		});
+		// Works while focus is still out here, which is the case worth having.
+		document.addEventListener("keydown", (event) => {
+			if (event.key === "Escape") set(false);
+		});
+
+		body.append(veil, hint);
+		set(false);
+
+		window.addEventListener("message", (event) => {
+			// A remount replaces the frame; the listener on `window` outlives it.
+			if (!frame.isConnected) return;
+			if (event.source !== frame.contentWindow) return;
+			const message = event.data;
+			if (!message || typeof message !== "object") return;
+
+			if (message.t === "decks:embed-ready") {
+				host.classList.add("embed-guest");
+				host.classList.remove("embed-live");
+				veil.remove();
+				hint.remove();
+				return;
+			}
+			if (message.t === "decks:touch") {
+				const phase = message.phase;
+				if (phase !== "down" && phase !== "move" && phase !== "up") return;
+				const raw = Number(message.id);
+				const x = Number(message.x);
+				const y = Number(message.y);
+				if (!Number.isFinite(raw) || !Number.isFinite(x) || !Number.isFinite(y)) return;
+
+				let id = fingers.get(raw);
+				if (id === undefined) {
+					// A move or an up for a gesture this side never saw begin is noise.
+					if (phase !== "down") return;
+					id = nextEmbedFinger++;
+					fingers.set(raw, id);
+				}
+
+				/*
+				 * Named rather than replayed. A synthetic `WheelEvent` is read by nobody
+				 * but `frame-gestures.ts`, so replaying one is honest; a synthetic
+				 * `pointerdown` would also reach the editor, which would select this
+				 * embed and then drag it while the finger was busy inside the page.
+				 * `frame-gestures.ts` listens for this event and nothing else does.
+				 */
+				const rect = frame.getBoundingClientRect();
+				document.dispatchEvent(
+					new CustomEvent("decks:embed-finger", {
+						detail: { phase, id, x: rect.left + x, y: rect.top + y },
+					}),
+				);
+				if (phase === "up") fingers.delete(raw);
+				return;
+			}
+			if (message.t !== "decks:wheel") return;
+
+			const dx = Number(message.dx);
+			const dy = Number(message.dy);
+			if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+
+			/*
+			 * The guest's `clientX/clientY` are its own pixels, and its own pixels are
+			 * this document's: the frame fills the embed's body at 1:1, and the canvas's
+			 * zoom is a transform on an ancestor of both. So the point is the frame's
+			 * offset plus the guest's and the deltas pass through unchanged — the same
+			 * trade `frame-gestures.ts` makes one level up, for the same reason.
+			 */
+			const rect = frame.getBoundingClientRect();
+			frame.dispatchEvent(
+				new WheelEvent("wheel", {
+					deltaX: clampDelta(dx),
+					deltaY: clampDelta(dy),
+					clientX: rect.left + (Number(message.x) || 0),
+					clientY: rect.top + (Number(message.y) || 0),
+					ctrlKey: message.zooming === true,
+					bubbles: true,
+					cancelable: true,
+				}),
+			);
+		});
+	}
+
 	/**
 	 * The extensions rendered as escaped preformatted text.
 	 *
@@ -542,6 +698,8 @@
 				frame.title = label;
 				body.appendChild(frame);
 				note.textContent = mode === "snapshot" ? "snapshot" : "sandboxed";
+				// A thumbnail has no pointer, and a veil in one would only be furniture.
+				if (mode !== "snapshot") guardEmbed(host, body, frame);
 				return;
 			}
 

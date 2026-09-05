@@ -927,6 +927,38 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
   since the zoom is a transform on an ancestor) and deltas are passed through
   unchanged; a test pans by the same delta over bare stage and over a board and
   insists the camera moves equally.
+- **An HTML embed is the same problem one document deeper, and the same answer does not
+  reach it** (`guardEmbed` in `board.js`). A `[data-embed]` page is mounted in a sandboxed
+  iframe in an opaque origin (§4), so nobody can listen inside it: the scroll arrived
+  there and stopped, and a board covered by one could not be dragged by that patch of
+  itself either. Two answers, and an embed gets whichever it earns. A **veil** — a
+  transparent sheet in the board's own document — covers a page that has never heard of
+  Decks, so wheel and pointer land where the canvas can already see them; a click lifts
+  it and the pointer leaving the box brings it back. Leaving is the release gesture
+  because Escape cannot be one: focus inside the frame means its keys belong to its
+  document too, which is where this started. A page that opts in with
+  `lib/embed-guest.js` gets the **bridge** instead: it applies the canvas's own rule one
+  level down — a scroll its boxes can take is theirs, the rest is posted up as
+  `decks:wheel` — and `board.js` replays that as a wheel over the frame, which
+  `frame-gestures.ts` forwards without knowing it was synthetic. A guest needs no veil
+  and no click, so `decks:embed-ready` takes the veil away. Only messages from that
+  frame's own window are read, and only those three shapes: a postMessage channel into the
+  app's document must not quietly become a remote control.
+- **Fingers take a named channel, and the wheel does not need one.** A fabricated
+  `WheelEvent` over the frame is read by nobody but `onWheel`, so replaying one is honest.
+  A fabricated `pointerdown` would also reach the editor, which listens in the same
+  document — it would select the embed component and then drag it while the finger was
+  busy inside the page. So a guest's fingers arrive as `decks:embed-finger`, which only
+  `frame-gestures.ts` reads, and they arrive already decided: the guest applies the
+  scroll rule one level down, which means it also takes `touch-action: none` and scrolls
+  its own boxes by hand, exactly as the board does and for the same reason. Ids are
+  allocated from 900001 up, because the stage pools fingers by id from every document it
+  can see and a guest's `pointerId` starts at 1 like everyone else's — a pinch made of a
+  thumb on the board and a finger in an embed that shared an id would be one finger
+  teleporting. `embed-touch.mjs` asserts the pan, the pinch, the tap, and the half that
+  must *not* travel; it also asserts the zoom is above `INTERACT_ZOOM` first, because
+  below it no frame takes a pointer at all and every one of those passes for the wrong
+  reason.
 - **A file dropped on a board is the same problem, and the same answer.** A drag from the
   desktop over a board produces `dragover`/`drop` inside the frame's document and nothing
   in the app's, so `file-drop.ts` listens inside the frame exactly as `frame-gestures.ts`

@@ -308,6 +308,20 @@ unrecognised becomes a chip naming the file, its size and its kind.
 
 Embeds should normally have an explicit height.
 
+**An interactive HTML embed is covered by a veil until it is clicked.** Wheel events
+inside a sandboxed iframe cannot reach the canvas, so an embedded page that took the
+pointer would swallow every two-finger scroll passing over it. The veil keeps panning
+working; a click lifts it, and the pointer leaving the box brings it back. For a page
+*you* wrote, include the guest script and the veil is not used at all:
+
+```html
+<script src="../lib/embed-guest.js"></script>
+```
+
+It hands back the gestures the page has no use for — a two-finger scroll, a pinch, and a
+finger dragged across it — while a box with its own overflow still scrolls, and taps and
+clicks are untouched. The page is interactive without a click.
+
 Files must live under a root permitted by the deck configuration. A
 `data-embed="../assets/…"` you did not write is probably a file the user dragged onto the
 board.

@@ -432,6 +432,47 @@ table.table,
 	border: 0;
 }
 
+/*
+ * The veil over an HTML embed, and the chip that says what it is for.
+ *
+ * Transparent rather than tinted: the page underneath is the content, and a film over it
+ * would make every embed look disabled. The chip is the entire affordance, so the chip is
+ * the one thing that is opaque — a veil nobody can see is a scroll that mysteriously does
+ * the wrong thing.
+ */
+.embed > .embed-body > .embed-veil {
+	position: absolute;
+	z-index: 2;
+	inset: 0;
+	cursor: pointer;
+}
+
+.embed.embed-live > .embed-body > .embed-veil {
+	pointer-events: none;
+}
+
+.embed > .embed-body > .embed-hint {
+	position: absolute;
+	z-index: 3;
+	right: 8px;
+	bottom: 8px;
+	padding: 4px 9px 5px;
+	border-radius: 999px;
+	opacity: 0.84;
+	background: var(--b-fg);
+	color: var(--b-bg);
+	font-size: 10.5px;
+	font-weight: 600;
+	white-space: nowrap;
+	cursor: pointer;
+	user-select: none;
+}
+
+.embed.embed-live > .embed-body > .embed-hint {
+	opacity: 1;
+	background: var(--b-ok);
+}
+
 .embed > .embed-body > img {
 	display: block;
 	width: 100%;

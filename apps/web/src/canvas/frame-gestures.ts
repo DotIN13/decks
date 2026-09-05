@@ -392,6 +392,50 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	doc.addEventListener("keydown", onKeyDown, true);
 	doc.addEventListener("keyup", onKeyUp, true);
 	doc.addEventListener("pointerdown", onPointerDown, true);
+	/**
+	 * A finger inside an HTML embed, arriving by name.
+	 *
+	 * An embed is a third document and a sandboxed one, so its events cannot be listened
+	 * for from here at all; a page that opts in (`lib/embed-guest.js`) posts them to the
+	 * board, and `board.js` re-emits them as this event. The wheel takes a shorter route
+	 * — `board.js` replays it as a real `WheelEvent` over the frame, which `onWheel`
+	 * above cannot tell from a trusted one and does not need to. A *pointer* event cannot
+	 * be replayed that way: the editor listens for `pointerdown` in this document too, so
+	 * a fabricated one would select the embed component and then drag it while the finger
+	 * was busy inside the page. Hence a channel of its own, which only this file reads.
+	 *
+	 * The guest has already made the scroll decision one level down — a finger its own
+	 * boxes can use never leaves it — so what arrives here is the camera's by definition
+	 * and gets no `scrollableUnder` treatment. Positions arrive in the frame's own pixels,
+	 * which is what `fingerAt` wants, so the conversion is the same one every finger gets.
+	 */
+	const onEmbedFinger = (event: Event) => {
+		const detail = (event as CustomEvent).detail as { phase?: string; id?: number; x?: number; y?: number } | null;
+		if (!detail) return;
+		const { phase, id } = detail;
+		if (typeof id !== "number" || !Number.isFinite(detail.x) || !Number.isFinite(detail.y)) return;
+
+		const { rect, scale, stageLeft, stageTop } = geometry();
+		const finger = {
+			id,
+			x: rect.left + (detail.x as number) * scale - stageLeft,
+			y: rect.top + (detail.y as number) * scale - stageTop,
+		};
+
+		if (phase === "down") {
+			host.touch("down", finger);
+			return;
+		}
+		if (phase === "move") {
+			const step = host.touch("move", finger);
+			// Said out loud for the editor, exactly as a finger on the board says it.
+			if (step.kind !== "idle") noteCameraMove(doc);
+			return;
+		}
+		if (phase === "up") host.touch("up", finger);
+	};
+	doc.addEventListener("decks:embed-finger", onEmbedFinger);
+
 	/*
 	 * Bubble, not capture, and that is the whole handshake with the editor: it also
 	 * listens for `pointerdown` in this document, and a finger that lands on a component
@@ -418,6 +462,7 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		doc.removeEventListener("pointermove", onTouchMove, true);
 		doc.removeEventListener("pointerup", onTouchUp, true);
 		doc.removeEventListener("pointercancel", onTouchUp, true);
+		doc.removeEventListener("decks:embed-finger", onEmbedFinger);
 		touchStyle.remove();
 		win.removeEventListener("blur", onBlur);
 		if (spaceHeld) host.space(false);
