@@ -21,6 +21,7 @@ import { deckContext, runtimeDir } from "../agents/context.ts";
 import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";
+import { accountEnvironment, epochMs } from "./accounts.ts";
 import { qualifiedToolName, stageMcpServer } from "./tools.ts";
 import { toUsageReport } from "./usage.ts";
 
@@ -164,6 +165,9 @@ export class ClaudeBackend implements AgentBackend {
 		const { deck, translator, notice } = this.context;
 		const executable = claudeExecutable();
 		const state = newStreamState();
+		// Read once: it ensures the symlink as a side effect, and the answer must not change
+		// halfway through building the options.
+		const accountEnv = this.context.accounts?.activeEnvironment();
 
 		const options: Options = {
 			cwd: this.context.cwd,
@@ -211,16 +215,11 @@ export class ClaudeBackend implements AgentBackend {
 			 *
 			 * A symlink, so re-pointing it switches the account *inside* this session — the
 			 * CLI re-reads its credentials per request, so the next turn uses whoever the link
-			 * points at now. Absent when no account has been added, which leaves the CLI on
-			 * its own `~/.claude` exactly as before.
-			 *
-			 * `env` REPLACES the subprocess environment rather than extending it, so
-			 * `process.env` is spread: without it the CLI would start with no `PATH` and no
-			 * `HOME`.
+			 * points at now. Set for the CLI's own login too, which is what makes a session
+			 * that started on it switchable: a subprocess's environment cannot be changed
+			 * after `spawn`, so a session given no variable is pinned to `~/.claude` for life.
 			 */
-			...(this.context.accounts?.activeConfigDir()
-				? { env: { ...process.env, CLAUDE_CONFIG_DIR: this.context.accounts.activeConfigDir() } }
-				: {}),
+			...(accountEnv ? { env: accountEnv } : {}),
 			stderr: (data: string) => {
 				// The CLI's own diagnostics, which are usually about credentials.
 				if (data.trim()) notice("warn", data.trim().split("\n").slice(-1)[0] ?? "");
@@ -501,7 +500,10 @@ export class ClaudeBackend implements AgentBackend {
 		notice("info", `Starting Claude's ${method.noun} login…`);
 		const child = spawn(binary, ["auth", "login", method.flag], {
 			stdio: ["pipe", "pipe", "pipe"],
-			...(into ? { env: { ...process.env, CLAUDE_CONFIG_DIR: into.configDir } } : {}),
+			// Aimed at the account's own directory rather than the link, and told to keep the
+			// token under that directory's name — so the session, which reaches the same
+			// account *through* the link, still finds it on macOS (`accountEnvironment`).
+			...(into ? { env: accountEnvironment(into.configDir, into.configDir) } : {}),
 		});
 
 		// The URL prints immediately; wait for it rather than racing the process,
@@ -760,8 +762,18 @@ export class ClaudeBackend implements AgentBackend {
 	 */
 	async report(): Promise<UsageReport> {
 		await this.refreshUsage();
-		const account = this.context.accounts?.active();
-		return toUsageReport(await this.planUsage(), account?.email ?? null);
+		/*
+		 * Whose subscription this is, asked of the CLI rather than read off the row.
+		 *
+		 * The stored label is what the account was called when it was added, and it goes
+		 * stale the moment somebody runs `claude auth login` in a terminal — which had the
+		 * panel captioned with an account the machine was no longer signed in as. One short
+		 * subprocess, on a panel that is already waiting for `planUsage`, and the stored
+		 * label is still there as the answer when the CLI is slow.
+		 */
+		const accounts = this.context.accounts;
+		const identity = accounts ? await claudeIdentity(accounts.keychainDir(accounts.activeId()) || undefined) : {};
+		return toUsageReport(await this.planUsage(), identity.email ?? accounts?.active()?.email ?? null);
 	}
 
 	/**
@@ -807,13 +819,15 @@ export class ClaudeBackend implements AgentBackend {
 		}
 
 		const spent = accounts?.active();
-		const reset = resetWords(info.resetsAt);
+		// Unix seconds on the event, milliseconds everywhere it is stored, compared or shown.
+		const resetsAt = epochMs(info.resetsAt);
+		const reset = resetWords(resetsAt);
 		if (!accounts) {
 			notice("error", `This Claude subscription has reached its ${limitWindow(info.rateLimitType)} limit${reset}.`);
 			return;
 		}
 
-		const { moved, nextReset } = accounts.rotate(spent?.id, info.resetsAt, info.rateLimitType);
+		const { moved, nextReset } = accounts.rotate(spent?.id, resetsAt, info.rateLimitType);
 		// The list moved either way — a spent account is now marked spent, which the panel
 		// shows with its reset time.
 		this.context.accountsChanged?.();
@@ -1102,7 +1116,9 @@ function runClaudeCommand(
 		}
 		const child = spawn(binary, args, {
 			stdio: ["ignore", "pipe", "pipe"],
-			...(configDir ? { env: { ...process.env, CLAUDE_CONFIG_DIR: configDir } } : {}),
+			// The account's own directory is both where it reads from and what names its
+			// keychain entry, which is what makes `auth status` agree with the session.
+			...(configDir ? { env: accountEnvironment(configDir, configDir) } : {}),
 		});
 		let stdout = "";
 		let stderr = "";

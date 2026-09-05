@@ -27,8 +27,8 @@ export interface StageHost {
 	/** Is anyone looking? */
 	connected(): boolean;
 	broadcast(message: ServerMessage): void;
-	/** The camera the browser last reported. */
-	camera(): Camera;
+	/** The camera the browser last reported for one agent's canvas. */
+	camera(agentId: string): Camera;
 	/** Agents, for `stage.agents()` and for `inContext` on every board. */
 	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
 }
@@ -100,27 +100,49 @@ export class StageService {
 
 	// --- the browser's half ---------------------------------------------------------
 
-	camera(): Camera {
-		return this.host.camera();
+	camera(agentId: string): Camera {
+		return this.host.camera(agentId);
 	}
 
-	async setCamera(at: Camera): Promise<void> {
-		await this.ask({ op: "camera", args: at });
+	/**
+	 * How much room the canvas has, in CSS pixels — or nothing, if no browser ever said.
+	 *
+	 * `undefined` rather than a default, and that is the whole design: a number an agent can
+	 * size a board against has to be a number somebody measured. A headless run and a fresh
+	 * session before the first reading both get nothing, and an agent told nothing picks its
+	 * own size, which is what it would have done anyway.
+	 */
+	viewport(agentId: string): { width: number; height: number } | undefined {
+		const { width, height } = this.host.camera(agentId);
+		if (!width || !height) return undefined;
+		return { width, height };
 	}
 
-	async show(paths: string[], options: { fit?: "board" | "all"; highlight?: string } = {}): Promise<void> {
+	/**
+	 * Every one of these says which agent asked, and the browser decides what that means.
+	 *
+	 * The rule it applies: an operation that moves *the view* is carried out when the agent
+	 * is the conversation on screen, and remembered against that agent when it is not — so it
+	 * arrives, framed as it intended, the moment you open that chat. The result says which
+	 * happened, so an agent working in the background is told rather than lied to.
+	 */
+	async setCamera(agentId: string, at: Camera): Promise<unknown> {
+		return this.ask(agentId, { op: "camera", args: at });
+	}
+
+	async show(agentId: string, paths: string[], options: { fit?: "board" | "all"; highlight?: string } = {}): Promise<unknown> {
 		for (const path of paths) {
 			if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
 		}
-		await this.ask({ op: "show", args: { paths, ...options } });
+		return this.ask(agentId, { op: "show", args: { paths, ...options } });
 	}
 
-	async reload(path: string): Promise<void> {
-		await this.ask({ op: "reload", args: { path } });
+	async reload(agentId: string, path: string): Promise<void> {
+		await this.ask(agentId, { op: "reload", args: { path } });
 	}
 
-	async cursor(path: string, at: { x: number; y: number } | null, label: string, color: string): Promise<void> {
-		await this.ask({ op: "cursor", args: { path, at, label, color } });
+	async cursor(agentId: string, path: string, at: { x: number; y: number } | null, label: string, color: string): Promise<void> {
+		await this.ask(agentId, { op: "cursor", args: { path, at, label, color } });
 	}
 
 	/**
@@ -133,20 +155,20 @@ export class StageService {
 	 */
 	async annotate(agentId: string, path: string, marks: unknown): Promise<unknown> {
 		if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
-		return this.ask({ op: "annotate", args: { agentId, path, marks: marks ?? null } });
+		return this.ask(agentId, { op: "annotate", args: { agentId, path, marks: marks ?? null } });
 	}
 
-	async toast(text: string): Promise<void> {
-		await this.ask({ op: "toast", args: { text } });
+	async toast(agentId: string, text: string): Promise<void> {
+		await this.ask(agentId, { op: "toast", args: { text } });
 	}
 
-	private async ask(call: Omit<StageCall, "id">): Promise<unknown> {
+	private async ask(agentId: string, call: Omit<StageCall, "id" | "agentId">): Promise<unknown> {
 		if (!this.host.connected()) {
 			// Not an error: an agent can do useful work with nobody watching, and it
 			// should be told rather than blocked.
 			return { skipped: "no browser is connected to the canvas" };
 		}
-		return this.host.call(call);
+		return this.host.call({ ...call, agentId });
 	}
 }
 

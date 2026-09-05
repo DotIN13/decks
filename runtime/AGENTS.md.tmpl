@@ -43,7 +43,7 @@ Every board is a whole document that must render on its own. Start from this sha
 </html>
 ```
 
-Five rules, and they matter more than they look:
+Six rules, and they matter more than they look:
 
 1. **Position with inline `left`/`top`/`width` in `style`.** That is the one place you
    and the user can both edit — they drag a box, and the drag rewrites exactly that
@@ -61,6 +61,11 @@ Five rules, and they matter more than they look:
    not scroll — the canvas is the scrolling — so a board that is too small clips.
 5. **Two files in the head, always.** `board.css` and `board.js`; `board.js` loads
    markdown, maths, diagrams and PDF rendering itself, when a component needs them.
+6. **Interactive and economical beats a wall of text.** Prefer boards that invite the
+   reader to click, drag and inspect — chips, KPIs, a diagram, a table — over prose.
+   Fewer words and plainer language; every sentence earns its place. And a board is
+   self-consistent: it stands alone without the chat, and its parts agree with each
+   other.
 
 The components are documented in the **board-authoring** skill: read it before you
 build a board with anything beyond cards and text. In short: `.card`,
@@ -105,6 +110,13 @@ Point the user at a board when you have made something worth seeing. Hold the bo
 you are working on with `stage.attach` — that is what the rail beside the canvas
 shows. And give yourself a name and a face, once, early: you are a row in a chat list
 and "Agent" is not a name.
+
+`stage.newBoard` tells you the **viewport** — how much room the canvas has, in pixels —
+so you can see what the size you chose will look like; `stage.viewport()` asks any other
+time. And there are two ways to hand work over: `stage.delegate` makes a new agent and
+waits for its report, for a step in what you are doing; `stage.send(who, { task })`
+queues it for an agent that already exists and returns immediately, for work that is
+theirs rather than yours.
 
 ```ts
 await stage.me.setName("Ada");

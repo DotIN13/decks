@@ -499,6 +499,20 @@ export function App() {
 	 */
 	onMount(() => watchInsets());
 
+	/*
+	 * One reading at startup, so an agent knows the canvas before anybody pans.
+	 *
+	 * Until now the server only ever heard about the camera *after* a gesture: a session
+	 * where the user asked one question and never touched the canvas reported nothing, and
+	 * `stage.viewport()` had nothing to answer with. Read at fire time rather than now,
+	 * because the deck arrives and fits itself in the first moments and this should carry
+	 * where that left the camera, not the {0,0,1} it started at.
+	 */
+	onMount(() => {
+		const timer = window.setTimeout(() => sendCamera(camera()), 400);
+		onCleanup(() => clearTimeout(timer));
+	});
+
 	onMount(() => {
 		socket = connect(setConnected);
 		const off = socket.on((message) => {
@@ -749,7 +763,19 @@ export function App() {
 								const stage = document.querySelector(".stage");
 								return { width: stage?.clientWidth ?? 0, height: stage?.clientHeight ?? 0 };
 							},
+							/*
+							 * Whose canvas this is. An op that moves the view is carried out for the
+							 * conversation on screen and remembered for one that is not — see `defer`
+							 * in `canvas/stage-ops.ts`, which is where the reasoning lives.
+							 */
+							focused: () => state.focused,
 							setCamera: (camera) => setCamera(camera),
+							rememberView: (agentId, camera, selected) => {
+								views.set(agentId, viewToPark(camera, selected));
+								// So `stage.camera()` answers for that agent's canvas rather than falling
+								// back to wherever the last person to look at anything was.
+								sendCamera(camera, agentId);
+							},
 							select: (path) => setSelected(path),
 							reload: (path) => setState("nonces", path, (current = 0) => current + 1),
 							cursor: (cursor) => setState("cursor", cursor),
@@ -842,7 +868,22 @@ export function App() {
 	let cameraTimer: number | undefined;
 	const reportCamera = (camera: Camera) => {
 		if (cameraTimer) clearTimeout(cameraTimer);
-		cameraTimer = window.setTimeout(() => socket.send({ type: "camera.set", camera }), 250);
+		cameraTimer = window.setTimeout(() => sendCamera(camera), 250);
+	};
+
+	/**
+	 * A camera reading, with how much room the canvas has to draw in.
+	 *
+	 * The size rides on the camera rather than travelling as its own frame because they
+	 * change together and are read together: `stage.viewport()` and `stage.newBoard` want
+	 * the number a board has to fit into, and that is the window minus the chrome standing
+	 * beside it — not `innerWidth`, which counts the boards panel as space a board could
+	 * use.
+	 */
+	const sendCamera = (camera: Camera, agentId?: string) => {
+		const box = canvasBox({ width: window.innerWidth, height: window.innerHeight });
+		const sized: Camera = { ...camera, width: Math.round(box.width), height: Math.round(box.height) };
+		socket.send({ type: "camera.set", camera: sized, ...(agentId ? { agentId } : {}) });
 	};
 
 	const setCameraAndReport = (camera: Camera) => {
@@ -1757,6 +1798,7 @@ export function App() {
 						onAdd={() => socket.send({ type: "claude.accounts.add" })}
 						onUse={(id) => socket.send({ type: "claude.accounts.use", id })}
 						onForget={(id) => socket.send({ type: "claude.accounts.forget", id })}
+						onMove={(id, direction) => socket.send({ type: "claude.accounts.move", id, direction })}
 						onClose={() => setSettings(false)}
 					/>
 				</Show>

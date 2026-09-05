@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { blocks, inline, plainText, type Inline } from "./markdown.ts";
+import { blocks, inline, plainText, type Block, type Inline } from "./markdown.ts";
 
 /** A span tree as a readable string, so a failure says what it got. */
 function shape(spans: Inline[]): string {
@@ -185,4 +185,91 @@ test("plainText strips the syntax and keeps the words", () => {
 	assert.equal(plainText("# Title\n\n- one\n- two"), "Title\n• one\n• two");
 	assert.equal(plainText("see [the docs](https://example.com)"), "see the docs");
 	assert.equal(plainText("---"), "");
+});
+
+/*
+ * Tables.
+ *
+ * The one construct whose source is genuinely unreadable — an agent comparing three options
+ * writes one every time, and pipes and dashes in a 360px column are a puzzle. The rules worth
+ * pinning are the ones that stop *other* things becoming tables, because a false positive
+ * turns a paragraph into a grid.
+ */
+
+/** The words of a cell, so an assertion reads like the table did. */
+const text = (spans: Inline[]): string => spans.map((span) => (span.kind === "text" || span.kind === "code" ? span.text : "?")).join("");
+const grid = (block: Block | undefined): string[][] =>
+	block?.kind === "table" ? [block.head, ...block.rows].map((row) => row.map(text)) : [];
+
+test("a header, a divider and rows become a table", () => {
+	const parsed = blocks("| Name | Size |\n| --- | --- |\n| plan | 3kb |\n| risks | 9kb |");
+	assert.deepEqual(parsed.map((block) => block.kind), ["table"]);
+	assert.deepEqual(grid(parsed[0]), [
+		["Name", "Size"],
+		["plan", "3kb"],
+		["risks", "9kb"],
+	]);
+});
+
+test("the outer pipes are decoration, and the colons are alignment", () => {
+	const parsed = blocks("a | b | c\n:--- | :---: | ---:\n1 | 2 | 3");
+	assert.deepEqual(grid(parsed[0]), [
+		["a", "b", "c"],
+		["1", "2", "3"],
+	]);
+	assert.deepEqual(parsed[0]?.kind === "table" ? parsed[0].align : [], ["left", "center", "right"]);
+	// No colon at all is no opinion, which is not the same as "left".
+	const plain = blocks("a | b\n--- | ---\n1 | 2");
+	assert.deepEqual(plain[0]?.kind === "table" ? plain[0].align : [], [null, null]);
+});
+
+test("a header on its own is still a paragraph, so a table does not flicker into place", () => {
+	// The state between the header arriving and the line under it, which happens on every
+	// streaming reply that contains a table.
+	assert.deepEqual(blocks("| Name | Size |").map((block) => block.kind), ["paragraph"]);
+});
+
+test("a divider with the wrong number of cells is not a divider", () => {
+	// `some | text` over `---` is a paragraph and a rule, which is what it almost always is.
+	assert.deepEqual(blocks("some | text\n---").map((block) => block.kind), ["paragraph", "rule"]);
+});
+
+test("one column is a table only when it is written with both pipes", () => {
+	assert.deepEqual(blocks("| Name |\n| --- |\n| plan |").map((block) => block.kind), ["table"]);
+	assert.deepEqual(blocks("Name\n---\nplan").map((block) => block.kind), ["paragraph", "rule", "paragraph"]);
+});
+
+test("an escaped pipe is a pipe in the cell, not a new cell", () => {
+	const parsed = blocks("a | b\n--- | ---\nleft \\| right | second");
+	assert.deepEqual(grid(parsed[0]), [
+		["a", "b"],
+		["left | right", "second"],
+	]);
+});
+
+test("a ragged row is padded and a long one is cut, because a table is still a table", () => {
+	const parsed = blocks("a | b | c\n--- | --- | ---\n1 | 2\n1 | 2 | 3 | 4");
+	assert.deepEqual(grid(parsed[0]), [
+		["a", "b", "c"],
+		["1", "2", ""],
+		["1", "2", "3"],
+	]);
+});
+
+test("a cell keeps its inline markup", () => {
+	const parsed = blocks("a | b\n--- | ---\n`code` | **bold**");
+	const row = parsed[0]?.kind === "table" ? parsed[0].rows[0] : undefined;
+	assert.equal(row?.[0]?.[0]?.kind, "code");
+	assert.equal(row?.[1]?.[0]?.kind, "strong");
+});
+
+test("a bullet that contains a pipe is still a bullet", () => {
+	// The table check runs last for exactly this: a list, a quote and a heading all win.
+	assert.deepEqual(blocks("- a | b\n- c | d").map((block) => block.kind), ["list"]);
+	assert.deepEqual(blocks("> a | b\n> --- | ---").map((block) => block.kind), ["quote"]);
+});
+
+test("a table ends at a blank line", () => {
+	const parsed = blocks("a | b\n--- | ---\n1 | 2\n\nafter");
+	assert.deepEqual(parsed.map((block) => block.kind), ["table", "paragraph"]);
 });

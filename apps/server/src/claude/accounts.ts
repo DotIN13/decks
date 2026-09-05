@@ -1,7 +1,7 @@
-import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 /**
  * The Claude subscriptions this install can use, and which one is in force.
@@ -45,16 +45,38 @@ import { join } from "node:path";
  *
  * ### The account that was already there
  *
- * An install almost always has one Claude login before it ever opens this panel — the
- * CLI's own, in `~/.claude`. It is on the list as **`default`**, a row with no directory of
- * its own: making it active means leaving `CLAUDE_CONFIG_DIR` *unset*, which is what every
- * session did before any of this existed.
+ * An install almost always has one Claude login before it ever opens this panel — the CLI's
+ * own, in `~/.claude`. It is on the list as **`default`**, and without it the feature would
+ * not work for the commonest case: somebody signed in to one account who adds a second would
+ * have one account Decks could rotate to and one it could not. It cannot be removed from here
+ * either — those credentials belong to the CLI, and `claude auth logout` is where they are
+ * given up.
  *
- * Without it the feature would not work for the commonest case. Somebody signed in to one
- * account who adds a second would have one account Decks could rotate to and one it could
- * not, so the first limit would strand them on the new account with the old one visible and
- * unreachable. It cannot be removed from here either — those credentials belong to the CLI,
- * and `claude auth logout` is where they are given up.
+ * It used to mean "leave `CLAUDE_CONFIG_DIR` unset", on the reasoning that an install which
+ * never opens this panel should behave exactly as it always had. **That reasoning cost the
+ * feature its point.** A subprocess's environment is fixed at `spawn`, so a session started
+ * while `default` was in force had no variable at all and was pinned to `~/.claude` for its
+ * whole life: adding a second account later could not reach it, and a limit could not move
+ * it. On an install sitting on its default account — which is most of them — nothing could
+ * ever switch.
+ *
+ * So `default` is a directory too, `claude-accounts/default/`, made of symlinks pointing back
+ * at whatever the CLI already had. One rule instead of two, and every session switchable. It
+ * is a directory of links rather than a link straight at `~/.claude` because of one file:
+ * `.claude.json` — identity, project trust, MCP servers — is resolved as
+ * `join(CLAUDE_CONFIG_DIR ?? homedir(), ".claude.json")`, so setting the variable at all
+ * moves it *inside* the config home and leaves the CLI's own behind.
+ *
+ * ### What an account is, and what merely sat next to it
+ *
+ * A config directory holds two kinds of thing, and only one of them is the account.
+ * `.credentials.json` and `.claude.json` *are* the subscription; `projects/` (transcripts and
+ * memory), `settings.json` (what the person has allowed) and their own commands, agents and
+ * skills are not — and all of it used to move when an account became active. So an agent that
+ * switched accounts lost its memory, its permissions and every transcript it could rewind to,
+ * and the SDK's own `getSessionMessages` went looking in the wrong place. Those parts are
+ * symlinked back to the CLI's config home in every account directory (`SHARED`), which leaves
+ * one set of transcripts and one set of permissions no matter whose subscription is paying.
  *
  * ### Where the list lives
  *
@@ -91,25 +113,64 @@ interface Index {
 	/** The account every agent uses, until it runs out. */
 	active?: string;
 	accounts: ClaudeAccount[];
+	/**
+	 * The ids in the order the user put them in — who a limit moves to first.
+	 *
+	 * Kept apart from `accounts` rather than being its order, because `accounts` is rewritten
+	 * by things that have nothing to do with priority: `describeDefault` moves the CLI's own
+	 * row to the end every time the list is published, and `add` appends. An order stored in
+	 * that array would be undone by merely reading the list.
+	 *
+	 * Absent, or missing an id, means "as it always was": the CLI's own login first, then in
+	 * the order they were added. So an install that has never touched the arrows behaves
+	 * exactly as it did.
+	 */
+	order?: string[];
 }
 
 const EMPTY: Index = { accounts: [] };
+
+/**
+ * Where the CLI's own login keeps its things, and which platform it keeps them for.
+ *
+ * Two paths rather than one because the CLI keeps them in two places. The config home is
+ * `CLAUDE_CONFIG_DIR ?? ~/.claude`, but `.claude.json` is resolved as
+ * `join(CLAUDE_CONFIG_DIR ?? homedir(), ".claude.json")` — *beside* the config home rather
+ * than inside it, when the variable is unset. Which is the whole reason `default` needs a
+ * directory of links instead of a link straight at `~/.claude`: pointing `CLAUDE_CONFIG_DIR`
+ * at `~/.claude` would move `.claude.json` to `~/.claude/.claude.json` and leave the CLI's
+ * own identity, project trust and MCP config behind.
+ */
+export interface ClaudeHome {
+	configDir: string;
+	configFile: string;
+	/** macOS keeps tokens in the keychain rather than in a file — see `hasCredentials`. */
+	platform: NodeJS.Platform;
+}
+
+/** What the CLI's own login is on this machine, read from the environment once. */
+export function claudeHome(): ClaudeHome {
+	const configured = process.env.CLAUDE_CONFIG_DIR;
+	return {
+		configDir: configured ?? join(homedir(), ".claude"),
+		configFile: join(configured ?? homedir(), ".claude.json"),
+		platform: process.platform,
+	};
+}
 
 /** The row for the CLI's own `~/.claude`, which has no directory of its own. */
 export const DEFAULT_ACCOUNT = "default";
 
 export class ClaudeAccounts {
 	/**
-	 * `homeCredentials` is where the CLI's own login keeps its token.
-	 *
-	 * A constructor argument rather than a call to `homedir()` inside the class, because
-	 * whether that file exists decides whether `default` is a row worth rotating *to* — and a
-	 * test that depended on the real `~/.claude` of whoever ran it would pass or fail by
+	 * `home` is where the CLI's own login keeps its things — passed in rather than looked up
+	 * inside the class, because the `default` account is a *view of that directory* and a
+	 * test that reached into the real `~/.claude` of whoever ran it would pass or fail by
 	 * accident.
 	 */
 	constructor(
 		private dataDir: string,
-		private readonly homeCredentials: string = join(homedir(), ".claude", ".credentials.json"),
+		private readonly home: ClaudeHome = claudeHome(),
 	) {}
 
 	setDataDir(dataDir: string): void {
@@ -130,23 +191,97 @@ export class ClaudeAccounts {
 	}
 
 	/**
-	 * What every session sets `CLAUDE_CONFIG_DIR` to: the symlink, not an account.
+	 * What every session sets `CLAUDE_CONFIG_DIR` to: the symlink, never an account directly.
 	 *
-	 * `undefined` when no account has been added, which leaves the variable unset and the
-	 * CLI on its own `~/.claude` — exactly the behaviour of every install that never opens
-	 * this settings panel. Adding accounts is opt-in, and nothing changes for anyone who
-	 * does not.
+	 * **Always the link, including for the CLI's own login.** It used to be `undefined` for
+	 * `default`, on the reasoning that an install which never opens the settings panel should
+	 * behave exactly as it always had — and that reasoning cost the feature its point. A
+	 * subprocess's environment is fixed at `spawn`, so a session started while `default` was
+	 * in force had no `CLAUDE_CONFIG_DIR` at all and was pinned to `~/.claude` for its whole
+	 * life. Adding a second account later could not reach it, and a limit could not move it.
+	 * One rule instead of two: every session reads through the link, and every session is
+	 * therefore switchable.
+	 *
+	 * `undefined` only when the link cannot be made at all — a filesystem with no symlinks.
+	 * Then a *new* session still lands on the right account, and what is lost is the switch
+	 * reaching one already running, which is the same bargain `point` has always made.
 	 */
 	activeConfigDir(): string | undefined {
-		const index = this.read();
-		// Unset for the CLI's own login, and for an install that has added nothing: both mean
-		// "whatever `claude` would use on its own".
-		if (!index.active || index.active === DEFAULT_ACCOUNT) return undefined;
-		return this.link;
+		const id = this.activeId();
+		const target = this.targetFor(id);
+		if (this.ensureLink(target)) return this.link;
+		return id === DEFAULT_ACCOUNT ? undefined : target;
+	}
+
+	/**
+	 * The environment a `claude` process needs in order to spend the active subscription.
+	 *
+	 * Two variables, and the second one is entirely about macOS. There, tokens live in the
+	 * keychain rather than in `.credentials.json`, and the CLI names its keychain entry
+	 * `Claude Code-credentials-<sha256(configDir)[:8]>` — hashed from `CLAUDE_CONFIG_DIR`
+	 * unless `CLAUDE_SECURESTORAGE_CONFIG_DIR` overrides it.
+	 *
+	 * Which the symlink breaks in both directions. Every account is reached through the *same*
+	 * link path, so every account would hash to the same keychain entry and overwrite each
+	 * other's tokens; and `auth login` runs against the account's own directory, so it would
+	 * write under a hash the session then fails to look up. `CLAUDE_SECURESTORAGE_CONFIG_DIR`
+	 * is set to the account's **own** directory to fix both — a stable identity per account,
+	 * independent of the path used to reach it.
+	 *
+	 * For the CLI's own login it is the empty string, which the CLI reads as "no suffix" —
+	 * the unadorned `Claude Code-credentials` entry that a bare `claude` in a terminal uses.
+	 * Without it, routing `default` through the link would have looked in a keychain entry
+	 * that has never existed and reported a signed-in account as signed out.
+	 *
+	 * Harmless on Linux, where the keychain path is not taken at all, so it is set
+	 * unconditionally rather than behind a platform check: one environment to reason about,
+	 * and the check that matters is the one inside the CLI.
+	 */
+	activeEnvironment(): NodeJS.ProcessEnv | undefined {
+		const configDir = this.activeConfigDir();
+		if (!configDir) return undefined;
+		return accountEnvironment(configDir, this.keychainDir(this.activeId()));
+	}
+
+	/**
+	 * The account's own directory, as opposed to the link that reaches it.
+	 *
+	 * This is what identifies an account to the macOS keychain, and what a one-off `claude
+	 * auth` command is pointed at. Empty for the CLI's own login, which has no directory of
+	 * its own and wants the unsuffixed keychain entry.
+	 */
+	keychainDir(id: string): string {
+		return id === DEFAULT_ACCOUNT ? "" : this.configDir(id);
+	}
+
+	/**
+	 * The directory the link should point at for a given account.
+	 *
+	 * `default` is a directory too now — `claude-accounts/default/`, made of symlinks into
+	 * the CLI's own config home. See `mirror` for why that is a view rather than a link.
+	 */
+	private targetFor(id: string): string {
+		return this.configDir(id);
 	}
 
 	private get link(): string {
 		return join(this.dir, "active");
+	}
+
+	/**
+	 * Make sure the link exists and points where it should, without rewriting it needlessly.
+	 *
+	 * Called on every session start, so the cheap case — a link already aimed at the right
+	 * account — is one `readlink`. Returns whether the link can be relied on.
+	 */
+	private ensureLink(target: string): boolean {
+		if (target === this.configDir(DEFAULT_ACCOUNT)) this.mirrorDefault();
+		try {
+			if (readlinkSync(this.link) === target) return true;
+		} catch {
+			/* no link yet, or not a link: fall through and make one */
+		}
+		return this.point(target);
 	}
 
 	/**
@@ -156,38 +291,192 @@ export class ClaudeAccounts {
 	 * path fails and removing it first would leave a window with no link at all — which a
 	 * live session would read as "no credentials" rather than as "one moment please".
 	 */
-	private point(id: string): void {
+	private point(target: string): boolean {
 		try {
 			mkdirSync(this.dir, { recursive: true });
 			const staging = `${this.link}.next`;
 			rmSync(staging, { force: true });
-			symlinkSync(this.configDir(id), staging);
+			symlinkSync(target, staging);
 			renameSync(staging, this.link);
+			return true;
 		} catch {
 			/*
 			 * A filesystem with no symlinks, or one that refuses. The account is still
 			 * recorded as active and every *new* session picks it up through `activeConfigDir`
 			 * — what is lost is the switch reaching sessions already running.
 			 */
+			return false;
 		}
 	}
 
 	/**
-	 * Take the symlink away, for when the account in force is the CLI's own.
+	 * Aim the link at whichever account is in force now.
 	 *
-	 * `activeConfigDir()` returns nothing for `default`, so a link left over from the last
-	 * account is never *read* — but it is still a link on disk pointing at a directory that
-	 * has usually just been deleted, and the next person to look at
-	 * `claude-accounts/` finds a dangling one and has to work out whether it matters.
-	 *
-	 * `rmSync` on a symlink removes the link and not its target, which is what makes this
-	 * safe to call while another account still owns the directory it points at.
+	 * Through `ensureLink` rather than `point`, so that landing on the CLI's own login builds
+	 * its view first. Pointing at a `default` directory that had never been made left the link
+	 * aimed at nothing, which is the same dangling link this was meant to stop.
 	 */
-	private unlink(): void {
+	private repoint(): void {
+		this.ensureLink(this.targetFor(this.activeId()));
+	}
+
+	/**
+	 * `claude-accounts/default/`: the CLI's own config home, seen through symlinks.
+	 *
+	 * The obvious thing would be to point `active` straight at `~/.claude`, and it is wrong
+	 * for one reason: `.claude.json` — which holds `oauthAccount`, project trust and MCP
+	 * config — is resolved as `join(CLAUDE_CONFIG_DIR ?? homedir(), ".claude.json")`. Setting
+	 * the variable at all moves it *inside* the config home, so the CLI's own login would
+	 * come up with no identity, no trust and no MCP servers. A directory of links gets the
+	 * variable set and every file resolved back to where the CLI actually keeps it.
+	 *
+	 * Safe because **the CLI writes through symlinks rather than replacing them** — verified
+	 * by running it against a config directory of links and watching the targets grow. So a
+	 * refreshed token lands in `~/.claude/.credentials.json`, which is the same property that
+	 * makes the `active` link itself work.
+	 *
+	 * Every entry is linked rather than a chosen few, so nothing is silently left behind when
+	 * the CLI grows a new file. Re-run on open and on every session start, which is what
+	 * picks up entries that appeared since.
+	 */
+	private mirrorDefault(): void {
+		const into = this.configDir(DEFAULT_ACCOUNT);
+		let entries: string[];
 		try {
-			rmSync(this.link, { force: true });
+			mkdirSync(this.home.configDir, { recursive: true });
+			entries = readdirSync(this.home.configDir);
 		} catch {
-			/* nothing there, which is the outcome wanted */
+			return;
+		}
+		this.mirror(into, this.home.configDir, entries);
+		// The one file that is not in the config home at all.
+		this.linkOne(join(into, ".claude.json"), this.home.configFile);
+	}
+
+	/**
+	 * The parts of a config directory that are *not* about which subscription is signed in.
+	 *
+	 * Transcripts and memory (`projects/`), what the person has allowed (`settings.json`),
+	 * and what they have written for themselves (`commands/`, `agents/`, `skills/`). None of
+	 * it belongs to an account, and all of it used to move when one became active — so an
+	 * agent switched accounts and lost its memory, its permissions and every transcript it
+	 * could rewind to.
+	 *
+	 * Deliberately not shared: `.credentials.json` and `.claude.json`, which *are* the
+	 * account; and `policy-limits.json`, `remote-settings.json`, `statsig/`, `sessions/` and
+	 * `backups/`, which are per-subscription state fetched from the server.
+	 */
+	private static readonly SHARED = [
+		"projects",
+		"todos",
+		"file-history",
+		"shell-snapshots",
+		"plugins",
+		"commands",
+		"agents",
+		"skills",
+		"settings.json",
+		"settings.local.json",
+		"keybindings.json",
+		"CLAUDE.md",
+	];
+
+	/** Give one account directory its share of what is not account-bound. */
+	private share(configDir: string): void {
+		this.mirror(configDir, this.home.configDir, ClaudeAccounts.SHARED);
+	}
+
+	/**
+	 * Make named entries of `from` reachable through `into` as symlinks.
+	 *
+	 * Anything already written into `into` directly is *adopted* rather than destroyed: a
+	 * real directory has its children moved across one by one, and only ever into a name that
+	 * is free, so nothing is overwritten. What cannot be moved without a collision is left
+	 * where it is and simply not linked, which is a directory somebody can still find.
+	 */
+	private mirror(into: string, from: string, names: string[]): void {
+		try {
+			mkdirSync(into, { recursive: true });
+		} catch {
+			return;
+		}
+		for (const name of names) {
+			if (name === "." || name === ".." || name.includes("/")) continue;
+			this.linkOne(join(into, name), join(from, name));
+		}
+	}
+
+	/** One entry: adopt whatever is there, then link it at `target`. */
+	private linkOne(at: string, target: string): void {
+		try {
+			if (readlinkSync(at) === target) return;
+		} catch {
+			/* not a link, or nothing there */
+		}
+		let local: ReturnType<typeof lstatSync> | undefined;
+		try {
+			local = lstatSync(at);
+		} catch {
+			/* nothing there, which is the ordinary case */
+		}
+		if (local && !local.isSymbolicLink()) {
+			if (!this.adopt(at, target)) return;
+		} else if (local) {
+			// A link pointing somewhere else: ours to replace.
+			try {
+				rmSync(at, { force: true });
+			} catch {
+				return;
+			}
+		}
+		let exists = true;
+		try {
+			statSync(target);
+		} catch {
+			exists = false;
+		}
+		if (!exists) return;
+		try {
+			symlinkSync(target, at);
+		} catch {
+			/* no symlinks here; the account simply keeps its own copy */
+		}
+	}
+
+	/**
+	 * Move what was written locally back to where it should have gone.
+	 *
+	 * Returns whether `at` is now free to be replaced by a link. Nothing is ever overwritten:
+	 * an entry moves only into a name that does not exist, two directories are merged child by
+	 * child instead, and anything that would still collide is left exactly where it is — which
+	 * costs that one account a shared directory and loses nobody a transcript.
+	 *
+	 * Recursive, because the collision is usually one level down. An account signed in before
+	 * any of this existed has `projects/<deck>/` and so does the config home: the directories
+	 * collide, the transcripts inside them do not.
+	 */
+	private adopt(at: string, target: string): boolean {
+		const kind = (path: string): "none" | "dir" | "other" => {
+			try {
+				return lstatSync(path).isDirectory() ? "dir" : "other";
+			} catch {
+				return "none";
+			}
+		};
+		try {
+			if (kind(target) === "none") {
+				mkdirSync(dirname(target), { recursive: true });
+				renameSync(at, target);
+				return true;
+			}
+			if (kind(target) !== "dir" || kind(at) !== "dir") return false;
+			let whole = true;
+			for (const child of readdirSync(at)) if (!this.adopt(join(at, child), join(target, child))) whole = false;
+			if (!whole) return false;
+			rmSync(at, { recursive: true, force: true });
+			return true;
+		} catch {
+			return false;
 		}
 	}
 
@@ -231,7 +520,31 @@ export class ClaudeAccounts {
 		const index = this.read();
 		const stored = index.accounts.filter((account) => account.id !== DEFAULT_ACCOUNT);
 		const mine = index.accounts.find((account) => account.id === DEFAULT_ACCOUNT);
-		return [{ id: DEFAULT_ACCOUNT, addedAt: 0, ...mine }, ...stored];
+		return sort([{ id: DEFAULT_ACCOUNT, addedAt: 0, ...mine }, ...stored], index.order);
+	}
+
+	/**
+	 * Move one account up or down the list — which is to say, change who is tried first.
+	 *
+	 * The list *is* the priority: `pick` walks it from the top, so the order here is the order
+	 * a limit moves through. Deliberately **not** a switch: the account in force stays in
+	 * force, because reordering is a statement about what happens when this one runs out, and
+	 * taking a running conversation off its subscription is not what an arrow key looks like
+	 * it does. `use()` is the switch, and it is one click away on the same row.
+	 *
+	 * Returns whether anything moved, so a press at the end of the list is a no-op the caller
+	 * can decline to broadcast rather than a lie it repaints.
+	 */
+	move(id: string, direction: "up" | "down"): boolean {
+		const order = this.list().map((account) => account.id);
+		const at = order.indexOf(id);
+		const to = direction === "up" ? at - 1 : at + 1;
+		if (at === -1 || to < 0 || to >= order.length) return false;
+		[order[at], order[to]] = [order[to]!, order[at]!];
+		const index = this.read();
+		index.order = order;
+		this.write(index);
+		return true;
 	}
 
 	/** Which one is in force. `default` when nothing has been chosen, because that is the truth. */
@@ -263,7 +576,18 @@ export class ClaudeAccounts {
 		 * read, and this is the one part of it that writes.
 		 */
 		const existing = index.accounts.find((account) => account.id === DEFAULT_ACCOUNT);
-		index.accounts = [...rest, { ...existing, id: DEFAULT_ACCOUNT, addedAt: 0, ...identity }];
+		/*
+		 * Unless it is a different subscription behind the same row, which is what somebody
+		 * running `claude auth login` in a terminal does. The remembered limit belonged to the
+		 * account that has just been replaced — kept, it would have the deck rotating away
+		 * from a fresh subscription and showing a reset time for one nobody is signed in to.
+		 */
+		const kept: Partial<ClaudeAccount> = { ...existing };
+		if (existing?.email && identity.email && existing.email !== identity.email) {
+			delete kept.limitedUntil;
+			delete kept.limitType;
+		}
+		index.accounts = [...rest, { ...kept, id: DEFAULT_ACCOUNT, addedAt: 0, ...identity }];
 		this.write(index);
 	}
 
@@ -279,6 +603,9 @@ export class ClaudeAccounts {
 		const id = randomUUID();
 		const configDir = this.configDir(id);
 		mkdirSync(configDir, { recursive: true });
+		// Before the login, so the CLI's first write already goes to the shared transcripts
+		// and reads the shared settings rather than starting a second set of them.
+		this.share(configDir);
 		return { id, configDir };
 	}
 
@@ -316,7 +643,7 @@ export class ClaudeAccounts {
 		index.accounts = [...index.accounts.filter((other) => other.id !== entry.id), entry];
 		index.active = entry.id;
 		this.write(index);
-		this.point(entry.id);
+		this.repoint();
 		return entry;
 	}
 
@@ -339,7 +666,7 @@ export class ClaudeAccounts {
 		index.accounts = index.accounts.filter((account) => account.id !== id);
 		index.active = DEFAULT_ACCOUNT;
 		this.write(index);
-		this.unlink();
+		this.repoint();
 		return this.list().find((account) => account.id === DEFAULT_ACCOUNT) ?? { id: DEFAULT_ACCOUNT, addedAt: 0 };
 	}
 
@@ -353,23 +680,24 @@ export class ClaudeAccounts {
 		if (id === DEFAULT_ACCOUNT) return;
 		const index = this.read();
 		index.accounts = index.accounts.filter((account) => account.id !== id);
-		if (index.active === id) {
-			// Back to the CLI's own login when nothing else is available, rather than to
-			// nothing — `default` is always a usable row.
+		const wasActive = index.active === id;
+		if (wasActive) {
 			/*
 			 * Removing the active account moves to another rather than leaving none.
 			 *
 			 * `undefined` would mean "use the CLI's default", which is a different account
 			 * from any of these and almost certainly not what removing one asked for. An
 			 * unlimited one first; failing that, whichever is left.
+			 *
+			 * `id` is passed as the one to skip because `list()` reads the file, which still
+			 * has this row in it — without that, forgetting the account in force could pick it
+			 * again and "move" to the directory it is about to delete.
 			 */
-			index.active = this.pick(this.list(), undefined)?.id ?? DEFAULT_ACCOUNT;
-			// Repointed at the next account, or taken away — falling back to `default` used to
-			// leave the link pointing at the directory this call is about to delete.
-			if (index.active !== DEFAULT_ACCOUNT) this.point(index.active);
-			else this.unlink();
+			index.active = this.pick(this.list(), id)?.id ?? DEFAULT_ACCOUNT;
 		}
 		this.write(index);
+		// Repointed before the directory goes, so the link is never left aimed at nothing.
+		if (wasActive) this.repoint();
 		this.discard(id);
 	}
 
@@ -385,6 +713,7 @@ export class ClaudeAccounts {
 				delete mine.limitType;
 			}
 			this.write(index);
+			this.repoint();
 			return this.active();
 		}
 		const found = index.accounts.find((account) => account.id === id);
@@ -401,7 +730,7 @@ export class ClaudeAccounts {
 		delete found.limitType;
 		index.active = id;
 		this.write(index);
-		this.point(id);
+		this.repoint();
 		return found;
 	}
 
@@ -423,7 +752,7 @@ export class ClaudeAccounts {
 		 * *forever* because the number was missing is an account nothing will use again. An
 		 * hour is short enough to be self-correcting and long enough to stop a switch loop.
 		 */
-		const until = resetsAt && Number.isFinite(resetsAt) ? resetsAt : Date.now() + 60 * 60 * 1000;
+		const until = epochMs(resetsAt) ?? Date.now() + 60 * 60 * 1000;
 		/*
 		 * Every row with that email, not only the one that refused.
 		 *
@@ -466,7 +795,7 @@ export class ClaudeAccounts {
 			index.active = next.id;
 			this.write(index);
 			// The switch itself. Every running session's next request reads through this.
-			if (next.id !== DEFAULT_ACCOUNT) this.point(next.id);
+			this.repoint();
 			return { moved: next };
 		}
 		// Nothing left: the soonest an account comes back is what the deck can usefully say.
@@ -488,8 +817,9 @@ export class ClaudeAccounts {
 	 * Whether an account is signed in is asked of the disk rather than remembered, since the
 	 * CLI's own login can change without Decks hearing about it.
 	 *
-	 * Ordered by list position among the usable ones — the CLI's own login first, then in the
-	 * order they were added — because a rotation should be predictable rather than clever.
+	 * Ordered by list position among the usable ones, because a rotation should be predictable
+	 * rather than clever — and that position is now the user's to set (`move`). Untouched, it
+	 * is what it always was: the CLI's own login first, then the order they were added.
 	 */
 	private pick(accounts: ClaudeAccount[], except: string | undefined): ClaudeAccount | undefined {
 		const now = Date.now();
@@ -499,11 +829,30 @@ export class ClaudeAccounts {
 			.filter((account) => this.hasCredentials(account.id))[0];
 	}
 
-	/** Whether there is a token behind an account at all. */
+	/**
+	 * Whether there is a token behind an account at all.
+	 *
+	 * Two readings, because there are two places a token can be. On Linux and Windows the CLI
+	 * writes `.credentials.json`; on macOS it writes the keychain and that file may not exist
+	 * at all — so every account looked signed out, `pick` passed over all of them, and a limit
+	 * had nowhere to move to on the one platform where nothing else looked wrong.
+	 *
+	 * The macOS reading is `oauthAccount` in the config, which is the CLI's own record of who
+	 * that directory is signed in as and is written alongside the keychain entry. Taken as
+	 * text rather than parsed: the file is tens of kilobytes of caches, and the question is
+	 * only whether one key is in it.
+	 */
 	private hasCredentials(id: string): boolean {
-		const file = id === DEFAULT_ACCOUNT ? this.homeCredentials : join(this.configDir(id), ".credentials.json");
+		const dir = id === DEFAULT_ACCOUNT ? this.home.configDir : this.configDir(id);
 		try {
-			return statSync(file).size > 0;
+			if (statSync(join(dir, ".credentials.json")).size > 0) return true;
+		} catch {
+			/* no file — which on macOS is the ordinary state of a signed-in account */
+		}
+		if (this.home.platform !== "darwin") return false;
+		const config = id === DEFAULT_ACCOUNT ? this.home.configFile : join(dir, ".claude.json");
+		try {
+			return readFileSync(config, "utf8").includes('"oauthAccount"');
 		} catch {
 			return false;
 		}
@@ -551,6 +900,15 @@ export class ClaudeAccounts {
 			return;
 		}
 		for (const entry of entries) if (!known.has(entry)) this.discard(entry);
+		/*
+		 * Then repair, so an install that added accounts before any of this existed is put
+		 * right without anybody doing anything: the CLI's own login gets the directory of
+		 * links that makes it switchable, every added account gets the shared `projects/` and
+		 * settings, and transcripts already written into an account are adopted back out.
+		 */
+		this.mirrorDefault();
+		for (const account of this.list()) if (account.id !== DEFAULT_ACCOUNT) this.share(this.configDir(account.id));
+		this.repoint();
 	}
 }
 
@@ -571,11 +929,66 @@ function validate(raw: unknown): Index {
 				...(text(account.orgName) ? { orgName: text(account.orgName)! } : {}),
 				...(text(account.plan) ? { plan: text(account.plan)! } : {}),
 				addedAt: time(account.addedAt) ?? Date.now(),
-				...(time(account.limitedUntil) ? { limitedUntil: time(account.limitedUntil)! } : {}),
+				// Migrated on the way out of the file: what is stored may be seconds (`epochMs`).
+				...(epochMs(time(account.limitedUntil)) ? { limitedUntil: epochMs(time(account.limitedUntil))! } : {}),
 				...(text(account.limitType) ? { limitType: text(account.limitType)! } : {}),
 			};
 		})
 		.filter((account): account is ClaudeAccount => account !== undefined);
 	const active = typeof source.active === "string" && accounts.some((account) => account.id === source.active) ? source.active : undefined;
-	return { ...(active ? { active } : {}), accounts };
+	// Ids only, deduplicated. A stale id for an account that has since been forgotten is
+	// harmless — `sort` looks the other way, from the accounts to the order — so there is
+	// nothing to prune and nothing that goes wrong if the pruning were forgotten.
+	const listed = Array.isArray((raw as { order?: unknown }).order) ? ((raw as { order: unknown[] }).order.filter((id) => typeof id === "string") as string[]) : [];
+	const order = [...new Set(listed)];
+	return { ...(active ? { active } : {}), accounts, ...(order.length > 0 ? { order } : {}) };
+}
+
+/**
+ * Put the rows in the user's order, and everything they have not placed after them.
+ *
+ * Stable in both halves: placed rows keep the order the array gives, and unplaced ones keep
+ * the order they arrived in — which for a freshly added account means the bottom, where a
+ * new subscription belongs until somebody says otherwise.
+ */
+function sort(accounts: ClaudeAccount[], order: string[] | undefined): ClaudeAccount[] {
+	if (!order || order.length === 0) return accounts;
+	const placed = order.map((id) => accounts.find((account) => account.id === id)).filter((account): account is ClaudeAccount => account !== undefined);
+	return [...placed, ...accounts.filter((account) => !order.includes(account.id))];
+}
+
+/**
+ * A rate limit's reset time in milliseconds, whichever unit it arrived in.
+ *
+ * `SDKRateLimitInfo.resetsAt` is **unix seconds**, and it was being stored and formatted as
+ * milliseconds. Two things followed from that, and they are the two halves of the feature.
+ * `1788588600` compared against `Date.now()` is always in the past, so an account looked
+ * available again the instant it was marked spent — the memory that stops a rotation going
+ * straight back to the subscription that just refused never bit. And the same number through
+ * `new Date()` prints 1970, so the deck told people their limit would lift in January of
+ * that year.
+ *
+ * The threshold is the only honest way to take both units: below `1e12` cannot be
+ * milliseconds in any year anyone will see this (1e12 ms is September 2001), and above it
+ * cannot be seconds (1e12 s is the year 33658). Idempotent, so it is safe at the boundary
+ * *and* on the way out of the file — which is what migrates a list written before this.
+ */
+export function epochMs(value: number | undefined): number | undefined {
+	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+	return value < 1e12 ? Math.round(value * 1000) : value;
+}
+
+/**
+ * The environment that makes a `claude` process spend one particular account.
+ *
+ * `configDir` is where it reads its configuration from — the `active` link for a session, an
+ * account's own directory for a one-off `auth` command. `keychain` is that account's stable
+ * identity, which macOS needs and the other platforms ignore; the reasoning is on
+ * `ClaudeAccounts.activeEnvironment`.
+ *
+ * `process.env` is spread because `env` **replaces** a subprocess's environment rather than
+ * extending it: without it the CLI would start with no `PATH` and no `HOME`.
+ */
+export function accountEnvironment(configDir: string, keychain: string): NodeJS.ProcessEnv {
+	return { ...process.env, CLAUDE_CONFIG_DIR: configDir, CLAUDE_SECURESTORAGE_CONFIG_DIR: keychain };
 }

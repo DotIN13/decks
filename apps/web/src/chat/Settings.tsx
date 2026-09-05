@@ -1,9 +1,12 @@
 import type { ClaudeAccount } from "@decks/protocol";
+import ChevronDown from "lucide-solid/icons/chevron-down";
+import ChevronUp from "lucide-solid/icons/chevron-up";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
 import { For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { AlertSettings } from "./AlertSettings.tsx";
+import { canMove, nextUp } from "../lib/accounts.ts";
 import type { AlertPrefs } from "../lib/alerts.ts";
 
 /**
@@ -45,6 +48,8 @@ export function Settings(props: {
 	onAdd: () => void;
 	onUse: (id: string) => void;
 	onForget: (id: string) => void;
+	/** Change who a limit moves to first. The list is the priority (`lib/accounts.ts`). */
+	onMove: (id: string, direction: "up" | "down") => void;
 	onClose: () => void;
 }) {
 	/*
@@ -55,6 +60,14 @@ export function Settings(props: {
 	 * nothing at all unless you had first clicked a row. The browse modal gets away with the
 	 * same arrangement because its search field is focused as it appears.
 	 */
+	/**
+	 * The row a limit would hand over to, so the order can be seen and not only set.
+	 *
+	 * Computed here rather than sent: everything the rule needs is already on the wire, and a
+	 * "next" the server had decided would be stale the moment an account was spent.
+	 */
+	const next = () => nextUp(props.accounts, props.active);
+
 	onMount(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -118,7 +131,9 @@ export function Settings(props: {
 								when={props.accounts.find((account) => account.id === props.active && !account.signedIn)}
 								fallback={
 									<span class="set-note">
-										{props.accounts.length === 1 ? "Add another to switch when this one runs out." : "Switches on its own when one runs out."}
+										{props.accounts.length === 1
+											? "Add another to switch when this one runs out."
+											: "When one runs out it moves down this list — use the arrows to set the order."}
 									</span>
 								}
 							>
@@ -135,8 +150,12 @@ export function Settings(props: {
 									<Row
 										account={account}
 										active={props.active === account.id}
+										next={next() === account.id}
+										canUp={props.accounts.length > 1 && canMove(props.accounts, account.id, "up")}
+										canDown={props.accounts.length > 1 && canMove(props.accounts, account.id, "down")}
 										onUse={() => props.onUse(account.id)}
 										onForget={() => props.onForget(account.id)}
+										onMove={(direction) => props.onMove(account.id, direction)}
 									/>
 								)}
 							</For>
@@ -162,7 +181,17 @@ export function Settings(props: {
 	);
 }
 
-function Row(props: { account: ClaudeAccount; active: boolean; onUse: () => void; onForget: () => void }) {
+function Row(props: {
+	account: ClaudeAccount;
+	active: boolean;
+	/** Whether this is the one a limit would move to — the top usable row that is not in use. */
+	next: boolean;
+	canUp: boolean;
+	canDown: boolean;
+	onUse: () => void;
+	onForget: () => void;
+	onMove: (direction: "up" | "down") => void;
+}) {
 	const limited = () => {
 		const until = props.account.limitedUntil;
 		return until && until > Date.now() ? until : undefined;
@@ -258,9 +287,58 @@ function Row(props: { account: ClaudeAccount; active: boolean; onUse: () => void
 						<Match when={props.active}>
 							<span class="state flex-none text-accent">active</span>
 						</Match>
+						{/*
+							The only row that says what the arrows *did*. Ranked below every other
+							state for the same reason they are ranked among themselves: "next" is a
+							plan, and a row that is signed out or spent has something truer to say.
+						*/}
+						<Match when={props.next}>
+							<span class="state flex-none text-muted">next</span>
+						</Match>
 					</Switch>
 				</span>
 			</button>
+
+			{/*
+				The order, one step at a time.
+				*
+				* Not drag-and-drop: this list is two or three rows in a modal, a drag needs a
+				* handle and a drop target and an answer for what a half-finished one means, and
+				* two arrows need none of that. They are `.close`-shaped so they live in the same
+				* revealed slot the × does — a column of arrows standing at rest would make a
+				* settings list look like a queue you were meant to be managing.
+				*
+				* Disabled at the ends rather than hidden: a button that disappears at the top of
+				* the list is a row that changes shape as it moves.
+			*/}
+			<Show when={props.canUp || props.canDown}>
+				<button
+					class="close rank"
+					type="button"
+					disabled={!props.canUp}
+					title={`Try ${name()} sooner when an account runs out`}
+					aria-label={`Move ${name()} up`}
+					onClick={(event) => {
+						event.stopPropagation();
+						props.onMove("up");
+					}}
+				>
+					<Icon of={ChevronUp} size={13} />
+				</button>
+				<button
+					class="close rank"
+					type="button"
+					disabled={!props.canDown}
+					title={`Try ${name()} later when an account runs out`}
+					aria-label={`Move ${name()} down`}
+					onClick={(event) => {
+						event.stopPropagation();
+						props.onMove("down");
+					}}
+				>
+					<Icon of={ChevronDown} size={13} />
+				</button>
+			</Show>
 
 			{/*
 				The CLI's own login has no × — those credentials are not Decks' to delete, and

@@ -244,6 +244,58 @@ say("the foot counts what the sections hold", panel.foot === "5 agents", panel.f
 say("the density toggle belongs to Boards", panel.density === "none", panel.density);
 say("the field says it searches tags too", /agents or tags/.test(panel.placeholder ?? ""), panel.placeholder);
 
+// --- approaching a row, and what is allowed to move ---------------------------------
+/*
+ * The two buttons arrive over the *first line* and nothing else may move.
+ *
+ * They were flex siblings of the row's body, so their arrival took 24px off it — 46px on a
+ * row that can also be closed — and the state, the tags and the last thing the agent said
+ * all reflowed as the pointer crossed the list, losing words to an ellipsis for a button
+ * 40px above them. They are 22px tall at the top of a 90px row; nothing under the name was
+ * ever in their way.
+ */
+const geometry = () =>
+	page.evaluate(() => {
+		const row = [...document.querySelectorAll(".agent-row")].find((agent) => agent.querySelector(".lb")?.textContent === "Ada");
+		if (!row) return null;
+		const at = row.getBoundingClientRect();
+		const line = row.querySelector(".agent-line");
+		const style = getComputedStyle(line);
+		const shown = [...row.querySelectorAll(".agent-tagbtn, .close")].filter((button) => getComputedStyle(button).display !== "none");
+		const words = [...line.children].filter((child) => getComputedStyle(child).display !== "none").pop();
+		return {
+			body: Math.round(row.querySelector(".agent-body").getBoundingClientRect().width),
+			said: Math.round(row.querySelector(".agent-said")?.getBoundingClientRect().width ?? 0),
+			tags: Math.round(row.querySelector(".tags")?.getBoundingClientRect().width ?? 0),
+			state: Math.round(row.querySelector(".agent-state")?.getBoundingClientRect().width ?? 0),
+			nameRoom: Math.round(line.clientWidth - parseFloat(style.paddingRight)),
+			buttons: shown.length,
+			firstButtonAt: shown.length > 0 ? Math.round(Math.min(...shown.map((button) => button.getBoundingClientRect().left - at.left))) : null,
+			wordsEndAt: words ? Math.round(words.getBoundingClientRect().right - at.left) : null,
+		};
+	});
+
+const still = await geometry();
+await page.locator(".agent-row").filter({ hasText: "Ada" }).first().hover();
+await settle(page, 400);
+const approached = await geometry();
+
+say("approaching a row brings its buttons out", approached.buttons > 0 && still.buttons === 0, `${still.buttons} → ${approached.buttons}`);
+say(
+	"…and the three lines under the name do not move",
+	approached.said === still.said && approached.tags === still.tags && approached.state === still.state,
+	`said ${still.said}→${approached.said}, tags ${still.tags}→${approached.tags}, state ${still.state}→${approached.state}`,
+);
+/* The one line that does give ground — it is the line they stand on. */
+say("…while the name line gives up exactly their column", approached.nameRoom < still.nameRoom, `${still.nameRoom} → ${approached.nameRoom}`);
+say(
+	"…so the words never run under a button",
+	approached.wordsEndAt <= approached.firstButtonAt,
+	`words end at ${approached.wordsEndAt}, first button at ${approached.firstButtonAt}`,
+);
+await page.mouse.move(4, 4);
+await settle(page, 300);
+
 // --- searching by tag, and the query clearing on a switch --------------------------
 
 await page.locator(".panel-shell .field input").fill("panel-css");

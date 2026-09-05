@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { titleFor } from "./translator.ts";
+import type { ServerMessage } from "@decks/protocol";
+import { Translator, titleFor } from "./translator.ts";
 
 /*
  * What a tool row says it was called on.
@@ -45,4 +46,92 @@ test("whitespace in an argument is flattened, because a row is one line", () => 
 	// Every run of it, including the two spaces `grep` joins its two halves with: a row is
 	// one line and a tab in the middle of it would be a gap nobody chose.
 	assert.equal(titleFor("grep", { pattern: "  needle\n\there  ", path: "src" }), "needle here src");
+});
+
+/*
+ * When a reply becomes a bubble.
+ *
+ * A card the browser has been told about but that has nothing in it is an empty box sitting
+ * in the column: for a model that thinks first, seconds of it; for a turn that opens with a
+ * tool call, the whole of that call, after which the card silently disappears again. The
+ * working sign already covers that state, and it covers it better.
+ */
+
+/** A translator, and everything it sent. */
+function transcript(): { t: Translator; sent: ServerMessage[]; kinds: () => string[] } {
+	const sent: ServerMessage[] = [];
+	const t = new Translator("A", (message) => sent.push(message));
+	return {
+		t,
+		sent,
+		// Only what is said about the *reply*: a tool call is a `chat.item` too, and this is
+		// not a question about tool calls.
+		kinds: () =>
+			sent
+				.filter((message) => (message.type === "chat.item" && message.item.kind === "assistant") || message.type === "chat.delta")
+				.map((message) => message.type),
+	};
+}
+
+test("a reply is not a bubble until it says something", () => {
+	const { t, sent, kinds } = transcript();
+	t.startAssistant();
+
+	assert.deepEqual(kinds(), [], "nothing sent for a reply that has not spoken");
+	assert.ok(
+		sent.some((message) => message.type === "agent.state" && message.state === "streaming"),
+		"but the state says it has started, which is what the working sign reads",
+	);
+
+	t.delta("Hello");
+	assert.deepEqual(kinds(), ["chat.item"], "the first thing said arrives as the item itself");
+	const first = sent.find((message) => message.type === "chat.item");
+	assert.equal(first?.item.kind === "assistant" && first.item.text, "Hello", "carrying that text, so it is not sent twice");
+
+	t.delta(" again");
+	assert.deepEqual(kinds(), ["chat.item", "chat.delta"], "and everything after it as an increment");
+});
+
+test("a turn that only calls tools sends no bubble at all", () => {
+	const { t, kinds } = transcript();
+	t.startAssistant();
+	t.toolStart("c1", "read", "apps/web/src/App.tsx", { path: "a" });
+	t.endAssistant();
+
+	/*
+	 * Not even at the end. It used to emit a fabricated empty item here — a message whose
+	 * whole content is "the card I told you about is empty now", sent to a browser that was
+	 * never told about it.
+	 */
+	assert.deepEqual(kinds(), [], "nothing about a reply that never happened");
+	assert.deepEqual(
+		t.history().map((item) => item.kind),
+		["tool"],
+		"and the transcript a reconnecting browser gets has only the call",
+	);
+});
+
+test("thinking counts as saying something, and text after it is still a delta", () => {
+	const { t, sent, kinds } = transcript();
+	t.startAssistant();
+	t.thinking("weighing it up");
+	assert.deepEqual(kinds(), ["chat.item"], "a reply that is only thinking is worth drawing");
+
+	t.delta("Here is the answer.");
+	assert.deepEqual(kinds(), ["chat.item", "chat.delta"]);
+	const delta = sent.find((message) => message.type === "chat.delta");
+	assert.equal(delta?.type === "chat.delta" && delta.field, "text");
+});
+
+test("a reply that did say something is still ended the way it always was", () => {
+	const { t, sent } = transcript();
+	t.startAssistant();
+	t.delta("Done.");
+	t.endAssistant();
+
+	const items = sent.filter((message) => message.type === "chat.item");
+	assert.equal(items.length, 2, "the announcement, and the final shape");
+	const last = items.at(-1);
+	assert.equal(last?.item.kind === "assistant" && last.item.streaming, false, "which is what takes the caret off it");
+	assert.equal(last?.item.kind === "assistant" && last.item.text, "Done.");
 });

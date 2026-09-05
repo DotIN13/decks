@@ -39,6 +39,14 @@ export class App {
 	 * truth — nothing here ever moves it except at an agent's request.
 	 */
 	private lastCamera: Camera = { x: 0, y: 0, zoom: 1 };
+	/**
+	 * And one per conversation, because the camera belongs to the conversation.
+	 *
+	 * The browser reports which agent's view it is reporting, so `stage.camera()` answers
+	 * "where is my canvas looking" rather than "where is the user looking". An agent nobody
+	 * has looked at yet falls back to the last reading, which is the only honest guess.
+	 */
+	private readonly cameras = new Map<string, Camera>();
 	/** Stage calls waiting for the browser to carry them out. */
 	private readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
@@ -55,7 +63,7 @@ export class App {
 			call: (call) => this.callStage(call),
 			connected: () => (this.hub?.connections ?? 0) > 0,
 			broadcast: (message) => this.send(message),
-			camera: () => this.lastCamera,
+			camera: (agentId) => this.cameras.get(agentId) ?? this.lastCamera,
 			agents: () => this.agents.summaries(),
 		});
 		/*
@@ -74,7 +82,7 @@ export class App {
 			{
 				port: config.port,
 				defaultKind: config.backend,
-				camera: () => this.lastCamera,
+				camera: (agentId) => this.cameras.get(agentId) ?? this.lastCamera,
 				recordRevision: (path) => this.recordRevision(path),
 				boardPathOf: (file) => this.boardPathOf(file),
 				accounts: this.claudeAccounts,
@@ -262,6 +270,7 @@ export class App {
 				// Recorded, not acted on: the camera is the browser's, and this is the
 				// reading an agent gets when it asks what the user can see.
 				this.lastCamera = message.camera;
+				if (message.agentId) this.cameras.set(message.agentId, message.camera);
 				return;
 
 			case "stage.result": {
@@ -566,6 +575,13 @@ export class App {
 			case "claude.accounts.forget": {
 				this.claudeAccounts.forget(message.id);
 				void this.publishAccounts();
+				return;
+			}
+
+			case "claude.accounts.move": {
+				// Only when something actually moved. A press at the top of the list is a no-op,
+				// and republishing an unchanged list would repaint every open panel to say so.
+				if (this.claudeAccounts.move(message.id, message.direction)) void this.publishAccounts();
 				return;
 			}
 

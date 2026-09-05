@@ -15,9 +15,11 @@
  * output is a link target, and `safeHref` is the whole of that surface: `http:`, `https:`
  * and `mailto:`, and anything else stays the literal text it was.
  *
- * A subset, on purpose — the blocks an agent actually writes into a chat. Tables, footnotes,
+ * A subset, on purpose — the blocks an agent actually writes into a chat. Footnotes,
  * reference links and raw HTML are not here; they arrive as their own source text, which is
- * honest and readable, rather than as half-rendered guesses.
+ * honest and readable, rather than as half-rendered guesses. **Tables are**, because an agent
+ * comparing three options writes one every time and the pipes-and-dashes source is the one
+ * markdown construct that is genuinely unreadable unrendered.
  */
 
 export type Inline =
@@ -42,12 +44,19 @@ export interface ListItem {
 	depth: number;
 }
 
+/** A column's alignment, from the `:` in its divider cell. `null` is "whatever the text is". */
+export type Align = "left" | "center" | "right" | null;
+
+/** One cell, parsed. A row is cells and a table is rows; there is nothing else to a table. */
+export type TableCell = Inline[];
+
 export type Block =
 	| { kind: "paragraph"; spans: Inline[] }
 	| { kind: "heading"; level: number; spans: Inline[] }
 	| { kind: "code"; text: string; lang: string }
 	| { kind: "list"; ordered: boolean; start: number; items: ListItem[] }
 	| { kind: "quote"; spans: Inline[] }
+	| { kind: "table"; align: Align[]; head: TableCell[]; rows: TableCell[][] }
 	| { kind: "rule" };
 
 /** How deep a nested list item is allowed to get before it stops indenting. */
@@ -59,6 +68,10 @@ const QUOTE = /^ {0,3}> ?(.*)$/;
 const BULLET = /^([ \t]*)([-*+])[ \t]+(.*)$/;
 const ORDERED = /^([ \t]*)(\d{1,9})[.)][ \t]+(.*)$/;
 const FENCE = /^ {0,3}(`{3,}|~{3,})[ \t]*([\w+#.-]*)[ \t]*$/;
+/** The `|---|:--:|` line, which is what turns the row above it into a header. */
+const DIVIDER = /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+/** A row written with both outer pipes, which is what makes a one-column table unambiguous. */
+const PIPED = /^[ \t]*\|.*\|[ \t]*$/;
 
 /**
  * A reply, as blocks.
@@ -153,11 +166,94 @@ export function blocks(text: string): Block[] {
 			continue;
 		}
 
+		/*
+		 * A table, and only once its divider has arrived.
+		 *
+		 * Last, so a bullet or a quote that happens to contain a pipe is still a bullet or a
+		 * quote. And the divider is what makes it a table at all: a row of pipes on its own is
+		 * a paragraph — which is also what it looks like for the one token between the header
+		 * arriving and the line under it, and rendering that as a one-row table that then
+		 * turns into something else is exactly the flicker the fence rule above avoids.
+		 */
+		const table = tableAt(lines, i);
+		if (table) {
+			flush();
+			out.push(table.block);
+			i = table.end;
+			continue;
+		}
+
 		paragraph.push(line);
 	}
 
 	flush();
 	return out;
+}
+
+/**
+ * The table starting at `at`, or nothing — with the index of its last line.
+ *
+ * The count has to match: GFM says a divider with a different number of cells from the header
+ * is not a table, and that rule is what stops `some | text` followed by `---` becoming one.
+ * A body row that is short is padded and one that is long is cut, because a ragged table is
+ * still a table and refusing to draw it helps nobody.
+ */
+function tableAt(lines: string[], at: number): { block: Block; end: number } | undefined {
+	const header = lines[at] ?? "";
+	const divider = lines[at + 1] ?? "";
+	if (!header.includes("|") || !DIVIDER.test(divider)) return undefined;
+	const head = cellsOf(header);
+	const align = cellsOf(divider).map((cell): Align => {
+		const left = cell.startsWith(":");
+		const right = cell.endsWith(":");
+		return left && right ? "center" : right ? "right" : left ? "left" : null;
+	});
+	// One column is a table only when it is written with both outer pipes. Without that,
+	// `a` over `---` is a paragraph and a rule, which is what it almost always is.
+	if (align.length !== head.length || (head.length < 2 && !PIPED.test(header))) return undefined;
+
+	const rows: TableCell[][] = [];
+	let end = at + 1;
+	while (end + 1 < lines.length) {
+		const next = lines[end + 1] ?? "";
+		if (!next.trim() || !next.includes("|")) break;
+		end += 1;
+		const cells = cellsOf(next).slice(0, head.length);
+		while (cells.length < head.length) cells.push("");
+		rows.push(cells.map((cell) => inline(cell)));
+	}
+	return { block: { kind: "table", align, head: head.map((cell) => inline(cell)), rows }, end };
+}
+
+/**
+ * A row split into cells, on unescaped pipes.
+ *
+ * The outer pipes are decoration — `| a | b |` and `a | b` are the same row — so an empty
+ * first or last cell is dropped when there is something else in the row. `\|` becomes a
+ * literal pipe here rather than in `inline`, because the escape is about *this* split: it is
+ * the only way to put a pipe inside a cell.
+ */
+function cellsOf(line: string): string[] {
+	const out: string[] = [];
+	let current = "";
+	for (let i = 0; i < line.length; i += 1) {
+		const char = line[i] ?? "";
+		if (char === "\\" && line[i + 1] === "|") {
+			current += "|";
+			i += 1;
+			continue;
+		}
+		if (char === "|") {
+			out.push(current);
+			current = "";
+			continue;
+		}
+		current += char;
+	}
+	out.push(current);
+	if (out.length > 1 && !out[0]!.trim()) out.shift();
+	if (out.length > 1 && !out.at(-1)!.trim()) out.pop();
+	return out.map((cell) => cell.trim());
 }
 
 /** Leading whitespace as a nesting level. A tab is four columns, the way everything else is. */
@@ -367,6 +463,10 @@ export function plainText(text: string): string {
 					return "";
 				case "list":
 					return block.items.map((item) => `• ${say(item.spans)}`).join("\n");
+				// A row per line, cells separated by something that is not a pipe: this is read
+				// aloud by a notification, where the source's own punctuation is noise.
+				case "table":
+					return [block.head, ...block.rows].map((row) => row.map(say).join(" · ")).join("\n");
 				default:
 					return say(block.spans);
 			}

@@ -1,5 +1,5 @@
 import type { Board, Camera } from "@decks/protocol";
-import { boxOf, fitInto } from "../lib/camera.ts";
+import { boxOf, fitInto, frames } from "../lib/camera.ts";
 
 /**
  * What a conversation remembers about the canvas, and what switching to it should do.
@@ -39,9 +39,10 @@ export interface AgentView {
  * 2. **A remembered view that still shows at least one of its boards** → that view, exactly.
  *    Not a fit of those boards — the position and zoom as they were, including the fact that
  *    you had scrolled to the corner of one of them.
- * 3. **A remembered view whose boards have all gone**, or no memory at all → fit what it has
- *    now. A remembered view pointing at boards that no longer exist is worse than a fresh
- *    fit, because it looks like a view of something.
+ * 3. **A remembered view that has stopped showing anything**, or no memory at all → fit what
+ *    it has now. Boards get moved, hidden and shown while you are reading another chat, so a
+ *    saved camera can be pointing at empty canvas by the time you come back — and a view of
+ *    nothing that *looks* like a view of something is worse than a fresh fit.
  *
  * `playing` is what the agent has on the canvas; `boards` is the deck, needed to turn those
  * paths into boxes. A path in `playing` that the deck no longer has is ignored throughout —
@@ -65,22 +66,21 @@ export function viewOnSwitch(input: {
 	// 1 · nothing to look at.
 	if (live.length === 0) return undefined;
 
-	// 2 · a remembered view that still has something of its own on screen.
-	if (input.view && live.length > 0) {
-		/*
-		 * "Still shows one of its boards" is asked of the *current* in-play set rather than of
-		 * whatever was playing when the view was saved. The question is whether the view is
-		 * still a view of this agent's work, and the agent's work is what it is holding now.
-		 */
-		return input.view.camera;
-	}
+	const boxes = live.map((path) => boxOf(known.get(path)!));
 
-	// 3 · no memory, so frame what it has, into the space the canvas actually has.
-	return fitInto(
-		live.map((path) => boxOf(known.get(path)!)),
-		input.viewport,
-		input.region,
-	);
+	/*
+	 * 2 · a remembered view that still has something of its own on screen.
+	 *
+	 * "Still shows one of its boards" is asked of the *current* in-play set rather than of
+	 * whatever was playing when the view was saved, and it is asked of the geometry rather
+	 * than assumed. Merely having a memory is not enough: a board moved across the deck while
+	 * you were in another conversation leaves the saved camera pointing at nothing, and
+	 * putting it back regardless recreates the empty-canvas bug from the other end.
+	 */
+	if (input.view && frames(input.view.camera, input.viewport, boxes)) return input.view.camera;
+
+	// 3 · no memory, or one that has stopped showing anything: frame what it has now.
+	return fitInto(boxes, input.viewport, input.region);
 }
 
 /**

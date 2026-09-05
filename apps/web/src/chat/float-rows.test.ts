@@ -4,7 +4,7 @@ import type { ChatItem } from "@decks/protocol";
 import { floatRows } from "./float-rows.ts";
 
 const user = (id: string, text = "hello"): ChatItem => ({ kind: "user", id, text, at: 1 });
-const assistant = (id: string, text: string, streaming = false): ChatItem => ({ kind: "assistant", id, text, at: 2, streaming });
+const assistant = (id: string, text: string, streaming = false, thinking?: string): ChatItem => ({ kind: "assistant", id, text, at: 2, streaming, ...(thinking ? { thinking } : {}) });
 const tool = (id: string, name: string, state: "running" | "done" | "error" = "done"): ChatItem => ({ kind: "tool", id, name, title: name, state });
 const notice = (id: string, text: string, level: "info" | "warn" | "error" = "info"): ChatItem => ({ kind: "notice", id, text, level, at: 4 });
 
@@ -29,9 +29,21 @@ test("tool rows remember the worst state — running or error", () => {
 	if (failed?.kind === "tools") assert.equal(failed.failed, true);
 });
 
-test("an assistant bubble with no text and no stream has nothing to float", () => {
+/*
+ * A bubble needs something in it — including while it is arriving, which is the part that
+ * changed. A reply is created the moment the model starts, and drawing a card for it put an
+ * empty box in the column until the first token: seconds for a model that thinks first, and
+ * the whole of an opening tool call for a turn that starts with one, after which the box
+ * silently vanished again. The server no longer announces a reply that early; this is the
+ * same rule read from the other end, for a browser handed a history mid-turn.
+ */
+test("an assistant bubble with nothing in it has nothing to float", () => {
 	assert.deepEqual(floatRows([user("u1"), assistant("a1", ""), assistant("a2", " real")]).map((row) => row.id), ["u1", "a2"]);
-	assert.equal(floatRows([user("u1"), assistant("a1", "", true)])[1]?.kind, "assistant");
+	assert.deepEqual(floatRows([user("u1"), assistant("a1", "", true)]).map((row) => row.id), ["u1"], "not even while it is streaming");
+
+	// One token in, and it is a bubble — as is a reply that is so far only thinking.
+	assert.equal(floatRows([user("u1"), assistant("a1", "H", true)])[1]?.kind, "assistant");
+	assert.equal(floatRows([user("u1"), assistant("a1", "", true, "weighing it up")])[1]?.kind, "assistant");
 });
 
 test("rows before the first user message belong to their own turn", () => {

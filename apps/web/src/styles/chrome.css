@@ -519,6 +519,34 @@
 	}
 
 	/*
+	 * A button at the end of its travel: still there, plainly not pressable.
+	 *
+	 * Hiding it instead would make the first and last rows a different shape from the ones
+	 * between them, and the shape would change as a row moved — the list rearranging itself
+	 * around the thing you are dragging it with.
+	 */
+	:is(.popover, .rowlist) .row-act > .close[disabled] {
+		color: var(--faint);
+		cursor: default;
+	}
+
+	/*
+	 * Dimmer than its neighbours, but **only once the row has been approached** — a disabled
+	 * button is still one of these, and it hides at rest with the rest of them. Written as its
+	 * own reveal rule rather than as a flat `opacity` on the disabled state, which is what it
+	 * was first: that beat the `opacity: 0` above, so the two arrows that could *not* be
+	 * pressed were the only ones visible on an untouched list.
+	 */
+	:is(.popover, .rowlist) .row-act:is(:hover, :focus-within) > .close[disabled] {
+		opacity: 0.35;
+	}
+
+	:is(.popover, .rowlist) .row-act > .close[disabled]:hover {
+		background: none;
+		color: var(--faint);
+	}
+
+	/*
 	 * The slot that opens, and it only exists where there is a pointer to open it.
 	 *
 	 * `display` rather than `opacity`, which is the whole difference from the arrangement

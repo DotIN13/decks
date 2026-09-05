@@ -46,6 +46,29 @@ test("a remembered view comes back exactly, not as a fresh fit of the same board
 	assert.deepEqual(back, somewhere, "position and zoom as they were, including having scrolled into a corner");
 });
 
+/*
+ * The third case, and the one that only shows up after a while: the boards are still there
+ * and the camera is still remembered, but they have moved apart in the meantime. Handing the
+ * saved view back regardless is the empty-canvas bug from the other end — a view of nothing
+ * that looks like a view of something.
+ */
+test("a remembered view that has stopped showing anything is refitted, not restored", () => {
+	const moved = [board("boards/plan.html", 0, 0), board("boards/deep.html", 40000, 40000)];
+	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["boards/deep.html"] }), boards: moved });
+
+	assert.notDeepEqual(next, somewhere, "the saved camera is 40000px from the only board it has");
+	assert.ok(next, "and it does move, because there is something to look at");
+	// A fit of what it is showing now, which is what no memory at all would have given.
+	assert.deepEqual(next, viewOnSwitch({ ...at({ view: undefined, playing: ["boards/deep.html"] }), boards: moved }));
+});
+
+test("…while a view that still has its board on screen is left exactly alone", () => {
+	// The board moved, but not out of shot: this is still the view you left.
+	const nudged = [board("boards/plan.html", 0, 0), board("boards/deep.html", 700, 2900)];
+	const next = viewOnSwitch({ ...at({ view: { camera: somewhere }, playing: ["boards/deep.html"] }), boards: nudged });
+	assert.deepEqual(next, somewhere);
+});
+
 test("no memory at all is a fit of what it holds", () => {
 	const fresh = viewOnSwitch(at({ view: undefined, playing: ["boards/risks.html"] }));
 	assert.ok(fresh, "there is something to look at, so the camera moves");

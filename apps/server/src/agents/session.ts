@@ -20,7 +20,7 @@ import { CLAUDE_CAPABILITIES, CLAUDE_COMMANDS, ClaudeBackend } from "../claude/b
 import type { Deck } from "../deck/loader.ts";
 import { PI_CAPABILITIES, PI_COMMANDS, PiBackend } from "../pi/backend.ts";
 import type { StageService } from "../stage/service.ts";
-import { createStageTool, type DelegateReport, type DelegateSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
+import { createStageTool, type DelegateReport, type DelegateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { SnapshotStore } from "./snapshot.ts";
@@ -28,6 +28,34 @@ import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
 import { Translator } from "./translator.ts";
 import { cleanTags, sameTags } from "./tags.ts";
+
+/**
+ * How long an agent must have been quiet before it starts on queued work.
+ *
+ * Ten seconds, because the number is not really about latency — it is about never running
+ * a second thing while the first one is still settling. Long enough that a turn which has
+ * just ended, a tool result still arriving, or a user halfway through typing gets there
+ * first; short enough that a handover is not a thing you wait around for.
+ */
+function quietMs(): number {
+	const configured = Number(process.env.DECKS_QUEUE_IDLE_MS);
+	return Number.isFinite(configured) && configured > 0 ? configured : 10_000;
+}
+
+/**
+ * How many items may be waiting for one agent.
+ *
+ * A legibility limit like `MAX_CHILDREN`, and for the same reason: eight tasks queued
+ * against a chat is already more than anybody watching can follow, and the ninth is a sign
+ * that the sender should have done the work or spawned somebody to.
+ */
+const QUEUE_LIMIT = 8;
+
+/** The first line of a task, for a notice that has to fit on one. */
+function firstLine(task: string): string {
+	const line = task.trim().split("\n")[0] ?? "";
+	return line.length > 100 ? `${line.slice(0, 99)}…` : line;
+}
 
 /**
  * One agent, and everything about it that is not Pi's.
@@ -83,6 +111,26 @@ export class DeckAgent {
 	 * rides along with whatever the user says next rather than waking the agent up.
 	 */
 	private pending: string[] = [];
+	/**
+	 * Work another agent handed over, waiting for this one to be quiet.
+	 *
+	 * Beside `pending` rather than in it, because they are different things arriving by
+	 * different routes. A nudge is a *fact* about a board that rides along with whatever the
+	 * user says next and never wakes anybody; an item here is a *task*, and it runs a turn of
+	 * its own once nothing else is happening. Sharing one list would have meant either a task
+	 * that waits forever for a user who has gone to lunch, or a board edit that starts a turn
+	 * nobody asked for.
+	 */
+	private work: QueuedWork[] = [];
+	/**
+	 * The quiet period before the queue is drained.
+	 *
+	 * Armed on the way into `idle` and cancelled on the way out, so it measures *silence*
+	 * rather than elapsed time: an agent that is thinking, streaming, running a tool, or —
+	 * the case that matters — `waiting` on a question it asked the user is not idle, and the
+	 * timer cannot fire under any of them.
+	 */
+	private drainTimer: ReturnType<typeof setTimeout> | undefined;
 	private tool: StageTool | undefined;
 
 	constructor(
@@ -91,9 +139,21 @@ export class DeckAgent {
 		private readonly stage: StageService,
 		private readonly host: {
 			port: number;
-			camera(): Camera;
+			camera(agentId: string): Camera;
 			agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
 			spawn(parentId: string, spec: DelegateSpec): Promise<DelegateReport>;
+			/** Put work in another agent's queue, without waiting for it. */
+			send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
+			/** What is waiting for one agent, for `stage.queue`. */
+			queue(agentId: string): QueuedWork[];
+			/**
+			 * The briefing a handed-over task is run with — the same one `delegate` uses.
+			 *
+			 * Called when the item *runs*, not when it was queued, so the receiver reads the
+			 * board as it is by then. A brief composed at send time is a snapshot of a plan
+			 * that may have moved twice while it sat in the queue.
+			 */
+			brief(task: string, boards: string[]): string;
 			recordRevision(path: string): string | undefined;
 			boardPathOf(file: string): string | undefined;
 		},
@@ -180,7 +240,14 @@ export class DeckAgent {
 		this.translator = new Translator(
 			this.id,
 			(message) => {
-				if (message.type === "agent.state") this.state = message.state;
+				if (message.type === "agent.state") {
+					this.state = message.state;
+					// The queue's whole clock. Going idle starts the countdown; anything else
+					// stops it, which is how "quiet for ten seconds" stays true rather than
+					// becoming "ten seconds after the last time it happened to be idle".
+					if (message.state === "idle") this.armDrain();
+					else this.cancelDrain();
+				}
 				this.emit(message);
 			},
 			deck.path,
@@ -268,8 +335,10 @@ export class DeckAgent {
 			setTags: (tags: unknown) => this.setTags(tags),
 			setAvatar: (url: string) => this.setAvatar(url),
 			agents: () => this.host.agents(),
-			camera: () => this.host.camera(),
+			camera: () => this.host.camera(this.id),
 			spawn: (spec: DelegateSpec) => this.host.spawn(this.id, spec),
+			send: (target: string, spec: SendSpec) => this.host.send(this.id, target, spec),
+			queue: (agentId?: string) => this.host.queue(agentId ?? this.id),
 			recordRevision: (path: string) => this.host.recordRevision(path),
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
 		};
@@ -575,6 +644,82 @@ export class DeckAgent {
 		return { report: this.translator.lastAssistantText(), boards };
 	}
 
+	// --- work handed over by another agent -------------------------------------------
+
+	/**
+	 * Take an item into this agent's queue, and say so where the user can see it.
+	 *
+	 * The notice is not decoration. A queue that fills silently and then starts a turn on its
+	 * own is a chat that appears to talk to itself, and the first time it happens the honest
+	 * reading is that something is broken — so the arrival is in the transcript at the moment
+	 * it arrives, named with who sent it, and the work itself lands as an ordinary message
+	 * when it runs.
+	 *
+	 * Returns the position it landed at: an agent that queued something behind five other
+	 * items should know that before it decides to wait.
+	 */
+	enqueue(item: QueuedWork): number {
+		if (this.work.length >= QUEUE_LIMIT) {
+			throw new Error(`${this.identity.name} already has ${QUEUE_LIMIT} items waiting; nothing was queued.`);
+		}
+		this.work.push(item);
+		this.translator.notice("info", `${item.fromName} queued work for you: ${firstLine(item.task)}`);
+		// Nothing is started here. A dormant chat stays dormant until its item actually runs,
+		// and `prompt()` already opens with `await this.start()` — waking a runtime at queue
+		// time would mean a restored chat with something waiting behind six other items holds
+		// a model process open for as long as the queue is long.
+		this.armDrain();
+		return this.work.length;
+	}
+
+	/** What is waiting, oldest first. A copy: the queue is drained here and nowhere else. */
+	queue(): QueuedWork[] {
+		return [...this.work];
+	}
+
+	/** How much is waiting, for the chat list and for `stage.agents()`. */
+	get queued(): number {
+		return this.work.length;
+	}
+
+	private armDrain(): void {
+		if (this.drainTimer || this.work.length === 0 || this.state !== "idle") return;
+		this.drainTimer = setTimeout(() => {
+			this.drainTimer = undefined;
+			void this.drain();
+		}, quietMs());
+		// So a queue waiting to drain never holds the process open — a server with nothing
+		// else to do should still be able to exit, and a test should not hang for ten seconds.
+		this.drainTimer.unref?.();
+	}
+
+	private cancelDrain(): void {
+		if (this.drainTimer) clearTimeout(this.drainTimer);
+		this.drainTimer = undefined;
+	}
+
+	/**
+	 * Run one item, then let the state hook decide whether to run another.
+	 *
+	 * Popped *before* it runs, not after: an item that fails, or a turn the user aborts
+	 * halfway, must not come back round and be tried again forever. One item at a time, and
+	 * the re-arm rides on the return to idle, so a drain can never overlap a turn.
+	 */
+	private async drain(): Promise<void> {
+		if (this.state !== "idle") return;
+		const item = this.work.shift();
+		if (!item) return;
+		try {
+			await this.run(this.host.brief(item.task, item.boards));
+		} catch (error) {
+			this.translator.notice("error", `Queued work from ${item.fromName} failed: ${(error as Error).message}`);
+		}
+		// Belt and braces: the state hook re-arms on the way back to idle, but a turn that
+		// never moved the state at all (a backend that failed to start) would otherwise leave
+		// the rest of the queue stranded.
+		this.armDrain();
+	}
+
 	// --- the time machine (§6.7) -----------------------------------------------------
 
 	timeline(): ReturnType<NonNullable<typeof this.backend>["timeline"]> {
@@ -632,6 +777,9 @@ export class DeckAgent {
 	}
 
 	async abort(): Promise<void> {
+		// Stopping work is also a statement that now is not the moment for more of it: the
+		// countdown starts again from the return to idle below.
+		this.cancelDrain();
 		await this.backend?.abort();
 		this.translator.setState("idle");
 	}
@@ -797,6 +945,7 @@ export class DeckAgent {
 	}
 
 	dispose(): void {
+		this.cancelDrain();
 		// Before the backend goes: `flush` asks it for the session to resume, and a disposed
 		// one cannot answer. A pending debounce is cancelled because this write supersedes it.
 		if (this.saving) clearTimeout(this.saving);

@@ -1,5 +1,5 @@
-import { For, Match, Show, Switch, type JSX } from "solid-js";
-import { blocks, type Block, type Inline } from "./markdown.ts";
+import { createMemo, For, Match, Show, Switch, type JSX } from "solid-js";
+import { blocks, type Align, type Block, type Inline } from "./markdown.ts";
 
 /**
  * A reply, drawn from the token tree `markdown.ts` produced.
@@ -21,7 +21,30 @@ export function Markdown(props: {
 	 */
 	trailing?: JSX.Element;
 }) {
-	const parsed = () => blocks(props.text);
+	/**
+	 * Parsed once per distinct string, not once per read and not once per token.
+	 *
+	 * Three things made this the most expensive thing on the screen while a reply arrived.
+	 * It was a plain function, so every access re-parsed the whole reply — and it is accessed
+	 * three ways below, including *inside* the `For`, so a reply with n blocks was parsed
+	 * n + 2 times per render. And the column rebuilds every card on every token, so all of
+	 * that ran for every reply in the history, not only the one growing.
+	 *
+	 * The string check is what does the work: an untouched card gets the same text and the
+	 * memo hands back the *same array*, so the `For` below has nothing to diff and the DOM
+	 * for that reply is never touched. Safe because `blocks` is pure — the same text is the
+	 * same tree — and one entry is the right size, because the only string a card ever
+	 * changes to is its own next one.
+	 */
+	let cachedText: string | undefined;
+	let cachedBlocks: Block[] = [];
+	const parsed = createMemo(() => {
+		if (props.text !== cachedText) {
+			cachedText = props.text;
+			cachedBlocks = blocks(props.text);
+		}
+		return cachedBlocks;
+	});
 	return (
 		<div class="md">
 			<For each={parsed()}>
@@ -87,6 +110,10 @@ function BlockView(props: { block: Block; trailing?: JSX.Element }) {
 				</blockquote>
 			</Match>
 
+			<Match when={props.block.kind === "table"}>
+				<TableView block={props.block as Extract<Block, { kind: "table" }>} trailing={props.trailing} />
+			</Match>
+
 			<Match when={props.block.kind === "rule"}>
 				<>
 					<hr />
@@ -94,6 +121,49 @@ function BlockView(props: { block: Block; trailing?: JSX.Element }) {
 				</>
 			</Match>
 		</Switch>
+	);
+}
+
+/**
+ * A table, in a box that scrolls sideways rather than one that stretches the column.
+ *
+ * The wrapper is the whole of "it must not overflow". A chat column is narrow and a table an
+ * agent writes is as wide as its widest cell needs; without a scroller of its own it either
+ * pushes the card past the edge of the screen or squeezes every column to one character.
+ * Cells wrap and have a floor width, so a narrow table simply fits and only a genuinely wide
+ * one ever scrolls — the same bargain `pre` makes with a pasted log.
+ *
+ * `trailing` goes *after* the box rather than inside it: the streaming slot belongs at the
+ * end of the reply, not inside a scroll container it would be scrolled away from.
+ */
+function TableView(props: { block: Extract<Block, { kind: "table" }>; trailing?: JSX.Element }) {
+	const align = (index: number): Align => props.block.align[index] ?? null;
+	const style = (index: number) => {
+		const at = align(index);
+		return at ? { "text-align": at } : undefined;
+	};
+	return (
+		<>
+			<div class="md-table">
+				<table>
+					<thead>
+						<tr>
+							<For each={props.block.head}>{(cell, index) => <th style={style(index())}><Spans spans={cell} /></th>}</For>
+						</tr>
+					</thead>
+					<tbody>
+						<For each={props.block.rows}>
+							{(row) => (
+								<tr>
+									<For each={row}>{(cell, index) => <td style={style(index())}><Spans spans={cell} /></td>}</For>
+								</tr>
+							)}
+						</For>
+					</tbody>
+				</table>
+			</div>
+			{props.trailing}
+		</>
 	);
 }
 

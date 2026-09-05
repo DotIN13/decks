@@ -41,6 +41,11 @@ function agentOn(
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
 			agents: () => [],
 			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
+			send: () => ({ queued: true as const, position: 1 }),
+			queue: () => [],
+			// The real one pastes the board source in; here the task is the whole briefing, so
+			// a drained item is recognisable in the transcript by its own words.
+			brief: (task: string) => task,
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
@@ -220,5 +225,128 @@ test("a subagent outlives the parent it reported to", () => {
 	agent.orphan("parent-1");
 	assert.equal(agent.parentId, undefined);
 	assert.equal(agent.chat().parentId, undefined, "and the row stops claiming it");
+	cleanup();
+});
+
+/*
+ * The queue another agent fills, and the quiet period before it is drained (§6.2).
+ *
+ * `run` is overridden rather than stubbed through the host, because the drain's contract is
+ * exactly that it calls it: one item at a time, only while idle, and never a second one
+ * before the first has come back. A real `run` would start a model runtime and these tests
+ * would take as long as a conversation.
+ */
+class Probe extends DeckAgent {
+	readonly ran: string[] = [];
+	override async run(text: string): Promise<{ report: string; boards: string[] }> {
+		this.ran.push(text);
+		return { report: "done", boards: [] };
+	}
+}
+
+function probeOn(): { agent: Probe; sent: ServerMessage[]; cleanup: () => void } {
+	const root = mkdtempSync(join(tmpdir(), "decks-queue-"));
+	mkdirSync(join(root, "boards"), { recursive: true });
+	writeFileSync(join(root, "boards", "plan.html"), `<!doctype html><title>plan</title><body class="board"></body>`);
+	const sent: ServerMessage[] = [];
+	const deck = Deck.open(root);
+	const agent = new Probe(
+		deck,
+		(message) => sent.push(message),
+		{} as StageService,
+		{
+			port: 4329,
+			camera: () => ({ x: 0, y: 0, zoom: 1 }),
+			agents: () => [],
+			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
+			send: () => ({ queued: true as const, position: 1 }),
+			queue: () => [],
+			brief: (task: string, boards: string[]) => (boards.length > 0 ? `${task} [${boards.join(" ")}]` : task),
+			recordRevision: () => undefined,
+			boardPathOf: () => undefined,
+		},
+		{ color: "#000", kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck) },
+	);
+	return { agent, sent, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+}
+
+const item = (task: string, boards: string[] = []) => ({ from: "a1", fromName: "Ada", task, boards, at: 1 });
+const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("queued work is announced when it arrives, not when it runs", () => {
+	const { agent, sent, cleanup } = probeOn();
+	const position = agent.enqueue(item("Remeasure the panel numbers"));
+
+	assert.equal(position, 1, "and the sender is told where it landed");
+	assert.equal(agent.queued, 1);
+	const notice = sent.filter((message) => message.type === "chat.item").at(-1);
+	assert.ok(notice && notice.type === "chat.item" && notice.item.kind === "notice", "a notice in the receiver's transcript");
+	assert.match(notice.item.text, /Ada queued work for you: Remeasure the panel numbers/);
+	cleanup();
+});
+
+test("a queue is capped, and the item over the cap is refused rather than dropped", () => {
+	const { agent, cleanup } = probeOn();
+	for (let n = 0; n < 8; n++) agent.enqueue(item(`task ${n}`));
+	assert.equal(agent.queued, 8);
+	assert.throws(() => agent.enqueue(item("one too many")), /already has 8 items waiting/);
+	assert.equal(agent.queued, 8, "and nothing was queued");
+	cleanup();
+});
+
+test("the queue drains once the agent has been quiet, one item at a time", async () => {
+	process.env.DECKS_QUEUE_IDLE_MS = "10";
+	const { agent, cleanup } = probeOn();
+	agent.enqueue(item("first", ["boards/plan.html"]));
+	agent.enqueue(item("second"));
+
+	await settle(80);
+	// The brief is composed when the item runs, so the board source is the one that exists
+	// then — here the stub just names what it was handed.
+	assert.deepEqual(agent.ran, ["first [boards/plan.html]", "second"]);
+	assert.equal(agent.queued, 0);
+	delete process.env.DECKS_QUEUE_IDLE_MS;
+	cleanup();
+});
+
+test("a busy agent is not interrupted, and the countdown restarts when it goes quiet", async () => {
+	process.env.DECKS_QUEUE_IDLE_MS = "10";
+	const { agent, cleanup } = probeOn();
+	agent.translator.setState("thinking");
+	agent.enqueue(item("waits its turn"));
+
+	await settle(60);
+	assert.deepEqual(agent.ran, [], "nothing ran while the agent was working");
+
+	// `waiting` is a question the agent asked the user. It is not idle, and the timer must
+	// not fire under it either.
+	agent.translator.setState("waiting");
+	await settle(60);
+	assert.deepEqual(agent.ran, [], "nor while it is waiting on an answer");
+
+	agent.translator.setState("idle");
+	await settle(60);
+	assert.deepEqual(agent.ran, ["waits its turn"]);
+	delete process.env.DECKS_QUEUE_IDLE_MS;
+	cleanup();
+});
+
+test("an item is popped before it runs, so a failure cannot loop", async () => {
+	process.env.DECKS_QUEUE_IDLE_MS = "10";
+	const { agent, sent, cleanup } = probeOn();
+	let calls = 0;
+	agent.run = async () => {
+		calls++;
+		throw new Error("the model fell over");
+	};
+	agent.enqueue(item("doomed"));
+
+	await settle(80);
+	assert.equal(calls, 1, "tried once");
+	assert.equal(agent.queued, 0, "and not put back");
+	const notice = sent.filter((message) => message.type === "chat.item").at(-1);
+	assert.ok(notice && notice.type === "chat.item" && notice.item.kind === "notice");
+	assert.match(notice.item.text, /Queued work from Ada failed: the model fell over/);
+	delete process.env.DECKS_QUEUE_IDLE_MS;
 	cleanup();
 });

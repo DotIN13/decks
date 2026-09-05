@@ -18,13 +18,41 @@ import { boxOf, fit } from "../lib/camera.ts";
 export interface StageOpsHost {
 	boards(): Board[];
 	viewport(): { width: number; height: number };
+	/** Which conversation is on screen, so an op that moves the view can tell whose it is. */
+	focused(): string | undefined;
 	setCamera(camera: Camera): void;
+	/**
+	 * Keep a view for an agent that is not the one on screen.
+	 *
+	 * Not applied — remembered against that agent, so it arrives framed as it intended the
+	 * moment you open that chat. The same store `focusAgent` parks the live view in.
+	 */
+	rememberView(agentId: string, camera: Camera, selected?: string): void;
 	select(path: string | undefined): void;
 	reload(path: string): void;
 	cursor(cursor: { path: string; x: number; y: number; label: string; color: string } | null): void;
 	/** Replace one agent's annotations on one board. An empty list clears them. */
 	annotate(agentId: string, path: string, marks: Mark[]): void;
 	toast(text: string): void;
+}
+
+/**
+ * A background agent's view waits for you, and it is told that it is waiting.
+ *
+ * The canvas is per conversation — it draws the focused agent's in-play set and nothing else
+ * — and the camera has to follow the same rule or it is the one part of the view an agent
+ * you are not watching can reach into. It could, and did: an agent working in another corner
+ * of the deck flew your camera to a board that was not drawn on your canvas at all, which is
+ * an empty view arriving while you sit still.
+ *
+ * So the fit is *remembered against that agent* rather than applied, and `viewOnSwitch` hands
+ * it to you when you open that chat. Returns the sentence to put in the agent's result, or
+ * nothing when the agent asking is the one on screen and the op should simply happen.
+ */
+function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: string): { deferred: string } | undefined {
+	if (!call.agentId || call.agentId === host.focused()) return undefined;
+	host.rememberView(call.agentId, camera, selected);
+	return { deferred: "you are not the conversation on screen, so this view is waiting in your chat rather than moving the canvas" };
 }
 
 /**
@@ -50,7 +78,11 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			if (boards.length === 0) return { error: "none of those boards are on the canvas" };
 
 			const fitAll = args.fit === "all" || boards.length > 1;
-			host.setCamera(fit(fitAll ? boards.map(boxOf) : [boxOf(boards[0]!)], host.viewport()));
+			const wanted = fit(fitAll ? boards.map(boxOf) : [boxOf(boards[0]!)], host.viewport());
+			const waiting = defer(call, host, wanted, boards[0]!.path);
+			if (waiting) return { shown: boards.map((board) => board.path), ...waiting };
+
+			host.setCamera(wanted);
 			host.select(boards[0]!.path);
 
 			if (typeof args.highlight === "string") highlight(boards[0]!.path, args.highlight);
@@ -62,7 +94,11 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			if (![x, y, zoom].every((value) => typeof value === "number" && Number.isFinite(value))) {
 				return { error: "camera needs numeric x, y and zoom" };
 			}
-			host.setCamera({ x: x!, y: y!, zoom: zoom! });
+			const wanted = { x: x!, y: y!, zoom: zoom! };
+			const waiting = defer(call, host, wanted);
+			if (waiting) return { camera: wanted, ...waiting };
+
+			host.setCamera(wanted);
 			return { camera: { x, y, zoom } };
 		}
 

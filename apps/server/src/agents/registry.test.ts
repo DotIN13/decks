@@ -45,6 +45,11 @@ function agentOn(deck: Deck, color = "#3b5cf6"): DeckAgent {
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
 			agents: () => [],
 			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
+			send: () => ({ queued: true as const, position: 1 }),
+			queue: () => [],
+			// The real one pastes the board source in; here the task is the whole briefing, so
+			// a drained item is recognisable in the transcript by its own words.
+			brief: (task: string) => task,
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
@@ -301,5 +306,71 @@ test("a restored chat is opened on the model the conversation was last held in",
 	registry.get("held")?.dispose();
 	assert.deepEqual(store.read("held")?.record.model, { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "high" });
 	assert.equal(sent.length > 0, true);
+	cleanup();
+});
+
+/*
+ * Routing work to an agent that already exists (§6.2).
+ *
+ * Dormant rows on purpose: nothing here starts a runtime, and a queue is exactly the thing
+ * that should be fillable while the receiver is asleep. What is under test is the routing
+ * and the bookkeeping — the drain itself belongs to `session.test.ts`, which can watch it.
+ */
+function twoRestored(deck: Deck): { registry: Registry; ada: string; kit: string } {
+	for (const name of ["Ada", "Kit"]) {
+		const agent = agentOn(deck);
+		agent.rename(name);
+		agent.translator.user("hello");
+		agent.dispose();
+	}
+	const { registry } = registryOn(deck);
+	registry.restore();
+	const idOf = (name: string) => registry.chats().find((chat) => chat.name === name)?.id ?? "";
+	return { registry, ada: idOf("Ada"), kit: idOf("Kit") };
+}
+
+test("work can be sent to an agent by name, and lands in its queue", () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, ada, kit } = twoRestored(deck);
+
+	const result = registry.send(ada, "Kit", { task: "Remeasure the panel", boards: ["boards/plan.html", "boards/gone.html"] });
+	assert.deepEqual(result, { queued: true, position: 1 });
+
+	const waiting = registry.get(kit)?.queue() ?? [];
+	assert.equal(waiting.length, 1);
+	assert.equal(waiting[0]?.fromName, "Ada", "and it says who sent it");
+	assert.deepEqual(waiting[0]?.boards, ["boards/plan.html"], "boards that do not exist are dropped");
+	assert.deepEqual([...(registry.get(kit)?.context ?? [])], [], "and the receiver's own context is untouched");
+	cleanup();
+});
+
+test("a second item queues behind the first, and every agent can see the backlog", () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, ada, kit } = twoRestored(deck);
+
+	assert.equal(registry.send(ada, kit, { task: "one" }).position, 1, "by id as well as by name");
+	assert.equal(registry.send(ada, kit, { task: "two" }).position, 2);
+	assert.equal(registry.summaries().find((agent) => agent.id === kit)?.queued, 2);
+	assert.equal(registry.summaries().find((agent) => agent.id === ada)?.queued, 0);
+	cleanup();
+});
+
+test("sending to yourself is allowed — it is how you leave yourself a follow-up", () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, ada } = twoRestored(deck);
+	assert.equal(registry.send(ada, ada, { task: "and then check the numbers" }).position, 1);
+	cleanup();
+});
+
+test("an address that cannot be resolved is refused rather than guessed at", () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, ada } = twoRestored(deck);
+
+	assert.throws(() => registry.send(ada, "Nobody", { task: "x" }), /No agent Nobody/);
+
+	// Two agents with the same name is a real state — the user can rename either — and
+	// picking one of them would send work to the wrong conversation silently.
+	registry.get(ada)?.rename("Kit");
+	assert.throws(() => registry.send(ada, "Kit", { task: "x" }), /More than one agent is called Kit/);
 	cleanup();
 });

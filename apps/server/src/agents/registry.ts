@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, Camera, ChatItem, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
-import type { DelegateReport, DelegateSpec } from "../stage/tool.ts";
+import type { DelegateReport, DelegateSpec, QueuedWork, SendSpec } from "../stage/tool.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { SnapshotStore } from "./snapshot.ts";
@@ -49,7 +49,7 @@ export class Registry {
 			port: number;
 			/** The runtime a new agent gets unless it asks for another one. */
 			defaultKind: AgentKind;
-			camera(): Camera;
+			camera(agentId: string): Camera;
 			recordRevision(path: string): string | undefined;
 			boardPathOf(file: string): string | undefined;
 			/** The Claude subscriptions this install can use, for the backends that can. */
@@ -69,10 +69,13 @@ export class Registry {
 	 * what *you* think of an agent is not something it should be steering on, and a field an
 	 * agent can read is a field it will optimise against.
 	 */
-	summaries(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }> {
+	summaries(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[]; queued: number }> {
 		return this.agents.map((agent) => {
 			const chat = agent.chat();
-			return { id: agent.id, name: chat.name, state: chat.state, context: [...agent.context], tags: agent.tags };
+			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand
+			// something to can see, in one call, both what they are doing and how much is
+			// already waiting for them.
+			return { id: agent.id, name: chat.name, state: chat.state, context: [...agent.context], tags: agent.tags, queued: agent.queued };
 		});
 	}
 
@@ -121,9 +124,12 @@ export class Registry {
 			this.stage,
 			{
 				port: this.host.port,
-				camera: () => this.host.camera(),
+				camera: (agentId: string) => this.host.camera(agentId),
 				agents: () => this.summaries(),
 				spawn: (parentId, spec) => this.spawn(parentId, spec),
+				send: (fromId, target, spec) => this.send(fromId, target, spec),
+				queue: (agentId) => this.get(agentId)?.queue() ?? [],
+				brief: (task, boards) => brief(task, boards, this.deck),
 				recordRevision: (path) => this.host.recordRevision(path),
 				boardPathOf: (file) => this.host.boardPathOf(file),
 			},
@@ -294,6 +300,43 @@ export class Registry {
 		const result = await child.run(brief(spec.task, handed, this.deck));
 		this.publish();
 		return { agent: child.id, name: child.chat().name, report: result.report, boards: result.boards };
+	}
+
+	/**
+	 * Put work in an existing agent's queue and return — the handover that does not block.
+	 *
+	 * Where `spawn` makes an agent and waits for it, this hands a task to somebody who is
+	 * already here and is done. Nothing is created, so it does not count against
+	 * `MAX_CHILDREN`, and the sender's next line runs immediately.
+	 *
+	 * The target may be given as an id or as a name, because a model reading
+	 * `stage.agents()` has both in front of it and will reach for whichever reads better. A
+	 * name that two agents share is refused rather than guessed at: sending work to the wrong
+	 * conversation is not a mistake you can see happening.
+	 */
+	send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number } {
+		const from = this.get(fromId);
+		if (!from) throw new Error("The sending agent is gone");
+
+		const byId = this.get(target);
+		const named = this.agents.filter((agent) => agent.chat().name.toLowerCase() === target.toLowerCase());
+		if (!byId && named.length > 1) throw new Error(`More than one agent is called ${target}; use the id from stage.agents().`);
+		const to = byId ?? named[0];
+		if (!to) throw new Error(`No agent ${target}. Use an id or a name from stage.agents().`);
+
+		// Only boards that exist, and no context change on the receiver: what it is holding is
+		// its own decision, and a sender that could rewrite it would be a sender that can take
+		// somebody's canvas away. The source rides in the briefing instead.
+		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
+		const position = to.enqueue({
+			from: from.id,
+			fromName: from.chat().name,
+			task: spec.task.trim(),
+			boards: handed,
+			at: Date.now(),
+		});
+		this.publish();
+		return { queued: true, position };
 	}
 
 	/** Every agent holding this board hears what the user did to it. */

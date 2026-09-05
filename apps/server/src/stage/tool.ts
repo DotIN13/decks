@@ -26,6 +26,30 @@ export interface DelegateSpec {
 	model?: string;
 }
 
+/**
+ * What one agent hands to another that already exists (the queue, not a spawn).
+ *
+ * No `model`: a delegation creates the agent it is about to run, so choosing its model is
+ * part of creating it. A send lands in a conversation that is already somebody's, on
+ * whatever model that conversation is having — changing it from outside would rewrite the
+ * voice of a chat the user is reading.
+ */
+export interface SendSpec {
+	task: string;
+	/** Boards handed over: the receiver is given their source when the item runs. */
+	boards?: string[];
+}
+
+/** One item waiting in an agent's queue. */
+export interface QueuedWork {
+	/** The agent that sent it, and what it was calling itself at the time. */
+	from: string;
+	fromName: string;
+	task: string;
+	boards: string[];
+	at: number;
+}
+
 export interface DelegateReport {
 	agent: string;
 	name: string;
@@ -45,11 +69,15 @@ export interface StageAgentHooks {
 	setAvatar(url: string): void;
 	/** Replaces the agent's own tags and returns them as stored — see `agents/tags.ts`. */
 	setTags(tags: unknown): string[];
-	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
+	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[]; queued?: number }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
 	/** Hand work to a new agent and wait for it. */
 	spawn(spec: DelegateSpec): Promise<DelegateReport>;
+	/** Queue work for an agent that already exists, and return without waiting. */
+	send(target: string, spec: SendSpec): { queued: true; position: number };
+	/** What is waiting for an agent — this one, unless another is named. */
+	queue(agentId?: string): QueuedWork[];
 	/**
 	 * Store the board's current bytes as a revision and return its id.
 	 *
@@ -102,13 +130,13 @@ const DESCRIPTION = `Run TypeScript against the canvas the user is looking at.
 
 Your code is the body of an async function with \`stage\` in scope; whatever you return comes back as JSON, and whatever you console.log comes back with it. The full API is in the stage.d.ts included in your context — if something is not in it, it does not exist.
 
-**Boards are how you answer.** A question, a design, or a finished piece of work goes on a board rather than into the chat column — the user should not have to read the chat to know what is happening. \`stage.newBoard({ title, kind })\` writes the document shell (kinds: answer, design, report, plan, blank) and returns a path to fill in with write/edit, so a board costs one call instead of fifteen lines of boilerplate.
+**Boards are how you answer.** A question, a design, or a finished piece of work goes on a board rather than into the chat column — the user should not have to read the chat to know what is happening. \`stage.newBoard({ title, kind })\` writes the document shell (kinds: answer, design, report, plan, blank) and returns a path to fill in with write/edit, so a board costs one call instead of fifteen lines of boilerplate; it also tells you the viewport, so you can see what the size you chose will look like.
 
 **Keep the canvas to what matters.** \`stage.show(paths)\` sets what is on the canvas and fits the camera to it. \`stage.hide(paths)\` takes a board off the canvas but keeps it in your context. \`stage.attach\` / \`stage.detach\` are the context itself, which is what the rail beside the canvas lists. The camera never moves unless you call \`show\`.
 
 Also here: look at the deck (\`stage.boards\`, \`stage.read\`), place boards (\`stage.move\`), resolve a path to embed (\`stage.resolve\`), get a URL to screenshot with Playwright (\`stage.url\`), name yourself and draw your own avatar (\`stage.me\`).
 
-Hand work to a subagent with \`stage.delegate({ task, boards })\`: it gets the source of the boards you name, so it starts from the same plan you are working to, and it reports by changing them.
+Two ways to hand work over. \`stage.delegate({ task, boards })\` makes a subagent and waits for its report — it gets the source of the boards you name, so it starts from the same plan you are working to. \`stage.send(who, { task, boards })\` queues work for an agent that **already exists** and returns immediately; they run it once they have been quiet for a moment. Delegate when the answer is a step in what you are doing; send when the work is theirs.
 
 Board *content* is files — write and edit it with your ordinary tools, not through this.`;
 
@@ -138,6 +166,20 @@ export function createStageTool(deps: {
 	const { stage: service, agent, port } = deps;
 	const asList = (path: string | string[]) => (Array.isArray(path) ? path : [path]);
 
+	/**
+	 * Lines added to the tool's result that the code did not return.
+	 *
+	 * There is exactly one today — the viewport, after `newBoard` — and it is here rather
+	 * than in the return value because the return value is an API: `const path = await
+	 * stage.newBoard(...)` is in every board this deck has written, and a call that started
+	 * answering with an object instead of a path would break all of them. The model reads
+	 * the result text, so that is where a number it should notice belongs.
+	 */
+	let notes: string[] = [];
+
+	/** The canvas's own size, or nothing if no browser has ever reported one. */
+	const viewport = () => service.viewport(agent.id);
+
 	const stage = {
 		// --- reads ---------------------------------------------------------------
 		boards: async () => service.boards(),
@@ -145,6 +187,16 @@ export function createStageTool(deps: {
 		roots: async () => service.roots(),
 		resolve: async (file: string) => service.resolve(file),
 		url: async (path: string) => service.url(path, port),
+		/**
+		 * How much room the canvas has, in CSS pixels — the window minus the chrome standing
+		 * beside it, not divided by the zoom.
+		 *
+		 * `undefined` when nobody is looking, or before the first reading. There is no default
+		 * on purpose: a made-up number is indistinguishable from a measured one at the point
+		 * it is used, and a board sized against a fiction is worse than a board sized against
+		 * your own judgement.
+		 */
+		viewport: async () => viewport(),
 
 		/**
 		 * Start a board: the shell, written for you, so you write only the content.
@@ -166,6 +218,17 @@ export function createStageTool(deps: {
 			});
 			agent.setContext([...agent.context(), path]);
 			agent.setInPlay([...agent.inPlay(), path]);
+			/*
+			 * The size of the thing you are about to fill, said once, at the moment you would
+			 * use it.
+			 *
+			 * No judgement with it — no "fits", no "too big". The number is the whole
+			 * mechanism: an agent that knows the canvas is 1400×900 does not need a rule about
+			 * how big a board should be, and a rule without the number was only ever a guess
+			 * ("a board that is too small clips") that nobody could check.
+			 */
+			const view = viewport();
+			if (view) notes.push(`viewport ${view.width}×${view.height} px`);
 			return path;
 		},
 
@@ -215,7 +278,7 @@ export function createStageTool(deps: {
 				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
 			}
 			agent.setInPlay(paths);
-			await service.show(paths, options ?? {});
+			return service.show(agent.id, paths, options ?? {});
 		},
 		/** Take boards off the canvas, keeping them in context. */
 		hide: async (path: string | string[]) => {
@@ -225,16 +288,16 @@ export function createStageTool(deps: {
 		move: async (path: string, at: { x: number; y: number }) => service.move(path, at),
 		camera: (async (at?: Camera) => {
 			if (!at) return agent.camera();
-			await service.setCamera(at);
+			await service.setCamera(agent.id, at);
 			return undefined;
 		}) as {
 			(): Promise<Camera>;
 			(at: Camera): Promise<void>;
 		},
-		reload: async (path: string) => service.reload(path),
+		reload: async (path: string) => service.reload(agent.id, path),
 		cursor: async (path: string, at: { x: number; y: number } | null) =>
-			service.cursor(path, at, agent.identity().name, agent.identity().color),
-		toast: async (text: string) => service.toast(text),
+			service.cursor(agent.id, path, at, agent.identity().name, agent.identity().color),
+		toast: async (text: string) => service.toast(agent.id, text),
 
 		// --- identity -------------------------------------------------------------
 		/**
@@ -294,6 +357,27 @@ export function createStageTool(deps: {
 			});
 		},
 
+		/**
+		 * Hand work to an agent that already exists, and carry on.
+		 *
+		 * The difference from `delegate` is the whole point: `delegate` makes a new agent and
+		 * blocks until it reports, which is right when the work is a step in what you are
+		 * doing. `send` puts an item in somebody else's queue and returns — right when the
+		 * work is *theirs*, when they are the one holding that part of the deck, or when you
+		 * have nothing to do with the answer.
+		 *
+		 * The receiver runs it once it has been quiet for a while, so it never interrupts a
+		 * turn in progress, and it is handed the board *source* when it runs — not when you
+		 * sent it, so a board that changes in between is read as it is.
+		 */
+		send: async (target: string, spec: SendSpec) => {
+			if (!target?.trim()) throw new Error("Say which agent: an id or a name from stage.agents()");
+			if (!spec?.task?.trim()) throw new Error("Sent work needs a description");
+			return agent.send(target.trim(), { task: spec.task, ...(spec.boards ? { boards: spec.boards } : {}) });
+		},
+		/** What is waiting for an agent: yours, or another's if you name it. */
+		queue: async (agentId?: string) => agent.queue(agentId),
+
 		agents: async () =>
 			agent.agents().map((other) => ({
 				id: other.id,
@@ -301,6 +385,9 @@ export function createStageTool(deps: {
 				me: other.id === agent.id,
 				state: other.state,
 				context: other.context,
+				tags: other.tags,
+				/** How much is already waiting for them — a queue of six is a reason to send elsewhere. */
+				queued: other.queued ?? 0,
 			})),
 	};
 
@@ -321,12 +408,16 @@ export function createStageTool(deps: {
 		snapshot,
 
 		async run(code: string): Promise<StageToolResult> {
+			notes = [];
 			const outcome = await runEval(code, stage);
 			const parts: string[] = [];
 			if (outcome.logs.length > 0) parts.push(outcome.logs.join("\n"));
 			if (outcome.error) parts.push(`Error: ${outcome.error}`);
 			else if (outcome.value !== undefined) parts.push(safeJson(outcome.value));
 			else parts.push("(done)");
+			// After the value, because the value is the answer and this is a fact about the
+			// canvas the call happened on.
+			if (notes.length > 0) parts.push(...notes);
 
 			// Written after every run, failed ones included: a run that threw halfway may
 			// still have attached a board, and the snapshot is what the canvas is restored

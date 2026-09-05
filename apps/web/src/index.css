@@ -1297,6 +1297,80 @@ svg.lucide {
 	list-style-type: decimal;
 }
 
+/*
+ * A table, in a box of its own that scrolls.
+ *
+ * The wrapper is the containment: `overflow-x: auto` on the *box* rather than any rule about
+ * the table means a wide table scrolls inside the card instead of widening it. `max-width`
+ * matters as much — a flex item's default `min-width: auto` is its content, so without this
+ * the `.md` column above would happily grow to the width of the widest row and take the card
+ * with it.
+ */
+.md .md-table {
+	max-width: 100%;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+}
+
+/*
+ * `max-content`, so the table is the width it wants and the box above scrolls.
+ *
+ * The first version let the table shrink to the column and wrap inside every cell, on the
+ * argument that a narrow table should simply fit. It does fit — as four words stacked one per
+ * line in each of three columns, which is a table you cannot read a row of. A comparison is
+ * read *across*, so the row has to stay a row: the table takes its natural width and you
+ * scroll to the rest, which is the bargain `pre` already makes with a wide log.
+ */
+.md table {
+	width: max-content;
+	border-collapse: collapse;
+	font-size: 11.5px;
+	line-height: 1.45;
+}
+
+/*
+ * Cells wrap, with a floor.
+ *
+ * The alternative — `white-space: nowrap` — makes every table scroll, including the two-column
+ * one that would have fitted. Wrapping inverts that: a narrow table simply fits the column,
+ * and only one whose columns genuinely cannot be squeezed into it scrolls.
+ *
+ * **`word-break: normal` is the load-bearing line**, and it took a screenshot to find. The
+ * card sets `word-break: break-word` for prose — right for a paragraph in a 360px column —
+ * and it inherits straight into the cells, where it is the legacy alias for
+ * `overflow-wrap: anywhere` and *does* lower a column's minimum width below its longest word.
+ * So the last inch of space came out of "credentials" and left "credential" over "s": a table
+ * that fits by being unreadable. Undone here, the longest word is the floor, the table asks
+ * for the width it needs, and the box above scrolls when the column cannot give it — which is
+ * what the box is for. `overflow-wrap: break-word` stays for the cell holding a hash, which
+ * has nowhere to break and would otherwise set the floor for the whole table on its own.
+ */
+/*
+ * A ceiling, so "natural width" stays a width and not a paragraph on one line.
+ *
+ * With the table at `max-content` a cell holding a sentence would be as wide as the sentence,
+ * and one long cell would push every other column off the screen — scrolling past the thing
+ * you were comparing to reach the thing you were comparing it with. `max-width` puts the
+ * wrapping back exactly where it earns its place: short cells keep their row, long ones wrap
+ * in a column wide enough to read.
+ */
+.md :is(th, td) {
+	min-width: 56px;
+	max-width: 280px;
+	padding: 3px 8px;
+	border: 1px solid var(--line);
+	/* Undone, not merely unset: `.stream-card` sets it for prose and it inherits in here. */
+	word-break: normal;
+	text-align: left;
+	vertical-align: top;
+	overflow-wrap: break-word;
+}
+
+.md th {
+	background: var(--bg-deep);
+	font-weight: 600;
+}
+
 /* A nested bullet gets its own mark as well as its own indent, so two levels read as two. */
 .md ul li[data-depth="1"] {
 	list-style-type: circle;

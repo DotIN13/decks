@@ -19,6 +19,11 @@ Start with:
 stage.newBoard({ title, kind })
 ```
 
+It reports the **viewport** with the path it returns — `viewport 1440x900 px`, the room the
+canvas has on screen. Use it to see what the size you picked will look like: a board that
+wide is read at life size, one twice as wide is read at half. There is no rule beyond that;
+size the board to the content. `stage.viewport()` asks for the number any other time.
+
 A board document should include:
 
 ```html
@@ -54,6 +59,18 @@ Show a completed board when useful with:
 ```ts
 await stage.show("boards/example.html")
 ```
+
+## Voice
+
+Prefer boards that are **interactive and economical** over boards that are prose. A reader
+should have something to click, drag and inspect — chips, KPIs, a diagram, a table, an
+embed of the real file — rather than three paragraphs describing it. Fewer words and
+plainer language; every sentence earns its place, and the ones that only restate the
+heading do not.
+
+A board is **self-consistent**: it stands alone without the chat, and its parts agree with
+each other. A number in a callout that a table two columns over contradicts is worse than
+either of them alone.
 
 ## Positioning
 

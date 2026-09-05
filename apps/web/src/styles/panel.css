@@ -268,13 +268,47 @@
 		place-items: center;
 	}
 
+	/*
+	 * The two buttons stand **over** the row's first line rather than beside its body.
+	 *
+	 * They were flex siblings of `.agent-body`, top-aligned so they sat level with the name —
+	 * which is where they belong, and that part was right. What it also did was take 24px off
+	 * the body (46px with both) *for the whole row*: the state, the tags and the last thing it
+	 * said all reflowed as the pointer crossed the list, and the sentence at the bottom lost
+	 * two more words to its ellipsis — none of which the buttons were within 40px of. They are
+	 * 22px tall at the top of a 90px row, on a line that gives up its column for them anyway;
+	 * nothing under the name was ever going to collide with them.
+	 *
+	 * So they come out of the flow. The body keeps its width, the three lines under the name
+	 * do not move, and the only thing that gives ground is the line the buttons are on.
+	 */
 	.agent-list .row-act {
+		position: relative;
 		align-items: flex-start;
 	}
 
 	.agent-list .row-act > :is(.close, .agent-tagbtn) {
-		align-self: flex-start;
-		margin-top: 7px;
+		position: absolute;
+		top: 7px;
+		right: 4px;
+	}
+
+	/* With both, the pen sits inboard of the ×. Alone — an agent mid-turn cannot be closed —
+	   it takes the ×'s place rather than leaving a gap where one would have been. */
+	.agent-list .row-act:has(> .close) > .agent-tagbtn {
+		right: calc(var(--control-sm) + 6px);
+	}
+
+	/*
+	 * And the first line reserves exactly what they cover: the width the whole body used to
+	 * lose, spent on the one line that had to lose it.
+	 */
+	.agent-list .row-act:is(:hover, :focus-within) .agent-line {
+		padding-right: calc(var(--control-sm) + 2px);
+	}
+
+	.agent-list .row-act:is(:hover, :focus-within):has(> .close) .agent-line {
+		padding-right: calc(2 * var(--control-sm) + 4px);
 	}
 
 	.agent-body {
@@ -484,6 +518,40 @@
 			padding: 9px 6px;
 		}
 
+		/*
+		 * Both buttons are drawn at all times here, so the first line reserves their column at
+		 * all times too — and 28px each rather than 22px, which is the one number this block
+		 * exists to change.
+		 */
+		.agent-list .row-act > :is(.close, .agent-tagbtn) {
+			top: 9px;
+		}
+
+		.agent-list .row-act:has(> .close) > .agent-tagbtn {
+			right: 34px;
+		}
+
+		.agent-list .row-act .agent-line {
+			padding-right: 30px;
+		}
+
+		.agent-list .row-act:has(> .close) .agent-line {
+			padding-right: 60px;
+		}
+	}
+
+	/*
+	 * And the row stops holding a slot the buttons no longer stand in.
+	 *
+	 * `chrome.css` gives a touch row with no × a `padding-right` so its last column lines up
+	 * with the rows that have one. That reserve is on the *row*, so it narrows every line —
+	 * which is the thing this whole arrangement is here to stop. The first line reserves the
+	 * column itself now, and it is the only line that needs to.
+	 */
+	@media (hover: none) {
+		.rowlist.agent-list .row-act:has([data-yield]):not(:has(> .close)) {
+			padding-right: 4px;
+		}
 	}
 
 	.board-row {

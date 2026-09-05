@@ -495,6 +495,20 @@ export interface Camera {
 	x: number;
 	y: number;
 	zoom: number;
+	/**
+	 * How big the canvas is, in CSS pixels, when the browser is the one reporting.
+	 *
+	 * Not world units and not divided by the zoom: it is the room a board has on screen,
+	 * which is what an agent choosing a board size actually needs. It is the window *minus
+	 * the chrome standing beside it* (`web/lib/insets.ts`) rather than `innerWidth`, because
+	 * a panel that covers a third of the window is not room a board can use.
+	 *
+	 * Optional because most cameras are computed — `fitInto`, `zoomAbout` and every rewind
+	 * make one — and only a reading taken from a live browser can know this. An agent that
+	 * has never had one reported is told nothing rather than told a default.
+	 */
+	width?: number;
+	height?: number;
 }
 
 /**
@@ -505,6 +519,15 @@ export interface Camera {
  */
 export interface StageCall {
 	id: string;
+	/**
+	 * Which agent asked.
+	 *
+	 * The canvas is *per conversation* — it draws the focused agent's in-play set and
+	 * nothing else — so the browser has to know whose `show` it is carrying out. Without
+	 * this it could not tell, and an agent you were not watching flew your camera to a board
+	 * that is not on your canvas at all.
+	 */
+	agentId: string;
 	/** `annotate` is the newest: bubbles with arrows, drawn on the canvas and never written
 	 *  to a board file. See `canvas/annotations.ts`. */
 	op: "show" | "camera" | "move" | "highlight" | "reload" | "cursor" | "annotate" | "toast" | "read";
@@ -615,7 +638,14 @@ export type ClientMessage =
 	 */
 	| { type: "board.delete"; path: string }
 	| { type: "board.comment"; path: string; id: string; text: string }
-	| { type: "camera.set"; camera: Camera }
+	/**
+	 * Where the browser is looking, and which conversation's view that is.
+	 *
+	 * The camera belongs to the conversation, so the server keeps one reading per agent and
+	 * `stage.camera()` answers "where is my canvas looking" rather than "where is the user
+	 * looking" — which is what it always claimed to mean.
+	 */
+	| { type: "camera.set"; camera: Camera; agentId?: string }
 	| { type: "agent.create"; parentId?: string; kind?: AgentKind }
 	| { type: "agent.focus"; id: string }
 	/**
@@ -655,6 +685,14 @@ export type ClientMessage =
 	| { type: "claude.accounts.use"; id: string }
 	/** Forget one, and its credentials. Refused for the CLI's own login. */
 	| { type: "claude.accounts.forget"; id: string }
+	/**
+	 * Move one up or down the list, which is who a limit moves to first.
+	 *
+	 * A step at a time rather than a whole order, because the control is a pair of arrows and
+	 * a message that carried the entire list would be a message two open settings panels
+	 * could disagree about.
+	 */
+	| { type: "claude.accounts.move"; id: string; direction: "up" | "down" }
 	| { type: "rewind.preview"; id: string; entryId: string | null }
 	| { type: "rewind.to"; id: string; entryId: string }
 	| { type: "fork.from"; id: string; entryId: string }

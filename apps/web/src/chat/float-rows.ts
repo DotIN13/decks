@@ -22,9 +22,8 @@ export type FloatRow =
  * User and assistant items become bubbles; a run of consecutive tool items
  * collapses into one slim row, because a turn that edits files is mostly tool
  * calls and the float is about the conversation, not the code; notices stay as
- * slim lines. An assistant bubble that exists only between a turn starting and
- * its first token has nothing to float — it is skipped until there is text or
- * it is streaming.
+ * slim lines. An assistant bubble with nothing in it is not a bubble: it is
+ * skipped until there is something to read.
  *
  * The collapsed row keeps the **whole call**, not just its name. The float is the
  * only transcript there is now — the chat column it used to summarise is gone — so
@@ -40,7 +39,18 @@ export function floatRows(items: ChatItem[]): FloatRow[] {
 	for (const item of items) {
 		if (item.kind === "user") turnId = item.id;
 		if (item.kind === "assistant") {
-			if (!item.text.trim() && !item.streaming) continue;
+			/*
+			 * A bubble needs something in it.
+			 *
+			 * A reply that has started but not yet said anything — a model thinking for ten
+			 * seconds, or a turn that opens with a tool call — used to draw an empty card that
+			 * sat in the column until it filled or quietly vanished. The server no longer sends
+			 * one; this is the same rule read from the other end, and it is what a browser
+			 * reconnecting mid-turn needs, because the history it is handed still has that item
+			 * in it.
+			 */
+			const said = item.text.trim() || (item.streaming === true && item.thinking?.trim());
+			if (!said) continue;
 			rows.push({
 				kind: "assistant",
 				id: item.id,

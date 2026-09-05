@@ -70,6 +70,18 @@ export interface AgentSummary {
 	context: string[];
 	/** What it says it is working on. Empty if it has not said. */
 	tags: string[];
+	/** How many handed-over items are waiting for it — see `send`. */
+	queued: number;
+}
+
+/** One item waiting in an agent's queue. */
+export interface QueuedWork {
+	/** The agent that sent it, and the name it was going by. */
+	from: string;
+	fromName: string;
+	task: string;
+	boards: string[];
+	at: number;
 }
 
 export interface ShowOptions {
@@ -100,6 +112,19 @@ export interface Stage {
 	/** The URL to open in Playwright when you want to look at a board. */
 	url(path: string): Promise<string>;
 
+	/**
+	 * How much room the canvas has, in CSS pixels — the size a board is looked at in.
+	 *
+	 * The window minus the chrome standing beside it, not divided by the zoom: it is the
+	 * space a board has on screen, so `1440x900` means a board that wide is read at life
+	 * size and a board twice that is read at half.
+	 *
+	 * `undefined` when nobody is looking, or before the browser's first reading. There is
+	 * deliberately no default — a made-up number looks exactly like a measured one at the
+	 * point you would use it.
+	 */
+	viewport(): Promise<{ width: number; height: number } | undefined>;
+
 	// --- starting a board ----------------------------------------------------------
 
 	/**
@@ -122,6 +147,11 @@ export interface Stage {
 	 * - `report` — method, result, what is left; for when work is done
 	 * - `plan`   — goal, approach, steps
 	 * - `blank`  — a heading and nothing else
+	 *
+	 * **The result tells you the viewport** — `viewport 1440x900 px`, the room the canvas
+	 * has — because that is the moment the number is worth knowing. There is no rule about
+	 * what to do with it: size the board to the content, and let the number tell you what
+	 * that will look like. `stage.viewport()` asks for it any other time.
 	 */
 	newBoard(options: { title: string; kind?: "answer" | "design" | "report" | "plan" | "blank"; w?: number; h?: number }): Promise<string>;
 
@@ -155,8 +185,14 @@ export interface Stage {
 	 * becomes exactly what you name. Anything not already held is attached, because a
 	 * board you show is a board you are working on. To put everything back:
 	 * `await stage.show((await stage.context()).map((b) => b.path))`.
+	 *
+	 * **The camera is per conversation.** If the user is reading another chat, the canvas
+	 * does not move — your view is remembered and arrives, framed as you asked, the moment
+	 * they open yours. The result says which happened: `{ shown }` when it moved,
+	 * `{ shown, deferred }` when it is waiting. Either way the boards are in play, so this
+	 * is worth doing whether or not anyone is watching.
 	 */
-	show(path: string | string[], options?: ShowOptions): Promise<void>;
+	show(path: string | string[], options?: ShowOptions): Promise<{ shown: string[]; deferred?: string }>;
 
 	/**
 	 * Take boards off the canvas, keeping them in your context.
@@ -169,7 +205,11 @@ export interface Stage {
 	/** Move a board on the canvas. Persists to deck.json, so it is a real rearrangement. */
 	move(path: string, at: { x: number; y: number }): Promise<Board>;
 
-	/** Where the user is looking. Reading it tells you what they can see. */
+	/**
+	 * Where **your** canvas is looking — not where the user is, unless they are reading you.
+	 * Setting it follows the same rule as `show`: applied if you are on screen, remembered
+	 * against your chat if you are not.
+	 */
 	camera(): Promise<Camera>;
 	camera(at: Camera): Promise<void>;
 
@@ -273,6 +313,35 @@ export interface Stage {
 		/** "provider/model", if it should not use the default. */
 		model?: string;
 	}): Promise<{ agent: string; name: string; report: string; boards: string[] }>;
+
+	/**
+	 * Hand work to an agent that **already exists**, and carry on without waiting.
+	 *
+	 * The counterpart to `delegate`, and the difference is who the work belongs to.
+	 * `delegate` creates an agent and blocks until it reports: right when the result is a
+	 * step in what *you* are doing. `send` puts an item in somebody else's queue and returns
+	 * at once: right when the work is *theirs* — they are holding that part of the deck,
+	 * they asked, or you have nothing to do with the answer.
+	 *
+	 *     await stage.send("Ada", {
+	 *       task: "The panel numbers on boards/rows.html are stale — remeasure and update them.",
+	 *       boards: ["boards/rows.html"],
+	 *     });
+	 *     // -> { queued: true, position: 1 }
+	 *
+	 * `to` is an id or a name from `stage.agents()`. The receiver starts it once it has been
+	 * **idle for a quiet period**, so it never cuts into a turn in progress, and it is handed
+	 * the board *source* at that moment — not at this one, so a board that changes while the
+	 * item waits is read as it then is. It arrives as a notice in their transcript
+	 * immediately, so nothing runs unannounced.
+	 *
+	 * Eight items per agent. Nothing is created, so it does not count against the subagent
+	 * limit, and sending to yourself is allowed — it is how you leave yourself a follow-up.
+	 */
+	send(to: string, work: { task: string; boards?: string[] }): Promise<{ queued: true; position: number }>;
+
+	/** What is waiting for an agent: yours, or another's if you name it. */
+	queue(agentId?: string): Promise<QueuedWork[]>;
 }
 
 declare const stage: Stage;

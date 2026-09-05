@@ -36,7 +36,7 @@ const rows = await page.evaluate(() =>
 	[...document.querySelectorAll(".account-row")].map((row) => ({
 		text: row.innerText.replace(/\n+/g, " | "),
 		current: row.dataset.current === "true",
-		removable: Boolean(row.querySelector(".close")),
+		removable: Boolean(row.querySelector(".close:not(.rank)")),
 		disabled: row.querySelector("button")?.disabled ?? null,
 	})),
 );
@@ -103,7 +103,7 @@ const after = await page.evaluate(() =>
 	[...document.querySelectorAll(".account-row")].map((row) => ({
 		text: row.innerText.replace(/\n+/g, " | "),
 		current: row.dataset.current === "true",
-		removable: Boolean(row.querySelector(".close")),
+		removable: Boolean(row.querySelector(".close:not(.rank)")),
 	})),
 );
 console.log("      after:", JSON.stringify(after, null, 1));
@@ -139,6 +139,54 @@ say(
 	after.filter((r) => r.removable).every((r) => !/Claude Code's own login/.test(r.text)),
 	JSON.stringify(after.filter((r) => r.removable).map((r) => r.text)),
 );
+// --- the order, which is who a limit goes to first --------------------------------
+/*
+ * The list *is* the priority: `pick` walks it from the top. The arrows are the only way to
+ * say which subscription should be spent before which, and what is checked here is the whole
+ * round trip — the press, the redrawn list, and the order on disk, which is what survives a
+ * restart.
+ */
+const names = () => page.evaluate(() => [...document.querySelectorAll(".account-row")].map((row) => row.innerText.split("\n")[0]));
+const before = await names();
+// The CLI's own login first and the added ones in the order they arrived — which is what the
+// list has always been, and is now merely the default rather than the rule.
+const untouched = await page.evaluate(() => [...document.querySelectorAll(".account-row")].map((row) => Boolean(row.querySelector(".close:not(.rank)"))));
+say("the list opens with the CLI's own login first", untouched[0] === false && before.length === 3, JSON.stringify(before));
+
+const arrows = await page.evaluate(() => ({
+	onlyOnTheEnds: [...document.querySelectorAll(".account-row")].map((row) => [...row.querySelectorAll(".close.rank")].map((button) => button.disabled)),
+	labelled: Boolean(document.querySelector('.account-row .close.rank[aria-label^="Move"]')),
+}));
+say("every row has a pair of arrows", arrows.onlyOnTheEnds.every((pair) => pair.length === 2), JSON.stringify(arrows.onlyOnTheEnds));
+say("…named, so the control is not two chevrons and a guess", arrows.labelled);
+say(
+	"…and they stop at the ends rather than disappearing",
+	arrows.onlyOnTheEnds.at(0)?.[0] === true && arrows.onlyOnTheEnds.at(-1)?.[1] === true && arrows.onlyOnTheEnds.at(0)?.[1] === false,
+	JSON.stringify(arrows.onlyOnTheEnds),
+);
+
+await page.locator(".account-row").last().locator('.close.rank[aria-label^="Move"]').first().click();
+await page.waitForTimeout(900);
+const moved = await names();
+say("pressing up moves the row up", moved[1] === before[2] && moved[2] === before[1], `${JSON.stringify(before)} → ${JSON.stringify(moved)}`);
+
+/*
+ * And on disk, in a field of its own. The stored account array is rewritten every time the
+ * list is published — `describeDefault` moves the CLI's own row to the end of it — so an
+ * order kept *as* that array's order would be undone by merely opening this panel.
+ */
+const stored = JSON.parse(readFileSync(indexFile, "utf8"));
+say("the order is written down", Array.isArray(stored.order) && stored.order.length === 3, JSON.stringify(stored.order));
+say("…as its own field, not as the order of the accounts", stored.order?.[1] === ids[1] && stored.order?.[2] === ids[0], JSON.stringify(stored.order));
+
+// Reopening reads it back: the order is a property of the install, not of this panel.
+await page.keyboard.press("Escape");
+await page.waitForTimeout(300);
+await openOverflow(page, /settings/i);
+await page.waitForSelector(".settings", { timeout: 6000 });
+await page.waitForTimeout(2000);
+say("…and it is still there when the panel is reopened", JSON.stringify(await names()) === JSON.stringify(moved), JSON.stringify(await names()));
+
 /*
  * An account with no token behind it says so rather than being hidden, and cannot be
  * switched to — that is what stops a rate limit turning into an auth failure.

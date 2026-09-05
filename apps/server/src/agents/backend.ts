@@ -90,8 +90,17 @@ export interface AgentBackendContext {
  * only `claude/backend.ts` knows what one is.
  */
 export interface ClaudeAccountSwitcher {
-	/** What `CLAUDE_CONFIG_DIR` should be, or nothing to leave the CLI on its own default. */
+	/** What `CLAUDE_CONFIG_DIR` should be, or nothing when the link cannot be made. */
 	activeConfigDir(): string | undefined;
+	/**
+	 * The whole environment a session must be spawned with to spend the active account —
+	 * the config directory and, for macOS, which keychain entry that account's token is in.
+	 */
+	activeEnvironment(): NodeJS.ProcessEnv | undefined;
+	/** The account's own directory, as opposed to the link. Empty for the CLI's own login. */
+	keychainDir(id: string): string;
+	/** Which account is in force, by id, so a one-off command can be aimed at it. */
+	activeId(): string;
 	/** Which account is in force, for the sentence a switch says. */
 	active(): { id: string; email?: string } | undefined;
 	/**

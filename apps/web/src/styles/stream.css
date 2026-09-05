@@ -578,10 +578,26 @@
 		outline-offset: 2px;
 	}
 
+	/*
+	 * Bounded, and it scrolls.
+	 *
+	 * Thinking is not the reply, and it is not written to be read in full — a model can spend
+	 * two thousand words getting to a one-line answer. Opened, an unbounded disclosure pushed
+	 * the reply itself off the bottom of the column and made every card above it scroll past
+	 * a page of reasoning to get anywhere. The cap is what makes it a disclosure rather than a
+	 * second transcript.
+	 *
+	 * `min(320px, 38vh)` so it is a fixed, predictable block on a laptop and still a fraction
+	 * of the screen on a phone, where 320px is most of the column. `contain` so reaching its
+	 * end does not carry on and scroll the conversation behind it.
+	 */
 	.stream-thinking > .body {
+		max-height: min(320px, 38vh);
 		margin-top: 4px;
 		padding-left: 8px;
+		overflow-y: auto;
 		border-left: 2px solid var(--line);
+		overscroll-behavior-y: contain;
 		white-space: pre-wrap;
 	}
 

@@ -17,7 +17,12 @@ const KEEP = 500;
 
 export class Translator {
 	private readonly items: ChatItem[] = [];
-	private streaming: { id: string; text: string; thinking: string } | undefined;
+	/**
+	 * The reply being assembled, and whether the browser has been told about it yet.
+	 *
+	 * `said` is the whole of the empty-bubble fix — see `startAssistant`.
+	 */
+	private streaming: { id: string; text: string; thinking: string; said: boolean } | undefined;
 	private counter = 0;
 
 	constructor(
@@ -188,9 +193,8 @@ export class Translator {
 	startAssistant(): void {
 		if (this.streaming) this.endAssistant();
 		const item: ChatItem = { kind: "assistant", id: this.id("a"), text: "", at: Date.now(), streaming: true };
-		this.streaming = { id: item.id, text: "", thinking: "" };
+		this.streaming = { id: item.id, text: "", thinking: "", said: false };
 		this.items.push(item);
-		this.emit({ type: "chat.item", agentId: this.agentId, item });
 		this.setState("streaming");
 	}
 
@@ -199,6 +203,7 @@ export class Translator {
 		const active = this.streaming!;
 		active.text += text;
 		this.sync(active.id, { text: active.text });
+		if (this.announce(active)) return;
 		this.emit({ type: "chat.delta", agentId: this.agentId, itemId: active.id, delta: text, field: "text" });
 	}
 
@@ -207,7 +212,32 @@ export class Translator {
 		const active = this.streaming!;
 		active.thinking += text;
 		this.sync(active.id, { thinking: active.thinking });
+		if (this.announce(active)) return;
 		this.emit({ type: "chat.delta", agentId: this.agentId, itemId: active.id, delta: text, field: "thinking" });
+	}
+
+	/**
+	 * The first thing a reply says is sent as the item; everything after it as a delta.
+	 *
+	 * A reply used to be announced the moment the model opened its mouth — at
+	 * `message_start`, before a single token — and the browser drew a card for it. Which is
+	 * an **empty bubble sitting in the column**, for as long as it takes the first token to
+	 * arrive: seconds for a model that thinks first, and the whole of a tool call for a turn
+	 * that opens with one, after which the card silently disappears again. Nobody wants to
+	 * watch that, and the working sign already says what it was trying to say.
+	 *
+	 * So nothing goes out until there is something in it. The item is still created here at
+	 * `message_start`, because `endAssistant` and a reconnecting browser both need it; what
+	 * moved is only when the browser is told. Returns whether this call was the announcement,
+	 * so the caller can skip the delta — the item it just sent already carries this text.
+	 */
+	private announce(active: { id: string; said: boolean }): boolean {
+		if (active.said) return false;
+		active.said = true;
+		const item = this.itemOf(active.id);
+		if (!item) return false;
+		this.emit({ type: "chat.item", agentId: this.agentId, item });
+		return true;
 	}
 
 	endAssistant(): void {
@@ -220,6 +250,15 @@ export class Translator {
 		if (!active.text.trim() && !active.thinking.trim()) {
 			const index = this.items.findIndex((item) => item.id === active.id);
 			if (index !== -1) this.items.splice(index, 1);
+			/*
+			 * And if it was never announced there is nothing to take back either. This used to
+			 * emit a fabricated empty item, which is a message whose whole content is "the card
+			 * I told you about is empty now" — sent to a browser that was never told.
+			 */
+			if (!active.said) {
+				this.onChange?.();
+				return;
+			}
 		}
 		this.emit({ type: "chat.item", agentId: this.agentId, item: this.itemOf(active.id) ?? { kind: "assistant", id: active.id, text: active.text, at: Date.now(), streaming: false } });
 		this.onChange?.();

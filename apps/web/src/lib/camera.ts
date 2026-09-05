@@ -216,3 +216,22 @@ export function fitInto(
 }
 
 export const boxOf = (board: Board) => ({ x: board.x, y: board.y, w: board.w, h: board.h });
+
+/**
+ * Whether a camera has any of these boxes on screen.
+ *
+ * For deciding whether a *remembered* view is still a view of anything. A saved camera keeps
+ * pointing wherever it pointed, and the boards under it can be moved, hidden or deleted while
+ * you are reading another conversation — so coming back to it can mean landing on empty
+ * canvas, which is the same failure as not remembering it at all.
+ *
+ * Any overlap counts, deliberately: a board half off the edge is a board you can see, and a
+ * margin here would be a second opinion about what "looking at it" means.
+ */
+export function frames(camera: Camera, view: Viewport, boxes: Array<{ x: number; y: number; w: number; h: number }>): boolean {
+	return boxes.some((box) => {
+		const topLeft = toScreen(camera, view, { x: box.x, y: box.y });
+		const bottomRight = toScreen(camera, view, { x: box.x + box.w, y: box.y + box.h });
+		return bottomRight.x > 0 && topLeft.x < view.width && bottomRight.y > 0 && topLeft.y < view.height;
+	});
+}

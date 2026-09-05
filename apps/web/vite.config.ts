@@ -31,6 +31,30 @@ const WEB_PORT = Number(process.env.DECKS_WEB_PORT ?? 4328);
  * from the server side, so `DECKS_HOST` can stay on loopback and the websocket still works.
  */
 const WEB_HOST = process.env.DECKS_WEB_HOST ?? "127.0.0.1";
+/*
+ * Which `Host` headers this server will answer to, once it is not on loopback.
+ *
+ * Vite refuses a request whose Host is a name it was not told about — the defence against DNS
+ * rebinding, where a page you are looking at resolves a name it controls to 127.0.0.1 and
+ * reads a dev server that trusts anything local. An **address** is always allowed, so
+ * `http://100.x.y.z:4327` works with nothing set; a **name** is not, which is exactly the
+ * case a Tailscale MagicDNS host is: `jules.tail39f75c.ts.net` was answered with "Blocked
+ * request" and nothing else — no clue as to why.
+ *
+ * So `.ts.net` is allowed by default when the server is exposed at all, because every name
+ * under it resolves inside somebody's tailnet and reaching this one means already being on
+ * *this* tailnet. Anything else is named deliberately, comma-separated:
+ *
+ *     DECKS_WEB_ALLOWED=deck.example.internal,.lan
+ *
+ * On loopback nothing is set and nothing changes: `localhost` is allowed on its own.
+ */
+const named = (process.env.DECKS_WEB_ALLOWED ?? "")
+	.split(",")
+	.map((host) => host.trim())
+	.filter(Boolean);
+const LOOPBACK = WEB_HOST === "127.0.0.1" || WEB_HOST === "localhost" || WEB_HOST === "::1";
+const ALLOWED_HOSTS = named.length > 0 ? named : LOOPBACK ? undefined : [".ts.net"];
 
 export default defineConfig({
 	plugins: [solid(), tailwind()],
@@ -38,6 +62,7 @@ export default defineConfig({
 		host: WEB_HOST,
 		port: WEB_PORT,
 		strictPort: true,
+		...(ALLOWED_HOSTS ? { allowedHosts: ALLOWED_HOSTS } : {}),
 		proxy: {
 			"/api": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false },
 			"/ws": { target: `ws://127.0.0.1:${API_PORT}`, ws: true },
