@@ -28,8 +28,21 @@ export type SignPlace = "none" | "dock" | "column";
 export function signPlacement(state: AgentState, options: { historyOpen: boolean; arriving: boolean }): SignPlace {
 	if (state === "idle") return "none";
 	if (!options.historyOpen) return "dock";
-	// In the column, and only where the column is not already saying it.
-	return options.arriving ? "none" : "column";
+	/*
+	 * In the column, and now *including* while a reply is arriving.
+	 *
+	 * It used to return `none` for that case, on the argument that a streaming reply already
+	 * says "still going" with the caret blinking at the end of its text — in the place the
+	 * words are appearing, which is better than a sign below them. That argument was sound
+	 * and it died with the caret: with no caret there is nothing carrying the fact, so a
+	 * streaming reply had a growing paragraph and no indicator at all.
+	 *
+	 * `arriving` is kept in the signature rather than deleted. It is still the honest name for
+	 * the state, three callers pass it, and a sign that behaves differently mid-reply is a
+	 * change somebody may want back — with a caret or with something quieter in its place.
+	 */
+	void options.arriving;
+	return "column";
 }
 
 /** Whether these are the states that mean work is in progress, so the mark moves. */

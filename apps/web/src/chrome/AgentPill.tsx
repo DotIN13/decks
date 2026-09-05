@@ -10,13 +10,16 @@ import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
 import StickyNote from "lucide-solid/icons/sticky-note";
 import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
+import Pencil from "lucide-solid/icons/pencil";
+import Hand from "lucide-solid/icons/hand";
 import X from "lucide-solid/icons/x";
-import { createSignal, For, Show, type JSX } from "solid-js";
+import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { AgentMark } from "../chat/agent-marks.tsx";
-import type { Tool } from "../canvas/Editor.ts";
+import type { CanvasMode, Tool } from "../canvas/Editor.ts";
 import { Icon } from "../icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
 import { agentList, agentStatus, closeWords, rowWords } from "./agent-order.ts";
+import { AgentHoverCard } from "./AgentHoverCard.tsx";
 
 /**
  * The top-left cluster: the panel, the agent, the tools, undo.
@@ -171,6 +174,71 @@ export function AgentMenu(props: {
 	const [picking, setPicking] = createSignal(false);
 
 	/*
+	 * Which row the card is describing, and where that row is.
+	 *
+	 * `held` keeps the last row after the pointer leaves so the card fades out with words
+	 * still in it — the same arrangement `AgentStack` makes, and for the same reason: a card
+	 * emptied the instant it starts fading is a card that fades out blank.
+	 */
+	type Anchor = Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height">;
+	const [over, setOver] = createSignal<{ id: string; at: Anchor } | undefined>();
+	const [held, setHeld] = createSignal<{ id: string; at: Anchor } | undefined>();
+	let exit: ReturnType<typeof setTimeout> | undefined;
+	onCleanup(() => clearTimeout(exit));
+
+	/**
+	 * At once, and it lingers 80ms on the way out — which is exactly what the corner stack
+	 * does with the same card (`AgentStack`).
+	 *
+	 * There was a 350ms wait before the card, to stop a pointer run down five rows from
+	 * flashing five cards. The fear was reasonable and the cure was worse: the same card
+	 * summoned from the corner arrives instantly, so one hover felt broken and the other
+	 * did not, and 350ms of nothing is long enough to conclude there is nothing to see.
+	 *
+	 * What actually stops the flashing is the grace on the way *out*: leaving a row does not
+	 * take the card down for 80ms, so entering the next one inside that window moves it
+	 * rather than replacing it. A card that slides down the list is not a card that blinks
+	 * five times — and it is the behaviour of the surface next to it.
+	 */
+	/**
+	 * The box the card hangs off: level with the row, clear of the *menu*.
+	 *
+	 * A row is inset from the popover's edge by its padding, so a card placed beside the row
+	 * overlapped the menu's own border by three pixels — visible as a card that looks stuck
+	 * to the list rather than beside it. Taking the row's vertical extent and the popover's
+	 * right edge is the anchor that means what the design says: beside the menu, aligned to
+	 * the row.
+	 */
+	const anchorFor = (row: HTMLElement): Anchor => {
+		const at = row.getBoundingClientRect();
+		const card = row.closest(".popover")?.getBoundingClientRect();
+		return {
+			top: at.top,
+			bottom: at.bottom,
+			height: at.height,
+			left: card?.left ?? at.left,
+			right: card?.right ?? at.right,
+			width: (card?.right ?? at.right) - (card?.left ?? at.left),
+		};
+	};
+
+	const point = (id: string, at: Anchor) => {
+		clearTimeout(exit);
+		setOver({ id, at });
+		setHeld({ id, at });
+	};
+
+	const unpoint = (id: string) => {
+		clearTimeout(exit);
+		exit = setTimeout(() => setOver((was) => (was?.id === id ? undefined : was)), 80);
+	};
+
+	const describing = () => {
+		const id = (over() ?? held())?.id;
+		return id ? props.chats.find((chat) => chat.id === id) : undefined;
+	};
+
+	/*
 	 * `Popover` closes on Escape and on a press outside, but a row picked *inside* it has to
 	 * say so — and the card's children are not handed an api. So the trigger's `toggle` is
 	 * kept as it renders, which is always before the card exists.
@@ -220,6 +288,16 @@ export function AgentMenu(props: {
 								class="min-w-0 flex-1"
 								onClick={() => pick(() => props.onFocus(chat.id))}
 								/*
+								 * The card is summoned by pointing and by focus, which is the keyboard's
+								 * equivalent — the arrows rove this list, so without the focus half the
+								 * detail would be mouse-only, and the roving exists precisely so the list
+								 * can be used without one.
+								 */
+								onPointerEnter={(event) => point(chat.id, anchorFor(event.currentTarget))}
+								onPointerLeave={() => unpoint(chat.id)}
+								onFocus={(event) => point(chat.id, anchorFor(event.currentTarget))}
+								onBlur={() => unpoint(chat.id)}
+								/*
 								 * Delete is the × for the keyboard, and it is on the row because the row
 								 * is what the arrows rove onto. `Popover`'s own handler reads Escape and
 								 * the arrows off the document and ignores these two, so nothing has to
@@ -234,9 +312,21 @@ export function AgentMenu(props: {
 								}}
 							>
 								<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} size={20} ring={1.5} />
-								{/* `block`, because `.lb` is a flex row and `text-overflow` does not apply to one —
-								    a long name would have overflowed the row rather than ellipsing. */}
-								<span class="lb block truncate">{name()}</span>
+								{/*
+									`block`, because `.lb` is a flex row and `text-overflow` does not apply to
+									one — a long name would have overflowed the row rather than ellipsing.
+
+									`nm` keeps the name at 600 where the rest of this menu's labels are 400: a
+									row you pick an *agent* from is not a row you pick a command from. See
+									`chrome.css`, where both halves of that are stated together.
+								*/}
+								<span class="lb nm block truncate">{name()}</span>
+								{/*
+									Which runtime, in the word the server uses. The chip the panel row and the
+									hover card also wear, so the three surfaces name a runtime identically —
+									`.kind` in `styles/chrome.css` argues for the word over a badge on the face.
+								*/}
+								<span class="kind" data-dormant={chat.dormant ? "true" : undefined}>{chat.kind}</span>
 								{/*
 									`data-yield` says these words give ground for the × rather than a square
 									standing empty beside them until it arrives: the last column of a row is one
@@ -306,7 +396,7 @@ export function AgentMenu(props: {
 			<div class="flex items-center gap-1">
 				<button type="button" role="menuitem" data-row data-flat="true" class="w-auto min-w-0 flex-1" onClick={() => pick(() => props.onNew(props.defaultKind))}>
 					<Icon of={Plus} size={13} class="flex-none text-muted" />
-					<span class="lb font-normal whitespace-nowrap">New agent</span>
+					<span class="lb whitespace-nowrap">New agent</span>
 				</button>
 				<button
 					type="button"
@@ -336,7 +426,7 @@ export function AgentMenu(props: {
 							{/* `flex-none`: an `<svg>` in a flex row shrinks to nothing beside a
 							    `flex-1` label, and has. */}
 							<AgentMark class="flex-none" agent={kind} size={13} />
-							<span class="lb flex-1 font-normal">New {kind} agent</span>
+							<span class="lb flex-1">New {kind} agent</span>
 							<Show when={kind === props.defaultKind}>
 								<Icon of={Check} size={13} class="flex-none text-faint" />
 							</Show>
@@ -344,11 +434,43 @@ export function AgentMenu(props: {
 					)}
 				</For>
 			</Show>
+					{/*
+				One card for the whole menu, mounted with it and only unhidden on hover.
+				
+				`beside`, not under: a card centred beneath a row would cover the rows below it,
+				which are the ones being compared. It is the same component the corner faces
+				summon — the detail lives in one place and is reachable from either list.
+			*/}
+			<Show when={describing()}>
+				{(chat) => (
+					<AgentHoverCard
+						chat={chat()}
+						identity={props.identities[chat().id]}
+						unread={props.unread[chat().id] ?? 0}
+						anchor={(over() ?? held())!.at}
+						shown={over() !== undefined}
+						beside
+					/>
+				)}
+			</Show>
 		</Popover>
 	);
 }
 
 export function AgentPill(props: {
+	/**
+	 * Browse or edit. Browse is the default and the safe one.
+	 *
+	 * In browse mode a board is a *document*: text selects and copies, a game plays, a click
+	 * is an ordinary click. In edit mode it is a *drawing*: components drag, a click selects,
+	 * a double-click retypes a run of words. Both pan and zoom.
+	 *
+	 * The toggle lives here because the tools do, and because the tools are meaningless in
+	 * browse mode — they insert components. They fold away with it rather than sitting there
+	 * inert, which is the same argument the corner makes about a control that cannot act.
+	 */
+	mode: CanvasMode;
+	onMode: (mode: CanvasMode) => void;
 	chats: AgentChat[];
 	identities: Record<string, Identity>;
 	focused: string | undefined;
@@ -489,6 +611,54 @@ export function AgentPill(props: {
 				)}
 			/>
 
+			<span class="pill-sep" aria-hidden="true" />
+
+			{/*
+				Browse or edit, and it is the first thing after the agent because it changes what
+				every control to its right means.
+
+				A pencil when you are browsing (press it to start editing) and a hand when you
+				are editing (press it to stop) — the icon is **what pressing it does**, not what
+				mode you are in, which is the convention every drawing tool has settled on and
+				the opposite of what reads naturally when you write the markup.
+
+				No confirmation. A single press is right for something this reversible, and the
+				guard against pressing it by accident is that editing *looks* different — see
+				`.stage[data-mode]` and the badge in `Stage.tsx`. A dialog in front of a mode
+				switch is a dialog you learn to dismiss without reading.
+			*/}
+			<button
+				type="button"
+				class="iconbtn"
+				/*
+				 * `soft` — the grey wash the panel toggle wears, not the accent fill.
+				 *
+				 * The accent is for one of a set: which tool is selected, read from across the
+				 * window. Editing is not one of a set, it is a thing being *held* — the same
+				 * kind of fact as "the panel is open" — and `data-on="soft"` is the state this
+				 * file's own note reserves for exactly that. It was the accent, which put the
+				 * loudest control in the pill next to the tool that is actually chosen and made
+				 * the two look like peers.
+				 */
+				data-on={props.mode === "edit" ? "soft" : undefined}
+				aria-pressed={props.mode === "edit"}
+				title={props.mode === "edit" ? "Stop editing — back to browsing" : "Edit the boards: drag components, retype text"}
+				aria-label={props.mode === "edit" ? "Stop editing" : "Edit the boards"}
+				onClick={() => props.onMode(props.mode === "edit" ? "browse" : "edit")}
+			>
+				<Icon of={props.mode === "edit" ? Hand : Pencil} size={15} />
+			</button>
+
+			{/*
+				The tools, and only while editing.
+
+				They insert components, which is editing by definition — in browse mode they
+				would be five controls that cannot act. Gone rather than disabled, for the reason
+				the corner gives about the close button on a busy agent: a control that cannot be
+				pressed is worth drawing when its absence would be a mystery, and the pencil
+				beside them is not a mystery.
+			*/}
+			<Show when={props.mode === "edit"}>
 			<span class="pill-sep max-[1100px]:hidden" aria-hidden="true" />
 
 			{/*
@@ -556,7 +726,7 @@ export function AgentPill(props: {
 								onClick={() => props.onTool(entry.tool)}
 							>
 								<Icon of={entry.icon} size={14} class="flex-none text-muted" />
-								<span class="lb flex-1 font-normal">{entry.label}</span>
+								<span class="lb flex-1">{entry.label}</span>
 								<span class="meta flex-none text-[10px]">{entry.key}</span>
 							</button>
 						)}
@@ -576,7 +746,7 @@ export function AgentPill(props: {
 								<span class="rule hidden max-[640px]:block" />
 								<button type="button" role="menuitem" data-row data-flat="true" onClick={() => undo()()} class="hidden max-[640px]:flex">
 									<Icon of={Undo2} size={14} class="flex-none text-muted" />
-									<span class="lb flex-1 font-normal">Undo the last edit</span>
+									<span class="lb flex-1">Undo the last edit</span>
 									<span class="meta flex-none text-[10px]">⌘Z</span>
 								</button>
 							</>
@@ -608,6 +778,7 @@ export function AgentPill(props: {
 						</button>
 					</>
 				)}
+			</Show>
 			</Show>
 		</div>
 	);

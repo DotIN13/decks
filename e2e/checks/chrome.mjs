@@ -169,27 +169,40 @@ link.send({ type: "board.play", path: "boards/plan.html" });
 await page.waitForSelector('.board-node[data-path="boards/plan.html"] iframe', { timeout: 10000 });
 await settle(page, 600);
 
-// Hovering the handle previews instantly; the transcript is not dimmed.
+// Pressing Preview shows that point's boards; the transcript is not dimmed.
 const before = read(plan);
 await page.locator(".stream .stream-mine").first().hover();
-await page.locator(".stream .stream-mine .stream-rw").first().hover();
+/*
+ * Opened and pressed. Pointing at the handle used to be enough — and that is exactly what
+ * was wrong with it: the canvas changed under a cursor crossing the transcript, into a state
+ * whose only exit was inside this menu.
+ */
+await page.locator(".stream .stream-mine .stream-rw").first().click();
+await page.waitForSelector(".popover", { timeout: 6000 });
+await page.locator(".popover [data-row]").filter({ hasText: /^Preview$/ }).first().click();
 await page.waitForFunction(() => document.querySelector(".stage")?.dataset.previewing === "true", null, { timeout: 8000 });
 const previewing = await page.evaluate(() => ({
 	stage: document.querySelector(".stage")?.dataset.previewing,
 	src: document.querySelector(".board-node iframe")?.getAttribute("src"),
 	transcriptOpacity: Number(getComputedStyle(document.querySelector(".stream .stream-roll > *")).opacity),
 }));
-say("hovering rewind previews the boards at once", (previewing.src ?? "").startsWith("/api/revision/"), `src=${previewing.src}`);
-say("the transcript is not dimmed under the cursor", previewing.transcriptOpacity === 1, `opacity ${previewing.transcriptOpacity}`);
+say("pressing Preview shows the boards at that point", (previewing.src ?? "").startsWith("/api/revision/"), `src=${previewing.src}`);
+say("the transcript is not dimmed while it is up", previewing.transcriptOpacity === 1, `opacity ${previewing.transcriptOpacity}`);
 say("previewing writes nothing", read(plan) === before);
 
+/*
+ * And Escape puts them back — the canvas's own way out, which is the other half of making the
+ * preview deliberate: moving the pointer away no longer ends it, so something on the canvas
+ * has to. (`preview.mjs` checks the badge and its Leave button without spending a turn.)
+ */
 await page.mouse.move(800, 300);
+await page.keyboard.press("Escape");
 await page.waitForFunction(
 	() => (document.querySelector(".board-node iframe")?.getAttribute("src") ?? "").startsWith("/api/board/"),
 	null,
 	{ timeout: 8000 },
 );
-say("leaving puts the live boards back", true);
+say("Escape puts the live boards back", true);
 
 /*
  * The column does not churn under the cursor.

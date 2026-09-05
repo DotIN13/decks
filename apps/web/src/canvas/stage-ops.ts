@@ -1,4 +1,5 @@
 import type { Board, Camera, StageCall } from "@decks/protocol";
+import { anchorPoint, cleanMarks, type Mark } from "./annotations.ts";
 import { boxOf, fit } from "../lib/camera.ts";
 
 /**
@@ -21,7 +22,22 @@ export interface StageOpsHost {
 	select(path: string | undefined): void;
 	reload(path: string): void;
 	cursor(cursor: { path: string; x: number; y: number; label: string; color: string } | null): void;
+	/** Replace one agent's annotations on one board. An empty list clears them. */
+	annotate(agentId: string, path: string, marks: Mark[]): void;
 	toast(text: string): void;
+}
+
+/**
+ * A board's own document, or `undefined` if it is not mounted.
+ *
+ * The same reach `highlight` makes below, and it is the same-origin decision (DESIGN §4)
+ * doing real work: a board is served from `/api/board/...` into a frame on this origin, so
+ * its DOM is readable without a message protocol.
+ */
+function boardDoc(path: string): Document | undefined {
+	const selector = `.board-node[data-path="${CSS.escape(path)}"] iframe`;
+	const frame = document.querySelector(selector) as HTMLIFrameElement | null;
+	return frame?.contentDocument ?? undefined;
 }
 
 export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
@@ -54,6 +70,40 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			if (typeof args.path !== "string") return { error: "reload needs a path" };
 			host.reload(args.path);
 			return { reloaded: args.path };
+		}
+
+		case "annotate": {
+			if (typeof args.path !== "string") return { error: "annotate needs a path" };
+			if (typeof args.agentId !== "string") return { error: "annotate needs an agent" };
+			if (!host.boards().some((board) => board.path === args.path)) return { error: `that board is not on the canvas: ${args.path}` };
+			/*
+			 * Cleaned here rather than on the server, unlike tags. The rules are about *drawing*
+			 * — how many bubbles fit, how long a label can be before it stops being a label —
+			 * and they belong beside the thing that draws them. The server's job is to know the
+			 * board exists, which it does before sending this.
+			 */
+			const wanted = cleanMarks(args.agentId, args.path, args.marks ?? []);
+			/*
+			 * Dropped here if the anchor does not resolve, so the number reported back is the
+			 * number *drawn*.
+			 *
+			 * It was the cleaned count, which made `{ annotated: 3, of: 3 }` the answer to three
+			 * marks of which one pointed at a `data-id` the board does not have — true about the
+			 * request and useless about the result. An agent that mistypes an id should be told,
+			 * because the alternative is it believing it has pointed at something.
+			 *
+			 * The drawing keeps its own guard for the other case: a component that exists now
+			 * and is deleted while the bubble is up.
+			 */
+			const doc = boardDoc(args.path);
+			const marks = wanted.filter((mark) => anchorPoint(doc, mark.to) !== undefined);
+			host.annotate(args.agentId, args.path, marks);
+			const missed = wanted.filter((mark) => !marks.includes(mark)).map((mark) => mark.to);
+			return {
+				annotated: marks.length,
+				of: Array.isArray(args.marks) ? args.marks.length : args.marks ? 1 : 0,
+				...(missed.length > 0 ? { notFound: missed } : {}),
+			};
 		}
 
 		case "cursor": {

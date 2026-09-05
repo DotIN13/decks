@@ -46,7 +46,7 @@ const PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAABgAAAAwCAIAAACE6i30AAAAK0lEQVR4nO3MMQ0AAAgDsMlBE9oRg4mdTXo3t1MRkUgkEolEIpFIJBI1oweXkCdb46qvjQAAAABJRU5ErkJggg==";
 const TEXT = Buffer.from(Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join("\n")).toString("base64");
 
-const { browser, page, errors } = await open();
+const { browser, page, errors } = await open({ edit: true });
 const before = new Set(existsSync(assets) ? readdirSync(assets) : []);
 try {
 	await boardReady(page, path);

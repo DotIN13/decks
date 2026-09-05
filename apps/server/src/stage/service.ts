@@ -30,7 +30,7 @@ export interface StageHost {
 	/** The camera the browser last reported. */
 	camera(): Camera;
 	/** Agents, for `stage.agents()` and for `inContext` on every board. */
-	agents(): Array<{ id: string; name: string; state: string; context: string[] }>;
+	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
 }
 
 export class StageService {
@@ -121,6 +121,19 @@ export class StageService {
 
 	async cursor(path: string, at: { x: number; y: number } | null, label: string, color: string): Promise<void> {
 		await this.ask({ op: "cursor", args: { path, at, label, color } });
+	}
+
+	/**
+	 * Point at what just changed: bubbles with arrows, on the canvas, not in the file.
+	 *
+	 * `null` clears this agent's own — the browser filters by the id it is given, so one agent
+	 * clearing does not wipe another's. The result carries the count *as drawn*, because the
+	 * browser drops anything it cannot anchor and an agent that asked for four and got two
+	 * should be told rather than assume.
+	 */
+	async annotate(agentId: string, path: string, marks: unknown): Promise<unknown> {
+		if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
+		return this.ask({ op: "annotate", args: { agentId, path, marks: marks ?? null } });
 	}
 
 	async toast(text: string): Promise<void> {

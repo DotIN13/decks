@@ -93,6 +93,34 @@
 		color: var(--fg);
 	}
 
+	/*
+	 * Hovering a control that is already on.
+	 *
+	 * `.iconbtn:hover` is a wash of `--line` on a transparent button, and on a button that
+	 * is *on* that wash is already spent: on an accent fill it would be a contradiction —
+	 * grey where the state says accent — and on a soft one it is the colour already there,
+	 * so nothing moves at all. Both were true here, the first of them loudly, because the
+	 * palette's own unlayered `:hover` was overriding the accent for the selected tool.
+	 *
+	 * So the feedback is a step *within* the state rather than a different colour: one shade
+	 * toward the foreground, which darkens in light and lightens in dark. Both borrow what
+	 * the app already says elsewhere — `--line-strong` is the wash's next rung, and the
+	 * oklab mix is the one the picker's `+` uses.
+	 */
+	.iconbtn[data-on="true"]:hover {
+		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
+	}
+
+	.iconbtn[data-on="soft"]:hover {
+		background: var(--line-strong);
+	}
+
+	/* And the third state, for the same reason: the conversation button while the inspector
+	   has the edge is a tinted accent, and the grey wash over it read as *off*. */
+	.iconbtn[data-on="yield"]:hover {
+		background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+	}
+
 	.iconbtn[data-on="yield"] {
 		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
 		color: var(--color-accent);
@@ -321,6 +349,40 @@
 	}
 
 	/*
+	 * In a menu, a row with nothing under it is not a title.
+	 *
+	 * 600 is right for a row that *has* a `.nt` — a mode, a model, a described choice: the
+	 * label is a heading over its own sentence. It is wrong for a plain menu row, where it
+	 * makes a list of six places to go read as six headings, and the corner's `⋯` read
+	 * heavier than the zoom menu sitting a button away from it.
+	 *
+	 * That disagreement had been patched seven times, one `font-normal` at a time — the
+	 * zoom stops, the two zoom steps, the tools menu, undo, and both "new agent" rows. Seven
+	 * opt-outs from a default is the default being wrong, so it is stated once here and the
+	 * utilities are gone. `.rowlist` keeps 600 throughout: the panel's boards, the settings
+	 * groups and the dialog's options are lists you read, not lists you pick from.
+	 */
+	.popover [data-row]:not(:has(> .nt)) > .lb {
+		font-weight: 400;
+	}
+
+	/*
+	 * …unless the label is somebody's name.
+	 *
+	 * The agent list is the one menu whose rows are not places to go: each one is a person
+	 * you are switching to, and a name carries its row the way a title does — so it keeps
+	 * 600 while "Settings" and "Zoom in" do not. Said with a class rather than inferred from
+	 * `:has(> .kind)`, which would be true of those rows only by coincidence of what else is
+	 * in them.
+	 *
+	 * Immediately after the rule it excepts, because the two have the same specificity and
+	 * source order is what decides between them.
+	 */
+	.popover [data-row] > .lb.nm {
+		font-weight: 600;
+	}
+
+	/*
 	 * The note under a row.
 	 *
 	 * This is the reason a mode is a menu and not a segmented control: "edit freely" does
@@ -410,9 +472,16 @@
 	 *   like an agent: 22px reserved there is a ragged gutter down the whole list, and 22px
 	 *   of words sliding left is a smaller price than that.
 	 *
-	 * Either way both are up together once the × is up. It replaced the words for a while and
-	 * that was worse: the status is the thing you were reading, and swapping it for a button
-	 * takes the row's only fact away at the moment you are deciding what to do with it.
+	 * **On a pointer the words step aside for the button rather than shuffling along beside
+	 * it.** They shared the row for a while, the status sliding left by 22px as the × arrived,
+	 * on the argument that the status is what you were reading and taking it away mid-decision
+	 * is rude. What that actually produced was a row that rearranged itself under the cursor
+	 * every time you crossed it — five agents' worth of words twitching left as the pointer
+	 * went down the list. The cursor is *on* this row: what you want from it now is what you
+	 * can do to it, and the status is a glance away in every other row and in the corner.
+	 *
+	 * On a touch screen neither of those is true — nothing is hovering, and nothing moves —
+	 * so there both are simply drawn, all the time.
 	 */
 	:is(.popover, .rowlist) .row-act > .close {
 		display: grid;
@@ -464,6 +533,18 @@
 
 		:is(.popover, .rowlist) .row-act:has([data-yield]):is(:hover, :focus-within) > .close {
 			display: grid;
+		}
+
+		/*
+		 * And the words the button is arriving in place of — **only where one is arriving.**
+		 *
+		 * Only an idle agent can be closed (`closeWords`), so a row that is mid-turn has no ×
+		 * in its box at all. Without the `:has`, hovering one of those emptied the last column
+		 * and put nothing in it: the status vanished to make room for a button that was never
+		 * coming. The panel's rows always have their tag button, so they always yield.
+		 */
+		:is(.popover, .rowlist) .row-act:has(> :is(.close, .agent-tagbtn)):is(:hover, :focus-within) [data-yield] {
+			display: none;
 		}
 	}
 
@@ -672,6 +753,108 @@
 		color: var(--fg);
 		font-weight: 600;
 		box-shadow: var(--shadow-row);
+	}
+
+	/*
+	 * Which runtime an agent is on: `claude` or `pi`, as a word.
+	 *
+	 * Three surfaces draw it — the dropdown row, the hover card, the panel's agent row — and
+	 * they must name a runtime identically, which is the whole reason this is one class.
+	 *
+	 * A word rather than a badge on the avatar, which was the option it beat: agents draw
+	 * their own faces (`stage.me.setAvatar`), so a badge would be a third mark on a 22px
+	 * circle that already carries a status ring and an unread dot, sitting on top of artwork
+	 * nobody controls. A word cannot collide with any of that, and it is readable aloud.
+	 *
+	 * Mono, because it is an identifier — the string the server calls the runtime, not a
+	 * label somebody chose.
+	 */
+	/*
+	 * The runtime: a filled **box**, where a tag is a pill.
+	 *
+	 * Same size, same mono, same grey — and a different shape, which is the whole of what
+	 * tells them apart. They are not the same kind of fact: a tag is something somebody said
+	 * about this agent and there can be four of them; the runtime is what the agent *is* and
+	 * there is exactly one. Shape carries that, so the fill does not have to, and both can
+	 * keep the quiet grey they read best in.
+	 *
+	 * This is why the filled chip is affordable again after being stripped for being five
+	 * grey slabs down a list of five: it is now the only square thing in the row.
+	 */
+	.kind {
+		flex: none;
+		padding: 1px 5px;
+		border-radius: 4px;
+		background: var(--fill);
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		line-height: 14px;
+		letter-spacing: 0.01em;
+	}
+
+	/*
+	 * Hollow on an agent with no runtime behind it.
+	 *
+	 * A dormant chat has a `kind` recorded and nothing running, so the word is a fact about
+	 * what it *will* resume as — and the emptied box is a good picture of that. It cannot be
+	 * mistaken for one of your tags, which are outlined too: those are pills, this is a box.
+	 */
+	.kind[data-dormant] {
+		background: transparent;
+		box-shadow: inset 0 0 0 1px var(--line);
+		color: var(--faint);
+	}
+
+	/*
+	 * A tag: what an agent says it is working on, or what you say it is.
+	 *
+	 * **Neutral, not coloured.** A hue hashed from the tag would make "who else is on
+	 * panel-css" a glance rather than a read — and it would put four saturated colours in a
+	 * list where colour already means exactly one thing, the status ring, which is the most
+	 * important mark on the row. Tags are read as words; the ring is read as a colour.
+	 */
+	.tag {
+		min-width: 0;
+		max-width: 100%;
+		overflow: hidden;
+		padding: 1px 6px;
+		border-radius: 999px;
+		background: var(--fill);
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		line-height: 14px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/*
+	 * Yours, drawn differently, because they are a different claim.
+	 *
+	 * The agent's tags say what it is doing; yours say what you think of it. They live in
+	 * separate fields (`Identity.userTags`) precisely so `setTags` cannot delete them, and
+	 * they are outlined rather than filled so the two are told apart without a legend.
+	 */
+	.tag[data-mine] {
+		background: transparent;
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 45%, var(--line));
+		color: color-mix(in srgb, var(--color-accent) 70%, var(--fg));
+	}
+
+	/*
+	 * Two pills and a box: **the agent's tags are filled pills, yours are outlined pills, and
+	 * the runtime is a filled box.** Tags are what somebody says about the agent, and which
+	 * of the two somebody it was is the fill; the runtime is what the agent *is*, and that is
+	 * a different kind of fact, so it gets a different shape rather than a third fill.
+	 */
+
+	/* A row of them, wrapping. Two lines at 264px is the cap's whole justification. */
+	.tags {
+		display: flex;
+		min-width: 0;
+		flex-wrap: wrap;
+		gap: 3px;
 	}
 
 	/*

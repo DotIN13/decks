@@ -56,6 +56,8 @@ export interface Identity {
 	name: string;
 	avatar?: string;
 	color: string;
+	/** What you last said you were doing, as stored — see `me.setTags`. */
+	tags?: string[];
 }
 
 export interface AgentSummary {
@@ -66,6 +68,8 @@ export interface AgentSummary {
 	state: "idle" | "thinking" | "streaming" | "tool" | "waiting";
 	/** Boards this agent is holding. */
 	context: string[];
+	/** What it says it is working on. Empty if it has not said. */
+	tags: string[];
 }
 
 export interface ShowOptions {
@@ -178,6 +182,33 @@ export interface Stage {
 	 */
 	cursor(path: string, at: { x: number; y: number } | null): Promise<void>;
 
+	/**
+	 * Point at what you just changed: a bubble with a small arrow, on the canvas.
+	 *
+	 *     await stage.annotate("boards/plan.html", [
+	 *       { to: "goal", label: "rewrote this" },
+	 *       { to: "risk-auth", label: "and added this", tone: "ok" },
+	 *     ]);
+	 *     await stage.annotate("boards/plan.html", null);   // clear yours
+	 *
+	 * **Nothing is written to the board.** These live on the canvas and vanish, like
+	 * `cursor` — a board that has been annotated is byte-identical to one that has not, so
+	 * there is nothing to tidy up afterwards.
+	 *
+	 * `to` is a component's `data-id`, which is the point: the arrow is anchored to the
+	 * *thing*, so a component that moves takes its arrow with it. A `{ x, y }` is a board
+	 * coordinate, for pointing at somewhere rather than something.
+	 *
+	 * Use it when you have changed a board and want the reader's eye to land on where —
+	 * which `show({ highlight })` cannot do, because it frames exactly one component and
+	 * moves the camera to do it. Four at most, `tone` is `accent` | `ok` | `warn` | `danger`,
+	 * and labels are cut at 80 characters. Yours are cleared when you are next prompted.
+	 *
+	 * Returns how many were drawn: anything pointing at a `data-id` the board does not have
+	 * is dropped, so `{ annotated: 2, of: 3 }` means one of them missed.
+	 */
+	annotate(path: string, marks: Array<{ to: string | { x: number; y: number }; label: string; tone?: "accent" | "ok" | "warn" | "danger" }> | null): Promise<unknown>;
+
 	/** A short message in the corner of the canvas. Sparingly. */
 	toast(text: string): Promise<void>;
 
@@ -191,6 +222,27 @@ export interface Stage {
 		 * which is the intended use — keep it square, simple, and legible at 18px.
 		 */
 		setAvatar(avatar: { emoji: string } | { svg: string }): Promise<void>;
+		/**
+		 * What you are working on, in a few words. **Set these when you start on something and
+		 * clear them when you stop**, so the person watching can see what each agent is up to
+		 * without opening five conversations.
+		 *
+		 *     await stage.me.setTags(["panel-css", "measuring"]);
+		 *     // when the work moves on
+		 *     await stage.me.setTags(["panel-css", "writing-up"]);
+		 *     // finished
+		 *     await stage.me.setTags([]);
+		 *
+		 * **It replaces, it does not add.** So the list always says what is true now — which is
+		 * the only thing it is asked. Four at most, and each is slugged: lowercased, spaces to
+		 * hyphens, cut at 24 characters on a word boundary. It returns them **as stored**, so
+		 * `["Reading panel.css and measuring"]` comes back `["reading-panel-css-and"]` — read
+		 * the result if you care what it became.
+		 *
+		 * Short nouns beat sentences: `panel-css`, `e2e`, `thumbnails`. The name of the thing
+		 * you are working on, not a description of the work.
+		 */
+		setTags(tags: string[]): Promise<string[]>;
 		get(): Promise<Identity>;
 	};
 

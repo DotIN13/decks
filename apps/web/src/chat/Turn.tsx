@@ -183,7 +183,19 @@ function Said(props: { part: Extract<AgentPart, { kind: "text" }> }) {
 					</div>
 				)}
 			</Show>
-			<Markdown text={props.part.text} trailing={props.part.streaming ? <span class="caret" /> : undefined} />
+			{/*
+				No caret, deliberately.
+				
+				A blinking block at the end of a streaming reply was a second thing on screen
+				saying "still going" — the `typing…` indicator says it, in words, in one place
+				that does not move. Two signals for one fact, one of which flickered on and off
+				twice a second, and the flicker was the whole complaint.
+				
+				`Markdown`'s `trailing` slot stays: it exists to put something *inside* the last
+				block rather than on a line of its own, which is a hard-won piece of layout and
+				will be wanted again. Nothing is passed to it today.
+			*/}
+			<Markdown text={props.part.text} />
 		</>
 	);
 }

@@ -1,5 +1,5 @@
 import type { Board, Camera } from "@decks/protocol";
-import { createEffect, createSignal, For, onCleanup, onMount } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
 import { canvasBox } from "../lib/insets.ts";
 import { BoardFrame } from "./BoardFrame.tsx";
@@ -33,6 +33,14 @@ const TOOL_KEYS: Record<string, Tool> = { v: "select", s: "sticky", c: "card", t
  * otherwise, which on a board means a title bar or a component already selected.
  */
 export function Stage(props: {
+	/**
+	 * Browse or edit. The stage draws the difference so it cannot be entered unnoticed.
+	 *
+	 * This is the guard that replaces a confirmation dialog: pressing the pencil is one
+	 * press and immediately reversible, so what stops an accident is that the canvas *looks*
+	 * different for as long as it lasts, not a question you learn to dismiss.
+	 */
+	mode: "browse" | "edit";
 	boards: Board[];
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
@@ -43,6 +51,8 @@ export function Stage(props: {
 	/** Per-board reload counters, from `stage.reload`. */
 	nonces?: Record<string, number>;
 	cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
+	/** Every agent's annotations, across all boards. Each frame takes the ones that are its. */
+	marks?: import("./annotations.ts").Mark[];
 	/** So the server can answer `stage.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
 	editor: EditorHost;
@@ -54,6 +64,15 @@ export function Stage(props: {
 	frameRevs?: Record<string, number>;
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
+	/**
+	 * Leave the preview — the canvas's own way out of it.
+	 *
+	 * It had none. The only handle on a held preview was the row inside the message's own
+	 * menu, in a transcript that is away by default, while the canvas said nothing at all
+	 * about being in a state where every board is inert. The badge below and Escape are
+	 * both this.
+	 */
+	onLeavePreview?: () => void;
 	/**
 	 * Swipe in from an edge to open a panel, where there is no cursor to reach with.
 	 *
@@ -171,6 +190,20 @@ export function Stage(props: {
 	 * board. Returns whether the key meant anything, so the caller knows to swallow it.
 	 */
 	const shortcut = (key: string): boolean => {
+		/*
+		 * Escape leaves the preview, and it is first because it is the way *out* of a state
+		 * that has taken everything else away: while a preview is up every frame is inert, so
+		 * none of the keys below can be reached from inside a board anyway.
+		 *
+		 * Here rather than on the window, so it works with focus inside a board too —
+		 * `frame-gestures.ts` forwards a board's keys to this same function, which is the
+		 * whole reason the camera's keys live here rather than in the components that own
+		 * them.
+		 */
+		if (key === "Escape" && props.preview && props.onLeavePreview) {
+			props.onLeavePreview();
+			return true;
+		}
 		/*
 		 * The palette's keys live here rather than in the palette, for the same reason
 		 * the camera's do: a click on a board puts focus inside its iframe, so a
@@ -442,6 +475,7 @@ export function Stage(props: {
 	return (
 		<div
 			class="stage"
+			data-mode={props.mode}
 			data-previewing={Boolean(props.preview)}
 			data-panning={panning()}
 			ref={element}
@@ -449,6 +483,25 @@ export function Stage(props: {
 			onPointerDown={onPointerDown}
 			style={{ cursor: spaceHeld() ? "grab" : undefined }}
 		>
+			{/*
+				The state, and the way out of it, in the corner the editing badge uses.
+				
+				A real element rather than the `::before` that says "Editing", because this one
+				has to be pressable: the editing badge can be a pseudo-element since the pencil
+				beside it is the way back, and a preview had no equivalent anywhere on screen.
+				
+				`role="status"` and not an alert: it is a standing condition, not an event, and it
+				appears because *you* asked to look at the past.
+			*/}
+			<Show when={props.preview && props.onLeavePreview}>
+				<div class="preview-sign" role="status">
+					<span>Showing an earlier version</span>
+					<button type="button" onClick={() => props.onLeavePreview?.()}>
+						Leave
+					</button>
+				</div>
+			</Show>
+
 			<div
 				class="world"
 				ref={worldEl}
@@ -462,6 +515,7 @@ export function Stage(props: {
 							selected={props.selected === board.path}
 							nonce={props.nonces?.[board.path]}
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
+							marks={(props.marks ?? []).filter((mark) => mark.path === board.path)}
 							editor={props.editor}
 							gestures={gestures}
 							drops={props.drops(board.path)}

@@ -14,6 +14,7 @@ import type {
 	ServerMessage,
 	SlashCommand,
 	ThinkingLevel,
+	UsageReport,
 } from "@decks/protocol";
 import { CLAUDE_CAPABILITIES, CLAUDE_COMMANDS, ClaudeBackend } from "../claude/backend.ts";
 import type { Deck } from "../deck/loader.ts";
@@ -26,6 +27,7 @@ import type { SnapshotStore } from "./snapshot.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
 import { Translator } from "./translator.ts";
+import { cleanTags, sameTags } from "./tags.ts";
 
 /**
  * One agent, and everything about it that is not Pi's.
@@ -90,7 +92,7 @@ export class DeckAgent {
 		private readonly host: {
 			port: number;
 			camera(): Camera;
-			agents(): Array<{ id: string; name: string; state: string; context: string[] }>;
+			agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
 			spawn(parentId: string, spec: DelegateSpec): Promise<DelegateReport>;
 			recordRevision(path: string): string | undefined;
 			boardPathOf(file: string): string | undefined;
@@ -125,6 +127,8 @@ export class DeckAgent {
 				createdAt: number;
 				model?: AgentModel;
 				mode?: AgentMode;
+				tags?: string[];
+				userTags?: string[];
 			};
 		},
 	) {
@@ -145,6 +149,16 @@ export class DeckAgent {
 		this.createdAt = options.restored?.createdAt ?? Date.now();
 		this.identity = { name: options.name ?? "Agent", color: options.color };
 		if (options.restored?.avatar) this.identity = { ...this.identity, avatar: options.restored.avatar };
+		/*
+		 * Both tag lists come back with a restored agent.
+		 *
+		 * Assigned rather than pushed through `setTags`, because this runs in the constructor:
+		 * the setters emit and save, and there is nobody subscribed yet and nothing to save
+		 * over. Already cleaned — they were cleaned on the way in — and re-cleaning a stored
+		 * value is how a cap change silently rewrites history.
+		 */
+		if (options.restored?.tags?.length) this.identity = { ...this.identity, tags: options.restored.tags };
+		if (options.restored?.userTags?.length) this.identity = { ...this.identity, userTags: options.restored.userTags };
 		this.parentId = options.parentId;
 		this.resumeRef = options.resumeRef;
 		this.kind = options.kind;
@@ -187,8 +201,8 @@ export class DeckAgent {
 		}
 
 		this.bridge = new ExtensionUiBridge({
-			prompt: (prompt) => this.emit({ type: "extension.ui.prompt", prompt }),
-			closePrompt: (id) => this.emit({ type: "extension.ui.prompt.closed", id }),
+			prompt: (prompt) => this.emit({ type: "extension.ui.prompt", agentId: this.id, prompt }),
+			closePrompt: (id) => this.emit({ type: "extension.ui.prompt.closed", agentId: this.id, id }),
 			notify: (text, level) => this.translator.notice(level, text),
 			status: () => {},
 			working: () => {},
@@ -229,6 +243,16 @@ export class DeckAgent {
 		if (Array.isArray(snapshot.inPlay)) this.setInPlay(snapshot.inPlay.filter((path) => typeof path === "string"));
 		if (snapshot.identity?.name) this.rename(snapshot.identity.name);
 		if (snapshot.identity?.avatar) this.setAvatar(snapshot.identity.avatar);
+		/*
+		 * Tags survive a restart, both kinds.
+		 *
+		 * The agent's, because a dormant agent's tags are the answer to "which of these was
+		 * the one about the panel" — which is the question most often asked about the parked
+		 * ones, and it would be lost exactly when it is most useful. Yours, because you typed
+		 * them and nothing about a restart is a reason to throw them away.
+		 */
+		if (snapshot.identity?.tags) this.setTags(snapshot.identity.tags);
+		if (snapshot.identity?.userTags) this.setUserTags(snapshot.identity.userTags);
 	}
 
 	/** What the canvas extension is allowed to reach on this agent (§6.2). */
@@ -241,6 +265,7 @@ export class DeckAgent {
 			inPlay: () => [...this.playing],
 			setInPlay: (paths: string[]) => this.setInPlay(paths),
 			rename: (name: string) => this.rename(name),
+			setTags: (tags: unknown) => this.setTags(tags),
 			setAvatar: (url: string) => this.setAvatar(url),
 			agents: () => this.host.agents(),
 			camera: () => this.host.camera(),
@@ -348,6 +373,8 @@ export class DeckAgent {
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
+			...(this.identity.tags?.length ? { tags: this.identity.tags } : {}),
+			...(this.identity.userTags?.length ? { userTags: this.identity.userTags } : {}),
 			// The last thing actually said, not the time of this write — it is what the list
 			// is ordered by and what `prune` keeps, so a flush on shutdown must not make an
 			// old chat look like the newest one.
@@ -408,6 +435,9 @@ export class DeckAgent {
 			// The install's Claude subscriptions, so a limit can move to the next one.
 			...(this.accounts ? { accounts: this.accounts } : {}),
 			...(this.accountsChanged ? { accountsChanged: this.accountsChanged } : {}),
+			// `/cost` asked for the panel. The shell reads the figures; the backend only says
+			// that somebody wants them.
+			showUsage: () => void this.pushReport(),
 		};
 
 		const create: Promise<AgentBackend> =
@@ -452,10 +482,34 @@ export class DeckAgent {
 		}
 	}
 
-	/** The backend's usage and cost, in a modal — the /cost command's surface, or the meter's click. */
-	async usageModal(): Promise<void> {
-		if (!this.backend) return;
-		await this.backend.usageModal?.();
+	/**
+	 * The full usage reading — the panel's own request, and `/cost`'s.
+	 *
+	 * Throws rather than answering emptily: the panel has a refresh button and shows what
+	 * went wrong beside the figures it already has, so a failure that is reported is worth
+	 * more than one that leaves the button looking broken.
+	 */
+	async report(): Promise<UsageReport> {
+		await this.start();
+		const backend = this.backend;
+		if (!backend) throw new Error(this.failure ?? "This agent is not running.");
+		if (!backend.report) throw new Error("This runtime does not report usage.");
+		return backend.report();
+	}
+
+	/**
+	 * `/cost`: the same reading, pushed with the instruction to open the panel.
+	 *
+	 * Broadcast rather than replied to, because nobody clicked anything in a browser — the
+	 * request came from the composer as a prompt, and every tab looking at this agent should
+	 * get the panel the person just asked for.
+	 */
+	private async pushReport(): Promise<void> {
+		try {
+			this.emit({ type: "agent.report", id: this.id, report: await this.report(), show: true });
+		} catch (error) {
+			this.emit({ type: "agent.report", id: this.id, error: (error as Error).message, show: true });
+		}
 	}
 
 	async prompt(text: string): Promise<void> {
@@ -651,6 +705,46 @@ export class DeckAgent {
 		this.save();
 	}
 
+	/**
+	 * The agent saying what it is doing, from `stage.me.setTags`. Replaces the list.
+	 *
+	 * Cleaned here rather than at the tool, so the one caller that is *not* a tool — a
+	 * restored snapshot — cannot reintroduce a tag this build would refuse. Returns the
+	 * cleaned list because the tool reports it back to the agent, which is how a model
+	 * discovers that its sentence became `reading-panel-css-and`.
+	 */
+	setTags(raw: unknown): string[] {
+		const tags = cleanTags(raw);
+		// A no-op is not a change. An agent that re-sets the same tags every turn would
+		// otherwise put an identity on the wire per turn and re-render every panel watching.
+		if (sameTags(this.identity.tags, tags)) return tags;
+		this.identity = { ...this.identity, ...(tags.length > 0 ? { tags } : { tags: undefined }) };
+		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
+		this.save();
+		return tags;
+	}
+
+	/**
+	 * Your tags on this agent, from the customise popup. A separate field, on purpose.
+	 *
+	 * `setTags` above replaces, so a shared list would mean the agent's next call silently
+	 * deleted what you typed. The agent cannot read this field either — `stage.agents()`
+	 * reports `tags` and not `userTags`, because what you think of an agent is not something
+	 * it should be steering on.
+	 */
+	setUserTags(raw: unknown): string[] {
+		const tags = cleanTags(raw);
+		if (sameTags(this.identity.userTags, tags)) return tags;
+		this.identity = { ...this.identity, ...(tags.length > 0 ? { userTags: tags } : { userTags: undefined }) };
+		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
+		this.save();
+		return tags;
+	}
+
+	get tags(): string[] {
+		return this.identity.tags ?? [];
+	}
+
 	get color(): string {
 		return this.identity.color;
 	}
@@ -695,7 +789,7 @@ export class DeckAgent {
 		if (this.modelOptions.length > 0) reply({ type: "models", agentId: this.id, models: this.modelOptions });
 		// A question asked before this browser existed still needs answering, or the agent
 		// that asked it waits forever.
-		for (const prompt of this.bridge.outstanding()) reply({ type: "extension.ui.prompt", prompt });
+		for (const prompt of this.bridge.outstanding()) reply({ type: "extension.ui.prompt", agentId: this.id, prompt });
 	}
 
 	answerDialog(...args: Parameters<ExtensionUiBridge["answer"]>): void {

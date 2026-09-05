@@ -1,12 +1,13 @@
-import type { AgentMode, AgentModel, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { AgentMode, AgentModel, ModelOption, SlashCommand, ThinkingLevel, AgentUsage } from "@decks/protocol";
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Square from "lucide-solid/icons/square";
-import { createEffect, createMemo, createSignal, For, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onMount, Show, untrack } from "solid-js";
 import { Icon } from "../../icons.tsx";
 import { Hints } from "./Hints.tsx";
 import { ModeMenu } from "./ModeMenu.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { ContextDial } from "./ContextDial.tsx";
 
 /**
  * The input bar, floating over the canvas.
@@ -60,6 +61,25 @@ export function Composer(props: {
 	 */
 	draft: { text: string; at: number } | undefined;
 	/**
+	 * How full this agent's context is, for the dial under the box.
+	 *
+	 * Back on this component after a detour through the corner's `⋯`. It reports rather than
+	 * acts, which is why it is *below* the box and not among the controls inside it — see the
+	 * note on the hint row.
+	 */
+	usage: AgentUsage | undefined;
+	/** The runtime's own usage report, from the row at the foot of the dial's popup. */
+	onUsage: () => void;
+	/**
+	 * Whose conversation this is. What you have typed is parked under it when you switch.
+	 *
+	 * The text used to be one signal, cleared only on send or Escape — so a half-written
+	 * prompt followed you to the next agent, addressed to it, one Enter from being sent to a
+	 * conversation it was not written for. There is no undo for a sent message, which makes
+	 * this the sharpest edge of the three the audit found.
+	 */
+	agentId: string | undefined;
+	/**
 	 * Button one of three: the file picker the app already has (`canvas/FilePicker`).
 	 *
 	 * Optional, and the button is absent rather than inert when it is not supplied. A
@@ -69,6 +89,17 @@ export function Composer(props: {
 	onAttach?: () => void;
 }) {
 	const [text, setText] = createSignal("");
+
+	/**
+	 * What you had typed to each agent, by id.
+	 *
+	 * Kept here rather than in `App.tsx` because the input's value is the composer's own
+	 * state and always has been — hoisting it would mean every keystroke crossing a component
+	 * boundary to be handed straight back. A plain `Map`: nothing renders from it, and it is
+	 * read once per switch.
+	 */
+	const parked = new Map<string, string>();
+	let held: string | undefined;
 	let input!: HTMLTextAreaElement;
 
 	/*
@@ -120,6 +151,28 @@ export function Composer(props: {
 	 * fresh object: two rewinds to the same message are two handovers, and the second must
 	 * put the words back even though they are the same words.
 	 */
+	/*
+	 * Park what is typed under the agent you are leaving, and restore that agent's own words.
+	 *
+	 * Tracks `props.agentId` only. Reading `text()` here would make this run on every
+	 * keystroke and park a half-word against the *current* agent — which is harmless but
+	 * means the effect is doing work per character to answer a question asked per switch. So
+	 * the outgoing text is read untracked, and `held` is the id it belongs to.
+	 */
+	createEffect(() => {
+		const next = props.agentId;
+		if (next === held) return;
+		if (held !== undefined) {
+			const outgoing = untrack(text);
+			if (outgoing) parked.set(held, outgoing);
+			else parked.delete(held);
+		}
+		held = next;
+		const restored = next ? parked.get(next) ?? "" : "";
+		setText(restored);
+		if (input) input.value = restored;
+	});
+
 	createEffect(() => {
 		const handed = props.draft;
 		if (!handed) return;
@@ -172,6 +225,9 @@ export function Composer(props: {
 		props.onSend(value);
 		setText("");
 		input.value = "";
+		// And forget the parked copy, or switching away and back would bring back a prompt
+		// that has already been sent.
+		if (props.agentId) parked.delete(props.agentId);
 	};
 
 	/*
@@ -368,12 +424,19 @@ export function Composer(props: {
 			 * `pointer-coarse` and not a width: a narrow window on a laptop still has the keys,
 			 * and the hints are still worth having there.
 			 *
-			 * The context dial used to sit at the right end of this row. It is in the corner's
-			 * `⋯` now (`chrome/ContextSummary.tsx`) — which is also why this row can go on a
-			 * phone at all, rather than staying for the one thing in it that was not a keycap.
+			 * **The context dial is at the right end of this row**, which is where it started.
+			 * It spent a while in the corner's `⋯` and that was half right: on a phone there is
+			 * no room under the input bar for anything, and on a desktop a reading you glance at
+			 * twenty times an hour should not be behind a menu you have to open. So it is here
+			 * for a fine pointer, and `⋯` keeps one row for a coarse one.
+			 *
+			 * Which also means the row is not *only* keycaps again — but the argument for
+			 * dropping it on a touchscreen is unchanged, because the dial goes to `⋯` there.
 			 */}
 			<div class="hintrow flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden">
 				<Hints menuOpen={menuOpen()} />
+				<span class="flex-1" />
+				<ContextDial usage={props.usage} onUsage={props.onUsage} />
 			</div>
 		</section>
 	);

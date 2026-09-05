@@ -14,6 +14,7 @@ import type {
 	Identity,
 	ModelOption,
 	ThinkingLevel,
+	UsageReport,
 } from "@decks/protocol";
 import Info from "lucide-solid/icons/info";
 import MessageSquare from "lucide-solid/icons/message-square";
@@ -29,6 +30,8 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { createStore, reconcile } from "solid-js/store";
 import type { EditorHost, Tool } from "./canvas/Editor.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
+import type { CanvasMode } from "./canvas/Editor.ts";
+import type { Mark } from "./canvas/annotations.ts";
 import { Settings } from "./chat/Settings.tsx";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
@@ -46,6 +49,7 @@ import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
 import { boxOf, fitInto, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
+import { selectionOnSwitch, viewOnSwitch, viewToPark, type AgentView } from "./chrome/agent-view.ts";
 import { closeHistory, historyShown, openHistory, setInspectable, toggleHistory } from "./lib/edge.ts";
 import { canvasBox, watchInsets } from "./lib/insets.ts";
 import { connect, type Socket } from "./lib/socket.ts";
@@ -68,6 +72,7 @@ import { setUnattended as paintBadge } from "./lib/favicon.ts";
 import { post as postBanner } from "./lib/notify.ts";
 import { play as playCue, preload as preloadCues } from "./lib/sound.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
+import { UsageModal } from "./chat/UsageModal.tsx";
 
 interface Notice {
 	id: number;
@@ -98,7 +103,16 @@ export function App() {
 		agentModel: Record<string, AgentModel | undefined>;
 		/** The context/cost meter for each agent, by id. */
 		agentUsage: Record<string, AgentUsage | undefined>;
-		dialog?: ExtensionUiPrompt;
+		/**
+		 * The question each agent is waiting on, keyed by whose it is.
+		 *
+		 * One `dialog` before, so a background agent's question was drawn over whichever
+		 * conversation you happened to be in — and the card could not say whose it was,
+		 * because the frame did not carry an id. It does now (`extension.ui.prompt`), so a
+		 * question belongs to a conversation: drawn when you are in it, and reported by the
+		 * agent list's "Wants you" when you are not.
+		 */
+		dialogs: Record<string, ExtensionUiPrompt>;
 		/** Boards each agent is holding, from `context.changed`. */
 		contexts: Record<string, string[]>;
 		/** The subset each agent has put on the canvas. */
@@ -114,7 +128,14 @@ export function App() {
 		 * the file, the stage refuses pointer events, and nothing is written until the
 		 * user actually clicks the notch.
 		 */
-		preview?: { entryId: string; boards: Record<string, string> };
+		/**
+		 * A point being previewed, per agent, and the revisions to render while it is.
+		 *
+		 * Keyed because `timeline.preview` always carried an `agentId` and the browser was
+		 * throwing it away: previewing Ada's history and switching left her past revisions
+		 * rendered into Bo's canvas, read-only, with nothing saying whose they were.
+		 */
+		previews: Record<string, { entryId: string; boards: Record<string, string> }>;
 		/** The Claude subscriptions this install can use (`chat/Settings.tsx`). */
 		accounts: ClaudeAccount[];
 		/** Which of them is spending. `default` is the CLI's own login. */
@@ -123,6 +144,8 @@ export function App() {
 		boards: [],
 		notices: [],
 		chats: [],
+		dialogs: {} as Record<string, ExtensionUiPrompt>,
+		previews: {} as Record<string, { entryId: string; boards: Record<string, string> }>,
 		identities: {},
 		transcripts: {} as Record<string, ChatItem[]>,
 		modelsByAgent: {} as Record<string, ModelOption[]>,
@@ -141,6 +164,32 @@ export function App() {
 	const [connected, setConnected] = createSignal(false);
 	const [selected, setSelected] = createSignal<string | undefined>(undefined);
 	const [tool, setTool] = createSignal<Tool>("select");
+	/**
+	 * Browse or edit, and **browse is where every session starts**.
+	 *
+	 * A deck is read far more often than it is drawn, and the failure modes are not
+	 * symmetrical: browsing when you meant to edit costs one press, while editing when you
+	 * meant to browse means a component has moved and been written to disk before you noticed.
+	 *
+	 * Not persisted, deliberately. A mode that enables dragging and is remembered across a
+	 * reload is a mode you can be in without having chosen it this session — which is exactly
+	 * the state the default is protecting against. The cost is one press after a refresh.
+	 */
+	const [mode, setMode] = createSignal<CanvasMode>("browse");
+
+	/**
+	 * Agents pointing at components: bubbles with arrows, on the canvas.
+	 *
+	 * One flat list rather than a map, because the two things done with it are "draw the ones
+	 * on this board" and "clear the ones this agent put there", and both are a filter.
+	 *
+	 * Cleared when the agent it belongs to **starts a new turn** — that is the lifetime
+	 * `boards/方案①` asks for, read the useful way round: the marks survive the turn that made
+	 * them, so they are still there when the agent stops and you come to read them, and they
+	 * go when you say something next. Also cleared by the × on each bubble, and by the agent
+	 * calling `annotate(path, null)`.
+	 */
+	const [marks, setMarks] = createSignal<Mark[]>([]);
 	const [component, setComponent] = createSignal<{ path: string; id: string } | undefined>(undefined);
 	/**
 	 * The file picker's promise, and which board asked.
@@ -201,6 +250,35 @@ export function App() {
 	 */
 	const [ops, setOps] = createSignal(false);
 	/**
+	 * The usage panel: whose it is open for, and what it has read.
+	 *
+	 * An agent id rather than a boolean, because every figure in it belongs to one agent and
+	 * a panel that survived a switch would be showing the last agent's plan under this one's
+	 * name. `usagePanel` is compared against `state.focused` before it is drawn, so moving
+	 * to another conversation closes it rather than relabelling it.
+	 *
+	 * Two ways in. On a desktop the cheap reading is a popover on the dial under the input
+	 * bar and this is what its last row opens; on a phone there is no room under the box, so
+	 * `⋯` has one row for the reading and it opens this directly. The third way is `/cost`,
+	 * which arrives from the server with `show` — see the `agent.report` case below.
+	 *
+	 * The report itself is *not* kept per agent across openings: it is read fresh every
+	 * time, because two of its three parts are running totals and the third is a countdown.
+	 */
+	const [usagePanel, setUsagePanel] = createSignal<string | undefined>(undefined);
+	const [report, setReport] = createSignal<{ report?: UsageReport; error?: string; loading: boolean }>({ loading: false });
+	const readUsage = (id: string | undefined) => {
+		if (!id) return;
+		setReport((was) => ({ ...was, loading: true }));
+		socket.send({ type: "agent.report", id });
+	};
+	const openUsage = (id: string | undefined) => {
+		if (!id) return;
+		setUsagePanel(id);
+		setReport({ loading: true });
+		socket.send({ type: "agent.report", id });
+	};
+	/**
 	 * Unread counts, kept here rather than on the server.
 	 *
 	 * "Have I read this" is a fact about a person in front of a browser, not about the
@@ -225,6 +303,16 @@ export function App() {
 	 * component drag. A rev is a content hash, so matching on it absorbs however many
 	 * echoes arrive and still reloads for a rev we did not produce.
 	 */
+	/**
+	 * What each conversation was looking at, by agent id.
+	 *
+	 * A `Map` rather than store state because nothing renders from it: it is read once, at the
+	 * moment of switching, and a signal would make every pan re-run whatever read it. Not
+	 * persisted either — a reload starts over, which is a deliberate limit and the one thing
+	 * `agent-view.ts` says it does not do.
+	 */
+	const views = new Map<string, AgentView>();
+
 	const selfRevs = new Map<string, number>();
 	/** Paths with a patch in flight, before the accepted rev is known. */
 	const patching = new Set<string>();
@@ -247,6 +335,15 @@ export function App() {
 	 * URL changes, and the frame reloads, which is exactly what should happen.
 	 */
 	const [frameRevs, setFrameRevs] = createStore<Record<string, number>>({});
+
+	/** The focused agent's question, if it has one. */
+	const dialog = () => (state.focused ? state.dialogs[state.focused] : undefined);
+	/* Clearing is always the focused agent's: it is the only one drawn, so it is the only
+	   one there is anything to dismiss. */
+	const clearDialog = () => state.focused && setState("dialogs", state.focused, undefined as never);
+	const clearPreview = () => state.focused && setState("previews", state.focused, undefined as never);
+	/** The focused agent's preview, if it is looking at its own past. */
+	const preview = () => (state.focused ? state.previews[state.focused] : undefined);
 
 	let socket: Socket;
 	let noticeId = 0;
@@ -571,6 +668,20 @@ export function App() {
 					setState("agentUsage", message.id, message.usage);
 					return;
 
+				/*
+				 * The usage panel's answer — and, when it carries `show`, the instruction to
+				 * open it. That is `/cost`: the person asked in the composer, so the panel has
+				 * to appear rather than wait for a reading nobody is looking at.
+				 */
+				case "agent.report": {
+					if (message.show) setUsagePanel(message.id);
+					// A reading for an agent whose panel is not open is a reading for a panel that
+					// was closed while it was in flight.
+					if (usagePanel() !== message.id) return;
+					setReport({ loading: false, ...(message.report ? { report: message.report } : {}), ...(message.error ? { error: message.error } : {}) });
+					return;
+				}
+
 				case "models":
 					// One list per agent: the runtime each agent runs on answers its own, and
 					// a global list would show the last agent to start on everyone — a row
@@ -616,7 +727,7 @@ export function App() {
 				}
 
 				case "timeline.preview":
-					setState("preview", message.entryId ? { entryId: message.entryId, boards: message.boards } : undefined);
+					setState("previews", message.agentId, message.entryId ? { entryId: message.entryId, boards: message.boards } : (undefined as never));
 					return;
 
 				case "context.changed":
@@ -642,6 +753,9 @@ export function App() {
 							select: (path) => setSelected(path),
 							reload: (path) => setState("nonces", path, (current = 0) => current + 1),
 							cursor: (cursor) => setState("cursor", cursor),
+							/* Replace one agent's marks on one board, leaving every other agent's alone. */
+							annotate: (agentId, path, next) =>
+								setMarks((was) => [...was.filter((mark) => mark.agentId !== agentId || mark.path !== path), ...next]),
 							toast: (text) => notice("info", text),
 						});
 					} catch (error) {
@@ -652,7 +766,7 @@ export function App() {
 				}
 
 				case "extension.ui.prompt":
-					setState("dialog", message.prompt);
+					setState("dialogs", message.agentId, message.prompt);
 					// Drawn in the dock, above the input bar, so it needs nothing dragged
 					// open to be seen.
 					/*
@@ -660,17 +774,22 @@ export function App() {
 					 * sets the `waiting` state yet, but every question an agent asks arrives here.
 					 * Both routes are wired because the state is the one that will survive — see
 					 * `agent-order.ts`, which has ringed `waiting` since before anything set it.
+					 *
+					 * It said `agent: state.focused`, which was a guess — right most of the time
+					 * and silently wrong when a background agent asked. The frame carries the id
+					 * now, so the banner names the agent that is actually waiting and clicking it
+					 * switches to that conversation rather than to whichever was on screen.
 					 */
 					raise("ask", {
-						title: "A question is waiting",
+						title: `${nameOf(message.agentId)} is waiting for you`,
 						body: "title" in message.prompt ? message.prompt.title : undefined,
 						tag: `prompt:${message.prompt.id}`,
-						agent: state.focused,
+						agent: message.agentId,
 					});
 					return;
 
 				case "extension.ui.prompt.closed":
-					setState("dialog", (current) => (current?.id === message.id ? undefined : current));
+					setState("dialogs", message.agentId, (current) => (current?.id === message.id ? (undefined as never) : current));
 					return;
 
 				case "notice":
@@ -862,9 +981,19 @@ export function App() {
 				});
 			}),
 		notice: (text) => notice("info", text),
-		// Editing follows the same threshold as pointer events: if the frame is inert
-		// because we are zoomed out, there is nothing to edit with.
-		enabled: () => zoomInteractive(),
+		/*
+		 * The whole of browse mode is this line.
+		 *
+		 * It was "are we zoomed in far enough": below `INTERACT_ZOOM` a frame takes no pointer
+		 * events, so there is nothing to edit with. Browse mode is a second reason for the
+		 * same gate to be shut — and because every listener in `Editor.ts` already consulted
+		 * it, dragging, selecting, the handle and double-click-to-retype all stand down
+		 * together with no new interception logic anywhere.
+		 *
+		 * What is *not* gated is what makes browse mode worth having: the frame still takes
+		 * pointer events, so text selects and copies, and a board that is a game is playable.
+		 */
+		enabled: () => zoomInteractive() && mode() === "edit",
 		reveal: (path, box) => {
 			const board = state.boards.find((candidate) => candidate.path === path);
 			const stage = document.querySelector(".stage");
@@ -911,7 +1040,7 @@ export function App() {
 	 * showing an inspector for something that had stopped being selectable.
 	 */
 	createEffect(() => {
-		setInspectable(shape() !== undefined && zoomInteractive() && !state.preview);
+		setInspectable(shape() !== undefined && zoomInteractive() && !preview());
 	});
 	createEffect(() => {
 		const selection = component();
@@ -1105,7 +1234,7 @@ export function App() {
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (event.key !== "Escape" || event.defaultPrevented) return;
 			if (!component()) return;
-			if (state.dialog) return;
+			if (dialog()) return;
 			const target = event.target as HTMLElement | null;
 			if (target?.closest?.("input, textarea, select, [contenteditable]")) return;
 			event.preventDefault();
@@ -1154,7 +1283,7 @@ export function App() {
 				const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node");
 				// While the timeline is being previewed the frames take no pointer events, so
 				// every drop arrives here — and "zoom in" would be a lie about why.
-				if (state.preview) {
+				if (preview()) {
 					notice("info", "That is a board as it used to be. Let go of the timeline first.");
 					return;
 				}
@@ -1278,13 +1407,52 @@ export function App() {
 	 * together, which is the whole reason there is no separate "observe": following an
 	 * agent *is* switching to it.
 	 */
+	/**
+	 * Clear one agent's annotations, wherever they are.
+	 *
+	 * Called when that agent is prompted again: the marks survive the turn that made them —
+	 * so they are still there when the agent stops and you come to read them — and go when
+	 * you say something next. `boards/方案①` asks for "until the end of the next turn"; this is
+	 * that, read the way that is actually useful.
+	 */
+	const clearMarks = (agentId: string) => setMarks((was) => was.filter((mark) => mark.agentId !== agentId));
+
 	const focusAgent = (id: string) => {
+		const leaving = state.focused;
+		if (leaving === id) return;
+
+		/*
+		 * Park the view you are leaving, then take the one you are arriving at.
+		 *
+		 * The canvas has always been per agent — it is the focused agent's in-play set — while
+		 * the camera was one value for the whole app, so switching swapped every board on
+		 * screen and left the camera where the last conversation had it. Nothing refitted,
+		 * because the only automatic fit runs once per page load: two agents in different
+		 * corners of a deck meant coming back to one of them and looking at empty canvas
+		 * thousands of pixels from anything.
+		 *
+		 * `agent-view.ts` owns the three cases and argues for them. In short: nothing on the
+		 * canvas leaves the camera alone, a remembered view comes back *exactly*, and an agent
+		 * with no memory gets a fit of what it holds.
+		 */
+		if (leaving) views.set(leaving, viewToPark(camera(), selected()));
+
 		setState("focused", id);
 		setUnread(id, 0);
 		setAtTurn(undefined);
 		setSeenAt(Date.now());
 		// A component selected in a board another agent was holding is not your selection.
 		setComponent(undefined);
+
+		const playing = state.inPlay[id] ?? [];
+		const view = views.get(id);
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		const next = viewOnSwitch({ view, playing, boards: state.boards, viewport: size, region: canvasBox(size) });
+		if (next) setCamera(next);
+		/* The board selection follows the camera. It was global, which made it inconsistent
+		   with the *component* selection three lines up — the two are the same kind of fact. */
+		setSelected(selectionOnSwitch(view, playing));
+
 		socket.send({ type: "agent.focus", id });
 	};
 
@@ -1340,6 +1508,8 @@ export function App() {
 
 			<div class="work">
 				<Stage
+					mode={mode()}
+					marks={marks()}
 					boards={stageBoards()}
 					camera={camera()}
 					setCamera={setCameraAndReport}
@@ -1369,7 +1539,11 @@ export function App() {
 					onTool={setTool}
 					drops={drops}
 					frameRevs={frameRevs}
-					preview={state.preview?.boards}
+					preview={preview()?.boards}
+					/* The canvas's own way out — the badge in the corner, and Escape. Clearing the
+					   browser's copy is the whole of it: the server keeps no preview state, which
+					   is also why a reload has always been an accidental escape hatch. */
+					onLeavePreview={clearPreview}
 					onEdgeSwipe={edgeSwipe}
 				/>
 
@@ -1383,6 +1557,8 @@ export function App() {
 					`data-inset="top"` where there were two.
 				*/}
 				<AgentPill
+					mode={mode()}
+					onMode={setMode}
 					chats={state.chats}
 					identities={state.identities}
 					focused={state.focused}
@@ -1441,9 +1617,9 @@ export function App() {
 					 * row of numbers in `⋯` now, and the corner's own button wears the warning.
 					 */
 					usage={state.focused ? state.agentUsage[state.focused] : undefined}
-					onUsage={() => socket.send({ type: "agent.usage", id: state.focused ?? "" })}
+					onContext={() => openUsage(state.focused)}
 					overflow={[
-						{ label: "What you can do on the canvas", icon: Info, onPick: () => setOps(true) },
+						{ label: "Shortcuts", icon: Info, onPick: () => setOps(true) },
 						{
 							label: "Settings",
 							icon: SettingsIcon,
@@ -1468,7 +1644,9 @@ export function App() {
 				    which is a read-only view of a board that no longer exists (§6.7). */}
 				<Inspector
 					shape={shape()}
-					visible={zoomInteractive() && !state.preview}
+					/* Edit-only: it is a properties panel, and a panel whose fields cannot be
+					   applied is a panel that lies about what it does. */
+					visible={zoomInteractive() && !preview() && mode() === "edit"}
 					onEdit={inspect}
 					pickFile={() => editor.pickFile(shape()?.path)}
 					onClose={() => setComponent(undefined)}
@@ -1517,6 +1695,20 @@ export function App() {
 					open={boardsOpen()}
 					onOpenChange={showBoards}
 					findAt={findAt()}
+					/*
+					 * The Agents tab. The same three signals the corner and the dropdown already
+					 * take, so the panel is not a second source of truth about who exists — and
+					 * `focusAgent` rather than a bare `agent.focus`, because switching moves the
+					 * canvas, the camera, the transcript and the draft together.
+					 */
+					chats={state.chats}
+					identities={state.identities}
+					unread={unread}
+					onFocusAgent={focusAgent}
+					onCloseAgent={closeAgent}
+					/* Your tags, which the agent cannot see or overwrite — a separate field from
+					   `stage.me.setTags`, for the reason `protocol/Identity` gives. */
+					onAgentTags={(id, tags) => socket.send({ type: "agent.tags", id, tags })}
 					onPick={(board) => {
 						socket.send({ type: "board.play", path: board.path });
 						flyTo(board);
@@ -1533,6 +1725,28 @@ export function App() {
 					onDelete={(board) => socket.send({ type: "board.delete", path: board.path })}
 				/>
 
+
+				{/*
+					The usage panel — the plan, the spend, and what has been driving it.
+					
+					Drawn only while it is open *for the agent you are looking at*: the figures are
+					one agent's, so a switch closes it instead of leaving this agent's name over the
+					last one's plan.
+					
+					Its own `Show`, not nested in the settings one — which is where the modal it
+					replaced first landed, so it could only open while Settings happened to be open
+					too.
+				*/}
+				<Show when={usagePanel() && usagePanel() === state.focused}>
+					<UsageModal
+						usage={state.focused ? state.agentUsage[state.focused] : undefined}
+						report={report().report}
+						error={report().error}
+						loading={report().loading}
+						onRefresh={() => readUsage(state.focused)}
+						onClose={() => setUsagePanel(undefined)}
+					/>
+				</Show>
 
 				<Show when={settings()}>
 					<Settings
@@ -1572,28 +1786,28 @@ export function App() {
 					name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
 					agent={focusedChat()?.kind ?? state.defaultKind}
 					{...(atTurn() ? { scrollTo: atTurn()! } : {})}
-					previewing={state.preview?.entryId ?? null}
+					previewing={preview()?.entryId ?? null}
 					onPreview={(entryId) => {
 						if (!state.focused) return;
 						if (!entryId) {
-							setState("preview", undefined);
+							clearPreview();
 							return;
 						}
 						socket.send({ type: "rewind.preview", id: state.focused, entryId });
 					}}
 					onRewind={(entryId) => {
 						if (!state.focused) return;
-						setState("preview", undefined);
+						clearPreview();
 						socket.send({ type: "rewind.to", id: state.focused, entryId });
 					}}
 					onFork={(entryId) => {
 						if (!state.focused) return;
-						setState("preview", undefined);
+						clearPreview();
 						socket.send({ type: "fork.from", id: state.focused, entryId });
 					}}
 					onRestore={(entryId) => {
 						if (!state.focused) return;
-						setState("preview", undefined);
+						clearPreview();
 						socket.send({ type: "boards.restore", id: state.focused, entryId });
 					}}
 				/>
@@ -1610,7 +1824,7 @@ export function App() {
 				 * you type into must not move between turns.
 				 */}
 				<div class="dock">
-					<Show when={state.dialog}>
+					<Show when={dialog()}>
 						{(prompt) => (
 							<Dialog
 								prompt={prompt()}
@@ -1619,7 +1833,7 @@ export function App() {
 										type: "extension.ui.answer",
 										answer: { id: prompt().id, ...answer } as never,
 									});
-									setState("dialog", undefined);
+									clearDialog();
 								}}
 							/>
 						)}
@@ -1633,6 +1847,9 @@ export function App() {
 
 					<Composer
 						draft={draft()}
+						agentId={state.focused}
+						usage={state.focused ? state.agentUsage[state.focused] : undefined}
+						onUsage={() => openUsage(state.focused)}
 						busy={busy()}
 						model={state.focused ? state.agentModel[state.focused] : undefined}
 						models={state.focused ? state.modelsByAgent[state.focused] ?? [] : []}
@@ -1640,7 +1857,11 @@ export function App() {
 						modes={focusedChat()?.capabilities?.modes ?? []}
 						mode={focusedChat()?.mode}
 						onMode={(mode) => socket.send({ type: "agent.setMode", id: state.focused ?? "", mode })}
-						onSend={(text) => socket.send({ type: "agent.prompt", id: state.focused ?? "", text })}
+						onSend={(text) => {
+							/* A new turn clears what the last one pointed at — see `clearMarks`. */
+							if (state.focused) clearMarks(state.focused);
+							socket.send({ type: "agent.prompt", id: state.focused ?? "", text });
+						}}
 						onAbort={() => socket.send({ type: "agent.abort", id: state.focused ?? "" })}
 						/*
 						 * `thinking` comes back with the model now. Switching to a model that does

@@ -5,7 +5,12 @@ import { canHover } from "../lib/panels.ts";
 import { tokens } from "./keycaps.ts";
 
 /**
- * What you can do to the canvas, in one place you can open and close.
+ * Shortcuts: what you can do to the canvas, in one place you can open and close.
+ *
+ * Called "What you can do on the canvas" in the `⋯` menu and headed "On the canvas" inside,
+ * which was a sentence where a name belonged — a menu row should name the thing it opens,
+ * and a menu of six rows is not the place to explain one of them. The sentence is still
+ * true; it is just what this file's first line is for.
  *
  * The same content spent a while as a line of grey text under the input bar, and then as a
  * tip rotating through the composer's placeholder. Both were wrong in the same way: they
@@ -146,10 +151,10 @@ export function CanvasOps(props: { onClose: () => void }) {
 			<div
 				class="panel-float ops flex max-h-[78%] w-[min(560px,calc(100vw-24px))] static flex-col overflow-hidden bg-bg p-0"
 				role="dialog"
-				aria-label="What you can do on the canvas"
+				aria-label="Shortcuts"
 			>
 				<header class="label flex items-center gap-2 border-b border-line py-2 pr-2.5 pl-3">
-					<span>On the canvas</span>
+					<span>Shortcuts</span>
 					<span class="flex-1" />
 					{/* `.iconbtn`: `icon-button` is a class the rewrite replaced and nothing defines,
 					    so this × was a bare button with no target and no hover. */}

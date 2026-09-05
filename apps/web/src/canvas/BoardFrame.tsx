@@ -1,10 +1,11 @@
 import type { Board, Camera } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { boardUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../lib/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
+import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
 import { paintFrame } from "../lib/theme.ts";
@@ -32,6 +33,8 @@ export function BoardFrame(props: {
 	nonce?: number;
 	/** Where an agent is pointing, in board coordinates. */
 	cursor?: { x: number; y: number; label: string; color: string };
+	/** Agents pointing at components on this board. Transient; never written to the file. */
+	marks?: Mark[];
 	onSelect: () => void;
 	onMove: (x: number, y: number) => void;
 	onOpen: () => void;
@@ -78,6 +81,51 @@ export function BoardFrame(props: {
 	};
 	const zoom = createMemo(() => props.camera.zoom);
 	const inert = createMemo(() => zoom() < INTERACT_ZOOM);
+
+	/*
+	 * A clock for re-measuring the board's own DOM.
+	 *
+	 * An annotation's position comes from `offsetLeft` on an element in *another document*,
+	 * which no signal can depend on. So it is re-read when the camera moves, when the board
+	 * changes revision, and — while there is anything to draw — a few times a second, which
+	 * is what lets an arrow follow a component being dragged.
+	 *
+	 * The interval runs **only while this board has marks on it**, which is almost never: it
+	 * is not a render loop, it is a poll that exists for a few seconds after an agent points
+	 * at something.
+	 */
+	/*
+	 * Tell the board's own document whether editing is on.
+	 *
+	 * The injected stylesheet hangs its hover affordances — the dotted underline and the
+	 * I-beam — off `:root[data-decks-edit]`, and this is what sets it. An effect rather than
+	 * something inside `attachEditor`, because `enabled()` is a signal and that file is plain
+	 * DOM in somebody else's document with no way to observe one.
+	 *
+	 * Re-applied on every mount as well as every change: the frame reloads when another tab
+	 * edits the board, and a fresh document has none of our attributes on it.
+	 */
+	createEffect(() => {
+		const can = props.editor.enabled();
+		void props.mounted;
+		void props.board.rev;
+		const root = frameEl?.contentDocument?.documentElement;
+		if (!root) return;
+		if (can) root.setAttribute("data-decks-edit", "");
+		else root.removeAttribute("data-decks-edit");
+	});
+
+	const [tick, setTick] = createSignal(0);
+	createEffect(() => {
+		if ((props.marks?.length ?? 0) === 0) return;
+		const timer = setInterval(() => setTick((n) => n + 1), 120);
+		onCleanup(() => clearInterval(timer));
+	});
+	createEffect(() => {
+		void props.camera;
+		void props.board.rev;
+		setTick((n) => n + 1);
+	});
 
 	/**
 	 * Point the frame at a URL, but only when that URL actually changed.
@@ -290,6 +338,42 @@ export function BoardFrame(props: {
 					/>
 				</Show>
 			</div>
+
+			{/*
+				Agents pointing at components: a bubble with a small arrow, per mark.
+
+				In the board's own coordinates and counter-scaled, exactly as the cursor below
+				is — a board component's `offsetLeft`/`offsetTop` *are* board coordinates, so
+				`anchorPoint` needs no camera maths and this file keeps its rule of having none.
+
+				Re-resolved on every draw, which is what makes an arrow follow a component that
+				is dragged: the drag rewrites the element's inline style and the next read sees
+				it. `tick` is what forces that read — the position is not reactive state, it is
+				a measurement of somebody else's DOM.
+			*/}
+			<For each={props.marks ?? []}>
+				{(mark) => {
+					const at = () => {
+						void tick();
+						return anchorPoint(frameEl?.contentDocument ?? undefined, mark.to);
+					};
+					return (
+						<Show when={at()}>
+							{(point) => (
+								<div
+									class="board-mark"
+									data-tone={mark.tone}
+									data-side={bubbleSide(point(), props.board.w)}
+									style={{ left: `${point().x}px`, top: `${point().y}px`, transform: `scale(${1 / zoom()})` }}
+								>
+									<span class="tip" aria-hidden="true" />
+									<span class="say">{mark.label}</span>
+								</div>
+							)}
+						</Show>
+					);
+				}}
+			</For>
 
 			{/* An agent pointing at something, in the board's own coordinates and
 			    counter-scaled so the label stays readable however far out you are. */}

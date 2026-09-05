@@ -16,6 +16,7 @@
 @import "./styles/inspector.css";
 @import "./styles/stream.css";
 @import "./styles/dock.css";
+@import "./styles/usage.css";
 
 /*
  * The app's tokens, handed to Tailwind so utilities speak the design language.
@@ -46,6 +47,7 @@
 	--color-faint: var(--faint);
 	--color-line: var(--line);
 	--color-line-strong: var(--line-strong);
+	--color-fill: var(--fill);
 	--color-accent: var(--color-accent);
 	--color-ok: var(--color-ok);
 	--color-warn: var(--color-warn);
@@ -168,6 +170,18 @@
 	--faint: var(--color-grey-600);
 	--line: rgb(0 0 0 / 10%);
 	--line-strong: rgb(0 0 0 / 20%);
+	/*
+	 * The ground under a small filled thing: a tag, a runtime, a provider chip.
+	 *
+	 * There was no such token, so all three reached for `--line` — a *line* colour, used as a
+	 * fill. Two things went wrong with that and both are visible in the agents panel. It is
+	 * pale, because a hairline wants to be barely there and a chip does not; and it is
+	 * translucent, so the same tag came out `#e6e6e6` on a plain row and `#dadada` on the
+	 * selected one — one list, two chip colours, for a reason nobody could name.
+	 *
+	 * Solid, and off the app's own ramp, so a chip is the same chip wherever it is put.
+	 */
+	--fill: var(--color-grey-400);
 	--shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 8px 24px rgb(0 0 0 / 8%);
 	/*
 	 * The same shadow, sized for a row rather than a panel — see `.chat-float .fsroll`.
@@ -198,6 +212,9 @@
 	--faint: var(--color-grey-600);
 	--line: rgb(255 255 255 / 12%);
 	--line-strong: rgb(255 255 255 / 24%);
+	/* One rung up from `--panel` here, where light is a few down from it: the eye reads a
+	   chip by how far it is from its ground, not by which way. */
+	--fill: var(--color-grey-800);
 	--shadow: 0 1px 2px rgb(0 0 0 / 50%), 0 10px 30px rgb(0 0 0 / 40%);
 	--shadow-row: 0 1px 2px rgb(0 0 0 / 45%), 0 3px 12px rgb(0 0 0 / 38%);
 	--shadow-menu: 0 1px 1px rgb(0 0 0 / 50%), 0 4px 12px rgb(0 0 0 / 55%), 0 18px 44px rgb(0 0 0 / 50%);
@@ -455,6 +472,65 @@ svg.lucide {
 
 .stage[data-panning="true"] {
 	cursor: grabbing;
+}
+
+/*
+ * Editing looks different, for as long as it lasts.
+ *
+ * This is what stands in for a confirmation dialog on the pencil. A mode that changes what a
+ * click does has to be visible the whole time it is on — otherwise the first you know of it
+ * is a component that has moved and been written to disk. A dialog in front of the switch
+ * would be the other answer, and it is the worse one: a question asked every time is a
+ * question dismissed without reading.
+ *
+ * An inset ring rather than a border, so it costs no layout and cannot move the canvas by a
+ * pixel when it appears. `--edit-ring` is the accent at low strength: unmistakable against
+ * the stage's flat ground, and quiet enough to work behind for an hour.
+ */
+/*
+ * `:not([data-previewing="true"])` on both halves of the editing sign.
+ *
+ * While a preview is up the frames take no pointer events, so nothing can be edited — and a
+ * ring plus the word "Editing" over a canvas where every board is inert is the app claiming
+ * something that is not true. The mode itself is untouched: leave the preview and the ring
+ * comes straight back, because you are still in edit mode and always were.
+ */
+.stage[data-mode="edit"]:not([data-previewing="true"])::after {
+	position: absolute;
+	z-index: 4;
+	inset: 0;
+	content: "";
+	pointer-events: none;
+	box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+/*
+ * And the word, because a colour whose meaning you have to remember needs a legend.
+ *
+ * Bottom-left: the four corners are taken by the pill, the agent cluster, the panel and the
+ * dock, and the bottom-left is the one edge of the canvas nothing else claims. Small, and it
+ * does not take pointer events — pressing the pencil is how you leave, and a second control
+ * saying the same thing is a second thing to keep in step.
+ */
+.stage[data-mode="edit"]:not([data-previewing="true"])::before {
+	position: absolute;
+	z-index: 5;
+	/* Above the dock and clear of the left panel, for the reasons the preview sign gives
+	   below — this badge had both problems and neither showed, because it was behind the
+	   panel to begin with. */
+	bottom: calc(var(--dock, 88px) + 12px + var(--keyboard, 0px) + env(safe-area-inset-bottom));
+	/* Clear of the left panel, for the reason the preview sign gives below — a legend behind
+	   a panel is one nobody reads, and the panel is open most of the time. */
+	left: calc(var(--inset-left, 0px) + max(12px, env(safe-area-inset-left)));
+	padding: 3px 8px 4px;
+	border-radius: 999px;
+	content: "Editing";
+	pointer-events: none;
+	background: color-mix(in srgb, var(--color-accent) 88%, var(--fg));
+	color: #fff;
+	font-size: 10.5px;
+	font-weight: 600;
+	letter-spacing: 0.01em;
 }
 
 .world {
@@ -1125,24 +1201,6 @@ svg.lucide {
 	color: var(--fg);
 }
 
-/* The caret that says a reply is still arriving. */
-@keyframes blink {
-	to {
-		visibility: hidden;
-	}
-}
-
-.fbubble .caret {
-	display: inline-block;
-	width: 7px;
-	height: 13px;
-	margin-left: 2px;
-	background: currentColor;
-	opacity: 0.5;
-	translate: 0 2px;
-	animation: blink 1s steps(2, start) infinite;
-}
-
 .fbubble code,
 .fbubble pre {
 	font-family: var(--font-mono);
@@ -1544,6 +1602,92 @@ svg.lucide {
 }
 
 /* An agent pointing at something on a board. */
+/*
+ * An agent pointing at a component: a bubble with a small arrow.
+ *
+ * Lives in the board's own coordinate space beside `.agent-cursor`, and is counter-scaled
+ * the same way, so the words stay readable however far out the camera is. Never written to
+ * the board — see `canvas/annotations.ts`.
+ *
+ * **A bubble and a small arrow, not a curve from the agent's avatar.** The playful version
+ * was on the table (`boards/方案①`) and this is the restrained one: an arrow that starts at a
+ * face in the corner has to cross whatever is between, so it draws over other boards and its
+ * length carries no meaning. A tip on the component's own edge says the same thing in 12px.
+ */
+.board-mark {
+	position: absolute;
+	z-index: 6;
+	display: flex;
+	/*
+	 * `max-content`, and it is load-bearing.
+	 *
+	 * An absolutely positioned box shrink-wraps against the space left between its `left` and
+	 * its containing block's right edge. A mark on a component near the right of the board
+	 * therefore had a few dozen pixels to lay out in, and the label wrapped to three lines
+	 * *before* `translate: -100%` moved it back to where it belonged — so the flip produced a
+	 * tall narrow bubble instead of the same bubble on the other side.
+	 */
+	width: max-content;
+	align-items: center;
+	gap: 0;
+	transform-origin: 0 50%;
+	pointer-events: none;
+}
+
+/* Flipped when the component is near the board's right edge, so the bubble stays on the
+   board rather than hanging over whatever is beside it on the canvas. */
+.board-mark[data-side="left"] {
+	flex-direction: row-reverse;
+	transform-origin: 100% 50%;
+	translate: -100% 0;
+}
+
+/* The arrow: a 12px triangle whose point is *on* the component's edge. */
+.board-mark > .tip {
+	flex: none;
+	width: 0;
+	height: 0;
+	border-top: 5px solid transparent;
+	border-bottom: 5px solid transparent;
+	border-right: 7px solid var(--mark);
+}
+
+.board-mark[data-side="left"] > .tip {
+	border-right: 0;
+	border-left: 7px solid var(--mark);
+}
+
+.board-mark > .say {
+	max-width: 220px;
+	padding: 4px 9px 5px;
+	border-radius: 7px;
+	background: var(--mark);
+	color: #fff;
+	font-size: 11.5px;
+	font-weight: 500;
+	line-height: 1.35;
+	text-align: left;
+	/* Wraps rather than ellipsing: a label is a clause and half a clause is worse than two
+	   lines of one. `MAX_LABEL` is what stops it becoming a paragraph. */
+	white-space: normal;
+}
+
+.board-mark {
+	--mark: var(--color-accent);
+}
+
+.board-mark[data-tone="ok"] {
+	--mark: var(--color-ok);
+}
+
+.board-mark[data-tone="warn"] {
+	--mark: var(--color-warn);
+}
+
+.board-mark[data-tone="danger"] {
+	--mark: var(--color-danger);
+}
+
 .agent-cursor {
 	position: absolute;
 	display: flex;
@@ -1581,38 +1725,30 @@ svg.lucide {
  * then covered it.
  */
 /*
- * The tool group, which is no longer a float of its own.
+ * The tool group, which is no longer a float of its own — and no longer has any rules.
  *
  * It was `.panel-float.palette`, absolutely positioned at `top: 12px; left: 50%` with a
  * translate — the free-standing palette that sat under the title bar. The tools live inside
- * the top-left pill now, so those four declarations are not merely redundant: keeping the
- * class as a handle for the canvas checks re-applied them, and the group jumped out of the
- * pill's flex line and landed back at the centre of the window, on top of the agent's name.
+ * the top-left pill now, and `palette` survives only as the handle the canvas checks
+ * address the group by.
  *
- * What is left is the vocabulary of the buttons themselves, which the pill reuses as-is.
+ * There was a second icon-button vocabulary here: `.palette button` at 30px with its own
+ * hover and its own `[data-active="true"]` accent fill. Every one of those declarations was
+ * wrong by the time it was read.
+ *
+ * - **30px, unlayered.** The five tools were 30px in a pill of 28px buttons, so the hover
+ *   wash on a tool was two pixels bigger than the hover wash beside it. `@layer components`
+ *   holds `.iconbtn`, and an unlayered rule beats a layered one however specific — which is
+ *   also why nobody found this by reading `.iconbtn`.
+ * - **`:hover` beating `[data-on]`.** For the same reason, hovering the *selected* tool
+ *   replaced its accent fill with grey: the layered `[data-on="true"]` lost to this. A
+ *   control saying "on" and then saying "not on" while your cursor is on it is the worst
+ *   available answer.
+ * - **`[data-active]` was a dead name.** The markup has said `data-on` since the tools moved
+ *   into the pill, so the accent fill here had not applied to anything in months.
+ *
+ * The tools are `.iconbtn`, like every other icon button in the app. That is the whole rule.
  */
-
-.palette button {
-	display: grid;
-	width: 30px;
-	height: 30px;
-	padding: 0;
-	border: 0;
-	border-radius: 8px;
-	background: transparent;
-	color: var(--muted);
-	cursor: pointer;
-	place-items: center;
-}
-
-.palette button:hover {
-	background: var(--line);
-}
-
-.palette button[data-active="true"] {
-	background: var(--color-accent);
-	color: #fff;
-}
 
 /* --- the inspector ----------------------------------------------------------- */
 
@@ -2377,6 +2513,80 @@ svg.lucide {
 
 .stage[data-previewing="true"] .board-node > .surface > iframe {
 	pointer-events: none;
+}
+
+/*
+ * The preview's own sign, in the corner the editing badge uses — and unlike that one, a
+ * control.
+ *
+ * The state it announces is the one this app had no way out of from the canvas: the only
+ * handle on a held preview was a row inside one message's menu, in a transcript that is
+ * away by default, while every board sat amber and inert with nothing saying why. So this
+ * says what is happening in words and offers the way back in the same breath.
+ *
+ * Amber, because that is the colour the boards are already outlined in: one fact, one
+ * colour, and no legend to remember. Escape does the same thing (`Stage.shortcut`).
+ */
+.preview-sign {
+	position: absolute;
+	z-index: 5;
+	display: flex;
+	align-items: center;
+	/*
+	 * Above the dock, not merely at the bottom of the window: the dock is centred but its
+	 * hint row is wide, and at 1400px the two met over this sign's Leave button.
+	 *
+	 * `--dock` and not `--inset-bottom`: the dock does not register as an inset surface at
+	 * all — the conversation and the notices already climb over it with this same
+	 * expression, which is the app's existing answer to "how tall is the thing at the
+	 * bottom right now".
+	 */
+	bottom: calc(var(--dock, 88px) + 12px + var(--keyboard, 0px) + env(safe-area-inset-bottom));
+	/*
+	 * Clear of the left panel, which is the whole difference between this and the editing
+	 * badge above: that one takes no pointer events, so sitting behind the panel only made
+	 * it invisible; this one has a button in it, and a button under another surface is not a
+	 * button. `--inset-left` is the panel's far edge, gutter included (`lib/insets.ts`), and
+	 * it is 0 when the panel is folded away.
+	 */
+	left: calc(var(--inset-left, 0px) + max(12px, env(safe-area-inset-left)));
+	padding: 3px 4px 3px 10px;
+	gap: 8px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--color-warn) 88%, var(--fg));
+	color: #fff;
+	font-size: 10.5px;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	box-shadow: var(--shadow-row);
+}
+
+/*
+ * The way out, inside the sign rather than beside it: the sentence and the button are one
+ * object, so the answer to "what is this?" and the answer to "how do I stop it?" cannot
+ * drift apart or be moved independently.
+ */
+.preview-sign > button {
+	height: 20px;
+	padding: 0 9px;
+	border: 0;
+	border-radius: 999px;
+	background: rgb(255 255 255 / 22%);
+	color: #fff;
+	cursor: pointer;
+	font: inherit;
+	font-size: 10.5px;
+	font-weight: 600;
+	transition: background-color 120ms ease;
+}
+
+.preview-sign > button:hover {
+	background: rgb(255 255 255 / 34%);
+}
+
+.preview-sign > button:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 1px;
 }
 
 /* --- the turn bar ------------------------------------------------------------ */

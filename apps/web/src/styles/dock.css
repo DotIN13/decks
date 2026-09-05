@@ -299,13 +299,15 @@
 	 * `flex: none` so it is never squeezed *below* its content either: the ellipsis is a
 	 * ceiling, not a negotiation with the name beside it.
 	 */
+	/* Same chip, same ground as a tag and a runtime word — `--fill` in `index.css` says why
+	   the three of them stopped using the hairline colour. */
 	.popover .pv {
 		max-width: 72px;
 		flex: none;
 		padding: 1px 5px;
 		overflow: hidden;
 		border-radius: 4px;
-		background: var(--line);
+		background: var(--fill);
 		color: var(--faint);
 		font-size: 10px;
 		text-overflow: ellipsis;
@@ -332,7 +334,16 @@
 	 * Tabular figures because these are read as a column — 68,400 over 200,000 — and
 	 * proportional digits make two aligned numbers look misaligned.
 	 */
-	.popover .kv {
+	/*
+	 * The context summary's own dressing — the figures, the bar, the action row.
+	 *
+	 * `:is(.popover, .usage-modal)` because the same three objects are drawn in both: the
+	 * popover on the dial under the input bar, and the usage panel, which opens from that
+	 * popover on a desktop and from `⋯` on a phone. It was `.popover` alone once, so in a
+	 * modal the rows rendered as "Used148,000" with no gap and the bar was invisible — the
+	 * component was in a container it had never been dressed for.
+	 */
+	:is(.popover, .usage-modal) .kv {
 		display: flex;
 		align-items: center;
 		padding: 4px 8px;
@@ -341,17 +352,17 @@
 		font-size: 11px;
 	}
 
-	.popover .kv > .k {
+	:is(.popover, .usage-modal) .kv > .k {
 		flex: 1;
 		color: var(--faint);
 	}
 
-	.popover .kv > .v {
+	:is(.popover, .usage-modal) .kv > .v {
 		font-variant-numeric: tabular-nums;
 	}
 
 	/* The same percentage as the ring, in the one place there is room to say it in full. */
-	.popover .big {
+	:is(.popover, .usage-modal) .big {
 		color: var(--fg);
 		font-size: 22px;
 		font-weight: 650;
@@ -359,13 +370,13 @@
 	}
 
 	/* The track under it: the ring unrolled, for a reading the arc can only approximate. */
-	.popover .track {
+	:is(.popover, .usage-modal) .track {
 		height: 5px;
 		border-radius: 999px;
 		background: var(--line);
 	}
 
-	.popover .track > i {
+	:is(.popover, .usage-modal) .track > i {
 		display: block;
 		height: 5px;
 		border-radius: 999px;
@@ -373,12 +384,14 @@
 	}
 
 	/* The same two thresholds the `⋯` button uses, so an amber corner does not open onto a
-	   blue bar. `contextLevel` in `chrome/ContextSummary.tsx` is where 70 and 85 are decided. */
-	.popover .track[data-level="warn"] > i {
+	   blue bar — and the same ones every plan meter in the usage panel wears, because they
+	   are one function: `usageLevel` in `chrome/context-usage.ts`, where 70 and 85 are
+	   decided once. */
+	:is(.popover, .usage-modal) .track[data-level="warn"] > i {
 		background: var(--color-warn);
 	}
 
-	.popover .track[data-level="high"] > i {
+	:is(.popover, .usage-modal) .track[data-level="high"] > i {
 		background: var(--color-danger);
 	}
 
@@ -391,7 +404,7 @@
 	 * `title` says the server cannot do this yet — where a missing row would only leave the
 	 * reader looking for it.
 	 */
-	.popover .act {
+	:is(.popover, .usage-modal) .act {
 		display: flex;
 		width: 100%;
 		height: 30px;
@@ -408,14 +421,110 @@
 		text-align: left;
 	}
 
-	.popover .act:not([disabled]):hover {
+	:is(.popover, .usage-modal) .act:not([disabled]):hover {
 		background: var(--line);
 	}
 
-	.popover .act[disabled] {
+	:is(.popover, .usage-modal) .act[disabled] {
 		color: var(--faint);
 		cursor: not-allowed;
 	}
+
+	/*
+	 * Restored. This was deleted when the reading moved into the corner's `⋯`, and the move
+	 * was half right: on a phone there is no room under the input bar for anything, but on a
+	 * desktop a reading you glance at twenty times an hour should not be behind a menu. So the
+	 * ring is back here for a fine pointer and the `⋯` keeps a single row for a coarse one.
+	 */
+
+	/*
+	 * The dial: how full the context is, as a ring at the end of the hint row.
+	 *
+	 * Ambient rather than alarming — it fills as the conversation grows and only changes
+	 * colour when it is worth doing something about. `--dial` carries the ring's own colour
+	 * so the number and the arc move together through the three levels without either
+	 * being stated twice.
+	 */
+	/*
+	 * The ring, wherever it is drawn: the dial under the input bar and the `⋯` row on a
+	 * touchscreen. `--dial` is what the two levels move, so the arc and the number beside it
+	 * change together without either being stated twice.
+	 */
+	.ctx-ring {
+		flex: none;
+		--dial: var(--color-accent);
+	}
+
+	.ctx-ring[data-level="warn"] {
+		--dial: var(--color-warn);
+	}
+
+	.ctx-ring[data-level="high"] {
+		--dial: var(--color-danger);
+	}
+
+	.ctx-ring > .track {
+		stroke: var(--line-strong);
+	}
+
+	.ctx-ring > .fill {
+		stroke: var(--dial);
+	}
+
+	.dial {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 5px;
+		padding: 1px 4px;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+		font: inherit;
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+		--dial: var(--color-accent);
+	}
+
+	.dial:hover,
+	.dial[aria-expanded="true"] {
+		background: var(--line);
+		color: var(--fg);
+	}
+
+	.dial:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* Amber over 70%, red over 85%: the two points where the next long turn is the one
+	   that gets truncated, so the colour arrives before the trouble does. */
+	.dial[data-level="warn"] {
+		color: var(--color-warn);
+		--dial: var(--color-warn);
+	}
+
+	.dial[data-level="high"] {
+		color: var(--color-danger);
+		--dial: var(--color-danger);
+	}
+
+	.dial .track {
+		stroke: var(--line-strong);
+	}
+
+	.dial .fill {
+		stroke: var(--dial);
+	}
+
+	/*
+	 * The provider, as a pill in front of the model's own name.
+	 *
 
 	/*
 	 * The switch, drawn rather than borrowed.

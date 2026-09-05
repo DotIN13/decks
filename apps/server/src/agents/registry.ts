@@ -61,11 +61,18 @@ export class Registry {
 		this.store = new AgentStore(deck);
 	}
 
-	/** What every agent may know about the others — including itself. */
-	summaries(): Array<{ id: string; name: string; state: string; context: string[] }> {
+	/**
+	 * What every agent may know about the others — including itself.
+	 *
+	 * `tags` is here so an agent can ask what the others are working on with one call rather
+	 * than needing a second shape for the same fact. **`userTags` is deliberately absent:**
+	 * what *you* think of an agent is not something it should be steering on, and a field an
+	 * agent can read is a field it will optimise against.
+	 */
+	summaries(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }> {
 		return this.agents.map((agent) => {
 			const chat = agent.chat();
-			return { id: agent.id, name: chat.name, state: chat.state, context: [...agent.context] };
+			return { id: agent.id, name: chat.name, state: chat.state, context: [...agent.context], tags: agent.tags };
 		});
 	}
 
@@ -171,6 +178,8 @@ export class Registry {
 					// conversation was using, not on whatever the runtime defaults to.
 					...(record.model ? { model: record.model } : {}),
 					...(record.mode ? { mode: record.mode } : {}),
+					...(record.tags ? { tags: record.tags } : {}),
+					...(record.userTags ? { userTags: record.userTags } : {}),
 				},
 			});
 		}

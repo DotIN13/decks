@@ -58,7 +58,7 @@ link.send({ type: "board.play", path });
 await new Promise((resolve) => setTimeout(resolve, 500));
 link.close();
 
-const { browser, page, errors } = await open();
+const { browser, page, errors } = await open({ edit: true });
 const frame = () => page.frameLocator(`.board-node[data-path="${path}"] iframe`);
 const inFrame = (fn) =>
 	page.evaluate(

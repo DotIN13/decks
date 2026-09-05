@@ -89,11 +89,16 @@ const revealed = await page.evaluate(() => {
 });
 say("hovering the row shows its ×", revealed.close !== "none" && revealed.opacity === "1", JSON.stringify(revealed));
 /*
- * And the words stay. The slot opens beside them rather than taking their place: the status
- * is what you were reading, and swapping it for a button removes the row's only fact at the
- * moment you are deciding what to do with the row.
+ * And it takes the words' place rather than opening beside them.
+ *
+ * This asserted the opposite for a while — the status slid left by 22px and both were up
+ * together, on the argument that the status is what you were reading. What that produced was
+ * a row that rearranged itself under the cursor every time you crossed the list. The cursor
+ * is *on* this row: what you want from it now is what you can do to it, and the status is
+ * still on every other row and in the corner. On a touch screen both are drawn, because
+ * nothing is being pointed at and nothing moves.
  */
-say("…beside the words rather than in place of them", revealed.words !== "none", revealed.words);
+say("…in place of the words, not beside them", revealed.words === "none", revealed.words);
 say("…inside the box that draws the row's wash", revealed.inside);
 
 await target.locator(".close").click();

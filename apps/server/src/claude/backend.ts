@@ -13,7 +13,7 @@ import {
 	type SDKRateLimitInfo,
 	type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
 import { parseSlash } from "../agents/slash.ts";
 import { answerQuestions } from "./ask-user-question.ts";
@@ -22,6 +22,7 @@ import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from ".
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";
 import { qualifiedToolName, stageMcpServer } from "./tools.ts";
+import { toUsageReport } from "./usage.ts";
 
 /**
  * Claude Code behind one Decks agent (DESIGN §6.2).
@@ -77,7 +78,7 @@ export const CLAUDE_COMMANDS: SlashCommand[] = [
 	{ name: "logout", hint: "Sign out of Claude" },
 	{ name: "status", hint: "Model, mode and auth state" },
 	{ name: "doctor", hint: "Check the Claude Code install" },
-	{ name: "cost", hint: "Spend and context for this session" },
+	{ name: "cost", hint: "Open the usage panel: plan limits, spend, context" },
 	{ name: "compact", hint: "Compress the conversation", arg: "[notes]" },
 	{ name: "help", hint: "The commands Decks understands" },
 ];
@@ -425,7 +426,9 @@ export class ClaudeBackend implements AgentBackend {
 				);
 				return;
 			case "cost":
-				await this.usageModal();
+				// The panel, not a paragraph. The shell reads the figures and sends them with
+				// the instruction to open it (`session.pushReport`).
+				this.context.showUsage?.();
 				return;
 			default:
 				// The CLI's own commands — /compact, /doctor — run inside the
@@ -743,37 +746,22 @@ export class ClaudeBackend implements AgentBackend {
 	}
 
 	/**
-	 * The session's usage and cost, in a modal the browser shows.
+	 * The full reading, for the usage panel.
 	 *
-	 * Read fresh rather than from the cache: the modal is opened deliberately, so the one
-	 * moment it is worth a round trip to the CLI is this one — the cached figures are as
-	 * old as the last turn, and a session left idle for an hour would report an hour-old
-	 * plan window.
+	 * Read fresh rather than from the cache: the panel is opened deliberately, so the one
+	 * moment it is worth a round trip to the CLI is this one — the cached figures are as old
+	 * as the last turn, and a session left idle for an hour would report an hour-old plan
+	 * window.
 	 *
-	 * The plan windows are what a subscription actually runs out of, and the reason to
-	 * open this at all on one. They are absent for an API account, Bedrock and Vertex —
-	 * `rate_limits_available` says so — and the rows are simply left out rather than shown
-	 * as dashes, because a row that can never have a value is a question the modal answers
-	 * with nothing.
+	 * The mapping lives in `usage.ts` and everything it reads is `unknown`. What this method
+	 * adds is the subject: **which account these windows belong to**. Decks rotates between
+	 * several Claude subscriptions on its own, so "42% of the 5-hour window" is a reading
+	 * with nobody attached until the report says whose it is.
 	 */
-	async usageModal(): Promise<void> {
+	async report(): Promise<UsageReport> {
 		await this.refreshUsage();
-		const usage = this.lastUsage;
-		const plan = await this.planUsage();
-		const windows = plan?.rate_limits_available ? plan.rate_limits : undefined;
-		await this.context.bridge.usage("Claude session", [
-			{
-				label: "Context",
-				value: usage?.contextWindow
-					? `${Math.round(((usage.contextTokens ?? 0) / usage.contextWindow) * 100)}% (${usage.contextTokens ?? "?"} / ${usage.contextWindow} tokens)`
-					: "—",
-			},
-			{ label: "Cost", value: `$${(usage?.cost ?? 0).toFixed(4)}` },
-			{ label: "Model", value: this.currentModel ?? "default" },
-			...(plan?.subscription_type ? [{ label: "Plan", value: plan.subscription_type }] : []),
-			...window(windows?.five_hour, "5 hours"),
-			...window(windows?.seven_day, "7 days"),
-		]);
+		const account = this.context.accounts?.active();
+		return toUsageReport(await this.planUsage(), account?.email ?? null);
 	}
 
 	/**
@@ -886,7 +874,7 @@ export class ClaudeBackend implements AgentBackend {
 	 * Held at arm's length, because the SDK's own name for it is an instruction:
 	 * `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`. Probed for rather than
 	 * called, so an SDK that drops or renames it degrades to the previous figure instead of
-	 * throwing inside a turn — the same reason `usageModal` treats the plan windows as a
+	 * throwing inside a turn — the same reason `report` treats the plan windows as a
 	 * bonus rather than a field.
 	 */
 	private async spend(): Promise<number | undefined> {
@@ -1195,20 +1183,6 @@ function describe(input: Record<string, unknown>): string {
 		if (typeof value === "string" && value.trim()) return `${key}: ${value.trim().slice(0, 300)}`;
 	}
 	return "";
-}
-
-/**
- * One plan window as a row, or no row at all.
- *
- * `utilization` is nullable independently of the window existing — the CLI reports the
- * window with an unknown figure while it is still being fetched — and "88% of 5 hours,
- * resets 14:20" is the whole of what the number is for.
- */
-function window(limit: { utilization?: number | null; resets_at?: string | null } | null | undefined, label: string): Array<{ label: string; value: string }> {
-	if (!limit || typeof limit.utilization !== "number") return [];
-	const resets = limit.resets_at ? new Date(limit.resets_at) : undefined;
-	const at = resets && !Number.isNaN(resets.getTime()) ? `, resets ${resets.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "";
-	return [{ label: `Last ${label}`, value: `${Math.round(limit.utilization)}% used${at}` }];
 }
 
 /** The window a limit is about, in words rather than the wire's name for it. */

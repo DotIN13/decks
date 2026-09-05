@@ -12,7 +12,7 @@
  * camera silently. Asserting on it here means the selector and the behaviour cannot drift
  * apart.
  */
-import { open, say } from "../harness.mjs";
+import { editMode, open, say } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 try {
@@ -37,9 +37,19 @@ try {
 	const corner = clusters.find((c) => c.side === "right");
 	say("both are 40px pills at the same height", pill?.height === 40 && corner?.height === 40 && pill?.top === corner?.top, `${pill?.height}/${corner?.height} at ${pill?.top}/${corner?.top}`);
 
-	// The five tools moved *into* the left cluster. They were a free-standing float before,
-	// which is why notices had to dodge them; top centre is empty now.
-	say("the five tools are inside the left cluster", pill?.tools === 5, String(pill?.tools));
+	/*
+	 * The tools are inside the left cluster — and only while editing.
+	 *
+	 * They moved *into* this pill from a free-standing float, which is why notices no longer
+	 * have to dodge them and top centre is empty. What changed since is that they insert
+	 * components, so browse mode has none of them: in the default state the pill is the panel
+	 * button, the agent and the pencil, and pressing the pencil is what brings the five out.
+	 */
+	say("no tools in the left cluster while browsing", pill?.tools === 0, String(pill?.tools));
+	await editMode(page);
+	const editing = await page.evaluate(() => document.querySelectorAll(".float.pill .palette .iconbtn").length);
+	say("…and the five appear inside it when editing", editing === 5, String(editing));
+	await editMode(page, false);
 	say("nothing floats at top centre", await page.evaluate(() => {
 		const at = document.elementFromPoint(innerWidth / 2, 32);
 		return at === null || at.closest("[data-inset='top']") === null;
@@ -72,9 +82,14 @@ try {
 			.map((row) => row.querySelector(".lb")?.textContent?.trim() ?? ""),
 	);
 	const app = rows.slice(-3);
+	/*
+	 * `shortcuts`, not `canvas`: the first row was called "What you can do on the canvas" and
+	 * is called "Shortcuts" now — a menu row should name the thing it opens rather than
+	 * explain it, and the panel's own header says the same word.
+	 */
 	say(
-		"the overflow ends with the cheat sheet, the settings and the theme",
-		app.length === 3 && /canvas/i.test(app[0]) && /settings/i.test(app[1]) && /light|dark/i.test(app[2]),
+		"the overflow ends with the shortcuts, the settings and the theme",
+		app.length === 3 && /shortcuts/i.test(app[0]) && /settings/i.test(app[1]) && /light|dark/i.test(app[2]),
 		rows.join(" | "),
 	);
 	say(

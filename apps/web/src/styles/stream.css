@@ -598,37 +598,20 @@
 		white-space: pre;
 	}
 
-	/* The caret that says a reply is still arriving. Its own keyframes rather than the
-	   conversation's old ones, so this stylesheet stands on its own. */
-	@keyframes stream-blink {
-		to {
-			visibility: hidden;
-		}
-	}
-
 	/*
-	 * The caret, sized and placed in **em**, so that it lands on the text's ink rather than
-	 * near it — and, more to the point, so that it stays inside the line box.
+	 * The caret is gone, and with it its keyframes.
 	 *
-	 * It was `height: 12px; translate: 0 2px`, and the translate is the bug: a transform
-	 * paints outside the box without growing it, so a card with a caret in it had two pixels
-	 * of ink below where the line ended and looked short of padding along its bottom edge,
-	 * every time a reply was arriving. Measured in this font at 12px, the text's ink runs
-	 * from 9px above the baseline to 3px below it — one em tall, sitting a quarter of an em
-	 * under the baseline — which is exactly what these two lines say. So the caret spans the
-	 * same band as the letters beside it, the line box already reserves the descent it needs,
-	 * and the card's padding is the padding on all four sides.
+	 * It was a 6px block blinking at the end of a streaming reply, and a good deal of care
+	 * went into it: sized in `em` so it sat on the text's ink rather than near it, after a
+	 * `translate` was found to be painting two pixels outside the line box and making every
+	 * arriving card look short of padding along its bottom edge.
+	 *
+	 * All correct, and beside the point — the complaint was never where it sat but that it
+	 * was there at all, appearing and vanishing twice a second at the one place the eye was
+	 * already resting. `typing…` in the working sign says the same thing in words, in a
+	 * place that does not move. See `chat/working-sign.ts`, which no longer stands the sign
+	 * down mid-reply now that nothing else carries the fact.
 	 */
-	.stream-card .caret {
-		display: inline-block;
-		width: 6px;
-		height: 1em;
-		margin-left: 2px;
-		background: currentColor;
-		opacity: 0.5;
-		vertical-align: -0.25em;
-		animation: stream-blink 1s steps(2, start) infinite;
-	}
 
 	/* A notice is a card too — a failure to launch is exactly the thing worth being able to
 	   scroll back to — but it is the quietest one. */

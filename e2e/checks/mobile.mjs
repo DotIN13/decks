@@ -9,7 +9,7 @@
  * was under your finger. Both are asserted here, on bare stage and over a board, since a
  * board is a separate document and its gestures come out through `frame-gestures.ts`.
  */
-import { open, openPanel, say, settle } from "../harness.mjs";
+import { editMode, open, openPanel, say, settle } from "../harness.mjs";
 
 const { browser, page, context, errors } = await open({ device: "iPhone 15" });
 const cdp = await context.newCDPSession(page);
@@ -304,6 +304,9 @@ const run = await page.evaluate(() => {
 if (!run) {
 	say("a run of text is on screen to tap", false, "nothing found — the camera moved somewhere unexpected");
 } else {
+	/* Tapping to select and to retype is editing, so the mode has to be on. The tap *gesture*
+	   itself — one tap, not a double — is what this section is really asserting. */
+	await editMode(page);
 	const tap = async () => {
 		await touch("touchStart", [{ x: run.x, y: run.y }]);
 		await touch("touchEnd", []);
@@ -592,13 +595,22 @@ const header = await page.evaluate(() => {
 	};
 	return {
 		tabs: document.querySelectorAll('[role="tab"]').length,
+		tab: box('[role="tab"]'),
 		field: box(".panel-shell .field"),
 		font: Math.round(parseFloat(getComputedStyle(document.querySelector(".panel-shell .field input")).fontSize)),
 		foot: box(".panel-foot"),
 		toggle: box(".panel-foot .seg button"),
 	};
 });
-say("no tab strip to aim at, on a phone least of all", header.tabs === 0, JSON.stringify(header));
+/*
+ * There is a strip again — Boards and Agents — and on a phone it has to be hittable.
+ *
+ * This assertion used to be `no tab strip to aim at`. The strip that went was Context/Deck,
+ * one collection split in two; these are two collections that overlap in nothing. What
+ * matters here is only the target: 36px, which is what the panel gives anything pressed on a
+ * coarse pointer, and the same height the old strip had for the same reason.
+ */
+say("the tab strip is back, and thumb-sized", header.tabs === 2 && header.tab >= 36, JSON.stringify(header));
 say("the panel's search field is a finger tall", header.field >= 36, JSON.stringify(header));
 say("…and its foot, which has two more targets in it", header.foot >= 40 && header.toggle >= 28, JSON.stringify(header));
 say("the search input is 16px, so focusing it does not zoom the page", header.font >= 16, JSON.stringify(header));

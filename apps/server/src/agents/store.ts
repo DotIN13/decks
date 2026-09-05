@@ -53,6 +53,10 @@ export interface AgentRecord {
 	model?: AgentModel;
 	/** What it last asked before acting. Claude Code only; `capabilities.modes` is empty for pi. */
 	mode?: AgentMode;
+	/** What the agent said it was doing, from `stage.me.setTags` — see `agents/tags.ts`. */
+	tags?: string[];
+	/** What *you* said it was doing, from the customise popup. Never written by the agent. */
+	userTags?: string[];
 	/** Ordering, and what `prune` keeps. */
 	lastAt: number;
 }

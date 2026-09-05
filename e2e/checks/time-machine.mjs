@@ -1,5 +1,5 @@
 /**
- * The time machine (DESIGN §6.7): hovering a turn previews the boards as they were,
+ * The time machine (DESIGN §6.7): previewing a turn shows the boards as they were,
  * restoring writes them back, and rewinding truncates the transcript.
  *
  * Needs a model, because the thing being travelled through is a real conversation.
@@ -64,20 +64,26 @@ try {
 	await page.waitForSelector('.board-node[data-path="boards/plan.html"] iframe', { timeout: 10000 });
 	await settle(page, 600);
 
-	// Hovering rewind on the *second* message shows the state after turn one.
+	// Previewing the *second* message shows the state after turn one.
 	//
-	// Marked before hovering: the `src` attribute changes before the new document parses,
-	// so waiting on the URL alone and then reading the DOM reads the *old* document and
-	// the preview looks like it did not happen. The marker is only absent once a genuinely
-	// new document is in the frame, and `__boardReady` says it has finished rendering.
+	// Marked first: the `src` attribute changes before the new document parses, so waiting on
+	// the URL alone and then reading the DOM reads the *old* document and the preview looks
+	// like it did not happen. The marker is only absent once a genuinely new document is in
+	// the frame, and `__boardReady` says it has finished rendering.
 	await page.evaluate(() => {
 		document.querySelector('.board-node[data-path="boards/plan.html"] iframe').contentWindow.__live = true;
 	});
 	const second = mine.nth(1);
 	await second.hover();
-	// Hovering the handle previews, with no dwell delay: you only get there by reaching for
-	// it. The menu it would open is not needed for a preview, and that is the point.
-	await second.locator(".stream-rw").hover();
+	/*
+	 * Opened and pressed, not hovered. Pointing at the handle used to preview on its own, and
+	 * that is gone: it changed the canvas under a cursor on its way past, and left people in
+	 * a state they had not asked for. `preview.mjs` is where the absence of the hover is
+	 * asserted; here the menu is simply the way in.
+	 */
+	await second.locator(".stream-rw").click();
+	await page.waitForSelector(".popover", { timeout: 6000 });
+	await page.locator(".popover [data-row]").filter({ hasText: /^Preview$/ }).first().click();
 	await page.waitForFunction(
 		() => {
 			const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');
@@ -92,16 +98,16 @@ try {
 		return { src: frame?.getAttribute("src"), text: frame?.contentDocument?.querySelector('[data-id="timecheck"]')?.textContent?.trim() };
 	});
 	say(
-		"hovering rewind shows that point's boards",
+		"previewing a message shows that point's boards",
 		(preview.text ?? "").trim().toLowerCase() === "first turn",
 		`text=${JSON.stringify(preview.text)}`,
 	);
 	say("previewing writes nothing", read(plan) === afterSecond);
 
 	/*
-	 * Restore is deliberate, and it does write — so it is a row in the menu rather than
-	 * something a hover can do. `Restore` only appears while a preview is up, which is why
-	 * the handle is hovered before the menu is opened.
+	 * Restore is deliberate, and it does write — so it is a row in the menu, behind the rule,
+	 * and it is there whether or not a preview is up. The menu is reopened because pressing
+	 * `Preview` above closed it.
 	 */
 	await second.locator(".stream-rw").click();
 	await page.waitForSelector(".popover", { timeout: 6000 });

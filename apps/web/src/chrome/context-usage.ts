@@ -35,9 +35,27 @@ export function contextPercent(usage: AgentUsage | undefined): number | undefine
  * marked is a corner nobody reads.
  */
 export function contextLevel(usage: AgentUsage | undefined): "warn" | "high" | undefined {
-	const value = contextPercent(usage);
-	if (value === undefined) return undefined;
-	if (value >= 85) return "high";
-	if (value >= 70) return "warn";
+	return usageLevel(contextPercent(usage));
+}
+
+/**
+ * The same two thresholds, for any share of anything that runs out.
+ *
+ * The context ring and the plan windows in the usage panel sit a click apart, and two
+ * readings that disagree about what "nearly full" looks like are worse than either. So the
+ * numbers are stated once here: **the ring, the bar and every plan meter are one function.**
+ *
+ * picone, where the panel came from, has this drift in it — the dial bands at 70/85 and the
+ * meter at 75/90, with a comment beside the meter claiming they are the same two
+ * thresholds. They were, once.
+ *
+ * Colour is earned rather than applied: a meter that is amber at 40% has nothing left to
+ * say at 95%. Null is not zero — a window whose share the server would not state gets no
+ * colour rather than a calm one.
+ */
+export function usageLevel(percent: number | null | undefined): "warn" | "high" | undefined {
+	if (percent == null || !Number.isFinite(percent)) return undefined;
+	if (percent >= 85) return "high";
+	if (percent >= 70) return "warn";
 	return undefined;
 }

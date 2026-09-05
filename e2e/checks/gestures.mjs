@@ -5,7 +5,7 @@
  * With the frame live that meant panning and pinching stopped working exactly where the
  * user is most likely to be looking.
  */
-import { open, say, settle } from "../harness.mjs";
+import { editMode, open, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 await page.evaluate(() => document.querySelector(".board-row").click());
@@ -102,6 +102,14 @@ const scrolled = await page.evaluate(() => {
 say("the board itself never scrolls", scrolled.x === 0 && scrolled.y === 0, JSON.stringify(scrolled));
 
 // 4. Clicking a component still selects it — the pan capture must not eat clicks.
+/*
+ * From here down the check is about *selecting* a component, which is editing — so it asks
+ * for edit mode. Everything above is pan and zoom, and those are deliberately left in the
+ * default browse state: the camera is not editing, and a gesture that behaved differently
+ * between the two modes would be the bug this check exists to catch.
+ */
+await editMode(page);
+
 await page.evaluate(() => {
 	const frame = document.querySelector('.board-node[data-path="boards/plan.html"] iframe');
 	const element = frame.contentDocument.querySelector('[data-id="goal"]');

@@ -101,7 +101,7 @@ export function write(file, text) {
  * the pixel ratio and the user agent with it, and the returned `context` is what a check
  * attaches a CDP session to in order to dispatch real touches.
  */
-export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device } = {}) {
+export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false } = {}) {
 	const browser = await chromium.launch();
 	const descriptor = device ? devices[device] : undefined;
 	if (device && !descriptor) throw new Error(`playwright has no device called "${device}"`);
@@ -155,6 +155,15 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	page.on("close", () => clearInterval(watch));
 
 	if (boards) await ready(page);
+	/*
+	 * Editing is off by default in the app now, so a check about editing has to ask for it.
+	 *
+	 * The canvas opens in **browse** mode — text selects, a game plays, nothing drags — and
+	 * `edit: true` presses the pencil. Every check that drags a component, opens the
+	 * inspector or retypes a run of words needs it; the ones about the camera, the panel and
+	 * the chrome do not, and are better off in the default state a person actually lands in.
+	 */
+	if (edit) await editMode(page);
 	return { browser, page, context, errors, asked, stopAnswering: () => clearInterval(watch) };
 }
 
@@ -164,6 +173,23 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
  * `__boardReady` is set by `runtime/lib/board.js` once the document has rendered its
  * components, which is the same signal the app itself waits for.
  */
+/**
+ * Turn editing on, by pressing the pencil in the left cluster.
+ *
+ * Through the real control rather than by reaching into the app's state, because "the pencil
+ * turns editing on" is itself worth asserting and this is the only place that does it. Idempotent:
+ * a check that calls it twice, or after `open({ edit: true })`, gets one edit mode.
+ */
+export async function editMode(page, on = true) {
+	const now = await page.evaluate(() => document.querySelector(".stage")?.dataset.mode ?? "browse");
+	if ((now === "edit") === on) return;
+	await page.locator(on ? '[aria-label="Edit the boards"]' : '[aria-label="Stop editing"]').click();
+	await page.waitForFunction((want) => (document.querySelector(".stage")?.dataset.mode ?? "browse") === want, on ? "edit" : "browse", {
+		timeout: 4000,
+	});
+	await page.waitForTimeout(120);
+}
+
 export async function ready(page, { timeout = 30000 } = {}) {
 	await page.waitForSelector(".board-node iframe", { timeout });
 	await page.waitForFunction(

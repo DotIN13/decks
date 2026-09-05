@@ -71,13 +71,18 @@ export function Stream(props: {
 	const [behind, setBehind] = createSignal(0);
 
 	/*
-	 * Whether the tail of the column is already answering "is anything happening".
+	 * Whether the tail of the column is a reply in flight.
 	 *
-	 * A streaming reply has a caret blinking at the end of its text, which is the same
-	 * message the sign carries and is *in the place the words are arriving* — so the sign
-	 * stands down and lets the card have it. Between turns there is no card yet, and that is
-	 * where a sign earns its keep: "running tools…" for four minutes with nothing to read is
-	 * exactly the state a column would otherwise report as silence.
+	 * It used to decide whether the sign stood down: a streaming reply had a caret blinking
+	 * at the end of its text, saying "still going" in the place the words were arriving,
+	 * which is a better place for it than a sign below them. The caret is gone, so the sign
+	 * stays up throughout and this no longer gates it — `signPlacement` says why it still
+	 * takes the flag.
+	 *
+	 * Still computed, because it is the honest name for the state and the column may want to
+	 * know it again. Between turns there is no card at all, and that is where a sign earns
+	 * its keep: "running tools…" for four minutes with nothing to read is exactly the state
+	 * a column would otherwise report as silence.
 	 */
 	const arriving = () => {
 		const last = cards().at(-1);

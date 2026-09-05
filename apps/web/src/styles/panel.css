@@ -115,12 +115,14 @@
 	 * from the edge, so the right side of this panel is one line down the page rather than
 	 * three things that nearly agree.
 	 */
+	/* 22px, up from 20, because the header above it went 28 → 32: a label at the old height
+	   under a taller header reads as the list starting too soon. */
 	.panel-meta {
 		display: flex;
 		flex: none;
 		align-items: center;
 		box-sizing: border-box;
-		height: 20px;
+		height: 22px;
 		padding: 0 6px 0 4px;
 		gap: 4px;
 	}
@@ -228,6 +230,262 @@
 	 * nothing — the same argument `.field` makes. The current row is *also* semibold, so
 	 * which one you are looking at survives a colour scheme where the wash is 6% of nothing.
 	 */
+	/*
+	 * One agent in the Agents tab: the reading surface.
+	 *
+	 * Taller than a board row and multi-line, because it is answering a different question.
+	 * A board row is a name you pick from a list; this is the whole story of one agent, so
+	 * the row grows with what there is to say and **shrinks when there is nothing** — an
+	 * agent with no tags and nothing quoted is two lines, and a list of five where two are
+	 * short reads better than five each carrying an empty third line.
+	 *
+	 * `align-items: flex-start` on the button: the avatar sits level with the name rather
+	 * than floating in the middle of a four-line row.
+	 */
+	/*
+	 * Two overrides on the row vocabulary, and nothing else.
+	 *
+	 * `.rowlist` already gives the grid, the corner, the hover, the current wash, `.row-act`
+	 * and the type scale — the board rows above are the same object, and re-implementing it
+	 * here is how two lists in one panel come to nearly match. What differs is only what has
+	 * to: the icon column is 28px rather than 16 because the avatar is worth seeing at that
+	 * size here, and the actions sit on the *first line* rather than centred in a row that
+	 * may be four lines tall.
+	 */
+	/* `.rowlist.agent-list`, not `.agent-list`: the vocabulary's own selector is
+	   `:is(.popover, .rowlist) [data-row]`, so matching its specificity would leave the
+	   winner to source order between two files. */
+	.rowlist.agent-list [data-row] {
+		padding: 7px 6px;
+		gap: 3px 9px;
+		grid-template-columns: 28px 1fr;
+	}
+
+	/* The avatar's slot: 28px and no top padding, where a 16px icon wanted one. */
+	.rowlist.agent-list [data-row] > .ic {
+		display: grid;
+		padding-top: 0;
+		place-items: center;
+	}
+
+	.agent-list .row-act {
+		align-items: flex-start;
+	}
+
+	.agent-list .row-act > :is(.close, .agent-tagbtn) {
+		align-self: flex-start;
+		margin-top: 7px;
+	}
+
+	.agent-body {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.agent-line {
+		display: flex;
+		min-width: 0;
+		align-items: baseline;
+		gap: 6px;
+	}
+
+	/*
+	 * The right-hand column of the first line: how long ago, and the column the two buttons
+	 * take over on approach. The hover card puts the time in exactly this place.
+	 */
+	.agent-line > .ago {
+		margin-left: auto;
+		flex: none;
+		font-size: 10px;
+		white-space: nowrap;
+	}
+
+	/*
+	 * The second line, which is the card's second line: swatch, the state in words, and the
+	 * runtime in the same right-hand column the time is in above it.
+	 *
+	 * A colour whose meaning has to be remembered needs a legend, and this is that legend
+	 * shown in place — the same argument the card makes, in the same shape, so the panel and
+	 * the card cannot come to describe an agent differently.
+	 */
+	.agent-state {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 5px;
+		color: var(--muted);
+		font-size: 11px;
+	}
+
+	/*
+	 * The last thing it said: one line, plain.
+	 *
+	 * Two clamped lines of italic inside curly quotes was three decorations on the quietest
+	 * thing in the row, and five rows of two lines is a panel of prose. One line, and the
+	 * hover card is where a longer look belongs — except this row has no card, which is the
+	 * trade: a list you can scan beats a list you can read.
+	 */
+	.agent-said {
+		overflow: hidden;
+		color: var(--faint);
+		font-size: 10.5px;
+		line-height: 1.4;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/*
+	 * A parked agent, said by dimming rather than by a sentence.
+	 *
+	 * The row used to spell out "Dormant — not resumed" on its own line. It is in the Quiet
+	 * section, its runtime word is drawn hollow, and now its name is muted as well — three
+	 * quiet signals in the place of one loud one, and the `title` on the row still says it
+	 * in words for anyone who asks.
+	 */
+	.agent-row[data-dormant] .lb {
+		color: var(--muted);
+		font-weight: 500;
+	}
+
+	/*
+	 * The `+` that opens your own tags.
+	 *
+	 * In the row's action column beside the ×, revealed on approach for the same reason the
+	 * board row's bin is: a column of `+` down a list of five agents is an invitation to
+	 * tidy rather than a list to read. Always visible on a coarse pointer, where nothing can
+	 * be approached.
+	 */
+	/*
+	 * The pen, at exactly the ×'s size — `--control-sm`, the same token the × takes.
+	 *
+	 * It was 20 beside a 22, which put the two icons on different centre lines by half a
+	 * pixel: not nameable, and visible as a wobble in the pair.
+	 */
+	.agent-tagbtn {
+		display: grid;
+		width: var(--control-sm);
+		height: var(--control-sm);
+		flex: none;
+		place-items: center;
+		border: 0;
+		border-radius: 5px;
+		background: transparent;
+		color: var(--faint);
+		cursor: pointer;
+		opacity: 0;
+		transition:
+			opacity 120ms ease,
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.agent-row:is(:hover, :focus-within) > .agent-tagbtn,
+	.agent-tagbtn[data-on] {
+		opacity: 1;
+	}
+
+	/*
+	 * On a pointer it takes no room until it is wanted, like the × beside it.
+	 *
+	 * `opacity` alone left a 20px hole in every row at rest, which the status column then had
+	 * to end before — so the two buttons now *arrive* into the space the status gives up
+	 * (`[data-yield]` in `chrome.css`), and at rest the row ends with its words.
+	 */
+	@media (hover: hover) {
+		.agent-row > .agent-tagbtn {
+			display: none;
+		}
+
+		.agent-row:is(:hover, :focus-within) > .agent-tagbtn,
+		.agent-row > .agent-tagbtn[data-on] {
+			display: grid;
+		}
+	}
+
+	.agent-tagbtn:is(:hover, [data-on]) {
+		background: var(--line);
+		color: var(--fg);
+	}
+
+	/* Your tags, in the popup: a chip with a × in it. */
+	.tagpop {
+		display: flex;
+		flex-direction: column;
+		gap: 7px;
+		padding: 2px;
+	}
+
+	/*
+	 * The popup's own two type sizes.
+	 *
+	 * `.nt` is scoped to `:is(.popover, .rowlist) [data-row] > .nt` — it is the note under a
+	 * *row*, and there is no row in here — so it fell back to body size and the hint read
+	 * larger than the tags it was explaining. Stated rather than reached for: this is not a
+	 * row, and pretending otherwise to borrow one declaration is how a vocabulary stops
+	 * meaning anything.
+	 */
+	.tagpop .nt {
+		color: var(--faint);
+		font-size: 10.5px;
+		line-height: 1.4;
+	}
+
+	.tagpop .tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		padding-right: 3px;
+	}
+
+	.tag-x {
+		display: grid;
+		width: 13px;
+		height: 13px;
+		flex: none;
+		place-items: center;
+		border: 0;
+		border-radius: 999px;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+		opacity: 0.65;
+	}
+
+	.tag-x:hover {
+		background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+		opacity: 1;
+	}
+
+	@media (pointer: coarse) {
+		/* Both of them bigger for a finger, and both by the same amount — a 28px pen beside a
+		   22px × is the wobble again, one size up. */
+		.agent-tagbtn,
+		.agent-list .row-act > .close {
+			width: 28px;
+			height: 28px;
+		}
+
+		.agent-tagbtn {
+			opacity: 1;
+		}
+
+		/*
+		 * And the time comes off the name line, because the two buttons hold that column at
+		 * all times here. It is not dropped — `AgentRow` puts it on the state line instead.
+		 */
+		.agent-line > .ago {
+			display: none;
+		}
+
+		.agent-row > [data-row] {
+			padding: 9px 6px;
+		}
+
+	}
+
 	.board-row {
 		display: flex;
 		flex: none;

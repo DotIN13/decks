@@ -104,21 +104,27 @@ try {
 	say("Escape dismisses it", (await page.locator(".popover").count()) === 0);
 
 	/*
-	 * No context reading in the dock, at any reading.
+	 * The context reading is back in the dock — on a fine pointer.
 	 *
-	 * It was a ring and a percentage here, drawn once the agent reported and blank before
-	 * then — a reading nobody acts on, in the one place on screen that is about the turn you
-	 * are *about* to take. It lives in the corner's overflow now, and the warning it used to
-	 * carry ambiently is a colour on that menu's button (`clusters.mjs` reads the menu; the
-	 * two thresholds are unit-tested in `chrome/context-usage.test.ts`).
+	 * It was a ring and a percentage here; it moved to the corner's overflow on the argument
+	 * that a reading nobody acts on does not belong in the place that is about the turn you
+	 * are *about* to take. That was half right. On a phone there is genuinely no room under
+	 * the box, and it stays in `⋯` there. On a desktop a reading you glance at twenty times
+	 * an hour should not be behind a menu you have to open to take the glance.
+	 *
+	 * The reading-dependent half — the dial appearing, its popover, the `⋯` row and the modal
+	 * on a touchscreen — is `context.mjs`, which drives a usage frame. What is checked here is
+	 * the row's shape, which holds whether or not an agent has reported.
 	 */
-	const inDock = await page.evaluate(() =>
-		document.querySelectorAll(".dock .dial, .dock .track, .dock [aria-label*='context' i]").length,
-	);
-	say("no context reading in the dock — it moved to the corner's menu", inDock === 0, String(inDock));
-	// The second register is one thing wide now: the hints, and nothing else.
+	const dialSlot = await page.evaluate(() => Boolean(document.querySelector(".hintrow")));
+	say("the hint row is still there on a fine pointer", dialSlot, String(dialSlot));
+	/*
+	 * The hints, then a spacer, then the dial's own slot at the right end. Two children before
+	 * an agent has reported anything: nothing is drawn for an unknown reading, because a ring
+	 * at zero would claim the context is empty rather than unknown.
+	 */
 	const second = await page.evaluate(() => document.querySelector(".hintrow")?.children.length ?? -1);
-	say("the hint row holds the hints and nothing else", second === 1, String(second));
+	say("the hint row is the hints and the dial's slot", second === 2, String(second));
 
 	// Ranked hints: whole phrases drop out as the bar narrows, because half a hint is worse
 	// than none. The lowest-ranked one goes first.

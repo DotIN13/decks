@@ -14,8 +14,8 @@ import { historyButton, toggleHistory } from "../lib/edge.ts";
 import { Popover } from "../ui/Popover.tsx";
 import { AgentStack } from "./AgentStack.tsx";
 import { agentOrder } from "./agent-order.ts";
-import { contextLevel } from "./context-usage.ts";
-import { ContextSummary } from "./ContextSummary.tsx";
+import { contextLevel, contextPercent } from "./context-usage.ts";
+import { ContextRing } from "./ContextRing.tsx";
 
 /**
  * The top-right cluster: who is working, how close you are, and the way into the
@@ -83,8 +83,13 @@ export function Corner(props: {
 	 * outside is the warning, which is why the trigger below takes its level.
 	 */
 	usage?: AgentUsage;
-	/** The runtime's own usage report, from the row at the foot of that summary. */
-	onUsage: () => void;
+	/**
+	 * Open the usage panel — the plan, the spend, and what has been driving it.
+	 *
+	 * The `⋯` row's job, on a touchscreen only: a phone has no dial under the input bar, so
+	 * the reading it does have here is also the way in to the rest of it.
+	 */
+	onContext: () => void;
 	/** The `⋯` menu, which is the integrator's: it collects whatever has folded. */
 	/**
 	 * The three secondary controls, as menu rows at every width.
@@ -168,7 +173,7 @@ export function Corner(props: {
 								data-current={percent() === stop ? "true" : undefined}
 								onClick={() => props.onZoom(stop / 100)}
 							>
-								<span class="lb flex-1 font-normal tabular-nums">{stop}%</span>
+								<span class="lb flex-1 tabular-nums">{stop}%</span>
 							</button>
 						)}
 					</For>
@@ -182,12 +187,12 @@ export function Corner(props: {
 					    has to survive the press. Every other row here closes it. */}
 					<button type="button" role="menuitem" data-row data-keep-open data-flat="true" onClick={() => props.onZoom(clamp(props.zoom * STEP))}>
 						<Icon of={ZoomIn} size={13} class="flex-none text-muted" />
-						<span class="lb flex-1 font-normal">Zoom in</span>
+						<span class="lb flex-1">Zoom in</span>
 						<span class="meta flex-none text-[10px]">⌘=</span>
 					</button>
 					<button type="button" role="menuitem" data-row data-keep-open data-flat="true" onClick={() => props.onZoom(clamp(props.zoom / STEP))}>
 						<Icon of={ZoomOut} size={13} class="flex-none text-muted" />
-						<span class="lb flex-1 font-normal">Zoom out</span>
+						<span class="lb flex-1">Zoom out</span>
 						<span class="meta flex-none text-[10px]">⌘-</span>
 					</button>
 				</Popover>
@@ -314,14 +319,35 @@ export function Corner(props: {
 				)}
 			>
 				{/*
-					How full the context is, first, because it is the only thing in this menu that
-					is *news*. The rest — the canvas buttons that folded, the cheat sheet, the
-					settings, the theme — is a list of places to go, and a reading you might act on
-					should not be under one.
+					How full the context is — **one row, and only on a touchscreen.**
+					
+					The whole summary used to be inlined here at every width, and that was half
+					right. On a phone there is no room under the input bar for anything, so a menu
+					is the only place it can live. On a desktop it is back where it started, at the
+					right end of the hint row under the box (`composer/ContextDial.tsx`): a reading
+					you glance at twenty times an hour should not be behind a menu you have to open
+					to take the glance.
+					
+					A row rather than the summary, because a menu is a list of places to go and this
+					is now one of them — it opens the same numbers as a modal, which is the shape a
+					phone can actually show them in.
 				*/}
-				<Show when={props.usage}>
-					<ContextSummary usage={props.usage} onUsage={props.onUsage} />
-					<span class="rule" />
+				<Show when={props.usage && contextPercent(props.usage) !== undefined}>
+					<button
+						type="button"
+						role="menuitem"
+						data-row
+						data-flat="true"
+						class="hidden pointer-coarse:flex"
+						onClick={props.onContext}
+					>
+						<span class="ic">
+							<ContextRing usage={props.usage} size={15} />
+						</span>
+						<span class="lb flex-1">Context usage</span>
+						<span class="meta flex-none tabular-nums">{Math.round(contextPercent(props.usage) ?? 0)}%</span>
+					</button>
+					<span class="rule hidden pointer-coarse:block" />
 				</Show>
 
 				{/*

@@ -2,7 +2,7 @@ import ArchiveRestore from "lucide-solid/icons/archive-restore";
 import Eye from "lucide-solid/icons/eye";
 import GitBranch from "lucide-solid/icons/git-branch";
 import RotateCcw from "lucide-solid/icons/rotate-ccw";
-import { createMemo, createSignal, Show } from "solid-js";
+import { createMemo } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { Popover } from "../ui/Popover.tsx";
 
@@ -16,14 +16,22 @@ import { Popover } from "../ui/Popover.tsx";
  * transcript and once as a scrubber.
  *
  * What is new is that it is a **visible button with a menu** rather than three squares you
- * had to hover a bubble to find. Three consequences worth the 22px:
+ * had to hover a bubble to find. Two consequences worth the 22px: a touchscreen can reach it
+ * at all, and each action gets a sentence — "Rewind" alone does not say that the words come
+ * back to the input bar, and that is the fact that decides whether you dare press it.
  *
- * - The behaviour hover already had is *written down*. "Preview" is what pointing at the
- *   button does; a row that says so is the difference between a feature and an accident.
- * - A touchscreen can reach it at all. There is no hovering there, and this was the only
- *   route to the time machine.
- * - Each action gets a sentence. "Rewind" alone does not say that the words come back to
- *   the input bar, and that is the fact that decides whether you dare press it.
+ * ### Pointing at it used to preview, and no longer does
+ *
+ * Hovering the handle started a preview with no dwell delay, and picking the row *held* one
+ * that outlived the pointer. Two ways in, one of which you could take by accident, and both
+ * ending in the same state: every board amber and inert, with the only way out inside this
+ * menu. What that produced is a canvas somebody is stuck in without having asked for
+ * anything — and a reading of the boards that changes while your cursor drifts across a
+ * transcript is not a feature, it is a flinch.
+ *
+ * So there is one way in and it is a press. Which also makes this menu what it says it is:
+ * **look, take back, branch, put back** — four deliberate acts on one point in the
+ * conversation, none of them reachable by drifting.
  */
 export function TimeMachine(props: {
 	/** The session entry this message became — the address every action is sent to. */
@@ -35,16 +43,6 @@ export function TimeMachine(props: {
 	onFork: (entryId: string) => void;
 	onRestore: (entryId: string) => void;
 }) {
-	/**
-	 * A preview asked for by name, rather than one that follows the cursor.
-	 *
-	 * Pointing at the button previews and leaving puts it back — that is the cheap gesture
-	 * and it should cost nothing to abandon. Picking the row means you want to *look*, so
-	 * the preview outlives both the menu closing and the pointer leaving, and only an
-	 * explicit act clears it again.
-	 */
-	const [held, setHeld] = createSignal(false);
-
 	/*
 	 * The prop, read through a memo of our own — and it is not a cache.
 	 *
@@ -90,9 +88,6 @@ export function TimeMachine(props: {
 			placement="top-start"
 			class="w-[min(268px,calc(100vw-32px))]"
 			label="Go back to this message"
-			onOpenChange={(open) => {
-				if (!open && !held()) props.onPreview(null);
-			}}
 			trigger={(api) => {
 				dismiss = () => {
 					if (api.open) api.toggle();
@@ -106,20 +101,13 @@ export function TimeMachine(props: {
 						aria-label="Go back to this message"
 						aria-haspopup="menu"
 						aria-expanded={api.open}
-						title="Preview, rewind, or fork from this message"
+						title="Preview, rewind, fork or restore from this message"
 						/*
-						 * Hovering previews, with no dwell delay: you only get here by reaching for
-						 * the thing itself, so the reach is the intent. Focus does the same, which is
-						 * what gives a keyboard the preview at all.
+						 * A press, and only a press. This used to preview on `mouseenter` and on
+						 * `focus`, and put it back on the way out — which meant the canvas could
+						 * change under a cursor that was on its way somewhere else, and a keyboard
+						 * roving the transcript previewed every message it passed.
 						 */
-						onMouseEnter={() => props.onPreview(props.entryId)}
-						onMouseLeave={() => {
-							if (!api.open && !held()) props.onPreview(null);
-						}}
-						onFocus={() => props.onPreview(props.entryId)}
-						onBlur={() => {
-							if (!api.open && !held()) props.onPreview(null);
-						}}
 						onClick={api.toggle}
 					>
 						<Icon of={RotateCcw} size={12} />
@@ -133,16 +121,10 @@ export function TimeMachine(props: {
 				data-current={previewing()}
 				onClick={() =>
 					pick(() => {
-						// Pressed while it is already the shown past: put the canvas back. The row
-						// is the only visible handle on a held preview, so it has to be able to
-						// undo itself.
-						if (previewing()) {
-							setHeld(false);
-							props.onPreview(null);
-							return;
-						}
-						setHeld(true);
-						props.onPreview(props.entryId);
+						// Pressed while it is already the shown past: put the canvas back. Not the
+						// only way out any more — the canvas has a badge with a Leave in it, and
+						// Escape — but a control that cannot undo itself is still a bad control.
+						props.onPreview(previewing() ? null : props.entryId);
 					})
 				}
 			>
@@ -150,7 +132,7 @@ export function TimeMachine(props: {
 					<Icon of={Eye} size={13} />
 				</span>
 				<span class="lb">{previewing() ? "Stop previewing" : "Preview"}</span>
-				<span class="nt">Show the canvas as it was at this message. Hovering the button does this too.</span>
+				<span class="nt">Show the canvas as it was at this message. Nothing is written, and Escape puts it back.</span>
 			</button>
 
 			<button
@@ -158,7 +140,6 @@ export function TimeMachine(props: {
 				data-row
 				onClick={() =>
 					pick(() => {
-						setHeld(false);
 						props.onPreview(null);
 						props.onRewind(props.entryId);
 					})
@@ -176,7 +157,6 @@ export function TimeMachine(props: {
 				data-row
 				onClick={() =>
 					pick(() => {
-						setHeld(false);
 						props.onPreview(null);
 						props.onFork(props.entryId);
 					})
@@ -190,30 +170,30 @@ export function TimeMachine(props: {
 			</button>
 
 			{/*
-			 * Only while a preview is up, and that is the point of it: restoring writes the
-			 * boards back for real, and offering that beside "have a look" makes the reversible
-			 * act and the permanent one the same size. Once you are looking at the past, "keep
-			 * this" is the obvious next thing to want.
+			 * Restore, always — it is the fourth thing you can do to a point, not a reward for
+			 * having previewed one.
+			 *
+			 * It used to appear only while a preview was up, on the argument that "keep this" is
+			 * the obvious next thing to want once you are looking at the past. That argument was
+			 * standing on the hover: previewing was free and constant, so "you are already
+			 * looking at it" was the ordinary state of the menu. With one deliberate way in, a
+			 * row that is usually not there is a row nobody knows about — and the menu stops
+			 * being a list of what you can do to this message.
+			 *
+			 * Behind the rule, because this is the one that writes to the boards.
 			 */}
-			<Show when={previewing()}>
-				<div class="rule" />
-				<button
-					type="button"
-					data-row
-					onClick={() =>
-						pick(() => {
-							setHeld(false);
-							props.onRestore(props.entryId);
-						})
-					}
-				>
-					<span class="ic">
-						<Icon of={ArchiveRestore} size={13} />
-					</span>
-					<span class="lb">Restore</span>
-					<span class="nt">Write the boards back to how they were here. The conversation stays where it is.</span>
-				</button>
-			</Show>
+			<div class="rule" />
+			<button
+				type="button"
+				data-row
+				onClick={() => pick(() => props.onRestore(props.entryId))}
+			>
+				<span class="ic">
+					<Icon of={ArchiveRestore} size={13} />
+				</span>
+				<span class="lb">Restore</span>
+				<span class="nt">Write the boards back to how they were here. The conversation stays where it is.</span>
+			</button>
 		</Popover>
 	);
 }

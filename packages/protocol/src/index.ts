@@ -134,6 +134,27 @@ export interface Identity {
 	avatar?: string;
 	/** Assigned on creation, used for cursors and board-edge tints. */
 	color: string;
+	/**
+	 * What the agent says it is doing, in its own words: `["panel-css", "measuring"]`.
+	 *
+	 * Set through `stage.me.setTags`, which **replaces** the list rather than adding to it —
+	 * an `addTag` is never un-called, so every agent would accumulate its whole history and
+	 * the list would stop meaning "what it is up to". Slugged, deduped and capped by
+	 * `cleanTags` on the way in, so a row can draw them without measuring anything.
+	 *
+	 * Here rather than on `AgentChat` because a tag is the same kind of fact as a name: the
+	 * agent chose it about itself, and `agent.identity` is already broadcast on change and
+	 * replayed on connect. A tag is not something the *runtime* knows.
+	 */
+	tags?: string[];
+	/**
+	 * Tags **you** put on an agent, which the agent cannot see or overwrite.
+	 *
+	 * A separate field, not a shared list, and that is the whole point: `setTags` replaces,
+	 * so one list would mean the agent's next call silently deleted yours. Drawn differently
+	 * from the agent's own — see `.tag[data-mine]` in `styles/panel.css`.
+	 */
+	userTags?: string[];
 }
 
 /**
@@ -182,6 +203,116 @@ export interface AgentUsage {
 	contextTokens: number | null;
 	contextWindow: number;
 	cost: number;
+}
+
+/**
+ * Everything the usage panel draws: the plan, the spend, and what has been driving it.
+ *
+ * `AgentUsage` above is the *glance* — three numbers, cheap, emitted after every turn and
+ * drawn as a ring. This is the thing you open, and it is a different question in three
+ * parts: how close is this account to a limit, what has this conversation cost, and what
+ * kind of work has been spending it.
+ *
+ * Read on demand and never cached across openings: two of the three parts are running
+ * totals and the third is a countdown, so figures from an hour ago labelled as usage are
+ * worse than no figures.
+ *
+ * **A narrowing, deliberately.** The Claude CLI answers a control request whose payload is
+ * already wider than its own typings — codenamed buckets that are all null, an undocumented
+ * `limits[]` — so the server reads whatever is there and publishes these fields. A bucket
+ * appearing or being renamed upstream changes one mapping function rather than the panel.
+ */
+export interface UsageReport {
+	/** Which runtime answered, because what it can answer depends on that. */
+	kind: AgentKind;
+	/** `pro`, `max`, `team` — or null on an API key, a 3P provider, or a runtime without plans. */
+	subscription: string | null;
+	/**
+	 * The account these limits belong to.
+	 *
+	 * Decks rotates between several Claude subscriptions on its own (`claude/accounts.ts`),
+	 * so "42% of the 5-hour window" is a reading with no subject until this says whose. Null
+	 * when the install has no account store — the CLI's own login, or a pi agent.
+	 */
+	account: string | null;
+	/**
+	 * The windows, fullest first, or empty when the account has none to report.
+	 *
+	 * Empty and `null` are different answers and the panel says so: a runtime or an account
+	 * with no plan windows has nothing to be near the end of, which is not a request that
+	 * failed.
+	 */
+	limits: PlanLimit[] | null;
+	/** What this conversation has run up. */
+	session: SessionSpend;
+	/**
+	 * What has been driving the usage, as the CLI's own scan reports it.
+	 *
+	 * Approximate by construction — it is this machine's transcripts, so it misses other
+	 * devices and claude.ai entirely — and null when the runtime does not collect it.
+	 */
+	behaviors: { day: UsageWindow; week: UsageWindow } | null;
+}
+
+export interface PlanLimit {
+	/** Stable enough to key a list on: `five_hour`, `weekly:opus`. */
+	key: string;
+	label: string;
+	/** 0–100, or null when the window is known but its share is not. */
+	percent: number | null;
+	/** ISO 8601. Null for a window with no scheduled reset. */
+	resetsAt: string | null;
+}
+
+/** Tokens, the four ways they are counted and priced. */
+export interface TokenCounts {
+	input: number;
+	output: number;
+	cacheRead: number;
+	cacheWrite: number;
+}
+
+/**
+ * What one conversation has spent.
+ *
+ * The totals are always there; the breakdown and the four wall-clock figures are not. A
+ * runtime that only keeps a running total sends `models: []` and nulls rather than zeros —
+ * "this runtime does not count it" and "it counted zero" are different claims, and a panel
+ * that draws them the same way is inventing the first one.
+ */
+export interface SessionSpend {
+	costUsd: number;
+	tokens: TokenCounts;
+	/** Per model, dearest first. Empty when the runtime keeps only totals. */
+	models: ModelSpend[];
+	/** Wall clock and API time in milliseconds, or null when the runtime does not count them. */
+	durationMs: number | null;
+	apiDurationMs: number | null;
+	linesAdded: number | null;
+	linesRemoved: number | null;
+}
+
+export interface ModelSpend {
+	model: string;
+	tokens: TokenCounts;
+	costUsd: number;
+}
+
+/** One time window of the runtime's own usage scan. */
+export interface UsageWindow {
+	requests: number;
+	sessions: number;
+	/** Overlapping characteristics, so these do not sum to 100. */
+	behaviors: { key: string; percent: number; count: number }[];
+	agents: UsageShare[];
+	skills: UsageShare[];
+	plugins: UsageShare[];
+	mcpServers: UsageShare[];
+}
+
+export interface UsageShare {
+	name: string;
+	percent: number;
 }
 
 // --- the transcript ------------------------------------------------------------
@@ -374,7 +505,9 @@ export interface Camera {
  */
 export interface StageCall {
 	id: string;
-	op: "show" | "camera" | "move" | "highlight" | "reload" | "cursor" | "toast" | "read";
+	/** `annotate` is the newest: bubbles with arrows, drawn on the canvas and never written
+	 *  to a board file. See `canvas/annotations.ts`. */
+	op: "show" | "camera" | "move" | "highlight" | "reload" | "cursor" | "annotate" | "toast" | "read";
 	args: unknown;
 }
 
@@ -425,9 +558,15 @@ export type ExtensionUiPrompt =
 	 * answer is the code (`{ value }`); `{ confirmed: true }` is the app closing the
 	 * dialog itself because the credentials landed without one.
 	 */
-	| { id: string; method: "login"; title: string; message: string; url: string; placeholder?: string }
-	/** Informational figures, dismissed with OK. */
-	| { id: string; method: "usage"; title: string; rows: { label: string; value: string }[] };
+	| { id: string; method: "login"; title: string; message: string; url: string; placeholder?: string };
+/*
+ * There was a `usage` method here: a title and a list of pre-formatted `label: value`
+ * strings, which both backends filled in and the dock drew as a card above the input bar.
+ * It is gone, and what replaced it is `UsageReport` — structured, read on demand, and drawn
+ * by a panel that can put a meter next to a window and a countdown under it. A runtime
+ * formatting its own numbers into strings is a runtime deciding how they are drawn, which
+ * is how "42% (148000 / 200000 tokens)" ended up being the whole of what the app knew.
+ */
 
 export type ExtensionUiAnswer =
 	| { id: string; value: string }
@@ -487,13 +626,25 @@ export type ClientMessage =
 	 * destroying its history.
 	 */
 	| { type: "agent.remove"; id: string }
+	/**
+	 * Your own tags on an agent, from the customise popup. Replaces the list.
+	 *
+	 * Separate from `stage.me.setTags`, which is the agent's, and stored in a separate field —
+	 * the two never write to each other.
+	 */
+	| { type: "agent.tags"; id: string; tags: string[] }
 	| { type: "agent.prompt"; id: string; text: string }
 	| { type: "agent.abort"; id: string }
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
 	| { type: "agent.thinking"; id: string; thinking: ThinkingLevel }
 	| { type: "agent.setMode"; id: string; mode: AgentMode }
-	/** Ask the focused agent's runtime for its usage, in a modal. */
-	| { type: "agent.usage"; id: string }
+	/**
+	 * Read this agent's full usage report — the panel, not the ring.
+	 *
+	 * A request rather than a subscription: it costs a control round trip to the runtime,
+	 * and the only moment it is worth one is when somebody has the panel open.
+	 */
+	| { type: "agent.report"; id: string }
 	| { type: "stage.result"; result: StageResult }
 	| { type: "extension.ui.answer"; answer: ExtensionUiAnswer }
 	/** Read the account list — the settings panel asking on open. */
@@ -527,6 +678,17 @@ export type ServerMessage =
 	| { type: "agent.identity"; id: string; identity: Identity }
 	| { type: "agent.model"; id: string; model?: AgentModel }
 	| { type: "agent.usage"; id: string; usage: AgentUsage }
+	/**
+	 * The answer to `agent.report`, or why there is not one.
+	 *
+	 * `error` rather than a silent absence: the panel has a refresh button, and a button
+	 * that does nothing and says nothing is worse than one that reports a failure.
+	 *
+	 * `show` is the agent's side of the same panel — `/cost`, which nobody typed into a
+	 * browser — so the reading arrives with the instruction to open it. Requests the
+	 * browser made carry no flag: it already has the panel open.
+	 */
+	| { type: "agent.report"; id: string; report?: UsageReport; error?: string; show?: true }
 	| { type: "models"; agentId: string; models: ModelOption[] }
 	| { type: "timeline.preview"; agentId: string; entryId: string | null; boards: Record<string, string> }
 	| { type: "chat.history"; agentId: string; items: ChatItem[] }
@@ -541,8 +703,20 @@ export type ServerMessage =
 	 */
 	| { type: "context.changed"; agentId: string; boards: string[]; inPlay: string[] }
 	| { type: "stage.call"; call: StageCall }
-	| { type: "extension.ui.prompt"; prompt: ExtensionUiPrompt }
-	| { type: "extension.ui.prompt.closed"; id: string }
+	/**
+	 * A question an agent is waiting on, and **which agent is waiting**.
+	 *
+	 * `agentId` was missing, and its absence was not harmless: the dialog is drawn over the
+	 * input bar whichever conversation you are in, so a background agent's question arrived
+	 * on top of somebody else's transcript with nothing able to say whose it was — the frame
+	 * did not carry it. The `ask` notification had to attribute the question to whoever
+	 * happened to be focused, which is right most of the time and silently wrong the rest.
+	 *
+	 * With the id, the question belongs to a conversation: it is drawn when you are in that
+	 * conversation and the agent list says "Wants you" when you are not.
+	 */
+	| { type: "extension.ui.prompt"; agentId: string; prompt: ExtensionUiPrompt }
+	| { type: "extension.ui.prompt.closed"; agentId: string; id: string }
 	| { type: "notice"; level: "info" | "warn" | "error"; text: string }
 	/**
 	 * Words for the input bar, put there by the deck rather than typed.

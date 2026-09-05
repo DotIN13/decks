@@ -1,4 +1,4 @@
-import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import type { StageAgentHooks, StageTool } from "../stage/tool.ts";
 import type { ExtensionUiBridge } from "./extension-ui.ts";
@@ -71,6 +71,15 @@ export interface AgentBackendContext {
 	accounts?: ClaudeAccountSwitcher;
 	/** Tell the browser the account list moved, after a login or a switch. */
 	accountsChanged?(): void;
+	/**
+	 * Open the usage panel, unasked — `/cost`, typed in the composer.
+	 *
+	 * The backend does not draw it and does not format it: it says the person asked, and the
+	 * shell reads the report and sends it with `show`. Which is the difference between this
+	 * and what was here before, where each backend built its own list of `label: value`
+	 * strings and so each decided how usage looked.
+	 */
+	showUsage?(): void;
 }
 
 /**
@@ -131,8 +140,14 @@ export interface AgentBackend {
 	mode?(): AgentMode | undefined;
 	models(): Promise<ModelOption[]>;
 	usage(): AgentUsage | null;
-	/** The runtime's own usage and cost, in a modal the browser shows. */
-	usageModal?(): Promise<void>;
+	/**
+	 * The full reading: the plan's windows, what this conversation spent, what drove it.
+	 *
+	 * Optional because it is a round trip to the runtime and not every runtime has one to
+	 * make. A backend without it is not asked, and the panel says which parts a runtime
+	 * cannot answer rather than drawing them empty.
+	 */
+	report?(): Promise<UsageReport>;
 
 	/** The name the agent gave itself, if it has (M3: `stage.me.setName`). */
 	name(): string | undefined;

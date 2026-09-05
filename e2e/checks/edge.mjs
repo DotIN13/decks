@@ -15,7 +15,7 @@
  * condition the second read, so a single press dismissed the inspector *and* a conversation
  * that had never been asked to go.
  */
-import { open, say } from "../harness.mjs";
+import { editMode, open, say } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 try {
@@ -62,6 +62,9 @@ try {
 	await page.locator('.board-node[data-path="boards/plan.html"] .chrome').first().click();
 	await page.keyboard.press("1");
 	await page.waitForTimeout(900);
+	/* Selecting a component is editing, and the inspector is edit-only — it is a properties
+	   panel, and one whose fields cannot be applied would be lying about what it does. */
+	await editMode(page);
 	await page.frameLocator('.board-node[data-path="boards/plan.html"] iframe').locator('[data-id="goal"]').click();
 	await page.waitForSelector(".inspector", { timeout: 6000 });
 	now = await state();

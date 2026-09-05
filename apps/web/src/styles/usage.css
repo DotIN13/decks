@@ -1,0 +1,240 @@
+/*
+ * The usage panel.
+ *
+ * Only what this panel adds. The window it sits in is the settings modal's — `.set-head`,
+ * `.set-body`, `.set-group`, `.set-title`, `.set-note` in `index.css` — and the figures, the
+ * bar and the ring are the context popover's, in `dock.css` under
+ * `:is(.popover, .usage-modal)`. What is left is a list of windows, a grid of facts, a
+ * table of models and two attribution lists, none of which existed anywhere before.
+ *
+ * Nothing here restates a shape the app already has. In particular the day/week switch is
+ * `chrome.css`'s `.seg` and the section headings are `.label`, because inventing a second
+ * segmented control beside `.seg` is how two corners of one window stop matching.
+ */
+
+@layer components {
+	/*
+	 * The padded body of a group, for content that is prose and figures rather than rows.
+	 *
+	 * `.set-rows` is the other kind — a `.rowlist` flush to the group's edges — and this is
+	 * its sibling: the hairline under the heading, drawn the same way, and room to breathe
+	 * for things that are not rows.
+	 */
+	.usage-modal .usage-pad {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		padding: 10px 12px 12px;
+		box-shadow: inset 0 1px 0 0 var(--line);
+	}
+
+	/* The percentage, with what it is a percentage of beside it rather than under it. */
+	.usage-modal .usage-headline {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+	}
+
+	.usage-modal .usage-note {
+		margin: 0;
+		color: var(--faint);
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* Nothing to draw, said in words. Padded, so a group does not collapse to a line. */
+	.usage-modal .usage-empty {
+		margin: 0;
+		padding: 6px 0;
+		color: var(--faint);
+		font-size: 12px;
+	}
+
+	/* A read that failed over figures that are still on screen. */
+	.usage-modal .usage-stale {
+		margin: 0 0 10px;
+		color: var(--color-danger);
+		font-size: 11.5px;
+		overflow-wrap: anywhere;
+	}
+
+	/* Turning while it reads. Reduced motion keeps the disabled state, which is the part
+	   that carries the information. */
+	.usage-modal .usage-spin svg {
+		animation: usage-spin 900ms linear infinite;
+	}
+
+	@keyframes usage-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.usage-modal .usage-spin svg {
+			animation: none;
+		}
+	}
+
+	/* --- the windows ------------------------------------------------------------- */
+
+	.usage-modal .usage-limits {
+		display: flex;
+		flex-direction: column;
+		margin: 0;
+		padding: 0;
+		gap: 11px;
+		list-style: none;
+	}
+
+	.usage-modal .usage-limit {
+		display: grid;
+		gap: 3px;
+	}
+
+	.usage-modal .usage-limit-head {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		font-size: 12.5px;
+	}
+
+	/* A window's name can be `7-day window (claude-opus-4-1)`, which will not always fit. */
+	.usage-modal .usage-limit-label {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		color: var(--fg);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* Tabular figures so a column of percentages lines up on the decimal even though there
+	   is not one — 7% and 42% should not shuffle sideways. */
+	.usage-modal .usage-limit-value {
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.usage-modal .usage-limit-reset {
+		color: var(--faint);
+		font-size: 11px;
+	}
+
+	/* --- the conversation's figures ---------------------------------------------- */
+
+	/*
+	 * As many across as fit, which is the one honest layout here: a runtime that counts
+	 * clocks and lines has nine of these and one that keeps only tokens has five, so a fixed
+	 * column count would leave a hole in the second case.
+	 */
+	.usage-modal .usage-facts {
+		display: grid;
+		margin: 0;
+		gap: 8px 10px;
+		grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+	}
+
+	.usage-modal .usage-facts dt {
+		color: var(--faint);
+		font-size: 10.5px;
+	}
+
+	.usage-modal .usage-facts dd {
+		margin: 0;
+		color: var(--fg);
+		font-size: 14px;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.usage-modal .usage-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 11.5px;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.usage-modal .usage-table th {
+		padding: 5px 0;
+		box-shadow: inset 0 1px 0 0 var(--line);
+		color: var(--faint);
+		font-weight: 500;
+		text-align: end;
+	}
+
+	.usage-modal .usage-table td {
+		padding: 4px 0;
+		color: var(--muted);
+		text-align: end;
+	}
+
+	/* The model is the label for its row, so it reads from the left; every other column is a
+	   number and reads from the right. */
+	.usage-modal .usage-table :is(th, td):first-child {
+		padding-inline: 12px 10px;
+		color: var(--fg);
+		text-align: start;
+	}
+
+	.usage-modal .usage-table :is(th, td):last-child {
+		padding-inline-end: 12px;
+	}
+
+	/* --- what's using it --------------------------------------------------------- */
+
+	.usage-modal .usage-shares {
+		display: grid;
+		gap: 2px;
+	}
+
+	.usage-modal .usage-shares ul {
+		display: grid;
+		margin: 0;
+		padding: 0;
+		gap: 1px;
+		list-style: none;
+	}
+
+	.usage-modal .usage-shares li {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		font-size: 12px;
+	}
+
+	/*
+	 * Truncated at the end rather than at the start, unlike a path: what identifies a plugin
+	 * or an MCP server is its first segment, and the rtl trick that keeps a filename readable
+	 * would reorder the colons in an id. Full name on hover either way.
+	 */
+	.usage-modal .usage-share-name {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		color: var(--muted);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.usage-modal .usage-share-pct {
+		color: var(--faint);
+		font-variant-numeric: tabular-nums;
+	}
+
+	/*
+	 * The scan's own switch sits in a group heading rather than beside its content, which
+	 * takes two corrections: the heading is a baseline row, and `.seg`'s buttons are sized
+	 * for a control strip where every label is one short word — "24 hours" wrapped to two
+	 * lines and made the heading 14px taller than every other one.
+	 */
+	.usage-modal [data-group="behaviors"] > header {
+		align-items: center;
+	}
+
+	.usage-modal [data-group="behaviors"] .seg > button {
+		padding-inline: 7px;
+		white-space: nowrap;
+	}
+}

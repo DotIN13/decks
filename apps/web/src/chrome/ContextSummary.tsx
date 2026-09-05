@@ -28,7 +28,7 @@ const figure = (value: number) => value.toLocaleString("en-US");
  */
 export function ContextSummary(props: {
 	usage: AgentUsage | undefined;
-	/** The runtime's own usage report — the panel the old percentage chip opened. */
+	/** Open the usage panel: the plan's windows, the per-model spend, the scan (`UsageModal`). */
 	onUsage: () => void;
 }) {
 	const percent = () => contextPercent(props.usage);
@@ -76,6 +76,14 @@ export function ContextSummary(props: {
 					 */}
 					<div class="rule" />
 
+					{/*
+					 * The way through to the whole reading.
+					 *
+					 * It used to send a message that made the *runtime* format its figures into
+					 * strings and push them back as a card above the input bar. It opens a panel in
+					 * the browser now (`chat/UsageModal.tsx`), which is why the label can promise
+					 * limits: there is somewhere for a meter and a countdown to go.
+					 */}
 					<button
 						data-row
 						data-flat="true"

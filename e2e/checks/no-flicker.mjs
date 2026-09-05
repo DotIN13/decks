@@ -11,7 +11,7 @@ const plan = await boardPath("plan.html");
 const original = read(plan);
 const selector = '.board-node[data-path="boards/plan.html"] iframe';
 
-const { browser, page, errors } = await open();
+const { browser, page, errors } = await open({ edit: true });
 try {
 	await page.locator('.board-node[data-path="boards/plan.html"] .chrome').first().click();
 	await page.keyboard.press("1");

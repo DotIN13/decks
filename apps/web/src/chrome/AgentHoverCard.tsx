@@ -5,6 +5,7 @@ import { Portal } from "solid-js/web";
 import { Icon } from "../icons.tsx";
 import { AgentFace } from "./AgentPill.tsx";
 import { agentStatus, since, statusWords } from "./agent-order.ts";
+import { For } from "solid-js";
 
 /**
  * The box under a face in the corner. It answers exactly one question.
@@ -29,8 +30,23 @@ export function AgentHoverCard(props: {
 	chat: AgentChat;
 	identity: Identity | undefined;
 	unread: number;
-	/** The face's box in viewport coordinates. The card hangs 8px under it, centred. */
-	anchor: DOMRect;
+	/**
+	 * The box to hang off, in viewport coordinates. The card sits 8px under it, centred.
+	 *
+	 * The fields of a `DOMRect` rather than a `DOMRect`, because `beside` wants an anchor
+	 * that is not any one element: the card goes beside the *menu* and level with the *row*,
+	 * so `AgentPill` composes one from both and a real rect cannot be edited.
+	 */
+	anchor: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height">;
+	/**
+	 * Put it to the *side* of the anchor rather than under it.
+	 *
+	 * For the agent dropdown, where the anchor is a menu row: a card centred under a row
+	 * covers the rows below it, which are exactly the ones being compared. To the right,
+	 * top-aligned, and it flips to the left when there is no room — the same clamping the
+	 * vertical case does, on the other axis.
+	 */
+	beside?: boolean;
 	/**
 	 * Whether it is up.
 	 *
@@ -58,6 +74,18 @@ export function AgentHoverCard(props: {
 		if (!card) return;
 		const box = card.getBoundingClientRect();
 		const MARGIN = 8;
+		if (props.beside) {
+			/*
+			 * Beside a menu row: to its right, top-aligned, flipping left when the window ends.
+			 * Top-aligned rather than centred so the card's first line sits level with the name
+			 * it belongs to — the row and the card read as one thing that way.
+			 */
+			let left = props.anchor.right + MARGIN;
+			if (left + box.width > window.innerWidth - MARGIN) left = Math.max(MARGIN, props.anchor.left - box.width - MARGIN);
+			const top = Math.min(Math.max(MARGIN, props.anchor.top), Math.max(MARGIN, window.innerHeight - box.height - MARGIN));
+			setAt({ left, top });
+			return;
+		}
 		let left = props.anchor.left + props.anchor.width / 2 - box.width / 2;
 		left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - box.width - MARGIN));
 		let top = props.anchor.bottom + MARGIN;
@@ -119,8 +147,28 @@ export function AgentHoverCard(props: {
 
 				<div class="flex items-center gap-1.5 text-[11px] text-muted">
 					<span class="agent-swatch" data-status={status()} aria-hidden="true" />
-					{statusWords(status(), props.chat.state)}
+					<span class="min-w-0 flex-1 truncate">{statusWords(status(), props.chat.state)}</span>
+					{/*
+						Which runtime, as the same word the dropdown row and the panel row use.
+						On the status line rather than beside the name, because it is the same *kind*
+						of fact — what this agent is, not what it is called.
+					*/}
+					<span class="kind" data-dormant={props.chat.dormant ? "true" : undefined}>{props.chat.kind}</span>
 				</div>
+
+				{/*
+					What it says it is working on, and what you say it is.
+					
+					Above the quote, because a tag is a standing fact and the quote is a moment —
+					and because tags are the thing being scanned for when several of these are
+					opened in turn. Yours are outlined; the agent's are filled.
+				*/}
+				<Show when={(props.identity?.tags?.length ?? 0) + (props.identity?.userTags?.length ?? 0) > 0}>
+					<div class="tags">
+						<For each={props.identity?.tags ?? []}>{(tag) => <span class="tag">{tag}</span>}</For>
+						<For each={props.identity?.userTags ?? []}>{(tag) => <span class="tag" data-mine="true">{tag}</span>}</For>
+					</div>
+				</Show>
 
 				{/*
 				 * The last thing it said, in quotes.

@@ -283,32 +283,17 @@ export function Dialog(props: {
 						</button>
 					</div>
 				</Match>
-
-				<Match when={props.prompt.method === "usage"}>
-					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
-					{/*
-						A label and a number per line, with the numbers in the app's tabular figures so
-						the column lines up on the digits rather than on the widths of the words. The
-						label takes `.label`'s size and colour, which is what every other
-						read-only pair in the app uses.
-					*/}
-					<div class="mt-[7px] grid gap-1">
-						<For each={(props.prompt as { rows: { label: string; value: string }[] }).rows}>
-							{(row) => (
-								<div class="flex items-baseline justify-between gap-2.5">
-									<span class="label">{row.label}</span>
-									<span class="font-mono text-[12px] tabular-nums">{row.value}</span>
-								</div>
-							)}
-						</For>
-					</div>
-					<div class="mt-2 flex flex-wrap gap-1.5">
-						<button class="btn" type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
-							OK
-						</button>
-					</div>
-				</Match>
 			</Switch>
 		</div>
 	);
 }
+
+/*
+ * There was a sixth `Match` here: `usage`, a title and a list of `label: value` strings the
+ * backend had already formatted, drawn as a card above the input bar with an OK button.
+ *
+ * It is gone. The figures are structured now (`UsageReport`) and drawn by `UsageModal`,
+ * which can put a meter beside a plan window and a countdown under it — and a card in the
+ * dock could not, because by the time the strings arrived nobody knew a percentage from a
+ * dollar. What is left in this file is what it is for: a runtime asking a *question*.
+ */

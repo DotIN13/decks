@@ -351,6 +351,18 @@ export class App {
 				return;
 			}
 
+			/*
+			 * Your own tags on an agent, from the customise popup.
+			 *
+			 * Silent when the agent is gone: the popup is opened from a row, and a row can be
+			 * removed by another tab between the open and the save. There is nothing useful to
+			 * say about it — the list the popup was editing no longer exists.
+			 */
+			case "agent.tags": {
+				this.agents.get(message.id)?.setUserTags(message.tags);
+				return;
+			}
+
 			case "agent.prompt": {
 				const agent = this.agents.get(message.id) ?? this.agents.focused();
 				// Deliberately not awaited: a prompt runs for minutes and the socket has
@@ -380,10 +392,23 @@ export class App {
 				return;
 			}
 
-			case "agent.usage": {
+			/*
+			 * The usage panel, read on demand.
+			 *
+			 * Replied to rather than broadcast: a second tab did not open this panel and has
+			 * no use for figures it did not ask for. The `/cost` path is the other way round
+			 * and broadcasts — see `pushReport` — because there the *agent* asked.
+			 */
+			case "agent.report": {
 				const agent = this.agents.get(message.id);
-				if (!agent) return;
-				void agent.usageModal();
+				if (!agent) {
+					reply({ type: "agent.report", id: message.id, error: "That agent is gone." });
+					return;
+				}
+				void agent
+					.report()
+					.then((report) => reply({ type: "agent.report", id: message.id, report }))
+					.catch((error: unknown) => reply({ type: "agent.report", id: message.id, error: (error as Error).message }));
 				return;
 			}
 

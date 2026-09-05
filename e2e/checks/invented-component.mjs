@@ -63,7 +63,7 @@ link.send({ type: "board.play", path });
 await new Promise((resolve) => setTimeout(resolve, 500));
 link.close();
 
-const { browser, page, errors } = await open();
+const { browser, page, errors } = await open({ edit: true });
 try {
 	await page.waitForFunction(
 		(wanted) => document.querySelector(`.board-node[data-path="${wanted}"] iframe`)?.contentWindow?.__boardReady === true,

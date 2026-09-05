@@ -354,9 +354,22 @@
 		gap: 10px;
 	}
 
+	/*
+	 * The name takes the space it needs, and the runtime follows it.
+	 *
+	 * `flex: 1` on the name put the whole gap between it and the runtime word, so `claude`
+	 * and `pi` floated at a different x on every row — a ragged column of nothing between
+	 * two things that *are* aligned. The name and its runtime read as one item now, as they
+	 * do in the panel, and the gap moved to where a gap belongs: before the status, which is
+	 * flush right.
+	 */
 	.popover [data-row][data-flat="true"][data-agent] > .lb {
 		min-width: 0;
-		flex: 1;
+		flex: 0 1 auto;
+	}
+
+	.popover [data-row][data-flat="true"][data-agent] > .kind {
+		margin-right: auto;
 	}
 
 	/* An idle agent's *name* at half — the division of labour in one declaration: the corner

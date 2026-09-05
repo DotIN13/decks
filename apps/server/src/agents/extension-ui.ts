@@ -106,11 +106,6 @@ export class ExtensionUiBridge {
 		return this.askRaw<string | boolean>({ method: "login", title: "Sign in to Claude", message, url, placeholder }, false, options);
 	}
 
-	/** A modal of informational figures, dismissed with OK (the value is never used). */
-	usage(title: string, rows: { label: string; value: string }[]): Promise<void> {
-		return this.ask<void>({ method: "usage", title, rows }, undefined);
-	}
-
 	/**
 	 * A question whose options carry their own reasons (`choose` in the protocol).
 	 *

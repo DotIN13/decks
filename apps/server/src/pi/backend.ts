@@ -7,7 +7,7 @@ import {
 	SessionManager,
 	type AgentSession,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
 import { parseSlash } from "../agents/slash.ts";
 import { decksStage } from "./extension.ts";
@@ -38,7 +38,7 @@ export const PI_CAPABILITIES: AgentCapabilities = { modes: [] };
 export const PI_COMMANDS: SlashCommand[] = [
 	{ name: "compact", hint: "Condense the conversation", arg: "[notes]" },
 	{ name: "session", hint: "Session file, id and what is in it" },
-	{ name: "cost", hint: "How much this session has spent" },
+	{ name: "cost", hint: "Open the usage panel: spend, tokens, context" },
 	{ name: "name", hint: "Rename this agent", arg: "<name>" },
 	{ name: "help", hint: "The commands Decks understands" },
 ];
@@ -175,7 +175,8 @@ export class PiBackend implements AgentBackend {
 				return;
 			}
 			case "cost":
-				await this.usageModal();
+				// The panel, not a paragraph — see `claude/backend.ts` for the same line.
+				this.context.showUsage?.();
 				return;
 			case "name": {
 				if (!args.trim()) {
@@ -253,26 +254,43 @@ export class PiBackend implements AgentBackend {
 		};
 	}
 
-	/** The session's usage, in a modal the browser shows. */
-	async usageModal(): Promise<void> {
-		const usage = this.usage();
-		const model = this.session?.model;
-		const tokens = usage?.contextTokens ?? null;
-		const window = usage?.contextWindow ?? 0;
-		await this.context.bridge.usage("Pi session", [
-			{
-				label: "Context",
-				value:
-					window > 0
-						? `${Math.round(((tokens ?? 0) / window) * 100)}% (${tokens ?? "?"} / ${window} tokens)`
-						: tokens === null
-							? "—"
-							: `${tokens} tokens`,
+	/**
+	 * The full reading, for the usage panel.
+	 *
+	 * Pi has no subscription and no plan windows — its credentials are `pi auth`'s business
+	 * and it bills per token — so `limits` and `subscription` are null and the panel says
+	 * as much in words instead of drawing three empty meters.
+	 *
+	 * What it does keep is a running total, and **only** a total: `SessionStats.tokens` is
+	 * the whole session across however many models it has been through. So `models` is
+	 * empty rather than one row labelled with the model that happens to be current, which
+	 * would attribute every token of the conversation to whatever it was switched to last.
+	 */
+	async report(): Promise<UsageReport> {
+		const stats = this.session.getSessionStats();
+		return {
+			kind: "pi",
+			subscription: null,
+			account: null,
+			limits: null,
+			session: {
+				costUsd: stats.cost,
+				tokens: {
+					input: stats.tokens.input,
+					output: stats.tokens.output,
+					cacheRead: stats.tokens.cacheRead,
+					cacheWrite: stats.tokens.cacheWrite,
+				},
+				models: [],
+				// Pi counts messages and tool calls, not clocks or lines. Null, not zero:
+				// "this runtime does not count it" is not "it counted nothing".
+				durationMs: null,
+				apiDurationMs: null,
+				linesAdded: null,
+				linesRemoved: null,
 			},
-			{ label: "Cost", value: `$${(usage?.cost ?? 0).toFixed(4)}` },
-			{ label: "Model", value: model ? `${model.provider}/${model.id}` : "—" },
-			{ label: "Session", value: this.session?.sessionName ?? this.session?.sessionId ?? "—" },
-		]);
+			behaviors: null,
+		};
 	}
 
 	// --- identity ------------------------------------------------------------------

@@ -31,8 +31,19 @@ test("with the conversation open, the column has it and the dock does not", () =
  * The one case where neither draws it: a reply already on screen, filling in behind a caret.
  * A sign under that card would be a second cursor saying what the first one says.
  */
-test("a reply that is already arriving needs no sign at all", () => {
-	assert.equal(signPlacement("streaming", { historyOpen: true, arriving: true }), "none");
+test("a reply that is arriving keeps its sign, now that there is no caret", () => {
+	/*
+	 * This asserted `"none"`, and the reasoning was good while it lasted: a streaming reply
+	 * had a caret blinking at the end of its text, saying "still going" in the place the
+	 * words were appearing, so a second sign below them was noise.
+	 *
+	 * The caret is gone — it flickered on and off twice a second and was the thing that made
+	 * the column look restless. With it went the only other carrier of that fact, so the sign
+	 * stays up for the whole reply: a growing paragraph and no indicator is a column that has
+	 * stopped saying whether anything is happening.
+	 */
+	assert.equal(signPlacement("streaming", { historyOpen: true, arriving: true }), "column");
+	assert.equal(signPlacement("streaming", { historyOpen: true, arriving: false }), "column", "and the same either way, which is the point");
 });
 
 test("waiting for you is a sign but not work in progress", () => {

@@ -30,6 +30,24 @@ import { cameraMovedSince } from "./pan-signal.ts";
 export type Tool = "select" | ComponentKind;
 
 /**
+ * What a click on a board means.
+ *
+ * **browse** — a board is a document. Text selects and copies, a game plays, a click is an
+ * ordinary click that reaches the board's own content. Nothing can be moved and nothing can
+ * be retyped. This is the default, because most of the time a deck is being read.
+ *
+ * **edit** — a board is a drawing. Components drag on an 8px grid, a click selects one for
+ * the inspector, a double-click opens a run of words for retyping. Everything this file does.
+ *
+ * Both pan and zoom: the camera is not editing.
+ *
+ * The whole switch is `EditorHost.enabled()`. Every listener in this file already consulted
+ * it — it was "are we zoomed in far enough to edit" — so browse mode is that same gate with
+ * a second reason to be shut, and no new interception logic anywhere.
+ */
+export type CanvasMode = "browse" | "edit";
+
+/**
  * The grid every placement snaps to, exported because the drop path snaps to it too
  * (`file-drop.ts`). A file dropped on a board has to line up with the components
  * placed by hand beside it, and two definitions of "the grid" is one too many.
@@ -164,25 +182,38 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * the paragraph's underline already spans the word, and the pair renders as one line.
 		 *
 		 * Only on hover, and only an underline: the point is to answer "can I type here" at
-		 * the moment somebody wonders, not to draw boxes over a finished board. It needs no
-		 * zoom guard — below INTERACT_ZOOM the frame takes no pointer events, so nothing in
-		 * it can be hovered.
+		 * the moment somebody wonders, not to draw boxes over a finished board.
+		 *
+		 * **Every rule below is under :root[data-decks-edit], and that guard is the whole of
+		 * what browse mode needed here.** The comment used to say no guard was necessary,
+		 * because below INTERACT_ZOOM the frame takes no pointer events and nothing in it can
+		 * be hovered — true, and it stopped being the only case: browse mode leaves the frame
+		 * live so that text selects and a game plays, so without this the dotted underline and
+		 * the I-beam were promising an edit that nothing would accept.
+		 *
+		 * BoardFrame writes the attribute from EditorHost.enabled(), so it follows the mode
+		 * and the zoom together. (Still no backticks in this comment — see above; it is inside
+		 * the template literal and one would end it. I put three here and the build said so.)
+		 *
+		 * The I-beam goes with it rather than staying for the sake of selection: text is
+		 * selectable under any cursor, and cursor: text on a board that cannot be edited is
+		 * the same false promise as the underline.
 		 */
-		[data-id] *:not(:has(:not(${INLINE_TAGS.join(", ")}))):hover,
-		[data-id]:not(:has(:not(${INLINE_TAGS.join(", ")}))):hover,
-		[data-md]:hover,
-		[data-mermaid]:hover {
+		:root[data-decks-edit] [data-id] *:not(:has(:not(${INLINE_TAGS.join(", ")}))):hover,
+		:root[data-decks-edit] [data-id]:not(:has(:not(${INLINE_TAGS.join(", ")}))):hover,
+		:root[data-decks-edit] [data-md]:hover,
+		:root[data-decks-edit] [data-mermaid]:hover {
 			text-decoration: underline dotted var(--b-faint, #9aa0aa);
 			text-underline-offset: 3px;
 			cursor: text;
 		}
 
-		[data-md] *:hover,
-		[data-mermaid] *:hover,
-		[data-embed]:hover,
-		[data-embed] *:hover,
-		svg:hover,
-		svg *:hover {
+		:root[data-decks-edit] [data-md] *:hover,
+		:root[data-decks-edit] [data-mermaid] *:hover,
+		:root[data-decks-edit] [data-embed]:hover,
+		:root[data-decks-edit] [data-embed] *:hover,
+		:root[data-decks-edit] svg:hover,
+		:root[data-decks-edit] svg *:hover {
 			text-decoration: none;
 			cursor: inherit;
 		}

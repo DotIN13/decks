@@ -43,7 +43,9 @@ export interface StageAgentHooks {
 	setInPlay(paths: string[]): void;
 	rename(name: string): void;
 	setAvatar(url: string): void;
-	agents(): Array<{ id: string; name: string; state: string; context: string[] }>;
+	/** Replaces the agent's own tags and returns them as stored — see `agents/tags.ts`. */
+	setTags(tags: unknown): string[];
+	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
 	/** Hand work to a new agent and wait for it. */
@@ -115,6 +117,15 @@ const GUIDELINES = [
 	"The board carries the answer; the chat reply names it and may recap or add to it. What is never acceptable is the substance in chat with a stub on the board, or a board that only makes sense after reading the chat.",
 	"When work is finished, report on a board — method, result, what is left — rather than describing it in the chat column.",
 	"Keep the canvas to what matters now: stage.show narrows it, stage.hide takes a board off it without dropping it from your context.",
+	/*
+	 * The one guideline that is about the *chat list* rather than the canvas.
+	 *
+	 * It is here as well as in `stage.d.ts` because the two are read differently: the d.ts is
+	 * reference, consulted when reaching for a call, and these are instructions read once at
+	 * the top. An API documented only in reference material is an API nobody remembers exists
+	 * — which for tags means a row that is permanently empty, and the feature not existing.
+	 */
+	"Say what you are working on: stage.me.setTags(['panel-css', 'measuring']) when you start on something, and setTags([]) when you stop. It is how the user sees what each agent is up to without opening every conversation. Short nouns, not sentences.",
 ];
 
 export function createStageTool(deps: {
@@ -226,12 +237,32 @@ export function createStageTool(deps: {
 		toast: async (text: string) => service.toast(text),
 
 		// --- identity -------------------------------------------------------------
+		/**
+		 * Point at something on a board: a bubble with a small arrow, drawn on the canvas.
+		 *
+		 * Transient — nothing is written to the board file, so a board that has been annotated
+		 * is byte-identical to one that has not. `to` is a component's `data-id`, which is what
+		 * makes the arrow follow it when it moves; a `{ x, y }` is taken as a board coordinate.
+		 * Four at most per board, and `null` clears the ones this agent put there.
+		 */
+		annotate: async (path: string, marks: unknown) => service.annotate(agent.id, path, marks),
+
 		me: {
 			setName: async (name: string) => {
 				const clean = name.trim().slice(0, 40);
 				if (!clean) throw new Error("A name cannot be empty");
 				agent.rename(clean);
 			},
+			/**
+			 * What this agent is doing, in its own words. Replaces the list.
+			 *
+			 * Returns the tags **as stored**, which is not always what was passed: they are
+			 * slugged, deduped and capped at four, so `["Reading panel.css and measuring"]`
+			 * comes back as `["reading-panel-css-and"]`. Returning them is the only way a model
+			 * finds that out, and the alternative — silently storing something different from
+			 * what it thinks it set — is how an agent ends up re-setting the same tags forever.
+			 */
+			setTags: async (tags: string[]) => agent.setTags(tags),
 			setAvatar: async (avatar: { emoji: string } | { svg: string }) => {
 				if ("emoji" in avatar) {
 					// An emoji becomes a data URL rather than a special case in the

@@ -7,6 +7,9 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup,
 import { Icon } from "../icons.tsx";
 import { BoardRow, BoardTile } from "./BoardRow.tsx";
 import { panelSections, panelTally } from "./panel-groups.ts";
+import type { AgentChat, Identity } from "@decks/protocol";
+import { AgentRow } from "./AgentRow.tsx";
+import { agentFoot, agentSections, agentTally } from "./agent-sections.ts";
 
 /**
  * The left panel: one surface, **one list**, and a button that makes it go away.
@@ -74,6 +77,14 @@ import { panelSections, panelTally } from "./panel-groups.ts";
 /** How the list draws each board: a line, or a picture with a caption. */
 export type Density = "list" | "grid";
 
+/**
+ * Which list the panel is showing.
+ *
+ * Two genuinely different collections, which is what makes a strip defensible here — see the
+ * note on the `chats` prop.
+ */
+export type PanelTab = "boards" | "agents";
+
 /** Below this the panel cannot stand beside the canvas, so it goes over it. */
 const SHEET = 1100;
 
@@ -124,11 +135,57 @@ export function LeftPanel(props: {
 	 * already in — the same reason `draft` and `scrollTo` carry one.
 	 */
 	findAt?: number;
+
+	// --- the Agents tab ---------------------------------------------------------------
+	/**
+	 * Every chat, for the second tab.
+	 *
+	 * A tab strip is back, and it is not the one that was removed. **Context** and **Deck**
+	 * were one collection with a line drawn through it — everything in Context was also in
+	 * Deck, so finding a board began by guessing which side the app had put it on this
+	 * second. Boards and agents overlap in *nothing*: no agent is in the boards list and no
+	 * board is in the agents list, so the invariant that mattered — every item appears
+	 * exactly once — stays true trivially rather than by argument.
+	 */
+	chats?: AgentChat[];
+	identities?: Record<string, Identity>;
+	unread?: Record<string, number>;
+	onFocusAgent?: (id: string) => void;
+	onCloseAgent?: (id: string) => void;
+	/** Replace *your* tags on an agent. Absent means no row can be customised. */
+	onAgentTags?: (id: string, tags: string[]) => void;
 }) {
 	const ids = createUniqueId();
 	const [ownDensity, setOwnDensity] = createSignal<Density>("list");
 	const [query, setQuery] = createSignal("");
+	const [tab, setTab] = createSignal<PanelTab>("boards");
 	const sheet = createSheet();
+
+	/*
+	 * Switching tabs clears the query.
+	 *
+	 * The one thing the old strip got right, and it was right for a reason that applies here
+	 * and did not apply there: the two lists differ, so a query left over from the other one
+	 * is a filter whose cause is off screen. Between Context and Deck it was the same list
+	 * either way, which is why the strip went.
+	 */
+	const goTab = (next: PanelTab) => {
+		if (next === tab()) return;
+		setTab(next);
+		setQuery("");
+		props.onSearch?.("");
+	};
+
+	const agents = () =>
+		agentSections({
+			chats: props.chats ?? [],
+			identities: props.identities ?? {},
+			unread: props.unread ?? {},
+			focused: props.focused,
+			query: query(),
+		});
+	/** Every agent, unfiltered — what the foot counts and the placeholder says. */
+	const allAgents = () => agentTally(agentSections({ chats: props.chats ?? [], identities: props.identities ?? {}, unread: props.unread ?? {}, focused: props.focused }));
 
 	const density = () => props.density ?? ownDensity();
 	let list: HTMLDivElement | undefined;
@@ -240,29 +297,66 @@ export function LeftPanel(props: {
 				}`}
 			>
 				{/*
-					The header: a search field, and nothing above it.
+					The header: which list, then a field over it.
 
-					There was a tab strip here — Context and Deck — and it is gone; `panel-groups.ts`
-					argues why. What it leaves behind is a header that is one control tall and a
-					list that has to be scrolled rather than switched.
+					**Both controls are 32px**, which is `--control-md` — the height a labelled chip
+					in the dock already is, so the panel's header matches the chrome across the top
+					of the app instead of sitting 4px shorter than everything in it. It was 28px
+					(`--field`), a value chosen for a box *inside a row*; asked twice whether that
+					read short, the answer was twice yes.
 
-					On the 4 / 8 / 12 scale, which is the only scale in here: a 28px field and 12px
-					to the list, 40px and taller type under a finger. 24px was right beside a cursor
-					— the panel is a dense list and its header should not compete with it — and
-					under half a fingertip on a phone, where this is a *sheet's* header and the only
-					control above a scrolling list.
+					A strip is back, and `PanelTab` says why it is not the one that went: these are
+					two collections rather than one with a line through it.
+
+					On a coarse pointer both stay at 40px, which the field already had and which is
+					under the 44px the panel uses for anything pressed.
 				*/}
 				<div class="flex flex-none flex-col gap-2 pb-3">
+					<Show when={props.chats}>
+						{/*
+							The app's `.seg`, at `h-8` — 28px buttons inside 2px of padding is a 32px
+							strip, matching the field below it. The removed Context/Deck strip was the
+							same object at `h-6`.
+						*/}
+						<div class="seg w-full" role="tablist" aria-label="Panel">
+							<For each={["boards", "agents"] as PanelTab[]}>
+								{(name) => (
+									<button
+										type="button"
+										role="tab"
+										id={`${ids}-tab-${name}`}
+										aria-selected={tab() === name}
+										aria-controls={`${ids}-list`}
+										/* One tab stop for the strip, arrows within it — the ARIA tabs pattern,
+										   which is what keeps the panel three stops rather than five. */
+										tabindex={tab() === name ? 0 : -1}
+										data-on={tab() === name}
+										class="h-7 text-[11.5px] pointer-coarse:h-9"
+										onClick={() => goTab(name)}
+										onKeyDown={(event) => {
+											if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+											event.preventDefault();
+											const next: PanelTab = name === "boards" ? "agents" : "boards";
+											goTab(next);
+											document.getElementById(`${ids}-tab-${next}`)?.focus();
+										}}
+									>
+										{name === "boards" ? "Boards" : "Agents"}
+									</button>
+								)}
+							</For>
+						</div>
+					</Show>
 					{/*
-						`.field` is 24px by default; the header's rhythm wants 28, and a utility beats
+						`.field` is 24px by default; the header's rhythm wants 32, and a utility beats
 						the layer it is defined in — which is the whole reason that layer exists.
 
 						`flex-none` is load-bearing, not tidying. `.field` carries `flex: 1` for the
 						inspector's row of four, where it grows sideways; in a *column* that grow is
 						vertical, and a `flex-basis: 0` beats a stated height — so the field measured
-						its input's min-content and came out 19px instead of 28.
+						its input's min-content and came out 19px instead of 32.
 					*/}
-					<label class="field h-7 flex-none gap-1.5 rounded-md pointer-coarse:h-10 pointer-coarse:gap-2 pointer-coarse:px-2.5">
+					<label class="field h-8 flex-none gap-1.5 rounded-md pointer-coarse:h-10 pointer-coarse:gap-2 pointer-coarse:px-2.5">
 						<Icon of={Search} class="flex-none text-faint" size={13} />
 						{/*
 							16px on a touch keyboard, like the composer's field and for the same reason:
@@ -275,7 +369,14 @@ export function LeftPanel(props: {
 							type="text"
 							spellcheck={false}
 							class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
-							placeholder={`Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`}
+							/* Says what it will match, which for agents includes the tags — “who else is
+							   on panel-css” is the question tags exist to answer, and this is the surface
+							   with room to show the answer. */
+							placeholder={
+								tab() === "agents"
+									? `Search ${allAgents().total} agent${allAgents().total === 1 ? "" : "s"} or tags`
+									: `Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`
+							}
 							value={query()}
 							onInput={(event) => type(event.currentTarget.value)}
 							onKeyDown={(event) => {
@@ -328,6 +429,51 @@ export function LeftPanel(props: {
 					data-density={density()}
 					onKeyDown={rove}
 				>
+					<Show when={tab() === "agents"}>
+						<For each={agents()}>
+							{(section) => (
+								<div class="panel-section" data-kind={section.kind}>
+									<div class="panel-meta meta">
+										<span class="truncate">{section.label}</span>
+										<span class="flex-1" />
+										<span class="n tabular-nums">{section.rows.length}</span>
+									</div>
+									{/*
+										`.rowlist` is the row vocabulary — the grid, the corner, the hover, the
+										current wash, `.row-act` and its ×, and the `.lb`/`.nt` type scale. The
+										agent row wants all of that and two overrides (a 28px icon column and a
+										top-aligned action), which `.agent-list` in `panel.css` supplies.
+
+										Re-implementing it instead is how two lists in one panel come to nearly
+										match: the board rows above are the same object.
+									*/}
+									<div class="rowlist agent-list">
+									<For each={section.rows}>
+										{(row) => (
+											<AgentRow
+												row={row}
+												identity={props.identities?.[row.chat.id]}
+												onFocus={() => props.onFocusAgent?.(row.chat.id)}
+												onClose={() => props.onCloseAgent?.(row.chat.id)}
+												{...(props.onAgentTags ? { onTags: (tags: string[]) => props.onAgentTags?.(row.chat.id, tags) } : {})}
+											/>
+										)}
+									</For>
+									</div>
+								</div>
+							)}
+						</For>
+
+						{/* The same shape of empty state the boards list has, and the same reasoning:
+						    a panel that is blank for a good reason still looks broken without it. */}
+						<Show when={agents().length === 0}>
+							<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
+								{allAgents().total === 0 ? "No agents yet. Start one with `+`." : `No agent matches “${query().trim()}”.`}
+							</p>
+						</Show>
+					</Show>
+
+					<Show when={tab() === "boards"}>
 					<For each={sections()}>
 							{(section) => (
 								<div
@@ -411,6 +557,7 @@ export function LeftPanel(props: {
 								: `Nothing in the deck matches “${query().trim()}”.`}
 						</p>
 					</Show>
+					</Show>
 				</div>
 
 				{/* The foot: what the list adds up to, and how it is drawn. 24px, 8px above it. */}
@@ -423,12 +570,22 @@ export function LeftPanel(props: {
 						the sections say it too, but they scroll and this does not.
 					*/}
 					<span class="truncate">
-						{tally().shown === props.boards.length
-							? `${props.boards.length} board${props.boards.length === 1 ? "" : "s"}${tally().held > 0 ? ` · ${tally().held} held` : ""}`
-							: `${tally().shown} of ${props.boards.length} match`}
+						{tab() === "agents"
+							? agentFoot(allAgents(), query().trim() ? agentTally(agents()).total : undefined)
+							: tally().shown === props.boards.length
+								? `${props.boards.length} board${props.boards.length === 1 ? "" : "s"}${tally().held > 0 ? ` · ${tally().held} held` : ""}`
+								: `${tally().shown} of ${props.boards.length} match`}
 					</span>
 					<span class="flex-1" />
-					<div class="seg">
+					{/*
+						The density toggle belongs to Boards.
+
+						Pictures or rows is a question about *thumbnails*; an agent has no second
+						rendering, so on the Agents tab the control would be a switch with one
+						position. Hidden rather than disabled: a disabled control asks to be
+						explained, and its absence here explains itself.
+					*/}
+					<div class="seg" style={tab() === "agents" ? { display: "none" } : undefined}>
 						<button
 							type="button"
 							class="grid place-items-center px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"

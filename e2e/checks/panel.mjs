@@ -21,7 +21,35 @@ try {
 
 	say("the panel is up, and declares its width", (await mounted()) === 1 && (await inset()) === "276px", await inset());
 
-	say("no tab strip: there is one list", (await page.getByRole("tab").count()) === 0);
+	/*
+	 * A tab strip, and it is not the one that was removed.
+	 *
+	 * **Context** and **Deck** were one collection with a line drawn through it: everything
+	 * in Context was also in Deck, so finding a board began by guessing which side the app
+	 * had put it on this second. That is why that strip went, and the assertion here used to
+	 * be `no tab strip: there is one list`.
+	 *
+	 * **Boards** and **Agents** overlap in nothing — no agent is in the boards list and no
+	 * board is in the agents list. So the invariant that actually mattered, every item
+	 * appearing exactly once, holds trivially rather than by argument; it is still checked
+	 * below, on the boards list, because that is where it could still break.
+	 */
+	const tabs = await page.getByRole("tab").allInnerTexts();
+	say("two tabs, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Boards", "Agents"]), JSON.stringify(tabs));
+
+	/*
+	 * The header is 32px, both controls, which is `--control-md` — the height a labelled chip
+	 * in the dock already is. It was 28px (`--field`), a value meant for a box inside a row,
+	 * and it read short against the rest of the chrome. Checked because a header that drifts
+	 * back to 28 is exactly the kind of regression nobody files.
+	 */
+	const header = await page.evaluate(() => ({
+		strip: Math.round(document.querySelector(".panel-shell .seg")?.getBoundingClientRect().height ?? 0),
+		field: Math.round(document.querySelector(".panel-shell .field")?.getBoundingClientRect().height ?? 0),
+		label: Math.round(document.querySelector(".panel-meta")?.getBoundingClientRect().height ?? 0),
+	}));
+	say("the strip and the field are both 32px", header.strip === 32 && header.field === 32, JSON.stringify(header));
+	say("…and the section labels grew with them", header.label === 22, `${header.label}px`);
 
 	/*
 	 * Every board is in it, whoever is holding what. A fresh agent holds nothing, so this is
