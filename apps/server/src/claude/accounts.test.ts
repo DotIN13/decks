@@ -97,13 +97,36 @@ test("a fresh install reads the CLI's own login through the link, not around it"
 });
 
 /*
- * macOS names its keychain entry after the config directory, and every account is reached
- * through the same link — so with one variable they would all share one entry, and a login
- * written against an account's own directory would be looked for under the wrong name by the
- * session that follows it.
+ * The token comes from `CLAUDE_SECURESTORAGE_CONFIG_DIR`, not from `CLAUDE_CONFIG_DIR` — so
+ * unless the link is on that variable too, a session is pinned to whichever account was active
+ * when it spawned and no switch can reach it. This is the assertion the feature rests on.
  */
-test("the environment names the account, not the path it was reached by", () => {
-	const { accounts, dir, cleanup } = store();
+test("a session reads its credentials through the link, not from a fixed account", () => {
+	const { accounts, dir, cleanup } = store({ platform: "linux" });
+	const link = join(dir, "claude-accounts", "active");
+
+	const mine = accounts.activeEnvironment();
+	assert.equal(mine?.CLAUDE_CONFIG_DIR, link);
+	assert.equal(mine?.CLAUDE_SECURESTORAGE_CONFIG_DIR, link, "the CLI's own login goes through the link like any other");
+
+	const id = add(accounts, "one@example.com");
+	const added = accounts.activeEnvironment();
+	assert.equal(added?.CLAUDE_CONFIG_DIR, link, "still reached through the link");
+	assert.equal(added?.CLAUDE_SECURESTORAGE_CONFIG_DIR, link, "and so is the token, which is what makes the switch land");
+	assert.notEqual(added?.CLAUDE_SECURESTORAGE_CONFIG_DIR, accounts.configDir(id), "never the resolved path: that is the pin");
+	cleanup();
+});
+
+/*
+ * macOS is the exception, and the reason the variable exists at all. There the value names a
+ * keychain entry, `Claude Code-credentials-<sha256(dir)[:8]>` — so every account reached
+ * through one link would hash to one entry and overwrite each other's tokens, and a login
+ * written against an account's own directory would be looked for under the wrong name by the
+ * session that follows it. A stable identity per account is worth more there than a live
+ * switch, which is the trade `credentialsDir` makes.
+ */
+test("on macOS the environment names the account, not the path it was reached by", () => {
+	const { accounts, dir, cleanup } = store({ platform: "darwin" });
 	const link = join(dir, "claude-accounts", "active");
 
 	const mine = accounts.activeEnvironment();
@@ -194,8 +217,10 @@ test("a limit moves the active account on, and the symlink with it", () => {
 	cleanup();
 });
 
+// Pinned to linux because the last assertion is about the link carrying the token, which is
+// the one thing macOS does differently — see `credentialsDir`.
 test("the CLI's own login is one of the accounts a limit can move to", () => {
-	const { accounts, dir, cleanup } = store();
+	const { accounts, dir, cleanup } = store({ platform: "linux" });
 	const only = add(accounts, "one@example.com");
 
 	const { moved } = accounts.rotate(only, Date.now() + 60_000, "seven_day");
@@ -206,7 +231,11 @@ test("the CLI's own login is one of the accounts a limit can move to", () => {
 	 * kept spending the subscription that had just refused.
 	 */
 	assert.equal(pointsAt(dir), accounts.configDir(DEFAULT_ACCOUNT));
-	assert.equal(accounts.activeEnvironment()?.CLAUDE_SECURESTORAGE_CONFIG_DIR, "", "back on the CLI's own keychain entry");
+	assert.equal(
+		accounts.activeEnvironment()?.CLAUDE_SECURESTORAGE_CONFIG_DIR,
+		join(dir, "claude-accounts", "active"),
+		"and a session already running reads the moved link on its next request",
+	);
 	cleanup();
 });
 

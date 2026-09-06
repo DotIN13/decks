@@ -234,6 +234,11 @@ export class ClaudeBackend implements AgentBackend {
 			 * points at now. Set for the CLI's own login too, which is what makes a session
 			 * that started on it switchable: a subprocess's environment cannot be changed
 			 * after `spawn`, so a session given no variable is pinned to `~/.claude` for life.
+			 *
+			 * Both variables, and the credentials come from `CLAUDE_SECURESTORAGE_CONFIG_DIR`
+			 * rather than `CLAUDE_CONFIG_DIR` — for a long time only the second one carried the
+			 * link, which made every word above true of a variable the CLI does not read a
+			 * token from. `accounts.ts` has the measurement.
 			 */
 			...(accountEnv ? { env: accountEnv } : {}),
 			stderr: (data: string) => {
@@ -731,8 +736,8 @@ export class ClaudeBackend implements AgentBackend {
 			});
 			notice("info", `Signed in as ${remembered.email ?? `your ${method.noun}`}, and now using it.`);
 			this.context.accountsChanged?.();
-			// No restart: the account is a symlink every session reads through, so this one
-			// picks it up on its next request (`claude/accounts.ts`).
+			// No restart: the account is a symlink every session reads its credentials through,
+			// so this one picks it up on its next request (`claude/accounts.ts`).
 			return;
 		}
 		notice("info", `Signed in to Claude with your ${method.noun}.`);

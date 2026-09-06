@@ -646,8 +646,13 @@ export class App {
 					reply({ type: "notice", level: "warn", text: "That account is not on the list any more." });
 					return;
 				}
-				// The switch is the symlink; every running session reads through it, so there is
-				// nothing to restart.
+				/*
+				 * The switch is the symlink, and every running session reads its *credentials*
+				 * through it — so there is nothing to restart. That is true of the second
+				 * variable rather than the first, which is what it was quietly not doing before
+				 * (`claude/accounts.ts`, `activeEnvironment`). On macOS the link cannot carry the
+				 * account, so a switch there reaches the next session rather than this one.
+				 */
 				this.send({ type: "notice", level: "info", text: `Now using ${moved.email ?? "that account"}.` });
 				void this.publishAccounts();
 				return;

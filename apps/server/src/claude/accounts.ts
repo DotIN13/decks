@@ -216,39 +216,59 @@ export class ClaudeAccounts {
 	/**
 	 * The environment a `claude` process needs in order to spend the active subscription.
 	 *
-	 * Two variables, and the second one is entirely about macOS. There, tokens live in the
-	 * keychain rather than in `.credentials.json`, and the CLI names its keychain entry
-	 * `Claude Code-credentials-<sha256(configDir)[:8]>` — hashed from `CLAUDE_CONFIG_DIR`
-	 * unless `CLAUDE_SECURESTORAGE_CONFIG_DIR` overrides it.
+	 * Two variables, and **the second one is the account**. `CLAUDE_CONFIG_DIR` says where the
+	 * transcripts, the settings and the MCP config live; `CLAUDE_SECURESTORAGE_CONFIG_DIR`
+	 * says where the *token* is read from, and it wins outright. Measured both ways: a session
+	 * given a real token in the first and a fabricated one in the second fails to
+	 * authenticate, and the same pair swapped over succeeds. The `.credentials.json` sitting
+	 * in the config directory is never consulted.
 	 *
-	 * Which the symlink breaks in both directions. Every account is reached through the *same*
-	 * link path, so every account would hash to the same keychain entry and overwrite each
-	 * other's tokens; and `auth login` runs against the account's own directory, so it would
-	 * write under a hash the session then fails to look up. `CLAUDE_SECURESTORAGE_CONFIG_DIR`
-	 * is set to the account's **own** directory to fix both — a stable identity per account,
-	 * independent of the path used to reach it.
+	 * So the link belongs on **both**. The CLI re-reads its credentials on every request — a
+	 * live session whose secure-storage link is repointed between turns fails on the very next
+	 * one — which is what makes a switch land without restarting anything.
 	 *
-	 * For the CLI's own login it is the empty string, which the CLI reads as "no suffix" —
-	 * the unadorned `Claude Code-credentials` entry that a bare `claude` in a terminal uses.
-	 * Without it, routing `default` through the link would have looked in a keychain entry
-	 * that has never existed and reported a signed-in account as signed out.
+	 * That is the bug this replaces. The second variable was read as a macOS detail
+	 * ("harmless on Linux, where the keychain path is not taken at all") and set to the
+	 * account's *resolved* directory, so every session was pinned to whichever account was
+	 * active when it spawned, however often the link moved. The switch was wired to the one
+	 * variable that does not choose the account — and rotating off a spent subscription handed
+	 * the refused prompt straight back to the subscription that had refused it.
 	 *
-	 * Harmless on Linux, where the keychain path is not taken at all, so it is set
-	 * unconditionally rather than behind a platform check: one environment to reason about,
-	 * and the check that matters is the one inside the CLI.
+	 * **macOS keeps the resolved directory**, and that is deliberate. There the value is not a
+	 * directory to read but the name of a keychain entry, `Claude Code-credentials-<sha256(
+	 * dir)[:8]>`. Every account reached through one link would hash to one entry and overwrite
+	 * each other's tokens, and `auth login` — which runs against the account's own directory —
+	 * would write under a name the session never looks up. A stable identity per account is
+	 * worth more there than a live switch, so the cost is stated rather than hidden: on macOS
+	 * a switch reaches the next session rather than the one already running.
+	 *
+	 * Empty string for the CLI's own login on macOS, which the CLI reads as "no suffix" — the
+	 * unadorned entry a bare `claude` in a terminal uses. Everywhere else `default` goes
+	 * through the link like every other account, to `claude-accounts/default/`, whose
+	 * `.credentials.json` is a symlink to the config home's.
 	 */
 	activeEnvironment(): NodeJS.ProcessEnv | undefined {
 		const configDir = this.activeConfigDir();
 		if (!configDir) return undefined;
-		return accountEnvironment(configDir, this.keychainDir(this.activeId()));
+		return accountEnvironment(configDir, this.credentialsDir(configDir));
+	}
+
+	/**
+	 * Where a *running* session reads its token from: the link, so that moving it switches.
+	 *
+	 * On macOS this is a keychain name rather than a path, and a name that moves is a name two
+	 * accounts share — see `activeEnvironment` for why that trade goes the other way there.
+	 */
+	private credentialsDir(configDir: string): string {
+		return this.home.platform === "darwin" ? this.keychainDir(this.activeId()) : configDir;
 	}
 
 	/**
 	 * The account's own directory, as opposed to the link that reaches it.
 	 *
-	 * This is what identifies an account to the macOS keychain, and what a one-off `claude
-	 * auth` command is pointed at. Empty for the CLI's own login, which has no directory of
-	 * its own and wants the unsuffixed keychain entry.
+	 * What a one-off `claude auth` command is pointed at, on every platform, and what
+	 * identifies an account to the macOS keychain. Empty for the CLI's own login, which has no
+	 * directory of its own and wants the unsuffixed keychain entry.
 	 */
 	keychainDir(id: string): string {
 		return id === DEFAULT_ACCOUNT ? "" : this.configDir(id);
@@ -982,9 +1002,10 @@ export function epochMs(value: number | undefined): number | undefined {
  * The environment that makes a `claude` process spend one particular account.
  *
  * `configDir` is where it reads its configuration from — the `active` link for a session, an
- * account's own directory for a one-off `auth` command. `keychain` is that account's stable
- * identity, which macOS needs and the other platforms ignore; the reasoning is on
- * `ClaudeAccounts.activeEnvironment`.
+ * account's own directory for a one-off `auth` command. `keychain` is where it reads its
+ * *token* from, which is the account: a directory on Linux and Windows, and the name of a
+ * keychain entry on macOS. The two are the same value for a one-off command and differ for a
+ * session, which is the point; the reasoning is on `ClaudeAccounts.activeEnvironment`.
  *
  * `process.env` is spread because `env` **replaces** a subprocess's environment rather than
  * extending it: without it the CLI would start with no `PATH` and no `HOME`.
