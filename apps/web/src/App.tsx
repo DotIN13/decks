@@ -1582,6 +1582,17 @@ export function App() {
 					drops={drops}
 					frameRevs={frameRevs}
 					preview={preview()?.boards}
+					/*
+					 * A live board draws itself from a conversation this app is already
+					 * holding — every agent's, not only the focused one, because the registry
+					 * greets the browser with all of them. Accessors rather than values: which
+					 * conversation a board wants is only known once it has loaded and asked.
+					 */
+					transcript={(agentId) => state.transcripts[agentId]}
+					agentIdentity={(agentId) => {
+						const identity = state.identities[agentId];
+						return identity ? { name: identity.name, color: identity.color } : undefined;
+					}}
 					/* The canvas's own way out — Escape, over the canvas or inside a board. Clearing
 					   the browser's copy is the whole of it: the server keeps no preview state,
 					   which is also why a reload has always been an accidental escape hatch. */
@@ -1748,6 +1759,7 @@ export function App() {
 					unread={unread}
 					onFocusAgent={focusAgent}
 					onCloseAgent={closeAgent}
+					onMirrorAgent={(id) => socket.send({ type: "agent.mirror", agentId: id })}
 					/* Your tags, which the agent cannot see or overwrite — a separate field from
 					   `stage.me.setTags`, for the reason `protocol/Identity` gives. */
 					onAgentTags={(id, tags) => socket.send({ type: "agent.tags", id, tags })}

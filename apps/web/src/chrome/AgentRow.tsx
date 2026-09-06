@@ -1,4 +1,5 @@
 import type { Identity } from "@decks/protocol";
+import PictureInPicture2 from "lucide-solid/icons/picture-in-picture-2";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onMount, Show } from "solid-js";
@@ -41,6 +42,14 @@ export function AgentRow(props: {
 	onClose: () => void;
 	/** Replace *your* tags on this agent. Absent means the row cannot be customised. */
 	onTags?: (tags: string[]) => void;
+	/**
+	 * Put a live view of this agent's conversation on the canvas.
+	 *
+	 * Here rather than only on the conversation you are reading, because the better half of
+	 * a mirror is the agent you are *not* talking to — and this list is where you are
+	 * looking at them. Absent means the row cannot be mirrored.
+	 */
+	onMirror?: () => void;
 }) {
 	const chat = () => props.row.chat;
 	const name = () => props.identity?.name ?? chat().name;
@@ -161,6 +170,29 @@ export function AgentRow(props: {
 				that cannot be pressed is worth drawing when its absence would be a mystery, and
 				this is not a mystery.
 			*/}
+			{/*
+				A mirror, beside the ×, and revealed by the same hover.
+
+				It shares `.close`'s styling deliberately: these are both things you can do
+				*to* the row rather than parts of what the row says, and a second vocabulary
+				for the second one would only be a second thing to keep in step.
+			*/}
+			<Show when={props.onMirror}>
+				{(mirror) => (
+					<button
+						class="close"
+						type="button"
+						title={`Put ${name()}'s conversation on the canvas`}
+						aria-label={`Mirror ${name()} on the canvas`}
+						onClick={(event) => {
+							event.stopPropagation();
+							mirror()();
+						}}
+					>
+						<Icon of={PictureInPicture2} size={13} />
+					</button>
+				)}
+			</Show>
 			<Show when={close()}>
 				{(words) => (
 					<button

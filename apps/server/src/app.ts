@@ -6,7 +6,7 @@ import type { Board, BoardPatch, Camera, ClientMessage, ServerMessage, StageCall
 import { Registry } from "./agents/registry.ts";
 import { applyPatches, mintId, PatchRefused } from "./boards/patch.ts";
 import { Revisions } from "./boards/snapshots.ts";
-import { isBoardKind, renderTemplate, slugFor, type BoardKind } from "./boards/templates.ts";
+import { isBoardKind, MIRROR_SIZE, renderMirror, renderTemplate, slugFor, type BoardKind } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./claude/accounts.ts";
@@ -85,6 +85,7 @@ export class App {
 		this.revisions = new Revisions(deck);
 		this.stage = new StageService(deck, {
 			newBoard: (options) => this.newBoard({ ...options, kind: options.kind as BoardKind }),
+			newMirror: (options) => this.newMirror(options),
 			writeBoard: (path, html) => this.writeBoard(path, html),
 			extent: (path, rev) => this.extentOf(path, rev),
 			awaitExtent: (path, rev, ms) => this.awaitExtent(path, rev, ms),
@@ -379,6 +380,26 @@ export class App {
 			 * the context is the agent's, and nobody should be able to strip what it is
 			 * working from by tidying the view.
 			 */
+			/*
+			 * A mirror, from the Agents tab.
+			 *
+			 * Created *and* played, the way `board.create` is, because nobody asks for a
+			 * window onto a conversation in order to leave it closed. The name comes from
+			 * the agent rather than from the person pressing the button, so two people
+			 * mirroring the same agent land on the same board.
+			 */
+			case "agent.mirror": {
+				const of = this.agents.summaries().find((candidate) => candidate.id === message.agentId);
+				if (!of) {
+					reply({ type: "notice", level: "warn", text: "That agent is not here any more." });
+					return;
+				}
+				const path = this.newMirror({ agentId: of.id, name: of.name });
+				const agent = this.agents.focused();
+				agent.setInPlay([...agent.inPlay, path]);
+				return;
+			}
+
 			case "board.play": {
 				const agent = this.agents.focused();
 				agent.setInPlay([...agent.inPlay, message.path]);
@@ -789,6 +810,33 @@ export class App {
 
 		// The watcher would find it in 80ms; refreshing now means the caller can attach
 		// and show it in the same turn without a race.
+		const board = this.deck.refresh(path);
+		if (board) this.send({ type: "board.changed", path, rev: board.rev, board });
+		return path;
+	}
+
+	/**
+	 * Write a mirror: a board that is a live view of one agent's conversation.
+	 *
+	 * Beside `newBoard` rather than inside it, because a mirror is not a shape of document
+	 * but a *kind* of board — the file is a stub and its content never comes from disk
+	 * (`boards/templates.ts`, `lib/live-chat.js`). Kept in `boards/mirrors/` so a deck full
+	 * of them still reads as a deck: they are views, and views belong together.
+	 *
+	 * One per agent, deliberately. Asking for a mirror of somebody already mirrored hands
+	 * back the board that exists rather than a second window onto the same conversation —
+	 * which is also what makes the menu item safe to press twice.
+	 */
+	newMirror(options: { agentId: string; name: string; size?: { w?: number; h?: number } }): string {
+		const path = `boards/mirrors/${slugFor(options.name || options.agentId, "blank")}.html`;
+		const file = this.deck.fileOf(path);
+		// The same agent behind the same name: hand back the window that is already open.
+		if (existsSync(file) && readFileSync(file, "utf8").includes(`data-agent="${options.agentId}"`)) return path;
+
+		const html = renderMirror(options.name || "Conversation", options.agentId, options.size ?? MIRROR_SIZE);
+		mkdirSync(dirname(file), { recursive: true });
+		writeFileSync(file, html);
+		this.revisions.record(path, html);
 		const board = this.deck.refresh(path);
 		if (board) this.send({ type: "board.changed", path, rev: board.rev, board });
 		return path;

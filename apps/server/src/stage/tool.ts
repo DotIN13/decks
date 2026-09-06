@@ -272,6 +272,41 @@ export function createStageTool(deps: {
 		},
 
 		/**
+		 * A mirror: a live view of a conversation, on the canvas.
+		 *
+		 * The board it writes never changes — its turns arrive in the browser, from a
+		 * transcript the app is already holding for every agent. So mirroring somebody
+		 * you are not talking to costs a `postMessage`, which is the point of it: three
+		 * mirrors side by side is what everyone is doing, without opening three chats.
+		 *
+		 * Attached and put on the canvas, camera unmoved, exactly as `newBoard` is. Asking
+		 * twice for the same agent hands back the board you already have.
+		 */
+		mirror: async (options?: { of?: string; w?: number; h?: number }) => {
+			const wanted = options?.of?.trim();
+			const others = agent.agents();
+			const found = wanted
+				? (others.find((other) => other.id === wanted) ??
+					others.find((other) => other.name.toLowerCase() === wanted.toLowerCase()))
+				: others.find((other) => other.id === agent.id);
+			if (!found) {
+				throw new Error(
+					wanted
+						? `No agent called ${wanted}. Use an id or a name from stage.agents().`
+						: "This conversation is not in the agent list yet, so there is nothing to mirror.",
+				);
+			}
+			const path = service.mirror({
+				agentId: found.id,
+				name: found.name,
+				size: { ...(options?.w ? { w: options.w } : {}), ...(options?.h ? { h: options.h } : {}) },
+			});
+			agent.setContext([path, ...agent.context().filter((held) => held !== path)]);
+			agent.setInPlay([...agent.inPlay().filter((shown) => shown !== path), path]);
+			return { path, of: found.name, agent: found.id };
+		},
+
+		/**
 		 * Set a board's size, in one call, without opening the file.
 		 *
 		 * Either dimension on its own is allowed, because the one that is usually wrong is

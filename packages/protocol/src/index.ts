@@ -698,6 +698,14 @@ export type ClientMessage =
 	| { type: "board.extent"; path: string; rev: number; w: number; h: number }
 	| { type: "board.undo"; path: string }
 	/** Put a board on the canvas / take it off again. The context is untouched either way. */
+	/**
+	 * Put a live view of one agent's conversation on the canvas.
+	 *
+	 * The board it makes never changes as the conversation grows — its turns arrive in the
+	 * browser, from a transcript this app already holds (`canvas/live-chat.ts`). Asking
+	 * twice for the same agent lands on the board that already exists.
+	 */
+	| { type: "agent.mirror"; agentId: string }
 	| { type: "board.play"; path: string }
 	| { type: "board.hide"; path: string }
 	/**

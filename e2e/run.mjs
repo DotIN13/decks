@@ -37,6 +37,7 @@ const CHECKS = [
 	{ file: "gestures.mjs", needsAgent: false },
 	{ file: "mobile.mjs", needsAgent: false },
 	{ file: "embed-scroll.mjs", needsAgent: false },
+	{ file: "mirror.mjs", needsAgent: false },
 	{ file: "embed-guard.mjs", needsAgent: false },
 	{ file: "embed-touch.mjs", needsAgent: false },
 	{ file: "editing.mjs", needsAgent: false },

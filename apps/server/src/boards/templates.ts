@@ -91,3 +91,44 @@ const FALLBACK = `<!doctype html>
 	</body>
 </html>
 `;
+
+/** The default size of a mirror: tall and narrow, because a conversation is a column. */
+export const MIRROR_SIZE = { w: 560, h: 900 };
+
+/**
+ * The whole document of a live board.
+ *
+ * Four lines that never change, which is the point: a mirror's content is a conversation
+ * the app is already holding, fed in over `postMessage` by `canvas/live-chat.ts` and drawn
+ * by `lib/live-chat.js`. Nothing here is written again as the conversation grows — no
+ * watcher event, no revision churn, and a board file somebody can read and understand.
+ *
+ * The component fills the board and carries an explicit height, so `contentExtent`
+ * measures it exactly: a mirror never clips and `stage.fit` has nothing to do to it. The
+ * growth happens inside, where the list scrolls.
+ */
+export function renderMirror(name: string, agentId: string, size?: { w?: number; h?: number }): string {
+	const w = Math.round(size?.w ?? MIRROR_SIZE.w);
+	const h = Math.round(size?.h ?? MIRROR_SIZE.h);
+	return `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>${escapeHtml(name)} — the conversation</title>
+		<meta name="board" content='{"w":${w},"h":${h},"bg":"plain"}' />
+		<link rel="stylesheet" href="../../lib/board.css" />
+	</head>
+	<body class="board">
+		<div
+			class="live"
+			data-id="mirror"
+			data-live="chat"
+			data-agent="${escapeHtml(agentId)}"
+			style="left: 0; top: 0; width: ${w}px; height: ${h}px"
+		></div>
+
+		<script src="../../lib/board.js"></script>
+	</body>
+</html>
+`;
+}

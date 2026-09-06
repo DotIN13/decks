@@ -583,3 +583,147 @@ table.table,
 		background-image: none;
 	}
 }
+
+/* --- live components: a window onto something the app is holding ---------------- */
+
+/*
+ * A mirror board. The component fills the board, the list inside it scrolls, and nothing
+ * here comes from the file — `lib/live-chat.js` draws it from turns the app posts in.
+ *
+ * The one property that matters to the canvas is on `.live-list`: `overflow-y: auto` is
+ * what makes `frame-gestures.ts` give it the wheel while it has room and hand the scroll
+ * back to the stage at the ends. Everything else is appearance.
+ */
+.live {
+	--live-accent: var(--b-blue-600);
+	position: absolute;
+	display: flex;
+	overflow: hidden;
+	box-sizing: border-box;
+	flex-direction: column;
+	border: 1px solid var(--b-border-strong);
+	border-radius: 10px;
+	background: var(--b-bg);
+}
+
+.live > .live-head {
+	display: flex;
+	align-items: center;
+	flex: none;
+	height: 26px;
+	padding: 0 10px;
+	gap: 6px;
+	background: var(--live-accent);
+	color: #fff;
+	font-size: 12px;
+	font-weight: 650;
+}
+
+.live > .live-list {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	padding: 10px;
+	gap: 8px;
+	/* Set here as well as inline, so a board that never runs the script still reads. */
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+}
+
+.live .live-turn {
+	max-width: 100%;
+	font-size: 13px;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.live .live-ask {
+	align-self: flex-start;
+	max-width: 82%;
+	padding: 6px 10px;
+	border-radius: 10px;
+	background: var(--b-blue-200);
+	color: var(--b-fg);
+}
+
+.live .live-say > :first-child {
+	margin-top: 0;
+}
+
+.live .live-say > :last-child {
+	margin-bottom: 0;
+}
+
+/* Still arriving: a caret at the end of the last paragraph, the way the column does it. */
+.live .live-say[data-streaming="true"]::after {
+	display: inline-block;
+	width: 2px;
+	height: 1em;
+	margin-left: 2px;
+	background: var(--b-accent);
+	content: "";
+	vertical-align: text-bottom;
+}
+
+.live .live-tool {
+	align-self: flex-start;
+	max-width: 100%;
+	overflow: hidden;
+	padding: 2px 8px;
+	border: 1px solid var(--b-border);
+	border-radius: 999px;
+	color: var(--b-muted);
+	font-family: var(--b-mono);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.live .live-tool[data-state="error"] {
+	border-color: var(--b-danger);
+	color: var(--b-danger);
+}
+
+.live .live-notice {
+	padding: 4px 8px;
+	border-radius: 6px;
+	background: var(--b-bg-deep);
+	color: var(--b-muted);
+	font-size: 12px;
+}
+
+.live .live-notice[data-level="warn"] {
+	background: var(--b-yellow-200);
+	color: var(--b-yellow-900);
+}
+
+.live .live-notice[data-level="error"] {
+	background: var(--b-red-200);
+	color: var(--b-red-700);
+}
+
+/* Turns that arrived while you were reading further up. Both ways back mean the same. */
+.live > .live-new {
+	position: absolute;
+	right: 12px;
+	bottom: 12px;
+	padding: 4px 10px;
+	border: none;
+	border-radius: 999px;
+	background: var(--b-accent);
+	box-shadow: var(--b-shadow);
+	color: #fff;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 12px;
+	font-weight: 650;
+}
+
+/* Opened outside the app, so there is nobody to feed it. Says so rather than sitting blank. */
+.live[data-state="alone"] > .live-list::after,
+.live[data-state="broken"] > .live-list::after {
+	color: var(--b-muted);
+	content: "Nothing is feeding this mirror — it is live only on the canvas.";
+	font-size: 12px;
+}

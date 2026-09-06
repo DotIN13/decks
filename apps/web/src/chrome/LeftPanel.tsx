@@ -152,6 +152,8 @@ export function LeftPanel(props: {
 	unread?: Record<string, number>;
 	onFocusAgent?: (id: string) => void;
 	onCloseAgent?: (id: string) => void;
+	/** Put a live view of that agent's conversation on the canvas (`canvas/live-chat.ts`). */
+	onMirrorAgent?: (id: string) => void;
 	/** Replace *your* tags on an agent. Absent means no row can be customised. */
 	onAgentTags?: (id: string, tags: string[]) => void;
 }) {
@@ -456,6 +458,7 @@ export function LeftPanel(props: {
 												onFocus={() => props.onFocusAgent?.(row.chat.id)}
 												onClose={() => props.onCloseAgent?.(row.chat.id)}
 												{...(props.onAgentTags ? { onTags: (tags: string[]) => props.onAgentTags?.(row.chat.id, tags) } : {})}
+												{...(props.onMirrorAgent ? { onMirror: () => props.onMirrorAgent?.(row.chat.id) } : {})}
 											/>
 										)}
 									</For>

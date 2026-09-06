@@ -30,6 +30,7 @@ function toolOn(camera: Camera) {
 	/** What a browser would have reported, if one were looking. */
 	const extents = new Map<string, { rev: number; w: number; h: number }>();
 	const service = new StageService(deck, {
+		newMirror: () => "boards/mirrors/x.html",
 		newBoard: (options) => {
 			const path = `boards/${options.title.toLowerCase().replace(/\W+/g, "-")}.html`;
 			writeFileSync(join(root, path), `<!doctype html><title>${options.title}</title><body class="board"></body>`);
@@ -150,6 +151,7 @@ test("attach is most-recently-touched first, and re-attaching moves the board to
 	}
 	const deck = Deck.open(root);
 	const service = new StageService(deck, {
+		newMirror: () => "boards/mirrors/x.html",
 		newBoard: () => "",
 		writeBoard: () => {
 			throw new Error("not used here");

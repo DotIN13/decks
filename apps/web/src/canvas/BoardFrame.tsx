@@ -1,6 +1,7 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Board, Camera, ChatItem } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { unwrap } from "solid-js/store";
 import { Icon } from "../icons.tsx";
 import { boardUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../lib/camera.ts";
@@ -9,6 +10,7 @@ import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { measureFrame } from "./extent.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
+import { attachLiveWant, liveDelta, pushLive } from "./live-chat.ts";
 import { paintFrame } from "../lib/theme.ts";
 
 /**
@@ -66,16 +68,28 @@ export function BoardFrame(props: {
 	 * Read-only by construction: it is a different URL, and the store never changes.
 	 */
 	previewSha?: string;
+	/**
+	 * A conversation, for a board that is a live view of one (`live-chat.ts`).
+	 *
+	 * Read inside an effect, so it has to be an accessor rather than a value: which agent
+	 * a board wants is only known once the board has loaded and asked, and the answer has
+	 * to stay reactive after that.
+	 */
+	transcript?: (agentId: string) => readonly ChatItem[] | undefined;
+	/** Who that agent is, so a mirror can draw a header in their colour. */
+	agentIdentity?: (agentId: string) => { name: string; color: string } | undefined;
 }) {
 	let detachEditor: (() => void) | undefined;
 	let detachGestures: (() => void) | undefined;
 	let detachDrop: (() => void) | undefined;
+	let detachLive: (() => void) | undefined;
 	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
 	onCleanup(() => {
 		detachEditor?.();
 		detachGestures?.();
 		detachDrop?.();
+		detachLive?.();
 		clearTimeout(measuring);
 	});
 
@@ -167,6 +181,56 @@ export function BoardFrame(props: {
 		if (!root) return;
 		if (can) root.setAttribute("data-decks-edit", "");
 		else root.removeAttribute("data-decks-edit");
+	});
+
+	/*
+	 * Feeding a live board.
+	 *
+	 * A mirror asks which conversation it is of once it has mounted, and keeps asking until
+	 * it is answered — so this is a signal set by the board rather than a prop, and the
+	 * effect below only starts existing once there is something to feed.
+	 *
+	 * `sent` is what that board is holding. It is deliberately *not* reactive state: it is
+	 * a record of what went down the wire, and writing it inside the effect that reads the
+	 * transcript would be a loop if it were.
+	 */
+	const [wants, setWants] = createSignal<string | undefined>(undefined);
+	let sent: readonly ChatItem[] = [];
+	/**
+	 * Whether this board has been answered at all.
+	 *
+	 * The first feed goes out even when there is nothing in it. A conversation with no turns
+	 * yet is the ordinary state of an agent you have just started, and a mirror of one sat
+	 * saying "…" with no name and no colour until it had something to say — which reads as
+	 * broken rather than as empty, and is also the first thing anybody would try.
+	 */
+	let fed = false;
+	createEffect(() => {
+		const agent = wants();
+		if (!agent || !props.transcript) return;
+		/*
+		 * Unwrapped, because `postMessage` cannot clone a proxy.
+		 *
+		 * The transcript comes out of a Solid store, so every item and everything nested in
+		 * one is a proxy — and the structured clone algorithm refuses those with a
+		 * `DataCloneError` that Solid reports as "Unknown error". The reactive read has
+		 * already happened by the time this runs, so unwrapping costs no tracking.
+		 */
+		const items = unwrap(props.transcript(agent) ?? []) as readonly ChatItem[];
+		const delta = liveDelta(sent, items);
+		if (!delta && fed) return;
+		const frame = frameEl;
+		if (!frame) return;
+		sent = [...items];
+		fed = true;
+		pushLive(frame, {
+			decks: "live.chat",
+			agent,
+			from: delta?.from ?? 0,
+			items: delta ? delta.items : [...items],
+			total: items.length,
+			...(props.agentIdentity?.(agent) ? { identity: props.agentIdentity(agent) as { name: string; color: string } } : {}),
+		});
 	});
 
 	const [tick, setTick] = createSignal(0);
@@ -385,9 +449,19 @@ export function BoardFrame(props: {
 							detachEditor?.();
 							detachGestures?.();
 							detachDrop?.();
+							detachLive?.();
 							detachEditor = attachEditor(frame, props.board.path, props.editor);
 							detachGestures = attachFrameGestures(frame, props.gestures);
 							detachDrop = attachFrameDrop(frame, props.drops);
+							/*
+							 * A reloaded document holds nothing, so the record of what it has
+							 * been sent is cleared with it — otherwise the next delta would be
+							 * an append onto turns that are no longer there.
+							 */
+							sent = [];
+							fed = false;
+							setWants(undefined);
+							detachLive = attachLiveWant(frame, (agent) => setWants(agent));
 							reportExtent(frame, props.board.rev);
 						}}
 					/>

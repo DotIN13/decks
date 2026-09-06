@@ -1,4 +1,4 @@
-import type { Board, Camera } from "@decks/protocol";
+import type { Board, Camera, ChatItem } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
 import { canvasBox } from "../lib/insets.ts";
@@ -64,6 +64,10 @@ export function Stage(props: {
 	drops: (path: string) => FileDropHost;
 	/** Which revision each frame is showing; see `selfEdited` in App. */
 	frameRevs?: Record<string, number>;
+	/** A conversation, for boards that are a live view of one (`live-chat.ts`). */
+	transcript?: (agentId: string) => readonly ChatItem[] | undefined;
+	/** Who an agent is, so a mirror can wear their colour. */
+	agentIdentity?: (agentId: string) => { name: string; color: string } | undefined;
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
 	/**
@@ -503,6 +507,8 @@ export function Stage(props: {
 							drops={props.drops(board.path)}
 							showRev={props.frameRevs?.[board.path]}
 							previewSha={props.preview?.[board.path]}
+							{...(props.transcript ? { transcript: props.transcript } : {})}
+							{...(props.agentIdentity ? { agentIdentity: props.agentIdentity } : {})}
 							onSelect={() => props.onSelect(board.path)}
 							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}

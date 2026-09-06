@@ -182,6 +182,33 @@ export interface Stage {
 	newBoard(options: { title: string; kind?: "answer" | "design" | "report" | "plan" | "blank"; w?: number; h?: number }): Promise<string>;
 
 	/**
+	 * A **mirror**: a board that is a live view of a conversation.
+	 *
+	 *     await stage.mirror();                          // this conversation
+	 *     await stage.mirror({ of: "Vale", w: 560, h: 900 });
+	 *     // -> { path: "boards/mirrors/vale.html", of: "Vale", agent: "7f3a…" }
+	 *
+	 * Unlike every other board, its file never changes: it is a stub, and the turns arrive
+	 * in the browser from a transcript the app is already holding. So it costs no writes, it
+	 * cannot go stale, and **mirroring an agent you are not talking to is free** — which is
+	 * the point of `of`. Three mirrors side by side is what everyone is doing, without
+	 * opening three conversations.
+	 *
+	 * It scrolls, inside its own rectangle, and hands the scroll back to the canvas at the
+	 * ends. It is pinned to the newest turn until you scroll away from it, and says how many
+	 * arrived while you were reading further up. Below half zoom a board takes no pointer
+	 * events at all, so a mirror seen small is a glance and a mirror zoomed into is a
+	 * transcript.
+	 *
+	 * A **view, not a document**: you cannot retype a turn in it or drag one out. If you
+	 * want part of a conversation as material on the canvas, write it onto a board yourself.
+	 *
+	 * Attached and put on the canvas, camera unmoved, exactly as `newBoard` is. Asking twice
+	 * for the same agent hands back the board you already have rather than a second window.
+	 */
+	mirror(options?: { of?: string; w?: number; h?: number }): Promise<{ path: string; of: string; agent: string }>;
+
+	/**
 	 * Set a board's size. Either dimension on its own is fine.
 	 *
 	 *     await stage.resize("boards/plan.html", { h: 1800 });
