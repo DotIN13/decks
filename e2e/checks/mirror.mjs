@@ -76,9 +76,20 @@ const feed = (from, items) =>
 		{ agent, from, items },
 	);
 
+/*
+ * Enough turns to overflow the board several times over, and a tool call in every one.
+ *
+ * The count is load-bearing rather than arbitrary. A flex column only shrinks its children
+ * when they do not fit, so twenty exchanges — which is what this fed before — sat inside a
+ * 900px board at their natural height and the collapse this now guards against could not
+ * happen. A real mirror of a working session is a hundred rows and mostly tool calls, and a
+ * tool row is the one that collapses worst: it has `overflow: hidden` and no text of its own
+ * pushing back.
+ */
 const many = [];
-for (let i = 1; i <= 20; i++) {
+for (let i = 1; i <= 40; i++) {
 	many.push({ kind: "user", id: `u${i}`, text: `Question ${i}`, at: 0 });
+	many.push({ kind: "tool", id: `t${i}`, name: "Bash", title: `cd /home/decks/projects/decks && something ${i}`, at: 0 });
 	many.push({ kind: "assistant", id: `a${i}`, text: `Answer **${i}**, long enough to take a line or two of the board it is drawn on.`, at: 0 });
 }
 await feed(0, many);
@@ -99,6 +110,29 @@ const list = () =>
 let state = await list();
 say("every turn is drawn", state.turns === many.length, `${state.turns} of ${many.length}`);
 say("more than fits means it scrolls", state.max > 0, `${state.max}px of overflow`);
+
+/*
+ * …and every one of them is its own height.
+ *
+ * `.live-list` is a scrolling flex column, and a flex column's first move when its children
+ * do not fit is to *shrink them* rather than to scroll. Forty turns in a 900px board came
+ * out at **6 pixels each** — a sliver of a pill with the text clipped out of it — and every
+ * assertion above still passed, because forty turns were drawn and the box did overflow.
+ *
+ * So this measures the rows rather than counting them. The floor is deliberately below a
+ * real line (13px at 1.5 is ~20px, a tool pill ~19px) and far above the collapsed state:
+ * anything under 16px is not a row anybody can read.
+ */
+const shortest = await inside((doc) =>
+	[...doc.querySelectorAll(".live-turn")].reduce(
+		(worst, el) => {
+			const h = Math.round(el.getBoundingClientRect().height);
+			return h < worst.h ? { h, cls: el.className, text: (el.textContent ?? "").slice(0, 30) } : worst;
+		},
+		{ h: Infinity, cls: "", text: "" },
+	),
+);
+say("…rather than squeezing every turn to fit", shortest.h >= 16, `shortest turn ${shortest.h}px — ${shortest.cls} ${JSON.stringify(shortest.text)}`);
 say("and it opens at the newest turn", state.max - state.top <= 8, JSON.stringify(state));
 
 // --- pinned to now, until you scroll away ------------------------------------------

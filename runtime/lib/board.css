@@ -631,8 +631,23 @@ table.table,
 	scrollbar-width: thin;
 }
 
+/*
+ * A turn is its own height, and never less.
+ *
+ * `.live-list` is a scrolling flex column, and a flex column's children default to
+ * `flex-shrink: 1` — so the browser's first move, when a hundred turns do not fit in 900px,
+ * is to squeeze every one of them rather than to scroll. A tool row has `overflow: hidden`
+ * and nothing of its own to push back with, so it collapsed to its padding: **6 pixels**, a
+ * sliver of a pill with the text clipped out of it, for every row in the mirror.
+ *
+ * The float learnt this first — `.stream-roll > *` in `styles/stream.css` carries the same
+ * declaration and the same reasoning. That it had to be learnt twice is the argument for
+ * putting it on the container's children rather than on the one kind of row that showed it
+ * worst: the next row type added here inherits the fix instead of rediscovering the bug.
+ */
 .live .live-turn {
 	max-width: 100%;
+	flex: 0 0 auto;
 	font-size: 13px;
 	line-height: 1.5;
 	overflow-wrap: anywhere;
