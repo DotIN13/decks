@@ -1,4 +1,5 @@
 import { typingInto } from "./Editor.ts";
+import { type ZoomKey, zoomKey } from "./zoom-keys.ts";
 import { noteCameraMove } from "./pan-signal.ts";
 import type { Finger, TouchStep } from "./touch.ts";
 
@@ -82,6 +83,8 @@ export interface FrameGestureHost {
 	 * Returns whether it meant something, so the frame knows whether to swallow it.
 	 */
 	key(name: string): boolean;
+	/** ⌘+ / ⌘− / ⌘0, which a board frame takes rather than letting Chrome zoom the page. */
+	zoom(direction: ZoomKey): void;
 }
 
 export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGestureHost): () => void {
@@ -174,6 +177,20 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 
 	let spaceHeld = false;
 	const onKeyDown = (event: KeyboardEvent) => {
+		/*
+		 * ⌘+ / ⌘− / ⌘0 first, because they are the exception the guard below is carved out
+		 * of — and because a board usually *has* the focus. Clicking a board puts the caret
+		 * inside its document, so a keystroke arrives here rather than on the app's own
+		 * window; taking the zoom in the stage and not here would mean ⌘+ worked on empty
+		 * canvas and did nothing the moment anybody touched a board, which is the worse of
+		 * the two bugs.
+		 */
+		const zoom = zoomKey(event);
+		if (zoom) {
+			host.zoom(zoom);
+			event.preventDefault();
+			return;
+		}
 		// Someone typing into a component owns every key, including the space bar.
 		if (typingInto(event.target)) return;
 

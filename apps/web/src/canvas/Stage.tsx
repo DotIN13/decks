@@ -6,6 +6,7 @@ import { BoardFrame } from "./BoardFrame.tsx";
 import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
 import type { FrameGestureHost } from "./frame-gestures.ts";
+import { zoomKey } from "./zoom-keys.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 
@@ -119,6 +120,30 @@ export function Stage(props: {
 		onCleanup(() => observer.disconnect());
 
 		const keydown = (event: KeyboardEvent) => {
+			/*
+			 * ⌘+ / ⌘− / ⌘0, before every other guard in this function.
+			 *
+			 * Above the typing check as well as the modifier one, because these mean the same
+			 * thing wherever the caret is: they do nothing useful in a text field, and the
+			 * caret is in the composer most of the time — a zoom that stopped working as soon
+			 * as you clicked the input would be the bug in a smaller costume.
+			 *
+			 * These are the one place a person's habit and the browser's collide. On a canvas
+			 * ⌘+ means "zoom in"; Chrome hears "make the page bigger", which enlarges the whole
+			 * app — chat column, chrome and all — and leaves the camera exactly where it was.
+			 * So they are taken here and the browser's page zoom is declined.
+			 *
+			 * `zoom-keys.ts` decides which keystroke this is, because the answer is not the
+			 * obvious one: the key labelled `+` is `=` unshifted, so matching `"+"` misses
+			 * every press that is not on the numpad.
+			 */
+			const zoom = zoomKey(event);
+			if (zoom) {
+				if (zoom === "fit") pushCamera(frame(props.boards.map(boxOf)));
+				else pushCamera(zoomAbout(localCamera, view(), centre(), zoom === "in" ? 1.2 : 1 / 1.2));
+				event.preventDefault();
+				return;
+			}
 			const typing = (event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]");
 			if (typing) return;
 			/*
@@ -407,6 +432,15 @@ export function Stage(props: {
 		spaceHeld: () => spaceHeld(),
 		interactive: () => localCamera.zoom >= INTERACT_ZOOM,
 		key: (name) => shortcut(name),
+		/*
+		 * Same three keys as the window handler above, and deliberately the same code path —
+		 * a board frame forwards the *intent* rather than a key name, because `shortcut` takes
+		 * a bare key and `zoom-keys.ts` has already read the modifier.
+		 */
+		zoom: (direction) => {
+			if (direction === "fit") pushCamera(frame(props.boards.map(boxOf)));
+			else pushCamera(zoomAbout(localCamera, view(), centre(), direction === "in" ? 1.2 : 1 / 1.2));
+		},
 	};
 
 	const onPointerDown = (event: PointerEvent) => {

@@ -70,6 +70,92 @@ const fitted = await page.evaluate(() => {
 const expected = (await deckState()).boards.length;
 say("0 fits every board on screen", fitted.inside && fitted.count === expected, `${fitted.count}/${expected} boards at ${fitted.level}`);
 
+/*
+ * 2b. ⌘+ / ⌘− / ⌘0 are the canvas's, not the browser's.
+ *
+ * Chrome binds these to page zoom, which enlarges the whole app — chat column and chrome
+ * with it — and leaves the camera exactly where it was. Taking them needs `preventDefault`
+ * on a keystroke Chrome would rather have, so this asserts the outcome the unit test cannot:
+ * that the browser honoured the refusal and the camera actually moved.
+ *
+ * Ctrl rather than ⌘ because the check runs on Linux, and the two are one gesture in
+ * `zoom-keys.ts`. The key sent is `Equal`, which is the case that made this a bug: the key
+ * labelled `+` is `=` unshifted, so a handler matching `"+"` never fired.
+ */
+const zoomOf = () =>
+	page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(document.querySelector(".world").style.transform)?.[1] ?? 0));
+
+const fittedZoom = await zoomOf();
+await page.keyboard.press("Control+Equal");
+await settle(page, 400);
+const zoomedIn = await zoomOf();
+say("⌘+ zooms the canvas instead of the page", zoomedIn > fittedZoom * 1.1, `${fittedZoom.toFixed(3)} → ${zoomedIn.toFixed(3)}`);
+
+await page.keyboard.press("Control+Minus");
+await settle(page, 400);
+const zoomedOut = await zoomOf();
+say("…⌘− the other way", zoomedOut < zoomedIn * 0.95, `${zoomedIn.toFixed(3)} → ${zoomedOut.toFixed(3)}`);
+
+await page.keyboard.press("Control+Digit0");
+await settle(page, 500);
+const refit = await zoomOf();
+say("…and ⌘0 fits everything again", Math.abs(refit - fittedZoom) < 0.01, `${refit.toFixed(3)} vs ${fittedZoom.toFixed(3)}`);
+
+/*
+ * And the refusal itself, which is the half a camera reading cannot see. Without
+ * `preventDefault` Chrome zooms the page *as well* — the camera would still move and this
+ * check would still pass, while the app quietly grew a step every time somebody pressed it.
+ */
+// Not awaited before the keystroke: `page.evaluate` blocks until its promise settles, so
+// awaiting here would hold the press until the listener had already timed out.
+const refused = page.evaluate(
+	() =>
+		new Promise((resolve) => {
+			const spy = (event) => {
+				// The modifier arrives as a keydown of its own and is nobody's shortcut, so
+				// resolving on the first event would answer about `Control` rather than `=`.
+				if (event.key === "Control" || event.key === "Meta" || event.key === "Shift") return;
+				removeEventListener("keydown", spy);
+				resolve(event.defaultPrevented);
+			};
+			addEventListener("keydown", spy);
+			setTimeout(() => resolve("nothing arrived"), 3000);
+		}),
+);
+await settle(page, 200);
+await page.keyboard.press("Control+Equal");
+const verdict = await refused;
+say("…and the browser's own page zoom is declined", verdict === true, String(verdict));
+await page.keyboard.press("Control+Digit0");
+await settle(page, 400);
+
+/*
+ * With the focus inside a board, which is where it goes the moment anybody clicks one. The
+ * keystroke arrives in the board's own document and is handed back through
+ * `frame-gestures.ts` — take the zoom in the stage and not there, and ⌘+ works on empty
+ * canvas and stops working as soon as you touch a board.
+ */
+const focused = await page.evaluate(() => {
+	const frame = document.querySelector(".board-node iframe");
+	frame?.contentWindow?.focus();
+	const body = frame?.contentDocument?.body;
+	if (!body) return "no board frame";
+	body.tabIndex = -1;
+	body.focus();
+	// Asserted, not assumed: if the focus stayed in the top document this would pass through
+	// the window handler and prove nothing about the path it is meant to be testing.
+	return frame.contentDocument.activeElement === body ? "in the board" : "focus did not move";
+});
+say("the focus really is inside a board", focused === "in the board", String(focused));
+await settle(page, 300);
+const beforeInBoard = await zoomOf();
+await page.keyboard.press("Control+Equal");
+await settle(page, 500);
+const afterInBoard = await zoomOf();
+say("…and all of it still works with a board focused", afterInBoard > beforeInBoard * 1.1, `${beforeInBoard.toFixed(3)} → ${afterInBoard.toFixed(3)}`);
+await page.keyboard.press("Control+Digit0");
+await settle(page, 400);
+
 // 3. The embeds on the sources board.
 const embeds = await page.evaluate(() => {
 	const frame = [...document.querySelectorAll(".board-node iframe")].find((f) => f.src.includes("sources"));
