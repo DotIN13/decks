@@ -580,6 +580,14 @@ export class DeckAgent {
 			// a second call would write a model change into a session that never changed.
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
+			/*
+			 * Something was taken out of the transcript, so the browser needs the whole list
+			 * again — the same message a rewind sends, and for the same reason.
+			 */
+			historyChanged: () => {
+				this.emit({ type: "chat.history", agentId: this.id, items: this.translator.history() });
+				this.save();
+			},
 			// The install's Claude subscriptions, so a limit can move to the next one.
 			...(this.accounts ? { accounts: this.accounts } : {}),
 			/*

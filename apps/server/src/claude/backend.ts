@@ -21,6 +21,7 @@ import { deckContext, runtimeDir } from "../agents/context.ts";
 import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";
+import { isTransientAuthFailure, MAX_TRANSIENT_RETRIES, retryDelayMs } from "./transient.ts";
 import { accountEnvironment, epochMs } from "./accounts.ts";
 import { qualifiedToolName, stageMcpServer } from "./tools.ts";
 import { toUsageReport } from "./usage.ts";
@@ -131,6 +132,8 @@ export class ClaudeBackend implements AgentBackend {
 	private commandList: SlashCommand[] = CLAUDE_COMMANDS;
 	/** Which limit window has already been warned about, so it is said once and not per turn. */
 	private warnedAbout: string | undefined;
+	/** How many times this turn has been retried past a busy login (`transient.ts`). */
+	private transientTries = 0;
 
 	private constructor(private readonly context: AgentBackendContext) {
 		/*
@@ -309,6 +312,8 @@ export class ClaudeBackend implements AgentBackend {
 							.then(() => this.context.turnEnded?.());
 					}
 					handleClaudeMessage(translator, state, message);
+					// After the translator, so `lastAssistantText` is the reply this turn gave.
+					if (message.type === "result") this.retryTransient();
 				}
 			} catch (error) {
 				if (this.closed) return;
@@ -953,6 +958,59 @@ export class ClaudeBackend implements AgentBackend {
 		notice("info", `${from} reached its ${limitWindow(info.rateLimitType)} limit${reset}. Switched to ${to} and carrying on.`);
 		const again = this.context.translator.lastUserText();
 		if (again) this.push(again);
+	}
+
+	/**
+	 * A turn that was not an answer: try it again rather than leaving it as one.
+	 *
+	 * Several Claude Code processes on one machine share one credentials file, and when a
+	 * token comes due they all want it refreshed at once. The CLI serialises that with a
+	 * lock and tells the losers to come back — and with six agents open that is five turns
+	 * lost to a sentence the CLI itself calls transient. Worse, the SDK reports the turn as
+	 * a *success* whose content is that sentence, so it lands as the assistant's reply and
+	 * the person watching has to read it and press send again.
+	 *
+	 * Three conditions, and all three are needed:
+	 *
+	 * - the reply **is** the failure (`transient.ts`, which matches on prose because there
+	 *   is nothing structural to match on, and says so);
+	 * - the turn **did nothing** — no tool call, no board write. `turnTouchedAnything` is
+	 *   the same guard the rate-limit resend uses, and for the same reason: Decks agents
+	 *   edit files, and replaying a turn that got halfway could write the same board twice;
+	 * - there are retries left, so a refresh that is genuinely stuck ends in the message
+	 *   standing rather than in a turn that never finishes.
+	 *
+	 * The old reply is taken back before the new attempt, so what the person sees is one
+	 * line saying the login is busy and then the answer — rather than an error, an error,
+	 * and an answer.
+	 */
+	private retryTransient(): void {
+		const { translator, notice } = this.context;
+		if (!isTransientAuthFailure(translator.lastAssistantText())) {
+			this.transientTries = 0;
+			return;
+		}
+		if (translator.turnTouchedAnything()) return;
+		const again = translator.lastUserText();
+		if (!again) return;
+
+		if (this.transientTries >= MAX_TRANSIENT_RETRIES) {
+			this.transientTries = 0;
+			notice("error", "Another Claude Code process is still refreshing this login. Send that again in a minute, or close some agents.");
+			return;
+		}
+
+		const attempt = ++this.transientTries;
+		const wait = retryDelayMs(attempt);
+		translator.dropLastAssistant();
+		this.context.historyChanged?.();
+		notice("warn", `Another Claude Code process is refreshing this login. Trying again in ${Math.round(wait / 1000)}s.`);
+		const timer = setTimeout(() => {
+			if (this.closed) return;
+			this.push(again);
+		}, wait);
+		// Never a reason to hold the process open: a deck shutting down mid-wait should shut down.
+		timer.unref?.();
 	}
 
 	/** Read after each turn, because Decks' `usage()` is synchronous and this is not. */

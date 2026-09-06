@@ -135,3 +135,40 @@ test("a reply that did say something is still ended the way it always was", () =
 	assert.equal(last?.item.kind === "assistant" && last.item.streaming, false, "which is what takes the caret off it");
 	assert.equal(last?.item.kind === "assistant" && last.item.text, "Done.");
 });
+
+/*
+ * Taking back a reply that was not one.
+ *
+ * A Claude turn whose whole content is "another process is refreshing the login" is about to
+ * be retried (`claude/transient.ts`), so leaving it in the column would give the reader two
+ * error paragraphs and then the answer. The items are the display copy on disk, so this has
+ * to really remove it.
+ */
+test("the last reply can be taken back, and only the last one", () => {
+	const t = new Translator("A", () => {});
+	t.user("first");
+	t.startAssistant();
+	t.delta("an answer");
+	t.endAssistant();
+	t.user("second");
+	t.startAssistant();
+	t.delta("another process is refreshing it");
+	t.endAssistant();
+
+	assert.equal(t.dropLastAssistant(), true);
+	assert.deepEqual(
+		t.history().map((item) => `${item.kind}:${"text" in item ? item.text : ""}`),
+		["user:first", "assistant:an answer", "user:second"],
+		"the failed reply is gone and the earlier one is not",
+	);
+
+	// And again takes the *earlier* answer — so a caller that dropped twice would be deleting
+	// history rather than a failure. One call per turn is the contract, and it is the
+	// backend's `retryTransient` that keeps it.
+	assert.equal(t.dropLastAssistant(), true);
+	assert.deepEqual(
+		t.history().map((item) => item.kind),
+		["user", "user"],
+	);
+	assert.equal(t.dropLastAssistant(), false, "and nothing to take back is not an error");
+});

@@ -11,6 +11,7 @@ import { StageBridge } from "./stage/bridge.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./claude/accounts.ts";
 import { claudeIdentity } from "./claude/backend.ts";
+import { mapSeries } from "./series.ts";
 import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
@@ -23,6 +24,9 @@ import { Hub } from "./ws.ts";
  * Slow enough that it is free (a walk and a `stat` per board), fast enough that a missed
  * event is a beat rather than a session.
  */
+/** How long an account's identity is worth reusing before asking the CLI again. */
+const IDENTITY_TTL_MS = 60_000;
+
 const RESYNC_MS = 4000;
 
 /**
@@ -131,15 +135,77 @@ export class App {
 	 * Broadcast when nobody asked in particular (a switch, a new login), because two tabs on
 	 * one deck share these accounts.
 	 */
-	private async publishAccounts(reply?: (message: ServerMessage) => void): Promise<void> {
+	/**
+	 * Refresh an account's token **once**, before the sessions want it.
+	 *
+	 * An account nothing has used for eight hours has an expired access token, so the first
+	 * request after switching to it must refresh — and every session switches at the same
+	 * instant, because they all read the same link. Six sessions then race for one lock,
+	 * five lose, and each loss is somebody's turn replaced by "another Claude Code process
+	 * is refreshing it".
+	 *
+	 * So the switch does the refresh itself, in one process, and waits for it. `auth status`
+	 * is the cheapest thing that will do it: it reads the token, refreshes it if it is due,
+	 * and writes it back where the account keeps it. By the time a session looks, the token
+	 * on disk is fresh and there is nothing to contend for.
+	 *
+	 * `reread: true` on the publish that follows, because this is the one moment the cached
+	 * identity is certainly stale — the file has just been rewritten.
+	 */
+	private async warmAccount(id: string): Promise<void> {
+		try {
+			await this.identityOf(id, id === DEFAULT_ACCOUNT, true);
+		} catch {
+			/*
+			 * A failed warm-up is not a failed switch. The account is already in force; what
+			 * is lost is the head start, and the sessions fall back to what they did
+			 * before — one of them refreshes and the rest retry (`claude/transient.ts`).
+			 */
+		}
+	}
+
+	/**
+	 * An account's identity, from the CLI, with a short memory.
+	 *
+	 * `claude auth status` is a subprocess that will refresh a stale token, so it is not a
+	 * free read — it touches the same credentials file every session is reading. Asking once
+	 * a minute per account is enough for a panel: an email does not change on its own, and
+	 * the one thing that *can* change without Decks hearing (somebody running
+	 * `claude auth login` in a terminal) is exactly what `reread` is for.
+	 */
+	private readonly identities = new Map<string, { at: number; identity: { email?: string; orgName?: string; plan?: string } }>();
+
+	private async identityOf(id: string, isDefault: boolean, reread: boolean): Promise<{ email?: string; orgName?: string; plan?: string }> {
+		const cached = this.identities.get(id);
+		if (!reread && cached && Date.now() - cached.at < IDENTITY_TTL_MS) return cached.identity;
+		const identity = await claudeIdentity(isDefault ? undefined : this.claudeAccounts.configDir(id));
+		/*
+		 * An empty answer is not cached. It means the CLI was slow, or busy behind somebody
+		 * else's refresh — and remembering "this account has no name" for a minute is how a
+		 * transient failure becomes a panel that says the account is signed out.
+		 */
+		if (identity.email || identity.plan) this.identities.set(id, { at: Date.now(), identity });
+		return identity;
+	}
+
+	private async publishAccounts(reply?: (message: ServerMessage) => void, options?: { reread?: boolean }): Promise<void> {
 		const stored = this.claudeAccounts.list();
 		const active = this.claudeAccounts.activeId();
-		const accounts = await Promise.all(
-			stored.map(async (account) => {
-				const isDefault = account.id === DEFAULT_ACCOUNT;
-				const identity = await claudeIdentity(isDefault ? undefined : this.claudeAccounts.configDir(account.id));
-				const signedIn = Boolean(identity.email || identity.plan);
-				return {
+		/*
+		 * One `claude auth status` at a time, and not at all when a recent answer will do.
+		 *
+		 * This used to be `Promise.all` over the accounts — one subprocess per row, all at
+		 * once, each able to refresh a stale token. Which made this function a small
+		 * stampede on the very files the sessions are reading: the CLI serialises a refresh
+		 * with a lock and tells the losers to come back in a minute, so a publish could
+		 * cost somebody their turn. It fires on six paths, including one that is a person
+		 * pressing a button, so it has to be cheap rather than parallel.
+		 */
+		const accounts = await mapSeries(stored, async (account) => {
+			const isDefault = account.id === DEFAULT_ACCOUNT;
+			const identity = await this.identityOf(account.id, isDefault, options?.reread === true);
+			const signedIn = Boolean(identity.email || identity.plan);
+			return {
 					id: account.id,
 					...(isDefault ? { isDefault: true as const } : {}),
 					signedIn,
@@ -150,9 +216,8 @@ export class App {
 					...(identity.plan ?? account.plan ? { plan: identity.plan ?? account.plan } : {}),
 					...(account.limitedUntil ? { limitedUntil: account.limitedUntil } : {}),
 					...(account.limitType ? { limitType: account.limitType } : {}),
-				};
-			}),
-		);
+			};
+		});
 		// Recorded so a row keeps its name when the CLI is next slow to answer.
 		const mine = accounts.find((account) => account.isDefault);
 		if (mine?.signedIn) {
@@ -706,7 +771,7 @@ export class App {
 						reply({ type: "notice", level: "warn", text: "That account is not on the list any more." });
 						return;
 					}
-					void this.publishAccounts();
+					void this.warmAccount(message.id).then(() => this.publishAccounts(undefined, { reread: true }));
 					return;
 				}
 				const moved = this.claudeAccounts.use(message.id);
@@ -722,7 +787,7 @@ export class App {
 				 * account, so a switch there reaches the next session rather than this one.
 				 */
 				this.send({ type: "notice", level: "info", text: `New agents will use ${moved.email ?? "that account"}. Agents already open keep the one they are on.` });
-				void this.publishAccounts();
+				void this.warmAccount(message.id).then(() => this.publishAccounts(undefined, { reread: true }));
 				return;
 			}
 

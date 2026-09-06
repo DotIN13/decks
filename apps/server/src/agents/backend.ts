@@ -95,6 +95,14 @@ export interface AgentBackendContext {
 	 * credentials are `pi auth`'s business and it has no equivalent of a plan window.
 	 */
 	accounts?: ClaudeAccountSwitcher;
+	/**
+	 * The transcript changed in a way `chat.item` cannot express — something was removed.
+	 *
+	 * One caller, and it is why this exists rather than being a general facility: a turn
+	 * whose whole reply was a transient auth failure is taken back before it is retried
+	 * (`claude/transient.ts`). The shell re-sends the history, exactly as a rewind does.
+	 */
+	historyChanged?(): void;
 	/** Tell the browser the account list moved, after a login or a switch. */
 	accountsChanged?(): void;
 	/**

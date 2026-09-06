@@ -173,6 +173,27 @@ export class Translator {
 		return "";
 	}
 
+	/**
+	 * Take back the last reply, for a turn that turned out not to be one.
+	 *
+	 * One caller: a Claude turn whose whole content was "another process is refreshing the
+	 * login" (`claude/transient.ts`). That is not an answer and it is about to be retried,
+	 * so leaving it in the column would mean two error paragraphs and then the real reply.
+	 *
+	 * The items are the display copy on disk, so this really removes it rather than hiding
+	 * it — and the caller re-sends the whole history, because a removal is the one change
+	 * `chat.item` cannot express.
+	 */
+	dropLastAssistant(): boolean {
+		for (let index = this.items.length - 1; index >= 0; index--) {
+			if (this.items[index]?.kind !== "assistant") continue;
+			this.items.splice(index, 1);
+			this.onChange?.();
+			return true;
+		}
+		return false;
+	}
+
 	setState(state: AgentState): void {
 		this.emit({ type: "agent.state", id: this.agentId, state });
 	}
