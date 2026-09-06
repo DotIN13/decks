@@ -19,10 +19,29 @@ Start with:
 stage.newBoard({ title, kind })
 ```
 
-It reports the **viewport** with the path it returns — `viewport 1440x900 px`, the room the
-canvas has on screen. Use it to see what the size you picked will look like: a board that
-wide is read at life size, one twice as wide is read at half. There is no rule beyond that;
-size the board to the content. `stage.viewport()` asks for the number any other time.
+It reports the **viewport** and the **width it chose** with the path it returns — `viewport
+1440x900 px`, `board width 1000 — the rule is min(viewport width, 1600)`. The viewport is the
+room the canvas has on screen: a board that wide is read at life size, one twice as wide is
+read at half. `stage.viewport()` asks for it any other time.
+
+Two rules, and a board is judged on them.
+
+**Width — the smallest that holds the content, capped at `min(viewport width, 1600)`.** 1600
+is a ceiling, not a target: past it a line of prose is too long to track back to, and wider
+than the viewport is read scaled down. Viewport 1920 → never wider than 1600. Viewport 1440 →
+never wider than 1440. Viewport 390, a phone → never wider than 390, and the templates fold
+their columns to fit. `newBoard` applies this when you pass no `w`; an explicit `w` is still
+yours. `stage.fit` holds to the same ceiling, and shrinks a too-wide board as well as growing
+a too-narrow one.
+
+**Reading order — DOM order is visual order, top to bottom.** One column or two; where two
+components share a row, write the left one first. The reader has the picture and you have the
+file, and the two have to be the same document — you cannot point at "the third card" if the
+third card in the file is the second one on screen.
+
+Aim for the **smallest board that explains the thing**: a summary at the top, then diagrams,
+tables and embeds in preference to prose, every sentence earning its place. Once the height is
+near twice the width, it is two boards.
 
 A board document should include:
 

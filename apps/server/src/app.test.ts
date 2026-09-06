@@ -41,13 +41,19 @@ test("a frame's measurement reaches the deck, and fit writes it back", async () 
 		assert.deepEqual(measured.content, { w: 648, h: 690 });
 		assert.equal(measured.clipped, true, "690 of content in 400 of board");
 
-		const fitted = await app.stage.fit("boards/tall.html");
+		const { board: fitted } = await app.stage.fit("boards/tall.html");
 		assert.equal(fitted.h, 738, "the content plus the margin components start at");
-		assert.equal(fitted.w, 900, "and a width that was already wide enough is left alone");
+		/*
+		 * And the width comes down with it: 648 of content in 900 of board left a column of
+		 * empty grid nobody could tell from a deliberate one. The second reading never
+		 * arrives here — no browser is looking — so the height falls back to the first,
+		 * which is the right answer whenever the content did not reflow.
+		 */
+		assert.equal(fitted.w, 696, "the content, plus the same margin");
 
 		// The file is the only place a size lives, so that is where to check.
 		const html = readFileSync(join(deck, "boards", "tall.html"), "utf8");
-		assert.ok(html.includes('"w":900,"h":738'));
+		assert.ok(html.includes('"w":696,"h":738'));
 		assert.ok(html.includes('"bg":"grid"'), "and the rest of the tag survived");
 		assert.equal(boardOf(app).h, 738);
 	} finally {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readBoardMeta } from "../deck/meta.ts";
-import { BOARD_KINDS, isBoardKind, renderTemplate, slugFor } from "./templates.ts";
+import { BOARD_KINDS, boardWidth, isBoardKind, MAX_BOARD_W, renderTemplate, slugFor } from "./templates.ts";
 
 test("every kind renders a board the loader can read", () => {
 	for (const kind of BOARD_KINDS) {
@@ -46,3 +46,87 @@ test("a kind has to be one of the shapes", () => {
 	assert.equal(isBoardKind(undefined), false);
 });
 
+
+/*
+ * The two rules a board is written to, pinned where they are decided.
+ *
+ * Rule 1 is a *ceiling*: `min(viewport, 1600)`. Rule 2 is that the order of the file is the
+ * order of the page — which is not a matter of taste but of whether an agent and a reader
+ * can talk about the same board, since one of them has only the DOM and the other has only
+ * the picture.
+ */
+
+/** Every positioned component, in the order the file puts them. */
+function components(html: string): Array<{ id: string; left: number; top: number; width: number }> {
+	return [...html.matchAll(/data-id="([^"]+)"[^>]*style="left: (\d+)px; top: (\d+)px; width: (\d+)px/g)].map((match) => ({
+		id: match[1] as string,
+		left: Number(match[2]),
+		top: Number(match[3]),
+		width: Number(match[4]),
+	}));
+}
+
+test("no shape's own width is above the ceiling", () => {
+	for (const kind of BOARD_KINDS) {
+		const meta = readBoardMeta(renderTemplate(kind, "T"));
+		assert.ok((meta.w ?? 0) <= MAX_BOARD_W, `${kind} is ${meta.w}, over ${MAX_BOARD_W}`);
+	}
+});
+
+test("a width is the smallest of what the shape wants, the viewport, and the ceiling", () => {
+	// A wide screen is still capped: past 1600 a line of prose is too long to track back to.
+	assert.equal(boardWidth(undefined, 1920, "report"), 1200);
+	assert.equal(boardWidth(undefined, 1920, "blank"), 1000);
+	// A screen narrower than the shape wins, which is the whole point of asking.
+	assert.equal(boardWidth(undefined, 900, "report"), 900);
+	assert.equal(boardWidth(undefined, 390, "report"), 390);
+	// Nobody looking: the ceiling, not a guess that would be indistinguishable from a measurement.
+	assert.equal(boardWidth(undefined, undefined, "report"), 1200);
+	// A number somebody typed is theirs, above the ceiling or not.
+	assert.equal(boardWidth(1800, 390, "report"), 1800);
+});
+
+test("every template reads top to bottom in the order the file is written", () => {
+	for (const kind of BOARD_KINDS) {
+		for (const width of [1200, 1000, 390]) {
+			const boxes = components(renderTemplate(kind, "T", { w: width }));
+			assert.ok(boxes.length > 0, `${kind} has components`);
+			for (let index = 1; index < boxes.length; index++) {
+				const before = boxes[index - 1] as { id: string; left: number; top: number };
+				const now = boxes[index] as { id: string; left: number; top: number };
+				const order = now.top > before.top || (now.top === before.top && now.left > before.left);
+				assert.ok(order, `${kind} at ${width}: ${now.id} comes after ${before.id} in the file but not on the page`);
+			}
+		}
+	}
+});
+
+test("nothing sticks out of the board it was laid out for", () => {
+	for (const kind of BOARD_KINDS) {
+		for (const width of [1200, 1000, 390]) {
+			const html = renderTemplate(kind, "T", { w: width });
+			const meta = readBoardMeta(html);
+			for (const box of components(html)) {
+				assert.ok(box.left + box.width <= (meta.w ?? 0), `${kind} at ${width}: ${box.id} runs past the right edge`);
+			}
+		}
+	}
+});
+
+/*
+ * A pair of columns at 130px each is a mistake with a rule through the middle, so below a
+ * threshold the second card goes under the first. The file does not change to do it — which
+ * is why the reading-order test above passes at 390 as well as at 1200.
+ */
+test("a pair folds into one column on a narrow board, and the board grows to hold it", () => {
+	const wide = components(renderTemplate("plan", "T", { w: 1000 }));
+	const narrow = components(renderTemplate("plan", "T", { w: 390 }));
+	const beside = wide.find((box) => box.id === "approach");
+	const under = narrow.find((box) => box.id === "approach");
+	assert.ok((beside?.left ?? 0) > 48, "wide: the second card is beside the first");
+	assert.equal(under?.left, 48, "narrow: it is under it");
+	assert.ok(
+		(readBoardMeta(renderTemplate("plan", "T", { w: 390 })).h ?? 0) > (readBoardMeta(renderTemplate("plan", "T", { w: 1000 })).h ?? 0),
+		"and the board is taller for it, rather than clipping",
+	);
+});

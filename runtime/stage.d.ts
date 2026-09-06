@@ -174,10 +174,24 @@ export interface Stage {
 	 * - `plan`   — goal, approach, steps
 	 * - `blank`  — a heading and nothing else
 	 *
-	 * **The result tells you the viewport** — `viewport 1440x900 px`, the room the canvas
-	 * has — because that is the moment the number is worth knowing. There is no rule about
-	 * what to do with it: size the board to the content, and let the number tell you what
-	 * that will look like. `stage.viewport()` asks for it any other time.
+	 * **The result tells you the viewport and the width it chose** — `viewport 1440x900 px`,
+	 * `board width 1000 — the rule is min(viewport width, 1600)` — because that is the moment
+	 * both are worth knowing. `stage.viewport()` asks any other time.
+	 *
+	 * **Width.** The smallest width that holds the content, capped at `min(viewport width,
+	 * 1600)`. 1600 is a ceiling, not a target: a board wider than the room the canvas has is
+	 * read scaled down, and past 1600 a line of prose is too long to track back to. Viewport
+	 * 1920 → never wider than 1600. Viewport 1440 → never wider than 1440. Viewport 390, a
+	 * phone → never wider than 390, and the template folds its columns to fit. This is
+	 * applied for you when you pass no `w`; an explicit `w` is still yours.
+	 *
+	 * **Reading order.** DOM order is visual order, top to bottom. One column or two; where
+	 * two components share a row, write the left one first. The reader has the picture and
+	 * you have the file, and the two have to be the same document.
+	 *
+	 * Aim for the smallest board that explains the thing: a summary at the top, then
+	 * diagrams, tables and embeds in preference to prose. Once the height is near twice the
+	 * width, it is two boards.
 	 */
 	newBoard(options: { title: string; kind?: "answer" | "design" | "report" | "plan" | "blank"; w?: number; h?: number }): Promise<string>;
 
@@ -221,15 +235,24 @@ export interface Stage {
 	resize(path: string, size: { w?: number; h?: number }): Promise<{ path: string; w: number; h: number }>;
 
 	/**
-	 * Size a board to what is on it.
+	 * Size a board to what is on it — **both dimensions**.
 	 *
 	 *     await stage.fit("boards/plan.html");            // -> { path, w, h, content }
 	 *     await stage.fit("boards/plan.html", { margin: 80 });
 	 *
-	 * **The height comes from the content; the width only grows.** Narrowing a board
-	 * reflows its text, which changes the height, which is the thing being measured — so
-	 * `fit` never narrows. It grows the width only for something pushed past the right
-	 * edge.
+	 * The width shrinks as well as grows: a board left at the width it was guessed at has a
+	 * column of empty grid down its right-hand side, and a reader cannot tell that from a
+	 * board whose author meant it. It is clamped to `min(viewport width, 1600)` — the same
+	 * ceiling `newBoard` uses.
+	 *
+	 * **Two passes, because narrowing reflows.** Changing the width changes the height that
+	 * was being measured, so `fit` sets the width, waits for the browser to lay the board
+	 * out again, and takes the height from that second reading. You do not have to do
+	 * anything about this; it is why one call can take two round trips.
+	 *
+	 * Content wider than the ceiling is left clipped rather than papered over: the board
+	 * stops at the ceiling, `clipped` says so on `stage.boards()`, and the answer is a
+	 * narrower component rather than a wider board.
 	 *
 	 * The measurement is taken in the frame showing the board, because that is the only
 	 * place a board is laid out. So **the board has to be on the canvas**: a board nobody

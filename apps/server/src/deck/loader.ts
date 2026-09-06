@@ -6,9 +6,19 @@ import { readBoardMeta } from "./meta.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
+import { MAX_BOARD_W } from "../boards/templates.ts";
 
-/** Defaults for a board that says nothing about its own size. */
-const DEFAULT_W = 1200;
+/**
+ * Defaults for a board that says nothing about its own size.
+ *
+ * The ceiling rather than a typical width, and deliberately so: this is the last resort for
+ * a file with no `<meta name="board">` at all, and the two ways to be wrong are not equal.
+ * A record too *narrow* clips the board in silence, which is the failure nobody sees; a
+ * record too wide is a board with empty grid down one side, which anybody can see and
+ * `stage.fit` corrects in one call. Shapes that know their own width are in
+ * `boards/templates.ts`, and every one of them is well under this.
+ */
+const DEFAULT_W = MAX_BOARD_W;
 const DEFAULT_H = 800;
 /** Space between auto-placed boards, and how many go in a row before wrapping. */
 const GUTTER = 160;

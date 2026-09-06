@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -33,7 +33,11 @@ function toolOn(camera: Camera) {
 		newMirror: () => "boards/mirrors/x.html",
 		newBoard: (options) => {
 			const path = `boards/${options.title.toLowerCase().replace(/\W+/g, "-")}.html`;
-			writeFileSync(join(root, path), `<!doctype html><title>${options.title}</title><body class="board"></body>`);
+			// The size it was asked for goes into the file, because the file is the only
+			// place a size lives — a stub that dropped it would make every width assertion
+			// below a reading of the loader's fallback instead.
+			const meta = `<meta name="board" content='{"w":${options.size?.w ?? 1000},"h":${options.size?.h ?? 700}}' />`;
+			writeFileSync(join(root, path), `<!doctype html><title>${options.title}</title>${meta}<body class="board"></body>`);
 			return path;
 		},
 		writeBoard: (path, html) => {
@@ -43,7 +47,15 @@ function toolOn(camera: Camera) {
 			return board;
 		},
 		extent: (path, rev) => (extents.get(path)?.rev === rev ? extents.get(path) : undefined),
-		awaitExtent: async (path, rev) => (extents.get(path)?.rev === rev ? extents.get(path) : undefined),
+		/*
+		 * A browser that is actually looking.
+		 *
+		 * The cached reading is per revision, so a resize invalidates it — and `fit` now
+		 * resizes and then asks again, which is the second pass. A real frame answers that,
+		 * with the same content: narrowing the board does not narrow components that carry
+		 * their own width. So this answers whatever revision is asked for.
+		 */
+		awaitExtent: async (path) => extents.get(path),
 		call: async () => ({ ok: true }),
 		connected: () => true,
 		broadcast: () => {},
@@ -76,7 +88,15 @@ function toolOn(camera: Camera) {
 			boardPathOf: () => undefined,
 		},
 	});
-	return { tool, sends, deck, extents, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+	return {
+		tool,
+		sends,
+		deck,
+		extents,
+		/** What was actually written to disk, which is the only place a board's size lives. */
+		read: (path: string) => readFileSync(join(root, path), "utf8"),
+		cleanup: () => rmSync(root, { recursive: true, force: true }),
+	};
 }
 
 test("newBoard says how much room the canvas has, after the path it returns", async () => {
@@ -94,9 +114,41 @@ test("with no reading from a browser, it says nothing rather than making a numbe
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	const result = await tool.run(`return await stage.newBoard({ title: "Sizing", kind: "answer" })`);
 
-	assert.equal(result.text.includes("viewport"), false);
+	assert.equal(/viewport \d+/.test(result.text), false, "no measurement, because nobody took one");
+	// The *rule* is still said, because it still applies: with no screen to measure, the
+	// ceiling is the 1600 in the formula rather than a number invented for the occasion.
+	assert.match(result.text, /min\(viewport width, 1600\)/);
 	assert.equal((await tool.run(`return (await stage.viewport()) ?? "none"`)).text, `"none"`);
 	cleanup();
+});
+
+/*
+ * The acceptance criterion for the width rule, at the two ends of it: a board is never
+ * wider than the room the canvas has, and never wider than 1600 however much room there is.
+ * Asserted through the tool rather than through `boardWidth` because the point is that the
+ * clamp is *applied* — it used to be a sentence in a note that nothing enforced.
+ */
+test("a new board is never wider than min(viewport, 1600), and says which rule it used", async () => {
+	/** The width the file was written with — the only place a board's size lives. */
+	const widthOf = (text: string) => Number(/"w":(\d+)/.exec(text)?.[1]);
+
+	const wide = toolOn({ x: 0, y: 0, zoom: 1, width: 1920, height: 1080 });
+	const onWide = await wide.tool.run(`return await stage.newBoard({ title: "Wide", kind: "report" })`);
+	assert.equal(widthOf(wide.read("boards/wide.html")), 1200, "the shape's own width, which is under the ceiling");
+	assert.match(onWide.text, /board width 1200/);
+	wide.cleanup();
+
+	const phone = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
+	const onPhone = await phone.tool.run(`return await stage.newBoard({ title: "Phone", kind: "report" })`);
+	assert.equal(widthOf(phone.read("boards/phone.html")), 390, "the screen, when the screen is smaller");
+	assert.match(onPhone.text, /board width 390 — the rule is min\(viewport width, 1600\)/);
+	phone.cleanup();
+
+	// And a width somebody typed is still theirs, ceiling or no ceiling.
+	const asked = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
+	await asked.tool.run(`return await stage.newBoard({ title: "Asked", kind: "report", w: 1800 })`);
+	assert.equal(widthOf(asked.read("boards/asked.html")), 1800);
+	asked.cleanup();
 });
 
 test("the viewport is the canvas in pixels, not divided by the zoom", async () => {
@@ -211,7 +263,7 @@ test("attach is most-recently-touched first, and re-attaching moves the board to
 test("resize writes the meta and the deck agrees immediately", async () => {
 	const { tool, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const before = deck.board("boards/plan.html");
-	assert.equal(before?.w, 1200, "the default, since this board's file says nothing");
+	assert.equal(before?.w, 1600, "the last-resort width, since this board's file says nothing");
 
 	const result = await tool.run(`return await stage.resize("boards/plan.html", { w: 1600, h: 1100 })`);
 	assert.match(result.text, /"w": 1600/);
@@ -231,25 +283,57 @@ test("fit says to put the board on the canvas rather than guessing a height", as
 	cleanup();
 });
 
-test("fit takes the height from the content and leaves a margin", async () => {
+test("fit takes both dimensions from the content, and narrows a board with room to spare", async () => {
 	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const board = deck.board("boards/plan.html");
+	assert.equal(board?.w, 1600, "a board that says nothing about itself gets the ceiling");
 	extents.set("boards/plan.html", { rev: board!.rev, w: 700, h: 1400 });
 
 	await tool.run(`return await stage.fit("boards/plan.html")`);
 	const fitted = deck.board("boards/plan.html");
 	assert.equal(fitted?.h, 1448, "the content, plus the margin its components start at");
-	assert.equal(fitted?.w, 1200, "and a width that was already wide enough is left alone");
+	/*
+	 * The change this test exists for. `fit` used to grow the width and never shrink it, so
+	 * a board guessed at 1200 with 700 of content kept a column of empty grid down its
+	 * right-hand side — and a reader cannot tell that from a board whose author meant it.
+	 */
+	assert.equal(fitted?.w, 748, "and the width comes down to the content too");
 	cleanup();
 });
 
-test("fit grows the width for content pushed past the edge, and never narrows it", async () => {
+test("fit still grows a board its content has outgrown", async () => {
 	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const board = deck.board("boards/plan.html");
-	extents.set("boards/plan.html", { rev: board!.rev, w: 1500, h: 600 });
+	extents.set("boards/plan.html", { rev: board!.rev, w: 1300, h: 600 });
 
 	await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
-	assert.equal(deck.board("boards/plan.html")?.w, 1500);
+	assert.equal(deck.board("boards/plan.html")?.w, 1300);
 	assert.equal(deck.board("boards/plan.html")?.h, 600);
+	cleanup();
+});
+
+/*
+ * The ceiling is the same one `newBoard` applies: `min(viewport, 1600)`. A board wider than
+ * the room the canvas has is read scaled down, so growing past it does not help — and the
+ * note says so rather than leaving the agent to find the clipping later.
+ */
+test("fit will not grow a board past min(viewport, 1600), and says why", async () => {
+	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
+	const board = deck.board("boards/plan.html");
+	extents.set("boards/plan.html", { rev: board!.rev, w: 1900, h: 600 });
+
+	const result = await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
+	assert.equal(deck.board("boards/plan.html")?.w, 1400, "the viewport, not the content");
+	assert.match(result.text, /narrow a component rather than widening the board/);
+	cleanup();
+});
+
+test("with a wide screen the ceiling is 1600 rather than the screen", async () => {
+	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 2560, height: 1400 });
+	const board = deck.board("boards/plan.html");
+	extents.set("boards/plan.html", { rev: board!.rev, w: 1900, h: 600 });
+
+	await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
+	assert.equal(deck.board("boards/plan.html")?.w, 1600);
 	cleanup();
 });

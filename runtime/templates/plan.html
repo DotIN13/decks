@@ -7,21 +7,26 @@
 		<link rel="stylesheet" href="../lib/board.css" />
 	</head>
 	<body class="board">
-		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 900px">
+		<!--
+			Goal, approach, steps — in that order down the page and in that order in the
+			file. Widths come from the board's own width ({{CONTENT}}, {{COL}}), so the pair
+			folds into one column on a narrow board without this file changing.
+		-->
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
 		</div>
 
-		<section class="card" data-id="goal" style="left: 48px; top: 152px; width: 380px">
+		<section class="card" data-id="goal" style="left: 48px; top: {{ROW1}}px; width: {{COL}}px">
 			<h3>Goal</h3>
 			<p>One sentence that would survive being read out loud.</p>
 		</section>
 
-		<section class="card" data-id="approach" style="left: 476px; top: 152px; width: 380px">
+		<section class="card" data-id="approach" style="left: {{COLX}}px; top: {{PAIRB}}px; width: {{COL}}px">
 			<h3>Approach</h3>
 			<p>…</p>
 		</section>
 
-		<section class="card" data-id="steps" style="left: 48px; top: 420px; width: 808px">
+		<section class="card" data-id="steps" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
 			<h3>Steps</h3>
 			<ol>
 				<li>…</li>

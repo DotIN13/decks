@@ -1,5 +1,5 @@
 import type { AgentKind, AgentMode, Camera, Identity, ThinkingLevel } from "@decks/protocol";
-import { BOARD_KINDS, isBoardKind } from "../boards/templates.ts";
+import { BOARD_KINDS, boardWidth, isBoardKind } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService } from "./service.ts";
 
@@ -169,7 +169,15 @@ Your code is the body of an async function with \`stage\` in scope; whatever you
 
 **Keep the canvas to what matters.** \`stage.show(paths)\` sets what is on the canvas and fits the camera to it. \`stage.hide(paths)\` takes a board off the canvas but keeps it in your context. \`stage.attach\` / \`stage.detach\` are the context itself, which is what the rail beside the canvas lists. The camera never moves unless you call \`show\`.
 
-**A board does not scroll, so a board that is too small clips — silently.** \`stage.fit(path)\` sizes it to what is on it: write the content, \`show\` it, then fit. The measurement is taken in the frame showing the board, so it has to be on the canvas; \`stage.boards()\` carries the same reading as \`content\` and \`clipped\`. \`stage.resize(path, { w, h })\` sets a size outright.
+**A board does not scroll, so a board that is too small clips — silently.** \`stage.fit(path)\` sizes it to what is on it, **width and height**: write the content, \`show\` it, then fit. It shrinks a board that is wider than its content as well as growing one that is narrower, clamped to the ceiling below. The measurement is taken in the frame showing the board, so it has to be on the canvas; \`stage.boards()\` carries the same reading as \`content\` and \`clipped\`. \`stage.resize(path, { w, h })\` sets a size outright.
+
+**Two rules, and they are what a board is judged on.**
+
+*Width.* The smallest width that holds the content, capped at \`min(viewport width, 1600)\`. 1600 is a ceiling, not a target: a board wider than the room the canvas has is read scaled down, and past 1600 a line of prose is too long to track back to. Viewport 1920 -> never wider than 1600. Viewport 1440 -> never wider than 1440. Viewport 390, a phone -> never wider than 390. \`newBoard\` applies this when you pass no \`w\`; an explicit \`w\` is still yours.
+
+*Reading order.* DOM order is visual order, top to bottom. One column or two; where two components share a row, write the left one first. A reader has the picture and you have the file, and the two have to be the same document.
+
+Aim for the smallest board that explains the thing: an executive summary at the top, then diagrams, tables and embeds in preference to prose. Once the height is near twice the width, it is two boards.
 
 Also here: look at the deck (\`stage.boards\`, \`stage.read\`), place boards (\`stage.move\`), resolve a path to embed (\`stage.resolve\`), get a URL to screenshot with Playwright (\`stage.url\`), name yourself and draw your own avatar (\`stage.me\`).
 
@@ -179,6 +187,9 @@ Board *content* is files — write and edit it with your ordinary tools, not thr
 
 const GUIDELINES = [
 	"Answer on a board: stage.newBoard for the shell, write/edit for the content, stage.show to put it in front of the user.",
+	"Width: the smallest that holds the content, capped at min(viewport width, 1600). 1600 is a ceiling, not a target — at a 390px viewport a board is 390 wide.",
+	"Reading order: DOM order is visual order, top to bottom. Two components sharing a row go left-first in the file.",
+	"Aim for the smallest board that explains the thing — summary first, then diagrams, tables and embeds over prose. Height near twice the width means it is two boards.",
 	"The board carries the answer; the chat reply names it and may recap or add to it. What is never acceptable is the substance in chat with a stub on the board, or a board that only makes sense after reading the chat.",
 	"When work is finished, report on a board — method, result, what is left — rather than describing it in the chat column.",
 	"Keep the canvas to what matters now: stage.show narrows it, stage.hide takes a board off it without dropping it from your context.",
@@ -250,24 +261,35 @@ export function createStageTool(deps: {
 			const kind = options.kind ?? "blank";
 			if (!isBoardKind(kind)) throw new Error(`Unknown kind ${kind}; use one of ${BOARD_KINDS.join(", ")}`);
 
+			/*
+			 * The width, when nobody said one.
+			 *
+			 * `min(viewport, 1600)` is a ceiling, and each shape's own default is under it,
+			 * so this is the smallest of the three. Applied here rather than suggested,
+			 * because a suggestion in a note is a rule nothing enforces. A phone is what
+			 * makes it matter: at a 390px viewport every default is wider than the screen,
+			 * and the template folds its columns to fit rather than being clipped.
+			 */
+			const view = viewport();
+			const width = boardWidth(options.w, view?.width, kind);
 			const path = service.newBoard({
 				title,
 				kind,
-				size: { ...(options.w ? { w: options.w } : {}), ...(options.h ? { h: options.h } : {}) },
+				size: { w: width, ...(options.h ? { h: options.h } : {}) },
 			});
 			agent.setContext([path, ...agent.context()]);
 			agent.setInPlay([...agent.inPlay(), path]);
 			/*
-			 * The size of the thing you are about to fill, said once, at the moment you would
-			 * use it.
+			 * The size of the thing you are about to fill, and the rule it was sized by.
 			 *
-			 * No judgement with it — no "fits", no "too big". The number is the whole
-			 * mechanism: an agent that knows the canvas is 1400×900 does not need a rule about
-			 * how big a board should be, and a rule without the number was only ever a guess
-			 * ("a board that is too small clips") that nobody could check.
+			 * The number used to be the whole of it, on the reasoning that an agent that
+			 * knows the canvas is 1400×900 does not need a rule about how wide a board
+			 * should be. It did: knowing the room and choosing 1900 anyway is exactly what
+			 * kept happening, because nothing joined the two. So the rule goes beside the
+			 * number — one line, with the formula in it, at the moment it would be used.
 			 */
-			const view = viewport();
 			if (view) notes.push(`viewport ${view.width}×${view.height} px`);
+			notes.push(`board width ${width} — the rule is min(viewport width, 1600), and reading order is top to bottom in DOM order`);
 			return path;
 		},
 
@@ -323,9 +345,17 @@ export function createStageTool(deps: {
 		 * something has been pushed past the edge.
 		 */
 		fit: async (path: string, options?: { margin?: number }) => {
-			const board = await service.fit(path, options);
-			const content = service.boards().find((one) => one.path === board.path)?.content;
-			return { path: board.path, w: board.w, h: board.h, ...(content ? { content } : {}) };
+			const { board, content } = await service.fit(path, { ...options, ...(viewport() ? { viewport: viewport()?.width } : {}) });
+			/*
+			 * The one case `fit` cannot fix, said rather than hidden: content wider than
+			 * `min(viewport, 1600)` leaves the board at the ceiling and clipped. A wider
+			 * board is not the answer — it would be read scaled down — so the note names
+			 * the component's width as the thing to change.
+			 */
+			if (content.w > board.w) {
+				notes.push(`${board.path} is ${board.w} wide, the most a board should be here, and its content is ${content.w} — narrow a component rather than widening the board`);
+			}
+			return { path: board.path, w: board.w, h: board.h, content };
 		},
 
 		// --- context -------------------------------------------------------------

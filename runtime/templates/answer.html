@@ -7,17 +7,27 @@
 		<link rel="stylesheet" href="../lib/board.css" />
 	</head>
 	<body class="board">
-		<div class="text" data-id="question" style="left: 48px; top: 40px; width: 900px">
+		<!--
+			One column, read top to bottom, and the file is in that order — which is the rule
+			rather than a habit: a reader's eye and a `data-id` list should agree, or neither
+			you nor the person you are answering can say where anything is.
+
+			Widths come from the board's own width ({{CONTENT}}, {{COL}}), so this same file
+			is a wide board on a laptop and a narrow one on a phone without clipping either.
+		-->
+		<div class="text" data-id="question" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
 		</div>
 
-		<!--
-			The answer, in one screen. Replace this section; add more beside it at
-			x = 48 / 560 / 1072 rather than scattering them.
-		-->
-		<section class="card" data-id="answer" style="left: 48px; top: 152px; width: 480px">
+		<!-- The answer, in one screen. Put the thing that answers it first. -->
+		<section class="card" data-id="answer" style="left: 48px; top: {{ROW1}}px; width: {{CONTENT}}px">
 			<p>…</p>
 		</section>
+
+		<!--
+			More below this, not beside it, unless two things really are a pair — then use
+			x = 48 and x = {{COLX}}, in that order in the file.
+		-->
 
 		<script src="../lib/board.js"></script>
 	</body>

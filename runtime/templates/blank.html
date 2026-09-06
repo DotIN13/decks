@@ -7,7 +7,12 @@
 		<link rel="stylesheet" href="../lib/board.css" />
 	</head>
 	<body class="board">
-		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 900px">
+		<!--
+			Nothing but a heading, on purpose. What goes under it reads top to bottom, and
+			the file should be in that order too; a pair of cards goes at x = 48 and
+			x = {{COLX}}, left one first. {{CONTENT}} is the full width inside the margins.
+		-->
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
 		</div>
 

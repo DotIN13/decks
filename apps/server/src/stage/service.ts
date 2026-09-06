@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Board, Camera, ServerMessage, StageCall, StageResult } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { withBoardSize } from "../deck/meta.ts";
+import { MAX_BOARD_W } from "../boards/templates.ts";
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
 
 /**
@@ -44,8 +45,14 @@ export interface StageHost {
 
 /** The room `fit` leaves under the content — the margin a board's own components start at. */
 const FIT_MARGIN = 48;
+
+/** The narrowest `fit` will make a board. Below this a board is not small, it is broken. */
+const FIT_MIN_W = 320;
 /** How long `fit` waits for the frame to load and report, before saying nobody looked. */
 const FIT_WAIT_MS = 5000;
+
+/** And how long to wait for the *second* reading, after a width change. Best effort. */
+const FIT_REFLOW_MS = 1500;
 
 export class StageService {
 	constructor(
@@ -136,20 +143,25 @@ export class StageService {
 	}
 
 	/**
-	 * Size a board to what is on it.
+	 * Size a board to what is on it — **both** dimensions, in two passes.
 	 *
-	 * The height comes from the content and the width only grows, and that asymmetry is
-	 * the whole design: narrowing a board reflows its text, which changes the height,
-	 * which is what we were trying to measure. Growing the width is safe, and is what a
-	 * component pushed past the right edge needs.
+	 * This used to grow the width and never shrink it, on the reasoning that narrowing a
+	 * board reflows its text and so changes the height being measured. True, and the wrong
+	 * conclusion: a board left at the width it was guessed at is a board with a column of
+	 * empty grid down its right-hand side, and a reader cannot tell that from a board whose
+	 * author meant it. Reflow is a reason to measure twice, not a reason not to look.
 	 *
-	 * The measurement comes from the browser, because the browser is the only place a
-	 * board is laid out. Every frame reports one when it loads, so the usual case is
-	 * instant; a board nobody is showing has never been measured and says so rather than
-	 * guessing, which is the only honest answer and also a useful one — it means "put it
-	 * on the canvas".
+	 * So: set the width, wait for the browser to lay the board out again, and take the
+	 * height from *that* reading. One extra round trip, on a call that already waits for
+	 * one, and only when the width actually moves.
+	 *
+	 * The width is clamped to `min(viewport, 1600)` — the same ceiling `newBoard` uses, and
+	 * the reason is the same. A board wider than the room the canvas has is read scaled
+	 * down, and past 1600 a line of prose is too long to track back to. Content that will
+	 * not fit under the ceiling is left clipped rather than papered over: `clipped` on
+	 * `stage.boards()` says so, and the answer is a narrower component, not a wider board.
 	 */
-	async fit(path: string, options?: { margin?: number }): Promise<Board> {
+	async fit(path: string, options?: { margin?: number; viewport?: number; minWidth?: number }): Promise<{ board: Board; content: { w: number; h: number } }> {
 		// The record first: an agent calls this straight after writing the content, and
 		// the revision we wait for a measurement of has to be the one now on disk.
 		this.deck.refresh(path);
@@ -157,17 +169,59 @@ export class StageService {
 		if (!board) throw new Error(`No such board: ${path}`);
 
 		const margin = Math.max(0, Math.min(400, Math.round(options?.margin ?? FIT_MARGIN)));
-		const extent = this.host.extent(path, board.rev) ?? (await this.host.awaitExtent(path, board.rev, FIT_WAIT_MS));
+		const floor = Math.max(FIT_MIN_W, Math.round(options?.minWidth ?? FIT_MIN_W));
+		const ceiling = Math.max(floor, Math.min(options?.viewport ?? MAX_BOARD_W, MAX_BOARD_W));
+
+		const measured = await this.measure(path, board.rev);
+		const w = Math.max(floor, Math.min(ceiling, measured.w + margin));
+
+		/*
+		 * One pass when the width is already right, which is the ordinary case — an agent
+		 * fitting a board it just wrote at a sensible width is asking about the height.
+		 */
+		if (w === board.w) {
+			const h = measured.h + margin;
+			return { board: h === board.h ? board : this.resize(path, { h }), content: measured };
+		}
+
+		/*
+		 * Two passes: the width, then the height of the board that width produced.
+		 *
+		 * The second reading is **best effort**. A frame re-measures on every revision, so
+		 * it usually arrives in a frame or two — but the width is the change that was asked
+		 * for and it is already written, and refusing the whole call because the browser was
+		 * slow would leave the board worse than it started. So a reading that does not come
+		 * falls back to the one already taken, which is right whenever the content did not
+		 * reflow — and components carry their own widths, so mostly it did not.
+		 */
+		const narrowed = this.resize(path, { w });
+		const after = (await this.host.awaitExtent(path, narrowed.rev, FIT_REFLOW_MS)) ?? measured;
+		const h = after.h + margin;
+		/*
+		 * The second reading is the one handed back, because it is the one that describes
+		 * the board as it now is — and it is what says whether the content still overflows
+		 * a board held at the ceiling.
+		 */
+		return { board: h === narrowed.h ? narrowed : this.resize(path, { h }), content: after };
+	}
+
+	/**
+	 * What the browser last said this revision of a board measures.
+	 *
+	 * The measurement comes from the browser because the browser is the only place a board
+	 * is laid out. Every frame reports one when it loads and on every revision, so the
+	 * usual case is instant; a board nobody is showing has never been measured and says so
+	 * rather than guessing, which is the only honest answer and also a useful one — it
+	 * means "put it on the canvas".
+	 */
+	private async measure(path: string, rev: number): Promise<{ w: number; h: number }> {
+		const extent = this.host.extent(path, rev) ?? (await this.host.awaitExtent(path, rev, FIT_WAIT_MS));
 		if (!extent) {
 			throw new Error(
 				`Nothing has measured ${path} yet. A board is measured in the frame showing it, so put it on the canvas — stage.show("${path}") — and ask again.`,
 			);
 		}
-
-		const h = extent.h + margin;
-		const w = Math.max(board.w, extent.w + margin);
-		if (w === board.w && h === board.h) return board;
-		return this.resize(path, { w, h });
+		return extent;
 	}
 
 	/** An agent's avatar, drawn by the agent, stored beside the deck. */
