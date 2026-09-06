@@ -128,6 +128,8 @@ export class Registry {
 			 */
 			model?: AgentModel;
 			mode?: AgentMode;
+			/** The Claude subscription to open on — a delegating parent's, handed down. */
+			account?: string;
 			/** Set only by `restore`: a chat from a previous run, with nothing running behind it. */
 			restored?: {
 				id: string;
@@ -138,6 +140,9 @@ export class Registry {
 				createdAt: number;
 				model?: AgentModel;
 				mode?: AgentMode;
+				account?: string;
+				tags?: string[];
+				userTags?: string[];
 			};
 		} = {},
 	): DeckAgent {
@@ -212,6 +217,9 @@ export class Registry {
 					// conversation was using, not on whatever the runtime defaults to.
 					...(record.model ? { model: record.model } : {}),
 					...(record.mode ? { mode: record.mode } : {}),
+					// And the subscription it was spending, for the same reason: a restart
+					// should not move an agent onto a different account without saying so.
+					...(record.account ? { account: record.account } : {}),
 					...(record.tags ? { tags: record.tags } : {}),
 					...(record.userTags ? { userTags: record.userTags } : {}),
 				},
@@ -273,6 +281,9 @@ export class Registry {
 		// After `dispose`, which flushes the record — deleting first would leave that write
 		// to put it straight back, and the row would return on the next restart.
 		this.store.forget(id);
+		// And the symlink that said which subscription it spent. Nothing else of an agent
+		// lives in the account store, so this is the whole of that cleanup.
+		this.host.accounts?.releaseAgent?.(id);
 		for (const child of this.agents) child.orphan(id);
 
 		// The focus moves to whatever is nearest, or to a new agent on the next request —
@@ -320,6 +331,15 @@ export class Registry {
 			parentId,
 			...(spec.name ? { name: spec.name } : {}),
 			...(spec.kind ? { kind: spec.kind } : {}),
+			/*
+			 * And the parent's subscription.
+			 *
+			 * A subagent is the parent's work continuing, so it should not quietly spend a
+			 * different account than the agent that asked for it — which is what the install
+			 * default would have given it. Only meaningful for a Claude child; the other
+			 * runtimes have no Claude account to spend and ignore it.
+			 */
+			...(parent.accountId() ? { account: parent.accountId() as string } : {}),
 		});
 		if (spec.model?.includes("/")) {
 			const [provider, ...rest] = spec.model.split("/");

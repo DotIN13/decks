@@ -53,6 +53,19 @@ export interface AgentRecord {
 	model?: AgentModel;
 	/** What it last asked before acting. Claude Code only; `capabilities.modes` is empty for pi. */
 	mode?: AgentMode;
+	/**
+	 * Which Claude subscription this agent spends, by account id (`claude/accounts.ts`).
+	 *
+	 * Here rather than in the account store's own index, because it is a property of the
+	 * agent in the same way its model is: it survives a restart with the conversation, a
+	 * dormant row can still say what it will spend, and there is one writer for it. The
+	 * account store owns the accounts and the links; who is on which is the agent's.
+	 *
+	 * Absent on a record written before this existed, and on any agent that has never been
+	 * given one — both mean "the default", read once at start and then recorded, so a later
+	 * change of default cannot move an agent that already exists.
+	 */
+	account?: string;
 	/** What the agent said it was doing, from `stage.me.setTags` — see `agents/tags.ts`. */
 	tags?: string[];
 	/** What *you* said it was doing, from the customise popup. Never written by the agent. */
@@ -214,6 +227,16 @@ function validate(raw: unknown, id: string): AgentRecord {
 		createdAt: created,
 		...(model ? { model } : {}),
 		...(MODES.includes(source.mode as AgentMode) ? { mode: source.mode as AgentMode } : {}),
+		/*
+		 * Which subscription it was spending.
+		 *
+		 * Read back as well as written, which is the seam the model once fell through: a
+		 * field `record()` writes and `validate()` ignores makes every restart look like a
+		 * fresh agent, and here that would silently move a conversation onto the install
+		 * default. An id and nothing more — whether it still names an account is
+		 * `ClaudeAccounts.has`, because only it knows.
+		 */
+		...(typeof source.account === "string" && source.account ? { account: source.account } : {}),
 		lastAt: finite(source.lastAt, created),
 	};
 }

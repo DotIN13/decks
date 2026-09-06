@@ -784,7 +784,12 @@ export type ClientMessage =
 	/** Sign in to another Claude account, which adds it to the list. */
 	| { type: "claude.accounts.add" }
 	/** Use this one from now on, chosen by hand. */
-	| { type: "claude.accounts.use"; id: string }
+	/**
+	 * Spend this subscription: for one agent when `agentId` is given, and otherwise as the
+	 * default a new agent starts on. Never both — moving every unassigned agent is the
+	 * surprise the per-agent choice exists to remove.
+	 */
+	| { type: "claude.accounts.use"; id: string; agentId?: string }
 	/** Forget one, and its credentials. Refused for the CLI's own login. */
 	| { type: "claude.accounts.forget"; id: string }
 	/**
@@ -868,8 +873,17 @@ export type ServerMessage =
 	 * whole message sat in a toast.
 	 */
 	| { type: "composer.draft"; text: string }
-	/** The install's Claude subscriptions, and which one is in force. */
-	| { type: "claude.accounts"; accounts: ClaudeAccount[]; active: string }
+	/**
+	 * The install's Claude subscriptions, which one a new agent starts on, and who is on what.
+	 *
+	 * `active` is the **default for a new agent**, not the account every agent uses: each one
+	 * records its own (`AgentRecord.account`). `spending` is that mapping, agent id to account
+	 * id, because with three agents on three subscriptions one "active" row no longer answers
+	 * the question the panel exists to answer.
+	 */
+	| { type: "claude.accounts"; accounts: ClaudeAccount[]; active: string; spending?: Record<string, string> }
+	/** One agent moved to a different subscription — by hand, or because a limit moved it. */
+	| { type: "agent.account"; id: string; account: string }
 	| { type: "error"; text: string };
 
 /** Where the API lives, so the browser does not hard-code it in three places. */

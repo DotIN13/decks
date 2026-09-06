@@ -162,7 +162,20 @@ export class App {
 				...(mine.plan ? { plan: mine.plan } : {}),
 			});
 		}
-		const frame: ServerMessage = { type: "claude.accounts", accounts, active };
+		/*
+		 * Who is on what, because `active` no longer answers it.
+		 *
+		 * With a subscription per agent, one "in force" row is at best the default a new
+		 * agent gets. The panel is where somebody goes to ask which subscription is being
+		 * spent, and the answer is now a mapping — leaving it out is how the account row came
+		 * to disagree with the billing in the first place.
+		 */
+		const spending: Record<string, string> = {};
+		for (const agent of this.agents.all()) {
+			const on = agent.accountId();
+			if (on) spending[agent.id] = on;
+		}
+		const frame: ServerMessage = { type: "claude.accounts", accounts, active, ...(Object.keys(spending).length > 0 ? { spending } : {}) };
 		if (reply) reply(frame);
 		else this.send(frame);
 	}
@@ -237,6 +250,12 @@ export class App {
 		 * deck.
 		 */
 		if (this.agents.restore() === 0) this.agents.create();
+		/*
+		 * After the rows are back: drop per-agent account links for agents this install no
+		 * longer has. `remove` covers the ordinary close; this covers a chat pruned while the
+		 * server was down, and a data directory carried between installs.
+		 */
+		this.claudeAccounts.sweepAgents(this.agents.all().map((agent) => agent.id));
 	}
 
 	private watch(): void {
@@ -438,6 +457,12 @@ export class App {
 			}
 
 			case "agent.create": {
+				/*
+				 * A new agent is a new row in the accounts mapping — it starts on the default
+				 * and records it — so the panel and the picker have to hear about it. Without
+				 * this the picker for a fresh conversation showed nothing selected until
+				 * something else happened to republish the list.
+				 */
 				const agent = this.agents.create({
 					...(message.parentId ? { parentId: message.parentId } : {}),
 					...(message.kind ? { kind: message.kind } : {}),
@@ -448,6 +473,7 @@ export class App {
 				 * the focus — its parent is mid-turn and still has something to say.
 				 */
 				this.agents.focus(agent.id);
+				void this.publishAccounts();
 				return;
 			}
 
@@ -662,6 +688,27 @@ export class App {
 			}
 
 			case "claude.accounts.use": {
+				/*
+				 * One agent, or the default for the next one — never both.
+				 *
+				 * A switch aimed at an agent repoints that agent's own link and is in force on
+				 * its next turn; nothing else moves. Without an `agentId` this is the default
+				 * row, which is what a *new* agent will start on and what a one-off
+				 * `claude auth` command is aimed at.
+				 */
+				if (message.agentId) {
+					const agent = this.agents.all().find((candidate) => candidate.id === message.agentId);
+					if (!agent) {
+						reply({ type: "notice", level: "warn", text: "That agent is not here any more." });
+						return;
+					}
+					if (!agent.useAccount(message.id)) {
+						reply({ type: "notice", level: "warn", text: "That account is not on the list any more." });
+						return;
+					}
+					void this.publishAccounts();
+					return;
+				}
 				const moved = this.claudeAccounts.use(message.id);
 				if (!moved) {
 					reply({ type: "notice", level: "warn", text: "That account is not on the list any more." });
@@ -674,7 +721,7 @@ export class App {
 				 * (`claude/accounts.ts`, `activeEnvironment`). On macOS the link cannot carry the
 				 * account, so a switch there reaches the next session rather than this one.
 				 */
-				this.send({ type: "notice", level: "info", text: `Now using ${moved.email ?? "that account"}.` });
+				this.send({ type: "notice", level: "info", text: `New agents will use ${moved.email ?? "that account"}. Agents already open keep the one they are on.` });
 				void this.publishAccounts();
 				return;
 			}
@@ -1016,6 +1063,12 @@ export class App {
 		// another deck starts again rather than re-pointing what is running.
 		void this.agents.reset(this.deck).then(() => {
 			if (this.agents.restore() === 0) this.agents.create();
+		/*
+		 * After the rows are back: drop per-agent account links for agents this install no
+		 * longer has. `remove` covers the ordinary close; this covers a chat pruned while the
+		 * server was down, and a data directory carried between installs.
+		 */
+		this.claudeAccounts.sweepAgents(this.agents.all().map((agent) => agent.id));
 		});
 		this.watch();
 		this.send({ type: "deck.state", deck: this.deck.state() });

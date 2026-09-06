@@ -52,6 +52,7 @@ const CHECKS = [
 	{ file: "thumbs.mjs", needsAgent: false },
 	{ file: "model-picker.mjs", needsAgent: false },
 	{ file: "accounts.mjs", needsAgent: false },
+	{ file: "accounts-per-agent.mjs", needsAgent: false },
 	{ file: "agent-close.mjs", needsAgent: false },
 	{ file: "notifications.mjs", needsAgent: false },
 	{ file: "agents-tab.mjs", needsAgent: false },

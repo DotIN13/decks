@@ -1,7 +1,7 @@
 import { lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 /**
  * The Claude subscriptions this install can use, and which one is in force.
@@ -110,7 +110,14 @@ export interface ClaudeAccount {
 }
 
 interface Index {
-	/** The account every agent uses, until it runs out. */
+	/**
+	 * The account a **new** agent starts on.
+	 *
+	 * It used to be the account every agent used. Each agent now records its own — see
+	 * `AgentRecord.account` — so this is the default that a fresh one is given, and what a
+	 * one-off `claude auth` command is aimed at. The field keeps its name because an index
+	 * written by an older build is still a valid one.
+	 */
 	active?: string;
 	accounts: ClaudeAccount[];
 	/**
@@ -294,14 +301,14 @@ export class ClaudeAccounts {
 	 * Called on every session start, so the cheap case — a link already aimed at the right
 	 * account — is one `readlink`. Returns whether the link can be relied on.
 	 */
-	private ensureLink(target: string): boolean {
+	private ensureLink(target: string, at: string = this.link): boolean {
 		if (target === this.configDir(DEFAULT_ACCOUNT)) this.mirrorDefault();
 		try {
-			if (readlinkSync(this.link) === target) return true;
+			if (readlinkSync(at) === target) return true;
 		} catch {
 			/* no link yet, or not a link: fall through and make one */
 		}
-		return this.point(target);
+		return this.point(target, at);
 	}
 
 	/**
@@ -311,13 +318,13 @@ export class ClaudeAccounts {
 	 * path fails and removing it first would leave a window with no link at all — which a
 	 * live session would read as "no credentials" rather than as "one moment please".
 	 */
-	private point(target: string): boolean {
+	private point(target: string, at: string = this.link): boolean {
 		try {
-			mkdirSync(this.dir, { recursive: true });
-			const staging = `${this.link}.next`;
+			mkdirSync(dirname(at), { recursive: true });
+			const staging = `${at}.next`;
 			rmSync(staging, { force: true });
 			symlinkSync(target, staging);
-			renameSync(staging, this.link);
+			renameSync(staging, at);
 			return true;
 		} catch {
 			/*
@@ -327,6 +334,120 @@ export class ClaudeAccounts {
 			 */
 			return false;
 		}
+	}
+
+	/**
+	 * One link per agent, under `claude-accounts/agents/`.
+	 *
+	 * The machine-wide `active` link is what a one-off `claude auth` command and an install
+	 * with no agents read; a *session* reads its own. That is the whole of what makes a
+	 * subscription per agent work, and it works for the same reason the global switch does:
+	 * the CLI re-reads its credentials on every request, so repointing one agent's link
+	 * changes who pays for that agent's next turn and touches nobody else's.
+	 *
+	 * The id is a UUID, and sanitised anyway — a link path is a filesystem write, and "it is
+	 * always a UUID" is a fact about today's callers rather than about this function.
+	 */
+	private agentLink(agentId: string): string {
+		return join(this.dir, "agents", agentId.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 64) || "unnamed");
+	}
+
+	/**
+	 * The environment a session must be spawned with to spend one account as one agent.
+	 *
+	 * The per-agent counterpart of `activeEnvironment`, and the same two variables for the
+	 * same reasons — see that method for why the link belongs on both of them, and why macOS
+	 * is the exception. `undefined` when the link cannot be made at all, which loses the
+	 * *live* switch rather than the account: a new session still lands on the right one.
+	 */
+	environmentFor(agentId: string, accountId: string): NodeJS.ProcessEnv | undefined {
+		const id = this.has(accountId) ? accountId : this.defaultId();
+		const target = this.targetFor(id);
+		const link = this.agentLink(agentId);
+		if (!this.ensureLink(target, link)) return undefined;
+		return accountEnvironment(link, this.home.platform === "darwin" ? this.keychainDir(id) : link);
+	}
+
+	/** Repoint one agent's link. Returns whether the link can be relied on. */
+	pointAgentAt(agentId: string, accountId: string): boolean {
+		const id = this.has(accountId) ? accountId : this.defaultId();
+		return this.ensureLink(this.targetFor(id), this.agentLink(agentId));
+	}
+
+	/** An agent is gone: its link is too. Nothing else of the agent lives here. */
+	releaseAgent(agentId: string): void {
+		try {
+			rmSync(this.agentLink(agentId), { force: true });
+		} catch {
+			/* a link that will not go is a stale symlink, not a reason to fail a close */
+		}
+	}
+
+	/**
+	 * Drop links for agents this install no longer has.
+	 *
+	 * `releaseAgent` covers the ordinary close; this covers the rest — a chat pruned while
+	 * the server was down, a data directory moved between installs. Called at boot with the
+	 * ids the agent store actually has.
+	 */
+	sweepAgents(known: readonly string[]): void {
+		const keep = new Set(known.map((id) => basename(this.agentLink(id))));
+		let entries: string[];
+		try {
+			entries = readdirSync(join(this.dir, "agents"));
+		} catch {
+			return;
+		}
+		for (const entry of entries) {
+			if (keep.has(entry)) continue;
+			try {
+				rmSync(join(this.dir, "agents", entry), { force: true, recursive: true });
+			} catch {
+				/* nothing to do about it, and nothing broken by it */
+			}
+		}
+	}
+
+	/**
+	 * Which account a *new* agent starts on.
+	 *
+	 * The same row the settings panel calls active, renamed for what it now means: with a
+	 * subscription per agent, "use this one" can only sensibly be a default, because moving
+	 * every agent that had not said otherwise is the surprise the per-agent choice exists to
+	 * remove.
+	 */
+	defaultId(): string {
+		return this.activeId();
+	}
+
+	/** Whether an id still names an account. A record can outlive the account it names. */
+	has(id: string): boolean {
+		return this.list().some((account) => account.id === id);
+	}
+
+	/** Who an id is, for the sentence a switch says. */
+	describe(id: string): ClaudeAccount | undefined {
+		return this.list().find((account) => account.id === id);
+	}
+
+	/**
+	 * Mark the account that refused as spent, and say which one to move to — **without**
+	 * moving anybody.
+	 *
+	 * The split is the point. Being spent is a fact about a *subscription* and belongs to
+	 * every agent on it; which account an agent moves to afterwards is that agent's own, and
+	 * is written to that agent's record by whoever asked. `rotate` used to do both, which is
+	 * why one agent running out dragged every other agent onto a different subscription
+	 * mid-turn.
+	 */
+	nextFor(spent: string | undefined, resetsAt: number | undefined, limitType: string | undefined): { moved?: ClaudeAccount; nextReset?: number } {
+		if (spent) this.markLimited(spent, resetsAt, limitType);
+		const next = this.nextAvailable(spent);
+		if (next) return { moved: next };
+		const waits = this.list()
+			.map((account) => account.limitedUntil)
+			.filter((until): until is number => typeof until === "number");
+		return waits.length > 0 ? { nextReset: Math.min(...waits) } : {};
 	}
 
 	/**
@@ -808,21 +929,14 @@ export class ClaudeAccounts {
 	 * moved to, or the earliest moment any of them will be usable again.
 	 */
 	rotate(except: string | undefined, resetsAt: number | undefined, limitType: string | undefined): { moved?: ClaudeAccount; nextReset?: number } {
-		if (except) this.markLimited(except, resetsAt, limitType);
-		const next = this.nextAvailable(except);
-		if (next) {
+		const outcome = this.nextFor(except, resetsAt, limitType);
+		if (outcome.moved) {
 			const index = this.read();
-			index.active = next.id;
+			index.active = outcome.moved.id;
 			this.write(index);
-			// The switch itself. Every running session's next request reads through this.
 			this.repoint();
-			return { moved: next };
 		}
-		// Nothing left: the soonest an account comes back is what the deck can usefully say.
-		const waits = this.list()
-			.map((account) => account.limitedUntil)
-			.filter((until): until is number => typeof until === "number");
-		return waits.length > 0 ? { nextReset: Math.min(...waits) } : {};
+		return outcome;
 	}
 
 	/**

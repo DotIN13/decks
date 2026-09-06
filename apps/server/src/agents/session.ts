@@ -80,6 +80,19 @@ export class DeckAgent {
 	private starting: Promise<void> | undefined;
 	private failure: string | undefined;
 	private state: AgentState = "idle";
+	/**
+	 * Which Claude subscription this agent spends, by account id.
+	 *
+	 * Owned here because it is persisted here: it is on the record beside the model, so it
+	 * survives a restart with the conversation and a dormant row can still say what it will
+	 * spend. `claude/accounts.ts` owns the accounts and the per-agent symlinks; who is on
+	 * which is this.
+	 *
+	 * Resolved once, at start, and then recorded — so changing the default afterwards cannot
+	 * move an agent that already exists, which is the surprise the per-agent choice is for.
+	 */
+	private account: string | undefined;
+
 	/** The last model the runtime reported, kept for the record — and for a dormant chat, which has no runtime to ask. */
 	private lastModel: AgentModel | undefined;
 	/** Shared with every other agent: one active subscription for the install. */
@@ -195,6 +208,14 @@ export class DeckAgent {
 			/** The model and mode to open on, handed down rather than read off disk — see `Registry.create`. */
 			model?: AgentModel;
 			mode?: AgentMode;
+			/**
+			 * The Claude account to open on, for a child that should spend what its parent does.
+			 *
+			 * A subagent is the parent's work continuing, so it should not quietly spend a
+			 * different subscription — `stage.delegate` hands this down. Absent means the
+			 * install's default.
+			 */
+			account?: string;
 			/** The install's Claude subscriptions (`claude/accounts.ts`). */
 			accounts?: ClaudeAccountSwitcher;
 			accountsChanged?(): void;
@@ -214,6 +235,8 @@ export class DeckAgent {
 				createdAt: number;
 				model?: AgentModel;
 				mode?: AgentMode;
+				/** Which subscription it was spending, so a restart does not move it. */
+				account?: string;
 				tags?: string[];
 				userTags?: string[];
 			};
@@ -232,6 +255,13 @@ export class DeckAgent {
 		 * then answered from pi's configured default the moment you typed.
 		 */
 		this.lastModel = options.restored?.model ?? options.model ?? sessionModelOf(options.resumeRef);
+		/*
+		 * A record written before this existed names no account, and neither does a brand new
+		 * agent — both take the default, once. A record naming an account that has since been
+		 * forgotten also falls back, rather than pointing a link at a directory that is gone.
+		 */
+		const named = options.restored?.account ?? options.account;
+		this.account = named && this.accounts?.has(named) ? named : this.accounts?.defaultId();
 		this.currentMode = options.restored?.mode ?? options.mode;
 		this.createdAt = options.restored?.createdAt ?? Date.now();
 		this.identity = { name: options.name ?? "Agent", color: options.color };
@@ -480,6 +510,7 @@ export class DeckAgent {
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
+			...(this.account ? { account: this.account } : {}),
 			...(this.identity.tags?.length ? { tags: this.identity.tags } : {}),
 			...(this.identity.userTags?.length ? { userTags: this.identity.userTags } : {}),
 			// The last thing actually said, not the time of this write — it is what the list
@@ -551,6 +582,19 @@ export class DeckAgent {
 			...(this.currentMode ? { mode: this.currentMode } : {}),
 			// The install's Claude subscriptions, so a limit can move to the next one.
 			...(this.accounts ? { accounts: this.accounts } : {}),
+			/*
+			 * And which of them *this* agent spends. A window onto the field above rather
+			 * than a copy: the backend spawns with `id()` and calls `set()` when a limit
+			 * moves it, and the writing — record, link, browser — happens here, once.
+			 */
+			...(this.accounts && this.account
+				? {
+						account: {
+							id: () => this.account ?? (this.accounts as ClaudeAccountSwitcher).defaultId(),
+							set: (accountId: string) => this.adoptAccount(accountId),
+						},
+					}
+				: {}),
 			...(this.accountsChanged ? { accountsChanged: this.accountsChanged } : {}),
 			...(this.commandsChanged ? { commandsChanged: this.commandsChanged } : {}),
 			// `/cost` asked for the panel. The shell reads the figures; the backend only says
@@ -839,6 +883,52 @@ export class DeckAgent {
 		this.cancelDrain();
 		await this.backend?.abort();
 		this.translator.setState("idle");
+	}
+
+	/**
+	 * Which subscription this agent spends, from the panel — and it lands on the next turn.
+	 *
+	 * Three writes, in this order, and the order is the whole of it. The **link** first,
+	 * because that is the switch: the CLI re-reads its credentials on every request, so a
+	 * repointed link is in force before this method returns and without the session being
+	 * touched. Then the **record**, so a restart does not undo it. Then the **transcript**,
+	 * because which subscription answered is part of what happened — the same reasoning as
+	 * `noteModel`, and for the same reader.
+	 *
+	 * A no-op when it is already on that account: both callers can arrive at the value they
+	 * already had, and a line per non-change is a transcript that logs the furniture.
+	 */
+	useAccount(accountId: string): boolean {
+		if (!this.accounts || !this.accounts.has(accountId)) return false;
+		if (this.account === accountId) return true;
+		this.account = accountId;
+		this.accounts.pointAgentAt?.(this.id, accountId);
+		this.save();
+		const who = this.accounts.describe(accountId);
+		this.translator.notice("info", `Now spending ${who?.email ?? "another subscription"}.`);
+		this.emit({ type: "agent.account", id: this.id, account: accountId });
+		return true;
+	}
+
+	/** Which subscription it is spending, for the row and for a delegated child. */
+	accountId(): string | undefined {
+		return this.account;
+	}
+
+	/**
+	 * The same, when a rate limit moved it rather than a person.
+	 *
+	 * Separate from `useAccount` because the link is already pointed by the time this runs —
+	 * the account store repointed nothing, but the *backend* asked for this after choosing,
+	 * and the sentence it says about the limit is better than a second one here. So this
+	 * records and republishes; it does not narrate.
+	 */
+	private adoptAccount(accountId: string): void {
+		if (this.account === accountId) return;
+		this.account = accountId;
+		this.accounts?.pointAgentAt?.(this.id, accountId);
+		this.save();
+		this.emit({ type: "agent.account", id: this.id, account: accountId });
 	}
 
 	/**

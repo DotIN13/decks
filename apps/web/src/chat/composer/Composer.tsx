@@ -1,4 +1,4 @@
-import type { AgentMode, AgentModel, ModelOption, SlashCommand, ThinkingLevel, AgentUsage } from "@decks/protocol";
+import type { AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Square from "lucide-solid/icons/square";
@@ -55,6 +55,10 @@ export function Composer(props: {
 	/** `thinking` is new: what `nearestLevel` kept when the model changed under it. */
 	onModel: (provider: string, model: string, thinking?: ThinkingLevel) => void;
 	onThinking: (level: ThinkingLevel) => void;
+	/** The Claude subscriptions, and which one this conversation spends (`ModelPicker`). */
+	accounts?: ClaudeAccount[];
+	account?: string;
+	onAccount?: (id: string) => void;
 	/**
 	 * Words the deck has put here, rather than typed: the message a rewind took back.
 	 *
@@ -399,7 +403,15 @@ export function Composer(props: {
 					{/* Mode before model, because it is the larger decision: what the agent may
 					    do at all, rather than which one is doing it. */}
 					<ModeMenu modes={props.modes} mode={props.mode} onMode={props.onMode} />
-					<ModelPicker model={props.model} models={props.models} onModel={props.onModel} onThinking={props.onThinking} />
+					<ModelPicker
+						model={props.model}
+						models={props.models}
+						onModel={props.onModel}
+						onThinking={props.onThinking}
+						{...(props.accounts ? { accounts: props.accounts } : {})}
+						{...(props.account ? { account: props.account } : {})}
+						{...(props.onAccount ? { onAccount: props.onAccount } : {})}
+					/>
 
 					<span class="flex-1" />
 

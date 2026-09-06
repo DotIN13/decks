@@ -699,3 +699,122 @@ test("an account added later joins at the bottom, and one forgotten leaves no ga
 	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, second], "a stale id in the order is simply not found");
 	cleanup();
 });
+
+/*
+ * A subscription per agent.
+ *
+ * The mechanism is the one the global switch already used, moved down a level: a symlink the
+ * CLI re-reads on every request, one per agent instead of one per machine. So what is worth
+ * pinning is that the links are genuinely separate — that repointing one agent's cannot be
+ * observed by another — and that the store no longer decides *who* moves when a limit lands.
+ */
+
+/** Where one agent's link points, resolved. */
+const agentPointsAt = (dir: string, agentId: string): string => readlinkSync(join(dir, "claude-accounts", "agents", agentId));
+
+test("two agents get two links, and repointing one leaves the other alone", () => {
+	const { accounts, dir, cleanup } = store({ platform: "linux" });
+	const one = add(accounts, "one@example.com");
+	const two = add(accounts, "two@example.com");
+
+	const envA = accounts.environmentFor("agent-a", one);
+	const envB = accounts.environmentFor("agent-b", two);
+	assert.equal(envA?.CLAUDE_CONFIG_DIR, join(dir, "claude-accounts", "agents", "agent-a"));
+	assert.equal(envA?.CLAUDE_SECURESTORAGE_CONFIG_DIR, envA?.CLAUDE_CONFIG_DIR, "the token comes from the same link");
+	assert.equal(envB?.CLAUDE_CONFIG_DIR, join(dir, "claude-accounts", "agents", "agent-b"), "its own link, not a shared one");
+
+	assert.equal(agentPointsAt(dir, "agent-a"), accounts.configDir(one));
+	assert.equal(agentPointsAt(dir, "agent-b"), accounts.configDir(two));
+
+	// The switch: one agent moves, and that is the whole of what changed.
+	assert.equal(accounts.pointAgentAt("agent-a", two), true);
+	assert.equal(agentPointsAt(dir, "agent-a"), accounts.configDir(two));
+	assert.equal(agentPointsAt(dir, "agent-b"), accounts.configDir(two), "unmoved, and still its own link");
+	cleanup();
+});
+
+test("an agent named an account that has since been forgotten falls back to the default", () => {
+	const { accounts, dir, cleanup } = store({ platform: "linux" });
+	const gone = add(accounts, "gone@example.com");
+	accounts.forget(gone);
+
+	const env = accounts.environmentFor("agent-a", gone);
+	assert.ok(env, "it still gets an environment rather than nothing");
+	assert.equal(agentPointsAt(dir, "agent-a"), accounts.configDir(accounts.defaultId()), "pointed somewhere that exists");
+	cleanup();
+});
+
+/*
+ * The split that makes a fallback per agent. `rotate` used to mark the account *and* move the
+ * machine onto the next one, so one agent running out dragged every other agent onto a
+ * different subscription mid-turn. `nextFor` marks and chooses; who moves is the caller's.
+ */
+test("nextFor marks the spent account and names the next, without moving anybody", () => {
+	const { accounts, dir, cleanup } = store({ platform: "linux" });
+	const one = add(accounts, "one@example.com");
+	const two = add(accounts, "two@example.com");
+	accounts.environmentFor("agent-a", one);
+	accounts.environmentFor("agent-b", one);
+	const before = accounts.activeId();
+
+	const resets = Date.now() + 60_000;
+	const { moved } = accounts.nextFor(one, resets, "five_hour");
+	assert.ok(moved && moved.id !== one, "it names somewhere to go");
+	assert.equal(accounts.activeId(), before, "and does not touch the default row");
+	assert.equal(agentPointsAt(dir, "agent-a"), accounts.configDir(one), "nor either agent's link");
+	assert.equal(agentPointsAt(dir, "agent-b"), accounts.configDir(one));
+
+	// Being spent *is* global: it is a fact about the subscription, so the other agent on it
+	// will be sent elsewhere too, by its own refusal.
+	const spent = accounts.list().find((account) => account.id === one);
+	assert.equal(spent?.limitedUntil, resets);
+	assert.equal(spent?.limitType, "five_hour");
+	// And a spent account is not offered again while it is spent — to anybody, which is the
+	// half that stays global. Asked with nothing excluded, the answer is never the spent one.
+	assert.notEqual(accounts.nextFor(undefined, undefined, undefined).moved?.id, one);
+	assert.ok([DEFAULT_ACCOUNT, two].includes(accounts.nextFor(undefined, undefined, undefined).moved?.id ?? ""));
+	cleanup();
+});
+
+test("with everything spent nextFor says when the first one comes back, and moves nobody", () => {
+	const { accounts, cleanup } = store({ homeSignedIn: false, platform: "linux" });
+	const only = add(accounts, "one@example.com");
+	const resets = Date.now() + 60_000;
+
+	const outcome = accounts.nextFor(only, resets, "seven_day");
+	assert.equal(outcome.moved, undefined);
+	assert.equal(outcome.nextReset, resets);
+	cleanup();
+});
+
+test("an agent's link goes when the agent does, and strays are swept", () => {
+	const { accounts, dir, cleanup } = store({ platform: "linux" });
+	const one = add(accounts, "one@example.com");
+	accounts.environmentFor("agent-a", one);
+	accounts.environmentFor("agent-b", one);
+	accounts.environmentFor("agent-c", one);
+
+	accounts.releaseAgent("agent-a");
+	assert.equal(existsSync(join(dir, "claude-accounts", "agents", "agent-a")), false);
+
+	// The rest: a chat pruned while the server was down leaves a link nobody will ask for.
+	accounts.sweepAgents(["agent-b"]);
+	assert.equal(existsSync(join(dir, "claude-accounts", "agents", "agent-b")), true, "an agent that still exists keeps its link");
+	assert.equal(existsSync(join(dir, "claude-accounts", "agents", "agent-c")), false, "one that does not, does not");
+	cleanup();
+});
+
+test("on macOS the per-agent link carries the config home and the account still names the keychain entry", () => {
+	const { accounts, dir, cleanup } = store({ platform: "darwin" });
+	const one = add(accounts, "one@example.com");
+
+	const env = accounts.environmentFor("agent-a", one);
+	assert.equal(env?.CLAUDE_CONFIG_DIR, join(dir, "claude-accounts", "agents", "agent-a"));
+	/*
+	 * Not the link. There the value names a keychain entry rather than a directory to read,
+	 * and every agent reached through a link of its own would still hash to whatever that
+	 * link is called — so the account's own directory is what keeps one entry per account.
+	 */
+	assert.equal(env?.CLAUDE_SECURESTORAGE_CONFIG_DIR, accounts.configDir(one));
+	cleanup();
+});

@@ -98,6 +98,18 @@ export interface AgentBackendContext {
 	/** Tell the browser the account list moved, after a login or a switch. */
 	accountsChanged?(): void;
 	/**
+	 * Which Claude subscription this agent spends, and how to change it.
+	 *
+	 * Read at spawn and written when a limit moves it. The *session* owns the value — it is
+	 * on the agent's record and persists with the conversation — so this is a window onto
+	 * it rather than a second copy: `id()` is what to spawn with, and `set()` is how a
+	 * rotation makes the change stick.
+	 */
+	account?: {
+		id(): string;
+		set(accountId: string): void;
+	};
+	/**
 	 * The `/` menu changed: republish the chat row that carries it.
 	 *
 	 * A runtime's command list is not fixed at start — Claude discovers skills as the
@@ -131,6 +143,32 @@ export interface ClaudeAccountSwitcher {
 	 * the config directory and, for macOS, which keychain entry that account's token is in.
 	 */
 	activeEnvironment(): NodeJS.ProcessEnv | undefined;
+	/**
+	 * The same, for **one agent spending one account**: its own link, so that repointing it
+	 * switches that agent and nobody else. This is what a session is actually spawned with;
+	 * `activeEnvironment` remains for the machine-wide paths that have no agent.
+	 */
+	environmentFor(agentId: string, accountId: string): NodeJS.ProcessEnv | undefined;
+	/** Which account a new agent starts on, when its record does not name one. */
+	defaultId(): string;
+	/** Repoint one agent's link, so its next request spends a different subscription. */
+	pointAgentAt?(agentId: string, accountId: string): boolean;
+	/** An agent is gone: drop its link. */
+	releaseAgent?(agentId: string): void;
+	/** Whether an id still names an account: a record can outlive the account it names. */
+	has(id: string): boolean;
+	/** Who an id is, for the sentence a switch says. */
+	describe(id: string): { id: string; email?: string } | undefined;
+	/**
+	 * Mark the account that refused as spent and say which one to move to, without moving
+	 * anybody. Being spent belongs to the subscription; where an agent goes next is the
+	 * agent's, and is written to its record by whoever asked.
+	 */
+	nextFor(
+		spent: string | undefined,
+		resetsAt: number | undefined,
+		limitType: string | undefined,
+	): { moved?: { id: string; email?: string }; nextReset?: number };
 	/** The account's own directory, as opposed to the link. Empty for the CLI's own login. */
 	keychainDir(id: string): string;
 	/** Which account is in force, by id, so a one-off command can be aimed at it. */

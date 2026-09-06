@@ -1,4 +1,4 @@
-import type { AgentModel, ModelOption, ThinkingLevel } from "@decks/protocol";
+import type { AgentModel, ClaudeAccount, ModelOption, ThinkingLevel } from "@decks/protocol";
 import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Search from "lucide-solid/icons/search";
@@ -34,6 +34,19 @@ export function ModelPicker(props: {
 	 */
 	onModel: (provider: string, model: string, thinking?: ThinkingLevel) => void;
 	onThinking: (level: ThinkingLevel) => void;
+	/**
+	 * The Claude subscriptions this install can use, and which one **this conversation**
+	 * spends (`claude/accounts.ts`).
+	 *
+	 * Here because it is the same kind of choice as the two above it: what will answer, for
+	 * the conversation you are looking at. It used to be one global row in Settings, which
+	 * meant switching it moved every agent at once — and a limit on one dragged the rest with
+	 * it. Empty, or fewer than two accounts, and the section is not drawn: a picker with one
+	 * option is a label.
+	 */
+	accounts?: ClaudeAccount[];
+	account?: string;
+	onAccount?: (id: string) => void;
 	disabled?: boolean;
 }) {
 	const [filter, setFilter] = createSignal("");
@@ -251,6 +264,49 @@ export function ModelPicker(props: {
 									{level}
 								</button>
 							)}
+						</For>
+					</div>
+				</div>
+			</Show>
+
+			{/*
+				Which subscription answers, for this conversation alone.
+
+				Rows rather than a scale, because the useful thing about an account is its
+				address and a `seg` chip cannot hold one — and because a spent one has to be
+				able to say so. Below two accounts there is nothing to choose between.
+			*/}
+			<Show when={(props.accounts?.length ?? 0) > 1 && props.onAccount}>
+				<div class="rule" />
+				<div class="px-2 py-1">
+					<span class="meta">Subscription</span>
+					<div class="mt-1">
+						<For each={props.accounts ?? []}>
+							{(account) => {
+								const spent = () => Boolean(account.limitedUntil && account.limitedUntil > Date.now());
+								return (
+									<button
+										type="button"
+										data-row
+										data-flat="true"
+										data-current={props.account === account.id ? "true" : undefined}
+										/* A spent account is still choosable: it comes back, and the person
+										   choosing may know when. Saying so beats refusing the press. */
+										title={spent() ? "This subscription has reached a limit; it will come back" : undefined}
+										onClick={() => props.onAccount?.(account.id)}
+									>
+										<span class="ic">
+											<Show when={props.account === account.id}>
+												<Icon of={Check} size={13} />
+											</Show>
+										</span>
+										<span class="lb flex-1 truncate">{account.email ?? account.id}</span>
+										<Show when={spent()}>
+											<span class="meta flex-none text-[10px]">spent</span>
+										</Show>
+									</button>
+								);
+							}}
 						</For>
 					</div>
 				</div>

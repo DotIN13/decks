@@ -181,9 +181,17 @@ export class ClaudeBackend implements AgentBackend {
 		const { deck, translator, notice } = this.context;
 		const executable = claudeExecutable();
 		const state = newStreamState();
-		// Read once: it ensures the symlink as a side effect, and the answer must not change
-		// halfway through building the options.
-		const accountEnv = this.context.accounts?.activeEnvironment();
+		/*
+		 * Read once: it ensures this agent's symlink as a side effect, and the answer must
+		 * not change halfway through building the options.
+		 *
+		 * Per agent, not per machine. The link is `claude-accounts/agents/<id>`, so another
+		 * agent switching account — or running out and rotating — cannot reach this session,
+		 * and this one switching cannot reach theirs.
+		 */
+		const accounts = this.context.accounts;
+		const account = this.context.account;
+		const accountEnv = accounts && account ? accounts.environmentFor(this.context.stageAgent.id, account.id()) : accounts?.activeEnvironment();
 
 		const options: Options = {
 			cwd: this.context.cwd,
@@ -229,11 +237,12 @@ export class ClaudeBackend implements AgentBackend {
 			/*
 			 * Which subscription this session spends (`claude/accounts.ts`).
 			 *
-			 * A symlink, so re-pointing it switches the account *inside* this session — the
-			 * CLI re-reads its credentials per request, so the next turn uses whoever the link
-			 * points at now. Set for the CLI's own login too, which is what makes a session
-			 * that started on it switchable: a subprocess's environment cannot be changed
-			 * after `spawn`, so a session given no variable is pinned to `~/.claude` for life.
+			 * A symlink — **this agent's own** — so re-pointing it switches the account inside
+			 * this session and no other. The CLI re-reads its credentials per request, so the
+			 * next turn uses whoever the link points at now. Set for the CLI's own login too,
+			 * which is what makes a session that started on it switchable: a subprocess's
+			 * environment cannot be changed after `spawn`, so a session given no variable is
+			 * pinned to `~/.claude` for life.
 			 *
 			 * Both variables, and the credentials come from `CLAUDE_SECURESTORAGE_CONFIG_DIR`
 			 * rather than `CLAUDE_CONFIG_DIR` — for a long time only the second one carried the
@@ -890,7 +899,10 @@ export class ClaudeBackend implements AgentBackend {
 			return;
 		}
 
-		const spent = accounts?.active();
+		// What *this* agent is on, not what the machine is on: two agents can be spending
+		// two subscriptions, and the one that refused is the one this session was using.
+		const mine = this.context.account?.id();
+		const spent = mine ? accounts?.describe(mine) : accounts?.active();
 		// Unix seconds on the event, milliseconds everywhere it is stored, compared or shown.
 		const resetsAt = epochMs(info.resetsAt);
 		const reset = resetWords(resetsAt);
@@ -899,7 +911,14 @@ export class ClaudeBackend implements AgentBackend {
 			return;
 		}
 
-		const { moved, nextReset } = accounts.rotate(spent?.id, resetsAt, info.rateLimitType);
+		/*
+		 * The account store marks the spent subscription and names the next one; the *record*
+		 * is what moves this agent onto it. Which is the split that makes a fallback per
+		 * agent: `rotate` used to write the machine's active row, so one agent running out
+		 * dragged every other agent onto a different subscription in the middle of its turn.
+		 */
+		const { moved, nextReset } = accounts.nextFor(spent?.id, resetsAt, info.rateLimitType);
+		if (moved) this.context.account?.set(moved.id);
 		// The list moved either way — a spent account is now marked spent, which the panel
 		// shows with its reset time.
 		this.context.accountsChanged?.();

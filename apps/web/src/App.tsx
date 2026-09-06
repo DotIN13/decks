@@ -138,8 +138,15 @@ export function App() {
 		previews: Record<string, { entryId: string; boards: Record<string, string> }>;
 		/** The Claude subscriptions this install can use (`chat/Settings.tsx`). */
 		accounts: ClaudeAccount[];
-		/** Which of them is spending. `default` is the CLI's own login. */
+		/**
+		 * Which of them a **new** agent starts on. `default` is the CLI's own login.
+		 *
+		 * Not "which one is spending": each agent records its own, and `spendingByAgent` is
+		 * that mapping. With three agents on three subscriptions one row cannot answer it.
+		 */
 		activeAccount: string;
+		/** Agent id → the account it spends, from the server's own records. */
+		spendingByAgent: Record<string, string>;
 	}>({
 		boards: [],
 		notices: [],
@@ -157,6 +164,7 @@ export function App() {
 		defaultKind: "pi" as AgentKind,
 		accounts: [] as ClaudeAccount[],
 		activeAccount: "default",
+		spendingByAgent: {} as Record<string, string>,
 	});
 
 	const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
@@ -830,7 +838,18 @@ export function App() {
 					return;
 
 				case "claude.accounts":
-					setState({ accounts: message.accounts, activeAccount: message.active });
+					setState({ accounts: message.accounts, activeAccount: message.active, spendingByAgent: message.spending ?? {} });
+					return;
+
+				/*
+				 * One agent moved — by hand, or because a limit moved it.
+				 *
+				 * Merged rather than waiting for the whole list to be republished: a rotation
+				 * happens mid-turn, and the row saying which subscription is answering should
+				 * change with the turn rather than on the next poll.
+				 */
+				case "agent.account":
+					setState("spendingByAgent", message.id, message.account);
 					return;
 				case "error":
 					notice("error", message.text);
@@ -1937,6 +1956,20 @@ export function App() {
 						onThinking={(thinking: ThinkingLevel) =>
 							socket.send({ type: "agent.thinking", id: state.focused ?? "", thinking })
 						}
+						/*
+						 * Which subscription this conversation spends.
+						 *
+						 * Only for a Claude chat: the other runtimes have no Claude account, and a
+						 * section offering to change one they do not have would be a control that
+						 * does nothing. `agentId` is what makes the switch reach this agent alone —
+						 * without it the server reads it as the default for the *next* one.
+						 */
+						{...(focusedChat()?.kind === "claude" && state.accounts.length > 1 ? { accounts: state.accounts } : {})}
+						/* Falling back to the default, because that is what an agent with no entry in
+						   the mapping is actually on — and a picker showing nothing selected reads
+						   as "no subscription" rather than as "the list has not arrived". */
+						account={(state.focused ? state.spendingByAgent[state.focused] : undefined) ?? state.activeAccount}
+						onAccount={(id: string) => socket.send({ type: "claude.accounts.use", id, agentId: state.focused ?? "" })}
 						/*
 						 * The paperclip opens the same picker the inspector's embed row does, and
 						 * what it hands back is a deck path — so what it inserts is an `@` mention

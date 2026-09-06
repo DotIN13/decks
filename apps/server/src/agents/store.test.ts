@@ -245,3 +245,45 @@ test("a malformed model is dropped rather than passed on", () => {
 	);
 	cleanup();
 });
+
+/*
+ * And so does the subscription it was spending.
+ *
+ * The same seam as the model, and the same failure if it were missed: a field written by
+ * `record()` and never read by `validate()` hands a restored chat `undefined`, which here
+ * means the install default — so a conversation left on one account would quietly come back
+ * spending another, and the only sign would be the bill.
+ */
+test("the account comes back too, because a restart must not move an agent's subscription", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.write(
+		{
+			id: "three",
+			kind: "claude",
+			name: "Rune",
+			color: "#2eaf5a",
+			context: [],
+			inPlay: [],
+			createdAt: 1,
+			lastAt: 2,
+			account: "67d596a8-a998-4ccf-a6f9-097c5f72fbd6",
+		},
+		[],
+	);
+
+	assert.equal(store.read("three")?.record.account, "67d596a8-a998-4ccf-a6f9-097c5f72fbd6");
+	cleanup();
+});
+
+test("an account that is not a string is no account", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	const folder = join(deck.path, ".decks", "agents", "four");
+	mkdirSync(folder, { recursive: true });
+	writeFileSync(join(folder, "meta.json"), JSON.stringify({ kind: "claude", name: "Ada", createdAt: 1, lastAt: 2, account: { id: "nope" } }));
+
+	// Falls back to the default rather than pointing a symlink at whatever that stringifies to.
+	assert.equal(store.read("four")?.record.account, undefined);
+	cleanup();
+});
