@@ -43,6 +43,7 @@ function agentOn(
 			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
+			report: () => {},
 			// The real one pastes the board source in; here the task is the whole briefing, so
 			// a drained item is recognisable in the transcript by its own words.
 			brief: (task: string) => task,
@@ -124,13 +125,15 @@ test("holding a board puts it on the canvas; the canvas is a subset of what is h
 	cleanup();
 });
 
-test("showing a board the agent was not holding attaches it", () => {
+test("showing a board the agent was not holding attaches it, newest first", () => {
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html"]);
 	agent.setContext(["boards/a.html"]);
 
 	agent.setInPlay(["boards/b.html"]);
 	assert.equal(inPlay(), "boards/b.html");
-	assert.equal(context(), "boards/a.html boards/b.html", "b is now held, appended in order");
+	// A board shown for the first time is the most recent touch, so it leads the held
+	// list rather than joining the end — `stage.agents()` answers newest-first.
+	assert.equal(context(), "boards/b.html boards/a.html");
 	cleanup();
 });
 
@@ -152,18 +155,40 @@ test("taking a board off the canvas leaves it held", () => {
 	// What `stage.hide` and the board's × both do.
 	agent.setInPlay(agent.inPlay.filter((path) => path !== "boards/a.html"));
 	assert.equal(inPlay(), "boards/b.html");
-	assert.equal(context(), "boards/a.html boards/b.html");
+	assert.equal(context(), "boards/b.html boards/a.html");
 	cleanup();
 });
 
 test("both sets travel together, and neither repeats itself", () => {
 	const { agent, last, cleanup } = agentOn(["a.html", "b.html"]);
+	// Both fresh boards lead the held list, most recent last-named first.
 	agent.setInPlay(["boards/a.html", "boards/a.html", "boards/b.html"]);
 
 	const message = last();
 	assert.ok(message && message.type === "context.changed");
 	assert.deepEqual(message.inPlay, ["boards/a.html", "boards/b.html"], "deduplicated");
-	assert.deepEqual(message.boards, ["boards/a.html", "boards/b.html"]);
+	assert.deepEqual(message.boards, ["boards/b.html", "boards/a.html"], "newest first");
+	cleanup();
+});
+
+test("setContext keeps the recency order it is given, and never repeats itself", () => {
+	const { agent, context, cleanup } = agentOn(["a.html", "b.html"]);
+
+	// The touch sites build most-recently-touched-first; setContext is the one place the
+	// invariant is stored, so what the caller says the newest is, the readers see.
+	agent.setContext(["boards/b.html", "boards/b.html", "boards/a.html"]);
+	assert.equal(context(), "boards/b.html boards/a.html");
+	cleanup();
+});
+
+test("setInPlay and setContext agree on what the newest board is", () => {
+	const { agent, context, cleanup } = agentOn(["a.html", "b.html", "c.html"]);
+	// A first show fronts every board: the last named is the most recent touch.
+	agent.setInPlay(["boards/a.html", "boards/b.html", "boards/c.html"]);
+	assert.equal(context(), "boards/c.html boards/b.html boards/a.html");
+	// Re-showing one already held does not reorder — showing is not attaching.
+	agent.setInPlay(["boards/a.html"]);
+	assert.equal(context(), "boards/c.html boards/b.html boards/a.html");
 	cleanup();
 });
 
@@ -244,11 +269,13 @@ class Probe extends DeckAgent {
 	}
 }
 
-function probeOn(): { agent: Probe; sent: ServerMessage[]; cleanup: () => void } {
+function probeOn(): { agent: Probe; sent: ServerMessage[]; reportCalls: Array<{ agentId: string; text: string }>; sentTos: string[]; cleanup: () => void } {
 	const root = mkdtempSync(join(tmpdir(), "decks-queue-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	writeFileSync(join(root, "boards", "plan.html"), `<!doctype html><title>plan</title><body class="board"></body>`);
 	const sent: ServerMessage[] = [];
+	const reportCalls: Array<{ agentId: string; text: string }> = [];
+	const sentTos: string[] = [];
 	const deck = Deck.open(root);
 	const agent = new Probe(
 		deck,
@@ -259,18 +286,29 @@ function probeOn(): { agent: Probe; sent: ServerMessage[]; cleanup: () => void }
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
 			agents: () => [],
 			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
-			send: () => ({ queued: true as const, position: 1 }),
+			send: (fromId, target) => {
+				sentTos.push(target);
+				return { queued: true as const, position: 1 };
+			},
 			queue: () => [],
+			report: (agentId, text) => reportCalls.push({ agentId, text }),
 			brief: (task: string, boards: string[]) => (boards.length > 0 ? `${task} [${boards.join(" ")}]` : task),
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
 		{ color: "#000", kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck) },
 	);
-	return { agent, sent, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+	return { agent, sent, reportCalls, sentTos, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-const item = (task: string, boards: string[] = []) => ({ from: "a1", fromName: "Ada", task, boards, at: 1 });
+const item = (task: string, boards: string[] = [], reply = false) => ({
+	from: "a1",
+	fromName: "Ada",
+	task,
+	boards,
+	at: 1,
+	...(reply ? { reply: true as const } : {}),
+});
 const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("queued work is announced when it arrives, not when it runs", () => {
@@ -347,6 +385,34 @@ test("an item is popped before it runs, so a failure cannot loop", async () => {
 	const notice = sent.filter((message) => message.type === "chat.item").at(-1);
 	assert.ok(notice && notice.type === "chat.item" && notice.item.kind === "notice");
 	assert.match(notice.item.text, /Queued work from Ada failed: the model fell over/);
+	delete process.env.DECKS_QUEUE_IDLE_MS;
+	cleanup();
+});
+
+test("a reply asked for goes back to the sender as a notice — never as another queued task", async () => {
+	process.env.DECKS_QUEUE_IDLE_MS = "10";
+	const { agent, reportCalls, sentTos, cleanup } = probeOn();
+	agent.enqueue(item("Remeasure the panel numbers", ["boards/plan.html"], true));
+
+	await settle(80);
+	// The report reached the sender, named with who finished what…
+	assert.deepEqual(reportCalls, [{ agentId: "a1", text: 'Agent finished "Remeasure the panel numbers": done' }]);
+	// …through `report`, which the registry turns into a notice. Not through `send`, which
+	// would queue a task — that is the loop: an item in a queue runs a turn, and the sender
+	// would be woken to answer its own report.
+	assert.deepEqual(sentTos, [], "nothing was queued back to the sender");
+	assert.equal(agent.queued, 0, "and the receiver's own queue drained normally");
+	delete process.env.DECKS_QUEUE_IDLE_MS;
+	cleanup();
+});
+
+test("a report nobody asked for is not delivered — a reply you did not ask for is an interruption", async () => {
+	process.env.DECKS_QUEUE_IDLE_MS = "10";
+	const { agent, reportCalls, cleanup } = probeOn();
+	agent.enqueue(item("Remeasure the panel numbers"));
+
+	await settle(80);
+	assert.deepEqual(reportCalls, [], "no reply and no delivery: the sender had nothing more to do with the answer");
 	delete process.env.DECKS_QUEUE_IDLE_MS;
 	cleanup();
 });

@@ -6,10 +6,12 @@ import {
 	ModelRuntime,
 	SessionManager,
 	type AgentSession,
+	type ExtensionAPI,
+	type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
-import { parseSlash } from "../agents/slash.ts";
+import { helpText, mergeCommands, parseSlash } from "../agents/slash.ts";
 import { decksStage } from "./extension.ts";
 import { deckContext, skillsDir } from "../agents/context.ts";
 import { handlePiEvent } from "./events.ts";
@@ -36,11 +38,11 @@ export const PI_CAPABILITIES: AgentCapabilities = { modes: [] };
  * commands, `/skill:name` and prompt templates of its own (§6.8).
  */
 export const PI_COMMANDS: SlashCommand[] = [
-	{ name: "compact", hint: "Condense the conversation", arg: "[notes]" },
-	{ name: "session", hint: "Session file, id and what is in it" },
-	{ name: "cost", hint: "Open the usage panel: spend, tokens, context" },
-	{ name: "name", hint: "Rename this agent", arg: "<name>" },
-	{ name: "help", hint: "The commands Decks understands" },
+	{ name: "compact", hint: "Condense the conversation", arg: "[notes]", source: "deck" },
+	{ name: "session", hint: "Session file, id and what is in it", source: "deck" },
+	{ name: "cost", hint: "Open the usage panel: spend, tokens, context", source: "deck" },
+	{ name: "name", hint: "Rename this agent", arg: "<name>", source: "deck" },
+	{ name: "help", hint: "The commands Decks understands", source: "deck" },
 ];
 
 export class PiBackend implements AgentBackend {
@@ -48,6 +50,16 @@ export class PiBackend implements AgentBackend {
 
 	private session!: AgentSession;
 	private modelRuntime!: ModelRuntime;
+	/**
+	 * Pi's own commands, read through the extension API.
+	 *
+	 * `getCommands()` is only reachable from inside an extension factory and only once
+	 * the runtime has initialised, so the accessor is captured there and called lazily.
+	 * It covers extension commands, prompt templates and skills — everything pi's core
+	 * parses out of a prompt itself, which is exactly the set that works when Decks hands
+	 * one through untouched.
+	 */
+	private piCommands: (() => SlashCommand[]) | undefined;
 	private unsubscribe: (() => void) | undefined;
 
 	private constructor(private readonly context: AgentBackendContext) {}
@@ -72,7 +84,7 @@ export class PiBackend implements AgentBackend {
 			// has, and where it came from should not be a mystery.
 			// Built here rather than found on disk: Pi hands a factory only `ExtensionAPI`,
 			// so an extension on disk could not reach the canvas (§6.3).
-			extensionFactories: [decksStage({ tool, agent: this.context.stageAgent })],
+			extensionFactories: [decksStage({ tool, agent: this.context.stageAgent }), this.commandReader()],
 			/*
 			 * The deck's description goes in as a context file, once. Pi owns it from
 			 * there — re-injecting it every turn would be a second, competing source of
@@ -155,9 +167,44 @@ export class PiBackend implements AgentBackend {
 		else await this.session.prompt(text);
 	}
 
-	/** What typing `/` completes to, for the composer's menu. */
+	/**
+	 * What typing `/` completes to: the deck's own, with pi's own list under them.
+	 *
+	 * Computed on each call rather than cached at bind time. Pi's commands come from the
+	 * resource loader — prompts, skills, extension commands — and asking for them inside
+	 * the extension factory answers before the loader has finished, so a cached list was
+	 * the deck's five and nothing else. The list is a few dozen strings and this is called
+	 * once per publish, so recomputing is cheaper than being wrong.
+	 */
 	commands(): SlashCommand[] {
-		return PI_COMMANDS;
+		return mergeCommands(PI_COMMANDS, this.piCommands?.() ?? []);
+	}
+
+	/**
+	 * A one-line extension whose only job is to hold on to `pi.getCommands`.
+	 *
+	 * Inline for the same reason `decks-stage` is: a factory is handed `ExtensionAPI` and
+	 * nothing else, so this is the only place the accessor exists. It registers nothing
+	 * and answers nothing — it closes over a function and returns.
+	 */
+	private commandReader(): InlineExtension {
+		return {
+			name: "decks-commands",
+			factory: (pi: ExtensionAPI) => {
+				this.piCommands = () =>
+					pi.getCommands().map((command) => ({
+						name: command.name,
+						...(command.description ? { hint: command.description } : {}),
+						source: command.source,
+					}));
+				/*
+				 * Bind time is too early to *read* the list — the loader is still finding
+				 * skills — but it is the right moment to say one exists, so the chat row
+				 * goes out again once there is something to put in it.
+				 */
+				this.context.commandsChanged?.();
+			},
+		};
 	}
 
 	private async runSlash(name: string, args: string): Promise<void> {
@@ -188,13 +235,21 @@ export class PiBackend implements AgentBackend {
 				return;
 			}
 			case "help":
-				notice(
-					"info",
-					this.commands().map((command) => `/${command.name}${command.arg ? ` ${command.arg}` : ""} — ${command.hint ?? ""}`).join("\n") || "No commands.",
-				);
+				notice("info", helpText(this.commands()));
 				return;
-			default:
-				notice("warn", `Unknown command /${name}. Try /help.`);
+			default: {
+				/*
+				 * Handed through untouched, which is what the doc comment on `prompt()` has
+				 * always claimed and what this branch did not do: it answered "Unknown
+				 * command" and swallowed the prompt, so every extension command, prompt
+				 * template and `/skill:name` pi can parse was refused by the shell in front
+				 * of it. Pi's core is the thing that knows that surface; this is not.
+				 */
+				const prompt = `/${name}${args ? ` ${args}` : ""}`;
+				if (this.session.isStreaming) await this.session.prompt(prompt, { streamingBehavior: "steer" });
+				else await this.session.prompt(prompt);
+				return;
+			}
 		}
 	}
 

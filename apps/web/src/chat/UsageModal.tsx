@@ -247,7 +247,7 @@ export function UsageModal(props: {
 											 */
 											<p class="usage-empty">
 												{report().kind !== "claude"
-													? "A pi agent bills per token and has no plan windows to run out of."
+													? `A ${report().kind} agent bills per token and has no plan windows to run out of.`
 													: report().limits === null
 														? "This agent is not running against a claude.ai plan, so there are no windows to report."
 														: "The plan reports no active windows."}

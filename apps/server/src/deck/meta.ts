@@ -76,3 +76,53 @@ export function readBoardMeta(html: string): BoardMeta {
 
 	return meta;
 }
+
+/**
+ * The same document with a different size in it.
+ *
+ * Sizing a board is editing one number in one tag, which is exactly the kind of edit an
+ * agent should not be doing by hand: the tag is JSON inside an HTML attribute, the file is
+ * the only place the size is written down, and the write has to keep every other byte
+ * where it was. So the server does it, and `stage.resize` / `stage.fit` are the two ways
+ * to ask.
+ *
+ * Other keys in the tag — `bg`, `theme`, anything a later version adds — are carried
+ * through. A board with no tag at all gets one, because a board written by hand is still
+ * a board and refusing to resize it would be a rule about how it was authored.
+ */
+export function withBoardSize(html: string, size: { w?: number; h?: number }): string {
+	const meta = readBoardMeta(html);
+	const w = Math.max(1, Math.round(size.w ?? meta.w ?? 1200));
+	const h = Math.max(1, Math.round(size.h ?? meta.h ?? 800));
+
+	META.lastIndex = 0;
+	for (let tag = META.exec(html); tag; tag = META.exec(html)) {
+		if (tag[1]?.toLowerCase() !== "board") continue;
+		const content = CONTENT.exec(tag[0]);
+		let rest: Record<string, unknown> = {};
+		if (content) {
+			try {
+				const parsed = JSON.parse(unescapeAttribute(content[1] ?? content[2] ?? "{}")) as Record<string, unknown>;
+				const { w: _w, h: _h, ...others } = parsed;
+				rest = others;
+			} catch {
+				/* a broken tag is replaced rather than preserved; it said nothing usable */
+			}
+		}
+		const replaced = tag[0].replace(
+			/content\s*=\s*(?:"[^"]*"|'[^']*')/i,
+			`content='${JSON.stringify({ w, h, ...rest })}'`,
+		);
+		// Single-quoted, because the JSON inside carries double quotes of its own. If the
+		// tag had no `content` at all there is nothing to replace, so one is added.
+		const written = replaced === tag[0] ? tag[0].replace(/\s*\/?>$/, ` content='${JSON.stringify({ w, h, ...rest })}'>`) : replaced;
+		return html.slice(0, tag.index) + written + html.slice(tag.index + tag[0].length);
+	}
+
+	const tag = `<meta name="board" content='${JSON.stringify({ w, h, bg: "grid" })}' />`;
+	const title = /<\/title>/i.exec(html);
+	if (title) return `${html.slice(0, title.index + title[0].length)}\n\t\t${tag}${html.slice(title.index + title[0].length)}`;
+	const head = /<head[^>]*>/i.exec(html);
+	if (head) return `${html.slice(0, head.index + head[0].length)}\n\t\t${tag}${html.slice(head.index + head[0].length)}`;
+	return `${tag}\n${html}`;
+}

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, Camera, ChatItem, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
+import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
 import type { DelegateReport, DelegateSpec, QueuedWork, SendSpec } from "../stage/tool.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
@@ -56,6 +57,8 @@ export class Registry {
 			accounts?: ClaudeAccountSwitcher;
 			/** Tell the browser the list moved, after a login or an automatic switch. */
 			accountsChanged?(): void;
+			/** The canvas tool's HTTP end, for a runtime that is not in this process. */
+			bridge?: StageBridge;
 		},
 	) {
 		this.store = new AgentStore(deck);
@@ -67,15 +70,35 @@ export class Registry {
 	 * `tags` is here so an agent can ask what the others are working on with one call rather
 	 * than needing a second shape for the same fact. **`userTags` is deliberately absent:**
 	 * what *you* think of an agent is not something it should be steering on, and a field an
-	 * agent can read is a field it will optimise against.
+	 * agent can read is a field it will optimise against. The same argument bars a model or a
+	 * cost figure: an agent choosing who to hand work to should be choosing on what they are
+	 * doing and what they can do, not on which of them is cheaper.
+	 *
+	 * `context` is the twenty newest boards, not everything held. That is a cap, not a
+	 * truncation: `holding` carries the true total, so a reader can tell a slice from the
+	 * whole before deciding whether to ask for more. And `kind` is the runtime, because it is
+	 * now load-bearing — whether the row you are handing to is a Claude one or an antigravity
+	 * one changes what it can do.
 	 */
-	summaries(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[]; queued: number }> {
+	summaries(): Array<{ id: string; name: string; state: string; kind: AgentKind; context: string[]; holding: number; tags: string[]; queued: number }> {
 		return this.agents.map((agent) => {
 			const chat = agent.chat();
 			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand
 			// something to can see, in one call, both what they are doing and how much is
 			// already waiting for them.
-			return { id: agent.id, name: chat.name, state: chat.state, context: [...agent.context], tags: agent.tags, queued: agent.queued };
+			return {
+				id: agent.id,
+				name: chat.name,
+				state: chat.state,
+				kind: agent.kind,
+				// `held` is most-recently-touched first, so the front of the list is the
+				// answer to "what is it working on" and twenty is a screen of it — more than
+				// any agent on a deck is genuinely working from at once.
+				context: [...agent.context].slice(0, 20),
+				holding: agent.context.length,
+				tags: agent.tags,
+				queued: agent.queued,
+			};
 		});
 	}
 
@@ -128,6 +151,7 @@ export class Registry {
 				agents: () => this.summaries(),
 				spawn: (parentId, spec) => this.spawn(parentId, spec),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
+			report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
 				queue: (agentId) => this.get(agentId)?.queue() ?? [],
 				brief: (task, boards) => brief(task, boards, this.deck),
 				recordRevision: (path) => this.host.recordRevision(path),
@@ -137,6 +161,10 @@ export class Registry {
 				...options,
 				...(this.host.accounts ? { accounts: this.host.accounts } : {}),
 				...(this.host.accountsChanged ? { accountsChanged: this.host.accountsChanged } : {}),
+				...(this.host.bridge ? { bridge: this.host.bridge } : {}),
+				// The whole chat row is what carries the menu, so a longer list is one
+				// republish of the list the browser already keys on.
+				commandsChanged: () => this.publish(),
 				color: options.color ?? COLORS[this.agents.length % COLORS.length]!,
 				kind: options.kind ?? this.host.defaultKind,
 				snapshots: this.snapshots,
@@ -284,13 +312,43 @@ export class Registry {
 			throw new Error(`You already have ${running} subagents running; wait for one to finish.`);
 		}
 
-		const child = this.create({ parentId, ...(spec.name ? { name: spec.name } : {}) });
+		// The runtime is chosen at creation, exactly as the `+` button does: a live session
+		// cannot change the process it is talking to, so `kind` is fixed here for the child's
+		// life. Ask for one and the child is that runtime; ask for nothing and it is the
+		// server's default, as before — every call written so far keeps working.
+		const child = this.create({
+			parentId,
+			...(spec.name ? { name: spec.name } : {}),
+			...(spec.kind ? { kind: spec.kind } : {}),
+		});
 		if (spec.model?.includes("/")) {
 			const [provider, ...rest] = spec.model.split("/");
 			try {
-				await child.setModel(provider!, rest.join("/"));
+				// The third argument is the thinking level, and it used to be dropped here —
+				// `setModel(provider, model)` stopped two arguments short of what every backend
+				// takes, so a subagent asked for a model silently lost whatever level it would
+				// otherwise have had. A delegation that asks for both gets both.
+				await child.setModel(provider!, rest.join("/"), spec.thinking);
 			} catch (error) {
 				parent.translator.notice("warn", `Subagent stays on the default model: ${(error as Error).message}`);
+			}
+		} else if (spec.thinking) {
+			// Thinking asked for on its own, on the default model.
+			await child.start();
+			child.setThinking(spec.thinking);
+		}
+
+		if (spec.mode) {
+			const modes = child.chat().capabilities.modes;
+			if (modes.includes(spec.mode)) {
+				await child.start();
+				await child.setMode(spec.mode);
+			} else {
+				// Asking for a posture a runtime cannot hold is not an error: the work is worth
+				// doing on the nearest thing it has, and the parent is told it did not get what
+				// it asked for — the same deal `spawn` already makes for a refused model. pi has
+				// no modes at all, opencode offers three of the four, antigravity two.
+				parent.translator.notice("warn", `Subagent stays in its default mode: ${child.chat().kind} cannot do "${spec.mode}".`);
 			}
 		}
 
@@ -334,6 +392,7 @@ export class Registry {
 			task: spec.task.trim(),
 			boards: handed,
 			at: Date.now(),
+			...(spec.reply ? { reply: true } : {}),
 		});
 		this.publish();
 		return { queued: true, position };

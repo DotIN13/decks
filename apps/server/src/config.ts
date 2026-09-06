@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import type { AgentKind } from "@decks/protocol";
+import { AGENT_KINDS, type AgentKind } from "@decks/protocol";
 
 /**
  * Everything the process is told from outside, read once.
@@ -53,7 +53,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): Config {
 	// Anything unrecognised falls back to Pi rather than failing to start: a typo in an
 	// environment variable should not cost you the deck.
 	const asked = process.env.DECKS_BACKEND;
-	const backend: AgentKind = asked === "claude" ? "claude" : "pi";
+	const backend: AgentKind = isKind(asked) ? asked : "pi";
 
 	return {
 		host: process.env.DECKS_HOST ?? "127.0.0.1",
@@ -62,4 +62,9 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): Config {
 		deck: join(dataDir, DECK_DIR),
 		backend,
 	};
+}
+
+/** `DECKS_BACKEND` is a string until it is one of the four. */
+export function isKind(value: string | undefined): value is AgentKind {
+	return value !== undefined && (AGENT_KINDS as readonly string[]).includes(value);
 }

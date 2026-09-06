@@ -15,7 +15,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
-import { parseSlash } from "../agents/slash.ts";
+import { helpText, mergeCommands, parseSlash, sameCommands } from "../agents/slash.ts";
 import { answerQuestions } from "./ask-user-question.ts";
 import { deckContext, runtimeDir } from "../agents/context.ts";
 import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
@@ -74,14 +74,28 @@ const LOGIN_METHODS = [
  * CLI's own `auth login` through the dock's dialogs, `/logout` runs `auth logout`, and
  * the rest read state the backend already has.
  */
+export const CLAUDE_DECK_COMMANDS: SlashCommand[] = [
+	{ name: "login", hint: "Sign in with a subscription or an API account", source: "deck" },
+	{ name: "logout", hint: "Sign out of Claude", source: "deck" },
+	{ name: "status", hint: "Model, mode and auth state", source: "deck" },
+	// `/cost` opens the panel, and Claude resolves its own `/cost` to `/usage` — claimed
+	// as an alias so the merge does not list that one beside this one.
+	{ name: "cost", hint: "Open the usage panel: plan limits, spend, context", source: "deck", aliases: ["usage", "stats"] },
+	{ name: "help", hint: "The commands Decks understands", source: "deck" },
+];
+
+/**
+ * What a chat offers before its runtime has answered.
+ *
+ * The deck's five, plus the two pass-through commands worth having in a dormant chat's
+ * menu. Once the session is up this is replaced by the CLI's own list — sixty-odd
+ * commands, skills and the project's own `commands/` included — merged over the same
+ * five. See `refreshCommands`.
+ */
 export const CLAUDE_COMMANDS: SlashCommand[] = [
-	{ name: "login", hint: "Sign in with a subscription or an API account" },
-	{ name: "logout", hint: "Sign out of Claude" },
-	{ name: "status", hint: "Model, mode and auth state" },
-	{ name: "doctor", hint: "Check the Claude Code install" },
-	{ name: "cost", hint: "Open the usage panel: plan limits, spend, context" },
-	{ name: "compact", hint: "Compress the conversation", arg: "[notes]" },
-	{ name: "help", hint: "The commands Decks understands" },
+	...CLAUDE_DECK_COMMANDS,
+	{ name: "compact", hint: "Compress the conversation", arg: "[notes]", source: "runtime" },
+	{ name: "doctor", hint: "Check the Claude Code install", source: "runtime" },
 ];
 
 /**
@@ -113,6 +127,8 @@ export class ClaudeBackend implements AgentBackend {
 	private lastUsage: AgentUsage | null = null;
 	private storedName: string | undefined;
 	private title: string | undefined;
+	/** The `/` menu: the deck's own, with whatever the CLI declares merged under them. */
+	private commandList: SlashCommand[] = CLAUDE_COMMANDS;
 	/** Which limit window has already been warned about, so it is said once and not per turn. */
 	private warnedAbout: string | undefined;
 
@@ -237,6 +253,15 @@ export class ClaudeBackend implements AgentBackend {
 						this.sessionId = message.session_id;
 					}
 					/*
+					 * The list changed under us — a skill discovered as the agent moved into a
+					 * subdirectory, a `commands/` file written this turn. The SDK pushes the
+					 * whole replacement rather than a delta, so this is a set and not a merge
+					 * of a merge.
+					 */
+					if (message.type === "system" && message.subtype === "commands_changed") {
+						this.setCommands(message.commands);
+					}
+					/*
 					 * The subscription ran out, or is about to.
 					 *
 					 * `rate_limit_event` is the CLI's own signal and carries the window that ran
@@ -278,6 +303,10 @@ export class ClaudeBackend implements AgentBackend {
 				notice("error", `Claude stopped: ${(error as Error).message}`);
 			}
 		})();
+
+		// Not awaited with the models: the menu is worth having a moment later, and a
+		// control request that hangs must not hold up the session opening.
+		void this.refreshCommands();
 
 		try {
 			this.available = await this.session.supportedModels();
@@ -396,7 +425,45 @@ export class ClaudeBackend implements AgentBackend {
 
 	/** What typing `/` completes to, for the composer's menu. */
 	commands(): SlashCommand[] {
-		return CLAUDE_COMMANDS;
+		return this.commandList;
+	}
+
+	/**
+	 * Ask the CLI what it can do, and merge it under the deck's own.
+	 *
+	 * `supportedCommands()` is a control request rather than a turn, so it costs nothing
+	 * to ask and answers with everything this session can reach: the built-ins, the
+	 * skills it discovered, and any `commands/` the project or the user has. That list is
+	 * the whole reason the menu is worth more than seven rows — and it is also the reason
+	 * it must be *asked for* rather than written down here, because half of it is the
+	 * user's own files and cannot be known in advance.
+	 *
+	 * Never fatal: a session whose control channel refuses this still has the deck's five
+	 * and its pass-throughs, which is what the menu had before.
+	 */
+	private async refreshCommands(): Promise<void> {
+		try {
+			this.setCommands(await this.session.supportedCommands());
+		} catch {
+			// A CLI too old to answer is a shorter menu, not a broken agent.
+		}
+	}
+
+	/** One list in, one list out, and the browser told if it moved. */
+	private setCommands(declared: Array<{ name: string; description?: string; argumentHint?: string; aliases?: string[] }>): void {
+		const runtime: SlashCommand[] = declared.map((command) => ({
+			name: command.name,
+			...(command.description ? { hint: command.description } : {}),
+			...(command.argumentHint ? { arg: command.argumentHint } : {}),
+			...(command.aliases && command.aliases.length > 0 ? { aliases: command.aliases } : {}),
+			// The CLI does not say which of these is a skill and which is a builtin, and a
+			// badge that guesses is worse than one that says where the answer comes from.
+			source: "runtime" as const,
+		}));
+		const merged = mergeCommands(CLAUDE_DECK_COMMANDS, runtime);
+		if (sameCommands(this.commandList, merged)) return;
+		this.commandList = merged;
+		this.context.commandsChanged?.();
 	}
 
 	private async runSlash(name: string, args: string): Promise<void> {
@@ -421,7 +488,7 @@ export class ClaudeBackend implements AgentBackend {
 			case "help":
 				notice(
 					"info",
-					this.commands().map((slash) => `/${slash.name}${slash.arg ? ` ${slash.arg}` : ""} — ${slash.hint ?? ""}`).join("\n") || "No commands.",
+					helpText(this.commands()),
 				);
 				return;
 			case "cost":

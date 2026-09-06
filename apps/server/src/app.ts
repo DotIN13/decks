@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BoardPatch, Camera, ClientMessage, ServerMessage, StageCall } from "@decks/protocol";
+import type { Board, BoardPatch, Camera, ClientMessage, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { applyPatches, mintId, PatchRefused } from "./boards/patch.ts";
 import { Revisions } from "./boards/snapshots.ts";
 import { isBoardKind, renderTemplate, slugFor, type BoardKind } from "./boards/templates.ts";
+import { StageBridge } from "./stage/bridge.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./claude/accounts.ts";
 import { claudeIdentity } from "./claude/backend.ts";
@@ -15,6 +16,14 @@ import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { watchDeck } from "./deck/watcher.ts";
 import { Hub } from "./ws.ts";
+
+/**
+ * How often the deck re-reads its boards from disk regardless of what the watcher said.
+ *
+ * Slow enough that it is free (a walk and a `stat` per board), fast enough that a missed
+ * event is a beat rather than a session.
+ */
+const RESYNC_MS = 4000;
 
 /**
  * The open deck, the watcher on it, and the browsers looking at it.
@@ -28,9 +37,13 @@ export class App {
 	deck: Deck;
 	readonly agents: Registry;
 	readonly stage: StageService;
+	/** The canvas tool's other end, for the runtimes that are not in this process. */
+	readonly bridge = new StageBridge();
 	readonly revisions: Revisions;
 	private hub: Hub | undefined;
 	private unwatch: (() => void) | undefined;
+	/** The safety net under the watcher — see `watch()`. */
+	private resyncTimer: NodeJS.Timeout | undefined;
 	/**
 	 * Where the browser last said it was looking.
 	 *
@@ -49,6 +62,18 @@ export class App {
 	private readonly cameras = new Map<string, Camera>();
 	/** Stage calls waiting for the browser to carry them out. */
 	private readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout }>();
+	/**
+	 * What the canvas last measured of each board's content, and at which revision.
+	 *
+	 * One reading per board, not a history: the only question anyone asks is "how big is
+	 * what is on it *now*", and a reading of a document that has since been rewritten
+	 * answers nothing. Kept here rather than on the board record because it is a fact
+	 * about a browser rather than about the deck — a headless server has none of these,
+	 * and everything that reads them copes with that.
+	 */
+	private readonly extents = new Map<string, { rev: number; w: number; h: number }>();
+	/** `stage.fit` calls waiting for the frame to load and report. */
+	private readonly extentWaiters = new Set<{ path: string; rev: number; resolve: (extent: { w: number; h: number } | undefined) => void }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
 	private readonly claudeAccounts: ClaudeAccounts;
 
@@ -60,6 +85,9 @@ export class App {
 		this.revisions = new Revisions(deck);
 		this.stage = new StageService(deck, {
 			newBoard: (options) => this.newBoard({ ...options, kind: options.kind as BoardKind }),
+			writeBoard: (path, html) => this.writeBoard(path, html),
+			extent: (path, rev) => this.extentOf(path, rev),
+			awaitExtent: (path, rev, ms) => this.awaitExtent(path, rev, ms),
 			call: (call) => this.callStage(call),
 			connected: () => (this.hub?.connections ?? 0) > 0,
 			broadcast: (message) => this.send(message),
@@ -87,6 +115,7 @@ export class App {
 				boardPathOf: (file) => this.boardPathOf(file),
 				accounts: this.claudeAccounts,
 				accountsChanged: () => void this.publishAccounts(),
+				bridge: this.bridge,
 			},
 		);
 	}
@@ -212,6 +241,12 @@ export class App {
 	private watch(): void {
 		this.unwatch?.();
 		this.unwatch = watchDeck(this.deck.path, (change) => {
+			if (change.kind === "rescan") {
+				// A rename went past, or the watcher was replaced. Either way what we
+				// were told is no longer trustworthy, so ask the disk.
+				this.resyncBoards();
+				return;
+			}
 			if (change.kind === "deck") {
 				// Our own `save()` coming back around. The browsers already know — they
 				// asked for it — and re-reading the deck to tell them again is what made a
@@ -235,7 +270,10 @@ export class App {
 				}
 				// A board that is gone must leave every agent's context with it, or the
 				// dead path silently empties the rail and the canvas (DeckAgent.forget).
-				if (!board) this.agents.boardRemoved(change.path);
+				if (!board) {
+					this.agents.boardRemoved(change.path);
+					this.extents.delete(change.path);
+				}
 				this.send(
 					board
 						? { type: "board.changed", path: change.path, rev: board.rev, board }
@@ -247,6 +285,44 @@ export class App {
 			// has no way to know, so every board reloads — cheap, and rare.
 			this.send({ type: "deck.state", deck: this.deck.state() });
 		});
+
+		/*
+		 * And a slow reading of the disk under all of it.
+		 *
+		 * The watcher is a promise the operating system does not quite make: events are
+		 * dropped under load, a recursive arm can end up pointed at a replaced inode, and
+		 * a deck on a network filesystem may produce nothing at all. None of that is
+		 * recoverable from the inside, and the failure is silent — the canvas simply stops
+		 * agreeing with the files.
+		 *
+		 * So every few seconds the deck stats its boards and reports what actually moved.
+		 * It costs a directory walk and one `stat` per board, it reads nothing that has
+		 * not changed, and it says nothing when nothing has. `unref` so it never holds a
+		 * process open, which matters for the tests and for a headless run.
+		 */
+		clearInterval(this.resyncTimer);
+		this.resyncTimer = setInterval(() => this.resyncBoards(), RESYNC_MS);
+		this.resyncTimer.unref?.();
+	}
+
+	/**
+	 * Re-read the boards directory and tell everyone what moved.
+	 *
+	 * The same two messages the watcher's own branch sends, from the same place, so a
+	 * board that arrives this way is indistinguishable from one the watcher caught.
+	 */
+	private resyncBoards(): void {
+		const { changed, removed } = this.deck.resync();
+		for (const board of changed) {
+			this.recordRevision(board.path);
+			this.send({ type: "board.changed", path: board.path, rev: board.rev, board });
+		}
+		for (const path of removed) {
+			// A dead path left in a context silently empties the rail and the canvas.
+			this.agents.boardRemoved(path);
+			this.extents.delete(path);
+			this.send({ type: "board.changed", path, rev: 0, removed: true });
+		}
 	}
 
 	handle(message: ClientMessage, reply: (message: ServerMessage) => void): void {
@@ -266,6 +342,11 @@ export class App {
 				this.send({ type: "board.changed", path: board.path, rev: board.rev, board });
 				return;
 			}
+			case "board.extent": {
+				this.noteExtent(message.path, { rev: message.rev, w: message.w, h: message.h });
+				return;
+			}
+
 			case "camera.set":
 				// Recorded, not acted on: the camera is the browser's, and this is the
 				// reading an agent gets when it asks what the user can see.
@@ -618,6 +699,68 @@ export class App {
 	}
 
 	/**
+	 * A reading from a frame: keep it, and wake anything waiting for one.
+	 *
+	 * Last writer wins, including when the numbers are for an older revision — two frames
+	 * showing the same board agree, and a stale reading is filtered where it is read
+	 * rather than hoarded here.
+	 */
+	private noteExtent(path: string, extent: { rev: number; w: number; h: number }): void {
+		this.extents.set(path, extent);
+		for (const waiter of [...this.extentWaiters]) {
+			if (waiter.path !== path || waiter.rev !== extent.rev) continue;
+			this.extentWaiters.delete(waiter);
+			waiter.resolve({ w: extent.w, h: extent.h });
+		}
+	}
+
+	/** The measurement for this board *at this revision*, or nothing. */
+	private extentOf(path: string, rev: number): { w: number; h: number } | undefined {
+		const extent = this.extents.get(path);
+		return extent && extent.rev === rev ? { w: extent.w, h: extent.h } : undefined;
+	}
+
+	/**
+	 * Wait for a frame to report this revision, giving up quietly.
+	 *
+	 * `undefined` rather than a rejection: "nobody is looking at that board" is an answer,
+	 * and the caller (`stage.fit`) turns it into a sentence that says what to do about it.
+	 */
+	private awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number } | undefined> {
+		const ready = this.extentOf(path, rev);
+		if (ready) return Promise.resolve(ready);
+		if (!this.hub?.connections) return Promise.resolve(undefined);
+		return new Promise((resolve) => {
+			const waiter = { path, rev, resolve };
+			this.extentWaiters.add(waiter);
+			const timer = setTimeout(() => {
+				this.extentWaiters.delete(waiter);
+				resolve(undefined);
+			}, ms);
+			timer.unref?.();
+		});
+	}
+
+	/**
+	 * Write a board's file and tell everyone — the path a *changed* board takes, as
+	 * `newBoard` is the path a new one takes.
+	 *
+	 * Deliberately not left to the watcher. The watcher would get there in 80ms and the
+	 * caller would have to wait to see its own write; refreshing here means a `resize`
+	 * returns the board as it now is, and the browser is told once rather than twice
+	 * (the watcher's event finds the same bytes and the same revision, and says nothing).
+	 */
+	private writeBoard(path: string, html: string): Board {
+		const file = this.deck.fileOf(path);
+		writeFileSync(file, html);
+		this.revisions.record(path, html);
+		const board = this.deck.refresh(path);
+		if (!board) throw new Error(`No such board: ${path}`);
+		this.send({ type: "board.changed", path, rev: board.rev, board });
+		return board;
+	}
+
+	/**
 	 * Write a new board from a template, and return its deck-relative path (§2).
 	 *
 	 * Here rather than in the stage service because this is where board writes and their
@@ -680,6 +823,7 @@ export class App {
 			return;
 		}
 		this.agents.boardRemoved(path);
+		this.extents.delete(path);
 		this.send({ type: "board.changed", path, rev: 0, removed: true });
 	}
 
@@ -832,6 +976,8 @@ export class App {
 	dispose(): void {
 		this.unwatch?.();
 		this.unwatch = undefined;
+		clearInterval(this.resyncTimer);
+		this.resyncTimer = undefined;
 		this.agents.dispose();
 	}
 }

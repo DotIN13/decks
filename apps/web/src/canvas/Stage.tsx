@@ -55,6 +55,8 @@ export function Stage(props: {
 	marks?: import("./annotations.ts").Mark[];
 	/** So the server can answer `stage.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
+	/** How much room a board's content took, measured in its frame once it had mounted. */
+	onExtent?: (path: string, extent: { rev: number; w: number; h: number }) => void;
 	editor: EditorHost;
 	/** A tool picked by its key, which the palette's tooltips have always claimed. */
 	onTool?: (tool: Tool) => void;
@@ -65,12 +67,11 @@ export function Stage(props: {
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
 	/**
-	 * Leave the preview — the canvas's own way out of it.
+	 * Leave the preview — Escape, read by the stage's own key handler.
 	 *
-	 * It had none. The only handle on a held preview was the row inside the message's own
-	 * menu, in a transcript that is away by default, while the canvas said nothing at all
-	 * about being in a state where every board is inert. The badge below and Escape are
-	 * both this.
+	 * Here rather than on a window listener so it works with focus inside a board too:
+	 * `frame-gestures.ts` forwards a board's keys to the same function. The amber outline
+	 * on every board is what says the state is on; this is the way out of it.
 	 */
 	onLeavePreview?: () => void;
 	/**
@@ -483,25 +484,6 @@ export function Stage(props: {
 			onPointerDown={onPointerDown}
 			style={{ cursor: spaceHeld() ? "grab" : undefined }}
 		>
-			{/*
-				The state, and the way out of it, in the corner the editing badge uses.
-				
-				A real element rather than the `::before` that says "Editing", because this one
-				has to be pressable: the editing badge can be a pseudo-element since the pencil
-				beside it is the way back, and a preview had no equivalent anywhere on screen.
-				
-				`role="status"` and not an alert: it is a standing condition, not an event, and it
-				appears because *you* asked to look at the past.
-			*/}
-			<Show when={props.preview && props.onLeavePreview}>
-				<div class="preview-sign" role="status">
-					<span>Showing an earlier version</span>
-					<button type="button" onClick={() => props.onLeavePreview?.()}>
-						Leave
-					</button>
-				</div>
-			</Show>
-
 			<div
 				class="world"
 				ref={worldEl}
@@ -522,6 +504,7 @@ export function Stage(props: {
 							showRev={props.frameRevs?.[board.path]}
 							previewSha={props.preview?.[board.path]}
 							onSelect={() => props.onSelect(board.path)}
+							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}
 							{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
 							onOpen={() => pushCamera(frame([boxOf(board)]))}

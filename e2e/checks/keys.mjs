@@ -23,8 +23,30 @@ await page.waitForFunction(() => Number((document.querySelector('.pill [aria-lab
 // Empty board space, not a component: clicking a component is handled by the editor,
 // which calls preventDefault and so keeps focus where it was. Bare board gives the
 // iframe focus, which is the case that used to swallow every shortcut.
-const box = await page.locator(".board-node iframe").first().boundingBox();
-await page.mouse.click(box.x + box.width - 30, box.y + box.height - 30);
+//
+// The frame to click is the one the row-click above flew to, not the first in the DOM.
+// The panel lists "on the canvas" boards in the agent's held order, which is most-recently-
+// touched first, so the row you clicked is a different board from the first frame on a deck
+// that has been reset to show everything. The camera centres the clicked board, so the
+// frame nearest the viewport centre is the one whose empty corner we want.
+const box = await page.evaluate(() => {
+	const frames = [...document.querySelectorAll(".board-node iframe")];
+	const cx = innerWidth / 2;
+	const cy = innerHeight / 2;
+	let best;
+	let distance = Infinity;
+	for (const frame of frames) {
+		const r = frame.getBoundingClientRect();
+		const d = Math.hypot(r.left + r.width / 2 - cx, r.top + r.height / 2 - cy);
+		if (d < distance) {
+			distance = d;
+			best = r;
+		}
+	}
+	if (!best) throw new Error("no board frame to click");
+	return { x: best.right, y: best.bottom };
+});
+await page.mouse.click(box.x - 30, box.y - 30);
 await page.waitForFunction(() => document.activeElement?.tagName === "IFRAME", null, { timeout: 4000 });
 say("focus is inside the board", (await page.evaluate(() => document.activeElement?.tagName)) === "IFRAME");
 

@@ -210,6 +210,31 @@ export function createHttpApp(app: App): Express {
 		},
 	);
 
+	/**
+	 * The canvas tool, for a runtime that is not in this process (`stage/bridge.ts`).
+	 *
+	 * opencode's TypeScript tool and antigravity's Python one both end up here, and the
+	 * two name themselves differently. Antigravity still holds a token minted per agent;
+	 * opencode now shares one server with every other opencode agent, so its tool sends
+	 * the session id opencode gave it and the bridge resolves *that* to an agent — with
+	 * the shared server's single token in the header proving the caller is the process
+	 * Decks spawned. Either way there is no agent id in the URL to get wrong, and a call
+	 * from a process that has outlived its agent is refused by the identity rather than
+	 * by a guess about who it is.
+	 *
+	 * `200` even for a failed run, because a tool that failed is not a transport that
+	 * failed: the model is supposed to read the message and try something else, and an
+	 * HTTP error would be swallowed by whichever client library is between us.
+	 */
+	api.post("/stage/eval", (req, res) => {
+		const header = req.headers.authorization;
+		const token = typeof header === "string" && header.startsWith("Bearer ") ? header.slice(7) : undefined;
+		const body = (req.body ?? {}) as { code?: unknown; sessionID?: unknown };
+		const code = typeof body.code === "string" ? body.code : "";
+		const sessionID = typeof body.sessionID === "string" ? body.sessionID : undefined;
+		void app.bridge.run(token, code, sessionID).then((outcome) => res.json(outcome));
+	});
+
 	server.use("/api", api);
 
 	// The built UI, when there is one. In development Vite serves it instead and

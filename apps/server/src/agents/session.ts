@@ -18,6 +18,8 @@ import type {
 } from "@decks/protocol";
 import { CLAUDE_CAPABILITIES, CLAUDE_COMMANDS, ClaudeBackend } from "../claude/backend.ts";
 import type { Deck } from "../deck/loader.ts";
+import { ANTIGRAVITY_CAPABILITIES, ANTIGRAVITY_COMMANDS, AntigravityBackend } from "../antigravity/backend.ts";
+import { OPENCODE_CAPABILITIES, OPENCODE_COMMANDS, OpencodeBackend } from "../opencode/backend.ts";
 import { PI_CAPABILITIES, PI_COMMANDS, PiBackend } from "../pi/backend.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, type DelegateReport, type DelegateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
@@ -26,6 +28,7 @@ import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { SnapshotStore } from "./snapshot.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
+import type { StageBridge } from "../stage/bridge.ts";
 import { Translator } from "./translator.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 
@@ -82,6 +85,10 @@ export class DeckAgent {
 	/** Shared with every other agent: one active subscription for the install. */
 	private readonly accounts: ClaudeAccountSwitcher | undefined;
 	private readonly accountsChanged: (() => void) | undefined;
+	/** The runtime's `/` menu moved, so the chat row that carries it has to be resent. */
+	private readonly commandsChanged: (() => void) | undefined;
+	/** Where an out-of-process runtime's canvas tool calls back to. */
+	private readonly stageBridge: StageBridge | undefined;
 	private identity: Identity;
 	/**
 	 * The model list, kept as well as sent.
@@ -92,7 +99,18 @@ export class DeckAgent {
 	 */
 	private modelOptions: ModelOption[] = [];
 
-	/** The boards this agent is holding, in the order it attached them. */
+	/**
+	 * The boards this agent is holding, most-recently-touched first.
+	 *
+	 * The order used to be insertion order, which is how `stage.agents()` ended up answering
+	 * "what is this agent working on" with everything it had ever held, oldest first. A held
+	 * board is a decision the agent made — attaching one is it saying *this is what I am
+	 * working from* — so the recent end is the answer to the question, and the rest of the
+	 * list is history. The touch sites (`stage.attach`, a new board, a first `show`) put the
+	 * newest board at the front; `setContext` keeps whatever order it is given. Re-attaching a
+	 * board is a fresh touch, which is why `attach` moves it to the front rather than leaving
+	 * it where it sat.
+	 */
 	private held: string[] = [];
 	/**
 	 * The subset of those on the canvas.
@@ -140,10 +158,17 @@ export class DeckAgent {
 		private readonly host: {
 			port: number;
 			camera(agentId: string): Camera;
-			agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
+			agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[]; kind: AgentKind; holding: number }>;
 			spawn(parentId: string, spec: DelegateSpec): Promise<DelegateReport>;
 			/** Put work in another agent's queue, without waiting for it. */
 			send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
+			/**
+			 * Deliver a finished item's report to the agent that asked for it.
+			 *
+			 * A notice, not a queued task: it lands in the sender's transcript without running a
+			 * turn of their own, which is what keeps a reply from becoming a conversation.
+			 */
+			report(agentId: string, text: string): void;
 			/** What is waiting for one agent, for `stage.queue`. */
 			queue(agentId: string): QueuedWork[];
 			/**
@@ -173,6 +198,8 @@ export class DeckAgent {
 			/** The install's Claude subscriptions (`claude/accounts.ts`). */
 			accounts?: ClaudeAccountSwitcher;
 			accountsChanged?(): void;
+			commandsChanged?(): void;
+			bridge?: StageBridge;
 			/**
 			 * Everything a chat needs to be a row again without its runtime running
 			 * (`agents/store.ts`). Its presence is also what makes the agent dormant: it
@@ -225,6 +252,8 @@ export class DeckAgent {
 		this.snapshots = options.snapshots;
 		this.accounts = options.accounts;
 		this.accountsChanged = options.accountsChanged;
+		this.commandsChanged = options.commandsChanged;
+		this.stageBridge = options.bridge;
 		// A fork opens a conversation that already happened, so it should open with the
 		// canvas that conversation had rather than an empty context.
 		if (options.forkedFrom) {
@@ -357,9 +386,14 @@ export class DeckAgent {
 	 *
 	 * Detaching a board has to take it off the canvas too — a board in play that the agent
 	 * is no longer holding would be a third state nobody asked for.
+	 *
+	 * `held` is most-recently-touched first, and the callers build the argument that way —
+	 * the newest board leads. This keeps the order: it is the one place the invariant is
+	 * stored, so every reader (`stage.agents()`, the rail, the canvas, the record on disk)
+	 * sees the same list without each deciding what "newest" means for itself.
 	 */
 	setContext(paths: string[]): void {
-		this.held = [...paths];
+		this.held = paths.filter((path, index) => paths.indexOf(path) === index);
 		this.playing = this.playing.filter((path) => this.held.includes(path));
 		this.publishContext();
 	}
@@ -367,7 +401,11 @@ export class DeckAgent {
 	/** Set what is on the canvas. Anything shown is held, so showing can attach. */
 	setInPlay(paths: string[]): void {
 		const wanted = paths.filter((path, index) => paths.indexOf(path) === index);
-		for (const path of wanted) if (!this.held.includes(path)) this.held.push(path);
+		// A board shown for the first time is the most recent touch, so it leads the held
+		// list rather than joining the end. This is one of the two places a board first
+		// enters `held` — the other is `stage.attach`, which fronts them itself — and both
+		// must agree on what "newest" means or the recency order silently splits in two.
+		for (const path of wanted) if (!this.held.includes(path)) this.held.unshift(path);
 		this.playing = wanted;
 		this.publishContext();
 	}
@@ -494,6 +532,16 @@ export class DeckAgent {
 			},
 			tool,
 			stageAgent: this.stageHooks(),
+			// Where a runtime that is not in this process reaches the deck: the same
+			// loopback server the browser talks to.
+			port: this.host.port,
+			// Minted here rather than in the backend, because the token is the *agent's* and
+			// outlives any one runtime process: a rewind reopens the session and the tool on
+			// the other side must not be left holding a token nobody answers.
+			...(this.stageBridge ? { canvasToken: this.stageBridge.issue(this.id, tool) } : {}),
+			// …and the bridge itself, for the one runtime that shares a process and so names
+			// its calls by session id rather than by a token of its own (opencode).
+			...(this.stageBridge ? { stageBridge: this.stageBridge } : {}),
 			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
 			// Opened *on* the model and mode the conversation was last using, rather than
 			// asked what it happened to default to. Both runtimes take them at session
@@ -504,13 +552,13 @@ export class DeckAgent {
 			// The install's Claude subscriptions, so a limit can move to the next one.
 			...(this.accounts ? { accounts: this.accounts } : {}),
 			...(this.accountsChanged ? { accountsChanged: this.accountsChanged } : {}),
+			...(this.commandsChanged ? { commandsChanged: this.commandsChanged } : {}),
 			// `/cost` asked for the panel. The shell reads the figures; the backend only says
 			// that somebody wants them.
 			showUsage: () => void this.pushReport(),
 		};
 
-		const create: Promise<AgentBackend> =
-			this.kind === "claude" ? ClaudeBackend.create(context) : PiBackend.create(context);
+		const create: Promise<AgentBackend> = BACKENDS[this.kind](context);
 		this.starting ??= create
 			.then((backend) => {
 				this.backend = backend;
@@ -710,7 +758,16 @@ export class DeckAgent {
 		const item = this.work.shift();
 		if (!item) return;
 		try {
-			await this.run(this.host.brief(item.task, item.boards));
+			const result = await this.run(this.host.brief(item.task, item.boards));
+			// A report the sender asked for is delivered to them as a notice, not as a queued
+			// task. The distinction is the whole of the no-loop rule: an item in a queue runs a
+			// turn when it drains, and a turn that answers a report with another report is two
+			// agents talking forever. A notice lands in the sender's transcript and is read on
+			// their next turn instead.
+			if (item.reply) {
+				const report = result.report.trim();
+				if (report) this.host.report(item.from, `${this.identity.name} finished "${firstLine(item.task)}": ${report}`);
+			}
 		} catch (error) {
 			this.translator.notice("error", `Queued work from ${item.fromName} failed: ${(error as Error).message}`);
 		}
@@ -945,6 +1002,9 @@ export class DeckAgent {
 	}
 
 	dispose(): void {
+		// The canvas token stops working before the runtime has finished dying, so a tool
+		// call from a process that outlives its agent is refused rather than answered.
+		this.stageBridge?.revoke(this.id);
 		this.cancelDrain();
 		// Before the backend goes: `flush` asks it for the session to resume, and a disposed
 		// one cannot answer. A pending debounce is cancelled because this write supersedes it.
@@ -965,9 +1025,30 @@ export class DeckAgent {
  * only file that knows both runtimes exist, so the mapping belongs here rather than in the
  * neutral interface.
  */
+/**
+ * Which class answers for which runtime.
+ *
+ * A table rather than a chain of ternaries, because there are four of them now and a
+ * fifth would have been a fourth place to forget. Every entry is the same shape — a
+ * context in, a started backend out — which is the whole of what `AgentBackend` asks.
+ */
+const BACKENDS: Record<AgentKind, (context: AgentBackendContext) => Promise<AgentBackend>> = {
+	pi: (context) => PiBackend.create(context),
+	claude: (context) => ClaudeBackend.create(context),
+	opencode: (context) => OpencodeBackend.create(context),
+	antigravity: (context) => AntigravityBackend.create(context),
+};
+
 function capabilitiesOf(kind: AgentKind): AgentCapabilities {
-	return kind === "claude" ? CLAUDE_CAPABILITIES : PI_CAPABILITIES;
+	return CAPABILITIES[kind];
 }
+
+const CAPABILITIES: Record<AgentKind, AgentCapabilities> = {
+	pi: PI_CAPABILITIES,
+	claude: CLAUDE_CAPABILITIES,
+	opencode: OPENCODE_CAPABILITIES,
+	antigravity: ANTIGRAVITY_CAPABILITIES,
+};
 
 /**
  * The `/` commands a dormant chat offers without waking its runtime.
@@ -976,8 +1057,15 @@ function capabilitiesOf(kind: AgentKind): AgentCapabilities {
  * chat has no backend to ask, and the menu should not change when one is resumed.
  */
 function commandsOf(kind: AgentKind): SlashCommand[] {
-	return kind === "claude" ? CLAUDE_COMMANDS : PI_COMMANDS;
+	return DORMANT_COMMANDS[kind];
 }
+
+const DORMANT_COMMANDS: Record<AgentKind, SlashCommand[]> = {
+	pi: PI_COMMANDS,
+	claude: CLAUDE_COMMANDS,
+	opencode: OPENCODE_COMMANDS,
+	antigravity: ANTIGRAVITY_COMMANDS,
+};
 
 /**
  * The model a pi session was last on, read from its file.

@@ -1576,14 +1576,15 @@ export function App() {
 					nonces={state.nonces}
 					cursor={state.cursor}
 					onViewport={() => reportCamera(camera())}
+					onExtent={(path, extent) => socket.send({ type: "board.extent", path, ...extent })}
 					editor={editor}
 					onTool={setTool}
 					drops={drops}
 					frameRevs={frameRevs}
 					preview={preview()?.boards}
-					/* The canvas's own way out — the badge in the corner, and Escape. Clearing the
-					   browser's copy is the whole of it: the server keeps no preview state, which
-					   is also why a reload has always been an accidental escape hatch. */
+					/* The canvas's own way out — Escape, over the canvas or inside a board. Clearing
+					   the browser's copy is the whole of it: the server keeps no preview state,
+					   which is also why a reload has always been an accidental escape hatch. */
 					onLeavePreview={clearPreview}
 					onEdgeSwipe={edgeSwipe}
 				/>
@@ -1896,6 +1897,7 @@ export function App() {
 						model={state.focused ? state.agentModel[state.focused] : undefined}
 						models={state.focused ? state.modelsByAgent[state.focused] ?? [] : []}
 						commands={focusedChat()?.commands ?? []}
+						runtime={focusedChat()?.kind}
 						modes={focusedChat()?.capabilities?.modes ?? []}
 						mode={focusedChat()?.mode}
 						onMode={(mode) => socket.send({ type: "agent.setMode", id: state.focused ?? "", mode })}

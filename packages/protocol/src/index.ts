@@ -40,6 +40,17 @@ export interface Board {
 	rev: number;
 	/** `<meta name="poster">`, deck-relative. A cheap rail image for a heavy board. */
 	poster?: string;
+	/**
+	 * How much room the board's components actually take, as the canvas last measured it.
+	 *
+	 * Present only when a browser has looked at *this* revision, because a measurement of
+	 * an older document is worse than none: it is a number, and a number gets believed.
+	 * The pair with it is `clipped` — content past the edge of the board, which renders
+	 * without complaint and is invisible until somebody notices the missing paragraph.
+	 */
+	content?: { w: number; h: number };
+	/** Content reaching past `w`/`h`. Derived from `content`, and absent when that is. */
+	clipped?: boolean;
 	/** Agent ids holding this board in context. */
 	inContext: string[];
 	/** Agent id, or "you". Drawn as a fading tint on the board's edge. */
@@ -63,8 +74,22 @@ export type AgentState = "idle" | "thinking" | "streaming" | "tool" | "waiting";
  *
  * Fixed for an agent's life: a live session cannot change the process it is talking to,
  * and pretending otherwise would mean silently starting a new conversation.
+ *
+ * Four now. Pi runs in this process; the other three are somebody else's program, reached
+ * through that program's own SDK — Claude Code's, opencode's HTTP server, and
+ * antigravity's Python one. What differs between them is `capabilities`, not a method that
+ * throws.
  */
-export type AgentKind = "pi" | "claude";
+export type AgentKind = "pi" | "claude" | "opencode" | "antigravity";
+
+/**
+ * The same four, as a value.
+ *
+ * A union type cannot be iterated, and both sides need to: the server maps each kind to a
+ * backend class, the browser draws a row per kind in the new-agent menu. Written once here
+ * so a fifth runtime is one edit rather than three that drift.
+ */
+export const AGENT_KINDS: readonly AgentKind[] = ["claude", "pi", "opencode", "antigravity"];
 
 /**
  * How much an agent asks before acting.
@@ -96,6 +121,24 @@ export interface SlashCommand {
 	hint?: string;
 	/** An example argument, e.g. "[notes]" for "/compact [notes]". */
 	arg?: string;
+	/**
+	 * Who answers it, for the badge at the end of the row.
+	 *
+	 * `deck` is one Decks interprets itself and the runtime never sees — `/login` drives
+	 * the CLI's `auth login` through the dock's dialogs, `/cost` opens the usage panel.
+	 * Everything else is handed to the runtime as a prompt and answered there: `runtime`
+	 * is its own built-in, `skill` a skill it found, `prompt` a saved prompt, `extension`
+	 * an extension's. Absent means unlabelled rather than unknown.
+	 */
+	source?: "deck" | "runtime" | "skill" | "prompt" | "extension";
+	/**
+	 * Other names that reach the same command, so the menu finds it by either.
+	 *
+	 * Claude declares these (`/cost` and `/stats` both resolve to `/usage`); they are
+	 * searched but not listed, because a menu that draws every alias as its own row is
+	 * three rows for one command.
+	 */
+	aliases?: string[];
 }
 
 /** One row in the chat list: an agent, as a messaging app would draw it. */
@@ -181,6 +224,48 @@ export interface ClaudeAccount {
 }
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
+/**
+ * The thinking scale, lowest effort first.
+ *
+ * The order is the whole reason this array exists rather than a `Set`: "nearest" is only
+ * a question you can answer about a *scale*, and the union type has no order of its own.
+ * Kept in step with `ThinkingLevel` — the `satisfies` below is what makes a level added
+ * here and forgotten in the array a type error rather than a chip that quietly never
+ * appears. In the protocol rather than in either app because `nearestLevel` is a question
+ * both sides ask: the model picker picks a level for a model, and a runtime maps a picked
+ * level onto the levels that model actually offers.
+ */
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const satisfies readonly ThinkingLevel[];
+
+/** Where the app lands when nothing has been chosen, and what an unknown level is read as. */
+export const DEFAULT_THINKING: ThinkingLevel = "medium";
+
+/**
+ * Keep the user's intent when moving to something that does not offer the current level:
+ * take the nearest one it does, rather than silently resetting.
+ *
+ * The alternative — the one this replaces — is to send no level at all and let the
+ * runtime fall back to its default, which turns "I want this model to think hard" into
+ * "I want this model", silently, at the moment you were thinking about the model and not
+ * about the level. Somebody who has asked for `max` and moves to something that stops at
+ * `high` means `high`; nobody means `medium` by it.
+ *
+ * Ties go to whichever level `supported` lists first, which is why `supported` should be
+ * in scale order too: between two equally distant neighbours the lower-effort one is the
+ * cheaper mistake.
+ */
+export function nearestLevel(wanted: ThinkingLevel | undefined, supported: readonly ThinkingLevel[]): ThinkingLevel | undefined {
+	// Something with no scale has no answer to give, and `undefined` is how the caller
+	// says "send no level" rather than "send off" — those are different requests.
+	if (supported.length === 0) return undefined;
+	if (wanted && supported.includes(wanted)) return wanted;
+
+	const asked = wanted ? THINKING_LEVELS.indexOf(wanted) : -1;
+	const from = asked === -1 ? THINKING_LEVELS.indexOf(DEFAULT_THINKING) : asked;
+	const distance = (level: ThinkingLevel) => Math.abs(THINKING_LEVELS.indexOf(level) - from);
+	return supported.reduce((best, level) => (distance(level) < distance(best) ? level : best));
+}
 
 /** A model the user may pick, as the picker needs it. */
 export interface ModelOption {
@@ -602,6 +687,15 @@ export type ClientMessage =
 	| { type: "deck.open"; path: string }
 	| { type: "board.move"; path: string; x: number; y: number }
 	| { type: "board.patch"; path: string; rev: number; patches: BoardPatch[] }
+	/**
+	 * How much room this board's content takes, measured in the frame that is showing it.
+	 *
+	 * The browser is the only thing that can answer this — it is the only place the board
+	 * is laid out — so the reading travels the other way from most of this file. It
+	 * carries the `rev` it was taken at, because a measurement of a document that has
+	 * since been rewritten is not a measurement of anything.
+	 */
+	| { type: "board.extent"; path: string; rev: number; w: number; h: number }
 	| { type: "board.undo"; path: string }
 	/** Put a board on the canvas / take it off again. The context is untouched either way. */
 	| { type: "board.play"; path: string }

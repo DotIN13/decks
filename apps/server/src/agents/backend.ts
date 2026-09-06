@@ -44,6 +44,32 @@ export interface AgentBackendContext {
 	 * Pi's adapter needs it to attribute a board revision to a turn; nothing else does.
 	 */
 	stageAgent: StageAgentHooks;
+	/**
+	 * The port Decks' own HTTP server is on.
+	 *
+	 * Only the out-of-process runtimes need it, and they need it for one thing: the canvas
+	 * tool's other end (`stage/bridge.ts`) is a route on that server, so a tool body running
+	 * inside opencode's Bun or antigravity's Python has an address to call back on.
+	 */
+	port: number;
+	/**
+	 * This agent's canvas token, for a runtime that is not in this process.
+	 *
+	 * Pi and Claude reach `tool` directly — a closure in this process. opencode registers a
+	 * TypeScript tool that runs in its own Bun runtime and antigravity a Python function
+	 * inside its SDK's, so for those two the tool body is an HTTP call and this is what it
+	 * authenticates with. Absent for the in-process runtimes, which have no use for it.
+	 */
+	canvasToken?: string;
+	/**
+	 * The stage bridge, for a runtime whose canvas tool is an HTTP call back here.
+	 *
+	 * opencode shares one `opencode serve` across every opencode agent, so its tool cannot
+	 * carry a per-agent token any more — it sends the session id opencode gave it, and the
+	 * backend needs the bridge to bind that session to this agent (`stage/bridge.ts`). The
+	 * in-process runtimes have no use for it and antigravity authenticates by token alone.
+	 */
+	stageBridge?: import("../stage/bridge.ts").StageBridge;
 	/** A session file to open instead of starting a new one — see `forkFrom`. */
 	resumeRef?: string;
 	/**
@@ -71,6 +97,14 @@ export interface AgentBackendContext {
 	accounts?: ClaudeAccountSwitcher;
 	/** Tell the browser the account list moved, after a login or a switch. */
 	accountsChanged?(): void;
+	/**
+	 * The `/` menu changed: republish the chat row that carries it.
+	 *
+	 * A runtime's command list is not fixed at start — Claude discovers skills as the
+	 * agent moves about, and pushes a replacement when it does — and the browser caches
+	 * the list per chat, so a list that moved has to be pushed rather than waited for.
+	 */
+	commandsChanged?(): void;
 	/**
 	 * Open the usage panel, unasked — `/cost`, typed in the composer.
 	 *

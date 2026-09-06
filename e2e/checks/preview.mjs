@@ -2,14 +2,13 @@
  * The time machine's preview, seen from the canvas.
  *
  * Previewing a past point turns every board amber and takes pointer events off every frame
- * — one CSS rule pair on `.stage`, so the colour and the deadness are the same fact. The
- * state was invisible from the canvas and had no way out of it: the only handle was a row
- * inside one message's own menu, in a transcript that is away by default. Somebody stuck in
- * it saw a canvas of yellow boards that would not take a click and nothing saying why.
+ * — one CSS rule pair on `.stage`, so the colour and the deadness are the same fact. That
+ * outline is the whole sign: there was a pill in the corner saying so with a Leave button
+ * in it, and it is gone.
  *
- * So this file is mostly about the *sign*: that it says what is happening, that pressing it
- * ends it, that Escape does too, and — the assertion that would have caught the first
- * attempt — that the thing is actually reachable rather than sitting under the left panel.
+ * So this file is about the amber and the deadness arriving together, about a board that
+ * arrives *during* a preview getting both, and about Escape being the way out — from the
+ * canvas and from inside a board, which is the same key handler.
  *
  * The preview is fed as a `timeline.preview` frame. The real one is a reply to
  * `rewind.preview`, which needs a session entry, which needs a turn and a model; the frame
@@ -50,7 +49,7 @@ await settle(page, 2500);
  * Edit mode *after* the reload, not `open({ edit: true })` before it: the mode is
  * deliberately not persisted, so the reload that installs the socket wrapper puts the app
  * back in browse. It is needed at all because half of what is checked here is the editing
- * sign standing down while a preview is up, and coming back afterwards.
+ * ring standing down while a preview is up, and coming back afterwards.
  */
 await editMode(page);
 
@@ -66,28 +65,27 @@ const stage = () =>
 	page.evaluate(() => ({
 		previewing: document.querySelector(".stage")?.dataset.mode !== undefined ? document.querySelector(".stage")?.dataset.previewing : null,
 		mode: document.querySelector(".stage")?.dataset.mode,
-		badge: getComputedStyle(document.querySelector(".stage"), "::before").content,
 		ring: getComputedStyle(document.querySelector(".stage"), "::after").boxShadow !== "none",
+		/** There was an amber pill with a Leave button in it. There is not now. */
+		sign: document.querySelector(".preview-sign") !== null,
 		boards: [...document.querySelectorAll(".board-node")].map((node) => ({
 			path: node.dataset.path,
 			outline: getComputedStyle(node.querySelector(".surface")).outlineColor,
 			pointer: node.querySelector("iframe") ? getComputedStyle(node.querySelector("iframe")).pointerEvents : "unmounted",
 		})),
-		sign: document.querySelector(".preview-sign")?.innerText?.replace(/\s+/g, " ").trim() ?? null,
 	}));
 
-/** `--color-warn`, which is what the boards and the sign share. */
+/** `--color-warn`, which is what a previewed board is outlined in. */
 const AMBER = "rgb(231, 175, 54)";
 
 // --- at rest --------------------------------------------------------------------------
 
 const rest = await stage();
 say("nothing is previewing to begin with", rest.previewing === "false", String(rest.previewing));
-say("…no sign on the canvas", rest.sign === null);
 say("…and no board is amber", rest.boards.every((board) => board.outline !== AMBER), JSON.stringify(rest.boards.map((board) => board.outline)));
-/* Opened in edit mode, so the editing sign is up — which is the thing the preview has to
-   stand down for a moment later. */
-say("the editing sign is up, because this check opened in edit mode", rest.badge.includes("Editing") && rest.ring, `${rest.badge}`);
+/* Opened in edit mode, so the ring is up — which is the thing the preview has to stand
+   down for a moment later. */
+say("the editing ring is up, because this check opened in edit mode", rest.ring, String(rest.ring));
 
 // --- previewing -----------------------------------------------------------------------
 
@@ -101,31 +99,16 @@ say("…every board goes amber", during.boards.length > 0 && during.boards.every
  * The colour and the deadness are one rule pair, so they are asserted together: a board that
  * looked amber and still took clicks would be a lie in the other direction.
  */
+say("…with no pill in the corner announcing it", during.sign === false, String(during.sign));
 say("…and every frame stops taking the cursor", during.boards.every((board) => board.pointer === "none" || board.pointer === "unmounted"), JSON.stringify(during.boards.map((board) => board.pointer)));
 
-say("the canvas says so, in words", /showing an earlier version/i.test(during.sign ?? ""), JSON.stringify(during.sign));
 /*
- * And the editing sign stands down. While a preview is up nothing can be edited, so a ring
- * and the word "Editing" over a canvas of inert boards is the app claiming something untrue
- * — the mode itself is untouched and comes back below.
+ * And the editing ring stands down. While a preview is up nothing can be edited, so a ring
+ * over a canvas of inert boards is the app claiming something untrue — the mode itself is
+ * untouched and comes back below.
  */
-say("…and the editing sign stands down, because nothing here can be edited", during.badge === "none" && !during.ring, `${during.badge}`);
+say("…and the editing ring stands down, because nothing here can be edited", !during.ring, String(during.ring));
 say("…without leaving edit mode, which is a different fact", during.mode === "edit", String(during.mode));
-
-/*
- * The assertion that would have caught the first attempt: the sign was placed at the
- * canvas's bottom-left corner, which is where the boards panel is, so its button was under
- * the panel and could not be pressed at all. A control nobody can reach is worse than no
- * control, because the state now looks answerable.
- */
-const reachable = await page.evaluate(() => {
-	const button = document.querySelector(".preview-sign button");
-	if (!button) return { ok: false, why: "no button" };
-	const box = button.getBoundingClientRect();
-	const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-	return { ok: button.contains(hit) || hit === button, why: hit?.className ?? hit?.tagName ?? "nothing" };
-});
-say("the way out is actually reachable, not under a panel", reachable.ok, String(reachable.why));
 
 // --- a board that arrives while it is up -----------------------------------------------
 
@@ -154,25 +137,26 @@ if (all.length > 1) {
 
 // --- the two ways out -------------------------------------------------------------------
 
-await page.locator(".preview-sign button").click();
+/*
+ * Escape, read by the stage's own key handler rather than by a window listener — which is
+ * what makes it work with focus inside a board as well, since `frame-gestures.ts` forwards a
+ * board's keys to the same function. It is the way out from the canvas; the message that
+ * started the preview holds the other one.
+ */
+await page.keyboard.press("Escape");
 await settle(page, 600);
 const left = await stage();
-say("pressing Leave ends the preview", left.previewing === "false" && left.sign === null, String(left.previewing));
+say("Escape ends the preview", left.previewing === "false", String(left.previewing));
 say("…the boards come back", left.boards.every((board) => board.outline !== AMBER), JSON.stringify(left.boards.map((board) => board.outline)));
-say("…and the editing sign returns, because the mode never changed", left.badge.includes("Editing") && left.ring, `${left.badge}`);
+say("…and the editing ring returns, because the mode never changed", left.ring, String(left.ring));
 
 await feed({ type: "timeline.preview", agentId: focused, entryId: "entry-1", boards: {} });
 await settle(page, 600);
 say("a second preview marks it again", (await stage()).previewing === "true");
 
-/*
- * Escape, read by the stage's own key handler rather than by a window listener — which is
- * what makes it work with focus inside a board as well, since `frame-gestures.ts` forwards a
- * board's keys to the same function.
- */
 await page.keyboard.press("Escape");
 await settle(page, 600);
-say("Escape ends it too", (await stage()).previewing === "false");
+say("and Escape ends that one too", (await stage()).previewing === "false");
 
 // --- the one way in ---------------------------------------------------------------------
 

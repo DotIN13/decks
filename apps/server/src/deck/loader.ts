@@ -28,6 +28,15 @@ export interface DeckWarning {
 export class Deck {
 	private file: DeckFile = { version: 1 };
 	private boardsByPath = new Map<string, Board>();
+	/**
+	 * `mtime:size` per board file, so `resync` can skip what has not moved.
+	 *
+	 * A signature is a *cheap* answer to "is this worth reading", never the answer to
+	 * "did it change" — that is `rev`, which is the content hashed. A board touched
+	 * without being edited has a new signature and the same revision, and nothing is
+	 * told about it.
+	 */
+	private signatures = new Map<string, string>();
 	private resolved: ResolvedRoots;
 	readonly warnings: string[] = [];
 
@@ -138,6 +147,45 @@ export class Deck {
 		this.boardsByPath = new Map([...placed, ...unplaced].map((board) => [board.path, board]));
 	}
 
+	/**
+	 * Re-read the whole boards directory from disk, and say what actually moved.
+	 *
+	 * The watcher is the fast path and this is the one that has to be right. A board is
+	 * re-read only when its `mtime:size` differs from the last reading, and reported only
+	 * when the *content hash* differs from the record we hold — so calling this on a timer
+	 * costs a directory walk and a `stat` per board, and a deck where nothing happened
+	 * produces nothing.
+	 *
+	 * It exists because a file event is not a promise. A write that replaces the file
+	 * (`sed -i`, `vim`, any atomic save) can leave the recursive watcher armed on an inode
+	 * nobody will write to again, and every later edit to that board then arrives nowhere:
+	 * the canvas keeps showing a version that is no longer on disk, silently, until the
+	 * server restarts.
+	 */
+	resync(): { changed: Board[]; removed: string[] } {
+		const found = scanBoards(join(this.path, "boards"), this.path);
+		const changed: Board[] = [];
+		const removed: string[] = [];
+
+		for (const path of found) {
+			const signature = signatureOf(join(this.path, path));
+			const known = this.boardsByPath.get(path);
+			if (known && this.signatures.get(path) === signature) continue;
+			const board = this.refresh(path);
+			if (board && (!known || known.rev !== board.rev)) changed.push(board);
+		}
+
+		const seen = new Set(found);
+		for (const path of [...this.boardsByPath.keys()]) {
+			if (seen.has(path)) continue;
+			this.boardsByPath.delete(path);
+			this.signatures.delete(path);
+			removed.push(path);
+		}
+
+		return { changed, removed };
+	}
+
 	/** Re-read one board after a change, keeping everything else as it is. */
 	refresh(boardPath: string): Board | undefined {
 		const path = normalizeBoardPath(boardPath);
@@ -237,6 +285,9 @@ export class Deck {
 		const absolute = join(this.path, path);
 		const html = readFileSync(absolute, "utf8");
 		const meta = readBoardMeta(html);
+		// Recorded here rather than in `resync` so that every path that reads a board —
+		// the first load, a watcher event, a `resync` — leaves the same mark behind.
+		this.signatures.set(path, signatureOf(absolute));
 		return {
 			path,
 			title: meta.title ?? basename(path).replace(/\.html?$/i, ""),
@@ -253,6 +304,16 @@ export class Deck {
 			...(meta.poster ? { poster: meta.poster } : {}),
 			inContext: [],
 		};
+	}
+}
+
+/** `mtime:size` for a file, or `""` if it went away between the scan and the stat. */
+function signatureOf(absolute: string): string {
+	try {
+		const stats = statSync(absolute);
+		return `${stats.mtimeMs}:${stats.size}`;
+	} catch {
+		return "";
 	}
 }
 

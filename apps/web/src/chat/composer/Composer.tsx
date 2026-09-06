@@ -8,6 +8,7 @@ import { Hints } from "./Hints.tsx";
 import { ModeMenu } from "./ModeMenu.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { ContextDial } from "./ContextDial.tsx";
+import { filterCommands, SlashMenu } from "./SlashMenu.tsx";
 
 /**
  * The input bar, floating over the canvas.
@@ -38,6 +39,8 @@ export function Composer(props: {
 	models: ModelOption[];
 	/** What `/` completes to on the focused agent's runtime. */
 	commands: SlashCommand[];
+	/** Whose runtime that is, for the badge on the rows the runtime rather than Decks answers. */
+	runtime?: string;
 	/**
 	 * What the agent's runtime asks before acting, and the modes it has.
 	 *
@@ -185,39 +188,64 @@ export function Composer(props: {
 	});
 
 	/** A draft that is exactly `/` followed by a command fragment, while nothing is typed after it. */
-	const SLASH = /^\/([a-z0-9_-]*)$/i;
+	const SLASH = /^\/([a-z0-9_:.-]*)$/i;
+	/** `null` when this draft is not a command draft at all, which is not the same as "". */
 	const fragment = createMemo(() => {
 		const match = SLASH.exec(text());
-		return match ? match[1]!.toLowerCase() : "";
+		return match ? match[1]!.toLowerCase() : null;
 	});
 	const matches = createMemo(() => {
-		// Only a draft that actually starts with `/` is a command draft; anything
-		// else is prose and gets no menu.
-		if (!text().startsWith("/")) return [];
-		if (!fragment()) return props.commands;
-		return props.commands.filter((command) => command.name.startsWith(fragment()));
+		const query = fragment();
+		// Only a bare `/token` is a command draft; a space after the name means the
+		// argument is being typed and the menu has had its say.
+		return query === null ? [] : filterCommands(props.commands, query);
 	});
 	const menuOpen = createMemo(() => matches().length > 0);
 
+	/**
+	 * Which row the arrows are on. Reset whenever the list under it changes.
+	 *
+	 * The hint row under the box has said `↑ ↓ to choose` and `Tab to complete` since the
+	 * composer was written, and until this signal existed all three of those keys did
+	 * nothing: the menu had no selection to move, Tab left the field, and Enter took
+	 * whatever happened to be first.
+	 */
+	const [menuIndex, setMenuIndex] = createSignal(0);
+	createEffect(() => {
+		matches();
+		setMenuIndex(0);
+	});
+
 	const pick = (command: SlashCommand) => {
-		// The argument placeholder stays for them to type over; a bare command sends
-		// fine as-is.
-		const value = `/${command.name}${command.arg ? ` ${command.arg}` : " "}`;
+		/*
+		 * `/name ` and a space — never the argument placeholder.
+		 *
+		 * It used to insert `/compact [notes]`, which reads as a form to fill in and is
+		 * not one: Enter on it sent the four literal characters `[notes]` to the runtime
+		 * as the argument. The hint stays where a hint belongs, on the row in the menu.
+		 *
+		 * The trailing space is also what closes the menu — `SLASH` does not match past
+		 * one — so the Enter after a completion sends rather than completing again.
+		 */
+		const value = `/${command.name} `;
 		setText(value);
 		input.value = value;
 		input.focus();
+		input.setSelectionRange(value.length, value.length);
 	};
 
 	/** Whether there is anything to send. Also what decides send against stop, below. */
 	const sendable = () => text().trim() !== "";
 
 	const send = () => {
-		// Enter with a command menu open completes the command instead of sending the
-		// fragment — "/lo" Enter is "login", not an unknown command. A command typed
-		// in full is already exact, so Enter sends it.
+		// Enter with a command menu open completes the highlighted row instead of sending
+		// the fragment — "/lo" Enter is "login", not an unknown command. A name typed out
+		// in full ranks itself first, so Enter on it completes to itself and the space
+		// that adds closes the menu; the Enter after that sends.
 		const menu = matches();
-		if (menu.length > 0 && menu[0]!.name !== fragment()) {
-			pick(menu[0]!);
+		const chosen = menu[menuIndex()] ?? menu[0];
+		if (chosen && chosen.name !== fragment()) {
+			pick(chosen);
 			return;
 		}
 		const value = text().trim();
@@ -272,37 +300,13 @@ export function Composer(props: {
 		 */
 		<section class="relative flex w-auto transform-none flex-col gap-1.5">
 			<Show when={menuOpen()}>
-				{/*
-					The menu floats *above* the whole stack rather than below it, because below is
-					where the keyboard is on a phone and where the canvas is everywhere else — and
-					above the stack rather than inside the controls row, because a completion list
-					is about the text and not about the controls.
-				*/}
-				<div
-					class="absolute bottom-[calc(100%+6px)] left-0 z-[12] flex max-h-[230px] w-[min(360px,100%)] flex-col gap-0.5 overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
-					role="listbox"
-					aria-label="Commands"
-				>
-					<For each={matches()}>
-						{(command) => (
-							<button
-								class="flex cursor-pointer items-baseline gap-2.5 rounded-control border-0 bg-transparent px-[9px] py-[7px] text-left text-[13px] text-fg hover:bg-line"
-								type="button"
-								role="option"
-								title={command.hint}
-								onClick={() => pick(command)}
-							>
-								<span class="flex-none font-mono text-accent">
-									/{command.name}
-									{command.arg ? ` ${command.arg}` : ""}
-								</span>
-								<Show when={command.hint}>
-									<span class="overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted">{command.hint}</span>
-								</Show>
-							</button>
-						)}
-					</For>
-				</div>
+				<SlashMenu
+					commands={matches()}
+					activeIndex={menuIndex()}
+					runtime={props.runtime ?? "agent"}
+					onHover={setMenuIndex}
+					onPick={pick}
+				/>
 			</Show>
 
 			{/* 10 / 10 / 8: the bottom is short because the controls row has its own gap to
@@ -340,9 +344,37 @@ export function Composer(props: {
 						endedAt = Date.now();
 					}}
 					onKeyDown={(event) => {
-						// Both branches below are destructive — one clears the draft, the other
-						// sends it — so both ask the input method first.
+						// Every branch below is destructive — one moves a selection, one clears
+						// the draft, one sends it — so all of them ask the input method first.
 						if (imeOwns(event)) return;
+						/*
+						 * While the menu is up it owns the arrows and Tab. Wrapping rather than
+						 * stopping at the ends: a fifty-row list is one ArrowUp away from its own
+						 * bottom, and that is a reachable row rather than a dead key.
+						 */
+						if (menuOpen()) {
+							const length = matches().length;
+							if (event.key === "ArrowDown") {
+								event.preventDefault();
+								setMenuIndex((at) => (at + 1) % length);
+								return;
+							}
+							if (event.key === "ArrowUp") {
+								event.preventDefault();
+								setMenuIndex((at) => (at - 1 + length) % length);
+								return;
+							}
+							if (event.key === "Tab") {
+								// Tab completes rather than leaving the field, which is what the hint
+								// under the box has been claiming all along.
+								const chosen = matches()[menuIndex()];
+								if (chosen) {
+									event.preventDefault();
+									pick(chosen);
+									return;
+								}
+							}
+						}
 						if (event.key === "Escape") {
 							setText("");
 							input.value = "";

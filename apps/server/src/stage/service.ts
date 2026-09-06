@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Board, Camera, ServerMessage, StageCall, StageResult } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
+import { withBoardSize } from "../deck/meta.ts";
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
 
 /**
@@ -22,6 +23,12 @@ import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
 export interface StageHost {
 	/** Write a new board from a template and return its deck-relative path. */
 	newBoard(options: { title: string; kind: string; size?: { w?: number; h?: number } }): string;
+	/** Write a board's file, record the revision, and tell everyone. */
+	writeBoard(path: string, html: string): Board;
+	/** What the canvas last measured of this board, if what it measured was this revision. */
+	extent(path: string, rev: number): { w: number; h: number } | undefined;
+	/** Wait for a measurement of this revision — every frame takes one when it loads. */
+	awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number } | undefined>;
 	/** Send to the focused browser, and resolve when it answers. */
 	call(call: Omit<StageCall, "id">): Promise<unknown>;
 	/** Is anyone looking? */
@@ -32,6 +39,11 @@ export interface StageHost {
 	/** Agents, for `stage.agents()` and for `inContext` on every board. */
 	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
 }
+
+/** The room `fit` leaves under the content — the margin a board's own components start at. */
+const FIT_MARGIN = 48;
+/** How long `fit` waits for the frame to load and report, before saying nobody looked. */
+const FIT_WAIT_MS = 5000;
 
 export class StageService {
 	constructor(
@@ -47,10 +59,16 @@ export class StageService {
 
 	boards(): Board[] {
 		const holders = this.host.agents();
-		return this.deck.boards.map((board) => ({
-			...board,
-			inContext: holders.filter((agent) => agent.context.includes(board.path)).map((agent) => agent.id),
-		}));
+		return this.deck.boards.map((board) => {
+			// A measurement of an older revision is left off rather than reported: it is a
+			// number, and a number gets believed.
+			const content = this.host.extent(board.path, board.rev);
+			return {
+				...board,
+				...(content ? { content, clipped: content.w > board.w || content.h > board.h } : {}),
+				inContext: holders.filter((agent) => agent.context.includes(board.path)).map((agent) => agent.id),
+			};
+		});
 	}
 
 	read(path: string): string {
@@ -86,6 +104,57 @@ export class StageService {
 	/** A new board from a template — the shell, so the agent writes only the content. */
 	newBoard(options: { title: string; kind: string; size?: { w?: number; h?: number } }): string {
 		return this.host.newBoard(options);
+	}
+
+	/**
+	 * Set a board's size: the one number in the file, written by the thing that owns it.
+	 *
+	 * An agent editing `<meta name="board">` by hand works and is a bad idea — it is JSON
+	 * inside an HTML attribute, and the write has to keep every other byte where it was.
+	 * Here the deck's own record is refreshed as part of the write, so a resize can never
+	 * be a change the canvas does not know about.
+	 */
+	resize(path: string, size: { w?: number; h?: number }): Board {
+		const board = this.deck.board(path);
+		if (!board) throw new Error(`No such board: ${path}`);
+		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
+		const html = readFileSync(this.deck.fileOf(path), "utf8");
+		return this.host.writeBoard(path, withBoardSize(html, size));
+	}
+
+	/**
+	 * Size a board to what is on it.
+	 *
+	 * The height comes from the content and the width only grows, and that asymmetry is
+	 * the whole design: narrowing a board reflows its text, which changes the height,
+	 * which is what we were trying to measure. Growing the width is safe, and is what a
+	 * component pushed past the right edge needs.
+	 *
+	 * The measurement comes from the browser, because the browser is the only place a
+	 * board is laid out. Every frame reports one when it loads, so the usual case is
+	 * instant; a board nobody is showing has never been measured and says so rather than
+	 * guessing, which is the only honest answer and also a useful one — it means "put it
+	 * on the canvas".
+	 */
+	async fit(path: string, options?: { margin?: number }): Promise<Board> {
+		// The record first: an agent calls this straight after writing the content, and
+		// the revision we wait for a measurement of has to be the one now on disk.
+		this.deck.refresh(path);
+		const board = this.deck.board(path);
+		if (!board) throw new Error(`No such board: ${path}`);
+
+		const margin = Math.max(0, Math.min(400, Math.round(options?.margin ?? FIT_MARGIN)));
+		const extent = this.host.extent(path, board.rev) ?? (await this.host.awaitExtent(path, board.rev, FIT_WAIT_MS));
+		if (!extent) {
+			throw new Error(
+				`Nothing has measured ${path} yet. A board is measured in the frame showing it, so put it on the canvas — stage.show("${path}") — and ask again.`,
+			);
+		}
+
+		const h = extent.h + margin;
+		const w = Math.max(board.w, extent.w + margin);
+		if (w === board.w && h === board.h) return board;
+		return this.resize(path, { w, h });
 	}
 
 	/** An agent's avatar, drawn by the agent, stored beside the deck. */

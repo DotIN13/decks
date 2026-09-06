@@ -17,6 +17,7 @@
     "@decks/protocol": "*",
     "@earendil-works/pi-coding-agent": "^0.85.0",
     "@earendil-works/pi-server": "^0.85.0",
+    "@opencode-ai/sdk": "^1.18.29",
     "esbuild": "^0.25.0",
     "express": "^5.1.0",
     "parse5": "^7.3.0",

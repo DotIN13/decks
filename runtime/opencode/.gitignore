@@ -1,0 +1,7 @@
+# opencode installs the tool's own dependency into this directory the first time it loads
+# `tools/stage_eval.ts`, and writes a lockfile beside it. Those are machine-local; the
+# `package.json` that *declares* the dependency is not, so it stays tracked — a fresh clone
+# has to say which version of `@opencode-ai/plugin` the tool is written against.
+node_modules
+package-lock.json
+bun.lock

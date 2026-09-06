@@ -2,6 +2,7 @@ import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import { createSignal, For, onCleanup, Show } from "solid-js";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 import { AgentFace, AgentMenu } from "./AgentPill.tsx";
+import { canHover } from "../lib/panels.ts";
 import { agentOrder, agentStatus, stackFaces, statusWords } from "./agent-order.ts";
 
 /**
@@ -88,7 +89,16 @@ export function AgentStack(props: {
 	const initialAnchor = () => strip?.querySelector("button")?.getBoundingClientRect() ?? new DOMRect();
 
 	let exit: ReturnType<typeof setTimeout> | undefined;
+	/*
+	 * Not on a touch screen: a finger cannot hover, and `pointerenter` fires on a tap.
+	 *
+	 * So on a phone the first tap on a face produced a card over the corner instead of
+	 * switching to that agent — the tap eaten by a thing nobody asked for, in front of the
+	 * faces beside it. `canHover` and not a width, because a narrow window on a laptop
+	 * still has a pointer that hovers.
+	 */
 	const enter = (id: string, event: { currentTarget: Element }) => {
+		if (!canHover()) return;
 		if (exit !== undefined) clearTimeout(exit);
 		const at = { id, at: event.currentTarget.getBoundingClientRect() };
 		setOver(at);

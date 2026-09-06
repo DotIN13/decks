@@ -88,7 +88,15 @@ than scattering components arbitrarily.
 Prefer sizing from content. Set explicit heights only where needed, particularly for
 embeds, diagrams, charts, or constrained boxes.
 
-Increase the board dimensions if content would otherwise clip.
+Increase the board dimensions if content would otherwise clip — or do not guess at all:
+once the content is written and the board is on the canvas, `stage.fit(path)` sizes it to
+what is on it, and `stage.boards()` reports `content` and `clipped` for anything already
+over the edge. `stage.resize(path, { w, h })` sets a size outright. Both write the board's
+`<meta name="board">` for you.
+
+**Edit board files in place** — Write, Edit, `cat > file`. A save that replaces the file
+rather than rewriting it (`sed -i`, `vim`, any atomic write) swaps the file the canvas is
+watching, and the board can stop tracking your edits.
 
 ## Component metadata
 
@@ -131,6 +139,22 @@ The board stylesheet provides common visual containers including:
 The first four are interchangeable box classes: they all mean "a box with prose in it",
 and the user's inspector can swap any of them for any other. `kpi`, `table` and `chip`
 style their children, so they are not in that switch.
+
+**They nest.** A `<table>` inside a card, a callout inside a section, a kpi row inside a
+box: all of these flow inside their parent, and the parent grows to hold them. What makes
+a component draggable is being a direct child of `<body>` with a `data-id` — not the
+class. Two ways to put a table on a board, and both are fine:
+
+```html
+<section class="card table" data-id="defaults">   <!-- a card, with a styled table in it -->
+	<h3>The template defaults</h3>
+	<table>…</table>
+</section>
+
+<div class="table" data-id="defaults" style="left: 48px; top: 144px; width: 620px">
+	<table>…</table>                               <!-- or the table as its own component -->
+</div>
+```
 
 Use these when useful, but they are not a schema or a limit on what may appear on a
 board.

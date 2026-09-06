@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { AgentChat, ServerMessage } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentMode, ServerMessage, ThinkingLevel } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import { Registry } from "./registry.ts";
@@ -47,6 +47,7 @@ function agentOn(deck: Deck, color = "#3b5cf6"): DeckAgent {
 			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
+			report: () => {},
 			// The real one pastes the board source in; here the task is the whole briefing, so
 			// a drained item is recognisable in the transcript by its own words.
 			brief: (task: string) => task,
@@ -372,5 +373,287 @@ test("an address that cannot be resolved is refused rather than guessed at", () 
 	// picking one of them would send work to the wrong conversation silently.
 	registry.get(ada)?.rename("Kit");
 	assert.throws(() => registry.send(ada, "Kit", { task: "x" }), /More than one agent is called Kit/);
+	cleanup();
+});
+
+/*
+ * What `stage.agents()` reports about every agent — the twenty newest boards, the true
+ * total, and the runtime.
+ *
+ * The cap is a screen of the held list, not a truncation: `holding` rides beside it so a
+ * reader can tell a slice from everything before deciding whether to ask for more. And
+ * `kind` is the load-bearing word — whether the row is a Claude one or an antigravity one
+ * changes what handing work to it means.
+ */
+test("summaries reports the twenty newest boards, the true total, and the runtime", () => {
+	const { deck, cleanup } = deckOn();
+
+	const agent = agentOn(deck);
+	agent.translator.user("hello");
+	const id = agent.id;
+	agent.dispose();
+
+	const { registry } = registryOn(deck);
+	registry.restore();
+	const held = registry.get(id)!;
+	const paths = Array.from({ length: 25 }, (_, index) => `boards/b${index}.html`);
+	held.setContext(paths);
+
+	const summary = registry.summaries().find((row) => row.id === id)!;
+	assert.equal(summary.holding, 25, "the true total is not truncated");
+	assert.deepEqual(summary.context, paths.slice(0, 20), "but the list reported is the twenty newest");
+	assert.equal(summary.kind, "pi", "and the runtime is on the row");
+	cleanup();
+});
+
+/*
+ * `Registry.spawn` honouring what a delegation asked for (§6.2).
+ *
+ * Spawn creates the child through `Registry.create`, which would start a real runtime — the
+ * thing these tests exist to avoid. So `create` is overridden to hand spawn a `SpyChild`
+ * whose `setModel`/`setMode`/`setThinking`/`run` record rather than reach a backend, and
+ * a parent built directly (the way the registry test harness builds every agent) is put on
+ * the list under its real id so `spawn` can find it and write its notices to it.
+ */
+class SpyChild extends DeckAgent {
+	readonly models: Array<[string, string, ThinkingLevel | undefined]> = [];
+	readonly modes: AgentMode[] = [];
+	readonly thinkings: ThinkingLevel[] = [];
+	override async start(): Promise<void> {}
+	override async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
+		this.models.push([provider, model, thinking]);
+	}
+	override async setMode(mode: AgentMode): Promise<void> {
+		this.modes.push(mode);
+	}
+	override setThinking(level: ThinkingLevel): void {
+		this.thinkings.push(level);
+	}
+	override async run(text: string): Promise<{ report: string; boards: string[] }> {
+		return { report: "done", boards: [] };
+	}
+}
+
+function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; parentId: string; child: () => SpyChild | undefined; sent: ServerMessage[] } {
+	const sent: ServerMessage[] = [];
+	let child: SpyChild | undefined;
+
+	class SpyRegistry extends Registry {
+		override create(options: { name?: string; parentId?: string; kind?: AgentKind } = {}) {
+			const agent = new SpyChild(
+				deck,
+				() => {},
+				{} as StageService,
+				{
+					port: 4329,
+					camera: () => ({ x: 0, y: 0, zoom: 1 }),
+					agents: () => [],
+					spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
+					send: () => ({ queued: true as const, position: 1 }),
+					queue: () => [],
+					report: () => {},
+					brief: (task: string) => task,
+					recordRevision: () => undefined,
+					boardPathOf: () => undefined,
+				},
+				{
+					...(options.name ? { name: options.name } : {}),
+					...(options.parentId ? { parentId: options.parentId } : {}),
+					color: "#2eaf5a",
+					kind: options.kind ?? childKind,
+					snapshots: new SnapshotStore(),
+					store: new AgentStore(deck),
+				},
+			);
+			child = agent;
+			return agent;
+		}
+	}
+
+	const registry = new SpyRegistry(deck, (message) => sent.push(message), {} as StageService, {
+		port: 4329,
+		defaultKind: "pi",
+		camera: () => ({ x: 0, y: 0, zoom: 1 }),
+		recordRevision: () => undefined,
+		boardPathOf: () => undefined,
+	});
+	// The parent: built directly so nothing starts, spoken to so its notices land, then put
+	// on the registry's list under its real id — which is all `spawn` asks of it. Its emit
+	// goes to the same `sent` the registry's does, so a refusal notice is observable.
+	const parent = new DeckAgent(
+		deck,
+		(message) => sent.push(message),
+		{} as StageService,
+		{
+			port: 4329,
+			camera: () => ({ x: 0, y: 0, zoom: 1 }),
+			agents: () => [],
+			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
+			send: () => ({ queued: true as const, position: 1 }),
+			queue: () => [],
+			report: () => {},
+			brief: (task: string) => task,
+			recordRevision: () => undefined,
+			boardPathOf: () => undefined,
+		},
+		{ color: "#3b5cf6", kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck) },
+	);
+	parent.translator.user("delegate something");
+	(registry as unknown as { agents: DeckAgent[] }).agents.push(parent);
+	return { registry, parentId: parent.id, child: () => child, sent };
+}
+
+test("spawn passes the asked-for kind to create, and the child is that runtime", async () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, parentId, child } = spawnHarness(deck, "pi");
+
+	await registry.spawn(parentId, { task: "survey the deck", kind: "claude", boards: ["boards/plan.html"] });
+	assert.equal(child()?.kind, "claude", "the child was created on the runtime asked for, not the default");
+	cleanup();
+});
+
+test("spawn passes the thinking level as setModel's third argument", async () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, parentId, child } = spawnHarness(deck, "claude");
+
+	await registry.spawn(parentId, { task: "x", model: "pi/deepseek-v4", thinking: "high" });
+	assert.deepEqual(child()?.models, [["pi", "deepseek-v4", "high"]], "the level reaches the backend, which is where it used to be dropped");
+	cleanup();
+});
+
+test("thinking asked for without a model is applied to the default", async () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, parentId, child } = spawnHarness(deck, "pi");
+
+	await registry.spawn(parentId, { task: "x", thinking: "max" });
+	assert.deepEqual(child()?.thinkings, ["max"]);
+	cleanup();
+});
+
+test("a mode the runtime offers reaches the child's setMode", async () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, parentId, child } = spawnHarness(deck, "claude");
+
+	await registry.spawn(parentId, { task: "x", mode: "plan" });
+	assert.deepEqual(child()?.modes, ["plan"]);
+	cleanup();
+});
+
+test("a mode a runtime does not offer is a notice, not an error — pi has no modes at all", async () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, parentId, child, sent } = spawnHarness(deck, "pi");
+
+	const report = await registry.spawn(parentId, { task: "x", mode: "plan" });
+	assert.equal(report.report, "done", "the child still did the work, on the mode it has");
+	assert.deepEqual(child()?.modes, [], "no mode was set");
+	const notice = sent.filter((message) => message.type === "chat.item").at(-1);
+	assert.ok(notice && notice.type === "chat.item" && notice.item.kind === "notice");
+	assert.match(notice.item.text, /Subagent stays in its default mode: pi cannot do "plan"/);
+	cleanup();
+});
+
+/*
+ * The reply: `send(to, { reply: true })` — the report comes back to the sender.
+ *
+ * The flag rides on the queued item; the delivery is the receiver's `drain()` calling
+ * `report` on the host, which this registry turns into a notice in the sender's transcript.
+ * The no-loop rule is the shape of that delivery: a notice, never a task — a task in a
+ * queue runs a turn when it drains, and a turn that answers a report with another report
+ * is two agents talking forever.
+ */
+test("send carries reply into the queued item, and not without it", () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, ada, kit } = twoRestored(deck);
+
+	registry.send(ada, kit, { task: "one", reply: true });
+	registry.send(ada, kit, { task: "two" });
+	const waiting = registry.get(kit)?.queue() ?? [];
+	assert.equal(waiting.length, 2);
+	assert.equal(waiting[0]?.reply, true);
+	assert.equal(waiting[1]?.reply, undefined, "plain sends stay plain");
+	cleanup();
+});
+
+/**
+ * A receiver that can actually drain without a runtime – the registry's `send`/`enqueue`
+ * path from one end to the other, with `run` stubbed the way `session.test.ts` stubs it.
+ */
+class DrainingChild extends DeckAgent {
+	readonly ran: string[] = [];
+	override async run(text: string): Promise<{ report: string; boards: string[] }> {
+		this.ran.push(text);
+		return { report: "the numbers are 42px", boards: [] };
+	}
+}
+
+function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; receiver: DrainingChild; sent: ServerMessage[] } {
+	const sent: ServerMessage[] = [];
+	const created: DrainingChild[] = [];
+	const registry = new (class extends Registry {
+		override create(options: { name?: string } = {}) {
+			const agent = new DrainingChild(
+				deck,
+				(message) => sent.push(message),
+				{} as StageService,
+				{
+					port: 4329,
+					camera: () => ({ x: 0, y: 0, zoom: 1 }),
+					agents: () => [],
+					spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
+					send: (fromId, target, spec) => this.send(fromId, target, spec),
+					queue: (agentId) => this.get(agentId)?.queue() ?? [],
+					// The real wiring under test: the receiver's `report` call becomes a
+					// notice in whoever is named — a transcript item, not a queued task.
+					report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
+					brief: (task: string, boards: string[]) => (boards.length > 0 ? `${task} [${boards.join(" ")}]` : task),
+					recordRevision: () => undefined,
+					boardPathOf: () => undefined,
+				},
+				{ name: options.name ?? "Agent", color: "#2eaf5a", kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck) },
+			);
+			(this as unknown as { agents: DeckAgent[] }).agents.push(agent);
+			(this as unknown as { focusedId?: string }).focusedId ??= agent.id;
+			created.push(agent);
+			return agent;
+		}
+	})(deck, (message) => sent.push(message), {} as StageService, {
+		port: 4329,
+		defaultKind: "pi",
+		camera: () => ({ x: 0, y: 0, zoom: 1 }),
+		recordRevision: () => undefined,
+		boardPathOf: () => undefined,
+	});
+
+	const sender = registry.create({ name: "Ada" });
+	const receiver = registry.create({ name: "Kit" });
+	return { registry, sender: sender as DrainingChild, receiver: receiver as DrainingChild, sent };
+}
+
+const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("a reply is delivered as a notice in the sender's transcript — and never runs a turn of their own", async () => {
+	process.env.DECKS_QUEUE_IDLE_MS = "10";
+	const { deck, cleanup } = deckOn();
+	const { registry, sender, receiver, sent } = replyHarness(deck);
+
+	registry.send(sender.id, receiver.id, { task: "Remeasure the panel numbers", boards: ["boards/plan.html"], reply: true });
+	await settle(80);
+
+	assert.deepEqual(receiver.ran, ["Remeasure the panel numbers [boards/plan.html]"], "the receiver did the work");
+	assert.equal(receiver.queued, 0, "and its queue drained");
+	const notices = sent.filter(
+		(message): message is Extract<ServerMessage, { type: "chat.item" }> => message.type === "chat.item" && message.item.kind === "notice",
+	);
+	assert.ok(
+		notices.some(
+			(message) => message.item.kind === "notice" && /Kit finished "Remeasure the panel numbers": the numbers are 42px/.test(message.item.text),
+		),
+		"the report landed in the sender's transcript as a notice",
+	);
+	// The no-loop rule: nothing was queued to the sender, so nothing can ever wake them to
+	// answer the report — the reply is read when they next look, not turned into a turn.
+	assert.equal(sender.queued, 0, "no task landed in the sender's queue");
+	assert.deepEqual(sender.ran, [], "and no turn of the sender ever ran");
+	delete process.env.DECKS_QUEUE_IDLE_MS;
 	cleanup();
 });

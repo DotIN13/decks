@@ -43,7 +43,7 @@ Every board is a whole document that must render on its own. Start from this sha
 </html>
 ```
 
-Six rules, and they matter more than they look:
+Seven rules, and they matter more than they look:
 
 1. **Position with inline `left`/`top`/`width` in `style`.** That is the one place you
    and the user can both edit — they drag a box, and the drag rewrites exactly that
@@ -58,10 +58,17 @@ Six rules, and they matter more than they look:
    property of the shape. What your markup does decide is the *size* of each field, so put
    strings the user should retype separately in separate leaves.
 4. **Size the board in `<meta name="board">`** to fit what you put on it. Content does
-   not scroll — the canvas is the scrolling — so a board that is too small clips.
-5. **Two files in the head, always.** `board.css` and `board.js`; `board.js` loads
+   not scroll — the canvas is the scrolling — so a board that is too small clips, in
+   silence. You do not have to guess the height: write the content, `stage.show` it, then
+   `stage.fit(path)` and the board takes the size of what is on it. `stage.boards()` says
+   `clipped` for any board already over its edge.
+5. **Edit a board in place.** Write, Edit, `cat > file` — anything that keeps the file
+   where it is. A temp-file-and-rename save (`sed -i`, `vim`, an atomic write) replaces
+   the file the canvas is watching, and the board can stop tracking your edits until the
+   server next looks.
+6. **Two files in the head, always.** `board.css` and `board.js`; `board.js` loads
    markdown, maths, diagrams and PDF rendering itself, when a component needs them.
-6. **Interactive and economical beats a wall of text.** Prefer boards that invite the
+7. **Interactive and economical beats a wall of text.** Prefer boards that invite the
    reader to click, drag and inspect — chips, KPIs, a diagram, a table — over prose.
    Fewer words and plainer language; every sentence earns its place. And a board is
    self-consistent: it stands alone without the chat, and its parts agree with each
@@ -113,10 +120,22 @@ and "Agent" is not a name.
 
 `stage.newBoard` tells you the **viewport** — how much room the canvas has, in pixels —
 so you can see what the size you chose will look like; `stage.viewport()` asks any other
-time. And there are two ways to hand work over: `stage.delegate` makes a new agent and
-waits for its report, for a step in what you are doing; `stage.send(who, { task })`
-queues it for an agent that already exists and returns immediately, for work that is
-theirs rather than yours.
+time. And once the content is written, `stage.fit(path)` sizes the board to it (the
+measurement is taken in the frame showing it, so `show` first), while
+`stage.resize(path, { w, h })` sets a size outright. There are two ways to hand work
+over. **`stage.delegate`** makes a new agent and waits
+for its report — right when the answer is a step in what you are doing.
+**`stage.send(who, …)`** queues it for an agent that already exists and returns at once —
+right when the work is theirs.
+
+Put a long brief on a board and point at it, rather than in the message. A board is read
+when the work actually runs, so you can still correct it after sending; a task string is
+frozen the moment you send it, and the receiver's transcript shows only its first line. One
+sentence of work does not need a board. A page of it does.
+
+Ask for a reply when you need one — `send(who, { task, reply: true })` — and do not when you
+do not. A report always reaches whoever asked for the work; `reply` is about whether it
+should reach you *as a message*, or only be there when you next look.
 
 ```ts
 await stage.me.setName("Ada");

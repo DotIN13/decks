@@ -1,4 +1,4 @@
-import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
+import { AGENT_KINDS, type AgentChat, type AgentKind, type Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
@@ -18,6 +18,7 @@ import { AgentMark } from "../chat/agent-marks.tsx";
 import type { CanvasMode, Tool } from "../canvas/Editor.ts";
 import { Icon } from "../icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
+import { canHover } from "../lib/panels.ts";
 import { agentList, agentStatus, closeWords, rowWords } from "./agent-order.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 
@@ -222,7 +223,17 @@ export function AgentMenu(props: {
 		};
 	};
 
+	/*
+	 * Not on a touch screen, and not as a rule about small windows: the card is a *hover*
+	 * card, and a finger cannot hover.
+	 *
+	 * `pointerenter` fires on a tap, so a list of agents on a phone answered the first tap
+	 * with a card and needed a second one to switch — the card arriving instead of the
+	 * thing you asked for. It reads as the tap being eaten, which is what it is. Everything
+	 * the card says is on the row underneath it anyway; on a phone the row is the answer.
+	 */
 	const point = (id: string, at: Anchor) => {
+		if (!canHover()) return;
 		clearTimeout(exit);
 		setOver({ id, at });
 		setHeld({ id, at });
@@ -420,7 +431,7 @@ export function AgentMenu(props: {
 			 * picking one here *creates* rather than remembering a preference.
 			 */}
 			<Show when={picking()}>
-				<For each={["claude", "pi"] as AgentKind[]}>
+				<For each={AGENT_KINDS}>
 					{(kind) => (
 						<button type="button" role="menuitem" data-row data-flat="true" onClick={() => pick(() => props.onNew(kind))}>
 							{/* `flex-none`: an `<svg>` in a flex row shrinks to nothing beside a
@@ -623,8 +634,8 @@ export function AgentPill(props: {
 				the opposite of what reads naturally when you write the markup.
 
 				No confirmation. A single press is right for something this reversible, and the
-				guard against pressing it by accident is that editing *looks* different — see
-				`.stage[data-mode]` and the badge in `Stage.tsx`. A dialog in front of a mode
+				guard against pressing it by accident is that editing *looks* different — the ring
+				around the canvas, `.stage[data-mode="edit"]::after`. A dialog in front of a mode
 				switch is a dialog you learn to dismiss without reading.
 			*/}
 			<button

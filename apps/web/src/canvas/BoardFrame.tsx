@@ -7,6 +7,7 @@ import { INTERACT_ZOOM } from "../lib/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
+import { measureFrame } from "./extent.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
 import { paintFrame } from "../lib/theme.ts";
 
@@ -38,6 +39,14 @@ export function BoardFrame(props: {
 	onSelect: () => void;
 	onMove: (x: number, y: number) => void;
 	onOpen: () => void;
+	/**
+	 * How much room this board's content took, once the document had finished mounting.
+	 *
+	 * Sent up rather than kept here because the frame is the only place a board is laid
+	 * out, and the server is where the question gets asked (`stage.fit`, and `clipped` on
+	 * `stage.boards()`). Reported once per load, with the revision it was measured at.
+	 */
+	onExtent?: (extent: { rev: number; w: number; h: number }) => void;
 	/** Take this board off the canvas. It stays in the agent's context. */
 	onHide?: () => void;
 	/** Editing lives inside the frame, because the frame is same-origin (§4). */
@@ -61,10 +70,55 @@ export function BoardFrame(props: {
 	let detachEditor: (() => void) | undefined;
 	let detachGestures: (() => void) | undefined;
 	let detachDrop: (() => void) | undefined;
+	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
+	let measuring: ReturnType<typeof setTimeout> | undefined;
 	onCleanup(() => {
 		detachEditor?.();
 		detachGestures?.();
 		detachDrop?.();
+		clearTimeout(measuring);
+	});
+
+	/**
+	 * Measure the document once it has finished mounting, and send the reading up.
+	 *
+	 * `load` is too early by design: `board.js` renders markdown, maths, diagrams and
+	 * embeds afterwards and only then sets `__boardReady`, so a measurement taken at
+	 * `load` is of a document that does not exist yet. Polling rather than a message
+	 * because a board is an ordinary document the deck can hold — it makes no promises to
+	 * this app, and an old board that never sets the flag must cost nothing more than a
+	 * few checks that come to nothing.
+	 */
+	const reportExtent = (frame: HTMLIFrameElement, rev: number) => {
+		clearTimeout(measuring);
+		if (!props.onExtent) return;
+		let left = 150;
+		const attempt = () => {
+			measuring = undefined;
+			// A reload replaced the document this measurement was for; the new one will
+			// ask again on its own `load`.
+			if (frame !== frameEl || !frame.isConnected) return;
+			const extent = measureFrame(frame);
+			if (extent) {
+				props.onExtent?.({ rev, ...extent });
+				return;
+			}
+			if (left-- > 0) measuring = setTimeout(attempt, 100);
+		};
+		measuring = setTimeout(attempt, 0);
+	};
+
+	/*
+	 * And again on every revision, not only on every load.
+	 *
+	 * The user's own edits are applied to the live DOM rather than by reloading the frame
+	 * — that is the whole point of the patch path — so a board being edited would keep
+	 * reporting the size it had when it last loaded, and `clipped` would go quiet exactly
+	 * while somebody is adding the paragraph that overflows it.
+	 */
+	createEffect(() => {
+		const rev = props.board.rev;
+		if (frameEl) reportExtent(frameEl, rev);
 	});
 
 	const [dragging, setDragging] = createSignal(false);
@@ -334,6 +388,7 @@ export function BoardFrame(props: {
 							detachEditor = attachEditor(frame, props.board.path, props.editor);
 							detachGestures = attachFrameGestures(frame, props.gestures);
 							detachDrop = attachFrameDrop(frame, props.drops);
+							reportExtent(frame, props.board.rev);
 						}}
 					/>
 				</Show>

@@ -1,4 +1,4 @@
-import type { Camera, Identity } from "@decks/protocol";
+import type { AgentKind, AgentMode, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { BOARD_KINDS, isBoardKind } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService } from "./service.ts";
@@ -24,6 +24,26 @@ export interface DelegateSpec {
 	boards?: string[];
 	/** "provider/model", if the child should run on something other than the default. */
 	model?: string;
+	/**
+	 * The runtime the child is: fixed at creation, exactly as the `+` button fixes it.
+	 *
+	 * Omit it and the child gets the server's default. It is the one field that can never
+	 * change afterwards, so asking for it here is the only way to get it.
+	 */
+	kind?: AgentKind;
+	/**
+	 * The thinking level, on its own scale from the model — the same reason the composer
+	 * draws it as a separate control below the model list.
+	 */
+	thinking?: ThinkingLevel;
+	/**
+	 * How much the child asks before acting, from its runtime's own set.
+	 *
+	 * The runtimes do not all offer all four — pi has none at all, antigravity two — and
+	 * asking for one a runtime does not have is not an error: the child does the work on
+	 * its default mode and the parent is told it did not get what it asked for.
+	 */
+	mode?: AgentMode;
 }
 
 /**
@@ -32,12 +52,25 @@ export interface DelegateSpec {
  * No `model`: a delegation creates the agent it is about to run, so choosing its model is
  * part of creating it. A send lands in a conversation that is already somebody's, on
  * whatever model that conversation is having — changing it from outside would rewrite the
- * voice of a chat the user is reading.
+ * voice of a chat the user is reading. The same argument bars `kind`, `thinking` and
+ * `mode`: they are all choices about how a piece of work is *created*, and a send creates
+ * nothing.
  */
 export interface SendSpec {
 	task: string;
 	/** Boards handed over: the receiver is given their source when the item runs. */
 	boards?: string[];
+	/**
+	 * Tell the sender when the work is done.
+	 *
+	 * Off by default: most sends are genuinely *theirs* — you handed it over because you
+	 * had nothing more to do with the answer, and a reply you did not ask for is an
+	 * interruption. When set, the receiver's report is delivered to the sender as a notice
+	 * in their transcript when the item runs — never as a queued task, because a task runs
+	 * a turn of the sender's own, and a turn that answers a report with another report is
+	 * two agents talking forever.
+	 */
+	reply?: boolean;
 }
 
 /** One item waiting in an agent's queue. */
@@ -48,6 +81,8 @@ export interface QueuedWork {
 	task: string;
 	boards: string[];
 	at: number;
+	/** The sender asked for the report back — see `SendSpec.reply`. */
+	reply?: boolean;
 }
 
 export interface DelegateReport {
@@ -69,7 +104,7 @@ export interface StageAgentHooks {
 	setAvatar(url: string): void;
 	/** Replaces the agent's own tags and returns them as stored — see `agents/tags.ts`. */
 	setTags(tags: unknown): string[];
-	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[]; queued?: number }>;
+	agents(): Array<{ id: string; name: string; state: string; context: string[]; holding: number; kind: AgentKind; tags: string[]; queued?: number }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
 	/** Hand work to a new agent and wait for it. */
@@ -134,6 +169,8 @@ Your code is the body of an async function with \`stage\` in scope; whatever you
 
 **Keep the canvas to what matters.** \`stage.show(paths)\` sets what is on the canvas and fits the camera to it. \`stage.hide(paths)\` takes a board off the canvas but keeps it in your context. \`stage.attach\` / \`stage.detach\` are the context itself, which is what the rail beside the canvas lists. The camera never moves unless you call \`show\`.
 
+**A board does not scroll, so a board that is too small clips — silently.** \`stage.fit(path)\` sizes it to what is on it: write the content, \`show\` it, then fit. The measurement is taken in the frame showing the board, so it has to be on the canvas; \`stage.boards()\` carries the same reading as \`content\` and \`clipped\`. \`stage.resize(path, { w, h })\` sets a size outright.
+
 Also here: look at the deck (\`stage.boards\`, \`stage.read\`), place boards (\`stage.move\`), resolve a path to embed (\`stage.resolve\`), get a URL to screenshot with Playwright (\`stage.url\`), name yourself and draw your own avatar (\`stage.me\`).
 
 Two ways to hand work over. \`stage.delegate({ task, boards })\` makes a subagent and waits for its report — it gets the source of the boards you name, so it starts from the same plan you are working to. \`stage.send(who, { task, boards })\` queues work for an agent that **already exists** and returns immediately; they run it once they have been quiet for a moment. Delegate when the answer is a step in what you are doing; send when the work is theirs.
@@ -145,6 +182,8 @@ const GUIDELINES = [
 	"The board carries the answer; the chat reply names it and may recap or add to it. What is never acceptable is the substance in chat with a stub on the board, or a board that only makes sense after reading the chat.",
 	"When work is finished, report on a board — method, result, what is left — rather than describing it in the chat column.",
 	"Keep the canvas to what matters now: stage.show narrows it, stage.hide takes a board off it without dropping it from your context.",
+	"Board files are edited in place — Write, Edit, cat > file. Never a temp-file-and-rename (sed -i, an atomic save): it replaces the file the canvas is watching.",
+	"After writing a board, stage.fit it rather than guessing whether it clips. A board does not scroll, so content past its edge is simply not drawn.",
 	/*
 	 * The one guideline that is about the *chat list* rather than the canvas.
 	 *
@@ -216,7 +255,7 @@ export function createStageTool(deps: {
 				kind,
 				size: { ...(options.w ? { w: options.w } : {}), ...(options.h ? { h: options.h } : {}) },
 			});
-			agent.setContext([...agent.context(), path]);
+			agent.setContext([path, ...agent.context()]);
 			agent.setInPlay([...agent.inPlay(), path]);
 			/*
 			 * The size of the thing you are about to fill, said once, at the moment you would
@@ -232,16 +271,41 @@ export function createStageTool(deps: {
 			return path;
 		},
 
+		/**
+		 * Set a board's size, in one call, without opening the file.
+		 *
+		 * Either dimension on its own is allowed, because the one that is usually wrong is
+		 * the height.
+		 */
+		resize: async (path: string, size: { w?: number; h?: number }) => {
+			if (!size || (size.w === undefined && size.h === undefined)) throw new Error("A resize needs a width, a height, or both");
+			const board = service.resize(path, size);
+			return { path: board.path, w: board.w, h: board.h };
+		},
+
+		/**
+		 * Size a board to what is on it: the height from the content, the width only if
+		 * something has been pushed past the edge.
+		 */
+		fit: async (path: string, options?: { margin?: number }) => {
+			const board = await service.fit(path, options);
+			const content = service.boards().find((one) => one.path === board.path)?.content;
+			return { path: board.path, w: board.w, h: board.h, ...(content ? { content } : {}) };
+		},
+
 		// --- context -------------------------------------------------------------
 		attach: async (path: string | string[]) => {
 			const wanted = asList(path);
 			for (const one of wanted) {
 				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
 			}
-			// Attach order is kept: it is the order the rail shows, and the order a
-			// subagent is handed them in.
-			const next = [...agent.context()];
-			for (const one of wanted) if (!next.includes(one)) next.push(one);
+			// Most-recently-touched first: the boards just attached lead the list — the last one
+			// named is the most recent — and boards already held that are not re-attached keep
+			// their existing recency behind them. Re-attaching a board is a fresh touch, which is
+			// why it leaves its old place and joins the front. `setContext` stores the order,
+			// and the rail, the canvas and `stage.agents()` all read the same list.
+			const retained = agent.context().filter((held) => !wanted.includes(held));
+			const next = [...wanted].reverse().concat(retained);
 			agent.setContext(next);
 			// A board taken up is a board put on the canvas: attaching something the user
 			// then cannot see would make the rail the only evidence it happened.
@@ -373,7 +437,11 @@ export function createStageTool(deps: {
 		send: async (target: string, spec: SendSpec) => {
 			if (!target?.trim()) throw new Error("Say which agent: an id or a name from stage.agents()");
 			if (!spec?.task?.trim()) throw new Error("Sent work needs a description");
-			return agent.send(target.trim(), { task: spec.task, ...(spec.boards ? { boards: spec.boards } : {}) });
+			return agent.send(target.trim(), {
+				task: spec.task,
+				...(spec.boards ? { boards: spec.boards } : {}),
+				...(spec.reply ? { reply: true } : {}),
+			});
 		},
 		/** What is waiting for an agent: yours, or another's if you name it. */
 		queue: async (agentId?: string) => agent.queue(agentId),
@@ -384,7 +452,11 @@ export function createStageTool(deps: {
 				name: other.name,
 				me: other.id === agent.id,
 				state: other.state,
+				kind: other.kind,
 				context: other.context,
+				// The true total rides beside the twenty shown, so a reader can tell a slice
+				// from everything (agents/registry.ts caps; this passes the cap through).
+				holding: other.holding,
 				tags: other.tags,
 				/** How much is already waiting for them — a queue of six is a reason to send elsewhere. */
 				queued: other.queued ?? 0,

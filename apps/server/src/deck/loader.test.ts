@@ -162,3 +162,59 @@ test("boards are found in subdirectories, and non-boards are not", () => {
 	);
 	rmSync(root, { recursive: true, force: true });
 });
+
+/*
+ * `resync` is what makes the deck right rather than merely quick: the watcher is a
+ * promise the operating system does not quite make, so the deck has to be able to
+ * answer "what is actually on disk" without one.
+ */
+test("resync reports what changed, what arrived and what went away — and nothing else", () => {
+	const root = emptyDeck();
+	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
+	const deck = Deck.open(root);
+	assert.deepEqual(deck.resync(), { changed: [], removed: [] });
+
+	// An edit the watcher never mentioned.
+	writeFileSync(join(root, "boards", "a.html"), board("A", 1200, 900));
+	const edited = deck.resync();
+	assert.deepEqual(
+		edited.changed.map((b) => [b.path, b.w, b.h]),
+		[["boards/a.html", 1200, 900]],
+	);
+	assert.deepEqual(edited.removed, []);
+
+	// A board that arrived without an event, and one that left the same way.
+	writeFileSync(join(root, "boards", "b.html"), board("B", 400, 300));
+	rmSync(join(root, "boards", "a.html"));
+	const moved = deck.resync();
+	assert.deepEqual(
+		moved.changed.map((b) => b.path),
+		["boards/b.html"],
+	);
+	assert.deepEqual(moved.removed, ["boards/a.html"]);
+	assert.deepEqual(
+		deck.boards.map((b) => b.path),
+		["boards/b.html"],
+	);
+
+	// Touched, not edited: a new signature and the same bytes is not news.
+	const same = readFileSync(join(root, "boards", "b.html"), "utf8");
+	writeFileSync(join(root, "boards", "b.html"), same);
+	assert.deepEqual(deck.resync(), { changed: [], removed: [] });
+
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("resync keeps a board's place on the canvas", () => {
+	const root = emptyDeck();
+	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
+	const deck = Deck.open(root);
+	deck.setPosition("boards/a.html", 640, 480);
+
+	writeFileSync(join(root, "boards", "a.html"), board("A", 900, 700));
+	const [changed] = deck.resync().changed;
+	assert.equal(changed?.x, 640);
+	assert.equal(changed?.y, 480);
+	assert.equal(changed?.w, 900);
+	rmSync(root, { recursive: true, force: true });
+});

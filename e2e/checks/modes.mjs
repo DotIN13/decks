@@ -18,8 +18,9 @@ const { browser, page, errors } = await open();
 const state = () =>
 	page.evaluate(() => ({
 		mode: document.querySelector(".stage")?.dataset.mode ?? null,
-		badge: getComputedStyle(document.querySelector(".stage"), "::before").content,
 		ring: getComputedStyle(document.querySelector(".stage"), "::after").boxShadow,
+		/** There was an "Editing" pill in the bottom-left corner. There is not now. */
+		word: getComputedStyle(document.querySelector(".stage"), "::before").content,
 		tools: document.querySelectorAll(".float.pill .palette .iconbtn").length,
 		inspector: document.querySelectorAll(".inspector").length,
 		toggle: document.querySelector('[aria-label="Edit the boards"], [aria-label="Stop editing"]')?.getAttribute("aria-label") ?? null,
@@ -37,7 +38,7 @@ const browse = await state();
 say("the canvas opens in browse mode", browse.mode === "browse", browse.mode);
 say("…with no editing tools, because they insert components", browse.tools === 0, String(browse.tools));
 say("…no inspector, because it is a properties panel", browse.inspector === 0);
-say("…and nothing drawn to say editing is on", browse.badge === "none" && browse.ring === "none", `${browse.badge} / ${browse.ring}`);
+say("…and nothing drawn to say editing is on", browse.ring === "none", `${browse.ring}`);
 say("the pencil offers to start editing", browse.toggle === "Edit the boards", browse.toggle);
 
 // --- a board is a document -------------------------------------------------------------
@@ -89,11 +90,13 @@ const editing = await state();
 say("the pencil turns editing on", editing.mode === "edit", editing.mode);
 say("…the five tools come with it", editing.tools === 5, String(editing.tools));
 /*
- * The indication is what stands in for a confirmation dialog: one press is right for
- * something this reversible, so what stops an accident is that editing *looks* different for
- * as long as it lasts. A question asked every time is a question dismissed without reading.
+ * The ring is what stands in for a confirmation dialog: one press is right for something
+ * this reversible, so what stops an accident is that editing *looks* different for as long
+ * as it lasts. A question asked every time is a question dismissed without reading. There
+ * was a word in the corner as well; the ring carries it alone now.
  */
-say("…and the canvas says so, in a ring and a word", editing.badge.includes("Editing") && editing.ring !== "none", `${editing.badge}`);
+say("…and the canvas says so, with a ring around it", editing.ring !== "none", `${editing.ring}`);
+say("…and nothing but the ring: no word in the corner", editing.word === "none", `${editing.word}`);
 say("…and the button now offers to stop", editing.toggle === "Stop editing", editing.toggle);
 
 if (clicked) {
@@ -109,7 +112,7 @@ say("…and the inspector arrives with it", nowClicked.inspector === 1);
 
 await editMode(page, false);
 const back = await state();
-say("and pressing it again puts everything back", back.mode === "browse" && back.tools === 0 && back.badge === "none", JSON.stringify(back));
+say("and pressing it again puts everything back", back.mode === "browse" && back.tools === 0 && back.ring === "none", JSON.stringify(back));
 say("…including dropping the selection's inspector", back.inspector === 0);
 
 // --- the column has no caret ------------------------------------------------------------

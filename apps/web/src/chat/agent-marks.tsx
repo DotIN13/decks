@@ -1,8 +1,8 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
-import { For, Show } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 
 /**
- * A mark for each runtime: Claude's burst and the Pi glyph.
+ * A mark for each runtime: Claude's burst, the Pi glyph, and a sign for the other two.
  *
  * The published symbols rather than drawings of our own — Anthropic's Claude symbol (CC0,
  * Wikimedia Commons, `File:Claude_AI_symbol.svg`) and the Pi glyph from `pi.dev/logo.svg` —
@@ -24,7 +24,7 @@ import { For, Show } from "solid-js";
  */
 
 /** How much of the 24-unit frame each mark's ink may fill. */
-const INK = { claude: 18, pi: 15.5 } as const;
+const INK: Record<AgentKind, number> = { claude: 18, pi: 15.5, opencode: 16.5, antigravity: 17 };
 
 const CLAUDE_PATH =
 	"m19.6 66.5 19.7-11 .3-1-.3-.5h-1l-3.3-.2-11.2-.3L14 53l-9.5-.5-2.4-.5L0 49l.2-1.5 2-1.3 2.9.2 6.3.5 9.5.6 6.9.4L38 49.1h1.6l.2-.7-.5-.4-.4-.4L29 41l-10.6-7-5.6-4.1-3-2-1.5-2-.6-4.2 2.7-3 3.7.3.9.2 3.7 2.9 8 6.1L37 36l1.5 1.2.6-.4.1-.3-.7-1.1L33 25l-6-10.4-2.7-4.3-.7-2.6c-.3-1-.4-2-.4-3l3-4.2L28 0l4.2.6L33.8 2l2.6 6 4.1 9.3L47 29.9l2 3.8 1 3.4.3 1h.7v-.5l.5-7.2 1-8.7 1-11.2.3-3.2 1.6-3.8 3-2L61 2.6l2 2.9-.3 1.8-1.1 7.7L59 27.1l-1.5 8.2h.9l1-1.1 4.1-5.4 6.9-8.6 3-3.5L77 13l2.3-1.8h4.3l3.1 4.7-1.4 4.9-4.4 5.6-3.7 4.7-5.3 7.1-3.2 5.7.3.4h.7l12-2.6 6.4-1.1 7.6-1.3 3.5 1.6.4 1.6-1.4 3.4-8.2 2-9.6 2-14.3 3.3-.2.1.2.3 6.4.6 2.8.2h6.8l12.6.9 3.3 2.2 2 2.6-.3 2-5.1 2.6-6.8-1.6-16-3.8-5.4-1.4h-.8v.5l4.5 4.4 8.3 7.5 10.4 9.6.5 2.4-1.3 1.9-1.4-.2-9.2-7-3.6-3.1-8-6.7h-.5v.7l1.8 2.7L74 80.5l.8 4.6-.7 1.5-2.6.9-2.8-.5-5.8-8.2-6-9.1-4.8-8.3-.6.3-2.8 30.5-1.3 1.6-3 1.1-2.5-1.9-1.3-3 1.3-6.1 1.6-8 1.3-6.3 1.2-7.9.7-2.6v-.2H49L43 72l-9 12.3-7.2 7.6-1.7.7-3-1.5.3-2.8L24 86l10-12.8 6-7.9 4-4.6-.1-.5h-.3L17.2 77.4l-4.7.6-2-2 .2-3 1-1 8-5.5Z";
@@ -34,6 +34,28 @@ const CLAUDE_INK = { x: 0, y: 0, w: 100, h: 100 };
 const PI_P = "M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z";
 const PI_DOT = "M517.36 400 H634.72 V634.72 H517.36 Z";
 const PI_INK = { x: 165.29, y: 165.29, w: 469.43, h: 469.43 };
+
+/*
+ * The two newer runtimes are drawn rather than borrowed, and that is a deliberate step
+ * down from the rule above.
+ *
+ * Claude's burst and the Pi glyph are their owners' published marks, because a product's
+ * own symbol is the thing people recognise. opencode's is a blocky ASCII wordmark and
+ * antigravity's is a full-colour Google lockup: neither reduces to a single monochrome
+ * path at 14px, and a bad tracing of a real logo looks worse than an honest glyph. So
+ * these two are *signs*, chosen to be told apart at a glance and in a list: a prompt for
+ * the terminal program, a rising arrow for the one named after leaving the ground.
+ */
+
+/** opencode: a shell prompt — a chevron and its caret rule. */
+const OPENCODE_CHEVRON = "M3.2 4.6 L6 1.8 L15.2 11 L6 20.2 L3.2 17.4 L9.6 11 Z";
+const OPENCODE_RULE = "M12 17.4 H21 V20.4 H12 Z";
+const OPENCODE_INK = { x: 3.2, y: 1.8, w: 17.8, h: 18.6 };
+
+/** antigravity: something leaving the ground, and the ground it left. */
+const ANTIGRAVITY_ARROW = "M12 1.6 L20.4 12.2 H15.6 V17 H8.4 V12.2 H3.6 Z";
+const ANTIGRAVITY_GROUND = "M4.8 19.8 H19.2 V22.4 H4.8 Z";
+const ANTIGRAVITY_INK = { x: 3.6, y: 1.6, w: 16.8, h: 20.8 };
 
 /*
  * ### Working: a second drawing per runtime, not the still one in motion
@@ -102,12 +124,16 @@ export function AgentMark(props: { agent: AgentKind; size?: number; class?: stri
 	const size = () => props.size ?? 14;
 	const claude = () => props.agent === "claude";
 	/*
-	 * Four drawings, four ink boxes — which is the whole reason this indirection exists. A
-	 * working mark is a *different drawing* at a different natural size, so if it took the
-	 * still mark's box the sign would change size at the moment a turn started, which is the
-	 * one moment nothing should move but the mark itself.
+	 * A drawing and an ink box per runtime, per state — which is the whole reason this
+	 * indirection exists. A working mark is a *different drawing* at a different natural
+	 * size, so if it took the still mark's box the sign would change size at the moment a
+	 * turn started, which is the one moment nothing should move but the mark itself.
+	 *
+	 * Only Claude has a working drawing of its own. The other three are blocky signs, and
+	 * the tile build — cells appearing in reading order, which is what a terminal does
+	 * while it draws — is the right idiom for all of them.
 	 */
-	const ink = () => (props.busy ? (claude() ? GLYPH_INK : TILE_INK) : claude() ? CLAUDE_INK : PI_INK);
+	const ink = () => (props.busy ? (claude() ? GLYPH_INK : TILE_INK) : STILL_INK[props.agent]);
 	// The longer side is what fills the frame, so a wide mark and a square one sit at the
 	// same optical size rather than the same width.
 	const scale = () => INK[props.agent] / Math.max(ink().w, ink().h);
@@ -158,20 +184,31 @@ export function AgentMark(props: { agent: AgentKind; size?: number; class?: stri
 	);
 }
 
-/** The published symbol for a runtime, at rest. */
+/** Where each runtime's still drawing actually has ink, inside whatever box it was drawn in. */
+const STILL_INK: Record<AgentKind, { x: number; y: number; w: number; h: number }> = {
+	claude: CLAUDE_INK,
+	pi: PI_INK,
+	opencode: OPENCODE_INK,
+	antigravity: ANTIGRAVITY_INK,
+};
+
+/** The symbol for a runtime, at rest. */
 function Still(props: { agent: AgentKind }) {
 	return (
-		<Show
-			when={props.agent === "claude"}
-			fallback={
-				<>
-					<path fill-rule="evenodd" d={PI_P} />
-					<path d={PI_DOT} />
-				</>
-			}
-		>
-			<path d={CLAUDE_PATH} />
-		</Show>
+		<Switch fallback={<path d={CLAUDE_PATH} />}>
+			<Match when={props.agent === "pi"}>
+				<path fill-rule="evenodd" d={PI_P} />
+				<path d={PI_DOT} />
+			</Match>
+			<Match when={props.agent === "opencode"}>
+				<path d={OPENCODE_CHEVRON} />
+				<path d={OPENCODE_RULE} />
+			</Match>
+			<Match when={props.agent === "antigravity"}>
+				<path d={ANTIGRAVITY_ARROW} />
+				<path d={ANTIGRAVITY_GROUND} />
+			</Match>
+		</Switch>
 	);
 }
 

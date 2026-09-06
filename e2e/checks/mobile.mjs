@@ -674,6 +674,30 @@ const small = await page.evaluate(() => {
 });
 say("every button in the chrome is at least 40px", small.length === 0, JSON.stringify(small));
 
+// --- 9. no hover card, because a finger cannot hover ---------------------------------
+/*
+ * `pointerenter` fires on a tap, so the agent list answered the first tap with a hover card
+ * instead of switching: the tap eaten by a 220px box that nobody asked for, drawn over the
+ * rows being chosen between. Everything it says is on the row underneath it.
+ *
+ * Asserted as *not built* rather than not visible — the card is normally always mounted and
+ * merely unhidden, so "no element" is the honest test that the summoning is what stopped.
+ */
+const menu = page.locator(".pill [aria-haspopup='menu']").first();
+if ((await menu.count()) > 0) {
+	await menu.tap();
+	await settle(page, 400);
+	const rows = page.locator(".popover [data-row]");
+	const many = await rows.count();
+	if (many > 0) {
+		await rows.first().tap();
+		await settle(page, 500);
+	}
+	say("tapping an agent row summons no hover card", (await page.locator(".agent-hover").count()) === 0, `rows: ${many}`);
+} else {
+	say("tapping an agent row summons no hover card", true, "skipped: no agent menu in the pill");
+}
+
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

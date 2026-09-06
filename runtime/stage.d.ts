@@ -32,6 +32,16 @@ export interface Board {
 	y: number;
 	w: number;
 	h: number;
+	/**
+	 * How much room the content actually takes, as the canvas last measured it.
+	 *
+	 * Only present for a board somebody is looking at, and only while the measurement
+	 * matches the file — a reading of a version you have since rewritten is left off
+	 * rather than reported, because a number gets believed.
+	 */
+	content?: { w: number; h: number };
+	/** Content past the edge of the board: written, rendered, and invisible. */
+	clipped?: boolean;
 	/** Ids of agents holding this board in context. */
 	inContext: string[];
 	/** Who wrote it last: an agent id, or "you" for the user. */
@@ -66,8 +76,24 @@ export interface AgentSummary {
 	/** Whether this is you. */
 	me: boolean;
 	state: "idle" | "thinking" | "streaming" | "tool" | "waiting";
-	/** Boards this agent is holding. */
+	/**
+	 * The runtime this agent is. Fixed at creation, and not interchangeable: a Claude agent
+	 * can rewind, an opencode one cannot, an antigravity one has no thinking scale in the
+	 * picker and applies a mode change only at its next start. It is the same word the chat
+	 * list shows the user.
+	 */
+	kind: "pi" | "claude" | "opencode" | "antigravity";
+	/**
+	 * The boards this agent is holding, **newest first** and capped at twenty.
+	 *
+	 * `held` is most-recently-touched-first, so this slice is the answer to "what is it
+	 * working on" — attaching a board already held moves it to the front. The cap is a
+	 * screen of it, not a truncation: `holding` is the true total, so a reader can tell
+	 * a slice from everything before deciding whether to ask for more.
+	 */
 	context: string[];
+	/** How many boards it really holds — `context` is capped, this is not. */
+	holding: number;
 	/** What it says it is working on. Empty if it has not said. */
 	tags: string[];
 	/** How many handed-over items are waiting for it — see `send`. */
@@ -154,6 +180,37 @@ export interface Stage {
 	 * that will look like. `stage.viewport()` asks for it any other time.
 	 */
 	newBoard(options: { title: string; kind?: "answer" | "design" | "report" | "plan" | "blank"; w?: number; h?: number }): Promise<string>;
+
+	/**
+	 * Set a board's size. Either dimension on its own is fine.
+	 *
+	 *     await stage.resize("boards/plan.html", { h: 1800 });
+	 *
+	 * A board's size is one number in its own `<meta name="board">`, and editing that tag
+	 * by hand works — but it is JSON inside an HTML attribute, and the write has to leave
+	 * every other byte alone. This does it, and refreshes the deck's record as part of the
+	 * write, so a resize is never a change the canvas has to be told about twice.
+	 */
+	resize(path: string, size: { w?: number; h?: number }): Promise<{ path: string; w: number; h: number }>;
+
+	/**
+	 * Size a board to what is on it.
+	 *
+	 *     await stage.fit("boards/plan.html");            // -> { path, w, h, content }
+	 *     await stage.fit("boards/plan.html", { margin: 80 });
+	 *
+	 * **The height comes from the content; the width only grows.** Narrowing a board
+	 * reflows its text, which changes the height, which is the thing being measured — so
+	 * `fit` never narrows. It grows the width only for something pushed past the right
+	 * edge.
+	 *
+	 * The measurement is taken in the frame showing the board, because that is the only
+	 * place a board is laid out. So **the board has to be on the canvas**: a board nobody
+	 * is showing has never been measured, and this says so rather than guessing. Write the
+	 * content, `show` it, then `fit` — which is the loop that replaces screenshotting a
+	 * board to find out whether it clips.
+	 */
+	fit(path: string, options?: { margin?: number }): Promise<{ path: string; w: number; h: number; content?: { w: number; h: number } }>;
 
 	// --- your context -------------------------------------------------------------
 
@@ -312,6 +369,27 @@ export interface Stage {
 		boards?: string[];
 		/** "provider/model", if it should not use the default. */
 		model?: string;
+		/**
+		 * The runtime the child is: fixed at creation, exactly as the `+` button fixes it.
+		 * Omit it and the child gets the server's default. The one field that can never
+		 * change afterwards.
+		 */
+		kind?: "pi" | "claude" | "opencode" | "antigravity";
+		/**
+		 * The thinking level, on its own scale from the model. Whatever you ask, the child is
+		 * still created — a request a runtime cannot hold is a notice in your transcript, not
+		 * an error. Every runtime takes these; only the set offered per model varies.
+		 */
+		thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+		/**
+		 * How much the child asks before acting, from its runtime's own set.
+		 *
+		 * A request a runtime cannot hold is not an error: the child does the work on its
+		 * default mode and your transcript says so. pi has no modes at all, opencode offers
+		 * three of the four (not `plan`), antigravity two (`acceptEdits` and `plan`), Claude
+		 * all four.
+		 */
+		mode?: "manual" | "acceptEdits" | "plan" | "auto";
 	}): Promise<{ agent: string; name: string; report: string; boards: string[] }>;
 
 	/**
@@ -338,7 +416,18 @@ export interface Stage {
 	 * Eight items per agent. Nothing is created, so it does not count against the subagent
 	 * limit, and sending to yourself is allowed — it is how you leave yourself a follow-up.
 	 */
-	send(to: string, work: { task: string; boards?: string[] }): Promise<{ queued: true; position: number }>;
+	send(to: string, work: {
+		task: string;
+		boards?: string[];
+		/**
+		 * Tell you when the work is done: the receiver's report lands in your transcript as
+		 * a notice when the item runs. Never a queued task — a task runs a turn of your own,
+		 * and two agents answering each other's reports is a conversation that never ends.
+		 * Off by default, because most sends are work you have nothing more to do with, and
+		 * a reply you did not ask for is an interruption.
+		 */
+		reply?: boolean;
+	}): Promise<{ queued: true; position: number }>;
 
 	/** What is waiting for an agent: yours, or another's if you name it. */
 	queue(agentId?: string): Promise<QueuedWork[]>;

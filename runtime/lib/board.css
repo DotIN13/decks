@@ -146,6 +146,19 @@ body.board > * {
 
 /* --- components --------------------------------------------------------------- */
 
+/*
+ * `max-width` only, and the missing `position: absolute` is the point.
+ *
+ * The rule above already makes a *top-level* component absolute, so saying it again here
+ * could only ever reach a **nested** one — and there it did harm: the child left its
+ * parent's flow, the parent measured as if it were empty, and whatever came after was
+ * overlapped. A table inside a card is a reasonable thing to write, and it renders without
+ * complaint, so the mistake was invisible until somebody measured the board.
+ *
+ * Nesting now flows: `.card > .table`, a callout inside a card, a kpi row inside a
+ * section. What makes a component draggable is still being a direct child of `<body>`
+ * with a `data-id`, which is unchanged.
+ */
 .card,
 .sticky,
 .text,
@@ -153,7 +166,6 @@ body.board > * {
 .kpi,
 .embed,
 .table {
-	position: absolute;
 	max-width: none;
 }
 
