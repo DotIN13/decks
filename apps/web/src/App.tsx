@@ -1826,9 +1826,7 @@ export function App() {
 						prefs={prefs()}
 						onPrefs={setPrefs}
 						accounts={state.accounts}
-						active={state.activeAccount}
 						onAdd={() => socket.send({ type: "claude.accounts.add" })}
-						onUse={(id) => socket.send({ type: "claude.accounts.use", id })}
 						onForget={(id) => socket.send({ type: "claude.accounts.forget", id })}
 						onMove={(id, direction) => socket.send({ type: "claude.accounts.move", id, direction })}
 						onClose={() => setSettings(false)}

@@ -22,7 +22,18 @@ function agentOn(
 	options: {
 		parentId?: string;
 		resumeRef?: string;
-		restored?: { id: string; items: ChatItem[]; context: string[]; inPlay: string[]; avatar?: string; createdAt: number; model?: AgentModel };
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the switcher the session takes, narrowed by the tests that pass one
+		accounts?: any;
+		restored?: {
+			id: string;
+			items: ChatItem[];
+			context: string[];
+			inPlay: string[];
+			avatar?: string;
+			createdAt: number;
+			model?: AgentModel;
+			account?: string;
+		};
 	} = {},
 ) {
 	const root = mkdtempSync(join(tmpdir(), "decks-sets-"));
@@ -414,5 +425,78 @@ test("a report nobody asked for is not delivered — a reply you did not ask for
 	await settle(80);
 	assert.deepEqual(reportCalls, [], "no reply and no delivery: the sender had nothing more to do with the answer");
 	delete process.env.DECKS_QUEUE_IDLE_MS;
+	cleanup();
+});
+
+/*
+ * Which subscription an agent opens on, and the seam that made this worth a test.
+ *
+ * The constructor resolved the account by reading `this.accounts` — twenty lines above the
+ * assignment that sets it. So it was always `undefined`, every agent fell through to "no
+ * account", and nothing anywhere failed: the field is optional and a missing one is a legal
+ * state. The damage was one level down. The backend only puts `account` on its context when
+ * this is set, so every Claude session spawned on the machine-wide link, and repointing an
+ * agent's own link — which is what the picker does — reached nothing.
+ *
+ * The lesson the tests had not learnt: the per-agent work was checked at the *link*, and a
+ * link nobody is reading through is not a switch. These assert the value the spawn depends
+ * on.
+ */
+
+/** The smallest thing that satisfies the switcher the session asks for. */
+function switcherOf(ids: string[]) {
+	const links: Record<string, string> = {};
+	return {
+		links,
+		switcher: {
+			has: (id: string) => ids.includes(id),
+			defaultId: () => ids[0] ?? "default",
+			pointAgentAt: (agentId: string, accountId: string) => {
+				links[agentId] = accountId;
+				return true;
+			},
+			releaseAgent: () => {},
+			describe: (id: string) => ({ id, email: `${id}@example.com` }),
+		},
+	};
+}
+
+test("a new agent opens on the install default, not on nothing", () => {
+	const { switcher } = switcherOf(["acct-one", "acct-two"]);
+	const { agent, cleanup } = agentOn([], { accounts: switcher });
+	assert.equal(agent.accountId(), "acct-one", "an agent with no account of its own spends the default");
+	cleanup();
+});
+
+test("a restored agent opens on the account it was left on", () => {
+	const { switcher } = switcherOf(["acct-one", "acct-two"]);
+	const { agent, cleanup } = agentOn([], {
+		accounts: switcher,
+		restored: { id: "r", items: [], context: [], inPlay: [], createdAt: 1, account: "acct-two" },
+	});
+	assert.equal(agent.accountId(), "acct-two", "which is the whole reason it is written down");
+	cleanup();
+});
+
+test("a restored agent naming an account that is gone falls back rather than pointing nowhere", () => {
+	const { switcher } = switcherOf(["acct-one"]);
+	const { agent, cleanup } = agentOn([], {
+		accounts: switcher,
+		restored: { id: "r", items: [], context: [], inPlay: [], createdAt: 1, account: "forgotten" },
+	});
+	assert.equal(agent.accountId(), "acct-one");
+	cleanup();
+});
+
+test("switching moves the agent and points its link", () => {
+	const { switcher, links } = switcherOf(["acct-one", "acct-two"]);
+	const { agent, cleanup } = agentOn([], { accounts: switcher });
+
+	assert.equal(agent.useAccount("acct-two"), true);
+	assert.equal(agent.accountId(), "acct-two");
+	assert.equal(links[agent.id], "acct-two", "the link the running session reads through");
+
+	assert.equal(agent.useAccount("nope"), false, "an account that is not on the list is refused");
+	assert.equal(agent.accountId(), "acct-two", "and refusing changes nothing");
 	cleanup();
 });

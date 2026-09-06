@@ -14,7 +14,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { deckState, open, say, settle } from "../harness.mjs";
+import { deckState, open, openOverflow, say, settle } from "../harness.mjs";
 
 // The fixture's data directory is the deck's parent — the same way `accounts.mjs` finds it.
 const dataDir = dirname((await deckState()).path);
@@ -128,7 +128,7 @@ say("switching an agent points its own link", linkOf(first.id) === join(accounts
  * changed what every other conversation was spending, mid-turn.
  */
 say("…and does not touch another agent's", linkOf(second.id) === undefined || linkOf(second.id) === join(accountsDir, ids[0]), String(linkOf(second.id)));
-say("…nor the default a new agent starts on", (await frame("claude.accounts"))?.active === ids[0]);
+say("…nor the default a new conversation starts on", (await frame("claude.accounts"))?.active === ids[0]);
 
 const spending = (await frame("claude.accounts"))?.spending ?? {};
 say("the published list says who is on what", spending[first.id] === ids[1], JSON.stringify(spending));
@@ -144,16 +144,48 @@ const stored = recordOf(first.id);
 if (stored) say("the account is written to the agent's record", stored.account === ids[1], JSON.stringify({ account: stored.account }));
 else say("the account is written to the agent's record", true, "no record yet: nothing has been said to this agent, so there is nothing to restore");
 
-// --- the Settings row is a default now, not a switch ---------------------------------
+// --- and Settings no longer switches anything ----------------------------------------
 
-await send({ type: "claude.accounts.use", id: ids[0] });
-await settle(page, 1500);
-const after = await frame("claude.accounts");
-say("the Settings row moves the default", after?.active === ids[0], after?.active);
+/*
+ * The panel used to carry a machine-wide switch: pressing a row moved the install default,
+ * which moved nobody, because every open conversation keeps its own account. It is gone, and
+ * these are the two halves of "gone" — no control in the markup, and the concept it set is
+ * now computed from the order instead of stored.
+ */
+await openOverflow(page, /settings/i);
+await page.waitForSelector(".settings", { timeout: 6000 });
+await settle(page, 2500);
+const panel = await page.evaluate(() => {
+	const rows = [...document.querySelectorAll(".account-row")];
+	return {
+		rows: rows.length,
+		pressable: rows.filter((row) => row.querySelector("button[data-row]")).length,
+		states: rows.map((row) => row.querySelector(".state")?.textContent ?? ""),
+		// What is left: the arrows and the ×, both of which are still buttons.
+		arrows: rows.filter((row) => row.querySelector('[aria-label*="up" i], [aria-label*="down" i]')).length,
+		removable: rows.filter((row) => row.querySelector(".close:not(.rank)")).length,
+	};
+});
+say("every account is still listed", panel.rows === 3, JSON.stringify(panel.states));
+say("…but no row is a switch any more", panel.pressable === 0, `${panel.pressable} pressable rows`);
+say("…and none of them claims to be active", !panel.states.some((state) => /\bactive\b/.test(state)), JSON.stringify(panel.states));
+say("…while the top usable row says it is the default for new conversations", panel.states.some((state) => /default for new/.test(state)), JSON.stringify(panel.states));
+say("adding and removing are what is left", panel.removable === 2 && panel.arrows === 3, JSON.stringify({ removable: panel.removable, arrows: panel.arrows }));
+await page.keyboard.press("Escape");
+await settle(page, 400);
+
+/*
+ * And the default a new conversation gets follows the *order* rather than a stored value —
+ * so the arrows are the control that decides it, which is the one job this panel kept.
+ */
+await send({ type: "claude.accounts.move", id: ids[1], direction: "up" });
+await settle(page, 2000);
+const reordered = await frame("claude.accounts");
+say("moving a row up makes it the default for new conversations", reordered?.active === ids[1], reordered?.active);
 say(
-	"…and leaves the agent that chose for itself where it is",
-	linkOf(first.id) === join(accountsDir, ids[1]) && (after?.spending ?? {})[first.id] === ids[1],
-	JSON.stringify({ link: linkOf(first.id), spending: (after?.spending ?? {})[first.id] }),
+	"…and leaves the conversation that chose for itself where it is",
+	linkOf(first.id) === join(accountsDir, ids[1]) && (reordered?.spending ?? {})[first.id] === ids[1],
+	JSON.stringify({ link: linkOf(first.id), spending: (reordered?.spending ?? {})[first.id] }),
 );
 
 say("no console errors", errors.length === 0, errors.join(" | "));

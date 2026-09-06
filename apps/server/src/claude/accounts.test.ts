@@ -197,6 +197,7 @@ test("a limit moves the active account on, and the symlink with it", () => {
 	const second = add(accounts, "two@example.com");
 	accounts.use(first);
 	assert.equal(pointsAt(dir), accounts.configDir(first));
+	const before = pointsAt(dir);
 
 	/*
 	 * The CLI's own login is signed out here, so the choice is between the two added
@@ -205,11 +206,16 @@ test("a limit moves the active account on, and the symlink with it", () => {
 	 */
 	rmSync(homeToken(home), { force: true });
 	const resets = Date.now() + 3 * 60 * 60 * 1000;
-	const { moved, nextReset } = accounts.rotate(first, resets, "five_hour");
+	const { moved, nextReset } = accounts.nextFor(first, resets, "five_hour");
 	assert.equal(moved?.id, second, "moved to the account that has not run out");
 	assert.equal(nextReset, undefined);
-	assert.equal(accounts.activeId(), second);
-	assert.equal(pointsAt(dir), accounts.configDir(second));
+	/*
+	 * And it moves nobody. `rotate` used to mark the account *and* repoint the machine, so
+	 * one agent running out dragged every other agent onto a different subscription
+	 * mid-turn; `nextFor` marks and chooses, and who moves is the session's — see the
+	 * per-agent tests below.
+	 */
+	assert.equal(pointsAt(dir), before, "the machine-wide link is not touched");
 
 	const spent = accounts.list().find((account) => account.id === first);
 	assert.equal(spent?.limitedUntil, resets, "and remembers when the spent one comes back");
@@ -223,19 +229,16 @@ test("the CLI's own login is one of the accounts a limit can move to", () => {
 	const { accounts, dir, cleanup } = store({ platform: "linux" });
 	const only = add(accounts, "one@example.com");
 
-	const { moved } = accounts.rotate(only, Date.now() + 60_000, "seven_day");
+	const { moved } = accounts.nextFor(only, Date.now() + 60_000, "seven_day");
 	assert.equal(moved?.id, DEFAULT_ACCOUNT, "rather than reporting that everything is spent");
 	/*
-	 * And the link moves with it, which is the half that used to be missing: rotating *to*
-	 * the CLI's own login left the link on the spent account, so a session already running
-	 * kept spending the subscription that had just refused.
+	 * Naming it is all this does. Moving *anybody* onto it is the session's to do, through
+	 * its own link — see the per-agent tests below. This used to repoint the machine here,
+	 * which is how one agent running out took every other agent with it.
 	 */
-	assert.equal(pointsAt(dir), accounts.configDir(DEFAULT_ACCOUNT));
-	assert.equal(
-		accounts.activeEnvironment()?.CLAUDE_SECURESTORAGE_CONFIG_DIR,
-		join(dir, "claude-accounts", "active"),
-		"and a session already running reads the moved link on its next request",
-	);
+	assert.equal(pointsAt(dir), accounts.configDir(only), "the machine-wide link is where it was");
+	// And with the only added account spent, the default a *new* agent takes is the CLI's own.
+	assert.equal(accounts.defaultId(), DEFAULT_ACCOUNT);
 	cleanup();
 });
 
@@ -248,7 +251,7 @@ test("with everything spent it says when the first one comes back", () => {
 	const sooner = Date.now() + 30 * 60 * 1000;
 	accounts.markLimited(DEFAULT_ACCOUNT, later, "seven_day");
 	accounts.markLimited(second, later, "five_hour");
-	const { moved, nextReset } = accounts.rotate(first, sooner, "five_hour");
+	const { moved, nextReset } = accounts.nextFor(first, sooner, "five_hour");
 
 	assert.equal(moved, undefined, "nothing to move to");
 	assert.equal(nextReset, sooner, "and the soonest reset is the one worth reporting");
@@ -282,7 +285,7 @@ test("an account that is signed out is not somewhere a limit can move to", () =>
 	rmSync(join(accounts.configDir(second), ".credentials.json"), { force: true });
 
 	assert.equal(accounts.usable(second), false);
-	const { moved, nextReset } = accounts.rotate(first, Date.now() + 60_000, "five_hour");
+	const { moved, nextReset } = accounts.nextFor(first, Date.now() + 60_000, "five_hour");
 	assert.equal(moved, undefined, "not the signed-out one, and not the signed-out default");
 	assert.ok(nextReset, "so it reports the wait instead");
 
@@ -647,7 +650,7 @@ test("moving an account up makes it the one a limit goes to first", () => {
 	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, second, first]);
 
 	// And the rotation follows it, which is the only reason the order exists.
-	const { moved } = accounts.rotate(DEFAULT_ACCOUNT, Date.now() + 60_000, "five_hour");
+	const { moved } = accounts.nextFor(DEFAULT_ACCOUNT, Date.now() + 60_000, "five_hour");
 	assert.equal(moved?.id, second);
 	cleanup();
 });

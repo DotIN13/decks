@@ -190,7 +190,9 @@ export class App {
 
 	private async publishAccounts(reply?: (message: ServerMessage) => void, options?: { reread?: boolean }): Promise<void> {
 		const stored = this.claudeAccounts.list();
-		const active = this.claudeAccounts.activeId();
+		// What a conversation with no account of its own spends: the first usable row. Not a
+		// setting any more — see `ClaudeAccounts.defaultId`.
+		const active = this.claudeAccounts.defaultId();
 		/*
 		 * One `claude auth status` at a time, and not at all when a recent answer will do.
 		 *
@@ -754,39 +756,29 @@ export class App {
 
 			case "claude.accounts.use": {
 				/*
-				 * One agent, or the default for the next one — never both.
+				 * One conversation onto one subscription, and nothing else moves.
 				 *
-				 * A switch aimed at an agent repoints that agent's own link and is in force on
-				 * its next turn; nothing else moves. Without an `agentId` this is the default
-				 * row, which is what a *new* agent will start on and what a one-off
-				 * `claude auth` command is aimed at.
+				 * There is no machine-wide switch to fall back to — this used to take an
+				 * optional `agentId` and, without one, move the install default. Which was a
+				 * control that looked like switching and was not: every open conversation kept
+				 * the account it already had, so all it changed was the *next* agent. The list
+				 * order answers that question now, visibly, with the arrows that were already
+				 * there for it.
 				 */
-				if (message.agentId) {
-					const agent = this.agents.all().find((candidate) => candidate.id === message.agentId);
-					if (!agent) {
-						reply({ type: "notice", level: "warn", text: "That agent is not here any more." });
-						return;
-					}
-					if (!agent.useAccount(message.id)) {
-						reply({ type: "notice", level: "warn", text: "That account is not on the list any more." });
-						return;
-					}
-					void this.warmAccount(message.id).then(() => this.publishAccounts(undefined, { reread: true }));
+				const agent = this.agents.all().find((candidate) => candidate.id === message.agentId);
+				if (!agent) {
+					reply({ type: "notice", level: "warn", text: "That agent is not here any more." });
 					return;
 				}
-				const moved = this.claudeAccounts.use(message.id);
-				if (!moved) {
+				if (!agent.useAccount(message.id)) {
 					reply({ type: "notice", level: "warn", text: "That account is not on the list any more." });
 					return;
 				}
 				/*
-				 * The switch is the symlink, and every running session reads its *credentials*
-				 * through it — so there is nothing to restart. That is true of the second
-				 * variable rather than the first, which is what it was quietly not doing before
-				 * (`claude/accounts.ts`, `activeEnvironment`). On macOS the link cannot carry the
-				 * account, so a switch there reaches the next session rather than this one.
+				 * Warmed before the sessions want it: an account nothing has used for eight
+				 * hours has an expired token, and the first request after a switch would
+				 * otherwise be several sessions racing to refresh it (`claude/transient.ts`).
 				 */
-				this.send({ type: "notice", level: "info", text: `New agents will use ${moved.email ?? "that account"}. Agents already open keep the one they are on.` });
 				void this.warmAccount(message.id).then(() => this.publishAccounts(undefined, { reread: true }));
 				return;
 			}

@@ -858,8 +858,15 @@ export class ClaudeBackend implements AgentBackend {
 		 * label is still there as the answer when the CLI is slow.
 		 */
 		const accounts = this.context.accounts;
-		const identity = accounts ? await claudeIdentity(accounts.keychainDir(accounts.activeId()) || undefined) : {};
-		return toUsageReport(await this.planUsage(), identity.email ?? accounts?.active()?.email ?? null);
+		/*
+		 * This agent's account, not a machine-wide one. The meter says whose subscription is
+		 * being spent, and with one per conversation the answer is the conversation's — a
+		 * panel naming the install default while the turn bills somewhere else is worse than
+		 * no panel.
+		 */
+		const mine = this.context.account?.id();
+		const identity = accounts ? await claudeIdentity(accounts.keychainDir(mine ?? accounts.active()?.id ?? "") || undefined) : {};
+		return toUsageReport(await this.planUsage(), identity.email ?? (mine ? accounts?.describe(mine)?.email : accounts?.active()?.email) ?? null);
 	}
 
 	/**

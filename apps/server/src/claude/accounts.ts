@@ -417,7 +417,21 @@ export class ClaudeAccounts {
 	 * remove.
 	 */
 	defaultId(): string {
-		return this.activeId();
+		/*
+		 * The first usable account in the order — not a stored "active".
+		 *
+		 * There used to be a machine-wide switch in Settings, and this returned whatever it
+		 * had last been set to. With a subscription per agent that switch was a control that
+		 * moved nobody: every open conversation keeps its own account, so all it decided was
+		 * the *next* agent — a thing nobody goes to a settings panel to set. So it is gone,
+		 * and the question it answered is answered by the list itself, which is already
+		 * ordered and already means "who is next" everywhere else.
+		 *
+		 * One concept instead of two, and the arrows now visibly control it. A list where
+		 * every row is spent or signed out still has to name somebody, and the CLI's own
+		 * login is the answer that always exists.
+		 */
+		return this.nextAvailable()?.id ?? DEFAULT_ACCOUNT;
 	}
 
 	/** Whether an id still names an account. A record can outlive the account it names. */
@@ -693,9 +707,9 @@ export class ClaudeAccounts {
 		return this.read().active ?? DEFAULT_ACCOUNT;
 	}
 
-	/** The account in force, or nothing — which means the CLI's own default `~/.claude`. */
+	/** What `defaultId` names, as a row — for the sentence a fallback says. */
 	active(): ClaudeAccount | undefined {
-		const id = this.activeId();
+		const id = this.defaultId();
 		return this.list().find((account) => account.id === id);
 	}
 
@@ -922,22 +936,6 @@ export class ClaudeAccounts {
 		return this.pick(this.list(), except);
 	}
 
-	/**
-	 * Switch to the next available account, if there is one.
-	 *
-	 * Returns what happened, because every caller has something to say about it: the account
-	 * moved to, or the earliest moment any of them will be usable again.
-	 */
-	rotate(except: string | undefined, resetsAt: number | undefined, limitType: string | undefined): { moved?: ClaudeAccount; nextReset?: number } {
-		const outcome = this.nextFor(except, resetsAt, limitType);
-		if (outcome.moved) {
-			const index = this.read();
-			index.active = outcome.moved.id;
-			this.write(index);
-			this.repoint();
-		}
-		return outcome;
-	}
 
 	/**
 	 * The next account worth trying: signed in, not spent, and not the one that just refused.

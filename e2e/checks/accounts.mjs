@@ -2,10 +2,14 @@
  * Several Claude subscriptions, and which one is spending (DESIGN §6.8).
  *
  * A subscription has a rate limit, and reaching it stops the work — so several can be signed
- * in at once, one is active, and reaching a limit moves the active one along
- * (`claude/accounts.ts`). The switch is seamless: the CLI re-reads its credentials per
- * request and every session is pointed at a symlink, so moving that link changes which
- * subscription the *next turn* spends.
+ * in at once, each conversation spends one of them, and reaching a limit moves *that*
+ * conversation along (`claude/accounts.ts`). The switch is seamless: the CLI re-reads its
+ * credentials per request and every session is pointed at a symlink of its own, so moving
+ * that link changes which subscription the next turn spends.
+ *
+ * This panel no longer switches anything — that is a conversation's own model picker, and
+ * `accounts-per-agent.mjs` drives it. What is left here is the *set* of accounts and their
+ * order: adding, removing, reordering, and the states a row can be in.
  *
  * The login itself is an OAuth flow that cannot be automated, so what is driven here is
  * everything around it — the list, the states a row can be in, and that reading the list
@@ -37,15 +41,17 @@ const rows = await page.evaluate(() =>
 		text: row.innerText.replace(/\n+/g, " | "),
 		current: row.dataset.current === "true",
 		removable: Boolean(row.querySelector(".close:not(.rank)")),
-		disabled: row.querySelector("button")?.disabled ?? null,
+		pressable: Boolean(row.querySelector("button[data-row]")),
 	})),
 );
 console.log("      rows:", JSON.stringify(rows, null, 1));
 say("the CLI's own login is on the list", rows.length >= 1);
-say("…and is the active one on a fresh install", rows[0]?.current === true);
+say("…and is the default for a new conversation on a fresh install", rows[0]?.current === true);
 say("…named from the CLI rather than as a uuid", /@/.test(rows[0]?.text ?? ""), rows[0]?.text);
 say("…and cannot be removed from here", rows[0]?.removable === false, "those credentials are the CLI's");
-say("the active row is not clickable, being already in use", rows[0]?.disabled === true);
+// Nothing in this panel is pressable except the arrows and the ×: a row that still looked
+// like a switch would be the same lie in a quieter form.
+say("no row is a switch", rows.every((row) => row.pressable === false), JSON.stringify(rows.map((r) => r.pressable)));
 
 // --- what the store did on disk --------------------------------------------------
 /*
@@ -108,15 +114,25 @@ const after = await page.evaluate(() =>
 );
 console.log("      after:", JSON.stringify(after, null, 1));
 say("the server reads the whole list", after.length === 3, `${after.length} rows`);
-say("…marking the account in force", after.filter((r) => r.current).length === 1 && after.find((r) => r.current)?.text.includes("two@example.com"), JSON.stringify(after.find((r) => r.current)?.text));
+/*
+ * And here nothing is marked, which is the right answer rather than a missing one: the two
+ * added rows have fabricated tokens so `auth status` reports them signed out, and the CLI's
+ * own — the only one with a real token — is the row this fixture put a limit on. Every row is
+ * unusable, so the panel names no default instead of picking one that cannot answer.
+ */
+say(
+	"…and names no default when every row is spent or signed out",
+	after.filter((row) => row.current).length === 0 && after.every((row) => /signed out|limited/.test(row.text)),
+	JSON.stringify(after.map((row) => `${row.current ? "*" : " "}${row.text}`)),
+);
 say("…and showing when a spent one comes back", after.some((r) => /limited . back/.test(r.text)), JSON.stringify(after.find((r) => /limited/.test(r.text))?.text));
 /*
  * One status per row, ranked. The first draft drew each condition independently and produced
- * "active · signed out" — two claims that cannot both be acted on.
+ * "default for new · signed out" — two claims that cannot both be true.
  */
 say(
 	"…and never two contradictory states on one row",
-	after.every((r) => !(/signed out/.test(r.text) && /\bactive\b/.test(r.text) && !/active . limited/.test(r.text))),
+	after.every((r) => !(/signed out/.test(r.text) && /default for new/.test(r.text))),
 	JSON.stringify(after.map((r) => r.text)),
 );
 say("…with the added ones removable and the CLI's own not", after.filter((r) => r.removable).length === 2);
@@ -188,8 +204,8 @@ await page.waitForTimeout(2000);
 say("…and it is still there when the panel is reopened", JSON.stringify(await names()) === JSON.stringify(moved), JSON.stringify(await names()));
 
 /*
- * An account with no token behind it says so rather than being hidden, and cannot be
- * switched to — that is what stops a rate limit turning into an auth failure.
+ * An account with no token behind it says so rather than being hidden — that is what stops a
+ * rate limit moving a conversation onto something that cannot answer.
  */
 rmSync(join(accountsDir, ids[0], ".credentials.json"), { force: true });
 await page.keyboard.press("Escape");
@@ -200,12 +216,12 @@ await page.waitForTimeout(2000);
 const signedOut = await page.evaluate(() =>
 	[...document.querySelectorAll(".account-row")].map((row) => ({
 		text: row.innerText.replace(/\n+/g, " | "),
-		disabled: row.querySelector("button")?.disabled ?? null,
+		current: row.dataset.current === "true",
 	})),
 );
 const gone = signedOut.find((row) => row.text.includes("one@example.com"));
 say("a signed-out account says so", /signed out/.test(gone?.text ?? ""), JSON.stringify(gone?.text));
-say("…and cannot be switched to", gone?.disabled === true);
+say("…and is not offered as the default for a new conversation", gone?.current === false, JSON.stringify(gone));
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

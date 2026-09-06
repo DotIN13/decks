@@ -259,9 +259,18 @@ export class DeckAgent {
 		 * A record written before this existed names no account, and neither does a brand new
 		 * agent — both take the default, once. A record naming an account that has since been
 		 * forgotten also falls back, rather than pointing a link at a directory that is gone.
+		 *
+		 * Read from `options`, not from `this.accounts`, and that is not a style choice: it
+		 * used to be `this.accounts?.has(...)` twenty lines *above* `this.accounts = …`, so it
+		 * was always `undefined` and every agent resolved to no account at all. Which is
+		 * invisible from here — the field is optional and a missing one is a legal state — and
+		 * fatal one level down: the backend only puts `account` on its context when this is
+		 * set, so every session spawned on the machine-wide link and no per-agent switch could
+		 * reach a running session. A constructor that reads its own fields in the order they
+		 * happen to be written is a bug waiting for the next person to move a line.
 		 */
 		const named = options.restored?.account ?? options.account;
-		this.account = named && this.accounts?.has(named) ? named : this.accounts?.defaultId();
+		this.account = named && options.accounts?.has(named) ? named : options.accounts?.defaultId();
 		this.currentMode = options.restored?.mode ?? options.mode;
 		this.createdAt = options.restored?.createdAt ?? Date.now();
 		this.identity = { name: options.name ?? "Agent", color: options.color };

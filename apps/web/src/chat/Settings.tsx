@@ -6,7 +6,7 @@ import X from "lucide-solid/icons/x";
 import { For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { AlertSettings } from "./AlertSettings.tsx";
-import { canMove, nextUp } from "../lib/accounts.ts";
+import { canMove, firstUsable } from "../lib/accounts.ts";
 import type { AlertPrefs } from "../lib/alerts.ts";
 
 /**
@@ -42,13 +42,20 @@ export function Settings(props: {
 	/** What the app may interrupt you with (`AlertSettings.tsx`). */
 	prefs: AlertPrefs;
 	onPrefs: (prefs: AlertPrefs) => void;
+	/**
+	 * The install's Claude subscriptions — the set of them, and their order.
+	 *
+	 * Not which one is in use: with a subscription per conversation there is no such row.
+	 * This panel adds accounts, removes them, and orders them; choosing which one answers is
+	 * done in a conversation's own model picker.
+	 */
 	accounts: ClaudeAccount[];
-	/** The id of the one in force. */
-	active: string;
 	onAdd: () => void;
-	onUse: (id: string) => void;
 	onForget: (id: string) => void;
-	/** Change who a limit moves to first. The list is the priority (`lib/accounts.ts`). */
+	/**
+	 * Change the order, which decides two things: where a new conversation starts, and where
+	 * one that runs out goes next (`lib/accounts.ts`).
+	 */
 	onMove: (id: string, direction: "up" | "down") => void;
 	onClose: () => void;
 }) {
@@ -66,7 +73,7 @@ export function Settings(props: {
 	 * Computed here rather than sent: everything the rule needs is already on the wire, and a
 	 * "next" the server had decided would be stale the moment an account was spent.
 	 */
-	const next = () => nextUp(props.accounts, props.active);
+	const next = () => firstUsable(props.accounts);
 
 	onMount(() => {
 		const onKey = (event: KeyboardEvent) => {
@@ -127,18 +134,20 @@ export function Settings(props: {
 								accounts belongs to the accounts group rather than to the window, which is
 								what made it look like a status line for the whole modal.
 							*/}
-							<Show
-								when={props.accounts.find((account) => account.id === props.active && !account.signedIn)}
-								fallback={
-									<span class="set-note">
-										{props.accounts.length === 1
-											? "Add another to switch when this one runs out."
-											: "When one runs out it moves down this list — use the arrows to set the order."}
-									</span>
-								}
-							>
-								<span class="set-note text-warn">The account in use is signed out. Add it again, or pick another.</span>
-							</Show>
+							{/*
+								What this list is *for*, now that it does not switch anything.
+
+								Choosing which subscription answers is done per conversation, in the model
+								picker — so all that is left here is the set of accounts and their order,
+								and the note says both of the things the order decides. A settings panel
+								that also carried a machine-wide switch was offering a control that moved
+								nobody: every open conversation keeps its own account.
+							*/}
+							<span class="set-note">
+								{props.accounts.length === 1
+									? "Add another to have somewhere to go when this one runs out. Pick per conversation in the model picker."
+									: "Top of the list first: a new conversation starts there, and a conversation that runs out moves down. Switch one conversation in its model picker."}
+							</span>
 						</header>
 
 						{/* `rowlist`, so each account is the same row as a described choice anywhere else in
@@ -149,11 +158,9 @@ export function Settings(props: {
 								{(account) => (
 									<Row
 										account={account}
-										active={props.active === account.id}
 										next={next() === account.id}
 										canUp={props.accounts.length > 1 && canMove(props.accounts, account.id, "up")}
 										canDown={props.accounts.length > 1 && canMove(props.accounts, account.id, "down")}
-										onUse={() => props.onUse(account.id)}
 										onForget={() => props.onForget(account.id)}
 										onMove={(direction) => props.onMove(account.id, direction)}
 									/>
@@ -183,12 +190,10 @@ export function Settings(props: {
 
 function Row(props: {
 	account: ClaudeAccount;
-	active: boolean;
-	/** Whether this is the one a limit would move to — the top usable row that is not in use. */
+	/** Whether this is the top usable row: what a new conversation starts on. */
 	next: boolean;
 	canUp: boolean;
 	canDown: boolean;
-	onUse: () => void;
 	onForget: () => void;
 	onMove: (direction: "up" | "down") => void;
 }) {
@@ -218,13 +223,11 @@ function Row(props: {
 	 * everywhere on the machine, from a panel that looks like it is about Decks.
 	 */
 	const title = () => {
-		const act = props.active
-			? "The account in use now"
-			: props.account.signedIn
-				? `Use ${name()} from now on`
-				: props.account.isDefault
-					? "Claude Code is signed out — sign in with claude auth login"
-					: "Signed out — add it again to use it";
+		const act = props.account.signedIn
+			? `${name()} — choose it for a conversation in its model picker`
+			: props.account.isDefault
+				? "Claude Code is signed out — sign in with claude auth login"
+				: "Signed out — add it again to use it";
 		return props.account.isDefault
 			? `${act}. These are Claude Code's own credentials, so Decks cannot remove them: claude auth logout gives them up.`
 			: act;
@@ -239,8 +242,14 @@ function Row(props: {
 		 * `.account-row` is only what is true of *accounts*: the accent tint on the one in
 		 * use, and the fact that its row is disabled without being dimmed.
 		 */
-		<div class="account-row row-act" data-current={props.active}>
-			<button class="min-w-0 flex-1" type="button" data-row disabled={!props.account.signedIn || props.active} title={title()} onClick={props.onUse}>
+		<div class="account-row row-act" data-current={props.next}>
+			{/*
+				A `div`, not a `button`. Pressing a row used to switch the whole machine to it;
+				there is nothing to press now, and a row that still looked pressable would be
+				the same lie in a quieter form. The two controls that remain — the arrows and
+				the × — are buttons of their own inside it.
+			*/}
+			<div class="min-w-0 flex-1" data-row title={title()}>
 				<span class="lb w-full items-baseline">
 					<span class="truncate">{name()}</span>
 					<Show when={props.account.plan}>{(plan) => <span class="meta flex-none">{plan()}</span>}</Show>
@@ -275,29 +284,29 @@ function Row(props: {
 					*/}
 					<Switch>
 						<Match when={!props.account.signedIn}>
-							<span class="state flex-none text-faint">{props.active ? "signed out — nothing can run" : "signed out"}</span>
+							<span class="state flex-none text-faint">signed out</span>
 						</Match>
 						<Match when={limited()}>
 							{(until) => (
 								<span class="state flex-none text-warn" title={props.account.limitType ? `The ${props.account.limitType} window ran out` : undefined}>
-									{props.active ? "active · limited" : "limited"} · back {when(until())}
+									limited · back {when(until())}
 								</span>
 							)}
 						</Match>
-						<Match when={props.active}>
-							<span class="state flex-none text-accent">active</span>
-						</Match>
 						{/*
-							The only row that says what the arrows *did*. Ranked below every other
-							state for the same reason they are ranked among themselves: "next" is a
-							plan, and a row that is signed out or spent has something truer to say.
+							The only row that says what the arrows *did* — and the one thing this panel
+							still decides. Ranked below the other two for the same reason they are
+							ranked among themselves: "default" is a plan, and a row that is signed out
+							or spent has something truer to say. There is no "active" any more; which
+							subscription is answering is a property of a conversation, and it is said
+							in that conversation's model picker.
 						*/}
 						<Match when={props.next}>
-							<span class="state flex-none text-muted">next</span>
+							<span class="state flex-none text-accent">default for new</span>
 						</Match>
 					</Switch>
 				</span>
-			</button>
+			</div>
 
 			{/*
 				The order, one step at a time.

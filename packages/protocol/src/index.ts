@@ -789,7 +789,16 @@ export type ClientMessage =
 	 * default a new agent starts on. Never both — moving every unassigned agent is the
 	 * surprise the per-agent choice exists to remove.
 	 */
-	| { type: "claude.accounts.use"; id: string; agentId?: string }
+	/**
+	 * Put **one conversation** on a subscription. There is no machine-wide switch.
+	 *
+	 * `agentId` is required, and that is the whole design in one field. It used to be
+	 * optional — omitting it moved the install default — and a settings panel that changed
+	 * what the *next* agent would spend, while every open conversation carried on as before,
+	 * was a control that appeared to do something and did not. Switching is now where the
+	 * model and the thinking level are: in the picker, for the conversation in front of you.
+	 */
+	| { type: "claude.accounts.use"; id: string; agentId: string }
 	/** Forget one, and its credentials. Refused for the CLI's own login. */
 	| { type: "claude.accounts.forget"; id: string }
 	/**

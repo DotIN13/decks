@@ -179,21 +179,13 @@ export interface ClaudeAccountSwitcher {
 	): { moved?: { id: string; email?: string }; nextReset?: number };
 	/** The account's own directory, as opposed to the link. Empty for the CLI's own login. */
 	keychainDir(id: string): string;
-	/** Which account is in force, by id, so a one-off command can be aimed at it. */
-	activeId(): string;
-	/** Which account is in force, for the sentence a switch says. */
-	active(): { id: string; email?: string } | undefined;
 	/**
-	 * Give up on the account that just refused and take the next one.
+	 * The account a conversation with none of its own would spend: the first usable row.
 	 *
-	 * Returns the account moved to, or the soonest any of them will be usable again when
-	 * they are all spent.
+	 * Not "the account in force" — there is no such thing now. Every conversation has its
+	 * own, and this is the answer for one that has not been given one yet.
 	 */
-	rotate(
-		except: string | undefined,
-		resetsAt: number | undefined,
-		limitType: string | undefined,
-	): { moved?: { id: string; email?: string }; nextReset?: number };
+	active(): { id: string; email?: string } | undefined;
 }
 
 /**
