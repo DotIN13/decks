@@ -15,7 +15,7 @@ import { runStageCall, type StageOpsHost } from "./stage-ops.ts";
  * into a board's document, and nothing here asks for one — so this runs as a plain unit test.
  */
 
-const board = (path: string, x: number, y: number): Board => ({ path, title: path, x, y, w: 800, h: 600, rev: 1, inContext: [] });
+const board = (path: string, x: number, y: number): Board => ({ path, format: "component" as const, title: path, x, y, w: 800, h: 600, rev: 1, inContext: [] });
 
 function host(focused: string | undefined) {
 	const moved: Camera[] = [];

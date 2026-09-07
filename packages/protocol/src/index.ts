@@ -28,6 +28,14 @@ export interface Board {
 	/** Deck-relative, forward slashes on every platform: "boards/plan.html". */
 	path: string;
 	title: string;
+	/**
+	 * What this board is, as a file — `component`, `flow` or `slides` (`deck/kinds.ts`).
+	 *
+	 * On the wire because the browser needs it before the frame has loaded: which editor a
+	 * board admits, whether its height is measured or fixed, and whether ← → mean anything
+	 * are all decided from this, and asking the frame would mean deciding them a beat late.
+	 */
+	format: "component" | "flow" | "slides";
 	x: number;
 	y: number;
 	w: number;

@@ -11,6 +11,7 @@ import { basename, matches, panelSections, panelTally } from "./panel-groups.ts"
 
 const board = (path: string, title = path): Board => ({
 	path,
+	format: "component",
 	title,
 	x: 0,
 	y: 0,

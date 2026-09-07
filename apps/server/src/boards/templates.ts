@@ -15,9 +15,27 @@ import { fileURLToPath } from "node:url";
  * for `AGENTS.md.tmpl`.
  */
 
-export type BoardKind = "answer" | "design" | "report" | "plan" | "blank";
+/**
+ * The *shape* a new board starts with — not its file format.
+ *
+ * These two were one word until board formats arrived, and the collision was not
+ * survivable: an `answer` can be written as component HTML or as markdown, so one field
+ * could not mean both. `template` is this; `format` is `BoardFormat` below.
+ */
+export type BoardTemplate = "answer" | "design" | "report" | "plan" | "blank";
 
-export const BOARD_KINDS: readonly BoardKind[] = ["answer", "design", "report", "plan", "blank"];
+/**
+ * What a board *is*, as a file.
+ *
+ * - `component` — absolutely-positioned boxes with `data-id`s. What every board was, and
+ *   the only format Decks' own drag-and-retype editor can work on.
+ * - `flow` — a document that reflows: markdown, or HTML that is not a component board.
+ *   Its height is whatever its content is; see `deck/kinds.ts`.
+ * - `slides` — reveal's markdown dialect, one slide at a time, aspect-locked.
+ */
+export type BoardFormat = "component" | "flow" | "slides";
+
+export const BOARD_TEMPLATES: readonly BoardTemplate[] = ["answer", "design", "report", "plan", "blank"];
 
 /**
  * The widest a board should ever be, and it is a **ceiling rather than a target**.
@@ -55,7 +73,7 @@ const STACK_BELOW = 720;
  * without stuffing it, and every one is under `MAX_BOARD_W` by a distance. A `report` is
  * the widest because it is the only shape with a number, two columns and a tail.
  */
-const SIZE: Record<BoardKind, { w: number; h: number }> = {
+const SIZE: Record<BoardTemplate, { w: number; h: number }> = {
 	answer: { w: 1000, h: 480 },
 	design: { w: 1000, h: 620 },
 	report: { w: 1200, h: 700 },
@@ -75,7 +93,7 @@ const SIZE: Record<BoardKind, { w: number; h: number }> = {
  * is wider than the screen, and a board wider than the screen is read scaled down. Clamping
  * to 390 is what makes `renderTemplate` fold its columns instead.
  */
-export function boardWidth(wanted: number | undefined, viewport: number | undefined, kind: BoardKind = "blank"): number {
+export function boardWidth(wanted: number | undefined, viewport: number | undefined, kind: BoardTemplate = "blank"): number {
 	const ceiling = Math.min(viewport ?? MAX_BOARD_W, MAX_BOARD_W);
 	// A width somebody typed is theirs — the clamp is about what *we* choose when they did
 	// not, and an agent that means 1800 has a reason we cannot see from here.
@@ -138,7 +156,7 @@ interface Rhythm {
 	rows: Array<{ h: number; pair?: boolean }>;
 }
 
-const ROWS: Record<BoardKind, Rhythm> = {
+const ROWS: Record<BoardTemplate, Rhythm> = {
 	answer: { first: 152, rows: [{ h: 220 }] },
 	design: { first: 168, rows: [{ h: 220, pair: true }, { h: 110 }] },
 	// The number first, then the two columns that explain it, then what is left.
@@ -151,8 +169,8 @@ function templatesDir(): string {
 	return resolve(dirname(fileURLToPath(import.meta.url)), "../../../../runtime/templates");
 }
 
-export function isBoardKind(value: unknown): value is BoardKind {
-	return typeof value === "string" && (BOARD_KINDS as readonly string[]).includes(value);
+export function isBoardTemplate(value: unknown): value is BoardTemplate {
+	return typeof value === "string" && (BOARD_TEMPLATES as readonly string[]).includes(value);
 }
 
 /**
@@ -161,7 +179,7 @@ export function isBoardKind(value: unknown): value is BoardKind {
  * A missing template file is a broken install rather than a reason to refuse: fall back to
  * the blank shape's markup so a deck can still be worked in.
  */
-export function renderTemplate(kind: BoardKind, title: string, size?: { w?: number; h?: number }): string {
+export function renderTemplate(kind: BoardTemplate, title: string, size?: { w?: number; h?: number }): string {
 	const file = join(templatesDir(), `${kind}.html`);
 	const source = existsSync(file) ? readFileSync(file, "utf8") : FALLBACK;
 	const w = Math.round(size?.w ?? SIZE[kind].w);
@@ -184,7 +202,7 @@ export function renderTemplate(kind: BoardKind, title: string, size?: { w?: numb
  * anything left after stripping the shape of a filename is kept rather than mangled, and a
  * title that reduces to nothing falls back to the kind.
  */
-export function slugFor(title: string, kind: BoardKind): string {
+export function slugFor(title: string, kind: BoardTemplate): string {
 	const slug = title
 		.toLowerCase()
 		.replace(/['"`]/g, "")

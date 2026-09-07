@@ -23,7 +23,7 @@ import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
 
 export interface StageHost {
 	/** Write a new board from a template and return its deck-relative path. */
-	newBoard(options: { title: string; kind: string; size?: { w?: number; h?: number } }): string;
+	newBoard(options: { title: string; template: string; size?: { w?: number; h?: number } }): string;
 	/** A live board: a stub that draws one agent's conversation. See `App.newMirror`. */
 	newMirror(options: { agentId: string; name: string; size?: { w?: number; h?: number } }): string;
 	/** Write a board's file, record the revision, and tell everyone. */
@@ -111,7 +111,7 @@ export class StageService {
 	}
 
 	/** A new board from a template — the shell, so the agent writes only the content. */
-	newBoard(options: { title: string; kind: string; size?: { w?: number; h?: number } }): string {
+	newBoard(options: { title: string; template: string; size?: { w?: number; h?: number } }): string {
 		return this.host.newBoard(options);
 	}
 

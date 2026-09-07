@@ -148,18 +148,34 @@ test("a path that climbs out of the deck cannot be removed", () => {
 	rmSync(root, { recursive: true, force: true });
 });
 
+/*
+ * Markdown used to be on the "not a board" side of this test, and now it is a board — see
+ * `deck/kinds.ts`. Kept as one test rather than split, because what it is really asserting
+ * has not changed: the glob walks subdirectories, skips dotfiles, and takes only the
+ * extensions it knows.
+ */
 test("boards are found in subdirectories, and non-boards are not", () => {
 	const root = emptyDeck();
 	mkdirSync(join(root, "boards", "nested"), { recursive: true });
 	writeFileSync(join(root, "boards", "a.html"), board("A"));
 	writeFileSync(join(root, "boards", "nested", "b.htm"), board("B"));
-	writeFileSync(join(root, "boards", "notes.md"), "# not a board");
+	writeFileSync(join(root, "boards", "notes.md"), "# Notes");
+	writeFileSync(join(root, "boards", "talk.slides.md"), "# One\n\n---\n\n# Two");
+	writeFileSync(join(root, "boards", "readme.txt"), "not a board");
 	writeFileSync(join(root, "boards", ".hidden.html"), board("H"));
 	const deck = Deck.open(root);
 	assert.deepEqual(
 		deck.boards.map((b) => b.path),
-		["boards/a.html", "boards/nested/b.htm"],
+		["boards/a.html", "boards/nested/b.htm", "boards/notes.md", "boards/talk.slides.md"],
 	);
+	// And each one knows what it is, which is what everything downstream keys off.
+	assert.deepEqual(
+		deck.boards.map((b) => b.format),
+		["component", "component", "flow", "slides"],
+	);
+	// The title comes from the content for a flow board: a rail full of filenames is a
+	// rail with nothing in it.
+	assert.equal(deck.boards.find((b) => b.path === "boards/notes.md")?.title, "Notes");
 	rmSync(root, { recursive: true, force: true });
 });
 

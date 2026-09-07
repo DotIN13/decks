@@ -742,3 +742,282 @@ table.table,
 	content: "Nothing is feeding this mirror — it is live only on the canvas.";
 	font-size: 12px;
 }
+
+/*
+ * ── Shell boards ──────────────────────────────────────────────────────────────────────
+ *
+ * A markdown file, a plain HTML document, or a slide deck. The file is not a board
+ * document, so the server sends one built around it (`boards/shell.ts`) and these are the
+ * two components it can contain.
+ */
+
+/*
+ * The one component on a flow board: the whole document, full bleed.
+ *
+ * No padding of its own — a flow board's height is measured and reported back, and padding
+ * inside a measured box is height the board grows to hold. The breathing room is on the
+ * prose instead, where it belongs and where it is already inherited from `[data-md]`.
+ */
+.board-shell .doc {
+	position: absolute;
+	box-sizing: border-box;
+	width: 100%;
+	padding: 28px 32px;
+}
+
+/*
+ * A flow board is a document, not an embed of one.
+ *
+ * `[data-embed]` draws a card: a header with the filename and a line count, a border, a
+ * shadow, and a scrolling body. That is exactly right for a file shown *on* a board and
+ * exactly wrong for a board that **is** that file — the board's own title already says what
+ * it is, so the header is the filename twice and the border is a card around the whole
+ * canvas rectangle.
+ *
+ * So the rendering is reused and the chrome is dropped, in CSS rather than by teaching
+ * `mountEmbed` a second mode. The important line is `overflow: visible`: the body scrolls
+ * inside a card, and a board does not scroll — the canvas is the scrolling — so a body that
+ * kept its own `overflow: auto` would clip the document at whatever height the board
+ * happened to be, which is the failure this format exists to make impossible.
+ */
+.board-shell .doc.embed {
+	display: block;
+	overflow: visible;
+	height: auto;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+}
+
+.board-shell .doc > .embed-head {
+	display: none;
+}
+
+.board-shell .doc > .embed-body {
+	overflow: visible;
+	height: auto;
+	padding: 0;
+}
+
+/*
+ * Except when the content is in a nested frame.
+ *
+ * A plain HTML document is rendered inside a sandboxed iframe — same as any foreign HTML on
+ * a board — and an iframe has no intrinsic height. Worse, this one is deliberately
+ * opaque-origin, so nothing outside it can measure it either. So a framed flow board keeps a
+ * *stored* height and is resized by dragging its edge, and only markdown gets to be exactly
+ * as tall as its content. Named here rather than left implicit, because "why does my
+ * markdown board self-fit and my HTML one not" deserves an answer in the file.
+ */
+.board-shell .doc[data-framed] {
+	height: 100%;
+}
+
+.board-shell .doc[data-framed] > .embed-body,
+.board-shell .doc[data-framed] > .embed-body > iframe {
+	height: 100%;
+}
+
+/*
+ * A document read at a canvas's distance.
+ *
+ * Slightly larger than a card's body text and looser in the leading, because a flow board is
+ * a page rather than a component — the whole board is the reading surface, so the measure is
+ * the board's width and the type has to hold a long line.
+ */
+.board-shell .doc .embed-body {
+	font-size: 14.5px;
+	line-height: 1.65;
+}
+
+/* ── A slide deck ─────────────────────────────────────────────────────────────────────
+ *
+ * The deck fills the board; one slide fills the deck. A slide is laid out at a **fixed
+ * logical size** and scaled — never reflowed — because a slide whose line breaks move when
+ * you present it is not a slide. `--fit` is set by `slides.js` from the board's width.
+ */
+.deck {
+	position: absolute;
+	display: flex;
+	overflow: hidden;
+	box-sizing: border-box;
+	align-items: center;
+	justify-content: center;
+	background: var(--b-bg);
+}
+
+.deck-stage {
+	position: relative;
+	overflow: hidden;
+	flex: none;
+}
+
+.slide {
+	position: absolute;
+	top: 0;
+	left: 0;
+	display: flex;
+	box-sizing: border-box;
+	width: var(--slide-w, 960px);
+	height: var(--slide-h, 540px);
+	flex-direction: column;
+	justify-content: center;
+	padding: 64px 72px;
+	transform: scale(var(--fit, 1));
+	transform-origin: top left;
+	background: var(--b-bg);
+	font-size: 22px;
+	line-height: 1.45;
+}
+
+.slide > :first-child {
+	margin-top: 0;
+}
+
+.slide > :last-child {
+	margin-bottom: 0;
+}
+
+.slide h1 {
+	margin: 0 0 0.4em;
+	font-size: 54px;
+	line-height: 1.1;
+	letter-spacing: -0.02em;
+}
+
+.slide h2 {
+	margin: 0 0 0.5em;
+	font-size: 38px;
+	line-height: 1.15;
+}
+
+.slide h3 {
+	margin: 0 0 0.5em;
+	font-size: 28px;
+}
+
+.slide ul,
+.slide ol {
+	margin: 0.2em 0;
+	padding-left: 1.4em;
+}
+
+.slide li {
+	margin: 0.35em 0;
+}
+
+.slide img,
+.slide svg {
+	max-width: 100%;
+	max-height: 60vh;
+	object-fit: contain;
+}
+
+.slide code {
+	font-size: 0.85em;
+}
+
+.slide pre {
+	overflow: hidden;
+	font-size: 16px;
+}
+
+/* Notes are for the presenter, and a presenter view does not exist yet — so they are
+   parsed, kept, and not drawn. Hidden rather than dropped, so the day it does exist the
+   content is already there. */
+.slide .slide-note {
+	display: none;
+}
+
+/*
+ * Which slide you are on. Bottom-right, faint, and outside the scaled slide — so it stays
+ * the same size whatever the board's width is, which is what makes it readable on a board
+ * that has been dragged small.
+ */
+.deck-count {
+	position: absolute;
+	right: 10px;
+	bottom: 8px;
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--b-bg) 80%, transparent);
+	color: var(--b-muted);
+	font-family: var(--b-mono);
+	font-size: 11px;
+	pointer-events: none;
+}
+
+/*
+ * The two arrows, revealed on hover.
+ *
+ * Standing at rest they would be furniture on every deck on the canvas; on hover they are
+ * the affordance that says this board is pageable at all, for somebody who has not learnt
+ * that clicking it gives them the arrow keys.
+ */
+.deck-step {
+	position: absolute;
+	top: 50%;
+	display: grid;
+	width: 34px;
+	height: 34px;
+	border: 1px solid var(--b-border-strong);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--b-bg) 88%, transparent);
+	color: var(--b-fg);
+	font-size: 15px;
+	line-height: 1;
+	opacity: 0;
+	cursor: pointer;
+	transition: opacity 120ms ease;
+	place-items: center;
+	transform: translateY(-50%);
+}
+
+.deck:hover .deck-step {
+	opacity: 1;
+}
+
+.deck-step[disabled] {
+	opacity: 0 !important;
+	cursor: default;
+}
+
+.deck-step.prev {
+	left: 10px;
+}
+
+.deck-step.next {
+	right: 10px;
+}
+
+/*
+ * The contact sheet: the deck's shape, below the zoom where a board takes pointer events.
+ *
+ * The same slides at a smaller `--fit`, not a second rendering — so it cannot drift from
+ * what the deck actually says, and a slide that is wrong is wrong in both places.
+ */
+.deck-sheet {
+	position: absolute;
+	display: grid;
+	overflow: hidden;
+	box-sizing: border-box;
+	width: 100%;
+	height: 100%;
+	align-content: start;
+	padding: 10px;
+	gap: 8px;
+}
+
+.deck-sheet .sheet-cell {
+	position: relative;
+	overflow: hidden;
+	border: 1px solid var(--b-border);
+	border-radius: 3px;
+	background: var(--b-bg);
+}
+
+.deck-sheet .sheet-cell[data-on="true"] {
+	border-color: var(--b-accent);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--b-accent) 30%, transparent);
+}

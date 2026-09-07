@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
-import { readBoardMeta } from "./meta.ts";
+import { readBoardMeta, readFlowMeta } from "./meta.ts";
+import { defaultWidth, formatOf, isBoardFile, slideHeight } from "./kinds.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
@@ -256,6 +257,48 @@ export class Deck {
 		return board;
 	}
 
+	/**
+	 * Resize a board that cannot say its own size, and write it down.
+	 *
+	 * Only for `flow` and `slides`: a component board's size lives in its own `<meta>` tag
+	 * and is changed by editing the file, which is what `stage.resize` does. Refused rather
+	 * than silently ignored for those, because a resize that reports success and changes
+	 * nothing is worse than one that says no.
+	 *
+	 * A slide deck takes the width and derives the height, so the two can never disagree
+	 * with the aspect. A flow board takes both, and the height is normally the browser's own
+	 * measurement coming back.
+	 *
+	 * Returns the board only when something actually moved. Nothing written, no save, and no
+	 * `rev` bump when the numbers already match — which is what stops a measurement that
+	 * agrees with the file from reloading the frame that produced it, forever.
+	 */
+	setSize(boardPath: string, size: { w?: number; h?: number }): Board | undefined {
+		const board = this.board(boardPath);
+		if (!board || board.format === "component") return undefined;
+		const width = size.w !== undefined && size.w > 0 ? Math.round(size.w) : board.w;
+		const height =
+			board.format === "slides"
+				? slideHeight(width, this.aspectOf(boardPath))
+				: size.h !== undefined && size.h > 0
+					? Math.round(size.h)
+					: board.h;
+		if (width === board.w && height === board.h) return undefined;
+		board.w = width;
+		board.h = height;
+		this.save();
+		return board;
+	}
+
+	/** A deck's declared aspect, re-read because it lives in the file's front-matter. */
+	private aspectOf(boardPath: string): string | undefined {
+		try {
+			return readFlowMeta(boardPath, readFileSync(join(this.path, boardPath), "utf8")).aspect;
+		} catch {
+			return undefined;
+		}
+	}
+
 	/** The bytes this process last wrote to `deck.json`, so its own echo is known. */
 	private lastWritten: string | undefined;
 
@@ -283,8 +326,17 @@ export class Deck {
 	 * the file belongs to the user as much as to us.
 	 */
 	save(): void {
-		const boards: Record<string, { x: number; y: number }> = {};
-		for (const board of this.boards) boards[board.path] = { x: board.x, y: board.y };
+		const boards: Record<string, { x: number; y: number; w?: number; h?: number }> = {};
+		for (const board of this.boards) {
+			/*
+			 * A size is written only for the formats that have nowhere else to keep it. A
+			 * component board's numbers are in its own `<meta>`, and copying them here would
+			 * make `deck.json` a second source of truth that goes stale the moment somebody
+			 * edits the board — the exact failure this feature had to avoid for markdown.
+			 */
+			boards[board.path] =
+				board.format === "component" ? { x: board.x, y: board.y } : { x: board.x, y: board.y, w: board.w, h: board.h };
+		}
 		this.file = { ...this.file, version: 1, name: this.file.name ?? this.name, boards };
 		const text = serializeDeckFile(this.file);
 		this.lastWritten = text;
@@ -293,24 +345,52 @@ export class Deck {
 
 	private describe(path: string): Board {
 		const absolute = join(this.path, path);
-		const html = readFileSync(absolute, "utf8");
-		const meta = readBoardMeta(html);
+		const source = readFileSync(absolute, "utf8");
+		const format = formatOf(path, source);
+		const meta = format === "component" ? readBoardMeta(source) : readFlowMeta(path, source);
 		// Recorded here rather than in `resync` so that every path that reads a board —
 		// the first load, a watcher event, a `resync` — leaves the same mark behind.
 		this.signatures.set(path, signatureOf(absolute));
+		/*
+		 * Where the size comes from, per format.
+		 *
+		 * A component board says its own, in `<meta name="board">`, and always has. Anything
+		 * else has nowhere in the file to put a number, so `deck.json` carries it beside the
+		 * position — the same file the user's drags already write, which means a resize and a
+		 * move are one mechanism rather than two.
+		 *
+		 * A flow board's height is the exception to the exception: it is never stored,
+		 * because the browser measures it and reports it back (`board.reported`). Until that
+		 * first measurement it gets a placeholder, and the placeholder is deliberately short
+		 * — a board that grows into its content on load looks like it is arriving, where one
+		 * that shrinks looks broken.
+		 */
+		const stored = this.file.boards?.[path];
+		const width = format === "component" ? meta.w ?? DEFAULT_W : stored?.w ?? meta.w ?? defaultWidth(format);
+		const height =
+			format === "component"
+				? meta.h ?? DEFAULT_H
+				: format === "slides"
+					? slideHeight(width, meta.aspect)
+					: // A framed flow board (a plain HTML document) cannot measure itself, so its
+						// placeholder has to be a usable size rather than one that grows. Markdown
+						// gets the short one, because a board that grows into its content on load
+						// looks like it is arriving where one that shrinks looks broken.
+						(stored?.h ?? (/\.html?$/i.test(path) ? 600 : 240));
 		return {
 			path,
-			title: meta.title ?? basename(path).replace(/\.html?$/i, ""),
+			title: meta.title ?? basename(path).replace(/\.(slides\.md|html?|mdx?)$/i, ""),
+			format,
 			x: 0,
 			y: 0,
-			w: meta.w ?? DEFAULT_W,
-			h: meta.h ?? DEFAULT_H,
+			w: width,
+			h: height,
 			// The revision is the *content*, hashed. The modification time was the
 			// obvious choice and the wrong one: it has millisecond resolution, so two
 			// writes inside the same millisecond leave it unchanged and the frame
 			// never reloads. A content hash also means an edit that puts a board back
 			// the way it was does not churn every open frame.
-			rev: revisionOf(html),
+			rev: revisionOf(source),
 			...(meta.poster ? { poster: meta.poster } : {}),
 			inContext: [],
 		};
@@ -327,7 +407,7 @@ function signatureOf(absolute: string): string {
 	}
 }
 
-/** Every `.html` under `boards/`, deck-relative, sorted, dotfiles skipped. */
+/** Every board file under `boards/`, deck-relative, sorted, dotfiles skipped. */
 function scanBoards(dir: string, deckRoot: string): string[] {
 	if (!existsSync(dir)) return [];
 	const out: string[] = [];
@@ -336,7 +416,7 @@ function scanBoards(dir: string, deckRoot: string): string[] {
 			if (entry.name.startsWith(".")) continue;
 			const full = join(current, entry.name);
 			if (entry.isDirectory()) walk(full);
-			else if (/\.html?$/i.test(entry.name)) out.push(normalizeBoardPath(relative(deckRoot, full)));
+			else if (isBoardFile(entry.name)) out.push(normalizeBoardPath(relative(deckRoot, full)));
 		}
 	};
 	walk(dir);

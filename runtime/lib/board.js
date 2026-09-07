@@ -163,8 +163,30 @@
 	async function renderMarkdown(target, source) {
 		await needScript("marked.umd.js");
 		const marked = window.marked;
-		target.innerHTML = marked.parse(dedent(source), { gfm: true, breaks: false });
+		target.innerHTML = marked.parse(dedent(stripFrontMatter(source)), { gfm: true, breaks: false });
 		await renderMath(target);
+	}
+
+	/**
+	 * Drop a YAML front-matter block, because it is metadata and not content.
+	 *
+	 * `marked` has no idea what front-matter is, so it renders the fence as a horizontal
+	 * rule and the keys as a paragraph — a markdown board opened with a rule and the words
+	 * "w: 760" across the top of it. True of any `.md` embedded on a board, not only of a
+	 * board that is one, so it belongs here rather than in the shell.
+	 *
+	 * **Conservative on purpose.** A file may legitimately open with `---` as a rule, so the
+	 * block only counts as front-matter if every line in it looks like `key: value`. Getting
+	 * this wrong in the permissive direction eats the first section of somebody's document.
+	 */
+	function stripFrontMatter(source) {
+		const text = String(source ?? "");
+		const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
+		if (!match) return text;
+		const lines = (match[1] ?? "").split(/\r?\n/).filter((line) => line.trim().length > 0);
+		if (lines.length === 0) return text;
+		if (!lines.every((line) => /^[A-Za-z_][\w-]*\s*:/.test(line) || /^\s+\S/.test(line))) return text;
+		return text.slice(match[0].length);
 	}
 
 	/** KaTeX, but only if the text plausibly contains maths. */
@@ -754,6 +776,40 @@
 	}
 
 	/** A live component: fed by the app, over `postMessage`, and never from the file. */
+	/**
+	 * Draw a slide deck, and hand the app the handle it pages with.
+	 *
+	 * The handle goes on `window.__deck` rather than being returned, because the thing that
+	 * drives it is in the *parent* document: the arrow keys arrive in the app's own
+	 * keyboard handler or are forwarded out of this frame by `frame-gestures.ts`, and
+	 * neither of those can await a promise this function returned. One deck per board, so
+	 * one global is the whole of the addressing needed.
+	 */
+	async function mountSlides(element) {
+		const file = element.getAttribute("data-slides");
+		if (!file) return;
+		try {
+			const [slides, response] = await Promise.all([needModule("slides.js"), fetch(new URL(file, location.href))]);
+			if (!response.ok) throw new Error(`${response.status}`);
+			const source = await response.text();
+			const deck = slides.mountDeck(element, source, {
+				// The board's own markdown renderer, so a slide gets the same marked,
+				// KaTeX and mermaid a `[data-md]` component does — one renderer, not two.
+				render: (into, markdown) => renderMarkdown(into, markdown),
+			});
+			window.__deck = deck;
+			/*
+			 * Re-fit on resize, because a board is dragged and a fullscreen overlay is a
+			 * different size again. Cheap: it sets one custom property and two pixel
+			 * widths, and it is the only thing that has to happen when the box changes.
+			 */
+			new ResizeObserver(() => deck.fit()).observe(element);
+		} catch (error) {
+			element.textContent = `Cannot read ${file}: ${(error && error.message) || "unknown error"}`;
+			element.classList.add("embed-missing");
+		}
+	}
+
 	async function mountLive(host) {
 		try {
 			const module = await needModule("live-chat.js");
@@ -787,6 +843,16 @@
 		 */
 		for (const element of document.querySelectorAll('[data-live="chat"]')) {
 			work.push(mountLive(element));
+		}
+		/*
+		 * A slide deck, which is neither a document nor live.
+		 *
+		 * `[data-slides]` names a markdown file in reveal's dialect. The view is
+		 * `slides.js`, loaded on demand like every other renderer here — so a deck costs a
+		 * board that is not one exactly nothing.
+		 */
+		for (const element of document.querySelectorAll("[data-slides]")) {
+			work.push(mountSlides(element));
 		}
 
 		await Promise.allSettled(work);

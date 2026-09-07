@@ -1,5 +1,5 @@
 import type { AgentKind, AgentMode, Camera, Identity, ThinkingLevel } from "@decks/protocol";
-import { BOARD_KINDS, boardWidth, isBoardKind } from "../boards/templates.ts";
+import { BOARD_TEMPLATES, boardWidth, isBoardTemplate } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService } from "./service.ts";
 
@@ -255,11 +255,20 @@ export function createStageTool(deps: {
 		 * where the user left it until `show` is called. Returns the deck-relative path to
 		 * edit.
 		 */
-		newBoard: async (options: { title: string; kind?: string; w?: number; h?: number }) => {
+		newBoard: async (options: { title: string; template?: string; kind?: string; w?: number; h?: number }) => {
 			const title = options?.title?.trim();
 			if (!title) throw new Error("A board needs a title");
-			const kind = options.kind ?? "blank";
-			if (!isBoardKind(kind)) throw new Error(`Unknown kind ${kind}; use one of ${BOARD_KINDS.join(", ")}`);
+			/*
+			 * `kind` still works, and is the old name for this.
+			 *
+			 * It meant the template shape until board formats arrived and needed the word.
+			 * Accepted rather than refused because this signature is in the `stage.d.ts`
+			 * every agent has already read: an agent mid-turn is working from the contract
+			 * as it was when its session opened, and breaking that costs somebody a turn to
+			 * save a deprecation.
+			 */
+			const template = options.template ?? options.kind ?? "blank";
+			if (!isBoardTemplate(template)) throw new Error(`Unknown template ${template}; use one of ${BOARD_TEMPLATES.join(", ")}`);
 
 			/*
 			 * The width, when nobody said one.
@@ -271,10 +280,10 @@ export function createStageTool(deps: {
 			 * and the template folds its columns to fit rather than being clipped.
 			 */
 			const view = viewport();
-			const width = boardWidth(options.w, view?.width, kind);
+			const width = boardWidth(options.w, view?.width, template);
 			const path = service.newBoard({
 				title,
-				kind,
+				template,
 				size: { w: width, ...(options.h ? { h: options.h } : {}) },
 			});
 			agent.setContext([path, ...agent.context()]);

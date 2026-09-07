@@ -15,6 +15,8 @@ export interface BoardMeta {
 	h?: number;
 	bg?: string;
 	poster?: string;
+	/** A slide deck's aspect, `"16:9"` by default — see `deck/kinds.ts`. */
+	aspect?: string;
 }
 
 const TITLE = /<title[^>]*>([\s\S]*?)<\/title>/i;
@@ -128,4 +130,52 @@ export function withBoardSize(html: string, size: { w?: number; h?: number }): s
 	const head = /<head[^>]*>/i.exec(html);
 	if (head) return `${html.slice(0, head.index + head[0].length)}\n\t\t${tag}${html.slice(head.index + head[0].length)}`;
 	return `${tag}\n${html}`;
+}
+
+
+/**
+ * What a *flow* board says about itself — a markdown file or a plain HTML document.
+ *
+ * The interesting field is the title, and the interesting decision is that it comes from the
+ * **content**. A rail listing `notes.md`, `report.html`, `talk.slides.md` has no information
+ * in it; a rail listing what those documents are called is the whole point of having one. So
+ * the first `#` of a markdown file, or the `<title>` of a document, and the filename only
+ * when neither exists.
+ *
+ * Front-matter is read for `w` and `aspect`, and deliberately not for anything else. It is
+ * how a board an agent writes can declare its own width the way an HTML board can — without
+ * it, an agent could create a markdown board but not size it, and would have to ask the user
+ * to drag the edge. Not a full YAML parser: three keys, one line each, at the top of the
+ * file, in the same spirit as the regex above.
+ */
+export function readFlowMeta(path: string, source: string): BoardMeta {
+	const meta: BoardMeta = {};
+	const front = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(source);
+	if (front) {
+		for (const line of (front[1] ?? "").split(/\r?\n/)) {
+			const pair = /^([a-z_]+)\s*:\s*(.+?)\s*$/i.exec(line);
+			if (!pair) continue;
+			const value = (pair[2] ?? "").replace(/^["']|["']$/g, "");
+			if (pair[1] === "title" && value) meta.title = value;
+			else if (pair[1] === "aspect" && value) meta.aspect = value;
+			else if (pair[1] === "w") {
+				const w = Number(value);
+				if (Number.isFinite(w) && w > 0) meta.w = Math.round(w);
+			}
+		}
+	}
+	if (meta.title) return meta;
+
+	// `<title>` for a document, then the first heading, then nothing — and `nothing` is
+	// what makes the caller fall back to the filename.
+	const titled = TITLE.exec(source);
+	if (titled?.[1]?.trim()) return { ...meta, title: titled[1].trim() };
+	const body = front ? source.slice(front[0].length) : source;
+	const heading = /^\s*#\s+(.+?)\s*$/m.exec(body);
+	if (heading?.[1]) return { ...meta, title: heading[1].replace(/\s*#*\s*$/, "") };
+	// An HTML document with an `<h1>` but no `<title>`, which a lot of exports are.
+	const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(source);
+	if (h1?.[1]) return { ...meta, title: h1[1].replace(/<[^>]*>/g, "").trim() || undefined };
+	void path;
+	return meta;
 }

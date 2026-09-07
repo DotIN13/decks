@@ -1,4 +1,5 @@
 import { readdirSync, statSync, watch, type FSWatcher } from "node:fs";
+import { isBoardFile } from "./kinds.ts";
 import { join } from "node:path";
 import { normalizeBoardPath } from "./schema.ts";
 
@@ -111,7 +112,8 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 				pending.delete(path);
 				if (replaced(path)) rearm();
 				if (path === "deck.json") onChange({ kind: "deck" });
-				else if (/^boards\/.+\.html?$/i.test(path)) onChange({ kind: "board", path });
+				// Every format the loader lists, so a saved `.md` reloads its frame like a `.html`.
+				else if (/^boards\/.+/i.test(path) && isBoardFile(path)) onChange({ kind: "board", path });
 				else onChange({ kind: "asset", path });
 			}, quietMs),
 		);

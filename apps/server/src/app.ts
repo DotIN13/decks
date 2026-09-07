@@ -6,7 +6,7 @@ import type { Board, BoardPatch, Camera, ClientMessage, ServerMessage, StageCall
 import { Registry } from "./agents/registry.ts";
 import { applyPatches, mintId, PatchRefused } from "./boards/patch.ts";
 import { Revisions } from "./boards/snapshots.ts";
-import { isBoardKind, MIRROR_SIZE, renderMirror, renderTemplate, slugFor, type BoardKind } from "./boards/templates.ts";
+import { isBoardTemplate, MIRROR_SIZE, renderMirror, renderTemplate, slugFor, type BoardTemplate } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./claude/accounts.ts";
@@ -88,7 +88,7 @@ export class App {
 		this.deck = deck;
 		this.revisions = new Revisions(deck);
 		this.stage = new StageService(deck, {
-			newBoard: (options) => this.newBoard({ ...options, kind: options.kind as BoardKind }),
+			newBoard: (options) => this.newBoard({ ...options, template: options.template as BoardTemplate }),
 			newMirror: (options) => this.newMirror(options),
 			writeBoard: (path, html) => this.writeBoard(path, html),
 			extent: (path, rev) => this.extentOf(path, rev),
@@ -431,6 +431,30 @@ export class App {
 			}
 			case "board.extent": {
 				this.noteExtent(message.path, { rev: message.rev, w: message.w, h: message.h });
+				/*
+				 * A flow board *is* its content's height.
+				 *
+				 * Markdown and plain documents have nowhere in the file to keep a height and
+				 * no reason to: the browser has just measured the only true answer, so the
+				 * board takes it. This is what makes "the board clips and nobody notices"
+				 * impossible for these formats — there is no stored height to be wrong.
+				 *
+				 * Three guards, and each one is a loop that was easy to write by accident:
+				 *
+				 * - `setSize` returns nothing when the numbers already match, so a
+				 *   measurement that agrees with the record neither saves nor bumps `rev`,
+				 *   and the frame that produced it is not reloaded to be asked again;
+				 * - only the height is taken. The width is the user's, from a drag, and a
+				 *   measurement that also set it would fight the drag that caused it;
+				 * - the reading must be for the revision the board is actually at, or a
+				 *   measurement of a document that has since been rewritten sets the height
+				 *   of one that no longer exists.
+				 */
+				const flowing = this.deck.board(message.path);
+				if (flowing?.format === "flow" && flowing.rev === message.rev) {
+					const resized = this.deck.setSize(message.path, { h: message.h });
+					if (resized) this.send({ type: "deck.state", deck: this.deck.state() });
+				}
 				return;
 			}
 
@@ -511,8 +535,8 @@ export class App {
 			 * board rather than a refusal.
 			 */
 			case "board.create": {
-				const kind = isBoardKind(message.kind) ? message.kind : "blank";
-				const path = this.newBoard({ title: "Untitled", kind });
+				const template = isBoardTemplate(message.kind) ? message.kind : "blank";
+				const path = this.newBoard({ title: "Untitled", template });
 				const agent = this.agents.focused();
 				agent.setInPlay([...agent.inPlay, path]);
 				return;
@@ -898,8 +922,8 @@ export class App {
 	 * from the title and made unique by suffixing, so an agent answering three questions
 	 * about the same thing gets `-2` and `-3` rather than an error.
 	 */
-	newBoard(options: { title: string; kind: BoardKind; size?: { w?: number; h?: number } }): string {
-		const base = slugFor(options.title, options.kind);
+	newBoard(options: { title: string; template: BoardTemplate; size?: { w?: number; h?: number } }): string {
+		const base = slugFor(options.title, options.template);
 		let path = `boards/${base}.html`;
 		for (let suffix = 2; existsSync(join(this.deck.path, path)); suffix++) {
 			path = `boards/${base}-${suffix}.html`;
@@ -907,7 +931,7 @@ export class App {
 		}
 
 		const file = this.deck.fileOf(path);
-		const html = renderTemplate(options.kind, options.title, options.size);
+		const html = renderTemplate(options.template, options.title, options.size);
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, html);
 		this.revisions.record(path, html);

@@ -11,7 +11,7 @@ import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./agent-view.ts";
 
 const board = (path: string, x: number, y: number): Board => ({
 	path,
-	title: path,
+	format: "component" as const, title: path,
 	x,
 	y,
 	w: 1200,

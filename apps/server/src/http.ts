@@ -1,4 +1,7 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { renderShell } from "./boards/shell.ts";
+import { normalizeBoardPath } from "./deck/schema.ts";
+import { readFlowMeta } from "./deck/meta.ts";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
@@ -86,6 +89,41 @@ export function createHttpApp(app: App): Express {
 			 */
 			if (isBoardPath(requested)) boardHeaders(res);
 			else assetHeaders(res, target);
+
+			/*
+			 * A board that is not a document gets one made for it.
+			 *
+			 * Markdown, a deck, and a plain HTML page are all *content* rather than board
+			 * documents, so the frame is sent a shell that renders them (`boards/shell.ts`).
+			 * The board record is what decides — it already knows the format, the size and
+			 * the title, and re-deriving them here would be a second opinion that can differ
+			 * from the one the canvas laid the board out with.
+			 *
+			 * Anything the deck knows nothing about — an asset, `lib/board.css` — falls
+			 * through to the file itself, which is what every non-board request is.
+			 */
+			/*
+			 * `?raw=1` is the shell asking for the file it wraps.
+			 *
+			 * Without it the shell — which is served at this very URL — would be what its
+			 * own embed fetched, and the board would render empty with nothing in any log to
+			 * say why. One query parameter rather than a second route, so the reference in
+			 * the shell stays *relative* and a nested board resolves its own sibling.
+			 */
+			const board = req.query.raw === undefined ? app.deck.board(normalizeBoardPath(requested)) : undefined;
+			if (board && board.format !== "component") {
+				res.type("html").send(
+					renderShell({
+						path: board.path,
+						format: board.format,
+						title: board.title,
+						w: board.w,
+						h: board.h,
+						...(aspectOf(app.deck, board.path) ? { aspect: aspectOf(app.deck, board.path) as string } : {}),
+					}),
+				);
+				return;
+			}
 			await sendFile(res, target);
 		}),
 	);
@@ -276,4 +314,19 @@ function sendFile(res: Response, target: string): Promise<void> {
 	return new Promise((ok, fail) => {
 		res.sendFile(target, { acceptRanges: true, dotfiles: "allow" }, (error) => (error ? fail(error) : ok()));
 	});
+}
+
+
+/**
+ * A deck's declared aspect, read from the file rather than carried on the board record.
+ *
+ * It is only wanted at the moment a shell is rendered, and the board record is a thing the
+ * whole app holds in memory — a field that one route reads once does not belong on it.
+ */
+function aspectOf(deck: { path: string }, boardPath: string): string | undefined {
+	try {
+		return readFlowMeta(boardPath, readFileSync(join(deck.path, boardPath), "utf8")).aspect;
+	} catch {
+		return undefined;
+	}
 }

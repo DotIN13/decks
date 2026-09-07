@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readBoardMeta } from "../deck/meta.ts";
-import { BOARD_KINDS, boardWidth, isBoardKind, MAX_BOARD_W, renderTemplate, slugFor } from "./templates.ts";
+import { BOARD_TEMPLATES, boardWidth, isBoardTemplate, MAX_BOARD_W, renderTemplate, slugFor } from "./templates.ts";
 
 test("every kind renders a board the loader can read", () => {
-	for (const kind of BOARD_KINDS) {
+	for (const kind of BOARD_TEMPLATES) {
 		const html = renderTemplate(kind, "Why the second tab fails");
 		const meta = readBoardMeta(html);
 		assert.equal(meta.title, "Why the second tab fails", kind);
@@ -41,9 +41,9 @@ test("slugs are file names, and survive titles that are not English", () => {
 });
 
 test("a kind has to be one of the shapes", () => {
-	assert.equal(isBoardKind("answer"), true);
-	assert.equal(isBoardKind("slideshow"), false);
-	assert.equal(isBoardKind(undefined), false);
+	assert.equal(isBoardTemplate("answer"), true);
+	assert.equal(isBoardTemplate("slideshow"), false);
+	assert.equal(isBoardTemplate(undefined), false);
 });
 
 
@@ -67,7 +67,7 @@ function components(html: string): Array<{ id: string; left: number; top: number
 }
 
 test("no shape's own width is above the ceiling", () => {
-	for (const kind of BOARD_KINDS) {
+	for (const kind of BOARD_TEMPLATES) {
 		const meta = readBoardMeta(renderTemplate(kind, "T"));
 		assert.ok((meta.w ?? 0) <= MAX_BOARD_W, `${kind} is ${meta.w}, over ${MAX_BOARD_W}`);
 	}
@@ -87,7 +87,7 @@ test("a width is the smallest of what the shape wants, the viewport, and the cei
 });
 
 test("every template reads top to bottom in the order the file is written", () => {
-	for (const kind of BOARD_KINDS) {
+	for (const kind of BOARD_TEMPLATES) {
 		for (const width of [1200, 1000, 390]) {
 			const boxes = components(renderTemplate(kind, "T", { w: width }));
 			assert.ok(boxes.length > 0, `${kind} has components`);
@@ -102,7 +102,7 @@ test("every template reads top to bottom in the order the file is written", () =
 });
 
 test("nothing sticks out of the board it was laid out for", () => {
-	for (const kind of BOARD_KINDS) {
+	for (const kind of BOARD_TEMPLATES) {
 		for (const width of [1200, 1000, 390]) {
 			const html = renderTemplate(kind, "T", { w: width });
 			const meta = readBoardMeta(html);
