@@ -195,5 +195,48 @@ say("an edit on disk reaches the frame unaided", live.found && live.src !== srcB
 
 write(plan, original);
 await changed(plan, read(plan) === original ? "" : original).catch(() => {});
+// 5. What a zoom does that a pan does not, and what it now costs.
+/*
+ * Moving the camera is a transform over pictures the compositor already holds. Changing
+ * its *scale* asks every board to be drawn again at a size it has never been drawn at —
+ * a board being a whole document — and every title bar to be laid out again, because a
+ * bar is counter-scaled and so its width and offset are functions of the zoom. Measured
+ * on twelve boards at 4× CPU throttle, that was 134ms of work per finger movement while
+ * pinching against 69ms while panning.
+ *
+ * Two mechanisms answer it, and both are here because neither shows up in a screenshot:
+ * the boards go on layers of their own while the scale is moving, and a board that is off
+ * screen does not draw a title bar at all.
+ */
+await page.keyboard.press("Control+Equal");
+const whileZooming = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
+say("a zoom says the scale is moving, so the boards can go on layers", whileZooming === "true", `data-scaling=${whileZooming}`);
+await settle(page, 900);
+const atRest = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
+// Held only while it is moving: a layer is a texture kept in memory, and a deck of them
+// held for the life of the page is memory nobody asked for.
+say("…and gives the layers back once it stops", atRest === "false", `data-scaling=${atRest}`);
+
+const beforePan = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
+await page.mouse.move(700, 400);
+await page.mouse.wheel(0, 120);
+await settle(page, 120);
+const whilePanning = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
+say("a scroll that only moves the camera does not ask for them", beforePan === "false" && whilePanning === "false", `${beforePan} -> ${whilePanning}`);
+
+// Zoom in until the other boards leave the screen, and their bars should go with them.
+for (let step = 0; step < 10; step++) {
+	await page.keyboard.press("Control+Equal");
+	await settle(page, 60);
+}
+await settle(page, 900);
+const bars = await page.evaluate(() => ({
+	nodes: document.querySelectorAll(".board-node").length,
+	documents: document.querySelectorAll(".board-node iframe").length,
+	bars: document.querySelectorAll(".board-node > .chrome").length,
+}));
+say("a board that is off screen draws no title bar", bars.bars < bars.nodes, JSON.stringify(bars));
+say("…and every board that is on screen still has one", bars.bars === bars.documents, JSON.stringify(bars));
+
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

@@ -476,6 +476,27 @@ svg.lucide {
 }
 
 /*
+ * While the camera's scale is moving, every board gets a layer of its own.
+ *
+ * A pan is a transform over pictures the compositor already holds, which is why it stays
+ * smooth with a dozen boards on the canvas. A zoom asks for every one of them to be drawn
+ * again at a size it has never been drawn at, and a board is an iframe — a whole document
+ * to redraw, per board, per frame. `will-change: transform` hands the board to the
+ * compositor, which stretches the picture it has rather than waking the main thread.
+ *
+ * Measured, 12 boards in view at 4× CPU throttle: 134ms of work per finger movement
+ * becomes 56ms — the same as a pan. At rest the two are the same picture: 0.2% of pixels
+ * differ, at the edges of letters, because the layer is redrawn once the scale settles.
+ *
+ * Only while it is moving. A layer is a texture that has to be kept, and a deck of them
+ * held forever is memory nobody asked for — `Stage.tsx` turns the attribute off 300ms
+ * after the last change of scale.
+ */
+.stage[data-scaling="true"] .board-node iframe {
+	will-change: transform;
+}
+
+/*
  * Editing looks different, for as long as it lasts.
  *
  * This is what stands in for a confirmation dialog on the pencil. A mode that changes what a

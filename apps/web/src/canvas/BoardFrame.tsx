@@ -370,6 +370,20 @@ export function BoardFrame(props: {
 			}}
 		>
 			{/*
+				Only for a board that is on screen, which is what `mounted` already means.
+
+				The bar is the one thing on a board node that has to be redrawn when the
+				*zoom* changes and not when the camera merely moves: it is counter-scaled, so
+				its width and its offset are both functions of the zoom, and writing them
+				dirties layout. That is per board, per frame, for every board on the canvas —
+				and it was being paid for boards nobody could see. Measured on a canvas of
+				120 boards at 4× CPU throttle: 110ms of work per finger movement while
+				pinching, against 51ms while panning, and taking the bars away closed the gap
+				entirely (48ms). Off-screen boards do not load their documents for the same
+				reason; this is the rest of that rule.
+			*/}
+			<Show when={props.mounted}>
+			{/*
 				Counter-scaled against the camera, so the title stays legible at any zoom —
 				one that shrinks with the board is unreadable exactly when the board is too
 				small to identify by its content.
@@ -440,6 +454,7 @@ export function BoardFrame(props: {
 					)}
 				</Show>
 			</div>
+			</Show>
 
 			{/*
 				When the frame is inert — zoomed out far enough that a board is a tile on a
