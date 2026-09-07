@@ -82,3 +82,15 @@ test("the one component carries a data-id, so the editor has something to land o
 	assert.match(renderShell({ path: "boards/n.md", format: "flow", title: "n", w: 720, h: 400 }), /data-id="body"/);
 	assert.match(renderShell({ path: "boards/t.slides.md", format: "slides", title: "t", w: 960, h: 540 }), /data-id="deck"/);
 });
+
+/*
+ * The fullscreen overlay loads the same board and needs it to fill the window rather than
+ * its own rectangle — a 960-wide deck sat in the corner of a 1500px overlay until this
+ * existed. One class, because the CSS is where the two layouts differ.
+ */
+test("a presented board says so, and an ordinary one does not", () => {
+	const shown = renderShell({ path: "boards/t.slides.md", format: "slides", title: "t", w: 960, h: 540, present: true });
+	assert.match(shown, /class="board board-shell board-present"/);
+	const onCanvas = renderShell({ path: "boards/t.slides.md", format: "slides", title: "t", w: 960, h: 540 });
+	assert.doesNotMatch(onCanvas, /board-present/);
+});

@@ -119,6 +119,9 @@ export function createHttpApp(app: App): Express {
 						title: board.title,
 						w: board.w,
 						h: board.h,
+						// The fullscreen overlay asks for the same board and wants it to fill the
+						// window instead of its own rectangle.
+						...(req.query.present === undefined ? {} : { present: true }),
 						...(aspectOf(app.deck, board.path) ? { aspect: aspectOf(app.deck, board.path) as string } : {}),
 					}),
 				);

@@ -1,5 +1,6 @@
 import type { Board, Camera, ChatItem } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
+import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { unwrap } from "solid-js/store";
 import { Icon } from "../icons.tsx";
@@ -49,6 +50,16 @@ export function BoardFrame(props: {
 	 * `stage.boards()`). Reported once per load, with the revision it was measured at.
 	 */
 	onExtent?: (extent: { rev: number; w: number; h: number }) => void;
+	/** Only for a deck: take it fullscreen. */
+	onPresent?: () => void;
+	/**
+	 * The board's own source, while it is being edited as text.
+	 *
+	 * Rendered *inside* this node rather than as a dialog, so the canvas positions and
+	 * scales it exactly as it does the frame it stands in for — which is what makes the box
+	 * feel like the board rather than like something on top of it.
+	 */
+	editing?: { source: string; onCommit: (text: string) => void; onCancel: () => void };
 	/** Take this board off the canvas. It stays in the agent's context. */
 	onHide?: () => void;
 	/** Editing lives inside the frame, because the frame is same-origin (§4). */
@@ -80,12 +91,14 @@ export function BoardFrame(props: {
 	agentIdentity?: (agentId: string) => { name: string; color: string } | undefined;
 }) {
 	let detachEditor: (() => void) | undefined;
+	let detachSelect: (() => void) | undefined;
 	let detachGestures: (() => void) | undefined;
 	let detachDrop: (() => void) | undefined;
 	let detachLive: (() => void) | undefined;
 	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
 	onCleanup(() => {
+		detachSelect?.();
 		detachEditor?.();
 		detachGestures?.();
 		detachDrop?.();
@@ -182,6 +195,8 @@ export function BoardFrame(props: {
 		if (can) root.setAttribute("data-decks-edit", "");
 		else root.removeAttribute("data-decks-edit");
 	});
+
+
 
 	/*
 	 * Feeding a live board.
@@ -384,6 +399,29 @@ export function BoardFrame(props: {
 			>
 				<span class="title">{props.board.title}</span>
 				<span class="file">{props.board.path}</span>
+				{/*
+					A deck says it is one, and offers the only thing you cannot get from the
+					keyboard without knowing about it. `f` works once a deck is focused, and
+					nothing in the app says so — a button in the title bar is where somebody
+					looks for "how do I show this to a room".
+				*/}
+				<Show when={props.board.format === "slides" && props.onPresent}>
+					{(present) => (
+						<button
+							class="hide present-open"
+							type="button"
+							title="Present this deck fullscreen (or press f with it selected)"
+							aria-label={`Present ${props.board.title}`}
+							onPointerDown={(event) => event.stopPropagation()}
+							onClick={(event) => {
+								event.stopPropagation();
+								present()();
+							}}
+						>
+							Present
+						</button>
+					)}
+				</Show>
 				<Show when={props.onHide}>
 					{(hide) => (
 						<button
@@ -429,6 +467,18 @@ export function BoardFrame(props: {
 					when={props.mounted}
 					fallback={<div class="placeholder">{props.board.path}</div>}
 				>
+					<Show when={props.editing} keyed>
+						{(editing) => (
+							<SourceEditor
+								path={props.board.path}
+								source={editing.source}
+								w={props.board.w}
+								h={props.board.h}
+								onCommit={editing.onCommit}
+								onCancel={editing.onCancel}
+							/>
+						)}
+					</Show>
 					<iframe
 						ref={(element) => {
 							frameEl = element;
@@ -450,6 +500,29 @@ export function BoardFrame(props: {
 							detachGestures?.();
 							detachDrop?.();
 							detachLive?.();
+							detachSelect?.();
+							/*
+							 * A click inside a board with no components selects the board.
+							 *
+							 * On a component board a click means "this box", and the editor
+							 * answers it. On a flow or slides board there are no boxes, so the
+							 * click can only mean "this board" — and it has to *say* so, because
+							 * everything the board then responds to asks the canvas which board
+							 * is selected: the arrow keys on a deck, the double-click that opens
+							 * the source. Clicking one was leaving that answer unchanged, so a
+							 * deck you had clicked ignored ← → unless you happened to have played
+							 * it from the rail as well.
+							 *
+							 * Here rather than in an effect, and that is the whole bug: an effect
+							 * reads `contentDocument` before the load and lands on the
+							 * `about:blank` the frame starts with, which is then thrown away.
+							 */
+							if (props.board.format !== "component") {
+								const doc = frame.contentDocument;
+								const select = () => props.onSelect();
+								doc?.addEventListener("pointerdown", select, true);
+								detachSelect = () => doc?.removeEventListener("pointerdown", select, true);
+							}
 							detachEditor = attachEditor(frame, props.board.path, props.editor);
 							detachGestures = attachFrameGestures(frame, props.gestures);
 							detachDrop = attachFrameDrop(frame, props.drops);

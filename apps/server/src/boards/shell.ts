@@ -35,6 +35,14 @@ export interface ShellSpec {
 	h: number;
 	/** A deck's aspect, passed through so `slides.js` scales without re-reading the file. */
 	aspect?: string;
+	/**
+	 * Being presented: fill the window rather than the board's rectangle.
+	 *
+	 * A board document lays out at the board's own size — 960 wide for a deck — which is
+	 * right on the canvas and wrong in a fullscreen overlay, where the slide sat at 960px in
+	 * the corner of a 1500px frame. One class on the body, and the CSS does the rest.
+	 */
+	present?: boolean;
 }
 
 /**
@@ -70,7 +78,7 @@ export function renderShell(spec: ShellSpec): string {
 		<meta name="board" content='${escapeAttribute(meta)}' />
 		<link rel="stylesheet" href="${LIB}/board.css" />
 	</head>
-	<body class="board board-shell" data-format="${spec.format}">
+	<body class="board board-shell${spec.present ? " board-present" : ""}" data-format="${spec.format}">
 ${body}
 		<script src="${LIB}/board.js"></script>
 	</body>

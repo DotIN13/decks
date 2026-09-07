@@ -17,6 +17,7 @@
 @import "./styles/stream.css";
 @import "./styles/dock.css";
 @import "./styles/usage.css";
+@import "./styles/canvas.css";
 
 /*
  * The app's tokens, handed to Tailwind so utilities speak the design language.

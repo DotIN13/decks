@@ -1,0 +1,165 @@
+/*
+ * The canvas's own surfaces — the ones that are not the chrome and not a board.
+ *
+ * There is one today: presenting a deck. In `styles/` beside the others rather than in
+ * `index.css` for the reason stated at the top of that file — a surface with its own
+ * vocabulary is easier to read as a file than as a section.
+ */
+/*
+ * ── Presenting ────────────────────────────────────────────────────────────────────────
+ *
+ * A deck, fullscreen. An overlay rather than a moved frame: the canvas keeps its own frame,
+ * camera and current slide behind this, so leaving puts you back exactly where you were
+ * (`canvas/Present.tsx`).
+ */
+@layer components {
+	.present {
+		position: fixed;
+		z-index: 200;
+		display: grid;
+		inset: 0;
+		background: #0b0d10;
+		place-items: center;
+	}
+
+	/*
+	 * The frame is the slide's own aspect and no bigger. `slides.js` scales the slide to
+	 * whatever box it is given, so the letterboxing is this rule and nothing else — and the
+	 * bars are the overlay's own background rather than a colour the deck chose.
+	 */
+	.present-frame {
+		width: min(100vw, calc(100vh * 16 / 9));
+		height: min(100vh, calc(100vw * 9 / 16));
+		border: 0;
+		background: #fff;
+		/*
+		 * The slide takes no pointer events while it is being presented.
+		 *
+		 * Not decoration: an iframe that can be clicked is an iframe that can take the
+		 * focus, and a focused board document receives the keystrokes itself — so ← → and
+		 * Space went into the slide and nothing paged. There is nothing in a slide to click
+		 * during a talk, so the cost is nil and the overlay keeps the keyboard.
+		 */
+		pointer-events: none;
+	}
+
+	/* The overlay is what has focus, so it must not draw a focus ring around the whole
+	   screen. */
+	.present:focus,
+	.present:focus-visible {
+		outline: 0;
+	}
+
+	.present-bar {
+		position: absolute;
+		bottom: 20px;
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		padding: 6px 8px;
+		border-radius: 999px;
+		background: rgb(255 255 255 / 10%);
+		backdrop-filter: blur(6px);
+		transition: opacity 200ms ease;
+	}
+
+	/* Out of the way until the pointer moves — a presentation with permanent buttons on it
+	   is a demo of a tool rather than a talk. `pointer-events` goes with the opacity so an
+	   invisible bar cannot swallow a click meant for the slide. */
+	.present[data-idle="true"] .present-bar {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.present-step,
+	.present-exit {
+		display: grid;
+		width: 30px;
+		height: 30px;
+		border: 0;
+		border-radius: 999px;
+		background: rgb(255 255 255 / 12%);
+		color: #fff;
+		font-size: 15px;
+		cursor: pointer;
+		place-items: center;
+	}
+
+	.present-exit {
+		width: auto;
+		padding: 0 10px;
+		font-family: var(--mono, monospace);
+		font-size: 11px;
+	}
+
+	.present-step:hover,
+	.present-exit:hover {
+		background: rgb(255 255 255 / 22%);
+	}
+
+	/*
+	 * The Present button in a deck's title bar. `.hide`-shaped — it lives in the same
+	 * revealed slot the × does — but with a word instead of a glyph, because "present" has
+	 * no icon anybody reads correctly and this is the one control worth spelling out.
+	 */
+	.board-node .chrome .present-open {
+		width: auto;
+		padding: 0 7px;
+		font-size: 10.5px;
+		letter-spacing: 0.02em;
+	}
+
+	.present-count {
+		min-width: 54px;
+		color: rgb(255 255 255 / 70%);
+		font-family: var(--mono, monospace);
+		font-size: 12px;
+		text-align: center;
+	}
+}
+
+/*
+ * ── A board edited as its own source ──────────────────────────────────────────────────
+ *
+ * Sits inside the board's node, so it is positioned and scaled by the canvas exactly as the
+ * frame it replaces — which is what makes the box the board rather than a dialog about it.
+ */
+@layer components {
+	.source-editor {
+		position: absolute;
+		z-index: 2;
+		display: flex;
+		overflow: hidden;
+		flex-direction: column;
+		border-radius: var(--radius, 8px);
+		background: var(--bg, #fff);
+		inset: 0;
+	}
+
+	.source-area {
+		flex: 1 1 auto;
+		padding: 16px 18px;
+		border: 0;
+		outline: 0;
+		background: none;
+		color: var(--fg, #111);
+		font-family: var(--mono, ui-monospace, monospace);
+		font-size: 12.5px;
+		line-height: 1.6;
+		resize: none;
+		tab-size: 2;
+	}
+
+	/* The two gestures, said once. An editor whose escape hatch is undocumented is one
+	   people leave by reloading the page. */
+	.source-hint {
+		display: flex;
+		flex: 0 0 auto;
+		gap: 12px;
+		justify-content: flex-end;
+		padding: 4px 10px 6px;
+		color: var(--muted, #667);
+		font-family: var(--mono, monospace);
+		font-size: 10.5px;
+	}
+}

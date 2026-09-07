@@ -101,6 +101,13 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 	}
 
 	if (patch.op === "text" || patch.op === "html") return retype(html, document, patch);
+	/*
+	 * A `source` op is a whole-file write and never reaches here — `App.patch` handles it
+	 * before parsing, because there is nothing in a markdown file to parse. Refused rather
+	 * than ignored so that a caller which somehow gets one this far is told why instead of
+	 * watching it silently do nothing.
+	 */
+	if (patch.op === "source") throw new PatchRefused("a source edit replaces the whole file and is applied without parsing");
 
 	const element = findById(document, patch.id);
 	if (!element) throw new PatchRefused(`no component with data-id="${patch.id}"`);

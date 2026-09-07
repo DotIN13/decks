@@ -1,5 +1,6 @@
 import { typingInto } from "./Editor.ts";
 import { type ZoomKey, zoomKey } from "./zoom-keys.ts";
+import { type SlideAction, slideKey } from "./slide-keys.ts";
 import { noteCameraMove } from "./pan-signal.ts";
 import type { Finger, TouchStep } from "./touch.ts";
 
@@ -85,6 +86,21 @@ export interface FrameGestureHost {
 	key(name: string): boolean;
 	/** ⌘+ / ⌘− / ⌘0, which a board frame takes rather than letting Chrome zoom the page. */
 	zoom(direction: ZoomKey): void;
+	/**
+	 * A double-click inside a flow or slides board: open it as its own source.
+	 *
+	 * Forwarded out rather than handled in the board, because the textarea belongs to the
+	 * app — it has to be positioned and scaled with the board, and a board's own document
+	 * knows neither the camera nor the zoom.
+	 */
+	editSource(): boolean;
+	/**
+	 * The arrow keys, when the focused board is a deck.
+	 *
+	 * Returns whether there was a deck to page — so a plain board's arrows fall through to
+	 * whatever else wants them rather than being swallowed by a handler that did nothing.
+	 */
+	slide(action: SlideAction): boolean;
 }
 
 export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGestureHost): () => void {
@@ -188,6 +204,18 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		const zoom = zoomKey(event);
 		if (zoom) {
 			host.zoom(zoom);
+			event.preventDefault();
+			return;
+		}
+		/*
+		 * And the arrows, if this board is a deck.
+		 *
+		 * Above the typing guard for the same reason the zoom is: clicking a deck to focus
+		 * it puts the caret in this document, so this is where a page-turn arrives. Below
+		 * the zoom, because ⌘→ is not a slide.
+		 */
+		const slide = slideKey(event, "focused");
+		if (slide && host.slide(slide)) {
 			event.preventDefault();
 			return;
 		}
@@ -406,6 +434,19 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	};
 
 	doc.addEventListener("wheel", onWheel, { passive: false, capture: true });
+	/*
+	 * A flow board has no components, so a double-click has nothing to select — which is
+	 * what makes it free to mean "edit this file". `host.editSource` answers whether the
+	 * board is one, so a component board's double-click still reaches the editor that
+	 * selects a box.
+	 */
+	const onDoubleClick = (event: MouseEvent) => {
+		if (typingInto(event.target)) return;
+		if (!host.editSource()) return;
+		event.preventDefault();
+		event.stopPropagation();
+	};
+	doc.addEventListener("dblclick", onDoubleClick, true);
 	doc.addEventListener("keydown", onKeyDown, true);
 	doc.addEventListener("keyup", onKeyUp, true);
 	doc.addEventListener("pointerdown", onPointerDown, true);
@@ -472,6 +513,7 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 
 	return () => {
 		doc.removeEventListener("wheel", onWheel, true);
+		doc.removeEventListener("dblclick", onDoubleClick, true);
 		doc.removeEventListener("keydown", onKeyDown, true);
 		doc.removeEventListener("keyup", onKeyUp, true);
 		doc.removeEventListener("pointerdown", onPointerDown, true);

@@ -1058,6 +1058,50 @@ export class App {
 		}
 
 		const file = this.deck.fileOf(path);
+
+		/*
+		 * A flow or slides board is edited as its own source.
+		 *
+		 * Handled before `applyPatches` rather than inside it, because that function is
+		 * parse5 over an HTML document and this is a markdown file: there is nothing to
+		 * parse, address or splice. The write is the whole of the edit.
+		 *
+		 * A `source` op against a component board is refused rather than obeyed. Writing a
+		 * textarea's contents over a board of positioned components would work exactly once
+		 * and destroy the document — and the refusal is the sort a person can act on,
+		 * because it says which editor the board actually has.
+		 */
+		const source = patches.find((patch) => patch.op === "source");
+		if (source) {
+			if (patches.length > 1 || board.format === "component") {
+				reply({
+					type: "board.patched",
+					path,
+					rev: board.rev,
+					refused:
+						board.format === "component"
+							? "That board is made of components; drag and retype them instead of replacing the file."
+							: "A source edit replaces the whole file, so it cannot be batched with other changes.",
+				});
+				return;
+			}
+			try {
+				const before = readFileSync(file, "utf8");
+				if (source.text === before) {
+					reply({ type: "board.patched", path, rev: board.rev });
+					return;
+				}
+				writeFileSync(file, source.text);
+				this.revisions.record(path, source.text);
+				this.deck.resync();
+				reply({ type: "board.patched", path, rev: this.deck.board(path)?.rev ?? board.rev });
+				this.send({ type: "deck.state", deck: this.deck.state() });
+			} catch (error) {
+				reply({ type: "board.patched", path, rev: board.rev, refused: (error as Error).message });
+			}
+			return;
+		}
+
 		try {
 			const before = readFileSync(file, "utf8");
 			/*

@@ -446,6 +446,20 @@ export type BoardPatch =
 	/** `null` in `attrs` *removes* the attribute, which is how a tone goes back to the default. */
 	| { op: "update"; id: string; style?: Partial<Rect>; class?: string; attrs?: Record<string, string | null> }
 	/**
+	 * Replace a **flow or slides** board's whole file.
+	 *
+	 * The other ops here address components inside a document, because that is what a
+	 * component board is. A markdown file has no components: it is one run of text, and the
+	 * editable unit is the file. So this op carries the file.
+	 *
+	 * Exact by construction, which is the point — there is no serialiser to reorder bytes
+	 * nobody touched. That matters more here than anywhere else in this list, because these
+	 * files are read back by agents: a board that rewrites itself on every human edit is a
+	 * board the agent stops recognising. Refused for a component board, where the
+	 * byte-range splicing above is the whole design.
+	 */
+	| { op: "source"; text: string }
+	/**
 	 * Retype a run of text, addressed by where it *is* rather than by a name.
 	 *
 	 * `id` is the component and `path` is the element-child indices walked into from it —

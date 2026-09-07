@@ -1021,3 +1021,31 @@ table.table,
 	border-color: var(--b-accent);
 	box-shadow: 0 0 0 2px color-mix(in srgb, var(--b-accent) 30%, transparent);
 }
+
+/*
+ * A deck being presented fills the window, not the board's rectangle.
+ *
+ * The same document is used on the canvas and in the fullscreen overlay — which is what
+ * makes the slide identical in both — but a board document lays out at the board's own
+ * width, so in a 1500px overlay a 960-wide deck sat in the corner. `?present=1` on the
+ * board's URL puts this class on the body and the deck takes the viewport instead;
+ * `slides.js` re-fits from its ResizeObserver, and the slide scales up with everything on it
+ * in proportion.
+ */
+.board-present {
+	overflow: hidden;
+}
+
+.board-present .deck {
+	position: fixed;
+	width: 100vw;
+	height: 100vh;
+	inset: 0;
+}
+
+/* The overlay draws its own counter and its own arrows, so the deck's would be a second
+   set of both — in different places, at different sizes. */
+.board-present .deck-count,
+.board-present .deck-step {
+	display: none;
+}

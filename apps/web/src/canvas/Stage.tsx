@@ -7,6 +7,8 @@ import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
 import type { FrameGestureHost } from "./frame-gestures.ts";
 import { zoomKey } from "./zoom-keys.ts";
+import { deckMode, type DeckHandle, type SlideAction, slideKey } from "./slide-keys.ts";
+import { cssEscape } from "./inspect.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 
@@ -46,6 +48,12 @@ export function Stage(props: {
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
 	selected?: string;
+	/** Take a deck fullscreen: the app owns the overlay, the stage only asks for it. */
+	onPresent?: (path: string, at: number) => void;
+	/** Open a flow or slides board as its own source. */
+	onEditSource?: (path: string) => void;
+	/** The board currently being edited as text, and how to finish. */
+	editing?: { path: string; editing: { source: string; onCommit: (text: string) => void; onCancel: () => void } };
 	onSelect: (path: string | undefined) => void;
 	onMove: (path: string, x: number, y: number) => void;
 	onHide?: (path: string) => void;
@@ -147,6 +155,19 @@ export function Stage(props: {
 			const typing = (event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]");
 			if (typing) return;
 			/*
+			 * A **focused** deck takes the arrows, and an unfocused one takes nothing.
+			 *
+			 * Clicking a board is the ask. Without that a deck parked in the corner of the
+			 * canvas would swallow every arrow key meant for something else — and there is
+			 * no conflict to arbitrate with the editor's own nudge, because that only fires
+			 * when a component is selected and a deck has no components.
+			 */
+			const slide = slideKey(event, "focused");
+			if (slide && drive(props.selected, slide)) {
+				event.preventDefault();
+				return;
+			}
+			/*
 			 * A key with a modifier on it is not one of ours.
 			 *
 			 * Every shortcut here is a bare key — `V S C T E` for the tools, `0 1 + -` for
@@ -178,6 +199,54 @@ export function Stage(props: {
 			removeEventListener("keydown", keydown);
 			removeEventListener("keyup", keyup);
 		});
+	});
+
+	/**
+	 * The slide handle inside a deck board's frame, if that board is a deck and has loaded.
+	 *
+	 * Found by query rather than by a registry the frames push into. The frames are
+	 * same-origin by design (§4) and `Editor.ts` already reaches into their documents, so
+	 * this adds no new coupling — and a registry would need every frame to remember to
+	 * deregister, which is a lifetime bug waiting for the first board that unmounts
+	 * mid-turn.
+	 */
+	const deckIn = (path: string): DeckHandle | undefined => {
+		const node = element?.querySelector(`.board-node[data-path="${cssEscape(path)}"] iframe`) as HTMLIFrameElement | null;
+		return (node?.contentWindow as { __deck?: DeckHandle } | null)?.__deck;
+	};
+
+	/** Act on a deck, and say whether there was one to act on. */
+	const drive = (path: string | undefined, action: SlideAction): boolean => {
+		if (!path) return false;
+		const board = props.boards.find((candidate) => candidate.path === path);
+		if (board?.format !== "slides") return false;
+		if (action === "present") {
+			props.onPresent?.(path, deckIn(path)?.current() ?? 0);
+			return true;
+		}
+		const deck = deckIn(path);
+		if (!deck) return false;
+		if (action === "next") deck.next();
+		else if (action === "prev") deck.prev();
+		else if (action === "first") deck.first();
+		else if (action === "last") deck.last();
+		return true;
+	};
+
+	/*
+	 * One slide, or the whole deck's shape.
+	 *
+	 * Driven from here because the *canvas* knows the zoom and a board does not: a document
+	 * inside a scaled frame cannot tell how large it is being drawn. The threshold is the
+	 * one the canvas already uses for pointer events, so the sheet appears exactly where a
+	 * deck stops being pageable.
+	 */
+	createEffect(() => {
+		const mode = deckMode(props.camera.zoom, INTERACT_ZOOM);
+		for (const board of props.boards) {
+			if (board.format !== "slides") continue;
+			deckIn(board.path)?.setMode(mode);
+		}
 	});
 
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
@@ -437,6 +506,28 @@ export function Stage(props: {
 		 * a board frame forwards the *intent* rather than a key name, because `shortcut` takes
 		 * a bare key and `zoom-keys.ts` has already read the modifier.
 		 */
+		/*
+		 * The arrows, arriving from inside a board's own document.
+		 *
+		 * Which is the normal case rather than the exotic one: clicking a deck to focus it
+		 * puts the caret inside its frame, so the keystroke that follows never reaches the
+		 * app's window at all.
+		 */
+		slide: (action) => drive(props.selected, action),
+		/*
+		 * A double-click inside a board that has no components: edit the file.
+		 *
+		 * Answered here because the stage knows the board's format and the board does not.
+		 * Returning false is what lets a component board's double-click carry on to the
+		 * editor that selects a box.
+		 */
+		editSource: () => {
+			const path = props.selected;
+			const board = props.boards.find((candidate) => candidate.path === path);
+			if (!path || !board || board.format === "component" || !props.onEditSource) return false;
+			props.onEditSource(path);
+			return true;
+		},
 		zoom: (direction) => {
 			if (direction === "fit") pushCamera(frame(props.boards.map(boxOf)));
 			else pushCamera(zoomAbout(localCamera, view(), centre(), direction === "in" ? 1.2 : 1 / 1.2));
@@ -533,6 +624,10 @@ export function Stage(props: {
 							camera={props.camera}
 							mounted={isVisible(board)}
 							selected={props.selected === board.path}
+							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
+							{...(board.format === "slides" && props.onPresent
+								? { onPresent: () => props.onPresent?.(board.path, deckIn(board.path)?.current() ?? 0) }
+								: {})}
 							nonce={props.nonces?.[board.path]}
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
 							marks={(props.marks ?? []).filter((mark) => mark.path === board.path)}

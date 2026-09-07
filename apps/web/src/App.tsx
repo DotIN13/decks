@@ -43,6 +43,7 @@ import { Stage } from "./canvas/Stage.tsx";
 import { runStageCall } from "./canvas/stage-ops.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
+import { Present } from "./canvas/Present.tsx";
 import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
@@ -168,6 +169,31 @@ export function App() {
 	});
 
 	const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
+	/**
+	 * The deck being presented, and the slide it opened on.
+	 *
+	 * Browser-only, and deliberately: paging a deck is a *view*, not a change to it. Putting
+	 * the slide number in the file would make every page-turn a write and the deck's git
+	 * history a log of somebody presenting — so the cost is that a reload opens on slide
+	 * one, which is the right way round.
+	 */
+	const [presenting, setPresenting] = createSignal<{ path: string; at: number } | undefined>();
+	/**
+	 * The board being edited as its own source, once its file has arrived.
+	 *
+	 * Fetched rather than read out of the frame. The frame holds the *rendered* markdown, and
+	 * rendering is one-way — recovering the source from it is the round trip this editor
+	 * exists to avoid. `?raw=1` is the same parameter the shell uses to ask for the file
+	 * behind a board.
+	 */
+	const [editingSource, setEditingSource] = createSignal<{ path: string; source: string } | undefined>();
+
+	const openSource = (path: string) => {
+		void fetch(`/api/board/${path}?raw=1`)
+			.then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
+			.then((source) => setEditingSource({ path, source }))
+			.catch(() => notice("error", `Could not read ${path} to edit it.`));
+	};
 	const zoomInteractive = createMemo(() => camera().zoom >= INTERACT_ZOOM);
 	const [connected, setConnected] = createSignal(false);
 	const [selected, setSelected] = createSignal<string | undefined>(undefined);
@@ -1574,6 +1600,27 @@ export function App() {
 					camera={camera()}
 					setCamera={setCameraAndReport}
 					selected={selected()}
+					onPresent={(path, at) => setPresenting({ path, at })}
+					onEditSource={openSource}
+					{...(editingSource()
+						? {
+								editing: {
+									path: editingSource()!.path,
+									editing: {
+										source: editingSource()!.source,
+										onCommit: (text: string) => {
+											const open = editingSource();
+											setEditingSource(undefined);
+											if (!open) return;
+											const board = state.boards.find((candidate) => candidate.path === open.path);
+											if (!board || text === open.source) return;
+											socket.send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
+										},
+										onCancel: () => setEditingSource(undefined),
+									},
+								},
+							}
+						: {})}
 					/*
 					 * A press on the canvas outside the component lets it go.
 					 *
@@ -1981,6 +2028,38 @@ export function App() {
 					/>
 				</div>
 
+
+				{/*
+					Presenting a deck: an overlay over the whole app, not a change to the canvas.
+				
+					Last in the tree so it is last in paint order, and mounted only while it is up —
+					`Show` rather than a hidden layer, because the overlay captures the keyboard and one
+					that is merely invisible would still be taking Escape.
+				*/}
+				<Show when={presenting()} keyed>
+					{(showing) => {
+						const board = () => state.boards.find((candidate) => candidate.path === showing.path);
+						return (
+							<Show when={board()} keyed>
+								{(deck) => (
+									<Present
+										board={deck}
+										at={showing.at}
+										onExit={() => setPresenting(undefined)}
+										onLeave={(at) => {
+											// Put the canvas's own frame on the slide you finished on, so
+											// leaving fullscreen is not a jump back in the talk.
+											const frame = document.querySelector(
+												`.board-node[data-path="${showing.path.replace(/"/g, '\\"')}"] iframe`,
+											) as HTMLIFrameElement | null;
+											(frame?.contentWindow as { __deck?: { go(n: number): void } } | null)?.__deck?.go(at);
+										}}
+									/>
+								)}
+							</Show>
+						);
+					}}
+				</Show>
 
 				{/* No zoombar. "Where am I looking" is a menu chip in the top-right cluster
 				    now, which is one place for it and gives the bottom-right corner back. */}
