@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createTouches } from "./touch.ts";
+import { createTouches, STALE_MS } from "./touch.ts";
 import { pinchCamera, toScreen, toWorld } from "../lib/camera.ts";
 
 const view = { width: 800, height: 600 };
@@ -12,10 +12,17 @@ test("one finger is a pan, measured against the last event and not the first", (
 	assert.deepEqual(touches.move({ id: 1, x: 110, y: 140 }), { kind: "pan", dx: 0, dy: 10 });
 });
 
-test("a finger nobody saw land moves nothing", () => {
+/*
+ * A finger nobody saw land contributes no step of its own — there is no previous
+ * position to measure one from — and is adopted rather than ignored, which is how a
+ * gesture recovers from a `pointerdown` that went missing.
+ */
+test("a finger nobody saw land moves nothing, and then drives the gesture", () => {
 	const touches = createTouches();
 	touches.down({ id: 1, x: 0, y: 0 });
+	touches.up(1);
 	assert.deepEqual(touches.move({ id: 7, x: 400, y: 400 }), { kind: "idle" });
+	assert.deepEqual(touches.move({ id: 7, x: 410, y: 380 }), { kind: "pan", dx: 10, dy: -20 });
 });
 
 /*
@@ -128,4 +135,81 @@ test("a pinch past the zoom limit still pans, and comes back the moment it can",
 	assert.equal(step.kind, "pinch");
 	if (step.kind !== "pinch") return;
 	assert.ok(pinchCamera(camera, view, step.from, step.to).zoom < 4);
+});
+
+/*
+ * ---------------------------------------------------------------------------------------
+ * A finger that never lifted.
+ *
+ * The pool is fed by several documents and none of them can promise to report the end of
+ * a gesture: writing a board navigates its iframe mid-drag, a background tab loses its
+ * touches, a sandboxed embed can be reloaded between two of its own events. Every one
+ * leaves a finger in the pool that is not on the glass — and one is enough to read every
+ * later touch as a pinch, which is the bug these cover.
+ */
+
+test("a finger left behind by a dead document does not make the next touch a pinch", () => {
+	let clock = 1_000;
+	const touches = createTouches({ now: () => clock });
+
+	// A finger on a board. The board is then written by somebody else, its iframe is
+	// navigated, and the `pointerup` is delivered to a document that no longer exists.
+	touches.down({ id: 1, x: 300, y: 300 });
+	touches.move({ id: 1, x: 320, y: 300 });
+	assert.equal(touches.count(), 1, "and nothing told the pool that finger had gone");
+
+	// A new touch, long enough afterwards that the hand cannot still be holding the old.
+	clock += STALE_MS + 1;
+	touches.down({ id: 2, x: 100, y: 100 });
+	assert.equal(touches.count(), 1, `the phantom was counted: ${JSON.stringify(touches.ids())}`);
+	assert.deepEqual(touches.move({ id: 2, x: 140, y: 100 }), { kind: "pan", dx: 40, dy: 0 });
+});
+
+test("…but a finger held still is not mistaken for one", () => {
+	let clock = 1_000;
+	const touches = createTouches({ now: () => clock });
+	touches.down({ id: 1, x: 300, y: 300 });
+	// Motionless for most of the window — a thumb resting on the glass reports nothing at
+	// all — and then a second finger lands. That is a pinch, and nothing is dropped.
+	clock += STALE_MS - 1;
+	touches.down({ id: 2, x: 500, y: 300 });
+	assert.equal(touches.count(), 2);
+	assert.equal(touches.move({ id: 2, x: 600, y: 300 }).kind, "pinch");
+});
+
+test("a finger dropped while the hand still had it is adopted back, without a jump", () => {
+	let clock = 1_000;
+	const touches = createTouches({ now: () => clock });
+	touches.down({ id: 1, x: 200, y: 200 });
+	clock += STALE_MS + 1;
+	// The stale sweep drops it as the second finger lands…
+	touches.down({ id: 2, x: 400, y: 400 });
+	assert.deepEqual(touches.ids(), [2]);
+	// …and the first turns out to be real after all. Its next move takes it back and
+	// reports nothing, so the camera does not lurch by however far it drifted unseen.
+	assert.deepEqual(touches.move({ id: 1, x: 260, y: 200 }), { kind: "idle" });
+	assert.equal(touches.count(), 2);
+	assert.equal(touches.move({ id: 1, x: 270, y: 200 }).kind, "pinch");
+});
+
+/*
+ * Safari hands out touch pointer ids from a small pool and reuses them, so a phantom
+ * finger and a real one can arrive with the same number. Landing takes the new position
+ * and emits no step, which is what stops the camera jumping the distance between them.
+ */
+test("a recycled id is a new finger, not the old one teleporting", () => {
+	const touches = createTouches();
+	touches.down({ id: 1, x: 100, y: 100 });
+	touches.down({ id: 1, x: 700, y: 500 });
+	assert.equal(touches.count(), 1);
+	assert.deepEqual(touches.move({ id: 1, x: 690, y: 500 }), { kind: "pan", dx: -10, dy: 0 });
+});
+
+test("the pool says what it is holding, so a document can release its own", () => {
+	const touches = createTouches();
+	touches.down({ id: 4, x: 0, y: 0 });
+	touches.down({ id: 9, x: 10, y: 10 });
+	assert.deepEqual(touches.ids(), [4, 9]);
+	for (const id of touches.ids()) touches.up(id);
+	assert.equal(touches.count(), 0);
 });

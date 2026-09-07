@@ -9,7 +9,7 @@
  * was under your finger. Both are asserted here, on bare stage and over a board, since a
  * board is a separate document and its gestures come out through `frame-gestures.ts`.
  */
-import { editMode, open, openPanel, say, settle } from "../harness.mjs";
+import { boardPath, editMode, open, openPanel, read, say, settle, write } from "../harness.mjs";
 
 const { browser, page, context, errors } = await open({ device: "iPhone 15" });
 const cdp = await context.newCDPSession(page);
@@ -698,6 +698,74 @@ if ((await menu.count()) > 0) {
 	say("tapping an agent row summons no hover card", true, "skipped: no agent menu in the pill");
 }
 
+
+// --- 10. a finger the canvas was never told about the end of -------------------------
+/*
+ * "Sometimes touch seems to not release, and every other touch becomes a pinch."
+ *
+ * A board's iframe carries its revision in its URL, so anybody writing that board — an
+ * agent, another browser, this check — navigates the frame. The document a finger was
+ * reported from then stops existing, and its `pointerup` is delivered to nothing: the
+ * stage pooled that finger and nothing was ever going to take it out again. One phantom
+ * finger is enough to make every later touch the second half of a pinch that is not
+ * happening, and to leave the canvas convinced a gesture is still in progress. There was
+ * no recovery from it short of reloading the page.
+ *
+ * **Last in the file on purpose.** A touch whose target document is destroyed mid-gesture
+ * confuses the *browser's* own bookkeeping as well: the touches that follow arrive as
+ * `touchmove` with no pointer events behind them, so this incident would quietly break
+ * every gesture asserted after it — measured, and it broke four. What a phantom finger
+ * does to the next touch is asserted in `touch.test.ts`, where the pool can be poisoned
+ * without upsetting Chrome. What is asserted here is the leak itself.
+ */
+await frameBoard("plan.html");
+const leakPoint = await page.evaluate(() => {
+	const surface = document.querySelector('.board-node[data-path="boards/plan.html"] .surface');
+	if (!surface) return null;
+	const rect = surface.getBoundingClientRect();
+	return {
+		x: Math.min(window.innerWidth - 60, Math.max(60, rect.x + rect.width / 2)),
+		y: Math.min(window.innerHeight - 220, Math.max(140, rect.y + rect.height / 2)),
+	};
+});
+const panning = () => page.evaluate(() => document.querySelector(".stage").dataset.panning);
+say(
+	"there is a live board to put a finger on",
+	leakPoint !== null && (await page.evaluate((at) => document.elementFromPoint(at.x, at.y)?.tagName === "IFRAME", leakPoint)),
+	JSON.stringify(leakPoint),
+);
+
+const planFile = await boardPath("plan.html");
+const planSource = read(planFile);
+const frameSrc = () =>
+	page.evaluate(() => document.querySelector('.board-node[data-path="boards/plan.html"] iframe')?.getAttribute("src"));
+const srcBefore = await frameSrc();
+
+await touch("touchStart", [leakPoint ?? { x: 190, y: 320 }]);
+await touch("touchMove", [{ x: (leakPoint?.x ?? 190) + 2, y: (leakPoint?.y ?? 320) - 8 }]);
+await settle(page, 120);
+say("…and it knows the finger is there", (await panning()) === "true", `data-panning is ${await panning()}`);
+
+// Somebody writes the board while the finger is on it.
+write(planFile, `${planSource}\n<!-- written while a finger was on it -->\n`);
+for (let step = 0; step < 50 && (await frameSrc()) === srcBefore; step++) await settle(page, 100);
+// The reload is the precondition and not the finding: without it there is no dead
+// document, no `pointerup` delivered to nowhere, and what follows proves nothing.
+say("the board under the finger reloaded mid-gesture", (await frameSrc()) !== srcBefore, `${srcBefore} -> ${await frameSrc()}`);
+await touch("touchEnd", []);
+await settle(page, 400);
+write(planFile, planSource);
+await settle(page, 600);
+
+/*
+ * `data-panning` is the pool seen from outside: the stage sets it on the first finger and
+ * clears it when the last one lifts. Stuck true is a finger the canvas still believes in.
+ */
+say(
+	"the finger is handed back when the document reporting it dies",
+	(await panning()) === "false",
+	`data-panning is ${await panning()}`,
+);
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

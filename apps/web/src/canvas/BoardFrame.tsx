@@ -486,6 +486,27 @@ export function BoardFrame(props: {
 							// effect below is what owns this attribute, and letting JSX also
 							// write it would navigate twice on mount.
 							applySrc();
+							/*
+							 * And the document can go away without a `load` to follow it.
+							 *
+							 * A board that leaves the visible margin is unmounted from inside
+							 * this component — the `Show` above — so the component's own cleanup
+							 * has not run and never will. Whatever is attached to that document
+							 * has to be let go here, or the gestures keep listening to a dead
+							 * frame and, worse, the fingers it had reported to the stage are
+							 * never handed back: the pool keeps them, and the next single touch
+							 * anywhere on the canvas is read as a pinch.
+							 */
+							onCleanup(() => {
+								detachSelect?.();
+								detachEditor?.();
+								detachGestures?.();
+								detachDrop?.();
+								detachLive?.();
+								detachSelect = detachEditor = detachGestures = detachDrop = detachLive = undefined;
+								clearTimeout(measuring);
+								if (frameEl === element) frameEl = undefined;
+							});
 						}}
 						title={props.board.title}
 						width={props.board.w}

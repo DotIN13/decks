@@ -323,6 +323,8 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	 * nothing however carefully the finger was placed inside an embed.
 	 */
 	const inFrame = new Map<number, { x: number; y: number; on: EventTarget | null }>();
+	/** Fingers reported by name from inside an embed, which is a document deeper again. */
+	const fromEmbed = new Set<number>();
 
 	/**
 	 * A finger, in stage coordinates rather than the frame's.
@@ -351,8 +353,45 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		};
 	};
 
+	/**
+	 * Give the stage back every finger this document is still holding.
+	 *
+	 * A frame does not get to see the end of its own gestures. Writing a board navigates
+	 * its iframe — that is what `rev` in the URL is for — so a board an agent edits while
+	 * a finger is on it loses the document that finger was reported from, and the
+	 * `pointerup` is delivered to nowhere. The stage's pool would keep that finger for the
+	 * life of the page, and one phantom finger reads every later touch as a pinch.
+	 *
+	 * So the ends are sent from here on the way out. The position does not matter — an
+	 * `up` only removes — which is as well, because by teardown the geometry this file
+	 * converts through may no longer describe anything.
+	 */
+	const releaseFingers = () => {
+		for (const id of [...inFrame.keys()]) {
+			inFrame.delete(id);
+			host.touch("up", { id, x: 0, y: 0 });
+		}
+		// An embed's fingers are held one document deeper still and cannot be listened for
+		// from here at all, so they are counted rather than tracked — and released with
+		// the rest, because an embed dies with the board that frames it.
+		for (const id of [...fromEmbed]) {
+			fromEmbed.delete(id);
+			host.touch("up", { id, x: 0, y: 0 });
+		}
+		mode = "undecided";
+		scrolling = undefined;
+	};
+
 	const onTouchDown = (event: PointerEvent) => {
 		if (event.pointerType !== "touch") return;
+		/*
+		 * The browser's own word for "no other finger is down": the primary pointer of a
+		 * touch sequence is the first one on the glass. So anything this document still
+		 * thinks it is holding at this moment was never released, and saying so here
+		 * recovers from a missed `pointerup` on the very next touch rather than after a
+		 * timeout.
+		 */
+		if (event.isPrimary && inFrame.size > 0) releaseFingers();
 		if (inFrame.size === 0) {
 			// The editor takes the gesture by preventing the default on this same event
 			// (it drags a component already selected, or draws with a tool). It listens in
@@ -481,6 +520,7 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		};
 
 		if (phase === "down") {
+			fromEmbed.add(id);
 			host.touch("down", finger);
 			return;
 		}
@@ -490,7 +530,10 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 			if (step.kind !== "idle") noteCameraMove(doc);
 			return;
 		}
-		if (phase === "up") host.touch("up", finger);
+		if (phase === "up") {
+			fromEmbed.delete(id);
+			host.touch("up", finger);
+		}
 	};
 	doc.addEventListener("decks:embed-finger", onEmbedFinger);
 
@@ -522,6 +565,7 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		doc.removeEventListener("pointerup", onTouchUp, true);
 		doc.removeEventListener("pointercancel", onTouchUp, true);
 		doc.removeEventListener("decks:embed-finger", onEmbedFinger);
+		releaseFingers();
 		touchStyle.remove();
 		win.removeEventListener("blur", onBlur);
 		if (spaceHeld) host.space(false);

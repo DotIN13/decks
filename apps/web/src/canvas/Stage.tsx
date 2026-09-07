@@ -465,9 +465,17 @@ export function Stage(props: {
 		carried.delete(event.pointerId);
 		touch("up", fingerOf(event));
 		if (carried.size > 0) return;
-		element.removeEventListener("pointermove", onTouchMove);
-		element.removeEventListener("pointerup", onTouchEnd);
-		element.removeEventListener("pointercancel", onTouchEnd);
+		window.removeEventListener("pointermove", onTouchMove);
+		window.removeEventListener("pointerup", onTouchEnd);
+		window.removeEventListener("pointercancel", onTouchEnd);
+	};
+
+	/** Hand back every finger this document is carrying, wherever each one got to. */
+	const releaseCarried = () => {
+		for (const id of [...carried]) {
+			carried.delete(id);
+			touch("up", { id, x: 0, y: 0 });
+		}
 	};
 
 	const beginTouch = (event: PointerEvent) => {
@@ -475,10 +483,24 @@ export function Stage(props: {
 		// the way down rather than on the way up: a pan that starts on empty stage is not
 		// a gesture that wants to keep a component selected either.
 		if (event.target === element) props.onSelect(undefined);
+		/*
+		 * The browser's own word for "nothing else is down": the primary pointer of a
+		 * touch sequence is the first finger on the glass. Anything still carried at that
+		 * moment never reported its end, so it is dropped here rather than counted as
+		 * half of a pinch that is not happening.
+		 */
+		if (event.isPrimary && carried.size > 0) releaseCarried();
 		if (carried.size === 0) {
-			element.addEventListener("pointermove", onTouchMove);
-			element.addEventListener("pointerup", onTouchEnd);
-			element.addEventListener("pointercancel", onTouchEnd);
+			/*
+			 * On the window, not on the stage. Capture is a nicety that can be refused,
+			 * and without it a finger that slides off the canvas — onto the conversation,
+			 * the rail, the composer — lifts somewhere this element never hears about,
+			 * and the pool keeps it. The handlers ask `carried` which fingers are theirs,
+			 * so listening wider costs nothing and closes that gap.
+			 */
+			window.addEventListener("pointermove", onTouchMove);
+			window.addEventListener("pointerup", onTouchEnd);
+			window.addEventListener("pointercancel", onTouchEnd);
 		}
 		carried.add(event.pointerId);
 		touch("down", fingerOf(event));
@@ -489,6 +511,46 @@ export function Stage(props: {
 			// the gesture for as long as the finger stays over the stage.
 		}
 	};
+
+	/**
+	 * The whole hand, gone: the tab went to the background, or the OS took the gesture.
+	 *
+	 * Neither of those ends a touch in a way any document is told about — the events
+	 * simply stop — so every finger in the pool is released, including the ones reported
+	 * from a board's own document, because whatever took the gesture took all of them.
+	 * Without this, backgrounding the tab mid-pan is enough to leave the canvas reading
+	 * every later touch as a pinch.
+	 */
+	const lostTouches = () => {
+		if (carried.size === 0 && touches.count() === 0) return;
+		releaseCarried();
+		for (const id of touches.ids()) touches.up(id);
+		claimed.clear();
+		edges.cancel();
+		setPanning(false);
+	};
+	const onHidden = () => {
+		if (document.visibilityState === "hidden") lostTouches();
+	};
+	/*
+	 * Focus moving *into* a board blurs this window too, and that happens on an ordinary
+	 * tap — so a bare `blur` handler would throw the gesture away as it began.
+	 * `document.hasFocus()` is the difference: it counts a nested frame as this document
+	 * having focus, and is false only when the browser or the tab really has lost it.
+	 */
+	const onBlur = () => {
+		if (document.hasFocus()) return;
+		lostTouches();
+	};
+	window.addEventListener("blur", onBlur);
+	document.addEventListener("visibilitychange", onHidden);
+	onCleanup(() => {
+		window.removeEventListener("blur", onBlur);
+		document.removeEventListener("visibilitychange", onHidden);
+		window.removeEventListener("pointermove", onTouchMove);
+		window.removeEventListener("pointerup", onTouchEnd);
+		window.removeEventListener("pointercancel", onTouchEnd);
+	});
 
 	/** What a board frame hands back when a canvas gesture starts inside it. */
 	const gestures: FrameGestureHost = {

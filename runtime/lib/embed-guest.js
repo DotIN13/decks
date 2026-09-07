@@ -138,8 +138,34 @@
 		document.removeEventListener("pointercancel", onUp, true);
 	};
 
+	/**
+	 * Give the canvas back every finger this page is holding.
+	 *
+	 * A finger reported from here is counted by the board and by the stage above it, and
+	 * this page cannot promise to report the end of one: it is reloaded when the board
+	 * that frames it is, and the `pointerup` then goes to a document that no longer
+	 * exists. One finger the canvas believes in and the hand does not is enough to make
+	 * every later touch read as a pinch, so the ends are sent whenever this page is
+	 * about to stop being able to send them.
+	 */
+	const release = () => {
+		for (const [id, was] of [...fingers]) {
+			fingers.delete(id);
+			post({ t: "decks:touch", phase: "up", id, x: was.x, y: was.y });
+		}
+		mode = "undecided";
+		scrolling = undefined;
+	};
+	window.addEventListener("pagehide", release);
+	document.addEventListener("visibilitychange", () => {
+		if (document.visibilityState === "hidden") release();
+	});
+
 	document.addEventListener("pointerdown", (event) => {
 		if (event.pointerType !== "touch") return;
+		// The first finger of a sequence: anything still held was never released, and
+		// saying so now recovers on the next touch instead of not at all.
+		if (event.isPrimary && fingers.size > 0) release();
 		if (fingers.size === 0) {
 			mode = "undecided";
 			scrolling = undefined;
