@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -285,5 +285,117 @@ test("an account that is not a string is no account", () => {
 
 	// Falls back to the default rather than pointing a symlink at whatever that stringifies to.
 	assert.equal(store.read("four")?.record.account, undefined);
+	cleanup();
+});
+
+/*
+ * The archive: what falls out of a session's window, so it can still be scrolled back to
+ * (DESIGN §6.2). `chat.json` is the window; `chat.log` is everything older, one row per
+ * line, appended at the moment of eviction.
+ */
+
+const said = (n: number, prefix = "u"): ChatItem[] =>
+	Array.from({ length: n }, (_, i) => ({ kind: "user", id: `${prefix}${i}`, text: `line ${i}`, at: 1000 + i }) as ChatItem);
+
+test("nothing is archived until something is evicted", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.write(record(), items);
+	assert.equal(store.hasArchive("agent-1"), false, "a chat that has never overflowed offers no scrollback");
+	assert.deepEqual(store.earlier("agent-1", "u0", 60), { items: [], more: false });
+	store.archive("agent-1", []);
+	assert.equal(store.hasArchive("agent-1"), false, "and an empty eviction is not an eviction");
+	cleanup();
+});
+
+test("evicted rows come back in reading order, a page at a time", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	// Three separate evictions, because that is how they arrive: the log's order is the
+	// conversation's order, and appending must not disturb it.
+	store.archive("agent-1", said(40));
+	store.archive("agent-1", said(40, "v"));
+	store.archive("agent-1", said(20, "w"));
+	assert.equal(store.hasArchive("agent-1"), true);
+
+	// `before` is the oldest row the browser holds, which is in the *window* and so is not
+	// in the log at all. That is the ordinary case, and it means "the end of the log".
+	const first = store.earlier("agent-1", "live-row", 60);
+	assert.equal(first.items.length, 60);
+	assert.equal(first.items.at(-1)?.id, "w19", "the newest archived row is the one nearest what is held");
+	assert.equal(first.items[0]?.id, "v0", "sixty back from the end, across two evictions");
+	assert.equal(first.more, true, "40 rows still older than this page");
+
+	// The second page is asked for by the oldest row of the first.
+	const second = store.earlier("agent-1", "v0", 60);
+	assert.equal(second.items.length, 40);
+	assert.equal(second.items[0]?.id, "u0", "which is the beginning of the conversation");
+	assert.equal(second.more, false, "and the browser is told to stop asking");
+	cleanup();
+});
+
+test("a page smaller than what is left still says there is more", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.archive("agent-1", said(10));
+	const page = store.earlier("agent-1", "u9", 4);
+	assert.deepEqual(
+		page.items.map((item) => item.id),
+		["u5", "u6", "u7", "u8"],
+	);
+	assert.equal(page.more, true);
+	cleanup();
+});
+
+test("a line that will not parse costs that line and nothing else", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.archive("agent-1", said(3));
+	// A kill mid-append leaves a torn line; a row from an older build may be unreadable.
+	appendFileSync(join(deck.path, ".decks", "agents", "agent-1", "chat.log"), '{"kind":"user","id":"tor\n');
+	store.archive("agent-1", said(2, "v"));
+	const page = store.earlier("agent-1", "live-row", 60);
+	assert.deepEqual(
+		page.items.map((item) => item.id),
+		["u0", "u1", "u2", "v0", "v1"],
+	);
+	cleanup();
+});
+
+/*
+ * The invariant the append log rests on: the log holds only rows older than the window, so
+ * no row is ever in both files. It is asserted here because the two are written by
+ * different paths — `write` rewrites the window, `archive` appends at eviction — and
+ * nothing in the types would notice them overlapping.
+ */
+test("the log and the window never hold the same row", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	const conversation = said(120);
+	const window = conversation.slice(60);
+	store.archive("agent-1", conversation.slice(0, 60));
+	store.write(record(), window);
+
+	const held = new Set(store.read("agent-1")?.items.map((item) => item.id));
+	const archived = store.earlier("agent-1", window[0]?.id ?? "", 200).items;
+	assert.equal(archived.length, 60);
+	assert.equal(
+		archived.filter((item) => held.has(item.id)).length,
+		0,
+		"a row in both files would be drawn twice when the reader scrolled back",
+	);
+	// And the two together are the whole conversation, in order.
+	assert.deepEqual([...archived, ...(store.read("agent-1")?.items ?? [])].map((item) => item.id), conversation.map((item) => item.id));
+	cleanup();
+});
+
+test("forgetting a chat takes its archive with it", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.write(record(), items);
+	store.archive("agent-1", said(5));
+	store.forget("agent-1");
+	assert.equal(store.hasArchive("agent-1"), false);
+	assert.deepEqual(readdirSync(join(deck.path, ".decks", "agents")), []);
 	cleanup();
 });

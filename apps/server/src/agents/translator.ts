@@ -10,8 +10,10 @@ import type { AgentState, ChatItem, ServerMessage } from "@decks/protocol";
  *
  * The transcript is kept in memory as well as sent, because a browser that
  * reconnects needs the conversation back and the runtime's session file is its
- * format, not ours. It is capped at the tail; `agents/store.ts` writes that tail
- * to disk so a chat survives a restart, and `load` is how it comes back.
+ * format, not ours. It is capped at the tail: `agents/store.ts` writes that tail to disk so
+ * a chat survives a restart, and `load` is how it comes back. What falls off the far end is
+ * handed to `onEvict` and kept in an append log beside it, so a reader scrolling back past
+ * the window still reaches it.
  */
 const KEEP = 500;
 
@@ -39,6 +41,17 @@ export class Translator {
 		 * correctness.
 		 */
 		private readonly onChange?: () => void,
+		/**
+		 * Rows leaving the window, on their way to the archive (`agents/store.ts`).
+		 *
+		 * The window is what a session holds in memory and what the browser is given to
+		 * open with; this is the far end of it. Called with the rows in order, exactly once
+		 * each, at the moment they are dropped — which is the moment they are certain never
+		 * to change again, several hundred messages having been said since. That certainty
+		 * is what lets the archive be an append log; without it a row could need rewriting
+		 * after it had been written.
+		 */
+		private readonly onEvict?: (items: ChatItem[]) => void,
 	) {}
 
 	/**
@@ -68,7 +81,10 @@ export class Translator {
 
 	private push(item: ChatItem): ChatItem {
 		this.items.push(item);
-		if (this.items.length > KEEP) this.items.splice(0, this.items.length - KEEP);
+		if (this.items.length > KEEP) {
+			const dropped = this.items.splice(0, this.items.length - KEEP);
+			this.onEvict?.(dropped);
+		}
 		this.emit({ type: "chat.item", agentId: this.agentId, item });
 		this.onChange?.();
 		return item;

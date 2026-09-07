@@ -697,6 +697,42 @@
 	}
 
 	/*
+	 * The way back into the conversation, at the top of what is drawn.
+	 *
+	 * Shaped like the day chip below rather than like a card: it is a marker in the column,
+	 * not a thing that was said, and a full-width card would read as a message from whoever
+	 * writes the software. Centred for the same reason, and it is a button because scrolling
+	 * has no affordance — a reader who cannot see that there is more has no reason to try.
+	 */
+	.stream-earlier {
+		align-self: center;
+		padding: 3px 11px;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: 11px;
+		font-weight: 500;
+		pointer-events: auto;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+
+	.stream-earlier:hover {
+		background: var(--bg);
+		color: var(--fg);
+	}
+
+	.stream-earlier:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/*
 	 * The way back to the foot, once you have read away from it.
 	 *
 	 * Overlaid on the bottom of the column rather than given a row of its own: a pill that

@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AgentKind, type AgentMode, type AgentModel, type ChatItem, type ThinkingLevel } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
@@ -22,6 +22,12 @@ import type { Deck } from "../deck/loader.ts";
  *   backend, one of them against pi's internal session shape. This is the display copy,
  *   in the shape the browser already receives.
  *
+ * - **`chat.log`** — what to *show from before that*. The window a session keeps in memory
+ *   is finite (`translator.ts`), and everything that falls out of the far end lands here,
+ *   one row of JSON per line, so a conversation that has been going for a week can still be
+ *   scrolled back through. This is the only append-only file of the three, and the reason it
+ *   is allowed to be one is below.
+ *
  * **A whole-array rewrite rather than an append log**, which is worth the paragraph because
  * append is the obvious choice and is wrong here. `ChatItem`s mutate after they are pushed:
  * a reply accumulates deltas, a tool call gets its result, an assistant turn that said
@@ -30,6 +36,14 @@ import type { Deck } from "../deck/loader.ts";
  * truncation pass. Writing `history()` whole makes both disappear: nothing is ever written
  * mid-flight, and a truncated transcript is just a shorter array. The translator already
  * caps itself at 500 items, so the file cannot grow without bound.
+ *
+ * …and yet `chat.log` **is** an append log, which is not a contradiction: a row is only
+ * written there at the moment it is *evicted*, which is to say once several hundred newer
+ * rows exist behind it. Nothing that far back can still be mutating — a tool call cannot
+ * receive its result after five hundred more messages have been said — so the objection
+ * above does not apply to it. That is the invariant the whole file rests on, and
+ * `store.test.ts` asserts it: **what is in the log is strictly older than what is in
+ * `chat.json`**, and neither ever holds the same row as the other.
  *
  * **A directory per agent, not one index**, so a bad write costs one chat rather than the
  * list. Every write goes to a temporary file and is renamed over the target, so a restart
@@ -164,6 +178,79 @@ export class AgentStore {
 		} catch {
 			/* already gone, which is the outcome wanted */
 		}
+	}
+
+	/**
+	 * Keep rows that have fallen out of a session's window, so they can be scrolled back to.
+	 *
+	 * Appended rather than rewritten, which is what makes a long conversation affordable:
+	 * the cost of an eviction is the size of what was evicted, not the size of everything
+	 * ever said. Called from the eviction itself (`translator.ts`), so the ordering of this
+	 * file is the ordering of the conversation, and nothing arrives out of turn.
+	 */
+	archive(id: string, items: ChatItem[]): void {
+		if (items.length === 0) return;
+		try {
+			const folder = this.folder(id);
+			mkdirSync(folder, { recursive: true });
+			appendFileSync(join(folder, "chat.log"), `${items.map((item) => JSON.stringify(item)).join("\n")}\n`);
+		} catch {
+			/* the same trade as `write`: a lost archive is not a lost chat */
+		}
+	}
+
+	/** Whether anything has been archived for this agent, without reading it. */
+	hasArchive(id: string): boolean {
+		try {
+			const file = join(this.folder(id), "chat.log");
+			return existsSync(file) && statSync(file).size > 0;
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * The page of archived rows immediately before `before`, in reading order.
+	 *
+	 * `before` is a row id the browser holds, and it is normally *not* in the log at all —
+	 * it is the oldest row of the live window, and the log is everything older than that.
+	 * So an id this file has never seen is the ordinary case and means "the end of the
+	 * log", not an error. An id it *does* find is the second page onwards, where the reader
+	 * has already pulled some of the log into the browser.
+	 *
+	 * The whole file is read to answer this. That is a deliberate simplicity: it happens
+	 * only when somebody scrolls back, a week of conversation is a few megabytes, and the
+	 * alternative is an index that has to be kept true through eviction, rewind and a
+	 * half-written line. If it ever matters, the fix is a `seq` per line and a seek — not a
+	 * cache, which would hold the memory this file exists to avoid.
+	 */
+	earlier(id: string, before: string, limit: number): { items: ChatItem[]; more: boolean } {
+		const all = this.archived(id);
+		const found = all.findIndex((item) => item.id === before);
+		const end = found === -1 ? all.length : found;
+		const start = Math.max(0, end - limit);
+		return { items: all.slice(start, end), more: start > 0 };
+	}
+
+	/** Every archived row, oldest first. A line that will not parse is a line skipped. */
+	private archived(id: string): ChatItem[] {
+		let text: string;
+		try {
+			text = readFileSync(join(this.folder(id), "chat.log"), "utf8");
+		} catch {
+			return [];
+		}
+		const out: ChatItem[] = [];
+		for (const line of text.split("\n")) {
+			if (!line) continue;
+			try {
+				out.push(JSON.parse(line) as ChatItem);
+			} catch {
+				// A torn last line from a kill mid-append, or a row written by an older
+				// build. One unreadable line must not cost the reader the rest of the week.
+			}
+		}
+		return out;
 	}
 
 	/** Keep the newest `keep` records and forget the rest. Returns what was kept. */

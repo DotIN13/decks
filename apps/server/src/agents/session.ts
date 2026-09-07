@@ -320,6 +320,15 @@ export class DeckAgent {
 			},
 			deck.path,
 			() => this.save(),
+			/*
+			 * Rows leaving the window go straight to disk, not through `save`.
+			 *
+			 * `save` is debounced and rewrites the whole tail; this is an append of exactly
+			 * what was dropped, and it has to happen at the moment of the drop because that
+			 * is the last moment those rows exist anywhere. Written before the debounce so a
+			 * kill in the next second cannot lose them.
+			 */
+			(dropped) => this.store.archive(this.id, dropped),
 		);
 
 		/*
@@ -496,6 +505,29 @@ export class DeckAgent {
 		}, 1000);
 	}
 
+	/**
+	 * The conversation as a browser should open it: the window, and whether there is more.
+	 *
+	 * `more` is asked of the store rather than remembered, because eviction and this
+	 * question have no reason to be in touch — the log either has something in it or it
+	 * does not, and that is a `statSync` rather than a piece of state to keep true.
+	 */
+	private historyMessage(): ServerMessage {
+		return { type: "chat.history", agentId: this.id, items: this.translator.history(), more: this.store.hasArchive(this.id) };
+	}
+
+	/**
+	 * A page of conversation older than the row the browser holds (`agents/store.ts`).
+	 *
+	 * The window this session keeps in memory is *not* consulted: everything in it is
+	 * already in the browser, which is why the browser is asking. So this is only ever the
+	 * archive, and the answer for a chat that has never evicted anything is an empty page
+	 * with `more: false` — which is also what the browser was told when it opened.
+	 */
+	earlier(before: string, limit: number): { items: ChatItem[]; more: boolean } {
+		return this.store.earlier(this.id, before, limit);
+	}
+
 	/** Write the record now. */
 	private flush(): void {
 		if (this.translator.userMessages().length === 0) return;
@@ -594,7 +626,7 @@ export class DeckAgent {
 			 * again — the same message a rewind sends, and for the same reason.
 			 */
 			historyChanged: () => {
-				this.emit({ type: "chat.history", agentId: this.id, items: this.translator.history() });
+				this.emit(this.historyMessage());
 				this.save();
 			},
 			// The install's Claude subscriptions, so a limit can move to the next one.
@@ -861,7 +893,7 @@ export class DeckAgent {
 		const result = await this.backend.rewindTo(entryId);
 		if (!result.cancelled) {
 			this.translator.truncateToUserMessage(result.editorText);
-			this.emit({ type: "chat.history", agentId: this.id, items: this.translator.history() });
+			this.emit(this.historyMessage());
 			// The branch moved, so the pairing is stale for everything still shown.
 			await this.backend?.syncEntryIds();
 			/*
@@ -1093,7 +1125,7 @@ export class DeckAgent {
 
 	greet(reply: (message: ServerMessage) => void): void {
 		reply({ type: "agent.identity", id: this.id, identity: this.identity });
-		reply({ type: "chat.history", agentId: this.id, items: this.translator.history() });
+		reply(this.historyMessage());
 		reply({ type: "agent.state", id: this.id, state: this.state });
 		reply({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
 		if (this.backend) reply({ type: "agent.model", id: this.id, model: this.backend.model() });

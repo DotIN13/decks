@@ -45,6 +45,7 @@ import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
 import { Present } from "./canvas/Present.tsx";
 import { StatusLine } from "./chat/StatusLine.tsx";
+import { PAGE, prepend } from "./chat/history-page.ts";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
@@ -99,6 +100,15 @@ export function App() {
 		focused?: string;
 		identities: Record<string, Identity>;
 		transcripts: Record<string, ChatItem[]>;
+		/**
+		 * Whether the server holds conversation older than the rows we have, by agent id.
+		 *
+		 * The server answers this once, when it sends the history, and again with every page
+		 * (`chat.earlier`). Kept rather than inferred because there is nothing in the browser
+		 * to infer it from: a window of sixty rows looks the same whether it is the whole
+		 * conversation or the end of a very long one.
+		 */
+		moreHistory: Record<string, boolean>;
 		modelsByAgent: Record<string, ModelOption[]>;
 		/** The model (and its thinking level) each agent is on, by agent id. */
 		agentModel: Record<string, AgentModel | undefined>;
@@ -156,6 +166,7 @@ export function App() {
 		previews: {} as Record<string, { entryId: string; boards: Record<string, string> }>,
 		identities: {},
 		transcripts: {} as Record<string, ChatItem[]>,
+		moreHistory: {} as Record<string, boolean>,
 		modelsByAgent: {} as Record<string, ModelOption[]>,
 		agentModel: {} as Record<string, AgentModel | undefined>,
 		agentUsage: {} as Record<string, AgentUsage | undefined>,
@@ -381,6 +392,44 @@ export function App() {
 
 	let socket: Socket;
 	let noticeId = 0;
+
+	/**
+	 * Readers waiting on a page of scrollback, keyed by the row they asked from.
+	 *
+	 * Keyed by the cursor rather than by the agent because the cursor is what the answer
+	 * carries back, and two pages can be in flight when a reader keeps scrolling. The value
+	 * is what the column is really waiting for: **how many rows arrived**, which is what it
+	 * uses to hold the reader's place while the column grows above them.
+	 */
+	const earlierWaiting = new Map<string, (added: number) => void>();
+
+	/**
+	 * Reach back past what the browser holds (`chat/history-page.ts`).
+	 *
+	 * Resolves with how many rows arrived, and with zero for every case where nothing will:
+	 * an empty conversation, a server that has already said there is nothing older, a
+	 * request already in flight for this cursor, or an answer that never comes. A promise
+	 * that resolves with nothing is what lets the column try again rather than deciding it
+	 * has reached the beginning.
+	 */
+	const loadEarlier = (agentId: string): Promise<number> => {
+		const held = state.transcripts[agentId] ?? [];
+		const before = held[0]?.id;
+		if (!before || state.moreHistory[agentId] === false) return Promise.resolve(0);
+		if (earlierWaiting.has(before)) return Promise.resolve(0);
+		return new Promise<number>((resolve) => {
+			earlierWaiting.set(before, resolve);
+			socket.send({ type: "chat.earlier", agentId, before, limit: PAGE });
+			/*
+			 * A dropped socket must not leave the column unable to ask again. Ten seconds is
+			 * far longer than a read of a log file and short enough that a reader who has
+			 * given up scrolling has not yet come back.
+			 */
+			setTimeout(() => {
+				if (earlierWaiting.delete(before)) resolve(0);
+			}, 10_000);
+		});
+	};
 
 	const notice = (level: Notice["level"], text: string) => {
 		const id = ++noticeId;
@@ -739,7 +788,28 @@ export function App() {
 
 				case "chat.history":
 					setState("transcripts", message.agentId, message.items);
+					setState("moreHistory", message.agentId, message.more ?? false);
 					return;
+
+				case "chat.earlier": {
+					/*
+					 * A page of scrollback, folded in at the front.
+					 *
+					 * `prepend` drops anything already held, which is not a hypothetical: a
+					 * reader who keeps scrolling asks for a second page before the first has
+					 * landed, and a rewind re-sends a window that can overlap a page already
+					 * fetched. The held copy wins — it is the one a delta may be arriving into.
+					 */
+					setState("transcripts", message.agentId, (held = []) => prepend(message.items, held));
+					setState("moreHistory", message.agentId, message.more);
+					// Whoever asked is waiting on the count, so it can hold the reader's place.
+					const waiting = earlierWaiting.get(message.before);
+					if (waiting) {
+						earlierWaiting.delete(message.before);
+						waiting(message.items.length);
+					}
+					return;
+				}
 
 				case "chat.item": {
 					const item = message.item;
@@ -1901,6 +1971,14 @@ export function App() {
 				 */}
 				<Stream
 					items={transcript()}
+					/*
+					 * Reaching back, in two parts: whether there is anything there, and how to
+					 * ask for it. The column owns the window over what is held; the server owns
+					 * everything older (`agents/store.ts`), and this is the seam between them.
+					 */
+					more={state.focused ? state.moreHistory[state.focused] === true : false}
+					onEarlier={() => (state.focused ? loadEarlier(state.focused) : Promise.resolve(0))}
+					agentId={state.focused ?? ""}
 					state={focusedChat()?.state ?? "idle"}
 					name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
 					agent={focusedChat()?.kind ?? state.defaultKind}

@@ -4,6 +4,7 @@ import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show
 import { Icon } from "../icons.tsx";
 import { closeHistory, historyShown } from "../lib/edge.ts";
 import { floatRows } from "./float-rows.ts";
+import { earlierLabel, hasEarlier, hiddenCount, LOAD_MORE_AT, WINDOW, windowOf } from "./history-page.ts";
 import { WorkingSign } from "./StatusLine.tsx";
 import { signPlacement } from "./working-sign.ts";
 import { attachSwipeClose } from "./swipe-close.ts";
@@ -42,6 +43,12 @@ import { Turn, type AgentPart, type TurnCard } from "./Turn.tsx";
  */
 export function Stream(props: {
 	items: ChatItem[];
+	/** Whose conversation this is, so the window resets when you switch chats. */
+	agentId: string;
+	/** Whether the server holds anything older than `items` (`chat/history-page.ts`). */
+	more: boolean;
+	/** Fetch the page before the oldest row held. Answers with how many arrived. */
+	onEarlier: () => Promise<number>;
 	/** What the focused agent is doing, for the sign at the foot. */
 	state: AgentState;
 	/** Whose work it is — only spoken when the agent is the one waiting. */
@@ -90,8 +97,86 @@ export function Stream(props: {
 	};
 	const signing = () => signPlacement(props.state, { historyOpen: true, arriving: arriving() }) === "column";
 
-	const rows = createMemo(() => floatRows(props.items));
-	const itemById = createMemo(() => new Map(props.items.map((item) => [item.id, item])));
+	/*
+	 * How much of the conversation is in the DOM (`chat/history-page.ts`).
+	 *
+	 * Only the end of it, because a card is not cheap — markdown, tool groups, a time
+	 * machine each — and a conversation has no upper bound. Reaching towards the top widens
+	 * the window; coming back to the foot throws the extra away, so a chat that has been
+	 * open all day costs what one just opened costs.
+	 */
+	const [windowed, setWindowed] = createSignal(WINDOW);
+	const shown = createMemo(() => windowOf(props.items, windowed()) as ChatItem[]);
+	const hidden = () => hiddenCount(props.items.length, shown().length);
+	const earlier = () => hasEarlier({ total: props.items.length, hidden: hidden(), more: props.more });
+
+	/** True while a page is on its way, so the column asks once. */
+	let fetching = false;
+
+	/**
+	 * Show more of the conversation, keeping what the reader is looking at where it is.
+	 *
+	 * Measure, grow, and hand the added height straight back to `scrollTop`: the column
+	 * grows *upwards*, so without the correction every page would throw the reader down the
+	 * page by exactly the height of what they asked for.
+	 *
+	 * Two sources, in order. The window is widened first, because those rows are already
+	 * here; only once it has caught up with what was sent does this go to the server, which
+	 * holds everything older.
+	 */
+	const showEarlier = () => {
+		if (!scroller) return;
+		if (hidden() > 0) {
+			const before = scroller.scrollHeight;
+			setWindowed((size) => size + WINDOW);
+			scroller.scrollTop += scroller.scrollHeight - before;
+			return;
+		}
+		if (fetching || !props.more) return;
+		fetching = true;
+		const before = scroller?.scrollHeight ?? 0;
+		void props
+			.onEarlier()
+			.then((added) => {
+				if (!scroller || added === 0) return;
+				// The window has to grow by what arrived, or the page is fetched and then
+				// immediately hidden again by the window it landed outside of.
+				setWindowed((size) => size + added);
+				scroller.scrollTop += scroller.scrollHeight - before;
+			})
+			.finally(() => {
+				fetching = false;
+			});
+	};
+
+	/*
+	 * Sending from the foot throws away the pages that were scrolled back to.
+	 *
+	 * Without something like this a conversation left open all day only ever grows: every
+	 * page anybody reached for is still in the DOM, above a reader who has long since come
+	 * back to the end.
+	 *
+	 * Keyed on **a new message of yours**, not on being pinned, and that distinction was a
+	 * bug before it was a comment: being pinned is a *state*, and resetting on it undid the
+	 * widening in the same tick as the click — pressing "earlier messages" while at the foot
+	 * did nothing at all. Sending is an event, it means "I am done reading back", and it is
+	 * read from the transcript rather than from a callback so that a queued task or a
+	 * rewind's replay re-arms it too.
+	 */
+	createEffect((previous: string | undefined) => {
+		const latest = [...props.items].reverse().find((item) => item.kind === "user")?.id;
+		if (previous !== undefined && latest && latest !== previous && pinned() && windowed() !== WINDOW) setWindowed(WINDOW);
+		return latest;
+	});
+
+	/* A different conversation is a different window. */
+	createEffect((previous: string | undefined) => {
+		if (previous !== undefined && props.agentId !== previous) setWindowed(WINDOW);
+		return props.agentId;
+	});
+
+	const rows = createMemo(() => floatRows(shown()));
+	const itemById = createMemo(() => new Map(shown().map((item) => [item.id, item])));
 
 	/**
 	 * The rows, folded into one card per turn.
@@ -264,6 +349,17 @@ export function Stream(props: {
 		const key = `${target.id}:${target.at}`;
 		if (travelled === key) return;
 		props.items.length;
+		/*
+		 * A turn clicked on the spine may be older than the window is wide, and a jump to a
+		 * card that is not in the DOM finds nothing and silently does nothing. So the window
+		 * is opened far enough to hold it first — by position in what is held, which is the
+		 * one measure that says how much is missing.
+		 */
+		const at = props.items.findIndex((item) => item.id === target.id);
+		if (at !== -1) {
+			const needed = props.items.length - at;
+			if (needed > windowed()) setWindowed(needed + WINDOW);
+		}
 		requestAnimationFrame(() => {
 			const element = scroller.querySelector(`[data-item="${cssEscape(target.id)}"]`);
 			// Not marked as travelled: the history can be open before the turn has arrived, and
@@ -369,7 +465,21 @@ export function Stream(props: {
 			 * would lose to it… no: it would lose to any utility, which is the same rule read
 			 * from the other end. The strong half has to be the variant.
 			 */}
-			<div class="stream-roll max-[1100px]:pointer-events-auto" ref={scroller} onScroll={measure}>
+			<div
+				class="stream-roll max-[1100px]:pointer-events-auto"
+				ref={scroller}
+				/*
+				 * Two questions on every scroll, and they are different questions. `measure`
+				 * asks where the *end* is, which is what pins the column. This asks how near
+				 * the *top of what is rendered* the reader has come, which is a distance
+				 * rather than a visibility — an observer would announce the top once on the
+				 * way in and then say nothing while the reader kept climbing.
+				 */
+				onScroll={() => {
+					measure();
+					if (scroller && scroller.scrollTop < LOAD_MORE_AT && earlier()) showEarlier();
+				}}
+			>
 				{/*
 				 * Empty, it says so. The column used to appear only once there was something in
 				 * it, which was right while it arrived on its own and wrong now that there is a
@@ -377,6 +487,20 @@ export function Stream(props: {
 				 */}
 				<Show when={cards().length === 0}>
 					<div class="stream-card stream-notice">Nothing said yet — ask for something and it will show up here.</div>
+				</Show>
+
+				{/*
+				 * Everything before the window, as one line rather than as three hundred cards.
+				 *
+				 * A button as well as a scroll target, because scrolling is a gesture with no
+				 * affordance: a reader who cannot see that there is more has no reason to try.
+				 * It says how many when it knows — the rows are already here, only not drawn —
+				 * and invites when it does not, which is when the rest is still on the server.
+				 */}
+				<Show when={earlier()}>
+					<button class="stream-earlier" type="button" onClick={showEarlier}>
+						{earlierLabel(hidden())}
+					</button>
 				</Show>
 
 				{/*

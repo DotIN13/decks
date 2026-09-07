@@ -606,6 +606,25 @@ export class App {
 				return;
 			}
 
+			case "chat.earlier": {
+				/*
+				 * Answered to the asker alone, not broadcast.
+				 *
+				 * Every other chat message goes to every client because it is news about the
+				 * conversation. This is not news — it is one reader's scrollback, and a
+				 * second tab that has not scrolled has no use for a page it did not ask for
+				 * and would prepend it to a window it is not looking at.
+				 */
+				const asked = this.agents.get(message.agentId);
+				if (!asked) {
+					reply({ type: "chat.earlier", agentId: message.agentId, before: message.before, items: [], more: false });
+					return;
+				}
+				const page = asked.earlier(message.before, Math.min(Math.max(message.limit ?? 60, 1), 200));
+				reply({ type: "chat.earlier", agentId: message.agentId, before: message.before, items: page.items, more: page.more });
+				return;
+			}
+
 			case "agent.setModel": {
 				const agent = this.agents.get(message.id);
 				if (!agent) return;

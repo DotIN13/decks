@@ -71,22 +71,30 @@ try {
 			empty: [...document.querySelectorAll("[data-card]")].filter((card) => !card.innerText.trim()).length,
 			sign: document.querySelector(".stream-working") !== null,
 			tail: [...document.querySelectorAll("[data-card] .md")].at(-1)?.innerText?.trim().slice(0, 12) ?? null,
+			// Whether the newest card is yours, which is what "the reply drew nothing" means.
+			lastIsMine: [...document.querySelectorAll("[data-card]")].at(-1)?.classList.contains("stream-mine") ?? false,
 		}));
 
 	const opened = await column();
 	/*
-	 * 61: thirty turns of two cards each, plus the question just asked. The reply to it is
-	 * the card that must *not* be there — the history above ends with exactly the item
-	 * `message_start` used to send, and nothing else.
+	 * Asserted as a *delta* and as which card is last, not as a count of the whole column.
+	 * The column renders a window of a long conversation rather than all of it
+	 * (`chat/history-page.ts`), so "61 cards for 61 items" stopped being true the day that
+	 * landed — and it was never the claim. The claim is that the silent reply draws nothing:
+	 * the newest card is the question that was asked, and one appears when a token arrives.
 	 */
-	say("a reply that has not spoken yet draws no card", opened.cards === 61, `${opened.cards} cards`);
+	say("a reply that has not spoken yet draws no card", opened.lastIsMine === true, `${opened.cards} cards, newest is ${opened.lastIsMine ? "the question" : "not yours"}`);
 	say("…and no card is empty", opened.empty === 0, `${opened.empty} empty`);
 	say("…because the working sign is what says it has started", opened.sign);
 
 	await feed({ type: "chat.delta", agentId: "A", itemId: "live", delta: "Right then." });
 	await settle(page, 300);
 	const spoke = await column();
-	say("the card arrives with the first thing said", spoke.cards === 62 && spoke.tail === "Right then.", `${spoke.cards} cards, tail ${spoke.tail}`);
+	say(
+		"the card arrives with the first thing said",
+		spoke.cards === opened.cards + 1 && spoke.tail === "Right then.",
+		`${opened.cards} -> ${spoke.cards} cards, tail ${spoke.tail}`,
+	);
 	say("…and it is not empty", spoke.empty === 0, `${spoke.empty} empty`);
 
 	const run = await page.evaluate(async () => {

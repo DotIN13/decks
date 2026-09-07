@@ -66,6 +66,7 @@ const CHECKS = [
 	{ file: "usage.mjs", needsAgent: false },
 	{ file: "streaming.mjs", needsAgent: false },
 	{ file: "chat-content.mjs", needsAgent: false },
+	{ file: "chat-history.mjs", needsAgent: false },
 	{ file: "agent-camera.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },

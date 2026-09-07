@@ -799,6 +799,15 @@ export type ClientMessage =
 	 * and the only moment it is worth one is when somebody has the panel open.
 	 */
 	| { type: "agent.report"; id: string }
+	/**
+	 * Reach back past the rows the browser was given (DESIGN §6.2).
+	 *
+	 * `before` is the oldest row it holds; the answer is the `limit` rows before that one,
+	 * in reading order. It is a *cursor* rather than a page number because the transcript
+	 * grows at the other end while a reader is scrolling back through it, and an index into
+	 * it would name a different row every turn.
+	 */
+	| { type: "chat.earlier"; agentId: string; before: string; limit?: number }
 	| { type: "stage.result"; result: StageResult }
 	| { type: "extension.ui.answer"; answer: ExtensionUiAnswer }
 	/** Read the account list — the settings panel asking on open. */
@@ -867,7 +876,24 @@ export type ServerMessage =
 	| { type: "agent.report"; id: string; report?: UsageReport; error?: string; show?: true }
 	| { type: "models"; agentId: string; models: ModelOption[] }
 	| { type: "timeline.preview"; agentId: string; entryId: string | null; boards: Record<string, string> }
-	| { type: "chat.history"; agentId: string; items: ChatItem[] }
+	/**
+	 * The conversation as the browser should open it: the tail, and whether there is more.
+	 *
+	 * `more` is what stops a chat offering to fetch messages it has never had. A session
+	 * keeps the last few hundred rows in memory and archives what falls out of that window
+	 * (`agents/store.ts`), so "is there anything before the oldest row you are being given"
+	 * is a question only the server can answer — and it is asked once, here, rather than by
+	 * a request that comes back empty.
+	 */
+	| { type: "chat.history"; agentId: string; items: ChatItem[]; more?: boolean }
+	/**
+	 * A page of older conversation, in reading order, answering `chat.earlier`.
+	 *
+	 * `before` is the row the page was asked for, echoed back: two pages can be in flight
+	 * when a reader keeps scrolling, and a browser that cannot tell them apart prepends the
+	 * same page twice. `more` says whether anything remains before this page.
+	 */
+	| { type: "chat.earlier"; agentId: string; before: string; items: ChatItem[]; more: boolean }
 	| { type: "chat.item"; agentId: string; item: ChatItem }
 	| { type: "chat.delta"; agentId: string; itemId: string; delta: string; field?: "text" | "thinking" }
 	/**

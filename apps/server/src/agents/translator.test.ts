@@ -172,3 +172,48 @@ test("the last reply can be taken back, and only the last one", () => {
 	);
 	assert.equal(t.dropLastAssistant(), false, "and nothing to take back is not an error");
 });
+
+/*
+ * The far end of the window (DESIGN §6.2).
+ *
+ * The transcript is capped, and what falls off used to be gone for good — so a
+ * conversation of a thousand messages could only ever be scrolled back through five
+ * hundred of them. The rows now leave through `onEvict`, which is what `agents/store.ts`
+ * appends to its log, and the two properties that matter are that **every** evicted row is
+ * handed over and that each is handed over **once**: a row delivered twice is drawn twice
+ * when the reader scrolls back, and one missed is a hole in the middle of a conversation.
+ */
+
+test("rows that fall out of the window are handed over, in order and exactly once", () => {
+	const evicted: string[] = [];
+	const translator = new Translator(
+		"a1",
+		() => {},
+		undefined,
+		undefined,
+		(items) => evicted.push(...items.map((item) => item.id)),
+	);
+
+	// 500 is the window, so the first 500 stay and the next 60 push that many out.
+	for (let i = 0; i < 560; i++) translator.user(`message ${i}`);
+
+	assert.equal(translator.history().length, 500, "the window is still a window");
+	assert.equal(evicted.length, 60);
+	assert.equal(new Set(evicted).size, 60, "no row was handed over twice");
+	// The oldest went first, and what was evicted is exactly what the window no longer has.
+	const held = new Set(translator.history().map((item) => item.id));
+	assert.equal(
+		evicted.filter((id) => held.has(id)).length,
+		0,
+		"a row in both places would be drawn twice when the reader scrolled back",
+	);
+	assert.equal(evicted[0], "a1:u1", "the first thing said is the first thing archived");
+	assert.equal(evicted.at(-1), "a1:u60");
+});
+
+test("a conversation inside the window evicts nothing", () => {
+	let calls = 0;
+	const translator = new Translator("a2", () => {}, undefined, undefined, () => calls++);
+	for (let i = 0; i < 40; i++) translator.user(`message ${i}`);
+	assert.equal(calls, 0, "and so a short chat writes no log and offers no scrollback");
+});
