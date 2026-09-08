@@ -103,20 +103,17 @@ export interface AgentBackendContext {
 	 * (`claude/transient.ts`). The shell re-sends the history, exactly as a rewind does.
 	 */
 	historyChanged?(): void;
-	/** Tell the browser the account list moved, after a login or a switch. */
+	/** Tell the browser the account list changed, after a login through `/login`. */
 	accountsChanged?(): void;
 	/**
-	 * Which Claude subscription this agent spends, and how to change it.
+	 * Which Claude subscription this agent spends.
 	 *
-	 * Read at spawn and written when a limit moves it. The *session* owns the value — it is
-	 * on the agent's record and persists with the conversation — so this is a window onto
-	 * it rather than a second copy: `id()` is what to spawn with, and `set()` is how a
-	 * rotation makes the change stick.
+	 * What to spawn with, and whose usage report the meter is asking for. A window onto the
+	 * session's field rather than a copy, and **read-only**: the value is on the agent's
+	 * record and changes only when somebody picks a row in the picker. It used to carry a
+	 * `set` too, which a rate limit called to move the conversation on by itself.
 	 */
-	account?: {
-		id(): string;
-		set(accountId: string): void;
-	};
+	account?: { id(): string };
 	/**
 	 * The `/` menu changed: republish the chat row that carries it.
 	 *
@@ -140,7 +137,7 @@ export interface AgentBackendContext {
  * What a backend needs from the account store, and nothing more.
  *
  * Narrowed to an interface here rather than importing the class, so `agents/` does not
- * depend on `claude/` — the shell knows there is a thing that can rotate an account, and
+ * depend on `claude/` — the shell knows there is a thing that holds the subscriptions, and
  * only `claude/backend.ts` knows what one is.
  */
 export interface ClaudeAccountSwitcher {
@@ -168,19 +165,18 @@ export interface ClaudeAccountSwitcher {
 	/** Who an id is, for the sentence a switch says. */
 	describe(id: string): { id: string; email?: string } | undefined;
 	/**
-	 * Mark the account that refused as spent and say which one to move to, without moving
-	 * anybody. Being spent belongs to the subscription; where an agent goes next is the
-	 * agent's, and is written to its record by whoever asked.
+	 * Whether there is another signed-in subscription this conversation could be put on.
+	 *
+	 * One clause of one sentence: a limit says "pick another one in the model picker" when
+	 * there is one and "add another account in settings" when there is not. Deliberately not
+	 * "which one" — nothing switches by itself, so naming a successor would be the deck
+	 * making a choice it no longer makes.
 	 */
-	nextFor(
-		spent: string | undefined,
-		resetsAt: number | undefined,
-		limitType: string | undefined,
-	): { moved?: { id: string; email?: string }; nextReset?: number };
+	hasOther?(except: string | undefined): boolean;
 	/** The account's own directory, as opposed to the link. Empty for the CLI's own login. */
 	keychainDir(id: string): string;
 	/**
-	 * The account a conversation with none of its own would spend: the first usable row.
+	 * The account a conversation with none of its own would spend.
 	 *
 	 * Not "the account in force" — there is no such thing now. Every conversation has its
 	 * own, and this is the answer for one that has not been given one yet.

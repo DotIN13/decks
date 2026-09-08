@@ -7,6 +7,7 @@ import type {
 	AgentMode,
 	AgentModel,
 	AgentState,
+	AgentUsage,
 	Camera,
 	ChatItem,
 	Identity,
@@ -95,7 +96,17 @@ export class DeckAgent {
 
 	/** The last model the runtime reported, kept for the record — and for a dormant chat, which has no runtime to ask. */
 	private lastModel: AgentModel | undefined;
-	/** Shared with every other agent: one active subscription for the install. */
+	/**
+	 * The last context and cost reading, for the same reason and with one difference.
+	 *
+	 * The model is *applied* from here when the runtime opens; this is only ever displayed.
+	 * It is the conversation's own reading — what this transcript costs to send — so it
+	 * survives a restart honestly, and it is replaced by the runtime's the moment a turn
+	 * ends. Without it a chat nobody had prompted since the deck opened drew no ring at all,
+	 * which is indistinguishable from a conversation that has cost nothing.
+	 */
+	private lastUsage: AgentUsage | undefined;
+	/** Shared with every other agent: the set of subscriptions this install can use. */
 	private readonly accounts: ClaudeAccountSwitcher | undefined;
 	private readonly accountsChanged: (() => void) | undefined;
 	/** The runtime's `/` menu moved, so the chat row that carries it has to be resent. */
@@ -109,6 +120,11 @@ export class DeckAgent {
 	 * The first agent starts when the server does, so its `models` frame is
 	 * broadcast before any browser exists to hear it. Anything a late connection
 	 * needs has to be in the greeting, not only in the event that produced it.
+	 *
+	 * Seeded in the constructor from what this runtime last offered on this deck
+	 * (`AgentStore.rememberModels`), because a list that only exists once a session has been
+	 * started is a picker that cannot be used until you have already sent a turn. Replaced
+	 * by the runtime's own list as soon as there is one.
 	 */
 	private modelOptions: ModelOption[] = [];
 
@@ -235,6 +251,8 @@ export class DeckAgent {
 				createdAt: number;
 				model?: AgentModel;
 				mode?: AgentMode;
+				/** What it last cost, so a dormant row can draw a ring — see `lastUsage`. */
+				usage?: AgentUsage;
 				/** Which subscription it was spending, so a restart does not move it. */
 				account?: string;
 				tags?: string[];
@@ -255,6 +273,11 @@ export class DeckAgent {
 		 * then answered from pi's configured default the moment you typed.
 		 */
 		this.lastModel = options.restored?.model ?? options.model ?? sessionModelOf(options.resumeRef);
+		this.lastUsage = options.restored?.usage;
+		// What this runtime offered the last time one ran on this deck. A list that is a
+		// session out of date is worth more than a picker that cannot be opened; choosing
+		// from it starts the runtime, which republishes it (`setModel`).
+		this.modelOptions = options.store.knownModels(options.kind);
 		/*
 		 * A record written before this existed names no account, and neither does a brand new
 		 * agent — both take the default, once. A record naming an account that has since been
@@ -551,6 +574,7 @@ export class DeckAgent {
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
+			...(this.usage ? { usage: this.usage } : {}),
 			...(this.account ? { account: this.account } : {}),
 			...(this.identity.tags?.length ? { tags: this.identity.tags } : {}),
 			...(this.identity.userTags?.length ? { userTags: this.identity.userTags } : {}),
@@ -593,10 +617,11 @@ export class DeckAgent {
 			notice: (level, text) => this.translator.notice(level, text),
 			turnEnded: () => {
 				if (!this.backend) return;
+				this.lastUsage = this.backend.usage() ?? this.lastUsage;
 				this.emit({
 					type: "agent.usage",
 					id: this.id,
-					usage: this.backend.usage() ?? { contextTokens: null, contextWindow: 0, cost: 0 },
+					usage: this.usage ?? { contextTokens: null, contextWindow: 0, cost: 0 },
 				});
 				// A finished turn is the point worth being durable at, rather than a second
 				// later: it is also the first moment the session ref exists to be stored.
@@ -629,20 +654,15 @@ export class DeckAgent {
 				this.emit(this.historyMessage());
 				this.save();
 			},
-			// The install's Claude subscriptions, so a limit can move to the next one.
+			// The install's Claude subscriptions, so a limit can say whether there is another.
 			...(this.accounts ? { accounts: this.accounts } : {}),
 			/*
-			 * And which of them *this* agent spends. A window onto the field above rather
-			 * than a copy: the backend spawns with `id()` and calls `set()` when a limit
-			 * moves it, and the writing — record, link, browser — happens here, once.
+			 * And which of them *this* agent spends: what to spawn with, and whose usage
+			 * report the meter is asking for. Read-only, now that nothing switches by itself
+			 * — it used to carry a `set` the backend called when a limit moved it.
 			 */
 			...(this.accounts && this.account
-				? {
-						account: {
-							id: () => this.account ?? (this.accounts as ClaudeAccountSwitcher).defaultId(),
-							set: (accountId: string) => this.adoptAccount(accountId),
-						},
-					}
+				? { account: { id: () => this.account ?? (this.accounts as ClaudeAccountSwitcher).defaultId() } }
 				: {}),
 			...(this.accountsChanged ? { accountsChanged: this.accountsChanged } : {}),
 			...(this.commandsChanged ? { commandsChanged: this.commandsChanged } : {}),
@@ -686,6 +706,8 @@ export class DeckAgent {
 		if (!this.backend) return;
 		try {
 			this.modelOptions = await this.backend.models();
+			// Remembered per runtime, so the *next* chat has a picker before it has a session.
+			this.store.rememberModels(this.kind, this.modelOptions);
 			this.emit({ type: "models", agentId: this.id, models: this.modelOptions });
 		} catch (error) {
 			this.translator.notice("warn", `Could not list models: ${(error as Error).message}`);
@@ -743,7 +765,8 @@ export class DeckAgent {
 			this.translator.notice("error", (error as Error).message);
 			this.translator.setState("idle");
 		}
-		this.emit({ type: "agent.usage", id: this.id, usage: this.backend.usage() ?? { contextTokens: null, contextWindow: 0, cost: 0 } });
+		this.lastUsage = this.backend.usage() ?? this.lastUsage;
+		this.emit({ type: "agent.usage", id: this.id, usage: this.usage ?? { contextTokens: null, contextWindow: 0, cost: 0 } });
 		// The branch gained a point — the message just asked — so the transcript's user
 		// messages can be paired with it and get their rewind actions.
 		await this.backend.syncEntryIds();
@@ -917,7 +940,21 @@ export class DeckAgent {
 	}
 
 	async setMode(mode: AgentMode): Promise<void> {
-		if (!this.backend?.setMode) return;
+		/*
+		 * And the same for what it asks before acting. `start()` passes `mode` at session
+		 * creation, so a dormant chat opens on the mode that was chosen rather than dropping
+		 * the press: this used to return early on `!this.backend?.setMode`, which on a chat
+		 * with no runtime is every press.
+		 */
+		if (!this.backend) {
+			this.currentMode = mode;
+			this.save();
+			// `start()` reads the mode off the record and reports back what the runtime made
+			// of it, so there is nothing to re-read here.
+			await this.start();
+			return;
+		}
+		if (!this.backend.setMode) return;
 		await this.backend.setMode(mode);
 		this.currentMode = mode;
 	}
@@ -965,22 +1002,6 @@ export class DeckAgent {
 	}
 
 	/**
-	 * The same, when a rate limit moved it rather than a person.
-	 *
-	 * Separate from `useAccount` because the link is already pointed by the time this runs —
-	 * the account store repointed nothing, but the *backend* asked for this after choosing,
-	 * and the sentence it says about the limit is better than a second one here. So this
-	 * records and republishes; it does not narrate.
-	 */
-	private adoptAccount(accountId: string): void {
-		if (this.account === accountId) return;
-		this.account = accountId;
-		this.accounts?.pointAgentAt?.(this.id, accountId);
-		this.save();
-		this.emit({ type: "agent.account", id: this.id, account: accountId });
-	}
-
-	/**
 	 * Change the model, and say so in the conversation.
 	 *
 	 * The transcript is the record of what happened, and *which model said it* is part of
@@ -998,13 +1019,43 @@ export class DeckAgent {
 	 * non-change is a transcript that logs the furniture.
 	 */
 	async setModel(provider: string, model: string, thinking?: ThinkingLevel): Promise<void> {
-		await this.start();
+		/*
+		 * A chat nobody has prompted has no runtime to tell, so the choice is written down
+		 * and the runtime is **opened on it** — `start()` reads the model off the record and
+		 * passes it at session creation. Recorded before starting rather than after, which is
+		 * the whole point: starting first and then asking for a change opens the session on
+		 * the model that was being replaced, and on the one runtime where the model is a
+		 * launch flag (antigravity) that is a spawn and an immediate respawn.
+		 */
+		if (!this.backend) {
+			this.lastModel = { provider, model, thinking: thinking ?? this.lastModel?.thinking ?? "medium" };
+			this.emit({ type: "agent.model", id: this.id, model: this.lastModel });
+			this.save();
+			await this.start();
+			this.reportModel();
+			return;
+		}
 		const before = this.backend?.model();
 		await this.backend?.setModel(provider, model, thinking);
 		this.lastModel = this.backend?.model();
 		this.noteModel(before, this.lastModel);
 		this.emit({ type: "agent.model", id: this.id, model: this.backend?.model() });
 		this.save();
+	}
+
+	/**
+	 * Say what the runtime landed on, once it exists.
+	 *
+	 * A separate method rather than three lines inline, and not only to avoid repeating them:
+	 * inside `if (!this.backend)` the compiler has narrowed the field away, so a re-read
+	 * after `await this.start()` — which is precisely the point of these branches — cannot be
+	 * written there at all. What was asked for and what a runtime accepts are different
+	 * things (a thinking level clamped to what the model offers, a model whose credentials
+	 * have gone), so the row is corrected from the runtime rather than left saying the wish.
+	 */
+	private reportModel(): void {
+		this.lastModel = this.backend?.model() ?? this.lastModel;
+		this.emit({ type: "agent.model", id: this.id, model: this.lastModel });
 	}
 
 	/**
@@ -1026,12 +1077,32 @@ export class DeckAgent {
 		this.translator.notice("info", `Model: ${arrow}${after.thinking ? ` · thinking ${after.thinking}` : ""}`);
 	}
 
-	setThinking(level: ThinkingLevel): void {
-		const before = this.backend?.model();
-		this.backend?.setThinking(level);
-		this.lastModel = this.backend?.model();
+	/**
+	 * How hard it thinks — the same rules as `setModel`, and it was the worse bug of the two.
+	 *
+	 * On a chat with no runtime this used to read `this.backend?.model()` and assign the
+	 * `undefined` it got, so pressing a level on a dormant chat *erased* the model the row was
+	 * showing and broadcast that erasure. Now the level is applied to the recorded model and
+	 * the runtime opens on it, exactly as a model change does.
+	 */
+	async setThinking(level: ThinkingLevel): Promise<void> {
+		if (!this.backend) {
+			if (this.lastModel) {
+				this.lastModel = { ...this.lastModel, thinking: level };
+				this.emit({ type: "agent.model", id: this.id, model: this.lastModel });
+				this.save();
+			}
+			await this.start();
+			this.reportModel();
+			return;
+		}
+		const before = this.backend.model();
+		this.backend.setThinking(level);
+		// `?? this.lastModel`: a runtime that does not report a model must not be allowed to
+		// unset the one the row is showing — see the note above.
+		this.lastModel = this.backend.model() ?? this.lastModel;
 		this.noteModel(before, this.lastModel);
-		this.emit({ type: "agent.model", id: this.id, model: this.backend?.model() });
+		this.emit({ type: "agent.model", id: this.id, model: this.lastModel });
 		this.save();
 	}
 
@@ -1098,6 +1169,11 @@ export class DeckAgent {
 		return this.backend?.model() ?? this.lastModel;
 	}
 
+	/** What it has cost, on the same terms — and `undefined` means "not known", not "nothing". */
+	get usage(): AgentUsage | undefined {
+		return this.backend?.usage() ?? this.lastUsage;
+	}
+
 	get mode(): AgentMode | undefined {
 		return this.backend?.mode?.() ?? this.currentMode;
 	}
@@ -1131,6 +1207,15 @@ export class DeckAgent {
 		if (this.backend) reply({ type: "agent.model", id: this.id, model: this.backend.model() });
 		else if (this.lastModel) reply({ type: "agent.model", id: this.id, model: this.lastModel });
 		if (this.modelOptions.length > 0) reply({ type: "models", agentId: this.id, models: this.modelOptions });
+		/*
+		 * What it will spend, and what it has spent. Both were missing from the greeting, and
+		 * both are only ever *emitted* from a running backend — so on a chat nobody had
+		 * prompted since the deck opened, the model picker's Subscription section had no row
+		 * marked and the context ring was not drawn at all. Neither needs a runtime to answer:
+		 * the account is on the record and the reading is the conversation's own.
+		 */
+		if (this.account) reply({ type: "agent.account", id: this.id, account: this.account });
+		if (this.usage) reply({ type: "agent.usage", id: this.id, usage: this.usage });
 		// A question asked before this browser existed still needs answering, or the agent
 		// that asked it waits forever.
 		for (const prompt of this.bridge.outstanding()) reply({ type: "extension.ui.prompt", agentId: this.id, prompt });

@@ -282,31 +282,35 @@ export function ModelPicker(props: {
 					<span class="meta">Subscription</span>
 					<div class="mt-1">
 						<For each={props.accounts ?? []}>
-							{(account) => {
-								const spent = () => Boolean(account.limitedUntil && account.limitedUntil > Date.now());
-								return (
-									<button
-										type="button"
-										data-row
-										data-flat="true"
-										data-current={props.account === account.id ? "true" : undefined}
-										/* A spent account is still choosable: it comes back, and the person
-										   choosing may know when. Saying so beats refusing the press. */
-										title={spent() ? "This subscription has reached a limit; it will come back" : undefined}
-										onClick={() => props.onAccount?.(account.id)}
-									>
-										<span class="ic">
-											<Show when={props.account === account.id}>
-												<Icon of={Check} size={13} />
-											</Show>
-										</span>
-										<span class="lb flex-1 truncate">{account.email ?? account.id}</span>
-										<Show when={spent()}>
-											<span class="meta flex-none text-[10px]">spent</span>
+							{(account) => (
+								<button
+									type="button"
+									data-row
+									data-flat="true"
+									data-current={props.account === account.id ? "true" : undefined}
+									/*
+									 * Every signed-in row is choosable, and none of them says "spent".
+									 *
+									 * A remembered rate limit used to be drawn here. Nothing re-checked
+									 * it, so it went on claiming a subscription was out of quota long
+									 * after its window had lifted — and it was only ever the last
+									 * refusal's word. A limit is said in the conversation that hit one.
+									 */
+									title={account.signedIn ? undefined : "This account has no credentials behind it — add it again in settings"}
+									disabled={!account.signedIn}
+									onClick={() => props.onAccount?.(account.id)}
+								>
+									<span class="ic">
+										<Show when={props.account === account.id}>
+											<Icon of={Check} size={13} />
 										</Show>
-									</button>
-								);
-							}}
+									</span>
+									<span class="lb flex-1 truncate">{account.email ?? account.id}</span>
+									<Show when={!account.signedIn}>
+										<span class="meta flex-none text-[10px]">signed out</span>
+									</Show>
+								</button>
+							)}
 						</For>
 					</div>
 				</div>

@@ -1,16 +1,17 @@
 import assert from "node:assert/strict";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { ClaudeAccounts, DEFAULT_ACCOUNT, epochMs } from "./accounts.ts";
 
 /**
- * Several Claude subscriptions, and which one is spending.
+ * Several Claude subscriptions, and which one each conversation spends.
  *
- * The switching rules are the part worth pinning: which account is chosen next, what a
- * remembered limit does and stops doing, and that the symlink every session reads through
- * actually moves. The credentials themselves are Claude's — nothing here writes a token.
+ * The mechanics are the part worth pinning: that the symlink a session reads its credentials
+ * through actually moves, that one agent's link is its own, and that a list written by the
+ * build which switched accounts on its own is read without its remembered limits. The
+ * credentials themselves are Claude's — nothing here writes a token.
  */
 
 /**
@@ -187,146 +188,6 @@ test("signing in adds an account, makes it active, and points the symlink at it"
 });
 
 /*
- * The switch itself. A `rename` over a symlink is what makes it seamless — the CLI re-reads
- * its credentials per request, so a session already running picks up whatever the link points
- * at now.
- */
-test("a limit moves the active account on, and the symlink with it", () => {
-	const { accounts, dir, home, cleanup } = store();
-	const first = add(accounts, "one@example.com");
-	const second = add(accounts, "two@example.com");
-	accounts.use(first);
-	assert.equal(pointsAt(dir), accounts.configDir(first));
-	const before = pointsAt(dir);
-
-	/*
-	 * The CLI's own login is signed out here, so the choice is between the two added
-	 * accounts — which is the case this test is about. That `default` would otherwise be
-	 * chosen first is its own test below.
-	 */
-	rmSync(homeToken(home), { force: true });
-	const resets = Date.now() + 3 * 60 * 60 * 1000;
-	const { moved, nextReset } = accounts.nextFor(first, resets, "five_hour");
-	assert.equal(moved?.id, second, "moved to the account that has not run out");
-	assert.equal(nextReset, undefined);
-	/*
-	 * And it moves nobody. `rotate` used to mark the account *and* repoint the machine, so
-	 * one agent running out dragged every other agent onto a different subscription
-	 * mid-turn; `nextFor` marks and chooses, and who moves is the session's — see the
-	 * per-agent tests below.
-	 */
-	assert.equal(pointsAt(dir), before, "the machine-wide link is not touched");
-
-	const spent = accounts.list().find((account) => account.id === first);
-	assert.equal(spent?.limitedUntil, resets, "and remembers when the spent one comes back");
-	assert.equal(spent?.limitType, "five_hour");
-	cleanup();
-});
-
-// Pinned to linux because the last assertion is about the link carrying the token, which is
-// the one thing macOS does differently — see `credentialsDir`.
-test("the CLI's own login is one of the accounts a limit can move to", () => {
-	const { accounts, dir, cleanup } = store({ platform: "linux" });
-	const only = add(accounts, "one@example.com");
-
-	const { moved } = accounts.nextFor(only, Date.now() + 60_000, "seven_day");
-	assert.equal(moved?.id, DEFAULT_ACCOUNT, "rather than reporting that everything is spent");
-	/*
-	 * Naming it is all this does. Moving *anybody* onto it is the session's to do, through
-	 * its own link — see the per-agent tests below. This used to repoint the machine here,
-	 * which is how one agent running out took every other agent with it.
-	 */
-	assert.equal(pointsAt(dir), accounts.configDir(only), "the machine-wide link is where it was");
-	// And with the only added account spent, the default a *new* agent takes is the CLI's own.
-	assert.equal(accounts.defaultId(), DEFAULT_ACCOUNT);
-	cleanup();
-});
-
-test("with everything spent it says when the first one comes back", () => {
-	const { accounts, cleanup } = store();
-	const first = add(accounts, "one@example.com");
-	const second = add(accounts, "two@example.com");
-
-	const later = Date.now() + 5 * 60 * 60 * 1000;
-	const sooner = Date.now() + 30 * 60 * 1000;
-	accounts.markLimited(DEFAULT_ACCOUNT, later, "seven_day");
-	accounts.markLimited(second, later, "five_hour");
-	const { moved, nextReset } = accounts.nextFor(first, sooner, "five_hour");
-
-	assert.equal(moved, undefined, "nothing to move to");
-	assert.equal(nextReset, sooner, "and the soonest reset is the one worth reporting");
-	cleanup();
-});
-
-test("a limit that has passed is no longer a reason to skip an account", () => {
-	const { accounts, home, cleanup } = store();
-	const first = add(accounts, "one@example.com");
-	const second = add(accounts, "two@example.com");
-	rmSync(homeToken(home), { force: true });
-	// Spent, but the window has already lifted.
-	accounts.markLimited(second, Date.now() - 60_000, "five_hour");
-
-	assert.equal(accounts.nextAvailable(first)?.id, second, "the past is not a limit");
-	cleanup();
-});
-
-/*
- * A limit must not move to an account with no token behind it.
- *
- * That would turn "out of quota" into "failed to authenticate", which is a worse failure
- * than the one being worked around: it does not read as a quota problem to anybody, and the
- * account it moved to looks fine in the list.
- */
-test("an account that is signed out is not somewhere a limit can move to", () => {
-	const { accounts, home, cleanup } = store({ homeSignedIn: false });
-	const first = add(accounts, "one@example.com");
-	const second = add(accounts, "two@example.com");
-	// Signed out: on the list, and not usable.
-	rmSync(join(accounts.configDir(second), ".credentials.json"), { force: true });
-
-	assert.equal(accounts.usable(second), false);
-	const { moved, nextReset } = accounts.nextFor(first, Date.now() + 60_000, "five_hour");
-	assert.equal(moved, undefined, "not the signed-out one, and not the signed-out default");
-	assert.ok(nextReset, "so it reports the wait instead");
-
-	// Signed back in, and it becomes a destination again.
-	writeFileSync(join(accounts.configDir(second), ".credentials.json"), "{}");
-	assert.equal(accounts.nextAvailable(first)?.id, second);
-	// And the CLI's own login, once it has a token, is chosen ahead of the others.
-	writeFileSync(homeToken(home), "{}");
-	assert.equal(accounts.nextAvailable(first)?.id, DEFAULT_ACCOUNT);
-	cleanup();
-});
-
-/*
- * A limit with no reset time is held for an hour rather than forever.
- *
- * `resetsAt` is optional on the event, and an account skipped permanently because the number
- * was missing is an account nothing will ever use again.
- */
-test("a limit with no reset time expires on its own", () => {
-	const { accounts, cleanup } = store();
-	const id = add(accounts, "one@example.com");
-	accounts.markLimited(id, undefined, "five_hour");
-
-	const until = accounts.list().find((account) => account.id === id)?.limitedUntil ?? 0;
-	assert.ok(until > Date.now(), "held now");
-	assert.ok(until < Date.now() + 2 * 60 * 60 * 1000, `and not held forever — ${new Date(until).toISOString()}`);
-	cleanup();
-});
-
-test("choosing an account by hand clears the limit it was remembered with", () => {
-	const { accounts, cleanup } = store();
-	const id = add(accounts, "one@example.com");
-	accounts.markLimited(id, Date.now() + 60 * 60 * 1000, "five_hour");
-
-	const chosen = accounts.use(id);
-	assert.equal(chosen?.limitedUntil, undefined, "a direct instruction outranks the memory");
-	assert.equal(accounts.activeId(), id);
-	cleanup();
-});
-
-/*
  * Signing in twice to one account replaces its row rather than adding a second.
  *
  * Two rows for one email is a list nobody can reason about, and the newer sign-in is the
@@ -429,27 +290,22 @@ test("an id that is not one this store issued is never turned into a path", () =
 });
 
 /*
- * Reading the list must not change it.
+ * Reading the list must not reorder it.
  *
- * `describeDefault` records what the CLI's own login is called so a row keeps its name when
- * `auth status` is next slow — and the first version wrote the whole row, which dropped the
- * remembered limit. Opening the settings panel therefore made a spent account look fresh,
- * and the next rotation would have gone straight back to the one that had just refused.
+ * `describeDefault` records what the CLI's own login is called, so a row keeps its name when
+ * `auth status` is next slow. It is the one part of publishing the list that writes, and it
+ * moves the CLI's own row to the end of the stored array — so the reading of that array has
+ * to be the thing that puts it back at the head, rather than the array's own order.
  */
-test("recording the default account's name does not forget that it ran out", () => {
+test("recording the default account's name leaves the list in the order it publishes in", () => {
 	const { accounts, cleanup } = store();
-	const resets = Date.now() + 60 * 60 * 1000;
-	accounts.markLimited(DEFAULT_ACCOUNT, resets, "five_hour");
+	const other = add(accounts, "other@example.com");
 
 	accounts.describeDefault({ email: "me@example.com", orgName: "Somewhere", plan: "Claude Max" });
+	accounts.describeDefault({ email: "me@example.com", orgName: "Somewhere", plan: "Claude Max" });
 
-	const row = accounts.list().find((account) => account.id === DEFAULT_ACCOUNT);
-	assert.equal(row?.email, "me@example.com", "the name is recorded");
-	assert.equal(row?.limitedUntil, resets, "and the limit is still remembered");
-	assert.equal(row?.limitType, "five_hour");
-	// The point of remembering it: a limit does not rotate back to the account that refused.
-	const other = add(accounts, "other@example.com");
-	assert.equal(accounts.nextAvailable(other)?.id, undefined, "nothing to move to, rather than back to the spent one");
+	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, other], "the CLI's own first, however often it is described");
+	assert.equal(accounts.list().find((account) => account.id === DEFAULT_ACCOUNT)?.email, "me@example.com", "and named");
 	cleanup();
 });
 
@@ -520,39 +376,11 @@ test("forgetting the account in force moves the link to the CLI's own, not to no
 	cleanup();
 });
 
-/*
- * A rate limit belongs to the subscription, not to the row.
- *
- * One subscription can still be two rows on an install that made the pair before
- * `abandon()` existed. Marking only the row that refused left its twin looking available,
- * so the next choice switched to the same account that had just run out.
- */
-test("a limit is recorded against every row with that email", () => {
-	const { accounts, cleanup } = store();
-	accounts.describeDefault({ email: "me@example.com" });
-	const copy = add(accounts, "me@example.com");
-	const other = add(accounts, "other@example.com");
-	const resets = Date.now() + 60 * 60 * 1000;
-
-	accounts.markLimited(copy, resets, "five_hour");
-
-	const limited = accounts.list().filter((account) => account.limitedUntil === resets);
-	assert.deepEqual(
-		limited.map((account) => account.id).sort(),
-		[DEFAULT_ACCOUNT, copy].sort(),
-		"both rows for that one subscription",
-	);
-	assert.equal(accounts.list().find((account) => account.id === other)?.limitedUntil, undefined, "and nothing else");
-	assert.equal(accounts.nextAvailable(copy)?.id, other, "so the next choice is a different subscription");
-	cleanup();
-});
-
 
 /*
  * On macOS the token is in the keychain and `.credentials.json` may not exist at all. Read
- * as a file that is simply missing, every account looked signed out — `pick` passed over all
- * of them and a limit had nowhere to move to, on the one platform where nothing else looked
- * wrong.
+ * as a file that is simply missing, every account on the machine looked signed out — on the
+ * one platform where nothing else looked wrong.
  */
 test("on macOS a signed-in account is recognised without a credentials file", () => {
 	const { accounts, cleanup } = store({ homeSignedIn: false, platform: "darwin" });
@@ -576,130 +404,111 @@ test("on Linux a keychain record is not evidence of a token", () => {
 });
 
 /*
- * `SDKRateLimitInfo.resetsAt` is unix seconds. Stored and compared as milliseconds it is
- * always in the past, so an account looked available again the instant it was marked spent —
- * and printed as a date it read 1970.
+ * `SDKRateLimitInfo.resetsAt` is unix seconds, and it reaches a person as a sentence: printed
+ * as milliseconds it read 1970, so the deck told people their limit would lift in January of
+ * that year. Nothing is stored any more, so this is the whole of what the unit does.
  */
 test("a reset time in seconds is taken as seconds", () => {
-	const { accounts, cleanup } = store();
-	const id = add(accounts, "one@example.com");
 	const seconds = Math.floor(Date.now() / 1000) + 3 * 60 * 60;
-
-	accounts.markLimited(id, seconds, "five_hour");
-
-	assert.equal(accounts.list().find((account) => account.id === id)?.limitedUntil, seconds * 1000);
-	assert.equal(accounts.nextAvailable(undefined)?.id, DEFAULT_ACCOUNT, "and the spent one is actually skipped");
+	assert.equal(epochMs(seconds), seconds * 1000);
 	assert.equal(epochMs(seconds * 1000), seconds * 1000, "milliseconds pass through, so it is safe to run twice");
 	assert.equal(epochMs(undefined), undefined);
 	assert.equal(epochMs(0), undefined, "and nothing is not a time");
-	cleanup();
 });
 
-test("a limit written in seconds by an older build is migrated on read", () => {
+/*
+ * A list written by the build that switched accounts on its own.
+ *
+ * Two fields and an array it no longer has anywhere to put: a remembered rate limit, the
+ * window it belonged to, and the priority order the arrows used to set. They are dropped on
+ * read rather than migrated, which is also what cleans them out of the file — and the rest of
+ * the row has to survive, because it is the account.
+ */
+test("a list written by an older build loses its limits and its order, and nothing else", () => {
 	const { accounts, dir, cleanup } = store();
 	const id = add(accounts, "one@example.com");
-	const seconds = Math.floor(Date.now() / 1000) + 3600;
+	const other = add(accounts, "two@example.com");
+	const file = join(dir, "claude-accounts", "index.json");
 	writeFileSync(
-		join(dir, "claude-accounts", "index.json"),
-		JSON.stringify({ active: id, accounts: [{ id, email: "one@example.com", addedAt: 1, limitedUntil: seconds }] }),
+		file,
+		JSON.stringify({
+			active: id,
+			order: [other, id, DEFAULT_ACCOUNT],
+			accounts: [
+				{ id, email: "one@example.com", addedAt: 1, limitedUntil: Date.now() + 3600_000, limitType: "five_hour" },
+				{ id: other, email: "two@example.com", addedAt: 2, plan: "Claude Max" },
+			],
+		}),
 	);
 
-	assert.equal(accounts.list().find((account) => account.id === id)?.limitedUntil, seconds * 1000);
+	const rows = accounts.list();
+	assert.deepEqual(rows.map((account) => account.id), [DEFAULT_ACCOUNT, id, other], "the CLI's own first, then as they were added");
+	assert.deepEqual(Object.keys(rows[1] ?? {}).sort(), ["addedAt", "email", "id"], "no limit survives the read");
+	assert.equal(rows[2]?.plan, "Claude Max", "and everything that is still a field does");
+	// And it is gone from the file itself the next time anything writes.
+	accounts.describeDefault({ email: "me@example.com" });
+	const written = JSON.parse(readFileSync(file, "utf8")) as { order?: unknown; accounts: Array<Record<string, unknown>> };
+	assert.equal(written.order, undefined, "the order is not written back");
+	assert.ok(
+		written.accounts.every((account) => account.limitedUntil === undefined && account.limitType === undefined),
+		JSON.stringify(written.accounts),
+	);
 	cleanup();
 });
 
 /*
- * The CLI's own row stands for whatever `~/.claude` is signed in as, and that can change
- * under it. A limit remembered against the account that was replaced would have the deck
- * rotating away from a subscription that has spent nothing.
- */
-test("a new login behind the CLI's own row forgets the old one's limit", () => {
-	const { accounts, cleanup } = store();
-	accounts.describeDefault({ email: "first@example.com", plan: "max" });
-	accounts.markLimited(DEFAULT_ACCOUNT, Date.now() + 60 * 60 * 1000, "five_hour");
-	assert.ok(accounts.list().find((account) => account.id === DEFAULT_ACCOUNT)?.limitedUntil, "spent");
-
-	accounts.describeDefault({ email: "second@example.com", plan: "max" });
-
-	const mine = accounts.list().find((account) => account.id === DEFAULT_ACCOUNT);
-	assert.equal(mine?.email, "second@example.com");
-	assert.equal(mine?.limitedUntil, undefined, "a different subscription, so not the same limit");
-	assert.equal(mine?.limitType, undefined);
-
-	// And the same email twice still keeps it — publishing the list must stay a read.
-	accounts.markLimited(DEFAULT_ACCOUNT, Date.now() + 60 * 60 * 1000, "five_hour");
-	accounts.describeDefault({ email: "second@example.com", plan: "max" });
-	assert.ok(accounts.list().find((account) => account.id === DEFAULT_ACCOUNT)?.limitedUntil, "still spent");
-	cleanup();
-});
-
-/*
- * Priority: the order of the list, and the arrows that set it.
+ * The list, and the one question a limit still asks it.
  *
- * The list has always been the order a limit walks. What is new is that it is the user's to
- * set, so these are about the two halves of that: the order survives the things that rewrite
- * the account list for other reasons, and it is what `rotate` actually follows.
+ * There is no priority order any more: the arrows are gone, nothing walks the list looking
+ * for a successor, and the only thing left that reads it is the sentence a refusal says —
+ * "pick another one in the model picker", or "add another account in settings" when there is
+ * nothing to pick.
  */
-test("moving an account up makes it the one a limit goes to first", () => {
+test("the list is the CLI's own login and then the order they were added", () => {
 	const { accounts, cleanup } = store();
 	const first = add(accounts, "one@example.com");
 	const second = add(accounts, "two@example.com");
+
 	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, first, second]);
-
-	assert.equal(accounts.move(second, "up"), true);
-	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, second, first]);
-
-	// And the rotation follows it, which is the only reason the order exists.
-	const { moved } = accounts.nextFor(DEFAULT_ACCOUNT, Date.now() + 60_000, "five_hour");
-	assert.equal(moved?.id, second);
-	cleanup();
-});
-
-test("the CLI's own login is not pinned to the top", () => {
-	const { accounts, cleanup } = store();
-	const mine = add(accounts, "one@example.com");
-
-	assert.equal(accounts.move(DEFAULT_ACCOUNT, "down"), true);
-	assert.deepEqual(accounts.list().map((account) => account.id), [mine, DEFAULT_ACCOUNT]);
-	cleanup();
-});
-
-test("a press at the end of the list moves nothing and says so", () => {
-	const { accounts, cleanup } = store();
-	const only = add(accounts, "one@example.com");
-
-	assert.equal(accounts.move(DEFAULT_ACCOUNT, "up"), false, "already at the top");
-	assert.equal(accounts.move(only, "down"), false, "already at the bottom");
-	assert.equal(accounts.move("never-existed", "up"), false);
-	cleanup();
-});
-
-test("the order is not what the account list happens to be in", () => {
-	const { accounts, cleanup } = store();
-	const first = add(accounts, "one@example.com");
-	accounts.move(first, "up");
-	assert.deepEqual(accounts.list().map((account) => account.id), [first, DEFAULT_ACCOUNT]);
-
-	/*
-	 * `describeDefault` rewrites the stored array on every publish, moving the CLI's own row
-	 * to the end of it. An order kept *as* that array's order would be undone by merely
-	 * reading the account list — which is why it is a separate field.
-	 */
-	accounts.describeDefault({ email: "mine@example.com" });
-	assert.deepEqual(accounts.list().map((account) => account.id), [first, DEFAULT_ACCOUNT], "and reading the list did not reshuffle it");
-	cleanup();
-});
-
-test("an account added later joins at the bottom, and one forgotten leaves no gap", () => {
-	const { accounts, cleanup } = store();
-	const first = add(accounts, "one@example.com");
-	accounts.move(first, "up");
-
-	const second = add(accounts, "two@example.com");
-	assert.deepEqual(accounts.list().map((account) => account.id), [first, DEFAULT_ACCOUNT, second], "placed rows keep their places");
-
 	accounts.forget(first);
-	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, second], "a stale id in the order is simply not found");
+	assert.deepEqual(accounts.list().map((account) => account.id), [DEFAULT_ACCOUNT, second], "and a gap closes rather than being kept");
+	cleanup();
+});
+
+test("a new conversation starts on the stored row, and on something usable when that cannot answer", () => {
+	const { accounts, cleanup } = store();
+	assert.equal(accounts.defaultId(), DEFAULT_ACCOUNT, "a fresh install: the login the machine already had");
+
+	const added = add(accounts, "one@example.com");
+	assert.equal(accounts.defaultId(), added, "signing one in makes it where a new conversation starts");
+
+	// Signed out under it. The stored answer cannot answer, so it repairs rather than
+	// pointing a conversation at an account that will fail to authenticate.
+	rmSync(join(accounts.configDir(added), ".credentials.json"), { force: true });
+	assert.equal(accounts.defaultId(), DEFAULT_ACCOUNT);
+	cleanup();
+});
+
+test("with no token anywhere it still names the CLI's own login", () => {
+	const { accounts, cleanup } = store({ homeSignedIn: false });
+	assert.equal(accounts.defaultId(), DEFAULT_ACCOUNT, "a list that can name nobody is not an option");
+	cleanup();
+});
+
+test("a limit is told whether there is another subscription to offer", () => {
+	const { accounts, home, cleanup } = store();
+	assert.equal(accounts.hasOther(DEFAULT_ACCOUNT), false, "one account, so the sentence says to add one");
+
+	const added = add(accounts, "one@example.com");
+	assert.equal(accounts.hasOther(DEFAULT_ACCOUNT), true, "somewhere to go, so it says to pick one");
+	assert.equal(accounts.hasOther(added), true, "and the CLI's own login counts as somewhere");
+
+	// Signed out is not somewhere to go: pointing at a row with no token behind it would turn
+	// "out of quota" into "failed to authenticate", which reads as a quota problem to nobody.
+	rmSync(join(accounts.configDir(added), ".credentials.json"), { force: true });
+	assert.equal(accounts.hasOther(DEFAULT_ACCOUNT), false);
+	rmSync(homeToken(home), { force: true });
+	assert.equal(accounts.hasOther(added), false);
 	cleanup();
 });
 
@@ -709,7 +518,7 @@ test("an account added later joins at the bottom, and one forgotten leaves no ga
  * The mechanism is the one the global switch already used, moved down a level: a symlink the
  * CLI re-reads on every request, one per agent instead of one per machine. So what is worth
  * pinning is that the links are genuinely separate — that repointing one agent's cannot be
- * observed by another — and that the store no longer decides *who* moves when a limit lands.
+ * observed by another.
  */
 
 /** Where one agent's link points, resolved. */
@@ -744,49 +553,6 @@ test("an agent named an account that has since been forgotten falls back to the 
 	const env = accounts.environmentFor("agent-a", gone);
 	assert.ok(env, "it still gets an environment rather than nothing");
 	assert.equal(agentPointsAt(dir, "agent-a"), accounts.configDir(accounts.defaultId()), "pointed somewhere that exists");
-	cleanup();
-});
-
-/*
- * The split that makes a fallback per agent. `rotate` used to mark the account *and* move the
- * machine onto the next one, so one agent running out dragged every other agent onto a
- * different subscription mid-turn. `nextFor` marks and chooses; who moves is the caller's.
- */
-test("nextFor marks the spent account and names the next, without moving anybody", () => {
-	const { accounts, dir, cleanup } = store({ platform: "linux" });
-	const one = add(accounts, "one@example.com");
-	const two = add(accounts, "two@example.com");
-	accounts.environmentFor("agent-a", one);
-	accounts.environmentFor("agent-b", one);
-	const before = accounts.activeId();
-
-	const resets = Date.now() + 60_000;
-	const { moved } = accounts.nextFor(one, resets, "five_hour");
-	assert.ok(moved && moved.id !== one, "it names somewhere to go");
-	assert.equal(accounts.activeId(), before, "and does not touch the default row");
-	assert.equal(agentPointsAt(dir, "agent-a"), accounts.configDir(one), "nor either agent's link");
-	assert.equal(agentPointsAt(dir, "agent-b"), accounts.configDir(one));
-
-	// Being spent *is* global: it is a fact about the subscription, so the other agent on it
-	// will be sent elsewhere too, by its own refusal.
-	const spent = accounts.list().find((account) => account.id === one);
-	assert.equal(spent?.limitedUntil, resets);
-	assert.equal(spent?.limitType, "five_hour");
-	// And a spent account is not offered again while it is spent — to anybody, which is the
-	// half that stays global. Asked with nothing excluded, the answer is never the spent one.
-	assert.notEqual(accounts.nextFor(undefined, undefined, undefined).moved?.id, one);
-	assert.ok([DEFAULT_ACCOUNT, two].includes(accounts.nextFor(undefined, undefined, undefined).moved?.id ?? ""));
-	cleanup();
-});
-
-test("with everything spent nextFor says when the first one comes back, and moves nobody", () => {
-	const { accounts, cleanup } = store({ homeSignedIn: false, platform: "linux" });
-	const only = add(accounts, "one@example.com");
-	const resets = Date.now() + 60_000;
-
-	const outcome = accounts.nextFor(only, resets, "seven_day");
-	assert.equal(outcome.moved, undefined);
-	assert.equal(outcome.nextReset, resets);
 	cleanup();
 });
 

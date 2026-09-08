@@ -1,27 +1,33 @@
 /**
- * Several Claude subscriptions, and which one is spending (DESIGN §6.8).
+ * Several Claude subscriptions, and which one a conversation spends.
  *
  * A subscription has a rate limit, and reaching it stops the work — so several can be signed
- * in at once, each conversation spends one of them, and reaching a limit moves *that*
- * conversation along (`claude/accounts.ts`). The switch is seamless: the CLI re-reads its
- * credentials per request and every session is pointed at a symlink of its own, so moving
- * that link changes which subscription the next turn spends.
+ * in at once and each conversation spends one of them, chosen in its own model picker
+ * (`claude/accounts.ts`). The switch is seamless: the CLI re-reads its credentials per
+ * request and every session is pointed at a symlink of its own, so moving that link changes
+ * which subscription the next turn spends.
  *
- * This panel no longer switches anything — that is a conversation's own model picker, and
- * `accounts-per-agent.mjs` drives it. What is left here is the *set* of accounts and their
- * order: adding, removing, reordering, and the states a row can be in.
+ * This panel switches nothing and orders nothing — switching is the model picker, which
+ * `accounts-per-agent.mjs` drives, and there is no order because nothing rotates. What is
+ * left here is the *set* of accounts: adding, removing, and the two states a row can be in.
  *
  * The login itself is an OAuth flow that cannot be automated, so what is driven here is
  * everything around it — the list, the states a row can be in, and that reading the list
- * changes nothing. The switching rules themselves are unit-tested in `accounts.test.ts`,
- * where a limit can be staged without a real account to spend.
+ * changes nothing.
  *
  * Accounts are stored per *install* rather than per deck, so this writes under the fixture's
  * data directory and takes it away again.
  */
-import { deckState, hasOverflowRow, open, openOverflow, say, settle } from "../harness.mjs";
+import { preflight, deckState, hasOverflowRow, open, openOverflow, say, settle } from "../harness.mjs";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
+/*
+ * A fixture, before anything is written. These accounts live in the *install* directory, not
+ * in the deck, so a run against a live Decks would overwrite somebody's real subscriptions —
+ * and `harness.mjs` defaults to the ports a live Decks uses.
+ */
+await preflight();
 
 /** The install's directory, which is the deck's parent — see `config.ts`. */
 const dataDir = dirname((await deckState()).path);
@@ -40,8 +46,9 @@ const rows = await page.evaluate(() =>
 	[...document.querySelectorAll(".account-row")].map((row) => ({
 		text: row.innerText.replace(/\n+/g, " | "),
 		current: row.dataset.current === "true",
-		removable: Boolean(row.querySelector(".close:not(.rank)")),
+		removable: Boolean(row.querySelector(".close")),
 		pressable: Boolean(row.querySelector("button[data-row]")),
+		arrows: row.querySelectorAll('[aria-label*="Move" i]').length,
 	})),
 );
 console.log("      rows:", JSON.stringify(rows, null, 1));
@@ -49,9 +56,11 @@ say("the CLI's own login is on the list", rows.length >= 1);
 say("…and is the default for a new conversation on a fresh install", rows[0]?.current === true);
 say("…named from the CLI rather than as a uuid", /@/.test(rows[0]?.text ?? ""), rows[0]?.text);
 say("…and cannot be removed from here", rows[0]?.removable === false, "those credentials are the CLI's");
-// Nothing in this panel is pressable except the arrows and the ×: a row that still looked
-// like a switch would be the same lie in a quieter form.
+// Nothing in this panel is pressable except the ×: a row that still looked like a switch
+// would be the same lie in a quieter form.
 say("no row is a switch", rows.every((row) => row.pressable === false), JSON.stringify(rows.map((r) => r.pressable)));
+// And no arrows, because there is no order: nothing walks the list when a limit lands.
+say("…and no row can be reordered", rows.every((row) => row.arrows === 0), JSON.stringify(rows.map((r) => r.arrows)));
 
 // --- what the store did on disk --------------------------------------------------
 /*
@@ -69,11 +78,15 @@ if (existsSync(indexFile)) {
 	say("…and merely reading it does not point anywhere", true);
 }
 
-// --- a second account, and a limit, seen through the server ----------------------
+// --- two more accounts, seen through the server ----------------------------------
 /*
  * The login is an OAuth flow that cannot be automated, so the accounts are written the way
  * the store writes them and the *server* is what reads them. Which is the honest test: what
- * is being checked is that the list, the active row and the limit reach the browser.
+ * is being checked is that the list and the default row reach the browser.
+ *
+ * The index is deliberately written the way the *previous* build wrote it — with a remembered
+ * limit, the window it belonged to, and a priority order — because a real install upgrading
+ * to this one has exactly that file on disk. None of it should reach the panel.
  */
 const ids = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"];
 for (const id of ids) {
@@ -85,12 +98,7 @@ writeFileSync(
 	join(accountsDir, "index.json"),
 	JSON.stringify({
 		active: ids[1],
-		/*
-		 * The limit is put on `default`, which is the only row with a real token behind it —
-		 * `auth status` is what decides `signedIn`, and a fabricated credentials file cannot
-		 * pass it. So the two added rows exercise "signed out" and the CLI's own exercises
-		 * "limited", which between them is every state a row can be in.
-		 */
+		order: [ids[1], ids[0], "default"],
 		accounts: [
 			{ id: "default", addedAt: 0, email: "tzhang5@stanford.edu", limitedUntil: resets, limitType: "five_hour" },
 			{ id: ids[0], addedAt: 1, email: "one@example.com", plan: "Claude Max" },
@@ -109,25 +117,44 @@ const after = await page.evaluate(() =>
 	[...document.querySelectorAll(".account-row")].map((row) => ({
 		text: row.innerText.replace(/\n+/g, " | "),
 		current: row.dataset.current === "true",
-		removable: Boolean(row.querySelector(".close:not(.rank)")),
+		removable: Boolean(row.querySelector(".close")),
 	})),
 );
 console.log("      after:", JSON.stringify(after, null, 1));
 say("the server reads the whole list", after.length === 3, `${after.length} rows`);
 /*
- * And here nothing is marked, which is the right answer rather than a missing one: the two
- * added rows have fabricated tokens so `auth status` reports them signed out, and the CLI's
- * own — the only one with a real token — is the row this fixture put a limit on. Every row is
- * unusable, so the panel names no default instead of picking one that cannot answer.
+ * The CLI's own login first, then the order they were added — and *not* the order written in
+ * the file, which this fixture put backwards on purpose. An install upgrading from the build
+ * that had arrows must not keep being ordered by a field nothing sets any more.
  */
 say(
-	"…and names no default when every row is spent or signed out",
-	after.filter((row) => row.current).length === 0 && after.every((row) => /signed out|limited/.test(row.text)),
+	"…in the CLI's own order, ignoring a priority list written by an older build",
+	/tzhang5@stanford.edu/.test(after[0]?.text ?? "") && /one@example.com/.test(after[1]?.text ?? "") && /two@example.com/.test(after[2]?.text ?? ""),
+	JSON.stringify(after.map((row) => row.text)),
+);
+/*
+ * And a remembered rate limit is gone with the switching it existed for. Nothing re-checked
+ * it, so a row could sit marked "limited · back at 14:20" long after its window had lifted —
+ * and it was only ever the last refusal's word about a subscription.
+ */
+say("…with no row claiming to be spent", after.every((row) => !/limited|spent/.test(row.text)), JSON.stringify(after.map((row) => row.text)));
+/*
+ * And no row is labelled the default for new conversations, which is the right answer rather
+ * than a missing one.
+ *
+ * The stored default here is one of the two fabricated accounts. Its credentials *file* is
+ * real enough for the server to keep naming it — that is all the server has to go on — but
+ * `claude auth status` reports it signed out, and the panel will not tell somebody a
+ * conversation is going to start on an account that cannot answer. So the badge is withheld
+ * and the row says "signed out" instead, which is the fact worth reading.
+ */
+say(
+	"…and no row is labelled the default when the stored one is signed out",
+	after.filter((row) => row.current).length === 0,
 	JSON.stringify(after.map((row) => `${row.current ? "*" : " "}${row.text}`)),
 );
-say("…and showing when a spent one comes back", after.some((r) => /limited . back/.test(r.text)), JSON.stringify(after.find((r) => /limited/.test(r.text))?.text));
 /*
- * One status per row, ranked. The first draft drew each condition independently and produced
+ * One status per row, ranked. An early draft drew each condition independently and produced
  * "default for new · signed out" — two claims that cannot both be true.
  */
 say(
@@ -155,57 +182,10 @@ say(
 	after.filter((r) => r.removable).every((r) => !/Claude Code's own login/.test(r.text)),
 	JSON.stringify(after.filter((r) => r.removable).map((r) => r.text)),
 );
-// --- the order, which is who a limit goes to first --------------------------------
 /*
- * The list *is* the priority: `pick` walks it from the top. The arrows are the only way to
- * say which subscription should be spent before which, and what is checked here is the whole
- * round trip — the press, the redrawn list, and the order on disk, which is what survives a
- * restart.
- */
-const names = () => page.evaluate(() => [...document.querySelectorAll(".account-row")].map((row) => row.innerText.split("\n")[0]));
-const before = await names();
-// The CLI's own login first and the added ones in the order they arrived — which is what the
-// list has always been, and is now merely the default rather than the rule.
-const untouched = await page.evaluate(() => [...document.querySelectorAll(".account-row")].map((row) => Boolean(row.querySelector(".close:not(.rank)"))));
-say("the list opens with the CLI's own login first", untouched[0] === false && before.length === 3, JSON.stringify(before));
-
-const arrows = await page.evaluate(() => ({
-	onlyOnTheEnds: [...document.querySelectorAll(".account-row")].map((row) => [...row.querySelectorAll(".close.rank")].map((button) => button.disabled)),
-	labelled: Boolean(document.querySelector('.account-row .close.rank[aria-label^="Move"]')),
-}));
-say("every row has a pair of arrows", arrows.onlyOnTheEnds.every((pair) => pair.length === 2), JSON.stringify(arrows.onlyOnTheEnds));
-say("…named, so the control is not two chevrons and a guess", arrows.labelled);
-say(
-	"…and they stop at the ends rather than disappearing",
-	arrows.onlyOnTheEnds.at(0)?.[0] === true && arrows.onlyOnTheEnds.at(-1)?.[1] === true && arrows.onlyOnTheEnds.at(0)?.[1] === false,
-	JSON.stringify(arrows.onlyOnTheEnds),
-);
-
-await page.locator(".account-row").last().locator('.close.rank[aria-label^="Move"]').first().click();
-await page.waitForTimeout(900);
-const moved = await names();
-say("pressing up moves the row up", moved[1] === before[2] && moved[2] === before[1], `${JSON.stringify(before)} → ${JSON.stringify(moved)}`);
-
-/*
- * And on disk, in a field of its own. The stored account array is rewritten every time the
- * list is published — `describeDefault` moves the CLI's own row to the end of it — so an
- * order kept *as* that array's order would be undone by merely opening this panel.
- */
-const stored = JSON.parse(readFileSync(indexFile, "utf8"));
-say("the order is written down", Array.isArray(stored.order) && stored.order.length === 3, JSON.stringify(stored.order));
-say("…as its own field, not as the order of the accounts", stored.order?.[1] === ids[1] && stored.order?.[2] === ids[0], JSON.stringify(stored.order));
-
-// Reopening reads it back: the order is a property of the install, not of this panel.
-await page.keyboard.press("Escape");
-await page.waitForTimeout(300);
-await openOverflow(page, /settings/i);
-await page.waitForSelector(".settings", { timeout: 6000 });
-await page.waitForTimeout(2000);
-say("…and it is still there when the panel is reopened", JSON.stringify(await names()) === JSON.stringify(moved), JSON.stringify(await names()));
-
-/*
- * An account with no token behind it says so rather than being hidden — that is what stops a
- * rate limit moving a conversation onto something that cannot answer.
+ * An account with no token behind it says so rather than being hidden: an account you added
+ * and cannot use is a fact worth showing, and hiding it would leave the list disagreeing with
+ * what you remember doing.
  */
 rmSync(join(accountsDir, ids[0], ".credentials.json"), { force: true });
 await page.keyboard.press("Escape");
@@ -222,6 +202,19 @@ const signedOut = await page.evaluate(() =>
 const gone = signedOut.find((row) => row.text.includes("one@example.com"));
 say("a signed-out account says so", /signed out/.test(gone?.text ?? ""), JSON.stringify(gone?.text));
 say("…and is not offered as the default for a new conversation", gone?.current === false, JSON.stringify(gone));
+
+/*
+ * And nothing this check did wrote a limit or an order back to the file. The fixture put both
+ * there; the first write after that should have cleaned them out, which is what stops an
+ * upgraded install carrying a stale "spent until" around forever.
+ */
+const cleaned = JSON.parse(readFileSync(indexFile, "utf8"));
+say("the stored list keeps no order", cleaned.order === undefined, JSON.stringify(Object.keys(cleaned)));
+say(
+	"…and no remembered limit",
+	(cleaned.accounts ?? []).every((account) => account.limitedUntil === undefined && account.limitType === undefined),
+	JSON.stringify(cleaned.accounts),
+);
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

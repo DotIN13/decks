@@ -211,9 +211,15 @@ export interface Identity {
 /**
  * One Claude subscription this install can use.
  *
- * Several can be signed in at once, one is active, and reaching a rate limit moves the
- * active one along (`claude/accounts.ts`). No credentials cross this wire — an account is a
- * handle, an identity read back out of the CLI, and whether it is currently spent.
+ * Several can be signed in at once and **each conversation spends one of them, by hand**
+ * (`claude/accounts.ts`). No credentials cross this wire — an account is a handle and an
+ * identity read back out of the CLI.
+ *
+ * There is deliberately no "spent until" on this row. Decks used to remember a refusal and
+ * move the conversation on by itself, and a remembered limit is a claim about a
+ * subscription that only the last refusal knows and that nothing ever re-checks. What a
+ * limit produces now is a sentence in the conversation that ran out, naming the window and
+ * when it lifts; moving to another subscription is a press in the model picker.
  */
 export interface ClaudeAccount {
 	id: string;
@@ -225,10 +231,6 @@ export interface ClaudeAccount {
 	isDefault?: true;
 	/** Signed in and usable. False for a row the CLI reports as signed out. */
 	signedIn: boolean;
-	/** Epoch ms when its limit is expected to lift, if it is known to be spent. */
-	limitedUntil?: number;
-	/** Which window ran out — `five_hour`, `seven_day`, … */
-	limitType?: string;
 }
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -323,9 +325,10 @@ export interface UsageReport {
 	/**
 	 * The account these limits belong to.
 	 *
-	 * Decks rotates between several Claude subscriptions on its own (`claude/accounts.ts`),
-	 * so "42% of the 5-hour window" is a reading with no subject until this says whose. Null
-	 * when the install has no account store — the CLI's own login, or a pi agent.
+	 * An install can have several Claude subscriptions signed in at once
+	 * (`claude/accounts.ts`), so "42% of the 5-hour window" is a reading with no subject
+	 * until this says whose. Null when the install has no account store — the CLI's own
+	 * login, or a pi agent.
 	 */
 	account: string | null;
 	/**
@@ -832,14 +835,6 @@ export type ClientMessage =
 	| { type: "claude.accounts.use"; id: string; agentId: string }
 	/** Forget one, and its credentials. Refused for the CLI's own login. */
 	| { type: "claude.accounts.forget"; id: string }
-	/**
-	 * Move one up or down the list, which is who a limit moves to first.
-	 *
-	 * A step at a time rather than a whole order, because the control is a pair of arrows and
-	 * a message that carried the entire list would be a message two open settings panels
-	 * could disagree about.
-	 */
-	| { type: "claude.accounts.move"; id: string; direction: "up" | "down" }
 	| { type: "rewind.preview"; id: string; entryId: string | null }
 	| { type: "rewind.to"; id: string; entryId: string }
 	| { type: "fork.from"; id: string; entryId: string }

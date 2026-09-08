@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { AgentModel, ChatItem, ServerMessage } from "@decks/protocol";
+import type { AgentModel, AgentUsage, ChatItem, ModelOption, ServerMessage } from "@decks/protocol";
 import { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import { DeckAgent } from "./session.ts";
@@ -24,6 +24,8 @@ function agentOn(
 		resumeRef?: string;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the switcher the session takes, narrowed by the tests that pass one
 		accounts?: any;
+		/** What this runtime last offered here, as `AgentStore.rememberModels` would have left it. */
+		models?: ModelOption[];
 		restored?: {
 			id: string;
 			items: ChatItem[];
@@ -32,6 +34,7 @@ function agentOn(
 			avatar?: string;
 			createdAt: number;
 			model?: AgentModel;
+			usage?: AgentUsage;
 			account?: string;
 		};
 	} = {},
@@ -43,6 +46,8 @@ function agentOn(
 	}
 	const sent: ServerMessage[] = [];
 	const deck = Deck.open(root);
+	const store = new AgentStore(deck);
+	if (options.models) store.rememberModels("pi", options.models);
 	const agent = new DeckAgent(
 		deck,
 		(message) => sent.push(message),
@@ -63,12 +68,12 @@ function agentOn(
 		},
 		// Given a store, but nothing reaches it here: an agent with no user message is never
 		// written down, which is what keeps these tests off the disk.
-		{ color: "#000", kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck), ...options },
+		{ color: "#000", kind: "pi", snapshots: new SnapshotStore(), store, ...options },
 	);
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");
 	const last = () => sent.filter((message) => message.type === "context.changed").at(-1);
-	return { agent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+	return { agent, sent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
 	test("a dormant chat greets the model it was restored with", () => {
@@ -87,6 +92,105 @@ function agentOn(
 		const model = sent.find((message): message is Extract<ServerMessage, { type: "agent.model" }> => message.type === "agent.model");
 		assert.ok(model, "greet should report a model for a dormant chat");
 		assert.deepEqual(model.model, { provider: "claude", model: "claude-sonnet-4", thinking: "low" });
+		cleanup();
+	});
+
+	/*
+	 * Everything a chat can say about itself before its runtime exists.
+	 *
+	 * The three controls under the composer — the account, the model and the context ring —
+	 * were all fed by messages that only a *running* backend emits. So on any chat nobody had
+	 * prompted since the deck opened, the model picker was a disabled chip, the Subscription
+	 * section had no row marked, and the ring was not drawn at all. None of the three needs a
+	 * runtime to answer: two are on the record and the third is what the runtime last offered.
+	 */
+	test("a dormant chat greets the account it spends, the reading it left, and a model list", () => {
+		const { switcher } = switcherOf(["acct-one", "acct-two"]);
+		const { agent, cleanup } = agentOn([], {
+			accounts: switcher,
+			models: [{ provider: "openai", model: "gpt-5", label: "GPT-5", reasoning: true }],
+			restored: {
+				id: "restored-3",
+				items: [{ kind: "user", id: "m1", text: "hello", at: 1 }],
+				context: [],
+				inPlay: [],
+				createdAt: 1,
+				account: "acct-two",
+				usage: { contextTokens: 12_000, contextWindow: 200_000, cost: 0.3 },
+			},
+		});
+		const sent: ServerMessage[] = [];
+		agent.greet((message) => sent.push(message));
+
+		const account = sent.find((message): message is Extract<ServerMessage, { type: "agent.account" }> => message.type === "agent.account");
+		assert.equal(account?.account, "acct-two", "so the picker can mark the row this conversation spends");
+		const usage = sent.find((message): message is Extract<ServerMessage, { type: "agent.usage" }> => message.type === "agent.usage");
+		assert.deepEqual(usage?.usage, { contextTokens: 12_000, contextWindow: 200_000, cost: 0.3 });
+		const models = sent.find((message): message is Extract<ServerMessage, { type: "models" }> => message.type === "models");
+		assert.deepEqual(models?.models.map((option) => option.model), ["gpt-5"], "the list this runtime last offered on this deck");
+		cleanup();
+	});
+
+	test("a chat with no reading says nothing rather than saying zero", () => {
+		const { agent, cleanup } = agentOn([]);
+		const sent: ServerMessage[] = [];
+		agent.greet((message) => sent.push(message));
+
+		// A ring at zero claims an empty context, which is a different and usually false
+		// claim from "not known yet" — so the absence has to reach the browser as an absence.
+		assert.equal(sent.some((message) => message.type === "agent.usage"), false);
+		cleanup();
+	});
+
+	/*
+	 * Pressing a thinking level on a chat with no runtime, which used to erase the model.
+	 *
+	 * `setThinking` read `this.backend?.model()` and assigned what it got — so on a dormant
+	 * chat it wrote `undefined` over the model the row was showing and broadcast that. The
+	 * runtime is stubbed out here because starting one is neither cheap in a unit test nor the
+	 * thing under test: what is under test is what the press does *before* anything starts.
+	 */
+	test("a thinking level pressed before the runtime exists is recorded, not lost", async () => {
+		const { agent, sent, cleanup } = agentOn([], {
+			restored: {
+				id: "restored-4",
+				items: [{ kind: "user", id: "m1", text: "hello", at: 1 }],
+				context: [],
+				inPlay: [],
+				createdAt: 1,
+				model: { provider: "openai", model: "gpt-5", thinking: "low" },
+			},
+		});
+		let started = 0;
+		(agent as unknown as { start: () => Promise<void> }).start = async () => {
+			started += 1;
+		};
+
+		await agent.setThinking("high");
+
+		assert.deepEqual(agent.model, { provider: "openai", model: "gpt-5", thinking: "high" }, "the level lands on the recorded model");
+		assert.equal(started, 1, "and the runtime is started, so the choice is in force rather than only written down");
+		const told = sent.filter((message): message is Extract<ServerMessage, { type: "agent.model" }> => message.type === "agent.model");
+		assert.equal(told.at(-1)?.model?.thinking, "high", "and the browser is told the model, not told it is gone");
+		cleanup();
+	});
+
+	test("a model chosen before the runtime exists opens it on that model", async () => {
+		const { agent, cleanup } = agentOn([], {
+			restored: { id: "restored-5", items: [], context: [], inPlay: [], createdAt: 1, model: { provider: "openai", model: "gpt-5", thinking: "low" } },
+		});
+		let started = 0;
+		(agent as unknown as { start: () => Promise<void> }).start = async () => {
+			started += 1;
+		};
+
+		await agent.setModel("anthropic", "claude-opus-5");
+
+		// Recorded *before* starting, because `start()` reads the model off the record and
+		// passes it at session creation: starting first and changing afterwards opens the
+		// session on the model being replaced, and on antigravity that is a spawn and a respawn.
+		assert.deepEqual(agent.model, { provider: "anthropic", model: "claude-opus-5", thinking: "low" }, "the level it was on carries across");
+		assert.equal(started, 1);
 		cleanup();
 	});
 

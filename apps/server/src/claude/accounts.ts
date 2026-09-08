@@ -4,12 +4,25 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 /**
- * The Claude subscriptions this install can use, and which one is in force.
+ * The Claude subscriptions this install can use, and which one each conversation spends.
  *
  * A subscription has a rate limit, and reaching it stops the work — so somebody with two
- * accounts wants the second one to take over rather than to be told to come back in four
- * hours. That is the whole feature: several accounts signed in at once, one active, and the
- * active one moving along when a limit is reached.
+ * accounts wants a way to carry on on the other one. That is the whole feature: several
+ * accounts signed in at once, and **a conversation put on one of them by hand**, in its own
+ * model picker.
+ *
+ * ### Nothing switches by itself
+ *
+ * It used to. A refusal was remembered against the account, and the conversation was moved
+ * to the next one down a list the user could reorder. Both are gone, and the reason is that
+ * neither could be trusted to be true. A remembered limit is what the *last* refusal said,
+ * and nothing ever re-checks it — so an account was passed over while it worked, and an
+ * account whose limit had lifted still read as spent until somebody clicked it. And a switch
+ * that happens on its own happens mid-turn, to a subscription the person did not choose, and
+ * is legible only if they read the transcript afterwards.
+ *
+ * What a limit produces now is a sentence in the conversation that ran out: which window,
+ * when it lifts, and that another subscription is a press away. The press is the switch.
  *
  * ### An account is a config directory, and `active` is a symlink to one
  *
@@ -96,17 +109,6 @@ export interface ClaudeAccount {
 	/** `pro`, `max`, `enterprise` — what the plan is, as the CLI reports it. */
 	plan?: string;
 	addedAt: number;
-	/**
-	 * When this account's limit is expected to lift, if it is limited now.
-	 *
-	 * Epoch milliseconds, from the rate-limit event's own `resetsAt`. Absent means "not
-	 * known to be limited" rather than "known to be fine": an account is only ever *found*
-	 * to be limited by being used, so this is a memory of what happened rather than a
-	 * reading of what is true.
-	 */
-	limitedUntil?: number;
-	/** Which window ran out — `five_hour`, `seven_day`, … — for the sentence the deck says. */
-	limitType?: string;
 }
 
 interface Index {
@@ -120,19 +122,6 @@ interface Index {
 	 */
 	active?: string;
 	accounts: ClaudeAccount[];
-	/**
-	 * The ids in the order the user put them in — who a limit moves to first.
-	 *
-	 * Kept apart from `accounts` rather than being its order, because `accounts` is rewritten
-	 * by things that have nothing to do with priority: `describeDefault` moves the CLI's own
-	 * row to the end every time the list is published, and `add` appends. An order stored in
-	 * that array would be undone by merely reading the list.
-	 *
-	 * Absent, or missing an id, means "as it always was": the CLI's own login first, then in
-	 * the order they were added. So an install that has never touched the arrows behaves
-	 * exactly as it did.
-	 */
-	order?: string[];
 }
 
 const EMPTY: Index = { accounts: [] };
@@ -418,20 +407,27 @@ export class ClaudeAccounts {
 	 */
 	defaultId(): string {
 		/*
-		 * The first usable account in the order — not a stored "active".
+		 * The stored row, and a fallback for when it cannot answer.
 		 *
-		 * There used to be a machine-wide switch in Settings, and this returned whatever it
-		 * had last been set to. With a subscription per agent that switch was a control that
-		 * moved nobody: every open conversation keeps its own account, so all it decided was
-		 * the *next* agent — a thing nobody goes to a settings panel to set. So it is gone,
-		 * and the question it answered is answered by the list itself, which is already
-		 * ordered and already means "who is next" everywhere else.
+		 * `active` is written when an account is signed in and when one is forgotten, so on an
+		 * install with two accounts it means "the one most recently added" — which is the
+		 * least surprising place for a *new* conversation to start, and the only stored answer
+		 * there is. It used to be the top of a list the user could reorder; there is no order
+		 * any more, and reinventing one here to answer a question nobody asks would be the
+		 * automatic switching coming back under another name.
 		 *
-		 * One concept instead of two, and the arrows now visibly control it. A list where
-		 * every row is spent or signed out still has to name somebody, and the CLI's own
-		 * login is the answer that always exists.
+		 * The fallback is for a row that has no token behind it — the CLI's own login after a
+		 * `claude auth logout`, or credentials that were revoked. Without it an install could
+		 * start every new conversation on an account that cannot answer while two working ones
+		 * sat on the list. It is a repair, not a priority: nothing walks the list looking for a
+		 * successor when a subscription runs out.
+		 *
+		 * And a list where no row has credentials still has to name somebody, which is what
+		 * the CLI's own login is: the answer that always exists.
 		 */
-		return this.nextAvailable()?.id ?? DEFAULT_ACCOUNT;
+		const stored = this.read().active;
+		if (stored && this.hasCredentials(stored) && this.has(stored)) return stored;
+		return this.list().find((account) => this.hasCredentials(account.id))?.id ?? DEFAULT_ACCOUNT;
 	}
 
 	/** Whether an id still names an account. A record can outlive the account it names. */
@@ -442,26 +438,6 @@ export class ClaudeAccounts {
 	/** Who an id is, for the sentence a switch says. */
 	describe(id: string): ClaudeAccount | undefined {
 		return this.list().find((account) => account.id === id);
-	}
-
-	/**
-	 * Mark the account that refused as spent, and say which one to move to — **without**
-	 * moving anybody.
-	 *
-	 * The split is the point. Being spent is a fact about a *subscription* and belongs to
-	 * every agent on it; which account an agent moves to afterwards is that agent's own, and
-	 * is written to that agent's record by whoever asked. `rotate` used to do both, which is
-	 * why one agent running out dragged every other agent onto a different subscription
-	 * mid-turn.
-	 */
-	nextFor(spent: string | undefined, resetsAt: number | undefined, limitType: string | undefined): { moved?: ClaudeAccount; nextReset?: number } {
-		if (spent) this.markLimited(spent, resetsAt, limitType);
-		const next = this.nextAvailable(spent);
-		if (next) return { moved: next };
-		const waits = this.list()
-			.map((account) => account.limitedUntil)
-			.filter((until): until is number => typeof until === "number");
-		return waits.length > 0 ? { nextReset: Math.min(...waits) } : {};
 	}
 
 	/**
@@ -675,31 +651,7 @@ export class ClaudeAccounts {
 		const index = this.read();
 		const stored = index.accounts.filter((account) => account.id !== DEFAULT_ACCOUNT);
 		const mine = index.accounts.find((account) => account.id === DEFAULT_ACCOUNT);
-		return sort([{ id: DEFAULT_ACCOUNT, addedAt: 0, ...mine }, ...stored], index.order);
-	}
-
-	/**
-	 * Move one account up or down the list — which is to say, change who is tried first.
-	 *
-	 * The list *is* the priority: `pick` walks it from the top, so the order here is the order
-	 * a limit moves through. Deliberately **not** a switch: the account in force stays in
-	 * force, because reordering is a statement about what happens when this one runs out, and
-	 * taking a running conversation off its subscription is not what an arrow key looks like
-	 * it does. `use()` is the switch, and it is one click away on the same row.
-	 *
-	 * Returns whether anything moved, so a press at the end of the list is a no-op the caller
-	 * can decline to broadcast rather than a lie it repaints.
-	 */
-	move(id: string, direction: "up" | "down"): boolean {
-		const order = this.list().map((account) => account.id);
-		const at = order.indexOf(id);
-		const to = direction === "up" ? at - 1 : at + 1;
-		if (at === -1 || to < 0 || to >= order.length) return false;
-		[order[at], order[to]] = [order[to]!, order[at]!];
-		const index = this.read();
-		index.order = order;
-		this.write(index);
-		return true;
+		return [{ id: DEFAULT_ACCOUNT, addedAt: 0, ...mine }, ...stored];
 	}
 
 	/** Which one is in force. `default` when nothing has been chosen, because that is the truth. */
@@ -723,26 +675,13 @@ export class ClaudeAccounts {
 		const index = this.read();
 		const rest = index.accounts.filter((account) => account.id !== DEFAULT_ACCOUNT);
 		/*
-		 * The label is *merged in*, not written over the row.
-		 *
-		 * Replacing it dropped `limitedUntil` — so merely reading the account list made the
-		 * CLI's own login forget it had run out, and the next rotation would have gone
-		 * straight back to the account that had just refused. Publishing the list has to be a
-		 * read, and this is the one part of it that writes.
+		 * The label is *merged in* rather than written over the row, so that publishing the
+		 * list — which is a read — cannot lose something else the row was carrying. There is
+		 * only `addedAt` to lose today; it used to be a remembered rate limit, and forgetting
+		 * that by merely opening the panel was a real bug once.
 		 */
 		const existing = index.accounts.find((account) => account.id === DEFAULT_ACCOUNT);
-		/*
-		 * Unless it is a different subscription behind the same row, which is what somebody
-		 * running `claude auth login` in a terminal does. The remembered limit belonged to the
-		 * account that has just been replaced — kept, it would have the deck rotating away
-		 * from a fresh subscription and showing a reset time for one nobody is signed in to.
-		 */
-		const kept: Partial<ClaudeAccount> = { ...existing };
-		if (existing?.email && identity.email && existing.email !== identity.email) {
-			delete kept.limitedUntil;
-			delete kept.limitType;
-		}
-		index.accounts = [...rest, { ...kept, id: DEFAULT_ACCOUNT, addedAt: 0, ...identity }];
+		index.accounts = [...rest, { ...existing, id: DEFAULT_ACCOUNT, addedAt: 0, ...identity }];
 		this.write(index);
 	}
 
@@ -838,17 +777,16 @@ export class ClaudeAccounts {
 		const wasActive = index.active === id;
 		if (wasActive) {
 			/*
-			 * Removing the active account moves to another rather than leaving none.
+			 * Removing the account named as the default leaves another named, not none.
 			 *
 			 * `undefined` would mean "use the CLI's default", which is a different account
-			 * from any of these and almost certainly not what removing one asked for. An
-			 * unlimited one first; failing that, whichever is left.
+			 * from any of these and almost certainly not what removing one asked for.
 			 *
-			 * `id` is passed as the one to skip because `list()` reads the file, which still
-			 * has this row in it — without that, forgetting the account in force could pick it
-			 * again and "move" to the directory it is about to delete.
+			 * The row being removed is skipped explicitly, because `list()` reads the file —
+			 * which still has this row in it — so without that, forgetting the default could
+			 * name the directory it is about to delete.
 			 */
-			index.active = this.pick(this.list(), id)?.id ?? DEFAULT_ACCOUNT;
+			index.active = this.list().find((account) => account.id !== id && this.hasCredentials(account.id))?.id ?? DEFAULT_ACCOUNT;
 		}
 		this.write(index);
 		// Repointed before the directory goes, so the link is never left aimed at nothing.
@@ -861,104 +799,16 @@ export class ClaudeAccounts {
 		const index = this.read();
 		if (id === DEFAULT_ACCOUNT) {
 			index.active = DEFAULT_ACCOUNT;
-			// Its remembered limit is cleared for the same reason as any other row's.
-			const mine = index.accounts.find((account) => account.id === DEFAULT_ACCOUNT);
-			if (mine) {
-				delete mine.limitedUntil;
-				delete mine.limitType;
-			}
 			this.write(index);
 			this.repoint();
 			return this.active();
 		}
 		const found = index.accounts.find((account) => account.id === id);
 		if (!found) return undefined;
-		/*
-		 * Chosen deliberately, so its remembered limit is cleared.
-		 *
-		 * A limit is a memory of the last refusal, and the person picking this row can see the
-		 * reset time next to it — if they pick it anyway they either know better than the
-		 * memory or want to find out. Refusing to switch to it would be the deck arguing with
-		 * a direct instruction, and the worst case is one rejected turn that marks it again.
-		 */
-		delete found.limitedUntil;
-		delete found.limitType;
 		index.active = id;
 		this.write(index);
 		this.repoint();
 		return found;
-	}
-
-	/** Note that an account has run out, so the next choice can pass over it. */
-	markLimited(id: string, resetsAt: number | undefined, limitType: string | undefined): void {
-		const index = this.read();
-		let found = index.accounts.find((account) => account.id === id);
-		if (!found && id === DEFAULT_ACCOUNT) {
-			// The CLI's own row is synthesised, so the first thing ever recorded about it may
-			// be that it ran out.
-			found = { id: DEFAULT_ACCOUNT, addedAt: 0 };
-			index.accounts = [...index.accounts, found];
-		}
-		if (!found) return;
-		/*
-		 * A limit with no reset time still counts, and is held for an hour.
-		 *
-		 * `resetsAt` is optional on the event, and an account whose limit is remembered
-		 * *forever* because the number was missing is an account nothing will use again. An
-		 * hour is short enough to be self-correcting and long enough to stop a switch loop.
-		 */
-		const until = epochMs(resetsAt) ?? Date.now() + 60 * 60 * 1000;
-		/*
-		 * Every row with that email, not only the one that refused.
-		 *
-		 * A rate limit belongs to the *subscription*, and one subscription can still be two
-		 * rows on an install that made the pair before `abandon()` existed — the CLI's own
-		 * login and a copy of it added by hand. Marking only the row that refused left the
-		 * twin looking available, so the next choice switched to the same account that had
-		 * just run out, was refused again, and only then moved on.
-		 */
-		const sharing = found.email ? index.accounts.filter((account) => account.email === found.email) : [found];
-		for (const account of sharing) {
-			account.limitedUntil = until;
-			if (limitType) account.limitType = limitType;
-		}
-		this.write(index);
-	}
-
-	/**
-	 * The next account worth trying, or nothing if they are all spent.
-	 *
-	 * `except` is the one that just refused — passed explicitly rather than read from
-	 * `active`, because the caller knows which account the refusal came from and the active
-	 * one may already have moved.
-	 */
-	nextAvailable(except?: string): ClaudeAccount | undefined {
-		return this.pick(this.list(), except);
-	}
-
-
-	/**
-	 * The next account worth trying: signed in, not spent, and not the one that just refused.
-	 *
-	 * **Signed in matters as much as not spent.** Without that check a limit could move to an
-	 * account with no credentials behind it — the CLI's own row when somebody has run
-	 * `claude auth logout`, or a directory whose token was revoked — and the next turn would
-	 * fail on authentication instead of on a limit. Which is a worse failure than the one
-	 * being worked around, because it does not read as "out of quota" to anybody.
-	 *
-	 * Whether an account is signed in is asked of the disk rather than remembered, since the
-	 * CLI's own login can change without Decks hearing about it.
-	 *
-	 * Ordered by list position among the usable ones, because a rotation should be predictable
-	 * rather than clever — and that position is now the user's to set (`move`). Untouched, it
-	 * is what it always was: the CLI's own login first, then the order they were added.
-	 */
-	private pick(accounts: ClaudeAccount[], except: string | undefined): ClaudeAccount | undefined {
-		const now = Date.now();
-		return accounts
-			.filter((account) => account.id !== except)
-			.filter((account) => !account.limitedUntil || account.limitedUntil <= now)
-			.filter((account) => this.hasCredentials(account.id))[0];
 	}
 
 	/**
@@ -966,8 +816,8 @@ export class ClaudeAccounts {
 	 *
 	 * Two readings, because there are two places a token can be. On Linux and Windows the CLI
 	 * writes `.credentials.json`; on macOS it writes the keychain and that file may not exist
-	 * at all — so every account looked signed out, `pick` passed over all of them, and a limit
-	 * had nowhere to move to on the one platform where nothing else looked wrong.
+	 * at all — so every account looked signed out, and on the one platform where nothing else
+	 * looked wrong the panel reported a machine full of accounts it could not use.
 	 *
 	 * The macOS reading is `oauthAccount` in the config, which is the CLI's own record of who
 	 * that directory is signed in as and is written alongside the keychain entry. Taken as
@@ -993,6 +843,18 @@ export class ClaudeAccounts {
 	/** For the list the browser draws: whether this row can be switched to at all. */
 	usable(id: string): boolean {
 		return this.hasCredentials(id);
+	}
+
+	/**
+	 * Whether there is another signed-in account to put a conversation on.
+	 *
+	 * Asked when a subscription runs out, and it decides a clause rather than a switch: the
+	 * sentence points at the model picker when there is somewhere to go and at settings when
+	 * there is not. Credentials are read off the disk rather than remembered, because the
+	 * CLI's own login can change without Decks hearing about it.
+	 */
+	hasOther(except: string | undefined): boolean {
+		return this.list().some((account) => account.id !== except && this.hasCredentials(account.id));
 	}
 
 	/**
@@ -1055,50 +917,32 @@ function validate(raw: unknown): Index {
 			if (typeof account.id !== "string" || !account.id) return undefined;
 			const text = (value: unknown) => (typeof value === "string" && value ? value : undefined);
 			const time = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
+			/*
+			 * `limitedUntil`, `limitType` and the `order` array are read off a list written by
+			 * an older build and dropped on the floor. Nothing switches by itself any more, so
+			 * a remembered refusal and a priority order have nothing left to decide — and
+			 * dropping them here is what makes the next write clean them out of the file.
+			 */
 			return {
 				id: account.id,
 				...(text(account.email) ? { email: text(account.email)! } : {}),
 				...(text(account.orgName) ? { orgName: text(account.orgName)! } : {}),
 				...(text(account.plan) ? { plan: text(account.plan)! } : {}),
 				addedAt: time(account.addedAt) ?? Date.now(),
-				// Migrated on the way out of the file: what is stored may be seconds (`epochMs`).
-				...(epochMs(time(account.limitedUntil)) ? { limitedUntil: epochMs(time(account.limitedUntil))! } : {}),
-				...(text(account.limitType) ? { limitType: text(account.limitType)! } : {}),
 			};
 		})
 		.filter((account): account is ClaudeAccount => account !== undefined);
 	const active = typeof source.active === "string" && accounts.some((account) => account.id === source.active) ? source.active : undefined;
-	// Ids only, deduplicated. A stale id for an account that has since been forgotten is
-	// harmless — `sort` looks the other way, from the accounts to the order — so there is
-	// nothing to prune and nothing that goes wrong if the pruning were forgotten.
-	const listed = Array.isArray((raw as { order?: unknown }).order) ? ((raw as { order: unknown[] }).order.filter((id) => typeof id === "string") as string[]) : [];
-	const order = [...new Set(listed)];
-	return { ...(active ? { active } : {}), accounts, ...(order.length > 0 ? { order } : {}) };
-}
-
-/**
- * Put the rows in the user's order, and everything they have not placed after them.
- *
- * Stable in both halves: placed rows keep the order the array gives, and unplaced ones keep
- * the order they arrived in — which for a freshly added account means the bottom, where a
- * new subscription belongs until somebody says otherwise.
- */
-function sort(accounts: ClaudeAccount[], order: string[] | undefined): ClaudeAccount[] {
-	if (!order || order.length === 0) return accounts;
-	const placed = order.map((id) => accounts.find((account) => account.id === id)).filter((account): account is ClaudeAccount => account !== undefined);
-	return [...placed, ...accounts.filter((account) => !order.includes(account.id))];
+	return { ...(active ? { active } : {}), accounts };
 }
 
 /**
  * A rate limit's reset time in milliseconds, whichever unit it arrived in.
  *
- * `SDKRateLimitInfo.resetsAt` is **unix seconds**, and it was being stored and formatted as
- * milliseconds. Two things followed from that, and they are the two halves of the feature.
- * `1788588600` compared against `Date.now()` is always in the past, so an account looked
- * available again the instant it was marked spent — the memory that stops a rotation going
- * straight back to the subscription that just refused never bit. And the same number through
- * `new Date()` prints 1970, so the deck told people their limit would lift in January of
- * that year.
+ * `SDKRateLimitInfo.resetsAt` is **unix seconds**, and it was being formatted as
+ * milliseconds — which through `new Date()` prints 1970, so the deck told people their limit
+ * would lift in January of that year. The number reaches a person as a sentence, and a
+ * sentence with the wrong year in it is worse than no sentence.
  *
  * The threshold is the only honest way to take both units: below `1e12` cannot be
  * milliseconds in any year anyone will see this (1e12 ms is September 2001), and above it

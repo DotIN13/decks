@@ -190,8 +190,7 @@ export class App {
 
 	private async publishAccounts(reply?: (message: ServerMessage) => void, options?: { reread?: boolean }): Promise<void> {
 		const stored = this.claudeAccounts.list();
-		// What a conversation with no account of its own spends: the first usable row. Not a
-		// setting any more — see `ClaudeAccounts.defaultId`.
+		// What a conversation with no account of its own spends — see `ClaudeAccounts.defaultId`.
 		const active = this.claudeAccounts.defaultId();
 		/*
 		 * One `claude auth status` at a time, and not at all when a recent answer will do.
@@ -216,8 +215,6 @@ export class App {
 					...(identity.email ?? account.email ? { email: identity.email ?? account.email } : {}),
 					...(identity.orgName ?? account.orgName ? { orgName: identity.orgName ?? account.orgName } : {}),
 					...(identity.plan ?? account.plan ? { plan: identity.plan ?? account.plan } : {}),
-					...(account.limitedUntil ? { limitedUntil: account.limitedUntil } : {}),
-					...(account.limitType ? { limitType: account.limitType } : {}),
 			};
 		});
 		// Recorded so a row keeps its name when the CLI is next slow to answer.
@@ -635,7 +632,12 @@ export class App {
 			}
 
 			case "agent.thinking": {
-				this.agents.get(message.id)?.setThinking(message.thinking);
+				// Fire and forget: it may have to start a runtime first, and the browser has
+				// already drawn the level it pressed. What comes back is `agent.model`.
+				void this.agents
+					.get(message.id)
+					?.setThinking(message.thinking)
+					.catch((error: unknown) => reply({ type: "notice", level: "warn", text: `Could not change the thinking level: ${(error as Error).message}` }));
 				return;
 			}
 
@@ -818,6 +820,20 @@ export class App {
 					return;
 				}
 				/*
+				 * And the runtime starts, if it has not yet.
+				 *
+				 * A chat nobody has prompted since the deck opened has no `claude` process, and
+				 * a process's environment is fixed at spawn — so on a dormant chat this was a
+				 * choice recorded in a file with nothing to show for it. Starting here makes the
+				 * press mean what it looks like it means: the subscription is in force, and the
+				 * model list and the context reading arrive with the session.
+				 *
+				 * Here rather than in `useAccount`, because *this* is the event — somebody
+				 * pressed a row in a picker. The method stays a record and a symlink, which is
+				 * what a rewind or a restore wants it to be.
+				 */
+				void agent.start();
+				/*
 				 * Warmed before the sessions want it: an account nothing has used for eight
 				 * hours has an expired token, and the first request after a switch would
 				 * otherwise be several sessions racing to refresh it (`claude/transient.ts`).
@@ -829,13 +845,6 @@ export class App {
 			case "claude.accounts.forget": {
 				this.claudeAccounts.forget(message.id);
 				void this.publishAccounts();
-				return;
-			}
-
-			case "claude.accounts.move": {
-				// Only when something actually moved. A press at the top of the list is a no-op,
-				// and republishing an unchanged list would repaint every open panel to say so.
-				if (this.claudeAccounts.move(message.id, message.direction)) void this.publishAccounts();
 				return;
 			}
 
@@ -1187,6 +1196,18 @@ export class App {
 		// The whole truth on connect, so a reconnect is a refresh: the deck, the
 		// agents, and each one's transcript.
 		this.agents.greet(reply);
+		/*
+		 * And the subscriptions, which used to arrive only when Settings was opened.
+		 *
+		 * Every conversation's model picker draws a row per account, so a browser that has
+		 * not opened Settings had a picker with no Subscription section at all — the control
+		 * for switching account was invisible until you visited an unrelated panel. The list
+		 * is a property of the install, like the deck itself, so it belongs in the greeting.
+		 *
+		 * Late, deliberately: each row costs a `claude auth status`, so this resolves a
+		 * second or two after the rest and the browser fills the section in when it lands.
+		 */
+		void this.publishAccounts(reply);
 	}
 
 	/**

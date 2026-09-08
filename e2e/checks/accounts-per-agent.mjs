@@ -1,12 +1,12 @@
 /**
- * A subscription per agent, and a fallback that moves one agent rather than all of them.
+ * A subscription per agent, chosen by hand and by nothing else.
  *
  * The switch itself is a symlink the CLI re-reads on every request — that part is measured
  * in `claude/accounts.test.ts`, against the real binary. What a browser is needed for is the
  * wiring either side of it: that the picker offers the install's accounts for *this*
  * conversation, that pressing a row moves that agent's link and no other agent's, that the
- * choice is written to the agent's record, and that the Settings row has stopped being a
- * global switch and become the default a new agent starts on.
+ * choice is written to the agent's record, and that Settings has stopped deciding anything
+ * about who spends what — no switch, and no arrows, because nothing rotates any more.
  *
  * Two Claude agents are made over the socket. Real ones would need two subscriptions and a
  * model, and the interesting state — two agents on two different accounts at once — is the
@@ -14,7 +14,14 @@
  */
 import { existsSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { deckState, open, openOverflow, say, settle } from "../harness.mjs";
+import { preflight, deckState, open, openOverflow, say, settle } from "../harness.mjs";
+
+/*
+ * A fixture, before anything is written. These accounts live in the *install* directory, not
+ * in the deck, so a run against a live Decks would overwrite somebody's real subscriptions —
+ * and `harness.mjs` defaults to the ports a live Decks uses.
+ */
+await preflight();
 
 // The fixture's data directory is the deck's parent — the same way `accounts.mjs` finds it.
 const dataDir = dirname((await deckState()).path);
@@ -39,7 +46,6 @@ writeFileSync(
 			{ id: ids[0], addedAt: 1, email: "one@example.com", plan: "Claude Max" },
 			{ id: ids[1], addedAt: 2, email: "two@example.com", plan: "Claude Pro" },
 		],
-		order: ids,
 	}),
 );
 
@@ -81,6 +87,8 @@ const list = await frame("claude.accounts");
 // Three rows: the two written here plus the CLI's own login, which is always a row and is
 // synthesised rather than stored — see `describeDefault`.
 say("the server publishes both accounts, beside the CLI's own", list?.accounts?.length === 3, JSON.stringify(list?.accounts?.map((a) => a.email)));
+// The stored row, which is where signing one in leaves it. There is no order to walk any
+// more, so this is the only answer to "where does a new conversation start".
 say("…and which one a new agent starts on", list?.active === ids[0], list?.active);
 
 // --- two Claude agents ---------------------------------------------------------------
@@ -148,9 +156,9 @@ else say("the account is written to the agent's record", true, "no record yet: n
 
 /*
  * The panel used to carry a machine-wide switch: pressing a row moved the install default,
- * which moved nobody, because every open conversation keeps its own account. It is gone, and
- * these are the two halves of "gone" — no control in the markup, and the concept it set is
- * now computed from the order instead of stored.
+ * which moved nobody, because every open conversation keeps its own account. Then it carried
+ * a pair of arrows, which set the order a rate limit walked. Both are gone — nothing switches
+ * by itself, so there is no order to set — and what is left is adding and removing.
  */
 await openOverflow(page, /settings/i);
 await page.waitForSelector(".settings", { timeout: 6000 });
@@ -161,7 +169,7 @@ const panel = await page.evaluate(() => {
 		rows: rows.length,
 		pressable: rows.filter((row) => row.querySelector("button[data-row]")).length,
 		states: rows.map((row) => row.querySelector(".state")?.textContent ?? ""),
-		// What is left: the arrows and the ×, both of which are still buttons.
+		// What is left is the ×. The arrows went with the automatic switching they ordered.
 		arrows: rows.filter((row) => row.querySelector('[aria-label*="up" i], [aria-label*="down" i]')).length,
 		removable: rows.filter((row) => row.querySelector(".close:not(.rank)")).length,
 	};
@@ -169,24 +177,30 @@ const panel = await page.evaluate(() => {
 say("every account is still listed", panel.rows === 3, JSON.stringify(panel.states));
 say("…but no row is a switch any more", panel.pressable === 0, `${panel.pressable} pressable rows`);
 say("…and none of them claims to be active", !panel.states.some((state) => /\bactive\b/.test(state)), JSON.stringify(panel.states));
-say("…while the top usable row says it is the default for new conversations", panel.states.some((state) => /default for new/.test(state)), JSON.stringify(panel.states));
-say("adding and removing are what is left", panel.removable === 2 && panel.arrows === 3, JSON.stringify({ removable: panel.removable, arrows: panel.arrows }));
+/*
+ * No row claims to be the default for new conversations. The stored default is one of the two
+ * accounts written by hand here — its credentials file is real enough for the server to keep
+ * naming it, but `claude auth status` reports it signed out, and the panel does not label a
+ * default a conversation could not actually start on. `accounts.mjs` argues this at length.
+ */
+say("…and no row is labelled a default it could not answer as", panel.states.filter((state) => /default for new/.test(state)).length === 0, JSON.stringify(panel.states));
+say("…and no row is marked spent, because a limit is no longer remembered here", !panel.states.some((state) => /limited/.test(state)), JSON.stringify(panel.states));
+say("adding and removing are what is left", panel.removable === 2 && panel.arrows === 0, JSON.stringify({ removable: panel.removable, arrows: panel.arrows }));
 await page.keyboard.press("Escape");
 await settle(page, 400);
 
 /*
- * And the default a new conversation gets follows the *order* rather than a stored value —
- * so the arrows are the control that decides it, which is the one job this panel kept.
+ * And the conversation that chose for itself is still where it was put. This used to be the
+ * assertion that reordering the list did not drag it; there is no reordering now, so what is
+ * being checked is that the round trip through Settings changed nothing about it.
  */
-await send({ type: "claude.accounts.move", id: ids[1], direction: "up" });
-await settle(page, 2000);
-const reordered = await frame("claude.accounts");
-say("moving a row up makes it the default for new conversations", reordered?.active === ids[1], reordered?.active);
+const after = await frame("claude.accounts");
 say(
-	"…and leaves the conversation that chose for itself where it is",
-	linkOf(first.id) === join(accountsDir, ids[1]) && (reordered?.spending ?? {})[first.id] === ids[1],
-	JSON.stringify({ link: linkOf(first.id), spending: (reordered?.spending ?? {})[first.id] }),
+	"the conversation that chose for itself is where it was put",
+	linkOf(first.id) === join(accountsDir, ids[1]) && (after?.spending ?? {})[first.id] === ids[1],
+	JSON.stringify({ link: linkOf(first.id), spending: (after?.spending ?? {})[first.id] }),
 );
+say("…and the default for new conversations has not moved", after?.active === ids[0], after?.active);
 
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();

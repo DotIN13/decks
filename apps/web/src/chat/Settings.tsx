@@ -1,26 +1,23 @@
 import type { ClaudeAccount } from "@decks/protocol";
-import ChevronDown from "lucide-solid/icons/chevron-down";
-import ChevronUp from "lucide-solid/icons/chevron-up";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
 import { For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { AlertSettings } from "./AlertSettings.tsx";
-import { canMove, firstUsable } from "../lib/accounts.ts";
 import type { AlertPrefs } from "../lib/alerts.ts";
 
 /**
  * The Claude subscriptions this install can use.
  *
  * A subscription has a rate limit, and reaching it stops the work — so somebody with two
- * accounts wants the second one to take over rather than to be told to come back in four
- * hours. Several can be signed in at once, one is active, and reaching a limit moves the
- * active one along on its own (`claude/accounts.ts`).
+ * accounts wants a way to carry on on the other one. Several can be signed in at once, and
+ * **which one a conversation spends is chosen in that conversation's model picker**
+ * (`claude/accounts.ts`). Nothing switches by itself, and there is no order to set: this
+ * panel is where accounts are added and removed, and that is all it is.
  *
  * **The switch is seamless.** The CLI re-reads its credentials per request and every session
  * is pointed at a symlink, so moving that link changes which subscription the *next turn*
- * spends — no session restart, no interrupted conversation. Which is why this panel says
- * "now using" rather than "will use from the next chat".
+ * spends — no session restart, no interrupted conversation.
  *
  * A modal rather than a panel, for the reason the all-canvases modal is one: this is a thing
  * you open, do, and close. It borrows the picker's backdrop — open, read, dismiss is one set
@@ -28,35 +25,37 @@ import type { AlertPrefs } from "../lib/alerts.ts";
  *
  * ### What a row can be
  *
- * **Active** is the one spending. **Limited** is one that ran out, with the time it comes
- * back — kept because it is worth seeing why the deck moved off it, and because clicking it
- * anyway is allowed: the reset time is right there, and somebody who picks it regardless
- * either knows better than the memory or wants to find out.
- *
  * **Signed out** is a row with no token behind it — the CLI's own login after a
  * `claude auth logout`, or an account whose credentials were revoked. It cannot be switched
  * to, and it says so rather than being hidden: an account you added and cannot use is a fact
  * worth showing, and hiding it would leave the list disagreeing with what you remember doing.
+ *
+ * **Default for new** is where a conversation starts if nobody chooses. One row at most, and
+ * it is the server's answer rather than this panel's rule — there is no list to walk any
+ * more, so it is the CLI's own login unless that has no token.
  */
 export function Settings(props: {
 	/** What the app may interrupt you with (`AlertSettings.tsx`). */
 	prefs: AlertPrefs;
 	onPrefs: (prefs: AlertPrefs) => void;
 	/**
-	 * The install's Claude subscriptions — the set of them, and their order.
+	 * The install's Claude subscriptions — the set of them, and nothing about who is using
+	 * them.
 	 *
-	 * Not which one is in use: with a subscription per conversation there is no such row.
-	 * This panel adds accounts, removes them, and orders them; choosing which one answers is
-	 * done in a conversation's own model picker.
+	 * This panel adds accounts and removes them. Choosing which one answers is done in a
+	 * conversation's own model picker, because that is what the choice is about.
 	 */
 	accounts: ClaudeAccount[];
+	/**
+	 * Where a conversation starts when nobody has chosen, from the server (`defaultId`).
+	 *
+	 * Sent rather than worked out here. The rule used to be duplicated in the browser so
+	 * that the arrows could be seen to do something — there are no arrows now, and one
+	 * implementation of a rule is the right number.
+	 */
+	active: string;
 	onAdd: () => void;
 	onForget: (id: string) => void;
-	/**
-	 * Change the order, which decides two things: where a new conversation starts, and where
-	 * one that runs out goes next (`lib/accounts.ts`).
-	 */
-	onMove: (id: string, direction: "up" | "down") => void;
 	onClose: () => void;
 }) {
 	/*
@@ -67,14 +66,6 @@ export function Settings(props: {
 	 * nothing at all unless you had first clicked a row. The browse modal gets away with the
 	 * same arrangement because its search field is focused as it appears.
 	 */
-	/**
-	 * The row a limit would hand over to, so the order can be seen and not only set.
-	 *
-	 * Computed here rather than sent: everything the rule needs is already on the wire, and a
-	 * "next" the server had decided would be stale the moment an account was spent.
-	 */
-	const next = () => firstUsable(props.accounts);
-
 	onMount(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -146,7 +137,7 @@ export function Settings(props: {
 							<span class="set-note">
 								{props.accounts.length === 1
 									? "Add another to have somewhere to go when this one runs out. Pick per conversation in the model picker."
-									: "Top of the list first: a new conversation starts there, and a conversation that runs out moves down. Switch one conversation in its model picker."}
+									: "Each conversation spends one of these, chosen in its own model picker. Nothing switches on its own."}
 							</span>
 						</header>
 
@@ -158,11 +149,8 @@ export function Settings(props: {
 								{(account) => (
 									<Row
 										account={account}
-										next={next() === account.id}
-										canUp={props.accounts.length > 1 && canMove(props.accounts, account.id, "up")}
-										canDown={props.accounts.length > 1 && canMove(props.accounts, account.id, "down")}
+										next={props.active === account.id && account.signedIn}
 										onForget={() => props.onForget(account.id)}
-										onMove={(direction) => props.onMove(account.id, direction)}
 									/>
 								)}
 							</For>
@@ -190,17 +178,10 @@ export function Settings(props: {
 
 function Row(props: {
 	account: ClaudeAccount;
-	/** Whether this is the top usable row: what a new conversation starts on. */
+	/** Whether a conversation that has not chosen would start here. */
 	next: boolean;
-	canUp: boolean;
-	canDown: boolean;
 	onForget: () => void;
-	onMove: (direction: "up" | "down") => void;
 }) {
-	const limited = () => {
-		const until = props.account.limitedUntil;
-		return until && until > Date.now() ? until : undefined;
-	};
 	/** What to call it: the email, or something honest when the CLI has not said. */
 	const name = () => props.account.email ?? (props.account.isDefault ? "Claude Code's own login" : "an account with no name yet");
 	/**
@@ -239,15 +220,15 @@ function Row(props: {
 		 * is invalid markup. That arrangement is `.row-act` in `chrome.css` now — the agent
 		 * dropdown wanted the same thing, and this file's version of it was the reason the
 		 * wash, the reveal and the 22px slot had to be argued twice. What is left on
-		 * `.account-row` is only what is true of *accounts*: the accent tint on the one in
-		 * use, and the fact that its row is disabled without being dimmed.
+		 * `.account-row` is only what is true of *accounts*: the accent tint on the default
+		 * row, and the fact that its row is disabled without being dimmed.
 		 */
 		<div class="account-row row-act" data-current={props.next}>
 			{/*
 				A `div`, not a `button`. Pressing a row used to switch the whole machine to it;
 				there is nothing to press now, and a row that still looked pressable would be
-				the same lie in a quieter form. The two controls that remain — the arrows and
-				the × — are buttons of their own inside it.
+				the same lie in a quieter form. The one control that remains — the × — is a
+				button of its own inside it.
 			*/}
 			<div class="min-w-0 flex-1" data-row title={title()}>
 				<span class="lb w-full items-baseline">
@@ -268,86 +249,32 @@ function Row(props: {
 					</Show>
 					<span class="flex-1" />
 					{/*
-						**One status, not a pile of them.** The first draft drew each condition
-						independently and produced rows reading "active · signed out", which is two
-						claims that cannot both be acted on — and a *limited* account that was also
-						signed out showed only the signing-out, hiding the reset time behind the worse
-						problem.
+						**One status, not a pile of them.** An early draft drew each condition
+						independently and produced rows reading "default for new · signed out", which
+						is two claims that cannot both be acted on.
 
 						So they are ranked, worst first. Signed out beats everything, because a row
-						with no token cannot be used whatever else is true of it. A limit beats being
-						active, because it is the thing that changed and the thing with a time
-						attached — and when both are true the row says so, since "the account in use
-						has run out" is exactly what a person needs to read. Said in words rather than
-						by colour alone: "active" and "limited" one hue apart is a distinction nobody
-						has to be able to see.
+						with no token cannot be used whatever else is true of it. "Default for new" is
+						a plan, and a row that cannot be used has something truer to say. There is no
+						"active": which subscription is answering is a property of a conversation, and
+						it is said in that conversation's model picker.
+
+						There used to be a third state — "limited · back at 14:20", a remembered rate
+						limit. It is gone with the automatic switching that needed it: nothing
+						re-checked it, so a row could sit marked spent long after its window had
+						lifted. A limit is now said in the conversation that hit it, at the moment it
+						happens, which is the only place the claim is known to be true.
 					*/}
 					<Switch>
 						<Match when={!props.account.signedIn}>
 							<span class="state flex-none text-faint">signed out</span>
 						</Match>
-						<Match when={limited()}>
-							{(until) => (
-								<span class="state flex-none text-warn" title={props.account.limitType ? `The ${props.account.limitType} window ran out` : undefined}>
-									limited · back {when(until())}
-								</span>
-							)}
-						</Match>
-						{/*
-							The only row that says what the arrows *did* — and the one thing this panel
-							still decides. Ranked below the other two for the same reason they are
-							ranked among themselves: "default" is a plan, and a row that is signed out
-							or spent has something truer to say. There is no "active" any more; which
-							subscription is answering is a property of a conversation, and it is said
-							in that conversation's model picker.
-						*/}
 						<Match when={props.next}>
 							<span class="state flex-none text-accent">default for new</span>
 						</Match>
 					</Switch>
 				</span>
 			</div>
-
-			{/*
-				The order, one step at a time.
-				*
-				* Not drag-and-drop: this list is two or three rows in a modal, a drag needs a
-				* handle and a drop target and an answer for what a half-finished one means, and
-				* two arrows need none of that. They are `.close`-shaped so they live in the same
-				* revealed slot the × does — a column of arrows standing at rest would make a
-				* settings list look like a queue you were meant to be managing.
-				*
-				* Disabled at the ends rather than hidden: a button that disappears at the top of
-				* the list is a row that changes shape as it moves.
-			*/}
-			<Show when={props.canUp || props.canDown}>
-				<button
-					class="close rank"
-					type="button"
-					disabled={!props.canUp}
-					title={`Try ${name()} sooner when an account runs out`}
-					aria-label={`Move ${name()} up`}
-					onClick={(event) => {
-						event.stopPropagation();
-						props.onMove("up");
-					}}
-				>
-					<Icon of={ChevronUp} size={13} />
-				</button>
-				<button
-					class="close rank"
-					type="button"
-					disabled={!props.canDown}
-					title={`Try ${name()} later when an account runs out`}
-					aria-label={`Move ${name()} down`}
-					onClick={(event) => {
-						event.stopPropagation();
-						props.onMove("down");
-					}}
-				>
-					<Icon of={ChevronDown} size={13} />
-				</button>
-			</Show>
 
 			{/*
 				The CLI's own login has no × — those credentials are not Decks' to delete, and
@@ -369,17 +296,4 @@ function Row(props: {
 			</Show>
 		</div>
 	);
-}
-
-/**
- * When a limit lifts, at a glance.
- *
- * A time for today and a date for anything further out, because "back at 14:20" is
- * information and "back 2026-09-02T14:20:00Z" is a string to decode.
- */
-function when(at: number): string {
-	const date = new Date(at);
-	const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-	if (new Date().toDateString() === date.toDateString()) return `at ${time}`;
-	return `${date.toLocaleDateString([], { month: "short", day: "numeric" })} at ${time}`;
 }

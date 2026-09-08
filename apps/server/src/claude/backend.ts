@@ -842,9 +842,9 @@ export class ClaudeBackend implements AgentBackend {
 	 * window.
 	 *
 	 * The mapping lives in `usage.ts` and everything it reads is `unknown`. What this method
-	 * adds is the subject: **which account these windows belong to**. Decks rotates between
-	 * several Claude subscriptions on its own, so "42% of the 5-hour window" is a reading
-	 * with nobody attached until the report says whose it is.
+	 * adds is the subject: **which account these windows belong to**. An install can have
+	 * several Claude subscriptions signed in at once, so "42% of the 5-hour window" is a
+	 * reading with nobody attached until the report says whose it is.
 	 */
 	async report(): Promise<UsageReport> {
 		await this.refreshUsage();
@@ -870,19 +870,21 @@ export class ClaudeBackend implements AgentBackend {
 	}
 
 	/**
-	 * A subscription reaching its limit, and the next one taking over.
+	 * A subscription reaching its limit — said, not worked around.
 	 *
-	 * The switch is one `rename` of a symlink and the CLI picks it up on its next request, so
-	 * the conversation is not interrupted to change accounts — which is the whole point of
-	 * doing it this way rather than reopening the session.
+	 * **Nothing switches by itself.** This used to mark the account spent, move the
+	 * conversation to the next subscription down the list, and re-send the prompt when the
+	 * turn had not touched anything yet. Three things happened without being asked, one of
+	 * them mid-turn, and the record of it was a line of transcript nobody was reading at the
+	 * time. So what is left is the sentence: which window ran out, whose subscription it was,
+	 * when it lifts, and that another one is a press away in the model picker.
 	 *
-	 * **Whether the turn is re-sent is decided by whether anything happened in it.** A limit
-	 * that lands before the agent has done anything is a turn that can simply be tried again
-	 * on the new account. A limit that lands after three tool calls and a board write is not:
-	 * Decks agents edit files, so replaying that turn could write the same board twice. So the
-	 * account moves either way and the *prompt* is only re-sent when the turn was still
-	 * untouched; otherwise the deck says what happened and leaves the resend to the person,
-	 * who can see on the boards what got as far as being written.
+	 * The press is cheap, which is what makes this the right trade: a switch is one `rename`
+	 * of a symlink and the CLI re-reads its credentials per request, so choosing another
+	 * account and pressing send again spends it on the very next turn — no restart, no lost
+	 * conversation. And re-sending is the person's, which is the part a machine should not
+	 * guess: Decks agents edit files, and a turn that got three tool calls in before the
+	 * refusal cannot simply be replayed.
 	 */
 	private onRateLimit(info: SDKRateLimitInfo): void {
 		const { notice } = this.context;
@@ -915,56 +917,25 @@ export class ClaudeBackend implements AgentBackend {
 		// two subscriptions, and the one that refused is the one this session was using.
 		const mine = this.context.account?.id();
 		const spent = mine ? accounts?.describe(mine) : accounts?.active();
-		// Unix seconds on the event, milliseconds everywhere it is stored, compared or shown.
-		const resetsAt = epochMs(info.resetsAt);
-		const reset = resetWords(resetsAt);
-		if (!accounts) {
-			notice("error", `This Claude subscription has reached its ${limitWindow(info.rateLimitType)} limit${reset}.`);
-			return;
-		}
-
+		// Unix seconds on the event, milliseconds everywhere it is compared or shown.
+		const reset = resetWords(epochMs(info.resetsAt));
+		const window = limitWindow(info.rateLimitType);
+		const whose = spent?.email ? `${spent.email}'s` : "This";
 		/*
-		 * The account store marks the spent subscription and names the next one; the *record*
-		 * is what moves this agent onto it. Which is the split that makes a fallback per
-		 * agent: `rotate` used to write the machine's active row, so one agent running out
-		 * dragged every other agent onto a different subscription in the middle of its turn.
-		 */
-		const { moved, nextReset } = accounts.nextFor(spent?.id, resetsAt, info.rateLimitType);
-		if (moved) this.context.account?.set(moved.id);
-		// The list moved either way — a spent account is now marked spent, which the panel
-		// shows with its reset time.
-		this.context.accountsChanged?.();
-		if (!moved) {
-			const wait = nextReset ? resetWords(nextReset) : reset;
-			notice(
-				"error",
-				spent
-					? `Every Claude account has reached its limit${wait}. Add another in settings, or wait.`
-					: `This Claude subscription has reached its ${limitWindow(info.rateLimitType)} limit${reset}. Add another account in settings to switch automatically.`,
-			);
-			return;
-		}
-
-		/*
-		 * The turn that was refused, and whether it is safe to try again.
+		 * Whether there is anywhere to go, which is the only thing the account list is asked
+		 * here — and it decides one clause of a sentence rather than an account switch.
 		 *
-		 * `this.streaming` is still true here — the refusal arrives before the result — so
-		 * what is asked is whether the turn *did* anything, which the translator knows because
-		 * every tool call and every board write went through it.
+		 * `signed in and not this one` rather than `not spent`: nothing is marked spent any
+		 * more, so the honest offer is "there is another subscription you could put this
+		 * conversation on", and whether it has quota left is something only trying it can say.
 		 */
-		const touched = this.context.translator.turnTouchedAnything();
-		const from = spent?.email ?? "this subscription";
-		const to = moved.email ?? "another account";
-		if (touched) {
-			notice(
-				"warn",
-				`${from} reached its ${limitWindow(info.rateLimitType)} limit${reset}. Switched to ${to}. This turn had already started work, so send it again to carry on.`,
-			);
-			return;
-		}
-		notice("info", `${from} reached its ${limitWindow(info.rateLimitType)} limit${reset}. Switched to ${to} and carrying on.`);
-		const again = this.context.translator.lastUserText();
-		if (again) this.push(again);
+		const elsewhere = accounts?.hasOther?.(mine) === true;
+		notice(
+			"error",
+			elsewhere
+				? `${whose} Claude subscription has reached its ${window} limit${reset}. Pick another one in the model picker and send again.`
+				: `${whose} Claude subscription has reached its ${window} limit${reset}. Add another account in settings, or wait.`,
+		);
 	}
 
 	/**
@@ -981,9 +952,9 @@ export class ClaudeBackend implements AgentBackend {
 	 *
 	 * - the reply **is** the failure (`transient.ts`, which matches on prose because there
 	 *   is nothing structural to match on, and says so);
-	 * - the turn **did nothing** — no tool call, no board write. `turnTouchedAnything` is
-	 *   the same guard the rate-limit resend uses, and for the same reason: Decks agents
-	 *   edit files, and replaying a turn that got halfway could write the same board twice;
+	 * - the turn **did nothing** — no tool call, no board write. Decks agents edit files, and
+	 *   replaying a turn that got halfway could write the same board twice. The rate-limit
+	 *   path used to resend under the same guard; it does not resend at all now;
 	 * - there are retries left, so a refresh that is genuinely stuck ends in the message
 	 *   standing rather than in a turn that never finishes.
 	 *

@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type AgentKind, type AgentMode, type AgentModel, type ChatItem, type ThinkingLevel } from "@decks/protocol";
+import { type AgentKind, type AgentMode, type AgentModel, type AgentUsage, type ChatItem, type ModelOption, type ThinkingLevel } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 
 /**
@@ -48,7 +48,15 @@ import type { Deck } from "../deck/loader.ts";
  * **A directory per agent, not one index**, so a bad write costs one chat rather than the
  * list. Every write goes to a temporary file and is renamed over the target, so a restart
  * during one leaves the previous version rather than half of the new one.
+ *
+ * One file is *not* per agent: **`models.json`**, the model list each runtime last offered,
+ * which is a fact about the runtime rather than about any conversation (`rememberModels`).
+ * It sits beside the agent directories, and `list()` only reads directories, so it is
+ * invisible to everything else here.
  */
+
+/** Where the remembered model lists live, beside the per-agent directories. */
+const MODELS_FILE = "models.json";
 
 /** What a row needs before its runtime has been started. */
 export interface AgentRecord {
@@ -80,6 +88,19 @@ export interface AgentRecord {
 	 * change of default cannot move an agent that already exists.
 	 */
 	account?: string;
+	/**
+	 * The last context and cost reading, so a dormant chat can show one.
+	 *
+	 * `AgentUsage` is emitted after every turn and drawn as a ring under the composer — and
+	 * before this it lived only in the running backend, so a chat that had not been prompted
+	 * since the deck opened drew nothing at all. Nothing is drawn for "not known" on purpose
+	 * (a ring at zero would claim an empty context), which made the absence look like a
+	 * design rather than a gap.
+	 *
+	 * A reading about the conversation, not about the runtime: the tokens are what this
+	 * transcript costs to send, which is as true after a restart as it was before one.
+	 */
+	usage?: AgentUsage;
 	/** What the agent said it was doing, from `stage.me.setTags` — see `agents/tags.ts`. */
 	tags?: string[];
 	/** What *you* said it was doing, from the customise popup. Never written by the agent. */
@@ -253,6 +274,51 @@ export class AgentStore {
 		return out;
 	}
 
+	/**
+	 * The model list a runtime last offered, so a picker exists before the runtime does.
+	 *
+	 * Kept per **kind**, not per agent, because that is what it is a fact about: the list
+	 * comes from the runtime and the credentials behind it, and two Claude chats on one
+	 * machine are offered the same models. Per-agent would also answer the wrong question —
+	 * a brand new chat has no record of its own and is exactly the case that needs a list.
+	 *
+	 * Why persisted at all: `models()` costs a session. Before this, the picker was a
+	 * disabled chip on any chat nobody had prompted yet — the control for choosing a model
+	 * could not be used until you had already sent a turn to the model you did not choose.
+	 * What is remembered can be a turn out of date (a provider signed out since), which is
+	 * why picking one starts the runtime and the list is republished from it.
+	 */
+	rememberModels(kind: AgentKind, models: ModelOption[]): void {
+		if (models.length === 0) return;
+		try {
+			mkdirSync(this.dir, { recursive: true });
+			const all = this.modelIndex();
+			atomicWrite(join(this.dir, MODELS_FILE), JSON.stringify({ ...all, [kind]: models }, null, 2));
+		} catch {
+			/* the same trade as `write`: a lost picker is not a lost chat */
+		}
+	}
+
+	/** What that kind last offered, or nothing if it has never run here. */
+	knownModels(kind: AgentKind): ModelOption[] {
+		return this.modelIndex()[kind] ?? [];
+	}
+
+	private modelIndex(): Partial<Record<AgentKind, ModelOption[]>> {
+		try {
+			const parsed = JSON.parse(readFileSync(join(this.dir, MODELS_FILE), "utf8")) as unknown;
+			if (!parsed || typeof parsed !== "object") return {};
+			const out: Partial<Record<AgentKind, ModelOption[]>> = {};
+			for (const [kind, value] of Object.entries(parsed as Record<string, unknown>)) {
+				const models = Array.isArray(value) ? value.map(optionOf).filter((option): option is ModelOption => option !== undefined) : [];
+				if (models.length > 0) out[kind as AgentKind] = models;
+			}
+			return out;
+		} catch {
+			return {};
+		}
+	}
+
 	/** Keep the newest `keep` records and forget the rest. Returns what was kept. */
 	prune(keep: number): Array<{ record: AgentRecord; items: ChatItem[] }> {
 		const all = this.list();
@@ -301,6 +367,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 	};
 	const created = finite(source.createdAt, Date.now());
 	const model = modelOf(source.model);
+	const usage = usageOf(source.usage);
 	return {
 		id,
 		kind: source.kind === "claude" ? "claude" : "pi",
@@ -313,6 +380,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 		inPlay: strings(source.inPlay),
 		createdAt: created,
 		...(model ? { model } : {}),
+		...(usage ? { usage } : {}),
 		...(MODES.includes(source.mode as AgentMode) ? { mode: source.mode as AgentMode } : {}),
 		/*
 		 * Which subscription it was spending.
@@ -340,6 +408,30 @@ const MODES: AgentMode[] = ["manual", "acceptEdits", "plan", "auto"];
  * runtimes' APIs, and a value from an older build that has since been renamed should
  * degrade to the middle rather than be passed through.
  */
+function usageOf(raw: unknown): AgentUsage | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
+	const source = raw as Record<string, unknown>;
+	const number = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
+	const window = number(source.contextWindow);
+	if (window === undefined) return undefined;
+	/*
+	 * `contextTokens` is `number | null`, and null is a real reading — "the agent has not
+	 * reported yet", which is the state right after a compaction. So it is kept as null
+	 * rather than dropped, and the ring draws nothing for it either way.
+	 */
+	return { contextTokens: number(source.contextTokens) ?? null, contextWindow: window, cost: number(source.cost) ?? 0 };
+}
+
+/** One row of a remembered model list. A row missing either half is not a row. */
+function optionOf(raw: unknown): ModelOption | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
+	const source = raw as Record<string, unknown>;
+	const { provider, model, label, reasoning } = source;
+	if (typeof provider !== "string" || !provider) return undefined;
+	if (typeof model !== "string" || !model) return undefined;
+	return { provider, model, label: typeof label === "string" && label ? label : model, reasoning: reasoning === true };
+}
+
 function modelOf(raw: unknown): AgentModel | undefined {
 	if (!raw || typeof raw !== "object") return undefined;
 	const source = raw as Record<string, unknown>;

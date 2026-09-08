@@ -217,6 +217,9 @@ export class Registry {
 					// conversation was using, not on whatever the runtime defaults to.
 					...(record.model ? { model: record.model } : {}),
 					...(record.mode ? { mode: record.mode } : {}),
+					// And what it cost, which is a reading about the transcript rather than
+					// about the runtime — so it is as true now as it was before the restart.
+					...(record.usage ? { usage: record.usage } : {}),
 					// And the subscription it was spending, for the same reason: a restart
 					// should not move an agent onto a different account without saying so.
 					...(record.account ? { account: record.account } : {}),
@@ -353,9 +356,9 @@ export class Registry {
 				parent.translator.notice("warn", `Subagent stays on the default model: ${(error as Error).message}`);
 			}
 		} else if (spec.thinking) {
-			// Thinking asked for on its own, on the default model.
-			await child.start();
-			child.setThinking(spec.thinking);
+			// Thinking asked for on its own, on the default model. `setThinking` starts the
+			// runtime itself now, so the explicit `start` is gone rather than duplicated.
+			await child.setThinking(spec.thinking);
 		}
 
 		if (spec.mode) {
@@ -453,15 +456,18 @@ export class Registry {
 		});
 		for (const agent of this.agents) agent.greet(reply);
 		/*
-		 * A deck restored from the store starts no runtimes, so no agent exists to
-		 * produce the `models` catalogue that a fresh deck's first agent produces at
-		 * boot — and without it every dormant chat's picker says nothing until some
-		 * new agent starts. The focused chat is the one the browser opens to talk
-		 * to; waking it here brings the catalogue (and its own model) with it.
-		 * `start()` is memoised, so an agent already starting is a no-op.
+		 * And nothing is started. This used to wake the focused agent here, because the model
+		 * catalogue came from a running backend and a restored deck has none — so every
+		 * dormant chat's picker was empty until something started. Which meant **opening the
+		 * page started a runtime**: a `claude` process, a session, and a first request, to
+		 * fill a dropdown nobody had opened.
+		 *
+		 * The list is remembered per runtime now (`AgentStore.rememberModels`) and greeted
+		 * from the store, along with the account each chat spends and the reading it left. So
+		 * a restored deck can draw all three controls with nothing running, which is what
+		 * dormant was always supposed to mean: readable, and started by something the person
+		 * actually did.
 		 */
-		const focus = this.get(this.focusedId);
-		if (focus) void focus.start();
 	}
 
 	/** A different deck is a different set of agents: a session's cwd cannot move. */

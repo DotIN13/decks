@@ -399,3 +399,107 @@ test("forgetting a chat takes its archive with it", () => {
 	assert.deepEqual(readdirSync(join(deck.path, ".decks", "agents")), []);
 	cleanup();
 });
+
+/*
+ * What a dormant row can say about itself, and where the model list lives.
+ *
+ * Both are here because both used to exist only inside a running backend, so a chat nobody
+ * had prompted since the deck opened drew no context ring and had a model picker that could
+ * not be opened. Neither needs a runtime to answer: the reading is about the transcript, and
+ * the list is about the runtime rather than about any one conversation.
+ */
+test("the last context and cost reading survives a restart", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+
+	store.write(record({ usage: { contextTokens: 41_500, contextWindow: 200_000, cost: 0.42 } }), items);
+
+	assert.deepEqual(store.read("agent-1")?.record.usage, { contextTokens: 41_500, contextWindow: 200_000, cost: 0.42 });
+	cleanup();
+});
+
+test("a reading of null is kept, because null is what it means before the first reply", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+
+	store.write(record({ usage: { contextTokens: null, contextWindow: 200_000, cost: 0 } }), items);
+
+	// `contextTokens: null` is a real state — right after a compaction, or before the first
+	// answer — and different from "there is no reading", which is what a missing `usage` is.
+	assert.deepEqual(store.read("agent-1")?.record.usage, { contextTokens: null, contextWindow: 200_000, cost: 0 });
+	cleanup();
+});
+
+test("a usage figure that is not a number is not read back as one", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.write(record(), items);
+	// Written by hand, the way an older build or a bad edit would leave it.
+	writeFileSync(
+		join(deck.path, ".decks", "agents", "agent-1", "meta.json"),
+		JSON.stringify({ ...record(), usage: { contextTokens: "lots", cost: "free" } }),
+	);
+
+	// No window, so there is nothing to be a percentage of, so there is no reading.
+	assert.equal(store.read("agent-1")?.record.usage, undefined);
+	cleanup();
+});
+
+test("the model list a runtime offered is remembered per runtime, not per chat", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	assert.deepEqual(store.knownModels("claude"), [], "nothing has ever run here");
+
+	store.rememberModels("claude", [
+		{ provider: "claude", model: "claude-opus-5", label: "Opus 5", reasoning: true },
+		{ provider: "claude", model: "claude-haiku-4-5", label: "Haiku 4.5", reasoning: false },
+	]);
+	store.rememberModels("pi", [{ provider: "openai", model: "gpt-5", label: "GPT-5", reasoning: true }]);
+
+	assert.deepEqual(store.knownModels("claude").map((option) => option.model), ["claude-opus-5", "claude-haiku-4-5"]);
+	assert.deepEqual(store.knownModels("pi").map((option) => option.model), ["gpt-5"], "one runtime's list does not overwrite another's");
+	assert.deepEqual(store.knownModels("opencode"), [], "and a runtime that has not run here still has nothing");
+	cleanup();
+});
+
+test("an empty list is not remembered, so a runtime that failed to answer does not erase what is known", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.rememberModels("claude", [{ provider: "claude", model: "claude-opus-5", label: "Opus 5", reasoning: true }]);
+
+	store.rememberModels("claude", []);
+
+	assert.equal(store.knownModels("claude").length, 1, "a picker with a stale list beats a picker with none");
+	cleanup();
+});
+
+test("the remembered lists are not a chat, and a torn one is not a broken deck", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.write(record(), items);
+	store.rememberModels("claude", [{ provider: "claude", model: "claude-opus-5", label: "Opus 5", reasoning: true }]);
+
+	// It sits beside the per-agent directories, and `list()` reads directories only.
+	assert.deepEqual(store.list().map((found) => found.record.id), ["agent-1"]);
+
+	writeFileSync(join(deck.path, ".decks", "agents", "models.json"), "{ not json");
+	assert.deepEqual(store.knownModels("claude"), [], "unreadable is the same as unknown");
+	assert.deepEqual(store.list().map((found) => found.record.id), ["agent-1"], "and costs nothing else");
+	cleanup();
+});
+
+test("a remembered row missing a provider or a model is not a row", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	mkdirSync(join(deck.path, ".decks", "agents"), { recursive: true });
+	writeFileSync(
+		join(deck.path, ".decks", "agents", "models.json"),
+		JSON.stringify({ claude: [{ provider: "claude", model: "claude-opus-5" }, { model: "nameless" }, { provider: "claude" }] }),
+	);
+
+	const known = store.knownModels("claude");
+	assert.equal(known.length, 1);
+	// And a row with no label of its own is labelled by its id rather than by nothing.
+	assert.deepEqual(known[0], { provider: "claude", model: "claude-opus-5", label: "claude-opus-5", reasoning: false });
+	cleanup();
+});

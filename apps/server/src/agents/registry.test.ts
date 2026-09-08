@@ -426,7 +426,7 @@ class SpyChild extends DeckAgent {
 	override async setMode(mode: AgentMode): Promise<void> {
 		this.modes.push(mode);
 	}
-	override setThinking(level: ThinkingLevel): void {
+	override async setThinking(level: ThinkingLevel): Promise<void> {
 		this.thinkings.push(level);
 	}
 	override async run(text: string): Promise<{ report: string; boards: string[] }> {
