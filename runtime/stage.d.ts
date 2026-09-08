@@ -164,7 +164,9 @@ export interface Stage {
 	 * when you want the user looking at it.
 	 *
 	 *     const path = await stage.newBoard({ title: "Why the second tab fails", kind: "answer" });
-	 *     // then: edit(path) to replace the placeholder section
+	 *     // then edit(path): replace the placeholder with the finding, in a sentence
+	 *     // somebody could repeat — "The second tab reuses the first one's socket" — and
+	 *     // stop there. Not the background, not the method, not what you were asked.
 	 *
 	 * Kinds are shapes, not rules — change anything afterwards:
 	 *
@@ -210,9 +212,12 @@ export interface Stage {
 	 * two components share a row, write the left one first. The reader has the picture and
 	 * you have the file, and the two have to be the same document.
 	 *
-	 * Aim for the smallest board that explains the thing: a summary at the top, then
-	 * diagrams, tables and embeds in preference to prose. Once the height is near twice the
-	 * width, it is two boards.
+	 * **Lead with the finding, then cut.** The first thing on a board is what you concluded,
+	 * said so it could be repeated; after that, delete every sentence that does not change
+	 * what the reader does or believes. Prefer a table to a paragraph about a comparison, a
+	 * diagram to a paragraph about a structure, and a number to an adjective — a third
+	 * paragraph in one card is a table you have not drawn yet. Once the height is near twice
+	 * the width, it is two boards.
 	 */
 	newBoard(options: {
 		title: string;

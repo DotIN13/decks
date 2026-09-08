@@ -19,7 +19,17 @@
 			<h1>{{TITLE}}</h1>
 		</div>
 
-		<!-- The answer, in one screen. Put the thing that answers it first. -->
+		<!--
+			The answer, in one screen — and the first sentence *is* the answer.
+
+			Not the background, not what you were asked, not how you found out. Somebody
+			should be able to read this line out loud and be right. Then cut every sentence
+			after it that does not change what they do or believe.
+
+			If the answer is a comparison it is a `.card.table`, not three paragraphs; if it
+			is a structure it is an `<svg>`; if it is a quantity it is a `.kpi`. A third
+			paragraph in here is one of those three you have not drawn yet.
+		-->
 		<section class="card" data-id="answer" style="left: 48px; top: {{ROW1}}px; width: {{CONTENT}}px">
 			<p>…</p>
 		</section>
@@ -27,6 +37,9 @@
 		<!--
 			More below this, not beside it, unless two things really are a pair — then use
 			x = 48 and x = {{COLX}}, in that order in the file.
+
+			And prefer not adding it. A second card that explains the first one usually means
+			the first one is not yet saying it.
 		-->
 
 		<script src="../lib/board.js"></script>

@@ -179,7 +179,7 @@ Your code is the body of an async function with \`stage\` in scope; whatever you
 
 *Reading order.* DOM order is visual order, top to bottom. One column or two; where two components share a row, write the left one first. A reader has the picture and you have the file, and the two have to be the same document.
 
-Aim for the smallest board that explains the thing: an executive summary at the top, then diagrams, tables and embeds in preference to prose. Once the height is near twice the width, it is two boards.
+**A board is read, not skimmed for the part that matters — so make every part matter.** Lead with the finding, in a sentence somebody could repeat. Cut every sentence that does not change what the reader does or believes. Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure, and a number to an adjective; a third paragraph in one card is a table you have not drawn yet. Once the height is near twice the width, it is two boards.
 
 Also here: look at the deck (\`stage.boards\`, \`stage.read\`), place boards (\`stage.move\`), resolve a path to embed (\`stage.resolve\`), get a URL to screenshot with Playwright (\`stage.url\`), name yourself and draw your own avatar (\`stage.me\`).
 
@@ -192,7 +192,19 @@ const GUIDELINES = [
 	"Pick the format for the thing: component boxes by default, format: 'flow' for a markdown document that reflows, format: 'slides' for a reveal deck of <section> elements. A board of prose does not want to be positioned boxes.",
 	"Width: the smallest that holds the content, capped at min(viewport width, 1600). 1600 is a ceiling, not a target — at a 390px viewport a board is 390 wide.",
 	"Reading order: DOM order is visual order, top to bottom. Two components sharing a row go left-first in the file.",
-	"Aim for the smallest board that explains the thing — summary first, then diagrams, tables and embeds over prose. Height near twice the width means it is two boards.",
+	/*
+	 * The four that are about *what a board says* rather than where its boxes are.
+	 *
+	 * They were one line — "aim for the smallest board that explains the thing" — which is a
+	 * preference, and a preference loses to the pull of writing everything down. These are
+	 * imperative and they name the move to make: cut this, put that in a table, lead with the
+	 * finding. Deliberately no counts: a word budget gets gamed into four short paragraphs,
+	 * and a components limit gets met by making one card longer.
+	 */
+	"Lead with the finding. The first thing on a board is what you concluded, in a sentence somebody could repeat — not the background, not the method, not what you were asked.",
+	"Cut every sentence that does not change what the reader does or believes. Say it once, in the place it belongs, and delete the sentence that says it again more carefully.",
+	"Write the shortest thing that is still true. Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure, a number to an adjective. A third paragraph in one card is a table you have not drawn yet.",
+	"A card is a claim with its evidence, not a section of an essay: a heading that says the point, then the fewest words that back it. If a card needs a scrollbar in your head, it is two cards or a table.",
 	"The board carries the answer; the chat reply names it and may recap or add to it. What is never acceptable is the substance in chat with a stub on the board, or a board that only makes sense after reading the chat.",
 	"When work is finished, report on a board — method, result, what is left — rather than describing it in the chat column.",
 	"Keep the canvas to what matters now: stage.show narrows it, stage.hide takes a board off it without dropping it from your context.",

@@ -20,7 +20,14 @@
 			<p style="color: var(--b-muted)">What is being decided, in one line.</p>
 		</div>
 
-		<!-- The options, as columns of the same width. Left first. -->
+		<!--
+			The options, as columns of the same width. Left first.
+			
+			Say what each one *costs*, not what it is. Two cards that describe two designs are
+			a pair nobody can choose between; two cards that name the trade-off each one makes
+			are a decision. If the options differ along more than two axes, they are a
+			`.card.table` with a row per axis rather than a pair of paragraphs.
+		-->
 		<section class="card" data-id="option-a" style="left: 48px; top: {{ROW1}}px; width: {{COL}}px">
 			<h3>Option A</h3>
 			<p>…</p>
@@ -30,7 +37,12 @@
 			<p>…</p>
 		</section>
 
-		<!-- The recommendation, said plainly, in a callout so the eye lands on it. -->
+		<!--
+			The recommendation, said plainly, in a callout so the eye lands on it.
+			
+			Name one, and give the reason in the same breath. "Either could work" is not a
+			recommendation; it is the question handed back.
+		-->
 		<div class="callout" data-id="recommendation" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
 			<strong>Recommendation.</strong> <span>…</span>
 		</div>

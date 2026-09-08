@@ -18,6 +18,11 @@
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
 			<p style="color: var(--b-muted)">What was done, and what it means.</p>
+			<!--
+				Replace that line with the finding, in a sentence somebody could repeat. It is
+				the most-read text on the board and "what was done, and what it means" is a
+				label for the shape rather than a thing you learned.
+			-->
 		</div>
 
 		<!-- The number that matters, before anything that explains it. -->
@@ -26,7 +31,13 @@
 			<span class="label">the number that matters</span>
 		</div>
 
-		<!-- Method: how, briefly. Not a log. -->
+		<!--
+			Method: how, briefly. **Not a log.**
+			
+			Two or three steps somebody could repeat, in the shortest words that are still
+			true. What you tried and abandoned belongs here only if the abandoning is the
+			finding.
+		-->
 		<section class="card" data-id="method" style="left: 48px; top: {{ROW2}}px; width: {{COL}}px">
 			<h4>Method</h4>
 			<ol>
@@ -34,7 +45,7 @@
 			</ol>
 		</section>
 
-		<!-- Result: what changed, and the numbers if there are any. -->
+		<!-- Result: what changed, said as a number wherever there is one to say. -->
 		<section class="card" data-id="result" style="left: {{COLX}}px; top: {{PAIRB}}px; width: {{COL}}px">
 			<h4>Result</h4>
 			<p>…</p>

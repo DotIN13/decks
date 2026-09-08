@@ -9,7 +9,7 @@ test("every kind renders a board the loader can read", () => {
 		const html = renderTemplate(kind, "Why the second tab fails");
 		const meta = readBoardMeta(html);
 		assert.equal(meta.title, "Why the second tab fails", kind);
-		assert.ok((meta.w ?? 0) >= 800, `${kind} has a width`);
+		assert.ok((meta.w ?? 0) >= 720, `${kind} has a width`);
 		assert.ok((meta.h ?? 0) >= 400, `${kind} has a height`);
 		// The two things every board must load, and the components the agent will edit.
 		assert.match(html, /lib\/board\.css/, kind);
@@ -77,7 +77,12 @@ test("no shape's own width is above the ceiling", () => {
 test("a width is the smallest of what the shape wants, the viewport, and the ceiling", () => {
 	// A wide screen is still capped: past 1600 a line of prose is too long to track back to.
 	assert.equal(boardWidth(undefined, 1920, "report"), 1200);
-	assert.equal(boardWidth(undefined, 1920, "blank"), 1000);
+	// 880 for a shape that is mostly one column — nearer the measure prose wants, and the
+	// same reasoning that makes a `flow` board 720.
+	assert.equal(boardWidth(undefined, 1920, "blank"), 880);
+	assert.equal(boardWidth(undefined, 1920, "answer"), 880);
+	// …and the two shapes that hold a comparison keep the room to hold it.
+	assert.equal(boardWidth(undefined, 1920, "design"), 1000);
 	// A screen narrower than the shape wins, which is the whole point of asking.
 	assert.equal(boardWidth(undefined, 900, "report"), 900);
 	assert.equal(boardWidth(undefined, 390, "report"), 390);

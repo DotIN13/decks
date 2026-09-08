@@ -102,15 +102,24 @@ const STACK_BELOW = 720;
  * The widest a board of this shape should be when nobody said.
  *
  * Not "the widest it may be": each of these is the smallest width that holds the shape
- * without stuffing it, and every one is under `MAX_BOARD_W` by a distance. A `report` is
- * the widest because it is the only shape with a number, two columns and a tail.
+ * without stuffing it, and every one is under `MAX_BOARD_W` by a distance.
+ *
+ * **880 for the shapes that are mostly one column**, because that is nearer the measure
+ * prose actually wants — a `flow` board is 720 for the same reason, and a component board
+ * being 1000 while a markdown board was 720 meant the format decided the line length rather
+ * than the reading did. `answer` and `blank` are a single column of text; `plan` has a pair
+ * above its steps and reads fine at 368 a column, which was looked at rather than assumed.
+ *
+ * `design` keeps 1000 and `report` 1200: a pair of options wants room to be compared, and a
+ * report is the only shape with a number, two columns *and* a tail. Widening a board is one
+ * drag; unpicking a cramped comparison is not.
  */
 const SIZE: Record<BoardTemplate, { w: number; h: number }> = {
-	answer: { w: 1000, h: 480 },
+	answer: { w: 880, h: 480 },
 	design: { w: 1000, h: 620 },
 	report: { w: 1200, h: 700 },
-	plan: { w: 1000, h: 680 },
-	blank: { w: 1000, h: 400 },
+	plan: { w: 880, h: 680 },
+	blank: { w: 880, h: 400 },
 };
 
 /**
