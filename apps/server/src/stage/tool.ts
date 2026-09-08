@@ -179,7 +179,7 @@ Your code is the body of an async function with \`stage\` in scope; whatever you
 
 *Reading order.* DOM order is visual order, top to bottom. One column or two; where two components share a row, write the left one first. A reader has the picture and you have the file, and the two have to be the same document.
 
-**A board is read, not skimmed for the part that matters — so make every part matter.** Lead with the finding, in a sentence somebody could repeat. Cut every sentence that does not change what the reader does or believes. Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure, and a number to an adjective; a third paragraph in one card is a table you have not drawn yet. Once the height is near twice the width, it is two boards.
+**A board is read, not skimmed for the part that matters — so make every part matter.** Lead with the finding, in a sentence somebody could repeat, and be concise: short sentences, no preamble, nothing said twice. Head every component with a short structural label — Problem, Method, Result, Todos — rather than a chatty sentence, so the shape of the board can be read off its headings. Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure, and a number to an adjective; a third paragraph in one card is a table you have not drawn yet. **A diagram or a table has to stand alone**: label every axis with its unit, name every column in words, and never code anything — no arms called A/B/C/D, no metrics called M1/M2/M3. Once the height is near twice the width, it is two boards.
 
 Also here: look at the deck (\`stage.boards\`, \`stage.read\`), place boards (\`stage.move\`), resolve a path to embed (\`stage.resolve\`), get a URL to screenshot with Playwright (\`stage.url\`), name yourself and draw your own avatar (\`stage.me\`).
 
@@ -193,18 +193,20 @@ const GUIDELINES = [
 	"Width: the smallest that holds the content, capped at min(viewport width, 1600). 1600 is a ceiling, not a target — at a 390px viewport a board is 390 wide.",
 	"Reading order: DOM order is visual order, top to bottom. Two components sharing a row go left-first in the file.",
 	/*
-	 * The four that are about *what a board says* rather than where its boxes are.
+	 * The ones about *what a board says* rather than where its boxes are.
 	 *
 	 * They were one line — "aim for the smallest board that explains the thing" — which is a
 	 * preference, and a preference loses to the pull of writing everything down. These are
-	 * imperative and they name the move to make: cut this, put that in a table, lead with the
-	 * finding. Deliberately no counts: a word budget gets gamed into four short paragraphs,
-	 * and a components limit gets met by making one card longer.
+	 * imperative and they name the move to make: be brief, label the axis, head the box with
+	 * what it is. Deliberately no counts: a word budget gets gamed into four short
+	 * paragraphs, and a components limit gets met by making one card longer.
 	 */
 	"Lead with the finding. The first thing on a board is what you concluded, in a sentence somebody could repeat — not the background, not the method, not what you were asked.",
-	"Cut every sentence that does not change what the reader does or believes. Say it once, in the place it belongs, and delete the sentence that says it again more carefully.",
+	"Be concise. Short sentences, no preamble, nothing said twice.",
+	"Head every component with a short structural label — Problem, Research question, Method, Result, Todos, Next — not a chatty sentence. A reader should see the shape of the board by scanning its headings; a heading that reads like conversation buries which box is which, and the finding belongs in the body.",
 	"Write the shortest thing that is still true. Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure, a number to an adjective. A third paragraph in one card is a table you have not drawn yet.",
-	"A card is a claim with its evidence, not a section of an essay: a heading that says the point, then the fewest words that back it. If a card needs a scrollbar in your head, it is two cards or a table.",
+	"A card is a claim with its evidence, not a section of an essay: a heading that says what it is, then the fewest words that back it. If a card needs a scrollbar in your head, it is two cards or a table.",
+	"A diagram or a table must stand on its own: every axis labelled with its unit, every series and column named in words. Never letter- or number-coded — no arms called A/B/C/D, no metrics called M1/M2/M3, no bare decimals with nothing saying what they measure. Somebody who has not read the chat should be able to say what every row and every axis is.",
 	"The board carries the answer; the chat reply names it and may recap or add to it. What is never acceptable is the substance in chat with a stub on the board, or a board that only makes sense after reading the chat.",
 	"When work is finished, report on a board — method, result, what is left — rather than describing it in the chat column.",
 	"Keep the canvas to what matters now: stage.show narrows it, stage.hide takes a board off it without dropping it from your context.",

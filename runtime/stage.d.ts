@@ -212,12 +212,20 @@ export interface Stage {
 	 * two components share a row, write the left one first. The reader has the picture and
 	 * you have the file, and the two have to be the same document.
 	 *
-	 * **Lead with the finding, then cut.** The first thing on a board is what you concluded,
-	 * said so it could be repeated; after that, delete every sentence that does not change
-	 * what the reader does or believes. Prefer a table to a paragraph about a comparison, a
-	 * diagram to a paragraph about a structure, and a number to an adjective — a third
-	 * paragraph in one card is a table you have not drawn yet. Once the height is near twice
-	 * the width, it is two boards.
+	 * **Lead with the finding, and be concise.** The first thing on a board is what you
+	 * concluded, said so it could be repeated; after that, short sentences, no preamble and
+	 * nothing said twice.
+	 *
+	 * **Head every component with a short structural label** — Problem, Research question,
+	 * Method, Result, Todos, Next — not a chatty sentence. The shape of a board should be
+	 * readable from its headings alone.
+	 *
+	 * Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a
+	 * structure, and a number to an adjective — a third paragraph in one card is a table you
+	 * have not drawn yet. **And a diagram or a table has to stand on its own**: every axis
+	 * labelled with its unit, every column named in words, and nothing coded — no arms called
+	 * A/B/C/D, no metrics called M1/M2/M3, no bare decimals. Once the height is near twice the
+	 * width, it is two boards.
 	 */
 	newBoard(options: {
 		title: string;
