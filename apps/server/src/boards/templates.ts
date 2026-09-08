@@ -125,12 +125,20 @@ const SIZE: Record<BoardTemplate, { w: number; h: number }> = {
  * is wider than the screen, and a board wider than the screen is read scaled down. Clamping
  * to 390 is what makes `renderTemplate` fold its columns instead.
  */
-export function boardWidth(wanted: number | undefined, viewport: number | undefined, kind: BoardTemplate = "blank"): number {
+export function boardWidth(wanted: number | undefined, viewport: number | undefined, kind: BoardTemplate = "blank", format: BoardFormat = "component"): number {
 	const ceiling = Math.min(viewport ?? MAX_BOARD_W, MAX_BOARD_W);
 	// A width somebody typed is theirs — the clamp is about what *we* choose when they did
 	// not, and an agent that means 1800 has a reason we cannot see from here.
 	if (wanted) return Math.round(wanted);
-	return Math.max(320, Math.min(SIZE[kind].w, ceiling));
+	/*
+	 * Whose default it is depends on the format, because a shape only belongs to a component
+	 * board. A `flow` board asked for through the stage API used to get the *blank shape's*
+	 * 1000 — a wide measure for prose — while the same board asked for with the `+` button
+	 * got 720, which is the documented one. Two routes to one request answering differently
+	 * is the defect; the format's own default is the answer to both.
+	 */
+	const own = format === "component" ? SIZE[kind].w : defaultFormatWidth(format);
+	return Math.max(320, Math.min(own, ceiling));
 }
 
 /**
@@ -251,7 +259,12 @@ export function renderFormat(format: Exclude<BoardFormat, "component">, title: s
 	return source.replaceAll("{{TITLE}}", titled).replaceAll("{{W}}", String(w));
 }
 
-/** 960 for a deck, because that is the logical width a slide is laid out at; 720 for prose. */
+/**
+ * 960 for a deck, because that is the logical width a slide is laid out at, so it opens at
+ * 1:1 with its own layout; 720 for prose, because a line much wider is one the eye loses its
+ * place in. The same two numbers `deck/kinds.ts` uses for a board that declares nothing —
+ * they are here as well because this is where a *new* one is written.
+ */
 function defaultFormatWidth(format: Exclude<BoardFormat, "component">): number {
 	return format === "slides" ? 960 : 720;
 }

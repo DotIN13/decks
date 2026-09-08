@@ -302,7 +302,7 @@ export function createStageTool(deps: {
 			 * and the template folds its columns to fit rather than being clipped.
 			 */
 			const view = viewport();
-			const width = boardWidth(options.w, view?.width, template);
+			const width = boardWidth(options.w, view?.width, template, format);
 			const path = service.newBoard({
 				title,
 				template,

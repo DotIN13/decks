@@ -355,6 +355,9 @@ test("a format reaches the service, and decides the file", async () => {
 
 	const doc = await tool.run(`return await stage.newBoard({ title: "Notes", format: "flow" })`);
 	assert.match(doc.text.split("\n")[0] ?? "", /boards\/notes\.md/);
+	// And the width it was sized at is the *format's* default, not the blank shape's 1000.
+	assert.match(doc.text, /board width 720/);
+	assert.match(deck.text, /board width 960/, "a deck opens 1:1 with a slide's own layout");
 
 	// Nothing said is a component board, which is what every board was before formats.
 	const board = await tool.run(`return await stage.newBoard({ title: "Ordinary", kind: "answer" })`);

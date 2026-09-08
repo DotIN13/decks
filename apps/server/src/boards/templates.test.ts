@@ -156,6 +156,26 @@ test("a format has to be one of the three", () => {
 	for (const no of ["reveal", "markdown", "md", "html", "deck", "", undefined, 3]) assert.equal(isBoardFormat(no), false, String(no));
 });
 
+test("a format's default width is the format's, not the blank shape's", () => {
+	// The defect this fixes: `flow` asked for through the stage API got the blank *shape's*
+	// 1000 — a wide measure for prose — while the same board from the `+` button got 720.
+	assert.equal(boardWidth(undefined, 1440, "blank", "flow"), 720, "a readable measure");
+	assert.equal(boardWidth(undefined, 1440, "blank", "slides"), 960, "1:1 with a slide's own layout");
+	assert.equal(boardWidth(undefined, 1440, "report", "component"), 1200, "a component board still asks its shape");
+	// The ceiling still wins, which is what makes a phone readable.
+	assert.equal(boardWidth(undefined, 390, "blank", "slides"), 390);
+	// And a width somebody typed is theirs, whatever the format.
+	assert.equal(boardWidth(1400, 1440, "blank", "slides"), 1400);
+});
+
+test("a deck honours a width it was given, and declares it where a deck can", () => {
+	assert.equal(readBoardMeta(renderFormat("slides", "T")).w, 960, "the format's own default");
+	assert.equal(readBoardMeta(renderFormat("slides", "T", { w: 1280 })).w, 1280, "or what was asked for");
+	// Which is what makes it reach the board: `readFlowMeta` takes an HTML deck's size from
+	// this tag, since reveal's markup has nowhere to put one.
+	assert.equal(readBoardMeta(renderFormat("slides", "T", { w: 1280 })).aspect, "16:9", "and the aspect is still there beside it");
+});
+
 test("a new deck is reveal's own format, and this view's rules can read it", () => {
 	const html = renderFormat("slides", "The plan, out loud");
 	// Reveal's structure, which is what makes the file portable: it opens in reveal unchanged.
