@@ -10,7 +10,7 @@ import { renderShell } from "./shell.ts";
  */
 
 test("the shell is a board the loader can read back", () => {
-	const html = renderShell({ path: "boards/notes.md", format: "flow", title: "Notes", w: 720, h: 400 });
+	const html = renderShell({ path: "boards/notes.md", shell: "content", format: "flow", title: "Notes", w: 720, h: 400 });
 	const meta = readBoardMeta(html);
 	assert.equal(meta.title, "Notes");
 	assert.equal(meta.w, 720);
@@ -26,7 +26,7 @@ test("the shell is a board the loader can read back", () => {
  * beyond an unstyled board.
  */
 test("a nested board reaches the same primitives as a top-level one", () => {
-	const nested = renderShell({ path: "boards/talks/2026/notes.md", format: "flow", title: "N", w: 720, h: 400 });
+	const nested = renderShell({ path: "boards/talks/2026/notes.md", shell: "content", format: "flow", title: "N", w: 720, h: 400 });
 	assert.match(nested, /href="\/api\/lib\/board\.css"/);
 	assert.match(nested, /src="\/api\/lib\/board\.js"/);
 	// And the file is addressed relative to the board's own URL, exactly as an `<img src>`
@@ -35,12 +35,12 @@ test("a nested board reaches the same primitives as a top-level one", () => {
 });
 
 test("a deck asks for the slide view, and carries its aspect", () => {
-	const html = renderShell({ path: "boards/talk.slides.md", format: "slides", title: "Talk", w: 960, h: 540, aspect: "4:3" });
+	const html = renderShell({ path: "boards/talk.slides.md", shell: "content", format: "slides", title: "Talk", w: 960, h: 540, aspect: "4:3" });
 	assert.match(html, /data-format="slides"/);
 	assert.match(html, /data-slides="talk\.slides\.md\?raw=1"/);
 	assert.match(html, /data-aspect="4:3"/);
 	// 16:9 is the default, so the common case says nothing rather than repeating it.
-	const plain = renderShell({ path: "boards/talk.slides.md", format: "slides", title: "Talk", w: 960, h: 540 });
+	const plain = renderShell({ path: "boards/talk.slides.md", shell: "content", format: "slides", title: "Talk", w: 960, h: 540 });
 	assert.doesNotMatch(plain, /data-aspect/);
 });
 
@@ -51,7 +51,7 @@ test("a deck asks for the slide view, and carries its aspect", () => {
 test("a title cannot close the tag it is inside", () => {
 	const html = renderShell({
 		path: "boards/x.md",
-		format: "flow",
+		shell: "content", format: "flow",
 		title: '</title><script>fetch("/api/deck")</script>',
 		w: 720,
 		h: 400,
@@ -61,7 +61,7 @@ test("a title cannot close the tag it is inside", () => {
 });
 
 test("a filename with a quote in it cannot escape the attribute", () => {
-	const html = renderShell({ path: 'boards/a" onload="alert(1).md', format: "flow", title: "x", w: 720, h: 400 });
+	const html = renderShell({ path: 'boards/a" onload="alert(1).md', shell: "content", format: "flow", title: "x", w: 720, h: 400 });
 	assert.doesNotMatch(html, /onload="alert/);
 	assert.match(html, /&quot;/);
 });
@@ -72,15 +72,15 @@ test("a filename with a quote in it cannot escape the attribute", () => {
  * anywhere saying why. `?raw=1` is what stops that, which makes it worth its own test.
  */
 test("the file is asked for raw, or the shell would fetch itself", () => {
-	const flow = renderShell({ path: "boards/notes.md", format: "flow", title: "n", w: 720, h: 400 });
+	const flow = renderShell({ path: "boards/notes.md", shell: "content", format: "flow", title: "n", w: 720, h: 400 });
 	assert.match(flow, /data-embed="notes\.md\?raw=1"/);
-	const deck = renderShell({ path: "boards/t.slides.md", format: "slides", title: "t", w: 960, h: 540 });
+	const deck = renderShell({ path: "boards/t.slides.md", shell: "content", format: "slides", title: "t", w: 960, h: 540 });
 	assert.match(deck, /data-slides="t\.slides\.md\?raw=1"/);
 });
 
 test("the one component carries a data-id, so the editor has something to land on", () => {
-	assert.match(renderShell({ path: "boards/n.md", format: "flow", title: "n", w: 720, h: 400 }), /data-id="body"/);
-	assert.match(renderShell({ path: "boards/t.slides.md", format: "slides", title: "t", w: 960, h: 540 }), /data-id="deck"/);
+	assert.match(renderShell({ path: "boards/n.md", shell: "content", format: "flow", title: "n", w: 720, h: 400 }), /data-id="body"/);
+	assert.match(renderShell({ path: "boards/t.slides.md", shell: "content", format: "slides", title: "t", w: 960, h: 540 }), /data-id="deck"/);
 });
 
 /*
@@ -89,8 +89,8 @@ test("the one component carries a data-id, so the editor has something to land o
  * existed. One class, because the CSS is where the two layouts differ.
  */
 test("a presented board says so, and an ordinary one does not", () => {
-	const shown = renderShell({ path: "boards/t.slides.md", format: "slides", title: "t", w: 960, h: 540, present: true });
+	const shown = renderShell({ path: "boards/t.slides.md", shell: "content", format: "slides", title: "t", w: 960, h: 540, present: true });
 	assert.match(shown, /class="board board-shell board-present"/);
-	const onCanvas = renderShell({ path: "boards/t.slides.md", format: "slides", title: "t", w: 960, h: 540 });
+	const onCanvas = renderShell({ path: "boards/t.slides.md", shell: "content", format: "slides", title: "t", w: 960, h: 540 });
 	assert.doesNotMatch(onCanvas, /board-present/);
 });

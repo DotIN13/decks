@@ -177,12 +177,16 @@ export interface Stage {
 	 * - `blank`  — a heading and nothing else
 	 *
 	 * **`format` is what the board is as a file**, which is a different question from its
-	 * shape — an answer can be written as boxes or as prose:
+	 * shape — an answer can be written as boxes or as prose. **All three are single HTML
+	 * files**; only the body says which:
 	 *
-	 * - `component` (default) — absolutely-positioned boxes with `data-id`s. Every board this
-	 *   deck has ever written, and the only format the drag-and-retype editor can work on.
-	 * - `flow` — a `.md` file that reflows. Its height is measured rather than stored, so it
-	 *   cannot clip; write it with an ordinary file write, not with positioned components.
+	 * - `component` (default) — `<body class="board">`, absolutely-positioned boxes with
+	 *   `data-id`s. The only format the drag-and-retype editor can work on.
+	 * - `flow` — `<body class="board flow">`, a document that reflows, with the content in
+	 *   one full-bleed `.doc` component. Ordinary HTML inside it: headings, paragraphs,
+	 *   tables, an `<svg>`, `[data-md]` for a markdown block. Its height is **measured**
+	 *   rather than stored, so it cannot clip, and a double-click edits the file as source
+	 *   rather than as boxes.
 	 * - `slides` — a `.slides.html` deck in **reveal's own format**: one `<section>` per
 	 *   slide inside `.reveal > .slides`. Nested sections become consecutive slides. Speaker
 	 *   notes are `<aside class="notes">`. Every slide is laid out at 960×540 and scaled, so
@@ -196,6 +200,9 @@ export interface Stage {
 	 *
 	 *     const deck = await stage.newBoard({ title: "The plan, out loud", format: "slides" });
 	 *     // -> "boards/the-plan-out-loud.slides.html", three sections in it to replace
+	 *
+	 *     const doc = await stage.newBoard({ title: "Notes on the refresh", format: "flow" });
+	 *     // -> "boards/notes-on-the-refresh.html", one .doc component to write into
 	 *
 	 * **The result tells you the viewport and the width it chose** — `viewport 1440x900 px`,
 	 * then the width with the advice beside it — because that is the moment both are worth

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readBoardMeta } from "../deck/meta.ts";
-import { formatOf } from "../deck/kinds.ts";
+import { formatOf, isComponentBoard, shellFor } from "../deck/kinds.ts";
 import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, extensionFor, isBoardFormat, isBoardTemplate, renderFormat, renderTemplate, slugFor, WIDE_BOARD_W } from "./templates.ts";
 
 test("every kind renders a board the loader can read", () => {
@@ -210,13 +210,41 @@ test("a new deck is reveal's own format, and this view's rules can read it", () 
 	assert.ok(!html.includes("{{"), "no placeholders left");
 });
 
-test("a new document is markdown, with a width it can declare", () => {
-	const md = renderFormat("flow", "Notes on the refresh", { w: 820 });
-	assert.match(md, /^---\ntitle: Notes on the refresh\nw: 820\n---\n/, md.slice(0, 80));
-	assert.match(md, /^# Notes on the refresh$/m);
-	assert.ok(!md.includes("{{"), "no placeholders left");
-	// Markdown, so it must *not* be HTML-escaped: an entity would be shown literally.
-	assert.match(renderFormat("flow", "Tom & Jerry"), /# Tom & Jerry/);
+/*
+ * A flow board is a single HTML file now, not markdown — every board this app writes is.
+ *
+ * Which is only true if the file is a *document*: it has to carry the primitives itself, or
+ * the route would have to wrap it, and a document inside a document is the thing this change
+ * removed. So the assertions are: the two classes that declare what it is, the primitives,
+ * one component for the editor to land on, and no stored height.
+ */
+test("a new document is one HTML file, and a document in its own right", () => {
+	const html = renderFormat("flow", "Notes on the refresh", { w: 820 });
+	assert.match(html, /<body class="board flow">/, "`board` for the primitives, `flow` for the reflow");
+	assert.match(html, /lib\/board\.css/);
+	assert.match(html, /lib\/board\.js/);
+	assert.match(html, /class="doc" data-id="body"/, "one component, so a double-click has something to land on");
+	assert.ok(!html.includes("{{"), "no placeholders left");
+
+	const meta = readBoardMeta(html);
+	assert.equal(meta.w, 820, "the width it was asked for");
+	assert.equal(meta.h, undefined, "and no height: a flow board's is measured, never stored");
+	assert.equal(meta.title, "Notes on the refresh");
+
+	// HTML now, so the title is escaped — it was left raw while this was markdown, where an
+	// entity is shown literally rather than decoded.
+	assert.match(renderFormat("flow", "Tom & Jerry"), /Tom &amp; Jerry/);
+});
+
+test("a flow board is read back as flow, and is not wrapped in a shell", () => {
+	const html = renderFormat("flow", "Notes");
+	assert.equal(formatOf("boards/notes.html", html), "flow", "the body class decides, not the extension");
+	assert.equal(shellFor("boards/notes.html", html), undefined, "it is already a document");
+	// And it is not handed the component editor, which is what the narrower class is for.
+	assert.equal(isComponentBoard(html), false);
+	// A component board is still a component board, which is the regression that would
+	// matter most: every board in the author's own deck is one.
+	assert.equal(formatOf("boards/plan.html", renderTemplate("answer", "T")), "component");
 });
 
 test("a deck's title is escaped, because a deck is HTML", () => {

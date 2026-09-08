@@ -869,6 +869,18 @@
 		for (const element of document.querySelectorAll("[data-slides]")) {
 			work.push(mountSlides(element));
 		}
+		/*
+		 * Maths in a flow board's own markup.
+		 *
+		 * A `[data-md]` component gets KaTeX because the markdown renderer runs it over what
+		 * it rendered. A flow board written as HTML has no such moment — the prose is in the
+		 * file — so `$…$` sat there as three characters. Offered to the whole document rather
+		 * than per component because a flow board *is* one document, and `renderMath` looks
+		 * for a delimiter before loading anything, so a board with no maths pays nothing.
+		 */
+		if (document.body.classList.contains("flow")) {
+			work.push(renderMath(document.body));
+		}
 
 		await Promise.allSettled(work);
 

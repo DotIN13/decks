@@ -124,7 +124,15 @@ say(
 	found.some((board) => board.path === "boards/notes.md" && board.format === "flow"),
 	JSON.stringify(found.map((board) => `${board.format}:${board.path.replace("boards/", "")}`)),
 );
-say("…an HTML file without class=board is flow", (await boardOf("boards/report.html"))?.format === "flow");
+/*
+ * An HTML page with no board class is a document from somewhere else: flow, wrapped in a
+ * shell, and *sandboxed* — it may carry scripts, and a page from elsewhere must not run in
+ * the deck's origin. Which is why it is the one board that keeps a stored height: a
+ * sandboxed frame cannot be measured from outside.
+ */
+say("…an HTML file without a board class is a foreign document", (await boardOf("boards/report.html"))?.format === "flow");
+say("…and is the one board wrapped and sandboxed", (await boardOf("boards/report.html"))?.shell === "foreign", JSON.stringify((await boardOf("boards/report.html"))?.shell));
+say("…while a board this app wrote needs no wrapper", (await boardOf("boards/plan.html"))?.shell === undefined);
 say("…a .slides.md is a deck", (await boardOf("boards/talk.slides.md"))?.format === "slides");
 say("…and a .slides.html is a deck too, whatever its body class says", (await boardOf("boards/native.slides.html"))?.format === "slides");
 say("…and the boards that were already here are untouched", (await boardOf("boards/plan.html"))?.format === "component");
@@ -443,7 +451,8 @@ const menu = await page.evaluate(() =>
 	[...document.querySelectorAll(".popover [data-row]")].map((row) => row.innerText.replace(/\s+/g, " ").trim()),
 );
 say("the new-board button offers three formats", menu.length === 3, JSON.stringify(menu));
-say("…each named by the file it writes", menu.join(" | ").includes(".slides.html") && menu.join(" | ").includes(".md"), JSON.stringify(menu));
+// Every one of them a single HTML file, which is the point of the row of extensions.
+say("…each named by the file it writes, and all three are HTML", menu.filter((row) => row.includes(".html")).length === 3, JSON.stringify(menu));
 
 const before = (await deck()).length;
 await page.locator(".popover [data-row]").filter({ hasText: "Slides" }).click();
@@ -473,6 +482,47 @@ const inFresh = (fn) =>
 		{ body: `return (${fn.toString()})(w, d);`, path: fresh },
 	);
 say("…and it renders its slides straight away", (await inFresh((w) => w?.__deck?.total ?? 0)) >= 2, `${await inFresh((w) => w?.__deck?.total ?? 0)} slides`);
+
+// --- a document, created rather than dropped in ---------------------------------------
+
+/*
+ * The other half of "every board is one HTML file": a flow board written by this app is a
+ * board *document* — `class="board flow"`, the primitives in its own head, one full-bleed
+ * component — so it needs no shell and it measures its own height like any other board.
+ * It used to be a `.md` file, which meant the deck held two kinds of file and one of them
+ * had to be wrapped to be shown at all.
+ */
+await page.locator('button[aria-label="A new board, on the canvas"]').click();
+await settle(page, 600);
+await page.locator(".popover [data-row]").filter({ hasText: "Document" }).click();
+await settle(page, 2500);
+const doc = (await deck()).find((board) => board.format === "flow" && board.path.endsWith(".html") && board.path !== "boards/report.html");
+say("pressing Document makes a flow board", Boolean(doc), JSON.stringify(doc && { path: doc.path, format: doc.format, shell: doc.shell }));
+say("…as a single HTML file, not markdown", doc?.path.endsWith(".html") === true);
+say("…that needs no shell, because it is already a document", doc?.shell === undefined);
+
+await only("Untitled");
+const measured = (await deck()).find((board) => board.path === doc?.path);
+/*
+ * 240 is the placeholder a measured board starts at and 600 is the one a *sandboxed*
+ * document keeps. Neither is what this should be: the real height of one heading and a
+ * paragraph, which is the round trip — the frame measures, the server stores, the deck
+ * reports it back.
+ */
+say(
+	"…and takes the height its own content measured",
+	Boolean(measured && measured.h !== 240 && measured.h !== 600 && measured.h > 40 && measured.h < 400),
+	`${measured?.w}x${measured?.h}`,
+);
+say("…at the width the format asks for", measured?.w === 720, String(measured?.w));
+
+await page.locator(`.board-node[data-path="${doc?.path}"] iframe`).dblclick({ position: { x: 200, y: 40 } });
+await settle(page, 1200);
+say("a double-click opens it as its own source, not as boxes", (await page.locator(".source-area").count()) === 1);
+const html = await page.locator(".source-area").inputValue();
+say("…and the source is the whole HTML file", html.includes('class="board flow"') && html.includes("lib/board.js"), `${html.length} bytes`);
+await page.keyboard.press("Escape");
+await settle(page, 500);
 
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();

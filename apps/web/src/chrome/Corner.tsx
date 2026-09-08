@@ -43,7 +43,7 @@ import { ContextRing } from "./ContextRing.tsx";
  */
 const FORMATS: Array<{ format: "component" | "flow" | "slides"; label: string; extension: string; note: string; icon: LucideIcon }> = [
 	{ format: "component", label: "Board", extension: ".html", note: "Positioned boxes you drag and retype — what a board is here", icon: FilePlus },
-	{ format: "flow", label: "Document", extension: ".md", note: "Markdown that reflows, as tall as its content", icon: FileText },
+	{ format: "flow", label: "Document", extension: ".html", note: "A document that reflows, as tall as its content", icon: FileText },
 	{ format: "slides", label: "Slides", extension: ".slides.html", note: "A reveal deck: one <section> per slide, paged with the arrow keys", icon: Presentation },
 ];
 

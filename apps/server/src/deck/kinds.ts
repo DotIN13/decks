@@ -9,19 +9,36 @@ import type { BoardFormat } from "../boards/templates.ts";
  * - `.slides.html` and `.slides.md` are decks. The double extension rather than a metadata
  *   field, so the file is still an ordinary HTML or markdown file to every other tool, and
  *   so there is exactly one way to say what a file is.
- * - any other `.md` is flow.
- * - any other `.html` is **component if its body carries `class="board"`**, and flow if it
- *   does not.
+ * - any other `.html` is read from its **body class**: `flow` is a document that reflows,
+ *   `board` is the positioned-component kind, and neither of those is a foreign document.
+ * - any other `.md` is flow too — markdown is still read, it is simply no longer what this
+ *   app *writes*. Every board it writes is a single HTML file.
  *
  * `.slides.html` is reveal's own format — `<section>` elements, which is what reveal *is*;
  * its markdown support is a plugin. So an HTML deck is the native one and a `.slides.md` is
  * the plugin's dialect, which is the reverse of the order they were built in here. Both are
  * read by `lib/slides.js`, which picks its splitter from the extension.
  *
- * That last rule is the one that costs nothing. Every board this deck has ever written
- * already says `<body class="board">`, and a pandoc export or a saved page already says the
- * other thing by omitting it — so there is no migration, no metadata to keep in sync, and no
- * way for a file to disagree with itself about what it is.
+ * The body-class rule costs nothing. Every board this deck has ever written already says
+ * `<body class="board">`, and a pandoc export or a saved page already says the other thing
+ * by omitting it — so there is no migration, no metadata to keep in sync, and no way for a
+ * file to disagree with itself about what it is.
+ *
+ * ### Three flow boards, and only one of them is foreign
+ *
+ * `flow` covers a document this app wrote, a markdown file, and an HTML file from somewhere
+ * else. They are not *delivered* the same way, which is what `shellFor` answers:
+ *
+ * - **`class="flow"`** is ours, and the file is already a board document: board.css,
+ *   board.js, and one full-bleed component holding the content. Served as it is, same
+ *   origin, and it measures its own height like any other board.
+ * - **`.md`** is `content`: not a document, so it is wrapped in a synthesised shell that
+ *   renders it into itself (`boards/shell.ts`). A deck is content too, in either dialect —
+ *   the shell is what gives it the `.deck` component and the slide view.
+ * - **an HTML file with neither class** is `foreign`: a saved page or an export. It gets a
+ *   shell as well, and inside a *sandboxed* frame — it may carry scripts, and a document
+ *   from somewhere else must not run in the deck's own origin. The price is that a sandboxed
+ *   frame has no measurable height, so that one board keeps a stored size.
  */
 
 /**
@@ -57,7 +74,31 @@ export function formatOf(path: string, source?: string): BoardFormat {
 	if (MARKDOWN.test(path)) return "flow";
 	if (!HTML.test(path)) return "flow";
 	if (source === undefined) return "component";
-	return isComponentBoard(source) ? "component" : "flow";
+	const classes = bodyClasses(source);
+	// `flow` before `board`, because a flow board written by this app says both: `board` is
+	// what makes the primitives apply, and `flow` is what says the content reflows.
+	if (classes.includes("flow")) return "flow";
+	return classes.includes("board") ? "component" : "flow";
+}
+
+/**
+ * How a board has to be *delivered*, or nothing when the file is already a document.
+ *
+ * `content` is a file that has to be rendered *into* a document — a `.md`, or a deck in
+ * either dialect. `foreign` is an HTML page from somewhere else, which gets a document too
+ * and is put in a sandboxed frame inside it. A component board and a flow board answer
+ * `undefined`: they carry the primitives themselves, and wrapping one would be a document
+ * inside a document.
+ */
+export function shellFor(path: string, source?: string): "content" | "foreign" | undefined {
+	// A deck is content in either dialect: the shell is what gives it the `.deck` component
+	// and the slide view, so `.slides.html` needs one exactly as `.slides.md` does.
+	if (SLIDES.test(path)) return "content";
+	if (MARKDOWN.test(path)) return "content";
+	if (!HTML.test(path)) return "content";
+	if (source === undefined) return undefined;
+	const classes = bodyClasses(source);
+	return classes.includes("flow") || classes.includes("board") ? undefined : "foreign";
 }
 
 /**
@@ -72,11 +113,20 @@ export function formatOf(path: string, source?: string): BoardFormat {
  * word rather than for the value.
  */
 export function isComponentBoard(source: string): boolean {
+	const classes = bodyClasses(source);
+	// A flow board says `board` as well — the primitives are the same — so the narrower
+	// word decides. Without this, every flow board this app writes would be handed the
+	// component editor and asked to be dragged.
+	return classes.includes("board") && !classes.includes("flow");
+}
+
+/** The words on the opening `<body>` tag's class attribute, or none. */
+function bodyClasses(source: string): string[] {
 	const body = /<body\b([^>]*)>/i.exec(source);
-	if (!body) return false;
+	if (!body) return [];
 	const attribute = /class\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(body[1] ?? "");
 	const value = attribute?.[1] ?? attribute?.[2] ?? attribute?.[3] ?? "";
-	return value.split(/\s+/).includes("board");
+	return value.split(/\s+/).filter(Boolean);
 }
 
 /**

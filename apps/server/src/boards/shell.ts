@@ -30,6 +30,16 @@ export interface ShellSpec {
 	/** Deck-relative path of the real file, e.g. `boards/notes.md`. */
 	path: string;
 	format: Exclude<BoardFormat, "component">;
+	/**
+	 * Which kind of content is being wrapped — `deck/kinds.ts` decides, and it is the one
+	 * thing this file cannot work out for itself.
+	 *
+	 * It used to be inferred from the extension: an `.html` flow board was assumed to be a
+	 * page from somewhere else and sandboxed. That was true while a flow board was always
+	 * markdown and is not now — every board this app writes is a single HTML file, and one of
+	 * those is a document in its own right rather than something to wrap.
+	 */
+	shell: "content" | "foreign";
 	title: string;
 	w: number;
 	h: number;
@@ -69,7 +79,7 @@ export function renderShell(spec: ShellSpec): string {
 	 * extension from the *written* path with the query stripped, for its own older reason.
 	 */
 	const file = `${escapeAttribute(basename(spec.path))}?raw=1`;
-	const body = spec.format === "slides" ? slidesBody(file, spec.aspect) : flowBody(file, /\.html?$/i.test(spec.path));
+	const body = spec.format === "slides" ? slidesBody(file, spec.aspect) : flowBody(file, spec.shell === "foreign");
 	return `<!doctype html>
 <html lang="en">
 	<head>
@@ -101,9 +111,11 @@ function flowBody(file: string, framed: boolean): string {
 	 * `framed` is the one asymmetry inside this format, and it is forced rather than chosen.
 	 *
 	 * Markdown is rendered *into* this document, so the component grows to its content and
-	 * the board can report a true height. A plain HTML document goes into a sandboxed,
-	 * opaque-origin iframe — which has no intrinsic height and cannot be measured from
-	 * outside — so it gets the board's height and is resized by dragging the edge.
+	 * the board can report a true height. A document from somewhere else goes into a
+	 * sandboxed, opaque-origin iframe — which has no intrinsic height and cannot be measured
+	 * from outside — so it gets the board's height and is resized by dragging the edge. It is
+	 * sandboxed because it may carry scripts and must not run in the deck's own origin;
+	 * a flow board *this app* wrote never reaches here at all.
 	 */
 	const box = framed ? "left: 0; top: 0; width: 100%; height: 100%" : "left: 0; top: 0; width: 100%";
 	const flag = framed ? " data-framed=\"true\"" : "";

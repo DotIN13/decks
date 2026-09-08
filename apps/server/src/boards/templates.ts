@@ -53,7 +53,19 @@ export const BOARD_FORMATS: readonly BoardFormat[] = ["component", "flow", "slid
  */
 const FORMATS: Record<BoardFormat, { extension: string; template?: string }> = {
 	component: { extension: ".html" },
-	flow: { extension: ".md", template: "flow.md" },
+	/*
+	 * `.html`, not `.md` — every board this app writes is a single HTML file.
+	 *
+	 * A flow board used to be markdown, which meant the deck held two kinds of file and the
+	 * markdown ones had to be wrapped in a synthesised document to be shown at all. An HTML
+	 * flow board *is* the document: it carries board.css and board.js, says
+	 * `class="board flow"`, and holds its content in one full-bleed component. Markdown is
+	 * still read (`deck/kinds.ts`); it is no longer what gets created.
+	 *
+	 * The extension it shares with `component` is not a collision: the body class is what
+	 * says which, and a file cannot disagree with itself about that.
+	 */
+	flow: { extension: ".html", template: "flow.html" },
 	// `.slides.html` rather than `.slides.md`: HTML *is* reveal, and markdown is a plugin in
 	// it. Both are read (`lib/slides.js` picks its splitter from the extension); a deck this
 	// app creates is the native one.
@@ -281,10 +293,9 @@ export function renderFormat(format: Exclude<BoardFormat, "component">, title: s
 	const file = name ? join(templatesDir(), name) : "";
 	const source = file && existsSync(file) ? readFileSync(file, "utf8") : FORMAT_FALLBACK[format];
 	const w = Math.round(size?.w ?? defaultFormatWidth(format));
-	// `{{TITLE}}` is escaped for the HTML deck and left alone for markdown, where an entity
-	// would be shown literally. Which is why this is two branches rather than one replace.
-	const titled = format === "slides" ? escapeHtml(title) : title;
-	return source.replaceAll("{{TITLE}}", titled).replaceAll("{{W}}", String(w));
+	// Both templates are HTML now, so the title is escaped for both. It was left raw for the
+	// markdown one, where an entity is shown literally rather than decoded.
+	return source.replaceAll("{{TITLE}}", escapeHtml(title)).replaceAll("{{W}}", String(w));
 }
 
 /**
@@ -298,7 +309,7 @@ function defaultFormatWidth(format: Exclude<BoardFormat, "component">): number {
 }
 
 const FORMAT_FALLBACK: Record<Exclude<BoardFormat, "component">, string> = {
-	flow: `# {{TITLE}}\n`,
+	flow: `<!doctype html>\n<html lang="en">\n\t<head>\n\t\t<meta charset="utf-8" />\n\t\t<title>{{TITLE}}</title>\n\t\t<meta name="board" content='{"w":{{W}}}' />\n\t\t<link rel="stylesheet" href="../lib/board.css" />\n\t</head>\n\t<body class="board flow">\n\t\t<div class="doc" data-id="body" style="left: 0; top: 0; width: 100%">\n\t\t\t<h1>{{TITLE}}</h1>\n\t\t</div>\n\t\t<script src="../lib/board.js"></script>\n\t</body>\n</html>\n`,
 	slides: `<!doctype html>\n<html lang="en">\n\t<head>\n\t\t<meta charset="utf-8" />\n\t\t<title>{{TITLE}}</title>\n\t</head>\n\t<body class="reveal">\n\t\t<div class="slides">\n\t\t\t<section>\n\t\t\t\t<h1>{{TITLE}}</h1>\n\t\t\t</section>\n\t\t</div>\n\t</body>\n</html>\n`,
 };
 

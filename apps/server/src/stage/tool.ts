@@ -167,7 +167,7 @@ Your code is the body of an async function with \`stage\` in scope; whatever you
 
 **Boards are how you answer.** A question, a design, or a finished piece of work goes on a board rather than into the chat column — the user should not have to read the chat to know what is happening. \`stage.newBoard({ title, kind })\` writes the document shell (kinds: answer, design, report, plan, blank) and returns a path to fill in with write/edit, so a board costs one call instead of fifteen lines of boilerplate; it also tells you the viewport, so you can see what the size you chose will look like.
 
-**Three formats, and \`format\` chooses.** \`component\` (the default) is positioned boxes — every board here, and the only one the drag-and-retype editor can work on. \`flow\` is a \`.md\` file that reflows and measures its own height, so it cannot clip. \`slides\` is a \`.slides.html\` deck in **reveal's own format**: one \`<section>\` per slide inside \`.reveal > .slides\`, notes in \`<aside class="notes">\`, every slide laid out at 960x540 and scaled so nothing reflows when it is presented. Ask for prose as flow and a talk as slides; the extension is derived and is not yours to name.
+**Three formats, and \`format\` chooses. Every one of them is a single HTML file.** \`component\` (the default) is positioned boxes — the only format the drag-and-retype editor can work on. \`flow\` is a document that reflows: \`<body class="board flow">\` with your content in one full-bleed \`.doc\` component, and its height is *measured* rather than stored, so it cannot clip. \`slides\` is a \`.slides.html\` deck in **reveal's own format**: one \`<section>\` per slide inside \`.reveal > .slides\`, notes in \`<aside class="notes">\`, every slide laid out at 960x540 and scaled so nothing reflows when it is presented. Ask for prose as flow and a talk as slides; the extension is derived and is not yours to name.
 
 **Keep the canvas to what matters.** \`stage.show(paths)\` sets what is on the canvas and fits the camera to it. \`stage.hide(paths)\` takes a board off the canvas but keeps it in your context. \`stage.attach\` / \`stage.detach\` are the context itself, which is what the rail beside the canvas lists. The camera never moves unless you call \`show\`.
 
@@ -189,7 +189,7 @@ Board *content* is files — write and edit it with your ordinary tools, not thr
 
 const GUIDELINES = [
 	"Answer on a board: stage.newBoard for the shell, write/edit for the content, stage.show to put it in front of the user.",
-	"Pick the format for the thing: component boxes by default, format: 'flow' for a markdown document that reflows, format: 'slides' for a reveal deck of <section> elements. A board of prose does not want to be positioned boxes.",
+	"Pick the format for the thing: component boxes by default, format: 'flow' for a document that reflows and measures its own height, format: 'slides' for a reveal deck of <section> elements. All three are single HTML files. A board of prose does not want to be positioned boxes.",
 	"Width: the smallest that holds the content. Nothing is capped, but keep a board under about 1200 and inside the viewport — wider is read scaled down, and a long line is one the eye loses its place in. On a small screen make that session's boards small rather than merely narrower, and split a very wide or very tall board in two.",
 	"Reading order: DOM order is visual order, top to bottom. Two components sharing a row go left-first in the file.",
 	/*

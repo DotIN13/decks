@@ -744,11 +744,15 @@ table.table,
 }
 
 /*
- * ── Shell boards ──────────────────────────────────────────────────────────────────────
+ * ── Flow boards and decks ─────────────────────────────────────────────────────────────
  *
- * A markdown file, a plain HTML document, or a slide deck. The file is not a board
- * document, so the server sends one built around it (`boards/shell.ts`) and these are the
- * two components it can contain.
+ * Two components, and they arrive by two routes. A flow board this app wrote is an ordinary
+ * board document that says `class="board flow"` and holds its content in a `.doc`; a
+ * markdown file, a page from somewhere else or a `.slides.md` is *content*, so the server
+ * sends a document built around it (`boards/shell.ts`) carrying the same two components.
+ *
+ * Hence the doubled selectors below: `.board-shell` for what the server wrapped, and
+ * `.board.flow` for the file that needed no wrapping.
  */
 
 /*
@@ -758,7 +762,8 @@ table.table,
  * inside a measured box is height the board grows to hold. The breathing room is on the
  * prose instead, where it belongs and where it is already inherited from `[data-md]`.
  */
-.board-shell .doc {
+.board-shell .doc,
+.board.flow .doc {
 	position: absolute;
 	box-sizing: border-box;
 	width: 100%;
@@ -780,7 +785,8 @@ table.table,
  * kept its own `overflow: auto` would clip the document at whatever height the board
  * happened to be, which is the failure this format exists to make impossible.
  */
-.board-shell .doc.embed {
+.board-shell .doc.embed,
+.board.flow .doc.embed {
 	display: block;
 	overflow: visible;
 	height: auto;
@@ -790,11 +796,13 @@ table.table,
 	box-shadow: none;
 }
 
-.board-shell .doc > .embed-head {
+.board-shell .doc > .embed-head,
+.board.flow .doc > .embed-head {
 	display: none;
 }
 
-.board-shell .doc > .embed-body {
+.board-shell .doc > .embed-body,
+.board.flow .doc > .embed-body {
 	overflow: visible;
 	height: auto;
 	padding: 0;
@@ -826,9 +834,41 @@ table.table,
  * a page rather than a component — the whole board is the reading surface, so the measure is
  * the board's width and the type has to hold a long line.
  */
-.board-shell .doc .embed-body {
+.board-shell .doc .embed-body,
+.board.flow .doc {
 	font-size: 14.5px;
 	line-height: 1.65;
+}
+
+/*
+ * And the prose inside a flow board this app wrote.
+ *
+ * The markdown path gets this from `[data-md]`, which styles what it rendered. A flow board
+ * holds hand-written HTML instead, so the same rhythm is stated here: the first heading sits
+ * flush with the padding, and everything after it is separated rather than crowded.
+ */
+.board.flow .doc > :first-child {
+	margin-top: 0;
+}
+
+.board.flow .doc h1,
+.board.flow .doc h2,
+.board.flow .doc h3 {
+	margin: 1.4em 0 0.5em;
+	line-height: 1.25;
+}
+
+.board.flow .doc p,
+.board.flow .doc ul,
+.board.flow .doc ol,
+.board.flow .doc table,
+.board.flow .doc pre,
+.board.flow .doc blockquote {
+	margin: 0.75em 0 0;
+}
+
+.board.flow .doc li {
+	margin: 0.3em 0;
 }
 
 /* ── A slide deck ─────────────────────────────────────────────────────────────────────

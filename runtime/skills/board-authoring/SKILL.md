@@ -11,12 +11,31 @@ not scroll or reflow, so the author is responsible for placement and sizing.
 Use boards for answers, designs, reports, diagrams, or other visual work where the user
 should be able to inspect and rearrange the result.
 
+## Three formats, all of them one HTML file
+
+`format` on `newBoard` chooses; the **body class** is what the file says about itself, and it
+is the only declaration there is.
+
+| format | body | what it is |
+| --- | --- | --- |
+| `component` | `class="board"` | positioned boxes — the rest of this document |
+| `flow` | `class="board flow"` | a document that reflows, in one full-bleed `.doc` component; its height is **measured**, so it cannot clip |
+| `slides` | `class="reveal"`, named `.slides.html` | a reveal deck: one `<section>` per slide inside `.reveal > .slides` |
+
+A `.md` file dropped into `boards/` is still read as `flow`, and an `.html` page with no
+board class is treated as a document from somewhere else — wrapped and *sandboxed*, since it
+may carry scripts. Neither is what this app writes: every board it creates is a single HTML
+file.
+
+Prose wants `flow`, a talk wants `slides`, and everything else wants the default. A wall of
+positioned boxes holding paragraphs is a `flow` board somebody made the hard way.
+
 ## Create the board
 
 Start with:
 
 ```ts
-stage.newBoard({ title, kind })
+stage.newBoard({ title, kind, format })
 ```
 
 It reports the **viewport** and the **width it chose** with the path it returns — `viewport

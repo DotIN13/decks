@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { defaultWidth, formatOf, isBoardFile, isComponentBoard, slideHeight } from "./kinds.ts";
+import { defaultWidth, formatOf, isBoardFile, isComponentBoard, shellFor, slideHeight } from "./kinds.ts";
 
 /*
  * The rule that made this cheap: an HTML board says what it is by the class on its body,
@@ -68,6 +68,46 @@ test("an HTML deck is a deck, whatever its body says", () => {
 test("an HTML path with no source read yet is assumed to be a board", () => {
 	assert.equal(formatOf("boards/plan.html"), "component");
 	assert.equal(formatOf("boards/notes.md"), "flow", "markdown needs no source to be sure");
+});
+
+/*
+ * The flow board this app writes, which is HTML and is *not* a component board.
+ *
+ * Both words are on the body: `board` makes the primitives apply and `flow` says the content
+ * reflows. The narrower one has to win, or every flow board would be handed the component
+ * editor and asked to be dragged.
+ */
+test("class=flow is a flow board, even though it also says board", () => {
+	const ours = '<body class="board flow"><div class="doc" data-id="body"><h1>Notes</h1></div></body>';
+	assert.equal(formatOf("boards/notes.html", ours), "flow");
+	assert.equal(isComponentBoard(ours), false);
+	// Order and quoting do not matter, as with any class list.
+	assert.equal(formatOf("boards/notes.html", "<body class='flow board'></body>"), "flow");
+	assert.equal(formatOf("boards/notes.html", '<body class="board  flow  dark"></body>'), "flow");
+});
+
+/*
+ * Which boards are documents already, and which are content that has to be wrapped.
+ *
+ * This is the whole reason `shellFor` exists apart from `formatOf`: three different files are
+ * all `flow`, and one of them — a page from somewhere else — has to end up sandboxed, while
+ * the flow board this app writes must not be wrapped at all.
+ */
+test("only raw content needs a shell", () => {
+	assert.equal(shellFor("boards/notes.html", '<body class="board flow"></body>'), undefined, "ours: already a document");
+	assert.equal(shellFor("boards/plan.html", '<body class="board"></body>'), undefined, "a component board, likewise");
+	// A deck is content in either dialect: the shell is what gives it the slide view.
+	assert.equal(shellFor("boards/talk.slides.html", '<body class="reveal"></body>'), "content", "a deck is rendered into a document");
+	assert.equal(shellFor("boards/notes.md"), "content", "rendered into a document rather than being one");
+	assert.equal(shellFor("boards/talk.slides.md"), "content");
+	assert.equal(
+		shellFor("boards/report.html", "<html><body><h1>Exported</h1></body></html>"),
+		"foreign",
+		"a saved page: wrapped, and sandboxed, because it may carry scripts",
+	);
+	// With no source read yet, an HTML file is assumed to be one of ours — the same
+	// asymmetry `formatOf` makes, and for the same reason.
+	assert.equal(shellFor("boards/plan.html"), undefined);
 });
 
 test("the glob, as a predicate", () => {

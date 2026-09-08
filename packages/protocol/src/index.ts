@@ -36,6 +36,20 @@ export interface Board {
 	 * are all decided from this, and asking the frame would mean deciding them a beat late.
 	 */
 	format: "component" | "flow" | "slides";
+	/**
+	 * How the frame has to be *given* this board, when the file is not a document already.
+	 *
+	 * Absent for a component board and for a flow board: both are complete documents this
+	 * app wrote. Present for a file that has to be rendered *into* one — `content`, which is
+	 * a `.md` or a deck in either dialect — and for `foreign`, an HTML page from somewhere
+	 * else, which gets a document too and is put in a sandboxed frame inside it because it
+	 * may carry scripts.
+	 *
+	 * On the wire because the browser sizes on it: a sandboxed page cannot be measured from
+	 * outside, so that one board keeps a stored height where every other flow board reports
+	 * its own.
+	 */
+	shell?: "content" | "foreign";
 	x: number;
 	y: number;
 	w: number;

@@ -93,14 +93,18 @@ export function createHttpApp(app: App): Express {
 			/*
 			 * A board that is not a document gets one made for it.
 			 *
-			 * Markdown, a deck, and a plain HTML page are all *content* rather than board
-			 * documents, so the frame is sent a shell that renders them (`boards/shell.ts`).
-			 * The board record is what decides — it already knows the format, the size and
-			 * the title, and re-deriving them here would be a second opinion that can differ
+			 * Two kinds of file need that, and `board.shell` names which: a `.md` is content
+			 * rather than a document, and an HTML page from somewhere else has to be wrapped
+			 * so it can be put in a *sandboxed* frame. Everything this app writes — a
+			 * component board, a flow board, an HTML deck — is already a document and falls
+			 * straight through to the file.
+			 *
+			 * The board record is what decides, because it already knows the format, the size
+			 * and the title; re-deriving them here would be a second opinion that can differ
 			 * from the one the canvas laid the board out with.
 			 *
 			 * Anything the deck knows nothing about — an asset, `lib/board.css` — falls
-			 * through to the file itself, which is what every non-board request is.
+			 * through as well, which is what every non-board request is.
 			 */
 			/*
 			 * `?raw=1` is the shell asking for the file it wraps.
@@ -111,11 +115,18 @@ export function createHttpApp(app: App): Express {
 			 * the shell stays *relative* and a nested board resolves its own sibling.
 			 */
 			const board = req.query.raw === undefined ? app.deck.board(normalizeBoardPath(requested)) : undefined;
-			if (board && board.format !== "component") {
+			/*
+			 * `format !== "component"` is a narrowing rather than a second condition: a board
+			 * that needs a shell is never a component board — `shellFor` only answers for a
+			 * `.md` file or an HTML page with no board class, and `formatOf` calls both of
+			 * those flow. Written out so the compiler knows it too.
+			 */
+			if (board?.shell && board.format !== "component") {
 				res.type("html").send(
 					renderShell({
 						path: board.path,
 						format: board.format,
+						shell: board.shell,
 						title: board.title,
 						w: board.w,
 						h: board.h,

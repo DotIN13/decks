@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>{{TITLE}}</title>
+		<!--
+			No height: a flow board's is measured, never stored. The browser reports what its
+			content came to and the deck follows, so this board cannot clip. Drag the right
+			edge to change the measure and the height follows on its own.
+		-->
+		<meta name="board" content='{"w":{{W}},"bg":"plain"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<!--
+		`flow` beside `board` is the whole declaration.
+
+		`board` is what makes the primitives apply; `flow` is what says the content reflows
+		rather than sitting in boxes you place. Together they make this file a board Decks
+		wrote, served as it is — same origin, no wrapper — where an HTML file with neither
+		class is treated as a document from somewhere else and sandboxed.
+	-->
+	<body class="board flow">
+		<!--
+			One component, full width, and the document goes inside it.
+
+			Ordinary HTML: headings, paragraphs, lists, tables, `<img>`, an `<svg>` you drew.
+			`[data-md]` renders markdown and maths if you would rather write a block that way,
+			and `[data-embed]` shows a file. A double-click opens this file as its own source.
+
+			Lead with the finding, be concise, and give the document sections — Summary,
+			Overview, Problem, Research question, Method, Result, Todos, Next — so it can be
+			read by scanning its headings.
+		-->
+		<div class="doc" data-id="body" style="left: 0; top: 0; width: 100%">
+			<h1>{{TITLE}}</h1>
+			<p>…</p>
+		</div>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

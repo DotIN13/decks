@@ -3,7 +3,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
 import { readBoardMeta, readFlowMeta } from "./meta.ts";
-import { defaultWidth, formatOf, isBoardFile, slideHeight } from "./kinds.ts";
+import { defaultWidth, formatOf, isBoardFile, shellFor, slideHeight } from "./kinds.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
@@ -347,6 +347,8 @@ export class Deck {
 		const absolute = join(this.path, path);
 		const source = readFileSync(absolute, "utf8");
 		const format = formatOf(path, source);
+		// Whether the file is a document already, or content that has to be wrapped in one.
+		const shell = shellFor(path, source);
 		const meta = format === "component" ? readBoardMeta(source) : readFlowMeta(path, source);
 		// Recorded here rather than in `resync` so that every path that reads a board —
 		// the first load, a watcher event, a `resync` — leaves the same mark behind.
@@ -372,17 +374,22 @@ export class Deck {
 				? meta.h ?? DEFAULT_H
 				: format === "slides"
 					? slideHeight(width, meta.aspect)
-					: // A framed flow board (a plain HTML document) cannot measure itself, so its
-						// placeholder has to be a usable size rather than one that grows. Markdown
-						// gets the short one, because a board that grows into its content on load
-						// looks like it is arriving where one that shrinks looks broken.
-						(stored?.h ?? (/\.html?$/i.test(path) ? 600 : 240));
+					: /*
+						 * A *sandboxed* flow board — a document from somewhere else — cannot measure
+						 * itself, so its placeholder has to be a usable size rather than one that
+						 * grows into its content. Everything else gets the short one, because a board
+						 * that grows on load looks like it is arriving where one that shrinks looks
+						 * broken. Keyed on the shell rather than on the extension: a flow board this
+						 * app wrote is HTML too, and it measures itself like any other board.
+						 */
+						(stored?.h ?? (shell === "foreign" ? 600 : 240));
 		return {
 			path,
 			// `.slides.html` before `.html`, or a deck with no title of its own is called
 			// `talk.slides` in the rail.
 			title: meta.title ?? basename(path).replace(/\.(slides\.(?:html?|md)|html?|mdx?)$/i, ""),
 			format,
+			...(shell ? { shell } : {}),
 			x: 0,
 			y: 0,
 			w: width,

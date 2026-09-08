@@ -22,6 +22,13 @@ Boards right now:
 
 ## How to write a board
 
+Three formats, and every one of them is a single HTML file. The **body class** is the whole
+declaration: `class="board"` is the positioned-component kind described below,
+`class="board flow"` is a document that reflows — one full-bleed `.doc` component, height
+measured rather than stored, so it cannot clip — and a `.slides.html` with `class="reveal"`
+is a deck of `<section>` slides. `stage.newBoard({ format })` writes any of them. Prose wants
+`flow`; a wall of positioned boxes holding paragraphs is a flow board made the hard way.
+
 Every board is a whole document that must render on its own. Start from this shape:
 
 ```html
