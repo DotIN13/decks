@@ -97,18 +97,6 @@
 		background: rgb(255 255 255 / 22%);
 	}
 
-	/*
-	 * The Present button in a deck's title bar. `.hide`-shaped — it lives in the same
-	 * revealed slot the × does — but with a word instead of a glyph, because "present" has
-	 * no icon anybody reads correctly and this is the one control worth spelling out.
-	 */
-	.board-node .chrome .present-open {
-		width: auto;
-		padding: 0 7px;
-		font-size: 10.5px;
-		letter-spacing: 0.02em;
-	}
-
 	.present-count {
 		min-width: 54px;
 		color: rgb(255 255 255 / 70%);

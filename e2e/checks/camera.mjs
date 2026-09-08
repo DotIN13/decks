@@ -161,14 +161,18 @@ const embeds = await page.evaluate(() => {
 	const frame = [...document.querySelectorAll(".board-node iframe")].find((f) => f.src.includes("sources"));
 	const doc = frame?.contentDocument;
 	return {
-		canvases: doc?.querySelectorAll('[data-id="paper"] canvas.page').length ?? -1,
+		// Images, not canvases: a rendered page is swapped for a picture of itself, because a
+		// canvas is re-uploaded to the compositor on every frame of a gesture (`board.js`).
+		pages: doc?.querySelectorAll('[data-id="paper"] img.page').length ?? -1,
+		canvases: doc?.querySelectorAll('[data-id="paper"] canvas').length ?? -1,
 		note: doc?.querySelector('[data-id="paper"] .note')?.textContent ?? "",
 		md: (doc?.querySelector('[data-id="notes"] .embed-body h1')?.textContent ?? "").trim(),
 		nested: doc?.querySelector('[data-id="report"] iframe')?.getAttribute("sandbox") ?? null,
 		missing: doc?.querySelector('[data-id="missing"]')?.dataset?.kind ?? null,
 	};
 });
-say("pdf renders the requested pages", embeds.canvases === 2, `${embeds.canvases} canvases, header "${embeds.note}"`);
+say("pdf renders the requested pages", embeds.pages === 2, `${embeds.pages} pages, header "${embeds.note}"`);
+say("…as pictures, with no canvas left behind to re-upload on every frame", embeds.canvases === 0, `${embeds.canvases} canvases`);
 say("markdown embed renders", embeds.md === "Session notes", `h1 "${embeds.md}"`);
 say("foreign html is in a sandboxed nested frame", embeds.nested === "allow-scripts", `sandbox="${embeds.nested}"`);
 say("an unresolvable embed says so", embeds.missing === "missing", `kind=${embeds.missing}`);
@@ -230,13 +234,41 @@ for (let step = 0; step < 10; step++) {
 	await settle(page, 60);
 }
 await settle(page, 900);
-const bars = await page.evaluate(() => ({
-	nodes: document.querySelectorAll(".board-node").length,
-	documents: document.querySelectorAll(".board-node iframe").length,
-	bars: document.querySelectorAll(".board-node > .chrome").length,
-}));
+/*
+ * Bars are counted against the boards within a viewport of the screen — the margin the
+ * stage loads documents for — rather than against the documents, because the two are no
+ * longer the same set: a document outlives its board leaving the screen by a few seconds
+ * (below), and a bar must not.
+ */
+const barsNow = () =>
+	page.evaluate(() => {
+		const near = [...document.querySelectorAll(".board-node")].filter((node) => {
+			const r = node.getBoundingClientRect();
+			return r.right > -innerWidth && r.left < 2 * innerWidth && r.bottom > -innerHeight && r.top < 2 * innerHeight;
+		}).length;
+		return {
+			nodes: document.querySelectorAll(".board-node").length,
+			near,
+			documents: document.querySelectorAll(".board-node iframe").length,
+			bars: document.querySelectorAll(".board-node > .chrome").length,
+		};
+	});
+const bars = await barsNow();
 say("a board that is off screen draws no title bar", bars.bars < bars.nodes, JSON.stringify(bars));
-say("…and every board that is on screen still has one", bars.bars === bars.documents, JSON.stringify(bars));
+say("…and every board that is on screen still has one", bars.bars === bars.near, JSON.stringify(bars));
+/*
+ * 6. A document outlives its board leaving the screen, by a moment.
+ *
+ * Zooming in puts every other board outside the margin within a few steps, and zooming out
+ * brings them back: unloading on the way in and parsing again on the way out was 37ms per
+ * step of `Document::shutdown` in the middle of the gesture, and every document rebuilt in
+ * the middle of the next. So the boards that just left are still documents here — and are
+ * let go once they have been gone for a few seconds.
+ */
+say("…while the boards that just left the screen keep their documents for now", bars.documents === bars.nodes, `${bars.documents} of ${bars.nodes}`);
+await settle(page, 3600);
+const later = await barsNow();
+say("…and are let go once they have been gone a few seconds", later.documents < later.nodes && later.documents >= later.bars, JSON.stringify(later));
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

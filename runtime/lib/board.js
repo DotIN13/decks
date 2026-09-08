@@ -386,8 +386,36 @@
 			canvas.height = Math.ceil(viewport.height);
 			body.appendChild(canvas);
 			await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+			await stillPicture(canvas);
 		}
 		return `${doc.numPages} page${doc.numPages === 1 ? "" : "s"}`;
+	}
+
+	/**
+	 * A rendered page is kept as an image, not left on the canvas it was drawn on.
+	 *
+	 * A `<canvas>` is a drawing surface, and the browser treats it as one for as long as it
+	 * exists: while the board is being panned or zoomed, every frame re-uploads each canvas's
+	 * pixels to the compositor as if something might have drawn on it — about 2ms per page at
+	 * 4× CPU throttle, paid on every step of every gesture for the life of the board. Nothing
+	 * ever draws on it again, so the same pixels as an `<img>` are a picture the compositor
+	 * keeps. The swap waits for the image to load, so `__boardReady` still means visible.
+	 */
+	function stillPicture(canvas) {
+		return new Promise((resolve) => {
+			canvas.toBlob((blob) => {
+				if (!blob) return resolve();
+				const image = document.createElement("img");
+				image.className = canvas.className;
+				image.width = canvas.width;
+				image.height = canvas.height;
+				image.alt = "";
+				image.addEventListener("load", () => resolve(), { once: true });
+				image.addEventListener("error", () => resolve(), { once: true });
+				image.src = URL.createObjectURL(blob);
+				canvas.replaceWith(image);
+			}, "image/png");
+		});
 	}
 
 	// --- embeds ------------------------------------------------------------------

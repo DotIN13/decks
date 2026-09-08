@@ -255,8 +255,18 @@ export function mountDeck(host, source, options) {
 	 * mermaid diagram takes long enough that re-rendering it is visible.
 	 */
 	const drawn = new Map();
-	const slideEl = (index, into) => {
-		const key = `${index}:${into === sheet ? "sheet" : "stage"}`;
+	/**
+	 * `where` is passed rather than inferred from `into`, and that is the bug this replaces.
+	 *
+	 * The key used to be read off the container — `into === sheet ? "sheet" : "stage"` — but
+	 * a contact-sheet slide is appended to its *cell*, never to the sheet itself. So every
+	 * thumbnail was filed under the stage's key: building the sheet handed back the elements
+	 * already standing on the stage (those cells came out empty) and moved the rest into
+	 * cells (those slides came out blank on the stage, paging forwards or back). One deck
+	 * looked at zoomed out and then zoomed into was mostly empty rectangles.
+	 */
+	const slideEl = (index, into, where) => {
+		const key = `${index}:${where}`;
 		if (drawn.has(key)) return drawn.get(key);
 		const el = document.createElement("div");
 		el.className = "slide";
@@ -301,7 +311,7 @@ export function mountDeck(host, source, options) {
 		const clamped = Math.max(0, Math.min(slides.length - 1, next));
 		at = clamped;
 		for (const el of stage.querySelectorAll(".slide")) el.hidden = true;
-		const showing = slideEl(at, stage);
+		const showing = slideEl(at, stage, "stage");
 		showing.hidden = false;
 		count.textContent = `${at + 1} / ${slides.length}`;
 		back.disabled = at === 0;
@@ -326,7 +336,7 @@ export function mountDeck(host, source, options) {
 			cell.className = "sheet-cell";
 			cell.dataset.on = String(index === at);
 			sheet.appendChild(cell);
-			slideEl(index, cell);
+			slideEl(index, cell, "sheet");
 		}
 	};
 

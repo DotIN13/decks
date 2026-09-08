@@ -1,5 +1,5 @@
 import type { Board, Camera, ChatItem } from "@decks/protocol";
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
 import { canvasBox } from "../lib/insets.ts";
 import { BoardFrame } from "./BoardFrame.tsx";
@@ -261,8 +261,11 @@ export function Stage(props: {
 	 * one the canvas already uses for pointer events, so the sheet appears exactly where a
 	 * deck stops being pageable.
 	 */
+	// A memo, so the frames are only asked when the answer changes — not on every frame
+	// of a gesture, which is how often the camera does.
+	const decksMode = createMemo(() => deckMode(props.camera.zoom, INTERACT_ZOOM));
 	createEffect(() => {
-		const mode = deckMode(props.camera.zoom, INTERACT_ZOOM);
+		const mode = decksMode();
 		for (const board of props.boards) {
 			if (board.format !== "slides") continue;
 			deckIn(board.path)?.setMode(mode);
@@ -311,6 +314,7 @@ export function Stage(props: {
 
 	const pushCamera = (cam: Camera) => {
 		if (cam.zoom !== localCamera.zoom) nowScaling();
+		lastMoved = performance.now();
 		localCamera = cam;
 		writeTransform(cam);
 		pendingCamera = cam;
@@ -390,10 +394,29 @@ export function Stage(props: {
 		}
 	};
 
+	/**
+	 * Where the stage sits in the window, read at most every quarter second.
+	 *
+	 * Every gesture converts client coordinates to stage ones, and `getBoundingClientRect`
+	 * on every event is a forced layout on every event — free while nothing is dirty, and
+	 * a full layout of every board's title bar during a pinch, when they are. The stage is
+	 * the window minus nothing (`inset: 0` inside `.work`), so it moves only when the
+	 * window does, and a reading a few hundred milliseconds old is the same reading.
+	 */
+	let origin = { left: 0, top: 0, at: Number.NEGATIVE_INFINITY };
+	const stageOrigin = () => {
+		const now = performance.now();
+		if (now - origin.at > 250) {
+			const rect = element.getBoundingClientRect();
+			origin = { left: rect.left, top: rect.top, at: now };
+		}
+		return origin;
+	};
+
 	/** Where the pointer is, in stage coordinates rather than page ones. */
 	const local = (event: { clientX: number; clientY: number }) => {
-		const rect = element.getBoundingClientRect();
-		return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+		const at = stageOrigin();
+		return { x: event.clientX - at.left, y: event.clientY - at.top };
 	};
 
 	/**
@@ -466,8 +489,8 @@ export function Stage(props: {
 	 * conversion existing in one place instead of two is meant to stop.
 	 */
 	const fingerOf = (event: PointerEvent): Finger => {
-		const rect = element.getBoundingClientRect();
-		return { id: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top };
+		const at = stageOrigin();
+		return { id: event.pointerId, x: event.clientX - at.left, y: event.clientY - at.top };
 	};
 
 	/** One finger's worth of a gesture, from this document or from a board's. */
@@ -616,6 +639,18 @@ export function Stage(props: {
 		space: (held) => setSpaceHeld(held),
 		spaceHeld: () => spaceHeld(),
 		interactive: () => localCamera.zoom >= INTERACT_ZOOM,
+		/*
+		 * Where a world point is on the stage right now, from the camera the gestures are
+		 * moving — `localCamera`, which is written synchronously in the same handler that
+		 * moves the world, so a frame asking mid-gesture gets the camera its event was
+		 * dispatched against. This is what lets a board frame convert a finger without
+		 * measuring itself: `getBoundingClientRect` on a frame is a forced layout of the
+		 * whole stage, and a pinch had two of them per step.
+		 */
+		screenOf: (world) => {
+			const at = toScreen(localCamera, view(), world);
+			return { x: at.x, y: at.y, scale: localCamera.zoom };
+		},
 		key: (name) => shortcut(name),
 		/*
 		 * Same three keys as the window handler above, and deliberately the same code path —
@@ -689,7 +724,7 @@ export function Stage(props: {
 	};
 
 	/**
-	 * Which boards get a live document.
+	 * Which boards are on screen, or within a viewport of it.
 	 *
 	 * A board off screen is a document not loaded — three of them is nothing, but a
 	 * deck of forty each pulling pdf.js is a browser on its knees. The margin is
@@ -707,6 +742,70 @@ export function Stage(props: {
 			bottomRight.y > -margin.y &&
 			topLeft.y < v.height + margin.y
 		);
+	};
+
+	/**
+	 * How long a board that has left the screen keeps its document.
+	 *
+	 * Visibility decides which boards *get* a document; this decides when one is taken
+	 * away, and the two are deliberately not the same moment. Zooming in on a phone puts
+	 * every other board outside the margin within a few steps, and zooming back out brings
+	 * them all back — so a document was torn down in the middle of one gesture and parsed
+	 * again in the middle of the next: `board.css`, `board.js`, KaTeX, Mermaid, for every
+	 * board, while the finger was still moving. Measured on 17 boards at 4× CPU throttle,
+	 * a wheel zoom in and out spent 37ms per step in `Document::shutdown` alone and more
+	 * again re-parsing, against 8ms of everything else.
+	 *
+	 * So a board that leaves the screen is kept until it has been gone for a few seconds
+	 * **and the camera has been still for one** — a document is never let go in the middle
+	 * of a gesture, however long the gesture. A board zoomed away from and back to costs
+	 * nothing the second time; a board really left behind is let go once the canvas is
+	 * quiet, from an idle callback rather than from inside whatever the user is doing
+	 * then. The memory cost is bounded by how many boards one gesture can pass over.
+	 */
+	const KEEP_MS = 3000;
+	/** How long the camera has to have been still before a document is taken away. */
+	const QUIET_MS = 1000;
+	const lastSeen = new Map<string, number>();
+	let lastMoved = 0;
+	const [sweep, setSweep] = createSignal(0);
+	let sweeper: ReturnType<typeof setTimeout> | undefined;
+	const sweepLater = (after: number) => {
+		if (sweeper !== undefined) return;
+		sweeper = setTimeout(() => {
+			sweeper = undefined;
+			const still = performance.now() - lastMoved;
+			// Not yet: the camera is moving. Ask again once it has had time to stop.
+			if (still < QUIET_MS) return sweepLater(QUIET_MS - still + 50);
+			const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
+			if (idle) idle(() => setSweep((n) => n + 1), { timeout: 1000 });
+			else setSweep((n) => n + 1);
+		}, after);
+	};
+	onCleanup(() => clearTimeout(sweeper));
+
+	/** Whether a board has a document: on screen now, or was within the last `KEEP_MS`. */
+	const isMounted = (board: Board): boolean => {
+		void sweep();
+		const now = performance.now();
+		if (isVisible(board)) {
+			lastSeen.set(board.path, now);
+			return true;
+		}
+		const seen = lastSeen.get(board.path);
+		if (seen === undefined) return false;
+		const gone = now - seen;
+		const still = now - lastMoved;
+		/*
+		 * Both conditions, here as well as in the timer: this runs on every camera change,
+		 * and a board whose grace ran out mid-gesture must not be dropped by the very step
+		 * that asked. Come back once both have passed, so the document is let go then.
+		 */
+		if (gone < KEEP_MS || still < QUIET_MS) {
+			sweepLater(Math.max(KEEP_MS - gone, QUIET_MS - still) + 50);
+			return true;
+		}
+		return false;
 	};
 
 	// Fit everything the first time boards arrive, so the deck opens looking at
@@ -739,7 +838,8 @@ export function Stage(props: {
 						<BoardFrame
 							board={board}
 							camera={props.camera}
-							mounted={isVisible(board)}
+							mounted={isMounted(board)}
+							visible={isVisible(board)}
 							selected={props.selected === board.path}
 							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
 							{...(board.format === "slides" && props.onPresent

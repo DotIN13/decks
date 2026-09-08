@@ -340,6 +340,54 @@ const big = await zoomTo(false);
 await settle(page, 1200);
 say("zoomed back in, it is one slide again", await inDeck((_w, d) => d?.querySelector(".deck-sheet")?.hidden === true), `at ${big}%`);
 
+/*
+ * Every cell has a slide in it, and every slide still works after the round trip.
+ *
+ * Both halves of one bug, which is why they are asserted together. A thumbnail is appended
+ * to its *cell*, so the cache that stops a slide being rendered twice was filing every
+ * thumbnail under the stage's key: the cells whose slides were already on the stage came out
+ * empty, and the slides that were built for a cell were then handed to the stage — where
+ * they were not, so paging showed an empty board in both directions. A deck looked at zoomed
+ * out and then zoomed back into was mostly blank rectangles.
+ */
+say(
+	"…every cell of the sheet has its slide in it",
+	await inDeck((_w, d) => [...(d?.querySelectorAll(".sheet-cell") ?? [])].every((cell) => cell.querySelector(".slide"))),
+);
+const drawnNow = () => inDeck((_w, d) => (d?.querySelector(".deck-stage .slide:not([hidden])")?.textContent ?? "").trim().length > 0);
+await page.locator('.board-node[data-path="boards/talk.slides.md"] iframe').click({ position: { x: 300, y: 200 } });
+await settle(page, 400);
+await page.keyboard.press("ArrowRight");
+await settle(page, 400);
+say("…and after the sheet, → still draws the slide it moves to", await drawnNow(), `slide ${await at()}`);
+await page.keyboard.press("ArrowLeft");
+await settle(page, 400);
+say("…and ← does too", (await drawnNow()) && (await at()) === 0, `slide ${await at()}`);
+
+/*
+ * Present sits beside the ×, not halfway along the bar.
+ *
+ * Two buttons that each ask for `margin-left: auto` share the free space between them, so
+ * the two controls at the right-hand end of a deck's title bar were 500px apart on a
+ * 1500px board. They are one group now, and this is the assertion that says so — measured,
+ * because the rule that broke it was invisible in the markup.
+ */
+await page.locator('.board-node[data-path="boards/talk.slides.md"] .chrome').hover();
+await settle(page, 300);
+const presentBox = await page.locator('.board-node[data-path="boards/talk.slides.md"] .present-open').boundingBox();
+const closeBox = await page.locator('.board-node[data-path="boards/talk.slides.md"] .chrome .hide:not(.present-open)').boundingBox();
+say(
+	"Present sits next to the board's close button",
+	closeBox.x - (presentBox.x + presentBox.width) < 8,
+	`${Math.round(closeBox.x - (presentBox.x + presentBox.width))}px apart`,
+);
+/*
+ * And it is wide enough to hold the word. `.hide` sets an 18px square and this button
+ * borrows the rest of that shape, so a `width: auto` written in a stylesheet the app
+ * imports *earlier* lost the tie and the label was clipped to a single letter's worth.
+ */
+say("…and is wide enough to read", presentBox.width > 40, `${Math.round(presentBox.width)}px`);
+
 // --- the source editor ----------------------------------------------------------------
 
 await only("Session notes");

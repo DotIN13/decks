@@ -79,6 +79,11 @@ export interface FrameGestureHost {
 	/** Whether the stage is currently letting the frame have pointer events at all. */
 	interactive(): boolean;
 	/**
+	 * Where a world point is on the stage, and the zoom — from the camera as the gestures
+	 * have moved it, not as the DOM has been asked to lay it out.
+	 */
+	screenOf(world: { x: number; y: number }): { x: number; y: number; scale: number };
+	/**
 	 * A camera shortcut pressed while focus was inside a board.
 	 *
 	 * Returns whether it meant something, so the frame knows whether to swallow it.
@@ -103,31 +108,39 @@ export interface FrameGestureHost {
 	slide(action: SlideAction): boolean;
 }
 
-export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGestureHost): () => void {
+/**
+ * @param place Where the board's top-left corner is, in world coordinates — including the
+ * ghost position while its title bar is being dragged, which is why it is asked each time.
+ */
+export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGestureHost, place: () => { x: number; y: number }): () => void {
 	const document = frame.contentDocument;
 	const view = frame.contentWindow;
 	if (!document || !view) return () => {};
 	const doc = document;
 	const win = view;
 
-	/** Board pixels -> stage pixels, and where the frame sits on screen. */
-	// Cached once: clientWidth never changes, and the stage's screen offset is stable
-	// between resizes (it fills the viewport). Reading these on every event forced
-	// a DOM query + two layout calls at 60–120 Hz.
-	const cachedClientWidth = frame.clientWidth;
-	const stageR = frame.ownerDocument.querySelector(".stage")?.getBoundingClientRect();
-	const cachedStageLeft = stageR?.left ?? 0;
-	const cachedStageTop = stageR?.top ?? 0;
-
+	/**
+	 * Where the frame is on the stage, and how large it is drawn: arithmetic, not a
+	 * measurement.
+	 *
+	 * This used to be `frame.getBoundingClientRect()` on every wheel and every finger
+	 * movement. That is a forced layout of the *parent* document each time — free while
+	 * nothing is dirty, and during a pinch everything is: every title bar on the canvas has
+	 * just had its width rewritten, so each of the two fingers' events paid for laying all
+	 * of them out again before it could be converted. The stage knows exactly where a world
+	 * point is from the camera it has just moved (`host.screenOf`), and the frame sits at
+	 * the board's own corner, so the position is three multiplications and the answer is
+	 * the same one the layout would have given — the camera is written synchronously in the
+	 * handler, so the two never disagree.
+	 */
 	const geometry = () => {
-		const rect = frame.getBoundingClientRect();
-		const scale = cachedClientWidth > 0 ? rect.width / cachedClientWidth : 1;
-		return { rect, scale, stageLeft: cachedStageLeft, stageTop: cachedStageTop };
+		const at = host.screenOf(place());
+		return { left: at.x, top: at.y, scale: at.scale };
 	};
 
 	const toStage = (clientX: number, clientY: number) => {
-		const { rect, scale, stageLeft, stageTop } = geometry();
-		return { x: rect.left + clientX * scale - stageLeft, y: rect.top + clientY * scale - stageTop };
+		const { left, top, scale } = geometry();
+		return { x: left + clientX * scale, y: top + clientY * scale };
 	};
 
 	const onWheel = (event: WheelEvent) => {
@@ -338,18 +351,18 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	 * the stage takes the positions as given (`Stage`, and the offset must not be
 	 * subtracted twice — that is a horizontal pinch that walks the canvas 90px downwards).
 	 *
-	 * The geometry is read per event, which is fine because the browser reports the
-	 * coordinates against the layout each event was dispatched into, and the camera is
-	 * moved synchronously in the handler: the pair agrees. Measured, not assumed — the
-	 * mobile check asserts a pinch over a board holds its midpoint to within 3px, and it
-	 * holds to within a tenth of one.
+	 * The geometry is computed per event from the camera the stage has just moved, and the
+	 * browser reports the coordinates against the layout each event was dispatched into;
+	 * the camera is moved synchronously in the handler, so the pair agrees. Measured, not
+	 * assumed — the mobile check asserts a pinch over a board holds its midpoint to within
+	 * 3px, and it holds to within a tenth of one.
 	 */
 	const fingerAt = (event: PointerEvent) => {
-		const { rect, scale, stageLeft, stageTop } = geometry();
+		const { left, top, scale } = geometry();
 		return {
 			id: event.pointerId,
-			x: rect.left + event.clientX * scale - stageLeft,
-			y: rect.top + event.clientY * scale - stageTop,
+			x: left + event.clientX * scale,
+			y: top + event.clientY * scale,
 		};
 	};
 
@@ -512,11 +525,11 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		const { phase, id } = detail;
 		if (typeof id !== "number" || !Number.isFinite(detail.x) || !Number.isFinite(detail.y)) return;
 
-		const { rect, scale, stageLeft, stageTop } = geometry();
+		const { left, top, scale } = geometry();
 		const finger = {
 			id,
-			x: rect.left + (detail.x as number) * scale - stageLeft,
-			y: rect.top + (detail.y as number) * scale - stageTop,
+			x: left + (detail.x as number) * scale,
+			y: top + (detail.y as number) * scale,
 		};
 
 		if (phase === "down") {

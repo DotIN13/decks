@@ -31,7 +31,10 @@ import { paintFrame } from "../lib/theme.ts";
 export function BoardFrame(props: {
 	board: Board;
 	camera: Camera;
+	/** Whether the board has a document: on screen, or off it for less than a moment (`Stage`). */
 	mounted: boolean;
+	/** Whether the board is on screen or within a viewport of it — what the title bar keys on. */
+	visible: boolean;
 	selected: boolean;
 	/** Bumped by `stage.reload`, for a change the watcher cannot see. */
 	nonce?: number;
@@ -370,7 +373,9 @@ export function BoardFrame(props: {
 			}}
 		>
 			{/*
-				Only for a board that is on screen, which is what `mounted` already means.
+				Only for a board that is on screen — `visible`, not `mounted`: a document is
+				kept for a moment after its board leaves the screen, and a bar for it would
+				be laid out and painted on every zoom step for nothing.
 
 				The bar is the one thing on a board node that has to be redrawn when the
 				*zoom* changes and not when the camera merely moves: it is counter-scaled, so
@@ -382,37 +387,35 @@ export function BoardFrame(props: {
 				entirely (48ms). Off-screen boards do not load their documents for the same
 				reason; this is the rest of that rule.
 			*/}
-			<Show when={props.mounted}>
+			<Show when={props.visible}>
 			{/*
 				Counter-scaled against the camera, so the title stays legible at any zoom —
 				one that shrinks with the board is unreadable exactly when the board is too
 				small to identify by its content.
 
-				The identity to keep in mind: this box sits inside a world scaled by `zoom`
-				and carries `scale(1/zoom)`, so the two cancel and **its layout size is its
-				size on screen**. Height and width are therefore written in screen pixels
-				(24, and the board's on-screen width). `top` is the exception: it positions
-				the layout box *before* the transform, and the transform's origin is the
-				box's bottom-left — so the constant part is the 24 the box will occupy, and
-				only the visual gap needs dividing by the zoom.
-
-				Asking for `24 / zoom` here made the bar 88px tall at 27% zoom, which is why
-				it appeared to drift off the boards as they shrank.
+				The scale, the offset and the width are CSS (`index.css`, `.board-node >
+				.chrome`), derived from the one number written here: `--zoom`, a registered
+				non-inherited property, so a change to it restyles this box and nothing
+				beneath it. One write per board per frame of a zoom, and none during a pan —
+				`zoom()` is a memo, so a camera that only moved re-runs nothing here.
 			*/}
 			<div
 				class="chrome"
-				style={{
-					transform: `scale(${1 / zoom()})`,
-					"transform-origin": "0 100%",
-					width: `${props.board.w * zoom()}px`,
-					top: `${-(24 + 2 / zoom())}px`,
-					height: "24px",
-				}}
+				style={{ "--zoom": zoom(), width: `calc(${props.board.w}px * var(--zoom))` }}
 				onPointerDown={startDrag}
 				onDblClick={() => props.onOpen()}
 			>
 				<span class="title">{props.board.title}</span>
 				<span class="file">{props.board.path}</span>
+				{/*
+					The right-hand end of the bar, as one group.
+
+					A group rather than two buttons that each ask to be pushed right: two
+					`margin-left: auto` siblings *share* the free space, so Present sat in the
+					middle of the bar and the × at the end, half a board apart. One auto margin,
+					on the box that holds them both.
+				*/}
+				<span class="acts">
 				{/*
 					A deck says it is one, and offers the only thing you cannot get from the
 					keyboard without knowing about it. `f` works once a deck is focused, and
@@ -453,8 +456,16 @@ export function BoardFrame(props: {
 						</button>
 					)}
 				</Show>
+				</span>
 			</div>
 			</Show>
+
+			{/*
+				The shadow and the outline, on a box of their own behind the surface. A shadow
+				on the surface itself makes Chrome repaint every board's document on every
+				step of a pan — see `.board-node > .shade` in `index.css`.
+			*/}
+			<div class="shade" aria-hidden="true" />
 
 			{/*
 				When the frame is inert — zoomed out far enough that a board is a tile on a
@@ -560,7 +571,9 @@ export function BoardFrame(props: {
 								detachSelect = () => doc?.removeEventListener("pointerdown", select, true);
 							}
 							detachEditor = attachEditor(frame, props.board.path, props.editor);
-							detachGestures = attachFrameGestures(frame, props.gestures);
+							// Told where the board is, so a finger's position is arithmetic
+							// rather than a layout read on every event (`frame-gestures.ts`).
+							detachGestures = attachFrameGestures(frame, props.gestures, at);
 							detachDrop = attachFrameDrop(frame, props.drops);
 							/*
 							 * A reloaded document holds nothing, so the record of what it has
@@ -602,7 +615,7 @@ export function BoardFrame(props: {
 									class="board-mark"
 									data-tone={mark.tone}
 									data-side={bubbleSide(point(), props.board.w)}
-									style={{ left: `${point().x}px`, top: `${point().y}px`, transform: `scale(${1 / zoom()})` }}
+									style={{ left: `${point().x}px`, top: `${point().y}px`, "--zoom": zoom() }}
 								>
 									<span class="tip" aria-hidden="true" />
 									<span class="say">{mark.label}</span>
@@ -622,7 +635,7 @@ export function BoardFrame(props: {
 						style={{
 							left: `${cursor().x}px`,
 							top: `${cursor().y}px`,
-							transform: `scale(${1 / zoom()})`,
+							"--zoom": zoom(),
 							"--cursor-color": cursor().color,
 						}}
 					>

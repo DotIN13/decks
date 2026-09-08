@@ -495,7 +495,8 @@ table.table,
 	background: var(--b-bg-layer);
 }
 
-.embed canvas.page {
+/* A page is an `<img>` once rendered (`stillPicture` in `board.js`); the canvas is transient. */
+.embed .page {
 	display: block;
 	width: 100%;
 	height: auto;

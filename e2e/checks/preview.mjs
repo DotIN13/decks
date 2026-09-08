@@ -70,7 +70,8 @@ const stage = () =>
 		sign: document.querySelector(".preview-sign") !== null,
 		boards: [...document.querySelectorAll(".board-node")].map((node) => ({
 			path: node.dataset.path,
-			outline: getComputedStyle(node.querySelector(".surface")).outlineColor,
+			// On the shade behind the surface, where the outline is drawn — see `.board-node > .shade`.
+			outline: getComputedStyle(node.querySelector(".shade")).outlineColor,
 			pointer: node.querySelector("iframe") ? getComputedStyle(node.querySelector("iframe")).pointerEvents : "unmounted",
 		})),
 	}));

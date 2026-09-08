@@ -541,11 +541,49 @@ svg.lucide {
 	position: absolute;
 }
 
+/*
+ * The zoom, as the one number a counter-scaled box is written with.
+ *
+ * A board's title bar, an agent's cursor and an annotation all stay a constant size on
+ * screen, so each has a scale, and some an offset, that are functions of the zoom. Each
+ * such element is handed the zoom as `--zoom` and the rules below derive the rest — one
+ * inline write per element per frame instead of three.
+ *
+ * **Registered, and not inherited, and that is load-bearing.** An ordinary custom property
+ * inherits, and a changed inherited property makes the browser recompute the style of every
+ * element beneath it: written once on the stage it cost 21ms of style recalculation per step
+ * of a pinch, more than the pinch cost before (measured, 17 boards, 4× CPU throttle). Written
+ * on the box that uses it, and declared non-inherited, a change touches that box alone.
+ */
+@property --zoom {
+	syntax: "<number>";
+	inherits: false;
+	initial-value: 1;
+}
+
+/*
+ * Counter-scaled against the camera.
+ *
+ * The bar is the one part of a board that has to change when the *zoom* changes: it stays 24
+ * screen pixels tall however far out you are, so its scale, its width and its offset are all
+ * functions of the zoom. `BoardFrame` writes `--zoom` on it, and the three are derived here.
+ *
+ * The identity to keep in mind: this box sits inside a world scaled by the zoom and carries
+ * `scale(1 / zoom)`, so the two cancel and **its layout size is its size on screen**. Height
+ * and width are therefore screen pixels (24, and the board's on-screen width — `BoardFrame`
+ * writes that one, because it is the only thing here that depends on the board). `top` is
+ * the exception: it positions the layout box *before* the transform, and the transform's
+ * origin is the box's bottom-left — so the constant part is the 24 the box will occupy, and
+ * only the visual gap divides by the zoom. Asking for `24 / zoom` made the bar 88px tall at
+ * 27% zoom, which is why it appeared to drift off the boards as they shrank.
+ */
 .board-node > .chrome {
 	position: absolute;
-	top: -26px;
+	top: calc(-24px - 2px / var(--zoom, 1));
 	left: 0;
 	display: flex;
+	transform: scale(calc(1 / var(--zoom, 1)));
+	transform-origin: 0 100%;
 	/* Clipped to the board's own on-screen width. The bar is counter-scaled, so its
 	   text is a constant size while the board shrinks — at 7% zoom, which is what
 	   fitting three boards into a phone comes to, the path label was three times the
@@ -571,12 +609,27 @@ svg.lucide {
 	white-space: nowrap;
 }
 
+/*
+ * The controls at the right-hand end of a board's title bar, as one group.
+ *
+ * The group is what carries `margin-left: auto`, and that is the whole point of it: two
+ * buttons each asking for an automatic left margin *split the free space between them*, so
+ * a deck's Present button sat half a board away from the × it belongs beside — 500px of
+ * empty bar between two controls that are one cluster.
+ */
+.board-node > .chrome .acts {
+	display: flex;
+	flex: none;
+	margin-left: auto;
+	gap: 2px;
+	align-items: center;
+}
+
 /* Takes the board off the canvas; appears on hover, like the message actions. */
 .board-node > .chrome .hide {
 	display: grid;
 	width: 18px;
 	height: 18px;
-	margin-left: auto;
 	padding: 0;
 	border: 0;
 	border-radius: 5px;
@@ -597,6 +650,23 @@ svg.lucide {
 	color: var(--fg);
 }
 
+/*
+ * Present, in a deck's title bar: `.hide`-shaped, but a word rather than a glyph, because
+ * "present" has no icon anybody reads correctly.
+ *
+ * Here beside `.hide` rather than with the rest of the presentation CSS in `styles/canvas.css`,
+ * and that is not filing — it is the only place it works. Both files declare their rules
+ * inside `@layer components` and this one is imported *after* canvas.css, so at equal
+ * specificity `.hide`'s `width: 18px` won and the button was an 18px box with the word
+ * clipped inside it.
+ */
+.board-node > .chrome .present-open {
+	width: auto;
+	padding: 0 7px;
+	font-size: 10.5px;
+	letter-spacing: 0.02em;
+}
+
 .board-node > .chrome .file {
 	/*
 	 * The path is what gives way when the bar is clipped, and it takes saying so twice.
@@ -615,17 +685,37 @@ svg.lucide {
 	white-space: nowrap;
 }
 
+/*
+ * The shadow and the outline live on a box *behind* the surface, never on the surface.
+ *
+ * Not a styling preference: it is the difference between a pan that moves pictures and a
+ * pan that redraws documents. The surface holds an iframe, and when the box that holds an
+ * iframe paints a `box-shadow` or an `outline`, Chrome repaints **every board's document on
+ * every step** of a pan or a zoom — a transform change that should cost the compositor a
+ * matrix instead costs the main thread a paint of sixteen web pages. Measured on sixteen
+ * boards at 4× CPU throttle, one step of a pan: 16.6 documents repainted, 28ms of main
+ * thread; the same shadow on a sibling, 0 repainted, 16ms. (`/tmp` repro, September 2026;
+ * the app measured the same shape, 42ms → 20ms.) Radius and clipping on the surface itself
+ * are fine — only the decorations that paint *outside* the box trigger it.
+ */
+.board-node > .shade {
+	position: absolute;
+	border-radius: 12px;
+	box-shadow: var(--shadow);
+	inset: 0;
+	outline: 1px solid var(--line);
+	pointer-events: none;
+}
+
+.board-node[data-selected="true"] > .shade {
+	outline: 2px solid var(--color-accent);
+}
+
 .board-node > .surface {
 	position: relative;
 	overflow: hidden;
 	border-radius: 12px;
 	background: var(--bg);
-	box-shadow: var(--shadow);
-	outline: 1px solid var(--line);
-}
-
-.board-node[data-selected="true"] > .surface {
-	outline: 2px solid var(--color-accent);
 }
 
 .board-node > .surface > iframe {
@@ -1698,6 +1788,7 @@ svg.lucide {
 	width: max-content;
 	align-items: center;
 	gap: 0;
+	transform: scale(calc(1 / var(--zoom, 1)));
 	transform-origin: 0 50%;
 	pointer-events: none;
 }
@@ -1761,6 +1852,7 @@ svg.lucide {
 	display: flex;
 	gap: 5px;
 	align-items: center;
+	transform: scale(calc(1 / var(--zoom, 1)));
 	transform-origin: 0 0;
 	pointer-events: none;
 }
@@ -2576,7 +2668,7 @@ svg.lucide {
  * change actually is. It is also the only signal: Escape leaves, and the message that
  * started it holds the other way back.
  */
-.stage[data-previewing="true"] .board-node > .surface {
+.stage[data-previewing="true"] .board-node > .shade {
 	outline-color: var(--color-warn);
 }
 
