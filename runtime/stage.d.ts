@@ -233,9 +233,11 @@ export interface Stage {
 	 * labelled with its unit, every column named in words, and nothing coded — no arms called
 	 * A/B/C/D, no metrics called M1/M2/M3, no bare decimals.
 	 *
-	 * **Reporting research, say it in plain language and give the technical detail.** What
-	 * was done, what came out and what it means, in words a reader outside the project would
-	 * follow — then the numbers, the method and the names. No metaphors, no clever framing.
+	 * **Write in plain language, always, unless you were asked for something else.** Technical
+	 * terms are welcome — precision is the point — and it is the sentence around them that
+	 * should be plain enough for a colleague outside the project. No metaphors, no clever
+	 * framing, no long sentence doing two jobs. Reporting research that means both: what was
+	 * done, what came out and what it means, then the numbers, the method and the names.
 	 *
 	 * Once the height is near twice the width, it is two boards.
 	 */

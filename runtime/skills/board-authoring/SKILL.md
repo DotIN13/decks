@@ -56,10 +56,13 @@ body, where it can be read.
 Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure,
 and a number to an adjective. **A diagram or a table has to stand on its own:** every axis
 labelled with its unit, every column named in words, and nothing coded — no arms called
-A/B/C/D, no metrics called M1/M2/M3, no bare decimals. **Reporting research, use plain
-language beside the technical detail** — what was done, what came out, what it means, in words
-a reader outside the project would follow, then the numbers and the method. No metaphors, no
-clever framing.
+A/B/C/D, no metrics called M1/M2/M3, no bare decimals.
+
+**Write in plain language, always, unless you were asked for something else.** Technical terms
+are welcome — precision is the point — and it is the sentence around them that should be plain
+enough for a colleague outside the project. No metaphors, no clever framing, no long sentence
+doing two jobs. Reporting research that means both: what was done, what came out and what it
+means, then the numbers, the method and the names.
 
 Once the height is near twice the width, it is two boards.
 
