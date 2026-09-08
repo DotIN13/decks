@@ -43,6 +43,24 @@ test("markdown is flow, and the double extension is a deck", () => {
 });
 
 /*
+ * `.slides.html` is reveal's native format — `<section>` elements — and the name has to
+ * outrank the body's class, because a deck this app writes carries `class="reveal"` and one
+ * served through the shell is wrapped in a document that says `class="board"`. Reading the
+ * body first would make a deck a component board and hand it to the wrong editor.
+ */
+test("an HTML deck is a deck, whatever its body says", () => {
+	assert.equal(formatOf("boards/talk.slides.html"), "slides", "with no source at all");
+	assert.equal(formatOf("boards/talk.slides.html", '<body class="reveal"><div class="slides"><section>One</section></div></body>'), "slides");
+	assert.equal(
+		formatOf("boards/talk.slides.html", '<body class="board"><div class="slides"><section>One</section></div></body>'),
+		"slides",
+		"the name is the declaration; the class cannot overrule it",
+	);
+	assert.equal(formatOf("boards/talk.slides.htm"), "slides", "and `.htm`, like every other HTML rule here");
+	assert.equal(formatOf("boards/slides.html", "<body><p>hi</p></body>"), "flow", "`slides.html` on its own is a file called slides");
+});
+
+/*
  * An HTML path with no source is `component`, and the asymmetry is deliberate: guessing
  * flow for a real board makes one unreadable frame out of a correct file, where guessing
  * component for a document at worst renders it unstyled.
@@ -53,7 +71,7 @@ test("an HTML path with no source read yet is assumed to be a board", () => {
 });
 
 test("the glob, as a predicate", () => {
-	for (const yes of ["boards/a.html", "boards/a.htm", "boards/a.md", "boards/a.slides.md", "boards/nested/b.md"]) {
+	for (const yes of ["boards/a.html", "boards/a.htm", "boards/a.md", "boards/a.slides.md", "boards/a.slides.html", "boards/nested/b.md"]) {
 		assert.equal(isBoardFile(yes), true, yes);
 	}
 	for (const no of ["boards/a.txt", "boards/a.drawio.svg", "assets/a.png", "deck.json", "boards/a.md.bak"]) {

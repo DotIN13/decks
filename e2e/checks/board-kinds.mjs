@@ -1,11 +1,16 @@
 /**
- * Three board formats: a component board, a flow board, and a deck.
+ * Three board formats: a component board, a flow board, and a deck — in both of reveal's
+ * own formats.
  *
  * The formats themselves are unit-tested (`deck/kinds.ts`, `boards/shell.ts`,
  * `boards/slides.test.ts`, `canvas/slide-keys.ts`). What a browser is needed for is whether
  * they are *wired*: whether a markdown file dropped into `boards/` becomes a board, whether
  * it ends up exactly as tall as its content, whether ← → page a focused deck, whether
  * fullscreen opens on the slide you were on, and whether a double-click gives you the file.
+ *
+ * **`splitHtmlDeck` is only testable here**, because it uses `DOMParser` and Node has none —
+ * so the `<section>` splitting, the flattened nested stack and the `<aside class="notes">`
+ * are asserted against rendered slides rather than in a unit test.
  *
  * The interesting assertions are the ones a unit test cannot make, because they are about
  * two processes agreeing: the browser measures a height and the server stores it; a
@@ -68,6 +73,43 @@ The last one.
 `,
 );
 
+/*
+ * A deck in reveal's *native* format, which is HTML: `<section>` elements inside
+ * `.reveal > .slides`. Markdown is a plugin in reveal, so this is the primary one and
+ * `.slides.md` above is the plugin's dialect — both are read.
+ *
+ * Four slides from three sections, because the third is a **vertical stack**: reveal nests
+ * sections for one, and this view flattens it into consecutive slides. The `<script>` is
+ * here to prove it does *not* run — slides are inserted with `innerHTML`, so a deck cannot
+ * bring its own reveal runtime and fight this view for the keyboard.
+ */
+writeFileSync(
+	join(boards, "native.slides.html"),
+	`<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>A native deck</title>
+		<meta name="board" content='{"aspect":"4:3"}' />
+	</head>
+	<body class="reveal">
+		<div class="slides">
+			<section><h1>Native one</h1></section>
+			<section>
+				<h2>Native two</h2>
+				<aside class="notes">said out loud, not on the slide</aside>
+			</section>
+			<section>
+				<section><h2>Stacked A</h2></section>
+				<section><h2>Stacked B</h2></section>
+			</section>
+		</div>
+		<script>window.__revealRan = true;</script>
+	</body>
+</html>
+`,
+);
+
 const { browser, page, errors } = await open({ width: 1500, height: 950 });
 await settle(page, 2500);
 
@@ -84,11 +126,20 @@ say(
 );
 say("…an HTML file without class=board is flow", (await boardOf("boards/report.html"))?.format === "flow");
 say("…a .slides.md is a deck", (await boardOf("boards/talk.slides.md"))?.format === "slides");
+say("…and a .slides.html is a deck too, whatever its body class says", (await boardOf("boards/native.slides.html"))?.format === "slides");
 say("…and the boards that were already here are untouched", (await boardOf("boards/plan.html"))?.format === "component");
 
 // The title comes from the content, because a rail full of filenames says nothing.
 say("a flow board is named by its content", (await boardOf("boards/notes.md"))?.title === "Session notes");
 say("…and a deck by its front-matter", (await boardOf("boards/talk.slides.md"))?.title === "A deck");
+say("…an HTML deck by its <title>", (await boardOf("boards/native.slides.html"))?.title === "A native deck");
+/*
+ * 4:3 of 960. Reveal's markup has nowhere to declare a slide's shape — its size is an
+ * argument to `Reveal.initialize`, a script this view does not run — so an HTML deck says it
+ * in `<meta name="board">`, the tag every board already carries.
+ */
+const native = await boardOf("boards/native.slides.html");
+say("…and its aspect comes from the tag every board has", native?.w === 960 && native?.h === 720, `${native?.w}x${native?.h}`);
 
 // --- a flow board is as tall as its content ------------------------------------------
 
@@ -326,6 +377,102 @@ await only("Auth refresh — the plan");
 await page.locator('.board-node[data-path="boards/plan.html"] iframe').dblclick({ position: { x: 60, y: 60 } });
 await settle(page, 900);
 say("a component board does not get the source editor", (await page.locator(".source-area").count()) === 0);
+
+// --- the native format, which is the one reveal actually is ---------------------------
+
+/*
+ * Everything above this line drove the markdown deck. This drives the HTML one, and the
+ * assertions are the ones no unit test can make: `splitHtmlDeck` needs `DOMParser`.
+ */
+await only("A native deck");
+
+const inNative = (fn) =>
+	page.evaluate((body) => {
+		const frame = document.querySelector('.board-node[data-path="boards/native.slides.html"] iframe');
+		// eslint-disable-next-line no-new-func
+		return new Function("w", "d", body)(frame?.contentWindow, frame?.contentDocument);
+	}, `return (${fn.toString()})(w, d);`);
+
+say(
+	"three sections become four slides, because a vertical stack is flattened",
+	(await inNative((w) => w?.__deck?.total ?? null)) === 4,
+	`${await inNative((w) => w?.__deck?.total ?? null)} slides`,
+);
+say("…opening on the first, with its markup rendered as-is", await inNative((_w, d) => d?.querySelector(".deck-stage .slide h1")?.textContent === "Native one"));
+say("…at the 4:3 logical size it declared", await inNative((_w, d) => {
+	const slide = d?.querySelector(".slide");
+	return slide?.offsetWidth === 960 && slide?.offsetHeight === 720;
+}));
+/*
+ * The whole security position of this format in one assertion: the slides are inserted with
+ * `innerHTML`, which never executes a script element. So a deck that carries its own
+ * `Reveal.initialize()` is inert here rather than fighting this view for the keyboard, and a
+ * deck from somewhere else cannot run code in the board's origin.
+ */
+say("a <script> in a deck does not run", (await inNative((w) => w?.__revealRan ?? null)) === null);
+
+await page.locator('.board-node[data-path="boards/native.slides.html"] iframe').click({ position: { x: 300, y: 200 } });
+await settle(page, 800);
+await page.keyboard.press("ArrowRight");
+await settle(page, 500);
+say("→ pages an HTML deck", (await inNative((w) => w?.__deck?.current?.() ?? null)) === 1);
+// Reveal's own notes element, taken out of the slide exactly as `Note:` is in markdown.
+say("<aside class=notes> is kept and not drawn", await inNative((_w, d) => {
+	const note = d?.querySelector(".slide-note");
+	return Boolean(note && note.textContent.includes("said out loud") && note.offsetHeight === 0);
+}));
+say("…and taken out of the slide, not left in it", await inNative((_w, d) => {
+	const slide = d?.querySelector(".deck-stage .slide:not([hidden])");
+	return Boolean(slide && !slide.querySelector("aside.notes") && slide.textContent.includes("Native two"));
+}));
+await page.keyboard.press("ArrowRight");
+await settle(page, 400);
+say("…and the stack's first slide is next in the sequence", await inNative((_w, d) => d?.querySelector(".deck-stage .slide:not([hidden]) h2")?.textContent === "Stacked A"));
+
+// --- making one, which is what the + button could not do -----------------------------
+
+/*
+ * The formats were recognised long before they could be *asked for*: `board.create` carried
+ * a template — a shape — and always wrote component HTML, so the only way to a deck was to
+ * write the file by hand. Three rows now, and the extension is shown beside each because it
+ * is the whole of how a format is declared.
+ */
+await page.locator('button[aria-label="A new board, on the canvas"]').click();
+await settle(page, 600);
+const menu = await page.evaluate(() =>
+	[...document.querySelectorAll(".popover [data-row]")].map((row) => row.innerText.replace(/\s+/g, " ").trim()),
+);
+say("the new-board button offers three formats", menu.length === 3, JSON.stringify(menu));
+say("…each named by the file it writes", menu.join(" | ").includes(".slides.html") && menu.join(" | ").includes(".md"), JSON.stringify(menu));
+
+const before = (await deck()).length;
+await page.locator(".popover [data-row]").filter({ hasText: "Slides" }).click();
+await settle(page, 2500);
+const made = (await deck()).find((board) => board.path.endsWith(".slides.html") && board.path !== "boards/native.slides.html");
+say("pressing Slides makes a deck", Boolean(made), JSON.stringify(made && { path: made.path, format: made.format }));
+say("…as a .slides.html, which is what makes it one", made?.path.endsWith(".slides.html") === true && made?.format === "slides");
+say("…and it is on the canvas, one board more than before", (await deck()).length === before + 1);
+/*
+ * And it is a deck the moment it exists — not an empty rectangle needing a restart. The
+ * template is reveal's own markup, so this is also the round trip that matters: written as
+ * HTML sections, read back as slides.
+ *
+ * Played on its own first, because a board that is added to the canvas does not refit the
+ * camera: off-screen boards skip loading their documents, so a frame that has never been in
+ * view has no deck in it and the assertion would read as a broken template.
+ */
+await only("Untitled");
+const fresh = made?.path;
+const inFresh = (fn) =>
+	page.evaluate(
+		({ body, path }) => {
+			const frame = document.querySelector(`.board-node[data-path="${path}"] iframe`);
+			// eslint-disable-next-line no-new-func
+			return new Function("w", "d", body)(frame?.contentWindow, frame?.contentDocument);
+		},
+		{ body: `return (${fn.toString()})(w, d);`, path: fresh },
+	);
+say("…and it renders its slides straight away", (await inFresh((w) => w?.__deck?.total ?? 0)) >= 2, `${await inFresh((w) => w?.__deck?.total ?? 0)} slides`);
 
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();

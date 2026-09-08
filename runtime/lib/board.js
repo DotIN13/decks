@@ -793,9 +793,23 @@
 			if (!response.ok) throw new Error(`${response.status}`);
 			const source = await response.text();
 			const deck = slides.mountDeck(element, source, {
-				// The board's own markdown renderer, so a slide gets the same marked,
-				// KaTeX and mermaid a `[data-md]` component does — one renderer, not two.
-				render: (into, markdown) => renderMarkdown(into, markdown),
+				/*
+				 * How a slide's body becomes a slide, and it differs by format.
+				 *
+				 * A markdown deck goes through the board's own renderer, so a slide gets the
+				 * same marked, KaTeX and mermaid a `[data-md]` component does — one renderer,
+				 * not two. A reveal HTML deck is *already* markup: it is inserted as-is and
+				 * then offered to KaTeX, which is the only enhancement that makes sense on
+				 * hand-written HTML. Running it through marked instead would have been the
+				 * tempting one line, and it mangles a deck the moment a `<section>` indents
+				 * its contents four spaces — which reveal's own examples do.
+				 */
+				render: slides.isHtmlDeck(file)
+					? async (into, markup) => {
+							into.innerHTML = markup;
+							await renderMath(into);
+						}
+					: (into, markdown) => renderMarkdown(into, markdown),
 			});
 			window.__deck = deck;
 			/*
@@ -847,7 +861,8 @@
 		/*
 		 * A slide deck, which is neither a document nor live.
 		 *
-		 * `[data-slides]` names a markdown file in reveal's dialect. The view is
+		 * `[data-slides]` names a deck file — reveal's HTML, or its markdown plugin's
+		 * dialect. The view is
 		 * `slides.js`, loaded on demand like every other renderer here — so a deck costs a
 		 * board that is not one exactly nothing.
 		 */

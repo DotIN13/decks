@@ -1,5 +1,5 @@
 import type { AgentKind, AgentMode, Camera, Identity, ThinkingLevel } from "@decks/protocol";
-import { BOARD_TEMPLATES, boardWidth, isBoardTemplate } from "../boards/templates.ts";
+import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, isBoardFormat, isBoardTemplate } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService } from "./service.ts";
 
@@ -167,6 +167,8 @@ Your code is the body of an async function with \`stage\` in scope; whatever you
 
 **Boards are how you answer.** A question, a design, or a finished piece of work goes on a board rather than into the chat column — the user should not have to read the chat to know what is happening. \`stage.newBoard({ title, kind })\` writes the document shell (kinds: answer, design, report, plan, blank) and returns a path to fill in with write/edit, so a board costs one call instead of fifteen lines of boilerplate; it also tells you the viewport, so you can see what the size you chose will look like.
 
+**Three formats, and \`format\` chooses.** \`component\` (the default) is positioned boxes — every board here, and the only one the drag-and-retype editor can work on. \`flow\` is a \`.md\` file that reflows and measures its own height, so it cannot clip. \`slides\` is a \`.slides.html\` deck in **reveal's own format**: one \`<section>\` per slide inside \`.reveal > .slides\`, notes in \`<aside class="notes">\`, every slide laid out at 960x540 and scaled so nothing reflows when it is presented. Ask for prose as flow and a talk as slides; the extension is derived and is not yours to name.
+
 **Keep the canvas to what matters.** \`stage.show(paths)\` sets what is on the canvas and fits the camera to it. \`stage.hide(paths)\` takes a board off the canvas but keeps it in your context. \`stage.attach\` / \`stage.detach\` are the context itself, which is what the rail beside the canvas lists. The camera never moves unless you call \`show\`.
 
 **A board does not scroll, so a board that is too small clips — silently.** \`stage.fit(path)\` sizes it to what is on it, **width and height**: write the content, \`show\` it, then fit. It shrinks a board that is wider than its content as well as growing one that is narrower, clamped to the ceiling below. The measurement is taken in the frame showing the board, so it has to be on the canvas; \`stage.boards()\` carries the same reading as \`content\` and \`clipped\`. \`stage.resize(path, { w, h })\` sets a size outright.
@@ -187,6 +189,7 @@ Board *content* is files — write and edit it with your ordinary tools, not thr
 
 const GUIDELINES = [
 	"Answer on a board: stage.newBoard for the shell, write/edit for the content, stage.show to put it in front of the user.",
+	"Pick the format for the thing: component boxes by default, format: 'flow' for a markdown document that reflows, format: 'slides' for a reveal deck of <section> elements. A board of prose does not want to be positioned boxes.",
 	"Width: the smallest that holds the content, capped at min(viewport width, 1600). 1600 is a ceiling, not a target — at a 390px viewport a board is 390 wide.",
 	"Reading order: DOM order is visual order, top to bottom. Two components sharing a row go left-first in the file.",
 	"Aim for the smallest board that explains the thing — summary first, then diagrams, tables and embeds over prose. Height near twice the width means it is two boards.",
@@ -255,9 +258,20 @@ export function createStageTool(deps: {
 		 * where the user left it until `show` is called. Returns the deck-relative path to
 		 * edit.
 		 */
-		newBoard: async (options: { title: string; template?: string; kind?: string; w?: number; h?: number }) => {
+		newBoard: async (options: { title: string; template?: string; kind?: string; format?: string; w?: number; h?: number }) => {
 			const title = options?.title?.trim();
 			if (!title) throw new Error("A board needs a title");
+			/*
+			 * What the board *is as a file*, which is a different question from its shape.
+			 *
+			 * `component` is every board this app wrote before formats existed and stays the
+			 * default, so an agent that says nothing gets what it has always got. The other
+			 * two are documents rather than boxes: `flow` is markdown that reflows, `slides`
+			 * is a reveal deck. The extension is derived from this and never named — see
+			 * `boards/templates.ts`.
+			 */
+			const format = options.format ?? "component";
+			if (!isBoardFormat(format)) throw new Error(`Unknown format ${format}; use one of ${BOARD_FORMATS.join(", ")}`);
 			/*
 			 * `kind` still works, and is the old name for this.
 			 *
@@ -269,6 +283,14 @@ export function createStageTool(deps: {
 			 */
 			const template = options.template ?? options.kind ?? "blank";
 			if (!isBoardTemplate(template)) throw new Error(`Unknown template ${template}; use one of ${BOARD_TEMPLATES.join(", ")}`);
+			/*
+			 * A shape asked for alongside a format that has no shapes is a misunderstanding
+			 * worth a sentence rather than a silent drop. There is no `report`-flavoured slide
+			 * deck: a deck and a markdown document are already the shape they are.
+			 */
+			if (format !== "component" && (options.template ?? options.kind)) {
+				notes.push(`a ${format} board has no template shape — ${template} was ignored`);
+			}
 
 			/*
 			 * The width, when nobody said one.
@@ -284,6 +306,7 @@ export function createStageTool(deps: {
 			const path = service.newBoard({
 				title,
 				template,
+				format,
 				size: { w: width, ...(options.h ? { h: options.h } : {}) },
 			});
 			agent.setContext([path, ...agent.context()]);

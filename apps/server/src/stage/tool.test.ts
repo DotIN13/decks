@@ -32,7 +32,10 @@ function toolOn(camera: Camera) {
 	const service = new StageService(deck, {
 		newMirror: () => "boards/mirrors/x.html",
 		newBoard: (options) => {
-			const path = `boards/${options.title.toLowerCase().replace(/\W+/g, "-")}.html`;
+			// The extension is the server's business and comes from the format — the stub
+			// mirrors the real table so a test can assert *which file* a format asked for.
+			const extension = options.format === "slides" ? ".slides.html" : options.format === "flow" ? ".md" : ".html";
+			const path = `boards/${options.title.toLowerCase().replace(/\W+/g, "-")}${extension}`;
 			// The size it was asked for goes into the file, because the file is the only
 			// place a size lives — a stub that dropped it would make every width assertion
 			// below a reading of the loader's fallback instead.
@@ -335,5 +338,48 @@ test("with a wide screen the ceiling is 1600 rather than the screen", async () =
 
 	await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
 	assert.equal(deck.board("boards/plan.html")?.w, 1600);
+	cleanup();
+});
+
+/*
+ * A format is what the board *is as a file*, and the thing worth pinning is that asking for
+ * one reaches the server — for a long time the only way to a markdown board or a deck was to
+ * write the file by hand, because this call had no way to say which you wanted.
+ */
+test("a format reaches the service, and decides the file", async () => {
+	const { tool, read, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
+
+	const deck = await tool.run(`return await stage.newBoard({ title: "The plan out loud", format: "slides" })`);
+	assert.match(deck.text.split("\n")[0] ?? "", /boards\/the-plan-out-loud\.slides\.html/);
+	assert.ok(read("boards/the-plan-out-loud.slides.html"), "and the file is the one the format names");
+
+	const doc = await tool.run(`return await stage.newBoard({ title: "Notes", format: "flow" })`);
+	assert.match(doc.text.split("\n")[0] ?? "", /boards\/notes\.md/);
+
+	// Nothing said is a component board, which is what every board was before formats.
+	const board = await tool.run(`return await stage.newBoard({ title: "Ordinary", kind: "answer" })`);
+	assert.match(board.text.split("\n")[0] ?? "", /boards\/ordinary\.html/);
+	cleanup();
+});
+
+test("an unknown format is refused by name rather than quietly becoming a board", async () => {
+	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	const result = await tool.run(`return await stage.newBoard({ title: "Talk", format: "reveal" })`);
+
+	assert.equal(result.isError, true);
+	// The words a caller reaches for — `reveal`, `markdown`, `deck` — are not formats, and a
+	// silent fallback to component would write positioned boxes for a talk.
+	assert.match(result.text, /Unknown format reveal/);
+	assert.match(result.text, /component, flow, slides/);
+	cleanup();
+});
+
+test("a shape asked for alongside a format that has none is said, not silently dropped", async () => {
+	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
+	const result = await tool.run(`return await stage.newBoard({ title: "Talk", format: "slides", kind: "report" })`);
+
+	assert.equal(result.isError, false);
+	// There is no report-flavoured slide deck; a deck is already the shape it is.
+	assert.match(result.text, /a slides board has no template shape — report was ignored/);
 	cleanup();
 });

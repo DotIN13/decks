@@ -1791,7 +1791,7 @@ export function App() {
 					 * it is what "where am I" means.
 					 */
 					onFit={() => fitAll(stageBoards(), setCamera)}
-					onNewBoard={() => socket.send({ type: "board.create" })}
+					onNewBoard={(format) => socket.send({ type: "board.create", ...(format && format !== "component" ? { format } : {}) })}
 					/*
 					 * Off the canvas, one message per board, and *not* out of the context.
 					 * `board.hide` has always drawn that line — the context is the agent's, and

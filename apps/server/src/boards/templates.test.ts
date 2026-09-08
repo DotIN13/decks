@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readBoardMeta } from "../deck/meta.ts";
-import { BOARD_TEMPLATES, boardWidth, isBoardTemplate, MAX_BOARD_W, renderTemplate, slugFor } from "./templates.ts";
+import { formatOf } from "../deck/kinds.ts";
+import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, extensionFor, isBoardFormat, isBoardTemplate, MAX_BOARD_W, renderFormat, renderTemplate, slugFor } from "./templates.ts";
 
 test("every kind renders a board the loader can read", () => {
 	for (const kind of BOARD_TEMPLATES) {
@@ -129,4 +130,57 @@ test("a pair folds into one column on a narrow board, and the board grows to hol
 		(readBoardMeta(renderTemplate("plan", "T", { w: 390 })).h ?? 0) > (readBoardMeta(renderTemplate("plan", "T", { w: 1000 })).h ?? 0),
 		"and the board is taller for it, rather than clipping",
 	);
+});
+
+/*
+ * The formats, which are what a board *is as a file* — a different question from its shape.
+ *
+ * The invariant worth a test: **the extension a format is written with must be the extension
+ * that format is read back from.** `deck/kinds.ts` decides a board's format from its
+ * filename, so if these two ever disagree, a board asked for as a deck is silently a
+ * markdown document and nothing anywhere says why. Asserted by round-tripping rather than by
+ * comparing two tables, because two tables are the thing that drifts.
+ */
+test("a format's extension is the extension that format is read back from", () => {
+	for (const format of BOARD_FORMATS) {
+		const path = `boards/talk${extensionFor(format)}`;
+		const source = format === "component" ? renderTemplate("blank", "Talk") : renderFormat(format, "Talk");
+		assert.equal(formatOf(path, source), format, path);
+	}
+});
+
+test("a format has to be one of the three", () => {
+	assert.equal(isBoardFormat("slides"), true);
+	assert.equal(isBoardFormat("component"), true);
+	// The words a caller might reach for, none of which is a format.
+	for (const no of ["reveal", "markdown", "md", "html", "deck", "", undefined, 3]) assert.equal(isBoardFormat(no), false, String(no));
+});
+
+test("a new deck is reveal's own format, and this view's rules can read it", () => {
+	const html = renderFormat("slides", "The plan, out loud");
+	// Reveal's structure, which is what makes the file portable: it opens in reveal unchanged.
+	assert.match(html, /<body class="reveal">/);
+	assert.match(html, /<div class="slides">/);
+	assert.ok((html.match(/<section>/g) ?? []).length >= 2, "more than one slide, or it does not demonstrate a deck");
+	// Reveal's own notes element rather than the markdown plugin's `Note:`.
+	assert.match(html, /<aside class="notes">/);
+	// And the one thing reveal's markup cannot say for itself.
+	assert.equal(readBoardMeta(html).aspect, "16:9");
+	assert.equal(readBoardMeta(html).title, "The plan, out loud");
+	assert.ok(!html.includes("{{"), "no placeholders left");
+});
+
+test("a new document is markdown, with a width it can declare", () => {
+	const md = renderFormat("flow", "Notes on the refresh", { w: 820 });
+	assert.match(md, /^---\ntitle: Notes on the refresh\nw: 820\n---\n/, md.slice(0, 80));
+	assert.match(md, /^# Notes on the refresh$/m);
+	assert.ok(!md.includes("{{"), "no placeholders left");
+	// Markdown, so it must *not* be HTML-escaped: an entity would be shown literally.
+	assert.match(renderFormat("flow", "Tom & Jerry"), /# Tom & Jerry/);
+});
+
+test("a deck's title is escaped, because a deck is HTML", () => {
+	const html = renderFormat("slides", 'Tom & Jerry <script>alert("x")</script>');
+	assert.ok(!html.includes("<script>alert"), "no injected element");
+	assert.match(html, /Tom &amp; Jerry &lt;script&gt;/);
 });

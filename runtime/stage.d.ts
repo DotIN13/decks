@@ -174,6 +174,27 @@ export interface Stage {
 	 * - `plan`   — goal, approach, steps
 	 * - `blank`  — a heading and nothing else
 	 *
+	 * **`format` is what the board is as a file**, which is a different question from its
+	 * shape — an answer can be written as boxes or as prose:
+	 *
+	 * - `component` (default) — absolutely-positioned boxes with `data-id`s. Every board this
+	 *   deck has ever written, and the only format the drag-and-retype editor can work on.
+	 * - `flow` — a `.md` file that reflows. Its height is measured rather than stored, so it
+	 *   cannot clip; write it with an ordinary file write, not with positioned components.
+	 * - `slides` — a `.slides.html` deck in **reveal's own format**: one `<section>` per
+	 *   slide inside `.reveal > .slides`. Nested sections become consecutive slides. Speaker
+	 *   notes are `<aside class="notes">`. Every slide is laid out at 960×540 and scaled, so
+	 *   nothing reflows when it is presented — and a `<script>` in it does not run, so a deck
+	 *   cannot bring its own runtime.
+	 *
+	 * A format that is not `component` has no shape to choose, so `kind` is ignored for one
+	 * and the result says so. The **file extension is derived** from the format and is not
+	 * yours to name: a board's format is read back out of its filename, so the two must not
+	 * be able to disagree.
+	 *
+	 *     const deck = await stage.newBoard({ title: "The plan, out loud", format: "slides" });
+	 *     // -> "boards/the-plan-out-loud.slides.html", three sections in it to replace
+	 *
 	 * **The result tells you the viewport and the width it chose** — `viewport 1440x900 px`,
 	 * `board width 1000 — the rule is min(viewport width, 1600)` — because that is the moment
 	 * both are worth knowing. `stage.viewport()` asks any other time.
@@ -193,7 +214,13 @@ export interface Stage {
 	 * diagrams, tables and embeds in preference to prose. Once the height is near twice the
 	 * width, it is two boards.
 	 */
-	newBoard(options: { title: string; kind?: "answer" | "design" | "report" | "plan" | "blank"; w?: number; h?: number }): Promise<string>;
+	newBoard(options: {
+		title: string;
+		kind?: "answer" | "design" | "report" | "plan" | "blank";
+		format?: "component" | "flow" | "slides";
+		w?: number;
+		h?: number;
+	}): Promise<string>;
 
 	/**
 	 * A **mirror**: a board that is a live view of a conversation.

@@ -6,7 +6,18 @@ import type { Board, BoardPatch, Camera, ClientMessage, ServerMessage, StageCall
 import { Registry } from "./agents/registry.ts";
 import { applyPatches, mintId, PatchRefused } from "./boards/patch.ts";
 import { Revisions } from "./boards/snapshots.ts";
-import { isBoardTemplate, MIRROR_SIZE, renderMirror, renderTemplate, slugFor, type BoardTemplate } from "./boards/templates.ts";
+import {
+	extensionFor,
+	isBoardFormat,
+	isBoardTemplate,
+	MIRROR_SIZE,
+	renderFormat,
+	renderMirror,
+	renderTemplate,
+	slugFor,
+	type BoardFormat,
+	type BoardTemplate,
+} from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./claude/accounts.ts";
@@ -88,7 +99,8 @@ export class App {
 		this.deck = deck;
 		this.revisions = new Revisions(deck);
 		this.stage = new StageService(deck, {
-			newBoard: (options) => this.newBoard({ ...options, template: options.template as BoardTemplate }),
+			newBoard: ({ format, template, ...rest }) =>
+				this.newBoard({ ...rest, template: template as BoardTemplate, ...(isBoardFormat(format) ? { format } : {}) }),
 			newMirror: (options) => this.newMirror(options),
 			writeBoard: (path, html) => this.writeBoard(path, html),
 			extent: (path, rev) => this.extentOf(path, rev),
@@ -533,7 +545,10 @@ export class App {
 			 */
 			case "board.create": {
 				const template = isBoardTemplate(message.kind) ? message.kind : "blank";
-				const path = this.newBoard({ title: "Untitled", template });
+				// An unknown format is component, for the same reason an unknown template is
+				// blank: the worst outcome of a typo should be an ordinary empty board.
+				const format = isBoardFormat(message.format) ? message.format : "component";
+				const path = this.newBoard({ title: "Untitled", template, format });
 				const agent = this.agents.focused();
 				agent.setInPlay([...agent.inPlay, path]);
 				return;
@@ -950,16 +965,31 @@ export class App {
 	 * from the title and made unique by suffixing, so an agent answering three questions
 	 * about the same thing gets `-2` and `-3` rather than an error.
 	 */
-	newBoard(options: { title: string; template: BoardTemplate; size?: { w?: number; h?: number } }): string {
+	newBoard(options: { title: string; template: BoardTemplate; format?: BoardFormat; size?: { w?: number; h?: number } }): string {
+		/*
+		 * The extension comes from the format and from nowhere else.
+		 *
+		 * `deck/kinds.ts` reads a board's format back out of its name, so these two cannot be
+		 * allowed to disagree: a file asked for as slides and written as `.md` would simply
+		 * *be* a flow board, correctly, with nothing anywhere to say why.
+		 */
+		const format = options.format ?? "component";
+		const extension = extensionFor(format);
 		const base = slugFor(options.title, options.template);
-		let path = `boards/${base}.html`;
+		let path = `boards/${base}${extension}`;
 		for (let suffix = 2; existsSync(join(this.deck.path, path)); suffix++) {
-			path = `boards/${base}-${suffix}.html`;
+			path = `boards/${base}-${suffix}${extension}`;
 			if (suffix > 200) throw new Error(`Too many boards called ${base}`);
 		}
 
 		const file = this.deck.fileOf(path);
-		const html = renderTemplate(options.template, options.title, options.size);
+		/*
+		 * The shape only applies to a component board. A slide deck and a markdown document
+		 * are already the shape they are — there is no `report`-flavoured deck — so the
+		 * template argument is ignored for them rather than being refused, which keeps
+		 * `newBoard({ format: "slides" })` from needing a second argument nobody would set.
+		 */
+		const html = format === "component" ? renderTemplate(options.template, options.title, options.size) : renderFormat(format, options.title, options.size);
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, html);
 		this.revisions.record(path, html);

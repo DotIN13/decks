@@ -37,6 +37,38 @@ export type BoardFormat = "component" | "flow" | "slides";
 
 export const BOARD_TEMPLATES: readonly BoardTemplate[] = ["answer", "design", "report", "plan", "blank"];
 
+export const BOARD_FORMATS: readonly BoardFormat[] = ["component", "flow", "slides"];
+
+/**
+ * What a new board of each format is called, and what it starts from.
+ *
+ * **The extension is derived from the format, never named by the caller.** A format and a
+ * filename that could disagree is the one failure this design set out to make impossible:
+ * `deck/kinds.ts` reads a board's format back *out of* its name, so a file called `.md` that
+ * was asked for as slides would simply be a flow board and nothing would say why.
+ *
+ * `component` has five shapes to choose between (`BoardTemplate`) and so has no single
+ * template file; the other two are one file each, because a slide deck and a markdown
+ * document are already the shape they are.
+ */
+const FORMATS: Record<BoardFormat, { extension: string; template?: string }> = {
+	component: { extension: ".html" },
+	flow: { extension: ".md", template: "flow.md" },
+	// `.slides.html` rather than `.slides.md`: HTML *is* reveal, and markdown is a plugin in
+	// it. Both are read (`lib/slides.js` picks its splitter from the extension); a deck this
+	// app creates is the native one.
+	slides: { extension: ".slides.html", template: "slides.html" },
+};
+
+/** The extension a board of this format takes. */
+export function extensionFor(format: BoardFormat): string {
+	return FORMATS[format].extension;
+}
+
+export function isBoardFormat(value: unknown): value is BoardFormat {
+	return typeof value === "string" && (BOARD_FORMATS as readonly string[]).includes(value);
+}
+
 /**
  * The widest a board should ever be, and it is a **ceiling rather than a target**.
  *
@@ -194,6 +226,40 @@ export function renderTemplate(kind: BoardTemplate, title: string, size?: { w?: 
 	for (const [token, value] of Object.entries(boxes)) out = out.replaceAll(`{{${token}}}`, String(value));
 	return out;
 }
+
+/**
+ * The document for a new board of a format that is not component HTML.
+ *
+ * Two tokens and no layout, which is the difference from `renderTemplate`: a flow board has
+ * no boxes to place and a slide is laid out at a fixed logical size, so neither needs the
+ * width arithmetic that a component template is written against. `{{W}}` is still
+ * substituted because a markdown board can declare its own measure in front-matter, which
+ * is the only way an agent can size one.
+ *
+ * A missing template file is a broken install rather than a reason to refuse — the same
+ * bargain `renderTemplate` makes — so it falls back to the smallest honest document of that
+ * format rather than throwing.
+ */
+export function renderFormat(format: Exclude<BoardFormat, "component">, title: string, size?: { w?: number }): string {
+	const name = FORMATS[format].template;
+	const file = name ? join(templatesDir(), name) : "";
+	const source = file && existsSync(file) ? readFileSync(file, "utf8") : FORMAT_FALLBACK[format];
+	const w = Math.round(size?.w ?? defaultFormatWidth(format));
+	// `{{TITLE}}` is escaped for the HTML deck and left alone for markdown, where an entity
+	// would be shown literally. Which is why this is two branches rather than one replace.
+	const titled = format === "slides" ? escapeHtml(title) : title;
+	return source.replaceAll("{{TITLE}}", titled).replaceAll("{{W}}", String(w));
+}
+
+/** 960 for a deck, because that is the logical width a slide is laid out at; 720 for prose. */
+function defaultFormatWidth(format: Exclude<BoardFormat, "component">): number {
+	return format === "slides" ? 960 : 720;
+}
+
+const FORMAT_FALLBACK: Record<Exclude<BoardFormat, "component">, string> = {
+	flow: `# {{TITLE}}\n`,
+	slides: `<!doctype html>\n<html lang="en">\n\t<head>\n\t\t<meta charset="utf-8" />\n\t\t<title>{{TITLE}}</title>\n\t</head>\n\t<body class="reveal">\n\t\t<div class="slides">\n\t\t\t<section>\n\t\t\t\t<h1>{{TITLE}}</h1>\n\t\t\t</section>\n\t\t</div>\n\t</body>\n</html>\n`,
+};
 
 /**
  * A file name from a title: lower case, words joined by dashes, ASCII only where it can be.

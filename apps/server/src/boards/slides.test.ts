@@ -2,14 +2,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 // @ts-expect-error -- the vendored runtime is plain JS, deliberately untyped: it is shipped
 // into every deck as-is and a `.d.ts` beside it would be a second thing to keep true.
-import { logicalSize, sheetColumns, splitDeck, splitNote } from "../../../../runtime/lib/slides.js";
+import { isHtmlDeck, logicalSize, sheetColumns, splitDeck, splitNote } from "../../../../runtime/lib/slides.js";
 
 /**
  * The deck parser, tested here because `runtime/lib` ships as plain JS with no build step.
  *
  * These are the functions with real edge cases in them — the fence that is also a
  * separator, the trailing `---` that is a habit rather than a slide — and they are the ones
- * a broken deck would be blamed on. The DOM half is exercised in `e2e/checks/slides.mjs`.
+ * a broken deck would be blamed on.
+ *
+ * `splitHtmlDeck` is **not** here, and that is a limit rather than an oversight: it uses
+ * `DOMParser`, which Node has none of, and a stub would be testing the stub. The HTML
+ * format's splitting is asserted in `e2e/checks/board-kinds.mjs`, in a real browser, against
+ * the rendered slides — which is where the rest of the DOM half already lives.
  */
 
 test("front-matter is consumed, not shown as the first slide", () => {
@@ -56,11 +61,41 @@ test("CRLF is a line ending", () => {
 	assert.deepEqual(slides, ["# One", "# Two"]);
 });
 
+/*
+ * Which splitter a deck gets, and it comes from the filename because that is the only place
+ * a format is ever declared. The query string is expected: the shell asks for
+ * `talk.slides.html?raw=1`, since it is served at the board's own URL.
+ */
+test("the format is read off the file name, query and all", () => {
+	assert.equal(isHtmlDeck("talk.slides.html"), true);
+	assert.equal(isHtmlDeck("talk.slides.html?raw=1"), true);
+	assert.equal(isHtmlDeck("talk.slides.htm?raw=1&present=1"), true);
+	assert.equal(isHtmlDeck("talk.slides.md?raw=1"), false);
+	assert.equal(isHtmlDeck("notes.md"), false);
+	// A file merely called slides is not a deck at all, and never reaches this.
+	assert.equal(isHtmlDeck("slides.html"), false);
+	assert.equal(isHtmlDeck(undefined), false);
+});
+
 test("speaker notes are separated and kept", () => {
 	assert.deepEqual(splitNote("# Two\n\nNote: say the thing"), { body: "# Two", note: "say the thing" });
 	assert.deepEqual(splitNote("# Two"), { body: "# Two", note: "" });
 	// Only at the start of a line — otherwise a slide about musical notes loses its text.
 	assert.deepEqual(splitNote("A whole Note: is four beats"), { body: "A whole Note: is four beats", note: "" });
+});
+
+/*
+ * Reveal's own default for `data-separator-notes` is `notes?:`, matched case-insensitively —
+ * so `Note:`, `Notes:` and `note:` are all notes to it. This matched `^Note:` exactly, and a
+ * deck written with the plural had its speaker notes rendered as body text on the slide,
+ * which is the one failure mode a presenter finds out about in front of an audience.
+ */
+test("the plural and the lower case are notes too, as they are in reveal", () => {
+	assert.deepEqual(splitNote("# Two\n\nNotes: say the thing"), { body: "# Two", note: "say the thing" });
+	assert.deepEqual(splitNote("# Two\n\nnote: say the thing"), { body: "# Two", note: "say the thing" });
+	assert.deepEqual(splitNote("# Two\n\nNOTES: say the thing"), { body: "# Two", note: "say the thing" });
+	// And still only at the start of a line.
+	assert.deepEqual(splitNote("Two notes: C and E"), { body: "Two notes: C and E", note: "" });
 });
 
 test("the logical size is the aspect, and nonsense is 16:9", () => {

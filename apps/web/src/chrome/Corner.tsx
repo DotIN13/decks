@@ -5,6 +5,8 @@ import Maximize from "lucide-solid/icons/maximize";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Eraser from "lucide-solid/icons/eraser";
 import FilePlus from "lucide-solid/icons/file-plus";
+import FileText from "lucide-solid/icons/file-text";
+import Presentation from "lucide-solid/icons/presentation";
 import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import ZoomIn from "lucide-solid/icons/zoom-in";
 import ZoomOut from "lucide-solid/icons/zoom-out";
@@ -31,6 +33,19 @@ import { ContextRing } from "./ContextRing.tsx";
  * `@media` block in `agents.css`: a layer keeps its precedence inside a media query, so the
  * stylesheet would lose to the utilities on the same element and do nothing at all.
  */
+
+/**
+ * What a new board can be, in the order a press is likely to want it.
+ *
+ * The extension is shown beside each one rather than explained: it is the whole of how a
+ * format is declared — `deck/kinds.ts` reads a board's format back out of its filename — so
+ * seeing it here is seeing the mechanism rather than a decoration.
+ */
+const FORMATS: Array<{ format: "component" | "flow" | "slides"; label: string; extension: string; note: string; icon: LucideIcon }> = [
+	{ format: "component", label: "Board", extension: ".html", note: "Positioned boxes you drag and retype — what a board is here", icon: FilePlus },
+	{ format: "flow", label: "Document", extension: ".md", note: "Markdown that reflows, as tall as its content", icon: FileText },
+	{ format: "slides", label: "Slides", extension: ".slides.html", note: "A reveal deck: one <section> per slide, paged with the arrow keys", icon: Presentation },
+];
 
 /** The zoom stops the menu offers, as percentages. */
 const STOPS = [50, 100, 200];
@@ -64,7 +79,15 @@ export function Corner(props: {
 	/** Frame what is on the canvas — the `0` key's job, and the button beside the readout. */
 	onFit: () => void;
 	/** A new, empty board, straight onto the canvas. */
-	onNewBoard: () => void;
+	/**
+	 * A new board, of a format.
+	 *
+	 * The argument is what this control was missing: three formats were recognised — a
+	 * component board of boxes, a markdown document, a reveal deck — and the only way to get
+	 * either of the last two was to write the file by hand, because this button sent
+	 * `board.create` with nothing on it and the server defaulted to component.
+	 */
+	onNewBoard: (format?: "component" | "flow" | "slides") => void;
 	/**
 	 * Take every board off the canvas.
 	 *
@@ -235,15 +258,52 @@ export function Corner(props: {
 			 * and goes with the state it acts on is a control you have to hunt for at exactly
 			 * the moment you want it, and the count in the title is what says why it is off.
 			 */}
-			<button
-				type="button"
-				class="iconbtn max-[640px]:hidden"
-				title="A new board, on the canvas"
-				aria-label="A new board, on the canvas"
-				onClick={() => props.onNewBoard()}
+			{/*
+				Three formats, so the choice is made where a board is made.
+				
+				A press used to be one thing and is now a small menu, which is the least it can
+				be: the formats are not variants of one board, they are three different kinds of
+				file with three different editors, and picking after the fact means renaming the
+				file. Ordinary board first, because it is what almost every press wants.
+			*/}
+			<Popover
+				placement="bottom-end"
+				label="A new board"
+				class="w-[236px]"
+				trigger={(api) => (
+					<button
+						ref={api.ref}
+						type="button"
+						class="iconbtn max-[640px]:hidden"
+						aria-haspopup="menu"
+						aria-expanded={api.open}
+						data-on={api.open ? "soft" : undefined}
+						title="A new board, on the canvas"
+						aria-label="A new board, on the canvas"
+						onClick={api.toggle}
+					>
+						<Icon of={FilePlus} size={15} />
+					</button>
+				)}
 			>
-				<Icon of={FilePlus} size={15} />
-			</button>
+				<For each={FORMATS}>
+					{(choice) => (
+						<button
+							type="button"
+							data-row
+							data-flat="true"
+							title={choice.note}
+							onClick={() => props.onNewBoard(choice.format)}
+						>
+							<span class="ic">
+								<Icon of={choice.icon} size={15} />
+							</span>
+							<span class="lb">{choice.label}</span>
+							<span class="nt">{choice.extension}</span>
+						</button>
+					)}
+				</For>
+			</Popover>
 			<button
 				type="button"
 				class="iconbtn max-[640px]:hidden"
@@ -371,18 +431,24 @@ export function Corner(props: {
 					</span>
 					<span class="lb">Fit the boards</span>
 				</button>
-				<button
-					type="button"
-					data-row
-					data-flat="true"
-					class="hidden max-[640px]:flex"
-					onClick={() => props.onNewBoard()}
-				>
-					<span class="ic">
-						<Icon of={FilePlus} size={15} />
-					</span>
-					<span class="lb">A new board</span>
-				</button>
+				{/* The same three, as rows, because on a phone this menu *is* the toolbar. */}
+				<For each={FORMATS}>
+					{(choice) => (
+						<button
+							type="button"
+							data-row
+							data-flat="true"
+							class="hidden max-[640px]:flex"
+							onClick={() => props.onNewBoard(choice.format)}
+						>
+							<span class="ic">
+								<Icon of={choice.icon} size={15} />
+							</span>
+							<span class="lb">{choice.label}</span>
+							<span class="nt">{choice.extension}</span>
+						</button>
+					)}
+				</For>
 				<button
 					type="button"
 					data-row

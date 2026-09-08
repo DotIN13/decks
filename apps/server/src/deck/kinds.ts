@@ -6,11 +6,17 @@ import type { BoardFormat } from "../boards/templates.ts";
  * Three formats (`BoardFormat`), and the pleasing part is that nothing had to be invented
  * to tell them apart:
  *
- * - `.slides.md` is a deck. The double extension rather than front-matter, so a markdown
- *   file is still a markdown file to every other tool, and so there is exactly one way to
- *   say what a file is.
+ * - `.slides.html` and `.slides.md` are decks. The double extension rather than a metadata
+ *   field, so the file is still an ordinary HTML or markdown file to every other tool, and
+ *   so there is exactly one way to say what a file is.
  * - any other `.md` is flow.
- * - `.html` is **component if its body carries `class="board"`**, and flow if it does not.
+ * - any other `.html` is **component if its body carries `class="board"`**, and flow if it
+ *   does not.
+ *
+ * `.slides.html` is reveal's own format — `<section>` elements, which is what reveal *is*;
+ * its markdown support is a plugin. So an HTML deck is the native one and a `.slides.md` is
+ * the plugin's dialect, which is the reverse of the order they were built in here. Both are
+ * read by `lib/slides.js`, which picks its splitter from the extension.
  *
  * That last rule is the one that costs nothing. Every board this deck has ever written
  * already says `<body class="board">`, and a pandoc export or a saved page already says the
@@ -18,8 +24,13 @@ import type { BoardFormat } from "../boards/templates.ts";
  * way for a file to disagree with itself about what it is.
  */
 
-/** `boards/talk.slides.md` → slides. Checked before the plain `.md` rule. */
-const SLIDES = /\.slides\.md$/i;
+/**
+ * `boards/talk.slides.html` and `boards/talk.slides.md` → slides.
+ *
+ * Checked before the plain `.md` and `.html` rules, and before the `class="board"` test —
+ * an HTML deck is a deck whatever its body says, because the name is the declaration.
+ */
+const SLIDES = /\.slides\.(?:html?|md)$/i;
 const MARKDOWN = /\.mdx?$/i;
 const HTML = /\.html?$/i;
 
@@ -39,6 +50,9 @@ export function isBoardFile(path: string): boolean {
  * document render as an unstyled one.
  */
 export function formatOf(path: string, source?: string): BoardFormat {
+	// The name first, so an HTML deck is never mistaken for a component board — a
+	// `.slides.html` written by this app carries `class="board"` on its body, because the
+	// shell it is served in needs one, and the extension has to outrank that.
 	if (SLIDES.test(path)) return "slides";
 	if (MARKDOWN.test(path)) return "flow";
 	if (!HTML.test(path)) return "flow";

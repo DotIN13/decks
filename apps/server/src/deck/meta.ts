@@ -68,10 +68,19 @@ export function readBoardMeta(html: string): BoardMeta {
 		// Written by hand as often as by an agent, so a broken one is ignored
 		// rather than fatal — the board still renders at the default size.
 		try {
-			const parsed = JSON.parse(unescapeAttribute(value)) as { w?: unknown; h?: unknown; bg?: unknown };
+			const parsed = JSON.parse(unescapeAttribute(value)) as { w?: unknown; h?: unknown; bg?: unknown; aspect?: unknown };
 			if (Number.isFinite(Number(parsed.w))) meta.w = Number(parsed.w);
 			if (Number.isFinite(Number(parsed.h))) meta.h = Number(parsed.h);
 			if (typeof parsed.bg === "string") meta.bg = parsed.bg;
+			/*
+			 * `aspect` is here for an HTML deck, which has nowhere else to put it.
+			 *
+			 * A `.slides.md` declares it in front-matter; reveal's own markup has no
+			 * equivalent — the slide size is an argument to `Reveal.initialize`, which is a
+			 * script this view deliberately does not run. So it goes in the tag every board
+			 * already carries rather than in something invented for the purpose.
+			 */
+			if (typeof parsed.aspect === "string" && parsed.aspect) meta.aspect = parsed.aspect;
 		} catch {
 			/* ignored: see above */
 		}
@@ -147,9 +156,15 @@ export function withBoardSize(html: string, size: { w?: number; h?: number }): s
  * it, an agent could create a markdown board but not size it, and would have to ask the user
  * to drag the edge. Not a full YAML parser: three keys, one line each, at the top of the
  * file, in the same spirit as the regex above.
+ *
+ * **An HTML file has no front-matter**, so for one of those the same three fields are taken
+ * from `<meta name="board">` — the tag every board in every deck already carries. That is
+ * what lets a `.slides.html` declare a 4:3 aspect: reveal's markup has no place to say it,
+ * and inventing a place would be a second way to describe a file that already describes
+ * itself.
  */
 export function readFlowMeta(path: string, source: string): BoardMeta {
-	const meta: BoardMeta = {};
+	const meta: BoardMeta = HTML_FILE.test(path) ? sized(readBoardMeta(source)) : {};
 	const front = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(source);
 	if (front) {
 		for (const line of (front[1] ?? "").split(/\r?\n/)) {
@@ -178,4 +193,23 @@ export function readFlowMeta(path: string, source: string): BoardMeta {
 	if (h1?.[1]) return { ...meta, title: h1[1].replace(/<[^>]*>/g, "").trim() || undefined };
 	void path;
 	return meta;
+}
+
+/** Whether a path is HTML, for deciding where its metadata lives. */
+const HTML_FILE = /\.html?$/i;
+
+/**
+ * The size fields of a board's own tag, and nothing else.
+ *
+ * `readBoardMeta` also returns the title and the poster; the title is settled by
+ * `readFlowMeta`'s own ladder (front-matter, `<title>`, `<h1>`, filename) and a poster is a
+ * component board's business. Taking only `w`, `h` and `aspect` keeps one answer per
+ * question.
+ */
+function sized(meta: BoardMeta): BoardMeta {
+	return {
+		...(meta.w !== undefined ? { w: meta.w } : {}),
+		...(meta.h !== undefined ? { h: meta.h } : {}),
+		...(meta.aspect !== undefined ? { aspect: meta.aspect } : {}),
+	};
 }

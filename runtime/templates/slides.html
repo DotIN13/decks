@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>{{TITLE}}</title>
+		<!--
+			`aspect` is where a deck's shape is declared, because reveal's markup has nowhere
+			to put one: its slide size is an argument to `Reveal.initialize`, and this view
+			does not run the deck's scripts. 16:9 unless you change it.
+		-->
+		<meta name="board" content='{"aspect":"16:9"}' />
+	</head>
+	<body class="reveal">
+		<!--
+			Reveal's own format: one `<section>` per slide, inside `.reveal > .slides`. This
+			file opens in reveal unchanged, and Decks reads the same sections — `lib/slides.js`
+			splits on them, takes `<aside class="notes">` out as the speaker note, and lays
+			every slide out at a fixed 960×540 scaled to the board.
+
+			Nested sections are reveal's vertical stacks. They become consecutive slides here:
+			left and right is one dimension, and a deck that branches has no honest thumbnail.
+
+			A `<script>` in this file will not run — the slides are inserted with `innerHTML`.
+			Reveal's own runtime is therefore inert, which is the point: this view owns the
+			keyboard, and a deck cannot run code in the board's origin.
+		-->
+		<div class="slides">
+			<section>
+				<h1>{{TITLE}}</h1>
+				<p>Reveal's native format. One <code>&lt;section&gt;</code> is one slide.</p>
+			</section>
+
+			<section>
+				<h2>What is on a slide</h2>
+				<ul>
+					<li>Ordinary HTML — headings, lists, images, tables</li>
+					<li>Maths in <code>$…$</code>, rendered by KaTeX</li>
+				</ul>
+				<aside class="notes">Speaker notes live here. They are kept and hidden, not thrown away.</aside>
+			</section>
+
+			<section>
+				<h2>Where it is read</h2>
+				<p>Below half zoom the board is a contact sheet. Click it and <code>←</code> <code>→</code> page it; <code>f</code> fills the screen.</p>
+			</section>
+		</div>
+	</body>
+</html>

@@ -290,7 +290,7 @@ export class Deck {
 		return board;
 	}
 
-	/** A deck's declared aspect, re-read because it lives in the file's front-matter. */
+	/** A deck's declared aspect, re-read because it lives in the file — front-matter, or the board tag for an HTML deck. */
 	private aspectOf(boardPath: string): string | undefined {
 		try {
 			return readFlowMeta(boardPath, readFileSync(join(this.path, boardPath), "utf8")).aspect;
@@ -379,7 +379,9 @@ export class Deck {
 						(stored?.h ?? (/\.html?$/i.test(path) ? 600 : 240));
 		return {
 			path,
-			title: meta.title ?? basename(path).replace(/\.(slides\.md|html?|mdx?)$/i, ""),
+			// `.slides.html` before `.html`, or a deck with no title of its own is called
+			// `talk.slides` in the rail.
+			title: meta.title ?? basename(path).replace(/\.(slides\.(?:html?|md)|html?|mdx?)$/i, ""),
 			format,
 			x: 0,
 			y: 0,

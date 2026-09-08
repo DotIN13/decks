@@ -748,8 +748,18 @@ export type ClientMessage =
 	 * it); it is a bare `string` here because the protocol package cannot depend on the
 	 * server, and an unknown one falls back to `blank` rather than failing — the worst
 	 * outcome of a typo should be an empty board.
+	 *
+	 * `format` is what the board *is as a file* — `component`, `flow` or `slides` — and it
+	 * is a different question from `kind`, which is the shape it starts with. An `answer`
+	 * can be written as component HTML or as markdown, so one field could not mean both.
+	 *
+	 * **The extension is not on the wire, deliberately.** The server derives it from the
+	 * format (`.html`, `.md`, `.slides.html`), because a board's format is read back out of
+	 * its filename — so a caller that could name the file could ask for a slide deck and be
+	 * handed a flow board, correctly, with nothing to say why. Absent means `component`,
+	 * which is what every board was before formats existed.
 	 */
-	| { type: "board.create"; kind?: string }
+	| { type: "board.create"; kind?: string; format?: string }
 	/**
 	 * Delete a board's file from the deck.
 	 *
