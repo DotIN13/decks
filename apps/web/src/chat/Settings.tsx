@@ -1,7 +1,7 @@
-import type { ClaudeAccount } from "@decks/protocol";
+import type { ClaudeAccount, WebStatus } from "@decks/protocol";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
-import { For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { AlertSettings } from "./AlertSettings.tsx";
 import type { AlertPrefs } from "../lib/alerts.ts";
@@ -56,6 +56,18 @@ export function Settings(props: {
 	active: string;
 	onAdd: () => void;
 	onForget: (id: string) => void;
+	/**
+	 * The user's own Chrome, shared with the deck through the Decks extension
+	 * (`server/web/bridge.ts`). The code is what the extension is paired with; the address
+	 * is this page's own origin, because that is the address the browser reached Decks at.
+	 */
+	web?: { status: WebStatus; code?: string };
+	/** A fresh pairing code. The extension has to be paired again. */
+	onWebRepair: () => void;
+	/** Let go of the shared tab. */
+	onWebStop: () => void;
+	/** Put the status board on the canvas. */
+	onWebBoard: () => void;
 	onClose: () => void;
 }) {
 	/*
@@ -170,6 +182,8 @@ export function Settings(props: {
 							Add an account
 						</button>
 					</section>
+
+					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
 				</div>
 			</div>
 		</div>
@@ -295,5 +309,97 @@ function Row(props: {
 				</button>
 			</Show>
 		</div>
+	);
+}
+
+/**
+ * The shared Chrome: what to paste into the extension, and what is shared right now.
+ *
+ * Last, because it is set up once. The address is `location.origin` rather than anything
+ * the server knows — the server sees loopback behind a proxy, and the one address that is
+ * certainly right is the one this page was loaded from.
+ */
+function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepair: () => void; onStop: () => void; onBoard: () => void }) {
+	const [copied, setCopied] = createSignal<"address" | "code" | undefined>(undefined);
+	const copy = async (what: "address" | "code", text: string) => {
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopied(what);
+			setTimeout(() => setCopied(undefined), 1500);
+		} catch {
+			/* no clipboard on this origin; the text is on screen to select */
+		}
+	};
+	const status = () => props.web?.status;
+	const note = () => {
+		const now = status();
+		if (!now) return "Waiting for the server to say.";
+		if (now.connected) return `Sharing ${now.tabs.length === 1 ? "one tab" : `${now.tabs.length} tabs`}. Agents can read and fill it; submitting asks you first, on the status board.`;
+		if (now.paired) return "Paired. Nothing is shared: press the Decks button in Chrome on the tab an agent should work in.";
+		return "Install the extension (extension/ in the repo, loaded unpacked), then paste these two lines into its Pairing section.";
+	};
+	return (
+		<section class="set-group" data-group="web">
+			<header>
+				<span class="set-title">Your Chrome</span>
+				<span class="set-note">{note()}</span>
+			</header>
+			<div class="rowlist set-rows">
+				<div class="row-act" data-row-static>
+					<div class="min-w-0 flex-1" data-row>
+						<span class="lb w-full items-baseline">
+							<span class="truncate">Decks address</span>
+						</span>
+						<span class="nt flex w-full items-baseline gap-1.5">
+							<span class="truncate font-mono text-muted">{location.origin}</span>
+						</span>
+					</div>
+					<button class="set-mini" type="button" onClick={() => void copy("address", location.origin)}>
+						{copied() === "address" ? "Copied" : "Copy"}
+					</button>
+				</div>
+				<div class="row-act" data-row-static>
+					<div class="min-w-0 flex-1" data-row>
+						<span class="lb w-full items-baseline">
+							<span class="truncate">Pairing code</span>
+						</span>
+						<span class="nt flex w-full items-baseline gap-1.5">
+							<span class="truncate font-mono text-muted">{props.web?.code ?? "…"}</span>
+						</span>
+					</div>
+					<button class="set-mini" type="button" disabled={!props.web?.code} onClick={() => props.web?.code && void copy("code", props.web.code)}>
+						{copied() === "code" ? "Copied" : "Copy"}
+					</button>
+					<button class="set-mini" type="button" title="Mint a fresh code; the extension has to be paired again" onClick={props.onRepair}>
+						New code
+					</button>
+				</div>
+				<For each={status()?.tabs ?? []}>
+					{(tab) => (
+						<div class="row-act" data-row-static>
+							<div class="min-w-0 flex-1" data-row>
+								<span class="lb w-full items-baseline">
+									<span class="truncate">{tab.title || "(untitled)"}</span>
+									<span class="state flex-none text-accent">shared</span>
+								</span>
+								<span class="nt flex w-full items-baseline gap-1.5">
+									<span class="truncate font-mono text-muted">{tab.url}</span>
+								</span>
+							</div>
+						</div>
+					)}
+				</For>
+			</div>
+			<div class="flex gap-2">
+				<button class="set-add" type="button" onClick={props.onBoard}>
+					Show the status board
+				</button>
+				<Show when={status()?.connected}>
+					<button class="set-add" type="button" onClick={props.onStop}>
+						Stop sharing
+					</button>
+				</Show>
+			</div>
+		</section>
 	);
 }

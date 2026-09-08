@@ -19,6 +19,8 @@ import {
 	type BoardTemplate,
 } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
+import { WebBridge } from "./web/bridge.ts";
+import { renderWebBoard, WEB_BOARD_SIZE } from "./boards/templates.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./claude/accounts.ts";
 import { claudeIdentity } from "./claude/backend.ts";
@@ -54,6 +56,8 @@ export class App {
 	readonly stage: StageService;
 	/** The canvas tool's other end, for the runtimes that are not in this process. */
 	readonly bridge = new StageBridge();
+	/** The user's own Chrome, shared through the Decks extension (`web/bridge.ts`). */
+	readonly web: WebBridge;
 	readonly revisions: Revisions;
 	private hub: Hub | undefined;
 	private unwatch: (() => void) | undefined;
@@ -120,6 +124,13 @@ export class App {
 		 */
 		this.claudeAccounts = new ClaudeAccounts(config.dataDir);
 		this.claudeAccounts.sweep();
+		/*
+		 * The shared browser, on the install like the accounts are: the pairing code is a
+		 * property of this server, not of a deck. Every change is broadcast, so the status
+		 * board and the extension's popup say the same thing at the same time.
+		 */
+		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.status", status }));
+		this.stage.web = Object.assign(this.web, { board: () => this.newWebBoard() }) as typeof this.web & { board: () => string };
 		this.agents = new Registry(
 			deck,
 			(message) => this.send(message),
@@ -507,6 +518,30 @@ export class App {
 			 * the agent rather than from the person pressing the button, so two people
 			 * mirroring the same agent land on the same board.
 			 */
+			/*
+			 * The shared Chrome: the user's answer to a submit, the Stop button, and the
+			 * card itself, all from the status board (`lib/live-web.js`).
+			 */
+			case "web.answer": {
+				if (!this.web.answer(message.id, message.ok)) reply({ type: "notice", level: "info", text: "That question has already been answered." });
+				return;
+			}
+			case "web.stop": {
+				this.web.stop();
+				return;
+			}
+			case "web.repair": {
+				const code = this.web.repair();
+				this.send({ type: "web.status", status: this.web.status(), code });
+				return;
+			}
+			case "web.board": {
+				const path = this.newWebBoard();
+				const agent = this.agents.focused();
+				agent.setInPlay([...agent.inPlay.filter((shown) => shown !== path), path]);
+				return;
+			}
+
 			case "agent.mirror": {
 				const of = this.agents.summaries().find((candidate) => candidate.id === message.agentId);
 				if (!of) {
@@ -1238,6 +1273,28 @@ export class App {
 		 * second or two after the rest and the browser fills the section in when it lands.
 		 */
 		void this.publishAccounts(reply);
+		// And the shared browser, with the code the extension pairs with: the status board
+		// shows it when nothing is connected yet, and the browser is where the user reads it.
+		reply({ type: "web.status", status: this.web.status(), code: this.web.code() });
+	}
+
+	/**
+	 * The status board for the shared Chrome: one per deck, made when first asked for.
+	 *
+	 * A stub like a mirror — `data-live="web"` and nothing else — fed from the `web.status`
+	 * the browser already holds. Asking again hands back the board that exists.
+	 */
+	newWebBoard(): string {
+		const path = "boards/your-chrome.html";
+		const file = this.deck.fileOf(path);
+		if (existsSync(file) && readFileSync(file, "utf8").includes('data-live="web"')) return path;
+		const html = renderWebBoard(WEB_BOARD_SIZE);
+		mkdirSync(dirname(file), { recursive: true });
+		writeFileSync(file, html);
+		this.revisions.record(path, html);
+		const board = this.deck.refresh(path);
+		if (board) this.send({ type: "board.changed", path, rev: board.rev, board });
+		return path;
 	}
 
 	/**
@@ -1279,6 +1336,7 @@ export class App {
 		this.unwatch = undefined;
 		clearInterval(this.resyncTimer);
 		this.resyncTimer = undefined;
+		this.web.dispose();
 		this.agents.dispose();
 	}
 }

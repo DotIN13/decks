@@ -40,7 +40,14 @@ export function decksStage(deps: { tool: StageTool; agent: StageAgentHooks }): I
 					// `details` is where Pi keeps a tool's structured result. The canvas
 					// state is no longer *restored* from it — that is `SnapshotStore`, which
 					// both runtimes use — but it costs nothing and is what Pi renders from.
-					return { content: [{ type: "text", text: outcome.text }], details: tool.snapshot() };
+					return {
+						content: [
+							{ type: "text", text: outcome.text },
+							// The same image blocks Pi's own read tool returns for a picture.
+							...(outcome.images ?? []).map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType })),
+						],
+						details: tool.snapshot(),
+					};
 				},
 			});
 

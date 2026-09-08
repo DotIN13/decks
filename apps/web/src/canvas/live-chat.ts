@@ -1,4 +1,4 @@
-import type { ChatItem } from "@decks/protocol";
+import type { ChatItem, WebStatus } from "@decks/protocol";
 
 /**
  * The channel between a live board and the transcript this app is already holding.
@@ -17,9 +17,21 @@ import type { ChatItem } from "@decks/protocol";
 /** What the board asks for, once it has mounted. Repeated until answered. */
 export interface LiveWant {
 	decks: "live.want";
-	kind: "chat";
-	agent: string;
+	/** A conversation (`live-chat.js`), or the shared Chrome's status card (`live-web.js`). */
+	kind: "chat" | "web";
+	agent?: string;
 }
+
+/** What the app posts to a `data-live="web"` board: the shared browser's state, whole. */
+export interface LiveWebFeed {
+	decks: "live.web";
+	status: WebStatus;
+	/** The pairing code, so an unpaired card can say what to paste into the extension. */
+	code?: string;
+}
+
+/** What a web card posts back: the user's answer to a submit, or the Stop button. */
+export type LiveWebReply = { decks: "live.web.answer"; id: string; ok: boolean } | { decks: "live.web.stop" };
 
 /**
  * What the app posts back.
@@ -91,18 +103,37 @@ export function applyDelta(held: readonly ChatItem[], delta: { from: number; ite
  * so this can be attached whenever the frame loads without a race to lose: a request that
  * arrives before anyone is listening is simply asked again.
  */
-export function attachLiveWant(frame: HTMLIFrameElement, onWant: (agent: string) => void): () => void {
+export function attachLiveWant(
+	frame: HTMLIFrameElement,
+	onWant: (agent: string) => void,
+	web?: { onWant: () => void; onReply: (reply: LiveWebReply) => void },
+): () => void {
 	const view = frame.ownerDocument.defaultView;
 	if (!view) return () => {};
 	const listener = (event: MessageEvent) => {
 		if (event.source !== frame.contentWindow) return;
-		const message = event.data as Partial<LiveWant> | null;
-		if (!message || message.decks !== "live.want" || message.kind !== "chat") return;
-		if (typeof message.agent !== "string" || !message.agent) return;
-		onWant(message.agent);
+		const message = event.data as Partial<LiveWant> | Partial<LiveWebReply> | null;
+		if (!message || typeof message.decks !== "string") return;
+		if (message.decks === "live.want") {
+			const want = message as Partial<LiveWant>;
+			if (want.kind === "web") web?.onWant();
+			else if (want.kind === "chat" && typeof want.agent === "string" && want.agent) onWant(want.agent);
+			return;
+		}
+		if (message.decks === "live.web.answer") {
+			const reply = message as Partial<Extract<LiveWebReply, { decks: "live.web.answer" }>>;
+			if (typeof reply.id === "string" && typeof reply.ok === "boolean") web?.onReply({ decks: "live.web.answer", id: reply.id, ok: reply.ok });
+			return;
+		}
+		if (message.decks === "live.web.stop") web?.onReply({ decks: "live.web.stop" });
 	};
 	view.addEventListener("message", listener);
 	return () => view.removeEventListener("message", listener);
+}
+
+/** Post the shared browser's state into a web card. */
+export function pushLiveWeb(frame: HTMLIFrameElement, feed: LiveWebFeed): void {
+	frame.contentWindow?.postMessage(feed, frame.ownerDocument.location.origin);
 }
 
 /** Post a feed into a board. Same origin, so the target is this app's own origin. */

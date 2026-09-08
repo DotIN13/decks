@@ -1,4 +1,5 @@
-import type { Server } from "node:http";
+import type { IncomingMessage, Server } from "node:http";
+import type { Duplex } from "node:stream";
 import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 
@@ -14,13 +15,28 @@ export class Hub {
 	private readonly sockets = new Set<WebSocket>();
 	private readonly server: WebSocketServer;
 
+	/**
+	 * `noServer`, and the upgrade is routed by hand.
+	 *
+	 * `/ws` is no longer the only websocket on this server: `/api/web/relay` is the user's
+	 * Chrome extension calling in (`web/bridge.ts`). Two `WebSocketServer`s on one HTTP
+	 * server each abort any upgrade whose path is not theirs, so the second one broke the
+	 * first — the one upgrade listener in `index.ts` looks at the path and hands the socket
+	 * to whichever of the two it belongs to.
+	 */
 	constructor(
 		httpServer: Server,
 		private readonly onMessage: (message: ClientMessage, reply: (message: ServerMessage) => void) => void,
 		private readonly onConnect: (reply: (message: ServerMessage) => void) => void,
 	) {
-		this.server = new WebSocketServer({ server: httpServer, path: "/ws" });
+		void httpServer;
+		this.server = new WebSocketServer({ noServer: true });
 		this.server.on("connection", (socket) => this.accept(socket));
+	}
+
+	/** The `/ws` upgrade, from the router in `index.ts`. */
+	handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+		this.server.handleUpgrade(request, socket, head, (ws) => this.server.emit("connection", ws, request));
 	}
 
 	private accept(socket: WebSocket): void {

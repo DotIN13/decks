@@ -28,6 +28,20 @@ const hub = new Hub(
 );
 app.attach(hub);
 
+/*
+ * One upgrade listener, two websockets.
+ *
+ * `/ws` is the browser; `/api/web/relay` is the Decks extension in the user's own Chrome,
+ * dialling in with its pairing code (`web/bridge.ts`). Anything else is not a websocket this
+ * server has, and is dropped rather than left hanging.
+ */
+httpServer.on("upgrade", (request, socket, head) => {
+	const path = new URL(request.url ?? "/", "http://decks").pathname;
+	if (path === "/ws") hub.handleUpgrade(request, socket, head);
+	else if (path === "/api/web/relay") app.web.handleUpgrade(request, socket, head);
+	else socket.destroy();
+});
+
 httpServer.on("error", (error) => {
 	console.error(`[decks] cannot listen on ${config.host}:${config.port}: ${(error as Error).message}`);
 	process.exit(1);

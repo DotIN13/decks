@@ -96,6 +96,7 @@ function toolOn(camera: Camera) {
 		sends,
 		deck,
 		extents,
+		service,
 		/** What was actually written to disk, which is the only place a board's size lives. */
 		read: (path: string) => readFileSync(join(root, path), "utf8"),
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
@@ -409,5 +410,68 @@ test("a shape asked for alongside a format that has none is said, not silently d
 	assert.equal(result.isError, false);
 	// There is no report-flavoured slide deck; a deck is already the shape it is.
 	assert.match(result.text, /a slides board has no template shape — report was ignored/);
+	cleanup();
+});
+
+/*
+ * `stage.web`: the user's shared Chrome, through the one object the server holds for it.
+ *
+ * What is tested is the wording again — the sentence an agent gets on a server with no shared
+ * browser, and that the calls reach the host — because the real thing (`web/bridge.test.ts`)
+ * runs against a Chromium and this is the tool's own contract with it.
+ */
+test("stage.web says so when this server has no shared browser, and reaches the host when it has", async () => {
+	const { tool, service, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	const without = await tool.run(`return await stage.web.status()`);
+	assert.equal(without.isError, true);
+	assert.match(without.text, /This server has no shared browser/);
+
+	const calls: string[] = [];
+	const status = { paired: true, connected: true, tab: { title: "Sign up", url: "https://x.example/join" }, tabs: [], actions: [] };
+	service.web = {
+		code: () => "code-1234",
+		repair: () => "code-5678",
+		status: () => status,
+		stop: () => void calls.push("stop"),
+		open: async (url) => (calls.push(`open ${url}`), { url, title: "Sign up" }),
+		read: async () => ({ url: "https://x.example/join", title: "Sign up", snapshot: "- textbox \"Email\"" }),
+		screenshot: async () => ({ file: "/tmp/shot.png", width: 800, height: 600, png: Buffer.from([0x89, 0x50, 0x4e, 0x47]) }),
+		fill: async (field, text) => (calls.push(`fill ${field}=${text}`), { field }),
+		select: async (field, option) => ({ field, option }),
+		click: async (what) => (calls.push(`click ${what}`), { clicked: what }),
+		press: async (key) => ({ pressed: key }),
+		submit: async (what) => (calls.push(`submit ${what}`), { submitted: what ?? "Enter", allowed: true }),
+		board: () => "boards/your-chrome.html",
+	};
+	const pairing = await tool.run(`return await stage.web.pairing()`);
+	assert.equal(pairing.isError, false);
+	assert.match(pairing.text, /"code": "code-1234"/);
+	assert.match(pairing.text, /Decks extension/);
+
+	const drove = await tool.run(`
+		await stage.web.open("https://x.example/join");
+		await stage.web.fill("Email", "ada@example.org");
+		await stage.web.click("Next");
+		const page = await stage.web.read();
+		const done = await stage.web.submit("Create account");
+		return { page: page.snapshot, done, board: await stage.web.board() };
+	`);
+	assert.equal(drove.isError, false, drove.text);
+	assert.deepEqual(calls, ["open https://x.example/join", "fill Email=ada@example.org", "click Next", "submit Create account"]);
+	assert.match(drove.text, /textbox \\"Email\\"/);
+	assert.match(drove.text, /"allowed": true/);
+	assert.match(drove.text, /boards\/your-chrome\.html/);
+
+	// A screenshot is handed back as an image block beside the text, and the text names the file.
+	const looked = await tool.run(`return await stage.web.screenshot()`);
+	assert.equal(looked.isError, false, looked.text);
+	assert.match(looked.text, /"file": "\/tmp\/shot.png"/);
+	assert.deepEqual(looked.images, [{ data: Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString("base64"), mimeType: "image/png" }]);
+	// …and only on the run that took one.
+	assert.equal((await tool.run(`return 1`)).images, undefined);
+
+	const empty = await tool.run(`return await stage.web.fill("", "x")`);
+	assert.equal(empty.isError, true);
+	assert.match(empty.text, /fill needs the field's label/);
 	cleanup();
 });

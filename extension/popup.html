@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Decks</title>
+		<style>
+			body { width: 320px; margin: 0; padding: 14px; font: 13px/1.45 system-ui, sans-serif; color: #1c1c1e; }
+			h1 { margin: 0 0 8px; font-size: 15px; }
+			label { display: block; margin: 8px 0 2px; font-weight: 600; font-size: 12px; }
+			input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #c8c8cc; border-radius: 6px; font: inherit; }
+			button { margin-top: 10px; padding: 6px 12px; border: 1px solid #c8c8cc; border-radius: 6px; background: #f4f4f6; font: inherit; font-weight: 600; cursor: pointer; }
+			button.primary { border-color: #2f6fed; background: #2f6fed; color: #fff; }
+			.row { display: flex; gap: 8px; }
+			.status { margin-top: 12px; padding: 8px 10px; border-radius: 6px; background: #f4f4f6; font-size: 12px; }
+			.status[data-on="true"] { background: #e6f4ea; }
+			.status .tab { margin-top: 4px; color: #555; word-break: break-all; }
+			.error { margin-top: 8px; color: #b3261e; font-size: 12px; }
+			details { margin-top: 10px; }
+			summary { cursor: pointer; font-weight: 600; font-size: 12px; }
+		</style>
+	</head>
+	<body>
+		<h1>Decks</h1>
+		<div class="status" id="status">…</div>
+		<div class="row">
+			<button class="primary" id="share">Share this tab</button>
+			<button id="stop" hidden>Stop sharing</button>
+		</div>
+		<div class="error" id="error"></div>
+		<details id="pairing">
+			<summary>Pairing</summary>
+			<label for="address">Decks address</label>
+			<input id="address" placeholder="https://decks.example.org" />
+			<label for="code">Pairing code</label>
+			<input id="code" placeholder="from the status board, or ask the agent" />
+			<button id="save">Save</button>
+		</details>
+		<script src="popup.js"></script>
+	</body>
+</html>

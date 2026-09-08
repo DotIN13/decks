@@ -110,6 +110,23 @@ export interface QueuedWork {
 	at: number;
 }
 
+/** The shared Chrome's state, as the status board draws it. */
+export interface WebStatus {
+	/** A pairing code exists. */
+	paired: boolean;
+	/** The extension is connected and a tab is attached. */
+	connected: boolean;
+	/** The tab you drive — the first shared one. */
+	tab?: { title: string; url: string };
+	tabs: Array<{ title: string; url: string }>;
+	/** The last twelve things done through `web.*`, oldest first. */
+	actions: Array<{ at: number; text: string; ok: boolean }>;
+	/** A submit waiting for the user's Allow. */
+	pending?: { id: string; text: string };
+	/** Why the last connection ended, if it has. */
+	closed?: string;
+}
+
 export interface ShowOptions {
 	/** "board" fits the one board (default); "all" fits everything named. */
 	fit?: "board" | "all";
@@ -282,6 +299,71 @@ export interface Stage {
 	 * for the same agent hands back the board you already have rather than a second window.
 	 */
 	mirror(options?: { of?: string; w?: number; h?: number }): Promise<{ path: string; of: string; agent: string }>;
+
+	/**
+	 * **The user's own Chrome**, shared with the deck through the Decks browser extension.
+	 *
+	 * The extension attaches to one tab the user picks and dials this server; from then on
+	 * these calls drive that tab — logged in as the user, on the user's own screen. Nothing is
+	 * streamed back: there is no picture of the tab, because the user is looking at it. **`read`
+	 * is how you see the page**: its address, its title, and the accessibility tree, which
+	 * names every field with its label and value and every button with its name. Use those
+	 * names in `fill` and `click`. **`screenshot` is how you look**: the picture comes back
+	 * attached to the call, for what a tree cannot say.
+	 *
+	 *     const page = await stage.web.read();            // { url, title, snapshot }
+	 *     await stage.web.screenshot();                    // the picture, attached to the result
+	 *     await stage.web.fill("Email", "ada@example.org");
+	 *     await stage.web.select("Country", "Iceland");
+	 *     await stage.web.click("Next");
+	 *     await stage.web.submit("Create account");        // waits for the user's Allow
+	 *
+	 * **Every call throws a sentence when no tab is shared** — pairing has not happened, the
+	 * laptop is asleep, the tab was closed — and that sentence is the thing to relay to the
+	 * user. Setting up is theirs to do, once: `pairing()` gives the code to paste into the
+	 * extension, and the status board (`board()`) shows the address and the code until a tab
+	 * arrives, then which tab, connected or not, and what you did.
+	 *
+	 * **`submit` asks the user first.** It puts the question on the status board and waits up
+	 * to two minutes for Allow or Deny; a `{ allowed: false }` result is a refusal, not an
+	 * error. Pass `{ ask: false }` only when the user has said they do not want to be asked
+	 * for this site. Passwords and codes are the user's to type, in the tab itself: do not ask
+	 * for them and do not fill them.
+	 */
+	web: {
+		/** Connected or not, which tab, the last actions, a pending question. */
+		status(): Promise<WebStatus>;
+		/** The pairing code and what to tell the user to do with it. */
+		pairing(): Promise<{ code: string; path: string; note: string }>;
+		/** A fresh code. The extension has to be paired again. */
+		repair(): Promise<{ code: string }>;
+		/** Make or find the status board, attach it, and put it on the canvas. Returns its path. */
+		board(): Promise<string>;
+		/** Navigate the shared tab. */
+		open(url: string): Promise<{ url: string; title: string }>;
+		/** The page as text. `truncated` when the tree was cut at 60,000 characters. */
+		read(): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
+		/**
+		 * A picture of the tab. **Attached to this call's result**, so you see it in the same
+		 * turn; also saved at `file` for a second look. The viewport by default, the whole page
+		 * with `full: true`. Chrome only paints a tab it is showing: if this times out, ask the
+		 * user to bring the shared tab to the front. `read` is still the cheaper way to learn
+		 * names and values; this is for what a tree cannot say — a thumbnail, a chart, a layout.
+		 */
+		screenshot(options?: { full?: boolean }): Promise<{ file: string; width: number; height: number }>;
+		/** Type into a field named by its label, placeholder or accessible name. Replaces what was there. */
+		fill(field: string, text: string): Promise<{ field: string }>;
+		/** Choose an option in a dropdown, by the option's label or value. */
+		select(field: string, option: string): Promise<{ field: string; option: string }>;
+		/** Click a button, link, checkbox, radio, tab or piece of text, by its name. */
+		click(what: string): Promise<{ clicked: string }>;
+		/** A key, by its name: "Enter", "Tab", "Escape", "ArrowDown". */
+		press(key: string): Promise<{ pressed: string }>;
+		/** Press the named button, or Enter, after the user allows it on the status board. */
+		submit(what?: string, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
+		/** Detach from the shared tab. The user can share again from the extension. */
+		stop(): Promise<void>;
+	};
 
 	/**
 	 * Set a board's size. Either dimension on its own is fine.

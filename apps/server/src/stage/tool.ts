@@ -146,6 +146,14 @@ export interface StageToolResult {
 	text: string;
 	/** Whether the run failed, which each runtime signals in its own way. */
 	isError: boolean;
+	/**
+	 * Pictures the run produced, for the model to look at alongside the text.
+	 *
+	 * One source today: `stage.web.screenshot()`. Base64, so each runtime can put it in
+	 * its own kind of image block; a runtime with no image blocks drops them and the text
+	 * still names the file.
+	 */
+	images?: Array<{ data: string; mimeType: string }>;
 }
 
 export interface StageTool {
@@ -246,9 +254,16 @@ export function createStageTool(deps: {
 	 * the result text, so that is where a number it should notice belongs.
 	 */
 	let notes: string[] = [];
+	/** Pictures produced during one run — see `StageToolResult.images`. */
+	let images: Array<{ data: string; mimeType: string }> = [];
 
 	/** The canvas's own size, or nothing if no browser has ever reported one. */
 	const viewport = () => service.viewport(agent.id);
+	/** The shared Chrome, or the sentence that says this server has none. */
+	const needWeb = () => {
+		if (!service.web) throw new Error("This server has no shared browser.");
+		return service.web;
+	};
 
 	const stage = {
 		// --- reads ---------------------------------------------------------------
@@ -567,6 +582,63 @@ export function createStageTool(deps: {
 		/** What is waiting for an agent: yours, or another's if you name it. */
 		queue: async (agentId?: string) => agent.queue(agentId),
 
+		/**
+		 * The user's own Chrome, shared with the deck through the Decks extension.
+		 *
+		 * Every call throws a sentence when no tab is shared, which is the state to expect
+		 * first: the user has to pair the extension once and share a tab each time. There is
+		 * no picture of the tab — it is on the user's own screen — so `read` is how the agent
+		 * sees it: the address, the title, and the accessibility tree with every field's
+		 * label and value.
+		 */
+		web: {
+			/** Connected or not, which tab, what the agent did; the status board draws this. */
+			status: async () => needWeb().status(),
+			/** What to put in the extension: the address is the one the browser uses for Decks. */
+			pairing: async () => ({ code: needWeb().code(), path: "/api/web/relay", note: "Paste the Decks address and this code into the Decks extension's popup, then share a tab." }),
+			/** A fresh code; the extension has to be paired again. */
+			repair: async () => ({ code: needWeb().repair() }),
+			/** Make (or find) the status board, attach it and put it on the canvas. */
+			board: async () => {
+				const path = needWeb().board();
+				agent.setContext([path, ...agent.context().filter((held) => held !== path)]);
+				agent.setInPlay([...agent.inPlay().filter((shown) => shown !== path), path]);
+				return path;
+			},
+			open: async (url: string) => {
+				if (!url?.trim()) throw new Error("open needs a URL");
+				return needWeb().open(url.trim());
+			},
+			read: async () => needWeb().read(),
+			/**
+			 * A picture of the tab, attached to this call's result so you see it at once, and
+			 * saved to `file` for a second look. `full: true` is the whole page.
+			 */
+			screenshot: async (options?: { full?: boolean }) => {
+				const shot = await needWeb().screenshot(options);
+				images.push({ data: shot.png.toString("base64"), mimeType: "image/png" });
+				return { file: shot.file, width: shot.width, height: shot.height };
+			},
+			fill: async (field: string, text: string) => {
+				if (!field?.trim()) throw new Error("fill needs the field's label");
+				return needWeb().fill(field.trim(), String(text ?? ""));
+			},
+			select: async (field: string, option: string) => needWeb().select(field, option),
+			click: async (what: string) => {
+				if (!what?.trim()) throw new Error("click needs the button's or link's name");
+				return needWeb().click(what.trim());
+			},
+			press: async (key: string) => needWeb().press(key),
+			/**
+			 * Press the named button, or Enter, once the user has allowed it on the status
+			 * board. Pass `{ ask: false }` only when the user has said they do not want to be
+			 * asked for this site.
+			 */
+			submit: async (what?: string, options?: { ask?: boolean }) => needWeb().submit(what?.trim() || undefined, options),
+			/** Detach from the shared tab. */
+			stop: async () => needWeb().stop(),
+		},
+
 		agents: async () =>
 			agent.agents().map((other) => ({
 				id: other.id,
@@ -602,6 +674,7 @@ export function createStageTool(deps: {
 
 		async run(code: string): Promise<StageToolResult> {
 			notes = [];
+			images = [];
 			const outcome = await runEval(code, stage);
 			const parts: string[] = [];
 			if (outcome.logs.length > 0) parts.push(outcome.logs.join("\n"));
@@ -620,7 +693,11 @@ export function createStageTool(deps: {
 			// A timed-out eval is reported rather than raised — the code may well have done
 			// its work before the timer — which is the one case that is an error to read
 			// and not an error to fail.
-			return { text: parts.join("\n"), isError: Boolean(outcome.error) && !outcome.timedOut };
+			return {
+				text: parts.join("\n"),
+				isError: Boolean(outcome.error) && !outcome.timedOut,
+				...(images.length > 0 ? { images: [...images] } : {}),
+			};
 		},
 	};
 }

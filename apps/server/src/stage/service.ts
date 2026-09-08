@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Board, Camera, ServerMessage, StageCall, StageResult } from "@decks/protocol";
+import type { Board, Camera, ServerMessage, StageCall, StageResult, WebStatus } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { withBoardSize } from "../deck/meta.ts";
 
@@ -43,6 +43,24 @@ export interface StageHost {
 	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
 }
 
+/** What the stage tool needs of the shared browser. `WebBridge` is the one implementation. */
+export interface WebHost {
+	code(): string;
+	repair(): string;
+	status(): WebStatus;
+	stop(): void;
+	open(url: string): Promise<{ url: string; title: string }>;
+	read(): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
+	screenshot(options?: { full?: boolean }): Promise<{ file: string; width: number; height: number; png: Buffer }>;
+	fill(field: string, text: string): Promise<{ field: string }>;
+	select(field: string, option: string): Promise<{ field: string; option: string }>;
+	click(what: string): Promise<{ clicked: string }>;
+	press(key: string): Promise<{ pressed: string }>;
+	submit(what?: string, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
+	/** Make or find the status board, and return its path. */
+	board(): string;
+}
+
 /** The room `fit` leaves under the content — the margin a board's own components start at. */
 const FIT_MARGIN = 48;
 
@@ -55,6 +73,15 @@ const FIT_WAIT_MS = 5000;
 const FIT_REFLOW_MS = 1500;
 
 export class StageService {
+	/**
+	 * The user's shared Chrome, if the app has one (`web/bridge.ts`).
+	 *
+	 * Held here rather than threaded through the registry and every session, because it is
+	 * one object per server, like the deck, and the stage tool is the only thing that reads
+	 * it. `undefined` in the tests that build a service on its own.
+	 */
+	web: WebHost | undefined;
+
 	constructor(
 		private deck: Deck,
 		private readonly host: StageHost,

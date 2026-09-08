@@ -393,3 +393,40 @@ export function renderMirror(name: string, agentId: string, size?: { w?: number;
 </html>
 `;
 }
+
+/** The default size of the shared-browser card: a short, wide status card. */
+export const WEB_BOARD_SIZE = { w: 560, h: 420 };
+
+/**
+ * The status board for the user's shared Chrome.
+ *
+ * A stub, like a mirror: the component carries `data-live="web"` and draws itself from the
+ * `web.status` the app is already holding (`canvas/live-chat.ts` feeds it, `lib/live-web.js`
+ * draws it). There is deliberately no picture of the tab in it — the tab is on the user's own
+ * screen — so the card says which tab is shared, whether it is connected, what the agent did,
+ * and carries the Allow/Deny for a submit and the Stop button.
+ */
+export function renderWebBoard(size?: { w?: number; h?: number }): string {
+	const w = Math.round(size?.w ?? WEB_BOARD_SIZE.w);
+	const h = Math.round(size?.h ?? WEB_BOARD_SIZE.h);
+	return `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Your Chrome — shared with the deck</title>
+		<meta name="board" content='{"w":${w},"h":${h},"bg":"plain"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<div
+			class="live"
+			data-id="web"
+			data-live="web"
+			style="left: 0; top: 0; width: ${w}px; height: ${h}px"
+		></div>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>
+`;
+}

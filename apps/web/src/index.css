@@ -2248,6 +2248,42 @@ svg.lucide {
 }
 
 /*
+ * A small control on the right of a settings row — Copy, New code — for a row whose value is
+ * text rather than a switch. The same slot the account row's × sits in, as a word.
+ */
+.set-mini {
+	flex: none;
+	align-self: center;
+	padding: 3px 9px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.set-mini:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+.set-mini:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/* A row that is information rather than a choice: no hover wash, no pointer. */
+.row-act[data-row-static] {
+	cursor: default;
+}
+
+.row-act[data-row-static]:hover {
+	background: transparent;
+}
+
+/*
  * The cue picker: forty-five sounds as five families of numbers.
  *
  * A flat list of forty-five rows is a scroll nobody reads to the end, and the names say

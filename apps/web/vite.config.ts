@@ -64,7 +64,12 @@ export default defineConfig({
 		strictPort: true,
 		...(ALLOWED_HOSTS ? { allowedHosts: ALLOWED_HOSTS } : {}),
 		proxy: {
-			"/api": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false },
+			/*
+			 * `ws: true` on `/api` as well: `/api/web/relay` is the Decks extension's websocket
+			 * (`server/web/bridge.ts`), and a dev server that only proxied the app's own `/ws`
+			 * refused the extension with nothing in any log to say why.
+			 */
+			"/api": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true },
 			"/ws": { target: `ws://127.0.0.1:${API_PORT}`, ws: true },
 		},
 	},

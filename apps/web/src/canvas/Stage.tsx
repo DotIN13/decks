@@ -1,4 +1,4 @@
-import type { Board, Camera, ChatItem } from "@decks/protocol";
+import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
 import { canvasBox } from "../lib/insets.ts";
@@ -9,6 +9,7 @@ import type { FrameGestureHost } from "./frame-gestures.ts";
 import { zoomKey } from "./zoom-keys.ts";
 import { deckMode, type DeckHandle, type SlideAction, slideKey } from "./slide-keys.ts";
 import { cssEscape } from "./inspect.ts";
+import type { LiveWebReply } from "./live-chat.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 
@@ -77,6 +78,10 @@ export function Stage(props: {
 	transcript?: (agentId: string) => readonly ChatItem[] | undefined;
 	/** Who an agent is, so a mirror can wear their colour. */
 	agentIdentity?: (agentId: string) => { name: string; color: string } | undefined;
+	/** The shared Chrome's state, for its status card (`live-web.js`). */
+	webStatus?: () => { status: WebStatus; code?: string } | undefined;
+	/** Allow, Deny or Stop pressed on that card. */
+	onWebReply?: (reply: LiveWebReply) => void;
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
 	/**
@@ -855,6 +860,8 @@ export function Stage(props: {
 							previewSha={props.preview?.[board.path]}
 							{...(props.transcript ? { transcript: props.transcript } : {})}
 							{...(props.agentIdentity ? { agentIdentity: props.agentIdentity } : {})}
+							{...(props.webStatus ? { webStatus: props.webStatus } : {})}
+							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
 							onSelect={() => props.onSelect(board.path)}
 							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}

@@ -862,6 +862,17 @@
 		}
 	}
 
+	/** The status card for the user's shared Chrome — `lib/live-web.js`, fed by the app. */
+	async function mountLiveWeb(host) {
+		try {
+			const module = await needModule("live-web.js");
+			module.mountLiveWeb(host);
+		} catch (error) {
+			host.textContent = `Cannot show the shared browser: ${error.message}`;
+			host.dataset.state = "broken";
+		}
+	}
+
 	// --- go ----------------------------------------------------------------------
 
 	async function start() {
@@ -885,6 +896,9 @@
 		 */
 		for (const element of document.querySelectorAll('[data-live="chat"]')) {
 			work.push(mountLive(element));
+		}
+		for (const element of document.querySelectorAll('[data-live="web"]')) {
+			work.push(mountLiveWeb(element));
 		}
 		/*
 		 * A slide deck, which is neither a document nor live.

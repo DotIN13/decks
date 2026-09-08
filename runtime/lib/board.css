@@ -1090,3 +1090,106 @@ table.table,
 .board-present .deck-step {
 	display: none;
 }
+
+/*
+ * The shared-Chrome status card (`lib/live-web.js`): the same `.live` shell as a mirror,
+ * with a body that lists the shared tab, the agent's actions, and the two decisions that
+ * are the user's — Allow/Deny for a submit, and Stop.
+ */
+.live.web > .live-head .web-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.45);
+}
+.live.web > .live-head .web-dot[data-on="true"] {
+	background: #6ee7a0;
+	box-shadow: 0 0 0 3px rgba(110, 231, 160, 0.3);
+}
+.live.web > .live-head .web-state {
+	margin-left: auto;
+	font-weight: 500;
+	opacity: 0.85;
+}
+.live.web .web-body {
+	font-size: 13px;
+	line-height: 1.45;
+}
+.live.web .web-how ol {
+	margin: 6px 0 0;
+	padding-left: 20px;
+}
+.live.web .web-how li {
+	margin: 2px 0;
+	overflow-wrap: anywhere;
+}
+.live.web .web-title {
+	font-weight: 650;
+}
+.live.web .web-tab {
+	padding: 8px 10px;
+	border: 1px solid var(--b-border);
+	border-radius: 8px;
+	background: var(--b-bg-layer);
+}
+.live.web .web-url {
+	color: var(--b-muted);
+	font-family: var(--b-mono);
+	font-size: 11px;
+	overflow-wrap: anywhere;
+}
+.live.web .web-note {
+	color: var(--b-muted);
+	font-size: 12px;
+}
+.live.web .web-ask {
+	padding: 10px;
+	border: 1px solid var(--b-warn);
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--b-warn) 12%, var(--b-bg));
+}
+.live.web .web-buttons {
+	display: flex;
+	margin-top: 8px;
+	gap: 8px;
+}
+.live.web button {
+	padding: 5px 12px;
+	border: 1px solid var(--b-border-strong);
+	border-radius: 6px;
+	background: var(--b-bg-layer);
+	color: var(--b-fg);
+	font: inherit;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.live.web button.web-allow {
+	border-color: var(--b-accent);
+	background: var(--b-accent);
+	color: #fff;
+}
+.live.web .web-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.live.web .web-action {
+	display: flex;
+	gap: 8px;
+	font-size: 12px;
+}
+.live.web .web-action[data-ok="false"] {
+	color: var(--b-danger);
+}
+.live.web .web-when {
+	flex: none;
+	color: var(--b-muted);
+	font-family: var(--b-mono);
+	font-size: 11px;
+}
+.live.web button.web-stop {
+	align-self: flex-start;
+	margin-top: auto;
+}

@@ -1,4 +1,4 @@
-import type { Board, Camera, ChatItem } from "@decks/protocol";
+import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
 import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
@@ -11,7 +11,7 @@ import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { measureFrame } from "./extent.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
-import { attachLiveWant, liveDelta, pushLive } from "./live-chat.ts";
+import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
 import { paintFrame } from "../lib/theme.ts";
 
 /**
@@ -92,6 +92,10 @@ export function BoardFrame(props: {
 	transcript?: (agentId: string) => readonly ChatItem[] | undefined;
 	/** Who that agent is, so a mirror can draw a header in their colour. */
 	agentIdentity?: (agentId: string) => { name: string; color: string } | undefined;
+	/** The shared Chrome's state, for a board that is its status card (`live-web.js`). */
+	webStatus?: () => { status: WebStatus; code?: string } | undefined;
+	/** The user pressed Allow, Deny or Stop on that card. */
+	onWebReply?: (reply: LiveWebReply) => void;
 }) {
 	let detachEditor: (() => void) | undefined;
 	let detachSelect: (() => void) | undefined;
@@ -249,6 +253,19 @@ export function BoardFrame(props: {
 			total: items.length,
 			...(props.agentIdentity?.(agent) ? { identity: props.agentIdentity(agent) as { name: string; color: string } } : {}),
 		});
+	});
+
+	/*
+	 * Feeding a web card: the whole status every time, because it is small and the card
+	 * redraws from scratch. The signal is set by the board asking, exactly as `wants` is.
+	 */
+	const [wantsWeb, setWantsWeb] = createSignal(false);
+	createEffect(() => {
+		if (!wantsWeb() || !props.webStatus) return;
+		const held = props.webStatus();
+		const frame = frameEl;
+		if (!held || !frame) return;
+		pushLiveWeb(frame, { decks: "live.web", status: unwrap(held.status) as WebStatus, ...(held.code ? { code: held.code } : {}) });
 	});
 
 	const [tick, setTick] = createSignal(0);
@@ -583,7 +600,11 @@ export function BoardFrame(props: {
 							sent = [];
 							fed = false;
 							setWants(undefined);
-							detachLive = attachLiveWant(frame, (agent) => setWants(agent));
+							setWantsWeb(false);
+							detachLive = attachLiveWant(frame, (agent) => setWants(agent), {
+								onWant: () => setWantsWeb(true),
+								onReply: (reply) => props.onWebReply?.(reply),
+							});
 							reportExtent(frame, props.board.rev);
 						}}
 					/>

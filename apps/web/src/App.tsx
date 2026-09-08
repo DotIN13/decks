@@ -15,6 +15,7 @@ import type {
 	ModelOption,
 	ThinkingLevel,
 	UsageReport,
+	WebStatus,
 } from "@decks/protocol";
 import Info from "lucide-solid/icons/info";
 import MessageSquare from "lucide-solid/icons/message-square";
@@ -100,6 +101,8 @@ export function App() {
 		focused?: string;
 		identities: Record<string, Identity>;
 		transcripts: Record<string, ChatItem[]>;
+		/** The user's shared Chrome, from `web.status`; the status board draws it (`live-web.js`). */
+		web?: { status: WebStatus; code?: string };
 		/**
 		 * Whether the server holds conversation older than the rows we have, by agent id.
 		 *
@@ -938,6 +941,14 @@ export function App() {
 					return;
 
 				/*
+				 * The shared Chrome. The code rides only on the greeting's copy, so a later
+				 * status keeps the code the greeting brought rather than dropping it.
+				 */
+				case "web.status":
+					setState("web", { status: message.status, code: message.code ?? state.web?.code });
+					return;
+
+				/*
 				 * One agent moved — by hand, or because a limit moved it.
 				 *
 				 * Merged rather than waiting for the whole list to be republished: a rotation
@@ -1725,6 +1736,11 @@ export function App() {
 					 * conversation a board wants is only known once it has loaded and asked.
 					 */
 					transcript={(agentId) => state.transcripts[agentId]}
+					webStatus={() => state.web}
+					onWebReply={(reply) => {
+						if (reply.decks === "live.web.answer") socket.send({ type: "web.answer", id: reply.id, ok: reply.ok });
+						else socket.send({ type: "web.stop" });
+					}}
 					agentIdentity={(agentId) => {
 						const identity = state.identities[agentId];
 						return identity ? { name: identity.name, color: identity.color } : undefined;
@@ -1946,6 +1962,13 @@ export function App() {
 						active={state.activeAccount}
 						onAdd={() => socket.send({ type: "claude.accounts.add" })}
 						onForget={(id) => socket.send({ type: "claude.accounts.forget", id })}
+						web={state.web}
+						onWebRepair={() => socket.send({ type: "web.repair" })}
+						onWebStop={() => socket.send({ type: "web.stop" })}
+						onWebBoard={() => {
+							socket.send({ type: "web.board" });
+							setSettings(false);
+						}}
 						onClose={() => setSettings(false)}
 					/>
 				</Show>

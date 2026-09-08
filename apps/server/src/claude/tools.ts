@@ -51,7 +51,12 @@ export function stageMcpServer(stage: StageTool): McpSdkServerConfigWithInstance
 					 * it lets the message stay the one the eval composed.
 					 */
 					return {
-						content: [{ type: "text" as const, text: outcome.text }],
+						content: [
+							{ type: "text" as const, text: outcome.text },
+							// A screenshot of the shared tab rides beside the text, as an image
+							// block the model looks at in the same turn (`stage.web.screenshot`).
+							...(outcome.images ?? []).map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType })),
+						],
 						...(outcome.isError ? { isError: true } : {}),
 					};
 				},

@@ -720,6 +720,39 @@ export type ExtensionUiAnswer =
 	| { id: string; confirmed: boolean }
 	| { id: string; cancelled: true };
 
+// --- your own Chrome, shared with the deck ---------------------------------------
+
+/**
+ * What the deck knows about the browser the user shared with it (`server/web/bridge.ts`).
+ *
+ * The extension in the user's Chrome dials the server and attaches to one tab; this is the
+ * state of that connection, broadcast whenever it changes and drawn by the `data-live="web"`
+ * board (`lib/live-web.js`). Nothing in it is a picture: the tab is on the user's own screen,
+ * so the board is a status card — which tab, whether it is connected, what the agent did.
+ */
+export interface WebStatus {
+	/** A pairing code exists, so the extension can be told where to connect. */
+	paired: boolean;
+	/** An extension is connected and at least one tab is attached. */
+	connected: boolean;
+	/** The tab the agent drives — the first attached one. */
+	tab?: { title: string; url: string };
+	/** Every attached tab, for a card that lists them. */
+	tabs: Array<{ title: string; url: string }>;
+	/** The last few things the agent did, newest last. */
+	actions: WebAction[];
+	/** A submit the agent is waiting for the user to allow. */
+	pending?: { id: string; text: string };
+	/** Why the last connection ended, if it did. */
+	closed?: string;
+}
+
+export interface WebAction {
+	at: number;
+	text: string;
+	ok: boolean;
+}
+
 // --- the wire ------------------------------------------------------------------
 
 export type ClientMessage =
@@ -863,7 +896,15 @@ export type ClientMessage =
 	| { type: "rewind.to"; id: string; entryId: string }
 	| { type: "fork.from"; id: string; entryId: string }
 	/** Write the boards back to how they were at that point. Deliberate, never implied. */
-	| { type: "boards.restore"; id: string; entryId: string };
+	| { type: "boards.restore"; id: string; entryId: string }
+	/** The user's answer to a submit the agent asked leave for (`WebStatus.pending`). */
+	| { type: "web.answer"; id: string; ok: boolean }
+	/** Detach from the shared tab — the Stop button on the status board. */
+	| { type: "web.stop" }
+	/** Make (or find) the status board and put it on the canvas. */
+	| { type: "web.board" }
+	/** A fresh pairing code; the extension has to be paired again. Answered with `web.status`. */
+	| { type: "web.repair" };
 
 export type ServerMessage =
 	| { type: "deck.state"; deck: DeckState }
@@ -960,6 +1001,8 @@ export type ServerMessage =
 	| { type: "claude.accounts"; accounts: ClaudeAccount[]; active: string; spending?: Record<string, string> }
 	/** One agent moved to a different subscription — by hand, or because a limit moved it. */
 	| { type: "agent.account"; id: string; account: string }
+	/** The shared browser's state, on connect and whenever it changes (`WebStatus`). */
+	| { type: "web.status"; status: WebStatus; code?: string }
 	| { type: "error"; text: string };
 
 /** Where the API lives, so the browser does not hard-code it in three places. */
