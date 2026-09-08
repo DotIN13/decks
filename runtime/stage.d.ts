@@ -198,15 +198,19 @@ export interface Stage {
 	 *     // -> "boards/the-plan-out-loud.slides.html", three sections in it to replace
 	 *
 	 * **The result tells you the viewport and the width it chose** — `viewport 1440x900 px`,
-	 * `board width 1000 — the rule is min(viewport width, 1600)` — because that is the moment
-	 * both are worth knowing. `stage.viewport()` asks any other time.
+	 * then the width with the advice beside it — because that is the moment both are worth
+	 * knowing. `stage.viewport()` asks any other time.
 	 *
-	 * **Width.** The smallest width that holds the content, capped at `min(viewport width,
-	 * 1600)`. 1600 is a ceiling, not a target: a board wider than the room the canvas has is
-	 * read scaled down, and past 1600 a line of prose is too long to track back to. Viewport
-	 * 1920 → never wider than 1600. Viewport 1440 → never wider than 1440. Viewport 390, a
-	 * phone → never wider than 390, and the template folds its columns to fit. This is
-	 * applied for you when you pass no `w`; an explicit `w` is still yours.
+	 * **Width.** The smallest width that holds the content. **Nothing is capped** — a width
+	 * you pass is used, whatever it is — so this is advice rather than a rule: keep a board
+	 * under about 1200 and inside the viewport, because a board wider than the room the
+	 * canvas has is read scaled down and a long line is one the eye loses its place in. On a
+	 * phone-sized viewport, make that session's boards *small* rather than merely narrower;
+	 * the templates fold their columns to fit. Very wide or very tall is two boards.
+	 *
+	 * With no `w`, a board is sized to its shape and to the screen: 880 for the shapes that
+	 * are one column, 1000 for `design`, 1200 for `report`, 720 for a `flow` document and
+	 * 960 for a deck — each capped by the viewport when there is one to measure.
 	 *
 	 * **Reading order.** DOM order is visual order, top to bottom. One column or two; where
 	 * two components share a row, write the left one first. The reader has the picture and
@@ -216,16 +220,24 @@ export interface Stage {
 	 * concluded, said so it could be repeated; after that, short sentences, no preamble and
 	 * nothing said twice.
 	 *
-	 * **Head every component with a short structural label** — Problem, Research question,
-	 * Method, Result, Todos, Next — not a chatty sentence. The shape of a board should be
-	 * readable from its headings alone.
+	 * **Give a board sections, and head them from this set** — Summary, Overview, Problem,
+	 * Research question, Method, Result, Todos, Next. Reading the section headings alone
+	 * should tell somebody what is on the board; that is what makes one scannable rather
+	 * than a wall of cards. Inside a section, a component's heading is a short plain phrase
+	 * saying what the box is — two or three words — never a chatty sentence and never the
+	 * finding itself, which belongs in the body where it can be read.
 	 *
 	 * Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a
 	 * structure, and a number to an adjective — a third paragraph in one card is a table you
 	 * have not drawn yet. **And a diagram or a table has to stand on its own**: every axis
 	 * labelled with its unit, every column named in words, and nothing coded — no arms called
-	 * A/B/C/D, no metrics called M1/M2/M3, no bare decimals. Once the height is near twice the
-	 * width, it is two boards.
+	 * A/B/C/D, no metrics called M1/M2/M3, no bare decimals.
+	 *
+	 * **Reporting research, say it in plain language and give the technical detail.** What
+	 * was done, what came out and what it means, in words a reader outside the project would
+	 * follow — then the numbers, the method and the names. No metaphors, no clever framing.
+	 *
+	 * Once the height is near twice the width, it is two boards.
 	 */
 	newBoard(options: {
 		title: string;
@@ -282,17 +294,18 @@ export interface Stage {
 	 *
 	 * The width shrinks as well as grows: a board left at the width it was guessed at has a
 	 * column of empty grid down its right-hand side, and a reader cannot tell that from a
-	 * board whose author meant it. It is clamped to `min(viewport width, 1600)` — the same
-	 * ceiling `newBoard` uses.
+	 * board whose author meant it. **Nothing is clamped** — the board becomes the size of
+	 * what is on it, so a fit can no longer leave content past the edge.
 	 *
 	 * **Two passes, because narrowing reflows.** Changing the width changes the height that
 	 * was being measured, so `fit` sets the width, waits for the browser to lay the board
 	 * out again, and takes the height from that second reading. You do not have to do
 	 * anything about this; it is why one call can take two round trips.
 	 *
-	 * Content wider than the ceiling is left clipped rather than papered over: the board
-	 * stops at the ceiling, `clipped` says so on `stage.boards()`, and the answer is a
-	 * narrower component rather than a wider board.
+	 * A board that comes out over about 1200 wide is reported back as a note, because that is
+	 * wide for reading and the fix is in the content: narrow a component, or split the board.
+	 * It is a note and not a refusal — a wide board is a thing you can see and drag, where a
+	 * silently clipped one is not.
 	 *
 	 * The measurement is taken in the frame showing the board, because that is the only
 	 * place a board is laid out. So **the board has to be on the canvas**: a board nobody

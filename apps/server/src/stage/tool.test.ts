@@ -118,36 +118,49 @@ test("with no reading from a browser, it says nothing rather than making a numbe
 	const result = await tool.run(`return await stage.newBoard({ title: "Sizing", kind: "answer" })`);
 
 	assert.equal(/viewport \d+/.test(result.text), false, "no measurement, because nobody took one");
-	// The *rule* is still said, because it still applies: with no screen to measure, the
-	// ceiling is the 1600 in the formula rather than a number invented for the occasion.
-	assert.match(result.text, /min\(viewport width, 1600\)/);
+	// The *advice* is still said, because it still applies: a board nobody is looking at is
+	// still a board somebody will read.
+	assert.match(result.text, /keep a board under 1200/);
 	assert.equal((await tool.run(`return (await stage.viewport()) ?? "none"`)).text, `"none"`);
 	cleanup();
 });
 
 /*
- * The acceptance criterion for the width rule, at the two ends of it: a board is never
- * wider than the room the canvas has, and never wider than 1600 however much room there is.
- * Asserted through the tool rather than through `boardWidth` because the point is that the
- * clamp is *applied* — it used to be a sentence in a note that nothing enforced.
+ * What a *default* width comes out as, at both ends of the screen — and that a width somebody
+ * asked for survives at any size.
+ *
+ * There is no cap here any more. It used to be `min(viewport, 1600)`, applied rather than
+ * suggested; the 1600 is gone entirely and the viewport is now a *default* being fitted to
+ * the screen rather than a limit being enforced. So what is asserted is the shape of the
+ * default and the fact that an explicit width is never touched.
  */
-test("a new board is never wider than min(viewport, 1600), and says which rule it used", async () => {
+test("a default width is the shape's own, or the screen when the screen is smaller", async () => {
 	/** The width the file was written with — the only place a board's size lives. */
 	const widthOf = (text: string) => Number(/"w":(\d+)/.exec(text)?.[1]);
 
 	const wide = toolOn({ x: 0, y: 0, zoom: 1, width: 1920, height: 1080 });
 	const onWide = await wide.tool.run(`return await stage.newBoard({ title: "Wide", kind: "report" })`);
-	assert.equal(widthOf(wide.read("boards/wide.html")), 1200, "the shape's own width, which is under the ceiling");
+	assert.equal(widthOf(wide.read("boards/wide.html")), 1200, "the shape's own width, on a screen with room to spare");
 	assert.match(onWide.text, /board width 1200/);
 	wide.cleanup();
 
 	const phone = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
 	const onPhone = await phone.tool.run(`return await stage.newBoard({ title: "Phone", kind: "report" })`);
 	assert.equal(widthOf(phone.read("boards/phone.html")), 390, "the screen, when the screen is smaller");
-	assert.match(onPhone.text, /board width 390 — the rule is min\(viewport width, 1600\)/);
+	assert.match(onPhone.text, /board width 390 — keep a board under 1200/);
 	phone.cleanup();
 
-	// And a width somebody typed is still theirs, ceiling or no ceiling.
+	// A huge screen is not an invitation: the shape's own width is still the answer.
+	const huge = toolOn({ x: 0, y: 0, zoom: 1, width: 3840, height: 2160 });
+	await huge.tool.run(`return await stage.newBoard({ title: "Huge", kind: "report" })`);
+	assert.equal(widthOf(huge.read("boards/huge.html")), 1200);
+	huge.cleanup();
+
+	/*
+	 * And a width somebody typed is theirs at any size — which is the whole of the rule now.
+	 * 1800 used to be silently narrowed to 1600 on a wide screen and to the screen on a
+	 * narrow one; a caller who means 1800 has a reason that cannot be seen from in there.
+	 */
 	const asked = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
 	await asked.tool.run(`return await stage.newBoard({ title: "Asked", kind: "report", w: 1800 })`);
 	assert.equal(widthOf(asked.read("boards/asked.html")), 1800);
@@ -320,24 +333,36 @@ test("fit still grows a board its content has outgrown", async () => {
  * the room the canvas has is read scaled down, so growing past it does not help — and the
  * note says so rather than leaving the agent to find the clipping later.
  */
-test("fit will not grow a board past min(viewport, 1600), and says why", async () => {
+/*
+ * A fit takes the width the content needs, and says when that came out wide.
+ *
+ * It used to clamp to `min(viewport, 1600)` — which meant a fit could produce the very thing
+ * it exists to prevent: a board held at a ceiling with its content past the edge, `clipped`
+ * on `stage.boards()`, and a reader with no idea. A wide board is a thing a person can see
+ * and drag; a silently clipped one is not.
+ */
+test("fit takes the width the content needs, and says so when that is wide", async () => {
 	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const board = deck.board("boards/plan.html");
 	extents.set("boards/plan.html", { rev: board!.rev, w: 1900, h: 600 });
 
 	const result = await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
-	assert.equal(deck.board("boards/plan.html")?.w, 1400, "the viewport, not the content");
-	assert.match(result.text, /narrow a component rather than widening the board/);
+	assert.equal(deck.board("boards/plan.html")?.w, 1900, "the content, not the viewport");
+	assert.match(result.text, /came out 1900 wide — over 1200/);
+	assert.match(result.text, /Narrow a component or split the board/);
 	cleanup();
 });
 
-test("with a wide screen the ceiling is 1600 rather than the screen", async () => {
+test("a fit that comes out under the wide mark says nothing about width", async () => {
 	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 2560, height: 1400 });
 	const board = deck.board("boards/plan.html");
-	extents.set("boards/plan.html", { rev: board!.rev, w: 1900, h: 600 });
+	extents.set("boards/plan.html", { rev: board!.rev, w: 1000, h: 600 });
 
-	await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
-	assert.equal(deck.board("boards/plan.html")?.w, 1600);
+	const result = await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
+	assert.equal(deck.board("boards/plan.html")?.w, 1000);
+	// The note is for a board that came out wide. An ordinary fit should be quiet — a warning
+	// on every call is a warning nobody reads.
+	assert.equal(/came out \d+ wide/.test(result.text), false, result.text);
 	cleanup();
 });
 

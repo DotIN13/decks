@@ -7,7 +7,7 @@ import { defaultWidth, formatOf, isBoardFile, slideHeight } from "./kinds.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
-import { MAX_BOARD_W } from "../boards/templates.ts";
+import { DEFAULT_BOARD_W } from "../boards/templates.ts";
 
 /**
  * Defaults for a board that says nothing about its own size.
@@ -19,7 +19,7 @@ import { MAX_BOARD_W } from "../boards/templates.ts";
  * `stage.fit` corrects in one call. Shapes that know their own width are in
  * `boards/templates.ts`, and every one of them is well under this.
  */
-const DEFAULT_W = MAX_BOARD_W;
+const DEFAULT_W = DEFAULT_BOARD_W;
 const DEFAULT_H = 800;
 /** Space between auto-placed boards, and how many go in a row before wrapping. */
 const GUTTER = 160;

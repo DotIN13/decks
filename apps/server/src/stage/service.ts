@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Board, Camera, ServerMessage, StageCall, StageResult } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { withBoardSize } from "../deck/meta.ts";
-import { MAX_BOARD_W } from "../boards/templates.ts";
+
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
 
 /**
@@ -155,11 +155,16 @@ export class StageService {
 	 * height from *that* reading. One extra round trip, on a call that already waits for
 	 * one, and only when the width actually moves.
 	 *
-	 * The width is clamped to `min(viewport, 1600)` — the same ceiling `newBoard` uses, and
-	 * the reason is the same. A board wider than the room the canvas has is read scaled
-	 * down, and past 1600 a line of prose is too long to track back to. Content that will
-	 * not fit under the ceiling is left clipped rather than papered over: `clipped` on
-	 * `stage.boards()` says so, and the answer is a narrower component, not a wider board.
+	 * **Nothing is clamped.** The width used to be held under `min(viewport, 1600)`, which
+	 * meant a fit could leave the very thing it was asked to prevent: a board narrowed to a
+	 * ceiling with its content overflowing, `clipped` on `stage.boards()` and a reader with
+	 * no idea. A fit that reports success and hides content is worse than a wide board, and
+	 * a wide board is a thing a person can see and drag.
+	 *
+	 * So this makes the board the size of what is on it, and the width to *aim* under —
+	 * `WIDE_BOARD_W`, 1200 — is guidance carried in the guidelines and in `stage.d.ts`
+	 * rather than a number enforced here. `minWidth` still applies, because a board narrower
+	 * than its own chrome is unreadable in a different way.
 	 */
 	async fit(path: string, options?: { margin?: number; viewport?: number; minWidth?: number }): Promise<{ board: Board; content: { w: number; h: number } }> {
 		// The record first: an agent calls this straight after writing the content, and
@@ -170,10 +175,9 @@ export class StageService {
 
 		const margin = Math.max(0, Math.min(400, Math.round(options?.margin ?? FIT_MARGIN)));
 		const floor = Math.max(FIT_MIN_W, Math.round(options?.minWidth ?? FIT_MIN_W));
-		const ceiling = Math.max(floor, Math.min(options?.viewport ?? MAX_BOARD_W, MAX_BOARD_W));
 
 		const measured = await this.measure(path, board.rev);
-		const w = Math.max(floor, Math.min(ceiling, measured.w + margin));
+		const w = Math.max(floor, measured.w + margin);
 
 		/*
 		 * One pass when the width is already right, which is the ordinary case — an agent

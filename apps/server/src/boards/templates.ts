@@ -70,18 +70,29 @@ export function isBoardFormat(value: unknown): value is BoardFormat {
 }
 
 /**
- * The widest a board should ever be, and it is a **ceiling rather than a target**.
+ * The width a board is worth keeping under, and it is **guidance, not a limit**.
  *
- * A board is read at the size the canvas has: `stage.viewport()` is the room on screen, not
- * divided by the zoom, so a board wider than the viewport is read scaled down and a board
- * much narrower than its content is read as a wall. The rule that follows is one line —
- * `min(viewport width, 1600)` — and 1600 is in it because past that a line of prose is too
- * long to track back to, whatever the screen is.
+ * There used to be a hard cap here: 1600, clamped by `boardWidth` and again by `stage.fit`,
+ * so a board that needed to be wider was quietly narrowed and its content left clipped.
+ * That is the wrong trade — the thing being protected is readability, and a caller who
+ * means 1800 has a reason that cannot be seen from in here. **Nothing is clamped now.**
+ * What is left is a number to aim under, and defaults that are small on a small screen.
  *
- * Enforced rather than suggested: `boardWidth` clamps, `stage.newBoard` calls it, and
- * `templates.test.ts` refuses a default above it.
+ * 1200, because past it the eye loses its place coming back for the next line — and because
+ * a board is read at the size the canvas has: `stage.viewport()` is the room on screen, not
+ * divided by the zoom, so a board wider than the viewport is read scaled down.
  */
-export const MAX_BOARD_W = 1600;
+export const WIDE_BOARD_W = 1200;
+
+/**
+ * What a board with no size of its own is given.
+ *
+ * A *fallback dimension* rather than a maximum: `deck/loader.ts` hands it to a board whose
+ * `<meta>` tag says nothing, and `deck/meta.ts` uses it when a resize arrives with no width.
+ * Neither is a cap on anything, which is why it kept the number the old ceiling had and not
+ * the name.
+ */
+export const DEFAULT_BOARD_W = 1600;
 
 /** The margin every template leaves around its content, on both sides. */
 const MARGIN = 48;
@@ -135,9 +146,17 @@ const SIZE: Record<BoardTemplate, { w: number; h: number }> = {
  * to 390 is what makes `renderTemplate` fold its columns instead.
  */
 export function boardWidth(wanted: number | undefined, viewport: number | undefined, kind: BoardTemplate = "blank", format: BoardFormat = "component"): number {
-	const ceiling = Math.min(viewport ?? MAX_BOARD_W, MAX_BOARD_W);
-	// A width somebody typed is theirs — the clamp is about what *we* choose when they did
-	// not, and an agent that means 1800 has a reason we cannot see from here.
+	/*
+	 * The room on screen, or nothing — and **no ceiling of our own**.
+	 *
+	 * This used to be `min(viewport, 1600)`, which capped a board on a large screen at a
+	 * number nobody had asked for. What is left is the screen: a default should fit the
+	 * device it will be read on, which is what keeps a phone's boards narrow, and on a big
+	 * screen every shape's own width is already well under anything worth calling wide.
+	 */
+	const room = viewport && viewport > 0 ? viewport : Number.POSITIVE_INFINITY;
+	// A width somebody typed is theirs, whatever it is. The default is the only thing this
+	// function decides, and an agent that means 1800 has a reason we cannot see from here.
 	if (wanted) return Math.round(wanted);
 	/*
 	 * Whose default it is depends on the format, because a shape only belongs to a component
@@ -147,7 +166,7 @@ export function boardWidth(wanted: number | undefined, viewport: number | undefi
 	 * is the defect; the format's own default is the answer to both.
 	 */
 	const own = format === "component" ? SIZE[kind].w : defaultFormatWidth(format);
-	return Math.max(320, Math.min(own, ceiling));
+	return Math.max(320, Math.min(own, room));
 }
 
 /**

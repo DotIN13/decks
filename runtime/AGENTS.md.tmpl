@@ -30,7 +30,7 @@ Every board is a whole document that must render on its own. Start from this sha
 	<head>
 		<meta charset="utf-8" />
 		<title>What this board is</title>
-		<meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}' />
+		<meta name="board" content='{"w":1000,"h":700,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 	</head>
 	<body class="board">
@@ -61,7 +61,10 @@ Seven rules, and they matter more than they look:
    not scroll — the canvas is the scrolling — so a board that is too small clips, in
    silence. You do not have to guess the height: write the content, `stage.show` it, then
    `stage.fit(path)` and the board takes the size of what is on it. `stage.boards()` says
-   `clipped` for any board already over its edge.
+   `clipped` for any board already over its edge. **Keep the width under about 1200 and
+   inside the viewport** — nothing stops you going wider, but a wide board is read scaled
+   down and a long line is one the eye loses its place in. On a small screen make that
+   session's boards small; very wide or very tall is two boards.
 5. **Edit a board in place.** Write, Edit, `cat > file` — anything that keeps the file
    where it is. A temp-file-and-rename save (`sed -i`, `vim`, an atomic write) replaces
    the file the canvas is watching, and the board can stop tracking your edits until the

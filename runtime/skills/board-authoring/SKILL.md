@@ -20,28 +20,48 @@ stage.newBoard({ title, kind })
 ```
 
 It reports the **viewport** and the **width it chose** with the path it returns — `viewport
-1440x900 px`, `board width 1000 — the rule is min(viewport width, 1600)`. The viewport is the
-room the canvas has on screen: a board that wide is read at life size, one twice as wide is
-read at half. `stage.viewport()` asks for it any other time.
+1440x900 px`, then the width with the advice beside it. The viewport is the room the canvas
+has on screen: a board that wide is read at life size, one twice as wide is read at half.
+`stage.viewport()` asks for it any other time.
 
 Two rules, and a board is judged on them.
 
-**Width — the smallest that holds the content, capped at `min(viewport width, 1600)`.** 1600
-is a ceiling, not a target: past it a line of prose is too long to track back to, and wider
-than the viewport is read scaled down. Viewport 1920 → never wider than 1600. Viewport 1440 →
-never wider than 1440. Viewport 390, a phone → never wider than 390, and the templates fold
-their columns to fit. `newBoard` applies this when you pass no `w`; an explicit `w` is still
-yours. `stage.fit` holds to the same ceiling, and shrinks a too-wide board as well as growing
-a too-narrow one.
+**Width — the smallest that holds the content.** Nothing is capped: a width you pass is used,
+whatever it is. So this is advice, and it is worth following — **keep a board under about 1200
+and inside the viewport.** Past 1200 the eye loses its place coming back for the next line,
+and wider than the viewport is read scaled down. On a phone-sized viewport make that session's
+boards *small* rather than merely narrower; the templates fold their columns to fit. Very wide
+or very tall is two boards. With no `w`, `newBoard` takes the shape's own width and holds it
+inside the screen; `stage.fit` takes the width the content needs, shrinking a board with room
+to spare as well as growing one that has outgrown itself.
 
 **Reading order — DOM order is visual order, top to bottom.** One column or two; where two
 components share a row, write the left one first. The reader has the picture and you have the
 file, and the two have to be the same document — you cannot point at "the third card" if the
 third card in the file is the second one on screen.
 
-Aim for the **smallest board that explains the thing**: a summary at the top, then diagrams,
-tables and embeds in preference to prose, every sentence earning its place. Once the height is
-near twice the width, it is two boards.
+**Lead with the finding**, in a sentence somebody could repeat, and be concise: short
+sentences, no preamble, nothing said twice.
+
+**Give a board sections, and head them from this set:** Summary, Overview, Problem, Research
+question, Method, Result, Todos, Next. Reading the section headings alone should tell somebody
+what is on the board — that is what makes one scannable rather than a wall of cards. A section
+heading is an `<h3 class="text">` above the components it covers, and the components under it
+follow in the file in the order they are read.
+
+Inside a section, a component's heading is a **short plain phrase** saying what the box is —
+two or three words. Not a chatty sentence, and not the finding itself: the finding goes in the
+body, where it can be read.
+
+Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure,
+and a number to an adjective. **A diagram or a table has to stand on its own:** every axis
+labelled with its unit, every column named in words, and nothing coded — no arms called
+A/B/C/D, no metrics called M1/M2/M3, no bare decimals. **Reporting research, use plain
+language beside the technical detail** — what was done, what came out, what it means, in words
+a reader outside the project would follow, then the numbers and the method. No metaphors, no
+clever framing.
+
+Once the height is near twice the width, it is two boards.
 
 A board document should include:
 
@@ -51,7 +71,7 @@ A board document should include:
 	<head>
 		<meta charset="utf-8" />
 		<title>Board title</title>
-		<meta name="board" content='{"w":1600,"h":1000,"bg":"grid"}' />
+		<meta name="board" content='{"w":1000,"h":700,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 	</head>
 	<body class="board">

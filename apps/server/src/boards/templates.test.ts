@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readBoardMeta } from "../deck/meta.ts";
 import { formatOf } from "../deck/kinds.ts";
-import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, extensionFor, isBoardFormat, isBoardTemplate, MAX_BOARD_W, renderFormat, renderTemplate, slugFor } from "./templates.ts";
+import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, extensionFor, isBoardFormat, isBoardTemplate, renderFormat, renderTemplate, slugFor, WIDE_BOARD_W } from "./templates.ts";
 
 test("every kind renders a board the loader can read", () => {
 	for (const kind of BOARD_TEMPLATES) {
@@ -67,16 +67,26 @@ function components(html: string): Array<{ id: string; left: number; top: number
 	}));
 }
 
-test("no shape's own width is above the ceiling", () => {
+/*
+ * No shape's own width is above the width a board is worth keeping under.
+ *
+ * There is no cap any more — a caller who asks for 1800 gets 1800 — so this is the one
+ * place the number still has teeth: the *defaults* are ours to choose, and choosing one
+ * above the width we tell agents to stay under would be the guidance disagreeing with the
+ * thing that implements it.
+ */
+test("no shape's own width is above the width we tell agents to aim under", () => {
 	for (const kind of BOARD_TEMPLATES) {
 		const meta = readBoardMeta(renderTemplate(kind, "T"));
-		assert.ok((meta.w ?? 0) <= MAX_BOARD_W, `${kind} is ${meta.w}, over ${MAX_BOARD_W}`);
+		assert.ok((meta.w ?? 0) <= WIDE_BOARD_W, `${kind} is ${meta.w}, over ${WIDE_BOARD_W}`);
 	}
 });
 
-test("a width is the smallest of what the shape wants, the viewport, and the ceiling", () => {
-	// A wide screen is still capped: past 1600 a line of prose is too long to track back to.
+test("a default width is the smaller of what the shape wants and the room on screen", () => {
+	// A wide screen no longer caps anything of ours: the shape's own width is the answer,
+	// and it is already under the width a board is worth keeping under.
 	assert.equal(boardWidth(undefined, 1920, "report"), 1200);
+	assert.equal(boardWidth(undefined, 3840, "report"), 1200, "and a very wide screen changes nothing");
 	// 880 for a shape that is mostly one column — nearer the measure prose wants, and the
 	// same reasoning that makes a `flow` board 720.
 	assert.equal(boardWidth(undefined, 1920, "blank"), 880);
@@ -86,10 +96,15 @@ test("a width is the smallest of what the shape wants, the viewport, and the cei
 	// A screen narrower than the shape wins, which is the whole point of asking.
 	assert.equal(boardWidth(undefined, 900, "report"), 900);
 	assert.equal(boardWidth(undefined, 390, "report"), 390);
-	// Nobody looking: the ceiling, not a guess that would be indistinguishable from a measurement.
+	// Nobody looking: the shape's own width, rather than a guess about the screen that would
+	// be indistinguishable from a measurement at the point it got used.
 	assert.equal(boardWidth(undefined, undefined, "report"), 1200);
-	// A number somebody typed is theirs, above the ceiling or not.
+	/*
+	 * A number somebody typed is theirs, at any size. This used to be true of the ceiling as
+	 * well and is now the whole rule: nothing here clamps, and 2400 is a board somebody meant.
+	 */
 	assert.equal(boardWidth(1800, 390, "report"), 1800);
+	assert.equal(boardWidth(2400, 1440, "answer"), 2400);
 });
 
 test("every template reads top to bottom in the order the file is written", () => {

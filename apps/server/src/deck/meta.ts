@@ -1,4 +1,4 @@
-import { MAX_BOARD_W } from "../boards/templates.ts";
+import { DEFAULT_BOARD_W } from "../boards/templates.ts";
 /**
  * What a board says about itself, read from the top of the file.
  *
@@ -106,7 +106,7 @@ export function withBoardSize(html: string, size: { w?: number; h?: number }): s
 	const meta = readBoardMeta(html);
 	// The same last-resort width the loader uses, for the same reason: a record that is too
 	// narrow clips in silence, and one that is too wide is visible and one `fit` away.
-	const w = Math.max(1, Math.round(size.w ?? meta.w ?? MAX_BOARD_W));
+	const w = Math.max(1, Math.round(size.w ?? meta.w ?? DEFAULT_BOARD_W));
 	const h = Math.max(1, Math.round(size.h ?? meta.h ?? 800));
 
 	META.lastIndex = 0;

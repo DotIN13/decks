@@ -1,5 +1,5 @@
 import type { AgentKind, AgentMode, Camera, Identity, ThinkingLevel } from "@decks/protocol";
-import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, isBoardFormat, isBoardTemplate } from "../boards/templates.ts";
+import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, isBoardFormat, isBoardTemplate, WIDE_BOARD_W } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService } from "./service.ts";
 
@@ -175,11 +175,11 @@ Your code is the body of an async function with \`stage\` in scope; whatever you
 
 **Two rules, and they are what a board is judged on.**
 
-*Width.* The smallest width that holds the content, capped at \`min(viewport width, 1600)\`. 1600 is a ceiling, not a target: a board wider than the room the canvas has is read scaled down, and past 1600 a line of prose is too long to track back to. Viewport 1920 -> never wider than 1600. Viewport 1440 -> never wider than 1440. Viewport 390, a phone -> never wider than 390. \`newBoard\` applies this when you pass no \`w\`; an explicit \`w\` is still yours.
+*Width.* The smallest width that holds the content. **Nothing is capped** — but keep a board under about 1200, and inside the viewport, because a board wider than the room the canvas has is read scaled down and a long line is one the eye loses its place in. On a phone-sized viewport make the boards for that session small, not merely narrower. Very wide or very tall is two boards. \`newBoard\` sizes a board to its shape and to the screen when you pass no \`w\`; an explicit \`w\` is yours, at any size.
 
 *Reading order.* DOM order is visual order, top to bottom. One column or two; where two components share a row, write the left one first. A reader has the picture and you have the file, and the two have to be the same document.
 
-**A board is read, not skimmed for the part that matters — so make every part matter.** Lead with the finding, in a sentence somebody could repeat, and be concise: short sentences, no preamble, nothing said twice. Head every component with a short structural label — Problem, Method, Result, Todos — rather than a chatty sentence, so the shape of the board can be read off its headings. Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure, and a number to an adjective; a third paragraph in one card is a table you have not drawn yet. **A diagram or a table has to stand alone**: label every axis with its unit, name every column in words, and never code anything — no arms called A/B/C/D, no metrics called M1/M2/M3. Once the height is near twice the width, it is two boards.
+**A board is read, not skimmed for the part that matters — so make every part matter.** Lead with the finding, in a sentence somebody could repeat, and be concise: short sentences, no preamble, nothing said twice. Give the board **sections** and head them from this set — Summary, Overview, Problem, Research question, Method, Result, Todos, Next — so that reading the section headings alone tells somebody what is on it. Inside a section, a component's heading is a short plain phrase saying what the box is, never a chatty sentence and never the finding itself. Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure, and a number to an adjective; a third paragraph in one card is a table you have not drawn yet. **A diagram or a table has to stand alone**: label every axis with its unit, name every column in words, and never code anything — no arms called A/B/C/D, no metrics called M1/M2/M3. **Reporting research, use plain language beside the technical detail** — what was done, what came out, what it means, in words a reader outside the project would follow, then the numbers and the method. No metaphors and no clever framing. Once the height is near twice the width, it is two boards.
 
 Also here: look at the deck (\`stage.boards\`, \`stage.read\`), place boards (\`stage.move\`), resolve a path to embed (\`stage.resolve\`), get a URL to screenshot with Playwright (\`stage.url\`), name yourself and draw your own avatar (\`stage.me\`).
 
@@ -190,7 +190,7 @@ Board *content* is files — write and edit it with your ordinary tools, not thr
 const GUIDELINES = [
 	"Answer on a board: stage.newBoard for the shell, write/edit for the content, stage.show to put it in front of the user.",
 	"Pick the format for the thing: component boxes by default, format: 'flow' for a markdown document that reflows, format: 'slides' for a reveal deck of <section> elements. A board of prose does not want to be positioned boxes.",
-	"Width: the smallest that holds the content, capped at min(viewport width, 1600). 1600 is a ceiling, not a target — at a 390px viewport a board is 390 wide.",
+	"Width: the smallest that holds the content. Nothing is capped, but keep a board under about 1200 and inside the viewport — wider is read scaled down, and a long line is one the eye loses its place in. On a small screen make that session's boards small rather than merely narrower, and split a very wide or very tall board in two.",
 	"Reading order: DOM order is visual order, top to bottom. Two components sharing a row go left-first in the file.",
 	/*
 	 * The ones about *what a board says* rather than where its boxes are.
@@ -203,10 +203,12 @@ const GUIDELINES = [
 	 */
 	"Lead with the finding. The first thing on a board is what you concluded, in a sentence somebody could repeat — not the background, not the method, not what you were asked.",
 	"Be concise. Short sentences, no preamble, nothing said twice.",
-	"Head every component with a short structural label — Problem, Research question, Method, Result, Todos, Next — not a chatty sentence. A reader should see the shape of the board by scanning its headings; a heading that reads like conversation buries which box is which, and the finding belongs in the body.",
+	"Give a board sections, and head the sections from this set: Summary, Overview, Problem, Research question, Method, Result, Todos, Next. Reading the section headings alone should tell somebody what is on the board — that is what makes a board scannable rather than a wall of cards.",
+	"Inside a section, a component's heading is a short plain phrase — two or three words saying what the box is — not a chatty sentence and not the finding itself. The finding goes in the body, where it can be read.",
 	"Write the shortest thing that is still true. Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure, a number to an adjective. A third paragraph in one card is a table you have not drawn yet.",
 	"A card is a claim with its evidence, not a section of an essay: a heading that says what it is, then the fewest words that back it. If a card needs a scrollbar in your head, it is two cards or a table.",
 	"A diagram or a table must stand on its own: every axis labelled with its unit, every series and column named in words. Never letter- or number-coded — no arms called A/B/C/D, no metrics called M1/M2/M3, no bare decimals with nothing saying what they measure. Somebody who has not read the chat should be able to say what every row and every axis is.",
+	"Reporting research, say it in plain language *and* give the technical detail: what was done, what came out, what it means, in words a reader outside the project would follow — then the numbers, the method and the names. No metaphors, no clever framing, no long sentences doing two jobs.",
 	"The board carries the answer; the chat reply names it and may recap or add to it. What is never acceptable is the substance in chat with a stub on the board, or a board that only makes sense after reading the chat.",
 	"When work is finished, report on a board — method, result, what is left — rather than describing it in the chat column.",
 	"Keep the canvas to what matters now: stage.show narrows it, stage.hide takes a board off it without dropping it from your context.",
@@ -307,13 +309,13 @@ export function createStageTool(deps: {
 			}
 
 			/*
-			 * The width, when nobody said one.
+			 * The width, when nobody said one: the shape's own, held inside the screen.
 			 *
-			 * `min(viewport, 1600)` is a ceiling, and each shape's own default is under it,
-			 * so this is the smallest of the three. Applied here rather than suggested,
-			 * because a suggestion in a note is a rule nothing enforces. A phone is what
-			 * makes it matter: at a 390px viewport every default is wider than the screen,
-			 * and the template folds its columns to fit rather than being clipped.
+			 * A phone is what makes it worth doing rather than suggesting: at a 390px
+			 * viewport every default is wider than the screen, and the template folds its
+			 * columns to fit rather than being clipped. There is no ceiling of ours in it any
+			 * more — a width that *was* asked for is used at any size, and 1200 is advice in
+			 * the note below.
 			 */
 			const view = viewport();
 			const width = boardWidth(options.w, view?.width, template, format);
@@ -326,16 +328,20 @@ export function createStageTool(deps: {
 			agent.setContext([path, ...agent.context()]);
 			agent.setInPlay([...agent.inPlay(), path]);
 			/*
-			 * The size of the thing you are about to fill, and the rule it was sized by.
+			 * The size of the thing you are about to fill, and the advice that goes with it.
 			 *
 			 * The number used to be the whole of it, on the reasoning that an agent that
-			 * knows the canvas is 1400×900 does not need a rule about how wide a board
-			 * should be. It did: knowing the room and choosing 1900 anyway is exactly what
-			 * kept happening, because nothing joined the two. So the rule goes beside the
-			 * number — one line, with the formula in it, at the moment it would be used.
+			 * knows the canvas is 1400×900 does not need telling how wide a board should be.
+			 * It did: knowing the room and choosing 1900 anyway is exactly what kept
+			 * happening, because nothing joined the two. So the advice goes beside the
+			 * number, at the moment it would be used — **as advice**, since the clamp that
+			 * used to enforce it is gone and a board wider than this is now allowed to
+			 * exist.
 			 */
 			if (view) notes.push(`viewport ${view.width}×${view.height} px`);
-			notes.push(`board width ${width} — the rule is min(viewport width, 1600), and reading order is top to bottom in DOM order`);
+			notes.push(
+				`board width ${width} — keep a board under ${WIDE_BOARD_W} and inside the viewport where you can; nothing stops you going wider, but a wide board is read scaled down. Reading order is top to bottom in DOM order.`,
+			);
 			return path;
 		},
 
@@ -391,15 +397,18 @@ export function createStageTool(deps: {
 		 * something has been pushed past the edge.
 		 */
 		fit: async (path: string, options?: { margin?: number }) => {
-			const { board, content } = await service.fit(path, { ...options, ...(viewport() ? { viewport: viewport()?.width } : {}) });
+			const { board, content } = await service.fit(path, options);
 			/*
-			 * The one case `fit` cannot fix, said rather than hidden: content wider than
-			 * `min(viewport, 1600)` leaves the board at the ceiling and clipped. A wider
-			 * board is not the answer — it would be read scaled down — so the note names
-			 * the component's width as the thing to change.
+			 * A fit can no longer clip — it takes the width the content needs — so what the
+			 * note is for has changed. It used to report the failure the clamp created; now
+			 * it says when the board it produced is wider than a board is worth being, which
+			 * is a thing to fix in the content rather than an error.
 			 */
-			if (content.w > board.w) {
-				notes.push(`${board.path} is ${board.w} wide, the most a board should be here, and its content is ${content.w} — narrow a component rather than widening the board`);
+			if (board.w > WIDE_BOARD_W) {
+				const room = viewport()?.width;
+				notes.push(
+					`${board.path} came out ${board.w} wide — over ${WIDE_BOARD_W}, which is wide for reading${room ? ` and ${room > 0 && board.w > room ? "wider than this screen" : "inside this screen"}` : ""}. Narrow a component or split the board rather than leaving it this wide.`,
+				);
 			}
 			return { path: board.path, w: board.w, h: board.h, content };
 		},
