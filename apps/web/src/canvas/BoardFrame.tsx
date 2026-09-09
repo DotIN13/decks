@@ -1,7 +1,7 @@
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
 import { SourceEditor } from "./SourceEditor.tsx";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { unwrap } from "solid-js/store";
 import { Icon } from "../icons.tsx";
 import { boardUrl } from "../lib/api.ts";
@@ -13,6 +13,8 @@ import { measureFrame } from "./extent.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
 import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
 import { paintFrame } from "../lib/theme.ts";
+import type { RendererChoice } from "../lib/renderer.ts";
+import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "./picture.ts";
 
 /**
  * One board on the stage: a title above it, and the document itself in a frame.
@@ -96,6 +98,18 @@ export function BoardFrame(props: {
 	webStatus?: () => { status: WebStatus; code?: string } | undefined;
 	/** The user pressed Allow, Deny or Stop on that card. */
 	onWebReply?: (reply: LiveWebReply) => void;
+	/**
+	 * How this board is put on the stage (`lib/renderer.ts`): a document in a box, a
+	 * document drawn into a canvas of its own, or a picture on the stage's one canvas.
+	 */
+	renderer: RendererChoice;
+	/**
+	 * Whether the camera's scale is moving right now. A canvas renderer draws nothing while
+	 * it is — the picture is stretched — and draws once, at the new size, when it stops.
+	 */
+	scaling: boolean;
+	/** The stage's side of a canvas renderer: the redraw queue, and the darkroom (`picture.ts`). */
+	pictures: PictureHost;
 }) {
 	let detachEditor: (() => void) | undefined;
 	let detachSelect: (() => void) | undefined;
@@ -298,6 +312,242 @@ export function BoardFrame(props: {
 		frameEl.setAttribute("src", next);
 	};
 	createEffect(applySrc);
+
+	/**
+	 * Wire a document that has just loaded: theme, editor, gestures, drops, live feeds, and
+	 * the measurement. Called from the frame's `load` whichever renderer put it there.
+	 */
+	const wire = (frame: HTMLIFrameElement) => {
+		paintFrame(frame);
+		// Re-attached on every load: a reload is a new document, and the
+		// listeners went with the old one.
+		detachEditor?.();
+		detachGestures?.();
+		detachDrop?.();
+		detachLive?.();
+		detachSelect?.();
+		/*
+		 * A click inside a board with no components selects the board.
+		 *
+		 * On a component board a click means "this box", and the editor
+		 * answers it. On a flow or slides board there are no boxes, so the
+		 * click can only mean "this board" — and it has to *say* so, because
+		 * everything the board then responds to asks the canvas which board
+		 * is selected: the arrow keys on a deck, the double-click that opens
+		 * the source. Clicking one was leaving that answer unchanged, so a
+		 * deck you had clicked ignored ← → unless you happened to have played
+		 * it from the rail as well.
+		 *
+		 * Here rather than in an effect, and that is the whole bug: an effect
+		 * reads `contentDocument` before the load and lands on the
+		 * `about:blank` the frame starts with, which is then thrown away.
+		 */
+		if (props.board.format !== "component") {
+			const doc = frame.contentDocument;
+			const select = () => props.onSelect();
+			doc?.addEventListener("pointerdown", select, true);
+			detachSelect = () => doc?.removeEventListener("pointerdown", select, true);
+		}
+		detachEditor = attachEditor(frame, props.board.path, props.editor);
+		// Told where the board is, so a finger's position is arithmetic
+		// rather than a layout read on every event (`frame-gestures.ts`).
+		detachGestures = attachFrameGestures(frame, props.gestures, at);
+		detachDrop = attachFrameDrop(frame, props.drops);
+		/*
+		 * A reloaded document holds nothing, so the record of what it has
+		 * been sent is cleared with it — otherwise the next delta would be
+		 * an append onto turns that are no longer there.
+		 */
+		sent = [];
+		fed = false;
+		setWants(undefined);
+		setWantsWeb(false);
+		detachLive = attachLiveWant(frame, (agent) => setWants(agent), {
+			onWant: () => setWantsWeb(true),
+			onReply: (reply) => props.onWebReply?.(reply),
+		});
+		reportExtent(frame, props.board.rev);
+	};
+
+	/**
+	 * Let go of everything attached to the frame's current document.
+	 *
+	 * The document can go away without a `load` to follow it: a board that leaves the
+	 * visible margin is unmounted from inside this component — a `Show` — so the component's
+	 * own cleanup has not run and never will. Whatever is attached to that document has to be
+	 * let go here, or the gestures keep listening to a dead frame and, worse, the fingers it
+	 * had reported to the stage are never handed back: the pool keeps them, and the next
+	 * single touch anywhere on the canvas is read as a pinch.
+	 */
+	const unwire = (element: HTMLIFrameElement) => {
+		detachSelect?.();
+		detachEditor?.();
+		detachGestures?.();
+		detachDrop?.();
+		detachLive?.();
+		detachSelect = detachEditor = detachGestures = detachDrop = detachLive = undefined;
+		clearTimeout(measuring);
+		if (frameEl === element) frameEl = undefined;
+	};
+
+	/**
+	 * The frame, as JSX, for the renderers that keep it in this box.
+	 *
+	 * A function rather than a constant because a `Show` creates it afresh each time the
+	 * board mounts, and the two places it is used each need an element of their own.
+	 */
+	const frameNode = () => (
+		<iframe
+			ref={(element) => {
+				frameEl = element;
+				// The first src has to be set here rather than as an attribute: the
+				// effect above is what owns this attribute, and letting JSX also
+				// write it would navigate twice on mount.
+				applySrc();
+				onCleanup(() => unwire(element));
+			}}
+			data-path={props.board.path}
+			title={props.board.title}
+			width={props.board.w}
+			height={props.board.h}
+			referrerpolicy="no-referrer"
+			// A drawable child of a canvas (`canvas-per-board`); ignored by a plain box.
+			attr:drawable=""
+			onLoad={(event) => {
+				wire(event.currentTarget);
+				if (props.renderer === "canvas-per-board") drawPicture(true);
+			}}
+		/>
+	);
+
+	// --- a canvas per board ---------------------------------------------------------
+
+	/**
+	 * The board's own canvas, when `canvas-per-board` is on.
+	 *
+	 * The frame is the canvas's child: laid out at the canvas's top-left at the board's own
+	 * size, which is exactly where `drawElementImage` draws it, so a click on the picture
+	 * lands on the document. The canvas has as many pixels as the board takes on screen —
+	 * `pictureSize` — and is drawn on three occasions: when the document loads, when the
+	 * browser says the document changed (the `paint` event), and when the camera rests after
+	 * a zoom. Never during a pinch: the compositor stretches the picture, and a pinch that
+	 * redrew sixteen documents a step is the thing this renderer exists to avoid.
+	 *
+	 * The picture outlives the document. `mounted` going false removes the frame and leaves
+	 * the canvas as it was, so a board off screen for a while is a picture rather than a
+	 * placeholder — which is also what makes zooming back to it instant.
+	 */
+	let canvasEl: HTMLCanvasElement | undefined;
+	/** The size the picture was last drawn at, in backing-store pixels. */
+	let have: { w: number; h: number } | undefined;
+	/** The document changed while the scale was moving; draw it at rest even if the size is right. */
+	let stale = false;
+	const [drawn, setDrawn] = createSignal(false);
+
+	const drawPicture = (resize: boolean) => {
+		const canvas = canvasEl;
+		const frame = frameEl;
+		if (!canvas || !frame || !frame.isConnected || frame.parentElement !== canvas) return;
+		const ctx = elementContext(canvas);
+		if (!ctx) return;
+		const dpr = window.devicePixelRatio || 1;
+		if (resize || !have) {
+			const size = pictureSize(props.board, props.camera.zoom, dpr);
+			if (canvas.width !== size.w || canvas.height !== size.h) {
+				canvas.width = size.w;
+				canvas.height = size.h;
+			}
+			have = { w: size.w, h: size.h };
+		}
+		/*
+		 * Measured off the canvas and the frame, never worked out from the board and the zoom
+		 * (`drawScale`): the frame arrives at its size on screen times the canvas's own pixels
+		 * per CSS pixel, and here the frame *is* the canvas's box, so this comes out at 1 at
+		 * every zoom and at every picture size.
+		 *
+		 * The ratio is the one from the browser's last rendering update, not the one this tick
+		 * would give — a canvas's box is laid out, and layout has not run since the transform
+		 * that moved it. Every draw here is a frame or more after the camera moved, which is
+		 * what makes that safe: on load, on a paint event, and at rest through the queue.
+		 */
+		const ratio = canvasPixelRatio(canvas);
+		const scale = ratio && drawScale({ w: canvas.width, h: canvas.height }, frame.getBoundingClientRect(), ratio);
+		if (!scale) return;
+		try {
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.setTransform(scale.x, 0, 0, scale.y, 0, 0);
+			ctx.drawElementImage(frame, 0, 0);
+			setDrawn(true);
+		} catch {
+			// "Before an initial snapshot has been recorded": the document is a frame away
+			// from drawable. Its paint event will ask again.
+		}
+	};
+
+	const onPaint = (event: Event) => {
+		const changed = (event as PaintEvent).changedElements;
+		if (changed && frameEl && !changed.includes(frameEl)) return;
+		// While the scale is moving the picture is being stretched; a draw now would be at
+		// the old size and thrown away at rest anyway. Remembered rather than dropped, so a
+		// board that finished rendering during a zoom is drawn once the zoom rests.
+		if (props.scaling) {
+			stale = true;
+			return;
+		}
+		drawPicture(false);
+	};
+
+	/*
+	 * Redraw at rest, at the size the board now takes on screen — through the stage's queue,
+	 * so sixteen boards settle over four frames rather than one long one. Runs on every
+	 * camera change and does nothing on a pan: the size has not changed, and `needsRedraw`
+	 * says so.
+	 */
+	createEffect(() => {
+		if (props.renderer !== "canvas-per-board" || props.scaling) return;
+		const zoom = props.camera.zoom;
+		void props.mounted;
+		const size = pictureSize(props.board, zoom, window.devicePixelRatio || 1);
+		if (!stale && !needsRedraw(have, size)) return;
+		stale = false;
+		props.pictures.queue.add(props.board.path, () => drawPicture(true));
+	});
+	onCleanup(() => props.pictures.queue.cancel(props.board.path));
+
+	// --- one canvas for the stage ---------------------------------------------------
+
+	/*
+	 * Under `one-canvas` the document does not live in this box at all: it is a child of the
+	 * stage's darkroom canvas, which is the only place the stage can draw it from. Made here
+	 * by hand rather than by JSX because it has to be appended to an element this component
+	 * does not own, and Solid tidies up the nodes *it* inserted where it inserted them. It is
+	 * inert — nothing inside a picture can be clicked, and a laid-out document that took
+	 * focus or pointer events at the stage's top-left would be a trap.
+	 */
+	createEffect(() => {
+		const darkroom = props.pictures.darkroom;
+		if (props.renderer !== "one-canvas" || !darkroom || !props.mounted) return;
+		const element = document.createElement("iframe");
+		element.dataset.path = props.board.path;
+		element.title = props.board.title;
+		element.width = String(props.board.w);
+		element.height = String(props.board.h);
+		element.referrerPolicy = "no-referrer";
+		element.setAttribute("drawable", "");
+		element.inert = true;
+		element.addEventListener("load", () => {
+			wire(element);
+			props.pictures.changed(props.board.path);
+		});
+		frameEl = element;
+		applySrc();
+		darkroom.appendChild(element);
+		onCleanup(() => {
+			unwire(element);
+			element.remove();
+		});
+	});
 
 	const startDrag = (event: PointerEvent) => {
 		if (event.button !== 0) return;
@@ -506,109 +756,69 @@ export function BoardFrame(props: {
 					if (inert() && event.pointerType !== "touch") startDrag(event);
 				}}
 			>
-				<Show
-					when={props.mounted}
-					fallback={<div class="placeholder">{props.board.path}</div>}
-				>
-					<Show when={props.editing} keyed>
-						{(editing) => (
-							<SourceEditor
-								path={props.board.path}
-								source={editing.source}
-								w={props.board.w}
-								h={props.board.h}
-								onCommit={editing.onCommit}
-								onCancel={editing.onCancel}
-							/>
-						)}
-					</Show>
-					<iframe
-						ref={(element) => {
-							frameEl = element;
-							// The first src has to be set here rather than as an attribute: the
-							// effect below is what owns this attribute, and letting JSX also
-							// write it would navigate twice on mount.
-							applySrc();
-							/*
-							 * And the document can go away without a `load` to follow it.
-							 *
-							 * A board that leaves the visible margin is unmounted from inside
-							 * this component — the `Show` above — so the component's own cleanup
-							 * has not run and never will. Whatever is attached to that document
-							 * has to be let go here, or the gestures keep listening to a dead
-							 * frame and, worse, the fingers it had reported to the stage are
-							 * never handed back: the pool keeps them, and the next single touch
-							 * anywhere on the canvas is read as a pinch.
-							 */
-							onCleanup(() => {
-								detachSelect?.();
-								detachEditor?.();
-								detachGestures?.();
-								detachDrop?.();
-								detachLive?.();
-								detachSelect = detachEditor = detachGestures = detachDrop = detachLive = undefined;
-								clearTimeout(measuring);
-								if (frameEl === element) frameEl = undefined;
-							});
-						}}
-						title={props.board.title}
-						width={props.board.w}
-						height={props.board.h}
-						referrerpolicy="no-referrer"
-						onLoad={(event) => {
-							const frame = event.currentTarget;
-							paintFrame(frame);
-							// Re-attached on every load: a reload is a new document, and the
-							// listeners went with the old one.
-							detachEditor?.();
-							detachGestures?.();
-							detachDrop?.();
-							detachLive?.();
-							detachSelect?.();
-							/*
-							 * A click inside a board with no components selects the board.
-							 *
-							 * On a component board a click means "this box", and the editor
-							 * answers it. On a flow or slides board there are no boxes, so the
-							 * click can only mean "this board" — and it has to *say* so, because
-							 * everything the board then responds to asks the canvas which board
-							 * is selected: the arrow keys on a deck, the double-click that opens
-							 * the source. Clicking one was leaving that answer unchanged, so a
-							 * deck you had clicked ignored ← → unless you happened to have played
-							 * it from the rail as well.
-							 *
-							 * Here rather than in an effect, and that is the whole bug: an effect
-							 * reads `contentDocument` before the load and lands on the
-							 * `about:blank` the frame starts with, which is then thrown away.
-							 */
-							if (props.board.format !== "component") {
-								const doc = frame.contentDocument;
-								const select = () => props.onSelect();
-								doc?.addEventListener("pointerdown", select, true);
-								detachSelect = () => doc?.removeEventListener("pointerdown", select, true);
-							}
-							detachEditor = attachEditor(frame, props.board.path, props.editor);
-							// Told where the board is, so a finger's position is arithmetic
-							// rather than a layout read on every event (`frame-gestures.ts`).
-							detachGestures = attachFrameGestures(frame, props.gestures, at);
-							detachDrop = attachFrameDrop(frame, props.drops);
-							/*
-							 * A reloaded document holds nothing, so the record of what it has
-							 * been sent is cleared with it — otherwise the next delta would be
-							 * an append onto turns that are no longer there.
-							 */
-							sent = [];
-							fed = false;
-							setWants(undefined);
-							setWantsWeb(false);
-							detachLive = attachLiveWant(frame, (agent) => setWants(agent), {
-								onWant: () => setWantsWeb(true),
-								onReply: (reply) => props.onWebReply?.(reply),
-							});
-							reportExtent(frame, props.board.rev);
-						}}
-					/>
-				</Show>
+				<Switch>
+					<Match when={props.renderer === "canvas-per-board"}>
+						<Show when={props.mounted ? props.editing : undefined} keyed>
+							{(editing) => (
+								<SourceEditor
+									path={props.board.path}
+									source={editing.source}
+									w={props.board.w}
+									h={props.board.h}
+									onCommit={editing.onCommit}
+									onCancel={editing.onCancel}
+								/>
+							)}
+						</Show>
+						{/*
+							The picture, and the document as its child while the board has one. The
+							canvas keeps what was drawn when the child goes, so the placeholder is
+							only for a board that has never been drawn at all.
+						*/}
+						<canvas
+							class="picture"
+							attr:layoutsubtree=""
+							width={1}
+							height={1}
+							ref={(element) => {
+								canvasEl = element;
+								element.addEventListener("paint", onPaint);
+								onCleanup(() => element.removeEventListener("paint", onPaint));
+							}}
+						>
+							<Show when={props.mounted}>{frameNode()}</Show>
+						</canvas>
+						<Show when={!props.mounted && !drawn()}>
+							<div class="placeholder">{props.board.path}</div>
+						</Show>
+					</Match>
+					<Match when={props.renderer === "one-canvas"}>
+						{/* The stage draws the board; this box is only the shadow, the bar and the marks. */}
+						<Show when={!props.mounted && !props.pictures.has(props.board.path)}>
+							<div class="placeholder">{props.board.path}</div>
+						</Show>
+					</Match>
+					<Match when={true}>
+						<Show
+							when={props.mounted}
+							fallback={<div class="placeholder">{props.board.path}</div>}
+						>
+							<Show when={props.editing} keyed>
+								{(editing) => (
+									<SourceEditor
+										path={props.board.path}
+										source={editing.source}
+										w={props.board.w}
+										h={props.board.h}
+										onCommit={editing.onCommit}
+										onCancel={editing.onCancel}
+									/>
+								)}
+							</Show>
+							{frameNode()}
+						</Show>
+					</Match>
+				</Switch>
 			</div>
 
 			{/*

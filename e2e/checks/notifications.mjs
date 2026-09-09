@@ -193,7 +193,7 @@ const panel = await page.evaluate(() => {
 	};
 });
 say("the window has a title rather than a section label", panel.title === "Settings", panel.title);
-say("three groups: sounds, banners, accounts", JSON.stringify(panel.groups.map((g) => g.name)) === JSON.stringify(["sounds", "banners", "accounts"]), JSON.stringify(panel.groups.map((g) => g.title)));
+say("sounds, banners and accounts come first, in that order", JSON.stringify(panel.groups.slice(0, 3).map((g) => g.name)) === JSON.stringify(["sounds", "banners", "accounts"]), JSON.stringify(panel.groups.map((g) => g.title)));
 
 const sounds = panel.groups[0];
 const banners = panel.groups[1];

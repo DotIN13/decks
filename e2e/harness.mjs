@@ -101,11 +101,21 @@ export function write(file, text) {
  * the pixel ratio and the user agent with it, and the returned `context` is what a check
  * attaches a CDP session to in order to dispatch real touches.
  */
-export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false } = {}) {
-	const browser = await chromium.launch();
+export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr } = {}) {
+	/*
+	 * Chrome's HTML-in-Canvas API, which the two canvas renderers need (`lib/renderer.ts`),
+	 * is behind a flag in Chrome 151. It changes nothing for a check that leaves the
+	 * renderer alone — the DOM renderer is the default — and `renderers.mjs` needs it on.
+	 */
+	const browser = await chromium.launch({ args: ["--enable-blink-features=CanvasDrawElement"] });
 	const descriptor = device ? devices[device] : undefined;
 	if (device && !descriptor) throw new Error(`playwright has no device called "${device}"`);
-	const context = descriptor ? await browser.newContext({ ...descriptor }) : await browser.newContext({ viewport: { width, height } });
+	// `dpr` is a retina screen without a phone attached to it — what `renderers.mjs` needs,
+	// because a canvas renderer can be right on this machine's 1× screen and wrong on a
+	// laptop's 2× one, and that is not a difference a viewport size can stand in for.
+	const context = descriptor
+		? await browser.newContext({ ...descriptor })
+		: await browser.newContext({ viewport: { width, height }, ...(dpr ? { deviceScaleFactor: dpr } : {}) });
 	const page = await context.newPage();
 	const errors = [];
 	page.on("pageerror", (error) => {

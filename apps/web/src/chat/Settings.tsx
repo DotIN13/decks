@@ -2,6 +2,7 @@ import type { ClaudeAccount, WebStatus } from "@decks/protocol";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
+import { RENDERERS, type RendererChoice } from "../lib/renderer.ts";
 import { Icon } from "../icons.tsx";
 import { AlertSettings } from "./AlertSettings.tsx";
 import type { AlertPrefs } from "../lib/alerts.ts";
@@ -68,6 +69,10 @@ export function Settings(props: {
 	onWebStop: () => void;
 	/** Put the status board on the canvas. */
 	onWebBoard: () => void;
+	/** How boards are drawn (`lib/renderer.ts`), and whether this browser can do the canvas ones. */
+	renderer: RendererChoice;
+	onRenderer: (choice: RendererChoice) => void;
+	canvasApi: boolean;
 	onClose: () => void;
 }) {
 	/*
@@ -183,6 +188,7 @@ export function Settings(props: {
 						</button>
 					</section>
 
+					<RendererSettings renderer={props.renderer} onChange={props.onRenderer} canvasApi={props.canvasApi} />
 					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
 				</div>
 			</div>
@@ -399,6 +405,55 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 						Stop sharing
 					</button>
 				</Show>
+			</div>
+		</section>
+	);
+}
+
+
+/**
+ * Which renderer draws the boards (`lib/renderer.ts`).
+ *
+ * One segmented control rather than three switches, because the choice is one of three and
+ * a switch is a yes or no. The note under the row is the part that matters on a browser
+ * without the API: the choice is kept, and this says which renderer is actually running.
+ */
+function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: RendererChoice) => void; canvasApi: boolean }) {
+	const running = () => (props.canvasApi || props.renderer === "dom" ? props.renderer : "dom");
+	const note = () => {
+		const chosen = RENDERERS.find((option) => option.id === props.renderer);
+		if (!props.canvasApi && props.renderer !== "dom")
+			return `This browser has no drawElementImage, so boards are documents whatever is chosen. In Chrome turn on chrome://flags/#canvas-draw-element.`;
+		return chosen?.note ?? "";
+	};
+	return (
+		<section class="set-group" data-group="renderer">
+			<header>
+				<span class="set-title">Boards</span>
+				<span class="set-note">How the canvas draws them. The canvas renderers need Chrome's HTML-in-Canvas API{props.canvasApi ? ", which this browser has." : ", which this browser does not have."}</span>
+			</header>
+			<div class="set-row">
+				<span class="set-k">
+					<span class="lb">Renderer</span>
+					<span class="nt" data-running={running()}>{note()}</span>
+				</span>
+				<span class="seg set-renderer" role="radiogroup" aria-label="Renderer">
+					<For each={RENDERERS}>
+						{(option) => (
+							<button
+								type="button"
+								role="radio"
+								aria-checked={props.renderer === option.id}
+								data-on={props.renderer === option.id}
+								data-moot={(option.id !== "dom" && !props.canvasApi) || undefined}
+								title={option.note}
+								onClick={() => props.onChange(option.id)}
+							>
+								{option.label}
+							</button>
+						)}
+					</For>
+				</span>
 			</div>
 		</section>
 	);

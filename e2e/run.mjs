@@ -69,6 +69,7 @@ const CHECKS = [
 	{ file: "chat-history.mjs", needsAgent: false },
 	{ file: "agent-camera.mjs", needsAgent: false },
 	{ file: "web-bridge.mjs", needsAgent: false },
+	{ file: "renderers.mjs", needsAgent: false },
 	/*
 	 * Last of the non-agent checks, and deliberately: it repoints the server's deck at a
 	 * directory of its own to make a *restored* chat, and puts it back afterwards. Nothing

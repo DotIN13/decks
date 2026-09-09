@@ -724,8 +724,60 @@ svg.lucide {
 }
 
 /* Above the interaction threshold the frame is inert, so a pan that crosses a
-   board is a pan and not a click into somebody's page. */
-.board-node[data-inert="true"] > .surface > iframe {
+   board is a pan and not a click into somebody's page. Descendant rather than child,
+   because under the canvas-per-board renderer the frame sits inside a canvas. */
+.board-node[data-inert="true"] .surface iframe {
+	pointer-events: none;
+}
+
+/*
+ * The canvas renderers (`lib/renderer.ts`).
+ *
+ * A canvas per board: the board's picture fills its surface and the document is the
+ * canvas's child — laid out at the canvas's top-left at the board's own size, which is where
+ * it is drawn, and never painted by the page itself. One canvas: the surface goes clear so
+ * the stage's picture shows through it, and the documents live in the darkroom, a canvas
+ * that is laid out (its children need layout to be drawn) but never seen.
+ */
+.board-node > .surface > canvas.picture {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.board-node > .surface > canvas.picture > iframe {
+	display: block;
+	border: 0;
+}
+
+.board-node > .surface > .placeholder {
+	position: absolute;
+	inset: 0;
+}
+
+.stage[data-renderer="one-canvas"] .board-node > .surface {
+	background: transparent;
+}
+
+.stage > .stage-picture {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}
+
+/*
+ * Shown, not hidden, and as large as its last capture. A canvas at `opacity: 0`, clipped
+ * away or `visibility: hidden` is one Chrome never records a paint for, and one shown at a
+ * single pixel draws an element into a corner of its store and leaves the rest blank —
+ * measured, each of them. So the capture sets this canvas's CSS size to match its store
+ * (`Stage.tsx`), and the opaque picture above it is what keeps it out of sight.
+ */
+.stage > .darkroom {
+	position: absolute;
+	top: 0;
+	left: 0;
 	pointer-events: none;
 }
 

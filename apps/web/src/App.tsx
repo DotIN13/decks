@@ -34,6 +34,7 @@ import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "
 import type { CanvasMode } from "./canvas/Editor.ts";
 import type { Mark } from "./canvas/annotations.ts";
 import { Settings } from "./chat/Settings.tsx";
+import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
@@ -479,6 +480,18 @@ export function App() {
 	const setPrefs = (next: AlertPrefs) => {
 		setPrefsSignal(next);
 		savePrefs(next);
+	};
+
+	/**
+	 * How boards are drawn (`lib/renderer.ts`). The choice is remembered; what runs is the
+	 * choice or `dom`, depending on whether this browser can draw an element into a canvas.
+	 */
+	const [rendererChoice, setRendererChoice] = createSignal<RendererChoice>(loadRenderer());
+	const canvasApi = canvasApiPresent();
+	const renderer = createMemo(() => effectiveRenderer(rendererChoice(), canvasApi));
+	const setRenderer = (choice: RendererChoice) => {
+		setRendererChoice(choice);
+		saveRenderer(choice);
 	};
 
 	/** Whether the person is demonstrably in front of this tab. Two facts, not one. */
@@ -1674,83 +1687,93 @@ export function App() {
 			*/}
 
 			<div class="work">
-				<Stage
-					mode={mode()}
-					marks={marks()}
-					boards={stageBoards()}
-					camera={camera()}
-					setCamera={setCameraAndReport}
-					selected={selected()}
-					onPresent={(path, at) => setPresenting({ path, at })}
-					onEditSource={openSource}
-					{...(editingSource()
-						? {
-								editing: {
-									path: editingSource()!.path,
+				{/*
+				 * Keyed on the renderer, so changing it in Settings rebuilds the stage: a board's
+				 * document lives in a different element under each renderer, and moving an iframe
+				 * reloads it anyway, so a clean remount is the honest version of the same cost.
+				 */}
+				<Show when={renderer()} keyed>
+					{(current) => (
+					<Stage
+						renderer={current}
+						mode={mode()}
+						marks={marks()}
+						boards={stageBoards()}
+						camera={camera()}
+						setCamera={setCameraAndReport}
+						selected={selected()}
+						onPresent={(path, at) => setPresenting({ path, at })}
+						onEditSource={openSource}
+						{...(editingSource()
+							? {
 									editing: {
-										source: editingSource()!.source,
-										onCommit: (text: string) => {
-											const open = editingSource();
-											setEditingSource(undefined);
-											if (!open) return;
-											const board = state.boards.find((candidate) => candidate.path === open.path);
-											if (!board || text === open.source) return;
-											socket.send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
+										path: editingSource()!.path,
+										editing: {
+											source: editingSource()!.source,
+											onCommit: (text: string) => {
+												const open = editingSource();
+												setEditingSource(undefined);
+												if (!open) return;
+												const board = state.boards.find((candidate) => candidate.path === open.path);
+												if (!board || text === open.source) return;
+												socket.send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
+											},
+											onCancel: () => setEditingSource(undefined),
 										},
-										onCancel: () => setEditingSource(undefined),
 									},
-								},
-							}
-						: {})}
-					/*
-					 * A press on the canvas outside the component lets it go.
-					 *
-					 * Every caller of this is the user pressing on bare stage or on a board's
-					 * own title bar, and both of those are "not the component" — so the
-					 * component selection goes with the board one rather than surviving it in
-					 * a panel still describing something nobody is pointing at. Pressing
-					 * *inside* a board is `Editor`'s to interpret, and it already clears the
-					 * selection for a press that lands on no component; the chrome panels are
-					 * not this handler's callers at all, which is what keeps a click on the
-					 * inspector from dismissing the thing it is about.
-					 */
-					onSelect={(path) => {
-						setSelected(path);
-						setComponent(undefined);
-					}}
-					onMove={move}
-					onHide={(path) => socket.send({ type: "board.hide", path })}
-					nonces={state.nonces}
-					cursor={state.cursor}
-					onViewport={() => reportCamera(camera())}
-					onExtent={(path, extent) => socket.send({ type: "board.extent", path, ...extent })}
-					editor={editor}
-					onTool={setTool}
-					drops={drops}
-					frameRevs={frameRevs}
-					preview={preview()?.boards}
-					/*
-					 * A live board draws itself from a conversation this app is already
-					 * holding — every agent's, not only the focused one, because the registry
-					 * greets the browser with all of them. Accessors rather than values: which
-					 * conversation a board wants is only known once it has loaded and asked.
-					 */
-					transcript={(agentId) => state.transcripts[agentId]}
-					webStatus={() => state.web}
-					onWebReply={(reply) => {
-						if (reply.decks === "live.web.answer") socket.send({ type: "web.answer", id: reply.id, ok: reply.ok });
-						else socket.send({ type: "web.stop" });
-					}}
-					agentIdentity={(agentId) => {
-						const identity = state.identities[agentId];
-						return identity ? { name: identity.name, color: identity.color } : undefined;
-					}}
-					/* The canvas's own way out — Escape, over the canvas or inside a board. Clearing
-					   the browser's copy is the whole of it: the server keeps no preview state,
-					   which is also why a reload has always been an accidental escape hatch. */
-					onLeavePreview={clearPreview}
-					onEdgeSwipe={edgeSwipe}
-				/>
+								}
+							: {})}
+						/*
+						 * A press on the canvas outside the component lets it go.
+						 *
+						 * Every caller of this is the user pressing on bare stage or on a board's
+						 * own title bar, and both of those are "not the component" — so the
+						 * component selection goes with the board one rather than surviving it in
+						 * a panel still describing something nobody is pointing at. Pressing
+						 * *inside* a board is `Editor`'s to interpret, and it already clears the
+						 * selection for a press that lands on no component; the chrome panels are
+						 * not this handler's callers at all, which is what keeps a click on the
+						 * inspector from dismissing the thing it is about.
+						 */
+						onSelect={(path) => {
+							setSelected(path);
+							setComponent(undefined);
+						}}
+						onMove={move}
+						onHide={(path) => socket.send({ type: "board.hide", path })}
+						nonces={state.nonces}
+						cursor={state.cursor}
+						onViewport={() => reportCamera(camera())}
+						onExtent={(path, extent) => socket.send({ type: "board.extent", path, ...extent })}
+						editor={editor}
+						onTool={setTool}
+						drops={drops}
+						frameRevs={frameRevs}
+						preview={preview()?.boards}
+						/*
+						 * A live board draws itself from a conversation this app is already
+						 * holding — every agent's, not only the focused one, because the registry
+						 * greets the browser with all of them. Accessors rather than values: which
+						 * conversation a board wants is only known once it has loaded and asked.
+						 */
+						transcript={(agentId) => state.transcripts[agentId]}
+						webStatus={() => state.web}
+						onWebReply={(reply) => {
+							if (reply.decks === "live.web.answer") socket.send({ type: "web.answer", id: reply.id, ok: reply.ok });
+							else socket.send({ type: "web.stop" });
+						}}
+						agentIdentity={(agentId) => {
+							const identity = state.identities[agentId];
+							return identity ? { name: identity.name, color: identity.color } : undefined;
+						}}
+						/* The canvas's own way out — Escape, over the canvas or inside a board. Clearing
+						   the browser's copy is the whole of it: the server keeps no preview state,
+						   which is also why a reload has always been an accidental escape hatch. */
+						onLeavePreview={clearPreview}
+						onEdgeSwipe={edgeSwipe}
+					/>
+					)}
+				</Show>
 
 				{/*
 					The two top clusters, and the tools are inside the left one.
@@ -1969,6 +1992,9 @@ export function App() {
 							socket.send({ type: "web.board" });
 							setSettings(false);
 						}}
+						renderer={rendererChoice()}
+						onRenderer={setRenderer}
+						canvasApi={canvasApi}
 						onClose={() => setSettings(false)}
 					/>
 				</Show>
