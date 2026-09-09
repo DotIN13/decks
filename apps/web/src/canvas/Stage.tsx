@@ -445,8 +445,15 @@ export function Stage(props: {
 			 * A pinch arrives as a stream of small deltas and a ⌘-wheel notch as one
 			 * delta of 100 or more, so the exponential is clamped: without it, the
 			 * pinch is right and one notch of the wheel jumps 2.7x.
+			 *
+			 * The divisor is how far a finger has to travel for a given zoom, and it is the
+			 * pinch's alone: a wheel notch is past the clamp at any of these numbers, so
+			 * changing it moves the trackpad and leaves the mouse where it was. It has been
+			 * turned twice, both times because a Mac trackpad felt slow — 300 barely doubled
+			 * the zoom across a whole pinch, 200 was still short. At 120 that pinch is about
+			 * 3.8×, which is the neighbourhood the Mac's own apps zoom in.
 			 */
-			const factor = Math.min(1.3, Math.max(1 / 1.3, Math.exp(-gesture.deltaY / 300)));
+			const factor = Math.min(1.3, Math.max(1 / 1.3, Math.exp(-gesture.deltaY / 120)));
 			pushCamera(zoomAbout(localCamera, view(), { x: gesture.x, y: gesture.y }, factor));
 			return;
 		}
