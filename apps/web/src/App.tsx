@@ -54,7 +54,7 @@ import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
-import { boxOf, fitInto, INTERACT_ZOOM, keepVisible } from "./lib/camera.ts";
+import { boxOf, fitInto, INTERACT_ZOOM, keepVisible, toWorld } from "./lib/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark, type AgentView } from "./chrome/agent-view.ts";
 import { closeHistory, historyShown, openHistory, setInspectable, toggleHistory } from "./lib/edge.ts";
 import { canvasBox, watchInsets } from "./lib/insets.ts";
@@ -290,7 +290,7 @@ export function App() {
 	 * Stamped, so rewinding twice to the same message is two handovers rather than one the
 	 * composer has already acted on.
 	 */
-	const [draft, setDraft] = createSignal<{ text: string; at: number } | undefined>(undefined);
+	const [draft, setDraft] = createSignal<{ text: string; at: number; agentId?: string; insert?: boolean } | undefined>(undefined);
 	/**
 	 * Whether the canvas cheat sheet is open (see `CanvasOps`).
 	 *
@@ -1019,8 +1019,18 @@ export function App() {
 					return;
 
 				case "composer.draft":
-					setDraft({ text: message.text, at: Date.now() });
+					// A rewound message, for the conversation that was rewound — the one on screen.
+					setDraft({ text: message.text, at: Date.now(), ...(state.focused ? { agentId: state.focused } : {}) });
 					return;
+
+				case "board.created": {
+					const waiting = created.get(message.request);
+					if (waiting) {
+						created.delete(message.request);
+						waiting(message.path);
+					}
+					return;
+				}
 
 				case "claude.accounts":
 					setState({ accounts: message.accounts, activeAccount: message.active, spendingByAgent: message.spending ?? {} });
@@ -1427,6 +1437,64 @@ export function App() {
 	};
 
 	/**
+	 * Files dropped on the input bar: copied into the deck, then mentioned where the caret is.
+	 *
+	 * The paperclip's two steps without the picker between them. Sequential, so the progress
+	 * line reads one file at a time, and the mentions arrive together once every copy is in.
+	 */
+	const dropIntoComposer = async (files: File[]) => {
+		const agentId = state.focused;
+		const paths: string[] = [];
+		for (const file of files) {
+			const path = await addFile(undefined, file);
+			if (path) paths.push(path);
+		}
+		if (paths.length > 0) setDraft({ text: paths.map((path) => `@${path}`).join(" "), at: Date.now(), insert: true, ...(agentId ? { agentId } : {}) });
+	};
+
+	/** Boards asked for with a `request`, waiting to hear their paths (`board.created`). */
+	const created = new Map<string, (path: string) => void>();
+
+	/**
+	 * Files dropped on empty canvas: a board of their own, centred where they landed.
+	 *
+	 * Laid out first, the same way a drop on a board is (`flow`), under the heading a new board
+	 * comes with, so the board can be asked for at the size that holds them. Then made, placed,
+	 * and filled through the ordinary drop path — one upload and one insert per file.
+	 */
+	const boardForFiles = async (files: File[], at: { x: number; y: number }) => {
+		const stage = document.querySelector(".stage")?.getBoundingClientRect();
+		if (!stage) return;
+		const FIRST_ROW = 152;
+		const shapes = await Promise.all(files.map(shapeFor));
+		const width = Math.min(1200, Math.max(880, Math.max(...shapes.map((shape) => shape.width)) + 96));
+		const boxes = flow(shapes, { x: 48, y: FIRST_ROW }, width);
+		const height = Math.max(400, Math.max(...boxes.map((box) => box.top + box.height)) + 48);
+		const middle = toWorld(camera(), { width: stage.width, height: stage.height }, { x: at.x - stage.left, y: at.y - stage.top });
+		const request = `drop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+		const path = await new Promise<string | undefined>((resolve) => {
+			created.set(request, resolve);
+			socket.send({
+				type: "board.create",
+				kind: "blank",
+				format: "component",
+				title: files.length === 1 ? files[0]!.name : `${files.length} files`,
+				size: { w: width, h: height },
+				at: { x: Math.round(middle.x - width / 2), y: Math.round(middle.y - height / 2) },
+				request,
+			});
+			setTimeout(() => {
+				if (created.delete(request)) resolve(undefined);
+			}, 10_000);
+		});
+		if (!path) {
+			notice("warn", "The board for that file was not made. Try dropping it again.");
+			return;
+		}
+		await dropOnBoard(path, files, { x: 48, y: FIRST_ROW });
+	};
+
+	/**
 	 * A file on the clipboard, landing on the selected board.
 	 *
 	 * The sibling of the drop path, and the one edge §8 listed against §6.9. A paste has no
@@ -1526,13 +1594,13 @@ export function App() {
 	 * and the gap between boards.
 	 *
 	 * Reaching here means the drop missed every live board, since a drop over one is
-	 * consumed inside that frame's document. The answer is a notice and nothing else:
-	 * an embed belongs to a board, and inventing a board to hold a file the user
-	 * dropped on empty canvas would be the app deciding something it was not asked to.
+	 * consumed inside that frame's document, and missed the input bar, which takes its own.
+	 * Over a board too small to be live it is a notice — zoom in; on empty canvas the files
+	 * get a board of their own, where they were dropped (`boardForFiles`).
 	 */
 	onMount(() => {
 		onCleanup(
-			guardDocumentDrops(document, (at) => {
+			guardDocumentDrops(document, (at, files) => {
 				const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node");
 				// While the timeline is being previewed the frames take no pointer events, so
 				// every drop arrives here — and "zoom in" would be a lie about why.
@@ -1540,12 +1608,11 @@ export function App() {
 					notice("info", "That is a board as it used to be. Let go of the timeline first.");
 					return;
 				}
-				notice(
-					"info",
-					over
-						? "Zoom in until the board is live, then drop the file on it."
-						: "Drop a file onto a board. An embed lives on a board, not on the canvas.",
-				);
+				if (over) {
+					notice("info", "Zoom in until the board is live, then drop the file on it.");
+					return;
+				}
+				if (files.length > 0) void boardForFiles(files, at);
 			}),
 		);
 	});
@@ -1707,6 +1774,7 @@ export function App() {
 		setSelected(selectionOnSwitch(view, playing));
 
 		ensureHistory(id);
+		setDraft(undefined);
 		socket.send({ type: "agent.focus", id });
 	};
 
@@ -2230,10 +2298,17 @@ export function App() {
 						 * of a file, which is the one thing in this app a message can point at.
 						 */
 						onAttach={() => {
-							void editor.pickFile(selected()).then((path) => {
-								if (path) setDraft({ text: `@${path} `, at: Date.now() });
+							// Taken now: the picker can be open across a switch, and the mention is for
+							// the conversation it was attached to. A deck path, not one relative to the
+							// selected board — a message is not a board, and `@../assets/x.png` means
+							// nothing to the agent reading it.
+							const agentId = state.focused;
+							void editor.pickFile(undefined).then((path) => {
+								if (path) setDraft({ text: `@${path}`, at: Date.now(), insert: true, ...(agentId ? { agentId } : {}) });
 							});
 						}}
+						onDraftTaken={() => setDraft(undefined)}
+						onDropFiles={(files) => void dropIntoComposer(files)}
 					/>
 				</div>
 

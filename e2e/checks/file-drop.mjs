@@ -8,6 +8,7 @@
  * the cursor, at any zoom), and that a drop the boards do not take cannot navigate
  * the app away.
  */
+import { dirname, join } from "node:path";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { boardReady, changed, deckState, open, read, say, socket, write } from "../harness.mjs";
 
@@ -141,8 +142,10 @@ try {
 		readdirSync(assets).join(" "),
 	);
 
-	// A drop that misses every board: a notice, and — the part that matters — an app
-	// that is still there. The browser's default would have navigated to the file.
+	// A drop that misses every board. It used to be refused with a notice; the canvas takes
+	// files now and gives them a board of their own (`drop-targets.mjs` checks that board).
+	// What this still asserts is the part that always mattered: the browser's default would
+	// have navigated to the file, and the app is still the app.
 	await page.evaluate(() => {
 		const transfer = new DataTransfer();
 		transfer.items.add(new File([new Uint8Array([1, 2, 3])], "stray.bin"));
@@ -160,11 +163,16 @@ try {
 			);
 		}
 	});
-	await page.waitForTimeout(300);
+	const took = await page
+		.waitForFunction(() => [...document.querySelectorAll(".notice")].some((n) => /stray\.bin added/.test(n.textContent ?? "")), null, { timeout: 8000 })
+		.then(() => true)
+		.catch(() => false);
 	const notices = await page.evaluate(() => [...document.querySelectorAll(".notice")].map((n) => n.textContent));
-	say("a file dropped on empty canvas is refused with a reason", notices.some((text) => /onto a board/.test(text)), notices.join(" | "));
+	say("a file dropped on empty canvas is taken rather than opened", took, notices.join(" | "));
 	say("and the app is still the app", await page.evaluate(() => Boolean(document.querySelector(".stage"))));
-	say("nothing was written for it", !readdirSync(assets).some((name) => name.includes("stray")));
+	say("…and kept in the deck", readdirSync(assets).some((name) => name.includes("stray")));
+	// The board it was given is this check's to clear, so the checks after it see the deck they expect.
+	for (const name of readdirSync(dirname(fixture)).filter((name) => name.includes("stray"))) rmSync(join(dirname(fixture), name), { force: true });
 
 	// The route's own guard, from outside the drag machinery: a name that is a path.
 	const refused = await page.evaluate(async () => {

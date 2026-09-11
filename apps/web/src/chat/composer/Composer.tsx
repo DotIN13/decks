@@ -3,6 +3,8 @@ import ArrowUp from "lucide-solid/icons/arrow-up";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Square from "lucide-solid/icons/square";
 import { createEffect, createMemo, createSignal, For, onMount, Show, untrack } from "solid-js";
+import { carriesFiles } from "../../canvas/file-drop.ts";
+import { withMention } from "./mention.ts";
 import { Icon } from "../../icons.tsx";
 import { Hints } from "./Hints.tsx";
 import { ModeMenu } from "./ModeMenu.tsx";
@@ -66,7 +68,15 @@ export function Composer(props: {
 	 * requests — an effect on the text alone would treat the second as one it had already
 	 * carried out, which is the same reason `atTurn` carries one.
 	 */
-	draft: { text: string; at: number } | undefined;
+	draft: { text: string; at: number; agentId?: string; insert?: boolean } | undefined;
+	/**
+	 * The draft above has been put in the field: forget it. A handover happens once — a draft
+	 * still held after it was taken is one that can be put back by anything that re-reads it,
+	 * which is how a mention attached with the paperclip kept coming back after it was sent.
+	 */
+	onDraftTaken?: () => void;
+	/** Files dropped on the bar: the app copies them into the deck and hands back mentions. */
+	onDropFiles?: (files: File[]) => void;
 	/**
 	 * How full this agent's context is, for the dial under the box.
 	 *
@@ -184,12 +194,34 @@ export function Composer(props: {
 		const handed = props.draft;
 		if (!handed) return;
 		void handed.at;
-		setText(handed.text);
-		if (!input) return;
-		input.value = handed.text;
-		input.focus();
-		input.setSelectionRange(handed.text.length, handed.text.length);
+		/*
+		 * Everything after reading the draft is untracked, and that is half the fix for a mention
+		 * that came back after it was sent. `input.focus()` runs the app's focus listeners
+		 * synchronously, inside this effect, and whatever they read became something the effect
+		 * depended on — so a send, or a switch of agent, re-ran it with the same stale draft and
+		 * put the words back into an emptied field. The other half is `onDraftTaken`: the app
+		 * forgets a draft the moment it is in the field.
+		 */
+		untrack(() => {
+			// A draft addressed to one conversation is not put into another's field.
+			if (handed.agentId === undefined || handed.agentId === props.agentId) {
+				const current = text();
+				const next = handed.insert
+					? withMention(current, input ? input.selectionEnd ?? current.length : current.length, handed.text)
+					: { text: handed.text, caret: handed.text.length };
+				setText(next.text);
+				if (input) {
+					input.value = next.text;
+					input.focus();
+					input.setSelectionRange(next.caret, next.caret);
+				}
+			}
+			props.onDraftTaken?.();
+		});
 	});
+
+	/** Whether a file is being dragged over the bar, so it can say it will take it. */
+	const [dropping, setDropping] = createSignal(false);
 
 	/** A draft that is exactly `/` followed by a command fragment, while nothing is typed after it. */
 	const SLASH = /^\/([a-z0-9_:.-]*)$/i;
@@ -315,7 +347,29 @@ export function Composer(props: {
 
 			{/* 10 / 10 / 8: the bottom is short because the controls row has its own gap to
 			    the text above it, and 10 under a 26px button reads as a hole. */}
-			<div class="dockbox float rounded-row px-2.5 pt-2.5 pb-2">
+			<div
+				class="dockbox float rounded-row px-2.5 pt-2.5 pb-2"
+				data-dropping={dropping() ? "true" : undefined}
+				onDragOver={(event) => {
+					if (!props.onDropFiles || !carriesFiles(event.dataTransfer)) return;
+					event.preventDefault();
+					if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+					setDropping(true);
+				}}
+				onDragLeave={(event) => {
+					if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false);
+				}}
+				onDrop={(event) => {
+					if (!props.onDropFiles || !carriesFiles(event.dataTransfer)) return;
+					event.preventDefault();
+					// The bar's, not the canvas's: the document's own guard would take this for a
+					// file dropped on empty canvas and make a board of it.
+					event.stopPropagation();
+					setDropping(false);
+					const files = Array.from(event.dataTransfer?.files ?? []);
+					if (files.length > 0) props.onDropFiles(files);
+				}}
+			>
 				<textarea
 					/*
 					 * Grows to about six lines and then scrolls. Six because that is a

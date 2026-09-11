@@ -812,7 +812,11 @@ export type ClientMessage =
 	 * handed a flow board, correctly, with nothing to say why. Absent means `component`,
 	 * which is what every board was before formats existed.
 	 */
-	| { type: "board.create"; kind?: string; format?: string }
+	/**
+	 * A new board. `title`, `size` and `at` are for a board made to hold something — a file
+	 * dropped on empty canvas — and `request` asks for a `board.created` naming its path.
+	 */
+	| { type: "board.create"; kind?: string; format?: string; title?: string; size?: { w?: number; h?: number }; at?: { x: number; y: number }; request?: string }
 	/**
 	 * Delete a board's file from the deck.
 	 *
@@ -970,6 +974,8 @@ export type ServerMessage =
 	| { type: "chat.earlier"; agentId: string; before: string; items: ChatItem[]; more: boolean }
 	/** Answering `chat.tool`: the whole output, or empty when the call is no longer anywhere. */
 	| { type: "chat.tool"; agentId: string; itemId: string; result: string }
+	/** Answering a `board.create` that carried a `request`: the path the new board was given. */
+	| { type: "board.created"; request: string; path: string }
 	| { type: "chat.item"; agentId: string; item: ChatItem }
 	| { type: "chat.delta"; agentId: string; itemId: string; delta: string; field?: "text" | "thinking" }
 	/**

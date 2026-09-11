@@ -3116,3 +3116,9 @@ svg.lucide {
 	font-size: 11px;
 	color: var(--muted, #888);
 }
+
+/* A file dragged over the input bar: it will be copied into the deck and mentioned (`Composer`). */
+.dockbox[data-dropping="true"] {
+	outline: 2px dashed var(--accent, #3b82f6);
+	outline-offset: 2px;
+}

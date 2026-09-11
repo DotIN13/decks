@@ -583,9 +583,26 @@ export class App {
 				// An unknown format is component, for the same reason an unknown template is
 				// blank: the worst outcome of a typo should be an ordinary empty board.
 				const format = isBoardFormat(message.format) ? message.format : "component";
-				const path = this.newBoard({ title: "Untitled", template, format });
+				/*
+				 * A title, a size and a place when the browser has something to put on the board: a
+				 * file dropped on empty canvas, which gets a board of its own where it was dropped.
+				 * Clamped rather than trusted, like everything a browser sends about a file.
+				 */
+				const bounded = (value: unknown, low: number, high: number) =>
+					typeof value === "number" && Number.isFinite(value) ? Math.min(high, Math.max(low, Math.round(value))) : undefined;
+				const title = typeof message.title === "string" && message.title.trim() !== "" ? message.title.trim().slice(0, 120) : "Untitled";
+				const w = bounded(message.size?.w, 320, 2400);
+				const h = bounded(message.size?.h, 240, 4000);
+				const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
+				const path = this.newBoard({ title, template, format, ...(size ? { size } : {}) });
 				const agent = this.agents.focused();
 				agent.setInPlay([...agent.inPlay, path]);
+				if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
+					const placed = this.deck.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
+					if (placed) this.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
+				}
+				// After the board is announced, so the asker already holds it when it hears the path.
+				if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
 				return;
 			}
 

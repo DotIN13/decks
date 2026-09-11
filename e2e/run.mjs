@@ -45,6 +45,7 @@ const CHECKS = [
 	{ file: "invented-component.mjs", needsAgent: false },
 	{ file: "rich-text.mjs", needsAgent: false },
 	{ file: "file-drop.mjs", needsAgent: false },
+	{ file: "drop-targets.mjs", needsAgent: false },
 	{ file: "no-flicker.mjs", needsAgent: false },
 	{ file: "tiers.mjs", needsAgent: false },
 	{ file: "deleted-board.mjs", needsAgent: false },

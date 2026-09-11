@@ -34,7 +34,7 @@
 import { GRID, snap, typingInto } from "./Editor.ts";
 
 /** Whether a drag is carrying files, as opposed to text or a component of its own. */
-function carriesFiles(transfer: DataTransfer | null): boolean {
+export function carriesFiles(transfer: DataTransfer | null): boolean {
 	if (!transfer) return false;
 	// `types` is the only thing readable during a drag — the files themselves are
 	// withheld until the drop — so this is what "is this a file drag" has to be.
@@ -197,11 +197,11 @@ export function attachFrameDrop(frame: HTMLIFrameElement, host: FileDropHost): (
  * "anywhere" includes the conversation, the rail and the gap between boards.
  *
  * A drop that reaches here missed every board, since a drop over a live frame is
- * consumed inside that frame's document. So this is also where the honest answer to
- * "you dropped a file on the canvas" is given, and `outside` gets the point so the
- * caller can say something better than "no".
+ * consumed inside that frame's document — and missed the composer, which takes its own.
+ * So this is where a file dropped on the canvas is answered, and `outside` gets the point
+ * and the files, which is enough to make a board for them where they landed.
  */
-export function guardDocumentDrops(target: Document, outside: (at: { x: number; y: number }) => void): () => void {
+export function guardDocumentDrops(target: Document, outside: (at: { x: number; y: number }, files: File[]) => void): () => void {
 	const onDragOver = (event: DragEvent) => {
 		if (!carriesFiles(event.dataTransfer)) return;
 		event.preventDefault();
@@ -210,7 +210,7 @@ export function guardDocumentDrops(target: Document, outside: (at: { x: number; 
 	const onDrop = (event: DragEvent) => {
 		if (!carriesFiles(event.dataTransfer)) return;
 		event.preventDefault();
-		outside({ x: event.clientX, y: event.clientY });
+		outside({ x: event.clientX, y: event.clientY }, Array.from(event.dataTransfer?.files ?? []));
 	};
 	target.addEventListener("dragover", onDragOver);
 	target.addEventListener("drop", onDrop);
