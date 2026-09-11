@@ -3106,3 +3106,13 @@ svg.lucide {
 
 }
 }
+
+/*
+ * Under a tool's output when only a preview of it arrived (`ToolChip`): the rest is on its
+ * way, or — if the call is no longer anywhere — this is all there is.
+ */
+.tool > .more {
+	margin: 4px 0 0;
+	font-size: 11px;
+	color: var(--muted, #888);
+}

@@ -2,8 +2,9 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { renderShell } from "./boards/shell.ts";
 import { normalizeBoardPath } from "./deck/schema.ts";
 import { readFlowMeta } from "./deck/meta.ts";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { cacheControlFor, compressedStatic } from "./static.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/roots.ts";
@@ -293,8 +294,18 @@ export function createHttpApp(app: App): Express {
 	// proxies here, so a missing dist is normal rather than an error.
 	const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
 	if (existsSync(webDist)) {
-		server.use(express.static(webDist));
-		server.get("*any", (_req, res) => res.sendFile(join(webDist, "index.html")));
+		// Compressed and cached by name first (`static.ts`); anything it passes on is sent plain,
+		// with the same cache rule.
+		server.use(compressedStatic(webDist));
+		server.use(
+			express.static(webDist, {
+				setHeaders: (res, file) => res.setHeader("Cache-Control", cacheControlFor(file.slice(webDist.length).split(sep).join("/"))),
+			}),
+		);
+		server.get("*any", (_req, res) => {
+			res.setHeader("Cache-Control", "no-cache");
+			res.sendFile(join(webDist, "index.html"));
+		});
 	}
 
 	// One error handler, because a refusal should read the same wherever it came

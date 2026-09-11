@@ -72,7 +72,7 @@ export function canvasBox(view: { width: number; height: number }) {
  * since left the document.
  */
 export function watchInsets(root: HTMLElement = document.body): void {
-	let sizes = new ResizeObserver(() => measure());
+	let sizes = new ResizeObserver(() => soon(false));
 	const tracked = new Set<Element>();
 
 	const measure = () => {
@@ -150,15 +150,42 @@ export function watchInsets(root: HTMLElement = document.body): void {
 		measure();
 	};
 
-	const tree = new MutationObserver(sync);
+	/*
+	 * Once a frame, however many times it is asked.
+	 *
+	 * The tree observer watches the whole body, so every change anywhere in the app — each
+	 * card of a transcript arriving, each row of the rail — asked for a measurement, and a
+	 * measurement reads layout. During an open that was a synchronous layout per batch of
+	 * mutations: 212 ms of one profile. Deferred to the next frame it is one read per frame,
+	 * taken where the browser was about to lay out anyway. `withSync` remembers that the tree
+	 * changed, since only then are there surfaces to add or drop before measuring.
+	 */
+	let frame = 0;
+	let resync = false;
+	const soon = (withSync: boolean) => {
+		resync ||= withSync;
+		if (frame) return;
+		frame = requestAnimationFrame(() => {
+			frame = 0;
+			const tree = resync;
+			resync = false;
+			if (tree) sync();
+			else measure();
+		});
+	};
+	const resized = () => soon(false);
+
+	const tree = new MutationObserver(() => soon(true));
 	tree.observe(root, { childList: true, subtree: true, attributeFilter: ["data-inset"] });
-	window.addEventListener("resize", measure);
+	window.addEventListener("resize", resized);
+	// The first reading is taken at once: the camera's first fit is waiting on it.
 	sync();
 
 	onCleanup(() => {
+		if (frame) cancelAnimationFrame(frame);
 		tree.disconnect();
 		sizes.disconnect();
 		sizes = new ResizeObserver(() => {});
-		window.removeEventListener("resize", measure);
+		window.removeEventListener("resize", resized);
 	});
 }

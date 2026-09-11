@@ -1,5 +1,5 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 import { AgentFace, AgentMenu } from "./AgentPill.tsx";
 import { canHover } from "../lib/panels.ts";
@@ -86,7 +86,28 @@ export function AgentStack(props: {
 	 * in from the last place it happened to be placed.
 	 */
 	let strip: HTMLElement | undefined;
-	const initialAnchor = () => strip?.querySelector("button")?.getBoundingClientRect() ?? new DOMRect();
+	/*
+	 * Measured a frame after the faces change, and kept — not read on demand. The card is
+	 * always mounted, so its anchor is evaluated whenever anything passed to it changes, and
+	 * during an open that is every greeting frame of every agent: each read was a forced
+	 * layout, 87 ms of one profile. A frame late only moves a card nobody has hovered yet.
+	 */
+	const [initialAnchor, setInitialAnchor] = createSignal<DOMRect>(new DOMRect());
+	let anchorFrame = 0;
+	createEffect(() => {
+		void split()
+			.shown.map((chat) => chat.id)
+			.join(" ");
+		if (anchorFrame) return;
+		anchorFrame = requestAnimationFrame(() => {
+			anchorFrame = 0;
+			const rect = strip?.querySelector("button")?.getBoundingClientRect();
+			if (rect) setInitialAnchor(rect);
+		});
+	});
+	onCleanup(() => {
+		if (anchorFrame) cancelAnimationFrame(anchorFrame);
+	});
 
 	let exit: ReturnType<typeof setTimeout> | undefined;
 	/*

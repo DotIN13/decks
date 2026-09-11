@@ -253,6 +253,11 @@ export class AgentStore {
 		return { items: all.slice(start, end), more: start > 0 };
 	}
 
+	/** One archived row by its id — a tool call's whole output, asked for by `chat.tool`. */
+	findArchived(id: string, itemId: string): ChatItem | undefined {
+		return this.archived(id).find((item) => item.id === itemId);
+	}
+
 	/** Every archived row, oldest first. A line that will not parse is a line skipped. */
 	private archived(id: string): ChatItem[] {
 		let text: string;

@@ -34,6 +34,7 @@ import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "
 import type { CanvasMode } from "./canvas/Editor.ts";
 import type { Mark } from "./canvas/annotations.ts";
 import { Settings } from "./chat/Settings.tsx";
+import { forgetAskedResults, receiveToolResult, setToolResultSender } from "./chat/tool-results.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
@@ -407,6 +408,22 @@ export function App() {
 	 */
 	const earlierWaiting = new Map<string, (added: number) => void>();
 
+	/*
+	 * Which conversations this browser holds a history of, and which it has asked for.
+	 *
+	 * A history is asked for when a chat is shown — opened, or mirrored on a board — rather
+	 * than greeted: the greeting used to carry every chat's, 8.2 MB on the live deck, with the
+	 * one on screen arriving last. Plain sets, not state, because nothing is drawn from them;
+	 * a reconnect empties both, since whatever the old connection was asked is not coming.
+	 */
+	const historyHeld = new Set<string>();
+	const historyAsked = new Set<string>();
+	const ensureHistory = (agentId: string | undefined) => {
+		if (!agentId || !socket || historyHeld.has(agentId) || historyAsked.has(agentId)) return;
+		historyAsked.add(agentId);
+		socket.send({ type: "chat.open", agentId });
+	};
+
 	/**
 	 * Reach back past what the browser holds (`chat/history-page.ts`).
 	 *
@@ -613,7 +630,21 @@ export function App() {
 	});
 
 	onMount(() => {
-		socket = connect(setConnected);
+		socket = connect((up) => {
+			if (up) {
+				historyHeld.clear();
+				historyAsked.clear();
+				forgetAskedResults();
+			}
+			setConnected(up);
+		});
+		// The chip knows the row; the conversation it is in is found here.
+		setToolResultSender((itemId) => {
+			const agentId = Object.keys(state.transcripts).find((id) => state.transcripts[id]?.some((item) => item.id === itemId));
+			if (!agentId) return false;
+			socket.send({ type: "chat.tool", agentId, itemId });
+			return true;
+		});
 		const off = socket.on((message) => {
 			switch (message.type) {
 				case "deck.state":
@@ -721,10 +752,13 @@ export function App() {
 						setSeenAt(Date.now());
 					}
 					setState({ chats: message.chats, focused, defaultKind: message.defaultKind });
+					ensureHistory(focused);
 					return;
 				}
 
 				case "agent.removed": {
+					historyHeld.delete(message.id);
+					historyAsked.delete(message.id);
 					/*
 					 * Drop what was being kept for it. The `agents` frame that follows sets
 					 * the list and the focus, so this is only about not holding a transcript
@@ -805,6 +839,12 @@ export function App() {
 				case "chat.history":
 					setState("transcripts", message.agentId, message.items);
 					setState("moreHistory", message.agentId, message.more ?? false);
+					historyHeld.add(message.agentId);
+					historyAsked.delete(message.agentId);
+					return;
+
+				case "chat.tool":
+					receiveToolResult(message.itemId, message.result);
 					return;
 
 				case "chat.earlier": {
@@ -1633,6 +1673,7 @@ export function App() {
 		   with the *component* selection three lines up — the two are the same kind of fact. */
 		setSelected(selectionOnSwitch(view, playing));
 
+		ensureHistory(id);
 		socket.send({ type: "agent.focus", id });
 	};
 
@@ -1756,7 +1797,11 @@ export function App() {
 						 * greets the browser with all of them. Accessors rather than values: which
 						 * conversation a board wants is only known once it has loaded and asked.
 						 */
-						transcript={(agentId) => state.transcripts[agentId]}
+						transcript={(agentId) => {
+							// A mirror of a chat nobody has opened here asks for it, like opening it would.
+							ensureHistory(agentId);
+							return state.transcripts[agentId];
+						}}
 						webStatus={() => state.web}
 						onWebReply={(reply) => {
 							if (reply.decks === "live.web.answer") socket.send({ type: "web.answer", id: reply.id, ok: reply.ok });

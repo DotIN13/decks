@@ -430,7 +430,13 @@ export interface UsageShare {
 export type ChatItem =
 	| { kind: "user"; id: string; text: string; at: number; entryId?: string }
 	| { kind: "assistant"; id: string; text: string; at: number; thinking?: string; streaming?: boolean }
-	| { kind: "tool"; id: string; name: string; title: string; args?: unknown; result?: string; images?: number; state: "running" | "done" | "error" }
+	/**
+	 * A tool call. `args` stays on the server: the browser has never read them — the chip's
+	 * `title` is what they are for — and they were half of what a greeting weighed. `result`
+	 * travels as a preview when it is long, and `full` is then how long the whole of it is;
+	 * opening the chip asks for the rest with `chat.tool` (`agents/wire.ts`).
+	 */
+	| { kind: "tool"; id: string; name: string; title: string; args?: unknown; result?: string; full?: number; images?: number; state: "running" | "done" | "error" }
 	| { kind: "notice"; id: string; level: "info" | "warn" | "error"; text: string; at: number };
 
 /** The tool's own rendering hint: how the chip reads before you expand it. */
@@ -868,6 +874,14 @@ export type ClientMessage =
 	 * it would name a different row every turn.
 	 */
 	| { type: "chat.earlier"; agentId: string; before: string; limit?: number }
+	/**
+	 * A conversation's history, asked for when it is shown — by opening it, or by a mirror
+	 * board of it. It used to be part of the greeting, for every chat at once: 8.2 MB on the
+	 * live deck, with the one on screen greeted last. Answered to the asker alone.
+	 */
+	| { type: "chat.open"; agentId: string }
+	/** The whole output of one tool call whose `result` arrived as a preview (`full` set). */
+	| { type: "chat.tool"; agentId: string; itemId: string }
 	| { type: "stage.result"; result: StageResult }
 	| { type: "extension.ui.answer"; answer: ExtensionUiAnswer }
 	/** Read the account list — the settings panel asking on open. */
@@ -954,6 +968,8 @@ export type ServerMessage =
 	 * same page twice. `more` says whether anything remains before this page.
 	 */
 	| { type: "chat.earlier"; agentId: string; before: string; items: ChatItem[]; more: boolean }
+	/** Answering `chat.tool`: the whole output, or empty when the call is no longer anywhere. */
+	| { type: "chat.tool"; agentId: string; itemId: string; result: string }
 	| { type: "chat.item"; agentId: string; item: ChatItem }
 	| { type: "chat.delta"; agentId: string; itemId: string; delta: string; field?: "text" | "thinking" }
 	/**

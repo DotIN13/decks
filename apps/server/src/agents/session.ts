@@ -31,6 +31,7 @@ import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
 import type { StageBridge } from "../stage/bridge.ts";
 import { Translator } from "./translator.ts";
+import { forBrowser, HISTORY_ITEMS } from "./wire.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 
 /**
@@ -339,7 +340,8 @@ export class DeckAgent {
 					if (message.state === "idle") this.armDrain();
 					else this.cancelDrain();
 				}
-				this.emit(message);
+				// Rows leave trimmed: no arguments, and only a preview of a long output (`wire.ts`).
+				this.emit(message.type === "chat.item" ? { ...message, item: forBrowser(message.item) } : message);
 			},
 			deck.path,
 			() => this.save(),
@@ -529,26 +531,49 @@ export class DeckAgent {
 	}
 
 	/**
-	 * The conversation as a browser should open it: the window, and whether there is more.
+	 * The conversation as a browser should open it — the newest rows of the window, trimmed
+	 * for the wire (`wire.ts`) — and whether there is more before them. Sent when a browser
+	 * asks (`chat.open`) and after a rewind; it is no longer part of the greeting.
 	 *
 	 * `more` is asked of the store rather than remembered, because eviction and this
 	 * question have no reason to be in touch — the log either has something in it or it
 	 * does not, and that is a `statSync` rather than a piece of state to keep true.
 	 */
-	private historyMessage(): ServerMessage {
-		return { type: "chat.history", agentId: this.id, items: this.translator.history(), more: this.store.hasArchive(this.id) };
+	historyMessage(): ServerMessage {
+		const window = this.translator.history();
+		const shown = window.slice(-HISTORY_ITEMS);
+		return {
+			type: "chat.history",
+			agentId: this.id,
+			items: shown.map(forBrowser),
+			// More behind it when the window holds rows it did not send, or the archive has any.
+			more: window.length > shown.length || this.store.hasArchive(this.id),
+		};
 	}
 
 	/**
-	 * A page of conversation older than the row the browser holds (`agents/store.ts`).
+	 * A page of conversation older than the row the browser holds, in reading order.
 	 *
-	 * The window this session keeps in memory is *not* consulted: everything in it is
-	 * already in the browser, which is why the browser is asking. So this is only ever the
-	 * archive, and the answer for a chat that has never evicted anything is an empty page
-	 * with `more: false` — which is also what the browser was told when it opened.
+	 * The window first, then the archive. A history carries only the newest rows of the
+	 * window, so the rows just before what a browser holds are usually still here in memory.
+	 * The archive is only what is older than the window, and asked about a row it has never
+	 * seen it answers with its own last page — which, asked first, would skip every row between.
 	 */
 	earlier(before: string, limit: number): { items: ChatItem[]; more: boolean } {
-		return this.store.earlier(this.id, before, limit);
+		const window = this.translator.history();
+		const at = window.findIndex((item) => item.id === before);
+		if (at > 0) {
+			const start = Math.max(0, at - limit);
+			return { items: window.slice(start, at).map(forBrowser), more: start > 0 || this.store.hasArchive(this.id) };
+		}
+		const page = this.store.earlier(this.id, before, limit);
+		return { items: page.items.map(forBrowser), more: page.more };
+	}
+
+	/** A tool call's whole output, for a chip that was sent only a preview of it (`chat.tool`). */
+	toolResult(itemId: string): string | undefined {
+		const found = this.translator.history().find((item) => item.id === itemId) ?? this.store.findArchived(this.id, itemId);
+		return found?.kind === "tool" ? found.result : undefined;
 	}
 
 	/** Write the record now. */
@@ -1201,7 +1226,6 @@ export class DeckAgent {
 
 	greet(reply: (message: ServerMessage) => void): void {
 		reply({ type: "agent.identity", id: this.id, identity: this.identity });
-		reply(this.historyMessage());
 		reply({ type: "agent.state", id: this.id, state: this.state });
 		reply({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
 		if (this.backend) reply({ type: "agent.model", id: this.id, model: this.backend.model() });

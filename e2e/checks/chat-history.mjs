@@ -107,10 +107,9 @@ say("the archive is on disk where the server keeps it", existsSync(join(agentsDi
 // --- the server says there is more, and hands it back a page at a time ---------------
 
 /*
- * A reload, because `chat.history` is part of the *greeting* — the frame a fresh connection
- * gets — rather than something focusing re-sends. Which is the right design: it is the one
- * frame that has to be the whole truth, and this is the cheapest way to ask for it again
- * now that there is an archive to report.
+ * A reload, because a fresh page asks for the history of the chat it opens on (`chat.open`)
+ * — the focused one, which is this agent now — and that answer is the one frame that has to
+ * say whether there is more. It used to be part of the greeting, for every chat at once.
  */
 await send({ type: "agent.focus", id: agentId });
 await settle(page, 800);

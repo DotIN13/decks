@@ -30,7 +30,22 @@ export class Hub {
 		private readonly onConnect: (reply: (message: ServerMessage) => void) => void,
 	) {
 		void httpServer;
-		this.server = new WebSocketServer({ noServer: true });
+		this.server = new WebSocketServer({
+			noServer: true,
+			/*
+			 * Compressed, one message at a time. What goes down this socket is JSON —
+			 * transcripts, board lists — and it deflates about 3.7× (the live deck's greeting:
+			 * 8.2 MB as sent, 2.2 MB deflated frame by frame). Frames under a kilobyte are left
+			 * alone, because a token of a reply or a state change costs more to compress than it
+			 * saves; and nothing is carried between messages, so a socket holds no compression
+			 * window in memory for being compressed.
+			 */
+			perMessageDeflate: {
+				threshold: 1024,
+				serverNoContextTakeover: true,
+				clientNoContextTakeover: true,
+			},
+		});
 		this.server.on("connection", (socket) => this.accept(socket));
 	}
 

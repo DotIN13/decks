@@ -9,6 +9,7 @@ import type { StageService } from "../stage/service.ts";
 import { DeckAgent } from "./session.ts";
 import { SnapshotStore } from "./snapshot.ts";
 import { AgentStore } from "./store.ts";
+import { HISTORY_ITEMS, TOOL_PREVIEW } from "./wire.ts";
 
 /**
  * The two sets and the invariant between them (DESIGN §2).
@@ -603,4 +604,78 @@ test("switching moves the agent and points its link", () => {
 	assert.equal(agent.useAccount("nope"), false, "an account that is not on the list is refused");
 	assert.equal(agent.accountId(), "acct-two", "and refusing changes nothing");
 	cleanup();
+});
+
+/*
+ * Opening the page used to greet every chat with its whole window — 8.2 MB on the live deck,
+ * and the one on screen came last. Now a history is asked for, carries the newest rows only,
+ * and a tool call travels without its arguments and with a preview of a long output.
+ */
+function longChat(length: number): ChatItem[] {
+	return Array.from({ length }, (_, i): ChatItem =>
+		i % 3 === 0
+			? { kind: "tool", id: `t${i}`, name: "Bash", title: "ls", args: { command: "x".repeat(2000) }, result: "y".repeat(5000), state: "done" }
+			: { kind: "user", id: `u${i}`, text: `message ${i}`, at: i },
+	);
+}
+
+test("a greeting carries no history, and one asked for is the newest rows, trimmed", () => {
+	const items = longChat(150);
+	const { agent, cleanup } = agentOn([], { restored: { id: "R", items, context: [], inPlay: [], createdAt: 1 } });
+	try {
+		const greeted: ServerMessage[] = [];
+		agent.greet((message) => greeted.push(message));
+		assert.equal(
+			greeted.some((message) => message.type === "chat.history"),
+			false,
+			"a history is asked for when a chat is shown, not greeted",
+		);
+		const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+		assert.equal(history.items.length, HISTORY_ITEMS);
+		assert.equal(history.items[0]?.id, items[150 - HISTORY_ITEMS]?.id, "the newest rows, in reading order");
+		assert.equal(history.more, true, "the rows it did not send are still behind it");
+		const tool = history.items.find((item): item is Extract<ChatItem, { kind: "tool" }> => item.kind === "tool");
+		assert.ok(tool, "a tool call among them");
+		assert.equal("args" in tool, false);
+		assert.equal(tool.result?.length, TOOL_PREVIEW);
+		assert.equal(tool.full, 5000);
+	} finally {
+		cleanup();
+	}
+});
+
+test("scrolling back pages through the window before it reaches the archive", () => {
+	const items = longChat(150);
+	const { agent, cleanup } = agentOn([], { restored: { id: "R", items, context: [], inPlay: [], createdAt: 1 } });
+	try {
+		const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+		const oldest = history.items[0]?.id ?? "";
+		const page = agent.earlier(oldest, 30);
+		assert.deepEqual(
+			page.items.map((item) => item.id),
+			items.slice(150 - HISTORY_ITEMS - 30, 150 - HISTORY_ITEMS).map((item) => item.id),
+			"the thirty rows just before what the browser holds",
+		);
+		assert.equal(page.more, true);
+		const first = agent.earlier(items[20]?.id ?? "", 60);
+		assert.deepEqual(
+			first.items.map((item) => item.id),
+			items.slice(0, 20).map((item) => item.id),
+		);
+		assert.equal(first.more, false, "the start of a conversation with no archive");
+		assert.ok(page.items.every((item) => item.kind !== "tool" || !("args" in item)), "scrollback is trimmed too");
+	} finally {
+		cleanup();
+	}
+});
+
+test("a tool call's whole output is there to be asked for", () => {
+	const { agent, cleanup } = agentOn([], { restored: { id: "R", items: longChat(10), context: [], inPlay: [], createdAt: 1 } });
+	try {
+		assert.equal(agent.toolResult("t0"), "y".repeat(5000));
+		assert.equal(agent.toolResult("not-a-row"), undefined);
+		assert.equal(agent.toolResult("u1"), undefined, "a row that is not a tool call has no output");
+	} finally {
+		cleanup();
+	}
 });

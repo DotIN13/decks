@@ -3,6 +3,7 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { createSignal, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
+import { askFullResult, awaitingResult, fullResult } from "./tool-results.ts";
 
 /**
  * A tool call, as one line: what happened, what ran, what it ran on, and a way in.
@@ -32,7 +33,12 @@ import { Icon } from "../icons.tsx";
  */
 export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 	const [open, setOpen] = createSignal(false);
-	const result = () => props.item.result?.trimEnd() ?? "";
+	/*
+	 * The whole output once it has been fetched, else what came with the row — which for a long
+	 * output is a preview, with `full` saying how long the whole of it is (`agents/wire.ts`).
+	 */
+	const result = () => (fullResult(props.item.id) ?? props.item.result)?.trimEnd() ?? "";
+	const partial = () => props.item.full !== undefined && fullResult(props.item.id) === undefined;
 	/*
 	 * Nothing to open is not a disclosure. A running call has no output yet and some tools
 	 * never return text, so the chevron is absent and the button is `disabled` — which is
@@ -49,7 +55,13 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 				aria-expanded={openable() ? open() : undefined}
 				disabled={!openable()}
 				title={openable() ? (open() ? "Hide the output" : "Show the output") : undefined}
-				onClick={() => setOpen(!open())}
+				onClick={() => {
+					const opening = !open();
+					// The preview is there at once; the rest is asked for the first time it is wanted —
+					// before opening, so the line under it says it is on its way from the first frame.
+					if (opening && partial()) askFullResult(props.item.id);
+					setOpen(opening);
+				}}
 			>
 				{/*
 					A fixed cell whatever is in it, so the names line up down the column — a
@@ -73,6 +85,13 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 			</button>
 			<Show when={open() && result()}>
 				<pre>{result()}</pre>
+				<Show when={partial()}>
+					<p class="more">
+						{awaitingResult(props.item.id)
+							? "Loading the rest…"
+							: `The first ${result().length.toLocaleString()} of ${(props.item.full ?? 0).toLocaleString()} characters.`}
+					</p>
+				</Show>
 			</Show>
 		</div>
 	);

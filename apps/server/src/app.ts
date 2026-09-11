@@ -653,6 +653,24 @@ export class App {
 				return;
 			}
 
+			case "chat.open": {
+				/*
+				 * A history, for the conversation a browser is about to show. To the asker alone,
+				 * like scrollback: another tab showing another chat has no use for it. An agent that
+				 * is not here gets no answer rather than an empty one, which would wipe a transcript
+				 * the browser was given some other way.
+				 */
+				const asked = this.agents.get(message.agentId);
+				if (asked) reply(asked.historyMessage());
+				return;
+			}
+
+			case "chat.tool": {
+				const asked = this.agents.get(message.agentId);
+				reply({ type: "chat.tool", agentId: message.agentId, itemId: message.itemId, result: asked?.toolResult(message.itemId) ?? "" });
+				return;
+			}
+
 			case "chat.earlier": {
 				/*
 				 * Answered to the asker alone, not broadcast.
