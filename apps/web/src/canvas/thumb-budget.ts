@@ -42,8 +42,25 @@ interface Holder {
 const holders = new Map<symbol, Holder>();
 let clock = 0;
 
+/*
+ * And none start until the app has opened and the boards on the canvas have (`Stage` says so
+ * through `openThumbnails`). A thumbnail is a document on the app's own main thread just as a
+ * board is, and of everything on screen at the open it is the least urgent: a 20×14 picture in
+ * a panel, beside a chat and a canvas that are still arriving. Asked for before then, it waits
+ * its turn in the same queue.
+ */
+let open = false;
+
+/** The canvas has had its turn; thumbnails may start. Once, for the life of the page. */
+export function openThumbnails(): void {
+	if (open) return;
+	open = true;
+	settle();
+}
+
 /** Start whoever is next, if the queue has room. Cheap: bounded by how many are mounted. */
 function settle(): void {
+	if (!open) return;
 	const starting = [...holders.values()].filter((holder) => holder.live && !holder.loaded).length;
 	let budget = Math.max(0, LOADING - starting);
 	if (budget <= 0) return;

@@ -50,6 +50,13 @@ export function Stage(props: {
 	mode: "browse" | "edit";
 	/** How boards are drawn (`lib/renderer.ts`): documents, a canvas each, or one canvas. */
 	renderer: RendererChoice;
+	/**
+	 * Whether the app has opened — the deck and the chat you are looking at are drawn — so the
+	 * boards may start. Until it is true no board has a document (`admitted` below).
+	 */
+	boardsMayStart: boolean;
+	/** Every board on screen at the open has been let in, so less urgent documents may start. */
+	onBoardsStarted?: () => void;
 	boards: Board[];
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
@@ -829,6 +836,70 @@ export function Stage(props: {
 	};
 
 
+	/*
+	 * **Boards start after the app has opened, nearest first, one at a time.**
+	 *
+	 * A board is a same-origin document, so it runs on the app's own main thread: its
+	 * stylesheet, `board.js`, markdown, maths and diagrams are parsed and laid out between the
+	 * app's own frames. Opening onto six boards mounted all six in the same second the app was
+	 * drawing its chat, and the page did not answer for 846 ms of it — a keystroke typed then
+	 * would have waited that long.
+	 *
+	 * So until the app says it has opened (`boardsMayStart`) no board has a document: the canvas
+	 * shows each one's frame and title, which is where the eye goes first anyway. Then they are
+	 * let in one at a time, nearest the middle of the screen first, each after the browser has
+	 * had an idle moment since the last — that is, once the previous document has done its work.
+	 * When every board on screen is in, the gate is gone for the rest of the session and a board
+	 * mounts the moment it is visible, as it always did.
+	 */
+	const [admitted, setAdmitted] = createSignal<ReadonlySet<string>>(new Set());
+	const [admitting, setAdmitting] = createSignal(true);
+	let admitScheduled = false;
+	let stopped = false;
+	onCleanup(() => {
+		stopped = true;
+	});
+	const whenIdle = (fn: () => void) => {
+		const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+		if (idle) idle(fn, { timeout: 300 });
+		else window.setTimeout(fn, 60);
+	};
+	const admitNext = () => {
+		admitScheduled = false;
+		if (stopped || !admitting()) return;
+		const v = view();
+		// Not measured yet: nothing is on screen until it is, and "nothing to let in" is not "done".
+		if (v.width === 0) {
+			admitScheduled = true;
+			window.setTimeout(admitNext, 100);
+			return;
+		}
+		const waiting = props.boards.filter((board) => isVisible(board) && !admitted().has(board.path));
+		if (waiting.length === 0) {
+			setAdmitting(false);
+			props.onBoardsStarted?.();
+			return;
+		}
+		const middle = { x: v.width / 2, y: v.height / 2 };
+		const distance = (board: Board) => {
+			const at = toScreen(props.camera, v, { x: board.x + board.w / 2, y: board.y + board.h / 2 });
+			return Math.hypot(at.x - middle.x, at.y - middle.y);
+		};
+		const next = waiting.reduce((best, board) => (distance(board) < distance(best) ? board : best));
+		setAdmitted((was) => new Set(was).add(next.path));
+		// A frame for it to begin, then an idle moment for it to finish, then the next one.
+		admitScheduled = true;
+		requestAnimationFrame(() => whenIdle(admitNext));
+	};
+	createEffect(() => {
+		if (!props.boardsMayStart || !admitting() || admitScheduled) return;
+		admitScheduled = true;
+		whenIdle(admitNext);
+	});
+	/** Whether the open still holds this board back. */
+	const mayHaveDocument = (board: Board) => !admitting() || admitted().has(board.path);
+
+
 	// --- the canvas renderers ---------------------------------------------------------
 
 	/**
@@ -1104,7 +1175,7 @@ export function Stage(props: {
 							scaling={scaling()}
 							pictures={pictures}
 							camera={props.camera}
-							mounted={isMounted(board)}
+							mounted={mayHaveDocument(board) && isMounted(board)}
 							visible={isVisible(board)}
 							selected={props.selected === board.path}
 							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}

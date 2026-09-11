@@ -91,6 +91,12 @@ const SHEET = 1100;
 export function LeftPanel(props: {
 	/** Every board there is. The list is all of them, in three sections. */
 	boards: Board[];
+	/**
+	 * Whether the rest of the list may be drawn. The first screenful is drawn at once; the rows
+	 * below it wait for the app and its canvas to have opened (`App`), then arrive a chunk at a
+	 * time. Left out, the whole list is drawn.
+	 */
+	listMayGrow?: boolean;
 	/** The board the canvas is centred on. */
 	current?: string;
 	/** The focused agent's in-play set: what is actually on the canvas. */
@@ -223,6 +229,50 @@ export function LeftPanel(props: {
 		}),
 	);
 	const tally = createMemo(() => panelTally(sections()));
+
+	/*
+	 * How many board rows are drawn, across the sections in order.
+	 *
+	 * A row is about a millisecond — a title, a picture from the cache, an icon — and a deck has
+	 * hundreds of boards: drawing every row the moment the deck arrived was 425 ms of the app's
+	 * first second, all of it before the chat it opened on could be drawn. So the first screenful
+	 * is drawn at once and the rest waits for the app and its canvas to have opened
+	 * (`listMayGrow`), then comes in sixty rows per idle moment. The counts in the section headers
+	 * are the whole list's all along; only rows below the fold are late.
+	 */
+	const FIRST_ROWS = 40;
+	const MORE_ROWS = 60;
+	const [rowBudget, setRowBudget] = createSignal(FIRST_ROWS);
+	const totalRows = () => sections().reduce((sum, section) => sum + section.rows.length, 0);
+	let growing = false;
+	let stopped = false;
+	onCleanup(() => {
+		stopped = true;
+	});
+	const later = (fn: () => void) => {
+		const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+		if (idle) idle(fn, { timeout: 500 });
+		else window.setTimeout(fn, 50);
+	};
+	const grow = () => {
+		growing = false;
+		if (stopped || rowBudget() >= totalRows()) return;
+		setRowBudget((n) => n + MORE_ROWS);
+		growing = true;
+		later(grow);
+	};
+	createEffect(() => {
+		if (!(props.listMayGrow ?? true) || growing || rowBudget() >= totalRows()) return;
+		growing = true;
+		later(grow);
+	});
+	/** How many of the section at `index`'s rows fit in what the sections above it left. */
+	const allowance = (index: number) => {
+		const all = sections();
+		let before = 0;
+		for (let i = 0; i < index; i += 1) before += all[i]?.rows.length ?? 0;
+		return Math.max(0, rowBudget() - before);
+	};
 
 	/*
 	 * `⌘\`, and the one guard it needs.
@@ -478,7 +528,7 @@ export function LeftPanel(props: {
 
 					<Show when={tab() === "boards"}>
 					<For each={sections()}>
-							{(section) => (
+							{(section, index) => (
 								<div
 									class="panel-section"
 									/* So a stylesheet or a check can name *which* section without reading its
@@ -514,7 +564,7 @@ export function LeftPanel(props: {
 									<Show
 										when={density() === "grid"}
 										fallback={
-											<For each={section.rows}>
+											<For each={section.rows.slice(0, allowance(index()))}>
 												{(row) => (
 													<BoardRow
 														board={row.board}
@@ -528,7 +578,7 @@ export function LeftPanel(props: {
 											</For>
 										}
 									>
-										<For each={section.rows}>
+										<For each={section.rows.slice(0, allowance(index()))}>
 											{(row) => (
 												<BoardTile
 													board={row.board}

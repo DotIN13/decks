@@ -35,6 +35,7 @@ import type { CanvasMode } from "./canvas/Editor.ts";
 import type { Mark } from "./canvas/annotations.ts";
 import { Settings } from "./chat/Settings.tsx";
 import { forgetAskedResults, receiveToolResult, setToolResultSender } from "./chat/tool-results.ts";
+import { openThumbnails } from "./canvas/thumb-budget.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
@@ -409,6 +410,33 @@ export function App() {
 	const earlierWaiting = new Map<string, (added: number) => void>();
 
 	/*
+	 * Whether the app has opened, which is when the boards may start (`Stage`).
+	 *
+	 * Opened means the deck is laid out and the chat you are looking at has its history — the
+	 * two things on screen that are the app's own. A board is a document on the same main
+	 * thread, so boards that start while the chat is still arriving are a page that does not
+	 * answer; they wait for this, and it happens once. Two frames after the history lands so it
+	 * is painted first, or after a few seconds whatever happened, so a history that never comes
+	 * cannot keep the canvas empty.
+	 */
+	const [boardsMayStart, setBoardsMayStart] = createSignal(false);
+	/*
+	 * And after that, the boards on the canvas are in: the rest of the panel's list may be
+	 * drawn and the rail's thumbnails may start. Chat, then canvas, then the rest.
+	 */
+	const [boardsStarted, setBoardsStarted] = createSignal(false);
+	const canvasOpened = () => {
+		setBoardsStarted(true);
+		openThumbnails();
+	};
+	let opened = false;
+	const appOpened = () => {
+		if (opened) return;
+		opened = true;
+		requestAnimationFrame(() => requestAnimationFrame(() => setBoardsMayStart(true)));
+	};
+
+	/*
 	 * Which conversations this browser holds a history of, and which it has asked for.
 	 *
 	 * A history is asked for when a chat is shown — opened, or mirrored on a board — rather
@@ -638,6 +666,8 @@ export function App() {
 			}
 			setConnected(up);
 		});
+		// Whatever arrives or does not, the canvas is not held empty for longer than this.
+		setTimeout(appOpened, 2500);
 		// The chip knows the row; the conversation it is in is found here.
 		setToolResultSender((itemId) => {
 			const agentId = Object.keys(state.transcripts).find((id) => state.transcripts[id]?.some((item) => item.id === itemId));
@@ -753,6 +783,8 @@ export function App() {
 					}
 					setState({ chats: message.chats, focused, defaultKind: message.defaultKind });
 					ensureHistory(focused);
+					// No chat to wait for: the deck is all there is to open.
+					if (!focused) appOpened();
 					return;
 				}
 
@@ -840,6 +872,7 @@ export function App() {
 					setState("transcripts", message.agentId, message.items);
 					setState("moreHistory", message.agentId, message.more ?? false);
 					historyHeld.add(message.agentId);
+					if (message.agentId === state.focused) appOpened();
 					historyAsked.delete(message.agentId);
 					return;
 
@@ -1737,6 +1770,9 @@ export function App() {
 					{(current) => (
 					<Stage
 						renderer={current}
+						boardsMayStart={boardsMayStart()}
+						// The panel's list and the rail's thumbnails are less urgent: after the canvas.
+						onBoardsStarted={canvasOpened}
 						mode={mode()}
 						marks={marks()}
 						boards={stageBoards()}
@@ -1961,6 +1997,7 @@ export function App() {
 				*/}
 				<LeftPanel
 					boards={state.boards}
+					listMayGrow={boardsStarted()}
 					current={selected()}
 					inPlay={state.focused ? state.inPlay[state.focused] ?? [] : []}
 					holdings={state.contexts}
