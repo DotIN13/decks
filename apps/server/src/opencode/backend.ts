@@ -74,9 +74,9 @@ export const OPENCODE_COMMANDS: SlashCommand[] = [
  * offering it.
  */
 const PERMISSIONS: Record<string, Record<string, "ask" | "allow">> = {
-	manual: { edit: "ask", bash: "ask", webfetch: "ask" },
-	acceptEdits: { edit: "allow", bash: "ask", webfetch: "allow" },
-	auto: { edit: "allow", bash: "allow", webfetch: "allow" },
+	manual: { edit: "ask", bash: "ask", webfetch: "ask", external_directory: "ask" },
+	acceptEdits: { edit: "allow", bash: "ask", webfetch: "allow", external_directory: "allow" },
+	auto: { edit: "allow", bash: "allow", webfetch: "allow", external_directory: "allow" },
 };
 
 /**
@@ -181,6 +181,7 @@ export class OpencodeBackend implements AgentBackend {
 			},
 			usage: (usage) => (this.lastUsage = usage),
 			model: (provider, model) => (this.currentModel = { provider, model, thinking: this.currentThinking ?? DEFAULT_THINKING }),
+			permission: (id, asked, title) => void this.answerPermission(id, asked, title),
 		});
 		void this.pump();
 
@@ -255,6 +256,32 @@ export class OpencodeBackend implements AgentBackend {
 	}
 
 	// --- the conversation -------------------------------------------------------------
+
+	/**
+	 * Answer an opencode permission request with this agent's mode.
+	 *
+	 * opencode holds the tool call until somebody replies, so a request that is only
+	 * noticed is a request that hangs: an agent told to look at a screenshot it had written
+	 * to `/tmp` sat on `external_directory` until the request was answered by hand. There
+	 * is no dialog here, so the mode is the answer — what the mode allows is allowed once,
+	 * and what the mode leaves to the person is refused, and said out loud rather than left
+	 * as a silence that reads like a stall. (`external_directory` is a rule in `PERMISSIONS`
+	 * for the same reason: with no rule it falls through to opencode's `ask` in every mode,
+	 * which is exactly how that hang began.)
+	 */
+	private async answerPermission(id: string, asked: string, title: string | undefined): Promise<void> {
+		if (!this.sessionId) return;
+		const allowed = PERMISSIONS[this.currentMode]?.[asked] === "allow";
+		await this.client
+			.postSessionIdPermissionsPermissionId({
+				path: { id: this.sessionId, permissionID: id },
+				body: { response: allowed ? "once" : "reject" },
+			})
+			.catch(() => undefined);
+		if (!allowed) {
+			this.context.notice("info", `Refused to ${title ?? asked}: ${this.currentMode} mode asks first, and there is no one to ask.`);
+		}
+	}
 
 	get isStreaming(): boolean {
 		return this.streamingNow;

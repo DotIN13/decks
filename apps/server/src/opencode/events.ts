@@ -48,6 +48,12 @@ export class OpencodeStream {
 			usage(usage: AgentUsage): void;
 			/** Which model actually answered, which is not always the one that was asked for. */
 			model(provider: string, model: string): void;
+			/**
+			 * opencode is asking before acting, and will not act until it is answered. The
+			 * answer belongs to the backend because only it knows the agent's mode; this
+			 * stream only reports that a request arrived, and which one.
+			 */
+			permission(id: string, asked: string, title: string | undefined): void;
 		},
 	) {}
 
@@ -69,15 +75,31 @@ export class OpencodeStream {
 			case "session.error":
 				return this.error(properties.error);
 			case "permission.updated":
-				// opencode is asking. Decks answers with its own mode rather than a dialog
-				// for now, so this is a notice: the turn is not stuck, but the person should
-				// know something was refused if it was.
-				return this.t.notice("info", `opencode is asking before ${String(properties.title ?? "acting")}.`);
+				// opencode blocks the tool call until the request is answered, so this must
+				// reach the backend rather than end as a notice — a request that is only
+				// noticed is a request that hangs. The kind is `type` on this event, with
+				// `permission` read as a fallback for the shape the newer API speaks.
+				return this.asked(
+					properties.id as string | undefined,
+					(properties.type as string | undefined) ?? (properties.permission as string | undefined),
+					properties.title as string | undefined,
+				);
 			case "session.idle":
 				return this.finish();
 			default:
 				return;
 		}
+	}
+
+	/**
+	 * A permission request, handed on only when it names something to answer.
+	 *
+	 * A frame with no id cannot be replied to — opencode would be left waiting on a request
+	 * that names nothing — so it is dropped rather than passed on as an unanswerable ask.
+	 */
+	private asked(id: string | undefined, kind: string | undefined, title: string | undefined): void {
+		if (!id || !kind) return;
+		this.hooks.permission(id, kind, title);
 	}
 
 	private delta(properties: { partID?: string; field?: string; delta?: string; messageID?: string }): void {

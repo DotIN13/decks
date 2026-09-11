@@ -18,10 +18,12 @@ function transcript(sessionId = "ses_1") {
 	let idle = 0;
 	let usage: AgentUsage | undefined;
 	let model: string | undefined;
+	const asked: Array<{ id: string; kind: string; title: string | undefined }> = [];
 	const stream = new OpencodeStream(translator, sessionId, {
 		idle: () => (idle += 1),
 		usage: (reading) => (usage = reading),
 		model: (provider, name) => (model = `${provider}/${name}`),
+		permission: (id, kind, title) => asked.push({ id, kind, title }),
 	});
 	return {
 		stream,
@@ -31,6 +33,7 @@ function transcript(sessionId = "ses_1") {
 		idles: () => idle,
 		usage: () => usage,
 		model: () => model,
+		asked: () => asked,
 	};
 }
 
@@ -181,4 +184,20 @@ test("an error ends the reply and says so", () => {
 	const notices = t.translator.history().filter((item) => item.kind === "notice");
 	assert.equal(notices.length, 1);
 	assert.match((notices[0] as Extract<ChatItem, { kind: "notice" }>).text, /no key/);
+});
+
+test("a permission request is handed to the backend, not merely noticed", () => {
+	/*
+	 * A request opencode never gets an answer to holds the tool call forever, so the
+	 * stream must pass it on. `type` names the permission; a frame without one cannot be
+	 * answered and must not reach the backend pretending it can.
+	 */
+	const t = transcript();
+	t.feed({ type: "permission.updated", properties: { sessionID: "ses_1", id: "per_1", type: "external_directory", title: "Read /tmp/board.png" } });
+	t.feed({ type: "permission.updated", properties: { sessionID: "ses_1", id: "per_2", type: "bash", title: "Run a command" } });
+	t.feed({ type: "permission.updated", properties: { sessionID: "ses_1", title: "nameless" } });
+	assert.deepEqual(t.asked(), [
+		{ id: "per_1", kind: "external_directory", title: "Read /tmp/board.png" },
+		{ id: "per_2", kind: "bash", title: "Run a command" },
+	]);
 });
