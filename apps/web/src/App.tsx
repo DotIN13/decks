@@ -24,13 +24,12 @@ import Plus from "lucide-solid/icons/plus";
 import Sun from "lucide-solid/icons/sun";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import type { EditorHost, Tool } from "./canvas/Editor.ts";
+import type { EditorHost } from "./canvas/Editor.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
-import type { CanvasMode } from "./canvas/Editor.ts";
-import type { Mark } from "./canvas/annotations.ts";
 import { Settings } from "./chat/Settings.tsx";
 import { forgetAskedResults, receiveToolResult, setToolResultSender } from "./chat/tool-results.ts";
 import { type AgentRecord, createAgentScratch, emptyAgent } from "./state/agent.ts";
+import { clearMarks, component, marks, mode, selected, setComponent, setMarks, setMode, setSelected, setTool, tool } from "./state/selection.ts";
 import { openThumbnails } from "./canvas/thumb-budget.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
@@ -207,35 +206,6 @@ export function App() {
 	};
 	const zoomInteractive = createMemo(() => camera().zoom >= INTERACT_ZOOM);
 	const [connected, setConnected] = createSignal(false);
-	const [selected, setSelected] = createSignal<string | undefined>(undefined);
-	const [tool, setTool] = createSignal<Tool>("select");
-	/**
-	 * Browse or edit, and **browse is where every session starts**.
-	 *
-	 * A deck is read far more often than it is drawn, and the failure modes are not
-	 * symmetrical: browsing when you meant to edit costs one press, while editing when you
-	 * meant to browse means a component has moved and been written to disk before you noticed.
-	 *
-	 * Not persisted, deliberately. A mode that enables dragging and is remembered across a
-	 * reload is a mode you can be in without having chosen it this session — which is exactly
-	 * the state the default is protecting against. The cost is one press after a refresh.
-	 */
-	const [mode, setMode] = createSignal<CanvasMode>("browse");
-
-	/**
-	 * Agents pointing at components: bubbles with arrows, on the canvas.
-	 *
-	 * One flat list rather than a map, because the two things done with it are "draw the ones
-	 * on this board" and "clear the ones this agent put there", and both are a filter.
-	 *
-	 * Cleared when the agent it belongs to **starts a new turn** — that is the lifetime
-	 * `boards/方案①` asks for, read the useful way round: the marks survive the turn that made
-	 * them, so they are still there when the agent stops and you come to read them, and they
-	 * go when you say something next. Also cleared by the × on each bubble, and by the agent
-	 * calling `annotate(path, null)`.
-	 */
-	const [marks, setMarks] = createSignal<Mark[]>([]);
-	const [component, setComponent] = createSignal<{ path: string; id: string } | undefined>(undefined);
 	/**
 	 * The file picker's promise, and which board asked.
 	 *
@@ -1730,16 +1700,6 @@ export function App() {
 	 * together, which is the whole reason there is no separate "observe": following an
 	 * agent *is* switching to it.
 	 */
-	/**
-	 * Clear one agent's annotations, wherever they are.
-	 *
-	 * Called when that agent is prompted again: the marks survive the turn that made them —
-	 * so they are still there when the agent stops and you come to read them — and go when
-	 * you say something next. `boards/方案①` asks for "until the end of the next turn"; this is
-	 * that, read the way that is actually useful.
-	 */
-	const clearMarks = (agentId: string) => setMarks((was) => was.filter((mark) => mark.agentId !== agentId));
-
 	const focusAgent = (id: string) => {
 		const leaving = state.focused;
 		if (leaving === id) return;
