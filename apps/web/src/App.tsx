@@ -30,6 +30,7 @@ import { Settings } from "./chat/Settings.tsx";
 import { forgetAskedResults, receiveToolResult, setToolResultSender } from "./chat/tool-results.ts";
 import { type AgentRecord, createAgentScratch, emptyAgent } from "./state/agent.ts";
 import { clearMarks, component, marks, mode, selected, setComponent, setMarks, setMode, setSelected, setTool, tool } from "./state/selection.ts";
+import { on, send, start, started } from "./state/socket.ts";
 import { openThumbnails } from "./canvas/thumb-budget.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
@@ -53,7 +54,6 @@ import { boxOf, fitInto, INTERACT_ZOOM, keepVisible, toWorld } from "./camera/ca
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
 import { closeHistory, historyShown, openHistory, setInspectable, toggleHistory } from "./lib/edge.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
-import { connect, type Socket } from "./app/socket.ts";
 import { embedPath, uploadAsset } from "./app/upload.ts";
 import { canHover, NARROW } from "./lib/panels.ts";
 import { blockPageZoom, obscured, trackVisualViewport } from "./app/viewport.ts";
@@ -205,7 +205,6 @@ export function App() {
 			.catch(() => notice("error", `Could not read ${path} to edit it.`));
 	};
 	const zoomInteractive = createMemo(() => camera().zoom >= INTERACT_ZOOM);
-	const [connected, setConnected] = createSignal(false);
 	/**
 	 * The file picker's promise, and which board asked.
 	 *
@@ -285,13 +284,13 @@ export function App() {
 	const readUsage = (id: string | undefined) => {
 		if (!id) return;
 		setReport((was) => ({ ...was, loading: true }));
-		socket.send({ type: "agent.report", id });
+		send({ type: "agent.report", id });
 	};
 	const openUsage = (id: string | undefined) => {
 		if (!id) return;
 		setUsagePanel(id);
 		setReport({ loading: true });
-		socket.send({ type: "agent.report", id });
+		send({ type: "agent.report", id });
 	};
 	/**
 	 * Unread counts, kept here rather than on the server.
@@ -350,7 +349,6 @@ export function App() {
 	/** The focused agent's preview, if it is looking at its own past. */
 	const preview = () => (state.focused ? state.agents[state.focused]?.preview : undefined);
 
-	let socket: Socket;
 	let noticeId = 0;
 
 	/**
@@ -398,11 +396,11 @@ export function App() {
 	 * the old connection was asked is not coming.
 	 */
 	const ensureHistory = (agentId: string | undefined) => {
-		if (!agentId || !socket) return;
+		if (!agentId || !started()) return;
 		const held = scratch.of(agentId);
 		if (held.historyHeld || held.historyAsked) return;
 		held.historyAsked = true;
-		socket.send({ type: "chat.open", agentId });
+		send({ type: "chat.open", agentId });
 	};
 
 	/**
@@ -421,7 +419,7 @@ export function App() {
 		if (earlierWaiting.has(before)) return Promise.resolve(0);
 		return new Promise<number>((resolve) => {
 			earlierWaiting.set(before, resolve);
-			socket.send({ type: "chat.earlier", agentId, before, limit: PAGE });
+			send({ type: "chat.earlier", agentId, before, limit: PAGE });
 			/*
 			 * A dropped socket must not leave the column unable to ask again. Ten seconds is
 			 * far longer than a read of a log file and short enough that a reader who has
@@ -609,12 +607,10 @@ export function App() {
 	});
 
 	onMount(() => {
-		socket = connect((up) => {
-			if (up) {
-				scratch.forgetAsked();
-				forgetAskedResults();
-			}
-			setConnected(up);
+		start(() => {
+			/* A reconnect means whatever the old connection was asked is not coming. */
+			scratch.forgetAsked();
+			forgetAskedResults();
 		});
 		// Whatever arrives or does not, the canvas is not held empty for longer than this.
 		setTimeout(appOpened, 2500);
@@ -622,10 +618,10 @@ export function App() {
 		setToolResultSender((itemId) => {
 			const agentId = Object.keys(state.agents).find((id) => state.agents[id]?.transcript.some((item) => item.id === itemId));
 			if (!agentId) return false;
-			socket.send({ type: "chat.tool", agentId, itemId });
+			send({ type: "chat.tool", agentId, itemId });
 			return true;
 		});
-		const off = socket.on((message) => {
+		const off = on((message) => {
 			switch (message.type) {
 				case "deck.state":
 					setState("deck", message.deck);
@@ -941,7 +937,7 @@ export function App() {
 					} catch (error) {
 						value = { error: error instanceof Error ? error.message : String(error) };
 					}
-					socket.send({ type: "stage.result", result: { id: message.call.id, value } });
+					send({ type: "stage.result", result: { id: message.call.id, value } });
 					return;
 				}
 
@@ -1043,7 +1039,7 @@ export function App() {
 		// row and reload the document that is sitting in it.
 		const index = state.boards.findIndex((board) => board.path === path);
 		if (index >= 0) setState("boards", index, { x, y });
-		socket.send({ type: "board.move", path, x, y });
+		send({ type: "board.move", path, x, y });
 	};
 
 	const focusedChat = createMemo(() => state.chats.find((chat) => chat.id === state.focused));
@@ -1077,7 +1073,7 @@ export function App() {
 	const sendCamera = (camera: Camera, agentId?: string) => {
 		const box = canvasBox({ width: window.innerWidth, height: window.innerHeight });
 		const sized: Camera = { ...camera, width: Math.round(box.width), height: Math.round(box.height) };
-		socket.send({ type: "camera.set", camera: sized, ...(agentId ? { agentId } : {}) });
+		send({ type: "camera.set", camera: sized, ...(agentId ? { agentId } : {}) });
 	};
 
 	const setCameraAndReport = (camera: Camera) => {
@@ -1177,7 +1173,7 @@ export function App() {
 			const board = state.boards.find((candidate) => candidate.path === path);
 			if (board) setFrameRevs(path, board.rev);
 		}
-		socket.send({ type: "board.patch", path, rev, patches });
+		send({ type: "board.patch", path, rev, patches });
 	};
 
 	const editor: EditorHost = {
@@ -1204,7 +1200,7 @@ export function App() {
 			}
 			sendPatches(path, board.rev, patches);
 		},
-		undo: (path) => socket.send({ type: "board.undo", path }),
+		undo: (path) => send({ type: "board.undo", path }),
 		pickFile: (board) =>
 			new Promise<string | undefined>((resolve) => {
 				setPicking({
@@ -1447,7 +1443,7 @@ export function App() {
 		const request = `drop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 		const path = await new Promise<string | undefined>((resolve) => {
 			created.set(request, resolve);
-			socket.send({
+			send({
 				type: "board.create",
 				kind: "blank",
 				format: "component",
@@ -1738,7 +1734,7 @@ export function App() {
 
 		ensureHistory(id);
 		setDraft(undefined);
-		socket.send({ type: "agent.focus", id });
+		send({ type: "agent.focus", id });
 	};
 
 	/*
@@ -1752,7 +1748,7 @@ export function App() {
 	 * row's × is disabled to avoid: `closing()` in `agent-order.ts` draws it from the same
 	 * rule `Registry.remove` enforces.
 	 */
-	const closeAgent = (id: string) => socket.send({ type: "agent.remove", id });
+	const closeAgent = (id: string) => send({ type: "agent.remove", id });
 
 	const flyTo = (board: Board) => {
 		setSelected(board.path);
@@ -1824,7 +1820,7 @@ export function App() {
 												if (!open) return;
 												const board = state.boards.find((candidate) => candidate.path === open.path);
 												if (!board || text === open.source) return;
-												socket.send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
+												send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
 											},
 											onCancel: () => setEditingSource(undefined),
 										},
@@ -1848,11 +1844,11 @@ export function App() {
 							setComponent(undefined);
 						}}
 						onMove={move}
-						onHide={(path) => socket.send({ type: "board.hide", path })}
+						onHide={(path) => send({ type: "board.hide", path })}
 						nonces={state.nonces}
 						cursor={state.cursor}
 						onViewport={() => reportCamera(camera())}
-						onExtent={(path, extent) => socket.send({ type: "board.extent", path, ...extent })}
+						onExtent={(path, extent) => send({ type: "board.extent", path, ...extent })}
 						editor={editor}
 						onTool={setTool}
 						drops={drops}
@@ -1871,8 +1867,8 @@ export function App() {
 						}}
 						webStatus={() => state.web}
 						onWebReply={(reply) => {
-							if (reply.decks === "live.web.answer") socket.send({ type: "web.answer", id: reply.id, ok: reply.ok });
-							else socket.send({ type: "web.stop" });
+							if (reply.decks === "live.web.answer") send({ type: "web.answer", id: reply.id, ok: reply.ok });
+							else send({ type: "web.stop" });
 						}}
 						agentIdentity={(agentId) => {
 							const identity = state.identities[agentId];
@@ -1904,7 +1900,7 @@ export function App() {
 					focused={state.focused}
 					unread={unread}
 					onFocus={focusAgent}
-					onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					onClose={closeAgent}
 					defaultKind={state.defaultKind}
 					boardsOpen={boardsOpen()}
@@ -1917,7 +1913,7 @@ export function App() {
 							notice("info", "Pick the board to undo on first.");
 							return;
 						}
-						socket.send({ type: "board.undo", path });
+						send({ type: "board.undo", path });
 					}}
 				/>
 
@@ -1927,7 +1923,7 @@ export function App() {
 					focused={state.focused}
 					unread={unread}
 					onFocus={focusAgent}
-					onNew={(kind) => socket.send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					onClose={closeAgent}
 					defaultKind={state.defaultKind}
 					zoom={camera().zoom}
@@ -1942,14 +1938,14 @@ export function App() {
 					 * it is what "where am I" means.
 					 */
 					onFit={() => fitAll(stageBoards(), setCamera)}
-					onNewBoard={(format) => socket.send({ type: "board.create", ...(format && format !== "component" ? { format } : {}) })}
+					onNewBoard={(format) => send({ type: "board.create", ...(format && format !== "component" ? { format } : {}) })}
 					/*
 					 * Off the canvas, one message per board, and *not* out of the context.
 					 * `board.hide` has always drawn that line — the context is the agent's, and
 					 * tidying the view must not strip what it is working from.
 					 */
 					onClearStage={() => {
-						for (const board of stageBoards()) socket.send({ type: "board.hide", path: board.path });
+						for (const board of stageBoards()) send({ type: "board.hide", path: board.path });
 					}}
 					onCanvas={stageBoards().length}
 					/*
@@ -1967,7 +1963,7 @@ export function App() {
 								setSettings(true);
 								// Read on open rather than kept in step: every identity in the list comes
 								// from the CLI, and the CLI's own login can change without the deck hearing.
-								socket.send({ type: "claude.accounts" });
+								send({ type: "claude.accounts" });
 							},
 						},
 						{
@@ -2047,12 +2043,12 @@ export function App() {
 					unread={unread}
 					onFocusAgent={focusAgent}
 					onCloseAgent={closeAgent}
-					onMirrorAgent={(id) => socket.send({ type: "agent.mirror", agentId: id })}
+					onMirrorAgent={(id) => send({ type: "agent.mirror", agentId: id })}
 					/* Your tags, which the agent cannot see or overwrite — a separate field from
 					   `stage.me.setTags`, for the reason `protocol/Identity` gives. */
-					onAgentTags={(id, tags) => socket.send({ type: "agent.tags", id, tags })}
+					onAgentTags={(id, tags) => send({ type: "agent.tags", id, tags })}
 					onPick={(board) => {
-						socket.send({ type: "board.play", path: board.path });
+						send({ type: "board.play", path: board.path });
 						flyTo(board);
 					}}
 					/*
@@ -2064,7 +2060,7 @@ export function App() {
 					 * deck rather than an optimistic one beside it. The selection and the canvas
 					 * follow from that, where they already did.
 					 */
-					onDelete={(board) => socket.send({ type: "board.delete", path: board.path })}
+					onDelete={(board) => send({ type: "board.delete", path: board.path })}
 				/>
 
 
@@ -2096,13 +2092,13 @@ export function App() {
 						onPrefs={setPrefs}
 						accounts={state.accounts}
 						active={state.activeAccount}
-						onAdd={() => socket.send({ type: "claude.accounts.add" })}
-						onForget={(id) => socket.send({ type: "claude.accounts.forget", id })}
+						onAdd={() => send({ type: "claude.accounts.add" })}
+						onForget={(id) => send({ type: "claude.accounts.forget", id })}
 						web={state.web}
-						onWebRepair={() => socket.send({ type: "web.repair" })}
-						onWebStop={() => socket.send({ type: "web.stop" })}
+						onWebRepair={() => send({ type: "web.repair" })}
+						onWebStop={() => send({ type: "web.stop" })}
 						onWebBoard={() => {
-							socket.send({ type: "web.board" });
+							send({ type: "web.board" });
 							setSettings(false);
 						}}
 						renderer={rendererChoice()}
@@ -2152,22 +2148,22 @@ export function App() {
 							clearPreview();
 							return;
 						}
-						socket.send({ type: "rewind.preview", id: state.focused, entryId });
+						send({ type: "rewind.preview", id: state.focused, entryId });
 					}}
 					onRewind={(entryId) => {
 						if (!state.focused) return;
 						clearPreview();
-						socket.send({ type: "rewind.to", id: state.focused, entryId });
+						send({ type: "rewind.to", id: state.focused, entryId });
 					}}
 					onFork={(entryId) => {
 						if (!state.focused) return;
 						clearPreview();
-						socket.send({ type: "fork.from", id: state.focused, entryId });
+						send({ type: "fork.from", id: state.focused, entryId });
 					}}
 					onRestore={(entryId) => {
 						if (!state.focused) return;
 						clearPreview();
-						socket.send({ type: "boards.restore", id: state.focused, entryId });
+						send({ type: "boards.restore", id: state.focused, entryId });
 					}}
 				/>
 
@@ -2188,7 +2184,7 @@ export function App() {
 							<Dialog
 								prompt={prompt()}
 								onAnswer={(answer) => {
-									socket.send({
+									send({
 										type: "extension.ui.answer",
 										answer: { id: prompt().id, ...answer } as never,
 									});
@@ -2216,13 +2212,13 @@ export function App() {
 						runtime={focusedChat()?.kind}
 						modes={focusedChat()?.capabilities?.modes ?? []}
 						mode={focusedChat()?.mode}
-						onMode={(mode) => socket.send({ type: "agent.setMode", id: state.focused ?? "", mode })}
+						onMode={(mode) => send({ type: "agent.setMode", id: state.focused ?? "", mode })}
 						onSend={(text) => {
 							/* A new turn clears what the last one pointed at — see `clearMarks`. */
 							if (state.focused) clearMarks(state.focused);
-							socket.send({ type: "agent.prompt", id: state.focused ?? "", text });
+							send({ type: "agent.prompt", id: state.focused ?? "", text });
 						}}
-						onAbort={() => socket.send({ type: "agent.abort", id: state.focused ?? "" })}
+						onAbort={() => send({ type: "agent.abort", id: state.focused ?? "" })}
 						/*
 						 * `thinking` comes back with the model now. Switching to a model that does
 						 * not offer the level you were on keeps the nearest one it does, and that
@@ -2230,7 +2226,7 @@ export function App() {
 						 * the server would hear two messages and apply them in either order.
 						 */
 						onModel={(provider, model, thinking) =>
-							socket.send({
+							send({
 								type: "agent.setModel",
 								id: state.focused ?? "",
 								provider,
@@ -2239,7 +2235,7 @@ export function App() {
 							})
 						}
 						onThinking={(thinking: ThinkingLevel) =>
-							socket.send({ type: "agent.thinking", id: state.focused ?? "", thinking })
+							send({ type: "agent.thinking", id: state.focused ?? "", thinking })
 						}
 						/*
 						 * Which subscription this conversation spends.
@@ -2254,7 +2250,7 @@ export function App() {
 						   the mapping is actually on — and a picker showing nothing selected reads
 						   as "no subscription" rather than as "the list has not arrived". */
 						account={(state.focused ? state.agents[state.focused]?.spending : undefined) ?? state.activeAccount}
-						onAccount={(id: string) => socket.send({ type: "claude.accounts.use", id, agentId: state.focused ?? "" })}
+						onAccount={(id: string) => send({ type: "claude.accounts.use", id, agentId: state.focused ?? "" })}
 						/*
 						 * The paperclip opens the same picker the inspector's embed row does, and
 						 * what it hands back is a deck path — so what it inserts is an `@` mention
