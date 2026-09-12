@@ -1,18 +1,13 @@
 import type {
 	AgentKind,
 	AgentChat,
-	AgentModel,
 	AgentState,
-	AgentUsage,
 	Board,
 	BoardPatch,
 	Camera,
-	ChatItem,
 	ClaudeAccount,
 	DeckState,
-	ExtensionUiPrompt,
 	Identity,
-	ModelOption,
 	ThinkingLevel,
 	UsageReport,
 	WebStatus,
@@ -35,6 +30,7 @@ import type { CanvasMode } from "./canvas/Editor.ts";
 import type { Mark } from "./canvas/annotations.ts";
 import { Settings } from "./chat/Settings.tsx";
 import { forgetAskedResults, receiveToolResult, setToolResultSender } from "./chat/tool-results.ts";
+import { type AgentRecord, createAgentScratch, emptyAgent } from "./state/agent.ts";
 import { openThumbnails } from "./canvas/thumb-budget.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
@@ -55,7 +51,7 @@ import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
 import { boxOf, fitInto, INTERACT_ZOOM, keepVisible, toWorld } from "./camera/camera.ts";
-import { selectionOnSwitch, viewOnSwitch, viewToPark, type AgentView } from "./camera/agent-view.ts";
+import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
 import { closeHistory, historyShown, openHistory, setInspectable, toggleHistory } from "./lib/edge.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { connect, type Socket } from "./app/socket.ts";
@@ -103,87 +99,85 @@ export function App() {
 		chats: AgentChat[];
 		focused?: string;
 		identities: Record<string, Identity>;
-		transcripts: Record<string, ChatItem[]>;
+		/**
+		 * Everything else the browser keeps per agent, one record each (`state/agent.ts`).
+		 *
+		 * Nine fields used to sit here as nine parallel `Record<string, …>` maps, and every
+		 * one of them was added the same way — something leaked between conversations, and
+		 * the fix was to key one more thing. Two of those are worth keeping in writing.
+		 *
+		 * There was one `dialog`, so a background agent's question was drawn over whichever
+		 * conversation you happened to be in, and the card could not say whose it was. And
+		 * `timeline.preview` always carried an `agentId` that the browser threw away, so
+		 * previewing Ada's history and switching left her past revisions rendered into Bo's
+		 * canvas, read-only, with nothing saying whose they were.
+		 *
+		 * A record is created before it is written and dropped whole when the agent goes —
+		 * which is also how four fields stopped leaking on removal, since the old teardown
+		 * cleared seven of the eleven maps by hand and missed the rest.
+		 */
+		agents: Record<string, AgentRecord | undefined>;
 		/** The user's shared Chrome, from `web.status`; the status board draws it (`live-web.js`). */
 		web?: { status: WebStatus; code?: string };
 		/**
-		 * Whether the server holds conversation older than the rows we have, by agent id.
+		 * Boards each agent is holding, from `context.changed`.
 		 *
-		 * The server answers this once, when it sends the history, and again with every page
-		 * (`chat.earlier`). Kept rather than inferred because there is nothing in the browser
-		 * to infer it from: a window of sixty rows looks the same whether it is the whole
-		 * conversation or the end of a very long one.
+		 * Still a map, unlike the nine that moved: this one is handed *whole* to
+		 * `panelSections`, which indexes it itself. Moving it means changing that signature.
 		 */
-		moreHistory: Record<string, boolean>;
-		modelsByAgent: Record<string, ModelOption[]>;
-		/** The model (and its thinking level) each agent is on, by agent id. */
-		agentModel: Record<string, AgentModel | undefined>;
-		/** The context/cost meter for each agent, by id. */
-		agentUsage: Record<string, AgentUsage | undefined>;
-		/**
-		 * The question each agent is waiting on, keyed by whose it is.
-		 *
-		 * One `dialog` before, so a background agent's question was drawn over whichever
-		 * conversation you happened to be in — and the card could not say whose it was,
-		 * because the frame did not carry an id. It does now (`extension.ui.prompt`), so a
-		 * question belongs to a conversation: drawn when you are in it, and reported by the
-		 * agent list's "Wants you" when you are not.
-		 */
-		dialogs: Record<string, ExtensionUiPrompt>;
-		/** Boards each agent is holding, from `context.changed`. */
 		contexts: Record<string, string[]>;
-		/** The subset each agent has put on the canvas. */
-		inPlay: Record<string, string[]>;
 		/** Reload counters from `stage.reload`, per board. */
 		nonces: Record<string, number>;
 		defaultKind: AgentKind;
 		cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
-		/**
-		 * A point being previewed, and the revisions to render while it is.
-		 *
-		 * Preview is a *look*: the frames load revisions out of the store instead of
-		 * the file, the stage refuses pointer events, and nothing is written until the
-		 * user actually clicks the notch.
-		 */
-		/**
-		 * A point being previewed, per agent, and the revisions to render while it is.
-		 *
-		 * Keyed because `timeline.preview` always carried an `agentId` and the browser was
-		 * throwing it away: previewing Ada's history and switching left her past revisions
-		 * rendered into Bo's canvas, read-only, with nothing saying whose they were.
-		 */
-		previews: Record<string, { entryId: string; boards: Record<string, string> }>;
 		/** The Claude subscriptions this install can use (`chat/Settings.tsx`). */
 		accounts: ClaudeAccount[];
 		/**
 		 * Which of them a **new** agent starts on. `default` is the CLI's own login.
 		 *
-		 * Not "which one is spending": each agent records its own, and `spendingByAgent` is
-		 * that mapping. With three agents on three subscriptions one row cannot answer it.
+		 * Not "which one is spending": each agent records its own, on its own record
+		 * (`state/agent.ts`, `spending`). With three agents on three subscriptions one row
+		 * cannot answer it.
 		 */
 		activeAccount: string;
-		/** Agent id → the account it spends, from the server's own records. */
-		spendingByAgent: Record<string, string>;
 	}>({
 		boards: [],
 		notices: [],
 		chats: [],
-		dialogs: {} as Record<string, ExtensionUiPrompt>,
-		previews: {} as Record<string, { entryId: string; boards: Record<string, string> }>,
 		identities: {},
-		transcripts: {} as Record<string, ChatItem[]>,
-		moreHistory: {} as Record<string, boolean>,
-		modelsByAgent: {} as Record<string, ModelOption[]>,
-		agentModel: {} as Record<string, AgentModel | undefined>,
-		agentUsage: {} as Record<string, AgentUsage | undefined>,
+		agents: {} as Record<string, AgentRecord | undefined>,
 		contexts: {} as Record<string, string[]>,
-		inPlay: {} as Record<string, string[]>,
 		nonces: {} as Record<string, number>,
 		defaultKind: "pi" as AgentKind,
 		accounts: [] as ClaudeAccount[],
 		activeAccount: "default",
-		spendingByAgent: {} as Record<string, string>,
 	});
+
+	/**
+	 * The scratch half of an agent's state: real, and deliberately not drawn (`state/agent.ts`).
+	 *
+	 * Where it was carried before: `views` parked a camera, `historyHeld` and `historyAsked`
+	 * guarded a request, `lastState` told a transition from a restatement. Each was a plain
+	 * `Map` or `Set` rather than store state, for one reason each file spelled out — nothing
+	 * renders from them, and a signal would re-run every reader on every change. That is still
+	 * true, so they are still not reactive; they are merely in one place now.
+	 */
+	const scratch = createAgentScratch();
+
+	/**
+	 * The record for an agent, created if this is the first thing said about it.
+	 *
+	 * Every write below goes through here first, and it is not a nicety: Solid's store
+	 * **throws** on a nested write whose parent is missing — `setState("agents", id, "model", …)`
+	 * with no `agents[id]` raises `Cannot read properties of undefined`, for plain values and
+	 * function updaters alike (measured). There is no single moment an agent first appears —
+	 * `agent.identity`, `models`, `chat.history`, `context.changed` and four others all write
+	 * into whichever field arrives first — so the alternative is remembering, twenty-two times,
+	 * something the compiler cannot check.
+	 */
+	const ensureAgent = (id: string) => {
+		if (!state.agents[id]) setState("agents", id, emptyAgent());
+	};
 
 	const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
 	/**
@@ -354,16 +348,6 @@ export function App() {
 	 * component drag. A rev is a content hash, so matching on it absorbs however many
 	 * echoes arrive and still reloads for a rev we did not produce.
 	 */
-	/**
-	 * What each conversation was looking at, by agent id.
-	 *
-	 * A `Map` rather than store state because nothing renders from it: it is read once, at the
-	 * moment of switching, and a signal would make every pan re-run whatever read it. Not
-	 * persisted either — a reload starts over, which is a deliberate limit and the one thing
-	 * `agent-view.ts` says it does not do.
-	 */
-	const views = new Map<string, AgentView>();
-
 	const selfRevs = new Map<string, number>();
 	/** Paths with a patch in flight, before the accepted rev is known. */
 	const patching = new Set<string>();
@@ -388,13 +372,13 @@ export function App() {
 	const [frameRevs, setFrameRevs] = createStore<Record<string, number>>({});
 
 	/** The focused agent's question, if it has one. */
-	const dialog = () => (state.focused ? state.dialogs[state.focused] : undefined);
+	const dialog = () => (state.focused ? state.agents[state.focused]?.dialog : undefined);
 	/* Clearing is always the focused agent's: it is the only one drawn, so it is the only
 	   one there is anything to dismiss. */
-	const clearDialog = () => state.focused && setState("dialogs", state.focused, undefined as never);
-	const clearPreview = () => state.focused && setState("previews", state.focused, undefined as never);
+	const clearDialog = () => state.focused && state.agents[state.focused] && setState("agents", state.focused, "dialog", undefined);
+	const clearPreview = () => state.focused && state.agents[state.focused] && setState("agents", state.focused, "preview", undefined);
 	/** The focused agent's preview, if it is looking at its own past. */
-	const preview = () => (state.focused ? state.previews[state.focused] : undefined);
+	const preview = () => (state.focused ? state.agents[state.focused]?.preview : undefined);
 
 	let socket: Socket;
 	let noticeId = 0;
@@ -437,18 +421,17 @@ export function App() {
 	};
 
 	/*
-	 * Which conversations this browser holds a history of, and which it has asked for.
-	 *
 	 * A history is asked for when a chat is shown — opened, or mirrored on a board — rather
 	 * than greeted: the greeting used to carry every chat's, 8.2 MB on the live deck, with the
-	 * one on screen arriving last. Plain sets, not state, because nothing is drawn from them;
-	 * a reconnect empties both, since whatever the old connection was asked is not coming.
+	 * one on screen arriving last. The two flags live on the agent's scratch record, which is
+	 * not reactive, because nothing is drawn from them; a reconnect clears both, since whatever
+	 * the old connection was asked is not coming.
 	 */
-	const historyHeld = new Set<string>();
-	const historyAsked = new Set<string>();
 	const ensureHistory = (agentId: string | undefined) => {
-		if (!agentId || !socket || historyHeld.has(agentId) || historyAsked.has(agentId)) return;
-		historyAsked.add(agentId);
+		if (!agentId || !socket) return;
+		const held = scratch.of(agentId);
+		if (held.historyHeld || held.historyAsked) return;
+		held.historyAsked = true;
 		socket.send({ type: "chat.open", agentId });
 	};
 
@@ -462,9 +445,9 @@ export function App() {
 	 * has reached the beginning.
 	 */
 	const loadEarlier = (agentId: string): Promise<number> => {
-		const held = state.transcripts[agentId] ?? [];
+		const held = state.agents[agentId]?.transcript ?? [];
 		const before = held[0]?.id;
-		if (!before || state.moreHistory[agentId] === false) return Promise.resolve(0);
+		if (!before || state.agents[agentId]?.moreHistory === false) return Promise.resolve(0);
 		if (earlierWaiting.has(before)) return Promise.resolve(0);
 		return new Promise<number>((resolve) => {
 			earlierWaiting.set(before, resolve);
@@ -624,15 +607,13 @@ export function App() {
 		});
 	};
 
-	/**
-	 * The state each agent was last in, so a change can be told from a restatement.
-	 *
-	 * A plain `Map` rather than store state: nothing renders from it, and it must be read and
-	 * written in the same tick the message arrives — a signal read here would see whatever
-	 * the last flush left. Reconnection replays every agent's state, which is exactly the
-	 * case `finished()` refuses on the grounds that the previous value is unknown.
+	/*
+	 * The state each agent was last in lives on its scratch record, so a change can be told
+	 * from a restatement. Not reactive, and it must be read and written in the same tick the
+	 * message arrives — a signal read here would see whatever the last flush left.
+	 * Reconnection replays every agent's state, which is exactly the case `finished()` refuses
+	 * on the grounds that the previous value is unknown.
 	 */
-	const lastState = new Map<string, AgentState>();
 
 	/*
 	 * Start measuring the chrome.
@@ -660,8 +641,7 @@ export function App() {
 	onMount(() => {
 		socket = connect((up) => {
 			if (up) {
-				historyHeld.clear();
-				historyAsked.clear();
+				scratch.forgetAsked();
 				forgetAskedResults();
 			}
 			setConnected(up);
@@ -670,7 +650,7 @@ export function App() {
 		setTimeout(appOpened, 2500);
 		// The chip knows the row; the conversation it is in is found here.
 		setToolResultSender((itemId) => {
-			const agentId = Object.keys(state.transcripts).find((id) => state.transcripts[id]?.some((item) => item.id === itemId));
+			const agentId = Object.keys(state.agents).find((id) => state.agents[id]?.transcript.some((item) => item.id === itemId));
 			if (!agentId) return false;
 			socket.send({ type: "chat.tool", agentId, itemId });
 			return true;
@@ -789,25 +769,26 @@ export function App() {
 				}
 
 				case "agent.removed": {
-					historyHeld.delete(message.id);
-					historyAsked.delete(message.id);
 					/*
-					 * Drop what was being kept for it. The `agents` frame that follows sets
-					 * the list and the focus, so this is only about not holding a transcript
-					 * for a chat that is gone — and about not showing its unread count on
-					 * whatever row happens to take its place.
+					 * Drop what was being kept for it. The `agents` frame that follows sets the
+					 * list and the focus, so this is only about not holding a transcript for a
+					 * chat that is gone — and about not showing its unread count on whatever row
+					 * happens to take its place.
+					 *
+					 * One record and one scratch, each dropped whole. The teardown this replaces
+					 * cleared seven maps by hand and missed four: `moreHistory`, `dialogs`,
+					 * `previews` and `spendingByAgent` all outlived the agent. Dropping a record
+					 * cannot miss a field, which is the point of there being one.
+					 *
+					 * `scratch.forget` carries the part that was never drawn — including the last
+					 * state, so a new agent cannot inherit a dead one's and be reported as having
+					 * just finished. Ids are unique, but the map would otherwise grow all session.
 					 */
-					setState("transcripts", message.id, undefined as never);
+					scratch.forget(message.id);
+					setState("agents", message.id, undefined);
 					setState("identities", message.id, undefined as never);
 					setState("contexts", message.id, undefined as never);
-					setState("inPlay", message.id, undefined as never);
-					setState("agentModel", message.id, undefined as never);
-					setState("agentUsage", message.id, undefined as never);
-					setState("modelsByAgent", message.id, undefined as never);
 					setUnread(message.id, 0);
-					// A new agent must not inherit a dead one's last state and be told it just
-					// finished; ids are unique, but the map would otherwise grow for the session.
-					lastState.delete(message.id);
 					return;
 				}
 
@@ -816,8 +797,9 @@ export function App() {
 					return;
 
 				case "agent.state": {
-					const was = lastState.get(message.id);
-					lastState.set(message.id, message.state);
+					const mine = scratch.of(message.id);
+					const was = mine.lastState;
+					mine.lastState = message.state;
 					setState("chats", (chats) => chats.map((chat) => (chat.id === message.id ? { ...chat, state: message.state } : chat)));
 					/*
 					 * The moment a face turns green (`chrome/agent-order.ts`), said out loud.
@@ -840,11 +822,13 @@ export function App() {
 				}
 
 				case "agent.model":
-					setState("agentModel", message.id, message.model);
+					ensureAgent(message.id);
+					setState("agents", message.id, "model", message.model);
 					return;
 
 				case "agent.usage":
-					setState("agentUsage", message.id, message.usage);
+					ensureAgent(message.id);
+					setState("agents", message.id, "usage", message.usage);
 					return;
 
 				/*
@@ -865,15 +849,17 @@ export function App() {
 					// One list per agent: the runtime each agent runs on answers its own, and
 					// a global list would show the last agent to start on everyone — a row
 					// for Claude listing the models of a pi agent that started after it.
-					setState("modelsByAgent", message.agentId, message.models);
+					ensureAgent(message.agentId);
+					setState("agents", message.agentId, "models", message.models);
 					return;
 
 				case "chat.history":
-					setState("transcripts", message.agentId, message.items);
-					setState("moreHistory", message.agentId, message.more ?? false);
-					historyHeld.add(message.agentId);
+					ensureAgent(message.agentId);
+					setState("agents", message.agentId, "transcript", message.items);
+					setState("agents", message.agentId, "moreHistory", message.more ?? false);
+					scratch.of(message.agentId).historyHeld = true;
 					if (message.agentId === state.focused) appOpened();
-					historyAsked.delete(message.agentId);
+					scratch.of(message.agentId).historyAsked = false;
 					return;
 
 				case "chat.tool":
@@ -889,8 +875,9 @@ export function App() {
 					 * landed, and a rewind re-sends a window that can overlap a page already
 					 * fetched. The held copy wins — it is the one a delta may be arriving into.
 					 */
-					setState("transcripts", message.agentId, (held = []) => prepend(message.items, held));
-					setState("moreHistory", message.agentId, message.more);
+					ensureAgent(message.agentId);
+					setState("agents", message.agentId, "transcript", (held) => prepend(message.items, held));
+					setState("agents", message.agentId, "moreHistory", message.more);
 					// Whoever asked is waiting on the count, so it can hold the reader's place.
 					const waiting = earlierWaiting.get(message.before);
 					if (waiting) {
@@ -909,7 +896,8 @@ export function App() {
 					 */
 					const unseen = message.agentId !== state.focused || !historyShown();
 					if (unseen && item.kind === "assistant") setUnread(message.agentId, (count = 0) => count + 1);
-					setState("transcripts", message.agentId, (items = []) => {
+					ensureAgent(message.agentId);
+					setState("agents", message.agentId, "transcript", (items) => {
 						const index = items.findIndex((existing) => existing.id === item.id);
 						if (index === -1) return [...items, item];
 						const next = [...items];
@@ -922,7 +910,8 @@ export function App() {
 				case "chat.delta": {
 					// Deltas are applied to the item in place: the server sends the whole
 					// item at the start and the end, and the increments in between.
-					setState("transcripts", message.agentId, (items = []) =>
+					ensureAgent(message.agentId);
+					setState("agents", message.agentId, "transcript", (items) =>
 						items.map((item) => {
 							if (item.id !== message.itemId || item.kind !== "assistant") return item;
 							return message.field === "thinking"
@@ -934,12 +923,14 @@ export function App() {
 				}
 
 				case "timeline.preview":
-					setState("previews", message.agentId, message.entryId ? { entryId: message.entryId, boards: message.boards } : (undefined as never));
+					ensureAgent(message.agentId);
+					setState("agents", message.agentId, "preview", message.entryId ? { entryId: message.entryId, boards: message.boards } : undefined);
 					return;
 
 				case "context.changed":
 					setState("contexts", message.agentId, message.boards);
-					setState("inPlay", message.agentId, message.inPlay);
+					ensureAgent(message.agentId);
+					setState("agents", message.agentId, "inPlay", message.inPlay);
 					return;
 
 				case "stage.call": {
@@ -964,7 +955,7 @@ export function App() {
 							focused: () => state.focused,
 							setCamera: (camera) => setCamera(camera),
 							rememberView: (agentId, camera, selected) => {
-								views.set(agentId, viewToPark(camera, selected));
+								scratch.of(agentId).view = viewToPark(camera, selected);
 								// So `stage.camera()` answers for that agent's canvas rather than falling
 								// back to wherever the last person to look at anything was.
 								sendCamera(camera, agentId);
@@ -985,7 +976,8 @@ export function App() {
 				}
 
 				case "extension.ui.prompt":
-					setState("dialogs", message.agentId, message.prompt);
+					ensureAgent(message.agentId);
+					setState("agents", message.agentId, "dialog", message.prompt);
 					// Drawn in the dock, above the input bar, so it needs nothing dragged
 					// open to be seen.
 					/*
@@ -1008,7 +1000,7 @@ export function App() {
 					return;
 
 				case "extension.ui.prompt.closed":
-					setState("dialogs", message.agentId, (current) => (current?.id === message.id ? (undefined as never) : current));
+					if (state.agents[message.agentId]) setState("agents", message.agentId, "dialog", (current) => (current?.id === message.id ? undefined : current));
 					return;
 
 				case "notice":
@@ -1032,9 +1024,18 @@ export function App() {
 					return;
 				}
 
-				case "claude.accounts":
-					setState({ accounts: message.accounts, activeAccount: message.active, spendingByAgent: message.spending ?? {} });
+				case "claude.accounts": {
+					setState({ accounts: message.accounts, activeAccount: message.active });
+					/*
+					 * Which subscription each agent spends arrives as one map and is scattered onto
+					 * the agents' own records, where the rest of what is known about them lives.
+					 */
+					for (const [id, account] of Object.entries(message.spending ?? {})) {
+						ensureAgent(id);
+						setState("agents", id, "spending", account);
+					}
 					return;
+				}
 
 				/*
 				 * The shared Chrome. The code rides only on the greeting's copy, so a later
@@ -1052,7 +1053,8 @@ export function App() {
 				 * change with the turn rather than on the next poll.
 				 */
 				case "agent.account":
-					setState("spendingByAgent", message.id, message.account);
+					ensureAgent(message.id);
+					setState("agents", message.id, "spending", message.account);
 					return;
 				case "error":
 					notice("error", message.text);
@@ -1075,7 +1077,7 @@ export function App() {
 	};
 
 	const focusedChat = createMemo(() => state.chats.find((chat) => chat.id === state.focused));
-	const transcript = createMemo(() => (state.focused ? state.transcripts[state.focused] ?? [] : []));
+	const transcript = createMemo(() => (state.focused ? state.agents[state.focused]?.transcript ?? [] : []));
 	const busy = createMemo(() => {
 		const chat = focusedChat();
 		return chat ? chat.state !== "idle" : false;
@@ -1162,7 +1164,7 @@ export function App() {
 	 * says it before anything has happened rather than after.
 	 */
 	const stageBoards = createMemo(() => {
-		const playing = new Set(state.focused ? state.inPlay[state.focused] ?? [] : []);
+		const playing = new Set(state.focused ? state.agents[state.focused]?.inPlay ?? [] : []);
 		return state.boards.filter((board) => playing.has(board.path));
 	});
 
@@ -1756,7 +1758,7 @@ export function App() {
 		 * canvas leaves the camera alone, a remembered view comes back *exactly*, and an agent
 		 * with no memory gets a fit of what it holds.
 		 */
-		if (leaving) views.set(leaving, viewToPark(camera(), selected()));
+		if (leaving) scratch.of(leaving).view = viewToPark(camera(), selected());
 
 		setState("focused", id);
 		setUnread(id, 0);
@@ -1765,8 +1767,8 @@ export function App() {
 		// A component selected in a board another agent was holding is not your selection.
 		setComponent(undefined);
 
-		const playing = state.inPlay[id] ?? [];
-		const view = views.get(id);
+		const playing = state.agents[id]?.inPlay ?? [];
+		const view = scratch.peek(id)?.view;
 		const size = { width: window.innerWidth, height: window.innerHeight };
 		const next = viewOnSwitch({ view, playing, boards: state.boards, viewport: size, region: canvasBox(size) });
 		if (next) setCamera(next);
@@ -1905,7 +1907,7 @@ export function App() {
 						transcript={(agentId) => {
 							// A mirror of a chat nobody has opened here asks for it, like opening it would.
 							ensureHistory(agentId);
-							return state.transcripts[agentId];
+							return state.agents[agentId]?.transcript;
 						}}
 						webStatus={() => state.web}
 						onWebReply={(reply) => {
@@ -1994,7 +1996,7 @@ export function App() {
 					 * The context reading, which used to be a dial under the input bar. It is a
 					 * row of numbers in `⋯` now, and the corner's own button wears the warning.
 					 */
-					usage={state.focused ? state.agentUsage[state.focused] : undefined}
+					usage={state.focused ? state.agents[state.focused]?.usage : undefined}
 					onContext={() => openUsage(state.focused)}
 					overflow={[
 						{ label: "Shortcuts", icon: Info, onPick: () => setOps(true) },
@@ -2068,7 +2070,7 @@ export function App() {
 					boards={state.boards}
 					listMayGrow={boardsStarted()}
 					current={selected()}
-					inPlay={state.focused ? state.inPlay[state.focused] ?? [] : []}
+					inPlay={state.focused ? state.agents[state.focused]?.inPlay ?? [] : []}
 					holdings={state.contexts}
 					focused={state.focused}
 					open={boardsOpen()}
@@ -2119,7 +2121,7 @@ export function App() {
 				*/}
 				<Show when={usagePanel() && usagePanel() === state.focused}>
 					<UsageModal
-						usage={state.focused ? state.agentUsage[state.focused] : undefined}
+						usage={state.focused ? state.agents[state.focused]?.usage : undefined}
 						report={report().report}
 						error={report().error}
 						loading={report().loading}
@@ -2176,7 +2178,7 @@ export function App() {
 					 * ask for it. The column owns the window over what is held; the server owns
 					 * everything older (`agents/store.ts`), and this is the seam between them.
 					 */
-					more={state.focused ? state.moreHistory[state.focused] === true : false}
+					more={state.focused ? state.agents[state.focused]?.moreHistory === true : false}
 					onEarlier={() => (state.focused ? loadEarlier(state.focused) : Promise.resolve(0))}
 					agentId={state.focused ?? ""}
 					state={focusedChat()?.state ?? "idle"}
@@ -2245,11 +2247,11 @@ export function App() {
 					<Composer
 						draft={draft()}
 						agentId={state.focused}
-						usage={state.focused ? state.agentUsage[state.focused] : undefined}
+						usage={state.focused ? state.agents[state.focused]?.usage : undefined}
 						onUsage={() => openUsage(state.focused)}
 						busy={busy()}
-						model={state.focused ? state.agentModel[state.focused] : undefined}
-						models={state.focused ? state.modelsByAgent[state.focused] ?? [] : []}
+						model={state.focused ? state.agents[state.focused]?.model : undefined}
+						models={state.focused ? state.agents[state.focused]?.models ?? [] : []}
 						commands={focusedChat()?.commands ?? []}
 						runtime={focusedChat()?.kind}
 						modes={focusedChat()?.capabilities?.modes ?? []}
@@ -2291,7 +2293,7 @@ export function App() {
 						/* Falling back to the default, because that is what an agent with no entry in
 						   the mapping is actually on — and a picker showing nothing selected reads
 						   as "no subscription" rather than as "the list has not arrived". */
-						account={(state.focused ? state.spendingByAgent[state.focused] : undefined) ?? state.activeAccount}
+						account={(state.focused ? state.agents[state.focused]?.spending : undefined) ?? state.activeAccount}
 						onAccount={(id: string) => socket.send({ type: "claude.accounts.use", id, agentId: state.focused ?? "" })}
 						/*
 						 * The paperclip opens the same picker the inspector's embed row does, and
