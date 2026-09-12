@@ -1,16 +1,11 @@
 import type {
-	AgentKind,
-	AgentChat,
 	AgentState,
 	Board,
 	BoardPatch,
 	Camera,
-	ClaudeAccount,
-	DeckState,
 	Identity,
 	ThinkingLevel,
 	UsageReport,
-	WebStatus,
 } from "@decks/protocol";
 import Info from "lucide-solid/icons/info";
 import MessageSquare from "lucide-solid/icons/message-square";
@@ -31,6 +26,7 @@ import { forgetAskedResults, receiveToolResult, setToolResultSender } from "./ch
 import { type AgentRecord, createAgentScratch, emptyAgent } from "./state/agent.ts";
 import { clearMarks, component, marks, mode, selected, setComponent, setMarks, setMode, setSelected, setTool, tool } from "./state/selection.ts";
 import { on, send, start, started } from "./state/socket.ts";
+import { clearDialog, clearPreview, dialog, type Notice, preview, setState, state } from "./state/deck.ts";
 import { openThumbnails } from "./canvas/thumb-budget.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
@@ -75,12 +71,6 @@ import { play as playCue, preload as preloadCues } from "./lib/sound.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./chat/UsageModal.tsx";
 
-interface Notice {
-	id: number;
-	level: "info" | "warn" | "error";
-	text: string;
-}
-
 /**
  * The shell: a title bar, the stage, and the panels floating over it.
  *
@@ -90,68 +80,6 @@ interface Notice {
  * anywhere until an agent asks about it (M3).
  */
 export function App() {
-	const [state, setState] = createStore<{
-		deck?: DeckState;
-		boards: Board[];
-		notices: Notice[];
-		/** One entry per agent, so switching chats (M5) is a lookup and not a fetch. */
-		chats: AgentChat[];
-		focused?: string;
-		identities: Record<string, Identity>;
-		/**
-		 * Everything else the browser keeps per agent, one record each (`state/agent.ts`).
-		 *
-		 * Nine fields used to sit here as nine parallel `Record<string, …>` maps, and every
-		 * one of them was added the same way — something leaked between conversations, and
-		 * the fix was to key one more thing. Two of those are worth keeping in writing.
-		 *
-		 * There was one `dialog`, so a background agent's question was drawn over whichever
-		 * conversation you happened to be in, and the card could not say whose it was. And
-		 * `timeline.preview` always carried an `agentId` that the browser threw away, so
-		 * previewing Ada's history and switching left her past revisions rendered into Bo's
-		 * canvas, read-only, with nothing saying whose they were.
-		 *
-		 * A record is created before it is written and dropped whole when the agent goes —
-		 * which is also how four fields stopped leaking on removal, since the old teardown
-		 * cleared seven of the eleven maps by hand and missed the rest.
-		 */
-		agents: Record<string, AgentRecord | undefined>;
-		/** The user's shared Chrome, from `web.status`; the status board draws it (`live-web.js`). */
-		web?: { status: WebStatus; code?: string };
-		/**
-		 * Boards each agent is holding, from `context.changed`.
-		 *
-		 * Still a map, unlike the nine that moved: this one is handed *whole* to
-		 * `panelSections`, which indexes it itself. Moving it means changing that signature.
-		 */
-		contexts: Record<string, string[]>;
-		/** Reload counters from `stage.reload`, per board. */
-		nonces: Record<string, number>;
-		defaultKind: AgentKind;
-		cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
-		/** The Claude subscriptions this install can use (`chat/Settings.tsx`). */
-		accounts: ClaudeAccount[];
-		/**
-		 * Which of them a **new** agent starts on. `default` is the CLI's own login.
-		 *
-		 * Not "which one is spending": each agent records its own, on its own record
-		 * (`state/agent.ts`, `spending`). With three agents on three subscriptions one row
-		 * cannot answer it.
-		 */
-		activeAccount: string;
-	}>({
-		boards: [],
-		notices: [],
-		chats: [],
-		identities: {},
-		agents: {} as Record<string, AgentRecord | undefined>,
-		contexts: {} as Record<string, string[]>,
-		nonces: {} as Record<string, number>,
-		defaultKind: "pi" as AgentKind,
-		accounts: [] as ClaudeAccount[],
-		activeAccount: "default",
-	});
-
 	/**
 	 * The scratch half of an agent's state: real, and deliberately not drawn (`state/agent.ts`).
 	 *
@@ -339,15 +267,6 @@ export function App() {
 	 * URL changes, and the frame reloads, which is exactly what should happen.
 	 */
 	const [frameRevs, setFrameRevs] = createStore<Record<string, number>>({});
-
-	/** The focused agent's question, if it has one. */
-	const dialog = () => (state.focused ? state.agents[state.focused]?.dialog : undefined);
-	/* Clearing is always the focused agent's: it is the only one drawn, so it is the only
-	   one there is anything to dismiss. */
-	const clearDialog = () => state.focused && state.agents[state.focused] && setState("agents", state.focused, "dialog", undefined);
-	const clearPreview = () => state.focused && state.agents[state.focused] && setState("agents", state.focused, "preview", undefined);
-	/** The focused agent's preview, if it is looking at its own past. */
-	const preview = () => (state.focused ? state.agents[state.focused]?.preview : undefined);
 
 	let noticeId = 0;
 
