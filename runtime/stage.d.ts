@@ -127,6 +127,22 @@ export interface WebStatus {
 	closed?: string;
 }
 
+/**
+ * How you name something in the shared tab.
+ *
+ * **A name is the default** — the label, the placeholder, the words on the button — because
+ * it is what a person would say and what a transcript can be read back from. The other two
+ * forms exist because real forms defeat names:
+ *
+ * - `{ ref: "e42" }` — an id from `read()`'s snapshot, where every element carries one. The
+ *   only way to reach a field with **no label at all**, and the way to be certain which of
+ *   several you mean. References belong to the page they were read from: after the tab
+ *   navigates, read again.
+ * - `{ name: "Degree", nth: 2 }` — one of several things with the same name, **counting from
+ *   1**. Cheap, but positions move when the page gains a row; a reference does not.
+ */
+export type WebTarget = string | { ref: string } | { name: string; nth?: number };
+
 export interface ShowOptions {
 	/** "board" fits the one board (default); "all" fits everything named. */
 	fit?: "board" | "all";
@@ -307,9 +323,9 @@ export interface Stage {
 	 * these calls drive that tab — logged in as the user, on the user's own screen. Nothing is
 	 * streamed back: there is no picture of the tab, because the user is looking at it. **`read`
 	 * is how you see the page**: its address, its title, and the accessibility tree, which
-	 * names every field with its label and value and every button with its name. Use those
-	 * names in `fill` and `click`. **`screenshot` is how you look**: the picture comes back
-	 * attached to the call, for what a tree cannot say.
+	 * names every field with its label and value and every button with its name, and puts a
+	 * `[ref=e42]` on each. Use those names in `fill` and `click`. **`screenshot` is how you
+	 * look**: the picture comes back attached to the call, for what a tree cannot say.
 	 *
 	 *     const page = await stage.web.read();            // { url, title, snapshot }
 	 *     await stage.web.screenshot();                    // the picture, attached to the result
@@ -317,6 +333,18 @@ export interface Stage {
 	 *     await stage.web.select("Country", "Iceland");
 	 *     await stage.web.click("Next");
 	 *     await stage.web.submit("Create account");        // waits for the user's Allow
+	 *
+	 * **When a name will not do, use the reference beside it in the snapshot.** A real form
+	 * has fields with no label, several fields with the same label, and controls it hides and
+	 * paints over — so `fill`, `select` and `click` also take `{ ref: "e42" }`, or
+	 * `{ name: "Degree", nth: 2 }` to take the second of several (see `WebTarget`).
+	 *
+	 *     // - textbox [ref=e57]        ← the question is loose text beside it, so it has no name
+	 *     await stage.web.fill({ ref: "e57" }, "The purpose of this study is…");
+	 *
+	 * **A name that matches more than one thing is refused**, with both ways out in the
+	 * sentence — it never picks one for you. A reference is read from one page: after the tab
+	 * navigates, read again rather than reusing it.
 	 *
 	 * **Every call throws a sentence when no tab is shared** — pairing has not happened, the
 	 * laptop is asleep, the tab was closed — and that sentence is the thing to relay to the
@@ -351,16 +379,16 @@ export interface Stage {
 		 * names and values; this is for what a tree cannot say — a thumbnail, a chart, a layout.
 		 */
 		screenshot(options?: { full?: boolean }): Promise<{ file: string; width: number; height: number }>;
-		/** Type into a field named by its label, placeholder or accessible name. Replaces what was there. */
-		fill(field: string, text: string): Promise<{ field: string }>;
+		/** Type into a field — by its label, or by a `{ ref }`. Replaces what was there. */
+		fill(field: WebTarget, text: string): Promise<{ field: string }>;
 		/** Choose an option in a dropdown, by the option's label or value. */
-		select(field: string, option: string): Promise<{ field: string; option: string }>;
-		/** Click a button, link, checkbox, radio, tab or piece of text, by its name. */
-		click(what: string): Promise<{ clicked: string }>;
+		select(field: WebTarget, option: string): Promise<{ field: string; option: string }>;
+		/** Click a button, link, checkbox, radio, tab or piece of text — by its name, or by a `{ ref }`. */
+		click(what: WebTarget): Promise<{ clicked: string }>;
 		/** A key, by its name: "Enter", "Tab", "Escape", "ArrowDown". */
 		press(key: string): Promise<{ pressed: string }>;
 		/** Press the named button, or Enter, after the user allows it on the status board. */
-		submit(what?: string, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
+		submit(what?: WebTarget, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
 		/** Detach from the shared tab. The user can share again from the extension. */
 		stop(): Promise<void>;
 	};

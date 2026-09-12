@@ -43,6 +43,17 @@ export interface StageHost {
 	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
 }
 
+/**
+ * How an agent names the thing it wants in the shared tab.
+ *
+ * A **name** is what a person would call it — the label, the placeholder, the words on the
+ * button. It is the readable form and stays the default. Two others exist because a real
+ * form defeats names: `{ ref }` is an id from `read()`'s snapshot, which is the only way to
+ * reach a field with no label at all or a control the page hides and paints over; and
+ * `{ name, nth }` picks one of several things with the same name, counting from 1.
+ */
+export type WebTarget = string | { ref: string } | { name: string; nth?: number };
+
 /** What the stage tool needs of the shared browser. `WebBridge` is the one implementation. */
 export interface WebHost {
 	code(): string;
@@ -52,11 +63,11 @@ export interface WebHost {
 	open(url: string): Promise<{ url: string; title: string }>;
 	read(): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
 	screenshot(options?: { full?: boolean }): Promise<{ file: string; width: number; height: number; png: Buffer }>;
-	fill(field: string, text: string): Promise<{ field: string }>;
-	select(field: string, option: string): Promise<{ field: string; option: string }>;
-	click(what: string): Promise<{ clicked: string }>;
+	fill(field: WebTarget, text: string): Promise<{ field: string }>;
+	select(field: WebTarget, option: string): Promise<{ field: string; option: string }>;
+	click(what: WebTarget): Promise<{ clicked: string }>;
 	press(key: string): Promise<{ pressed: string }>;
-	submit(what?: string, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
+	submit(what?: WebTarget, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
 	/** Make or find the status board, and return its path. */
 	board(): string;
 }

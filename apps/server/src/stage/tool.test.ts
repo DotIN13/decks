@@ -436,11 +436,11 @@ test("stage.web says so when this server has no shared browser, and reaches the 
 		open: async (url) => (calls.push(`open ${url}`), { url, title: "Sign up" }),
 		read: async () => ({ url: "https://x.example/join", title: "Sign up", snapshot: "- textbox \"Email\"" }),
 		screenshot: async () => ({ file: "/tmp/shot.png", width: 800, height: 600, png: Buffer.from([0x89, 0x50, 0x4e, 0x47]) }),
-		fill: async (field, text) => (calls.push(`fill ${field}=${text}`), { field }),
-		select: async (field, option) => ({ field, option }),
-		click: async (what) => (calls.push(`click ${what}`), { clicked: what }),
+		fill: async (field, text) => (calls.push(`fill ${name(field)}=${text}`), { field: name(field) }),
+		select: async (field, option) => ({ field: name(field), option }),
+		click: async (what) => (calls.push(`click ${name(what)}`), { clicked: name(what) }),
 		press: async (key) => ({ pressed: key }),
-		submit: async (what) => (calls.push(`submit ${what}`), { submitted: what ?? "Enter", allowed: true }),
+		submit: async (what) => (calls.push(`submit ${what === undefined ? "Enter" : name(what)}`), { submitted: what === undefined ? "Enter" : name(what), allowed: true }),
 		board: () => "boards/your-chrome.html",
 	};
 	const pairing = await tool.run(`return await stage.web.pairing()`);
@@ -473,5 +473,24 @@ test("stage.web says so when this server has no shared browser, and reaches the 
 	const empty = await tool.run(`return await stage.web.fill("", "x")`);
 	assert.equal(empty.isError, true);
 	assert.match(empty.text, /fill needs the field's label/);
+
+	// A target may also be a reference from `read`, or a name with a position.
+	const byRef = await tool.run(`
+		await stage.web.fill({ ref: "e42" }, "no label on this one");
+		await stage.web.click({ name: "Degree", nth: 2 });
+		return true;
+	`);
+	assert.equal(byRef.isError, false, byRef.text);
+	assert.deepEqual(calls.slice(-2), ["fill e42=no label on this one", "click Degree (2)"]);
+	const nonsense = await tool.run(`return await stage.web.click({ nth: 2 })`);
+	assert.equal(nonsense.isError, true);
+	assert.match(nonsense.text, /click needs the button's or link's name/);
 	cleanup();
 });
+
+/** A target as the log should name it: the string, the reference, or the name and position. */
+function name(target: string | { ref: string } | { name: string; nth?: number }): string {
+	if (typeof target === "string") return target;
+	if ("ref" in target) return target.ref;
+	return target.nth === undefined ? target.name : `${target.name} (${target.nth})`;
+}

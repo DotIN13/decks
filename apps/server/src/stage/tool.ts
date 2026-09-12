@@ -1,7 +1,7 @@
 import type { AgentKind, AgentMode, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, isBoardFormat, isBoardTemplate, WIDE_BOARD_W } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
-import type { StageService } from "./service.ts";
+import type { StageService, WebTarget } from "./service.ts";
 
 /**
  * The canvas tool, defined once for every runtime (DESIGN §6.3).
@@ -263,6 +263,27 @@ export function createStageTool(deps: {
 	const needWeb = () => {
 		if (!service.web) throw new Error("This server has no shared browser.");
 		return service.web;
+	};
+	/**
+	 * A target as the agent wrote it, checked here rather than in the bridge.
+	 *
+	 * Three forms, and anything else gets the verb's own sentence: a name, a `{ ref }` from
+	 * `read`, or a `{ name, nth }`. Checking it here keeps the bridge free to assume a target
+	 * it can act on, and keeps the wording beside the verb it belongs to.
+	 */
+	const needTarget = (value: unknown, sentence: string): WebTarget => {
+		if (typeof value === "string") {
+			if (!value.trim()) throw new Error(sentence);
+			return value.trim();
+		}
+		if (value && typeof value === "object") {
+			const ref = (value as { ref?: unknown }).ref;
+			if (typeof ref === "string" && ref.trim()) return { ref: ref.trim() };
+			const named = (value as { name?: unknown }).name;
+			const nth = (value as { nth?: unknown }).nth;
+			if (typeof named === "string" && named.trim()) return { name: named.trim(), ...(typeof nth === "number" ? { nth } : {}) };
+		}
+		throw new Error(sentence);
 	};
 
 	const stage = {
@@ -619,22 +640,17 @@ export function createStageTool(deps: {
 				images.push({ data: shot.png.toString("base64"), mimeType: "image/png" });
 				return { file: shot.file, width: shot.width, height: shot.height };
 			},
-			fill: async (field: string, text: string) => {
-				if (!field?.trim()) throw new Error("fill needs the field's label");
-				return needWeb().fill(field.trim(), String(text ?? ""));
-			},
-			select: async (field: string, option: string) => needWeb().select(field, option),
-			click: async (what: string) => {
-				if (!what?.trim()) throw new Error("click needs the button's or link's name");
-				return needWeb().click(what.trim());
-			},
+			fill: async (field: WebTarget, text: string) => needWeb().fill(needTarget(field, "fill needs the field's label, or a { ref } from stage.web.read()"), String(text ?? "")),
+			select: async (field: WebTarget, option: string) => needWeb().select(needTarget(field, "select needs the field's label, or a { ref } from stage.web.read()"), option),
+			click: async (what: WebTarget) => needWeb().click(needTarget(what, "click needs the button's or link's name, or a { ref } from stage.web.read()")),
 			press: async (key: string) => needWeb().press(key),
 			/**
 			 * Press the named button, or Enter, once the user has allowed it on the status
 			 * board. Pass `{ ask: false }` only when the user has said they do not want to be
 			 * asked for this site.
 			 */
-			submit: async (what?: string, options?: { ask?: boolean }) => needWeb().submit(what?.trim() || undefined, options),
+			submit: async (what?: WebTarget, options?: { ask?: boolean }) =>
+				needWeb().submit(what === undefined ? undefined : needTarget(what, "submit needs the button's name, or a { ref } from stage.web.read()"), options),
 			/** Detach from the shared tab. */
 			stop: async () => needWeb().stop(),
 		},

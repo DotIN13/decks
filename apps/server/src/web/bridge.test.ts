@@ -19,11 +19,21 @@ import { WebBridge } from "./bridge.ts";
  * hop the browser check (`e2e/checks/web-bridge.mjs`) covers with the real extension.
  */
 
+/*
+ * The form is the shape of a real one, not a demo: two fields sharing a label, a textarea
+ * with no label at all, and a radio the page hides and paints over — the three things that
+ * defeat naming, and the reason `read` hands back references.
+ */
 const FORM = `data:text/html,${encodeURIComponent(`<!doctype html><title>Sign up</title>
+<style>.hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);}</style>
 <form onsubmit="event.preventDefault(); document.title = 'Submitted ' + document.getElementById('email').value">
 <label for="email">Email</label><input id="email" name="email">
 <label for="country">Country</label><select id="country"><option>Chile</option><option>Iceland</option></select>
+<label for="degree1">Degree</label><input id="degree1"><label for="degree2">Degree</label><input id="degree2">
+<p>Why this study</p><textarea id="purpose"></textarea>
+<span class="hidden"><input type="radio" id="agree" name="agree"></span><span onclick="document.getElementById('agree').click()">I agree</span>
 <button type="submit">Create account</button></form>`)}`;
+const OTHER = `data:text/html,${encodeURIComponent("<!doctype html><title>Somewhere else</title><button>Back</button>")}`;
 
 let chrome: ChildProcess;
 let profile: string;
@@ -277,6 +287,40 @@ test("fill, select and click find things by their names, and every action is not
 	assert.equal(bridge.status().actions.at(-1)?.ok, false);
 });
 
+test("read gives every element a reference, and a field with no label is reachable by it", async () => {
+	const page = await bridge.read();
+	assert.match(page.snapshot, /textbox "Email".*\[ref=e\d+\]/);
+	const unnamed = page.snapshot.split("\n").find((line) => /- textbox \[ref=e\d+\]/.test(line));
+	assert.ok(unnamed, `an unnamed textbox, in:\n${page.snapshot}`);
+	const ref = unnamed.match(/\[ref=(e\d+)\]/)?.[1] ?? "";
+	assert.match(ref, /^e\d+$/);
+
+	await bridge.fill({ ref }, "Because the question has no label.");
+	assert.equal(await value("document.getElementById('purpose').value"), "Because the question has no label.");
+	assert.equal(bridge.status().actions.at(-1)?.text, `filled ${ref}`);
+});
+
+test("a name that matches two fields is refused, and a position picks one", async () => {
+	await assert.rejects(bridge.fill("Degree", "PhD"), /"Degree" matches 2 elements on this page, so I did not guess/);
+	assert.equal(await value("document.getElementById('degree1').value + '|' + document.getElementById('degree2').value"), "|");
+
+	await bridge.fill({ name: "Degree", nth: 2 }, "PhD");
+	assert.equal(await value("document.getElementById('degree1').value + '|' + document.getElementById('degree2').value"), "|PhD");
+	await assert.rejects(bridge.fill({ name: "Degree", nth: 5 }, "x"), /nth: 5 is out of range/);
+});
+
+test("a control the page hides and paints over is clicked through its reference", async () => {
+	const snapshot = (await bridge.read()).snapshot;
+	const line = snapshot.split("\n").find((row) => /- radio \[ref=e\d+\]/.test(row));
+	assert.ok(line, `a radio, in:\n${snapshot}`);
+	const ref = line.match(/\[ref=(e\d+)\]/)?.[1] ?? "";
+	assert.match(ref, /^e\d+$/);
+
+	await bridge.click({ ref });
+	assert.equal(await value("document.getElementById('agree').checked"), true);
+	assert.match(bridge.status().actions.at(-1)?.text ?? "", /hidden behind what the page paints/);
+});
+
 test("submit waits for the user's Allow on the status board, and a Deny is a refusal, not an error", async () => {
 	const denied = bridge.submit("Create account");
 	await until("a pending question", () => bridge.status().pending !== undefined);
@@ -296,6 +340,13 @@ test("submit waits for the user's Allow on the status board, and a Deny is a ref
 	assert.equal(title.result.value, "Submitted ada@example.org");
 });
 
+test("a reference from another page is a sentence, not a click on whatever now holds that number", async () => {
+	const ref = (await bridge.read()).snapshot.match(/\[ref=(e\d+)\]/)?.[1] ?? "";
+	await bridge.open(OTHER);
+	await assert.rejects(bridge.click({ ref }), /was read from .* and the tab is now on .*Read the page again/s);
+	await assert.rejects(bridge.click({ ref: "nonsense" }), /is not a reference/);
+});
+
 test("stop lets go of the tab; the extension's socket closes and the status says why", async () => {
 	const closed = new Promise<string>((resolve) => extension.once("close", (_code, reason) => resolve(reason.toString())));
 	bridge.stop();
@@ -305,6 +356,12 @@ test("stop lets go of the tab; the extension's socket closes and the status says
 	assert.ok(statuses.length > 5, "status changes were reported");
 	await assert.rejects(bridge.read(), /not connected/i);
 });
+
+/** Read something out of the shared tab, from outside the bridge — the independent check. */
+async function value(expression: string): Promise<unknown> {
+	const answer = (await devtools.send("Runtime.evaluate", { expression, returnByValue: true }, tabSession())) as { result: { value: unknown } };
+	return answer.result.value;
+}
 
 /** The tab's own DevTools session, for reading the page from outside the bridge. */
 function tabSession(): string {
