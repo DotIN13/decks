@@ -2,6 +2,7 @@ import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
+import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame } from "./BoardFrame.tsx";
 import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
@@ -165,6 +166,8 @@ export function Stage(props: {
 		const observer = new ResizeObserver(measure);
 		observer.observe(element);
 		measure();
+		// Everything on the canvas assumes a stage pixel is a client pixel; say so if it is not.
+		checkStageOrigin(element);
 		onCleanup(() => observer.disconnect());
 
 		const keydown = (event: KeyboardEvent) => {
@@ -418,29 +421,14 @@ export function Stage(props: {
 	};
 
 	/**
-	 * Where the stage sits in the window, read at most every quarter second.
+	 * Where the pointer is, in stage coordinates — which are the event's own client ones.
 	 *
-	 * Every gesture converts client coordinates to stage ones, and `getBoundingClientRect`
-	 * on every event is a forced layout on every event — free while nothing is dirty, and
-	 * a full layout of every board's title bar during a pinch, when they are. The stage is
-	 * the window minus nothing (`inset: 0` inside `.work`), so it moves only when the
-	 * window does, and a reading a few hundred milliseconds old is the same reading.
+	 * There was a cached `getBoundingClientRect` here, refreshed every 250 ms, and a
+	 * subtraction at each of three call sites. The stage element *is* the viewport, so all of
+	 * that was adding zero: `camera/coords.ts` sets out why, and `checkStageOrigin` — called
+	 * at mount — is what stops it quietly ceasing to be true.
 	 */
-	let origin = { left: 0, top: 0, at: Number.NEGATIVE_INFINITY };
-	const stageOrigin = () => {
-		const now = performance.now();
-		if (now - origin.at > 250) {
-			const rect = element.getBoundingClientRect();
-			origin = { left: rect.left, top: rect.top, at: now };
-		}
-		return origin;
-	};
-
-	/** Where the pointer is, in stage coordinates rather than page ones. */
-	const local = (event: { clientX: number; clientY: number }) => {
-		const at = stageOrigin();
-		return { x: event.clientX - at.left, y: event.clientY - at.top };
-	};
+	const local = stagePoint;
 
 	/**
 	 * One wheel gesture, wherever it came from.
@@ -519,8 +507,8 @@ export function Stage(props: {
 	 * conversion existing in one place instead of two is meant to stop.
 	 */
 	const fingerOf = (event: PointerEvent): Finger => {
-		const at = stageOrigin();
-		return { id: event.pointerId, x: event.clientX - at.left, y: event.clientY - at.top };
+		const at = stagePoint(event);
+		return { id: event.pointerId, x: at.x, y: at.y };
 	};
 
 	/** One finger's worth of a gesture, from this document or from a board's. */

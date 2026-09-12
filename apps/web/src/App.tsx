@@ -1463,14 +1463,15 @@ export function App() {
 	 * and filled through the ordinary drop path — one upload and one insert per file.
 	 */
 	const boardForFiles = async (files: File[], at: { x: number; y: number }) => {
-		const stage = document.querySelector(".stage")?.getBoundingClientRect();
+		const stage = document.querySelector(".stage");
 		if (!stage) return;
 		const FIRST_ROW = 152;
 		const shapes = await Promise.all(files.map(shapeFor));
 		const width = Math.min(1200, Math.max(880, Math.max(...shapes.map((shape) => shape.width)) + 96));
 		const boxes = flow(shapes, { x: 48, y: FIRST_ROW }, width);
 		const height = Math.max(400, Math.max(...boxes.map((box) => box.top + box.height)) + 48);
-		const middle = toWorld(camera(), { width: stage.width, height: stage.height }, { x: at.x - stage.left, y: at.y - stage.top });
+		// `at` is already in stage pixels: the stage is the viewport (`camera/coords.ts`).
+		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
 		const request = `drop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 		const path = await new Promise<string | undefined>((resolve) => {
 			created.set(request, resolve);

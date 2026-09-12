@@ -1,3 +1,4 @@
+import { deltaFromBoard, deltaToBoard, type FrameAt, pointFromBoard } from "../camera/coords.ts";
 import { typingInto } from "./Editor.ts";
 import { type ZoomKey, zoomKey } from "./zoom-keys.ts";
 import { type SlideAction, slideKey } from "./slide-keys.ts";
@@ -133,15 +134,12 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	 * the same one the layout would have given — the camera is written synchronously in the
 	 * handler, so the two never disagree.
 	 */
-	const geometry = () => {
+	const geometry = (): FrameAt => {
 		const at = host.screenOf(place());
 		return { left: at.x, top: at.y, scale: at.scale };
 	};
 
-	const toStage = (clientX: number, clientY: number) => {
-		const { left, top, scale } = geometry();
-		return { x: left + clientX * scale, y: top + clientY * scale };
-	};
+	const toStage = (clientX: number, clientY: number) => pointFromBoard(geometry(), clientX, clientY);
 
 	const onWheel = (event: WheelEvent) => {
 		// A pinch is always the canvas zooming; nothing inside a board zooms.
@@ -164,9 +162,9 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 			const box = scrollableUnder(event.target, event.deltaX, event.deltaY);
 			if (box) {
 				event.preventDefault();
-				const { scale } = geometry();
-				box.scrollLeft += event.deltaX / scale;
-				box.scrollTop += event.deltaY / scale;
+				const move = deltaToBoard(geometry(), event.deltaX, event.deltaY);
+				box.scrollLeft += move.dx;
+				box.scrollTop += move.dy;
 				return;
 			}
 		}
@@ -269,7 +267,7 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		event.preventDefault();
 		event.stopPropagation();
 
-		const { scale } = geometry();
+		const frame = geometry();
 		let last = { x: event.clientX, y: event.clientY };
 		const target = event.target as Element;
 		try {
@@ -280,7 +278,8 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 
 		const move = (moveEvent: PointerEvent) => {
 			// In-frame movement is in board pixels; the camera pans in screen pixels.
-			host.pan((moveEvent.clientX - last.x) * scale, (moveEvent.clientY - last.y) * scale);
+			const step = deltaFromBoard(frame, moveEvent.clientX - last.x, moveEvent.clientY - last.y);
+			host.pan(step.dx, step.dy);
 			last = { x: moveEvent.clientX, y: moveEvent.clientY };
 		};
 		const finish = () => {
@@ -358,12 +357,8 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	 * 3px, and it holds to within a tenth of one.
 	 */
 	const fingerAt = (event: PointerEvent) => {
-		const { left, top, scale } = geometry();
-		return {
-			id: event.pointerId,
-			x: left + event.clientX * scale,
-			y: top + event.clientY * scale,
-		};
+		const at = pointFromBoard(geometry(), event.clientX, event.clientY);
+		return { id: event.pointerId, x: at.x, y: at.y };
 	};
 
 	/**
@@ -525,12 +520,8 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		const { phase, id } = detail;
 		if (typeof id !== "number" || !Number.isFinite(detail.x) || !Number.isFinite(detail.y)) return;
 
-		const { left, top, scale } = geometry();
-		const finger = {
-			id,
-			x: left + (detail.x as number) * scale,
-			y: top + (detail.y as number) * scale,
-		};
+		const at = pointFromBoard(geometry(), detail.x as number, detail.y as number);
+		const finger = { id, x: at.x, y: at.y };
 
 		if (phase === "down") {
 			fromEmbed.add(id);
