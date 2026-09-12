@@ -14,7 +14,8 @@ import { createEdgeSwipe } from "./edge-swipe.ts";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
-import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "./picture.ts";
+import { createAdmission } from "./board-admission.ts";
+import { createOneCanvas } from "./one-canvas.ts";
 
 /** The palette's keys, in the order the palette draws them. */
 const TOOL_KEYS: Record<string, Tool> = { v: "select", s: "sticky", c: "card", t: "text", e: "embed" };
@@ -116,6 +117,8 @@ export function Stage(props: {
 	let element!: HTMLDivElement;
 	let worldEl!: HTMLDivElement;
 	let localCamera = props.camera;
+	/** When the camera last moved, read by `board-admission.ts`. */
+	let lastMoved = 0;
 	let rafId: number | undefined;
 	let pendingCamera: Camera | undefined;
 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
@@ -314,7 +317,7 @@ export function Stage(props: {
 	const writeTransform = (cam: Camera) => {
 		const v = view();
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
-		requestPicture();
+		oneCanvas.requestPicture();
 	};
 
 	/**
@@ -772,132 +775,24 @@ export function Stage(props: {
 	};
 
 	/**
-	 * How long a board that has left the screen keeps its document.
+	 * Which boards have a document, and the gate that holds them at the open
+	 * (`board-admission.ts`).
 	 *
-	 * Visibility decides which boards *get* a document; this decides when one is taken
-	 * away, and the two are deliberately not the same moment. Zooming in on a phone puts
-	 * every other board outside the margin within a few steps, and zooming back out brings
-	 * them all back — so a document was torn down in the middle of one gesture and parsed
-	 * again in the middle of the next: `board.css`, `board.js`, KaTeX, Mermaid, for every
-	 * board, while the finger was still moving. Measured on 17 boards at 4× CPU throttle,
-	 * a wheel zoom in and out spent 37ms per step in `Document::shutdown` alone and more
-	 * again re-parsing, against 8ms of everything else.
-	 *
-	 * So a board that leaves the screen is kept until it has been gone for a few seconds
-	 * **and the camera has been still for one** — a document is never let go in the middle
-	 * of a gesture, however long the gesture. A board zoomed away from and back to costs
-	 * nothing the second time; a board really left behind is let go once the canvas is
-	 * quiet, from an idle callback rather than from inside whatever the user is doing
-	 * then. The memory cost is bounded by how many boards one gesture can pass over.
+	 * It is handed `isVisible` rather than owning it, because the render body asks the same
+	 * question — and `lastMoved` as a getter, because the gestures write it synchronously in
+	 * their own handler while this reads it from a timer.
 	 */
-	const KEEP_MS = 3000;
-	/** How long the camera has to have been still before a document is taken away. */
-	const QUIET_MS = 1000;
-	const lastSeen = new Map<string, number>();
-	let lastMoved = 0;
-	const [sweep, setSweep] = createSignal(0);
-	let sweeper: ReturnType<typeof setTimeout> | undefined;
-	const sweepLater = (after: number) => {
-		if (sweeper !== undefined) return;
-		sweeper = setTimeout(() => {
-			sweeper = undefined;
-			const still = performance.now() - lastMoved;
-			// Not yet: the camera is moving. Ask again once it has had time to stop.
-			if (still < QUIET_MS) return sweepLater(QUIET_MS - still + 50);
-			const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
-			if (idle) idle(() => setSweep((n) => n + 1), { timeout: 1000 });
-			else setSweep((n) => n + 1);
-		}, after);
-	};
-	onCleanup(() => clearTimeout(sweeper));
-
-	/** Whether a board has a document: on screen now, or was within the last `KEEP_MS`. */
-	const isMounted = (board: Board): boolean => {
-		void sweep();
-		const now = performance.now();
-		if (isVisible(board)) {
-			lastSeen.set(board.path, now);
-			return true;
-		}
-		const seen = lastSeen.get(board.path);
-		if (seen === undefined) return false;
-		const gone = now - seen;
-		const still = now - lastMoved;
-		/*
-		 * Both conditions, here as well as in the timer: this runs on every camera change,
-		 * and a board whose grace ran out mid-gesture must not be dropped by the very step
-		 * that asked. Come back once both have passed, so the document is let go then.
-		 */
-		if (gone < KEEP_MS || still < QUIET_MS) {
-			sweepLater(Math.max(KEEP_MS - gone, QUIET_MS - still) + 50);
-			return true;
-		}
-		return false;
-	};
-
-
-	/*
-	 * **Boards start after the app has opened, nearest first, one at a time.**
-	 *
-	 * A board is a same-origin document, so it runs on the app's own main thread: its
-	 * stylesheet, `board.js`, markdown, maths and diagrams are parsed and laid out between the
-	 * app's own frames. Opening onto six boards mounted all six in the same second the app was
-	 * drawing its chat, and the page did not answer for 846 ms of it — a keystroke typed then
-	 * would have waited that long.
-	 *
-	 * So until the app says it has opened (`boardsMayStart`) no board has a document: the canvas
-	 * shows each one's frame and title, which is where the eye goes first anyway. Then they are
-	 * let in one at a time, nearest the middle of the screen first, each after the browser has
-	 * had an idle moment since the last — that is, once the previous document has done its work.
-	 * When every board on screen is in, the gate is gone for the rest of the session and a board
-	 * mounts the moment it is visible, as it always did.
-	 */
-	const [admitted, setAdmitted] = createSignal<ReadonlySet<string>>(new Set());
-	const [admitting, setAdmitting] = createSignal(true);
-	let admitScheduled = false;
-	let stopped = false;
-	onCleanup(() => {
-		stopped = true;
+	const admission = createAdmission({
+		boards: () => props.boards,
+		isVisible,
+		view,
+		lastMoved: () => lastMoved,
+		screenCentre: (board) => toScreen(props.camera, view(), { x: board.x + board.w / 2, y: board.y + board.h / 2 }),
+		mayStart: () => props.boardsMayStart,
+		onStarted: () => props.onBoardsStarted?.(),
 	});
-	const whenIdle = (fn: () => void) => {
-		const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-		if (idle) idle(fn, { timeout: 300 });
-		else window.setTimeout(fn, 60);
-	};
-	const admitNext = () => {
-		admitScheduled = false;
-		if (stopped || !admitting()) return;
-		const v = view();
-		// Not measured yet: nothing is on screen until it is, and "nothing to let in" is not "done".
-		if (v.width === 0) {
-			admitScheduled = true;
-			window.setTimeout(admitNext, 100);
-			return;
-		}
-		const waiting = props.boards.filter((board) => isVisible(board) && !admitted().has(board.path));
-		if (waiting.length === 0) {
-			setAdmitting(false);
-			props.onBoardsStarted?.();
-			return;
-		}
-		const middle = { x: v.width / 2, y: v.height / 2 };
-		const distance = (board: Board) => {
-			const at = toScreen(props.camera, v, { x: board.x + board.w / 2, y: board.y + board.h / 2 });
-			return Math.hypot(at.x - middle.x, at.y - middle.y);
-		};
-		const next = waiting.reduce((best, board) => (distance(board) < distance(best) ? board : best));
-		setAdmitted((was) => new Set(was).add(next.path));
-		// A frame for it to begin, then an idle moment for it to finish, then the next one.
-		admitScheduled = true;
-		requestAnimationFrame(() => whenIdle(admitNext));
-	};
-	createEffect(() => {
-		if (!props.boardsMayStart || !admitting() || admitScheduled) return;
-		admitScheduled = true;
-		whenIdle(admitNext);
-	});
-	/** Whether the open still holds this board back. */
-	const mayHaveDocument = (board: Board) => !admitting() || admitted().has(board.path);
+	createEffect(() => admission.begin());
+
 
 
 	// --- the canvas renderers ---------------------------------------------------------
@@ -913,207 +808,25 @@ export function Stage(props: {
 	onCleanup(() => redraws.clear());
 
 	/**
-	 * One canvas for the stage, and a darkroom behind it.
+	 * One canvas for the stage, and a darkroom behind it (`one-canvas.ts`).
 	 *
-	 * `drawElementImage` can only take an immediate child of the canvas it draws into, and
-	 * it repaints the whole document on every call — so a stage that drew every board on
-	 * every frame was measured at 21ms a pan step for 16 boards, 95ms at 4× CPU throttle,
-	 * against the DOM renderer at the frame floor. Instead each board is drawn **once** into
-	 * a hidden canvas of the same kind (the darkroom, whose children the documents are),
-	 * copied out as a bitmap at the zoom it was captured for, and from then on the visible
-	 * canvas only copies bitmaps: a pan is sixteen `drawImage` calls, a pinch stretches them,
-	 * and the camera resting is what asks for new captures.
-	 *
-	 * A bitmap outlives its document. A board whose frame has been let go is still drawn
-	 * from the picture it left, which is the one thing this renderer can do that the DOM
-	 * one cannot. What it cannot do is let anyone click into a board: Chrome does not yet
-	 * hit-test a drawn element where it was drawn, so the documents in the darkroom are
-	 * inert and the boards are pictures.
+	 * The queue is created here rather than there because both canvas renderers settle
+	 * through the same one: `canvas-per-board` draws each frame's own canvas through it
+	 * without any of the darkroom machinery.
 	 */
-	let pictureEl: HTMLCanvasElement | undefined;
-	let darkroomEl: HTMLCanvasElement | undefined;
-	/** Each board as a bitmap, with the size it was captured at. */
-	const bitmaps = new Map<string, { bitmap: ImageBitmap; w: number; h: number }>();
-	/**
-	 * Boards whose document changed while the scale was moving.
-	 *
-	 * A paint event during a pinch is not acted on — the picture is being stretched and
-	 * would be drawn again at rest anyway — but it must not be *lost*: the first version
-	 * dropped it, and a board that finished rendering its markdown during the opening fit
-	 * kept the blank picture taken at `load` for good, because at rest its size was right
-	 * and nothing said its content was not.
-	 */
-	const stale = new Set<string>();
-	let pictureRaf: number | undefined;
-
-	/** Redraw the visible canvas on the next frame, once, however many changes ask. */
-	const requestPicture = () => {
-		if (props.renderer !== "one-canvas" || pictureRaf !== undefined) return;
-		pictureRaf = requestAnimationFrame(() => {
-			pictureRaf = undefined;
-			drawScene();
-		});
-	};
-	onCleanup(() => {
-		if (pictureRaf !== undefined) cancelAnimationFrame(pictureRaf);
-		for (const held of bitmaps.values()) held.bitmap.close();
-		bitmaps.clear();
-	});
-
-	const drawScene = () => {
-		const canvas = pictureEl;
-		if (!canvas) return;
-		const v = view();
-		const dpr = window.devicePixelRatio || 1;
-		const w = Math.max(1, Math.round(v.width * dpr));
-		const h = Math.max(1, Math.round(v.height * dpr));
-		if (canvas.width !== w || canvas.height !== h) {
-			canvas.width = w;
-			canvas.height = h;
-		}
-		const ctx = canvas.getContext("2d");
-		if (!ctx) return;
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
-		// Opaque, in the stage's own colour: the darkroom sits under this canvas at whatever
-		// size its last capture needed, and this is what keeps it out of sight.
-		ctx.fillStyle = getComputedStyle(element).backgroundColor || "#fff";
-		ctx.fillRect(0, 0, w, h);
-		// The camera the gestures are moving, not the one committed a frame later — the
-		// world transform is written from the same number, and the two must agree.
-		const cam = localCamera;
-		ctx.setTransform(dpr * cam.zoom, 0, 0, dpr * cam.zoom, dpr * (v.width / 2 - cam.x * cam.zoom), dpr * (v.height / 2 - cam.y * cam.zoom));
-		ctx.imageSmoothingQuality = "high";
-		for (const board of props.boards) {
-			const held = bitmaps.get(board.path);
-			if (!held) continue;
-			const topLeft = toScreen(cam, v, { x: board.x, y: board.y });
-			const bottomRight = toScreen(cam, v, { x: board.x + board.w, y: board.y + board.h });
-			if (bottomRight.x < 0 || bottomRight.y < 0 || topLeft.x > v.width || topLeft.y > v.height) continue;
-			ctx.drawImage(held.bitmap, board.x, board.y, board.w, board.h);
-		}
-	};
-
-	/** The darkroom's box, in CSS pixels: the stage, and never anything else (`capture`). */
-	const darkroomBox = () => {
-		const v = view();
-		return { w: Math.max(1, Math.round(v.width)), h: Math.max(1, Math.round(v.height)) };
-	};
-	/** Its backing store, which is also the largest picture a board's capture may have. */
-	const darkroomBacking = (dpr: number) => {
-		const box = darkroomBox();
-		return { w: Math.max(1, Math.round(box.w * dpr)), h: Math.max(1, Math.round(box.h * dpr)) };
-	};
-
-	/** Draw one board's document through the darkroom and keep the result as its picture. */
-	const capture = (path: string) => {
-		const darkroom = darkroomEl;
-		if (!darkroom) return;
-		const board = props.boards.find((candidate) => candidate.path === path);
-		if (!board) return;
-		const frame = darkroom.querySelector(`iframe[data-path="${cssEscape(path)}"]`) as HTMLIFrameElement | null;
-		if (!frame) return;
-		const ctx = elementContext(darkroom);
-		if (!ctx) return;
-		const dpr = window.devicePixelRatio || 1;
-		/*
-		 * The darkroom stands at the size of the stage and never changes, and that is
-		 * load-bearing twice over.
-		 *
-		 * A canvas shown at one CSS pixel draws an element into a corner of its backing store
-		 * and leaves the rest blank, worse the larger the store — a 940×894 board came out
-		 * empty. So it has to be shown at a real size, and the stage is the largest picture
-		 * worth taking anyway.
-		 *
-		 * And a canvas's *box* is laid out, so a box set in this tick is not the one this
-		 * draw would use: the element arrives at the ratio from the last rendering update.
-		 * Resizing the darkroom per board therefore drew each board at the previous board's
-		 * ratio — a 1600-wide board at a 2× screen's ratio came out twice its picture, cropped
-		 * to the top-left. Only the backing store changes here, which does take effect at
-		 * once, and the picture is cropped out of the corner it was drawn into.
-		 */
-		const box = darkroomBox();
-		if (darkroom.style.width !== `${box.w}px` || darkroom.style.height !== `${box.h}px`) {
-			darkroom.style.width = `${box.w}px`;
-			darkroom.style.height = `${box.h}px`;
-			// Laid out this tick, so it is not the box this draw would be given. Next frame.
-			redraws.add(path, () => capture(path));
-			return;
-		}
-		const backing = darkroomBacking(dpr);
-		if (darkroom.width !== backing.w || darkroom.height !== backing.h) {
-			darkroom.width = backing.w;
-			darkroom.height = backing.h;
-		}
-		const size = pictureSize(board, localCamera.zoom, dpr, backing);
-		const ratio = canvasPixelRatio(darkroom);
-		const scale = ratio && drawScale(size, frame.getBoundingClientRect(), ratio);
-		if (!scale) return;
-		try {
-			ctx.setTransform(1, 0, 0, 1, 0, 0);
-			ctx.clearRect(0, 0, darkroom.width, darkroom.height);
-			ctx.setTransform(scale.x, 0, 0, scale.y, 0, 0);
-			ctx.drawElementImage(frame, 0, 0);
-		} catch {
-			// Not drawable yet — a document a frame away from its first snapshot. Its paint
-			// event asks again.
-			return;
-		}
-		// The copy is taken now; only the promise is later.
-		void createImageBitmap(darkroom, 0, 0, size.w, size.h)
-			.then((bitmap) => {
-				bitmaps.get(path)?.bitmap.close();
-				bitmaps.set(path, { bitmap, w: size.w, h: size.h });
-				requestPicture();
-			})
-			.catch(() => {});
-	};
-
-	/** The browser saying which documents changed since the last frame. */
-	const onDarkroomPaint = (event: Event) => {
-		const changed = (event as PaintEvent).changedElements;
-		const frames = changed ?? [...(darkroomEl?.children ?? [])];
-		for (const node of frames) {
-			const path = (node as HTMLElement).dataset?.path;
-			if (!path) continue;
-			if (scaling()) stale.add(path);
-			else redraws.add(path, () => capture(path));
-		}
-	};
-
-	const pictures: PictureHost = {
+	const oneCanvas = createOneCanvas({
+		boards: () => props.boards,
+		isVisible: (board) => isVisible(board),
+		view,
+		// The camera the gestures are moving, not the one committed a frame later.
+		camera: () => localCamera,
+		settledZoom: () => props.camera.zoom,
+		scaling,
+		renderer: () => props.renderer,
+		stage: () => element,
 		queue: redraws,
-		get darkroom() {
-			return darkroomEl;
-		},
-		changed: (path) => redraws.add(path, () => capture(path)),
-		has: (path) => bitmaps.has(path),
-	};
-
-	/*
-	 * At rest after a zoom, every board in view whose picture is now the wrong size is
-	 * captured again — through the queue, a few per frame. Runs on every camera change and
-	 * does nothing on a pan, because `needsRedraw` says the size has not changed.
-	 */
-	createEffect(() => {
-		if (props.renderer !== "one-canvas" || scaling()) return;
-		const zoom = props.camera.zoom;
-		const dpr = window.devicePixelRatio || 1;
-		for (const board of props.boards) {
-			if (!isVisible(board)) continue;
-			const want = pictureSize(board, zoom, dpr, darkroomBacking(dpr));
-			if (stale.has(board.path) || needsRedraw(bitmaps.get(board.path), want)) {
-				stale.delete(board.path);
-				redraws.add(board.path, () => capture(board.path));
-			}
-		}
 	});
 
-	// A board moved or was resized, or the window did: the scene is drawn from those.
-	createEffect(() => {
-		void props.boards;
-		void view();
-		requestPicture();
-	});
 
 	// Fit everything the first time boards arrive, so the deck opens looking at
 	// itself rather than at world origin.
@@ -1149,17 +862,14 @@ export function Stage(props: {
 					width={1}
 					height={1}
 					ref={(canvas) => {
-						darkroomEl = canvas;
-						canvas.addEventListener("paint", onDarkroomPaint);
-						onCleanup(() => canvas.removeEventListener("paint", onDarkroomPaint));
+						oneCanvas.setDarkroom(canvas);
 					}}
 				/>
 				<canvas
 					class="stage-picture"
 					aria-hidden="true"
 					ref={(canvas) => {
-						pictureEl = canvas;
-						requestPicture();
+						oneCanvas.setPicture(canvas);
 					}}
 				/>
 			</Show>
@@ -1173,9 +883,9 @@ export function Stage(props: {
 							board={board}
 							renderer={props.renderer}
 							scaling={scaling()}
-							pictures={pictures}
+							pictures={oneCanvas.pictures}
 							camera={props.camera}
-							mounted={mayHaveDocument(board) && isMounted(board)}
+							mounted={admission.mayHaveDocument(board) && admission.isMounted(board)}
 							visible={isVisible(board)}
 							selected={props.selected === board.path}
 							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
