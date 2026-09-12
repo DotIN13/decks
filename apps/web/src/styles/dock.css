@@ -1,11 +1,11 @@
 /*
  * The input bar's own vocabulary: the box, the controls row inside it, and the row under it.
  *
- * **To wire this up, `index.css` needs `@import "./styles/dock.css";` beside the
- * `chrome.css` import at the top.** Imported there rather than from `Composer.tsx` on
- * purpose: `@layer` order is fixed by the order the layers are first seen, and a stylesheet
- * that Vite injects from a module graph arrives whenever the module does — which would put
- * these rules in a components layer of their own, ordered against Tailwind's by accident.
+ * **Wired up from `index.css`**, which imports this beside `chrome.css` at the top, rather
+ * than from `Composer.tsx` — and that is on purpose: `@layer` order is fixed by the order
+ * the layers are first seen, and a stylesheet that Vite injects from a module graph arrives
+ * whenever the module does — which would put these rules in a components layer of their
+ * own, ordered against Tailwind's by accident.
  * One import in one file keeps the layering a fact rather than a coincidence.
  *
  * The shape this file dresses is picone's, and the load-bearing part of it is a division
