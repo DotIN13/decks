@@ -188,7 +188,7 @@ export const EDGE_FLOOR = 24;
  * A camera that fits the boxes into a *region* of the viewport rather than into all of it.
  *
  * The region is the canvas column: the window minus whatever the chrome is covering, which
- * `lib/insets.ts` measures. Two things follow, and only the first is obvious.
+ * `camera/insets.ts` measures. Two things follow, and only the first is obvious.
  *
  * The zoom comes from the region, not the window — otherwise `fit` frames boards into a
  * width that includes 500px of panel and half of what it framed is behind one.

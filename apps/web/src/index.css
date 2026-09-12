@@ -105,7 +105,7 @@
 :root {
 	/*
 	 * How much of the window the browser is covering from below — the on-screen
-	 * keyboard, mostly. Kept true by `lib/viewport.ts`; 0 everywhere else, so every
+	 * keyboard, mostly. Kept true by `app/viewport.ts`; 0 everywhere else, so every
 	 * rule that adds it reads exactly as it did before it existed.
 	 */
 	--keyboard: 0px;
@@ -1158,7 +1158,7 @@ svg.lucide {
 	 *
 	 * It used to be centred on the *window* with twice-224px subtracted from its width —
 	 * a constant standing in for the board rail plus its margins. That was exact for one
-	 * arrangement and wrong for every other, and it is the mistake `lib/insets.ts` exists
+	 * arrangement and wrong for every other, and it is the mistake `camera/insets.ts` exists
 	 * to stop: a panel's width stated twice drifts the first time someone changes its
 	 * padding.
 	 *
@@ -1986,7 +1986,7 @@ svg.lucide {
 	 * `top: 12px` put the panel's header on the same line as the tool pill, and at 320px
 	 * wide from `right: 30px` the two overlapped outright — the pill drew over the name of
 	 * the thing being edited. `--inset-top` is what the pill measures itself as (`data-inset`
-	 * on it, `lib/insets.ts` publishing the sum), so this follows it when the pill changes
+	 * on it, `camera/insets.ts` publishing the sum), so this follows it when the pill changes
 	 * height or folds, instead of restating a number that only holds for one arrangement.
 	 */
 	top: calc(var(--inset-top, 52px) + 8px);

@@ -5,7 +5,7 @@ import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Sw
 import { unwrap } from "solid-js/store";
 import { Icon } from "../icons.tsx";
 import { boardUrl } from "../lib/api.ts";
-import { INTERACT_ZOOM } from "../lib/camera.ts";
+import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";

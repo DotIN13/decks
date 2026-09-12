@@ -49,7 +49,7 @@ import { agentFoot, agentSections, agentTally } from "./agent-sections.ts";
  * shortcut you have to remember. That argument dies with the hover: the strip existed
  * because a hover-summoned panel needed something to aim at, and **a button is that
  * something**. Folded, this component draws nothing at all — which is also what makes the
- * camera correct for free, since `lib/insets.ts` measures what is in the document and an
+ * camera correct for free, since `camera/insets.ts` measures what is in the document and an
  * absent panel measures nothing.
  *
  * It must stay *mounted* while folded, though, because `⌘\` is registered here. Wrapping the
@@ -326,7 +326,7 @@ export function LeftPanel(props: {
 			<aside
 				/*
 				 * `data-inset` on the panel and *not* on the sheet — the one attribute in this
-				 * component that changes what the camera believes. See `lib/insets.ts`.
+				 * component that changes what the camera believes. See `camera/insets.ts`.
 				 */
 				/*
 				 * `data-inset` only while it is open *and* beside the canvas.

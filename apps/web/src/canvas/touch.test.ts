@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createTouches, STALE_MS } from "./touch.ts";
-import { pinchCamera, toScreen, toWorld } from "../lib/camera.ts";
+import { pinchCamera, toScreen, toWorld } from "../camera/camera.ts";
 
 const view = { width: 800, height: 600 };
 

@@ -368,7 +368,7 @@ export function Inspector(props: {
 					/*
 					 * No `data-inset`, in either arrangement.
 					 *
-					 * It used to declare `right`, and `lib/insets.ts` subtracted its width: the
+					 * It used to declare `right`, and `camera/insets.ts` subtracted its width: the
 					 * panel was a full-height column beside the canvas, so the dock centred on
 					 * what was left and `fit` framed into it. It is a card in the top-right
 					 * corner now — under the tool cluster, 320px by about 200 — and subtracting

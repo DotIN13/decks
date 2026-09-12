@@ -1,5 +1,5 @@
 import type { Board, Camera } from "@decks/protocol";
-import { boxOf, fitInto, frames } from "../lib/camera.ts";
+import { boxOf, fitInto, frames } from "./camera.ts";
 
 /**
  * What a conversation remembers about the canvas, and what switching to it should do.

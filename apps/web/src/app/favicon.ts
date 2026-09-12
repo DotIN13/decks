@@ -1,4 +1,4 @@
-import { tabTitle } from "./alerts.ts";
+import { tabTitle } from "../lib/alerts.ts";
 
 /**
  * The tab itself as a notification surface.

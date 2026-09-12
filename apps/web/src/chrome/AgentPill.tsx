@@ -507,7 +507,7 @@ export function AgentPill(props: {
 
 	return (
 		/*
-		 * `data-inset="top"` and nothing about its size stated twice: `lib/insets.ts`
+		 * `data-inset="top"` and nothing about its size stated twice: `camera/insets.ts`
 		 * measures whatever carries the attribute, so the pill may grow a control without
 		 * anything else in the app being told.
 		 */

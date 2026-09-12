@@ -54,14 +54,14 @@ import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
-import { boxOf, fitInto, INTERACT_ZOOM, keepVisible, toWorld } from "./lib/camera.ts";
-import { selectionOnSwitch, viewOnSwitch, viewToPark, type AgentView } from "./chrome/agent-view.ts";
+import { boxOf, fitInto, INTERACT_ZOOM, keepVisible, toWorld } from "./camera/camera.ts";
+import { selectionOnSwitch, viewOnSwitch, viewToPark, type AgentView } from "./camera/agent-view.ts";
 import { closeHistory, historyShown, openHistory, setInspectable, toggleHistory } from "./lib/edge.ts";
-import { canvasBox, watchInsets } from "./lib/insets.ts";
-import { connect, type Socket } from "./lib/socket.ts";
-import { embedPath, uploadAsset } from "./lib/upload.ts";
+import { canvasBox, watchInsets } from "./camera/insets.ts";
+import { connect, type Socket } from "./app/socket.ts";
+import { embedPath, uploadAsset } from "./app/upload.ts";
 import { canHover, NARROW } from "./lib/panels.ts";
-import { blockPageZoom, obscured, trackVisualViewport } from "./lib/viewport.ts";
+import { blockPageZoom, obscured, trackVisualViewport } from "./app/viewport.ts";
 import {
 	type AlertKind,
 	type AlertPrefs,
@@ -74,7 +74,7 @@ import {
 	shouldSound,
 	startedAsking,
 } from "./lib/alerts.ts";
-import { setUnattended as paintBadge } from "./lib/favicon.ts";
+import { setUnattended as paintBadge } from "./app/favicon.ts";
 import { post as postBanner } from "./lib/notify.ts";
 import { play as playCue, preload as preloadCues } from "./lib/sound.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";

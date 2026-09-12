@@ -1,6 +1,6 @@
 import type { Board, Camera, StageCall } from "@decks/protocol";
 import { anchorPoint, cleanMarks, type Mark } from "./annotations.ts";
-import { boxOf, fit } from "../lib/camera.ts";
+import { boxOf, fit } from "../camera/camera.ts";
 
 /**
  * What the browser does when an agent asks something of the canvas.

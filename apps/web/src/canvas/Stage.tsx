@@ -1,7 +1,7 @@
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../lib/camera.ts";
-import { canvasBox } from "../lib/insets.ts";
+import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
+import { canvasBox } from "../camera/insets.ts";
 import { BoardFrame } from "./BoardFrame.tsx";
 import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
@@ -148,7 +148,7 @@ export function Stage(props: {
 	 * Every `fit` on this page goes through here, which is the point: the stage element is
 	 * the full window, and half of what it framed used to end up behind a panel. What the
 	 * boards should be framed into is the window minus the chrome standing beside it, and
-	 * `lib/insets.ts` is the only thing that knows how much that is.
+	 * `camera/insets.ts` is the only thing that knows how much that is.
 	 */
 	const frame = (boxes: Array<{ x: number; y: number; w: number; h: number }>) =>
 		fitInto(boxes, view(), canvasBox(view()));
