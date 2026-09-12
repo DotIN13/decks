@@ -5,7 +5,6 @@ import type {
 	Camera,
 	Identity,
 	ThinkingLevel,
-	UsageReport,
 } from "@decks/protocol";
 import Info from "lucide-solid/icons/info";
 import MessageSquare from "lucide-solid/icons/message-square";
@@ -28,7 +27,35 @@ import { clearMarks, component, marks, mode, selected, setComponent, setMarks, s
 import { on, send, start, started } from "./state/socket.ts";
 import { clearDialog, clearPreview, dialog, preview, setState, state } from "./state/deck.ts";
 import { notice, working } from "./state/notices.ts";
-import { openThumbnails } from "./canvas/thumb-budget.ts";
+import {
+	boardsMayStart,
+	boardsOpen,
+	boardsStarted,
+	canvasOpened,
+	draft,
+	editingSource,
+	ops,
+	openSource,
+	openUsage,
+	picking,
+	presenting,
+	readUsage,
+	setBoardsMayStart,
+	setBoardsOpen,
+	setDraft,
+	setEditingSource,
+	setOps,
+	setPicking,
+	setPresenting,
+	setSettings,
+	setUnread,
+	setUsagePanel,
+	setUsageReport,
+	settings,
+	unread,
+	usagePanel,
+	usageReport,
+} from "./state/ui.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { DecksMark, Icon } from "./icons.tsx";
@@ -108,40 +135,7 @@ export function App() {
 	};
 
 	const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
-	/**
-	 * The deck being presented, and the slide it opened on.
-	 *
-	 * Browser-only, and deliberately: paging a deck is a *view*, not a change to it. Putting
-	 * the slide number in the file would make every page-turn a write and the deck's git
-	 * history a log of somebody presenting — so the cost is that a reload opens on slide
-	 * one, which is the right way round.
-	 */
-	const [presenting, setPresenting] = createSignal<{ path: string; at: number } | undefined>();
-	/**
-	 * The board being edited as its own source, once its file has arrived.
-	 *
-	 * Fetched rather than read out of the frame. The frame holds the *rendered* markdown, and
-	 * rendering is one-way — recovering the source from it is the round trip this editor
-	 * exists to avoid. `?raw=1` is the same parameter the shell uses to ask for the file
-	 * behind a board.
-	 */
-	const [editingSource, setEditingSource] = createSignal<{ path: string; source: string } | undefined>();
-
-	const openSource = (path: string) => {
-		void fetch(`/api/board/${path}?raw=1`)
-			.then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
-			.then((source) => setEditingSource({ path, source }))
-			.catch(() => notice("error", `Could not read ${path} to edit it.`));
-	};
 	const zoomInteractive = createMemo(() => camera().zoom >= INTERACT_ZOOM);
-	/**
-	 * The file picker's promise, and which board asked.
-	 *
-	 * The board is what a file uploaded *through* the picker needs: an embed is written
-	 * the way that board's document would address it (`embedPath`), so "add a photo from
-	 * this phone" cannot be answered without knowing where the answer is going.
-	 */
-	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; board?: string } | undefined>(undefined);
 	/** The turn the chat was opened at, from a click on the spine. */
 	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
 	/**
@@ -152,84 +146,6 @@ export function App() {
 	 * comparison is skipped entirely rather than being kept up to date — see `turns`.
 	 */
 	const [seenAt, setSeenAt] = createSignal(Date.now());
-	/**
-	 * Whether the conversation is up (see `FloatingTranscript`).
-	 *
-	 * This is *the* transcript now — the sheet that used to slide in from the right edge
-	 * is gone — so the flag is no longer only about the dock giving way to it. It is what
-	 * "the conversation is open" means everywhere: the dock's peek stands down, the spine
-	 * stops marking turns as unseen, and an arriving reply is not unread.
-	 */
-	/** The all-canvases modal (`canvas/AllBoards.tsx`), which is a thing you do and then stop. */
-	/*
-	 * Whether the boards panel is there. One signal where `lib/panels.ts` had two, because
-	 * there is one panel now — and a plain signal rather than that module's persisted pair,
-	 * since what it was mostly doing was closing one panel when the other opened.
-	 *
-	 * **Open where it is a panel, closed where it is a sheet.** Above 1100px it stands beside
-	 * the canvas and costs 264px of a wide window, which is a fair trade for knowing what the
-	 * agent is holding. Below that it is a sheet *over* the canvas, and a canvas app that
-	 * opens with something covering the canvas is answering a question nobody asked — on a
-	 * 393px screen the sheet took the left two thirds, and a pinch aimed at a board landed on
-	 * a list of filenames.
-	 */
-	const [boardsOpen, setBoardsOpen] = createSignal(window.innerWidth > 1100);
-	/** Settings: the Claude subscriptions this install can use (`chat/Settings.tsx`). */
-	const [settings, setSettings] = createSignal(false);
-	/**
-	 * Words the server has handed to the input bar: the message a rewind took back.
-	 *
-	 * Stamped, so rewinding twice to the same message is two handovers rather than one the
-	 * composer has already acted on.
-	 */
-	const [draft, setDraft] = createSignal<{ text: string; at: number; agentId?: string; insert?: boolean } | undefined>(undefined);
-	/**
-	 * Whether the canvas cheat sheet is open (see `CanvasOps`).
-	 *
-	 * Reference material, behind a button. It was a permanent line of grey text under the
-	 * input bar once, and a tip rotating through the composer's placeholder after that —
-	 * both of which put a reference table where a person is working, so it was either always
-	 * in the way or arriving at a moment nobody asked for it.
-	 */
-	const [ops, setOps] = createSignal(false);
-	/**
-	 * The usage panel: whose it is open for, and what it has read.
-	 *
-	 * An agent id rather than a boolean, because every figure in it belongs to one agent and
-	 * a panel that survived a switch would be showing the last agent's plan under this one's
-	 * name. `usagePanel` is compared against `state.focused` before it is drawn, so moving
-	 * to another conversation closes it rather than relabelling it.
-	 *
-	 * Two ways in. On a desktop the cheap reading is a popover on the dial under the input
-	 * bar and this is what its last row opens; on a phone there is no room under the box, so
-	 * `⋯` has one row for the reading and it opens this directly. The third way is `/cost`,
-	 * which arrives from the server with `show` — see the `agent.report` case below.
-	 *
-	 * The report itself is *not* kept per agent across openings: it is read fresh every
-	 * time, because two of its three parts are running totals and the third is a countdown.
-	 */
-	const [usagePanel, setUsagePanel] = createSignal<string | undefined>(undefined);
-	const [report, setReport] = createSignal<{ report?: UsageReport; error?: string; loading: boolean }>({ loading: false });
-	const readUsage = (id: string | undefined) => {
-		if (!id) return;
-		setReport((was) => ({ ...was, loading: true }));
-		send({ type: "agent.report", id });
-	};
-	const openUsage = (id: string | undefined) => {
-		if (!id) return;
-		setUsagePanel(id);
-		setReport({ loading: true });
-		send({ type: "agent.report", id });
-	};
-	/**
-	 * Unread counts, kept here rather than on the server.
-	 *
-	 * "Have I read this" is a fact about a person in front of a browser, not about the
-	 * agent — a second tab has its own answer, and the server has no business
-	 * guessing. Reset by opening the conversation, which is the only thing that means
-	 * you have seen it.
-	 */
-	const [unread, setUnread] = createStore<Record<string, number>>({});
 
 	/**
 	 * Revisions this browser caused, by path.
@@ -279,26 +195,6 @@ export function App() {
 	 */
 	const earlierWaiting = new Map<string, (added: number) => void>();
 
-	/*
-	 * Whether the app has opened, which is when the boards may start (`Stage`).
-	 *
-	 * Opened means the deck is laid out and the chat you are looking at has its history — the
-	 * two things on screen that are the app's own. A board is a document on the same main
-	 * thread, so boards that start while the chat is still arriving are a page that does not
-	 * answer; they wait for this, and it happens once. Two frames after the history lands so it
-	 * is painted first, or after a few seconds whatever happened, so a history that never comes
-	 * cannot keep the canvas empty.
-	 */
-	const [boardsMayStart, setBoardsMayStart] = createSignal(false);
-	/*
-	 * And after that, the boards on the canvas are in: the rest of the panel's list may be
-	 * drawn and the rail's thumbnails may start. Chat, then canvas, then the rest.
-	 */
-	const [boardsStarted, setBoardsStarted] = createSignal(false);
-	const canvasOpened = () => {
-		setBoardsStarted(true);
-		openThumbnails();
-	};
 	let opened = false;
 	const appOpened = () => {
 		if (opened) return;
@@ -693,7 +589,7 @@ export function App() {
 					// A reading for an agent whose panel is not open is a reading for a panel that
 					// was closed while it was in flight.
 					if (usagePanel() !== message.id) return;
-					setReport({ loading: false, ...(message.report ? { report: message.report } : {}), ...(message.error ? { error: message.error } : {}) });
+					setUsageReport({ loading: false, ...(message.report ? { report: message.report } : {}), ...(message.error ? { error: message.error } : {}) });
 					return;
 				}
 
@@ -1964,9 +1860,9 @@ export function App() {
 				<Show when={usagePanel() && usagePanel() === state.focused}>
 					<UsageModal
 						usage={state.focused ? state.agents[state.focused]?.usage : undefined}
-						report={report().report}
-						error={report().error}
-						loading={report().loading}
+						report={usageReport().report}
+						error={usageReport().error}
+						loading={usageReport().loading}
 						onRefresh={() => readUsage(state.focused)}
 						onClose={() => setUsagePanel(undefined)}
 					/>
