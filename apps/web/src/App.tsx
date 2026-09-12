@@ -26,7 +26,8 @@ import { forgetAskedResults, receiveToolResult, setToolResultSender } from "./ch
 import { type AgentRecord, createAgentScratch, emptyAgent } from "./state/agent.ts";
 import { clearMarks, component, marks, mode, selected, setComponent, setMarks, setMode, setSelected, setTool, tool } from "./state/selection.ts";
 import { on, send, start, started } from "./state/socket.ts";
-import { clearDialog, clearPreview, dialog, type Notice, preview, setState, state } from "./state/deck.ts";
+import { clearDialog, clearPreview, dialog, preview, setState, state } from "./state/deck.ts";
+import { notice, working } from "./state/notices.ts";
 import { openThumbnails } from "./canvas/thumb-budget.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
@@ -268,8 +269,6 @@ export function App() {
 	 */
 	const [frameRevs, setFrameRevs] = createStore<Record<string, number>>({});
 
-	let noticeId = 0;
-
 	/**
 	 * Readers waiting on a page of scrollback, keyed by the row they asked from.
 	 *
@@ -348,38 +347,6 @@ export function App() {
 				if (earlierWaiting.delete(before)) resolve(0);
 			}, 10_000);
 		});
-	};
-
-	const notice = (level: Notice["level"], text: string) => {
-		const id = ++noticeId;
-		setState("notices", (all) => [...all, { id, level, text }]);
-		// Length-based, floored and capped: long enough to read, short enough that a
-		// burst of warnings does not become a wall.
-		const linger = Math.min(12000, Math.max(4000, (text.length / 20) * 1000));
-		setTimeout(() => setState("notices", (all) => all.filter((item) => item.id !== id)), linger);
-	};
-
-	/**
-	 * A notice that lasts as long as the work it describes.
-	 *
-	 * The timed notices above are for things that have already happened. An upload has
-	 * not: it takes as long as the file is big, and a message that expires after four
-	 * seconds while the bytes are still going is worse than none. So this one is held
-	 * open by the caller, rewritten as the work progresses, and replaced by an ordinary
-	 * timed notice when it ends.
-	 */
-	const working = (text: string) => {
-		const id = ++noticeId;
-		setState("notices", (all) => [...all, { id, level: "info" as const, text }]);
-		const drop = () => setState("notices", (all) => all.filter((item) => item.id !== id));
-		return {
-			update: (next: string) =>
-				setState("notices", (all) => all.map((item) => (item.id === id ? { ...item, text: next } : item))),
-			done: (final?: string, level: Notice["level"] = "info") => {
-				drop();
-				if (final) notice(level, final);
-			},
-		};
 	};
 
 	// --- alerts: a cue, a banner, and a dot on the tab -------------------------------
