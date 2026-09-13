@@ -462,6 +462,27 @@ svg.lucide {
 }
 
 /*
+ * ### The boards are soft at high zoom, and it is not the layers
+ *
+ * Measured at 4× on a 2× display: a board's heading is visibly soft. Removing the world's
+ * `will-change`, re-taking that layer, and putting each iframe on a layer of its own all produce
+ * **byte-identical pixels** — so none of the three is the cause, and this box is the wrong place
+ * to fix it.
+ *
+ * What the difference is, though, is plain from the same screenshots: the *bar* over a board is
+ * crisp at 4× and the board under it is not. Both are inside the same scaled world. The bar is
+ * ordinary DOM, rastered as part of the world's layer at the composited scale; an iframe rasteres
+ * its *own* document at its own scale, and past some point the compositor upscales that picture
+ * instead of asking the frame for more pixels. It is not about the board being big — a 760px flow
+ * board is exactly as soft as a 940px one at the same zoom.
+ *
+ * So the levers are not CSS: either the boards are re-laid-out at the new zoom instead of scaled
+ * (what a browser's own page zoom does, and what would cost a document reflow per step), or the
+ * canvas renderers that draw with an explicit scale do it (`lib/renderer.ts` — and the reason they
+ * exist), or this is accepted as the price of the `dom` renderer.
+ */
+
+/*
  * Editing looks different, for as long as it lasts.
  *
  * This is what stands in for a confirmation dialog on the pencil. A mode that changes what a
