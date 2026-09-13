@@ -249,3 +249,81 @@ function remove(element: Element): void {
 	const at = parent.childNodes.indexOf(element);
 	if (at !== -1) parent.childNodes.splice(at, 1);
 }
+
+// --- whole blocks --------------------------------------------------------------------
+
+/**
+ * A whole block — a heading, a paragraph, a list, a table — on its way into a document.
+ *
+ * **Checked, not rewritten**, and that is the whole difference from `normalizeInline` beside it.
+ * A run of words is *rebuilt*: foreign tags unwrapped, attributes filtered down to a list, the
+ * result canonical — because a `contenteditable` hands back soup no author would have written.
+ * A **block** is authored content and comes back byte for byte as it arrived.
+ *
+ * That is not pedantry. Re-serialising a block through parse5 rewrote `<div data-mermaid>` as
+ * `<div data-mermaid="">` and escaped the `>` of a Mermaid arrow — both small, both real, and
+ * both exactly the kind of rewrite the ops on this file exist to avoid.
+ *
+ * So the payload is parsed only in order to *refuse* things, and what it refuses is about danger
+ * rather than taste: a document opened in an editor is executed by a browser, and whatever
+ * passes here lands in a file this app serves. A `<script>`, an `on*` handler, a `javascript:` URL or the
+ * editor's own overlay is a refusal; anything else an editor can produce is probably what
+ * somebody meant to write.
+ *
+ * Two shapes are refused because the ops cannot describe them: no element at all, and more
+ * than one root. `insert-child` adds **one** block at one index, and a payload holding three
+ * would shift every later index of the same batch — the silent version of exactly the failure
+ * this whole area exists to avoid.
+ */
+export function checkBlock(html: string): { html: string } | { problem: string } {
+	const fragment = parseFragment(html);
+	const roots = (fragment.childNodes ?? []).filter((node) => (node as Element).tagName);
+	if (roots.length === 0) return { problem: "there is no element in it" };
+	if (roots.length > 1) return { problem: "it holds more than one block" };
+
+	for (const node of descendants(fragment)) {
+		const element = node as Element;
+		if (!element.tagName) continue;
+		const tag = element.tagName.toLowerCase();
+		if (FOREIGN.has(tag)) return { problem: `it holds a <${tag}>` };
+		for (const attribute of element.attrs ?? []) {
+			const name = attribute.name.toLowerCase();
+			if (name.startsWith("on")) return { problem: `it carries a ${name} handler` };
+			if (name === "data-decks-ui") return { problem: "it carries the editor's own overlay" };
+			if ((name === "href" || name === "src") && /^\s*javascript:/i.test(attribute.value)) {
+				return { problem: `it links to javascript: through its ${name}` };
+			}
+		}
+	}
+
+	// Trimmed, because it is placed at a line start where its own indentation belongs to the
+	// document — and otherwise exactly the bytes that arrived.
+	return { html: html.trim() };
+}
+
+/**
+ * Elements a block may never hold, whatever they say.
+ *
+ * `<svg>` is deliberately not here: a board draws its own diagrams as SVG, so a figure is
+ * legitimate content in a document. A `<script>` inside one is caught anyway, because the walk
+ * goes all the way down.
+ */
+const FOREIGN = new Set([
+	"script",
+	"style",
+	"link",
+	"meta",
+	"base",
+	"iframe",
+	"object",
+	"embed",
+	"form",
+	"input",
+	"button",
+	"select",
+	"textarea",
+	"video",
+	"audio",
+	"source",
+	"track",
+]);

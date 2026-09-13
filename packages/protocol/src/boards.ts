@@ -102,6 +102,44 @@ export type BoardPatch =
 	 * about words.
 	 */
 	| { op: "html"; id: string; path: number[]; before: string; html: string }
+	/**
+	 * Put a block into a component's own content, or take one out.
+	 *
+	 * `text` and `html` address a **run of words** inside a component and can only replace
+	 * what is between two tags. A flow document is made of blocks — a heading, a paragraph, a
+	 * list, a table — and adding, deleting or moving one of those is not a retype: the whole
+	 * element goes or arrives, tags and all. That is what these three are for, and they are
+	 * the ops a rich editor over a document needs and a component board never does.
+	 *
+	 * The address is the same path `html` uses, one level up: `path` walks element children
+	 * from the component, and for `insert-child` the **last index is where among them the new
+	 * block goes** while the rest is the parent it goes into. So `[3, 1]` inserts as the second
+	 * child of the fourth element child. For `remove-child` and `move-child` the whole path
+	 * addresses the block itself, which is what `html` does too.
+	 *
+	 * `html` is the block's **own markup**, both tags included — the opposite of `op: "html"`,
+	 * whose payload is the inside of an element that is already there. `before` is that
+	 * markup for a removal, and it is compared as words against the file's own block, for the
+	 * same race `text` and `html` guard against: a path is only correct against the document
+	 * the editor loaded, and a board an agent rewrote underneath it must be refused rather
+	 * than edited in the wrong place.
+	 *
+	 * The batch has to be applied in the order the mapper sends it — content, then removals
+	 * bottom-up, then insertions top-down — because every index in it is read against the file
+	 * as it is by the time that op runs. `applyPatches` already re-parses per patch for exactly
+	 * this reason.
+	 */
+	| { op: "insert-child"; id: string; path: number[]; html: string }
+	| { op: "remove-child"; id: string; path: number[]; before: string }
+	/**
+	 * Move a block to a different position among its siblings.
+	 *
+	 * `to` is the index the block should **end up at**, counted the same way and after the
+	 * move — not the index of a neighbour to sit beside. Stated because the two readings
+	 * differ by one in one direction and agree in the other, which is the kind of ambiguity
+	 * that produces an off-by-one nobody can reproduce.
+	 */
+	| { op: "move-child"; id: string; path: number[]; to: number }
 	| { op: "remove"; id: string }
 	/**
 	 * A copy of a component, offset, with a name derived from the original's.

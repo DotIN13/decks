@@ -1,7 +1,7 @@
 import { BOX_CLASSES, component, type ComponentKind } from "@decks/board-kit";
 import type { BoardPatch, Rect } from "@decks/protocol";
 import { parse } from "parse5";
-import { isRichRun, normalizeInline, textOfInline } from "./inline-html.ts";
+import { checkBlock, isRichRun, normalizeInline, textOfInline } from "./inline-html.ts";
 import type { DefaultTreeAdapterMap } from "parse5";
 
 type Element = DefaultTreeAdapterMap["element"];
@@ -102,6 +102,14 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 	}
 
 	if (patch.op === "text" || patch.op === "html") return retype(html, document, patch);
+	/*
+	 * The block ops, addressed and resolved the same way — a component, then element-child
+	 * indices walked in from it. They run before the component lookup below because what they
+	 * address is *inside* a component, exactly as `retype` does.
+	 */
+	if (patch.op === "insert-child" || patch.op === "remove-child" || patch.op === "move-child") {
+		return blockOp(html, document, patch);
+	}
 	/*
 	 * A `source` op is a whole-file write and never reaches here — `App.patch` handles it
 	 * before parsing, because there is nothing in a markdown file to parse. Refused rather
@@ -391,6 +399,182 @@ function retype(
 		summary: `retyped ${describeTarget(id, path, target)}`,
 		id,
 	};
+}
+
+// --- the blocks inside a document ----------------------------------------------------
+
+/**
+ * Add, remove or move one element child of a component.
+ *
+ * What a rich editor over a flow document produces. `text` and `html` can only replace what is
+ * between two tags, so a whole block arriving or leaving had no way to be described at all:
+ * the editor's only answer was to write the entire file, which is the thing that rewrote 383
+ * lines into 225 and moved every line number an agent was holding. These three are the missing
+ * half of editing a document.
+ *
+ * Every byte outside the block is spliced around rather than re-serialised, and each op is
+ * applied to the file as it is *at that point* — `applyPatches` re-parses per patch, which is
+ * what makes the mapper's ordering (content, then removals bottom-up, then insertions
+ * top-down) sufficient rather than merely conventional.
+ */
+function blockOp(
+	html: string,
+	document: Node,
+	patch: Extract<BoardPatch, { op: "insert-child" | "remove-child" | "move-child" }>,
+): { html: string; summary: string; id: string } {
+	const component = findById(document, patch.id);
+	if (!component) throw new PatchRefused(`no component with data-id="${patch.id}"`);
+
+	if (patch.op === "insert-child") return addChild(html, document, patch.id, patch.path, patch.html);
+	if (patch.op === "remove-child") return dropChild(html, component, patch.id, patch.path, patch.before);
+
+	/*
+	 * A move is a removal followed by an insertion, against the file as the removal left it.
+	 * Composing the two rather than writing a third splice keeps the byte discipline in one
+	 * place — and `to` is read against the *moved* structure, which is the state the file is in
+	 * by the time the second half runs.
+	 */
+	const target = elementAt(component, patch.path);
+	if (!target) throw new PatchRefused(`#${patch.id} has nothing at ${describePath(patch.path)} any more`);
+	const location = target.sourceCodeLocation;
+	if (!location) throw new PatchRefused(`cannot locate ${describeTarget(patch.id, patch.path, target)} in the source`);
+	const markup = html.slice(location.startOffset, location.endOffset);
+	const parentPath = patch.path.slice(0, -1);
+	const cut = cutOut(html, location);
+
+	const placed = addChild(cut, parse(cut, { sourceCodeLocationInfo: true }), patch.id, [...parentPath, patch.to], markup);
+	return { ...placed, summary: `moved ${describePath(patch.path)} of #${patch.id} to ${patch.to}` };
+}
+
+/**
+ * Put one block in at `path`, whose last index is where among the parent's children it goes.
+ *
+ * The splice is at the **start of the line** the position is on, and writes the block plus its
+ * own trailing newline. That is not a style choice: the next line's indentation is already in
+ * the file at that offset, so writing an indent after the newline as well would indent the
+ * block below by one more tab. Written at a line start, `indent` belongs to the block and the
+ * file's own indentation belongs to whatever follows — which is how `order` writes a moved
+ * component too.
+ */
+function addChild(
+	html: string,
+	document: Node,
+	componentId: string,
+	path: number[],
+	markup: string,
+): { html: string; summary: string; id: string } {
+	const component = findById(document, componentId);
+	if (!component) throw new PatchRefused(`no component with data-id="${componentId}"`);
+
+	const parentPath = path.slice(0, -1);
+	const parent = elementAt(component, parentPath);
+	if (!parent) {
+		throw new PatchRefused(`#${componentId} has nothing at ${describePath(parentPath)} to put a block into`);
+	}
+
+	const clean = checkBlock(markup);
+	if ("problem" in clean) throw new PatchRefused(`that block cannot go into a board: ${clean.problem}`);
+	/*
+	 * An inserted block is anonymous as far as the app is concerned, but it may be authored
+	 * markup carrying a name — and a second component with an id the file already uses is a
+	 * name that means two things to the whole deck.
+	 */
+	const named = /\sdata-id="([^"]+)"/.exec(clean.html)?.[1];
+	if (named && findById(document, named)) throw new PatchRefused(`there is already a component called ${named}`);
+
+	const children = elementChildren(parent);
+	const index = path[path.length - 1] ?? 0;
+	const anchor = children[index];
+
+	let at: number;
+	let indent: string;
+	if (anchor?.sourceCodeLocation?.startOffset !== undefined) {
+		at = lineStartOf(html, anchor.sourceCodeLocation.startOffset);
+		indent = indentOf(html, anchor.sourceCodeLocation.startOffset);
+	} else {
+		/*
+		 * Appending. The block goes on the line above the parent's closing tag, indented as the
+		 * parent's last child is — or, into a container with no children yet, once in from the
+		 * closing tag's own indentation.
+		 */
+		const close = parent.sourceCodeLocation?.endTag?.startOffset;
+		if (close === undefined) throw new PatchRefused(`#${componentId} has no closing tag to add a block before`);
+		const last = children[children.length - 1];
+		at = lineStartOf(html, close);
+		indent = last?.sourceCodeLocation ? indentOf(html, last.sourceCodeLocation.startOffset) : `${indentOf(html, close)}\t`;
+	}
+
+	const placed = `${indent}${indentLines(clean.html, indent)}\n`;
+	return {
+		html: html.slice(0, at) + placed + html.slice(at),
+		summary: `added a block to #${componentId}`,
+		id: componentId,
+	};
+}
+
+/**
+ * Take a block out, and its line with it.
+ *
+ * `trimBack` is the existing answer to the hole a removal leaves — it takes the element's own
+ * indentation and the newline before it — so this only has to take the newline *after* it, and
+ * the result is a document with one line fewer rather than one blank line more.
+ *
+ * The guard is the race check `html` uses, compared the same way, as words: the block's markup
+ * arrives from the client and what it is checked against is the file's own bytes at that path.
+ * Text on both sides, because two serialisations of one paragraph differ about spaces that
+ * mean nothing and agree about words.
+ */
+function dropChild(
+	html: string,
+	component: Element,
+	componentId: string,
+	path: number[],
+	before: string,
+): { html: string; summary: string; id: string } {
+	const target = elementAt(component, path);
+	if (!target) throw new PatchRefused(`#${componentId} has nothing at ${describePath(path)} any more`);
+	const location = target.sourceCodeLocation;
+	if (!location) throw new PatchRefused(`cannot locate ${describeTarget(componentId, path, target)} in the source`);
+
+	const held = html.slice(location.startOffset, location.endOffset);
+	if (collapse(textOfInline(held)) !== collapse(textOfInline(before))) {
+		throw new PatchRefused(`${describeTarget(componentId, path, target)} is not what it was when you started editing`);
+	}
+
+	return {
+		html: cutOut(html, location),
+		summary: `removed ${describePath(path)} of #${componentId}`,
+		id: componentId,
+	};
+}
+
+/**
+ * An element's byte range gone from the file, and the line it was on with it.
+ *
+ * Only the newline **before** it: `trimBack` takes that one, and taking the one after as well
+ * joins the two neighbouring blocks onto one line — `<h1>…</h1>\t\t\t<p>…</p>`, a diff about
+ * whitespace with the removal hidden inside it. The trailing newline stays, so the line that
+ * followed the block goes on being its own line.
+ */
+function cutOut(html: string, location: { startOffset: number; endOffset: number }): string {
+	return html.slice(0, trimBack(html, location.startOffset)) + html.slice(location.endOffset);
+}
+
+/**
+ * The same block, indented to sit where it is going.
+ *
+ * Only the lines after the first: the first line's indentation is written by the splice, and
+ * adding it here would put one tab too many on it.
+ */
+function indentLines(markup: string, indent: string): string {
+	return markup
+		.split("\n")
+		.map((line, index) => (index === 0 || line === "" ? line : `${indent}${line}`))
+		.join("\n");
+}
+
+function lineStartOf(html: string, offset: number): number {
+	return html.lastIndexOf("\n", offset - 1) + 1;
 }
 
 /** The element `path` walks to from `component`, or nothing if the file has no such shape. */

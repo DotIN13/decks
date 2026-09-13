@@ -818,3 +818,131 @@ test("a class swap on an invented component keeps the class it invented", () => 
 	// And the CSS the agent wrote is keyed on `.phases`, which is why that must survive.
 	assert.match(html, /class="phase"/);
 });
+
+// --- the blocks inside a document ------------------------------------------------------
+
+/**
+ * A flow document, shaped like the real ones: a `.doc` component holding the document's own
+ * blocks, and paragraphs written across several indented lines — which is the shape a byte
+ * splice has to respect and the reason these ops exist rather than a whole-file write.
+ */
+const FLOW = `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Notes</title>
+		<meta name="board" content='{"w":760,"bg":"plain"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board flow">
+		<div class="doc" data-id="body">
+			<h1>What the round found</h1>
+			<p>
+				The first paragraph, written across
+				two lines.
+			</p>
+			<p>A second one.</p>
+		</div>
+		<script src="../lib/board.js"></script>
+	</body>
+</html>
+`;
+
+const positions = (html: string) =>
+	[...html.matchAll(/<(h1|p)>([^<]*)/g)].map((match) => match[2]!.split("\n").find((line) => line.trim() !== "")!.trim());
+
+test("a block inserted at an index goes in on its own line, indented as its siblings are", () => {
+	const { html, summary } = applyPatches(FLOW, [
+		{ op: "insert-child", id: "body", path: [1], html: "<p>A brand new one.</p>" },
+	]);
+	assert.ok(html.includes("\t\t\t<h1>What the round found</h1>\n\t\t\t<p>A brand new one.</p>\n\t\t\t<p>\n"), html);
+	assert.deepEqual(positions(html), [
+		"What the round found",
+		"A brand new one.",
+		"The first paragraph, written across",
+		"A second one.",
+	]);
+	assert.equal(summary[0], "added a block to #body");
+	// The one line that changed is the new one: everything else is the file's own bytes.
+	assert.equal(html.replace("\t\t\t<p>A brand new one.</p>\n", ""), FLOW);
+});
+
+test("a block appended goes above the closing tag, at the children's indentation", () => {
+	const { html } = applyPatches(FLOW, [
+		{ op: "insert-child", id: "body", path: [3], html: "<h2>The end</h2>" },
+	]);
+	assert.ok(html.includes("\t\t\t<p>A second one.</p>\n\t\t\t<h2>The end</h2>\n\t\t</div>"), html);
+});
+
+test("a block with markup in it keeps its markup, and a bare > stays bare", () => {
+	const { html } = applyPatches(FLOW, [
+		{ op: "insert-child", id: "body", path: [0], html: "<p>See <b>this</b> and <a href=\"/x\">that</a> — A --> B.</p>" },
+	]);
+	assert.ok(html.includes('<p>See <b>this</b> and <a href="/x">that</a> — A --> B.</p>'), html);
+});
+
+test("removing a block takes its line with it, however many lines it had", () => {
+	const { html, summary } = applyPatches(FLOW, [
+		{
+			op: "remove-child",
+			id: "body",
+			path: [1],
+			before: "<p>\n\t\t\t\tThe first paragraph, written across\n\t\t\t\ttwo lines.\n\t\t\t</p>",
+		},
+	]);
+	assert.ok(!html.includes("first paragraph"), html);
+	assert.ok(html.includes("\t\t\t<h1>What the round found</h1>\n\t\t\t<p>A second one.</p>"), html);
+	assert.equal(summary[0], "removed child 1 of #body");
+});
+
+test("a removal whose before does not match is a race, and refused", () => {
+	assert.throws(
+		() => applyPatches(FLOW, [{ op: "remove-child", id: "body", path: [1], before: "<p>Something else entirely.</p>" }]),
+		/not what it was when you started editing/,
+	);
+});
+
+test("a removal of something the file does not have is refused, not guessed at", () => {
+	assert.throws(() => applyPatches(FLOW, [{ op: "remove-child", id: "body", path: [9], before: "<p>x</p>" }]), /has nothing at child 9/);
+	assert.throws(() => applyPatches(FLOW, [{ op: "insert-child", id: "body", path: [9, 0], html: "<p>x</p>" }]), /has nothing at child 9 to put a block into/);
+});
+
+test("moving a block moves exactly one block, and re-inserts it at the index it ends up at", () => {
+	const { html, summary } = applyPatches(FLOW, [{ op: "move-child", id: "body", path: [2], to: 0 }]);
+	assert.deepEqual(positions(html), ["A second one.", "What the round found", "The first paragraph, written across"]);
+	/*
+	 * The invariant, read literally: take the moved line out of both documents and they are the
+	 * same bytes. One line moved; nothing was reformatted on the way.
+	 */
+	const without = (text: string) => text.replace("\t\t\t<p>A second one.</p>\n", "");
+	assert.equal(without(html), without(FLOW));
+	assert.match(summary[0]!, /moved child 2 of #body to 0/);
+});
+
+test("a block the file must not hold is refused, with the reason", () => {
+	const refuse = (html: string) =>
+		assert.throws(() => applyPatches(FLOW, [{ op: "insert-child", id: "body", path: [0], html }]), PatchRefused);
+	refuse("<p>ok</p><script>alert(1)</script>");
+	refuse("<p onclick=\"steal()\">ok</p>");
+	refuse('<p><a href="javascript:steal()">ok</a></p>');
+	refuse("<p>ok</p><p>two blocks</p>");
+	refuse("no element at all");
+	refuse('<p data-id="body">a name the file already uses</p>');
+});
+
+test("the mapper's order is the order that works: content, then removals bottom-up, then inserts", () => {
+	/*
+	 * Three edits at once — retype the first paragraph, delete the second, append a new one —
+	 * in the order `block-edits.ts` sends them. Each op is read against the file as it is by
+	 * the time it runs, which is why this is a test and not a convention: the indices in it
+	 * only add up in this sequence.
+	 */
+	const { html } = applyPatches(FLOW, [
+		{ op: "html", id: "body", path: [1], before: "The first paragraph, written across two lines.", html: "Rewritten." },
+		{ op: "remove-child", id: "body", path: [2], before: "<p>A second one.</p>" },
+		{ op: "insert-child", id: "body", path: [2], html: "<p>And a new last one.</p>" },
+	]);
+	assert.deepEqual(positions(html), ["What the round found", "Rewritten.", "And a new last one."]);
+	// The heading and the doc's own lines were never in the batch, so they are untouched.
+	assert.ok(html.startsWith(FLOW.slice(0, FLOW.indexOf("\t\t\t<h1>"))));
+});

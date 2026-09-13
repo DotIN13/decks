@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parse } from "parse5";
 import type { DefaultTreeAdapterMap } from "parse5";
-import { isRichRun, normalizeInline } from "./inline-html.ts";
+import { checkBlock, isRichRun, normalizeInline } from "./inline-html.ts";
 
 type Element = DefaultTreeAdapterMap["element"];
 type Node = DefaultTreeAdapterMap["node"];
@@ -115,4 +115,28 @@ test("a run of words with marks in it is one field; a box of blocks is not", () 
 	assert.equal(richRun("<x><h3>Goal</h3><p>Keep it short.</p></x>"), false);
 	assert.equal(richRun("<x>words <div>and a block</div></x>"), false);
 	assert.equal(richRun("<x><ul><li>one</li></ul></x>"), false);
+});
+
+test("a block keeps its own markup, which is the whole difference from a run of words", () => {
+	// A run of words is rebuilt — foreign tags unwrapped, attributes filtered. A block is
+	// authored content and is left as it is, so the two must not share an implementation.
+	const block = checkBlock('<p class="lede" data-note="x">Keep <b>this</b> and <span style="color:red">this styling</span>.</p>');
+	assert.deepEqual(block, {
+		html: '<p class="lede" data-note="x">Keep <b>this</b> and <span style="color:red">this styling</span>.</p>',
+	});
+	// And byte for byte, which re-serialising did not manage: parse5 wrote that valueless
+	// attribute as `data-mermaid=""`, and escaped the arrow inside it.
+	assert.deepEqual(checkBlock('<div data-mermaid>A --> B</div>\n'), { html: "<div data-mermaid>A --> B</div>" });
+});
+
+test("a block refuses what a document must not hold, and refuses more than one root", () => {
+	assert.deepEqual(checkBlock("<script>x</script>"), { problem: "it holds a <script>" });
+	assert.deepEqual(checkBlock('<p><img src="x" onerror="steal()"></p>'), { problem: "it carries a onerror handler" });
+	assert.deepEqual(checkBlock('<div data-decks-ui="true">handle</div>'), { problem: "it carries the editor's own overlay" });
+	assert.deepEqual(checkBlock("just words"), { problem: "there is no element in it" });
+	assert.deepEqual(checkBlock("<p>one</p><p>two</p>"), { problem: "it holds more than one block" });
+	// SVG is content — a board draws its own diagrams as it — so it is not refused, and a
+	// script inside one still is, because the walk goes all the way down.
+	assert.ok("html" in checkBlock('<figure><svg viewBox="0 0 1 1"><circle r="1"/></svg></figure>'));
+	assert.deepEqual(checkBlock("<svg><script>x</script></svg>"), { problem: "it holds a <script>" });
 });
