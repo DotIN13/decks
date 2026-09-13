@@ -20,7 +20,8 @@ import { handleFrame, type FrameHooks } from "./app/frames.ts";
 import { createFileDrops } from "./app/files.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
 import { installKeys } from "./app/keys.ts";
-import {createAgentScratch} from "./state/agent.ts";
+import { scratch } from "./state/agent.ts";
+import { ensureHistory, loadEarlier } from "./state/history.ts";
 import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
 import { on, send, start, started } from "./state/socket.ts";
 import {clearDialog, clearPreview, dialog, preview, setState, state} from "./state/deck.ts";
@@ -62,17 +63,6 @@ import { UsageModal } from "./chat/UsageModal.tsx";
  * anywhere until an agent asks about it (M3).
  */
 export function App() {
-	/**
-	 * The scratch half of an agent's state: real, and deliberately not drawn (`state/agent.ts`).
-	 *
-	 * Where it was carried before: `views` parked a camera, `historyHeld` and `historyAsked`
-	 * guarded a request, `lastState` told a transition from a restatement. Each was a plain
-	 * `Map` or `Set` rather than store state, for one reason each file spelled out — nothing
-	 * renders from them, and a signal would re-run every reader on every change. That is still
-	 * true, so they are still not reactive; they are merely in one place now.
-	 */
-	const scratch = createAgentScratch();
-
 	// The camera itself is `state/camera.ts`; this is the one derived reading of it.
 	const zoomInteractive = createMemo(() => camera().zoom >= INTERACT_ZOOM);
 	/** The turn the chat was opened at, from a click on the spine. */
@@ -115,58 +105,11 @@ export function App() {
 	 */
 	const [frameRevs, setFrameRevs] = createStore<Record<string, number>>({});
 
-	/**
-	 * Readers waiting on a page of scrollback, keyed by the row they asked from.
-	 *
-	 * Keyed by the cursor rather than by the agent because the cursor is what the answer
-	 * carries back, and two pages can be in flight when a reader keeps scrolling. The value
-	 * is what the column is really waiting for: **how many rows arrived**, which is what it
-	 * uses to hold the reader's place while the column grows above them.
-	 */
-	const earlierWaiting = new Map<string, (added: number) => void>();
-
 	/*
-	 * A history is asked for when a chat is shown — opened, or mirrored on a board — rather
-	 * than greeted: the greeting used to carry every chat's, 8.2 MB on the live deck, with the
-	 * one on screen arriving last. The two flags live on the agent's scratch record, which is
-	 * not reactive, because nothing is drawn from them; a reconnect clears both, since whatever
-	 * the old connection was asked is not coming.
+	 * The history window — asked for when a chat is shown, and reached back through on demand
+	 * (`state/history.ts`). The map of waiting readers lives with the request it mints, which
+	 * is why it is not part of the frame switch that answers it.
 	 */
-	const ensureHistory = (agentId: string | undefined) => {
-		if (!agentId || !started()) return;
-		const held = scratch.of(agentId);
-		if (held.historyHeld || held.historyAsked) return;
-		held.historyAsked = true;
-		send({ type: "chat.open", agentId });
-	};
-
-	/**
-	 * Reach back past what the browser holds (`chat/history-page.ts`).
-	 *
-	 * Resolves with how many rows arrived, and with zero for every case where nothing will:
-	 * an empty conversation, a server that has already said there is nothing older, a
-	 * request already in flight for this cursor, or an answer that never comes. A promise
-	 * that resolves with nothing is what lets the column try again rather than deciding it
-	 * has reached the beginning.
-	 */
-	const loadEarlier = (agentId: string): Promise<number> => {
-		const held = state.agents[agentId]?.transcript ?? [];
-		const before = held[0]?.id;
-		if (!before || state.agents[agentId]?.moreHistory === false) return Promise.resolve(0);
-		if (earlierWaiting.has(before)) return Promise.resolve(0);
-		return new Promise<number>((resolve) => {
-			earlierWaiting.set(before, resolve);
-			send({ type: "chat.earlier", agentId, before, limit: PAGE });
-			/*
-			 * A dropped socket must not leave the column unable to ask again. Ten seconds is
-			 * far longer than a read of a log file and short enough that a reader who has
-			 * given up scrolling has not yet come back.
-			 */
-			setTimeout(() => {
-				if (earlierWaiting.delete(before)) resolve(0);
-			}, 10_000);
-		});
-	};
 
 	/**
 	 * How boards are drawn (`lib/renderer.ts`). The choice is remembered; what runs is the
@@ -326,17 +269,12 @@ export function App() {
 	 * needs to answer a question with. Everything else the handler uses is a module.
 	 */
 	const frames: FrameHooks = {
-		ensureHistory,
 		hearBoard: (request, path) => files.hearBoard(request, path),
-		scratch,
-		earlierWaiting,
 		selfRevs,
 		patching,
 		queued,
 		setFrameRev: (path, rev) => setFrameRevs(path, rev),
 		sendPatches,
-		setCamera,
-		sendCamera: reportCamera,
 		setAtTurn,
 		raise,
 	};

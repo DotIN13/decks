@@ -82,8 +82,9 @@ const emptyScratch = (): AgentScratch => ({ historyHeld: false, historyAsked: fa
 /**
  * The scratch side: a plain map, with the same lifetime as the drawn side.
  *
- * A factory rather than a module singleton, so a test can have its own — the shape opencode
- * uses for `createServerSession`, and the reason that store has a test file at all.
+ * A factory rather than only a module singleton, so a test can have its own — the shape
+ * opencode uses for `createServerSession`, and the reason that store has a test file at all.
+ * The app's one is below.
  */
 export function createAgentScratch() {
 	const held = new Map<string, AgentScratch>();
@@ -120,3 +121,16 @@ export function createAgentScratch() {
 }
 
 export type AgentScratchStore = ReturnType<typeof createAgentScratch>;
+
+/**
+ * The app's one scratch store.
+ *
+ * Created here rather than inside a component, because two things that are not components
+ * need it: the history window (`state/history.ts`, for the two flags a reconnect clears) and
+ * the frame switch (`app/frames.ts`, for the last state an agent was in and the view parked
+ * for it). Handing it out through `FrameHooks` was the symptom; this is the value.
+ *
+ * Nothing renders from it — that is the whole point of it being scratch — so it needs no
+ * reactive owner and the module's lifetime is the right lifetime.
+ */
+export const scratch = createAgentScratch();

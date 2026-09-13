@@ -4,8 +4,11 @@ import { PAGE, prepend } from "../chat/history-page.ts";
 import { receiveToolResult } from "../chat/tool-results.ts";
 import { viewToPark } from "../camera/agent-view.ts";
 import { runStageCall } from "../canvas/stage-ops.ts";
-import type { AgentScratchStore } from "../state/agent.ts";
+import { scratch } from "../state/agent.ts";
+import { setCamera } from "../state/camera.ts";
+import { reportCamera } from "./camera-report.ts";
 import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
+import { ensureHistory, resolveEarlier } from "../state/history.ts";
 import { notice } from "../state/notices.ts";
 import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
@@ -15,14 +18,8 @@ import { releaseBoards, setDraft, setUnread, setUsagePanel, setUsageReport, usag
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
-	/** Ask for a conversation's history, once per connection. */
-	ensureHistory(agentId: string | undefined): void;
 	/** A board asked for by a drop heard its path. */
 	hearBoard(request: string, path: string): void;
-	/** The live half of an agent's state (`state/agent.ts`). */
-	scratch: AgentScratchStore;
-	/** Readers waiting on a page of scrollback, keyed by the row they asked from. */
-	earlierWaiting: Map<string, (added: number) => void>;
 	/** Revisions this browser caused, and the patches still in flight behind them. */
 	selfRevs: Map<string, number>;
 	patching: Set<string>;
@@ -31,8 +28,6 @@ export interface FrameHooks {
 	setFrameRev(path: string, rev: number): void;
 	/** A batch of patches down the socket, against a named revision. */
 	sendPatches(path: string, rev: number, patches: BoardPatch[]): void;
-	setCamera(camera: Camera): void;
-	sendCamera(camera: Camera, agentId?: string): void;
 	setAtTurn(at: { id: string; at: number } | undefined): void;
 	raise(kind: "done" | "ask" | "problem", banner: { title: string; body?: string; tag?: string; agent?: string }): void;
 }
@@ -161,7 +156,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 						hooks.setAtTurn(undefined);
 					}
 					setState({ chats: message.chats, focused, defaultKind: message.defaultKind });
-					hooks.ensureHistory(focused);
+					ensureHistory(focused);
 					// No chat to wait for: the deck is all there is to open.
 					if (!focused) releaseBoards();
 					return;
@@ -179,11 +174,11 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * `previews` and `spendingByAgent` all outlived the agent. Dropping a record
 					 * cannot miss a field, which is the point of there being one.
 					 *
-					 * `hooks.scratch.forget` carries the part that was never drawn — including the last
+					 * `scratch.forget` carries the part that was never drawn — including the last
 					 * state, so a new agent cannot inherit a dead one's and be reported as having
 					 * just finished. Ids are unique, but the map would otherwise grow all session.
 					 */
-					hooks.scratch.forget(message.id);
+					scratch.forget(message.id);
 					setState("agents", message.id, undefined);
 					setState("identities", message.id, undefined as never);
 					setState("contexts", message.id, undefined as never);
@@ -196,7 +191,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					return;
 
 				case "agent.state": {
-					const mine = hooks.scratch.of(message.id);
+					const mine = scratch.of(message.id);
 					const was = mine.lastState;
 					mine.lastState = message.state;
 					setState("chats", (chats) => chats.map((chat) => (chat.id === message.id ? { ...chat, state: message.state } : chat)));
@@ -256,9 +251,9 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "transcript", message.items);
 					setState("agents", message.agentId, "moreHistory", message.more ?? false);
-					hooks.scratch.of(message.agentId).historyHeld = true;
+					scratch.of(message.agentId).historyHeld = true;
 					if (message.agentId === state.focused) releaseBoards();
-					hooks.scratch.of(message.agentId).historyAsked = false;
+					scratch.of(message.agentId).historyAsked = false;
 					return;
 
 				case "chat.tool":
@@ -278,11 +273,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("agents", message.agentId, "transcript", (held) => prepend(message.items, held));
 					setState("agents", message.agentId, "moreHistory", message.more);
 					// Whoever asked is waiting on the count, so it can hold the reader's place.
-					const waiting = hooks.earlierWaiting.get(message.before);
-					if (waiting) {
-						hooks.earlierWaiting.delete(message.before);
-						waiting(message.items.length);
-					}
+					resolveEarlier(message.before, message.items.length);
 					return;
 				}
 
@@ -352,12 +343,12 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							 * in `canvas/stage-ops.ts`, which is where the reasoning lives.
 							 */
 							focused: () => state.focused,
-							setCamera: (camera) => hooks.setCamera(camera),
+							setCamera: (next) => setCamera(next),
 							rememberView: (agentId, camera, selected) => {
-								hooks.scratch.of(agentId).view = viewToPark(camera, selected);
+								scratch.of(agentId).view = viewToPark(camera, selected);
 								// So `stage.camera()` answers for that agent's canvas rather than falling
 								// back to wherever the last person to look at anything was.
-								hooks.sendCamera(camera, agentId);
+								reportCamera(camera, agentId);
 							},
 							select: (path) => setSelected(path),
 							reload: (path) => setState("nonces", path, (current = 0) => current + 1),
