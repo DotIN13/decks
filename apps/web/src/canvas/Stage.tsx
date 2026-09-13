@@ -12,14 +12,24 @@ import { deckMode, type DeckHandle, type SlideAction, slideKey } from "./slide-k
 import { cssEscape } from "./inspect.ts";
 import type { LiveWebReply } from "./live-chat.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
+import { PALETTE } from "@decks/board-kit";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { createAdmission } from "./board-admission.ts";
 import { createOneCanvas } from "./one-canvas.ts";
 
-/** The palette's keys, in the order the palette draws them. */
-const TOOL_KEYS: Record<string, Tool> = { v: "select", s: "sticky", c: "card", t: "text", e: "embed" };
+/**
+ * The palette's keys: `select`, then whatever `@decks/board-kit` says the palette offers.
+ *
+ * Written out here until the vocabulary had one home; the point of asking the manifest is
+ * that a kind with a `key` cannot be missing from the keyboard, and a key cannot outlive
+ * the kind it armed.
+ */
+const TOOL_KEYS: Record<string, Tool> = Object.fromEntries([
+	["v", "select"] as const,
+	...PALETTE.map((component) => [component.key, component.kind] as const),
+]);
 
 /**
  * The stage: one transform over the boards, and the gestures that move it.

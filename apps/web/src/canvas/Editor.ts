@@ -1,3 +1,4 @@
+import { component } from "@decks/board-kit";
 import { INLINE_TAGS, type BoardPatch, type ComponentKind, type Rect } from "@decks/protocol";
 import { cameraMovedSince } from "./pan-signal.ts";
 
@@ -281,14 +282,9 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 				return;
 			}
 		}
-		const size: Partial<Rect> =
-			kind === "sticky"
-				? { width: 220 }
-				: kind === "text"
-					? { width: 320 }
-					: kind === "embed" || kind === "image"
-						? { width: 420, height: 320 }
-						: { width: 360 };
+		// The size a new one gets is the vocabulary's, so a kind added there arrives with a
+		// sensible box rather than a default nobody chose (`@decks/board-kit`).
+		const size: Partial<Rect> = component(kind)?.size ?? { width: 360 };
 		host.patch(path, [
 			{
 				op: "insert",

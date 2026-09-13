@@ -19,7 +19,9 @@
  * dead `svg.link` at the top of the fixture is the third: it is what a board written
  * against the old runtime looks like, and it must draw as nothing at all.
  */
-import { BOX_CLASSES } from "@decks/protocol";
+// The vocabulary, not the wire: which classes the inspector offers a swap to is a fact
+// about boards rather than about the protocol, and it lives in its own package.
+import { BOX_CLASSES } from "@decks/board-kit";
 import { rmSync } from "node:fs";
 import { boardPath, open, read, say, socket, write } from "../harness.mjs";
 

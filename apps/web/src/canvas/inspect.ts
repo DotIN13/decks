@@ -1,4 +1,5 @@
-import { BOX_CLASSES, type BoardPatch, type BoxClass, type Rect } from "@decks/protocol";
+import { BOX_CLASSES, type BoxClass } from "@decks/board-kit";
+import type { BoardPatch, Rect } from "@decks/protocol";
 
 /**
  * What the selected component *is*, and what an inspector edit does to it.

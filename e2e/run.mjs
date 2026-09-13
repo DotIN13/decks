@@ -274,7 +274,17 @@ try {
 		}
 	}
 
-	console.log(`\n${pass} passed, ${fail} failed, ${((Date.now() - started) / 1000).toFixed(0)}s`);
+	/*
+	 * Failed *files* as well as failed assertions, and that is not decoration.
+	 *
+	 * A check that dies on its first import prints no assertion at all, so it contributes
+	 * nothing to either count — the summary said "256 passed, 0 failed" with one whole file
+	 * red, and a run read as green until somebody looked at the lines above. The exit code
+	 * was always right; the sentence at the end was the part that lied.
+	 */
+	console.log(
+		`\n${pass} passed, ${fail} failed assertions, ${failedFiles.length} failed check(s), ${((Date.now() - started) / 1000).toFixed(0)}s`,
+	);
 	for (const check of skipped) {
 		const why = wanted.length > 0 ? "not selected" : "needs a model; set DECKS_E2E_AGENT=1";
 		console.log(`  skipped ${check.file} (${why})`);

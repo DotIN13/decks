@@ -1,3 +1,4 @@
+import { PALETTE, type ComponentKind } from "@decks/board-kit";
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import Check from "lucide-solid/icons/check";
@@ -6,6 +7,7 @@ import FileText from "lucide-solid/icons/file-text";
 import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
+import ImageIcon from "lucide-solid/icons/image";
 import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
 import StickyNote from "lucide-solid/icons/sticky-note";
 import Type from "lucide-solid/icons/type";
@@ -61,15 +63,30 @@ interface ToolEntry {
 	key: string;
 }
 
+/*
+ * The icons, one per kind, and *all* of them — a `Partial` here would let a kind gain a
+ * palette key in the vocabulary and appear with no icon, which is a button with a hole in it.
+ * The rest of a button — its label, its key, the order — is `@decks/board-kit`'s.
+ */
+const ICONS: Record<ComponentKind, LucideIcon> = {
+	sticky: StickyNote,
+	card: RectangleHorizontal,
+	text: Type,
+	embed: FileText,
+	image: ImageIcon,
+};
+
 /* A non-empty tuple rather than an array: `select` is the fallback when the current tool is
    somehow not one of these, and typing it this way is how that fallback is a fact rather
    than a `!`. */
 const TOOLS: [ToolEntry, ...ToolEntry[]] = [
 	{ tool: "select", icon: MousePointer2, label: "Select, drag, resize", key: "V" },
-	{ tool: "sticky", icon: StickyNote, label: "Sticky note", key: "S" },
-	{ tool: "card", icon: RectangleHorizontal, label: "Card", key: "C" },
-	{ tool: "text", icon: Type, label: "Text", key: "T" },
-	{ tool: "embed", icon: FileText, label: "Embed a file", key: "E" },
+	...PALETTE.map((component) => ({
+		tool: component.kind as Tool,
+		icon: ICONS[component.kind],
+		label: component.label,
+		key: component.key.toUpperCase(),
+	})),
 ];
 
 /*

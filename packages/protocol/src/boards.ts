@@ -1,5 +1,14 @@
 /** A board file's vocabulary: its components, their rects, and the edits a user may commit. */
-export type ComponentKind = "sticky" | "card" | "text" | "image" | "embed";
+/**
+ * Which component a patch addresses, re-exported from the vocabulary both sides share.
+ *
+ * The union is `@decks/board-kit`'s; it is repeated here — as a *derivation*, not a second
+ * list — because `BoardPatch` is a wire type and this file is where the wire lives. Nothing
+ * that only wants the vocabulary should import it from here.
+ */
+import type { ComponentKind } from "@decks/board-kit";
+
+export type { ComponentKind };
 
 export interface Rect {
 	left: number;
@@ -116,25 +125,6 @@ export type BoardPatch =
 	| { op: "order"; id: string; to: "front" | "back" };
 
 /**
- * The five component classes that mean the same thing — a box with prose in it —
- * and so can be swapped for one another by the inspector (§6.5).
- *
- * This list is `board.css`'s, not this build's — the editor can only offer what the
- * stylesheet already styles. That used to be a harder constraint than it is: `lib/` is
- * copied into a deck, and the copy was once made at `Deck.create` and never touched
- * again, so a class invented here was an unstyled box in every deck that already
- * existed. Opening a deck now brings its `lib/` up to this build (`deck/lib-sync.ts`),
- * so adding to this list means adding to `board.css` in the same commit and no longer
- * means waiting a release. What has not changed: the list and the stylesheet are one
- * decision, and a class in one and not the other is a control that does nothing.
- * `kpi`, `table` and `chip`
- * are deliberately absent — their CSS styles children the other five do not have,
- * so swapping one in produces a component whose content no longer fits it.
- */
-export const BOX_CLASSES = ["text", "sticky", "card", "callout"] as const;
-export type BoxClass = (typeof BOX_CLASSES)[number];
-
-/**
  * The tags a run of words may be made of, shared because both sides ask about them.
  *
  * HTML's phrasing content, minus everything interactive, embedded, or capable of running
@@ -155,13 +145,6 @@ export const INLINE_TAGS = [
 	"a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "dfn", "em", "i", "kbd",
 	"mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup", "time", "u", "var", "wbr",
 ] as const;
-
-/**
- * `data-tone` as `board.css` reads it, and a callout is the only component that reads
- * it — absent means the accent. Same reasoning as `BOX_CLASSES`: this is the
- * stylesheet's list, and it stops where the stylesheet stops.
- */
-export const CALLOUT_TONES = ["warn", "danger", "ok"] as const;
 
 /** What the agent is told the user changed, and what `stage.edits()` returns. */
 export interface UserEdit {

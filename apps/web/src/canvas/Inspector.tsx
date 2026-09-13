@@ -1,4 +1,4 @@
-import { BOX_CLASSES, CALLOUT_TONES, type BoxClass } from "@decks/protocol";
+import { BOX_CLASSES, CALLOUT_TONES, type BoxClass } from "@decks/board-kit";
 import BringToFront from "lucide-solid/icons/bring-to-front";
 import Copy from "lucide-solid/icons/copy";
 import FolderOpen from "lucide-solid/icons/folder-open";

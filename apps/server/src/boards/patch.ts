@@ -1,4 +1,5 @@
-import { BOX_CLASSES, type BoardPatch, type ComponentKind, type Rect } from "@decks/protocol";
+import { BOX_CLASSES, component, type ComponentKind } from "@decks/board-kit";
+import type { BoardPatch, Rect } from "@decks/protocol";
 import { parse } from "parse5";
 import { isRichRun, normalizeInline, textOfInline } from "./inline-html.ts";
 import type { DefaultTreeAdapterMap } from "parse5";
@@ -610,17 +611,16 @@ function render(patch: Extract<BoardPatch, { op: "insert" }>, indent: string): s
 	}
 }
 
+/**
+ * The words a new component of this kind starts with.
+ *
+ * From the vocabulary (`@decks/board-kit`), because the palette cannot supply it: an insert
+ * carries a rect and the file is written here, so the placeholder is the server's to know.
+ * A kind with no text of its own gets nothing, which is what an absent entry means — `""`
+ * would be a different claim, and one the browser would render as an empty paragraph.
+ */
 function defaultText(kind: ComponentKind): string {
-	switch (kind) {
-		case "sticky":
-			return "…";
-		case "card":
-			return "Untitled";
-		case "text":
-			return "Text";
-		default:
-			return "";
-	}
+	return component(kind)?.text ?? "";
 }
 
 /** An id nobody is using, named after what it is. */
