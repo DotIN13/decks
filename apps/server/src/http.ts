@@ -226,11 +226,11 @@ export function createHttpApp(app: App): Express {
 		"/revision/:sha",
 		asyncRoute(async (req, res) => {
 			const sha = String(req.params.sha);
-			if (!app.revisions.has(sha)) throw new PathRefused(sha, "no such revision");
+			if (!app.boards.revisions.has(sha)) throw new PathRefused(sha, "no such revision");
 			res.setHeader("X-Content-Type-Options", "nosniff");
 			// Immutable by construction: the name is the hash of the contents.
 			res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-			res.type("html").send(app.revisions.read(sha));
+			res.type("html").send(app.boards.revisions.read(sha));
 		}),
 	);
 

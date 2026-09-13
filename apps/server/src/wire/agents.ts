@@ -152,7 +152,7 @@ export const agents = {
 			type: "timeline.preview",
 			agentId: message.id,
 			entryId: message.entryId,
-			boards: message.entryId ? wire.boardsAt(agent, message.entryId) : {},
+			boards: message.entryId ? wire.boards.boardsAt(agent, message.entryId) : {},
 		});
 	},
 

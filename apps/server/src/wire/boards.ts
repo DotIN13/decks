@@ -22,7 +22,7 @@ export const boards = {
 	},
 
 	"board.extent": (message, _reply, wire) => {
-		wire.noteExtent(message.path, { rev: message.rev, w: message.w, h: message.h });
+		wire.boards.noteExtent(message.path, { rev: message.rev, w: message.w, h: message.h });
 		/*
 		 * A flow board *is* its content's height.
 		 *
@@ -50,11 +50,11 @@ export const boards = {
 	},
 
 	"board.patch": (message, reply, wire) => {
-		wire.patch(message.path, message.rev, message.patches, reply);
+		wire.boards.patch(message.path, message.rev, message.patches, reply);
 	},
 
 	"board.undo": (message, reply, wire) => {
-		wire.undo(message.path, reply);
+		wire.boards.undo(message.path, reply);
 	},
 
 	/*
@@ -101,7 +101,7 @@ export const boards = {
 		const w = bounded(message.size?.w, 320, 2400);
 		const h = bounded(message.size?.h, 240, 4000);
 		const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
-		const path = wire.newBoard({ title, template, format, ...(size ? { size } : {}) });
+		const path = wire.boards.newBoard({ title, template, format, ...(size ? { size } : {}) });
 		const agent = wire.agents.focused();
 		agent.setInPlay([...agent.inPlay, path]);
 		if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
@@ -113,7 +113,7 @@ export const boards = {
 	},
 
 	"board.delete": (message, reply, wire) => {
-		wire.deleteBoard(message.path, reply);
+		wire.boards.deleteBoard(message.path, reply);
 	},
 
 	/*
@@ -146,7 +146,7 @@ export const boards = {
 			reply({ type: "notice", level: "warn", text: "That agent is not here any more." });
 			return;
 		}
-		const path = wire.newMirror({ agentId: of.id, name: of.name });
+		const path = wire.boards.newMirror({ agentId: of.id, name: of.name });
 		const agent = wire.agents.focused();
 		agent.setInPlay([...agent.inPlay, path]);
 	},
@@ -160,14 +160,14 @@ export const boards = {
 		 */
 		const agent = wire.agents.get(message.id);
 		if (!agent) return;
-		const wanted = wire.boardsAt(agent, message.entryId);
+		const wanted = wire.boards.boardsAt(agent, message.entryId);
 		let restored = 0;
 		for (const [path, sha] of Object.entries(wanted)) {
 			try {
-				const content = wire.revisions.read(sha);
+				const content = wire.boards.revisions.read(sha);
 				if (content === readFileSync(wire.deck.fileOf(path), "utf8")) continue;
 				writeFileSync(wire.deck.fileOf(path), content);
-				wire.revisions.record(path, content);
+				wire.boards.revisions.record(path, content);
 				restored++;
 			} catch (error) {
 				reply({ type: "notice", level: "warn", text: `Could not restore ${path}: ${(error as Error).message}` });

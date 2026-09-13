@@ -1,7 +1,6 @@
 import type { Camera, ClientMessage, ServerMessage } from "@decks/protocol";
 import type { Registry } from "../agents/registry.ts";
-import type { Revisions } from "../boards/snapshots.ts";
-import type { BoardFormat, BoardTemplate } from "../boards/templates.ts";
+import type { BoardService } from "../boards/service.ts";
 import type { ClaudeAccounts } from "../claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../web/bridge.ts";
@@ -62,9 +61,10 @@ export interface PendingStage {
  */
 export interface WireContext {
 	readonly deck: Deck;
+	/** Writing, editing and deleting boards — `boards/service.ts`. */
+	readonly boards: BoardService;
 	readonly agents: Registry;
 	readonly web: WebBridge;
-	readonly revisions: Revisions;
 	readonly claudeAccounts: ClaudeAccounts;
 
 	/** The camera a browser last reported, and the per-agent readings beside it. */
@@ -78,23 +78,6 @@ export interface WireContext {
 
 	/** Point the whole app at another data directory (§2). */
 	openDeck(path: string): void;
-
-	/** The board-write path (`boards/`), which also records the revision. */
-	newBoard(options: { title: string; template: BoardTemplate; format?: BoardFormat; size?: { w?: number; h?: number } }): string;
-	newMirror(options: { agentId: string; name: string; size?: { w?: number; h?: number } }): string;
-	newWebBoard(): string;
-	deleteBoard(path: string, reply: Reply): void;
-	patch(path: string, rev: number, patches: Extract<ClientMessage, { type: "board.patch" }>["patches"], reply: Reply): void;
-	undo(path: string, reply: Reply): void;
-
-	/** A reading from a frame's own layout, kept for whoever asks for it. */
-	noteExtent(path: string, extent: { rev: number; w: number; h: number }): void;
-
-	/** Which revision each board was at, at a point in a conversation (§6.7). */
-	boardsAt(
-		agent: { revisionsAt(entryId: string): Record<string, string>; timeline(): Array<{ id: string; at?: number }> },
-		entryId: string,
-	): Record<string, string>;
 
 	/** The install's Claude subscriptions, republished after anything moves one. */
 	publishAccounts(reply?: Reply, options?: { reread?: boolean }): Promise<void>;
