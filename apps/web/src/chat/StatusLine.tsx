@@ -1,7 +1,7 @@
 import type { AgentKind, AgentState } from "@decks/protocol";
 import { Show } from "solid-js";
 import { historyShown, toggleHistory } from "../state/edge.ts";
-import { AgentMark } from "./agent-marks.tsx";
+import { AgentMark } from "../chrome/agent-marks.tsx";
 import { isWorking, signPlacement, workingWords } from "./working-sign.ts";
 
 /**
@@ -18,7 +18,7 @@ export function WorkingSign(props: { state: AgentState; name: string; agent: Age
 			 * The agent's own mark, moving — rather than a generic spinner, so the sign says
 			 * whose work it is as well as that there is some (picone §58). Claude steps through
 			 * ten glyph frames, Pi builds its logo out of character cells; the drawings and the
-			 * reasoning behind them are in `agent-marks.tsx`.
+			 * reasoning behind them are in `chrome/agent-marks.tsx`.
 			 */}
 			<AgentMark agent={props.agent} class="mark" size={13} busy={isWorking(props.state)} />
 			<span>{workingWords(props.state, props.name)}</span>
