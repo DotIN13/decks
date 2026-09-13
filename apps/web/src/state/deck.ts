@@ -1,4 +1,4 @@
-import type { AgentChat, AgentKind, Board, ClaudeAccount, DeckState, Identity, WebStatus } from "@decks/protocol";
+import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckState, type Identity, type RuntimeInfo, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
 import type { AgentRecord } from "./agent.ts";
 
@@ -74,6 +74,12 @@ export function createDeck() {
 		nonces: Record<string, number>;
 		defaultKind: AgentKind;
 		cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
+		/**
+		 * What this install can run, and what each runtime is called, from the greeting.
+		 *
+		 * Empty until the first frame arrives, which is why `runtimes` below has a fallback.
+		 */
+		runtimes: RuntimeInfo[];
 		/** The Claude subscriptions this install can use (`chat/Settings.tsx`). */
 		accounts: ClaudeAccount[];
 		/**
@@ -93,6 +99,7 @@ export function createDeck() {
 		contexts: {} as Record<string, string[]>,
 		nonces: {} as Record<string, number>,
 		defaultKind: "pi" as AgentKind,
+		runtimes: [] as RuntimeInfo[],
 		accounts: [] as ClaudeAccount[],
 		activeAccount: "default",
 	});
@@ -100,6 +107,18 @@ export function createDeck() {
 
 /** The app's one deck. Tests build their own with `createDeck()`. */
 export const [state, setState] = createDeck();
+
+/**
+ * What this install can run, in the protocol's order.
+ *
+ * The server owns this — which runtimes exist, what to call them, and whether the machine
+ * can start them — but the menu is drawn before the first frame arrives, so an empty list
+ * falls back to the four names the protocol knows, all assumed usable. That is exactly what
+ * the menu did before this frame existed; the greeting upgrades it a beat later with the
+ * real labels and the real answer.
+ */
+export const runtimes = (): RuntimeInfo[] =>
+	state.runtimes.length > 0 ? state.runtimes : AGENT_KINDS.map((kind) => ({ kind, label: kind, available: true }));
 
 /** The focused agent's question, if it has one. */
 export const dialog = () => (state.focused ? state.agents[state.focused]?.dialog : undefined);

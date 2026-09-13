@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
-import { runtimeDir, skillsDir } from "../agents/context.ts";
-import { loadConfig } from "../config.ts";
+import { runtimeDir, skillsDir } from "../../agents/context.ts";
+import { loadConfig } from "../../config.ts";
 
 /**
  * Where the `agy` CLI is, and the HOME Decks hands it when it runs.

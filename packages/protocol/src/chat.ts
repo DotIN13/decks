@@ -24,6 +24,24 @@ export type AgentKind = "pi" | "claude" | "opencode" | "antigravity";
 export const AGENT_KINDS: readonly AgentKind[] = ["claude", "pi", "opencode", "antigravity"];
 
 /**
+ * One runtime, as a browser can understand it.
+ *
+ * The client used to know four runtime names and nothing else about them — not what to call
+ * them in a menu, and not whether the machine could run them. So the `+` menu said "New
+ * claude agent" and offered Antigravity on a machine with no `agy` on it, and the first
+ * prompt was where you found out. Both facts are the server's, and this is how they travel.
+ */
+export interface RuntimeInfo {
+	kind: AgentKind;
+	/** What a person calls it. Distinct from `kind`, which is an id. */
+	label: string;
+	/** Whether it can start here — a `PATH` lookup or a file check, never a spawn. */
+	available: boolean;
+	/** Why not, in a sentence for the person who has to fix it. Absent when available. */
+	reason?: string;
+}
+
+/**
  * How much an agent asks before acting.
  *
  * Claude Code's four permission modes, under its own names. Pi has none — permissions

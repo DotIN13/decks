@@ -14,10 +14,10 @@ import {
 	type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
-import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
-import { helpText, mergeCommands, parseSlash, sameCommands } from "../agents/slash.ts";
+import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
+import { helpText, mergeCommands, parseSlash, sameCommands } from "../../agents/slash.ts";
 import { answerQuestions } from "./ask-user-question.ts";
-import { deckContext, runtimeDir } from "../agents/context.ts";
+import { deckContext, runtimeDir } from "../../agents/context.ts";
 import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";

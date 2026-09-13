@@ -1,5 +1,5 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import { readToolResult, titleFor, type Translator } from "../agents/translator.ts";
+import { readToolResult, titleFor, type Translator } from "../../agents/translator.ts";
 
 /**
  * Pi's event stream, read into the transcript's terms.

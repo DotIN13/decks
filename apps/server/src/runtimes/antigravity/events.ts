@@ -1,5 +1,5 @@
 import type { AgentUsage } from "@decks/protocol";
-import type { Translator } from "../agents/translator.ts";
+import type { Translator } from "../../agents/translator.ts";
 
 /**
  * The `agy` stream, read into the transcript's terms.

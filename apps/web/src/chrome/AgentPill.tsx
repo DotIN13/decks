@@ -1,4 +1,4 @@
-import { AGENT_KINDS, type AgentChat, type AgentKind, type Identity } from "@decks/protocol";
+import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
@@ -18,6 +18,7 @@ import { AgentMark } from "../chat/agent-marks.tsx";
 import type { CanvasMode, Tool } from "../canvas/Editor.ts";
 import { Icon } from "../icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
+import { runtimes } from "../state/deck.ts";
 import { canHover } from "../lib/panels.ts";
 import { agentList, agentStatus, closeWords, rowWords } from "./agent-order.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
@@ -420,7 +421,7 @@ export function AgentMenu(props: {
 					title="The runtime cannot change once an agent exists"
 					onClick={() => setPicking((was) => !was)}
 				>
-					{props.defaultKind}
+					{runtimes().find((runtime) => runtime.kind === props.defaultKind)?.label ?? props.defaultKind}
 					<Icon of={ChevronDown} size={11} class="chev" />
 				</button>
 			</div>
@@ -431,14 +432,31 @@ export function AgentMenu(props: {
 			 * picking one here *creates* rather than remembering a preference.
 			 */}
 			<Show when={picking()}>
-				<For each={AGENT_KINDS}>
-					{(kind) => (
-						<button type="button" role="menuitem" data-row data-flat="true" onClick={() => pick(() => props.onNew(kind))}>
+				<For each={runtimes()}>
+					{(runtime) => (
+						/*
+						 * The list comes from the server, which is the only thing that knows what
+						 * this machine has: the runtime's own name for itself, and whether it can
+						 * start here. A runtime that cannot is disabled and says why — an option
+						 * that fails on the first prompt is worse than one that is not offered.
+						 */
+						<button
+							type="button"
+							role="menuitem"
+							data-row
+							data-flat="true"
+							disabled={!runtime.available}
+							title={runtime.reason ?? ""}
+							onClick={() => runtime.available && pick(() => props.onNew(runtime.kind))}
+						>
 							{/* `flex-none`: an `<svg>` in a flex row shrinks to nothing beside a
 							    `flex-1` label, and has. */}
-							<AgentMark class="flex-none" agent={kind} size={13} />
-							<span class="lb flex-1">New {kind} agent</span>
-							<Show when={kind === props.defaultKind}>
+							<AgentMark class="flex-none" agent={runtime.kind} size={13} />
+							<span class="lb flex-1">New {runtime.label} agent</span>
+							<Show when={!runtime.available}>
+								<span class="flex-none text-[11px] text-faint">not installed</span>
+							</Show>
+							<Show when={runtime.available && runtime.kind === props.defaultKind}>
 								<Icon of={Check} size={13} class="flex-none text-faint" />
 							</Show>
 						</button>

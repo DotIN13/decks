@@ -10,10 +10,10 @@ import {
 	type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
-import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
-import { helpText, mergeCommands, parseSlash } from "../agents/slash.ts";
+import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
+import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { decksStage } from "./extension.ts";
-import { deckContext, skillsDir } from "../agents/context.ts";
+import { deckContext, skillsDir } from "../../agents/context.ts";
 import { handlePiEvent } from "./events.ts";
 
 /**

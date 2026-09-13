@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { ChatItem, ServerMessage } from "@decks/protocol";
-import { Translator } from "../agents/translator.ts";
+import { Translator } from "../../agents/translator.ts";
 import { handleClaudeMessage, newStreamState, readClaudeToolResult } from "./events.ts";
 
 /**

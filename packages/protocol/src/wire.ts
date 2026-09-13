@@ -10,6 +10,7 @@ import type {
 	ClaudeAccount,
 	Identity,
 	ModelOption,
+	RuntimeInfo,
 	ThinkingLevel,
 } from "./chat.ts";
 import type { Board, DeckState } from "./deck.ts";
@@ -183,6 +184,14 @@ export type ClientMessage =
 
 export type ServerMessage =
 	| { type: "deck.state"; deck: DeckState }
+	/**
+	 * What this install can run, and what to call it — sent on connect, and whenever a
+	 * client asks.
+	 *
+	 * A property of the machine, not of the deck, and it travels beside `deck.state` rather
+	 * than inside it because the deck is a directory and this is what is installed.
+	 */
+	| { type: "runtimes"; list: RuntimeInfo[] }
 	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean }
 	| { type: "board.patched"; path: string; rev: number; refused?: string }
 	| {

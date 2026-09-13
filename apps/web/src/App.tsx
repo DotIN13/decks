@@ -405,6 +405,11 @@ export function App() {
 		});
 		const off = on((message) => {
 			switch (message.type) {
+				case "runtimes":
+					// A property of the machine rather than of the deck, so it travels beside
+					// the greeting instead of inside it.
+					setState("runtimes", message.list);
+					return;
 				case "deck.state":
 					setState("deck", message.deck);
 					/*

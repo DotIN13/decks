@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { delimiter, join, resolve } from "node:path";
-import { runtimeDir } from "../agents/context.ts";
+import { runtimeDir } from "../../agents/context.ts";
 
 /**
  * Where opencode is, and where Decks keeps the things it hands opencode.

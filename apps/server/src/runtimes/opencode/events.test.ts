@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AgentUsage, ChatItem, ServerMessage } from "@decks/protocol";
-import { Translator } from "../agents/translator.ts";
+import { Translator } from "../../agents/translator.ts";
 import { OpencodeStream } from "./events.ts";
 
 /**

@@ -1,9 +1,9 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
-import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../agents/backend.ts";
-import { deckContext } from "../agents/context.ts";
-import { helpText, parseSlash } from "../agents/slash.ts";
+import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
+import { deckContext } from "../../agents/context.ts";
+import { helpText, parseSlash } from "../../agents/slash.ts";
 import { agyExecutable, agyModels, antigravityHomeDir, antigravityAvailability, prepareAntigravityHome } from "./install.ts";
 import { AntigravityStream, type AntigravityResult, type AntigravityStep } from "./events.ts";
 

@@ -1,5 +1,5 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { titleFor, type Translator } from "../agents/translator.ts";
+import { titleFor, type Translator } from "../../agents/translator.ts";
 
 /**
  * Claude's message stream, read into the transcript's terms.

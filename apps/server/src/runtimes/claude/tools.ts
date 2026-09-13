@@ -1,6 +1,6 @@
 import { createSdkMcpServer, type McpSdkServerConfigWithInstance, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import type { StageTool } from "../stage/tool.ts";
+import type { StageTool } from "../../stage/tool.ts";
 
 /**
  * The canvas tool, for Claude (DESIGN §6.3).

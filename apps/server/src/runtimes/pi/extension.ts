@@ -1,6 +1,6 @@
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { StageAgentHooks, StageTool } from "../stage/tool.ts";
+import type { StageAgentHooks, StageTool } from "../../stage/tool.ts";
 
 /**
  * `decks-stage`: Pi's adapter for the canvas tool.

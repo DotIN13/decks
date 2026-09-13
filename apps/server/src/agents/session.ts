@@ -17,11 +17,8 @@ import type {
 	ThinkingLevel,
 	UsageReport,
 } from "@decks/protocol";
-import { CLAUDE_CAPABILITIES, CLAUDE_COMMANDS, ClaudeBackend } from "../claude/backend.ts";
 import type { Deck } from "../deck/loader.ts";
-import { ANTIGRAVITY_CAPABILITIES, ANTIGRAVITY_COMMANDS, AntigravityBackend } from "../antigravity/backend.ts";
-import { OPENCODE_CAPABILITIES, OPENCODE_COMMANDS, OpencodeBackend } from "../opencode/backend.ts";
-import { PI_CAPABILITIES, PI_COMMANDS, PiBackend } from "../pi/backend.ts";
+import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, type DelegateReport, type DelegateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
@@ -696,7 +693,7 @@ export class DeckAgent {
 			showUsage: () => void this.pushReport(),
 		};
 
-		const create: Promise<AgentBackend> = BACKENDS[this.kind](context);
+		const create: Promise<AgentBackend> = runtimeOf(this.kind).create(context);
 		this.starting ??= create
 			.then((backend) => {
 				this.backend = backend;
@@ -1280,23 +1277,17 @@ export class DeckAgent {
  * fifth would have been a fourth place to forget. Every entry is the same shape — a
  * context in, a started backend out — which is the whole of what `AgentBackend` asks.
  */
-const BACKENDS: Record<AgentKind, (context: AgentBackendContext) => Promise<AgentBackend>> = {
-	pi: (context) => PiBackend.create(context),
-	claude: (context) => ClaudeBackend.create(context),
-	opencode: (context) => OpencodeBackend.create(context),
-	antigravity: (context) => AntigravityBackend.create(context),
-};
-
+/**
+ * The runtime behind an agent: its class, its capabilities and its dormant commands.
+ *
+ * Three tables lived here, all keyed by kind, all listing the same four names — and this
+ * file imported every runtime to fill them, which is the opposite of what `backend.ts` says
+ * the layering is. They are one descriptor per runtime now (`runtimes/`), and this file
+ * asks the registry rather than naming anybody.
+ */
 function capabilitiesOf(kind: AgentKind): AgentCapabilities {
-	return CAPABILITIES[kind];
+	return runtimeOf(kind).capabilities;
 }
-
-const CAPABILITIES: Record<AgentKind, AgentCapabilities> = {
-	pi: PI_CAPABILITIES,
-	claude: CLAUDE_CAPABILITIES,
-	opencode: OPENCODE_CAPABILITIES,
-	antigravity: ANTIGRAVITY_CAPABILITIES,
-};
 
 /**
  * The `/` commands a dormant chat offers without waking its runtime.
@@ -1305,15 +1296,8 @@ const CAPABILITIES: Record<AgentKind, AgentCapabilities> = {
  * chat has no backend to ask, and the menu should not change when one is resumed.
  */
 function commandsOf(kind: AgentKind): SlashCommand[] {
-	return DORMANT_COMMANDS[kind];
+	return runtimeOf(kind).commands;
 }
-
-const DORMANT_COMMANDS: Record<AgentKind, SlashCommand[]> = {
-	pi: PI_COMMANDS,
-	claude: CLAUDE_COMMANDS,
-	opencode: OPENCODE_COMMANDS,
-	antigravity: ANTIGRAVITY_COMMANDS,
-};
 
 /**
  * The model a pi session was last on, read from its file.

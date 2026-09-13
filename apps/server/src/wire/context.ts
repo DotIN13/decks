@@ -1,7 +1,7 @@
 import type { Camera, ClientMessage, ServerMessage } from "@decks/protocol";
 import type { Registry } from "../agents/registry.ts";
 import type { BoardService } from "../boards/service.ts";
-import type { ClaudeAccounts } from "../claude/accounts.ts";
+import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../web/bridge.ts";
 

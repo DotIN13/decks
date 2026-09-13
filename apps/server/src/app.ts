@@ -5,14 +5,15 @@ import { fileURLToPath } from "node:url";
 import type { Camera, ClientMessage, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { BoardService } from "./boards/service.ts";
+import { runtimeList } from "./runtimes/registry.ts";
 import { isBoardFormat, type BoardTemplate } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./web/bridge.ts";
 import { StageService } from "./stage/service.ts";
-import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./claude/accounts.ts";
-import { claudeIdentity } from "./claude/backend.ts";
+import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
+import { claudeIdentity } from "./runtimes/claude/backend.ts";
 import { mapSeries } from "./series.ts";
 import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
@@ -428,6 +429,16 @@ export class App {
 
 	greet(reply: (message: ServerMessage) => void): void {
 		reply({ type: "deck.state", deck: this.deck.state() });
+		/*
+		 * And what this install can run.
+		 *
+		 * A property of the machine rather than of the deck, which is why it is a frame of
+		 * its own: which runtimes exist, what to call them in a menu, and whether this
+		 * machine can start them. The browser needs the last one to grey a row out — before
+		 * this, the `+` menu offered all four everywhere, and the first prompt was where you
+		 * found out that the binary was not installed.
+		 */
+		reply({ type: "runtimes", list: runtimeList() });
 		for (const warning of this.deck.warnings) reply({ type: "notice", level: "warn", text: warning });
 		// The whole truth on connect, so a reconnect is a refresh: the deck, the
 		// agents, and each one's transcript.
