@@ -103,6 +103,25 @@ say(
 	focused.nodes.filter((path) => path === NOTES).length === 1,
 	JSON.stringify(focused.nodes),
 );
+/*
+ * One corner, and the page draws it.
+ *
+ * A board on the canvas is a rounded box (`.board-node > .surface`, 12px) and that radius is
+ * *inside* the frame, so it scales with the page while the page's own does not — two curves that
+ * cross at every zoom but 1, and a square-cornered page showing behind the board's curve. That
+ * is what "double corner radius" was.
+ */
+const corners = await page.evaluate(() => {
+	const page_ = document.querySelector(".focus-page");
+	const surface = document.querySelector(".focus .board-node > .surface");
+	return { page: page_ ? getComputedStyle(page_).borderRadius : null, surface: surface ? getComputedStyle(surface).borderRadius : null };
+});
+say(
+	"…with one rounded corner, drawn by the page rather than by the board inside it",
+	corners.page === "12px" && corners.surface === "0px",
+	JSON.stringify(corners),
+);
+
 say(
 	"…centred in the room beside the panel rather than under it",
 	focused.page !== null && Math.abs((focused.page?.centre ?? 0) - (focused.beside ?? 0)) <= 6,

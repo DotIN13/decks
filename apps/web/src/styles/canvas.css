@@ -235,8 +235,27 @@
 	.focus-page {
 		margin: 0 auto;
 		overflow: hidden;
-		background: #fff;
+		/*
+		 * The page owns the corner, and the *board* stops drawing one inside it.
+		 *
+		 * A board on the canvas is a rounded box — `.board-node > .surface`, 12px — and that
+		 * radius is *inside* the frame, so it scales with the page: at 1.5× it is 18px against
+		 * this 12px, and the two curves cross. Worse at any zoom, the page's own rectangle showed
+		 * wherever the board's curve cut in, which is what "double corner radius" is: a radius,
+		 * and a square-cornered box behind it.
+		 *
+		 * So one curve, on the page, at screen scale, and nothing painted behind it — which also
+		 * means the corner shows whatever the app is behind the page rather than a white wedge
+		 * under a board that may not be white.
+		 */
+		border-radius: 12px;
+		background: transparent;
 		box-shadow: 0 1px 3px rgb(0 0 0 / 18%), 0 14px 40px rgb(0 0 0 / 16%);
+	}
+
+	.focus .board-node > .surface {
+		border-radius: 0;
+		background: transparent;
 	}
 
 	.focus-scaled {
