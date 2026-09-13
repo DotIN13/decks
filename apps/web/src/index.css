@@ -592,16 +592,19 @@ svg.lucide {
 
 /*
  * The board bar's buttons — taking a board off the canvas, and filling the window with it.
- * Appears on hover, like the message actions.
+ * Appears on hover, like the message actions. Two of them are buttons and the third is an
+ * `<a>` — the board's own address, so the browser's "open in a new tab" is the behaviour
+ * rather than an imitation of it — and all three take their shape from the rule below.
  *
- * Two selectors rather than one class shared by both, and that is a bug this had: the
+ * Three selectors rather than one class shared by all, and that is a bug this had: the
  * fullscreen button carried `.hide` because a *deck* was the only board with two buttons in
  * its bar, so nothing noticed. The moment every board got one, `e2e/checks/tiers.mjs`'s
  * `locator(".chrome .hide").click()` matched two elements and Playwright's strict mode
  * refused — a selector that means "the ×" would have meant "one of the two".
  */
 .board-node > .chrome .hide,
-.board-node > .chrome .present-open {
+.board-node > .chrome .present-open,
+.board-node > .chrome .open-tab {
 	display: grid;
 	width: 18px;
 	height: 18px;
@@ -617,12 +620,14 @@ svg.lucide {
 }
 
 .board-node:hover > .chrome .hide,
-.board-node:hover > .chrome .present-open {
+.board-node:hover > .chrome .present-open,
+.board-node:hover > .chrome .open-tab {
 	opacity: 1;
 }
 
 .board-node > .chrome .hide:hover,
-.board-node > .chrome .present-open:hover {
+.board-node > .chrome .present-open:hover,
+.board-node > .chrome .open-tab:hover {
 	background: var(--line);
 	color: var(--fg);
 }

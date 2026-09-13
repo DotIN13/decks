@@ -1,10 +1,11 @@
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
+import ExternalLink from "lucide-solid/icons/external-link";
 import X from "lucide-solid/icons/x";
 import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { unwrap } from "solid-js/store";
 import { Icon } from "../ui/icons.tsx";
-import { boardUrl } from "../lib/api.ts";
+import { boardUrl, deckFileUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
@@ -698,6 +699,35 @@ export function BoardFrame(props: {
 					so a second frame of it says nothing the first one does not, and its bar is
 					narrow enough that a third button is where the title was.
 				*/}
+				{/*
+					The board on its own, in its own tab.
+
+					A **link** rather than a button with `window.open` in it, and that is the whole
+					difference: the address ends up in the page, so it can be copied, middle-clicked
+					or opened with a modifier, and the browser's own "open in a new tab" is the
+					behaviour rather than an imitation of it.
+
+					No `?rev=`: a tab opened now shows the board as it *is* rather than as it was
+					when the canvas last loaded it (`deckFileUrl`). What arrives there is
+					browse-only — no canvas, so no camera, no editor and no inspector — and the
+					board is clickable at any size, which is not true of the canvas below half zoom.
+
+					Not on a live board: a mirror in a bare tab has nobody to feed it, and says so
+					itself (`.live[data-state="alone"]`).
+				*/}
+				<Show when={!props.board.live}>
+					<a
+						class="open-tab"
+						href={deckFileUrl(props.board.path)}
+						target="_blank"
+						rel="noopener"
+						title="Open this board in its own tab"
+						aria-label={`Open ${props.board.title} in its own tab`}
+						onPointerDown={(event) => event.stopPropagation()}
+					>
+						<Icon of={ExternalLink} size={12} />
+					</a>
+				</Show>
 				<Show when={Boolean(props.onPresent && !props.board.live)}>
 					<button
 						class="present-open"

@@ -17,7 +17,7 @@
  * reach *it* — and Escape then has to work from inside a board's document, which it can only
  * do because the overlay listens there too (same origin) rather than only on this window.
  */
-import { deckState, open, say, settle } from "../harness.mjs";
+import { WEB, deckState, open, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 900 });
 
@@ -88,6 +88,58 @@ say(
 	live.length > 0 && live.every((board) => labelOf(board) === null),
 	`${live.length} live board(s): ${live.map((board) => `${board.path} (${board.live})`).join(", ")}`,
 );
+/*
+ * 2. And every board that can be shown has an address of its own to open.
+ *
+ * The address matters as much as the affordance: it is the board's own URL with **no
+ * `?rev=`**, so a tab opened now shows the board as it is rather than as it was when the
+ * canvas last loaded it — and what arrives there is browse-only, which is asserted by
+ * loading it rather than by reading the attribute and hoping.
+ */
+const tabs = await page.evaluate(() =>
+	[...document.querySelectorAll(".board-node")].map((node) => ({
+		path: node.dataset.path,
+		href: node.querySelector(".chrome .open-tab")?.getAttribute("href") ?? null,
+	})),
+);
+const tabOf = (board) => tabs.find((tab) => tab.path === board.path)?.href ?? null;
+say(
+	"every board that can be shown has an address of its own",
+	plain.length > 0 && plain.every((board) => tabOf(board)?.startsWith("/api/board/")),
+	plain.map((board) => tabOf(board)).join(" "),
+);
+say(
+	"…with no revision in it, so a tab shows the board as it is",
+	plain.every((board) => tabOf(board) !== null && !tabOf(board).includes("rev=")),
+	plain.map((board) => tabOf(board)).join(" "),
+);
+say(
+	"…and a live board has none, because a bare tab has nothing to feed it",
+	live.length > 0 && live.every((board) => tabOf(board) === null),
+	live.map((board) => `${board.path} (${board.live})`).join(", "),
+);
+
+/*
+ * Load one, in a tab of its own. No canvas, no camera, no editor — and the board still
+ * renders, which is the whole promise of "every board is already served standalone".
+ */
+const standalone = await page.context().newPage();
+const complaints = [];
+standalone.on("pageerror", (error) => complaints.push(error.message));
+await standalone.goto(new URL(tabOf(plain[0]), WEB).href, { waitUntil: "load" });
+await standalone.waitForFunction(() => window.__boardReady === true, null, { timeout: 15000 }).catch(() => {});
+const alone = await standalone.evaluate(() => ({
+	ready: window.__boardReady === true,
+	canvas: document.querySelectorAll(".board-node").length,
+	components: document.querySelectorAll("[data-id]").length,
+}));
+await standalone.close();
+say(
+	"…and that address is the board on its own: no canvas, and it renders",
+	alone.ready && alone.canvas === 0 && alone.components > 0 && complaints.length === 0,
+	JSON.stringify({ ...alone, complaints: complaints.join(" | ") }),
+);
+
 const deckButton = buttons.find((button) => button.path === pick("slides"));
 const flowButton = buttons.find((button) => button.path === pick("flow"));
 const componentButton = buttons.find((button) => button.path === pick("component"));
@@ -95,7 +147,7 @@ say("…a deck's says Present", deckButton?.label === "Present", String(deckButt
 say("…and a document's and a component board's say Fullscreen", flowButton?.label === "Fullscreen" && componentButton?.label === "Fullscreen", `${flowButton?.label} / ${componentButton?.label}`);
 
 /*
- * 2. A deck: the slide's own shape, letterboxed, and the keys page it.
+ * 3. A deck: the slide's own shape, letterboxed, and the keys page it.
  */
 await present(pick("slides"));
 await settle(page, 700);
@@ -117,7 +169,7 @@ const afterDeck = await overlay();
 say("…and the canvas keeps its own frames behind it", afterDeck === null, "canvas back");
 
 /*
- * 3. A flow document: the window, scrolling inside it, and the document's own keys.
+ * 4. A flow document: the window, scrolling inside it, and the document's own keys.
  */
 await present(pick("flow"));
 await settle(page, 700);
@@ -132,7 +184,7 @@ say("…with the keyboard inside it, so the arrows scroll rather than page", flo
 say("…and Escape still gets out, from inside the frame", (await leave()) === false, "overlay gone");
 
 /*
- * 4. A component board: its own rectangle, at 1:1, and its own buttons reachable.
+ * 5. A component board: its own rectangle, at 1:1, and its own buttons reachable.
  */
 await present(pick("component"));
 await settle(page, 700);
