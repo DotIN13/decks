@@ -85,3 +85,19 @@ export function blockPageZoom(): () => void {
 		for (const name of events) document.removeEventListener(name, stop);
 	};
 }
+
+/**
+ * How tall the dock currently is, published for the stylesheet.
+ *
+ * The conversation stops above the dock, and the dock is a stack of however many of "the
+ * last reply", "a permission question" and "the input bar" are true right now. A constant
+ * would be wrong most of the time and on top of the composer some of it, so the one thing
+ * that knows measures it — `--dock`, beside `--keyboard` above and for the same reason.
+ */
+export function watchDock(dock: Element | null): void {
+	if (!dock) return;
+	new ResizeObserver(([entry]) => {
+		const height = Math.round(entry?.contentRect.height ?? 0);
+		document.documentElement.style.setProperty("--dock", `${height}px`);
+	}).observe(dock);
+}

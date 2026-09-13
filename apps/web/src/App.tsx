@@ -22,6 +22,9 @@ import type { EditorHost } from "./canvas/Editor.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
 import { Settings } from "./chat/Settings.tsx";
 import { forgetAskedResults, receiveToolResult, setToolResultSender } from "./chat/tool-results.ts";
+import { createAlerts } from "./app/alerts.ts";
+import { createCameraReport } from "./app/camera-report.ts";
+import { installKeys } from "./app/keys.ts";
 import { type AgentRecord, createAgentScratch, emptyAgent } from "./state/agent.ts";
 import { clearMarks, component, marks, mode, selected, setComponent, setMarks, setMode, setSelected, setTool, tool } from "./state/selection.ts";
 import { on, send, start, started } from "./state/socket.ts";
@@ -80,7 +83,7 @@ import { closeHistory, historyShown, openHistory, setInspectable, toggleHistory 
 import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { embedPath, uploadAsset } from "./app/upload.ts";
 import { canHover, NARROW } from "./lib/panels.ts";
-import { blockPageZoom, obscured, trackVisualViewport } from "./app/viewport.ts";
+import { blockPageZoom, obscured, trackVisualViewport, watchDock } from "./app/viewport.ts";
 import {
 	type AlertKind,
 	type AlertPrefs,
@@ -93,9 +96,6 @@ import {
 	shouldSound,
 	startedAsking,
 } from "./lib/alerts.ts";
-import { setUnattended as paintBadge } from "./app/favicon.ts";
-import { post as postBanner } from "./lib/notify.ts";
-import { play as playCue, preload as preloadCues } from "./lib/sound.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./chat/UsageModal.tsx";
 
@@ -245,21 +245,6 @@ export function App() {
 		});
 	};
 
-	// --- alerts: a cue, a banner, and a dot on the tab -------------------------------
-
-	/**
-	 * What the app is allowed to interrupt you with. The policy is in `lib/alerts.ts`.
-	 *
-	 * Held here rather than in the module because Settings has to redraw when it changes and
-	 * a module-level `let` is not reactive. The module owns the *rules* and the shape of what
-	 * is stored; this owns the copy the components read.
-	 */
-	const [prefs, setPrefsSignal] = createSignal<AlertPrefs>(loadPrefs());
-	const setPrefs = (next: AlertPrefs) => {
-		setPrefsSignal(next);
-		savePrefs(next);
-	};
-
 	/**
 	 * How boards are drawn (`lib/renderer.ts`). The choice is remembered; what runs is the
 	 * choice or `dom`, depending on whether this browser can draw an element into a canvas.
@@ -272,90 +257,15 @@ export function App() {
 		saveRenderer(choice);
 	};
 
-	/** Whether the person is demonstrably in front of this tab. Two facts, not one. */
-	const [presence, setPresence] = createSignal<Presence>({ visible: true, focused: true });
-	/**
-	 * How many alerts have landed since you last looked at this window.
-	 *
-	 * Not the same number as any agent's unread count, and deliberately: unread is about a
-	 * *conversation* and survives switching tabs, while this is about the *window* and is
-	 * cleared by coming back to it. Coming back is looking.
-	 */
-	const [unattended, setUnattended] = createSignal(0);
-
-	createEffect(() => paintBadge(unattended()));
-
-	onMount(() => {
-		const sync = () => {
-			const now = { visible: document.visibilityState === "visible", focused: document.hasFocus() };
-			setPresence(now);
-			if (inView(now)) setUnattended(0);
-		};
-		sync();
-		/*
-		 * Three listeners, because the two facts move independently: `visibilitychange` fires
-		 * for switching tabs and for minimising, and `focus`/`blur` for moving to another
-		 * window with this tab still on screen. A banner is wrong in both cases and only one
-		 * of the events covers each.
-		 */
-		window.addEventListener("focus", sync);
-		window.addEventListener("blur", sync);
-		document.addEventListener("visibilitychange", sync);
-		onCleanup(() => {
-			window.removeEventListener("focus", sync);
-			window.removeEventListener("blur", sync);
-			document.removeEventListener("visibilitychange", sync);
-		});
-	});
-
 	/*
-	 * Fetch the three configured cues on the first gesture.
-	 *
-	 * Not at mount: a cue is ~8kB and this is the least important thing on the page, so it
-	 * should not be competing with the deck for the first paint. On the first real interaction
-	 * it is free, and it is well before an agent can have finished anything. Over the network
-	 * the alternative is a first "it finished" that lands a round trip after you have looked.
+	 * The alerts: a cue, a banner and a badge, and the three conditions behind them
+	 * (`app/alerts.ts`). Wired here because `raise` is called from the frame switch below,
+	 * and clicking a banner has to be able to switch conversations.
 	 */
-	onMount(() => {
-		const warm = () => preloadCues(Object.values(prefs().sound));
-		const events = ["pointerdown", "keydown", "touchstart"] as const;
-		for (const name of events) window.addEventListener(name, warm, { once: true, passive: true });
-		onCleanup(() => {
-			for (const name of events) window.removeEventListener(name, warm);
-		});
-	});
+	const { prefs, setPrefs, raise } = createAlerts({ focusAgent: (id) => focusAgent(id) });
 
 	/** What to call an agent in a banner, without making the sentence about an id. */
 	const nameOf = (id: string | undefined) => (id ? (state.identities[id]?.name ?? "An agent") : "An agent");
-
-	/**
-	 * Raise one alert: the cue, the badge, and — only if you are elsewhere — the banner.
-	 *
-	 * The three are deliberately not the same condition. The sound plays whether or not you
-	 * are looking, because being in the room is the common case for "it finished". The badge
-	 * counts only what you have *not* seen. The banner is suppressed while the page is in
-	 * view, since an OS notification over a window you are reading is telling you something
-	 * that is already on your screen.
-	 */
-	const raise = (kind: AlertKind, banner: { title: string; body?: string; tag?: string; agent?: string }) => {
-		const current = prefs();
-		if (shouldSound(kind, current)) playCue(current.sound[kind], current.volume);
-		const here = presence();
-		if (!inView(here)) setUnattended((count) => count + 1);
-		if (!shouldNotify(kind, current, here)) return;
-		postBanner({
-			title: banner.title,
-			body: banner.body,
-			tag: banner.tag,
-			onClick: () => {
-				setUnattended(0);
-				// Clicking "Ada finished" and landing on somebody else's conversation is the one
-				// way this can be actively unhelpful, so the click switches as well as focuses.
-				if (banner.agent && banner.agent !== state.focused) focusAgent(banner.agent);
-				openHistory();
-			},
-		});
-	};
 
 	/*
 	 * The state each agent was last in lives on its scratch record, so a change can be told
@@ -836,37 +746,14 @@ export function App() {
 		return chat ? chat.state !== "idle" : false;
 	});
 
-	/**
-	 * Tell the server where the user is looking, but not on every frame.
-	 *
-	 * A pan is hundreds of camera changes and the server only needs the resting
-	 * place, so this trails the gesture by a beat rather than narrating it.
+	/*
+	 * Telling the server where the user is looking (`app/camera-report.ts`): the debounce, the
+	 * reading, and the canvas size that rides with it.
 	 */
-	let cameraTimer: number | undefined;
-	const reportCamera = (camera: Camera) => {
-		if (cameraTimer) clearTimeout(cameraTimer);
-		cameraTimer = window.setTimeout(() => sendCamera(camera), 250);
-	};
+	const report = createCameraReport({ read: camera, write: setCamera });
+	const sendCamera = report.now;
+	const setCameraAndReport = report.set;
 
-	/**
-	 * A camera reading, with how much room the canvas has to draw in.
-	 *
-	 * The size rides on the camera rather than travelling as its own frame because they
-	 * change together and are read together: `stage.viewport()` and `stage.newBoard` want
-	 * the number a board has to fit into, and that is the window minus the chrome standing
-	 * beside it — not `innerWidth`, which counts the boards panel as space a board could
-	 * use.
-	 */
-	const sendCamera = (camera: Camera, agentId?: string) => {
-		const box = canvasBox({ width: window.innerWidth, height: window.innerHeight });
-		const sized: Camera = { ...camera, width: Math.round(box.width), height: Math.round(box.height) };
-		send({ type: "camera.set", camera: sized, ...(agentId ? { agentId } : {}) });
-	};
-
-	const setCameraAndReport = (camera: Camera) => {
-		setCamera(camera);
-		reportCamera(camera);
-	};
 
 	/**
 	 * What the focused agent holds, restricted to boards that still exist.
@@ -1292,56 +1179,18 @@ export function App() {
 		};
 		document.addEventListener("paste", onPaste);
 		onCleanup(() => document.removeEventListener("paste", onPaste));
-
-		/*
-		 * Escape lets the selection go, from anywhere.
-		 *
-		 * It always did — inside the board's own document, where `Editor` listens (§6.5).
-		 * That is the one place the key was *never* pressed: selecting a component opens the
-		 * inspector, and the next thing a hand does is reach for it, which moves focus out
-		 * of the iframe. From then on the keypress arrived here, where nothing was listening,
-		 * and the only way out of a selection was the inspector's own ×.
-		 *
-		 * Two things own Escape ahead of this and keep it. A **field** — the composer clears
-		 * its draft, an inspector input reverts — because the selection is still there to let
-		 * go of afterwards, and losing a draft you were trying to keep is the worse outcome.
-		 * A **dialog**, because a question waiting for an answer is more urgent than a
-		 * selection, and answering it is what the key is for while one is up.
-		 */
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key !== "Escape" || event.defaultPrevented) return;
-			if (!component()) return;
-			if (dialog()) return;
-			const target = event.target as HTMLElement | null;
-			if (target?.closest?.("input, textarea, select, [contenteditable]")) return;
-			event.preventDefault();
-			setComponent(undefined);
-		};
-		window.addEventListener("keydown", onKeyDown);
-		onCleanup(() => window.removeEventListener("keydown", onKeyDown));
 		// The visual viewport, so the dock stays above the on-screen keyboard.
 		onCleanup(trackVisualViewport());
 		// And one pinch, zooming one thing: the boards, not the app around them.
 		onCleanup(blockPageZoom());
-
-		/*
-		 * How tall the dock currently is, published for the stylesheet.
-		 *
-		 * The conversation stops above the dock, and the dock is a stack of however many of
-		 * "the last reply", "a permission question" and "the input bar" are true right now.
-		 * A constant would be wrong most of the time and on top of the composer some of it,
-		 * so the one thing that knows measures it.
-		 */
-		const dock = document.querySelector(".dock");
-		if (dock) {
-			const observer = new ResizeObserver(([entry]) => {
-				const height = Math.round(entry?.contentRect.height ?? 0);
-				document.documentElement.style.setProperty("--dock", `${height}px`);
-			});
-			observer.observe(dock);
-			onCleanup(() => observer.disconnect());
-		}
+		// How tall the dock is, published for the stylesheet (`app/viewport.ts`).
+		watchDock(document.querySelector(".dock"));
 	});
+
+	/** Bumped to say "put the cursor in the search field" — the panel watches it. */
+	const [findAt, setFindAt] = createSignal(0);
+	// The two app-wide shortcuts: `⌘K` to find a board, Escape to drop a selection.
+	installKeys({ openBoards: () => showBoards(true), find: setFindAt });
 
 	/*
 	 * The browser opens a dropped file by default, which would unload the app — socket,
@@ -1430,28 +1279,6 @@ export function App() {
 		if (open && narrow()) closeHistory();
 	};
 
-	/*
-	 * `⌘K` — which is what the full-screen board browser became.
-	 *
-	 * That modal covered the canvas you were looking at in order to help you find something
-	 * on it. The panel's list is where it went — the whole deck, in three sections — so the
-	 * shortcut opens the panel and puts the cursor in the search field: the same intent,
-	 * without a sheet over the work. It used to have to pick a tab as well.
-	 *
-	 * The composer's placeholder has promised this since before there was anything behind
-	 * it, which is the other reason it is here rather than on a list of things to do.
-	 */
-	const [findAt, setFindAt] = createSignal(0);
-	onMount(() => {
-		const keys = (event: KeyboardEvent) => {
-			if (event.key !== "k" || !(event.metaKey || event.ctrlKey) || event.altKey) return;
-			event.preventDefault();
-			showBoards(true);
-			setFindAt(Date.now());
-		};
-		window.addEventListener("keydown", keys);
-		onCleanup(() => window.removeEventListener("keydown", keys));
-	});
 
 	/**
 	 * Pull in from an edge and the surface on that side arrives (`canvas/edge-swipe.ts`).
@@ -1634,7 +1461,7 @@ export function App() {
 						onHide={(path) => send({ type: "board.hide", path })}
 						nonces={state.nonces}
 						cursor={state.cursor}
-						onViewport={() => reportCamera(camera())}
+						onViewport={() => report.soon(camera())}
 						onExtent={(path, extent) => send({ type: "board.extent", path, ...extent })}
 						editor={editor}
 						onTool={setTool}
