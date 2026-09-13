@@ -27,7 +27,7 @@ import {clearMarks, component, marks, mode, selected, setComponent, setMode, set
 import { on, send, start, started } from "./state/socket.ts";
 import {clearDialog, clearPreview, dialog, preview, setState, state} from "./state/deck.ts";
 import { notice, working } from "./state/notices.ts";
-import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
+import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
@@ -324,6 +324,45 @@ export function App() {
 	 * is where that unpins.
 	 */
 	/**
+	 * Which board the focus view would show: the selected one, or the one being looked at.
+	 *
+	 * The selection first, because that is what a person has just pointed at. Otherwise the
+	 * board nearest the middle of the view, which is the one in front of them — the alternative
+	 * was "the first in the deck", which is a board they may not be able to see.
+	 */
+	const focusTarget = (): string | undefined => {
+		const chosen = selected();
+		if (chosen) return chosen;
+		const at = camera();
+		let best: { path: string; away: number } | undefined;
+		for (const board of stageBoards()) {
+			const away = Math.hypot(board.x + board.w / 2 - at.x, board.y + board.h / 2 - at.y);
+			if (!best || away < best.away) best = { path: board.path, away };
+		}
+		return best?.path;
+	};
+
+	/**
+	 * The focus view on or off — one key (`d`), one button, and Escape to come back.
+	 *
+	 * Nothing to show is a sentence rather than a mode with an empty page in it: with no boards
+	 * at all the view has nothing to be a view *of*, and a canvas that went blank on a keypress
+	 * and needed the same key to come back would read as a fault.
+	 */
+	const toggleFocus = () => {
+		if (focus()) {
+			setFocus(undefined);
+			return;
+		}
+		const path = focusTarget();
+		if (!path) {
+			notice("warn", "No board to focus — put one on the canvas first.");
+			return;
+		}
+		setFocus(path);
+	};
+
+	/**
 	 * A selected box's file as something to fill the window with.
 	 *
 	 * The overlay is told what the *box* said — the path, the page range — rather than being
@@ -604,6 +643,8 @@ export function App() {
 						 */
 						onPresent={(path, at) => setPresenting(presentingFor(path, at))}
 						onEditSource={openSource}
+						{...(focus() === undefined ? {} : { focus: focus()! })}
+						onFocusToggle={toggleFocus}
 						{...(editingSource()
 							? {
 									editing: {
@@ -691,6 +732,8 @@ export function App() {
 				<AgentPill
 					mode={mode()}
 					onMode={setMode}
+					focusView={focus() !== undefined}
+					onFocusView={toggleFocus}
 					chats={state.chats}
 					identities={state.identities}
 					focused={state.focused}

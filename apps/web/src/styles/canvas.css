@@ -197,6 +197,54 @@
 }
 
 /*
+ * ── The focus view: one board, as a page ─────────────────────────────────────────────
+ *
+ * The canvas is not rendered at all in this view; this is what stands in its place, inside the
+ * same box (`canvas/Stage.tsx`). A page on the app's surface colour, air around it, and a
+ * shadow so it reads as paper rather than as a panel — which is the whole difference between
+ * this and the canvas it replaces: there is exactly one thing to look at, and the scrolling
+ * that used to be panning is the scrolling every reader already knows.
+ */
+@layer components {
+	.focus {
+		position: absolute;
+		overflow-x: hidden;
+		overflow-y: auto;
+		/*
+		 * Room at the top and bottom so the first and last lines of a long page are not jammed
+		 * against the window's edge — and on the sides, the room the open panels are using.
+		 *
+		 * `--inset-left`/`--inset-right` are the same numbers the dock positions itself with
+		 * (`camera/insets.ts` measures the chrome that declares itself), so the page is centred
+		 * in the space *beside* a panel rather than underneath it. A reading view whose first
+		 * paragraph is behind a floating panel is not a view of one document; it is a view of one
+		 * document and a panel.
+		 */
+		padding: 32px var(--inset-right, 0px) 32px var(--inset-left, 0px);
+		inset: 0;
+		background: var(--canvas, var(--panel));
+		/* Scrolling a page is not dragging a canvas: no inertia chain to the shell. */
+		overscroll-behavior: contain;
+	}
+
+	/*
+	 * The page's box is the size it is *drawn* — the scaled size — because a CSS transform
+	 * does not change layout. The document inside it is scaled from its own top-left corner, so
+	 * the two agree about where the page ends and the scrollbar is honest.
+	 */
+	.focus-page {
+		margin: 0 auto;
+		overflow: hidden;
+		background: #fff;
+		box-shadow: 0 1px 3px rgb(0 0 0 / 18%), 0 14px 40px rgb(0 0 0 / 16%);
+	}
+
+	.focus-scaled {
+		position: relative;
+	}
+}
+
+/*
  * ── A board edited as its own source ──────────────────────────────────────────────────
  *
  * Sits inside the board's node, so it is positioned and scaled by the canvas exactly as the

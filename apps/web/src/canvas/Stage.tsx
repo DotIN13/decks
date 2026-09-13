@@ -1,5 +1,5 @@
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
@@ -74,6 +74,17 @@ export function Stage(props: {
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
 	selected?: string;
+	/**
+	 * The board being read on its own, if any — the canvas as a page rather than a map.
+	 *
+	 * One board, one column: no panning, the zoom free, and the wheel scrolling the document
+	 * the way it would in any reader. The chrome is untouched, so everything beside the canvas
+	 * still works — which is what makes this a *view* and not `Present`, an overlay that takes
+	 * the window and is deliberately browse-only.
+	 */
+	focus?: string;
+	/** Toggle it. The stage owns the key; the app owns which board and when. */
+	onFocusToggle?: () => void;
 	/** Take a deck fullscreen: the app owns the overlay, the stage only asks for it. */
 	onPresent?: (path: string, at: number) => void;
 	/** Open a flow or slides board as its own source. */
@@ -201,6 +212,18 @@ export function Stage(props: {
 			 */
 			const zoom = zoomKey(event);
 			if (zoom) {
+				/*
+				 * In the focus view these are the *page's*: the camera behind it is not on screen,
+				 * and zooming something nobody can see is a keystroke that does nothing. Caught
+				 * here, before the camera's branch, because `zoomKey` is checked first in this
+				 * handler and would otherwise swallow them.
+				 */
+				if (props.focus) {
+					if (zoom === "fit") fitFocus();
+					else setFocusZoom((current) => Math.min(4, Math.max(0.1, current * (zoom === "in" ? 1.2 : 1 / 1.2))));
+					event.preventDefault();
+					return;
+				}
 				if (zoom === "fit") pushCamera(frame(props.boards.map(boxOf)));
 				else pushCamera(zoomAbout(localCamera, view(), centre(), zoom === "in" ? 1.2 : 1 / 1.2));
 				event.preventDefault();
@@ -208,6 +231,24 @@ export function Stage(props: {
 			}
 			const typing = (event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]");
 			if (typing) return;
+			/*
+			 * The view's own two keys, and deliberately *not* in `shortcut`: a board's keys are
+			 * forwarded there (`frame-gestures.ts`), so a `d` in that table would be a `d` typed
+			 * at whatever board happens to have the focus. These fire only when the keystroke
+			 * arrived in the app's own document.
+			 */
+			if (props.onFocusToggle) {
+				if (event.key === "Escape" && props.focus) {
+					event.preventDefault();
+					props.onFocusToggle();
+					return;
+				}
+				if (event.key === "d" && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+					event.preventDefault();
+					props.onFocusToggle();
+					return;
+				}
+			}
 			/*
 			 * A **focused** deck takes the arrows, and an unfocused one takes nothing.
 			 *
@@ -338,6 +379,14 @@ export function Stage(props: {
 	 */
 	const LAYER_BUDGET = 48;
 
+	/**
+	 * The air a focused page keeps around it, in stage pixels.
+	 *
+	 * Stage pixels and not board ones, because it is the *window* being measured: a margin that
+	 * scaled with the page would vanish as you zoomed out and eat the width as you zoomed in.
+	 */
+	const FOCUS_AIR = 32;
+
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
 
 	const writeTransform = (cam: Camera) => {
@@ -360,6 +409,39 @@ export function Stage(props: {
 		scaleSettle = setTimeout(() => setScaling(false), 300);
 	};
 	onCleanup(() => clearTimeout(scaleSettle));
+
+	/**
+	 * The focus view: one board, as a page.
+	 *
+	 * Not a camera trick — the canvas is *not rendered* while this is on, and this is a
+	 * separate view with its own scroll box and its own zoom (`canvas/FocusView.tsx` explains
+	 * why). So the zoom lives here, because the stage is what owns the frame's wiring and the
+	 * gesture host the view's frame reports to.
+	 */
+	const [focusZoom, setFocusZoom] = createSignal(1);
+	let focusEl: HTMLDivElement | undefined;
+	const focused = () => props.boards.find((candidate) => candidate.path === props.focus);
+
+	/** The page width filled to the window, never blown up past its own size. */
+	const fitFocus = () => {
+		const board = focused();
+		if (!board) return;
+		const width = Math.max(120, view().width - FOCUS_AIR * 2);
+		setFocusZoom(Math.min(1, width / board.w));
+	};
+
+	/*
+	 * Fit on entering, and again when the window changes shape — in this view the window *is*
+	 * the page's width. `untrack` around the lookup: boards move and change (an agent writes
+	 * one, an extent arrives), and a zoom that jumped every time one did would be worse than no
+	 * view at all. What this follows is the view being entered and the window resizing.
+	 */
+	createEffect(() => {
+		if (!props.focus) return;
+		const width = view().width;
+		if (!width) return;
+		untrack(fitFocus);
+	});
 
 	const pushCamera = (cam: Camera) => {
 		if (cam.zoom !== localCamera.zoom) nowScaling();
@@ -422,6 +504,25 @@ export function Stage(props: {
 			props.onTool(tool);
 			return true;
 		}
+		/*
+		 * In the focus view the zoom keys are the page's: the camera behind it is not on screen
+		 * and moving it would be a change nobody could see. `0` is the same word it is on the
+		 * canvas — fit — which for a page means its width.
+		 */
+		if (props.focus) {
+			if (key === "0") {
+				fitFocus();
+				return true;
+			}
+			if (key === "+" || key === "=") {
+				setFocusZoom((zoom) => Math.min(4, zoom * 1.2));
+				return true;
+			}
+			if (key === "-") {
+				setFocusZoom((zoom) => Math.max(0.1, zoom / 1.2));
+				return true;
+			}
+		}
 		switch (key) {
 			case "0":
 				pushCamera(frame(props.boards.map(boxOf)));
@@ -461,6 +562,23 @@ export function Stage(props: {
 	 * document at all. Positions arrive already in stage coordinates.
 	 */
 	const wheel = (gesture: { x: number; y: number; deltaX: number; deltaY: number; zooming: boolean }) => {
+		/*
+		 * A wheel over the page is the page's, in both senses.
+		 *
+		 * The frame is a scaled document inside a scroll box, so the browser will not scroll it
+		 * for us — the same reason `frame-gestures.ts` scrolls a box inside a board by hand —
+		 * and the camera behind this view is not on screen to be panned. So the delta goes to the
+		 * box, and ⌘-wheel to the page's own zoom.
+		 */
+		if (props.focus) {
+			if (gesture.zooming) {
+				const factor = Math.min(1.2, Math.max(1 / 1.2, Math.exp(-gesture.deltaY / 120)));
+				setFocusZoom((zoom) => Math.min(4, Math.max(0.1, zoom * factor)));
+			} else if (focusEl) {
+				focusEl.scrollTop += gesture.deltaY;
+			}
+			return;
+		}
 		if (gesture.zooming) {
 			/*
 			 * A pinch arrives as a stream of small deltas and a ⌘-wheel notch as one
@@ -676,7 +794,15 @@ export function Stage(props: {
 		touch,
 		claimTouch: (id) => claimed.add(id),
 		pinching: () => touches.count() > 1,
-		pan: (dx, dy) => pushCamera(pan(localCamera, dx, dy)),
+		pan: (dx, dy) => {
+			// A drag across the page scrolls it, exactly as dragging a document does — and there
+			// is nothing sideways to go to, so only the vertical part means anything.
+			if (props.focus) {
+				if (focusEl) focusEl.scrollTop -= dy;
+				return;
+			}
+			pushCamera(pan(localCamera, dx, dy));
+		},
 		space: (held) => setSpaceHeld(held),
 		spaceHeld: () => spaceHeld(),
 		interactive: () => localCamera.zoom >= INTERACT_ZOOM,
@@ -733,6 +859,12 @@ export function Stage(props: {
 			return true;
 		},
 		zoom: (direction) => {
+			if (props.focus) {
+				if (direction === "fit") fitFocus();
+				else setFocusZoom((zoom) => Math.min(4, Math.max(0.1, zoom * (direction === "in" ? 1.2 : 1 / 1.2))));
+				return;
+			}
+
 			if (direction === "fit") pushCamera(frame(props.boards.map(boxOf)));
 			else pushCamera(zoomAbout(localCamera, view(), centre(), direction === "in" ? 1.2 : 1 / 1.2));
 		},
@@ -868,6 +1000,66 @@ export function Stage(props: {
 		props.setCamera(frame(props.boards.map(boxOf)));
 	});
 
+	/*
+	 * One board, as the canvas draws it: the frame, its title bar, its marks, its editor.
+	 *
+	 * A function because the focus view renders exactly one of these in a different box
+	 * (`canvas/FocusView.tsx`), and two copies of this — forty props, every wire the board
+	 * needs — is how the two views would drift apart.
+	 */
+	const boardNode = (board: Board, alone = false) => (
+						<BoardFrame
+							board={board}
+							/*
+							 * The focus view's board is the whole screen, so: it is mounted (the
+							 * admission budget is about six boards sharing a main thread), it is
+							 * visible (the camera is not looking at it, it is not a camera), it is
+							 * placed at the page's origin, and the DOM renderer draws it — the other
+							 * two are canvas renderers for a canvas (`lib/renderer.ts`).
+							 */
+							renderer={alone ? "dom" : props.renderer}
+							scaling={scaling()}
+							pictures={oneCanvas.pictures}
+							camera={props.camera}
+							mounted={alone || (admission.mayHaveDocument(board) && admission.isMounted(board))}
+							/*
+							 * No title bar in the focus view, and that is a decision rather than an
+							 * omission: the bar is canvas furniture — it is how you *identify and
+							 * choose* a board among others, and it sits above the board's top edge
+							 * where the page's margin is. `visible` gates exactly that bar
+							 * (`BoardFrame`), so the page is the document and nothing else, and the
+							 * panel still says which board it is.
+							 */
+							visible={alone ? false : isVisible(board)}
+							{...(alone ? { origin: { x: 0, y: 0 } } : {})}
+							selected={props.selected === board.path}
+							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
+							{...(props.onPresent
+								? {
+										onPresent: () =>
+											props.onPresent?.(board.path, board.format === "slides" ? (deckIn(board.path)?.current() ?? 0) : 0),
+									}
+								: {})}
+							nonce={props.nonces?.[board.path]}
+							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
+							marks={(props.marks ?? []).filter((mark) => mark.path === board.path)}
+							editor={props.editor}
+							gestures={gestures}
+							drops={props.drops(board.path)}
+							showRev={props.frameRevs?.[board.path]}
+							previewSha={props.preview?.[board.path]}
+							{...(props.transcript ? { transcript: props.transcript } : {})}
+							{...(props.agentIdentity ? { agentIdentity: props.agentIdentity } : {})}
+							{...(props.webStatus ? { webStatus: props.webStatus } : {})}
+							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
+							onSelect={() => props.onSelect(board.path)}
+							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
+							onMove={(x, y) => props.onMove(board.path, x, y)}
+							{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
+							onOpen={() => pushCamera(frame([boxOf(board)]))}
+						/>
+);
+
 	return (
 		<div
 			class="stage"
@@ -881,6 +1073,16 @@ export function Stage(props: {
 			onPointerDown={onPointerDown}
 			style={{ cursor: spaceHeld() ? "grab" : undefined }}
 		>
+			{/*
+			 * The view, either/or — and the canvas is *not rendered* in the focus view.
+			 *
+			 * Hidden would be cheaper and wrong: two elements carrying the same
+			 * `data-path` is two frames with the same board in them, and every lookup in this
+			 * app that asks "where is board X's document" — the inspector's shape, the editor's
+			 * patch target, a deck's page handle — asks by that attribute. One of them would be
+			 * the wrong one, silently, and which one would depend on document order.
+			 */}
+			<Show when={focused()} keyed fallback={<>
 			{/* The one-canvas renderer's two canvases: the picture everyone sees, and the
 			    darkroom the documents live in (see `drawScene`). Under the world, so the
 			    bars, shadows and marks stay HTML on top of the pictures. */}
@@ -909,44 +1111,37 @@ export function Stage(props: {
 				ref={worldEl}
 			>
 				<For each={props.boards} fallback={null}>
-					{(board) => (
-						<BoardFrame
-							board={board}
-							renderer={props.renderer}
-							scaling={scaling()}
-							pictures={oneCanvas.pictures}
-							camera={props.camera}
-							mounted={admission.mayHaveDocument(board) && admission.isMounted(board)}
-							visible={isVisible(board)}
-							selected={props.selected === board.path}
-							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
-							{...(props.onPresent
-								? {
-										onPresent: () =>
-											props.onPresent?.(board.path, board.format === "slides" ? (deckIn(board.path)?.current() ?? 0) : 0),
-									}
-								: {})}
-							nonce={props.nonces?.[board.path]}
-							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
-							marks={(props.marks ?? []).filter((mark) => mark.path === board.path)}
-							editor={props.editor}
-							gestures={gestures}
-							drops={props.drops(board.path)}
-							showRev={props.frameRevs?.[board.path]}
-							previewSha={props.preview?.[board.path]}
-							{...(props.transcript ? { transcript: props.transcript } : {})}
-							{...(props.agentIdentity ? { agentIdentity: props.agentIdentity } : {})}
-							{...(props.webStatus ? { webStatus: props.webStatus } : {})}
-							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
-							onSelect={() => props.onSelect(board.path)}
-							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
-							onMove={(x, y) => props.onMove(board.path, x, y)}
-							{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
-							onOpen={() => pushCamera(frame([boxOf(board)]))}
-						/>
-					)}
+					{(board) => boardNode(board)}
 				</For>
 			</div>
+			</>}>
+				{(board) => (
+					/*
+					 * The focus view: this board as a page, in the stage's own box.
+					 *
+					 * The outer box is scrollable and the middle one is the page at the size it is
+					 * *drawn*, because a CSS transform does not change layout — a scroll container
+					 * holding only the scaled copy would scroll by the untransformed height, which
+					 * is the whole document and then some. So the page reserves `w × zoom`, the
+					 * document inside it is scaled from its own top-left corner, and the scroll
+					 * extent is honest.
+					 *
+					 * Nothing is re-fitted here: the zoom is the stage's (`focusZoom`), because the
+					 * gesture host that reports a wheel over the page belongs to the stage, and one
+					 * number with two owners is a number that disagrees with itself.
+					 */
+					<div class="focus" ref={(element) => (focusEl = element)}>
+						<div class="focus-page" style={{ width: `${board.w * focusZoom()}px`, height: `${board.h * focusZoom()}px` }}>
+							<div
+								class="focus-scaled"
+								style={{ width: `${board.w}px`, height: `${board.h}px`, transform: `scale(${focusZoom()})`, "transform-origin": "top left" }}
+							>
+								{boardNode(board, true)}
+							</div>
+						</div>
+					</div>
+				)}
+			</Show>
 		</div>
 	);
 }

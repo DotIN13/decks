@@ -37,6 +37,13 @@ export function BoardFrame(props: {
 	camera: Camera;
 	/** Whether the board has a document: on screen, or off it for less than a moment (`Stage`). */
 	mounted: boolean;
+	/**
+	 * Where to put the node, when the caller is not the canvas.
+	 *
+	 * Absent on the canvas — the board's own world position is right there and the world's
+	 * transform applies the camera. The focus view passes `{ x: 0, y: 0 }`: it has neither.
+	 */
+	origin?: { x: number; y: number };
 	/** Whether the board is on screen or within a viewport of it — what the title bar keys on. */
 	visible: boolean;
 	selected: boolean;
@@ -175,7 +182,15 @@ export function BoardFrame(props: {
 	/** Where the board sits while a drag is in flight, before the server knows. */
 	const [ghost, setGhost] = createSignal<{ x: number; y: number } | null>(null);
 
-	const at = () => ghost() ?? { x: props.board.x, y: props.board.y };
+	/**
+	 * Where this node sits: the board's world position, or a place its caller chose.
+	 *
+	 * The canvas positions every node in *world* coordinates and lets the one transform on
+	 * `.world` do the camera — which is what makes a pan a compositor change rather than a
+	 * layout of every board. The focus view has no world and no camera, so it places the frame
+	 * itself (`canvas/Stage.tsx`).
+	 */
+	const at = () => props.origin ?? ghost() ?? { x: props.board.x, y: props.board.y };
 	const frameSrc = () => {
 		if (props.previewSha) return `/api/revision/${props.previewSha}`;
 		// 0 means unpinned: show whatever the board now is.

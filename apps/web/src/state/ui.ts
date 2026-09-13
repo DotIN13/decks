@@ -174,6 +174,16 @@ function createUi() {
 	const [boardsMayStart, setBoardsMayStart] = createSignal(false);
 
 	/**
+	 * The board being read on its own, filling the canvas.
+	 *
+	 * A *view* of the canvas rather than an overlay: the chrome stays, so the inspector, the
+	 * composer and every panel work exactly as they do beside the canvas — which is the whole
+	 * difference between this and `Present`. What changes is that the camera is confined to one
+	 * board, so the canvas becomes a page you scroll (`canvas/Stage.tsx`).
+	 */
+	const [focus, setFocus] = createSignal<string | undefined>();
+
+	/**
 	 * And after that, the boards on the canvas are in: the rest of the panel's list may be
 	 * drawn. Chat, then canvas, then the rest.
 	 *
@@ -207,6 +217,8 @@ function createUi() {
 	};
 
 	return {
+		focus,
+		setFocus,
 		presenting,
 		setPresenting,
 		editingSource,
@@ -258,6 +270,8 @@ export type Presenting =
 export const ui = createUi();
 
 export const {
+	focus,
+	setFocus,
 	presenting,
 	setPresenting,
 	editingSource,

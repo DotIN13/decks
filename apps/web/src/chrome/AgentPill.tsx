@@ -517,6 +517,9 @@ export function AgentPill(props: {
 	 */
 	mode: CanvasMode;
 	onMode: (mode: CanvasMode) => void;
+	/** Whether the canvas is showing one board on its own (`state/ui.ts`). */
+	focusView: boolean;
+	onFocusView: () => void;
 	chats: AgentChat[];
 	identities: Record<string, Identity>;
 	focused: string | undefined;
@@ -693,6 +696,26 @@ export function AgentPill(props: {
 				onClick={() => props.onMode(props.mode === "edit" ? "browse" : "edit")}
 			>
 				<Icon of={props.mode === "edit" ? Hand : Pencil} size={15} />
+			</button>
+
+			{/*
+				The focus view: this canvas as one page.
+
+				Beside the pencil because it is the same kind of fact — what the canvas *is* right
+				now — and `soft` rather than the accent for the pencil's own reason: a thing being
+				held, not one of a set being chosen. The icon is a document, because that is what it
+				turns the canvas into.
+			*/}
+			<button
+				type="button"
+				class="iconbtn"
+				data-on={props.focusView ? "soft" : undefined}
+				aria-pressed={props.focusView}
+				title={props.focusView ? "Back to the canvas (or press d)" : "Focus on one board — read it like a document (or press d)"}
+				aria-label={props.focusView ? "Show the whole canvas" : "Focus on one board"}
+				onClick={props.onFocusView}
+			>
+				<Icon of={FileText} size={15} />
 			</button>
 
 			{/*
