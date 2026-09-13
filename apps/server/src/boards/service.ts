@@ -114,11 +114,21 @@ export class BoardService {
 		return new Promise((resolve) => {
 			const waiter = { path, rev, resolve };
 			this.extentWaiters.add(waiter);
+			//
+			// **Not `unref`'d.** It was, to keep a pending measurement from holding the process
+			// open — and that made "give up after `ms`" mean "give up after `ms`, or as soon as
+			// nothing else is happening, whichever comes first". Nothing in the server noticed:
+			// a request is an open socket, and an open socket already holds the loop. Two tests
+			// in `app.test.ts` noticed on CI, where the file's other handles had gone by the time
+			// they ran — the loop drained, Node exited, and both were reported `cancelledByParent`
+			// / "Promise resolution is still pending" while passing here, where a stray handle
+			// from another file kept the loop alive. A wait that ends early because nothing else
+			// is happening is not the wait the caller asked for.
 			const timer = setTimeout(() => {
 				this.extentWaiters.delete(waiter);
 				resolve(undefined);
 			}, ms);
-			timer.unref?.();
+			timer.ref?.();
 		});
 	}
 
