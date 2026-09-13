@@ -1,7 +1,7 @@
 import type { Board } from "@decks/protocol";
 import Trash2 from "lucide-solid/icons/trash-2";
 import { createSignal, onCleanup, Show } from "solid-js";
-import { RailItem } from "../canvas/BoardRail.tsx";
+import { RailItem } from "./BoardRail.tsx";
 import { picture } from "../canvas/thumb-cache.ts";
 import { Icon } from "../icons.tsx";
 import { deckFileUrl } from "../lib/api.ts";

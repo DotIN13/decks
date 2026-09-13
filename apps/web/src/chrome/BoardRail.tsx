@@ -1,7 +1,7 @@
 import type { Board } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { claimThumb } from "./thumb-budget.ts";
-import { hasPicture, picture, takePicture } from "./thumb-cache.ts";
+import { claimThumb } from "../canvas/thumb-budget.ts";
+import { hasPicture, picture, takePicture } from "../canvas/thumb-cache.ts";
 
 /** How long after load to let `board.js` finish drawing before photographing a board. */
 const SETTLE = 700;

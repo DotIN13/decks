@@ -3,7 +3,7 @@ import RefreshCw from "lucide-solid/icons/refresh-cw";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
-import { contextLevel, contextPercent, usageLevel } from "../chrome/context-usage.ts";
+import { contextLevel, contextPercent, usageLevel } from "../lib/context-usage.ts";
 import { behaviorLabel, duration, exact, modelLabel, money, planLabel, resetsAt, resetsIn, tokens } from "./usage-format.ts";
 
 /** How often the countdowns move. A window resets in hours; this is plenty. */

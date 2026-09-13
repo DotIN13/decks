@@ -1,9 +1,9 @@
 import type { AgentUsage } from "@decks/protocol";
 import { Show } from "solid-js";
 import { Popover } from "../../ui/Popover.tsx";
-import { ContextSummary } from "../../chrome/ContextSummary.tsx";
+import { ContextSummary } from "./ContextSummary.tsx";
 import { ContextRing } from "../../chrome/ContextRing.tsx";
-import { contextLevel, contextPercent } from "../../chrome/context-usage.ts";
+import { contextLevel, contextPercent } from "../../lib/context-usage.ts";
 
 /**
  * How full the context is, at the right end of the hint row.
@@ -24,7 +24,7 @@ export function ContextDial(props: {
 	onUsage: () => void;
 }) {
 	/*
-	 * `contextPercent` and `contextLevel` come from `chrome/context-usage.ts` rather than
+	 * `contextPercent` and `contextLevel` come from `lib/context-usage.ts` rather than
 	 * being computed here, which is where they went when this file was deleted and is where
 	 * they should stay: the thresholds are 70 and 85, the null case is load-bearing
 	 * (`contextTokens` is `number | null`, meaning "the agent has not reported yet" — before

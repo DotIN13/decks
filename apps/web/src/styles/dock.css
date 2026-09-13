@@ -269,7 +269,7 @@
 	 *
 	 * It was `.dial` — a 16px arc and a percentage at the end of the hint row, ambient and
 	 * only alarming over 70%. The reading now lives in the corner's `⋯` as a row of numbers
-	 * (`chrome/ContextSummary.tsx`) and the warning lives on the `⋯` button itself, which is
+	 * (`chat/composer/ContextSummary.tsx`) and the warning lives on the `⋯` button itself, which is
 	 * `.iconbtn[data-level]` in `chrome.css`. Nothing here draws a ring any more, so the
 	 * fifty lines that did are deleted rather than kept warm.
 	 */
@@ -385,7 +385,7 @@
 
 	/* The same two thresholds the `⋯` button uses, so an amber corner does not open onto a
 	   blue bar — and the same ones every plan meter in the usage panel wears, because they
-	   are one function: `usageLevel` in `chrome/context-usage.ts`, where 70 and 85 are
+	   are one function: `usageLevel` in `lib/context-usage.ts`, where 70 and 85 are
 	   decided once. */
 	:is(.popover, .usage-modal) .track[data-level="warn"] > i {
 		background: var(--color-warn);

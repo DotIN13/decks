@@ -136,7 +136,7 @@
 	 * A reading carried on the glyph: the context, over 70% and over 85%.
 	 *
 	 * The corner's `⋯` is the only button that wears this. The number itself moved into that
-	 * menu (`chrome/ContextSummary.tsx`), and a full context that only announces itself once
+	 * menu (`chat/composer/ContextSummary.tsx`), and a full context that only announces itself once
 	 * you happen to open a menu is the one thing a reading like this must not become — so the
 	 * alarm stays outside and the numbers go in. Colour only: no dot, no badge, nothing that
 	 * changes the size of a control in a line of them.

@@ -1,8 +1,8 @@
 import type { AgentUsage } from "@decks/protocol";
 import Gauge from "lucide-solid/icons/gauge";
 import { Show } from "solid-js";
-import { Icon } from "../icons.tsx";
-import { contextLevel, contextPercent } from "./context-usage.ts";
+import { Icon } from "../../icons.tsx";
+import { contextLevel, contextPercent } from "../../lib/context-usage.ts";
 
 /** Thousands separated, because these are read at a glance and not counted digit by digit. */
 const figure = (value: number) => value.toLocaleString("en-US");

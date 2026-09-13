@@ -1,6 +1,6 @@
 import type { AgentUsage } from "@decks/protocol";
 import { Show } from "solid-js";
-import { contextLevel, contextPercent } from "./context-usage.ts";
+import { contextLevel, contextPercent } from "../lib/context-usage.ts";
 
 /**
  * How full the context is, as a ring.
