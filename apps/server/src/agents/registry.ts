@@ -6,7 +6,7 @@ import type { StageService } from "../stage/service.ts";
 import type { DelegateReport, DelegateSpec, QueuedWork, SendSpec } from "../stage/tool.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
-import { SnapshotStore } from "./snapshot.ts";
+import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
 
 /**
@@ -38,7 +38,7 @@ export class Registry {
 	private readonly agents: DeckAgent[] = [];
 	private focusedId: string | undefined;
 	/** Shared, so a fork can inherit the canvas of the agent it came from (§6.2). */
-	private readonly snapshots = new SnapshotStore();
+	private readonly snapshots = new AgentStateStore();
 	/** The chat list on disk, so it survives a restart (§6.2). */
 	private store: AgentStore;
 

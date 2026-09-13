@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { StageSnapshot } from "../stage/tool.ts";
-import { SnapshotStore } from "./snapshot.ts";
+import { AgentStateStore } from "./agent-state.ts";
 
 const snapshot = (context: string[], name = "Agent"): StageSnapshot => ({
 	context,
@@ -11,7 +11,7 @@ const snapshot = (context: string[], name = "Agent"): StageSnapshot => ({
 });
 
 test("the newest snapshot is what a starting agent gets", () => {
-	const store = new SnapshotStore();
+	const store = new AgentStateStore();
 	store.record("a", snapshot(["one.html"]), 100);
 	store.record("a", snapshot(["one.html", "two.html"]), 200);
 	assert.deepEqual(store.latest("a")?.context, ["one.html", "two.html"]);
@@ -19,7 +19,7 @@ test("the newest snapshot is what a starting agent gets", () => {
 });
 
 test("a rewind asks what the canvas was at a moment", () => {
-	const store = new SnapshotStore();
+	const store = new AgentStateStore();
 	store.record("a", snapshot(["one.html"]), 100);
 	store.record("a", snapshot(["one.html", "two.html"]), 200);
 	store.record("a", snapshot(["three.html"]), 300);
@@ -30,7 +30,7 @@ test("a rewind asks what the canvas was at a moment", () => {
 });
 
 test("order is not assumed, because a clock is not a guarantee", () => {
-	const store = new SnapshotStore();
+	const store = new AgentStateStore();
 	// Recorded out of order on purpose: `record` is called from a tool run.
 	store.record("a", snapshot(["late.html"]), 300);
 	store.record("a", snapshot(["early.html"]), 100);
@@ -38,7 +38,7 @@ test("order is not assumed, because a clock is not a guarantee", () => {
 });
 
 test("a fork inherits its parent's canvas up to the fork point", () => {
-	const store = new SnapshotStore();
+	const store = new AgentStateStore();
 	store.record("parent", snapshot(["one.html"]), 100);
 	store.record("parent", snapshot(["one.html", "two.html"]), 200);
 	store.record("parent", snapshot(["after-the-fork.html"]), 300);
@@ -50,13 +50,13 @@ test("a fork inherits its parent's canvas up to the fork point", () => {
 });
 
 test("seeding from an agent with no history leaves the child empty", () => {
-	const store = new SnapshotStore();
+	const store = new AgentStateStore();
 	store.seed("nobody", "child", Date.now());
 	assert.equal(store.latest("child"), undefined);
 });
 
 test("an agent that is gone keeps nothing", () => {
-	const store = new SnapshotStore();
+	const store = new AgentStateStore();
 	store.record("a", snapshot(["one.html"]));
 	store.forget("a");
 	assert.equal(store.latest("a"), undefined);

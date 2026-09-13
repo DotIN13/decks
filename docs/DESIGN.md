@@ -402,7 +402,7 @@ Claude counterpart and one mechanism is better than two. The stage snapshot — 
 held, showed and called itself — was carried in a tool result's `details` and rebuilt from
 the branch on `session_start`; MCP tool results have no `details`, and the SDK's
 `structuredContent` looks like the equivalent but *replaces* the text the model reads. It is
-now `agents/snapshot.ts`, a series resolved by time, the same way `BoardService.boardsAt` picks which
+now `agents/agent-state.ts`, a series resolved by time, the same way `BoardService.boardsAt` picks which
 revision of a board to show. It stays in memory, but no longer for the reason first given —
 "nothing recreates agents when the server restarts, so a snapshot has nothing to survive to"
 stopped being true the moment agents were persisted. What it survives *to* is now the record

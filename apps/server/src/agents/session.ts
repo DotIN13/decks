@@ -23,7 +23,7 @@ import type { StageService } from "../stage/service.ts";
 import { createStageTool, type DelegateReport, type DelegateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
-import type { SnapshotStore } from "./snapshot.ts";
+import type { AgentStateStore } from "./agent-state.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
 import type { StageBridge } from "../stage/bridge.ts";
@@ -215,7 +215,7 @@ export class DeckAgent {
 			parentId?: string;
 			resumeRef?: string;
 			kind: AgentKind;
-			snapshots: SnapshotStore;
+			snapshots: AgentStateStore;
 			store: AgentStore;
 			/** The agent this one was forked from, so its canvas can be inherited. */
 			forkedFrom?: { agentId: string; at: number };
@@ -383,7 +383,7 @@ export class DeckAgent {
 	 * the stored ref is refreshed from the backend rather than fixed at creation.
 	 */
 	private resumeRef: string | undefined;
-	private readonly snapshots: SnapshotStore;
+	private readonly snapshots: AgentStateStore;
 	private readonly store: AgentStore;
 	/** Restored from disk and not yet started — a row you can read but nothing is running. */
 	private readonly restored: boolean;

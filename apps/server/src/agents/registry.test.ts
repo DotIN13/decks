@@ -8,7 +8,7 @@ import { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import { Registry } from "./registry.ts";
 import { DeckAgent } from "./session.ts";
-import { SnapshotStore } from "./snapshot.ts";
+import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
 
 /**
@@ -54,7 +54,7 @@ function agentOn(deck: Deck, color = "#3b5cf6"): DeckAgent {
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color, kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck) },
+		{ color, kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 }
 
@@ -461,7 +461,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 					...(options.parentId ? { parentId: options.parentId } : {}),
 					color: "#2eaf5a",
 					kind: options.kind ?? childKind,
-					snapshots: new SnapshotStore(),
+					snapshots: new AgentStateStore(),
 					store: new AgentStore(deck),
 				},
 			);
@@ -496,7 +496,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color: "#3b5cf6", kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck) },
+		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 	parent.translator.user("delegate something");
 	(registry as unknown as { agents: DeckAgent[] }).agents.push(parent);
@@ -609,7 +609,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 					recordRevision: () => undefined,
 					boardPathOf: () => undefined,
 				},
-				{ name: options.name ?? "Agent", color: "#2eaf5a", kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck) },
+				{ name: options.name ?? "Agent", color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 			);
 			(this as unknown as { agents: DeckAgent[] }).agents.push(agent);
 			(this as unknown as { focusedId?: string }).focusedId ??= agent.id;

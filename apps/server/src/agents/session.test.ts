@@ -7,7 +7,7 @@ import type { AgentModel, AgentUsage, ChatItem, ModelOption, ServerMessage } fro
 import { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import { DeckAgent } from "./session.ts";
-import { SnapshotStore } from "./snapshot.ts";
+import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
 import { HISTORY_ITEMS, TOOL_PREVIEW } from "./wire.ts";
 
@@ -69,7 +69,7 @@ function agentOn(
 		},
 		// Given a store, but nothing reaches it here: an agent with no user message is never
 		// written down, which is what keeps these tests off the disk.
-		{ color: "#000", kind: "pi", snapshots: new SnapshotStore(), store, ...options },
+		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store, ...options },
 	);
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");
@@ -412,7 +412,7 @@ function probeOn(): { agent: Probe; sent: ServerMessage[]; reportCalls: Array<{ 
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color: "#000", kind: "pi", snapshots: new SnapshotStore(), store: new AgentStore(deck) },
+		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 	return { agent, sent, reportCalls, sentTos, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }

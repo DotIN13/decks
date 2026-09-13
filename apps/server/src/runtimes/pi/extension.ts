@@ -38,7 +38,7 @@ export function decksStage(deps: { tool: StageTool; agent: StageAgentHooks }): I
 					// contain the word "Error".
 					if (outcome.isError) throw new Error(outcome.text);
 					// `details` is where Pi keeps a tool's structured result. The canvas
-					// state is no longer *restored* from it — that is `SnapshotStore`, which
+					// state is no longer *restored* from it — that is `AgentStateStore`, which
 					// both runtimes use — but it costs nothing and is what Pi renders from.
 					return {
 						content: [

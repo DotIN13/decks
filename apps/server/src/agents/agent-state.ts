@@ -36,7 +36,7 @@ interface Recorded {
 /** Enough to cover any conversation worth rewinding, and bounded so it cannot grow forever. */
 const KEEP = 200;
 
-export class SnapshotStore {
+export class AgentStateStore {
 	private readonly series = new Map<string, Recorded[]>();
 
 	/** Note what the stage looked like after a run. */
