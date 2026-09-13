@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 /**
  * The Decks canvas tool, for antigravity — over MCP.
  *
@@ -20,6 +23,18 @@
  * has to resolve to spawn this, the fewer ways a deck can be missing it.
  */
 
+/*
+ * The tool's own words, read from `runtime/tool-description.txt`.
+ *
+ * One file, four runtimes: Pi and Claude are handed it by the server, opencode's loader
+ * reads it, and this reads it. It used to be typed out here too, shortened, under a comment
+ * that said "in the same words" — and the model on antigravity was told a different thing
+ * about what a board is for than the model on Pi. The MCP protocol wants the text at
+ * registration time, which is why it is read here rather than passed in.
+ */
+const HERE = dirname(fileURLToPath(import.meta.url));
+const TOOL_DESCRIPTION = readFileSync(resolve(HERE, "../tool-description.txt"), "utf8").trim();
+
 const STAGE_URL = process.env.DECKS_STAGE_URL ?? "";
 const STAGE_TOKEN = process.env.DECKS_STAGE_TOKEN ?? "";
 
@@ -27,11 +42,7 @@ const STAGE_TOKEN = process.env.DECKS_STAGE_TOKEN ?? "";
 const TOOLS = [
 	{
 		name: "stage_eval",
-		description:
-			"Run TypeScript against the Decks canvas the user is looking at. Your code is the body of an async " +
-			"function with `stage` in scope; whatever you return comes back as JSON. Boards are how you answer: " +
-			"put the substance on a board with your file tools, then use stage.show to put it in front of the user. " +
-			"The full API is in the stage.d.ts in your context — if something is not in it, it does not exist.",
+		description: TOOL_DESCRIPTION,
 		inputSchema: {
 			type: "object",
 			properties: {

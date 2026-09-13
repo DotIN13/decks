@@ -1,4 +1,7 @@
 import { tool } from "@opencode-ai/plugin"
+import { readFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 /**
  * The Decks canvas tool, for opencode.
@@ -14,13 +17,22 @@ import { tool } from "@opencode-ai/plugin"
  * Decks spawned, and the session id Decks created when it opened this conversation names
  * the agent. `context.sessionID` is opencode's own fact about the call, so nothing here
  * has to guess who is calling.
+ *
+ * **The description is a file, read here rather than typed here.** The wording lives in
+ * `runtime/tool-description.txt` and four runtimes show the same words to a model — Pi and
+ * Claude through the server's `StageTool`, opencode here, and antigravity from its own MCP
+ * script. This file used to carry its own shortened copy under a comment claiming it was
+ * "the same words"; the point of one product is that it is the same file.
  */
+let cached = ""
+function description(): string {
+  if (!cached) {
+    cached = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../tool-description.txt"), "utf8").trim()
+  }
+  return cached
+}
 export default tool({
-  description:
-    "Run TypeScript against the Decks canvas the user is looking at. Your code is the body of an async " +
-    "function with `stage` in scope; whatever you return comes back as JSON. Boards are how you answer: " +
-    "put the substance on a board with your file tools, then use stage.show to put it in front of the user. " +
-    "The full API is in the stage.d.ts in your context — if something is not in it, it does not exist.",
+  description: description(),
   args: {
     code: tool.schema.string().describe("TypeScript, run as an async function body with `stage` in scope. Return a value to see it."),
   },

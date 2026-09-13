@@ -308,11 +308,24 @@ export class StageService {
 		return this.ask(agentId, { op: "camera", args: at });
 	}
 
-	async show(agentId: string, paths: string[], options: { fit?: "board" | "all"; highlight?: string } = {}): Promise<unknown> {
+	/**
+	 * Put these boards on the canvas, and answer with what the browser did.
+	 *
+	 * The result is the browser's: which boards it moved to, and the sentence it left on the
+	 * canvas when this agent's view was remembered rather than moved (the camera is per
+	 * conversation — §7). Typed rather than `unknown` because `stage.d.ts` promises the
+	 * shape to the agent, and the agent writes code against what that file says.
+	 */
+	async show(agentId: string, paths: string[], options: { fit?: "board" | "all"; highlight?: string } = {}): Promise<{ shown: string[]; deferred?: string }> {
 		for (const path of paths) {
 			if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
 		}
-		return this.ask(agentId, { op: "show", args: { paths, ...options } });
+		const answer = await this.ask(agentId, { op: "show", args: { paths, ...options } });
+		const result = (answer ?? {}) as { shown?: unknown; deferred?: unknown };
+		return {
+			shown: Array.isArray(result.shown) ? result.shown.filter((path): path is string => typeof path === "string") : [],
+			...(typeof result.deferred === "string" ? { deferred: result.deferred } : {}),
+		};
 	}
 
 	async reload(agentId: string, path: string): Promise<void> {

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { Camera } from "@decks/protocol";
+import { runtimeDir } from "../agents/context.ts";
 import { Deck } from "../deck/loader.ts";
 import { StageService } from "./service.ts";
 import { createStageTool, type QueuedWork, type SendSpec } from "./tool.ts";
@@ -24,7 +25,7 @@ function toolOn(camera: Camera) {
 
 	const sends: Array<{ target: string; spec: SendSpec }> = [];
 	const others = [
-		{ id: "a1", name: "Ada", state: "idle", kind: "claude" as const, context: ["boards/plan.html"], holding: 1, tags: ["panel-css"], queued: 3 },
+		{ id: "a1", name: "Ada", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html"], holding: 1, tags: ["panel-css"], queued: 3 },
 	];
 	const waiting: QueuedWork[] = [];
 	/** What a browser would have reported, if one were looking. */
@@ -494,3 +495,31 @@ function name(target: string | { ref: string } | { name: string; nth?: number })
 	if ("ref" in target) return target.ref;
 	return target.nth === undefined ? target.name : `${target.name} (${target.nth})`;
 }
+
+/**
+ * The description four runtimes show to a model is one file.
+ *
+ * The tool is registered with a different adapter on every runtime — a Pi extension, an
+ * in-process MCP server for Claude, a loader in opencode's Bun, a JSON-RPC server for
+ * antigravity — so the *words* cannot be a string in one module that the others import.
+ * They live in `runtime/tool-description.txt` and all four read it.
+ *
+ * The failure this pins down is not hypothetical: opencode's loader and antigravity's MCP
+ * server each carried their own shortened copy, under a comment saying they were "in the
+ * same words", and the model on those runtimes was told something different about what a
+ * board is for.
+ */
+test("the description is the file, and nothing carries its own copy", async () => {
+	const { tool } = toolOn({ x: 0, y: 0, zoom: 1 });
+	const file = readFileSync(join(runtimeDir(), "tool-description.txt"), "utf8").trim();
+	assert.equal(tool.description, file);
+	assert.ok(file.length > 500, "the description is the agent's main briefing; a stub means the file was emptied");
+
+	// And no runtime may grow a second copy again: a sentence from the description
+	// hardcoded anywhere under `runtime/` is that drift coming back.
+	const marker = "Boards are how you answer";
+	for (const script of ["runtime/opencode/tools/stage_eval.ts", "runtime/antigravity/mcp-server.mjs"]) {
+		const source = readFileSync(join(runtimeDir(), "..", script), "utf8");
+		assert.ok(!source.includes(marker), `${script} has its own copy of the description`);
+	}
+});

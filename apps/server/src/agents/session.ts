@@ -185,7 +185,7 @@ export class DeckAgent {
 		private readonly host: {
 			port: number;
 			camera(agentId: string): Camera;
-			agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[]; kind: AgentKind; holding: number }>;
+			agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; tags: string[]; kind: AgentKind; holding: number }>;
 			spawn(parentId: string, spec: DelegateSpec): Promise<DelegateReport>;
 			/** Put work in another agent's queue, without waiting for it. */
 			send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };

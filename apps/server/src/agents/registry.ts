@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { AgentChat, AgentKind, AgentMode, AgentModel, Camera, ChatItem, ServerMessage } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ChatItem, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
@@ -80,7 +80,7 @@ export class Registry {
 	 * now load-bearing — whether the row you are handing to is a Claude one or an antigravity
 	 * one changes what it can do.
 	 */
-	summaries(): Array<{ id: string; name: string; state: string; kind: AgentKind; context: string[]; holding: number; tags: string[]; queued: number }> {
+	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; queued: number }> {
 		return this.agents.map((agent) => {
 			const chat = agent.chat();
 			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand
