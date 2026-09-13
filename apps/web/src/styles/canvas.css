@@ -242,6 +242,30 @@
 	.focus-scaled {
 		position: relative;
 	}
+
+	/*
+	 * The canvas, put away rather than taken apart — and *how* it is put away is the whole
+	 * assertion, measured rather than assumed.
+	 *
+	 * `display: none` is the obvious way and it is not the same thing: a subtree the browser is
+	 * not laying out has its documents dropped, so frames come back reloaded — a live board
+	 * re-asked for its feed, a deck back on its first slide, whatever was being edited gone.
+	 * Measured both ways with a marker on each frame's own window; `visibility` holds them.
+	 *
+	 * `visibility: hidden` still lays the subtree out, so the documents stay alive; `inert` (on
+	 * the element, in `Stage.tsx`) takes it out of the tab order, the pointer and the
+	 * accessibility tree; and the rule here is belt to that brace for the pointer, because a
+	 * hidden surface that can still be clicked is the bug this shape has to be careful about.
+	 *
+	 * The two canvases are the one-canvas renderer's, and they go with it: pictures of the same
+	 * boards, at a camera nobody can see.
+	 */
+	.stage[data-focus="true"] > .world,
+	.stage[data-focus="true"] > .stage-picture,
+	.stage[data-focus="true"] > .darkroom {
+		visibility: hidden;
+		pointer-events: none;
+	}
 }
 
 /*

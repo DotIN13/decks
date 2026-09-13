@@ -1069,6 +1069,7 @@ export function Stage(props: {
 			data-mode={props.mode}
 			data-renderer={props.renderer}
 			data-previewing={Boolean(props.preview)}
+			data-focus={props.focus ? "true" : undefined}
 			data-panning={panning()}
 			data-scaling={scaling() && props.boards.filter(isVisible).length <= LAYER_BUDGET}
 			ref={element}
@@ -1077,15 +1078,20 @@ export function Stage(props: {
 			style={{ cursor: spaceHeld() ? "grab" : undefined }}
 		>
 			{/*
-			 * The view, either/or — and the canvas is *not rendered* in the focus view.
+			 * The focus view is a *sibling* of the world, and the world stays where it is.
 			 *
-			 * Hidden would be cheaper and wrong: two elements carrying the same
-			 * `data-path` is two frames with the same board in them, and every lookup in this
-			 * app that asks "where is board X's document" — the inspector's shape, the editor's
-			 * patch target, a deck's page handle — asks by that attribute. One of them would be
-			 * the wrong one, silently, and which one would depend on document order.
+			 * Not two branches of one `Show`: unmounting the world would tear down every board's
+			 * document — six frames reloaded on the way back, every live board re-asked for its
+			 * feed, every deck back on its first slide. Hidden and `inert` instead, which are the
+			 * two halves of "not there" that matter: `display: none` takes it out of the layout,
+			 * and `inert` takes it out of the tab order, the pointer and the accessibility tree.
+			 *
+			 * The focused board is filtered *out* of the world while it is up — it is the one board
+			 * that renders in the other div — so there is still exactly one element carrying each
+			 * `data-path`. That is what keeps the app's lookups honest: the inspector's shape, the
+			 * editor's patch target and a deck's page handle all find the frame that is on screen,
+			 * and there is no second one for them to find instead.
 			 */}
-			<Show when={focused()} keyed fallback={<>
 			{/* The one-canvas renderer's two canvases: the picture everyone sees, and the
 			    darkroom the documents live in (see `drawScene`). Under the world, so the
 			    bars, shadows and marks stay HTML on top of the pictures. */}
@@ -1109,15 +1115,12 @@ export function Stage(props: {
 					}}
 				/>
 			</Show>
-			<div
-				class="world"
-				ref={worldEl}
-			>
-				<For each={props.boards} fallback={null}>
+			<div class="world" data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
+				<For each={props.boards.filter((board) => board.path !== props.focus)} fallback={null}>
 					{(board) => boardNode(board)}
 				</For>
 			</div>
-			</>}>
+			<Show when={focused()} keyed>
 				{(board) => (
 					/*
 					 * The focus view: this board as a page, in the stage's own box.

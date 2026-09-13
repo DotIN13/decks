@@ -41,6 +41,25 @@ say(
 	JSON.stringify(bar),
 );
 
+// A marker on every frame's own window before the view changes, and counted again after: a
+// reload takes it with it, so "the canvas was not taken apart" is a fact rather than a hope.
+// (The admission has its own policy about boards the *camera* has left, so this is reported
+// rather than asserted — what is asserted is that the same boards are on the canvas after.
+const markedBefore = await page.evaluate(() => {
+	const frames = [...document.querySelectorAll(".board-node iframe")];
+	// Only frames that have finished loading can hold a marker; the rest were never anywhere.
+	let marked = 0;
+	for (const frame of frames) {
+		if (!frame.contentWindow) continue;
+		try {
+			frame.contentWindow.__still = 1;
+			marked += 1;
+		} catch {
+			/* an opaque frame cannot be marked, and cannot be a board of ours */
+		}
+	}
+	return marked;
+});
 await page.locator(`.board-node[data-path="${NOTES}"] .chrome .focus-open`).click();
 await settle(page, 700);
 
@@ -50,21 +69,40 @@ const state = () =>
 		const page_ = document.querySelector(".focus-page");
 		const panel = document.querySelector('aside[aria-label="Boards"]')?.getBoundingClientRect();
 		const box_ = box?.getBoundingClientRect();
+		const world = document.querySelector(".world");
 		return {
 			open: Boolean(box),
-			world: Boolean(document.querySelector(".world")),
+			world: Boolean(world),
+			// Put away rather than taken apart — the two halves of "not there" that matter.
+			worldHidden: world ? getComputedStyle(world).visibility === "hidden" : false,
+			worldInert: world ? world.hasAttribute("inert") && getComputedStyle(world).pointerEvents === "none" : false,
+			worldNodes: [...document.querySelectorAll(".world .board-node")].map((node) => node.dataset.path),
 			nodes: [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path),
 			page: page_ ? { w: Math.round(page_.getBoundingClientRect().width), centre: Math.round(page_.getBoundingClientRect().x + page_.getBoundingClientRect().width / 2) } : null,
 			beside: panel ? Math.round(panel.right + (innerWidth - panel.right) / 2) : null,
 			scrollable: box ? box.scrollHeight > box.clientHeight + 40 : false,
 			scrollTop: box?.scrollTop ?? -1,
+			survived: [...document.querySelectorAll(".board-node iframe")].filter((frame) => frame.contentWindow?.__still === 1).length,
 			box: box_ ? { w: Math.round(box_.width), h: Math.round(box_.height) } : null,
 		};
 	});
 
 const focused = await state();
-say("d turns the canvas into one page", focused.open && !focused.world, JSON.stringify({ open: focused.open, world: focused.world }));
-say("…with exactly one board in the document", focused.nodes.length === 1 && focused.nodes[0] === NOTES, JSON.stringify(focused.nodes));
+say(
+	"the board's own button turns the canvas into one page",
+	focused.open && focused.worldHidden && focused.worldInert,
+	JSON.stringify({ open: focused.open, hidden: focused.worldHidden, inert: focused.worldInert }),
+);
+say(
+	"…with the canvas put away rather than taken apart",
+	focused.worldNodes.length > 0 && !focused.worldNodes.includes(NOTES),
+	`${focused.worldNodes.length} board(s) still mounted behind it, this one excluded`,
+);
+say(
+	"…so exactly one element carries this board, and it is the one on screen",
+	focused.nodes.filter((path) => path === NOTES).length === 1,
+	JSON.stringify(focused.nodes),
+);
 say(
 	"…centred in the room beside the panel rather than under it",
 	focused.page !== null && Math.abs((focused.page?.centre ?? 0) - (focused.beside ?? 0)) <= 6,
@@ -100,15 +138,29 @@ say("a wheel over the page scrolls it", after > before, `${before} → ${after}`
 await editMode(page);
 await settle(page, 400);
 const editable = await page.evaluate((path) => {
-	const nodes = [...document.querySelectorAll(".board-node")];
-	return { nodes: nodes.length, frame: Boolean(document.querySelector(`.board-node[data-path="${path}"] iframe`)), mode: document.querySelector(".stage")?.dataset.mode };
+	const nodes = [...document.querySelectorAll(`.board-node[data-path="${path}"]`)];
+	const frame = nodes[0]?.querySelector("iframe");
+	return {
+		copies: nodes.length,
+		inFocus: Boolean(nodes[0]?.closest(".focus")),
+		frame: Boolean(frame),
+		mode: document.querySelector(".stage")?.dataset.mode,
+	};
 }, NOTES);
-say("…and editing still finds that board's own frame", editable.nodes === 1 && editable.frame && editable.mode === "edit", JSON.stringify(editable));
+say(
+	"…and editing finds that board's frame — the one on screen, and the only one",
+	editable.copies === 1 && editable.inFocus && editable.frame && editable.mode === "edit",
+	JSON.stringify(editable),
+);
 
 await page.keyboard.press("Escape");
 await settle(page, 700);
 const returned = await state();
-say("Escape puts the canvas back", !returned.open && returned.world && returned.nodes.length > 1, JSON.stringify({ open: returned.open, world: returned.world, nodes: returned.nodes.length }));
+say(
+	"Escape puts the canvas back, with the same boards on it",
+	!returned.open && !returned.worldHidden && !returned.worldInert && returned.nodes.length === focused.nodes.length && returned.nodes.length > 1,
+	JSON.stringify({ hidden: returned.worldHidden, inert: returned.worldInert, nodes: returned.nodes.length, marked: markedBefore }),
+);
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();
