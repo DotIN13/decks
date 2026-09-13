@@ -78,6 +78,7 @@ import { PAGE, prepend } from "./chat/history-page.ts";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
+import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
 import { boxOf, fitInto, INTERACT_ZOOM, keepVisible, toWorld } from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
@@ -1332,36 +1333,12 @@ export function App() {
 				    twice. `scrubToTurn` survives it, because a notice can still ask to be
 				    shown a turn. */}
 
-				{/*
-					Toasts. Utilities rather than a stylesheet rule, because none of this is a
-					decision worth a name: it is a centred column of small cards over the canvas.
-
-					The responsive rules are variants here rather than media queries in the
-					stylesheet, because a utility outranks anything in the components layer — a
-					`@media` block there would lose to the class beside it and silently do
-					nothing. `pointer-coarse` drops the column below a title bar that grows to
-					52px with a 44px palette in it, where 58px used to be clear; the narrow rule
-					lets it span the screen instead of centring inside it.
-				*/}
-				<div class="notices pointer-events-none absolute top-[58px] left-1/2 flex max-w-[560px] -translate-x-1/2 flex-col gap-1.5 pointer-coarse:top-[74px] max-[760px]:right-3 max-[760px]:left-3 max-[760px]:max-w-none max-[760px]:translate-x-0">
-					<For each={state.notices}>
-						{(item) => (
-							<div
-								class="notice rounded-[10px] border border-line bg-panel px-3 py-[7px] text-[12px] shadow-panel data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
-								data-level={item.level}
-							>
-								{item.text}
-							</div>
-						)}
-					</For>
-				</div>
+				<NoticeStrip />
 
 			</div>
 		</div>
 	);
 }
-
-/** A byte count as a person would say it, for a progress line. */
 
 function fitAll(boards: Board[], setCamera: (camera: Camera) => void): void {
 	const stage = document.querySelector(".stage");
