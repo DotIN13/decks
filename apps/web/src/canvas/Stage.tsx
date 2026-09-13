@@ -85,6 +85,8 @@ export function Stage(props: {
 	focus?: string;
 	/** Toggle it. The stage owns the key; the app owns which board and when. */
 	onFocusToggle?: () => void;
+	/** The same, named by a board: the button in its own title bar (`canvas/BoardFrame.tsx`). */
+	onFocusBoard?: (path: string) => void;
 	/** Take a deck fullscreen: the app owns the overlay, the stage only asks for it. */
 	onPresent?: (path: string, at: number) => void;
 	/** Open a flow or slides board as its own source. */
@@ -1057,6 +1059,7 @@ export function Stage(props: {
 							onMove={(x, y) => props.onMove(board.path, x, y)}
 							{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
 							onOpen={() => pushCamera(frame([boxOf(board)]))}
+							{...(props.onFocusBoard ? { focused: props.focus === board.path, onFocus: () => props.onFocusBoard?.(board.path) } : {})}
 						/>
 );
 

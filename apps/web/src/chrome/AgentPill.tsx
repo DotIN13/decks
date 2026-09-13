@@ -3,7 +3,6 @@ import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
-import FileText from "lucide-solid/icons/file-text";
 import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
@@ -12,6 +11,7 @@ import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
 import StickyNote from "lucide-solid/icons/sticky-note";
 import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
+import FileText from "lucide-solid/icons/file-text";
 import Pencil from "lucide-solid/icons/pencil";
 import Hand from "lucide-solid/icons/hand";
 import X from "lucide-solid/icons/x";
@@ -517,9 +517,6 @@ export function AgentPill(props: {
 	 */
 	mode: CanvasMode;
 	onMode: (mode: CanvasMode) => void;
-	/** Whether the canvas is showing one board on its own (`state/ui.ts`). */
-	focusView: boolean;
-	onFocusView: () => void;
 	chats: AgentChat[];
 	identities: Record<string, Identity>;
 	focused: string | undefined;
@@ -698,25 +695,6 @@ export function AgentPill(props: {
 				<Icon of={props.mode === "edit" ? Hand : Pencil} size={15} />
 			</button>
 
-			{/*
-				The focus view: this canvas as one page.
-
-				Beside the pencil because it is the same kind of fact — what the canvas *is* right
-				now — and `soft` rather than the accent for the pencil's own reason: a thing being
-				held, not one of a set being chosen. The icon is a document, because that is what it
-				turns the canvas into.
-			*/}
-			<button
-				type="button"
-				class="iconbtn"
-				data-on={props.focusView ? "soft" : undefined}
-				aria-pressed={props.focusView}
-				title={props.focusView ? "Back to the canvas (or press d)" : "Focus on one board — read it like a document (or press d)"}
-				aria-label={props.focusView ? "Show the whole canvas" : "Focus on one board"}
-				onClick={props.onFocusView}
-			>
-				<Icon of={FileText} size={15} />
-			</button>
 
 			{/*
 				The tools, and only while editing.

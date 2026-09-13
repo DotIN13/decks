@@ -1,4 +1,5 @@
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
+import BookOpen from "lucide-solid/icons/book-open";
 import ExternalLink from "lucide-solid/icons/external-link";
 import Maximize from "lucide-solid/icons/maximize-2";
 import X from "lucide-solid/icons/x";
@@ -37,6 +38,11 @@ export function BoardFrame(props: {
 	camera: Camera;
 	/** Whether the board has a document: on screen, or off it for less than a moment (`Stage`). */
 	mounted: boolean;
+	/** Whether this is the board the focus view is showing (`state/ui.ts`). */
+	focused?: boolean;
+	/** Enter or leave that view for *this* board — the button in its own title bar. */
+	onFocus?: () => void;
+
 	/**
 	 * Where to put the node, when the caller is not the canvas.
 	 *
@@ -722,6 +728,36 @@ export function BoardFrame(props: {
 					so a second frame of it says nothing the first one does not, and its bar is
 					narrow enough that a third button is where the title was.
 				*/}
+				{/*
+					Focus: this board as the page, with the canvas out of the way.
+					
+					The fourth thing a board's bar offers — beside its file's address, filling the
+					window, and going away — and the only one about *reading* rather than about where
+					the board is. `BookOpen` rather than a document glyph: the fullscreen button next
+					to it is already the frame-corners one, and two squares would be two buttons
+					nobody can tell apart.
+				*/}
+				<Show when={props.onFocus}>
+					<button
+						class="focus-open"
+						type="button"
+						data-on={props.focused ? "soft" : undefined}
+						aria-pressed={props.focused}
+						title={
+							props.focused
+								? "Back to the canvas (or press d)"
+								: "Focus on this board — read and scroll it like a document (or press d)"
+						}
+						aria-label={props.focused ? `Show the whole canvas instead of ${props.board.title}` : `Focus on ${props.board.title}`}
+						onPointerDown={(event) => event.stopPropagation()}
+						onClick={(event) => {
+							event.stopPropagation();
+							props.onFocus?.();
+						}}
+					>
+						<Icon of={BookOpen} size={12} />
+					</button>
+				</Show>
 				{/*
 					The board on its own, in its own tab.
 

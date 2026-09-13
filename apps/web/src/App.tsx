@@ -349,12 +349,14 @@ export function App() {
 	 * at all the view has nothing to be a view *of*, and a canvas that went blank on a keypress
 	 * and needed the same key to come back would read as a fault.
 	 */
-	const toggleFocus = () => {
-		if (focus()) {
+	const toggleFocus = (wanted?: string) => {
+		// The board's own button names it, so that path wins; the key and the rule behind it
+		// pass nothing and get the target below.
+		const path = wanted ?? focusTarget();
+		if (focus() === path) {
 			setFocus(undefined);
 			return;
 		}
-		const path = focusTarget();
 		if (!path) {
 			notice("warn", "No board to focus — put one on the canvas first.");
 			return;
@@ -644,7 +646,8 @@ export function App() {
 						onPresent={(path, at) => setPresenting(presentingFor(path, at))}
 						onEditSource={openSource}
 						{...(focus() === undefined ? {} : { focus: focus()! })}
-						onFocusToggle={toggleFocus}
+						onFocusToggle={() => toggleFocus()}
+						onFocusBoard={(path) => toggleFocus(path)}
 						{...(editingSource()
 							? {
 									editing: {
@@ -732,8 +735,6 @@ export function App() {
 				<AgentPill
 					mode={mode()}
 					onMode={setMode}
-					focusView={focus() !== undefined}
-					onFocusView={toggleFocus}
 					chats={state.chats}
 					identities={state.identities}
 					focused={state.focused}

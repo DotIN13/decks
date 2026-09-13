@@ -604,7 +604,8 @@ svg.lucide {
  */
 .board-node > .chrome .hide,
 .board-node > .chrome .present-open,
-.board-node > .chrome .open-tab {
+.board-node > .chrome .open-tab,
+.board-node > .chrome .focus-open {
 	display: grid;
 	width: 18px;
 	height: 18px;
@@ -621,13 +622,15 @@ svg.lucide {
 
 .board-node:hover > .chrome .hide,
 .board-node:hover > .chrome .present-open,
-.board-node:hover > .chrome .open-tab {
+.board-node:hover > .chrome .open-tab,
+.board-node:hover > .chrome .focus-open {
 	opacity: 1;
 }
 
 .board-node > .chrome .hide:hover,
 .board-node > .chrome .present-open:hover,
-.board-node > .chrome .open-tab:hover {
+.board-node > .chrome .open-tab:hover,
+.board-node > .chrome .focus-open:hover {
 	background: var(--line);
 	color: var(--fg);
 }

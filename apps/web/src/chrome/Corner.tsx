@@ -1,11 +1,11 @@
 import type { AgentChat, AgentKind, AgentUsage, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
+import FileText from "lucide-solid/icons/file-text";
 import Maximize from "lucide-solid/icons/maximize";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Eraser from "lucide-solid/icons/eraser";
 import FilePlus from "lucide-solid/icons/file-plus";
-import FileText from "lucide-solid/icons/file-text";
 import Presentation from "lucide-solid/icons/presentation";
 import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import ZoomIn from "lucide-solid/icons/zoom-in";

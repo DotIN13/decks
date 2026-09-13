@@ -26,7 +26,22 @@ await settle(page, 900);
 const onCanvas = await page.locator(`.board-node[data-path="${NOTES}"]`).count();
 say("the flow board is on the canvas to focus on", onCanvas === 1, `${onCanvas} node(s)`);
 
-await page.keyboard.press("d");
+/*
+ * The button, not the key: the bar above *this* board is where the affordance lives — beside
+ * the file's address, filling the window, and taking the board away — and the key is the
+ * shorthand for the same thing.
+ */
+const bar = await page.evaluate((path) => {
+	const acts = document.querySelector(`.board-node[data-path="${path}"] .chrome .acts`);
+	return [...(acts?.children ?? [])].map((child) => child.className);
+}, NOTES);
+say(
+	"the bar above the board offers focus, its address, fullscreen and going away",
+	bar.length === 4 && bar[0] === "focus-open" && bar.includes("open-tab") && bar.includes("present-open") && bar.includes("hide"),
+	JSON.stringify(bar),
+);
+
+await page.locator(`.board-node[data-path="${NOTES}"] .chrome .focus-open`).click();
 await settle(page, 700);
 
 const state = () =>
