@@ -684,27 +684,38 @@ export function BoardFrame(props: {
 				*/}
 				<span class="acts">
 				{/*
-					A deck says it is one, and offers the only thing you cannot get from the
-					keyboard without knowing about it. `f` works once a deck is focused, and
-					nothing in the app says so — a button in the title bar is where somebody
-					looks for "how do I show this to a room".
+					The only thing on a board you cannot get from the keyboard without knowing
+					about it. `f` works once the board is selected, and nothing in the app says
+					so — a button in the title bar is where somebody looks for "how do I show
+					this to a room".
+
+					Every format now, not only a deck: a document is readable fullscreen and a
+					component board is usable there, which is the point (`canvas/Present.tsx`).
+					The word changes with the format because "present" is what you do with a
+					deck and "fullscreen" is what you do with a page.
+
+					Not on a live board. A mirror draws itself from what the app posts into it,
+					so a second frame of it says nothing the first one does not, and its bar is
+					narrow enough that a third button is where the title was.
 				*/}
-				<Show when={props.board.format === "slides" && props.onPresent}>
-					{(present) => (
-						<button
-							class="hide present-open"
-							type="button"
-							title="Present this deck fullscreen (or press f with it selected)"
-							aria-label={`Present ${props.board.title}`}
-							onPointerDown={(event) => event.stopPropagation()}
-							onClick={(event) => {
-								event.stopPropagation();
-								present()();
-							}}
-						>
-							Present
-						</button>
-					)}
+				<Show when={Boolean(props.onPresent && !props.board.live)}>
+					<button
+						class="present-open"
+						type="button"
+						title={
+							props.board.format === "slides"
+								? "Present this deck fullscreen (or press f with it selected)"
+								: "Fill the window with this board (or press f with it selected)"
+						}
+						aria-label={`${props.board.format === "slides" ? "Present" : "Fullscreen"} ${props.board.title}`}
+						onPointerDown={(event) => event.stopPropagation()}
+						onClick={(event) => {
+							event.stopPropagation();
+							props.onPresent?.();
+						}}
+					>
+						{props.board.format === "slides" ? "Present" : "Fullscreen"}
+					</button>
 				</Show>
 				<Show when={props.onHide}>
 					{(hide) => (

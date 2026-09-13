@@ -41,6 +41,17 @@ export interface Board {
 	 * its own.
 	 */
 	shell?: "content" | "foreign";
+	/**
+	 * What this board is a live view of, when it is one: `chat` for a mirror, `web` for the
+	 * shared-Chrome card, `agents` for an orchestration board.
+	 *
+	 * Read off the file's own `data-live` attribute — the same cheap source scan `format`
+	 * comes from — because the board that draws itself from `postMessage` has no content of
+	 * its own to look at. On the wire because two decisions depend on it and both are the
+	 * app's: a live board has nothing to open in a tab (there is no app in a bare tab to feed
+	 * it), and nothing to fill a window with.
+	 */
+	live?: string;
 	x: number;
 	y: number;
 	w: number;

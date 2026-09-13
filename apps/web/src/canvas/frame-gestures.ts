@@ -223,19 +223,24 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 			return;
 		}
 		/*
-		 * And the arrows, if this board is a deck.
+		 * Someone typing into a component owns every key, including the space bar.
 		 *
-		 * Above the typing guard for the same reason the zoom is: clicking a deck to focus
-		 * it puts the caret in this document, so this is where a page-turn arrives. Below
-		 * the zoom, because ⌘→ is not a slide.
+		 * **Above the slide keys, which it was not.** The argument for putting them above is
+		 * real — clicking a deck to focus it puts the caret in this document, so this is
+		 * where a page-turn arrives — but it is an argument about the *caret*, not about
+		 * typing, and it cost the letter `f`: `slideKey` answers `present` for `f` on a
+		 * focused board, so typing "different" into an editor opened fullscreen on the frame
+		 * you were editing. A deck has no text field for this to protect, so the guard first
+		 * loses nothing and `f` is a keystroke before it is a command.
 		 */
+		if (typingInto(event.target)) return;
+
+		// And the arrows, if this board is a deck. Below the zoom, because ⌘→ is not a slide.
 		const slide = slideKey(event, "focused");
 		if (slide && host.slide(slide)) {
 			event.preventDefault();
 			return;
 		}
-		// Someone typing into a component owns every key, including the space bar.
-		if (typingInto(event.target)) return;
 
 		if (event.code === "Space") {
 			event.preventDefault();

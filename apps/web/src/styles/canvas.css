@@ -8,18 +8,31 @@
 /*
  * ── Presenting ────────────────────────────────────────────────────────────────────────
  *
- * A deck, fullscreen. An overlay rather than a moved frame: the canvas keeps its own frame,
- * camera and current slide behind this, so leaving puts you back exactly where you were
+ * A board, fullscreen. An overlay rather than a moved frame: the canvas keeps its own frame,
+ * camera and current state behind this, so leaving puts you back exactly where you were
  * (`canvas/Present.tsx`).
+ *
+ * Every format, and the frame is the one thing that differs. A deck is a fixed 960×540 slide
+ * and gets the letterbox; a flow document is a page and gets the window, scrolling inside it;
+ * a component board is a fixed rectangle of positioned boxes and is shown at its own size,
+ * centred, with the overlay scrolling if it is taller than the window — the same 1:1 it has
+ * on its own, and the one place an interactive board is guaranteed to be clickable, since a
+ * board on the canvas below half zoom takes no pointer events at all.
  */
 @layer components {
 	.present {
 		position: fixed;
 		z-index: 200;
 		display: grid;
+		overflow: auto;
 		inset: 0;
 		background: #0b0d10;
 		place-items: center;
+	}
+
+	/* A slide is fitted, never scrolled — `slides.js` scales it to this box. */
+	.present[data-format="slides"] {
+		overflow: hidden;
 	}
 
 	/*
@@ -28,10 +41,13 @@
 	 * bars are the overlay's own background rather than a colour the deck chose.
 	 */
 	.present-frame {
-		width: min(100vw, calc(100vh * 16 / 9));
-		height: min(100vh, calc(100vw * 9 / 16));
 		border: 0;
 		background: #fff;
+	}
+
+	.present[data-format="slides"] .present-frame {
+		width: min(100vw, calc(100vh * 16 / 9));
+		height: min(100vh, calc(100vw * 9 / 16));
 		/*
 		 * The slide takes no pointer events while it is being presented.
 		 *
@@ -39,8 +55,20 @@
 		 * focus, and a focused board document receives the keystrokes itself — so ← → and
 		 * Space went into the slide and nothing paged. There is nothing in a slide to click
 		 * during a talk, so the cost is nil and the overlay keeps the keyboard.
+		 *
+		 * A document and a component board are the other way round on purpose: their keys are
+		 * their own, and a button on a board is a button.
 		 */
 		pointer-events: none;
+	}
+
+	/*
+	 * A page, filling the window. Its own height is its content's, so this is the one frame
+	 * whose inner document does the scrolling.
+	 */
+	.present[data-format="flow"] .present-frame {
+		width: 100%;
+		height: 100%;
 	}
 
 	/* The overlay is what has focus, so it must not draw a focus ring around the whole

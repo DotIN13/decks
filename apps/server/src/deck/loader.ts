@@ -3,7 +3,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
 import { readBoardMeta, readFlowMeta } from "./meta.ts";
-import { defaultWidth, formatOf, isBoardFile, shellFor, slideHeight } from "./kinds.ts";
+import { defaultWidth, formatOf, isBoardFile, liveKindOf, shellFor, slideHeight } from "./kinds.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
@@ -347,6 +347,8 @@ export class Deck {
 		const absolute = join(this.path, path);
 		const source = readFileSync(absolute, "utf8");
 		const format = formatOf(path, source);
+		// A stub that draws itself from `postMessage`, if this is one.
+		const live = liveKindOf(source);
 		// Whether the file is a document already, or content that has to be wrapped in one.
 		const shell = shellFor(path, source);
 		const meta = format === "component" ? readBoardMeta(source) : readFlowMeta(path, source);
@@ -401,6 +403,7 @@ export class Deck {
 			// the way it was does not churn every open frame.
 			rev: revisionOf(source),
 			...(meta.poster ? { poster: meta.poster } : {}),
+			...(live ? { live } : {}),
 			inContext: [],
 		};
 	}

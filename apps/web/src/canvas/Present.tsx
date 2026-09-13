@@ -3,7 +3,7 @@ import type { Board } from "@decks/protocol";
 import { type DeckHandle, slideKey } from "./slide-keys.ts";
 
 /**
- * A deck, fullscreen.
+ * A board, fullscreen.
  *
  * ### It is an overlay first, and the browser's Fullscreen API second
  *
@@ -20,11 +20,28 @@ import { type DeckHandle, slideKey } from "./slide-keys.ts";
  * ### Another frame of the same board
  *
  * Rather than moving the canvas's frame or re-implementing the slide view, this mounts a
- * second iframe on the same board URL. `slides.js` runs in it and scales to the window, so
- * the slide is *identical* to the one on the canvas — same logical 960×540, different
- * `--fit` — which is the whole promise of a fixed-size slide. The canvas keeps its own
- * frame, its own camera and its own current slide untouched behind the overlay, so leaving
- * puts you back exactly where you were.
+ * second iframe on the same board URL — so the canvas keeps its own frame, its own camera
+ * and its own current slide untouched behind the overlay, and leaving puts you back exactly
+ * where you were.
+ *
+ * ### Every format, and one decision per format
+ *
+ * This was decks only, gated on `format === "slides"` in three places. None of the
+ * machinery above is slide-specific — an overlay and a second frame are what fill a window
+ * with anything — so what is left per format is **the keyboard** and **how big the frame
+ * is**, and both are stated here rather than assumed:
+ *
+ * | | frame | keys |
+ * |---|---|---|
+ * | slides | the slide's own 16:9, letterboxed | the overlay owns them: ← → Space page the deck |
+ * | flow | the window; the document scrolls in it | the document's, so ↑ ↓ PageDown scroll it |
+ * | component | the board's own rectangle, at 1:1, centred | the board's — it may have buttons |
+ *
+ * Escape is the overlay's in every case, and the only key that is. For a document that is
+ * also the *only* key it takes, which is why the listener is installed **inside the frame**
+ * as well: a keystroke with the focus in a board's document is dispatched there and never
+ * reaches this window at all, so an Escape handled only here would work in a deck (whose
+ * frame takes no pointer events and cannot take the focus) and quietly fail in a document.
  *
  * The slide you were on is carried across on load, because arriving at slide one when you
  * pressed `f` on slide seven is the kind of thing that makes a presenter stop using a tool
@@ -40,8 +57,9 @@ export function Present(props: {
 }) {
 	let frameEl: HTMLIFrameElement | undefined;
 	let layerEl: HTMLDivElement | undefined;
+	const slides = () => props.board.format === "slides";
 	const [at, setAt] = createSignal(props.at);
-	const [total, setTotal] = createSignal(props.board.format === "slides" ? 0 : 0);
+	const [total, setTotal] = createSignal(0);
 	const [idle, setIdle] = createSignal(true);
 
 	const deck = (): DeckHandle | undefined => (frameEl?.contentWindow as { __deck?: DeckHandle } | null)?.__deck;
@@ -74,12 +92,17 @@ export function Present(props: {
 	const act = (event: KeyboardEvent) => {
 		const action = slideKey(event, "fullscreen");
 		if (!action) return;
-		event.preventDefault();
-		event.stopPropagation();
+		// Escape is everyone's. Everything else in this table belongs to the format, and to
+		// a document that means "nothing here takes it".
 		if (action === "exit") {
+			event.preventDefault();
+			event.stopPropagation();
 			leave();
 			return;
 		}
+		if (!slides()) return;
+		event.preventDefault();
+		event.stopPropagation();
 		const handle = deck();
 		if (!handle) return;
 		if (action === "next") handle.next();
@@ -96,53 +119,75 @@ export function Present(props: {
 	};
 
 	/*
-	 * Focus the overlay, and only once it is in the document.
+	 * Focus, and only once the element is in the document.
 	 *
 	 * `onMount` rather than the `ref` callback, which is the bug this replaces: a `ref` fires
 	 * before Solid inserts the element, and `focus()` on a detached node does nothing at all
 	 * — so the focus stayed inside the *canvas's* board frame, that frame received ← → and
 	 * Space, and nothing paged. `requestFullscreen` failed silently for the same reason.
 	 *
-	 * The focus has to be here rather than on the frame: an iframe that has it receives the
-	 * keystrokes itself, and a board document has no idea it is being presented. The frame is
-	 * `pointer-events: none` in CSS so a click on the slide cannot hand it back.
+	 * **Which** thing gets the focus is the per-format decision with teeth. A deck's overlay
+	 * takes it, because an iframe that has it receives the keystrokes itself and a deck has
+	 * no idea it is being presented. A flow document wants exactly the opposite: it has its
+	 * own scroll position, so the arrows have to reach *it*. A component board likewise —
+	 * it may have buttons on it.
 	 */
 	onMount(() => {
-		layerEl?.focus();
+		if (slides()) layerEl?.focus();
+		else frameEl?.focus();
 		// Best effort, and deliberately unawaited: a refusal is not a failure, because the
 		// overlay already *is* the presentation.
 		void layerEl?.requestFullscreen?.().catch(() => {});
 	});
 
 	/*
-	 * Captured on the window, and in the capture phase.
-	 *
-	 * The keystroke has to be taken before anything else sees it: the canvas is still
-	 * mounted behind this overlay with its own handler on the same window, and Escape in
-	 * particular has three other owners. Capture is what makes "the overlay is up" mean
-	 * "the overlay decides first" without adding a precedence flag to every other handler.
-	 */
-	createEffect(() => {
-		window.addEventListener("keydown", act, true);
-		onCleanup(() => window.removeEventListener("keydown", act, true));
-	});
-
-	/*
 	 * The chrome hides until the pointer moves. A presentation with permanent buttons on it
 	 * is a demo of a tool rather than a talk — but a person who has just pressed a button to
 	 * get here needs to be able to find the way back out, so any movement brings it back.
+	 *
+	 * A plain function with a module-scope timer rather than a signal and an effect: it is
+	 * called from a listener, from the frame's document and from this one, and none of those
+	 * is a reactive context.
 	 */
-	createEffect(() => {
-		let timer: number | undefined;
-		const wake = () => {
-			setIdle(false);
-			clearTimeout(timer);
-			timer = window.setTimeout(() => setIdle(true), 2000);
+	let wakeTimer: number | undefined;
+	const wake = () => {
+		setIdle(false);
+		clearTimeout(wakeTimer);
+		wakeTimer = window.setTimeout(() => setIdle(true), 2000);
+	};
+
+	/**
+	 * The keys, in both places they can arrive.
+	 *
+	 * The window, in the capture phase: the canvas is still mounted behind this overlay with
+	 * its own handler on the same window, and Escape in particular has three other owners.
+	 * Capture is what makes "the overlay is up" mean "the overlay decides first" without
+	 * adding a precedence flag to every other handler.
+	 *
+	 * And the frame's own document, because a keystroke that lands in a board never reaches
+	 * this window. Same origin (§4), so it can just be listened for — and it is the whole
+	 * reason Escape works in a document as well as in a deck.
+	 */
+	let frameListeners: (() => void) | undefined;
+	const listenInFrame = () => {
+		const doc = frameEl?.contentDocument;
+		if (!doc) return;
+		doc.addEventListener("keydown", act, true);
+		doc.addEventListener("pointermove", wake);
+		frameListeners = () => {
+			doc.removeEventListener("keydown", act, true);
+			doc.removeEventListener("pointermove", wake);
 		};
+	};
+
+	onMount(() => {
+		window.addEventListener("keydown", act, true);
 		window.addEventListener("pointermove", wake);
 		onCleanup(() => {
+			window.removeEventListener("keydown", act, true);
 			window.removeEventListener("pointermove", wake);
-			clearTimeout(timer);
+			frameListeners?.();
+			clearTimeout(wakeTimer);
 		});
 	});
 
@@ -150,17 +195,13 @@ export function Present(props: {
 		<div
 			class="present"
 			data-idle={idle()}
+			data-format={props.board.format}
 			tabIndex={-1}
 			ref={(element) => {
 				layerEl = element;
 				/*
-				 * Focus the overlay, not the frame inside it.
-				 *
-				 * An iframe that has the focus receives the keystrokes, and this one is a
-				 * board document with no idea it is being presented — so ← → and Space went
-				 * into it and nothing paged. The frame is also made non-interactive in CSS,
-				 * so a click on the slide cannot move the focus back into it: during a
-				 * presentation there is nothing in a slide to click anyway.
+				 * Focus the overlay, not the frame. See `onMount` — the same call, for the
+				 * case where Solid's `ref` runs before the element is in the document.
 				 */
 				element.focus();
 				// Best effort, and deliberately unawaited: a refusal is not a failure here,
@@ -168,30 +209,46 @@ export function Present(props: {
 				void layerEl?.requestFullscreen?.().catch(() => {});
 			}}
 			role="dialog"
-			aria-label={`${props.board.title} — presenting`}
+			aria-label={`${props.board.title} — ${slides() ? "presenting" : "fullscreen"}`}
 		>
 			<iframe
 				class="present-frame"
 				title={props.board.title}
-				src={`/api/board/${props.board.path}?present=1&rev=${props.board.rev}`}
+				/*
+				 * `present=1` is the slides shell's flag: fill the viewport rather than the
+				 * board's own rectangle, so a fixed 960×540 slide can scale to the window. A
+				 * flow document wants the opposite — the window *is* its rectangle, and the
+				 * flag's `overflow: hidden` would take away the scrolling it is there to do.
+				 */
+				src={`/api/board/${props.board.path}?${slides() ? "present=1&" : ""}rev=${props.board.rev}`}
+				/* A component board is shown at the size it was laid out at. A flow document
+				    is a page: CSS gives it the window and the document scrolls inside it. */
+				style={props.board.format === "component" ? { width: `${props.board.w}px`, height: `${props.board.h}px` } : undefined}
 				ref={(element) => {
 					frameEl = element;
-					element.addEventListener("load", ready);
+					element.addEventListener("load", () => {
+						frameListeners?.();
+						frameListeners = undefined;
+						listenInFrame();
+						if (slides()) ready();
+					});
 				}}
 			/>
 			<div class="present-bar">
-				<button type="button" class="present-step" onClick={() => { deck()?.prev(); setAt(deck()?.current() ?? 0); }} aria-label="Previous slide">
-					‹
-				</button>
-				<Show when={total() > 0}>
-					<span class="present-count">
-						{at() + 1} / {total()}
-					</span>
+				<Show when={slides()}>
+					<button type="button" class="present-step" onClick={() => { deck()?.prev(); setAt(deck()?.current() ?? 0); }} aria-label="Previous slide">
+						‹
+					</button>
+					<Show when={total() > 0}>
+						<span class="present-count">
+							{at() + 1} / {total()}
+						</span>
+					</Show>
+					<button type="button" class="present-step" onClick={() => { deck()?.next(); setAt(deck()?.current() ?? 0); }} aria-label="Next slide">
+						›
+					</button>
 				</Show>
-				<button type="button" class="present-step" onClick={() => { deck()?.next(); setAt(deck()?.current() ?? 0); }} aria-label="Next slide">
-					›
-				</button>
-				<button type="button" class="present-exit" onClick={leave} aria-label="Stop presenting">
+				<button type="button" class="present-exit" onClick={leave} aria-label={slides() ? "Stop presenting" : "Leave fullscreen"}>
 					Esc
 				</button>
 			</div>

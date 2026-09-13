@@ -102,6 +102,19 @@ export function shellFor(path: string, source?: string): "content" | "foreign" |
 }
 
 /**
+ * What a board is a live view of, or nothing.
+ *
+ * A live board is a stub: one component carrying `data-live`, drawn from `postMessage` by
+ * the app that framed it (`lib/live-chat.js`, `lib/live-web.js`). The same source scan that
+ * decides the format answers this, for the same reason — it is one attribute in bytes
+ * already being read, and a regex over them is not the parse it looks like.
+ */
+export function liveKindOf(source: string): string | undefined {
+	const match = /<body[^>]*>[\s\S]{0,4000}?data-live\s*=\s*["']([a-z]+)["']/i.exec(source);
+	return match?.[1];
+}
+
+/**
  * Whether an HTML document is one of Decks' own boards.
  *
  * A regex over the opening `<body>` tag, in the spirit of `meta.ts`: this runs for every

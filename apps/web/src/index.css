@@ -590,8 +590,18 @@ svg.lucide {
 	align-items: center;
 }
 
-/* Takes the board off the canvas; appears on hover, like the message actions. */
-.board-node > .chrome .hide {
+/*
+ * The board bar's buttons — taking a board off the canvas, and filling the window with it.
+ * Appears on hover, like the message actions.
+ *
+ * Two selectors rather than one class shared by both, and that is a bug this had: the
+ * fullscreen button carried `.hide` because a *deck* was the only board with two buttons in
+ * its bar, so nothing noticed. The moment every board got one, `e2e/checks/tiers.mjs`'s
+ * `locator(".chrome .hide").click()` matched two elements and Playwright's strict mode
+ * refused — a selector that means "the ×" would have meant "one of the two".
+ */
+.board-node > .chrome .hide,
+.board-node > .chrome .present-open {
 	display: grid;
 	width: 18px;
 	height: 18px;
@@ -606,11 +616,13 @@ svg.lucide {
 	transition: opacity 120ms ease;
 }
 
-.board-node:hover > .chrome .hide {
+.board-node:hover > .chrome .hide,
+.board-node:hover > .chrome .present-open {
 	opacity: 1;
 }
 
-.board-node > .chrome .hide:hover {
+.board-node > .chrome .hide:hover,
+.board-node > .chrome .present-open:hover {
 	background: var(--line);
 	color: var(--fg);
 }

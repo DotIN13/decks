@@ -52,6 +52,13 @@ const CHECKS = [
 	{ file: "notifications.mjs", needsAgent: false },
 	{ file: "modes.mjs", needsAgent: false },
 	{ file: "agents-tab.mjs", needsAgent: false },
+	/*
+	 * Fullscreen for every format, on a board of each — which brings back the one thing the
+	 * cut of `board-kinds.mjs` left with no coverage at all: a slides board and a flow board
+	 * in the fixture. Until this check existed the suite only ever saw component boards,
+	 * which is how a slides-only gate on fullscreen sat in the app unnoticed.
+	 */
+	{ file: "present.mjs", needsAgent: false },
 	{ file: "camera.mjs", needsAgent: false },
 	{ file: "context.mjs", needsAgent: false },
 	{ file: "per-agent.mjs", needsAgent: false },

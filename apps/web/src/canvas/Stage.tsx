@@ -275,11 +275,23 @@ export function Stage(props: {
 	const drive = (path: string | undefined, action: SlideAction): boolean => {
 		if (!path) return false;
 		const board = props.boards.find((candidate) => candidate.path === path);
-		if (board?.format !== "slides") return false;
+		if (!board) return false;
+		/*
+		 * Fullscreen is for any board; the four paging verbs are for a deck.
+		 *
+		 * The gate was on both, which is why fullscreen existed only for slides: it was a
+		 * property of `Present.tsx`, which is an overlay and a second frame and knows nothing
+		 * about slides (`canvas/Present.tsx`). A document wants the window; a component board
+		 * wants its own rectangle at 1:1.
+		 */
 		if (action === "present") {
-			props.onPresent?.(path, deckIn(path)?.current() ?? 0);
+			// A live board is a view of something the app is already showing; there is no
+			// second frame of it that says anything new.
+			if (board.live) return false;
+			props.onPresent?.(path, board.format === "slides" ? (deckIn(path)?.current() ?? 0) : 0);
 			return true;
 		}
+		if (board.format !== "slides") return false;
 		const deck = deckIn(path);
 		if (!deck) return false;
 		if (action === "next") deck.next();
@@ -896,8 +908,11 @@ export function Stage(props: {
 							visible={isVisible(board)}
 							selected={props.selected === board.path}
 							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
-							{...(board.format === "slides" && props.onPresent
-								? { onPresent: () => props.onPresent?.(board.path, deckIn(board.path)?.current() ?? 0) }
+							{...(props.onPresent
+								? {
+										onPresent: () =>
+											props.onPresent?.(board.path, board.format === "slides" ? (deckIn(board.path)?.current() ?? 0) : 0),
+									}
 								: {})}
 							nonce={props.nonces?.[board.path]}
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
