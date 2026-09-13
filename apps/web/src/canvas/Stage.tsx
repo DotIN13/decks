@@ -16,6 +16,7 @@ import { PALETTE } from "@decks/board-kit";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
+import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
 import { createOneCanvas } from "./one-canvas.ts";
 
@@ -787,7 +788,15 @@ export function Stage(props: {
 		lastMoved: () => lastMoved,
 		screenCentre: (board) => toScreen(props.camera, view(), { x: board.x + board.w / 2, y: board.y + board.h / 2 }),
 		mayStart: () => props.boardsMayStart,
-		onStarted: () => props.onBoardsStarted?.(),
+		onStarted: () => {
+			/*
+			 * The canvas's own queue, opened by the canvas: a thumbnail is a document on the same
+			 * main thread as a board, and of everything on screen at the open it is the least
+			 * urgent — so it waits for the boards to take their turn (`thumb-budget.ts`).
+			 */
+			openThumbnails();
+			props.onBoardsStarted?.();
+		},
 	});
 	createEffect(() => admission.begin());
 

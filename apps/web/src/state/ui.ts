@@ -1,7 +1,6 @@
 import type { UsageReport } from "@decks/protocol";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { openThumbnails } from "../canvas/thumb-budget.ts";
 import { notice } from "./notices.ts";
 import { send } from "./socket.ts";
 
@@ -176,7 +175,12 @@ function createUi() {
 
 	/**
 	 * And after that, the boards on the canvas are in: the rest of the panel's list may be
-	 * drawn and the rail's thumbnails may start. Chat, then canvas, then the rest.
+	 * drawn. Chat, then canvas, then the rest.
+	 *
+	 * The rail's thumbnails are the canvas's own business, and it starts them itself when it
+	 * admits the first board (`canvas/Stage.tsx`). They used to be started from here, which
+	 * meant this module imported the canvas's queue to tap it on the shoulder — the one edge
+	 * in this file pointing at a layer above it.
 	 */
 	const [boardsStarted, setBoardsStarted] = createSignal(false);
 
@@ -200,7 +204,6 @@ function createUi() {
 
 	const canvasOpened = () => {
 		setBoardsStarted(true);
-		openThumbnails();
 	};
 
 	return {

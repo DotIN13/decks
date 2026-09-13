@@ -43,11 +43,11 @@ const holders = new Map<symbol, Holder>();
 let clock = 0;
 
 /*
- * And none start until the app has opened and the boards on the canvas have (`Stage` says so
- * through `openThumbnails`). A thumbnail is a document on the app's own main thread just as a
- * board is, and of everything on screen at the open it is the least urgent: a 20×14 picture in
- * a panel, beside a chat and a canvas that are still arriving. Asked for before then, it waits
- * its turn in the same queue.
+ * And none start until the app has opened and the boards on the canvas have — `Stage` calls
+ * `openThumbnails` when it admits the first board. A thumbnail is a document on the app's own
+ * main thread just as a board is, and of everything on screen at the open it is the least
+ * urgent: a 20×14 picture in a panel, beside a chat and a canvas that are still arriving. Asked
+ * for before then, it waits its turn in the same queue.
  */
 let open = false;
 
