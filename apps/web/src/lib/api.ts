@@ -10,7 +10,7 @@ import type { Board } from "@decks/protocol";
  * `upload.ts`, where it can be streamed and its progress reported.
  *
  * The deck itself does not come through here: its state arrives over the socket, on
- * connect and on every change (`app/socket.ts`). There used to be a `fetchDeck()` in this
+ * connect and on every change (`state/socket.ts`). There used to be a `fetchDeck()` in this
  * file for the first paint, from before the greeting carried everything.
  */
 

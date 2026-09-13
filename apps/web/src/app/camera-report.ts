@@ -11,9 +11,10 @@ import { send } from "../state/socket.ts";
  * `App.tsx` — a timer, a debounce, the reading, and the setter that does both — and it is
  * the only place that knows a camera reading travels *with* the size of the canvas.
  *
- * The camera itself is `state/camera.ts`; this is the mechanism over it, the way
- * `app/socket.ts` is the connection under `state/socket.ts`. The timer is private here,
- * which is what `app/` is for.
+ * The camera itself is `state/camera.ts`; this is the mechanism over it — the thing that
+ * watches and writes. The timer is private here, which is what a module in `app/` is: the
+ * component builds it, no other module needs it, and the value has no life outside the one
+ * thing that asked for it.
  */
 
 /** The debounce that makes a pan one report instead of a hundred. */
