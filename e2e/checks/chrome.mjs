@@ -193,7 +193,8 @@ say("previewing writes nothing", read(plan) === before);
 /*
  * And Escape puts them back — the canvas's own way out, which is the other half of making the
  * preview deliberate: moving the pointer away no longer ends it, so something on the canvas
- * has to. (`preview.mjs` checks the badge and its Leave button without spending a turn.)
+ * has to. (`preview.mjs` covered the badge and its Leave button without spending a turn; it
+ * has been cut, so this is the only place either is asserted — and it needs a model.)
  */
 await page.mouse.move(800, 300);
 await page.keyboard.press("Escape");

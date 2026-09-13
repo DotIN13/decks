@@ -78,8 +78,8 @@ try {
 	/*
 	 * Opened and pressed, not hovered. Pointing at the handle used to preview on its own, and
 	 * that is gone: it changed the canvas under a cursor on its way past, and left people in
-	 * a state they had not asked for. `preview.mjs` is where the absence of the hover is
-	 * asserted; here the menu is simply the way in.
+	 * a state they had not asked for. `preview.mjs` asserted that absence and has been cut, so
+	 * nothing asserts it now; here the menu is simply the way in.
 	 */
 	await second.locator(".stream-rw").click();
 	await page.waitForSelector(".popover", { timeout: 6000 });

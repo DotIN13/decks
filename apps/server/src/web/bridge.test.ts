@@ -15,8 +15,9 @@ import { WebBridge } from "./bridge.ts";
  * The Decks extension is five commands around `chrome.debugger`; this fake answers the
  * same five against a headless Chromium's own DevTools socket, so everything from the
  * pairing check through the relay to Playwright's `fill` runs exactly as it does with the
- * user's Chrome — only the last hop, `chrome.debugger` itself, is stood in for. That is the
- * hop the browser check (`e2e/checks/web-bridge.mjs`) covers with the real extension.
+ * user's Chrome — only the last hop, `chrome.debugger` itself, is stood in for. That hop was
+ * covered by the browser check (`e2e/checks/web-bridge.mjs`) with the real extension; that
+ * check has been cut, so the real `chrome.debugger` hop is tested nowhere.
  */
 
 /*

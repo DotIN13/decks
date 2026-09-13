@@ -17,8 +17,9 @@
  * **nothing drawn at all when the reading is unknown** — cannot be produced on demand,
  * because a real agent reports as soon as it has anything to report.
  *
- * What each of them *opens* — the plan windows, the per-model spend, the scan — is
- * `usage.mjs`. This file is about which of the two is drawn at which width.
+ * What each of them *opens* — the plan windows, the per-model spend, the scan — was
+ * `usage.mjs`, which has been cut from the suite and is covered by nothing now. This file is
+ * about which of the two is drawn at which width.
  */
 import { open, say, settle } from "../harness.mjs";
 
@@ -89,8 +90,8 @@ const agent = {
 	}));
 	say("pressing it opens the numbers as a popover", popover.open && popover.percent === "74%", JSON.stringify(popover.percent));
 	say("…with the figures behind the percentage", popover.used.some((row) => /148,000/.test(row)) && popover.used.some((row) => /200,000/.test(row)), JSON.stringify(popover.used));
-	/* A popover, not a modal: this is the glance. The panel behind its last row is a modal
-	   and is `usage.mjs`'s subject. */
+	/* A popover, not a modal: this is the glance. The panel behind its last row is a modal;
+	   `usage.mjs` was its only cover and has been cut. */
 	say("…and no modal on a desktop", popover.modal === 0, String(popover.modal));
 
 	/* The `⋯` row is the phone's answer and must not be drawn here as well. */

@@ -13,9 +13,9 @@
  * **The drop point needs no camera maths.** `clientX/clientY` on a drag event are
  * in the frame's own pixels, which are board pixels, because the stage's zoom is a
  * CSS transform on an ancestor and the frame's coordinate system knows nothing
- * about it — exactly as for the pointer events the editor uses. That is asserted
- * rather than assumed: `e2e/checks/file-drop.mjs` drops at a known point and reads
- * the `left`/`top` the server wrote.
+ * about it — exactly as for the pointer events the editor uses. That *was* asserted
+ * rather than assumed: `e2e/checks/file-drop.mjs` dropped at a known point and read
+ * the `left`/`top` the server wrote. That check has been cut, so it is assumed now.
  *
  * **A paste is a drop with no cursor, and it lands here too.** Pasting an image was
  * the obvious sibling of dropping one and was listed as a known edge; it costs almost

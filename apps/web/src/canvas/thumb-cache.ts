@@ -49,8 +49,8 @@ import { createSignal } from "solid-js";
  * A shortlist is a fidelity risk, and the risk is a board using something not on it. What is
  * here covers position, box, paint, type, the two layout systems and the transforms boards
  * position themselves with; `fill` and `stroke` are for the SVG that Mermaid and hand-drawn
- * diagrams produce. `thumbs.mjs` asserts a picture still has ink in it, which is what a
- * missing property would take away.
+ * diagrams produce. `thumbs.mjs` asserted a picture still had ink in it, which is what a
+ * missing property would take away — it has been cut, so a missing property is silent now.
  */
 const STYLE_PROPERTIES = [
 	"position", "display", "left", "top", "right", "bottom", "width", "height",

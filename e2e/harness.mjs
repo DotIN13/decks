@@ -96,23 +96,28 @@ export function write(file, text) {
  * panel state, and the scheme is set explicitly so screenshots are stable.
  *
  * `device` names one of Playwright's device descriptors ("iPhone 15", "Pixel 7", "iPad
- * (gen 7)") and is what `mobile.mjs` needs: a viewport alone still has a mouse, and a
- * mouse hides exactly the bugs a touchscreen has. A device context brings `hasTouch`,
- * the pixel ratio and the user agent with it, and the returned `context` is what a check
- * attaches a CDP session to in order to dispatch real touches.
+ * (gen 7)"): a viewport alone still has a mouse, and a mouse hides exactly the bugs a
+ * touchscreen has. A device context brings `hasTouch`, the pixel ratio and the user agent
+ * with it, and the returned `context` is what a check attaches a CDP session to in order to
+ * dispatch real touches. `mobile.mjs` was why this exists and has been cut; `context.mjs` is
+ * the one caller left, and it only wants the narrow viewport — nothing dispatches a touch
+ * any more.
  */
 export async function open({ width = 1500, height = 950, scheme = "dark", boards = true, device, edit = false, dpr } = {}) {
 	/*
 	 * Chrome's HTML-in-Canvas API, which the two canvas renderers need (`lib/renderer.ts`),
-	 * is behind a flag in Chrome 151. It changes nothing for a check that leaves the
-	 * renderer alone — the DOM renderer is the default — and `renderers.mjs` needs it on.
+	 * is behind a flag in Chrome 151. It changes nothing for a check that leaves the renderer
+	 * alone — the DOM renderer is the default — and it stays on because turning it off would
+	 * change the browser every check runs in. `renderers.mjs` was the only check that needed
+	 * it and has been cut, so neither canvas renderer is exercised now.
 	 */
 	const browser = await chromium.launch({ args: ["--enable-blink-features=CanvasDrawElement"] });
 	const descriptor = device ? devices[device] : undefined;
 	if (device && !descriptor) throw new Error(`playwright has no device called "${device}"`);
-	// `dpr` is a retina screen without a phone attached to it — what `renderers.mjs` needs,
-	// because a canvas renderer can be right on this machine's 1× screen and wrong on a
-	// laptop's 2× one, and that is not a difference a viewport size can stand in for.
+	// `dpr` is a retina screen without a phone attached to it: a canvas renderer can be right
+	// on this machine's 1× screen and wrong on a laptop's 2× one, and that is not a difference
+	// a viewport size can stand in for. `renderers.mjs` was its only caller and has been cut,
+	// so nothing passes `dpr` today — the option is kept for the next check that needs it.
 	const context = descriptor
 		? await browser.newContext({ ...descriptor })
 		: await browser.newContext({ viewport: { width, height }, ...(dpr ? { deviceScaleFactor: dpr } : {}) });

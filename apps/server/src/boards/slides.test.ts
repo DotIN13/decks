@@ -13,8 +13,9 @@ import { isHtmlDeck, logicalSize, sheetColumns, splitDeck, splitNote } from "../
  *
  * `splitHtmlDeck` is **not** here, and that is a limit rather than an oversight: it uses
  * `DOMParser`, which Node has none of, and a stub would be testing the stub. The HTML
- * format's splitting is asserted in `e2e/checks/board-kinds.mjs`, in a real browser, against
- * the rendered slides — which is where the rest of the DOM half already lives.
+ * format's splitting *was* asserted in `e2e/checks/board-kinds.mjs`, in a real browser,
+ * against the rendered slides. That check has been cut, so `splitHtmlDeck` is now covered
+ * nowhere — this paragraph is the record of a gap, not of an arrangement.
  */
 
 test("front-matter is consumed, not shown as the first slide", () => {

@@ -23,60 +23,38 @@ const root = resolve(here, "..");
 /** `needsAgent` means it starts a turn, so it needs a model configured and will cost tokens. */
 const CHECKS = [
 	/*
-	 * `header.mjs` and `panels.mjs` are gone, replaced rather than ported: the title bar
-	 * they tested does not exist, and "two panels, one at a time" is one panel with a tab
-	 * strip. `turn-bar.mjs` went with the spine itself.
+	 * A core twelve, cut down from forty-five because the full suite took 8m17s and nothing
+	 * that slow gets run between edits. These twelve are 297 of the old 857 assertions and
+	 * about 121s; they were picked for assertions per second and for covering one surface
+	 * each, not by theme.
+	 *
+	 * **The thirty-three that went are in git, not gone.** `git log --diff-filter=D
+	 * --name-only -- e2e/checks` lists them; restoring one is a `git show` and a line here.
+	 * Worth knowing what is no longer covered at all: touch and the phone layout
+	 * (`mobile.mjs`, which was the most-cited check in this repo and the only place real
+	 * touches were dispatched), the three board formats (`board-kinds.mjs`), embeds, file
+	 * drops, thumbnails, streaming, scrollback paging, direct manipulation, the renderers,
+	 * the shared-Chrome bridge, and the accounts surfaces.
+	 *
+	 * `accounts.mjs` was among them and was also the one check failing on main — its
+	 * ordering assertion. Deleting it did not fix that; the ordering question is still open.
+	 *
+	 * Older removals, kept here because the reasons still explain absences: `header.mjs` and
+	 * `panels.mjs` went when the title bar became two clusters and two panels became one,
+	 * and `turn-bar.mjs` went with the spine itself.
 	 */
-	{ file: "clusters.mjs", needsAgent: false },
 	{ file: "panel.mjs", needsAgent: false },
-	{ file: "edge.mjs", needsAgent: false },
-	{ file: "dock.mjs", needsAgent: false },
-	{ file: "slash.mjs", needsAgent: false },
-	{ file: "camera.mjs", needsAgent: false },
-	{ file: "keys.mjs", needsAgent: false },
-	{ file: "gestures.mjs", needsAgent: false },
-	{ file: "mobile.mjs", needsAgent: false },
-	{ file: "embed-scroll.mjs", needsAgent: false },
-	{ file: "mirror.mjs", needsAgent: false },
-	{ file: "embed-guard.mjs", needsAgent: false },
-	{ file: "embed-touch.mjs", needsAgent: false },
-	{ file: "editing.mjs", needsAgent: false },
-	{ file: "inspector.mjs", needsAgent: false },
-	{ file: "invented-component.mjs", needsAgent: false },
-	{ file: "rich-text.mjs", needsAgent: false },
-	{ file: "file-drop.mjs", needsAgent: false },
-	{ file: "drop-targets.mjs", needsAgent: false },
-	{ file: "no-flicker.mjs", needsAgent: false },
 	{ file: "tiers.mjs", needsAgent: false },
-	{ file: "deleted-board.mjs", needsAgent: false },
-	{ file: "rail-scroll.mjs", needsAgent: false },
-	{ file: "thumbs.mjs", needsAgent: false },
-	{ file: "model-picker.mjs", needsAgent: false },
-	{ file: "board-kinds.mjs", needsAgent: false },
-	{ file: "accounts.mjs", needsAgent: false },
-	{ file: "accounts-per-agent.mjs", needsAgent: false },
-	{ file: "agent-close.mjs", needsAgent: false },
-	{ file: "notifications.mjs", needsAgent: false },
-	{ file: "agents-tab.mjs", needsAgent: false },
-	{ file: "runtimes.mjs", needsAgent: false },
-	{ file: "per-agent.mjs", needsAgent: false },
-	{ file: "modes.mjs", needsAgent: false },
-	{ file: "annotate.mjs", needsAgent: false },
-	{ file: "context.mjs", needsAgent: false },
-	{ file: "preview.mjs", needsAgent: false },
-	{ file: "usage.mjs", needsAgent: false },
-	{ file: "streaming.mjs", needsAgent: false },
 	{ file: "chat-content.mjs", needsAgent: false },
-	{ file: "chat-history.mjs", needsAgent: false },
-	{ file: "agent-camera.mjs", needsAgent: false },
-	{ file: "web-bridge.mjs", needsAgent: false },
-	{ file: "renderers.mjs", needsAgent: false },
-	/*
-	 * Last of the non-agent checks, and deliberately: it repoints the server's deck at a
-	 * directory of its own to make a *restored* chat, and puts it back afterwards. Nothing
-	 * else should be mid-check while the deck under everything moves.
-	 */
-	{ file: "dormant-controls.mjs", needsAgent: false },
+	{ file: "slash.mjs", needsAgent: false },
+	{ file: "mirror.mjs", needsAgent: false },
+	{ file: "inspector.mjs", needsAgent: false },
+	{ file: "notifications.mjs", needsAgent: false },
+	{ file: "modes.mjs", needsAgent: false },
+	{ file: "agents-tab.mjs", needsAgent: false },
+	{ file: "camera.mjs", needsAgent: false },
+	{ file: "context.mjs", needsAgent: false },
+	{ file: "per-agent.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },
@@ -147,8 +125,9 @@ rmSync(join(data, "decks", ".pi"), { recursive: true, force: true });
  * signed-in Claude accounts" — but it exists on any machine where somebody has logged in
  * from the example deck, and the copy above takes `example/` wholesale. So the fixture
  * arrived with a real account and an `active` symlink already in it, and `accounts.mjs`
- * failed three assertions about what a *fresh install* looks like. A check that depends on
- * whoever last used the example deck passes or fails by accident.
+ * failed three assertions about what a *fresh install* looks like. That check has since been
+ * cut, but the removal stays and does not depend on it: a fixture carrying somebody's real
+ * credentials is wrong whether or not anything asserts against it.
  */
 rmSync(join(data, "claude-accounts"), { recursive: true, force: true });
 

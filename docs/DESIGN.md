@@ -955,10 +955,10 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
   allocated from 900001 up, because the stage pools fingers by id from every document it
   can see and a guest's `pointerId` starts at 1 like everyone else's — a pinch made of a
   thumb on the board and a finger in an embed that shared an id would be one finger
-  teleporting. `embed-touch.mjs` asserts the pan, the pinch, the tap, and the half that
-  must *not* travel; it also asserts the zoom is above `INTERACT_ZOOM` first, because
-  below it no frame takes a pointer at all and every one of those passes for the wrong
-  reason.
+  teleporting. `embed-touch.mjs` asserted the pan, the pinch, the tap, and the half that
+  must *not* travel, and that the zoom was above `INTERACT_ZOOM` first — below it no frame
+  takes a pointer at all and every one of those would pass for the wrong reason. That check
+  has been cut, so none of this is asserted any more.
 - **A file dropped on a board is the same problem, and the same answer.** A drag from the
   desktop over a board produces `dragover`/`drop` inside the frame's document and nothing
   in the app's, so `file-drop.ts` listens inside the frame exactly as `frame-gestures.ts`
@@ -1272,8 +1272,9 @@ board, talking to the agent and light editing", and everything below serves that
   left beside two panels, and on a 390px screen that is a negative number: the composer was
   18px across with the placeholder broken one letter per line, and the send button was
   unreachable. This is the whole class of bug that only a real device viewport finds, which
-  is why `e2e/checks/mobile.mjs` runs in a device context with `hasTouch` and dispatches
-  real touches through CDP — a mouse would have hidden every one of these.
+  is why `e2e/checks/mobile.mjs` ran in a device context with `hasTouch` and dispatched real
+  touches through CDP — a mouse would have hidden every one of these. That check has been
+  cut; nothing exercises a device viewport now.
 
 - **Getting a file in without a desktop to drag from.** The upload route and the insert
   path already existed (§6.9); what was missing was somewhere to tap. The file picker grew

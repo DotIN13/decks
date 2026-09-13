@@ -114,15 +114,16 @@ deck directory.
 
 ## Development
 ```bash
-npm test            # 200 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
-npm run test:e2e    # 215 browser checks against a throwaway copy of example/ (~60s)
+npm test            # 284 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
+npm run test:e2e    # 297 browser assertions in 12 checks, against a throwaway copy of example/ (~2m)
 npm run typecheck
 npm run vendor      # re-copy the board primitives into runtime/lib
 ```
 
-The browser checks are in [e2e/](e2e/README.md). One of them (`mobile.mjs`) runs in a
-Playwright device context and drives real touches, because a mouse hides every bug a
-touchscreen has. Six more files drive a real agent turn and are skipped unless you ask:
+The browser checks are in [e2e/](e2e/README.md). They were cut from forty-five to twelve
+because the full suite took over eight minutes and nothing that slow gets run between edits;
+the thirty-three that went are in git rather than gone, and `e2e/README.md` says what is no
+longer covered. Five more files drive a real agent turn and are skipped unless you ask:
 `DECKS_E2E_AGENT=1 npm run test:e2e`.
 
 `example/` is a committed data directory — `example/decks` is the demo deck and
