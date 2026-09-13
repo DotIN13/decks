@@ -1,4 +1,4 @@
-import { deltaFromBoard, deltaToBoard, type FrameAt, pointFromBoard } from "../camera/coords.ts";
+import { deltaToBoard, type FrameAt, pointFromBoard } from "../camera/coords.ts";
 import { typingInto } from "./Editor.ts";
 import { type ZoomKey, zoomKey } from "./zoom-keys.ts";
 import { type SlideAction, slideKey } from "./slide-keys.ts";
@@ -18,12 +18,16 @@ import type { Finger, TouchStep } from "./touch.ts";
  * gesture to the stage. The frame owns the gesture's mechanics — it is where the
  * pointer is — and the stage owns the camera.
  *
- * Coordinates need care. `clientX/clientY` inside the frame are in the *board's*
- * pixels, because the stage's zoom is a CSS transform on an ancestor and the frame's
- * own coordinate system knows nothing about it. Wheel *deltas*, on the other hand,
- * are physical scroll amounts and are not scaled by that transform. So positions are
- * converted and deltas are passed through — and there is a test that pans by the same
- * delta over bare stage and over a board and insists the camera moves equally.
+ * Coordinates need care, and they are not one problem but three.
+ * `clientX/clientY` inside the frame are in the *board's* pixels, because the stage's
+ * zoom is a CSS transform on an ancestor and the frame's own coordinate system knows
+ * nothing about it. Wheel *deltas* are physical scroll amounts and are not scaled by
+ * that transform, so they pass through. And a **delta** measured in the frame's own
+ * pixels is not the mouse's movement at all: the frame moves as the pan lands, so a
+ * stationary mouse reports a shrinking `clientX` there. Positions are converted with
+ * the geometry of the moment and then differenced in screen space — which is what
+ * `e2e/checks/camera.mjs` measures, per event, on a live frame (`camera/coords.ts` has
+ * the three conversions and the bugs that came of crossing them by hand).
  *
  * **Touch is the same problem again, and it is worse before it is fixed.** A finger
  * inside a board produced no wheel event and no gesture at all: at a readable zoom the
@@ -267,8 +271,23 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		event.preventDefault();
 		event.stopPropagation();
 
-		const frame = geometry();
-		let last = { x: event.clientX, y: event.clientY };
+		/*
+		 * The position is kept in **stage** pixels, converted with the geometry of the moment — not
+		 * in the frame's own, which is the coordinate system the pan is moving.
+		 *
+		 * A mouse that is standing still is standing still in stage pixels; inside the frame its
+		 * `clientX` shrinks by every pan that moves the frame under it. So a delta measured there
+		 * is the mouse's movement *minus* the pan just applied, and feeding that back as the next
+		 * pan makes the camera advance by `mouse − previous step`: the board moves half the
+		 * distance, one event in two. Measured on a 12-step drag of 20px: 240px of mouse, 120px of
+		 * board, `20 0 20 0 …` — the lag and the jitter are the same bug.
+		 *
+		 * This is the trap the touch path documents below, and it solves it the same way: convert
+		 * the point, diff in screen space, and let the stage own the camera. It caught touch first
+		 * because a finger is still for longer between events, so the frame has further to move
+		 * under it — dragging 60 screen pixels moved the camera 30.
+		 */
+		let last = toStage(event.clientX, event.clientY);
 		const target = event.target as Element;
 		try {
 			target.setPointerCapture(event.pointerId);
@@ -277,10 +296,9 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		}
 
 		const move = (moveEvent: PointerEvent) => {
-			// In-frame movement is in board pixels; the camera pans in screen pixels.
-			const step = deltaFromBoard(frame, moveEvent.clientX - last.x, moveEvent.clientY - last.y);
-			host.pan(step.dx, step.dy);
-			last = { x: moveEvent.clientX, y: moveEvent.clientY };
+			const at = toStage(moveEvent.clientX, moveEvent.clientY);
+			host.pan(at.x - last.x, at.y - last.y);
+			last = at;
 		};
 		const finish = () => {
 			doc.removeEventListener("pointermove", move, true);
