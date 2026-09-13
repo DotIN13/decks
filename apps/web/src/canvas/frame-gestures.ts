@@ -103,7 +103,13 @@ export interface FrameGestureHost {
 	 * app — it has to be positioned and scaled with the board, and a board's own document
 	 * knows neither the camera nor the zoom.
 	 */
-	editSource(): boolean;
+	/**
+	 * Whether this board's double-click belongs to the source editor rather than the fields.
+	 *
+	 * Named by path because the frame knows which board it is and the selection does not have
+	 * to be it — a board can be double-clicked without having been clicked first.
+	 */
+	editSource(path: string, alt: boolean): boolean;
 	/**
 	 * The arrow keys, when the focused board is a deck.
 	 *
@@ -512,7 +518,18 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 	 */
 	const onDoubleClick = (event: MouseEvent) => {
 		if (typingInto(event.target)) return;
-		if (!host.editSource()) return;
+		/*
+		 * ⌥ decides, and the answer is about the *file* rather than the gesture: on a board
+		 * whose DOM tree is the file's tree, a plain double-click edits the words in place,
+		 * and ⌥ asks for the bytes. On a markdown board, a deck or a page from somewhere
+		 * else, the words on screen are not the file's, so a plain double-click is the only
+		 * sensible thing and it opens the source (`Stage`'s `editSource` answers which).
+		 *
+		 * The board is named rather than inferred from the selection: a double-click is a
+		 * gesture *on a board*, and asking which board is selected made ⌥ do nothing at all
+		 * on any board the user had not clicked first.
+		 */
+		if (!host.editSource(frame.dataset.path ?? "", event.altKey)) return;
 		event.preventDefault();
 		event.stopPropagation();
 	};

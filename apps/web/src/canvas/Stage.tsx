@@ -707,16 +707,28 @@ export function Stage(props: {
 		 */
 		slide: (action) => drive(props.selected, action),
 		/*
-		 * A double-click inside a board that has no components: edit the file.
+		 * Whether a double-click on a board belongs to the source editor.
 		 *
-		 * Answered here because the stage knows the board's format and the board does not.
-		 * Returning false is what lets a component board's double-click carry on to the
-		 * editor that selects a box.
+		 * Answered here because the stage knows the board's format and the board does not, and
+		 * returning false is what lets the *editor* have the gesture instead: the fields half
+		 * of `Editor.ts` retypes a run in place, which is the whole of what a document wants.
+		 *
+		 * Three answers, and the middle one is the one that changed:
+		 *
+		 * - a **component** board: no, unless ⌥ — a run of words is retyped in place, and the
+		 *   file as text is what ⌥ is for;
+		 * - a **flow board this app wrote**: no, unless ⌥ — its DOM tree *is* the file's tree,
+		 *   which is the condition the field editor needs and the reason the source editor was
+		 *   only ever a workaround here (`boards/editing-a-flow-document-properly`);
+		 * - anything else — markdown, a deck, a page from somewhere else, and any board at
+		 *   all with ⌥ — yes: what is on screen there was drawn from words that are not in the
+		 *   file, so the bytes are the only thing a double-click can honestly mean.
 		 */
-		editSource: () => {
-			const path = props.selected;
+		editSource: (path, alt) => {
 			const board = props.boards.find((candidate) => candidate.path === path);
-			if (!path || !board || board.format === "component" || !props.onEditSource) return false;
+			if (!board || !props.onEditSource) return false;
+			const fields = board.format === "component" || (board.format === "flow" && !board.shell);
+			if (!alt && fields) return false;
 			props.onEditSource(path);
 			return true;
 		},

@@ -59,6 +59,13 @@ const CHECKS = [
 	 * which is how a slides-only gate on fullscreen sat in the app unnoticed.
 	 */
 	{ file: "present.mjs", needsAgent: false },
+	/*
+	 * A flow document edited as fields. This is the other half of the fixture's flow board,
+	 * and the first coverage in the suite of the *document* editor: the field half of
+	 * `Editor.ts` ran on component boards only, and the reason a flow board was handed to the
+	 * source textarea was an assumption about markdown that a flow board does not share.
+	 */
+	{ file: "editing.mjs", needsAgent: false },
 	{ file: "camera.mjs", needsAgent: false },
 	{ file: "context.mjs", needsAgent: false },
 	{ file: "per-agent.mjs", needsAgent: false },

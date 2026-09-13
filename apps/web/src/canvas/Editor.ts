@@ -85,6 +85,16 @@ export interface EditorHost {
 	/** Whether editing is on at all — below a certain zoom the frame is inert. */
 	enabled(): boolean;
 	/**
+	 * Whether this board is a *document*, so that retyping runs is the whole of the job.
+	 *
+	 * A flow board's content reflows: there is no grid for a component to sit on, no box to
+	 * resize, and nowhere to place a new one — its DOM tree is the file's tree, and a run of
+	 * words is the thing that can be addressed. The **fields** half of this file is exactly
+	 * as meaningful there; the geometry half is not. So it is one flag rather than a second
+	 * editor, and the four places below are where the geometry half begins.
+	 */
+	fieldsOnly(path: string): boolean;
+	/**
 	 * Bring a box on this board into the part of the screen a person can see.
 	 *
 	 * For the on-screen keyboard, which is the only thing that has ever needed it: a
@@ -249,7 +259,9 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		const selection = host.selected();
 		const element = selection?.path === path ? (doc.querySelector(`[data-id="${cssEscape(selection.id)}"]`) as HTMLElement | null) : null;
 		for (const marked of doc.querySelectorAll(".decks-editing")) marked.classList.remove("decks-editing");
-		if (!element || !host.enabled()) {
+		// No resize handle on a document: there is no box to resize, and a handle that moved
+		// an element the CSS is laying out would fight the stylesheet rather than change it.
+		if (!element || !host.enabled() || host.fieldsOnly(path)) {
 			handle.style.display = "none";
 			return;
 		}
@@ -402,6 +414,13 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 
 		if (tool !== "select") {
 			event.preventDefault();
+			if (host.fieldsOnly(path)) {
+				// A placed component in a reflowing document is an absolutely positioned box in
+				// a page: the two layout systems would fight and the file would show it.
+				host.notice("This board is a document — components go on a placed board, not a page.");
+				host.resetTool();
+				return;
+			}
 			void insert(tool, { x: event.clientX + win.scrollX, y: event.clientY + win.scrollY });
 			return;
 		}
@@ -435,6 +454,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			 * what makes a drag across a board a pan rather than a rearrangement.
 			 */
 			if (!element || !onSelection || element.isContentEditable || editing) return;
+			if (host.fieldsOnly(path)) return;
 			event.preventDefault();
 			gesture = { kind: "move", element, from: { x: event.clientX, y: event.clientY }, origin: rectOf(element) };
 			return;
@@ -454,6 +474,8 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * was picking the card up and dropping the caret wherever the drag ended.
 		 */
 		if (element.isContentEditable || editingOwns(event.target)) return;
+		// Selected, and not picked up: see `fieldsOnly`.
+		if (host.fieldsOnly(path)) return;
 		event.preventDefault();
 		gesture = { kind: "move", element, from: { x: event.clientX, y: event.clientY }, origin: rectOf(element) };
 	});

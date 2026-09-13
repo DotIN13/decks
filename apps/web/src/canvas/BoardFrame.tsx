@@ -1,5 +1,6 @@
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import ExternalLink from "lucide-solid/icons/external-link";
+import Maximize from "lucide-solid/icons/maximize-2";
 import X from "lucide-solid/icons/x";
 import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
@@ -695,6 +696,13 @@ export function BoardFrame(props: {
 					The word changes with the format because "present" is what you do with a
 					deck and "fullscreen" is what you do with a page.
 
+					**Only a deck gets the word.** The bar is counter-scaled, so at the zoom where
+					a board is a tile its buttons take the whole of it — and "Fullscreen" is 64px
+					of the 160px a 760px board has down there, which puts an invisible button
+					where the *title* is. A double-click meant to fly to the board then presses
+					it. A deck's bar is 960px wide and the word is the design's own, so this is
+					about the two formats whose bars are narrow rather than about words.
+
 					Not on a live board. A mirror draws itself from what the app posts into it,
 					so a second frame of it says nothing the first one does not, and its bar is
 					narrow enough that a third button is where the title was.
@@ -744,7 +752,7 @@ export function BoardFrame(props: {
 							props.onPresent?.();
 						}}
 					>
-						{props.board.format === "slides" ? "Present" : "Fullscreen"}
+						<Show when={props.board.format === "slides"} fallback={<Icon of={Maximize} size={12} />}>Present</Show>
 					</button>
 				</Show>
 				<Show when={props.onHide}>

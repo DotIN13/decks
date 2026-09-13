@@ -71,7 +71,7 @@ const leave = async () => {
 const buttons = await page.evaluate(() =>
 	[...document.querySelectorAll(".board-node")].map((node) => ({
 		path: node.dataset.path,
-		label: node.querySelector(".chrome .present-open")?.textContent?.trim() ?? null,
+		label: node.querySelector(".chrome .present-open")?.getAttribute("aria-label") ?? null,
 	})),
 );
 const live = formats.filter((board) => board.live);
@@ -143,8 +143,20 @@ say(
 const deckButton = buttons.find((button) => button.path === pick("slides"));
 const flowButton = buttons.find((button) => button.path === pick("flow"));
 const componentButton = buttons.find((button) => button.path === pick("component"));
-say("…a deck's says Present", deckButton?.label === "Present", String(deckButton?.label));
-say("…and a document's and a component board's say Fullscreen", flowButton?.label === "Fullscreen" && componentButton?.label === "Fullscreen", `${flowButton?.label} / ${componentButton?.label}`);
+say("…a deck's is named Present", deckButton?.label?.startsWith("Present") === true, String(deckButton?.label));
+say(
+	"…and a document's and a component board's are named Fullscreen, without the word on the bar",
+	flowButton?.label?.startsWith("Fullscreen") === true && componentButton?.label?.startsWith("Fullscreen") === true,
+	`${flowButton?.label} / ${componentButton?.label}`,
+);
+const words = await page.evaluate(() =>
+	[...document.querySelectorAll(".board-node .chrome .present-open")].map((button) => button.textContent?.trim() ?? ""),
+);
+say(
+	"…so only a deck's bar carries the word, and the narrow ones are a glyph",
+	words.filter((word) => word.length > 0).length === 1,
+	JSON.stringify(words),
+);
 
 /*
  * 3. A deck: the slide's own shape, letterboxed, and the keys page it.
