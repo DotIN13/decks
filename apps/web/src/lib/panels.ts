@@ -82,7 +82,3 @@ function createPanel(name: PanelName): Panel {
 	};
 	return { open, set, toggle: () => set(!open()) };
 }
-
-export function createPanels(): Record<PanelName, Panel> {
-	return { agents: createPanel("agents"), context: createPanel("context") };
-}

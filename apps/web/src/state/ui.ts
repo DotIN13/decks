@@ -53,7 +53,7 @@ const panelOpensWith = (): boolean => {
 	}
 };
 
-export function createUi() {
+function createUi() {
 	/**
 	 * The deck being presented, and the slide it opened on.
 	 *

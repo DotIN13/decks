@@ -34,7 +34,7 @@ export interface Notice {
 	text: string;
 }
 
-export function createDeck() {
+function createDeck() {
 	return createStore<{
 		deck?: DeckState;
 		boards: Board[];
@@ -105,7 +105,7 @@ export function createDeck() {
 	});
 }
 
-/** The app's one deck. Tests build their own with `createDeck()`. */
+/** The app's one deck, built by the factory above. */
 export const [state, setState] = createDeck();
 
 /**

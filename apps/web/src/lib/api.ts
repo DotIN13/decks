@@ -1,4 +1,4 @@
-import type { Board, DeckState } from "@decks/protocol";
+import type { Board } from "@decks/protocol";
 
 /**
  * The server's file surface, over HTTP: what a URL is, for reading.
@@ -8,12 +8,11 @@ import type { Board, DeckState } from "@decks/protocol";
  * problem to show, not a thing to retry silently. The one exception is bytes,
  * which are not state: a file the user drops on a board is POSTed in
  * `upload.ts`, where it can be streamed and its progress reported.
+ *
+ * The deck itself does not come through here: its state arrives over the socket, on
+ * connect and on every change (`app/socket.ts`). There used to be a `fetchDeck()` in this
+ * file for the first paint, from before the greeting carried everything.
  */
-export async function fetchDeck(): Promise<{ deck: DeckState; warnings: string[] }> {
-	const response = await fetch("/api/deck");
-	if (!response.ok) throw new Error(`GET /api/deck: ${response.status}`);
-	return (await response.json()) as { deck: DeckState; warnings: string[] };
-}
 
 /**
  * The URL a board's frame loads.

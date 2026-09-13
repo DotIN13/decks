@@ -125,13 +125,6 @@ function keep(board: Board, url: string): void {
 	setTaken((count) => count + 1);
 }
 
-/** Everything, released. For a check that wants to prove the cache is doing the work. */
-export function forgetPictures(): void {
-	for (const url of pictures.values()) URL.revokeObjectURL(url);
-	pictures.clear();
-	setTaken((count) => count + 1);
-}
-
 /**
  * One worker, for the app's lifetime.
  *

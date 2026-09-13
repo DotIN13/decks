@@ -65,6 +65,6 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): Config {
 }
 
 /** `DECKS_BACKEND` is a string until it is one of the four. */
-export function isKind(value: string | undefined): value is AgentKind {
+function isKind(value: string | undefined): value is AgentKind {
 	return value !== undefined && (AGENT_KINDS as readonly string[]).includes(value);
 }

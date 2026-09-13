@@ -32,9 +32,6 @@ const [claim, setClaim] = createSignal<"history" | "inspector">("inspector");
 /** Whether there is anything for the inspector to describe. */
 const [describable, setDescribable] = createSignal(false);
 
-/** Whether the conversation is wanted — the state the button reports. */
-export const historyWanted = wanted;
-
 /**
  * Who is on the edge.
  *

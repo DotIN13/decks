@@ -57,11 +57,6 @@ const MODES: Array<{ mode: AgentMode; label: string; icon: LucideIcon; note: str
 	},
 ];
 
-/** The mode's own word, for anywhere outside this menu that needs to say it. */
-export function modeLabel(mode: AgentMode | undefined): string {
-	return MODES.find((entry) => entry.mode === mode)?.label ?? MODES[0]!.label;
-}
-
 /**
  * Button two of three, inside the box: the mode chip and its menu.
  *

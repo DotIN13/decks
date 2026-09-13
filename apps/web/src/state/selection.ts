@@ -18,7 +18,7 @@ import type { CanvasMode, Tool } from "../canvas/Editor.ts";
  * `onCleanup` and `createEffect` require a component to hang from. Those stay in `App.tsx`,
  * where they belong.
  */
-export function createSelection() {
+function createSelection() {
 	/** The selected board, by path. */
 	const [selected, setSelected] = createSignal<string | undefined>(undefined);
 

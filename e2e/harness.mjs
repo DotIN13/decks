@@ -33,7 +33,7 @@ export const API = process.env.DECKS_E2E_API ?? "http://127.0.0.1:4329";
  * into a proxy with a free tier and a metered one should be able to say which of them the
  * suite is allowed to burn.
  */
-export const MODEL = process.env.DECKS_E2E_MODEL ?? "";
+const MODEL = process.env.DECKS_E2E_MODEL ?? "";
 
 let failures = 0;
 
@@ -227,19 +227,6 @@ export async function ready(page, { timeout = 30000 } = {}) {
  */
 export async function emptyCanvas(page, { timeout = 15000 } = {}) {
 	await page.waitForFunction(() => document.querySelectorAll(".board-node").length === 0, null, { timeout });
-}
-
-/** Wait for one board to finish mounting, by deck-relative path. */
-export async function boardReady(page, path, { timeout = 30000 } = {}) {
-	await page.waitForSelector(`.board-node[data-path="${path}"] iframe`, { timeout });
-	await page.waitForFunction(
-		(wanted) => {
-			const frame = document.querySelector(`.board-node[data-path="${wanted}"] iframe`);
-			return frame?.contentWindow?.__boardReady === true;
-		},
-		path,
-		{ timeout },
-	);
 }
 
 /**
@@ -455,30 +442,6 @@ export async function openAgents(page) {
 }
 
 /**
- * Open the corner's overflow and click a row.
- *
- * The cheat sheet, the settings and the theme were three buttons in the title bar; they are
- * three menu rows now, at every width. A check that wants one asks for it by its words
- * rather than by its position, because the order is a design decision that may move and the
- * words are the thing a person reads.
- */
-export async function openOverflow(page, label) {
-	await page.locator('.pill button[aria-label="More"]').click();
-	await page.waitForSelector(".popover", { timeout: 4000 });
-	await page.locator(".popover [data-row]").filter({ hasText: label }).first().click();
-}
-
-/** Whether the overflow offers a row, without picking it. */
-export async function hasOverflowRow(page, label) {
-	await page.locator('.pill button[aria-label="More"]').click();
-	await page.waitForSelector(".popover", { timeout: 4000 });
-	const found = (await page.locator(".popover [data-row]").filter({ hasText: label }).count()) > 0;
-	await page.keyboard.press("Escape");
-	await page.waitForTimeout(120);
-	return found;
-}
-
-/**
  * How close the camera is, as a number.
  *
  * The zoom used to be a `.level` span in a bar in the bottom-right corner; it is a menu
@@ -492,11 +455,6 @@ export async function zoom(page) {
 
 /** The same reading, from inside the page, for a `waitForFunction`. */
 export const ZOOM_IN_PAGE = `Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, ""))`;
-
-/** Arm one of the five tools. Titles are the palette's own, wherever the palette lives. */
-export async function pickTool(page, title) {
-	await page.locator(`.palette button[title*="${title}"]`).first().click();
-}
 
 /**
  * Summon the conversation, and wait until it is actually up.

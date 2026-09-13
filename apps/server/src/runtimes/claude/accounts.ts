@@ -145,7 +145,7 @@ export interface ClaudeHome {
 }
 
 /** What the CLI's own login is on this machine, read from the environment once. */
-export function claudeHome(): ClaudeHome {
+function claudeHome(): ClaudeHome {
 	const configured = process.env.CLAUDE_CONFIG_DIR;
 	return {
 		configDir: configured ?? join(homedir(), ".claude"),

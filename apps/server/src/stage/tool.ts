@@ -171,7 +171,7 @@ export interface StageTool {
 	snapshot(): StageSnapshot;
 }
 
-export const STAGE_TOOL_NAME = "stage_eval";
+const STAGE_TOOL_NAME = "stage_eval";
 
 /**
  * The tool's description, read from `runtime/tool-description.txt`.

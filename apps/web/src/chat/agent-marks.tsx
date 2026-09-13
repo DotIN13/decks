@@ -248,15 +248,3 @@ export function AgentFace(props: { chat: AgentChat; identity: Identity | undefin
 		</span>
 	);
 }
-
-/** "thinking", not "streaming": what the state means to someone watching. */
-export function agentState(state: AgentChat["state"]): string {
-	switch (state) {
-		case "tool":
-			return "working…";
-		case "waiting":
-			return "waiting for you";
-		default:
-			return "thinking…";
-	}
-}

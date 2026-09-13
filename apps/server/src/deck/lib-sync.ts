@@ -39,7 +39,7 @@ export interface LibSync {
 	same: number;
 }
 
-export const NOTHING_TO_DO: LibSync = { written: [], removed: [], same: 0 };
+const NOTHING_TO_DO: LibSync = { written: [], removed: [], same: 0 };
 
 /**
  * A missing source is a refusal, not an empty sync.

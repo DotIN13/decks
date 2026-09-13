@@ -16,7 +16,7 @@ import type { StageTool } from "../../stage/tool.ts";
  */
 
 /** The server name, which decides what the model calls the tool. */
-export const STAGE_SERVER = "decks";
+const STAGE_SERVER = "decks";
 
 /** What the model sees: `mcp__{server}__{tool}`, not the bare name. */
 export function qualifiedToolName(stage: StageTool): string {

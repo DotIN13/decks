@@ -125,11 +125,6 @@ function link(at: string, target: string, type: "dir" | "file"): void {
 	}
 }
 
-/** Only for tests, which need to prepare two different homes in one run. */
-export function forgetPreparedHome(): void {
-	prepared = undefined;
-}
-
 export function antigravityAvailability(): { available: boolean; reason: string } {
 	if (!agyExecutable()) {
 		return {
@@ -190,11 +185,6 @@ export function agyModels(homeDir = antigravityHomeDir()): Array<{ model: string
 	return [...fallback];
 }
 
-/** Only for tests, which need to ask twice about different CLIs in one run. */
-export function forgetModels(): void {
-	models = undefined;
-}
-
 /**
  * The catalogue as measured against the CLI that is signed in here.
  *
@@ -203,7 +193,7 @@ export function forgetModels(): void {
  * never passes `--effort` — asking for a high-effort variant of a model whose name says
  * low is rejected by the CLI, loudly, before a turn.
  */
-export const ANTIGRAVITY_MODELS = [
+const ANTIGRAVITY_MODELS = [
 	{ model: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash (High)" },
 	{ model: "gemini-3.8-flash-medium", label: "Gemini 3.8 Flash (Medium)" },
 	{ model: "gemini-3.8-flash-low", label: "Gemini 3.8 Flash (Low)" },

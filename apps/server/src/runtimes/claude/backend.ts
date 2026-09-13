@@ -76,7 +76,7 @@ const LOGIN_METHODS = [
  * CLI's own `auth login` through the dock's dialogs, `/logout` runs `auth logout`, and
  * the rest read state the backend already has.
  */
-export const CLAUDE_DECK_COMMANDS: SlashCommand[] = [
+const CLAUDE_DECK_COMMANDS: SlashCommand[] = [
 	{ name: "login", hint: "Sign in with a subscription or an API account", source: "deck" },
 	{ name: "logout", hint: "Sign out of Claude", source: "deck" },
 	{ name: "status", hint: "Model, mode and auth state", source: "deck" },

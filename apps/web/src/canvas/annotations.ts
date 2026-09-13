@@ -36,7 +36,7 @@ export interface Mark {
 	tone: MarkTone;
 }
 
-export const TONES = ["accent", "ok", "warn", "danger"] as const;
+const TONES = ["accent", "ok", "warn", "danger"] as const;
 export type MarkTone = (typeof TONES)[number];
 
 /** Four at most per agent per board: past that they overlap each other and say nothing. */

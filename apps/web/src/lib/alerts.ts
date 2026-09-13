@@ -188,7 +188,7 @@ export function shouldNotify(kind: AlertKind, prefs: AlertPrefs, presence: Prese
 // --- the tab itself ----------------------------------------------------------------
 
 /** The name in the tab strip, with a count when things have piled up behind it. */
-export const BASE_TITLE = "Decks";
+const BASE_TITLE = "Decks";
 
 /**
  * `Decks`, `(1) Decks`, `(9+) Decks`.

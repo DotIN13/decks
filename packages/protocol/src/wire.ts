@@ -293,5 +293,3 @@ export type ServerMessage =
 	| { type: "web.status"; status: WebStatus; code?: string }
 	| { type: "error"; text: string };
 
-/** Where the API lives, so the browser does not hard-code it in three places. */
-export const API_PREFIX = "/api";

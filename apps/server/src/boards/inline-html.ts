@@ -55,7 +55,7 @@ const ATTRIBUTES = new Set(["class", "href", "hreflang", "lang", "dir", "title",
 const IDEMPOTENT = new Set(["a", "b", "code", "em", "i", "mark", "s", "small", "strong", "sub", "sup", "u"]);
 
 /** Whether an element is one a run of words may be made of. */
-export function isInlineTag(tag: string): boolean {
+function isInlineTag(tag: string): boolean {
 	return INLINE.has(tag.toLowerCase());
 }
 

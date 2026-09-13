@@ -204,7 +204,7 @@ export function BoardTile(props: { board: Board; current?: boolean; dim?: boolea
  * it passed nothing: a parameter kept for a case that cannot arise is a parameter the next
  * reader has to rule out.
  */
-export function BoardThumb(props: { board: Board; class?: string }) {
+function BoardThumb(props: { board: Board; class?: string }) {
 	const shot = () => shotOf(props.board);
 	return (
 		<span class={`board-thumb ${props.class ?? ""}`}>

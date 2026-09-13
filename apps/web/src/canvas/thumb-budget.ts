@@ -122,6 +122,3 @@ export function claimThumb(): { live: () => boolean; want: (wanted: boolean) => 
 		},
 	};
 }
-
-/** For the check that asserts the queue holds. */
-export const THUMB_LOADING = LOADING;

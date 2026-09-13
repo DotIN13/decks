@@ -29,7 +29,7 @@ function initial(): Scheme {
 const [scheme, setSchemeSignal] = createSignal<Scheme>(initial());
 export { scheme };
 
-export function setScheme(next: Scheme): void {
+function setScheme(next: Scheme): void {
 	setSchemeSignal(next);
 	document.documentElement.dataset.colorScheme = next;
 	try {
@@ -59,7 +59,7 @@ export function paintFrame(frame: HTMLIFrameElement | null | undefined): void {
 	}
 }
 
-export function paintAll(): void {
+function paintAll(): void {
 	for (const frame of document.querySelectorAll("iframe")) paintFrame(frame as HTMLIFrameElement);
 }
 
