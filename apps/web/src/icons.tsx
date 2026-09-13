@@ -46,19 +46,3 @@ const SIZE = 15;
 export function Icon(props: { of: LucideIcon; size?: number; class?: string }) {
 	return <Dynamic component={props.of} size={props.size ?? SIZE} strokeWidth={STROKE} class={props.class} />;
 }
-
-/**
- * The mark: boards of unequal size laid out on a canvas.
- *
- * Deliberately not a grid of equal squares — a deck is an arrangement somebody chose,
- * and the asymmetry is the only thing that says so at 17px.
- */
-export function DecksMark() {
-	return (
-		<svg viewBox="0 0 16 16" width="17" height="17" fill="currentColor" aria-hidden="true">
-			<rect x="1" y="2" width="7.5" height="6.5" rx="1.5" />
-			<rect x="10" y="2" width="5" height="12" rx="1.5" opacity="0.5" />
-			<rect x="1" y="10" width="7.5" height="4" rx="1.5" opacity="0.72" />
-		</svg>
-	);
-}

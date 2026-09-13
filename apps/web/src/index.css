@@ -357,8 +357,8 @@ svg.lucide {
  * the runtime mark, with the name and the tick outside it and nothing to press but the icon.
  */
 .inspector header .close,
-.chats .rail-head button:not(.menu *),
-.chat-row-wrap .close {
+.chats .rail-head button:not(.menu *) {
+
 	display: grid;
 	width: var(--control-sm);
 	height: var(--control-sm);
@@ -376,8 +376,8 @@ svg.lucide {
 .inspector .row.file button:hover,
 .inspector .acts button:hover,
 .inspector header .close:hover,
-.chats .rail-head button:not(.menu *):hover,
-.chat-row-wrap .close:hover {
+.chats .rail-head button:not(.menu *):hover {
+
 	background: var(--line);
 	color: var(--fg);
 }
@@ -398,41 +398,6 @@ svg.lucide {
 	position: relative;
 	height: 100%;
 }
-
-
-/*
- * The runtime's mark, leading the row.
- *
- * A mark rather than the word. It was a text chip reading PI or CLAUDE — a lot of furniture
- * for a fact that never changes, and at 9px uppercase it read as a label stuck on the name
- * rather than as part of it. `flex: none` because a long name should take the room, not the
- * mark.
- */
-.chat-row .runtime {
-	display: flex;
-	flex: none;
-	/*
-	 * Centred on the line, not sat on the baseline.
-	 *
-	 * The row is `align-items: baseline`, which is right for the name and the time — two
-	 * runs of text at different sizes. An SVG has no baseline, so a browser aligns its
-	 * bottom edge to the text's instead, which left the mark's ink 2.5px above the centre
-	 * of the name beside it.
-	 */
-	align-self: center;
-	align-items: center;
-	color: var(--faint);
-}
-
-/* The name is what shrinks; the time keeps its place at the right. */
-.chat-row .top .name {
-	flex: 1;
-}
-
-
-
-
-
 
 
 /*
@@ -953,76 +918,6 @@ svg.lucide {
 	font-size: 10px;
 }
 
-/*
- * A user message and the way back to it.
- *
- * The actions are hidden until the message is hovered: they are on every turn, and three
- * words under each one would make the history unreadable. `rewind` previews on hover, so
- * on a touchscreen they are simply shown and the preview is what is lost — see the known
- * edges in DESIGN §8.
- */
-.turn-row {
-	display: flex;
-	align-self: flex-end;
-	max-width: 92%;
-	flex-direction: column;
-	align-items: flex-end;
-	gap: 3px;
-}
-
-.turn-row > .fbubble {
-	max-width: 100%;
-}
-
-.turn-actions {
-	display: flex;
-	gap: 2px;
-	opacity: 0;
-	transition: opacity 120ms ease;
-}
-
-.turn-row:hover .turn-actions,
-.turn-row:focus-within .turn-actions {
-	opacity: 1;
-}
-
-/*
- * Icons, gridded into a square, at the size the small controls elsewhere use.
- *
- * They were three phrases of 10px grey text — "rewind", "fork", "restore boards" — under
- * every message ever sent, which is a second transcript running down the history saying the
- * same three things over and over. What each one means is in its tooltip now: read once
- * rather than continuously.
- */
-.turn-actions button {
-	display: grid;
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	border: 0;
-	border-radius: var(--control-radius);
-	background: none;
-	color: var(--faint);
-	cursor: pointer;
-	place-items: center;
-	transition:
-		background 120ms ease,
-		color 120ms ease;
-}
-
-.turn-actions button:hover {
-	background: var(--line);
-	color: var(--fg);
-}
-
-/* Hovering this one shows the past on the canvas, so it says so in the same colour the
-   boards are outlined in. Addressed by what it does rather than by being first: three
-   identical squares are not tellable apart by position. */
-.turn-actions button[data-act="rewind"]:hover {
-	background: color-mix(in srgb, var(--color-warn) 22%, transparent);
-	color: var(--fg);
-}
-
 .thinking {
 	align-self: flex-end;
 	max-width: 92%;
@@ -1295,64 +1190,6 @@ svg.lucide {
 	cursor: pointer;
 }
 
-/*
- * One radius, everywhere.
- *
- * Each bubble used to square off one corner — bottom-right for yours, bottom-left for the
- * agent's — the speech-bubble tail every chat app draws, which is how you tell the two
- * sides apart at a glance. With both sides on the same edge the tail has nothing left to
- * say, and two radii doing nothing is two radii to keep in step.
- *
- * Colour is what distinguishes them now, and it always was the part you actually read.
- */
-.fbubble {
-	display: block;
-	max-width: 92%;
-	padding: 9px 14px;
-	border: 0;
-	border-radius: var(--row-radius);
-	font-size: 13px;
-	line-height: 1.45;
-	white-space: pre-wrap;
-	word-break: break-word;
-	box-shadow: var(--shadow-row);
-}
-
-/*
- * Opaque, both of them, and the shadow is what lifts them off the boards.
- *
- * These were 84% and 88% over a 14px blur, which is the one place the frosting hurt most:
- * a bubble is small, it sits directly on top of a board's own paragraphs, and a reply you
- * are reading through a heading is a reply you read twice. Colour still tells the two
- * apart, which is the part that was doing the work.
- */
-.fbubble[data-who="user"] {
-	background: var(--color-accent);
-	color: #fff;
-}
-
-.fbubble[data-who="agent"] {
-	border: 1px solid var(--line);
-	background: var(--panel);
-	color: var(--fg);
-}
-
-.fbubble code,
-.fbubble pre {
-	font-family: var(--font-mono);
-}
-
-/* Nested inside a bubble, so a step tighter than the row it sits in. */
-.fbubble pre {
-	overflow-x: auto;
-	margin: 0;
-	padding: 8px 10px;
-	border-radius: calc(var(--row-radius) - 6px);
-	background: var(--bg-deep);
-	font-size: 12px;
-	white-space: pre;
-}
-
 /* --- markdown inside a reply -------------------------------------------------
  *
  * The blocks `chat/Markdown.tsx` builds. Everything here is spacing and weight: the
@@ -1584,106 +1421,6 @@ svg.lucide {
 
 .md s {
 	opacity: 0.65;
-}
-
-.fbubble[data-who="user"] pre {
-	background: rgb(0 0 0 / 22%);
-}
-
-/*
- * A turn's tool calls: one pill, and the calls themselves when asked for.
- *
- * The count is the point — a turn that edits files is mostly tool calls, and printing
- * each one in full is a transcript nobody reads. But this is the only transcript there
- * is now, so "3 tool calls" has to be something you can open; opening it stacks the same
- * `.tool` chips the chat column used, output and all.
- */
-.ftools-group {
-	display: flex;
-	align-self: flex-end;
-	max-width: 92%;
-	flex-direction: column;
-	align-items: flex-end;
-	gap: 6px;
-}
-
-.ftools-group .fcalls {
-	display: flex;
-	align-self: stretch;
-	flex-direction: column;
-	gap: 5px;
-}
-
-.ftools {
-	display: inline-flex;
-	gap: 7px;
-	align-items: center;
-	max-width: 100%;
-	padding: 6px 12px;
-	border: 1px solid var(--line);
-	border-radius: var(--row-radius);
-	background: var(--panel);
-	box-shadow: var(--shadow-row);
-	color: var(--muted);
-	font-size: 12px;
-}
-
-.ftools .fdot {
-	width: 7px;
-	height: 7px;
-	flex: none;
-	border-radius: 999px;
-	background: var(--faint);
-}
-
-.ftools[data-state="running"] .fdot {
-	background: var(--color-warn);
-	animation: pulse 1.2s ease-in-out infinite;
-}
-
-.ftools[data-state="error"] .fdot {
-	background: var(--color-danger);
-}
-
-.ftools .fcount,
-.ftools .fmore {
-	color: var(--faint);
-}
-
-.ftools .fname {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.ftools[data-open="true"] {
-	border-color: var(--line-strong);
-	color: var(--fg);
-}
-
-/* The chips inside are on the boards too, so they are lifted the same way the row is. */
-.ftools-group .fcalls .tool {
-	background: var(--panel);
-	box-shadow: var(--shadow-row);
-}
-
-.fnotice {
-	align-self: flex-end;
-	max-width: 92%;
-	padding: 7px 14px;
-	border-radius: var(--row-radius);
-	background: var(--panel);
-	color: var(--muted);
-	font-size: 12px;
-	letter-spacing: 0.02em;
-}
-
-.fnotice[data-level="warn"] {
-	color: color-mix(in srgb, var(--color-warn) 70%, var(--fg));
-}
-
-.fnotice[data-level="error"] {
-	color: var(--color-danger);
 }
 
 /*
@@ -2489,69 +2226,6 @@ svg.lucide {
 	background: var(--line);
 }
 
-.chat-rows {
-	display: flex;
-	overflow-y: auto;
-	/* And again for the agent list: it has to be allowed to shrink inside `.chats`
-	   before it will scroll. */
-	min-height: 0;
-	flex: 1;
-	flex-direction: column;
-	padding: 0 6px 6px;
-	gap: 2px;
-}
-
-/*
- * The visual row is the wrapper, not the `<button>` inside it.
- *
- * The × has to be a sibling of that button — a button inside a button is invalid, and a
- * browser resolves it by dropping one — but it still has to look like part of the row. So
- * the wrapper owns the shape and the highlight, and holds the button and the × side by
- * side. Two things follow from that, and both were wrong when the highlight lived on the
- * button: the × sat outside the highlight in the panel's gutter, and the highlight stopped
- * spanning the panel at all, because a `<button>` sizes to its content where a flex child
- * of `.chat-rows` was stretched for it.
- *
- * `:has` rather than moving `data-current` onto the wrapper: the row is what is current, and
- * this is the box that draws it.
- */
-.chat-row-wrap {
-	display: flex;
-	align-items: center;
-	padding-right: 4px;
-	border-radius: 9px;
-	gap: 2px;
-}
-
-.chat-row-wrap:hover {
-	background: var(--line);
-}
-
-.chat-row-wrap:has(.chat-row[data-current="true"]) {
-	background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-}
-
-.chat-row-wrap:has(.chat-row[data-child="true"]) {
-	margin-left: 12px;
-}
-
-/*
- * A chat from a previous run, with nothing running behind it.
- *
- * Dimmed rather than marked with an icon, because "not resumed yet" is an absence and a
- * badge would make it look like a status the agent chose. Opacity is on the wrapper so the
- * avatar, the runtime mark and the name all recede together; hover and selection bring it
- * back to full strength, since by then you are about to open it.
- */
-.chat-row-wrap[data-dormant="true"] {
-	opacity: 0.55;
-}
-
-.chat-row-wrap[data-dormant="true"]:hover,
-.chat-row-wrap[data-dormant="true"]:has(.chat-row[data-current="true"]) {
-	opacity: 1;
-}
-
 /*
  * The line between this run's chats and the ones restored from disk.
  *
@@ -2586,166 +2260,6 @@ svg.lucide {
  * Shown on approach, like the board's own ×, and kept when focused by the keyboard — which
  * is the only way to reach it without a pointer.
  */
-/* Hidden until the row is approached, and never squeezed by the name beside it. */
-.chat-row-wrap .close {
-	opacity: 0;
-	flex: none;
-	transition: opacity 120ms ease;
-}
-
-.chat-row-wrap:hover .close,
-.chat-row-wrap .close:focus-visible {
-	opacity: 1;
-}
-
-.chat-row-wrap .close:hover {
-	background: color-mix(in srgb, var(--fg) 12%, transparent);
-	color: var(--fg);
-}
-
-.chat-row {
-	display: flex;
-	/* Fills the wrapper, which is the flex child `.chat-rows` stretches. A button's own
-	   width is fit-content, which is what left the highlight short of the panel edge. */
-	min-width: 0;
-	flex: 1;
-	gap: 8px;
-	align-items: center;
-	padding: 6px;
-	border: 0;
-	border-radius: 9px;
-	background: none;
-	color: inherit;
-	cursor: pointer;
-	font: inherit;
-	text-align: left;
-}
-
-/*
- * An agent's face, at whichever size the thing drawing it asked for.
- *
- * Not scoped to `.chat-row` any more: the same face is a row in the list and an 18px mark on
- * a pill over the canvas (`chat/AgentPills.tsx`), and two drawings of one agent is two things
- * to keep in step. `--face` is the one number that differs, set by `AgentFace`, and the
- * initial scales off it so a small face is not a large letter in a small circle.
- */
-.avatar {
-	position: relative;
-	display: grid;
-	overflow: hidden;
-	width: var(--face, 26px);
-	height: var(--face, 26px);
-	flex: 0 0 auto;
-	border-radius: 999px;
-	color: #fff;
-	font-size: calc(var(--face, 26px) * 0.42);
-	place-items: center;
-}
-
-.avatar img {
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-}
-
-/* Working shows as a ring on the face, not a second row of furniture. */
-.avatar[data-state]:not([data-state="idle"])::after {
-	position: absolute;
-	border: 2px solid var(--dot);
-	border-radius: 999px;
-	content: "";
-	inset: -3px;
-	animation: pulse 1.2s ease-in-out infinite;
-}
-
-.chat-row .who {
-	display: flex;
-	overflow: hidden;
-	flex: 1;
-	flex-direction: column;
-	gap: 1px;
-}
-
-.chat-row .top,
-.chat-row .bottom {
-	display: flex;
-	gap: 6px;
-	align-items: baseline;
-	justify-content: space-between;
-}
-
-.chat-row .name {
-	overflow: hidden;
-	font-size: 12px;
-	font-weight: 600;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-
-
-.chat-row .last {
-	overflow: hidden;
-	color: var(--muted);
-	font-size: 11px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-/* The tag sits inside a line of running text, and the arrow in it is a block-level SVG,
-   so the tag itself becomes the small flex box that puts the two on a shared centre. */
-.chat-row .tag {
-	display: inline-flex;
-	align-items: center;
-	gap: 2px;
-	color: var(--faint);
-	vertical-align: -1px;
-}
-
-/*
- * The unread count, on the corner of the avatar.
- *
- * It used to sit at the right of the row's second line, which is where the × now is — and
- * two things competing for that corner is how a click lands on the wrong one. On the avatar
- * it is also next to the thing it is about, and a dot rather than a number because a 16px
- * numbered badge obscured the face it was reporting on.
- *
- * The ring is the panel's colour rather than the row's, which is close enough: a row's
- * highlight is a translucent tint over the same panel, so the ring reads as a gap either
- * way and needs no rule per state.
- */
-.face {
-	position: relative;
-	display: grid;
-	flex: 0 0 auto;
-}
-
-.unread {
-	position: absolute;
-	/*
-	 * On the arc, not at the corner of the box.
-	 *
-	 * The avatar is a circle in a square box, so its top-right *corner* is empty space and a
-	 * badge placed there floats free of it. At 0/0 an 8px dot's centre lands within a
-	 * pixel of the 45° point on a 26px circle's edge — half on the face, half off it.
-	 */
-	top: 0;
-	right: 0;
-	width: 8px;
-	height: 8px;
-	border-radius: 999px;
-	/*
-	 * The text colour, inverted — not the accent.
-	 *
-	 * Agent colours cycle from blue, and the accent is blue, so an accent badge on the first
-	 * agent's avatar was blue on blue: the ring separated the shapes but the count still
-	 * read as part of the circle. Inverting the foreground is legible against any of the six
-	 * avatar colours rather than against five of them, and a count is the one thing in this
-	 * list that should catch the eye.
-	 */
-	background: var(--fg);
-	box-shadow: 0 0 0 2px var(--panel);
-}
 
 /*
  * A previewed past is marked and untouchable: it is a look, not a state.
@@ -2892,8 +2406,8 @@ svg.lucide {
 
 	/* Hidden until hovered is hidden forever here. Both of these are the only route to
 	   what they do: taking a board off the canvas, and the time machine. */
-	.board-node > .chrome .hide,
-	.turn-row .turn-actions {
+	.board-node > .chrome .hide {
+
 		opacity: 1;
 	}
 
@@ -2937,19 +2451,6 @@ svg.lucide {
 	.chats .rail-head button {
 		width: 38px;
 		height: 38px;
-	}
-
-	/* No hover to reveal it, so it is simply there. */
-	.chat-row-wrap .close {
-		width: 34px;
-		height: 34px;
-		opacity: 1;
-	}
-
-	.turn-actions button {
-		min-height: 32px;
-		padding: 3px 10px;
-		font-size: 11px;
 	}
 
 	/* The board's own chrome is counter-scaled, so these are screen pixels at any zoom.

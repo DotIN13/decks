@@ -1,4 +1,4 @@
-import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
+import type { AgentKind } from "@decks/protocol";
 import { For, Match, Show, Switch } from "solid-js";
 
 /**
@@ -209,42 +209,5 @@ function Still(props: { agent: AgentKind }) {
 				<path d={ANTIGRAVITY_GROUND} />
 			</Match>
 		</Switch>
-	);
-}
-
-/**
- * An agent's face: its avatar or its initial, with its state as a ring.
- *
- * Here rather than in `ChatList`, where it was: it was drawn in two places for a while, and
- * `size` is the only thing that differed between them — the ring and the initial scale off
- * it. Kept general now that only the list uses it, because a face at one size is a face at
- * any size, and the alternative is finding this out again.
- */
-export function AgentFace(props: { chat: AgentChat; identity: Identity | undefined; unread?: number; size?: number }) {
-	const size = () => props.size ?? 26;
-	const colour = () => props.identity?.color ?? "var(--color-accent)";
-	const avatar = () => props.identity?.avatar;
-	return (
-		/*
-		 * A wrapper, because the count sits on the corner of the avatar and the avatar itself
-		 * clips to its circle — that `overflow: hidden` is what rounds an image avatar, so a
-		 * badge inside it would be cut in half.
-		 */
-		<span class="face" style={{ "--face": `${size()}px` }}>
-			<span class="avatar" data-state={props.chat.state} style={{ background: avatar() ? "transparent" : colour(), "--dot": colour() }}>
-				<Show when={avatar()} fallback={(props.identity?.name ?? props.chat.name).slice(0, 1).toUpperCase()}>
-					{(src) => <img src={src()} alt="" />}
-				</Show>
-			</span>
-			{/*
-			 * A dot, not a count. A 16px numbered badge on a 26px avatar covers the face it is
-			 * reporting on — and the number was never the point: what a person does with it is
-			 * "that one has something", which a dot says at a fifth of the area. The count
-			 * stays in the title for anyone who wants it.
-			 */}
-			<Show when={(props.unread ?? 0) > 0}>
-				<span class="unread" title={props.unread === 1 ? "1 unread message" : `${props.unread} unread messages`} />
-			</Show>
-		</span>
 	);
 }
