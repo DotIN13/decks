@@ -691,7 +691,7 @@ export function BoardFrame(props: {
 			*/}
 			<div
 				class="chrome"
-				style={{ "--zoom": zoom(), width: `calc(${props.board.w}px * var(--zoom))` }}
+				style={{ "--zoom": zoom(), width: `${props.board.w}px` }}
 				onPointerDown={startDrag}
 				onDblClick={() => props.onOpen()}
 			>

@@ -109,6 +109,27 @@ say(
 	JSON.stringify(focused.nodes),
 );
 /*
+ * The bar is laid out at the size it is drawn, and the world keeps its layer.
+ *
+ * Those two are one decision, not two: the bar's screen size comes from `--unit` (a length in
+ * board units that the camera's scale cancels) rather than from a `scale(1 / zoom)` transform,
+ * because a transform inside the world's composited layer is resampled — rastered at the
+ * camera's scale, scaled down by the bar, scaled back up by the camera — and the text came out
+ * visibly soft at 4×. The assertion is the pair, so that "fixing" the blur by taking the layer
+ * off the world fails here rather than passing quietly.
+ */
+const raster = await page.evaluate(() => {
+	const bar = document.querySelector(".board-node .chrome");
+	const world = document.querySelector(".world");
+	return { barTransform: getComputedStyle(bar).transform, worldWillChange: getComputedStyle(world).willChange };
+});
+say(
+	"the bar is drawn at the size it is laid out, not scaled, so zooming cannot soften it",
+	raster.barTransform === "none" && raster.worldWillChange === "transform",
+	JSON.stringify(raster),
+);
+
+/*
  * One corner, and the page draws it.
  *
  * A board on the canvas is a rounded box (`.board-node > .surface`, 12px) and that radius is

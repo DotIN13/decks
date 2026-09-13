@@ -556,7 +556,27 @@ svg.lucide {
  */
 .board-node > .chrome {
 	position: absolute;
-	top: calc(-24px - 2px / var(--zoom, 1));
+	/*
+	 * One screen pixel, in the coordinates this box is laid out in.
+	 *
+	 * The bar stays 24 screen pixels tall however far out the camera is, and the camera scales
+	 * everything by the zoom — so every length that has to stay a constant *screen* size is
+	 * written as `N * --unit`. One custom property, written once per frame by `BoardFrame`
+	 * beside the zoom it is derived from.
+	 *
+	 * **And this is what stops the blur.** It used to be a `transform: scale(1 / zoom)` on top of
+	 * a layout already in board units, so the world's layer — rastered at the camera's scale,
+	 * because `will-change: transform` up there is what makes a pan a matrix instead of a repaint
+	 * of sixteen documents — had its pixels resampled down by 1/zoom and then scaled back up by
+	 * the camera: two resamples of the same pixels, which is why the title was visibly soft at 4×
+	 * beside a crisp panel. `will-change` on the bar and `translateZ(0)` in its transform changed
+	 * not one pixel, and that is what pointed at the resample rather than at the layer.
+	 *
+	 * Laid out at the size it is drawn, there is nothing to resample. The cost is that a *zoom*
+	 * lays the bar out again — a pan does not, because `--zoom` does not change.
+	 */
+	--unit: calc(1px / var(--zoom, 1));
+	top: calc(-26 * var(--unit));
 	left: 0;
 	display: flex;
 	/*
@@ -569,17 +589,15 @@ svg.lucide {
 	 * centre back for itself.
 	 */
 	align-items: baseline;
-	transform: scale(calc(1 / var(--zoom, 1)));
-	transform-origin: 0 100%;
 	/* Clipped to the board's own on-screen width. The bar is counter-scaled, so its
 	   text is a constant size while the board shrinks — at 7% zoom, which is what
 	   fitting three boards into a phone comes to, the path label was three times the
 	   width of the board and written across the board next to it. */
 	overflow: hidden;
-	gap: 8px;
-	align-items: center;
+	gap: calc(8 * var(--unit));
 	width: 100%;
-	height: 24px;
+	height: calc(24 * var(--unit));
+	font-size: calc(13 * var(--unit));
 	color: var(--muted);
 	cursor: grab;
 	user-select: none;
@@ -608,7 +626,7 @@ svg.lucide {
 	display: flex;
 	flex: none;
 	margin-left: auto;
-	gap: 2px;
+	gap: calc(2 * var(--unit));
 	align-items: center;
 	/* Centred against a baseline-aligned row — see the note on the bar. */
 	align-self: center;
@@ -631,11 +649,11 @@ svg.lucide {
 .board-node > .chrome .open-tab,
 .board-node > .chrome .focus-open {
 	display: grid;
-	width: 18px;
-	height: 18px;
+	width: calc(18 * var(--unit));
+	height: calc(18 * var(--unit));
 	padding: 0;
 	border: 0;
-	border-radius: 5px;
+	border-radius: calc(5 * var(--unit));
 	background: none;
 	color: var(--faint);
 	cursor: pointer;
@@ -671,14 +689,14 @@ svg.lucide {
  */
 .board-node > .chrome .present-open {
 	width: auto;
-	padding: 0 7px;
-	font-size: 10.5px;
+	padding: 0 calc(7 * var(--unit));
+	font-size: calc(10.5 * var(--unit));
 	letter-spacing: 0.02em;
 }
 
 /* The same box as the three beside it: one 18px square, whichever glyph is in it. */
 .board-node > .chrome .present-open[data-glyph="true"] {
-	width: 18px;
+	width: calc(18 * var(--unit));
 	padding: 0;
 }
 
@@ -695,7 +713,7 @@ svg.lucide {
 	flex-shrink: 3;
 	color: var(--faint);
 	font-family: var(--font-mono);
-	font-size: 11px;
+	font-size: calc(11 * var(--unit));
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
