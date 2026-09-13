@@ -177,6 +177,41 @@ await settle(page, 250);
 const paged = await overlay();
 say("…and ArrowRight pages it", /2\s*\/\s*3/.test(paged?.bar ?? ""), JSON.stringify(paged?.bar));
 say("leaving with Escape", (await leave()) === false, "overlay gone");
+
+/*
+ * 2b. And the way out that produces no keystroke at all.
+ *
+ * Escape is the *browser's* key while the Fullscreen API is engaged: Chrome leaves fullscreen
+ * itself and never dispatches the press to the page. So an overlay that only listens for Escape
+ * does not hear the first press — which is exactly the reported "Escape has to be pressed
+ * twice" — and it needs the browser's own exit to mean its own.
+ *
+ * A headless browser refuses `requestFullscreen`, so the API cannot be engaged here for real;
+ * what *can* be reproduced is the one signal the overlay acts on. Both halves are asserted: a
+ * change that is not a leave is not a leave, and one that is, is.
+ */
+await present(pick("slides"));
+await settle(page, 700);
+await page.evaluate(() => {
+	Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => document.querySelector(".present") });
+	document.dispatchEvent(new Event("fullscreenchange"));
+});
+await settle(page, 400);
+say("a fullscreen change that is not a leave leaves the overlay up", (await overlay()) !== null, "still presenting");
+
+await page.evaluate(() => {
+	Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => null });
+	document.dispatchEvent(new Event("fullscreenchange"));
+});
+await settle(page, 400);
+say(
+	"…and the browser leaving fullscreen takes the overlay with it, with no second Escape",
+	(await overlay()) === null,
+	"gone on the browser's own exit",
+);
+await page.evaluate(() => {
+	delete document.fullscreenElement;
+});
 const afterDeck = await overlay();
 say("…and the canvas keeps its own frames behind it", afterDeck === null, "canvas back");
 

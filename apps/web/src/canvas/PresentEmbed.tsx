@@ -1,5 +1,6 @@
 import { createResource, createSignal, Match, onCleanup, onMount, Switch } from "solid-js";
 import { Markdown } from "../chat/Markdown.tsx";
+import { enterFullscreen, exitFullscreen, onFullscreenLeft } from "./fullscreen.ts";
 import { embedFamily, embedUrl, pdfUrl } from "../lib/api.ts";
 
 /**
@@ -72,8 +73,18 @@ export function PresentEmbed(props: {
 		},
 	);
 
+	/**
+	 * Once, whichever comes first.
+	 *
+	 * There are three ways out and two of them can arrive together: the person presses Escape
+	 * and we call `exitFullscreen`, whose `fullscreenchange` then arrives *after* this has
+	 * already run. A flag rather than trusting the order.
+	 */
+	let left = false;
 	const leave = () => {
-		if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+		if (left) return;
+		left = true;
+		exitFullscreen(document);
 		props.onExit();
 	};
 
@@ -111,11 +122,15 @@ export function PresentEmbed(props: {
 
 	onMount(() => {
 		layerEl?.focus();
-		// Best effort and deliberately unawaited: a refusal is not a failure, because the
-		// overlay already is the fullscreen (`Present.tsx` makes the same call).
-		void layerEl?.requestFullscreen?.().catch(() => {});
+		enterFullscreen(layerEl);
 		window.addEventListener("keydown", act, true);
 		window.addEventListener("pointermove", wake);
+		/*
+		 * And the way out that produces no keystroke at all: the browser leaving fullscreen by
+		 * itself. Chrome takes Escape for that and never dispatches it here, which is why the
+		 * overlay used to need a second press (`canvas/fullscreen.ts`).
+		 */
+		onCleanup(onFullscreenLeft(document, leave));
 		onCleanup(() => {
 			window.removeEventListener("keydown", act, true);
 			window.removeEventListener("pointermove", wake);

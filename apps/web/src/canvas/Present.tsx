@@ -1,6 +1,7 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import type { Board } from "@decks/protocol";
 import { type DeckHandle, slideKey } from "./slide-keys.ts";
+import { enterFullscreen, exitFullscreen, onFullscreenLeft } from "./fullscreen.ts";
 
 /**
  * A board, fullscreen.
@@ -112,9 +113,13 @@ export function Present(props: {
 		setAt(handle.current());
 	};
 
+	/** Once, whichever way out arrives first — see `canvas/fullscreen.ts` and each caller. */
+	let left = false;
 	const leave = () => {
+		if (left) return;
+		left = true;
 		props.onLeave?.(deck()?.current() ?? at());
-		if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+		exitFullscreen(document);
 		props.onExit();
 	};
 
@@ -135,9 +140,7 @@ export function Present(props: {
 	onMount(() => {
 		if (slides()) layerEl?.focus();
 		else frameEl?.focus();
-		// Best effort, and deliberately unawaited: a refusal is not a failure, because the
-		// overlay already *is* the presentation.
-		void layerEl?.requestFullscreen?.().catch(() => {});
+		enterFullscreen(layerEl);
 	});
 
 	/*
@@ -183,6 +186,9 @@ export function Present(props: {
 	onMount(() => {
 		window.addEventListener("keydown", act, true);
 		window.addEventListener("pointermove", wake);
+		// The way out with no keystroke in it: the browser leaving fullscreen on its own, which
+		// is what Escape does there — Chrome consumes it and the page never sees it.
+		onCleanup(onFullscreenLeft(document, leave));
 		onCleanup(() => {
 			window.removeEventListener("keydown", act, true);
 			window.removeEventListener("pointermove", wake);
@@ -204,9 +210,7 @@ export function Present(props: {
 				 * case where Solid's `ref` runs before the element is in the document.
 				 */
 				element.focus();
-				// Best effort, and deliberately unawaited: a refusal is not a failure here,
-				// because the overlay is already the presentation.
-				void layerEl?.requestFullscreen?.().catch(() => {});
+				enterFullscreen(layerEl);
 			}}
 			role="dialog"
 			aria-label={`${props.board.title} — ${slides() ? "presenting" : "fullscreen"}`}
