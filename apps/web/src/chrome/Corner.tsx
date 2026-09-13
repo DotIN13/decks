@@ -12,7 +12,7 @@ import ZoomIn from "lucide-solid/icons/zoom-in";
 import ZoomOut from "lucide-solid/icons/zoom-out";
 import { For, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
-import { historyButton, toggleHistory } from "../lib/edge.ts";
+import { historyButton, toggleHistory } from "../state/edge.ts";
 import { Popover } from "../ui/Popover.tsx";
 import { AgentStack } from "./AgentStack.tsx";
 import { agentOrder } from "./agent-order.ts";
@@ -327,7 +327,7 @@ export function Corner(props: {
 			 * `off`, `on`, and `yield` — wanted, but the inspector has the right edge for the
 			 * moment. Three rather than two because **yielded must not look like off**: a
 			 * button that goes dark when something borrows its surface is a button that has
-			 * silently forgotten what you asked it for. `lib/edge.ts` owns the bit; the only
+			 * silently forgotten what you asked it for. `state/edge.ts` owns the bit; the only
 			 * thing here is the translation into the attribute `.iconbtn` draws from.
 			 */}
 			<button

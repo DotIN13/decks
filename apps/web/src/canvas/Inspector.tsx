@@ -7,7 +7,7 @@ import Trash2 from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
-import { inspectorShown } from "../lib/edge.ts";
+import { inspectorShown } from "../state/edge.ts";
 import { NARROW } from "../lib/media.ts";
 import "../styles/inspector.css";
 import { elementOf, frameOf, isPdf, type Edit, type Shape } from "./inspect.ts";
@@ -44,7 +44,7 @@ const LABEL = "w-[34px] flex-none text-[11px] text-faint";
  * question does not arise. What is left of that story is worth keeping: subtracting a sheet
  * once fitted a 1600px board into the strip of canvas above it, at 3.7%.
  *
- * At module scope, like `lib/edge.ts`'s signals and for the same reason — one query, read by
+ * At module scope, like `state/edge.ts`'s signals and for the same reason — one query, read by
  * every mount, and a `createSignal` outside a reactive root is fine where a `createMemo`
  * would have no owner to clean it up.
  */
@@ -123,7 +123,7 @@ const STEP = 1;
  *
  * It appears for the selection and only above `INTERACT_ZOOM`, the same rule the palette
  * follows: below that a board is a tile on a map, its frame takes no pointer events, and
- * there is nothing to select. Whether it is actually *on* the edge is `lib/edge.ts`'s to
+ * there is nothing to select. Whether it is actually *on* the edge is `state/edge.ts`'s to
  * say and not this file's — the conversation wants the same 320px and only one of the two
  * may have it, so this renders on `inspectorShown()` and never asks who else is there.
  *
@@ -377,7 +377,7 @@ export function Inspector(props: {
 					 *
 					 * Nothing else in that corner insets either: the cluster above it declares
 					 * `top`, and its popovers declare nothing. The right edge is still *yielded*
-					 * to this panel — the conversation stands down for it, in `lib/edge.ts` —
+					 * to this panel — the conversation stands down for it, in `state/edge.ts` —
 					 * which is the arrangement that actually needed enforcing, and it is a
 					 * different mechanism from the one that moves the canvas.
 					 */

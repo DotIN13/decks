@@ -460,7 +460,7 @@ export const ZOOM_IN_PAGE = `Number((document.querySelector('.pill [aria-label^=
  * Summon the conversation, and wait until it is actually up.
  *
  * `data-shown` rather than a class, because the column is mounted whether or not it has the
- * right edge — `lib/edge.ts` decides who does, and "mounted" and "shown" are different
+ * right edge — `state/edge.ts` decides who does, and "mounted" and "shown" are different
  * questions now that the inspector can borrow the edge from it.
  *
  * `time-machine` and `chrome` call this now. They used to click a block on the *spine* to

@@ -2,7 +2,7 @@ import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
-import { closeHistory, historyShown } from "../lib/edge.ts";
+import { closeHistory, historyShown } from "../state/edge.ts";
 import { floatRows } from "./float-rows.ts";
 import { earlierLabel, hasEarlier, hiddenCount, LOAD_MORE_AT, WINDOW, windowOf } from "./history-page.ts";
 import { WorkingSign } from "./StatusLine.tsx";
@@ -36,7 +36,7 @@ import { Turn, type AgentPart, type TurnCard } from "./Turn.tsx";
  * one press takes it away, and it steps aside when the inspector needs the room — so
  * covering a board is a trade you made, not one made for you.
  *
- * Whether it is up at all belongs to `lib/edge.ts`, which owns the one bit of state deciding
+ * Whether it is up at all belongs to `state/edge.ts`, which owns the one bit of state deciding
  * who has the right edge. There is no `open` prop for the same reason there is no local
  * signal: two copies of "is the history showing" is the bug where the button says one thing
  * and the screen another.

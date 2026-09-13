@@ -1,6 +1,6 @@
 import type { AgentKind, AgentState } from "@decks/protocol";
 import { Show } from "solid-js";
-import { historyShown, toggleHistory } from "../lib/edge.ts";
+import { historyShown, toggleHistory } from "../state/edge.ts";
 import { AgentMark } from "./agent-marks.tsx";
 import { isWorking, signPlacement, workingWords } from "./working-sign.ts";
 
@@ -50,7 +50,7 @@ export function WorkingSign(props: { state: AgentState; name: string; agent: Age
  * so nothing slides underneath the reader here.
  *
  * **It is a button, because the one thing to do about "it is working" is go and watch.** It
- * hands off to `lib/edge.ts` rather than owning any state of its own — the same press, from
+ * hands off to `state/edge.ts` rather than owning any state of its own — the same press, from
  * the same one bit, as the button in the corner cluster.
  */
 export function StatusLine(props: {

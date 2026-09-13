@@ -9,7 +9,7 @@ import {
 	type AlertPrefs,
 	type Presence,
 } from "../lib/alerts.ts";
-import { openHistory } from "../lib/edge.ts";
+import { openHistory } from "../state/edge.ts";
 import { post as postBanner } from "../lib/notify.ts";
 import { play as playCue, preload as preloadCues } from "../lib/sound.ts";
 import { state } from "../state/deck.ts";

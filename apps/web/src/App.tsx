@@ -44,7 +44,7 @@ import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
 import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
-import {closeHistory, historyShown, openHistory, setInspectable} from "./lib/edge.ts";
+import {closeHistory, historyShown, openHistory, setInspectable} from "./state/edge.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { canHover, NARROW } from "./lib/media.ts";
 import { installViewport, obscured } from "./app/viewport.ts";
@@ -364,7 +364,7 @@ export function App() {
 	 * Opening the conversation is the act of having read it.
 	 *
 	 * An effect rather than a step inside every opener, which is what it used to be — there
-	 * were three routes in and each had to remember to clear the badge. Now `lib/edge.ts`
+	 * were three routes in and each had to remember to clear the badge. Now `state/edge.ts`
 	 * owns whether the column is up, and this watches that one fact: however it came to be
 	 * open, the agent on screen stops being unread.
 	 *
@@ -394,7 +394,7 @@ export function App() {
 	 * 264px of sheet and 320px of conversation on a 393px screen is two surfaces and no
 	 * canvas. The swipes used to be the only place this was enforced, because they were the
 	 * only openers `App` could see — the history button lives in `Corner` and calls
-	 * `lib/edge.ts` directly. So the rule went where the *state* is instead of where the
+	 * `state/edge.ts` directly. So the rule went where the *state* is instead of where the
 	 * buttons are: an effect watching whether the conversation is up.
 	 *
 	 * One direction only, deliberately. Closing the panel cannot reopen the conversation, so
@@ -868,7 +868,7 @@ export function App() {
 				 * below it. The rule: a surface that arrives on its own must be subtracted, and
 				 * one you summoned may overlap. Which is also why the inspector *is* an inset.
 				 *
-				 * Whether it is up is `lib/edge.ts`'s business, not this component's, because
+				 * Whether it is up is `state/edge.ts`'s business, not this component's, because
 				 * the same edge is wanted by the inspector and only one of them may have it.
 				 */}
 				<Stream
