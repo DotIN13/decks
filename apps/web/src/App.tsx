@@ -1,4 +1,4 @@
-import type { Board, Camera, Identity, ThinkingLevel } from "@decks/protocol";
+import type { BoardPatch, Board, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import Info from "lucide-solid/icons/info";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Minus from "lucide-solid/icons/minus";
@@ -645,6 +645,7 @@ export function App() {
 						 */
 						onPresent={(path, at) => setPresenting(presentingFor(path, at))}
 						onEditSource={openSource}
+						onEditDocument={(path) => openSource(path, "blocks")}
 						{...(focus() === undefined ? {} : { focus: focus()! })}
 						onFocusToggle={() => toggleFocus()}
 						onFocusBoard={(path) => toggleFocus(path)}
@@ -653,6 +654,7 @@ export function App() {
 									editing: {
 										path: editingSource()!.path,
 										editing: {
+											kind: editingSource()!.kind,
 											source: editingSource()!.source,
 											onCommit: (text: string) => {
 												const open = editingSource();
@@ -662,6 +664,28 @@ export function App() {
 												if (!board || text === open.source) return;
 												send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
 											},
+											/*
+											 * The rich editor's commit: a batch of ops from the mapper, sent with the
+											 * revision the frame is pinned to, exactly as an in-frame edit is. The
+											 * editor closes whatever the outcome — the server's refusal path re-reads
+											 * the board and tells the user (§6.5), which is the same answer the field
+											 * editor gets and should not be a second mechanism.
+											 */
+											onPatches: (patches: BoardPatch[]) => {
+												const open = editingSource();
+												setEditingSource(undefined);
+												if (!open) return;
+												const board = state.boards.find((candidate) => candidate.path === open.path);
+												if (!board) return;
+												send({ type: "board.patch", path: open.path, rev: board.rev, patches });
+											},
+											/*
+											 * Refused: the ops cannot express what was done. The file is handed over in
+											 * the same breath — the design's last step — rather than the edit being
+											 * dropped, because a person who rearranged a page with a mouse should not
+											 * have to work out that a mouse is the wrong tool.
+											 */
+											onSource: () => setEditingSource((open) => (open ? { ...open, kind: "source" } : open)),
 											onCancel: () => setEditingSource(undefined),
 										},
 									},

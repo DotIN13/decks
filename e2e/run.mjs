@@ -66,6 +66,7 @@ const CHECKS = [
 	 * source textarea was an assumption about markdown that a flow board does not share.
 	 */
 	{ file: "editing.mjs", needsAgent: false },
+	{ file: "grapes.mjs", needsAgent: false },
 	/*
 	 * The focus view: the canvas as one page. Its own check rather than a section of
 	 * `modes.mjs`, because it needs the deck as it opens — a page that has been typed into by

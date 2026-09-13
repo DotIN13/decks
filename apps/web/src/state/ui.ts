@@ -71,12 +71,23 @@ function createUi() {
 	 * exists to avoid. `?raw=1` is the same parameter the shell uses to ask for the file
 	 * behind a board.
 	 */
-	const [editingSource, setEditingSource] = createSignal<{ path: string; source: string } | undefined>();
+	const [editingSource, setEditingSource] = createSignal<{ path: string; source: string; kind: "source" | "blocks" } | undefined>();
 
-	const openSource = (path: string) => {
+	/**
+	 * Open a board for editing, as one of the two things an edit can be.
+	 *
+	 * `source` is the file itself in a textarea, which is the only honest editor for a markdown
+	 * file, a deck, or a page from somewhere else — the file *is* the text in the box.
+	 *
+	 * `blocks` is a flow document in the rich editor (`canvas/GrapesEditor.tsx`): a surface over
+	 * the document that writes ops rather than the file, so an untouched byte stays untouched.
+	 * Which one a board gets is decided in `Stage`'s `editSource`, where the rule for the
+	 * in-frame field editor already lives, and ⌥ means the bytes in every case.
+	 */
+	const openSource = (path: string, kind: "source" | "blocks" = "source") => {
 		void fetch(`/api/board/${path}?raw=1`)
 			.then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
-			.then((source) => setEditingSource({ path, source }))
+			.then((source) => setEditingSource({ path, source, kind }))
 			.catch(() => notice("error", `Could not read ${path} to edit it.`));
 	};
 

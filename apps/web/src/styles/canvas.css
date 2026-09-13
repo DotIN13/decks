@@ -332,3 +332,70 @@
 		font-size: 10.5px;
 	}
 }
+
+/*
+ * ── A document edited as a document ───────────────────────────────────────────────────
+ *
+ * The same box as the source editor, for the same reason, with GrapesJS's own canvas inside
+ * it. Its canvas is a frame of its own, so `board.css` and `board.js` run in there and the
+ * board looks like the board while it is being typed on — and nothing GrapesJS draws reaches
+ * the file, because the ops are read off the component model and not out of that frame.
+ */
+@layer components {
+	.grapes-editor {
+		position: absolute;
+		z-index: 2;
+		display: flex;
+		overflow: hidden;
+		flex-direction: column;
+		border-radius: var(--radius, 8px);
+		background: var(--bg, #fff);
+		inset: 0;
+	}
+
+	/* GrapesJS writes its own inline sizing here; the box is the board's, so it is told. */
+	.grapes-canvas {
+		flex: 1 1 auto;
+		min-height: 0;
+	}
+
+	.grapes-canvas .gjs-cv-canvas {
+		width: 100%;
+		height: 100%;
+	}
+
+	/*
+	 * A refusal, over the document rather than beside it.
+	 *
+	 * It is the one case where this editor cannot say what somebody did, and the answer is the
+	 * file — so it is a box with a button, not a toast that goes away.
+	 */
+	.grapes-refusal {
+		position: absolute;
+		inset: auto 0 0 0;
+		display: flex;
+		gap: 10px;
+		align-items: center;
+		justify-content: space-between;
+		padding: 8px 10px;
+		border-top: 1px solid var(--line, #e5e7eb);
+		background: var(--warn-bg, #fffbeb);
+		color: var(--warn-fg, #7c2d12);
+		font-size: 12px;
+	}
+
+	.grapes-refusal p {
+		margin: 0;
+	}
+
+	.grapes-refusal button {
+		flex: 0 0 auto;
+		padding: 3px 8px;
+		border: 1px solid currentColor;
+		border-radius: 4px;
+		background: none;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+	}
+}

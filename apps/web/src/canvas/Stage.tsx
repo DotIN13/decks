@@ -3,7 +3,7 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, 
 import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
-import { BoardFrame } from "./BoardFrame.tsx";
+import { BoardFrame, type BoardEditing } from "./BoardFrame.tsx";
 import type { EditorHost, Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
 import type { FrameGestureHost } from "./frame-gestures.ts";
@@ -90,9 +90,11 @@ export function Stage(props: {
 	/** Take a deck fullscreen: the app owns the overlay, the stage only asks for it. */
 	onPresent?: (path: string, at: number) => void;
 	/** Open a flow or slides board as its own source. */
-	onEditSource?: (path: string) => void;
+	onEditSource?: (path: string, kind: "source" | "blocks") => void;
+	/** The document editor's own way in, from a button in the board's bar. */
+	onEditDocument?: (path: string) => void;
 	/** The board currently being edited as text, and how to finish. */
-	editing?: { path: string; editing: { source: string; onCommit: (text: string) => void; onCancel: () => void } };
+	editing?: { path: string; editing: BoardEditing };
 	onSelect: (path: string | undefined) => void;
 	onMove: (path: string, x: number, y: number) => void;
 	onHide?: (path: string) => void;
@@ -835,29 +837,41 @@ export function Stage(props: {
 		 */
 		slide: (action) => drive(props.selected, action),
 		/*
-		 * Whether a double-click on a board belongs to the source editor.
+		 * Whether a double-click on a board belongs to an editor of its own, and which one.
 		 *
 		 * Answered here because the stage knows the board's format and the board does not, and
-		 * returning false is what lets the *editor* have the gesture instead: the fields half
-		 * of `Editor.ts` retypes a run in place, which is the whole of what a document wants.
+		 * returning false is what lets the *editor* have the gesture instead: the fields half of
+		 * `Editor.ts` retypes a run in place, which is what a run of words wants wherever it
+		 * appears.
 		 *
-		 * Three answers, and the middle one is the one that changed:
+		 * Four answers, and the third is the one this session added:
 		 *
-		 * - a **component** board: no, unless ⌥ — a run of words is retyped in place, and the
-		 *   file as text is what ⌥ is for;
-		 * - a **flow board this app wrote**: no, unless ⌥ — its DOM tree *is* the file's tree,
-		 *   which is the condition the field editor needs and the reason the source editor was
-		 *   only ever a workaround here (`boards/editing-a-flow-document-properly`);
-		 * - anything else — markdown, a deck, a page from somewhere else, and any board at
-		 *   all with ⌥ — yes: what is on screen there was drawn from words that are not in the
-		 *   file, so the bytes are the only thing a double-click can honestly mean.
+		 * - ⌥ on any board at all: the file as text, because that is what ⌥ means everywhere in
+		 *   this app — the bytes, as they are;
+		 * - a **component** board: false, so the field editor keeps the gesture — a run of words
+		 *   is retyped where it sits, and nothing there is a document;
+		 * - a **flow board this app wrote**: the rich editor, over the document
+		 *   (`boards/editing-a-flow-document-properly-not-as-source`). Its DOM tree is the file's
+		 *   tree, so a GrapesJS component *is* a block of the file, and a change to one maps to the
+		 *   ops that write it — steps 1 to 3 of that design's build order, whose milestone is
+		 *   retyping a sentence in a document and committing one line;
+		 * - anything else — markdown, a deck, a page from somewhere else — yes: what is on screen
+		 *   there was drawn from words that are not in the file, so the bytes are the only thing a
+		 *   double-click can honestly mean.
+		 *
+		 * The field editor is not lost for a flow board: it keeps a double-click on a *run* when the
+		 * board is zoomed in far enough to have live frames, which is the gesture `Editor.ts` owns.
+		 * This decides what a double-click on the document around it means.
 		 */
 		editSource: (path, alt) => {
 			const board = props.boards.find((candidate) => candidate.path === path);
 			if (!board || !props.onEditSource) return false;
-			const fields = board.format === "component" || (board.format === "flow" && !board.shell);
-			if (!alt && fields) return false;
-			props.onEditSource(path);
+			if (alt) {
+				props.onEditSource(path, "source");
+				return true;
+			}
+			if (board.format === "component") return false;
+			props.onEditSource(path, board.format === "flow" && !board.shell ? "blocks" : "source");
 			return true;
 		},
 		zoom: (direction) => {
@@ -1036,6 +1050,14 @@ export function Stage(props: {
 							{...(alone ? { origin: { x: 0, y: 0 } } : {})}
 							selected={props.selected === board.path}
 							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
+							/*
+							 * The document editor's way in: only for a flow board this app wrote, so
+							 * the button exists exactly where the answer is known and not as a
+							 * control that opens something and then refuses.
+							 */
+							{...(props.onEditDocument && board.format === "flow" && !board.shell
+								? { onEditDocument: () => props.onEditDocument?.(board.path) }
+								: {})}
 							{...(props.onPresent
 								? {
 										onPresent: () =>

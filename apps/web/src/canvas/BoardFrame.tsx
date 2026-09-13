@@ -1,8 +1,11 @@
+import type { BoardPatch } from "@decks/protocol";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import BookOpen from "lucide-solid/icons/book-open";
+import FilePenLine from "lucide-solid/icons/file-pen-line";
 import ExternalLink from "lucide-solid/icons/external-link";
 import Maximize from "lucide-solid/icons/maximize-2";
 import X from "lucide-solid/icons/x";
+import { GrapesEditor } from "./GrapesEditor.tsx";
 import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { unwrap } from "solid-js/store";
@@ -33,6 +36,24 @@ import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEve
  * handle, so moving a board never depends on hitting a part of the page that
  * happens to be empty.
  */
+/**
+ * A board being edited, and by which editor.
+ *
+ * One type for both surfaces because they have to stand in for the frame in exactly the same
+ * way — same box, same size, same moment — and because `Stage` passes this through untouched
+ * and would otherwise declare a second copy of it.
+ */
+export interface BoardEditing {
+	kind: "source" | "blocks";
+	source: string;
+	onCommit: (text: string) => void;
+	/** `blocks` only: the batch a commit amounts to, already mapped to ops. */
+	onPatches?: (patches: BoardPatch[]) => void;
+	/** `blocks` only: the ops could not express it, so hand over the bytes. */
+	onSource?: () => void;
+	onCancel: () => void;
+}
+
 export function BoardFrame(props: {
 	board: Board;
 	camera: Camera;
@@ -73,13 +94,24 @@ export function BoardFrame(props: {
 	/** Only for a deck: take it fullscreen. */
 	onPresent?: () => void;
 	/**
-	 * The board's own source, while it is being edited as text.
+	 * The board being edited, and by which editor.
 	 *
-	 * Rendered *inside* this node rather than as a dialog, so the canvas positions and
-	 * scales it exactly as it does the frame it stands in for — which is what makes the box
-	 * feel like the board rather than like something on top of it.
+	 * `source` is the file in a textarea; `blocks` is a flow document in GrapesJS, which writes
+	 * ops rather than the file. Rendered *inside* this node rather than as a dialog, so the
+	 * canvas positions and scales it exactly as it does the frame it stands in for — which is
+	 * what makes the box feel like the board rather than like something on top of it.
 	 */
-	editing?: { source: string; onCommit: (text: string) => void; onCancel: () => void };
+	editing?: BoardEditing;
+	/**
+	 * Edit this board's *document*, in the editor that writes ops (`GrapesEditor`).
+	 *
+	 * A button rather than a gesture, because the gesture is taken: a double-click on a run of
+	 * words belongs to the field editor, which is the right answer for a run and the wrong one
+	 * for a page somebody wants to rearrange. Offered only where the app can answer it — a flow
+	 * document this app wrote, whose DOM tree is the file's tree — and absent everywhere else
+	 * rather than present and refusing.
+	 */
+	onEditDocument?: () => void;
 	/** Take this board off the canvas. It stays in the agent's context. */
 	onHide?: () => void;
 	/** Editing lives inside the frame, because the frame is same-origin (§4). */
@@ -744,6 +776,23 @@ export function BoardFrame(props: {
 					Not on a live board: a mirror in a bare tab has nobody to feed it, and says so
 					itself (`.live[data-state="alone"]`).
 				*/}
+				<Show when={props.onEditDocument}>
+					<button
+						class="present-open"
+						type="button"
+						data-glyph="true"
+						data-act="document"
+						title="Edit this document (text, marks and paragraphs)"
+						aria-label={`Edit ${props.board.title} as a document`}
+						onPointerDown={(event) => event.stopPropagation()}
+						onClick={(event) => {
+							event.stopPropagation();
+							props.onEditDocument?.();
+						}}
+					>
+						<Icon of={FilePenLine} size={12} />
+					</button>
+				</Show>
 				<Show when={!props.board.live}>
 					<a
 						class="open-tab"
@@ -867,14 +916,7 @@ export function BoardFrame(props: {
 					<Match when={props.renderer === "canvas-per-board"}>
 						<Show when={props.mounted ? props.editing : undefined} keyed>
 							{(editing) => (
-								<SourceEditor
-									path={props.board.path}
-									source={editing.source}
-									w={props.board.w}
-									h={props.board.h}
-									onCommit={editing.onCommit}
-									onCancel={editing.onCancel}
-								/>
+								<BoardEditor board={props.board} editing={editing} />
 							)}
 						</Show>
 						{/*
@@ -912,14 +954,7 @@ export function BoardFrame(props: {
 						>
 							<Show when={props.editing} keyed>
 								{(editing) => (
-									<SourceEditor
-										path={props.board.path}
-										source={editing.source}
-										w={props.board.w}
-										h={props.board.h}
-										onCommit={editing.onCommit}
-										onCancel={editing.onCancel}
-									/>
+									<BoardEditor board={props.board} editing={editing} />
 								)}
 							</Show>
 							{frameNode()}
@@ -983,5 +1018,55 @@ export function BoardFrame(props: {
 				)}
 			</Show>
 		</div>
+	);
+}
+
+/**
+ * The editor a board gets, chosen where the board is: a file in a textarea, or a document on a
+ * surface that writes ops.
+ *
+ * One component for the two rather than a condition at each mount point, because they have to
+ * stand in for the frame in exactly the same way — same box, same size, same moment — and the
+ * renderer switch has three branches that each need the same answer.
+ *
+ * The rich editor needs somewhere to fall back to, and that is the source textarea for the same
+ * board: a refusal is the ops being unable to express what somebody did, and the honest reply is
+ * the file rather than a document quietly rewritten into a shape they did not choose.
+ */
+function BoardEditor(props: {
+	board: { path: string; w: number; h: number };
+	editing: {
+		kind: "source" | "blocks";
+		source: string;
+		onCommit: (text: string) => void;
+		onPatches?: (patches: BoardPatch[]) => void;
+		onSource?: () => void;
+		onCancel: () => void;
+	};
+}) {
+	return (
+		<Switch>
+			<Match when={props.editing.kind === "blocks"}>
+				<GrapesEditor
+					path={props.board.path}
+					source={props.editing.source}
+					w={props.board.w}
+					h={props.board.h}
+					onPatches={(patches) => props.editing.onPatches?.(patches)}
+					onSource={() => props.editing.onSource?.()}
+					onCancel={props.editing.onCancel}
+				/>
+			</Match>
+			<Match when={true}>
+				<SourceEditor
+					path={props.board.path}
+					source={props.editing.source}
+					w={props.board.w}
+					h={props.board.h}
+					onCommit={props.editing.onCommit}
+					onCancel={props.editing.onCancel}
+				/>
+			</Match>
+		</Switch>
 	);
 }
