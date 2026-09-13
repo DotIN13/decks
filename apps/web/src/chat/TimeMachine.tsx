@@ -3,7 +3,7 @@ import Eye from "lucide-solid/icons/eye";
 import GitBranch from "lucide-solid/icons/git-branch";
 import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import { createMemo } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { Popover } from "../ui/Popover.tsx";
 
 /**

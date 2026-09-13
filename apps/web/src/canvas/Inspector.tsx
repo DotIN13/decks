@@ -6,7 +6,7 @@ import SendToBack from "lucide-solid/icons/send-to-back";
 import Trash2 from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { inspectorShown } from "../state/edge.ts";
 import { NARROW } from "../lib/media.ts";
 import "../styles/inspector.css";

@@ -8,7 +8,7 @@ import FileText from "lucide-solid/icons/file-text";
 import FileType from "lucide-solid/icons/file-type";
 import Folder from "lucide-solid/icons/folder";
 import { createResource, createSignal, For, Show } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 
 /** Where you are, and where you would be if there were nothing here: the same quiet grey. */
 const WHERE = "overflow-hidden font-mono text-[11px] text-ellipsis whitespace-nowrap text-faint";

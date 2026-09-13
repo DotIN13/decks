@@ -18,7 +18,7 @@ import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { AgentMark } from "../chat/agent-marks.tsx";
 import type { CanvasMode, Tool } from "../canvas/Editor.ts";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
 import { runtimes } from "../state/deck.ts";
 import { canHover } from "../lib/media.ts";

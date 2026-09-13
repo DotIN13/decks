@@ -11,7 +11,7 @@ import MoreHorizontal from "lucide-solid/icons/more-horizontal";
 import ZoomIn from "lucide-solid/icons/zoom-in";
 import ZoomOut from "lucide-solid/icons/zoom-out";
 import { For, Show } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { historyButton, toggleHistory } from "../state/edge.ts";
 import { Popover } from "../ui/Popover.tsx";
 import { AgentStack } from "./AgentStack.tsx";

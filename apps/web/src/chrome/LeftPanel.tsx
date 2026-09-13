@@ -4,7 +4,7 @@ import Rows3 from "lucide-solid/icons/rows-3";
 import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { BoardRow, BoardTile } from "./BoardRow.tsx";
 import { panelSections, panelTally } from "./panel-groups.ts";
 import type { AgentChat, Identity } from "@decks/protocol";

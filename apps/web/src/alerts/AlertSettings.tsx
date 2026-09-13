@@ -1,7 +1,7 @@
 import Bell from "lucide-solid/icons/bell";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import { createSignal, For, Show } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { Popover } from "../ui/Popover.tsx";
 import { ALERT_KINDS, ALERT_LABELS, type AlertKind, type AlertPrefs } from "./policy.ts";
 import { availability, request, type Availability } from "./notify.ts";

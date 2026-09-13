@@ -4,6 +4,9 @@ import { Portal } from "solid-js/web";
 /**
  * One popover, for all five of them.
  *
+ * In `ui/` because that is what the directory is: the primitives every layer draws with,
+ * this and `Icon`.
+ *
  * The mode menu, the model picker, the context dial's numbers, the agent selector and the
  * time machine are the same object: a thing you press, a card that appears near it, and one
  * agreed way to make it go away. Three native `<select>`s were replaced here, and replacing

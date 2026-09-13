@@ -1,19 +1,21 @@
 /**
- * The mark, drawn here; every other icon comes from Lucide.
+ * Every icon in the app, and the one decision about how they are drawn.
  *
- * The logo is the one drawing that carries meaning nobody else's icon set has, so it
- * stays hand-rolled — and it is the first paint of the title bar, which is a poor place
- * to be waiting on anything. Everything else used to be a glyph character (`▹`, `×`,
- * `↑`, `+`) picked for having no dependency, and the cost of that showed: a text glyph
- * has a font's baseline and metrics rather than an icon's box, so each one needed its own
- * `font-size` to look centred, and none of them could be given a consistent weight.
  * Lucide's set is one grid, one joint style, and one stroke — imported per icon
- * (`lucide-solid/icons/x`) so the bundle carries the twenty the chrome uses rather than
- * the fifteen hundred that exist.
+ * (`lucide-solid/icons/x`) so the bundle carries the twenty the chrome uses rather than the
+ * fifteen hundred that exist. What it replaced was glyph characters (`▹`, `×`, `↑`, `+`)
+ * picked for having no dependency, and the cost of that showed: a text glyph has a font's
+ * baseline and metrics rather than an icon's box, so each one needed its own `font-size` to
+ * look centred, and none of them could be given a consistent weight.
  *
- * `lucide-solid` rather than `lucide-static` because it is a real Solid component: it
- * ships an uncompiled-JSX `solid` export condition that `vite-plugin-solid` compiles with
- * the rest of the app, so an icon is a few DOM calls rather than a parsed SVG string.
+ * `lucide-solid` rather than `lucide-static` because it is a real Solid component: it ships
+ * an uncompiled-JSX `solid` export condition that `vite-plugin-solid` compiles with the rest
+ * of the app, so an icon is a few DOM calls rather than a parsed SVG string.
+ *
+ * It lives in `ui/` because that is what the directory is: the primitives every layer draws
+ * with, this and `Popover.tsx` — as against `lib/`, which holds modules that are not
+ * components at all. The app's own mark was drawn here by hand until the mark became the
+ * avatar, and went with it.
  */
 import type { LucideIcon } from "lucide-solid";
 import { Dynamic } from "solid-js/web";

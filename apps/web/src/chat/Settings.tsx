@@ -3,7 +3,7 @@ import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { RENDERERS, type RendererChoice } from "../lib/renderer.ts";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { AlertSettings } from "../alerts/AlertSettings.tsx";
 import type { AlertPrefs } from "../alerts/policy.ts";
 

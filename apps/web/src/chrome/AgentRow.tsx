@@ -3,7 +3,7 @@ import PictureInPicture2 from "lucide-solid/icons/picture-in-picture-2";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onMount, Show } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { Popover } from "../ui/Popover.tsx";
 import { AgentFace } from "./AgentPill.tsx";
 import { closeWords, since, statusWords } from "./agent-order.ts";

@@ -1,7 +1,7 @@
 import type { ExtensionUiPrompt } from "@decks/protocol";
 import Check from "lucide-solid/icons/check";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 
 /**
  * A runtime asking the user something (DESIGN §6.8).

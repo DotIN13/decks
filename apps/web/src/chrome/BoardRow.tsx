@@ -3,7 +3,7 @@ import Trash2 from "lucide-solid/icons/trash-2";
 import { createSignal, onCleanup, Show } from "solid-js";
 import { RailItem } from "./BoardRail.tsx";
 import { picture } from "../canvas/thumb-cache.ts";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { deckFileUrl } from "../lib/api.ts";
 import { basename } from "./panel-groups.ts";
 

@@ -311,7 +311,7 @@ body {
  * pixel low beside its label. What is left is the rule that an icon is never the thing
  * that gives way: every one of these sits in a flex row next to a label that can be a
  * long path, and a shrunk icon is a squashed icon. Size, colour and stroke are
- * deliberately absent — they come from the `Icon` wrapper in `icons.tsx`, so the weight
+ * deliberately absent — they come from the `Icon` wrapper in `ui/icons.tsx`, so the weight
  * is one decision in one place.
  */
 svg.lucide {

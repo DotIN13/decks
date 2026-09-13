@@ -2,7 +2,7 @@ import type { AgentChat, Identity } from "@decks/protocol";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { AgentFace } from "./AgentPill.tsx";
 import { agentStatus, since, statusWords } from "./agent-order.ts";
 import { For } from "solid-js";

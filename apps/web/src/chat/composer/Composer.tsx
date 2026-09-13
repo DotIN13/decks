@@ -5,7 +5,7 @@ import Square from "lucide-solid/icons/square";
 import { createEffect, createMemo, createSignal, For, onMount, Show, untrack } from "solid-js";
 import { carriesFiles } from "../../canvas/file-drop.ts";
 import { withMention } from "./mention.ts";
-import { Icon } from "../../icons.tsx";
+import { Icon } from "../../ui/icons.tsx";
 import { Hints } from "./Hints.tsx";
 import { ModeMenu } from "./ModeMenu.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";

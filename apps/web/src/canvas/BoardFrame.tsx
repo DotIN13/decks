@@ -3,7 +3,7 @@ import X from "lucide-solid/icons/x";
 import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { unwrap } from "solid-js/store";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { boardUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";

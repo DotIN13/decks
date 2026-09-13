@@ -1,7 +1,7 @@
 import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import { closeHistory, historyShown } from "../state/edge.ts";
 import { floatRows } from "./float-rows.ts";
 import { earlierLabel, hasEarlier, hiddenCount, LOAD_MORE_AT, WINDOW, windowOf } from "./history-page.ts";

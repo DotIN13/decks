@@ -4,7 +4,7 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import Search from "lucide-solid/icons/search";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { createMemo, createSignal, For, onMount, Show } from "solid-js";
-import { Icon } from "../../icons.tsx";
+import { Icon } from "../../ui/icons.tsx";
 import { Popover } from "../../ui/Popover.tsx";
 import { levelsFor, nearestLevel, optionFor } from "./thinking.ts";
 

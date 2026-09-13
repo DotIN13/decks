@@ -7,7 +7,7 @@ import SquarePen from "lucide-solid/icons/square-pen";
 import Zap from "lucide-solid/icons/zap";
 import type { LucideIcon } from "lucide-solid";
 import { For, Show } from "solid-js";
-import { Icon } from "../../icons.tsx";
+import { Icon } from "../../ui/icons.tsx";
 import { Popover } from "../../ui/Popover.tsx";
 
 /**

@@ -1,6 +1,6 @@
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createSignal, Index, Show } from "solid-js";
-import { Icon } from "../icons.tsx";
+import { Icon } from "../ui/icons.tsx";
 import type { ToolItem } from "./float-rows.ts";
 import { ToolChip } from "./ToolChip.tsx";
 import { distinctNames, toolSlots, type ToolSlot } from "./tool-groups.ts";
