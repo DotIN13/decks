@@ -33,12 +33,17 @@ say("the flow board is on the canvas to focus on", onCanvas === 1, `${onCanvas} 
  */
 const bar = await page.evaluate((path) => {
 	const acts = document.querySelector(`.board-node[data-path="${path}"] .chrome .acts`);
-	return [...(acts?.children ?? [])].map((child) => child.className);
+	return [...(acts?.children ?? [])].map((child) => ({ cls: child.className, w: Math.round(child.getBoundingClientRect().width) }));
 }, NOTES);
 say(
-	"the bar above the board offers focus, its address, fullscreen and going away",
-	bar.length === 4 && bar[0] === "focus-open" && bar.includes("open-tab") && bar.includes("present-open") && bar.includes("hide"),
-	JSON.stringify(bar),
+	"the bar above the board offers its address, focus, fullscreen and going away, in that order",
+	bar.length === 4 && bar.map((b) => b.cls).join(",") === "open-tab,focus-open,present-open,hide",
+	JSON.stringify(bar.map((b) => b.cls)),
+);
+say(
+	"…and the four are the same width, glyph or word",
+	new Set(bar.map((b) => b.w)).size === 1,
+	JSON.stringify(bar.map((b) => `${b.cls}:${b.w}`)),
 );
 
 // A marker on every frame's own window before the view changes, and counted again after: a

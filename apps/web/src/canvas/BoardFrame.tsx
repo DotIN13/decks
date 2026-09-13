@@ -729,6 +729,35 @@ export function BoardFrame(props: {
 					narrow enough that a third button is where the title was.
 				*/}
 				{/*
+					The board on its own, in its own tab.
+
+					A **link** rather than a button with `window.open` in it, and that is the whole
+					difference: the address ends up in the page, so it can be copied, middle-clicked
+					or opened with a modifier, and the browser's own "open in a new tab" is the
+					behaviour rather than an imitation of it.
+
+					No `?rev=`: a tab opened now shows the board as it *is* rather than as it was
+					when the canvas last loaded it (`deckFileUrl`). What arrives there is
+					browse-only — no canvas, so no camera, no editor and no inspector — and the
+					board is clickable at any size, which is not true of the canvas below half zoom.
+
+					Not on a live board: a mirror in a bare tab has nobody to feed it, and says so
+					itself (`.live[data-state="alone"]`).
+				*/}
+				<Show when={!props.board.live}>
+					<a
+						class="open-tab"
+						href={deckFileUrl(props.board.path)}
+						target="_blank"
+						rel="noopener"
+						title="Open this board in its own tab"
+						aria-label={`Open ${props.board.title} in its own tab`}
+						onPointerDown={(event) => event.stopPropagation()}
+					>
+						<Icon of={ExternalLink} size={12} />
+					</a>
+				</Show>
+				{/*
 					Focus: this board as the page, with the canvas out of the way.
 					
 					The fourth thing a board's bar offers — beside its file's address, filling the
@@ -758,38 +787,16 @@ export function BoardFrame(props: {
 						<Icon of={BookOpen} size={12} />
 					</button>
 				</Show>
-				{/*
-					The board on its own, in its own tab.
-
-					A **link** rather than a button with `window.open` in it, and that is the whole
-					difference: the address ends up in the page, so it can be copied, middle-clicked
-					or opened with a modifier, and the browser's own "open in a new tab" is the
-					behaviour rather than an imitation of it.
-
-					No `?rev=`: a tab opened now shows the board as it *is* rather than as it was
-					when the canvas last loaded it (`deckFileUrl`). What arrives there is
-					browse-only — no canvas, so no camera, no editor and no inspector — and the
-					board is clickable at any size, which is not true of the canvas below half zoom.
-
-					Not on a live board: a mirror in a bare tab has nobody to feed it, and says so
-					itself (`.live[data-state="alone"]`).
-				*/}
-				<Show when={!props.board.live}>
-					<a
-						class="open-tab"
-						href={deckFileUrl(props.board.path)}
-						target="_blank"
-						rel="noopener"
-						title="Open this board in its own tab"
-						aria-label={`Open ${props.board.title} in its own tab`}
-						onPointerDown={(event) => event.stopPropagation()}
-					>
-						<Icon of={ExternalLink} size={12} />
-					</a>
-				</Show>
 				<Show when={Boolean(props.onPresent && !props.board.live)}>
 					<button
 						class="present-open"
+						/* A deck's button is a word and sizes to it; every other board's is a
+						   glyph, and a glyph button has to be the same 18px box as the three beside
+						   it — which it was not, because `width: auto` plus its padding made it
+						   26px while they were 18. The attribute rather than `:has(svg)`: this file
+						   already says which one it is drawing, and a selector that re-derives it
+						   from the markup is a second answer to the same question. */
+						data-glyph={props.board.format === "slides" ? undefined : "true"}
 						type="button"
 						title={
 							props.board.format === "slides"

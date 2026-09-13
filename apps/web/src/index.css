@@ -541,12 +541,34 @@ svg.lucide {
  * origin is the box's bottom-left — so the constant part is the 24 the box will occupy, and
  * only the visual gap divides by the zoom. Asking for `24 / zoom` made the bar 88px tall at
  * 27% zoom, which is why it appeared to drift off the boards as they shrank.
+ *
+ * ### And it is blurry when you zoom in, which is *not* fixed here
+ *
+ * A transform makes the bar part of the world's composited layer (`will-change: transform` up
+ * there is what makes a pan a matrix rather than a repaint of sixteen documents), so its pixels
+ * are rastered at a sub-1 local scale and then upscaled by the camera: at 4× the title is
+ * visibly soft beside the crisp panel next to it. `will-change` on this box and `translateZ(0)`
+ * in its transform both produced byte-identical pixels, which rules the compositor out; the
+ * transform itself is the cause, and removing it needs the bar to be laid out in screen space
+ * rather than cancelled — either a bar layer outside `.world`, or `zoom` for the scale, which
+ * was tried and moves the bar: lengths on this box are then in screen pixels while `top` and
+ * `width` are still being written for the transform's coordinate space.
  */
 .board-node > .chrome {
 	position: absolute;
 	top: calc(-24px - 2px / var(--zoom, 1));
 	left: 0;
 	display: flex;
+	/*
+	 * The text on the baseline, the controls on the centre.
+	 *
+	 * The title is 13px sans and the path 11px mono, and centring two boxes of different
+	 * heights puts their *baselines* half a pixel apart, which is exactly as far as it takes for
+	 * a row to look wrong without being able to say why. Baseline alignment is the thing being
+	 * asked for. The button group is not text and has no baseline to share, so it takes the
+	 * centre back for itself.
+	 */
+	align-items: baseline;
 	transform: scale(calc(1 / var(--zoom, 1)));
 	transform-origin: 0 100%;
 	/* Clipped to the board's own on-screen width. The bar is counter-scaled, so its
@@ -588,6 +610,8 @@ svg.lucide {
 	margin-left: auto;
 	gap: 2px;
 	align-items: center;
+	/* Centred against a baseline-aligned row — see the note on the bar. */
+	align-self: center;
 }
 
 /*
@@ -650,6 +674,12 @@ svg.lucide {
 	padding: 0 7px;
 	font-size: 10.5px;
 	letter-spacing: 0.02em;
+}
+
+/* The same box as the three beside it: one 18px square, whichever glyph is in it. */
+.board-node > .chrome .present-open[data-glyph="true"] {
+	width: 18px;
+	padding: 0;
 }
 
 .board-node > .chrome .file {
