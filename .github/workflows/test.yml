@@ -13,7 +13,11 @@ name: test
 #
 # Chromium is cached separately, because `cache: npm` below caches npm's cache directory
 # and **not** `~/.cache/ms-playwright`. It is ~100MB, and a run that downloads it takes
-# about forty seconds longer than one that does not.
+# about forty seconds longer than one that does not. It is installed before the unit tests
+# as well as before the browser checks, because some unit tests measure a real page.
+#
+# Nothing here needs a third-party agent CLI: the opencode tests build their own fake child
+# process, so a machine with no opencode on it still runs all 512 server tests.
 
 on:
   push:
@@ -43,8 +47,12 @@ jobs:
       # else — which is the reason it is `--workspaces` rather than a list of four.
       - run: npm run typecheck
 
-      - run: npm test
-
+      # **Before the unit tests, not after.** Three files in `apps/server` drive a real page —
+      # `web/bridge.test.ts` over the extension's socket, and two in `app.test.ts` that measure a
+      # frame and write the number back — so `npm test` needs a browser. This step used to come
+      # after it, which is why the build was red for its first three pushes, with nineteen
+      # failures that were all "no browser here".
+      #
       # Keyed on the lockfile rather than on Playwright's version, so a dependency bump
       # that changes the browser build gets a fresh cache instead of a stale one. The cost
       # of over-invalidating is one download; the cost of under-invalidating is a test run
@@ -57,6 +65,11 @@ jobs:
 
       # A no-op when the cache hit, which is the point.
       - run: npx playwright install --with-deps chromium
+
+      # Every workspace, with no browser needed to start one and no model to pay for: the seven
+      # opencode tests bring their own fake child process, so nothing here needs an opencode
+      # binary on the machine — see the flag that makes that true in `opencode/manager.ts`.
+      - run: npm test
 
       # Its own server, on its own ports, over its own copy of `example/` — so this needs
       # nothing running first, and it cannot touch a deck somebody is working in.

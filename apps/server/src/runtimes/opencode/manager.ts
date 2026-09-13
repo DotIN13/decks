@@ -91,6 +91,16 @@ export interface OpencodeChild {
 
 export class OpencodeManager {
 	private readonly spawnImpl: (argv: string[], env: NodeJS.ProcessEnv, cwd: string) => OpencodeChild;
+	/**
+	 * Whether the caller brought its own `spawn`.
+	 *
+	 * It decides one thing: whether the binary has to exist. A manager that launches opencode
+	 * itself cannot start without one, but one built with its own `spawn` runs whatever that
+	 * function says and never touches the path — which is what lets the counting, the memoised
+	 * start and the death broadcast be tested on a machine with no opencode installed. CI is
+	 * that machine, and this flag is why it stopped needing one.
+	 */
+	private readonly launchesItself: boolean;
 	private process: OpencodeChild | undefined;
 	/** The token the current server holds; replaced for every server lifetime. */
 	private token = "";
@@ -106,6 +116,7 @@ export class OpencodeManager {
 	private dead = false;
 
 	constructor(options: OpencodeManagerOptions = {}) {
+		this.launchesItself = options.spawn === undefined;
 		this.spawnImpl = options.spawn ?? ((argv, env, cwd) => spawn(argv[0]!, argv.slice(1), { cwd, env, stdio: ["ignore", "pipe", "pipe"] }) as unknown as OpencodeChild);
 	}
 
@@ -173,7 +184,7 @@ export class OpencodeManager {
 	private startServer(spec: OpencodeServerSpec): Promise<string> {
 		return new Promise((accept, refuse) => {
 			const executable = opencodeExecutable();
-			if (!executable) {
+			if (!executable && this.launchesItself) {
 				refuse(new Error("opencode is not installed. Put it on PATH, or set DECKS_OPENCODE_BIN to the binary."));
 				return;
 			}
@@ -190,7 +201,9 @@ export class OpencodeManager {
 			};
 			let child: OpencodeChild;
 			try {
-				child = this.spawnImpl([executable, "serve", "--hostname=127.0.0.1", "--port=0"], env, spec.cwd);
+				// The name is a placeholder when there is no binary: an injected `spawn` ignores it,
+				// and the real `spawn` cannot get here without one.
+				child = this.spawnImpl([executable ?? "opencode", "serve", "--hostname=127.0.0.1", "--port=0"], env, spec.cwd);
 			} catch (error) {
 				refuse(error instanceof Error ? error : new Error(String(error)));
 				return;

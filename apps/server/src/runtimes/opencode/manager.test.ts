@@ -10,6 +10,10 @@ import { OpencodeManager, type OpencodeChild, type OpencodeServerSpec } from "./
  * with opencode is two lines out of its stdout and an exit event, both of which a fake
  * can produce deterministically — and the counting, the memoised start and the death
  * broadcast are the parts that can be wrong, not the process under them.
+ *
+ * Nothing here needs opencode to be installed, and that is a guarantee rather than an
+ * accident: a manager built with its own `spawn` never looks the binary up, so this file
+ * passes on CI, where there is none.
  */
 
 /** A fake opencode child: announces its URL, remembers it was killed, can be died. */
