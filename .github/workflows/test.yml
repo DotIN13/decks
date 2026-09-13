@@ -11,8 +11,9 @@ name: test
 # `npm ci --include=dev`, because the whole toolchain (TypeScript, tsx, Vite, Playwright) is
 # a devDependency: nothing here is published and everything here is built.
 #
-# Playwright's browser is ~100MB. The action caches it, so the first run on a new runner is
-# slow and every one after it is not.
+# Chromium is cached separately, because `cache: npm` below caches npm's cache directory
+# and **not** `~/.cache/ms-playwright`. It is ~100MB, and a run that downloads it takes
+# about forty seconds longer than one that does not.
 
 on:
   push:
@@ -44,6 +45,17 @@ jobs:
 
       - run: npm test
 
+      # Keyed on the lockfile rather than on Playwright's version, so a dependency bump
+      # that changes the browser build gets a fresh cache instead of a stale one. The cost
+      # of over-invalidating is one download; the cost of under-invalidating is a test run
+      # against a browser nobody expects.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: ${{ runner.os }}-playwright-
+
+      # A no-op when the cache hit, which is the point.
       - run: npx playwright install --with-deps chromium
 
       # Its own server, on its own ports, over its own copy of `example/` — so this needs
