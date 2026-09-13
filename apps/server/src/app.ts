@@ -19,6 +19,8 @@ import {
 	type BoardTemplate,
 } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
+import { dispatch } from "./wire/index.ts";
+import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./web/bridge.ts";
 import { renderWebBoard, WEB_BOARD_SIZE } from "./boards/templates.ts";
 import { StageService } from "./stage/service.ts";
@@ -70,7 +72,7 @@ export class App {
 	 * an agent can ask what the user can see. It is a reading, not a source of
 	 * truth — nothing here ever moves it except at an agent's request.
 	 */
-	private lastCamera: Camera = { x: 0, y: 0, zoom: 1 };
+	lastCamera: Camera = { x: 0, y: 0, zoom: 1 };
 	/**
 	 * And one per conversation, because the camera belongs to the conversation.
 	 *
@@ -78,9 +80,9 @@ export class App {
 	 * "where is my canvas looking" rather than "where is the user looking". An agent nobody
 	 * has looked at yet falls back to the last reading, which is the only honest guess.
 	 */
-	private readonly cameras = new Map<string, Camera>();
+	readonly cameras = new Map<string, Camera>();
 	/** Stage calls waiting for the browser to carry them out. */
-	private readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout }>();
+	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout }>();
 	/**
 	 * What the canvas last measured of each board's content, and at which revision.
 	 *
@@ -94,7 +96,7 @@ export class App {
 	/** `stage.fit` calls waiting for the frame to load and report. */
 	private readonly extentWaiters = new Set<{ path: string; rev: number; resolve: (extent: { w: number; h: number } | undefined) => void }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
-	private readonly claudeAccounts: ClaudeAccounts;
+	readonly claudeAccounts: ClaudeAccounts;
 
 	private constructor(
 		readonly config: Config,
@@ -175,7 +177,7 @@ export class App {
 	 * `reread: true` on the publish that follows, because this is the one moment the cached
 	 * identity is certainly stale — the file has just been rewritten.
 	 */
-	private async warmAccount(id: string): Promise<void> {
+	async warmAccount(id: string): Promise<void> {
 		try {
 			await this.identityOf(id, id === DEFAULT_ACCOUNT, true);
 		} catch {
@@ -211,7 +213,7 @@ export class App {
 		return identity;
 	}
 
-	private async publishAccounts(reply?: (message: ServerMessage) => void, options?: { reread?: boolean }): Promise<void> {
+	async publishAccounts(reply?: (message: ServerMessage) => void, options?: { reread?: boolean }): Promise<void> {
 		const stored = this.claudeAccounts.list();
 		// What a conversation with no account of its own spends — see `ClaudeAccounts.defaultId`.
 		const active = this.claudeAccounts.defaultId();
@@ -432,510 +434,16 @@ export class App {
 		}
 	}
 
-	handle(message: ClientMessage, reply: (message: ServerMessage) => void): void {
-		switch (message.type) {
-			case "deck.open": {
-				this.openDeck(message.path);
-				return;
-			}
-			case "board.move": {
-				const board = this.deck.setPosition(message.path, message.x, message.y);
-				if (!board) {
-					reply({ type: "error", text: `No such board: ${message.path}` });
-					return;
-				}
-				// Broadcast rather than reply: a second tab is looking at the same
-				// stage and the board has moved there too.
-				this.send({ type: "board.changed", path: board.path, rev: board.rev, board });
-				return;
-			}
-			case "board.extent": {
-				this.noteExtent(message.path, { rev: message.rev, w: message.w, h: message.h });
-				/*
-				 * A flow board *is* its content's height.
-				 *
-				 * Markdown and plain documents have nowhere in the file to keep a height and
-				 * no reason to: the browser has just measured the only true answer, so the
-				 * board takes it. This is what makes "the board clips and nobody notices"
-				 * impossible for these formats — there is no stored height to be wrong.
-				 *
-				 * Three guards, and each one is a loop that was easy to write by accident:
-				 *
-				 * - `setSize` returns nothing when the numbers already match, so a
-				 *   measurement that agrees with the record neither saves nor bumps `rev`,
-				 *   and the frame that produced it is not reloaded to be asked again;
-				 * - only the height is taken. The width is the user's, from a drag, and a
-				 *   measurement that also set it would fight the drag that caused it;
-				 * - the reading must be for the revision the board is actually at, or a
-				 *   measurement of a document that has since been rewritten sets the height
-				 *   of one that no longer exists.
-				 */
-				const flowing = this.deck.board(message.path);
-				if (flowing?.format === "flow" && flowing.rev === message.rev) {
-					const resized = this.deck.setSize(message.path, { h: message.h });
-					if (resized) this.send({ type: "deck.state", deck: this.deck.state() });
-				}
-				return;
-			}
-
-			case "camera.set":
-				// Recorded, not acted on: the camera is the browser's, and this is the
-				// reading an agent gets when it asks what the user can see.
-				this.lastCamera = message.camera;
-				if (message.agentId) this.cameras.set(message.agentId, message.camera);
-				return;
-
-			case "stage.result": {
-				const pending = this.pendingStage.get(message.result.id);
-				if (!pending) return;
-				this.pendingStage.delete(message.result.id);
-				clearTimeout(pending.timer);
-				pending.resolve(message.result.error ? { error: message.result.error } : (message.result.value ?? null));
-				return;
-			}
-
-			case "board.patch": {
-				this.patch(message.path, message.rev, message.patches, reply);
-				return;
-			}
-
-			case "board.undo": {
-				this.undo(message.path, reply);
-				return;
-			}
-
-			/*
-			 * The user's half of the canvas. Playing a board is how the rail works as a
-			 * control; hiding takes it off the canvas and deliberately does *not* detach —
-			 * the context is the agent's, and nobody should be able to strip what it is
-			 * working from by tidying the view.
-			 */
-			/*
-			 * A mirror, from the Agents tab.
-			 *
-			 * Created *and* played, the way `board.create` is, because nobody asks for a
-			 * window onto a conversation in order to leave it closed. The name comes from
-			 * the agent rather than from the person pressing the button, so two people
-			 * mirroring the same agent land on the same board.
-			 */
-			/*
-			 * The shared Chrome: the user's answer to a submit, the Stop button, and the
-			 * card itself, all from the status board (`lib/live-web.js`).
-			 */
-			case "web.answer": {
-				if (!this.web.answer(message.id, message.ok)) reply({ type: "notice", level: "info", text: "That question has already been answered." });
-				return;
-			}
-			case "web.stop": {
-				this.web.stop();
-				return;
-			}
-			case "web.repair": {
-				const code = this.web.repair();
-				this.send({ type: "web.status", status: this.web.status(), code });
-				return;
-			}
-			case "web.board": {
-				const path = this.newWebBoard();
-				const agent = this.agents.focused();
-				agent.setInPlay([...agent.inPlay.filter((shown) => shown !== path), path]);
-				return;
-			}
-
-			case "agent.mirror": {
-				const of = this.agents.summaries().find((candidate) => candidate.id === message.agentId);
-				if (!of) {
-					reply({ type: "notice", level: "warn", text: "That agent is not here any more." });
-					return;
-				}
-				const path = this.newMirror({ agentId: of.id, name: of.name });
-				const agent = this.agents.focused();
-				agent.setInPlay([...agent.inPlay, path]);
-				return;
-			}
-
-			case "board.play": {
-				const agent = this.agents.focused();
-				agent.setInPlay([...agent.inPlay, message.path]);
-				return;
-			}
-
-			case "board.hide": {
-				const agent = this.agents.focused();
-				agent.setInPlay(agent.inPlay.filter((path) => path !== message.path));
-				return;
-			}
-
-			/*
-			 * A new board, and it goes straight onto the canvas.
-			 *
-			 * Created *and* played, because the two are one act: nobody asks for a board in
-			 * order to leave it in the deck. Attached too — `setInPlay` puts it in the focused
-			 * agent's context — so the agent you are talking to can see the thing you just
-			 * made without being told about it.
-			 *
-			 * An unknown `kind` becomes `blank` rather than an error. This arrives from a
-			 * button today, and the worst outcome of a bad template name should be an empty
-			 * board rather than a refusal.
-			 */
-			case "board.create": {
-				const template = isBoardTemplate(message.kind) ? message.kind : "blank";
-				// An unknown format is component, for the same reason an unknown template is
-				// blank: the worst outcome of a typo should be an ordinary empty board.
-				const format = isBoardFormat(message.format) ? message.format : "component";
-				/*
-				 * A title, a size and a place when the browser has something to put on the board: a
-				 * file dropped on empty canvas, which gets a board of its own where it was dropped.
-				 * Clamped rather than trusted, like everything a browser sends about a file.
-				 */
-				const bounded = (value: unknown, low: number, high: number) =>
-					typeof value === "number" && Number.isFinite(value) ? Math.min(high, Math.max(low, Math.round(value))) : undefined;
-				const title = typeof message.title === "string" && message.title.trim() !== "" ? message.title.trim().slice(0, 120) : "Untitled";
-				const w = bounded(message.size?.w, 320, 2400);
-				const h = bounded(message.size?.h, 240, 4000);
-				const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
-				const path = this.newBoard({ title, template, format, ...(size ? { size } : {}) });
-				const agent = this.agents.focused();
-				agent.setInPlay([...agent.inPlay, path]);
-				if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
-					const placed = this.deck.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
-					if (placed) this.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
-				}
-				// After the board is announced, so the asker already holds it when it hears the path.
-				if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
-				return;
-			}
-
-			case "board.delete": {
-				this.deleteBoard(message.path, reply);
-				return;
-			}
-
-			case "agent.create": {
-				/*
-				 * A new agent is a new row in the accounts mapping — it starts on the default
-				 * and records it — so the panel and the picker have to hear about it. Without
-				 * this the picker for a fresh conversation showed nothing selected until
-				 * something else happened to republish the list.
-				 */
-				const agent = this.agents.create({
-					...(message.parentId ? { parentId: message.parentId } : {}),
-					...(message.kind ? { kind: message.kind } : {}),
-				});
-				/*
-				 * Asked for by a person, so it is what they want to talk to. A subagent is
-				 * created through `Registry.spawn` instead and deliberately does not take
-				 * the focus — its parent is mid-turn and still has something to say.
-				 */
-				this.agents.focus(agent.id);
-				void this.publishAccounts();
-				return;
-			}
-
-			case "agent.focus": {
-				this.agents.focus(message.id);
-				return;
-			}
-
-			case "agent.remove": {
-				const outcome = this.agents.remove(message.id);
-				if (!outcome.removed && outcome.reason) reply({ type: "notice", level: "warn", text: outcome.reason });
-				return;
-			}
-
-			/*
-			 * Your own tags on an agent, from the customise popup.
-			 *
-			 * Silent when the agent is gone: the popup is opened from a row, and a row can be
-			 * removed by another tab between the open and the save. There is nothing useful to
-			 * say about it — the list the popup was editing no longer exists.
-			 */
-			case "agent.tags": {
-				this.agents.get(message.id)?.setUserTags(message.tags);
-				return;
-			}
-
-			case "agent.prompt": {
-				const agent = this.agents.get(message.id) ?? this.agents.focused();
-				// Deliberately not awaited: a prompt runs for minutes and the socket has
-				// other frames to handle meanwhile. Everything it produces arrives as
-				// events, and `publish()` refreshes the chat list once it settles.
-				void agent.prompt(message.text).then(() => this.agents.publish());
-				this.agents.publish();
-				return;
-			}
-
-			case "agent.abort": {
-				void this.agents.get(message.id)?.abort();
-				return;
-			}
-
-			case "chat.open": {
-				/*
-				 * A history, for the conversation a browser is about to show. To the asker alone,
-				 * like scrollback: another tab showing another chat has no use for it. An agent that
-				 * is not here gets no answer rather than an empty one, which would wipe a transcript
-				 * the browser was given some other way.
-				 */
-				const asked = this.agents.get(message.agentId);
-				if (asked) reply(asked.historyMessage());
-				return;
-			}
-
-			case "chat.tool": {
-				const asked = this.agents.get(message.agentId);
-				reply({ type: "chat.tool", agentId: message.agentId, itemId: message.itemId, result: asked?.toolResult(message.itemId) ?? "" });
-				return;
-			}
-
-			case "chat.earlier": {
-				/*
-				 * Answered to the asker alone, not broadcast.
-				 *
-				 * Every other chat message goes to every client because it is news about the
-				 * conversation. This is not news — it is one reader's scrollback, and a
-				 * second tab that has not scrolled has no use for a page it did not ask for
-				 * and would prepend it to a window it is not looking at.
-				 */
-				const asked = this.agents.get(message.agentId);
-				if (!asked) {
-					reply({ type: "chat.earlier", agentId: message.agentId, before: message.before, items: [], more: false });
-					return;
-				}
-				const page = asked.earlier(message.before, Math.min(Math.max(message.limit ?? 60, 1), 200));
-				reply({ type: "chat.earlier", agentId: message.agentId, before: message.before, items: page.items, more: page.more });
-				return;
-			}
-
-			case "agent.setModel": {
-				const agent = this.agents.get(message.id);
-				if (!agent) return;
-				void agent
-					.setModel(message.provider, message.model, message.thinking)
-					.catch((error: unknown) => reply({ type: "error", text: (error as Error).message }));
-				return;
-			}
-
-			case "agent.thinking": {
-				// Fire and forget: it may have to start a runtime first, and the browser has
-				// already drawn the level it pressed. What comes back is `agent.model`.
-				void this.agents
-					.get(message.id)
-					?.setThinking(message.thinking)
-					.catch((error: unknown) => reply({ type: "notice", level: "warn", text: `Could not change the thinking level: ${(error as Error).message}` }));
-				return;
-			}
-
-			/*
-			 * The usage panel, read on demand.
-			 *
-			 * Replied to rather than broadcast: a second tab did not open this panel and has
-			 * no use for figures it did not ask for. The `/cost` path is the other way round
-			 * and broadcasts — see `pushReport` — because there the *agent* asked.
-			 */
-			case "agent.report": {
-				const agent = this.agents.get(message.id);
-				if (!agent) {
-					reply({ type: "agent.report", id: message.id, error: "That agent is gone." });
-					return;
-				}
-				void agent
-					.report()
-					.then((report) => reply({ type: "agent.report", id: message.id, report }))
-					.catch((error: unknown) => reply({ type: "agent.report", id: message.id, error: (error as Error).message }));
-				return;
-			}
-
-			case "agent.setMode": {
-				const agent = this.agents.get(message.id);
-				if (!agent) return;
-				void agent
-					.setMode(message.mode)
-					.then(() => this.agents.publish())
-					.catch((error: unknown) => {
-						reply({ type: "notice", level: "warn", text: `Could not change mode: ${(error as Error).message}` });
-					});
-				return;
-			}
-
-			case "rewind.preview": {
-				const agent = this.agents.get(message.id);
-				if (!agent) return;
-				// A preview is a read. Nothing is written, and the browser renders those
-				// revisions read-only.
-				reply({
-					type: "timeline.preview",
-					agentId: message.id,
-					entryId: message.entryId,
-					boards: message.entryId ? this.boardsAt(agent, message.entryId) : {},
-				});
-				return;
-			}
-
-			case "rewind.to": {
-				const agent = this.agents.get(message.id);
-				if (!agent) return;
-				void agent.rewindTo(message.entryId).then((result) => {
-					this.agents.publish();
-					if (result.cancelled) {
-						reply({ type: "notice", level: "info", text: "Rewind cancelled." });
-						return;
-					}
-					/*
-					 * The rewound message goes back in the composer, which is what the deck has
-					 * been passing `editorText` around for since rewinding existed — and where it
-					 * never actually went. It was announced instead, so the notice carried the
-					 * whole message: a paragraph in a toast, saying a thing the transcript above
-					 * it already said, and the one place it would have been useful — the input
-					 * bar, ready to be said differently — was empty.
-					 */
-					reply({ type: "notice", level: "info", text: "Rewound." });
-					if (result.editorText) reply({ type: "composer.draft", text: result.editorText });
-				});
-				return;
-			}
-
-			case "fork.from": {
-				const agent = this.agents.get(message.id);
-				if (!agent) return;
-				// Async now: Claude's handle comes from copying a session file, which Pi
-				// can do from memory.
-				void agent.forkFrom(message.entryId).then((resumeRef) => {
-					if (!resumeRef) {
-						reply({ type: "notice", level: "warn", text: "There is nothing before that message to fork from." });
-						return;
-					}
-					const at = agent.entryTime(message.entryId);
-					// A fork is a new chat that remembers everything up to that point —
-					// including what was on the canvas then, so it does not open blank.
-					const child = this.agents.create({
-						name: `${agent.chat().name} (fork)`,
-						resumeRef,
-						kind: agent.kind,
-						...(at ? { forkedFrom: { agentId: agent.id, at } } : {}),
-						// And the model it was being held in. A fork continues one
-						// conversation; answering the rest of it from a different model is a
-						// change nobody asked for, and on Claude there is no session file to
-						// recover the choice from.
-						...(agent.model ? { model: agent.model } : {}),
-						...(agent.mode ? { mode: agent.mode } : {}),
-					});
-					this.agents.focus(child.id);
-				});
-				return;
-			}
-
-			case "boards.restore": {
-				/*
-				 * The one place a preview turns into a write, and it takes a click of its
-				 * own to get here. Restoring is a new revision rather than a rewind of the
-				 * store: going back is a thing that happened, and undoing the restore has
-				 * to be possible too.
-				 */
-				const agent = this.agents.get(message.id);
-				if (!agent) return;
-				const wanted = this.boardsAt(agent, message.entryId);
-				let restored = 0;
-				for (const [path, sha] of Object.entries(wanted)) {
-					try {
-						const content = this.revisions.read(sha);
-						if (content === readFileSync(this.deck.fileOf(path), "utf8")) continue;
-						writeFileSync(this.deck.fileOf(path), content);
-						this.revisions.record(path, content);
-						restored++;
-					} catch (error) {
-						reply({ type: "notice", level: "warn", text: `Could not restore ${path}: ${(error as Error).message}` });
-					}
-				}
-				reply({
-					type: "notice",
-					level: "info",
-					text: restored === 0 ? "Those boards are already as they were." : `Restored ${restored} board${restored === 1 ? "" : "s"}.`,
-				});
-				return;
-			}
-
-			case "extension.ui.answer": {
-				// The answer carries no agent id — a dialog id is unique across them —
-				// so it goes to every agent and the one holding that question takes it.
-				for (const agent of this.agents.all()) agent.answerDialog(message.answer);
-				return;
-			}
-
-			case "claude.accounts":
-				void this.publishAccounts(reply);
-				return;
-
-			case "claude.accounts.add": {
-				/*
-				 * The login runs on an *agent*, because it is the agent's dialog bridge that
-				 * asks for the code — the flow needs somewhere to put a modal and somewhere to
-				 * report to, and the conversation is both.
-				 *
-				 * A Claude agent, specifically: a pi agent has no Claude login to run. Focused
-				 * first, since that is the conversation the person is looking at.
-				 */
-				const claude = [this.agents.focused(), ...this.agents.all()].find((agent) => agent.kind === "claude");
-				if (!claude) {
-					reply({ type: "notice", level: "warn", text: "Start a Claude agent first — signing in runs through one." });
-					return;
-				}
-				void claude.prompt("/login");
-				return;
-			}
-
-			case "claude.accounts.use": {
-				/*
-				 * One conversation onto one subscription, and nothing else moves.
-				 *
-				 * There is no machine-wide switch to fall back to — this used to take an
-				 * optional `agentId` and, without one, move the install default. Which was a
-				 * control that looked like switching and was not: every open conversation kept
-				 * the account it already had, so all it changed was the *next* agent. The list
-				 * order answers that question now, visibly, with the arrows that were already
-				 * there for it.
-				 */
-				const agent = this.agents.all().find((candidate) => candidate.id === message.agentId);
-				if (!agent) {
-					reply({ type: "notice", level: "warn", text: "That agent is not here any more." });
-					return;
-				}
-				if (!agent.useAccount(message.id)) {
-					reply({ type: "notice", level: "warn", text: "That account is not on the list any more." });
-					return;
-				}
-				/*
-				 * And the runtime starts, if it has not yet.
-				 *
-				 * A chat nobody has prompted since the deck opened has no `claude` process, and
-				 * a process's environment is fixed at spawn — so on a dormant chat this was a
-				 * choice recorded in a file with nothing to show for it. Starting here makes the
-				 * press mean what it looks like it means: the subscription is in force, and the
-				 * model list and the context reading arrive with the session.
-				 *
-				 * Here rather than in `useAccount`, because *this* is the event — somebody
-				 * pressed a row in a picker. The method stays a record and a symlink, which is
-				 * what a rewind or a restore wants it to be.
-				 */
-				void agent.start();
-				/*
-				 * Warmed before the sessions want it: an account nothing has used for eight
-				 * hours has an expired token, and the first request after a switch would
-				 * otherwise be several sessions racing to refresh it (`claude/transient.ts`).
-				 */
-				void this.warmAccount(message.id).then(() => this.publishAccounts(undefined, { reread: true }));
-				return;
-			}
-
-			case "claude.accounts.forget": {
-				this.claudeAccounts.forget(message.id);
-				void this.publishAccounts();
-				return;
-			}
-
-			default:
-				reply({ type: "notice", level: "warn", text: `Not implemented yet: ${message.type}` });
-		}
+	/**
+	 * One frame, answered by the table in `wire/`.
+	 *
+	 * This method used to *be* the table — 38 cases and 500 lines in the middle of the
+	 * composition root, so every new frame landed in the same place as every unrelated
+	 * feature's. The cases moved to `wire/`, and what is left is the one line that says
+	 * where they went.
+	 */
+	handle(message: ClientMessage, reply: Reply): void {
+		dispatch(message, reply, this);
 	}
 
 	/**
@@ -951,7 +459,7 @@ export class App {
 	 * not, when this lived in two places: hovering showed the past and restoring said
 	 * there was nothing to do.
 	 */
-	private boardsAt(
+	boardsAt(
 		agent: { revisionsAt(entryId: string): Record<string, string>; timeline(): Array<{ id: string; at?: number }> },
 		entryId: string,
 	): Record<string, string> {
@@ -972,7 +480,7 @@ export class App {
 	 * showing the same board agree, and a stale reading is filtered where it is read
 	 * rather than hoarded here.
 	 */
-	private noteExtent(path: string, extent: { rev: number; w: number; h: number }): void {
+	noteExtent(path: string, extent: { rev: number; w: number; h: number }): void {
 		this.extents.set(path, extent);
 		for (const waiter of [...this.extentWaiters]) {
 			if (waiter.path !== path || waiter.rev !== extent.rev) continue;
@@ -1119,7 +627,7 @@ export class App {
 	 * unlink — are both things the person pressing it should read rather than a stack trace
 	 * in a log they do not have.
 	 */
-	private deleteBoard(path: string, reply: (message: ServerMessage) => void): void {
+	deleteBoard(path: string, reply: (message: ServerMessage) => void): void {
 		if (!this.deck.board(path)) {
 			reply({ type: "notice", level: "warn", text: `There is no board at ${path} to delete.` });
 			return;
@@ -1169,7 +677,7 @@ export class App {
 	 * browser can re-read the frame and decide whether the gesture still means
 	 * anything.
 	 */
-	private patch(path: string, rev: number, patches: BoardPatch[], reply: (message: ServerMessage) => void): void {
+	patch(path: string, rev: number, patches: BoardPatch[], reply: (message: ServerMessage) => void): void {
 		const board = this.deck.board(path);
 		if (!board) {
 			reply({ type: "board.patched", path, rev: 0, refused: `No such board: ${path}` });
@@ -1272,7 +780,7 @@ export class App {
 	 * inverse of "the agent rewrote this file", but there is a copy of what it said
 	 * before.
 	 */
-	private undo(path: string, reply: (message: ServerMessage) => void): void {
+	undo(path: string, reply: (message: ServerMessage) => void): void {
 		const previous = this.revisions.previous(path);
 		if (!previous) {
 			reply({ type: "notice", level: "info", text: "Nothing further to undo on this board." });
@@ -1362,7 +870,7 @@ export class App {
 		for (const warning of this.deck.warnings) this.send({ type: "notice", level: "warn", text: warning });
 	}
 
-	private send(message: ServerMessage): void {
+	send(message: ServerMessage): void {
 		this.hub?.broadcast(message);
 	}
 
