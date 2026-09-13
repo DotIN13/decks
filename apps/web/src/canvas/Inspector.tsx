@@ -1,7 +1,9 @@
 import { BOX_CLASSES, CALLOUT_TONES, type BoxClass } from "@decks/board-kit";
 import BringToFront from "lucide-solid/icons/bring-to-front";
 import Copy from "lucide-solid/icons/copy";
+import ExternalLink from "lucide-solid/icons/external-link";
 import FolderOpen from "lucide-solid/icons/folder-open";
+import Maximize from "lucide-solid/icons/maximize-2";
 import SendToBack from "lucide-solid/icons/send-to-back";
 import Trash2 from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
@@ -11,6 +13,7 @@ import { inspectorShown } from "../state/edge.ts";
 import { NARROW } from "../lib/media.ts";
 import "../styles/inspector.css";
 import { elementOf, frameOf, isPdf, type Edit, type Shape } from "./inspect.ts";
+import { embedUrl, pdfUrl } from "../lib/api.ts";
 import { scrubbable } from "./scrub.ts";
 
 /**
@@ -148,6 +151,8 @@ export function Inspector(props: {
 	pickFile: () => Promise<string | undefined>;
 	/** Let the selection go, which is what Escape does and a finger cannot. */
 	onClose: () => void;
+	/** Fill the window with the file this box holds, which has no address of its own. */
+	onFullscreen: () => void;
 }) {
 	/** The tones `board.css` styles for this component, or none for the rest. */
 	const tones = createMemo(() => (props.shape?.box === "callout" ? [...CALLOUT_TONES] : []));
@@ -534,6 +539,43 @@ export function Inspector(props: {
 								)}
 							</div>
 						</Show>
+
+						{/*
+						 * And the two things a file inside a box can be shown in.
+						 *
+						 * Here rather than in the board's title bar, and that is the design's decision
+						 * rather than a convenience: the *box* is what has an address, the board has one
+						 * of its own, and a board's author should not have to remember to put a button in
+						 * the markup for every file they embed. Selecting the box is the ask, and this is
+						 * where a box's properties are.
+						 *
+						 * The tab is an `<a>` for the same reason the board's bar has one: the address
+						 * ends up in the page, so it can be copied or middle-clicked. A PDF carries
+						 * `#page=` from the range above, because a tab that opened the wrong pages would
+						 * be worse than no tab at all.
+						 */}
+						<div class={`${ROW} embed-acts`}>
+							<span class={LABEL}>show</span>
+							<button
+								type="button"
+								data-act="fullscreen"
+								title="Fill the window with this file (or press f with the box selected)"
+								aria-label={`Fullscreen ${source().split("/").pop() || "this file"}`}
+								onClick={() => props.onFullscreen()}
+							>
+								<Icon of={Maximize} size={15} />
+							</button>
+							<a
+								class="embed-tab"
+								href={pdfUrl(embedUrl(shape().path, source()), shape().attrs["data-pages"])}
+								target="_blank"
+								rel="noopener"
+								title="Open this file in its own tab, where the browser's own viewer can read it"
+								aria-label={`Open ${source().split("/").pop() || "this file"} in its own tab`}
+							>
+								<Icon of={ExternalLink} size={15} />
+							</a>
+						</div>
 					</Show>
 
 					<div class={`${ROW} acts border-t border-line pt-1.5`}>

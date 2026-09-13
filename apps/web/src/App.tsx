@@ -13,6 +13,7 @@ import {createEffect, createMemo, createSignal, onCleanup, onMount, Show} from "
 import type { EditorHost } from "./canvas/Editor.ts";
 import { Settings } from "./chat/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
+import type { Presenting } from "./state/ui.ts";
 import { createAlerts } from "./app/alerts.ts";
 import { camera, setCamera } from "./state/camera.ts";
 import { handleFrame, type FrameHooks } from "./app/frames.ts";
@@ -36,6 +37,7 @@ import { Stage } from "./canvas/Stage.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
 import { Present } from "./canvas/Present.tsx";
+import { PresentEmbed } from "./canvas/PresentEmbed.tsx";
 import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
@@ -321,6 +323,38 @@ export function App() {
 	 * The exception is a duplicate, whose markup exists only in the file; `patches.ts`
 	 * is where that unpins.
 	 */
+	/**
+	 * A selected box's file as something to fill the window with.
+	 *
+	 * The overlay is told what the *box* said — the path, the page range — rather than being
+	 * handed the frame's document, because it mounts its own frame on the file's URL and has
+	 * nothing of the board's to read it from (`canvas/PresentEmbed.tsx`). The board is named
+	 * too: an embed's path is relative to the board that wrote it, which is exactly what
+	 * `urlFor` in `lib/board.js` and `embedUrl` in `lib/api.ts` both need.
+	 */
+	const embedPresenting = (box: Shape): Presenting => ({
+		kind: "embed",
+		board: box.path,
+		raw: box.attrs["data-embed"] ?? "",
+		...(box.attrs["data-pages"] === undefined ? {} : { pages: box.attrs["data-pages"] }),
+		title: `${box.attrs["data-embed"] ?? "file"} — ${box.id}`,
+	});
+
+	/**
+	 * What fullscreen means *now*: the embed in the selected box, or the board.
+	 *
+	 * One key with one meaning per level — `f` fullscreens the selection if it is an embed and
+	 * the board otherwise — and it is answered here because the selection is this component's.
+	 * The stage knows which board, and the box is a `Shape` the inspector is already reading.
+	 * The path check is the load-bearing part: a box selected on *another* board must not
+	 * change what `f` does to this one.
+	 */
+	const presentingFor = (path: string, at: number): Presenting => {
+		const box = shape();
+		if (box && box.path === path && box.family === "embed" && box.attrs["data-embed"]) return embedPresenting(box);
+		return { kind: "board", path, at };
+	};
+
 	const inspect = (edit: Edit) => {
 		const current = shape();
 		if (!current) return;
@@ -559,7 +593,16 @@ export function App() {
 						camera={camera()}
 						setCamera={setCameraAndReport}
 						selected={selected()}
-						onPresent={(path, at) => setPresenting({ path, at })}
+						/*
+						 * The board, or the file inside the box that is selected on it.
+						 *
+						 * One key with one meaning per level, which is the design's rule: `f`
+						 * fullscreens the selection when the selection *is* an embed, and the board
+						 * otherwise. Answered here rather than in `Stage` because the selection is
+						 * this component's — the stage knows the board, and the box is a shape
+						 * (`canvas/inspect.ts`) that the inspector is already reading.
+						 */
+						onPresent={(path, at) => setPresenting(presentingFor(path, at))}
 						onEditSource={openSource}
 						{...(editingSource()
 							? {
@@ -733,6 +776,10 @@ export function App() {
 				    which is a read-only view of a board that no longer exists (§6.7). */}
 				<Inspector
 					shape={shape()}
+					onFullscreen={() => {
+						const box = shape();
+						if (box) setPresenting(embedPresenting(box));
+					}}
 					/* Edit-only: it is a properties panel, and a panel whose fields cannot be
 					   applied is a panel that lies about what it does. */
 					visible={zoomInteractive() && !preview() && mode() === "edit"}
@@ -1034,6 +1081,17 @@ export function App() {
 				*/}
 				<Show when={presenting()} keyed>
 					{(showing) => {
+						if (showing.kind === "embed") {
+							return (
+								<PresentEmbed
+									board={showing.board}
+									raw={showing.raw}
+									{...(showing.pages === undefined ? {} : { pages: showing.pages })}
+									title={showing.title}
+									onExit={() => setPresenting(undefined)}
+								/>
+							);
+						}
 						const board = () => state.boards.find((candidate) => candidate.path === showing.path);
 						return (
 							<Show when={board()} keyed>

@@ -17,7 +17,7 @@
  * reach *it* — and Escape then has to work from inside a board's document, which it can only
  * do because the overlay listens there too (same origin) rather than only on this window.
  */
-import { WEB, deckState, open, say, settle } from "../harness.mjs";
+import { WEB, deckState, editMode, open, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 900 });
 
@@ -215,6 +215,116 @@ say(
 say("…centred in a scrollable overlay, so a tall board can be scrolled", componentOverlay?.overflow === "auto", String(componentOverlay?.overflow));
 say("…and clickable, which is the one place below half zoom it is", componentOverlay?.pointer !== "none", String(componentOverlay?.pointer));
 say("…and Escape leaves it too", (await leave()) === false, "overlay gone");
+
+/*
+ * 6. A file inside a box: the inspector's two controls, and where the range goes.
+ *
+ * An embed has no address of its own — the board has one, the box inside it does not — so the
+ * affordance is app-side, in the inspector, next to the page range. The page range is the part
+ * that has to be right rather than merely present: the board draws pages 1–2 of the fixture's
+ * PDF, and a fullscreen or a tab that opened page 1 of *all* of it would be showing a
+ * different document than the box is.
+ */
+// Editing on, because the inspector is the editor's properties panel: in browse mode a click
+// selects nothing and there is no panel to look at (`e2e/checks/modes.mjs`).
+await editMode(page);
+await page.locator('.board-node[data-path="boards/sources.html"] .chrome').dblclick();
+await settle(page, 900);
+for (let i = 0; i < 6; i++) {
+	const level = await page.evaluate(() =>
+		Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")),
+	);
+	if (level >= 70) break;
+	await page.keyboard.press("Control+Equal");
+	await settle(page, 250);
+}
+// The PDF's box, through the editor's own selection: a click on it is what the inspector reads.
+const paper = await page.frameLocator('.board-node[data-path="boards/sources.html"] iframe').locator('[data-id="paper"]').boundingBox();
+await page.mouse.click(paper.x + 20, paper.y + 20);
+await settle(page, 500);
+
+const controls = await page.evaluate(() => {
+	const panel = document.querySelector(".inspector");
+	const tab = panel?.querySelector(".embed-acts .embed-tab");
+	const full = panel?.querySelector(".embed-acts [data-act='fullscreen']");
+	return { panel: Boolean(panel), tab: tab?.getAttribute("href") ?? null, full: Boolean(full) };
+});
+say("a selected box holding a file offers both ways to show it", controls.full && controls.tab !== null, JSON.stringify(controls));
+say(
+	"…and the tab's address is the file, at the first page of the box's range",
+	(controls.tab ?? "").includes("sample.pdf") && (controls.tab ?? "").endsWith("#page=1"),
+	String(controls.tab),
+);
+
+await page.locator(".inspector .embed-acts [data-act='fullscreen']").click();
+await settle(page, 900);
+const embedded = await page.evaluate(() => {
+	const el = document.querySelector(".present.embed-present");
+	const frame = el?.querySelector(".present-frame");
+	return {
+		family: el?.dataset.family ?? null,
+		src: frame?.getAttribute("src") ?? null,
+		size: frame ? { w: Math.round(frame.getBoundingClientRect().width), h: Math.round(frame.getBoundingClientRect().height) } : null,
+		window: { w: innerWidth, h: innerHeight },
+	};
+});
+say("fullscreen shows the file itself, in its own family's frame", embedded.family === "pdf" && (embedded.src ?? "").includes("sample.pdf"), JSON.stringify(embedded));
+say("…filling the window rather than a board's rectangle", embedded.size?.w === embedded.window.w && embedded.size?.h === embedded.window.h, JSON.stringify(embedded.size));
+/*
+ * The address, and the reason it is the address rather than a picture: headless Chromium has
+ * no PDF viewer plugin, so a frame on a `.pdf` here is a blank page whatever is in it. What
+ * can be asserted is the two things that decide *which* document you get — the file, and the
+ * page the box's range starts at. (The board draws its own pages as pictures through
+ * `pdf.js`; the overlay hands the file to the browser's viewer, which is a better viewer than
+ * we have — search, zoom, print — and takes the range as a fragment.)
+ */
+say(
+	"…and told which page the box starts at, so it is the same document",
+	(embedded.src ?? "").endsWith("#page=1"),
+	String(embedded.src),
+);
+say("leaving the embed with Escape", (await leave()) === false, "overlay gone");
+
+/*
+ * 7. And the two families whose treatment differs from the PDF's, driven by the key rather
+ *    than the button — `f` is "the selection if it is an embed, the board otherwise", so this
+ *    is also the assertion that the key and the panel agree.
+ */
+const pickBox = async (id) => {
+	await page.locator('.board-node[data-path="boards/sources.html"] .chrome').dblclick();
+	await settle(page, 700);
+	const box = await page.frameLocator('.board-node[data-path="boards/sources.html"] iframe').locator(`[data-id="${id}"]`).boundingBox();
+	await page.mouse.click(box.x + 16, box.y + 16);
+	await settle(page, 400);
+};
+const embeddedNow = () =>
+	page.evaluate(() => {
+		const el = document.querySelector(".present.embed-present");
+		return {
+			family: el?.dataset.family ?? null,
+			image: Boolean(el?.querySelector(".present-image")),
+			doc: el?.querySelector(".present-doc")?.textContent?.slice(0, 40) ?? null,
+			headings: el?.querySelectorAll(".present-doc h1, .present-doc h2, .present-doc p").length ?? 0,
+		};
+	});
+
+await pickBox("notes");
+await page.keyboard.press("f");
+await settle(page, 800);
+const markdown = await embeddedNow();
+say(
+	"f on a selected markdown box renders the document rather than showing its text",
+	markdown.family === "md" && markdown.headings > 0,
+	JSON.stringify(markdown),
+);
+await leave();
+
+await pickBox("sketch");
+await page.keyboard.press("f");
+await settle(page, 700);
+const image = await embeddedNow();
+say("…and an image is the image, fitted", image.family === "image" && image.image, JSON.stringify(image));
+await leave();
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

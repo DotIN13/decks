@@ -61,7 +61,7 @@ function createUi() {
 	 * history a log of somebody presenting — so the cost is that a reload opens on slide
 	 * one, which is the right way round.
 	 */
-	const [presenting, setPresenting] = createSignal<{ path: string; at: number } | undefined>();
+	const [presenting, setPresenting] = createSignal<Presenting | undefined>();
 
 	/**
 	 * The board being edited as its own source, once its file has arrived.
@@ -240,6 +240,19 @@ function createUi() {
 }
 
 export type Ui = ReturnType<typeof createUi>;
+
+
+/**
+ * What is filling the window: a board, or one embed inside one.
+ *
+ * Two kinds in one signal rather than two signals, because they are one state — only one
+ * thing can be fullscreen, and whatever leaves is whichever is up. A board carries the slide
+ * it was on; an embed carries what the box said, because the overlay has no board document
+ * to read it from (`canvas/PresentEmbed.tsx`).
+ */
+export type Presenting =
+	| { kind: "board"; path: string; at: number }
+	| { kind: "embed"; board: string; raw: string; pages?: string; title: string };
 
 /** The app's one set of browser state. Tests build their own with `createUi()`. */
 export const ui = createUi();
