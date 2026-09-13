@@ -723,7 +723,7 @@ that file for a shape the guidance says not to write.
 **A burst of inspector clicks is one patch.** A patch carries the rev it was composed
 against and a stale one is refused (below) — right for "the agent wrote this file while
 you were dragging", absurd for "you clicked three tone swatches". So an edit made while
-a patch is in flight waits (`canvas/patches.ts`), coalesced — consecutive updates to
+a patch is in flight waits (`state/patches.ts`), coalesced — consecutive updates to
 one component merge, and two retypings of one run keep the last — and goes as a single
 batch against the rev the acknowledgement carries. The rev has to come from that
 message: `board.rev` in the store is not updated until `board.changed` arrives one
@@ -1017,7 +1017,7 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
   frame's DOM: true of a drag, of a class swap, of a delete, and false of an insert or a
   copy, whose component exists only in the file because the server mints the id and
   writes the markup. Pinned, a dropped file landed in `assets/`, landed in the board's
-  source, and appeared nowhere on screen. `needsReload` in `canvas/patches.ts` is the one
+  source, and appeared nowhere on screen. `needsReload` in `state/patches.ts` is the one
   place that decides.
 - **Space is held in one place.** Each document only sees the keys pressed while it has
   focus, so a space pressed over the canvas and a drag begun over a board were two
@@ -1208,7 +1208,7 @@ board, talking to the agent and light editing", and everything below serves that
 
 - **Two fingers are always the canvas, and there is one pool of fingers for the whole
   stage.** `canvas/touch.ts` reduces a set of fingers to a pan or to one step of a pinch,
-  and `pinchCamera` (`lib/camera.ts`) turns that step into a camera: the world point under
+  and `pinchCamera` (`camera/camera.ts`) turns that step into a camera: the world point under
   the old midpoint goes under the new one at the new zoom, which is `zoomAbout` generalised
   to an anchor that moves. Steps are measured against the previous event rather than
   against the start of the gesture, so a spread past `MAX_ZOOM` is clamped once instead of
@@ -1268,7 +1268,7 @@ board, talking to the agent and light editing", and everything below serves that
   out of the selection rule rather than being a second mechanism. Focusing that
   `contenteditable` raises the keyboard over the bottom half of the screen, which is
   usually where the words are: `keepVisible` pans the camera the smallest distance that
-  puts the component in the room left over, and `lib/viewport.ts` publishes how much of the
+  puts the component in the room left over, and `app/viewport.ts` publishes how much of the
   window the keyboard is covering as `--keyboard`, which the bottom chrome adds to its own
   offset. There is no CSS unit for that inset, and `dvh` describes the wrong thing.
 
