@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { BOARD_CLASSES, BOX_CLASSES, CALLOUT_TONES, COMPONENT_KINDS } from "@decks/board-kit";
-import { runtimeDir } from "../agents/context.ts";
+import { runtimeDir } from "@decks/runtime";
 import { applyPatches, mintId } from "./patch.ts";
 
 /**

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { Camera } from "@decks/protocol";
-import { runtimeDir } from "../agents/context.ts";
+import { runtimeDir } from "@decks/runtime";
 import { Deck } from "../deck/loader.ts";
 import { StageService } from "./service.ts";
 import { createStageTool, type QueuedWork, type SendSpec } from "./tool.ts";

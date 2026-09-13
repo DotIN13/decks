@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { runtimeLib } from "@decks/runtime";
 import type { Camera, ClientMessage, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { BoardService } from "./boards/service.ts";
@@ -305,7 +305,7 @@ export class App {
 
 	/** Where the shipped primitives live, copied into every deck and refreshed on open. */
 	static get runtimeLib(): string {
-		return resolve(dirname(fileURLToPath(import.meta.url)), "../../../runtime/lib");
+		return runtimeLib();
 	}
 
 	attach(hub: Hub): void {

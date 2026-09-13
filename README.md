@@ -112,13 +112,32 @@ deck directory.
 - **A time machine.** Hover the timeline to see the boards as they were at that point
   in the conversation; click to rewind; restore the boards only if you ask.
 
+## The repository
+
+| | |
+|---|---|
+| `apps/server` | the shell: the deck, the frame router (`wire/`), board writes (`boards/service.ts`), the agents (`agents/`), the canvas tool (`stage/`) and one directory per runtime (`runtimes/`) |
+| `apps/web` | the browser: the stage and its gestures (`canvas/`, `camera/`), the conversation (`chat/`), the chrome (`chrome/`) and the stores (`state/`) |
+| `packages/protocol` | every frame and every shape both sides must agree on, split by subject |
+| `packages/board-kit` | the board vocabulary as data: the classes, the tones, the kinds a palette can place |
+| `runtime/` | what the agents' runtimes read — the board primitives, the skills, the templates, the canvas API, the tool's own words, and the shims for the two runtimes outside this process |
+| `extension/` | the Chrome extension that shares one of your tabs with a deck |
+| `e2e/` | the browser checks, driven with Playwright over a throwaway copy of `example/` |
+
+`runtime/`, `extension/` and `e2e/` are workspaces like the rest: `npm run typecheck` covers
+every one of them.
+
 ## Development
 ```bash
-npm test            # 284 unit tests: config, path guards, uploads, patches, revisions, eval, camera, touch
+npm test            # 810 unit tests across five workspaces: paths, patches, revisions, transcripts, eval, camera, touch
 npm run test:e2e    # 297 browser assertions in 12 checks, against a throwaway copy of example/ (~2m)
-npm run typecheck
+npm run typecheck   # every workspace, including the extension and the browser checks
 npm run vendor      # re-copy the board primitives into runtime/lib
 ```
+
+`npm test` runs each workspace's own tests. The count is per package — `@decks/runtime`'s five
+are about the assets being where the app says they are, `@decks/board-kit`'s ten are about the
+vocabulary being consistent with itself, and the two apps hold the rest.
 
 The browser checks are in [e2e/](e2e/README.md). They were cut from forty-five to twelve
 because the full suite took over eight minutes and nothing that slow gets run between edits;

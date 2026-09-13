@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { delimiter, join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { runtimeDir, skillsDir } from "../../agents/context.ts";
+import { antigravityServer, skillsDir } from "@decks/runtime";
 import { loadConfig } from "../../config.ts";
 
 /**
@@ -50,7 +50,7 @@ export function agyExecutable(): string | undefined {
 
 /** The canvas-tool MCP server `mcp_config.json` names. Node runs it; agy spawns it. */
 export function mcpServerPath(): string {
-	return resolve(runtimeDir(), "antigravity", "mcp-server.mjs");
+	return antigravityServer();
 }
 
 /** The HOME Decks hands every `agy` it spawns, under the data dir like all its state. */

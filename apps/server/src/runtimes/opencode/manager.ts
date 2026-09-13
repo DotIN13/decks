@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { opencodeConfigDir, opencodeExecutable } from "./install.ts";
+import { opencodeConfigDir } from "@decks/runtime";
+import { opencodeExecutable } from "./install.ts";
 /**
  * One `opencode serve` for every opencode agent on the deck (DESIGN §6.1, "the server").
  *

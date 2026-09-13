@@ -299,14 +299,34 @@ lives there and is written *in response to* a change, so watching it would loop.
 
 ### 6.2 One agent, and many
 
-**Two runtimes, one seam.** `agents/backend.ts` says what the shell needs from an agent;
-`pi/backend.ts` wraps Pi's `createAgentSession` and `claude/backend.ts` holds one
-`@anthropic-ai/claude-agent-sdk` `query()` open per agent in streaming-input mode. Streaming
-input is not a preference: it is what makes `interrupt`, `setModel`, `setPermissionMode` and
-`getContextUsage` exist at all, and a query per turn would re-pay process start every time.
-The SDK is a thin client for the `claude` binary, which it does *not* look for on `PATH`, so
-`claude/available.ts` does the looking (`DECKS_CLAUDE_PATH` overrides) — that way an install
-can use the Claude Code already on the machine instead of a per-platform 283 MB dependency.
+**Four runtimes, one contract, and the shell knows none of them by name.**
+`agents/backend.ts` says what the shell needs from an agent; each runtime under `runtimes/`
+says what *it* is. `runtimes/contract.ts` is `AgentRuntime` — the kind, the name a person
+calls it, its capabilities, the `/` commands a dormant chat offers, whether it can start on
+this machine, and the factory — and `runtimes/registry.ts` is the one list. Pi runs in this
+process (`runtimes/pi/backend.ts`, over `createAgentSession`); Claude through
+`@anthropic-ai/claude-agent-sdk` (`runtimes/claude/backend.ts`), holding one `query()` open
+per agent in streaming-input mode; opencode and antigravity are somebody else's program,
+reached through their own SDKs.
+
+Streaming input is not a preference: it is what makes `interrupt`, `setModel`,
+`setPermissionMode` and `getContextUsage` exist at all, and a query per turn would re-pay
+process start every time. The Claude SDK is a thin client for the `claude` binary, which it
+does *not* look for on `PATH`, so `runtimes/claude/available.ts` does the looking
+(`DECKS_CLAUDE_PATH` overrides) — that way an install can use the Claude Code already on the
+machine instead of a per-platform 283 MB dependency.
+
+**That availability answer is on the wire**, which is the part that was missing for a
+while: every runtime could say whether it could run here, and no client could ask, so the `+`
+menu offered all four on every machine and the first prompt was where you found out. The
+greeting now carries `{ kind, label, available, reason }` per runtime, and the menu draws the
+runtime's own name and greys out what this machine cannot start. `availability()` returns a
+union — available, or unavailable *with* a reason — so a disabled row cannot be a dead end.
+
+Adding a runtime is a directory and a row in that registry. It used to be an import and three
+tables in `agents/session.ts` (which meant the neutral shell imported every runtime), the
+union and its array in `packages/protocol`, three entries in the browser's mark file, and a
+new directory. The shell asks the registry and never learns a name.
 
 Which runtime an agent uses is chosen when it is created and fixed for its life: a live
 session cannot swap the process behind it, and pretending otherwise would silently start a
@@ -316,8 +336,8 @@ that can see what an agent cannot do never offers it.
 
 `agents/session.ts` owns what is neither runtime's: the transcript in memory, the identity, the
 context set. `agents/translator.ts` decides what a transcript *is* — when a reply is
-flushed, what a tool call is called — and is shared by any future backend;
-`pi/events.ts` is the only file that reads Pi's event shapes.
+flushed, what a tool call is called — and is shared by every backend;
+`runtimes/pi/events.ts` is the only file that reads Pi's event shapes.
 
 An agent exists before it can be prompted: a Pi session has to load extensions,
 resolve models and check credentials, so `start()` is a promise a prompt waits on. A
@@ -366,9 +386,9 @@ is handed the *source* of the boards it needs, because that is the point of boar
 being files — alignment is a paste, not a briefing. Four children at a time, which is
 a legibility limit rather than a resource one.
 
-**The canvas tool is defined once.** `stage/tool.ts` holds its description, its guidelines
-and the `stage` object; `pi/extension.ts` registers it with a TypeBox schema and
-`claude/tools.ts` wraps it in an in-process MCP server with a Zod one. That split is forced:
+**The canvas tool is defined once.** `stage/tool.ts` holds its guidelines and the `stage`
+object; `runtimes/pi/extension.ts` registers it with a TypeBox schema and
+`runtimes/claude/tools.ts` wraps it in an in-process MCP server with a Zod one. That split is forced:
 `tool()` inside `createSdkMcpServer` is the SDK's only route for your own tools — the `tools`
 option is an availability filter over Claude's built-ins — and "MCP" oversells it, because
 the server runs in this process with no subprocess and no transport. Two consequences are
@@ -382,7 +402,7 @@ Claude counterpart and one mechanism is better than two. The stage snapshot — 
 held, showed and called itself — was carried in a tool result's `details` and rebuilt from
 the branch on `session_start`; MCP tool results have no `details`, and the SDK's
 `structuredContent` looks like the equivalent but *replaces* the text the model reads. It is
-now `agents/snapshot.ts`, a series resolved by time, the same way `App.boardsAt` picks which
+now `agents/snapshot.ts`, a series resolved by time, the same way `BoardService.boardsAt` picks which
 revision of a board to show. It stays in memory, but no longer for the reason first given —
 "nothing recreates agents when the server restarts, so a snapshot has nothing to survive to"
 stopped being true the moment agents were persisted. What it survives *to* is now the record
@@ -392,6 +412,13 @@ rewind, and seeding a fork — only ever happens while the process is up. And th
 edited a board" nudge was `pi.sendMessage({ deliverAs: "nextTurn" })`; it is now a queue on
 the agent, prepended to the next prompt, which keeps the property it was chosen for — a
 board edit is not an interruption — without needing the runtime's cooperation.
+
+**Its words are one file, because four runtimes show them.** The description a model reads
+before it calls the tool lives in `runtime/tool-description.txt`. Pi and Claude are handed it
+by the server; opencode's tool loader and antigravity's MCP server read the same file. Two of
+those four used to carry their own shortened copy under a comment claiming they were "in the
+same words", and the model on those runtimes was told something different about what a board
+is for.
 
 **A board has to be cheaper than a paragraph.** If answering on a board costs fifteen
 lines of boilerplate and answering in chat costs nothing, the chat wins every time — so
@@ -404,15 +431,20 @@ for `answer`, `design`, `report`, `plan` and `blank`, beside `runtime/lib` and
 `runtime/skills` where they can be read and edited like anything else. Each is a real
 board — a sized `<meta name="board">`, both `lib` tags, a title and one placeholder
 section with `data-id`s — and substitution is `{{TITLE}}`/`{{W}}`/`{{H}}`, the same shape
-`pi/context.ts` already uses for `AGENTS.md.tmpl`. No template engine.
+`agents/context.ts` already uses for `AGENTS.md.tmpl`. No template engine.
 
-The write itself lives in `app.ts` next to the other board writes, because that is what
-owns revision recording; the extension reaches it through `StageService`.
+The write itself lives in `boards/service.ts`, which is where board writes and their
+revisions live; the extension reaches it through `StageService`.
 
 ### 6.3 `stage_eval`
 
 One tool, taking TypeScript against a typed stage API (`runtime/stage.d.ts`), injected
-into the prompt verbatim. Everything the agent does to the canvas — showing a board,
+into the prompt verbatim — **and the server compiles against that file.** `stage/tool.ts`
+builds its object as `const stage: Stage` imported from the same declaration the agent is
+handed, so a method the reference promises and the object lacks is a compile error, and so is
+a method the object has that the reference never mentions. The declaration is the contract
+rather than a generated copy of one: its whole job is to be read by a model, so it is the
+right place for the truth to live. Everything the agent does to the canvas — showing a board,
 holding one in context, rearranging, naming itself, drawing its own avatar, handing
 boards to a subagent — goes through it. Not a table of narrow tools: the surface the
 agent has to learn is one function and one interface, and the interface is the

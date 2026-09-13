@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { agentsTemplate, stageDts } from "@decks/runtime";
 import type { Deck } from "../deck/loader.ts";
 
 /**
@@ -16,32 +15,14 @@ import type { Deck } from "../deck/loader.ts";
  * The board list is the one exception, and it is worth it: an agent that opens a
  * deck already knowing there are three boards called plan, risks and sources asks
  * a better first question.
- */
-const RUNTIME = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..", "runtime");
-
-export function runtimeDir(): string {
-	return RUNTIME;
-}
-
-/**
- * Where Decks itself is installed — the directory `node_modules` sits in.
  *
- * The agent runs with the *deck* as its cwd, and a deck is not inside the install
- * (`~/.decks/decks` by default). So a helper script the agent writes cannot resolve
- * `playwright` — or anything else Decks depends on — by walking up from where it
- * runs, and the `board-debug` skill needs to. Exported as `DECKS_APP_DIR` so a
- * script can anchor `createRequire` here instead of guessing.
+ * **This file does not know where anything is.** `runtimeDir`, `stageDts` and the rest were
+ * four levels of `../../..` computed here; they are `@decks/runtime`'s now, and there is a
+ * test over there that the directories exist.
  */
-export function installDir(): string {
-	return resolve(RUNTIME, "..");
-}
-
-export function skillsDir(): string {
-	return resolve(RUNTIME, "skills");
-}
 
 export function deckContext(deck: Deck, toolName: string): string {
-	const template = resolve(RUNTIME, "AGENTS.md.tmpl");
+	const template = agentsTemplate();
 	if (!existsSync(template)) {
 		// A missing template is a broken install, not a reason to refuse to run: the
 		// agent still has the skills and the deck.
@@ -66,7 +47,7 @@ export function deckContext(deck: Deck, toolName: string): string {
 					...roots.map((root) => `- \`${root.path}\`${root.exists ? "" : " — **missing**"}`),
 				].join("\n");
 
-	const stageApi = resolve(RUNTIME, "stage.d.ts");
+	const stageApi = stageDts();
 	const api = existsSync(stageApi) ? readFileSync(stageApi, "utf8") : "";
 
 	return readFileSync(template, "utf8")

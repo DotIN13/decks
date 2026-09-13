@@ -1,0 +1,10 @@
+{
+	"name": "@decks/e2e",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "The browser checks, driven with Playwright against a throwaway copy of example/.",
+	"scripts": {
+		"typecheck": "node --check run.mjs && node --check harness.mjs && node -e \"for (const f of require('node:fs').readdirSync('checks')) require('node:child_process').execFileSync(process.execPath, ['--check', 'checks/' + f], { stdio: 'inherit' })\""
+	}
+}

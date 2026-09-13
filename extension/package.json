@@ -1,0 +1,10 @@
+{
+	"name": "@decks/extension",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "The Chrome extension that shares one tab of your own browser with a deck.",
+	"scripts": {
+		"typecheck": "node --check background.js && node --check popup.js"
+	}
+}

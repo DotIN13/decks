@@ -1,0 +1,51 @@
+name: test
+
+# What this runs, and what it deliberately does not.
+#
+# **typecheck, the unit tests, and the twelve browser checks.** The browser checks were cut
+# from forty-five to twelve *for this*: the suite has to be fast enough to run on every push,
+# and at ~2 minutes over a throwaway copy of `example/` it is. The five that need a model are
+# not run here — they cost tokens against somebody's account, and a red build that means
+# "the API key expired" is a build people learn to ignore.
+#
+# `npm ci --include=dev`, because the whole toolchain (TypeScript, tsx, Vite, Playwright) is
+# a devDependency: nothing here is published and everything here is built.
+#
+# Playwright's browser is ~100MB. The action caches it, so the first run on a new runner is
+# slow and every one after it is not.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # `engines.node` says >=22.19, and 22.18 is where Node strips TypeScript types by
+      # itself — which is how the `.mjs` browser checks import `@decks/protocol` and
+      # `@decks/board-kit` with no build step at all.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+
+      - run: npm ci --include=dev
+
+      # One command over every workspace: the two apps, the protocol, the board vocabulary,
+      # the runtime assets, the extension and the browser checks. A workspace added to the
+      # root `package.json` with a `typecheck` script is covered by this line and nothing
+      # else — which is the reason it is `--workspaces` rather than a list of four.
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - run: npx playwright install --with-deps chromium
+
+      # Its own server, on its own ports, over its own copy of `example/` — so this needs
+      # nothing running first, and it cannot touch a deck somebody is working in.
+      - run: npm run test:e2e

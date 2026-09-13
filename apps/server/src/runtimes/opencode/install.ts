@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
-import { delimiter, join, resolve } from "node:path";
-import { runtimeDir } from "../../agents/context.ts";
+import { delimiter, join } from "node:path";
 
 /**
  * Where opencode is, and where Decks keeps the things it hands opencode.
@@ -27,15 +26,4 @@ export function opencodeExecutable(): string | undefined {
 		if (existsSync(candidate)) return candidate;
 	}
 	return undefined;
-}
-
-/**
- * The config directory Decks hands opencode, which is where the canvas tool lives.
- *
- * `OPENCODE_CONFIG_DIR` is loaded *after* the user's global config and their project's
- * `.opencode`, so this adds Decks' tool and skills to whatever they already have rather
- * than replacing it. Nothing is written into either.
- */
-export function opencodeConfigDir(): string {
-	return resolve(runtimeDir(), "opencode");
 }

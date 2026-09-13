@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { templatesDir } from "@decks/runtime";
 
 /**
  * The shells a new board starts from.
@@ -244,10 +244,6 @@ const ROWS: Record<BoardTemplate, Rhythm> = {
 	plan: { first: 152, rows: [{ h: 210, pair: true }, { h: 190 }] },
 	blank: { first: 152, rows: [] },
 };
-
-function templatesDir(): string {
-	return resolve(dirname(fileURLToPath(import.meta.url)), "../../../../runtime/templates");
-}
 
 export function isBoardTemplate(value: unknown): value is BoardTemplate {
 	return typeof value === "string" && (BOARD_TEMPLATES as readonly string[]).includes(value);

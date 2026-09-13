@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
+import { toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
 import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, isBoardFormat, isBoardTemplate, WIDE_BOARD_W } from "../boards/templates.ts";
-import { runtimeDir } from "../agents/context.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService, WebTarget } from "./service.ts";
 
@@ -190,7 +190,7 @@ export const STAGE_TOOL_NAME = "stage_eval";
 let description: string | undefined;
 function toolDescription(): string {
 	if (description === undefined) {
-		description = readFileSync(resolve(runtimeDir(), "tool-description.txt"), "utf8").trim();
+		description = readFileSync(toolDescriptionPath(), "utf8").trim();
 	}
 	return description;
 }

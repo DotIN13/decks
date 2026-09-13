@@ -6,7 +6,10 @@
   "description": "A canvas-centric coding agent powered by Pi",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "runtime",
+    "extension",
+    "e2e"
   ],
   "scripts": {
     "dev": "concurrently --raw --kill-others-on-fail \"npm:dev:server\" \"npm:dev:web\"",

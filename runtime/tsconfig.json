@@ -1,0 +1,10 @@
+{
+	"extends": "../tsconfig.base.json",
+	"compilerOptions": { "noEmit": true, "types": ["node"] },
+	/*
+	 * The assets are not TypeScript. What *is* here is the path resolver and the two shims
+	 * another program loads, and those are what this checks — `opencode/` resolves its own
+	 * dependency from its own `node_modules`, which is not this workspace's business.
+	 */
+	"include": ["paths.ts", "paths.test.ts"]
+}

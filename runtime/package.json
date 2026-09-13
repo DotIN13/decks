@@ -1,0 +1,18 @@
+{
+	"name": "@decks/runtime",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "What the agents' runtimes read: board primitives, skills, templates, the canvas API, and the tool shims.",
+	"exports": {
+		".": "./paths.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "node --import tsx --test \"paths.test.ts\""
+	},
+	"devDependencies": {
+		"tsx": "^4.20.7",
+		"typescript": "^5.9.3"
+	}
+}

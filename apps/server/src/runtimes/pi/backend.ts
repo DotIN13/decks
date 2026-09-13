@@ -13,7 +13,8 @@ import type { AgentCapabilities, AgentModel, AgentUsage, ModelOption, SlashComma
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { decksStage } from "./extension.ts";
-import { deckContext, skillsDir } from "../../agents/context.ts";
+import { skillsDir } from "@decks/runtime";
+import { deckContext } from "../../agents/context.ts";
 import { handlePiEvent } from "./events.ts";
 
 /**
