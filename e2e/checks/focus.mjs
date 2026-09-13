@@ -33,7 +33,11 @@ say("the flow board is on the canvas to focus on", onCanvas === 1, `${onCanvas} 
  */
 const bar = await page.evaluate((path) => {
 	const acts = document.querySelector(`.board-node[data-path="${path}"] .chrome .acts`);
-	return [...(acts?.children ?? [])].map((child) => ({ cls: child.className, w: Math.round(child.getBoundingClientRect().width) }));
+	return [...(acts?.children ?? [])].map((child) => ({
+		cls: child.className,
+		w: Math.round(child.getBoundingClientRect().width),
+		icon: Math.round(child.querySelector("svg")?.getBoundingClientRect().width ?? 0),
+	}));
 }, NOTES);
 say(
 	"the bar above the board offers its address, focus, fullscreen and going away, in that order",
@@ -166,6 +170,7 @@ for (let i = 0; i < 8 && !taller; i++) {
 	taller = (await state()).scrollable;
 }
 say("…and zooming in makes it longer than the window, which is what scrolling is for", taller, `scrollable: ${taller}`);
+
 say("…the page still filling its box rather than the frame's", (await state()).page !== null, "page present");
 
 const before = (await state()).scrollTop;

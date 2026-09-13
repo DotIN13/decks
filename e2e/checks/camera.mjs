@@ -86,10 +86,32 @@ const zoomOf = () =>
 	page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(document.querySelector(".world").style.transform)?.[1] ?? 0));
 
 const fittedZoom = await zoomOf();
+/*
+ * The bar's glyphs at the near end of the zoom, to compare with the far end.
+ *
+ * `Icon` sizes its SVG in pixels, and pixels inside a bar are *board* pixels — the bar is laid
+ * out in board units and the camera cancels them — so the buttons stay 18 screen pixels while the
+ * glyphs inside them scale with the camera: measured at 2.3px at 19% zoom and 48px at 400%,
+ * overflowing the button they were drawn in. Sized from `--unit` now, and this is the assertion
+ * that it stays that way: the same four glyphs, the same size, at both ends of a real zoom.
+ */
+const iconsAt = () =>
+	page.evaluate(() => {
+		const acts = document.querySelector(".board-node .chrome .acts");
+		if (!acts) return null;
+		return [...acts.children].map((child) => Math.round(child.querySelector("svg")?.getBoundingClientRect().width ?? 0));
+	});
+const iconsBefore = await iconsAt();
 await page.keyboard.press("Control+Equal");
 await settle(page, 400);
 const zoomedIn = await zoomOf();
 say("⌘+ zooms the canvas instead of the page", zoomedIn > fittedZoom * 1.1, `${fittedZoom.toFixed(3)} → ${zoomedIn.toFixed(3)}`);
+const iconsAfter = await iconsAt();
+say(
+	"…and the title bar's glyphs are the same size zoomed in as they were",
+	iconsBefore !== null && iconsAfter !== null && iconsAfter.every((icon, at) => icon === iconsBefore[at] && icon > 0),
+	`${(iconsBefore ?? []).join("/")} at ${fittedZoom.toFixed(2)} → ${(iconsAfter ?? []).join("/")} at ${zoomedIn.toFixed(2)}`,
+);
 
 await page.keyboard.press("Control+Minus");
 await settle(page, 400);

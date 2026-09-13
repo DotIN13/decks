@@ -694,6 +694,20 @@ svg.lucide {
 	letter-spacing: 0.02em;
 }
 
+/*
+ * And the glyph inside is the same size at every zoom, which it was not.
+ *
+ * `Icon` sizes its SVG in *pixels* — `width="12"` — and pixels here are board pixels, because
+ * this box is laid out in board units. So the buttons stayed 18 screen pixels while the glyph
+ * inside them scaled with the camera: measured, 2.3px at 19% and 48px at 400%, overflowing the
+ * button it was drawn in. CSS beats the width/height *attributes*, so one rule puts all four on
+ * the same unit — and on one size, which they were not: the × was 14 to the others' 12.
+ */
+.board-node > .chrome .acts svg {
+	width: calc(12 * var(--unit));
+	height: calc(12 * var(--unit));
+}
+
 /* The same box as the three beside it: one 18px square, whichever glyph is in it. */
 .board-node > .chrome .present-open[data-glyph="true"] {
 	width: calc(18 * var(--unit));
