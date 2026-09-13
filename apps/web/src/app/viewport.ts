@@ -1,3 +1,5 @@
+import { onCleanup, onMount } from "solid-js";
+
 /**
  * The part of the window a person can actually see.
  *
@@ -100,4 +102,28 @@ export function watchDock(dock: Element | null): void {
 		const height = Math.round(entry?.contentRect.height ?? 0);
 		document.documentElement.style.setProperty("--dock", `${height}px`);
 	}).observe(dock);
+}
+
+/**
+ * Everything this file knows, wired up — three facts about the window, one call.
+ *
+ * The three were three statements in an `onMount` in `App.tsx` that also installed the paste
+ * listener and the drop guard, and when those two moved to `app/files.ts` the cut took these
+ * with them. Nothing caught it: they were dead *imports* afterwards, which a typechecker does
+ * not report, and every browser check runs in a desktop Chromium with a mouse — no on-screen
+ * keyboard, no pinch gesture, and a dock whose height never changes. Two of the three were
+ * invisible to the whole suite and the third only mis-draws on a phone.
+ *
+ * One call that installs all three is the fix for the *shape* of that mistake, not just the
+ * three lines: there is now one place to delete, and it is named after what it does.
+ */
+export function installViewport(): void {
+	onMount(() => {
+		// The visual viewport, so the dock stays above the on-screen keyboard.
+		onCleanup(trackVisualViewport());
+		// And one pinch, zooming one thing: the boards, not the app around them.
+		onCleanup(blockPageZoom());
+		// How tall the dock is, published for the stylesheet.
+		watchDock(document.querySelector(".dock"));
+	});
 }

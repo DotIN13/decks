@@ -180,6 +180,24 @@ function createUi() {
 	 */
 	const [boardsStarted, setBoardsStarted] = createSignal(false);
 
+	/**
+	 * Release the gate above, once.
+	 *
+	 * Called from wherever the first thing worth showing lands — the greeting, or the focused
+	 * conversation's history — and from a timer, because a history that never comes must not
+	 * keep the canvas empty. Idempotent: the first call wins and the rest are a boolean.
+	 *
+	 * It was `appOpened` in `App.tsx`, which is where the *decisions* about when to call it
+	 * still are. The gate it fires is here, beside the signal it sets, so the frame switch can
+	 * reach it without a hook.
+	 */
+	let opened = false;
+	const releaseBoards = () => {
+		if (opened) return;
+		opened = true;
+		requestAnimationFrame(() => requestAnimationFrame(() => setBoardsMayStart(true)));
+	};
+
 	const canvasOpened = () => {
 		setBoardsStarted(true);
 		openThumbnails();
@@ -214,6 +232,7 @@ function createUi() {
 		boardsStarted,
 		setBoardsStarted,
 		canvasOpened,
+		releaseBoards,
 	};
 }
 
@@ -251,4 +270,5 @@ export const {
 	boardsStarted,
 	setBoardsStarted,
 	canvasOpened,
+	releaseBoards,
 } = ui;

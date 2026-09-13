@@ -1,6 +1,6 @@
 import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckState, type Identity, type RuntimeInfo, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
-import type { AgentRecord } from "./agent.ts";
+import { emptyAgent, type AgentRecord } from "./agent.ts";
 
 /**
  * The server's view of the world, as one store.
@@ -119,6 +119,27 @@ export const [state, setState] = createDeck();
  */
 export const runtimes = (): RuntimeInfo[] =>
 	state.runtimes.length > 0 ? state.runtimes : AGENT_KINDS.map((kind) => ({ kind, label: kind, available: true }));
+
+/**
+ * The record for an agent, created if this is the first thing said about it.
+ *
+ * Every write into `state.agents` goes through here first, and it is not a nicety: Solid's
+ * store **throws** on a nested write whose parent is missing — `setState("agents", id,
+ * "model", …)` with no `agents[id]` raises `Cannot read properties of undefined`, for plain
+ * values and function updaters alike (measured). There is no single moment an agent first
+ * appears — `agent.identity`, `models`, `chat.history`, `context.changed` and four others
+ * all write into whichever field arrives first — so the alternative is remembering, twenty
+ * times, something the compiler cannot check.
+ *
+ * Here rather than in the component because eleven of those writes are in the frame switch
+ * (`app/frames.ts`), which is not a component and has no business being handed a store write.
+ */
+export const ensureAgent = (id: string): void => {
+	if (!state.agents[id]) setState("agents", id, emptyAgent());
+};
+
+/** What to call an agent in a sentence, without the sentence being about an id. */
+export const nameOf = (id: string | undefined): string => (id ? (state.identities[id]?.name ?? "An agent") : "An agent");
 
 /** The focused agent's question, if it has one. */
 export const dialog = () => (state.focused ? state.agents[state.focused]?.dialog : undefined);

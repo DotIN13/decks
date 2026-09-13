@@ -1,6 +1,7 @@
 import { onCleanup, onMount } from "solid-js";
-import type { BoardPatch, Camera } from "@decks/protocol";
+import type { BoardPatch } from "@decks/protocol";
 import { toWorld } from "../camera/camera.ts";
+import { camera } from "../state/camera.ts";
 import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "../canvas/file-drop.ts";
 import type { EditorHost } from "../canvas/Editor.ts";
 import { state } from "../state/deck.ts";
@@ -38,10 +39,7 @@ function sizeLabel(bytes: number): string {
  * position at all and mentions the path where the caret is; and a paste has neither, so it
  * lands on the selected board, at the middle of it.
  */
-export function createFileDrops(deps: {
-	editor: EditorHost;
-	camera(): Camera;
-}) {
+export function createFileDrops(deps: { editor: EditorHost }) {
 	/** Boards asked for with a `request`, waiting to hear their paths (`board.created`). */
 	const created = new Map<string, (path: string) => void>();
 
@@ -158,7 +156,7 @@ export function createFileDrops(deps: {
 		const boxes = flow(shapes, { x: 48, y: FIRST_ROW }, width);
 		const height = Math.max(400, Math.max(...boxes.map((box) => box.top + box.height)) + 48);
 		// `at` is already in stage pixels: the stage is the viewport (`camera/coords.ts`).
-		const middle = toWorld(deps.camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
+		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
 		const request = `drop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 		const path = await new Promise<string | undefined>((resolve) => {
 			created.set(request, resolve);

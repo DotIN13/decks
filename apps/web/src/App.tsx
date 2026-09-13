@@ -1,11 +1,4 @@
-import type {
-	AgentState,
-	Board,
-	BoardPatch,
-	Camera,
-	Identity,
-	ThinkingLevel,
-} from "@decks/protocol";
+import type {Board, BoardPatch, Camera, Identity, ThinkingLevel} from "@decks/protocol";
 import Info from "lucide-solid/icons/info";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Minus from "lucide-solid/icons/minus";
@@ -16,89 +9,47 @@ import LayoutGrid from "lucide-solid/icons/layout-grid";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
 import Sun from "lucide-solid/icons/sun";
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { createStore, reconcile } from "solid-js/store";
+import {createEffect, createMemo, createSignal, onCleanup, onMount, Show} from "solid-js";
+import {createStore} from "solid-js/store";
 import type { EditorHost } from "./canvas/Editor.ts";
-import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "./canvas/file-drop.ts";
 import { Settings } from "./chat/Settings.tsx";
-import { forgetAskedResults, receiveToolResult, setToolResultSender } from "./chat/tool-results.ts";
+import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import { createAlerts } from "./app/alerts.ts";
+import { camera, setCamera } from "./state/camera.ts";
 import { handleFrame, type FrameHooks } from "./app/frames.ts";
 import { createFileDrops } from "./app/files.ts";
-import { createCameraReport } from "./app/camera-report.ts";
+import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
 import { installKeys } from "./app/keys.ts";
-import { type AgentRecord, createAgentScratch, emptyAgent } from "./state/agent.ts";
-import { clearMarks, component, marks, mode, selected, setComponent, setMarks, setMode, setSelected, setTool, tool } from "./state/selection.ts";
+import {createAgentScratch} from "./state/agent.ts";
+import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
 import { on, send, start, started } from "./state/socket.ts";
-import { clearDialog, clearPreview, dialog, preview, setState, state } from "./state/deck.ts";
+import {clearDialog, clearPreview, dialog, preview, setState, state} from "./state/deck.ts";
 import { notice, working } from "./state/notices.ts";
-import {
-	boardsMayStart,
-	boardsOpen,
-	boardsStarted,
-	canvasOpened,
-	draft,
-	editingSource,
-	ops,
-	openSource,
-	openUsage,
-	picking,
-	presenting,
-	readUsage,
-	setBoardsMayStart,
-	setBoardsOpen,
-	setDraft,
-	setEditingSource,
-	setOps,
-	setPicking,
-	setPresenting,
-	setSettings,
-	setUnread,
-	setUsagePanel,
-	setUsageReport,
-	settings,
-	unread,
-	usagePanel,
-	usageReport,
-} from "./state/ui.ts";
+import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
-import { DecksMark, Icon } from "./icons.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
 import { Inspector } from "./canvas/Inspector.tsx";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import { coalesce, needsReload } from "./canvas/patches.ts";
 import { Stage } from "./canvas/Stage.tsx";
-import { runStageCall } from "./canvas/stage-ops.ts";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
 import { Present } from "./canvas/Present.tsx";
 import { StatusLine } from "./chat/StatusLine.tsx";
-import { PAGE, prepend } from "./chat/history-page.ts";
+import {PAGE} from "./chat/history-page.ts";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
-import { boxOf, fitInto, INTERACT_ZOOM, keepVisible, toWorld } from "./camera/camera.ts";
+import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
-import { closeHistory, historyShown, openHistory, setInspectable, toggleHistory } from "./lib/edge.ts";
+import {closeHistory, historyShown, openHistory, setInspectable} from "./lib/edge.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
-import { embedPath, uploadAsset } from "./app/upload.ts";
 import { canHover, NARROW } from "./lib/panels.ts";
-import { blockPageZoom, obscured, trackVisualViewport, watchDock } from "./app/viewport.ts";
-import {
-	type AlertKind,
-	type AlertPrefs,
-	type Presence,
-	finished,
-	inView,
-	loadPrefs,
-	savePrefs,
-	shouldNotify,
-	shouldSound,
-	startedAsking,
-} from "./lib/alerts.ts";
+import { installViewport, obscured } from "./app/viewport.ts";
+import {finished} from "./lib/alerts.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./chat/UsageModal.tsx";
 
@@ -122,22 +73,7 @@ export function App() {
 	 */
 	const scratch = createAgentScratch();
 
-	/**
-	 * The record for an agent, created if this is the first thing said about it.
-	 *
-	 * Every write below goes through here first, and it is not a nicety: Solid's store
-	 * **throws** on a nested write whose parent is missing — `setState("agents", id, "model", …)`
-	 * with no `agents[id]` raises `Cannot read properties of undefined`, for plain values and
-	 * function updaters alike (measured). There is no single moment an agent first appears —
-	 * `agent.identity`, `models`, `chat.history`, `context.changed` and four others all write
-	 * into whichever field arrives first — so the alternative is remembering, twenty-two times,
-	 * something the compiler cannot check.
-	 */
-	const ensureAgent = (id: string) => {
-		if (!state.agents[id]) setState("agents", id, emptyAgent());
-	};
-
-	const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
+	// The camera itself is `state/camera.ts`; this is the one derived reading of it.
 	const zoomInteractive = createMemo(() => camera().zoom >= INTERACT_ZOOM);
 	/** The turn the chat was opened at, from a click on the spine. */
 	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
@@ -188,13 +124,6 @@ export function App() {
 	 * uses to hold the reader's place while the column grows above them.
 	 */
 	const earlierWaiting = new Map<string, (added: number) => void>();
-
-	let opened = false;
-	const appOpened = () => {
-		if (opened) return;
-		opened = true;
-		requestAnimationFrame(() => requestAnimationFrame(() => setBoardsMayStart(true)));
-	};
 
 	/*
 	 * A history is asked for when a chat is shown — opened, or mirrored on a board — rather
@@ -258,9 +187,6 @@ export function App() {
 	 */
 	const { prefs, setPrefs, raise } = createAlerts({ focusAgent: (id) => focusAgent(id) });
 
-	/** What to call an agent in a banner, without making the sentence about an id. */
-	const nameOf = (id: string | undefined) => (id ? (state.identities[id]?.name ?? "An agent") : "An agent");
-
 	/*
 	 * The state each agent was last in lives on its scratch record, so a change can be told
 	 * from a restatement. Not reactive, and it must be read and written in the same tick the
@@ -288,7 +214,7 @@ export function App() {
 	 * where that left the camera, not the {0,0,1} it started at.
 	 */
 	onMount(() => {
-		const timer = window.setTimeout(() => sendCamera(camera()), 400);
+		const timer = window.setTimeout(() => reportCamera(camera()), 400);
 		onCleanup(() => clearTimeout(timer));
 	});
 
@@ -299,7 +225,7 @@ export function App() {
 			forgetAskedResults();
 		});
 		// Whatever arrives or does not, the canvas is not held empty for longer than this.
-		setTimeout(appOpened, 2500);
+		setTimeout(releaseBoards, 2500);
 		// The chip knows the row; the conversation it is in is found here.
 		setToolResultSender((itemId) => {
 			const agentId = Object.keys(state.agents).find((id) => state.agents[id]?.transcript.some((item) => item.id === itemId));
@@ -331,9 +257,6 @@ export function App() {
 	 * Telling the server where the user is looking (`app/camera-report.ts`): the debounce, the
 	 * reading, and the canvas size that rides with it.
 	 */
-	const report = createCameraReport({ read: camera, write: setCamera });
-	const sendCamera = report.now;
-	const setCameraAndReport = report.set;
 
 
 	/**
@@ -403,8 +326,6 @@ export function App() {
 	 * needs to answer a question with. Everything else the handler uses is a module.
 	 */
 	const frames: FrameHooks = {
-		appOpened,
-		ensureAgent,
 		ensureHistory,
 		hearBoard: (request, path) => files.hearBoard(request, path),
 		scratch,
@@ -415,10 +336,9 @@ export function App() {
 		setFrameRev: (path, rev) => setFrameRevs(path, rev),
 		sendPatches,
 		setCamera,
-		sendCamera,
+		sendCamera: reportCamera,
 		setAtTurn,
 		raise,
-		nameOf,
 	};
 
 	const editor: EditorHost = {
@@ -571,12 +491,14 @@ export function App() {
 	 * Files arriving from outside: dropped, pasted, or picked (`app/files.ts`). Five routes,
 	 * one destination — the bytes are copied into the deck's `assets/`.
 	 */
-	const files = createFileDrops({ editor, camera });
+	const files = createFileDrops({ editor });
 	const { addFile, drops, intoComposer, paste } = files;
 
 
 	// A paste, and a drop that missed every board (`app/files.ts`).
 	files.install({ preview });
+	// The window's own facts: the on-screen keyboard, the page-zoom block, the dock's height.
+	installViewport();
 
 	/** Bumped to say "put the cursor in the search field" — the panel watches it. */
 	const [findAt, setFindAt] = createSignal(0);
@@ -815,7 +737,7 @@ export function App() {
 						onHide={(path) => send({ type: "board.hide", path })}
 						nonces={state.nonces}
 						cursor={state.cursor}
-						onViewport={() => report.soon(camera())}
+						onViewport={() => reportCameraSoon(camera())}
 						onExtent={(path, extent) => send({ type: "board.extent", path, ...extent })}
 						editor={editor}
 						onTool={setTool}

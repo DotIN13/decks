@@ -5,20 +5,16 @@ import { receiveToolResult } from "../chat/tool-results.ts";
 import { viewToPark } from "../camera/agent-view.ts";
 import { runStageCall } from "../canvas/stage-ops.ts";
 import type { AgentScratchStore } from "../state/agent.ts";
-import { setState, state } from "../state/deck.ts";
+import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
 import { notice } from "../state/notices.ts";
 import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../lib/alerts.ts";
 import { historyShown } from "../lib/edge.ts";
-import { setDraft, setUnread, setUsagePanel, setUsageReport, usagePanel } from "../state/ui.ts";
+import { releaseBoards, setDraft, setUnread, setUsagePanel, setUsageReport, usagePanel } from "../state/ui.ts";
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
-	/** Start the app's own opening fit, once. */
-	appOpened(): void;
-	/** The record for an agent, created if this is the first thing said about it. */
-	ensureAgent(id: string): void;
 	/** Ask for a conversation's history, once per connection. */
 	ensureHistory(agentId: string | undefined): void;
 	/** A board asked for by a drop heard its path. */
@@ -39,7 +35,6 @@ export interface FrameHooks {
 	sendCamera(camera: Camera, agentId?: string): void;
 	setAtTurn(at: { id: string; at: number } | undefined): void;
 	raise(kind: "done" | "ask" | "problem", banner: { title: string; body?: string; tag?: string; agent?: string }): void;
-	nameOf(id: string | undefined): string;
 }
 
 /**
@@ -168,7 +163,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState({ chats: message.chats, focused, defaultKind: message.defaultKind });
 					hooks.ensureHistory(focused);
 					// No chat to wait for: the deck is all there is to open.
-					if (!focused) hooks.appOpened();
+					if (!focused) releaseBoards();
 					return;
 				}
 
@@ -213,25 +208,25 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 */
 					if (finished(was, message.state)) {
 						hooks.raise("done", {
-							title: `${hooks.nameOf(message.id)} finished`,
+							title: `${nameOf(message.id)} finished`,
 							// The deck's name, so a banner from one of three windows says which one.
 							body: state.deck?.name,
 							tag: `done:${message.id}`,
 							agent: message.id,
 						});
 					} else if (startedAsking(was, message.state)) {
-						hooks.raise("ask", { title: `${hooks.nameOf(message.id)} is waiting for you`, tag: `ask:${message.id}`, agent: message.id });
+						hooks.raise("ask", { title: `${nameOf(message.id)} is waiting for you`, tag: `ask:${message.id}`, agent: message.id });
 					}
 					return;
 				}
 
 				case "agent.model":
-					hooks.ensureAgent(message.id);
+					ensureAgent(message.id);
 					setState("agents", message.id, "model", message.model);
 					return;
 
 				case "agent.usage":
-					hooks.ensureAgent(message.id);
+					ensureAgent(message.id);
 					setState("agents", message.id, "usage", message.usage);
 					return;
 
@@ -253,16 +248,16 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					// One list per agent: the runtime each agent runs on answers its own, and
 					// a global list would show the last agent to start on everyone — a row
 					// for Claude listing the models of a pi agent that started after it.
-					hooks.ensureAgent(message.agentId);
+					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "models", message.models);
 					return;
 
 				case "chat.history":
-					hooks.ensureAgent(message.agentId);
+					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "transcript", message.items);
 					setState("agents", message.agentId, "moreHistory", message.more ?? false);
 					hooks.scratch.of(message.agentId).historyHeld = true;
-					if (message.agentId === state.focused) hooks.appOpened();
+					if (message.agentId === state.focused) releaseBoards();
 					hooks.scratch.of(message.agentId).historyAsked = false;
 					return;
 
@@ -279,7 +274,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * landed, and a rewind re-sends a window that can overlap a page already
 					 * fetched. The held copy wins — it is the one a delta may be arriving into.
 					 */
-					hooks.ensureAgent(message.agentId);
+					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "transcript", (held) => prepend(message.items, held));
 					setState("agents", message.agentId, "moreHistory", message.more);
 					// Whoever asked is waiting on the count, so it can hold the reader's place.
@@ -300,7 +295,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 */
 					const unseen = message.agentId !== state.focused || !historyShown();
 					if (unseen && item.kind === "assistant") setUnread(message.agentId, (count = 0) => count + 1);
-					hooks.ensureAgent(message.agentId);
+					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "transcript", (items) => {
 						const index = items.findIndex((existing) => existing.id === item.id);
 						if (index === -1) return [...items, item];
@@ -314,7 +309,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				case "chat.delta": {
 					// Deltas are applied to the item in place: the server sends the whole
 					// item at the start and the end, and the increments in between.
-					hooks.ensureAgent(message.agentId);
+					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "transcript", (items) =>
 						items.map((item) => {
 							if (item.id !== message.itemId || item.kind !== "assistant") return item;
@@ -327,13 +322,13 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				}
 
 				case "timeline.preview":
-					hooks.ensureAgent(message.agentId);
+					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "preview", message.entryId ? { entryId: message.entryId, boards: message.boards } : undefined);
 					return;
 
 				case "context.changed":
 					setState("contexts", message.agentId, message.boards);
-					hooks.ensureAgent(message.agentId);
+					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "inPlay", message.inPlay);
 					return;
 
@@ -380,7 +375,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				}
 
 				case "extension.ui.prompt":
-					hooks.ensureAgent(message.agentId);
+					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "dialog", message.prompt);
 					// Drawn in the dock, above the input bar, so it needs nothing dragged
 					// open to be seen.
@@ -396,7 +391,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * switches to that conversation rather than to whichever was on screen.
 					 */
 					hooks.raise("ask", {
-						title: `${hooks.nameOf(message.agentId)} is waiting for you`,
+						title: `${nameOf(message.agentId)} is waiting for you`,
 						body: "title" in message.prompt ? message.prompt.title : undefined,
 						tag: `prompt:${message.prompt.id}`,
 						agent: message.agentId,
@@ -430,7 +425,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * the agents' own records, where the rest of what is known about them lives.
 					 */
 					for (const [id, account] of Object.entries(message.spending ?? {})) {
-						hooks.ensureAgent(id);
+						ensureAgent(id);
 						setState("agents", id, "spending", account);
 					}
 					return;
@@ -452,7 +447,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				 * change with the turn rather than on the next poll.
 				 */
 				case "agent.account":
-					hooks.ensureAgent(message.id);
+					ensureAgent(message.id);
 					setState("agents", message.id, "spending", message.account);
 					return;
 				case "error":
