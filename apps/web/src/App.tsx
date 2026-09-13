@@ -1,4 +1,4 @@
-import type {Board, BoardPatch, Camera, Identity, ThinkingLevel} from "@decks/protocol";
+import type { Board, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import Info from "lucide-solid/icons/info";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Minus from "lucide-solid/icons/minus";
@@ -10,7 +10,6 @@ import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
 import Sun from "lucide-solid/icons/sun";
 import {createEffect, createMemo, createSignal, onCleanup, onMount, Show} from "solid-js";
-import {createStore} from "solid-js/store";
 import type { EditorHost } from "./canvas/Editor.ts";
 import { Settings } from "./chat/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
@@ -22,6 +21,7 @@ import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera
 import { installKeys } from "./app/keys.ts";
 import { scratch } from "./state/agent.ts";
 import { ensureHistory, loadEarlier } from "./state/history.ts";
+import { frameRevs, patchBoard } from "./state/patches.ts";
 import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
 import { on, send, start, started } from "./state/socket.ts";
 import {clearDialog, clearPreview, dialog, preview, setState, state} from "./state/deck.ts";
@@ -32,13 +32,11 @@ import { FilePicker } from "./canvas/FilePicker.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
 import { Inspector } from "./canvas/Inspector.tsx";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
-import { coalesce, needsReload } from "./canvas/patches.ts";
 import { Stage } from "./canvas/Stage.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
 import { Present } from "./canvas/Present.tsx";
 import { StatusLine } from "./chat/StatusLine.tsx";
-import {PAGE} from "./chat/history-page.ts";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
@@ -67,43 +65,6 @@ export function App() {
 	const zoomInteractive = createMemo(() => camera().zoom >= INTERACT_ZOOM);
 	/** The turn the chat was opened at, from a click on the spine. */
 	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
-	/**
-	 * Revisions this browser caused, by path.
-	 *
-	 * Its own edit is already in the frame's DOM, so reloading the frame to show it
-	 * would throw away the thing it is showing and flash. Somebody else's edit — the
-	 * agent's, another tab's — does reload.
-	 *
-	 * This is keyed by revision rather than being a "just wrote it" flag because one
-	 * patch produces *two* `board.changed` messages: the immediate one from the write and
-	 * the watcher's, both carrying the same rev. A flag is consumed by the first and the
-	 * second then looks exactly like somebody else's write — it unpinned the frame and
-	 * reloaded the document out from under the user, which is the flash you see on every
-	 * component drag. A rev is a content hash, so matching on it absorbs however many
-	 * echoes arrive and still reloads for a rev we did not produce.
-	 */
-	const selfRevs = new Map<string, number>();
-	/** Paths with a patch in flight, before the accepted rev is known. */
-	const patching = new Set<string>();
-	/**
-	 * Edits made while a patch was in flight, per path.
-	 *
-	 * A patch carries the rev it was composed against, so a second one sent before the
-	 * first is acknowledged names a revision that no longer exists and is refused —
-	 * correct for "the agent wrote this file underneath you" and absurd for "you
-	 * clicked three inspector buttons". They wait here and go as one batch against the
-	 * rev the acknowledgement brings back. See `canvas/patches.ts`.
-	 */
-	const queued = new Map<string, BoardPatch[]>();
-	/**
-	 * The revision each frame is pinned to, or 0 for "show the newest".
-	 *
-	 * A pin is what stops a reload. Our own edit is already in the frame's DOM, so the
-	 * frame is pinned to the revision it *loaded* — not the one it just produced —
-	 * and the URL therefore does not change. Somebody else's edit clears the pin, the
-	 * URL changes, and the frame reloads, which is exactly what should happen.
-	 */
-	const [frameRevs, setFrameRevs] = createStore<Record<string, number>>({});
 
 	/*
 	 * The history window — asked for when a chat is shown, and reached back through on demand
@@ -233,48 +194,14 @@ export function App() {
 		for (const listener of selectionListeners) listener();
 	});
 
-	/**
-	 * A batch of patches, down the socket, against a named revision.
-	 *
-	 * Split out from `editor.patch` because the queue above sends from a second place:
-	 * the acknowledgement of the patch that was in flight.
-	 */
-	const sendPatches = (path: string, rev: number, patches: BoardPatch[]) => {
-		patching.add(path);
-		/*
-		 * Pin to what the frame is showing *now*, before the write lands — and only if
-		 * it is not already pinned. Re-pinning on each edit moves the pin to the newest
-		 * rev while the document on screen is still the one it first loaded, so the URL
-		 * changes and the frame reloads: the flash came back on the second drag.
-		 *
-		 * An insert is the exception, and a duplicate with it: both have to actively
-		 * *unpin*. The pin's premise is that the frame's DOM is already correct because
-		 * the editor mutated it — true of a drag, false of a component that exists only
-		 * in the file, because the server mints the id and writes the markup (§6.5).
-		 * Pinned, a dropped file landed in `assets/`, landed in the board's source, and
-		 * appeared nowhere on screen until something else reloaded the frame. One reload
-		 * beats a component the user cannot see.
-		 */
-		if (needsReload(patches)) setFrameRevs(path, 0);
-		else if (!frameRevs[path]) {
-			const board = state.boards.find((candidate) => candidate.path === path);
-			if (board) setFrameRevs(path, board.rev);
-		}
-		send({ type: "board.patch", path, rev, patches });
-	};
-
 	/*
-	 * What `handleFrame` may touch (`app/frames.ts`): the things the component *writes* —
-	 * the camera, the pins, the patch queue, the unread marks — plus the two readers a frame
-	 * needs to answer a question with. Everything else the handler uses is a module.
+	 * What `handleFrame` may touch (`app/frames.ts`). **Three fields**, and each has a reason
+	 * to be here: a request registry `app/files.ts` owns and mints, a signal whose one reader
+	 * is the conversation column, and behaviour that needs the component's own `focusAgent`.
+	 * Everything else the handler uses it imports — the camera, the patch queue, the store.
 	 */
 	const frames: FrameHooks = {
 		hearBoard: (request, path) => files.hearBoard(request, path),
-		selfRevs,
-		patching,
-		queued,
-		setFrameRev: (path, rev) => setFrameRevs(path, rev),
-		sendPatches,
 		setAtTurn,
 		raise,
 	};
@@ -291,18 +218,7 @@ export function App() {
 			selectionListeners.add(listener);
 			return () => selectionListeners.delete(listener);
 		},
-		patch: (path, patches) => {
-			const board = state.boards.find((candidate) => candidate.path === path);
-			if (!board) return;
-			// One patch at a time per board. The rest wait for the rev the acknowledgement
-			// brings, coalesced, because a burst of edits to one component is one edit as
-			// far as the file is concerned.
-			if (patching.has(path)) {
-				queued.set(path, coalesce([...(queued.get(path) ?? []), ...patches]));
-				return;
-			}
-			sendPatches(path, board.rev, patches);
-		},
+		patch: (path, patches) => patchBoard(path, patches),
 		undo: (path) => send({ type: "board.undo", path }),
 		pickFile: (board) =>
 			new Promise<string | undefined>((resolve) => {

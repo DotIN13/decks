@@ -9,6 +9,7 @@ import { setCamera } from "../state/camera.ts";
 import { reportCamera } from "./camera-report.ts";
 import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
 import { ensureHistory, resolveEarlier } from "../state/history.ts";
+import { boardChanged, forgetInFlight, forgetPatches, patchAccepted, patchRefused } from "../state/patches.ts";
 import { notice } from "../state/notices.ts";
 import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
@@ -20,14 +21,6 @@ import { releaseBoards, setDraft, setUnread, setUsagePanel, setUsageReport, usag
 export interface FrameHooks {
 	/** A board asked for by a drop heard its path. */
 	hearBoard(request: string, path: string): void;
-	/** Revisions this browser caused, and the patches still in flight behind them. */
-	selfRevs: Map<string, number>;
-	patching: Set<string>;
-	queued: Map<string, BoardPatch[]>;
-	/** Pin a frame to a revision, or unpin it with 0. */
-	setFrameRev(path: string, rev: number): void;
-	/** A batch of patches down the socket, against a named revision. */
-	sendPatches(path: string, rev: number, patches: BoardPatch[]): void;
 	setAtTurn(at: { id: string; at: number } | undefined): void;
 	raise(kind: "done" | "ask" | "problem", banner: { title: string; body?: string; tag?: string; agent?: string }): void;
 }
@@ -61,8 +54,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * a dropped socket would otherwise leave every later edit to that board
 					 * waiting for a message that is never coming.
 					 */
-					hooks.patching.clear();
-					hooks.queued.clear();
+					forgetInFlight();
 					/*
 					 * Reconciled by path, not replaced.
 					 *
@@ -76,60 +68,45 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("boards", reconcile(message.deck.boards, { key: "path", merge: false }));
 					return;
 				case "board.patched": {
-					hooks.patching.delete(message.path);
 					if (message.refused) {
 						notice("warn", message.refused);
-						// Its optimistic DOM is now a lie: unpin and reload from the file. What
-						// was hooks.queued behind it was composed against that same lie, so it goes
-						// too — one warning, not one per held-back click.
-						hooks.queued.delete(message.path);
-						// And the selection, which may name a component that was never renamed
-						// or a copy that was never made. The frame is about to reload with the
-						// file's own answer; a selection composed against the refused version of
-						// it would leave the inspector describing something that does not exist.
+						/*
+						 * Its optimistic DOM is now a lie: unpin and reload from the file. What
+						 * was queued behind it was composed against that same lie, so the queue
+						 * goes too (`state/patches.ts`) — one warning, not one per held-back
+						 * click.
+						 */
+						patchRefused(message.path);
+						/*
+						 * And the selection, which may name a component that was never renamed or
+						 * a copy that was never made. The frame is about to reload with the
+						 * file's own answer; a selection composed against the refused version of
+						 * it would leave the inspector describing something that does not exist.
+						 */
 						setComponent(undefined);
-						hooks.selfRevs.delete(message.path);
-						hooks.setFrameRev(message.path, 0);
 						setState("nonces", message.path, (current = 0) => current + 1);
 						return;
 					}
-					// Accepted: remember the rev our write produced so both echoes of it are
-					// recognised, and keep the pin so the frame holds the DOM it already has.
-					hooks.selfRevs.set(message.path, message.rev);
-					/*
-					 * Whatever arrived while this was in flight goes now, against the rev this
-					 * message carries — which is the only place the new rev is known this
-					 * early: `board.rev` in the store is not updated until `board.changed`
-					 * lands, one message later, so composing against it here would send a
-					 * stale patch to fix a stale patch.
-					 */
-					const waiting = hooks.queued.get(message.path);
-					if (waiting && waiting.length > 0) {
-						hooks.queued.delete(message.path);
-						hooks.sendPatches(message.path, message.rev, waiting);
-					}
+					// Accepted: our revision is remembered, and whatever was waiting behind it
+					// goes now, against the rev this message carries.
+					patchAccepted(message.path, message.rev);
 					return;
 				}
 
 				case "board.changed": {
 					if (message.removed) {
+						forgetPatches(message.path);
 						setState("boards", (boards) => boards.filter((board) => board.path !== message.path));
 						return;
 					}
 					if (!message.board) return;
 					const board = message.board;
-					if (hooks.selfRevs.get(board.path) === board.rev) {
-						// Our own write, already on screen. Kept, not consumed: the same rev
-						// arrives twice and the second copy must not read as somebody else's.
-					} else if (hooks.patching.has(board.path)) {
-						// The echo overtook the acknowledgement — adopt it as ours.
-						hooks.selfRevs.set(board.path, board.rev);
-					} else {
-						// Somebody else wrote it — the agent, another tab, an editor. Drop
-						// the pin so the frame loads what is now on disk.
-						hooks.selfRevs.delete(board.path);
-						hooks.setFrameRev(board.path, 0);
-					}
+					/*
+					 * Whose write it was, which decides whether the frame may reload: our own
+					 * (already on screen), the echo that overtook our acknowledgement, or
+					 * somebody else's — the agent, another tab, an editor (`state/patches.ts`).
+					 */
+					boardChanged(board.path, board.rev);
 					// Merged into the existing row so its frame survives; only a board that
 					// is genuinely new grows the array.
 					//
