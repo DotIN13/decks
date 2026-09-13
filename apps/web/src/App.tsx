@@ -46,7 +46,7 @@ import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
 import {closeHistory, historyShown, openHistory, setInspectable} from "./lib/edge.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
-import { canHover, NARROW } from "./lib/panels.ts";
+import { canHover, NARROW } from "./lib/media.ts";
 import { installViewport, obscured } from "./app/viewport.ts";
 import {finished} from "./lib/alerts.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";

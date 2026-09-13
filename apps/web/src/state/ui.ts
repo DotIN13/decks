@@ -18,7 +18,7 @@ import { send } from "./socket.ts";
  * **The initial width is read through a function, not inline.** `boardsOpen` starts from the
  * window's width, and a module-scope `window.innerWidth` runs at *import* — so importing this
  * module in Node, which is what a unit test does, would throw before a single assertion ran.
- * `lib/panels.ts` makes the same call for `canHover`, wrapping its `matchMedia` in a
+ * `lib/media.ts` makes the same call for `canHover`, wrapping its `matchMedia` in a
  * try/catch, and this follows it.
  *
  * **`usageReport` is not called `report`.** It was, in `App.tsx`, where it was a closure. As
@@ -91,7 +91,7 @@ function createUi() {
 	const [picking, setPicking] = createSignal<{ resolve: (path: string | undefined) => void; board?: string } | undefined>(undefined);
 
 	/**
-	 * Whether the boards panel is there. One signal where `lib/panels.ts` had two, because
+	 * Whether the boards panel is there. One signal where the module it came from had two, because
 	 * there is one panel now — and a plain signal rather than that module's persisted pair,
 	 * since what it was mostly doing was closing one panel when the other opened.
 	 */

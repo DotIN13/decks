@@ -2,7 +2,7 @@ import X from "lucide-solid/icons/x";
 import { PALETTE } from "@decks/board-kit";
 import { For, Match, Show, Switch } from "solid-js";
 import { Icon } from "../icons.tsx";
-import { canHover } from "../lib/panels.ts";
+import { canHover } from "../lib/media.ts";
 import { tokens } from "./keycaps.ts";
 
 /**

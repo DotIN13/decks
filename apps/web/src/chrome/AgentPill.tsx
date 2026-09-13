@@ -21,7 +21,7 @@ import type { CanvasMode, Tool } from "../canvas/Editor.ts";
 import { Icon } from "../icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
 import { runtimes } from "../state/deck.ts";
-import { canHover } from "../lib/panels.ts";
+import { canHover } from "../lib/media.ts";
 import { agentList, agentStatus, closeWords, rowWords } from "./agent-order.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 

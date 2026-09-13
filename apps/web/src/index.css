@@ -1777,7 +1777,7 @@ svg.lucide {
  * It slides rather than appears, and the transform is what moves: one composited property,
  * so a panel arriving never costs a layout. Closed it is fully off — the sliver that used to
  * stay behind was something to aim a *cursor* at, and there is nothing to aim at any more
- * now that the way in is a button (`lib/panels.ts`).
+ * now that the way in is a button (`state/ui.ts`).
  */
 .side {
 	top: 12px;

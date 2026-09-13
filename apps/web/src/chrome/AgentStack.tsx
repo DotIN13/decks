@@ -2,7 +2,7 @@ import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 import { AgentFace, AgentMenu } from "./AgentPill.tsx";
-import { canHover } from "../lib/panels.ts";
+import { canHover } from "../lib/media.ts";
 import { agentOrder, agentStatus, stackFaces, statusWords } from "./agent-order.ts";
 
 /**

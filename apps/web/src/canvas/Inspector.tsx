@@ -8,7 +8,7 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { inspectorShown } from "../lib/edge.ts";
-import { NARROW } from "../lib/panels.ts";
+import { NARROW } from "../lib/media.ts";
 import "../styles/inspector.css";
 import { elementOf, frameOf, isPdf, type Edit, type Shape } from "./inspect.ts";
 import { scrubbable } from "./scrub.ts";

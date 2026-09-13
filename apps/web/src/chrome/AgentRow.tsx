@@ -7,7 +7,7 @@ import { Icon } from "../icons.tsx";
 import { Popover } from "../ui/Popover.tsx";
 import { AgentFace } from "./AgentPill.tsx";
 import { closeWords, since, statusWords } from "./agent-order.ts";
-import { canHover } from "../lib/panels.ts";
+import { canHover } from "../lib/media.ts";
 import type { AgentRow as Row } from "./agent-sections.ts";
 
 /**

@@ -16,7 +16,7 @@ import { agentFoot, agentSections, agentTally } from "./agent-sections.ts";
  *
  * It replaces three things. The floating context rail, the floating agents panel and the
  * full-screen `AllBoards` modal all answered "what is on this canvas, and what else is
- * there" — and the first two could not be open at once because `lib/panels.ts` closed one
+ * there" — and the first two could not be open at once because the panel module closed one
  * when the other opened. That is a tab strip with the strip left out: the relationship was
  * enforced in code and invisible on screen, which is why the third surface had nowhere to
  * live and became a modal over the canvas you were looking at.
@@ -40,7 +40,7 @@ import { agentFoot, agentSections, agentTally } from "./agent-sections.ts";
  *
  * The panel is opened and closed by a **button** — the leftmost control in the top-left
  * pill, which owns `open` and passes it in here — and by `⌘\`. It is not summoned by the
- * cursor coming near the edge, which is what `lib/panels.ts` used to do: a surface you rely
+ * cursor coming near the edge, which is what the panels used to do: a surface you rely
  * on to know what an agent is holding should not arrive because of where the mouse happens
  * to be, and a button that disagrees with the screen is worse than no button.
  *
@@ -670,7 +670,7 @@ export function LeftPanel(props: {
  * Whether the panel has to go over the canvas rather than beside it.
  *
  * A signal and not a media query, because what changes across this line is `data-inset` —
- * see the note at the top. `matchMedia` in a `try` for the same reason `lib/panels.ts` does
+ * see the note at the top. `matchMedia` in a `try` for the same reason `lib/media.ts` does
  * it: a test environment without one should get the desktop answer, not an exception.
  */
 function createSheet(): () => boolean {
