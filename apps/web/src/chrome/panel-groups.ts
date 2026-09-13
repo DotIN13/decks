@@ -8,7 +8,7 @@ import type { Board } from "@decks/protocol";
  * what the panel *knows*. Leaving it inside the component would have meant the only way to
  * ask "does a board an agent holds also appear under the deck" is to render one and look —
  * which is how the old rail ended up meaning two different things depending on state nobody
- * was watching (see the note on `contextBoards` in `App.tsx`).
+ * was watching.
  *
  * The three sections, in the order they are drawn:
  *

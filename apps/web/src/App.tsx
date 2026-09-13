@@ -142,15 +142,6 @@ export function App() {
 	/** The turn the chat was opened at, from a click on the spine. */
 	const [atTurn, setAtTurn] = createSignal<{ id: string; at: number } | undefined>(undefined);
 	/**
-	 * When this conversation was last looked at.
-	 *
-	 * The spine marks turns that arrived since, which is what tells you something was
-	 * said while the panel was away. While the panel is open nothing is unseen, so the
-	 * comparison is skipped entirely rather than being kept up to date — see `turns`.
-	 */
-	const [seenAt, setSeenAt] = createSignal(Date.now());
-
-	/**
 	 * Revisions this browser caused, by path.
 	 *
 	 * Its own edit is already in the frame's DOM, so reloading the frame to show it
@@ -346,40 +337,6 @@ export function App() {
 
 
 	/**
-	 * What the focused agent holds, restricted to boards that still exist.
-	 *
-	 * The server prunes deleted boards out of context, but context is also rebuilt from a
-	 * transcript when rewinding, and a transcript can name a board that has since been
-	 * deleted. Resolving here means one dead path can never empty the rail and the canvas
-	 * at once: an agent left holding only ghosts counts as holding nothing, which is the
-	 * case the whole-deck fallback exists for.
-	 */
-	const held = createMemo(() => {
-		const paths = state.focused ? state.contexts[state.focused] ?? [] : [];
-		if (paths.length === 0) return paths;
-		const known = new Set(state.boards.map((board) => board.path));
-		return paths.filter((path) => known.has(path));
-	});
-
-	/**
-	 * The focused agent's boards, in attach order, and nothing else.
-	 *
-	 * The fallback to the whole deck is gone with the panel that needed it. It was there
-	 * because the rail was the only way to find a board, so it had to list everything there
-	 * was to find — which meant one list meaning two different things depending on state
-	 * nobody was looking at. Finding a board is the all-canvases modal's job now
-	 * (`canvas/AllBoards.tsx`), so this can say what is true: an agent holding nothing shows
-	 * nothing, and the panel says so in a sentence.
-	 */
-	const contextBoards = createMemo(() => {
-		const byPath = new Map(state.boards.map((board) => [board.path, board]));
-		return held().flatMap((path) => {
-			const board = byPath.get(path);
-			return board ? [board] : [];
-		});
-	});
-
-	/**
 	 * What is on the canvas: the focused agent's in-play set, and nothing else.
 	 *
 	 * An agent holding nothing shows *no* boards. The rail still lists the whole deck
@@ -460,7 +417,6 @@ export function App() {
 		setCamera,
 		sendCamera,
 		setAtTurn,
-		setSeenAt,
 		raise,
 		nameOf,
 	};
@@ -641,13 +597,7 @@ export function App() {
 	 * the whole signal — so a missed clear leaves a light on for something you are looking
 	 * at.
 	 */
-	createEffect(() => {
-		if (!historyShown()) {
-			setSeenAt(Date.now());
-			return;
-		}
-		if (state.focused) setUnread(state.focused, 0);
-	});
+
 
 	/**
 	 * On a narrow screen the panel and the conversation take turns.
@@ -738,8 +688,6 @@ export function App() {
 
 		setState("focused", id);
 		setUnread(id, 0);
-		setAtTurn(undefined);
-		setSeenAt(Date.now());
 		// A component selected in a board another agent was holding is not your selection.
 		setComponent(undefined);
 

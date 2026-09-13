@@ -38,7 +38,6 @@ export interface FrameHooks {
 	setCamera(camera: Camera): void;
 	sendCamera(camera: Camera, agentId?: string): void;
 	setAtTurn(at: { id: string; at: number } | undefined): void;
-	setSeenAt(at: number): void;
 	raise(kind: "done" | "ask" | "problem", banner: { title: string; body?: string; tag?: string; agent?: string }): void;
 	nameOf(id: string | undefined): string;
 }
@@ -165,7 +164,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					// opened at belongs to the one you were reading.
 					if (focused !== state.focused) {
 						hooks.setAtTurn(undefined);
-						hooks.setSeenAt(Date.now());
 					}
 					setState({ chats: message.chats, focused, defaultKind: message.defaultKind });
 					hooks.ensureHistory(focused);
