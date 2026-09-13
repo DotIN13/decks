@@ -4,8 +4,8 @@ import X from "lucide-solid/icons/x";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { RENDERERS, type RendererChoice } from "../lib/renderer.ts";
 import { Icon } from "../icons.tsx";
-import { AlertSettings } from "./AlertSettings.tsx";
-import type { AlertPrefs } from "../lib/alerts.ts";
+import { AlertSettings } from "../alerts/AlertSettings.tsx";
+import type { AlertPrefs } from "../alerts/policy.ts";
 
 /**
  * The Claude subscriptions this install can use.
@@ -36,7 +36,7 @@ import type { AlertPrefs } from "../lib/alerts.ts";
  * more, so it is the CLI's own login unless that has no token.
  */
 export function Settings(props: {
-	/** What the app may interrupt you with (`AlertSettings.tsx`). */
+	/** What the app may interrupt you with (`alerts/AlertSettings.tsx`). */
 	prefs: AlertPrefs;
 	onPrefs: (prefs: AlertPrefs) => void;
 	/**

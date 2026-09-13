@@ -531,7 +531,7 @@
 	 *
 	 * It was written as `.popover .sw` for a menu row and then never used by one — dead CSS
 	 * describing a control the app did not have. The notifications grid is its first caller
-	 * (`chat/AlertSettings.tsx`, three of them), so the `.popover` prefix came off rather than
+	 * (`alerts/AlertSettings.tsx`, three of them), so the `.popover` prefix came off rather than
 	 * a second one going on: a switch is a control, not a property of the menu it was
 	 * invented in.
 	 */

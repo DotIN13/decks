@@ -3,9 +3,9 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import { createSignal, For, Show } from "solid-js";
 import { Icon } from "../icons.tsx";
 import { Popover } from "../ui/Popover.tsx";
-import { ALERT_KINDS, ALERT_LABELS, type AlertKind, type AlertPrefs } from "../lib/alerts.ts";
-import { availability, request, type Availability } from "../lib/notify.ts";
-import { play, SILENT, SOUND_FAMILIES, soundName, type SoundChoice } from "../lib/sound.ts";
+import { ALERT_KINDS, ALERT_LABELS, type AlertKind, type AlertPrefs } from "./policy.ts";
+import { availability, request, type Availability } from "./notify.ts";
+import { play, SILENT, SOUND_FAMILIES, soundName, type SoundChoice } from "./sound.ts";
 
 /**
  * Notifications, as two groups of rows.
@@ -227,7 +227,7 @@ function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: Sound
  * `http://10.0.0.249:4327` from a phone, and on a plain-HTTP origin the browser refuses
  * notifications outright. Saying "allow notifications" there would be a button that does
  * nothing, so the state is named and the fix is given, because it is a real fix somebody can
- * carry out. See `lib/notify.ts`.
+ * carry out. See `alerts/notify.ts`.
  *
  * Nothing is drawn when everything is fine. A permanent line saying "banners are allowed" is
  * a row that has to be read once and then skipped forever, in a group whose three switches

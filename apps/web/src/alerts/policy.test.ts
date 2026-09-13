@@ -10,7 +10,7 @@ import {
 	shouldSound,
 	startedAsking,
 	tabTitle,
-} from "./alerts.ts";
+} from "./policy.ts";
 
 /*
  * The cases here are the ones that would otherwise be found by leaving the app open for a

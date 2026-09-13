@@ -8,10 +8,10 @@ import {
 	type AlertKind,
 	type AlertPrefs,
 	type Presence,
-} from "../lib/alerts.ts";
+} from "../alerts/policy.ts";
 import { openHistory } from "../state/edge.ts";
-import { post as postBanner } from "../lib/notify.ts";
-import { play as playCue, preload as preloadCues } from "../lib/sound.ts";
+import { post as postBanner } from "../alerts/notify.ts";
+import { play as playCue, preload as preloadCues } from "../alerts/sound.ts";
 import { state } from "../state/deck.ts";
 import { setUnattended as paintBadge } from "./favicon.ts";
 
@@ -38,7 +38,7 @@ export interface AlertBanner {
  * - The **banner** is suppressed while the page is in view: an OS notification over a window
  *   you are reading tells you something already on your screen.
  *
- * The policy is in `lib/alerts.ts` and the settings are the user's; what lives here is the
+ * The policy is in `alerts/policy.ts` and the settings are the user's; what lives here is the
  * live half — the stored prefs as a signal, whether the person is actually present (two
  * facts, not one), the counter, and the one function that raises an alert.
  */
@@ -49,7 +49,7 @@ export function createAlerts(deps: {
 	/**
 	 * What the app is allowed to interrupt you with.
 	 *
-	 * Held as a signal here rather than in `lib/alerts.ts` because Settings has to redraw
+	 * Held as a signal here rather than in `alerts/policy.ts` because Settings has to redraw
 	 * when it changes and a module-level `let` is not reactive. The module owns the *rules*
 	 * and the shape of what is stored; this owns the copy the components read.
 	 */

@@ -5,7 +5,7 @@ import { isSound, SILENT, type SoundChoice } from "./sound.ts";
  * What the app interrupts you for, and the rules about when.
  *
  * The whole policy, with no DOM and no `AudioContext` in it, so the questions worth arguing
- * about can be argued about in `alerts.test.ts` rather than by opening a browser and waiting
+ * about can be argued about in `policy.test.ts` rather than by opening a browser and waiting
  * for an agent to finish: does a state change count as finishing, does a sound play while
  * you are watching, does a notification fire while you are watching, and what does the tab
  * say when several things have piled up.

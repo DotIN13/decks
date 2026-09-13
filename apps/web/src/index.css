@@ -1843,7 +1843,7 @@ svg.lucide {
 
 /*
  * The settings window: a title, a recessed body, and groups of rows.
- * `chat/Settings.tsx` and `chat/AlertSettings.tsx`.
+ * `chat/Settings.tsx` and `alerts/AlertSettings.tsx`.
  *
  * This vocabulary replaced a three-column grid whose header row named the columns. The grid
  * measured correctly and read like a spreadsheet — and the header was the tell: a control

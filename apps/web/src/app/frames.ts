@@ -13,7 +13,7 @@ import { boardChanged, forgetInFlight, forgetPatches, patchAccepted, patchRefuse
 import { notice } from "../state/notices.ts";
 import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
-import { finished, startedAsking } from "../lib/alerts.ts";
+import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
 import { releaseBoards, setDraft, setUnread, setUsagePanel, setUsageReport, usagePanel } from "../state/ui.ts";
 
