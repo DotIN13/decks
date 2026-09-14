@@ -382,27 +382,36 @@ export function BoardFrame(props: {
 		detachLive?.();
 		detachSelect?.();
 		/*
-		 * A click inside a board with no components selects the board.
+		 * A press inside a board selects that board — **every** format, either mode.
 		 *
-		 * On a component board a click means "this box", and the editor
-		 * answers it. On a flow or slides board there are no boxes, so the
-		 * click can only mean "this board" — and it has to *say* so, because
-		 * everything the board then responds to asks the canvas which board
-		 * is selected: the arrow keys on a deck, the double-click that opens
-		 * the source. Clicking one was leaving that answer unchanged, so a
-		 * deck you had clicked ignored ← → unless you happened to have played
-		 * it from the rail as well.
+		 * It has to *say* so, because everything a board then responds to asks the canvas which
+		 * board is selected: the arrow keys on a deck, the double-click that opens the source, the
+		 * `f` that fills the window. The three other ways in are the title bar, the surface's own
+		 * padding and the rail, and none of them is the board: a click on the board itself lands in
+		 * the frame, which is a document of its own and sends nothing up.
 		 *
-		 * Here rather than in an effect, and that is the whole bug: an effect
-		 * reads `contentDocument` before the load and lands on the
-		 * `about:blank` the frame starts with, which is then thrown away.
+		 * **It used to be the non-component formats only**, on the argument that on a component
+		 * board a click means "this box" and the editor answers it. The editor does answer it — and
+		 * only when there is an editor: `Editor.ts` returns on its first line unless the canvas is
+		 * in edit mode and zoomed past the interaction threshold, and a press on the padding of a
+		 * card already cleared the component and left the board. So in browse mode — which is where
+		 * every session starts — clicking a placed board selected nothing at all, while clicking
+		 * its title bar selected it, which is the same gesture meaning two things.
+		 *
+		 * **Capture, and it cannot fight the editor.** `Editor.ts` listens on the bubble phase and
+		 * this runs first, so the order is: the board is selected, and then the editor says what was
+		 * under the pointer — a component, which selects it and its board together, or nothing,
+		 * which clears the component and leaves the board selected. That last part is the answer a
+		 * press on a component board's background should give, and this is where it comes from.
+		 *
+		 * Here rather than in an effect, and that is the whole bug: an effect reads
+		 * `contentDocument` before the load and lands on the `about:blank` the frame starts with,
+		 * which is then thrown away.
 		 */
-		if (props.board.format !== "component") {
-			const doc = frame.contentDocument;
-			const select = () => props.onSelect();
-			doc?.addEventListener("pointerdown", select, true);
-			detachSelect = () => doc?.removeEventListener("pointerdown", select, true);
-		}
+		const doc = frame.contentDocument;
+		const select = () => props.onSelect();
+		doc?.addEventListener("pointerdown", select, true);
+		detachSelect = () => doc?.removeEventListener("pointerdown", select, true);
 		detachEditor = attachEditor(frame, props.board.path, props.editor);
 		// Told where the board is, so a finger's position is arithmetic
 		// rather than a layout read on every event (`frame-gestures.ts`).

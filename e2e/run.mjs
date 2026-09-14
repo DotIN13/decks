@@ -66,6 +66,12 @@ const CHECKS = [
 	 * source textarea was an assumption about markdown that a flow board does not share.
 	 */
 	{ file: "editing.mjs", needsAgent: false },
+	/*
+	 * Which board is selected, and the one way in that did not work: a press on the board itself.
+	 * Its own check because it is one rule with four readers — the inspector, the arrow keys, the
+	 * focus view and the bar's own menu all ask the canvas which board is selected.
+	 */
+	{ file: "selection.mjs", needsAgent: false },
 	{ file: "grapes.mjs", needsAgent: false },
 	{ file: "grapes-typing.mjs", needsAgent: false },
 	{ file: "grapes-reorder.mjs", needsAgent: false },
