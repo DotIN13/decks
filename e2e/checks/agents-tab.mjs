@@ -195,8 +195,19 @@ const panel = await page.evaluate(() => ({
 			return Boolean(ic && body && body.left >= ic.right);
 		})(),
 	})),
-	foot: document.querySelector(".panel-foot")?.innerText.replace(/\s+/g, " ").trim(),
-	density: document.querySelector(".panel-foot .seg") ? getComputedStyle(document.querySelector(".panel-foot .seg")).display : "gone",
+	/* The sentence alone: the foot's right-hand slot now holds the grouping control, and
+	   `innerText` of the box would read "5 agents Attention Workspace". */
+	foot: document.querySelector(".panel-foot > span")?.textContent?.trim(),
+	density: (() => {
+		const seg = document.querySelector(".panel-foot .seg[data-seg='density']");
+		return seg ? getComputedStyle(seg).display : "gone";
+	})(),
+	/* The foot's right-hand slot holds one control per tab — density for Boards, the grouping
+	   for Agents — so `data-seg` is how a check says which of the two it means. */
+	grouping: (() => {
+		const seg = document.querySelector(".panel-foot .seg[data-seg='agents']");
+		return seg ? [...seg.querySelectorAll("button")].map((b) => `${b.textContent?.trim()}${b.dataset.on === "true" ? "*" : ""}`) : [];
+	})(),
 	placeholder: document.querySelector(".panel-shell .field input")?.placeholder,
 }));
 
@@ -242,7 +253,8 @@ say("…and dormant beats idle, in one word", basil.dormant === "true" && basil.
 say("the foot counts what the sections hold", panel.foot === "5 agents", panel.foot);
 /* Pictures or rows is a question about thumbnails; an agent has no second rendering. */
 say("the density toggle belongs to Boards", panel.density === "none", panel.density);
-say("the field says it searches tags too", /agents or tags/.test(panel.placeholder ?? ""), panel.placeholder);
+say("…and the grouping toggle belongs to Agents", JSON.stringify(panel.grouping) === JSON.stringify(["Attention*", "Workspace"]), JSON.stringify(panel.grouping));
+say("the field says what it searches", /agents, tags or workspaces/.test(panel.placeholder ?? ""), panel.placeholder);
 
 // --- approaching a row, and what is allowed to move ---------------------------------
 /*
@@ -302,7 +314,9 @@ await page.locator(".panel-shell .field input").fill("panel-css");
 await settle(page, 400);
 const found = await page.evaluate(() => ({
 	rows: [...document.querySelectorAll(".agent-row .lb")].map((el) => el.textContent),
-	foot: document.querySelector(".panel-foot")?.innerText.replace(/\s+/g, " ").trim(),
+	/* The sentence alone: the foot's right-hand slot now holds the grouping control, and
+	   `innerText` of the box would read "5 agents Attention Workspace". */
+	foot: document.querySelector(".panel-foot > span")?.textContent?.trim(),
 }));
 say("searching a tag finds the agent on it", JSON.stringify(found.rows) === JSON.stringify(["Ada"]), JSON.stringify(found.rows));
 say("…and the foot says how many matched", found.foot === "1 of 5 match", found.foot);
@@ -359,6 +373,103 @@ await page.locator(".tagpop .tag-x").first().click();
 await settle(page, 400);
 const after = await page.evaluate(() => JSON.parse(window.__sent.filter((frame) => frame.includes("agent.tags")).at(-1)));
 say("removing one sends the rest", JSON.stringify(after.tags) === JSON.stringify([]), JSON.stringify(after.tags));
+
+
+// --- the workspace axis ---------------------------------------------------------------
+
+/*
+ * The same five agents, filed by project — which is the second question this panel answers and
+ * the one an agent answers for itself: `stage.me.setWorkspace` writes the same identity field
+ * this frame carries, so there is nothing here a real agent could not have done.
+ */
+for (const [id, name, tags, workspace] of [
+	["a1", "Ada", ["panel-css", "measuring"], "political-llm"],
+	["a2", "Pi", [], "political-llm"],
+	["a4", "Wren", ["thumbnails"], "irb-84069"],
+	["a3", "Iris", ["e2e", "flaky-editing"], undefined],
+	["a5", "Basil", [], undefined],
+]) {
+	await feed({ type: "agent.identity", id, identity: { name, color: "#3b5cf6", tags, ...(workspace ? { workspace } : {}) } });
+}
+await settle(page, 500);
+
+const attention = await page.evaluate(() => [...document.querySelectorAll(".panel-section")].map((one) => one.dataset.kind));
+say("attention is the default, before anybody asks for the other axis", JSON.stringify(attention) === JSON.stringify(["wants", "working", "quiet"]), JSON.stringify(attention));
+/* The chip is drawn in both groupings: a fact about an agent is not a decoration of the
+   section it happens to be under, and in this one the heading says nothing about a project. */
+const chipped = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => `${row.querySelector(".lb")?.textContent}:${row.querySelector(".tag.ws")?.textContent ?? "-"}`));
+say("…and a workspace is on the row in the urgency grouping too", chipped.includes("Ada:political-llm") && chipped.includes("Basil:-"), JSON.stringify(chipped));
+
+await page.locator(".panel-foot .seg[data-seg='agents'] button", { hasText: /^Workspace$/ }).click();
+await settle(page, 400);
+
+const filed = await page.evaluate(() => {
+	return [...document.querySelectorAll(".panel-section")].map((section) => ({
+		kind: section.dataset.kind,
+		label: section.querySelector(".panel-meta > span")?.textContent,
+		note: section.querySelector(".panel-meta .note")?.textContent ?? null,
+		count: section.querySelector(".panel-meta .n")?.textContent,
+		rows: [...section.querySelectorAll(".agent-row")].map((row) => row.querySelector(".lb")?.textContent),
+	}));
+});
+/*
+ * The focused agent's project first whatever its size, then the biggest, then the name — and
+ * `No workspace` last, which is where an agent nobody has told about a project belongs. That
+ * last heading is the one that has to exist: a list that hid them would be a list an agent can
+ * vanish from by not being told something.
+ */
+say(
+	"…and by workspace: three sections, the focused agent's project first",
+	JSON.stringify(filed.map((one) => one.label)) === JSON.stringify(["political-llm", "irb-84069", "No workspace"]),
+	JSON.stringify(filed.map((one) => one.label)),
+);
+say("…with the rows in urgency order inside a heading", JSON.stringify(filed[0]?.rows) === JSON.stringify(["Ada", "Pi"]), JSON.stringify(filed[0]?.rows));
+say(
+	"…and the heading says who needs you, which the heading itself does not",
+	filed[0]?.note === "2 working" && filed[1]?.note === null && filed[2]?.note === "1 wants you",
+	JSON.stringify(filed.map((one) => one.note)),
+);
+say("…and nothing is lost in the count", filed.reduce((sum, one) => sum + Number(one.count), 0) === 5, JSON.stringify(filed.map((one) => one.count)));
+
+/* Searching by project works in either grouping — which is what makes it a way to *find* one. */
+await page.locator(".panel-shell input").first().fill("irb");
+await settle(page, 400);
+const byProject = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => row.querySelector(".lb")?.textContent));
+say("searching a project name finds its agents", JSON.stringify(byProject) === JSON.stringify(["Wren"]), JSON.stringify(byProject));
+await page.locator(".panel-shell input").first().fill("");
+await settle(page, 300);
+
+/* And the dropdown, where two named workspaces are two runs to tell apart. */
+await page.evaluate(() => {
+	const trigger = [...document.querySelectorAll(".float.pill button")].find((button) => /^Agents/.test(button.getAttribute("aria-label") ?? ""));
+	trigger?.click();
+});
+await page.waitForSelector(".popover", { timeout: 4000 });
+await settle(page, 300);
+const dropdown = await page.evaluate(() => {
+	/*
+	 * Read in document order, tracking which heading each row is under — because what the
+	 * dropdown promises is *filing*, not an order. Its rows are ranked by urgency, and the
+	 * groups are ordered by their best-ranked member, so the order of the headings is a
+	 * consequence of that ranking rather than a rule of its own.
+	 */
+	const card = document.querySelector(".popover");
+	const filed = [];
+	let group;
+	for (const child of card?.children ?? []) {
+		if (child.classList.contains("group")) group = child.textContent;
+		else for (const row of child.querySelectorAll('[data-agent="true"]')) filed.push(`${group}:${row.querySelector(".lb")?.textContent}`);
+	}
+	return { groups: [...document.querySelectorAll(".popover .group")].map((one) => one.textContent), filed };
+});
+const expected = ["political-llm:Ada", "political-llm:Pi", "No workspace:Iris", "irb-84069:Wren", "No workspace:Basil"].sort();
+say(
+	"the dropdown files each agent under its own project",
+	JSON.stringify([...dropdown.filed].sort()) === JSON.stringify(expected),
+	JSON.stringify(dropdown.filed),
+);
+say("…and it is the same three words as the panel's headings", JSON.stringify([...dropdown.groups].sort()) === JSON.stringify(["No workspace", "irb-84069", "political-llm"]), JSON.stringify(dropdown.groups));
+await page.keyboard.press("Escape");
 
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();

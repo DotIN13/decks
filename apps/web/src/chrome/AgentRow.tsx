@@ -2,7 +2,7 @@ import type { Identity } from "@decks/protocol";
 import PictureInPicture2 from "lucide-solid/icons/picture-in-picture-2";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
-import { createSignal, For, onMount, Show } from "solid-js";
+import { createEffect, createSignal, createUniqueId, For, onMount, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 import { Popover } from "../ui/Popover.tsx";
 import { AgentFace } from "./AgentPill.tsx";
@@ -50,9 +50,27 @@ export function AgentRow(props: {
 	 * looking at them. Absent means the row cannot be mirrored.
 	 */
 	onMirror?: () => void;
+	/**
+	 * Move this agent into a workspace, or out of one with `null`.
+	 *
+	 * Both writers of this field land on the same value — the agent through
+	 * `stage.me.setWorkspace`, you through here — so this is not "your workspace" the way the
+	 * tags beside it are yours. Absent means the row cannot be moved.
+	 */
+	onWorkspace?: (workspace: string | null) => void;
+	/**
+	 * Every workspace in use, for the popup's suggestions.
+	 *
+	 * The one thing that stops this feature's likeliest failure — a second spelling of a
+	 * project that already exists — so the names in use are offered as a `datalist` rather than
+	 * left to memory. Read off the identities the panel already holds; no extra fetch.
+	 */
+	workspaces?: string[];
 }) {
 	const chat = () => props.row.chat;
 	const name = () => props.identity?.name ?? chat().name;
+	/** Off the row, where `agent-sections.ts` put it — one source for one fact, like the tags. */
+	const workspace = () => props.row.workspace;
 	/** The tooltip if this agent can be closed, and `undefined` if it cannot. */
 	const close = () => closeWords(chat().state, name());
 
@@ -134,8 +152,20 @@ export function AgentRow(props: {
 						<span class="min-w-0 flex-1 truncate">{stateWords()}</span>
 					</span>
 
-					<Show when={props.row.tags.length + props.row.userTags.length > 0}>
+					<Show when={props.row.tags.length + props.row.userTags.length > 0 || workspace()}>
 						<span class="tags">
+							{/*
+								The workspace, first, in a box rather than a pill.
+
+								A box because `.kind` is one: this is a fact about the agent, where a tag is a
+								claim by it. Drawn on every row in both groupings — a fact about an agent is not a
+								decoration of the section it happens to be under, and in the attention grouping the
+								section says nothing about where it works.
+
+								First rather than last, because it is the one chip a reader is scanning *for* when
+								the list is long, and the tag line is the only place on the row that wraps.
+							*/}
+							<Show when={workspace()}>{(at) => <span class="tag ws">{at()}</span>}</Show>
 							<For each={props.row.tags}>{(tag) => <span class="tag">{tag}</span>}</For>
 							<For each={props.row.userTags}>{(tag) => <span class="tag" data-mine="true">{tag}</span>}</For>
 						</span>
@@ -161,7 +191,16 @@ export function AgentRow(props: {
 				journey through it. It is reachable by Tab from the row instead.
 			*/}
 			<Show when={props.onTags}>
-				{(onTags) => <Customise name={name()} tags={props.row.userTags} onTags={onTags()} />}
+				{(onTags) => (
+					<Customise
+						name={name()}
+						tags={props.row.userTags}
+						workspace={workspace()}
+						workspaces={props.workspaces ?? []}
+						onTags={onTags()}
+						{...(props.onWorkspace ? { onWorkspace: props.onWorkspace } : {})}
+					/>
+				)}
 			</Show>
 
 			{/*
@@ -230,9 +269,31 @@ export function AgentRow(props: {
  * **No Save.** Every change is sent, as everything else in this app is; a popup with a Save
  * button is a popup you can leave in a state that looks applied and is not.
  */
-function Customise(props: { name: string; tags: string[]; onTags: (tags: string[]) => void }) {
+function Customise(props: {
+	name: string;
+	tags: string[];
+	/** The workspace this agent is in, or undefined. */
+	workspace?: string;
+	/** Every workspace in use — the suggestions under the field. */
+	workspaces: string[];
+	onTags: (tags: string[]) => void;
+	/** Absent means the workspace cannot be set from here. */
+	onWorkspace?: (workspace: string | null) => void;
+}) {
 	const [draft, setDraft] = createSignal("");
+	const [room, setRoom] = createSignal(props.workspace ?? "");
+	const listId = createUniqueId();
 	let entry: HTMLInputElement | undefined;
+	let roomField: HTMLInputElement | undefined;
+
+	/*
+	 * The field follows the agent's workspace rather than owning it.
+	 *
+	 * Both writers land on one value — the agent declares one with `stage.me.setWorkspace`, and
+	 * the row announces it — so a field that only held what you last typed would disagree with
+	 * the chip on the row it was opened from.
+	 */
+	createEffect(() => setRoom(props.workspace ?? ""));
 
 	/*
 	 * Take the cursor when the popup opens — not when this component mounts.
@@ -249,6 +310,23 @@ function Customise(props: { name: string; tags: string[]; onTags: (tags: string[
 	 * opened in order to type into it.
 	 */
 	const focusEntry = () => requestAnimationFrame(() => entry?.focus());
+
+	/**
+	 * The workspace, committed on Enter or on leaving the field.
+	 *
+	 * Not on every keystroke: a slug is a *word* the other agents have to say, and writing
+	 * `polit`, then `politi`, then `political-llm` as three workspaces would leave two of them
+	 * behind — a workspace disappears when its last member leaves it, but a half-typed one that
+	 * the browser republished would be a section in somebody else's panel for as long as it took
+	 * to type the rest. Enter is the boundary, and it is the same key the tag field above uses.
+	 */
+	const commitRoom = () => {
+		if (!props.onWorkspace) return;
+		const wanted = room().trim();
+		const now = props.workspace ?? "";
+		if (wanted === now) return;
+		props.onWorkspace(wanted || null);
+	};
 
 	/*
 	 * Split on **commas only**, not on whitespace.
@@ -304,6 +382,44 @@ function Customise(props: { name: string; tags: string[]; onTags: (tags: string[
 			)}
 		>
 			<div class="tagpop">
+				{/*
+					The workspace, above the tags, because it is the one field here that is not yours
+					alone: the agent sets it through `stage.me.setWorkspace` and either of you can move it.
+				*/}
+				<Show when={props.onWorkspace}>
+					{(move) => (
+						<>
+							<div class="label">Workspace</div>
+							<label class="field h-8 flex-none gap-1.5 rounded-md">
+								<input
+									ref={roomField}
+									type="text"
+									spellcheck={false}
+									class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
+									placeholder="No workspace"
+									list={listId}
+									value={room()}
+									onInput={(event) => setRoom(event.currentTarget.value)}
+									onBlur={commitRoom}
+									onKeyDown={(event) => {
+										if (event.key === "Enter") event.preventDefault();
+										// As in the tag field below: `Popover` reads Enter off the document, and a
+										// keystroke that means "save this" should not also press the roved row.
+										if (event.key === "Enter") {
+											event.stopPropagation();
+											commitRoom();
+										}
+									}}
+								/>
+							</label>
+							<datalist id={listId}>
+								<For each={props.workspaces}>{(name) => <option value={name} />}</For>
+							</datalist>
+							<p class="nt m-0">Slugged and cut at 24 characters. ⏎ to move it; empty leaves the workspace.</p>
+						</>
+					)}
+				</Show>
+
 				<div class="label">Your tags for {props.name}</div>
 
 				<Show

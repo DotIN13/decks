@@ -942,6 +942,9 @@ export function App() {
 					/* Your tags, which the agent cannot see or overwrite — a separate field from
 					   `stage.me.setTags`, for the reason `protocol/Identity` gives. */
 					onAgentTags={(id, tags) => send({ type: "agent.tags", id, tags })}
+					/* The workspace, which is one field with two writers rather than two fields: the
+					   agent declares one and you can move it, and whoever wrote last is where it is. */
+					onAgentWorkspace={(id, workspace) => send({ type: "agent.workspace", id, workspace })}
 					onPick={(board) => {
 						send({ type: "board.play", path: board.path });
 						flyTo(board);

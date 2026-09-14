@@ -134,6 +134,22 @@
 		place-items: center;
 	}
 
+	/*
+	 * What the group is doing: `1 wants you`, `2 working` — a workspace heading only.
+	 *
+	 * In the count's own column and to its left, so the two read as one reading (`1 wants you ·
+	 * 3`) rather than as a word floating in the row. Quiet, and **not** the status colours: a
+	 * heading is not a row, and a coloured word three lines above the coloured dot it describes
+	 * is the mark and the legend arguing about which one you are meant to look at. Bold, which
+	 * is the whole of the emphasis it needs at 11px.
+	 */
+	.panel-meta > .note {
+		flex: none;
+		color: var(--muted);
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
 	/* 6px, on top of the list's own 2px gap: 8px between one section and the next. */
 	.panel-section + .panel-section .panel-meta {
 		margin-top: 6px;

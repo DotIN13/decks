@@ -120,3 +120,81 @@ test("…and says how many matched while a search is running", () => {
 	assert.equal(agentFoot({ total: 5, active: 3, wants: 1 }, 1), "1 of 5 match");
 	assert.equal(agentFoot({ total: 5, active: 3, wants: 1 }, 0), "0 of 5 match");
 });
+
+// --- the workspace axis ---------------------------------------------------------------
+
+/*
+ * The same five agents, filed by project. Ada and Pi are on one, Iris and Wren on another, and
+ * Basil on none — which is the case that has to work, because an agent nobody has told about a
+ * project is the common state and it must not appear in the wrong group.
+ */
+const rooms: Record<string, Identity> = {
+	...identities,
+	ada: { ...identities.ada!, workspace: "political-llm" },
+	pi: { ...identities.pi!, workspace: "political-llm" },
+	iris: { ...identities.iris!, workspace: "irb-84069" },
+	wren: { ...identities.wren!, workspace: "irb-84069" },
+};
+
+const grouped = (query?: string, focused = "ada") =>
+	agentSections({ chats, identities: rooms, unread, focused, query, group: "workspace" });
+
+test("filed by workspace: the focused agent's project first, `No workspace` last", () => {
+	assert.deepEqual(grouped().map((section) => section.label), ["political-llm", "irb-84069", "No workspace"]);
+	assert.deepEqual(grouped().map((section) => section.kind), ["workspace", "workspace", "unfiled"]);
+	// Basil is in none, and that is a section rather than an absence: a list that hid him would
+	// be a list where an agent goes missing by not being told about a project.
+	assert.deepEqual(grouped().at(-1)?.rows.map((row) => row.chat.id), ["basil"]);
+});
+
+test("…and the rows inside keep urgency order", () => {
+	const [project, other] = grouped();
+	// Ada is working and Pi is typing, so Ada leads; Iris is waiting and Wren finished, so Iris
+	// leads — the same ranking the attention axis uses, under a heading that says nothing about it.
+	assert.deepEqual(project?.rows.map((row) => row.chat.id), ["ada", "pi"]);
+	assert.deepEqual(other?.rows.map((row) => row.chat.id), ["iris", "wren"]);
+});
+
+test("…with the count of who needs you in the heading, because the heading does not say", () => {
+	assert.equal(grouped()[0]?.note, "2 working", "Ada is running tools and Pi is typing");
+	assert.equal(grouped()[1]?.note, "1 wants you", "waiting wins over working");
+	assert.equal(grouped()[2]?.note, undefined, "and silence when the group is quiet");
+});
+
+test("the focused agent's project leads whatever its size", () => {
+	// The panel sits beside the conversation you are in, so the group you are in is the one you
+	// are most likely to be looking for — and it is the only heading that does not move as
+	// other agents start and stop.
+	const list = agentSections({
+		chats,
+		identities: { ...rooms, pi: { ...rooms.pi!, workspace: "irb-84069" } },
+		unread,
+		focused: "ada",
+		group: "workspace",
+	});
+	assert.deepEqual(list[0]?.label, "political-llm");
+});
+
+test("…and with nobody focused, biggest first then alphabetical", () => {
+	const list = agentSections({ chats, identities: rooms, unread, group: "workspace" });
+	// Both projects have two members and nobody is focused, so the tie is the name.
+	assert.deepEqual(list.map((section) => section.label), ["irb-84069", "political-llm", "No workspace"]);
+	const swapped = agentSections({
+		chats,
+		identities: { ...rooms, ada: { ...rooms.ada!, workspace: "zeta" }, pi: { ...rooms.pi!, workspace: "zeta" }, iris: { ...rooms.iris!, workspace: "alpha" } },
+		unread,
+		group: "workspace",
+	});
+	// Zeta has two, alpha and the one Wren is left in have one each — the two singletons break
+	// on the name. `No workspace` is still last, and is not part of that ordering.
+	assert.deepEqual(swapped.map((section) => section.label), ["zeta", "alpha", "irb-84069", "No workspace"]);
+});
+
+test("search finds a project by name, in either grouping", () => {
+	assert.deepEqual(grouped("irb").map((section) => section.rows.map((row) => row.chat.id)), [["iris", "wren"]]);
+	assert.deepEqual(
+		agentSections({ chats, identities: rooms, unread, focused: "ada", query: "irb" }).map((section) => section.rows.map((row) => row.chat.id)),
+		[["iris"], ["wren"]],
+		"the same two agents in the attention axis, where the workspace is only on the row",
+	);
+});

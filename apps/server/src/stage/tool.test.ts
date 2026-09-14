@@ -25,9 +25,13 @@ function toolOn(camera: Camera) {
 
 	const sends: Array<{ target: string; spec: SendSpec }> = [];
 	const others = [
-		{ id: "a1", name: "Ada", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html"], holding: 1, tags: ["panel-css"], queued: 3 },
+		{ id: "a1", name: "Ada", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html"], holding: 1, tags: ["panel-css"], workspace: "political-llm", queued: 3 },
+		{ id: "a2", name: "Rune", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html", "boards/notes.html"], holding: 2, tags: [], workspace: "political-llm", queued: 0 },
+		{ id: "a3", name: "Iris", state: "idle" as const, kind: "claude" as const, context: ["boards/notes.html"], holding: 1, tags: [], queued: 0 },
 	];
 	const waiting: QueuedWork[] = [];
+	/** The workspace the fake session is in, so `me.setWorkspace` → `me.get` is one round trip. */
+	let room: string | undefined;
 	/** What a browser would have reported, if one were looking. */
 	const extents = new Map<string, { rev: number; w: number; h: number }>();
 	const service = new StageService(deck, {
@@ -72,7 +76,7 @@ function toolOn(camera: Camera) {
 		port: 4329,
 		agent: {
 			id: "a1",
-			identity: () => ({ name: "Ada", color: "#000" }),
+			identity: () => ({ name: "Ada", color: "#000", ...(room ? { workspace: room } : {}) }),
 			context: () => [],
 			setContext: () => {},
 			inPlay: () => [],
@@ -80,6 +84,10 @@ function toolOn(camera: Camera) {
 			rename: () => {},
 			setAvatar: () => {},
 			setTags: (tags) => tags as string[],
+			setWorkspace: (workspace) => {
+				room = typeof workspace === "string" && workspace ? workspace : undefined;
+				return room ?? null;
+			},
 			agents: () => others,
 			camera: () => camera,
 			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
@@ -210,6 +218,10 @@ test("stage.agents() carries what each one is working on, and what is waiting fo
 	assert.equal(seen[0]?.me, true);
 	assert.equal(seen[0]?.kind, "claude");
 	assert.equal(seen[0]?.holding, 1);
+	// And the workspace, which is the same argument one level up: "who else is on this" should
+	// not need a second call for a fact the first one already had in hand.
+	assert.equal(seen[0]?.workspace, "political-llm");
+	assert.equal(seen[2]?.workspace, undefined, "an agent in none says so by saying nothing");
 	cleanup();
 });
 
@@ -254,6 +266,7 @@ test("attach is most-recently-touched first, and re-attaching moves the board to
 			rename: () => {},
 			setAvatar: () => {},
 			setTags: (tags) => tags as string[],
+			setWorkspace: () => null,
 			agents: () => [],
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
 			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
@@ -522,4 +535,38 @@ test("the description is the file, and nothing carries its own copy", async () =
 		const source = readFileSync(join(runtimeDir(), "..", script), "utf8");
 		assert.ok(!source.includes(marker), `${script} has its own copy of the description`);
 	}
+});
+
+test("stage.workspaces() is who is on what, and what they are working from", async () => {
+	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	const rooms = JSON.parse((await tool.run(`return await stage.workspaces()`)).text) as Array<Record<string, unknown>>;
+
+	// One workspace, because only Ada and Rune have one — and the agent asking is `a1`.
+	assert.equal(rooms.length, 1);
+	assert.equal(rooms[0]?.name, "political-llm");
+	assert.deepEqual((rooms[0]?.agents as Array<{ name: string }>).map((one) => one.name), ["Ada", "Rune"]);
+	/*
+	 * The boards, most members first: `plan` is held by both and `notes` by one. That order is
+	 * the whole point of asking about a group rather than about an agent — the first entry is
+	 * the board everybody there is working from, so an agent joining does not have to be told.
+	 */
+	assert.deepEqual(rooms[0]?.boards, ["boards/plan.html", "boards/notes.html"]);
+	cleanup();
+});
+
+test("stage.me.setWorkspace hands the value to the session, and reports what came back", async () => {
+	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	/*
+	 * The tool does not clean it. `session.setWorkspace` is the one place that slugs a
+	 * workspace, so that one an agent declares and one you type are the same word — and the
+	 * *return* is the point of the call: it is how a model finds out that the sentence it sent
+	 * became `political-llm`, and therefore how two agents land in one group rather than two.
+	 */
+	assert.equal((await tool.run(`return await stage.me.setWorkspace("political-llm")`)).text, `"political-llm"`);
+	assert.equal((await tool.run(`return (await stage.me.get()).workspace`)).text, `"political-llm"`, "and it is on the identity");
+	assert.equal((await tool.run(`return await stage.me.setWorkspace(null)`)).text, "null", "`null` leaves the workspace");
+	// Leaving it is an absence, and an absence has nothing to print — the tool's own sentence
+	// for a run that returned nothing, rather than the word `undefined` dressed up as JSON.
+	assert.equal((await tool.run(`return (await stage.me.get()).workspace`)).text, "(done)");
+	cleanup();
 });

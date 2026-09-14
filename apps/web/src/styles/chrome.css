@@ -877,6 +877,28 @@
 	 * a different kind of fact, so it gets a different shape rather than a third fill.
 	 */
 
+	/*
+	 * And a fourth: the workspace, which is a box like the runtime and nothing like it.
+	 *
+	 * A box because it is a fact rather than a claim — the agent's own tags are what it says it
+	 * is doing, and this is where it *is*, which the other agents in it agree about. Mono, at
+	 * the runtime's size, because a workspace is an identifier too: `political-llm` is the word
+	 * everybody has to type, and it should look like one.
+	 *
+	 * Outlined rather than filled, which is the one thing that could have gone either way. The
+	 * filled box is the runtime, and two filled boxes in the same line would be two chips of the
+	 * same weight where one of them is what the agent *is*; the outline reads as "this one is
+	 * about a group", which is true — the box is the same word on every row under the same
+	 * heading, and on every row of the panel when the grouping is Attention.
+	 */
+	.tag.ws {
+		border-radius: 4px;
+		background: transparent;
+		box-shadow: inset 0 0 0 1px var(--line-strong);
+		color: var(--muted);
+		font-weight: 500;
+	}
+
 	/* A row of them, wrapping. Two lines at 264px is the cap's whole justification. */
 	.tags {
 		display: flex;

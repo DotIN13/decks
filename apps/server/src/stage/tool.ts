@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import type { AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
+import { roster } from "../agents/workspaces.ts";
 import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, isBoardFormat, isBoardTemplate, WIDE_BOARD_W } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService, WebTarget } from "./service.ts";
@@ -108,7 +109,9 @@ export interface StageAgentHooks {
 	setAvatar(url: string): void;
 	/** Replaces the agent's own tags and returns them as stored — see `agents/tags.ts`. */
 	setTags(tags: unknown): string[];
-	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; queued?: number }>;
+	/** Replaces the agent's workspace and returns it as stored — see `agents/workspaces.ts`. */
+	setWorkspace(workspace: unknown): string | null;
+	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
 	/** Hand work to a new agent and wait for it. */
@@ -232,6 +235,7 @@ const GUIDELINES = [
 	 * — which for tags means a row that is permanently empty, and the feature not existing.
 	 */
 	"Say what you are working on: stage.me.setTags(['panel-css', 'measuring']) when you start on something, and setTags([]) when you stop. It is how the user sees what each agent is up to without opening every conversation. Short nouns, not sentences.",
+	"Say which project you are on, once, when you start: stage.me.setWorkspace('political-llm'). It replaces a tag rather than adding to one: it is a location, not a list, so declaring the same word as the others is how a group forms. Check stage.workspaces() first and reuse a name that is already there rather than inventing a second spelling of it — the call returns the slug it stored, so what you set is what the others must say. Leave one project before you join another; the last word wins and it is the same field.",
 ];
 
 export function createStageTool(deps: {
@@ -547,6 +551,16 @@ export function createStageTool(deps: {
 			 * what it thinks it set — is how an agent ends up re-setting the same tags forever.
 			 */
 			setTags: async (tags: string[]) => agent.setTags(tags),
+			/**
+			 * The workspace this agent is in. Replaces — one value, not a list.
+			 *
+			 * Returns it **as stored**: slugged, lowercased and cut at 24 characters, so
+			 * `stage.me.setWorkspace("Political LLM (round 20)")` comes back as `political-llm`.
+			 * Returning it is the only way a model finds that out, and it is also how two agents
+			 * that named "the same" project differently end up in one group rather than two.
+			 * `null` or an empty string leaves the workspace.
+			 */
+			setWorkspace: async (workspace: string | null) => agent.setWorkspace(workspace),
 			setAvatar: async (avatar: { emoji: string } | { svg: string }) => {
 				if ("emoji" in avatar) {
 					// An emoji becomes a data URL rather than a special case in the
@@ -667,9 +681,35 @@ export function createStageTool(deps: {
 				// from everything (agents/registry.ts caps; this passes the cap through).
 				holding: other.holding,
 				tags: other.tags,
+				// Which project they are on, so "who else is on this" is one call rather than two.
+				workspace: other.workspace,
 				/** How much is already waiting for them — a queue of six is a reason to send elsewhere. */
 				queued: other.queued ?? 0,
 			})),
+
+		/**
+		 * The workspaces in use, biggest first — who is on which project, and what they hold.
+		 *
+		 * The field on `agents()` answers "which workspace is this one in"; this answers "which
+		 * workspaces are there", which is the question an agent has before it joins one, and
+		 * cannot be got by grouping the agents yourself if you do not already know the names.
+		 *
+		 * `boards` is the union of the members' held boards, **the ones most of them hold first** —
+		 * so a new agent joining a project finds what the project is working from in one call, and
+		 * the first entry is what everybody there has open. See `agents/workspaces.ts`: it is one
+		 * pure function over the summaries this agent can already ask for.
+		 */
+		workspaces: async () =>
+			roster(
+				agent.agents().map((other) => ({
+					id: other.id,
+					name: other.name,
+					state: other.state,
+					tags: other.tags,
+					workspace: other.workspace,
+					context: other.context,
+				})),
+			),
 	};
 
 	const snapshot = (): StageSnapshot => ({

@@ -68,6 +68,8 @@ export interface Identity {
 	color: string;
 	/** What you last said you were doing, as stored — see `me.setTags`. */
 	tags?: string[];
+	/** The workspace you are in, as a slug — `"political-llm"`. See `me.setWorkspace`. */
+	workspace?: string;
 }
 
 export interface AgentSummary {
@@ -96,8 +98,38 @@ export interface AgentSummary {
 	holding: number;
 	/** What it says it is working on. Empty if it has not said. */
 	tags: string[];
+	/**
+	 * The workspace it is in, or `undefined` for an agent in none.
+	 *
+	 * The panel clusters by this, and it is here rather than only in `workspaces()` so that
+	 * "who else is on this project" is answered by the call an agent already makes to see who
+	 * exists — the same argument `tags` makes, one level up.
+	 */
+	workspace?: string;
 	/** How many handed-over items are waiting for it — see `send`. */
 	queued: number;
+}
+
+/**
+ * One workspace: a slug, its members, and the boards they hold.
+ *
+ * There is no group object behind this and nothing to create — a workspace exists exactly as
+ * long as somebody says its name, which is what makes it something an agent can form on its
+ * own. See `agents/workspaces.ts` for the aggregation.
+ */
+export interface Workspace {
+	/** The slug every member shares. */
+	name: string;
+	/** Members, in the order `agents()` reports them. */
+	agents: Array<{ id: string; name: string; state: "idle" | "thinking" | "streaming" | "tool" | "waiting"; tags: string[] }>;
+	/**
+	 * Every board at least one member holds, **the ones most of them hold first**.
+	 *
+	 * A board two members are working from is the workspace's; a board one of them has open is
+	 * that agent's. The first entry is therefore the plan of record, which is what makes joining
+	 * a workspace useful rather than merely tidy.
+	 */
+	boards: string[];
 }
 
 /** One item waiting in an agent's queue. */
@@ -562,8 +594,45 @@ export interface Stage {
 		 * you are working on, not a description of the work.
 		 */
 		setTags(tags: string[]): Promise<string[]>;
+		/**
+		 * Which project you are on. **One word, and it replaces what was there.**
+		 *
+		 *     await stage.me.setWorkspace("political-llm");
+		 *     await stage.me.setWorkspace(null);        // no project in particular
+		 *
+		 * Two agents are in the same workspace when they say the same word — there is no group to
+		 * create and nobody to ask. That is the whole of the feature: the panel clusters agents by
+		 * this, and the person looking at a list of fourteen of them can see which are on what.
+		 *
+		 * **Check `workspaces()` before you invent a name.** A second spelling of a project that
+		 * already exists is a second group, which is the failure this is most likely to have. The
+		 * call returns the slug it stored — slugged, lowercased, cut at 24 characters on a word
+		 * boundary — so `("Political LLM (round 20)")` comes back `"political-llm"`:
+		 *
+		 *     const mine = await stage.me.setWorkspace("Political LLM");  // "political-llm"
+		 *
+		 * It is a *location*, not a list: unlike `setTags` there is exactly one, so joining one
+		 * project is leaving another. `null`, or `""`, means you are in none. Set it once when you
+		 * start rather than at the top of every turn — a repeated write is a no-op on the wire, but
+		 * it is how you would overwrite a workspace the user moved you into deliberately.
+		 */
+		setWorkspace(workspace: string | null): Promise<string | null>;
 		get(): Promise<Identity>;
 	};
+
+	/**
+	 * The workspaces in use, biggest first, with their members and the boards they hold.
+	 *
+	 * This is how you find the project you are joining: what it is called, who else is already
+	 * there, and — the useful half — **what they are working from**. `boards` is every board at
+	 * least one member holds, the ones most of them hold first, so the first entry is the plan of
+	 * record and a new agent does not have to be told where it is.
+	 *
+	 * Agents in no workspace are not in this list at all; they are the ones `agents()` reports
+	 * with no `workspace`. A workspace disappears when its last member leaves it, because there
+	 * was never anything to delete.
+	 */
+	workspaces(): Promise<Workspace[]>;
 
 	/** The other agents on this deck, and what they are holding. */
 	agents(): Promise<AgentSummary[]>;

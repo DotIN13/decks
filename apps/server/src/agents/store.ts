@@ -106,6 +106,14 @@ export interface AgentRecord {
 	/** What *you* said it was doing, from the customise popup. Never written by the agent. */
 	userTags?: string[];
 	/**
+	 * The workspace it is in, from `stage.me.setWorkspace` or from you.
+	 *
+	 * On the record for the reason tags are: the whole point of a workspace is finding the agent
+	 * you are *not* talking to, and a dormant chat has no session to ask. Read back by
+	 * `validate()` — the seam a field falls through if it is only ever written.
+	 */
+	workspace?: string;
+	/**
 	 * A summary of the transcript, not a copy of it. A row shows a preview of the last
 	 * thing said, and the only other place that line lives is `chat.json` — so without this
 	 * the list would have to read every conversation to draw itself, which is the cost that
@@ -451,6 +459,12 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(typeof source.account === "string" && source.account ? { account: source.account } : {}),
 		...(tags.length > 0 ? { tags } : {}),
 		...(userTags.length > 0 ? { userTags } : {}),
+		/*
+		 * Taken as it is, like the account, and for the reason the two lists above are not
+		 * *re-cleaned*: it was cleaned on the way in, and a second pass here is how a change of
+		 * cap silently rewrites stored history.
+		 */
+		...(typeof source.workspace === "string" && source.workspace ? { workspace: source.workspace } : {}),
 		...(lastLine ? { lastLine } : {}),
 		lastAt: finite(source.lastAt, created),
 	};

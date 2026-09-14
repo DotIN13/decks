@@ -1,4 +1,4 @@
-import type { AgentChat, AgentState } from "@decks/protocol";
+import type { AgentChat, AgentState, Identity } from "@decks/protocol";
 
 /**
  * Which agents want you, and in what order.
@@ -215,4 +215,40 @@ export function since(at: number | undefined, now: number = Date.now()): string 
 export function closeWords(state: AgentState, name: string): string | undefined {
 	if (state !== "idle") return undefined;
 	return `Close ${name} — the transcript stays on disk. Delete does the same.`;
+}
+
+/**
+ * The rows cut into workspace runs, for a menu that shows its headings.
+ *
+ * The dropdown is a *switcher*, ranked by urgency (`agentList`), and grouping it by workspace is
+ * a compromise the panel does not have to make: the two orders disagree, and one of them has to
+ * give. What gives is neither — **the groups are ordered by their best-ranked member**, and the
+ * rows inside a group keep the ranking they arrived in. So the agent that needs you is still the
+ * first row of the first heading.
+ *
+ * Consecutive runs rather than a `Map`, which is the other half of the same decision: a member
+ * of the same workspace appearing later rejoins its heading, instead of producing a second
+ * heading with the same word in it because somebody else's row sat between them.
+ *
+ * **No headings until there are two *named* workspaces.** A menu where everybody is in the same
+ * project, or where nobody is in any, or where one project has one member among twelve strays,
+ * gets the flat list it has today — a heading over the whole card says nothing, and "No
+ * workspace" over twelve of thirteen rows is a heading that means "not the other one". Once
+ * there are two names to tell apart the strays need their own run, and they get one.
+ */
+export function workspaceRuns(
+	chats: AgentChat[],
+	identities: Record<string, Identity>,
+): Array<{ label: string | undefined; chats: AgentChat[] }> {
+	const at = (chat: AgentChat) => identities[chat.id]?.workspace;
+	const named = new Set(chats.map(at).filter((name): name is string => Boolean(name)));
+	if (named.size < 2) return [{ label: undefined, chats }];
+	const runs = new Map<string, { label: string | undefined; chats: AgentChat[] }>();
+	for (const chat of chats) {
+		const name = at(chat) ?? "";
+		const run = runs.get(name) ?? { label: name || "No workspace", chats: [] };
+		run.chats.push(chat);
+		runs.set(name, run);
+	}
+	return [...runs.values()];
 }

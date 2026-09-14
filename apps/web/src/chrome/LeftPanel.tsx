@@ -9,7 +9,7 @@ import { BoardRow, BoardTile } from "./BoardRow.tsx";
 import { panelSections, panelTally } from "./panel-groups.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentRow } from "./AgentRow.tsx";
-import { agentFoot, agentSections, agentTally } from "./agent-sections.ts";
+import { agentFoot, agentSections, agentTally, type AgentGroup } from "./agent-sections.ts";
 
 /**
  * The left panel: one surface, **one list**, and a button that makes it go away.
@@ -162,9 +162,22 @@ export function LeftPanel(props: {
 	onMirrorAgent?: (id: string) => void;
 	/** Replace *your* tags on an agent. Absent means no row can be customised. */
 	onAgentTags?: (id: string, tags: string[]) => void;
+	/** Move an agent into a workspace, or out of one with `null`. */
+	onAgentWorkspace?: (id: string, workspace: string | null) => void;
+	/**
+	 * Which axis the agents list is cut by — see `AgentGroup`. Uncontrolled when absent.
+	 *
+	 * A preference rather than state that belongs to a caller, on the same terms as `density`:
+	 * it is how this list draws itself, and the panel is the only thing that reads it. It is
+	 * *not* remembered between sessions — unlike density, which is a property of the person, an
+	 * axis is a property of the question being asked, and the question is answered in one press.
+	 */
+	group?: AgentGroup;
+	onGroup?: (group: AgentGroup) => void;
 }) {
 	const ids = createUniqueId();
 	const [ownDensity, setOwnDensity] = createSignal<Density>("list");
+	const [ownGroup, setOwnGroup] = createSignal<AgentGroup>("attention");
 	const [query, setQuery] = createSignal("");
 	const [tab, setTab] = createSignal<PanelTab>("boards");
 	const sheet = createSheet();
@@ -191,11 +204,26 @@ export function LeftPanel(props: {
 			unread: props.unread ?? {},
 			focused: props.focused,
 			query: query(),
+			group: group(),
 		});
 	/** Every agent, unfiltered — what the foot counts and the placeholder says. */
 	const allAgents = () => agentTally(agentSections({ chats: props.chats ?? [], identities: props.identities ?? {}, unread: props.unread ?? {}, focused: props.focused }));
 
+	/**
+	 * The workspaces in use, for the popup's suggestions.
+	 *
+	 * Read off the identities the panel is already holding rather than asked for: a workspace is
+	 * only a word somebody is using, so the set of them *is* this list, and a fetch for it would
+	 * be a second source of truth free to disagree.
+	 */
+	const workspaceNames = createMemo(() => {
+		const names = new Set<string>();
+		for (const identity of Object.values(props.identities ?? {})) if (identity.workspace) names.add(identity.workspace);
+		return [...names].sort();
+	});
+
 	const density = () => props.density ?? ownDensity();
+	const group = () => props.group ?? ownGroup();
 	let list: HTMLDivElement | undefined;
 	let field: HTMLInputElement | undefined;
 
@@ -214,7 +242,10 @@ export function LeftPanel(props: {
 		setOwnDensity(next);
 		props.onDensity?.(next);
 	};
-	const type = (next: string) => {
+	const goGroup = (next: AgentGroup) => {
+		setOwnGroup(next);
+		props.onGroup?.(next);
+	};	const type = (next: string) => {
 		setQuery(next);
 		props.onSearch?.(next);
 	};
@@ -442,7 +473,7 @@ export function LeftPanel(props: {
 							   with room to show the answer. */
 							placeholder={
 								tab() === "agents"
-									? `Search ${allAgents().total} agent${allAgents().total === 1 ? "" : "s"} or tags`
+									? `Search ${allAgents().total} agent${allAgents().total === 1 ? "" : "s"}, tags or workspaces`
 									: `Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`
 							}
 							value={query()}
@@ -505,6 +536,14 @@ export function LeftPanel(props: {
 									<div class="panel-meta meta">
 										<span class="truncate">{section.label}</span>
 										<span class="flex-1" />
+										{/*
+											What the *group* is doing, where the group is a workspace.
+
+											A section you are not in can be the one that needs you, and this is what says so
+											without reading its rows — `1 wants you`, then `2 working`, then nothing. Written in
+											the heading's right-hand column, inboard of the count, so the two are read together.
+										*/}
+										<Show when={section.note}>{(note) => <span class="note">{note()}</span>}</Show>
 										<span class="n tabular-nums">{section.rows.length}</span>
 									</div>
 									{/*
@@ -525,6 +564,8 @@ export function LeftPanel(props: {
 												onFocus={() => props.onFocusAgent?.(row.chat.id)}
 												onClose={() => props.onCloseAgent?.(row.chat.id)}
 												{...(props.onAgentTags ? { onTags: (tags: string[]) => props.onAgentTags?.(row.chat.id, tags) } : {})}
+												workspaces={workspaceNames()}
+												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
 												{...(props.onMirrorAgent ? { onMirror: () => props.onMirrorAgent?.(row.chat.id) } : {})}
 											/>
 										)}
@@ -648,14 +689,16 @@ export function LeftPanel(props: {
 					</span>
 					<span class="flex-1" />
 					{/*
-						The density toggle belongs to Boards.
+						The density toggle belongs to Boards, and the grouping to Agents.
 
-						Pictures or rows is a question about *thumbnails*; an agent has no second
-						rendering, so on the Agents tab the control would be a switch with one
-						position. Hidden rather than disabled: a disabled control asks to be
-						explained, and its absence here explains itself.
+						Pictures or rows is a question about *thumbnails*; an agent has no second rendering.
+						What an agent list does have two of is ways of cutting it up — by who needs you, or
+						by which project they are on — so the foot's right-hand slot holds one control per
+						tab, and it is the same slot and the same `.seg` either way. Hidden rather than
+						disabled, for the reason this file gives elsewhere: a control that cannot be pressed
+						asks to be explained, and its absence here explains itself.
 					*/}
-					<div class="seg" style={tab() === "agents" ? { display: "none" } : undefined}>
+					<div class="seg" data-seg="density" style={tab() === "agents" ? { display: "none" } : undefined}>
 						<button
 							type="button"
 							class="grid place-items-center px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
@@ -675,6 +718,30 @@ export function LeftPanel(props: {
 							onClick={() => goDensity("grid")}
 						>
 							<Icon of={LayoutGrid} size={12} />
+						</button>
+					</div>
+					<div class="seg" data-seg="agents" style={tab() === "boards" ? { display: "none" } : undefined}>
+						<button
+							type="button"
+							class="px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
+							data-on={group() === "attention"}
+							aria-label="Group agents by what needs you"
+							aria-pressed={group() === "attention"}
+							title="Working, waiting, quiet"
+							onClick={() => goGroup("attention")}
+						>
+							Attention
+						</button>
+						<button
+							type="button"
+							class="px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
+							data-on={group() === "workspace"}
+							aria-label="Group agents by workspace"
+							aria-pressed={group() === "workspace"}
+							title="One section per workspace"
+							onClick={() => goGroup("workspace")}
+						>
+							Workspace
 						</button>
 					</div>
 				</div>

@@ -21,7 +21,7 @@ import { Icon } from "../ui/icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
 import { runtimes } from "../state/deck.ts";
 import { canHover } from "../lib/media.ts";
-import { agentList, agentStatus, closeWords, dropdownFaces, rowWords } from "./agent-order.ts";
+import { agentList, agentStatus, closeWords, dropdownFaces, rowWords, workspaceRuns } from "./agent-order.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 
 /**
@@ -327,6 +327,15 @@ export function AgentMenu(props: {
 	 * the only place that says so.
 	 */
 	const listed = () => dropdownFaces(agentList(props.chats, props.unread, props.focused));
+	/**
+	 * The same rows, cut into workspace runs — and nothing at all when nobody has one.
+	 *
+	 * A heading over a run of rows is what the panel does with a section; this is the same idea
+	 * in a 264px card, where there is no room for three of them and the cap already says how many
+	 * rows it is not drawing. See `workspaceRuns`: the rows keep the order they were ranked in,
+	 * and the headings appear only once there is more than one group to tell apart.
+	 */
+	const runs = () => workspaceRuns(listed().shown, props.identities);
 
 	return (
 		<Popover
@@ -339,7 +348,19 @@ export function AgentMenu(props: {
 				return props.trigger(api);
 			}}
 		>
-			<For each={listed().shown}>
+			<For each={runs()}>
+				{(run) => (
+					<>
+						{/*
+							What this run of rows has in common, where they have anything.
+
+							`.group` is the class that already labels a run of rows in a menu — the accounts
+							picker and the settings rows use it — so a workspace heading here is the same
+							object as every other label over a group, rather than a fourth kind of small text.
+							Not a `[data-row]`: the arrows should reach the agents, and a heading is not one.
+						*/}
+						<Show when={run.label}>{(label) => <div class="group">{label()}</div>}</Show>
+						<For each={run.chats}>
 				{(chat) => {
 					const status = () => agentStatus(chat.state, props.unread[chat.id] ?? 0);
 					const name = () => props.identities[chat.id]?.name ?? chat.name;
@@ -447,6 +468,9 @@ export function AgentMenu(props: {
 						</div>
 					);
 				}}
+						</For>
+					</>
+				)}
 			</For>
 
 			{/*

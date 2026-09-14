@@ -163,8 +163,17 @@ export function AgentHoverCard(props: {
 					and because tags are the thing being scanned for when several of these are
 					opened in turn. Yours are outlined; the agent's are filled.
 				*/}
-				<Show when={(props.identity?.tags?.length ?? 0) + (props.identity?.userTags?.length ?? 0) > 0}>
+				<Show when={props.identity?.workspace || (props.identity?.tags?.length ?? 0) + (props.identity?.userTags?.length ?? 0) > 0}>
 					<div class="tags">
+						{/*
+							The workspace first, in the same box the row and the panel draw it in.
+
+							"Which project is this face on" is asked while pointing at a face — which is the
+							reason the card exists — and it is the one fact on this chip line that is *about a
+							group* rather than about the agent alone. `.kind` is the shape: a box for a fact,
+							a pill for a claim.
+						*/}
+						<Show when={props.identity?.workspace}>{(at) => <span class="tag ws">{at()}</span>}</Show>
 						<For each={props.identity?.tags ?? []}>{(tag) => <span class="tag">{tag}</span>}</For>
 						<For each={props.identity?.userTags ?? []}>{(tag) => <span class="tag" data-mine="true">{tag}</span>}</For>
 					</div>

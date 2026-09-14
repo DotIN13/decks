@@ -49,6 +49,17 @@ export const agents = {
 		wire.agents.get(message.id)?.setUserTags(message.tags);
 	},
 
+	/*
+	 * The workspace, from the row's customise popup.
+	 *
+	 * One field and one writer at a time: this is the same value `stage.me.setWorkspace` writes,
+	 * so whoever moved last is where the agent is. Silent when the agent is gone, like the tags
+	 * above — the row a popup was opened from can be removed by another tab.
+	 */
+	"agent.workspace": (message, _reply, wire) => {
+		wire.agents.get(message.id)?.setWorkspace(message.workspace);
+	},
+
 	"agent.prompt": (message, _reply, wire) => {
 		const agent = wire.agents.get(message.id) ?? wire.agents.focused();
 		// Deliberately not awaited: a prompt runs for minutes and the socket has

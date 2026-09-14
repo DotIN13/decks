@@ -115,6 +115,13 @@ export type ClientMessage =
 	 * the two never write to each other.
 	 */
 	| { type: "agent.tags"; id: string; tags: string[] }
+	/**
+	 * The workspace an agent is in, from the row's customise popup. `null` leaves it.
+	 *
+	 * The same field `stage.me.setWorkspace` writes, and deliberately not a second one: a
+	 * workspace is a location, so there is one value and whoever wrote last owns it.
+	 */
+	| { type: "agent.workspace"; id: string; workspace: string | null }
 	| { type: "agent.prompt"; id: string; text: string }
 	| { type: "agent.abort"; id: string }
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }

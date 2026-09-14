@@ -1,7 +1,7 @@
 import type { AgentChat, AgentState } from "@decks/protocol";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agentList, agentOrder, agentStatus, closeWords, dropdownFaces, since, stackFaces, DROPDOWN_CAP, STACK_CAP } from "./agent-order.ts";
+import { agentList, agentOrder, agentStatus, closeWords, dropdownFaces, since, stackFaces, workspaceRuns, DROPDOWN_CAP, STACK_CAP } from "./agent-order.ts";
 
 /*
  * The corner subtracts one thing — the agent whose window this already is — and orders the
@@ -141,4 +141,54 @@ test("a chat can be closed when it is idle, and only then", () => {
 	 */
 	assert.match(closeWords("idle", "writer") ?? "", /^Close writer/, "it names which of six rows it belongs to");
 	assert.match(closeWords("idle", "writer") ?? "", /stays on disk/, "close, not delete — and there is no undo in the list");
+});
+
+// --- the dropdown's headings -----------------------------------------------------------
+
+/*
+ * A menu of thirteen rows is a switcher, and its order is urgency. Cutting it into workspaces
+ * therefore has two orders fighting, and what gives is neither: the groups are ordered by their
+ * best-ranked member, and the rows inside keep the ranking they arrived in.
+ */
+const identity = (name: string, workspace?: string) => ({ name, color: "#000", ...(workspace ? { workspace } : {}) });
+
+test("no headings until there is more than one group", () => {
+	const one = workspaceRuns([chat("a", "idle"), chat("b", "idle")], { a: identity("a"), b: identity("b", "p") });
+	assert.deepEqual(one.map((run) => run.label), [undefined], "one project — and twelve strays — is still a flat list");
+	assert.deepEqual(one[0]?.chats.map((one) => one.id), ["a", "b"]);
+
+	const none = workspaceRuns([chat("a", "idle"), chat("b", "idle")], { a: identity("a"), b: identity("b") });
+	assert.deepEqual(none.map((run) => run.label), [undefined], "and so is nobody in any");
+
+	const two = workspaceRuns([chat("a", "idle"), chat("b", "idle")], { a: identity("a", "p"), b: identity("b", "q") });
+	assert.deepEqual(two.map((run) => run.label), ["p", "q"]);
+});
+
+test("groups are ordered by their best-ranked member, not by size", () => {
+	// Ada wants you and is in `q`; three idle agents are in `p`. The heading you are most
+	// likely to be reaching for is the one with the question under it, and it goes first.
+	const ordered = [chat("ada", "idle"), chat("b", "idle"), chat("c", "idle"), chat("d", "idle")];
+	const runs = workspaceRuns(ordered, { ada: identity("Ada", "q"), b: identity("b", "p"), c: identity("c", "p"), d: identity("d", "p") });
+	assert.deepEqual(runs.map((run) => run.label), ["q", "p"]);
+	assert.deepEqual(runs[0]?.chats.map((one) => one.id), ["ada"]);
+});
+
+test("the same workspace appearing later rejoins its heading", () => {
+	// Consecutive runs would give two headings with the same word in them, because somebody in
+	// another group sat between two members — which is the ordinary case, not a corner one.
+	const runs = workspaceRuns([chat("a", "idle"), chat("b", "idle"), chat("c", "idle"), chat("d", "idle")], {
+		a: identity("a", "p"),
+		b: identity("b", "q"),
+		c: identity("c", "p"),
+		d: identity("d"),
+	});
+	assert.deepEqual(runs.map((run) => run.label), ["p", "q", "No workspace"]);
+	assert.deepEqual(runs[0]?.chats.map((one) => one.id), ["a", "c"]);
+});
+
+test("an agent in no workspace is a heading of its own, and last only because it ranked last", () => {
+	const runs = workspaceRuns([chat("a", "idle"), chat("b", "idle")], { a: identity("a", "p"), b: identity("b", "q") });
+	assert.deepEqual(runs.map((run) => run.label), ["p", "q"], "no strays, no heading");
+	const withStray = workspaceRuns([chat("a", "idle"), chat("b", "idle"), chat("c", "idle")], { a: identity("a", "p"), b: identity("b", "q"), c: identity("c") });
+	assert.deepEqual(withStray.map((run) => run.label), ["p", "q", "No workspace"]);
 });

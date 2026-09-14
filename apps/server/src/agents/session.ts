@@ -30,6 +30,7 @@ import type { StageBridge } from "../stage/bridge.ts";
 import { Translator } from "./translator.ts";
 import { forBrowser, HISTORY_ITEMS } from "./wire.ts";
 import { cleanTags, sameTags } from "./tags.ts";
+import { cleanWorkspace, sameWorkspace } from "./workspaces.ts";
 
 /**
  * How long an agent must have been quiet before it starts on queued work.
@@ -230,6 +231,14 @@ export class DeckAgent {
 			 * install's default.
 			 */
 			account?: string;
+			/**
+			 * The workspace to open in — a delegating parent's, handed down.
+			 *
+			 * Separate from `restored.workspace` because they answer to different owners: that one is
+			 * this chat's own record read back off disk, this one is the parent's live declaration
+			 * being inherited by a child that has never had one.
+			 */
+			workspace?: string;
 			/** The install's Claude subscriptions (`claude/accounts.ts`). */
 			accounts?: ClaudeAccountSwitcher;
 			accountsChanged?(): void;
@@ -263,6 +272,7 @@ export class DeckAgent {
 				account?: string;
 				tags?: string[];
 				userTags?: string[];
+				workspace?: string;
 			};
 		},
 	) {
@@ -314,6 +324,16 @@ export class DeckAgent {
 		 */
 		if (options.restored?.tags?.length) this.identity = { ...this.identity, tags: options.restored.tags };
 		if (options.restored?.userTags?.length) this.identity = { ...this.identity, userTags: options.restored.userTags };
+		/*
+		 * And the workspace, from either direction.
+		 *
+		 * `restored` is a chat read back off disk; `options.workspace` is a child being handed its
+		 * parent's — the same arrangement `account` has, and for the same reason: a subagent is the
+		 * parent's work continuing and should not land in a different group from the agent that
+		 * asked for it. Both are already cleaned, so neither is cleaned again here.
+		 */
+		const workspace = options.restored?.workspace ?? options.workspace;
+		if (workspace) this.identity = { ...this.identity, workspace };
 		this.parentId = options.parentId;
 		this.resumeRef = options.resumeRef;
 		this.kind = options.kind;
@@ -450,6 +470,14 @@ export class DeckAgent {
 		 */
 		if (snapshot.identity?.tags) this.setTags(snapshot.identity.tags);
 		if (snapshot.identity?.userTags) this.setUserTags(snapshot.identity.userTags);
+		/*
+		 * And the workspace, which rides the snapshot for the same reason the tags do: a rewind
+		 * restores what the agent was, and where it was working is part of that. Guarded rather than
+		 * `?? null` — absent means a snapshot taken before this existed, and clearing the workspace
+		 * of an agent that has one would be a rewind *removing* a fact rather than restoring an old
+		 * one.
+		 */
+		if (snapshot.identity?.workspace) this.setWorkspace(snapshot.identity.workspace);
 	}
 
 	/** What the canvas extension is allowed to reach on this agent (§6.2). */
@@ -463,6 +491,7 @@ export class DeckAgent {
 			setInPlay: (paths: string[]) => this.setInPlay(paths),
 			rename: (name: string) => this.rename(name),
 			setTags: (tags: unknown) => this.setTags(tags),
+			setWorkspace: (workspace: unknown) => this.setWorkspace(workspace),
 			setAvatar: (url: string) => this.setAvatar(url),
 			agents: () => this.host.agents(),
 			camera: () => this.host.camera(this.id),
@@ -672,6 +701,7 @@ export class DeckAgent {
 			...(this.account ? { account: this.account } : {}),
 			...(this.identity.tags?.length ? { tags: this.identity.tags } : {}),
 			...(this.identity.userTags?.length ? { userTags: this.identity.userTags } : {}),
+			...(this.identity.workspace ? { workspace: this.identity.workspace } : {}),
 			// The last thing actually said, not the time of this write — it is what the list
 			// is ordered by, and a flush on shutdown must not make an old chat look like the
 			// newest one. Kept on the record so the list never has to read a transcript.
@@ -1262,7 +1292,7 @@ export class DeckAgent {
 	}
 
 	/**
-	 * Your tags on this agent, from the customise popup. A separate field, on purpose.
+	 * 		 * Your tags on this agent, from the customise popup. A separate field, on purpose.
 	 *
 	 * `setTags` above replaces, so a shared list would mean the agent's next call silently
 	 * deleted what you typed. The agent cannot read this field either — `stage.agents()`
@@ -1276,6 +1306,32 @@ export class DeckAgent {
 		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
 		this.save();
 		return tags;
+	}
+
+	/**
+	 * The workspace this agent is in, from `stage.me.setWorkspace` or from the customise popup.
+	 *
+	 * Replaces — one value, not a list — and `null` or an empty string leaves it, which is the
+	 * same absence as never having had one. Returns what was **stored**, which is not always what
+	 * was passed: a workspace is slugged and cut at 24 characters, so a model that sends
+	 * `"Political LLM (round 20)"` gets `political-llm` back and learns the word the others are
+	 * actually in. That return value is the whole reason this is not a `void`: two agents that
+	 * both declared "the same" project in different words would otherwise never meet.
+	 *
+	 * Both writers land here, you and the agent, and there is no second field to keep in step. See
+	 * `protocol/Identity.workspace` for why a workspace is one value where tags are two.
+	 */
+	setWorkspace(raw: unknown): string | null {
+		const workspace = cleanWorkspace(raw);
+		if (sameWorkspace(this.identity.workspace, workspace)) return workspace;
+		this.identity = { ...this.identity, ...(workspace ? { workspace } : { workspace: undefined }) };
+		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
+		this.save();
+		return workspace;
+	}
+
+	get workspace(): string | undefined {
+		return this.identity.workspace;
 	}
 
 	get tags(): string[] {

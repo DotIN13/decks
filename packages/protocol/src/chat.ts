@@ -148,6 +148,22 @@ export interface Identity {
 	 * from the agent's own — see `.tag[data-mine]` in `styles/panel.css`.
 	 */
 	userTags?: string[];
+	/**
+	 * The workspace this agent works in, as a slug: `"political-llm"`.
+	 *
+	 * Set through `stage.me.setWorkspace`, and by you from the row's customise popup; **one
+	 * field, both writers, last write wins.** Tags needed two fields because a list can hold
+	 * two truths — the agent's and yours — but a workspace is a location, and an agent in two
+	 * locations is a contradiction rather than a richer answer.
+	 *
+	 * A slug rather than a label, for the reason `agents/tags.ts` gives: `"Political LLM"` and
+	 * `political-llm` have to be the same group or "who else is on this" has no answer.
+	 *
+	 * Here and not on `AgentChat` because it is the same kind of fact as a name: the agent
+	 * chose it about itself, and `agent.identity` already carries it to every browser and
+	 * through every restart.
+	 */
+	workspace?: string;
 }
 
 /**

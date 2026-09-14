@@ -70,8 +70,13 @@ export class Registry {
 	 * whole before deciding whether to ask for more. And `kind` is the runtime, because it is
 	 * now load-bearing — whether the row you are handing to is a Claude one or an antigravity
 	 * one changes what it can do.
+	 *
+	 * `workspace` is here for the same reason `tags` is, one level up: an agent asking "who is
+	 * on this project" gets an answer from the call it already makes to see who exists, rather
+	 * than needing a second shape for the same fact. `undefined` for an agent in none, which is
+	 * the absence the panel draws one section for.
 	 */
-	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; queued: number }> {
+	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number }> {
 		return this.agents.map((agent) => {
 			const chat = agent.chat();
 			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand
@@ -88,6 +93,9 @@ export class Registry {
 				context: [...agent.context].slice(0, 20),
 				holding: agent.context.length,
 				tags: agent.tags,
+				// The workspace, or `undefined` for an agent in none — see `agents/workspaces.ts` for
+				// who is in which, and `roster` for the aggregation.
+				workspace: agent.workspace,
 				queued: agent.queued,
 			};
 		});
@@ -121,6 +129,15 @@ export class Registry {
 			mode?: AgentMode;
 			/** The Claude subscription to open on — a delegating parent's, handed down. */
 			account?: string;
+			/**
+			 * The workspace to open in — a delegating parent's, or a chat's own record.
+			 *
+			 * A child is created in its parent's workspace rather than in none, for the reason it
+			 * inherits the parent's account: a subagent is the parent's work continuing, and a
+			 * fan-out that lands in a different group from the agent that asked for it is a group
+			 * nobody declared. A restored chat's own comes through `restored.workspace` instead.
+			 */
+			workspace?: string;
 			/** Set only by `restore`: a chat from a previous run, with nothing running behind it. */
 			restored?: {
 				id: string;
@@ -142,6 +159,7 @@ export class Registry {
 				account?: string;
 				tags?: string[];
 				userTags?: string[];
+				workspace?: string;
 			};
 		} = {},
 	): DeckAgent {
@@ -228,6 +246,7 @@ export class Registry {
 					...(record.account ? { account: record.account } : {}),
 					...(record.tags ? { tags: record.tags } : {}),
 					...(record.userTags ? { userTags: record.userTags } : {}),
+					...(record.workspace ? { workspace: record.workspace } : {}),
 				},
 			});
 		}
@@ -346,6 +365,14 @@ export class Registry {
 			 * runtimes have no Claude account to spend and ignore it.
 			 */
 			...(parent.accountId() ? { account: parent.accountId() as string } : {}),
+			/*
+			 * And the parent's workspace, on the same argument and one level more useful.
+			 *
+			 * A delegation is a group growing: the child is doing part of the project the parent
+			 * named, so a fan-out of six that each landed in no workspace would be six agents to
+			 * find by hand — which is the problem workspaces exist for.
+			 */
+			...(parent.workspace ? { workspace: parent.workspace } : {}),
 		});
 		if (spec.model?.includes("/")) {
 			const [provider, ...rest] = spec.model.split("/");

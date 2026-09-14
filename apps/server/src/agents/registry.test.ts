@@ -668,3 +668,41 @@ test("a reply is delivered as a notice in the sender's transcript — and never 
 	delete process.env.DECKS_QUEUE_IDLE_MS;
 	cleanup();
 });
+
+test("a workspace survives a restart, because a dormant chat has no session to ask", () => {
+	const { deck, cleanup } = deckOn();
+	const agent = agentOn(deck);
+	agent.rename("Rune");
+	// One thing said, so there is a record at all: an agent nobody has spoken to is not
+	// persisted (`session.persisted`), which is the same for its name and its tags.
+	agent.translator.user("where are we");
+	// The slug is what is stored, not the sentence that produced it.
+	assert.equal(agent.setWorkspace("Political LLM"), "political-llm");
+	const id = agent.id;
+	agent.dispose();
+
+	const { registry } = registryOn(deck);
+	registry.restore();
+	assert.equal(registry.summaries()[0]?.id, id);
+	assert.equal(registry.summaries()[0]?.workspace, "political-llm", "the row comes back in its workspace");
+	cleanup();
+});
+
+test("the summaries carry the workspace, and `undefined` is a real answer", () => {
+	const { deck, cleanup } = deckOn();
+	const one = agentOn(deck);
+	const two = agentOn(deck);
+	one.translator.user("one");
+	two.translator.user("two");
+	one.setWorkspace("political-llm");
+	two.setWorkspace(null);
+	// Disposed, so the debounced write is flushed rather than left on a timer.
+	one.dispose();
+	two.dispose();
+	const { registry } = registryOn(deck);
+	registry.restore();
+	const byId = new Map(registry.summaries().map((row) => [row.id, row]));
+	assert.equal(byId.get(one.id)?.workspace, "political-llm");
+	assert.equal(byId.get(two.id)?.workspace, undefined, "an agent in none is absent, not empty");
+	cleanup();
+});
