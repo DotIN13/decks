@@ -39,7 +39,6 @@ export function AgentStack(props: {
 	onNew: (kind?: AgentKind) => void;
 	/** …and every row in it has an ×, so the same list closes chats from either way in. */
 	onClose: (id: string) => void;
-	defaultKind: AgentKind;
 }) {
 	const ordered = () => agentOrder(props.chats, props.unread, props.focused);
 	const split = () => stackFaces(ordered());
@@ -188,7 +187,6 @@ export function AgentStack(props: {
 						onFocus={props.onFocus}
 						onNew={props.onNew}
 						onClose={props.onClose}
-						defaultKind={props.defaultKind}
 						placement="bottom-end"
 						label="Agents"
 						trigger={(api) => (

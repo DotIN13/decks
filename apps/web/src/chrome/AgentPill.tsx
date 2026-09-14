@@ -1,7 +1,6 @@
 import { PALETTE, type ComponentKind } from "@decks/board-kit";
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
-import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import PanelLeft from "lucide-solid/icons/panel-left";
@@ -145,6 +144,46 @@ export function AgentFace(props: {
 }
 
 /**
+ * Every runtime an agent can be, as rows — the whole of "add an agent", written once.
+ *
+ * Two controls open this list: the `+` in the top-left pill, and the `+ New agent` row at the
+ * foot of the agents menu that unfolds in place. They are the same question asked from two
+ * places — a live session cannot swap the process behind it, so choosing a runtime *is*
+ * creating the agent — and a list copied per caller is how "New claude agent" and "New
+ * Claude agent" end up in the same menu as two different things.
+ *
+ * The list comes from the server, which is the only thing that knows what this machine
+ * has: the runtime's own name for itself, and whether it can start here. A runtime that
+ * cannot is disabled and says why — an option that fails on the first prompt is worse than
+ * one that is not offered.
+ */
+function AgentChoices(props: { onPick: (kind: AgentKind) => void }) {
+	return (
+		<For each={runtimes()}>
+			{(runtime) => (
+				<button
+					type="button"
+					role="menuitem"
+					data-row
+					data-flat="true"
+					disabled={!runtime.available}
+					title={runtime.reason ?? ""}
+					onClick={() => props.onPick(runtime.kind)}
+				>
+					{/* `flex-none`: an `<svg>` in a flex row shrinks to nothing beside a
+					    `flex-1` label, and has. */}
+					<AgentMark class="flex-none" agent={runtime.kind} size={13} />
+					<span class="lb flex-1">New {runtime.label} agent</span>
+					<Show when={!runtime.available}>
+						<span class="flex-none text-[11px] text-faint">not installed</span>
+					</Show>
+				</button>
+			)}
+		</For>
+	);
+}
+
+/**
  * The agent list — every agent, and the only place an idle one appears.
  *
  * Exported because two controls open it: the chevron beside the active agent's name, and
@@ -182,8 +221,6 @@ export function AgentMenu(props: {
 	onNew: (kind?: AgentKind) => void;
 	/** Take a chat off the list. The transcript is a file on disk and stays there. */
 	onClose: (id: string) => void;
-	/** What the server hands a new agent unless told otherwise. */
-	defaultKind: AgentKind;
 	/** The control that opens it, given `Popover`'s api so it can draw itself pressed. */
 	trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;
 	placement?: Placement;
@@ -432,44 +469,36 @@ export function AgentMenu(props: {
 			<div class="rule" />
 
 			{/*
-			 * New agent, with its runtime beside it.
-			 *
-			 * Two rows on one line rather than a row with a button in it: a button inside a
-			 * button is invalid, and a non-`[data-row]` control here would be the one thing in
-			 * the menu the arrow keys could not reach. Both halves carry `data-row`, so the
-			 * keyboard roves onto either and the highlight is the popover's own.
-			 */}
-			{/*
-				`w-auto` on both halves, which is the whole reason this line works.
+				New agent, as one control that unfolds.
 
-				`.popover [data-row]` is `width: 100%`, so that an ordinary row fills the card —
-				and two rows sharing a line each claimed all of it. `flex-none` then held the
-				runtime button at 250px while the label shrank to its `+` icon, which is what
-				"New / pi / agent" stacked in three lines actually was.
+				It was two: a label that created an agent on the server's default runtime, and a chip
+				beside it, showing that runtime's name, that opened the four choices. So the menu
+				asked you to know which runtime you wanted before it showed you one — and the runtime
+				is the one thing about a new agent that cannot be changed afterwards. The pair is one
+				button now, and pressing it shows the four.
 
-				`whitespace-nowrap` on the label for the same reason in miniature: "New agent" is
-				two words and there is no width at which breaking them is better than eliding.
+				A row rather than a row with a button in it: a button inside a button is invalid, and a
+				non-`[data-row]` control here would be the one thing in the menu the arrow keys could
+				not reach.
+
+				`aria-expanded` is load-bearing rather than descriptive: `Popover` reads it to tell a
+				disclosure inside the menu from a choice that should close it, so without it the press
+				that unfolds the list would take the menu with it.
 			*/}
-			<div class="flex items-center gap-1">
-				<button type="button" role="menuitem" data-row data-flat="true" class="w-auto min-w-0 flex-1" onClick={() => pick(() => props.onNew(props.defaultKind))}>
-					<Icon of={Plus} size={13} class="flex-none text-muted" />
-					<span class="lb whitespace-nowrap">New agent</span>
-				</button>
-				<button
-					type="button"
-					role="menuitem"
-					data-row
-					data-flat="true"
-					class="w-auto flex-none px-2 text-[11px] whitespace-nowrap text-faint"
-					aria-expanded={picking()}
-					aria-label={`Runtime for a new agent — ${props.defaultKind}`}
-					title="The runtime cannot change once an agent exists"
-					onClick={() => setPicking((was) => !was)}
-				>
-					{runtimes().find((runtime) => runtime.kind === props.defaultKind)?.label ?? props.defaultKind}
-					<Icon of={ChevronDown} size={11} class="chev" />
-				</button>
-			</div>
+			<button
+				type="button"
+				role="menuitem"
+				data-row
+				data-flat="true"
+				aria-expanded={picking()}
+				aria-label="New agent — choose its runtime"
+				title="The runtime cannot change once an agent exists"
+				onClick={() => setPicking((was) => !was)}
+			>
+				<Icon of={Plus} size={13} class="flex-none text-muted" />
+				<span class="lb flex-1 whitespace-nowrap">New agent</span>
+				<Icon of={ChevronDown} size={11} class="flex-none text-muted" />
+			</button>
 
 			{/*
 			 * The runtime is not a setting on a new agent, it is the same question as "new
@@ -477,36 +506,7 @@ export function AgentMenu(props: {
 			 * picking one here *creates* rather than remembering a preference.
 			 */}
 			<Show when={picking()}>
-				<For each={runtimes()}>
-					{(runtime) => (
-						/*
-						 * The list comes from the server, which is the only thing that knows what
-						 * this machine has: the runtime's own name for itself, and whether it can
-						 * start here. A runtime that cannot is disabled and says why — an option
-						 * that fails on the first prompt is worse than one that is not offered.
-						 */
-						<button
-							type="button"
-							role="menuitem"
-							data-row
-							data-flat="true"
-							disabled={!runtime.available}
-							title={runtime.reason ?? ""}
-							onClick={() => runtime.available && pick(() => props.onNew(runtime.kind))}
-						>
-							{/* `flex-none`: an `<svg>` in a flex row shrinks to nothing beside a
-							    `flex-1` label, and has. */}
-							<AgentMark class="flex-none" agent={runtime.kind} size={13} />
-							<span class="lb flex-1">New {runtime.label} agent</span>
-							<Show when={!runtime.available}>
-								<span class="flex-none text-[11px] text-faint">not installed</span>
-							</Show>
-							<Show when={runtime.available && runtime.kind === props.defaultKind}>
-								<Icon of={Check} size={13} class="flex-none text-faint" />
-							</Show>
-						</button>
-					)}
-				</For>
+				<AgentChoices onPick={(kind) => pick(() => props.onNew(kind))} />
 			</Show>
 					{/*
 				One card for the whole menu, mounted with it and only unhidden on hover.
@@ -552,7 +552,6 @@ export function AgentPill(props: {
 	onFocus: (id: string) => void;
 	onNew: (kind?: AgentKind) => void;
 	onClose: (id: string) => void;
-	defaultKind: AgentKind;
 	/** Whether the boards panel is showing. A button, not a hover — folded means gone. */
 	boardsOpen: boolean;
 	onToggleBoards: () => void;
@@ -666,7 +665,6 @@ export function AgentPill(props: {
 				onFocus={props.onFocus}
 				onNew={props.onNew}
 				onClose={props.onClose}
-				defaultKind={props.defaultKind}
 				label="Agents"
 				trigger={(api) => (
 					<button
@@ -684,6 +682,46 @@ export function AgentPill(props: {
 					</button>
 				)}
 			/>
+
+			{/*
+				Add an agent, one press from the toolbar.
+
+				The list existed and was three presses deep: the chevron, then `New agent`, then the
+				runtime chip beside it — and the runtime is the one thing about a new agent that
+				**cannot be changed afterwards**, so it was the last thing the flow asked. This is
+				the same list (the same component, `AgentChoices`) one press from the toolbar, which
+				is where "add" lives in every app the person using this has already met.
+
+				Beside the selector it adds to, and not with the tools: adding an agent does not
+				change what a click on the canvas does. That is also what keeps two `+`-shaped
+				menus apart — the corner's is a new *board*.
+
+				Fold-away below 640px, where the pill is a 393px line with 44px targets and four
+				buttons already. Nothing is lost there: the chevron beside it opens the agents
+				menu, whose `New agent` pair is the same two presses it always was.
+			*/}
+			<Popover
+				placement="bottom-start"
+				label="Add an agent"
+				class="w-[248px]"
+				trigger={(api) => (
+					<button
+						type="button"
+						class="iconbtn max-[640px]:hidden"
+						ref={api.ref}
+						aria-haspopup="menu"
+						aria-expanded={api.open}
+						data-on={api.open ? "soft" : undefined}
+						title="Add an agent — pick its runtime"
+						aria-label="Add an agent"
+						onClick={api.toggle}
+					>
+						<Icon of={Plus} size={15} />
+					</button>
+				)}
+			>
+				<AgentChoices onPick={(kind) => props.onNew(kind)} />
+			</Popover>
 
 			<span class="pill-sep" aria-hidden="true" />
 

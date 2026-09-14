@@ -490,11 +490,11 @@ export async function newAgent(page, kind = "pi") {
 	 * It used to be a `+` in the header of the agents *panel*, and the panel is gone: a list
 	 * you switch with is a selector, so it hangs off the thing it selects.
 	 *
-	 * The `New agent` row is two controls. The label starts one on the default runtime; the
-	 * chevron beside it opens `New claude agent` / `New pi agent`, because the runtime cannot
-	 * change afterwards and that is the only moment it can be chosen. So this always goes
-	 * through the chevron and names the runtime — asking for the default by clicking the
-	 * label would make the check's `kind` argument a lie whenever the default changed.
+	 * `+ New agent` is one row that unfolds: pressing it shows `New claude agent` / `New pi
+	 * agent` / … in place, because the runtime cannot change afterwards and that is the only
+	 * moment it can be chosen. The row itself creates nothing, so this always goes on to name
+	 * the runtime — and it is the *last* row in the menu, which is why the click needs no
+	 * selector beyond that.
 	 */
 	await openAgents(page);
 	const rows = () => page.locator(".popover [data-row]");
@@ -505,7 +505,8 @@ export async function newAgent(page, kind = "pi") {
 	await page.locator(".popover [data-row]").filter({ hasText: new RegExp(`^New ${kind} agent`, "i") }).first().click();
 	/*
 	 * Counted with the menu re-opened, because picking closes it — and counted as agent
-	 * *rows* rather than every `[data-row]`, since the `New agent` pair are rows too.
+	 * *rows* rather than every `[data-row]`, since `+ New agent` and the four runtimes are
+	 * rows too.
 	 */
 	await page.waitForTimeout(500);
 	await openAgents(page);

@@ -780,7 +780,6 @@ export function App() {
 					onFocus={focusAgent}
 					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					onClose={closeAgent}
-					defaultKind={state.defaultKind}
 					boardsOpen={boardsOpen()}
 					onToggleBoards={() => showBoards(!boardsOpen())}
 					tool={tool()}
@@ -803,7 +802,6 @@ export function App() {
 					onFocus={focusAgent}
 					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					onClose={closeAgent}
-					defaultKind={state.defaultKind}
 					zoom={camera().zoom}
 					onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))}
 					/*
