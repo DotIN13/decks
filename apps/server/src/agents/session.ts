@@ -787,6 +787,28 @@ export class DeckAgent {
 			this.translator.notice("error", (error as Error).message);
 			this.translator.setState("idle");
 		}
+		/*
+		 * The "thinking" above is a **prediction**: set before the runtime has been told
+		 * anything, so the row lights up when you press send rather than when the runtime's
+		 * first frame arrives. A turn takes the prediction back — Pi's `agent_end`, Claude's
+		 * `result`, opencode's idle frame — and a slash command is not a turn. Pi's `/compact`
+		 * summarises in place, `/help`, `/name` and `/session` answer out of state the shell
+		 * already has, and Claude's `/status` and Antigravity's `/models` are the same kind of
+		 * thing: none of them starts an agent run, so no terminal event follows and the
+		 * prediction stood **for ever**.
+		 *
+		 * What that cost: the chat list said "working" about an agent that was finished, so did
+		 * `stage.agents()` for every other agent that asked, and — the part that actually bites —
+		 * **the queue never drained**, because its clock starts on the return to idle. Work
+		 * another agent had handed over sat behind a `/compact` until somebody pressed stop.
+		 *
+		 * So the runtime is asked the one question it can answer: is anything running now? A
+		 * backend whose `prompt()` returns mid-turn — Claude's pushes the message and returns —
+		 * says yes and keeps the state. One that ran nothing says no, and the prediction goes
+		 * back. It is here rather than in each backend's command switch because there are four
+		 * of those and three of them would forget.
+		 */
+		if (!this.backend.isStreaming && this.state !== "idle") this.translator.setState("idle");
 		this.lastUsage = this.backend.usage() ?? this.lastUsage;
 		this.emit({ type: "agent.usage", id: this.id, usage: this.usage ?? { contextTokens: null, contextWindow: 0, cost: 0 } });
 		// The branch gained a point — the message just asked — so the transcript's user

@@ -83,12 +83,35 @@ export function handlePiEvent(t: Translator, event: AgentSessionEvent): void {
 			return;
 
 		case "compaction_start":
+			/*
+			 * A compaction is **work with no agent run behind it**: Pi emits no `agent_start` and
+			 * no `agent_end` for one, so this event is the only chance to say the agent is busy.
+			 * The reason it matters is not the spinner on the row — nothing may be submitted
+			 * while a compaction is in progress ("Cannot submit a prompt while compaction is in
+			 * progress"), so an agent that looks idle here is an agent a queue will hand work to
+			 * and Pi will refuse.
+			 */
+			t.setState("thinking");
 			t.notice("info", "Compacting the conversation…");
 			return;
 
 		case "compaction_end":
 			if (event.aborted) t.notice("warn", "Compaction was cancelled.");
 			else if (event.errorMessage) t.notice("error", `Compaction failed: ${event.errorMessage}`);
+			/*
+			 * Said out loud, and the same words Claude's boundary gets: this is the end of the
+			 * one operation whose only other trace is the usage reading dropping. Without it the
+			 * transcript says "Compacting the conversation…" and then, as far as anyone reading
+			 * can tell, never stops — which is the half of "the compact never ends" that is not
+			 * about the state.
+			 */
+			else t.notice("info", "Compacted the conversation.");
+			/*
+			 * Unless Pi is about to run the turn the compaction was for: an overflow compaction
+			 * continues the turn that hit the wall (`willRetry`), and taking the state down there
+			 * would say idle for the moment before the turn resumes.
+			 */
+			if (!event.willRetry) t.setState("idle");
 			return;
 
 		case "auto_retry_start":

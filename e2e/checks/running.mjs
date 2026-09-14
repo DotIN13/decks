@@ -8,7 +8,7 @@
  * marks with the still mark scaled and faded on a loop — which is a flower opening and
  * closing, and nobody found out until it was on screen.
  */
-import { newAgent, open, say, settle, useModel } from "../harness.mjs";
+import { newAgent, open, say, settle, socket, useModel } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 
@@ -120,6 +120,60 @@ say(
  */
 const rowAfter = await page.evaluate(() => Math.round(document.querySelector(".statusrow")?.getBoundingClientRect().height ?? -1));
 say("the sign's row is reserved, so the input bar does not move when a turn ends", rowAfter === 28, `${rowAfter}px with nothing in it`);
+
+/*
+ * A slash command is not a turn, and it must not leave the sign up.
+ *
+ * The state the row and the send button read is set when a prompt is *sent* — a prediction, so
+ * the row lights up on the press rather than on the runtime's first frame. A turn takes it back
+ * (`agent_start` claims the agent, `agent_end` hands it back). A command runs no turn and so
+ * emits neither, and the prediction used to stand for ever: `/help`, `/compact`, `/name` and
+ * every runtime's own `/status` left the chat list saying "working" about an agent that had
+ * finished — and, because the queue's clock starts on the return to idle, stranded work another
+ * agent had handed over until somebody pressed stop.
+ *
+ * `/help` rather than `/compact`, which is where this was found: a compaction needs a whole
+ * conversation behind it (Pi answers "Nothing to compact (session too small)" and emits nothing),
+ * and the two take the same path out of `prompt()` — a slash command that runs nothing at all.
+ *
+ * **Read off the socket, not the DOM.** The state frames are the server's own answer, so this
+ * cannot pass because the field never sent: the prediction has to be *seen* going up. It is read
+ * for the agent the server names as focused, which is how `resetStage` names it too.
+ */
+const link = await socket();
+let focused;
+for (let i = 0; i < 60 && !focused; i += 1) {
+	focused = link.last("agents")?.focused;
+	if (!focused) await settle(page, 100);
+}
+const states = () => link.received.filter((message) => message.type === "agent.state" && message.id === focused).map((message) => message.state);
+
+await settle(page, 300);
+const before = states().length;
+await page.locator(".dockfield").fill("/help");
+await page.locator(".dockfield").press("Enter");
+let after = [];
+for (let i = 0; i < 60; i += 1) {
+	after = states().slice(before);
+	if (after.at(-1) === "idle") break;
+	await settle(page, 100);
+}
+say(
+	"a command that runs no turn hands the working state back",
+	after.at(-1) === "idle" && after.includes("thinking"),
+	after.join(" → ") || "no state at all — the prompt never reached the agent",
+);
+
+const signAfterCommand = await page.evaluate(() => ({
+	stop: document.querySelector('.sendbtn[data-stop="true"]') !== null,
+	working: document.querySelectorAll('.statusline[data-working="true"]').length,
+}));
+say(
+	"…so the row stops working and the send button stops offering stop",
+	!signAfterCommand.stop && signAfterCommand.working === 0,
+	JSON.stringify(signAfterCommand),
+);
+link.close();
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();
