@@ -251,38 +251,34 @@ const whilePanning = await page.evaluate(() => document.querySelector(".stage").
 say("a scroll that only moves the camera does not ask for them", beforePan === "false" && whilePanning === "false", `${beforePan} -> ${whilePanning}`);
 
 /*
- * The world's own layer, which is a different question from the boards' and has the opposite
- * answer at rest.
+ * And the world carries no `will-change` at all — which is the fix for a board being soft at high
+ * zoom, and this assertion is here so nobody puts it back for the sake of the pan.
  *
- * `will-change: transform` on `.world` is a promise: hold the picture, apply the camera as a
- * matrix. It is what makes a pan cheap *and* what keeps a zoom soft, because the raster is not
- * remade when the transform changes — which is the point of the promise. It used to be held for
- * the life of the page. Now a *gesture* raises it and 300ms of quiet drops it, so a pan is still
- * a matrix and the boards are drawn again at the scale the camera settled on.
+ * The declaration is a promise: hold the raster, apply the camera as a matrix. It makes a pan a
+ * matrix rather than a repaint of sixteen documents — and it makes every zoom the same picture
+ * stretched, which is what a board looked like at 400% on a 2× display until it was taken off.
+ * A gesture-scoped version was tried and reverted: the layer being built and torn down flashed
+ * under the pointer, worst over a board, and a camera moved without a gesture (an agent's
+ * `stage.show`, a restored view) could leave the promise held over a scale it no longer matched.
+ * The cost is a pan painting itself, which `index.css` measures and explains.
  */
-const movingNow = () =>
+const promise = () =>
 	page.evaluate(() => ({
-		stage: document.querySelector(".stage").dataset.moving,
 		world: getComputedStyle(document.querySelector(".world")).willChange,
+		iframes: getComputedStyle(document.querySelector(".board-node iframe")).willChange,
 	}));
+const resting = await promise();
+say("the world makes no promise, so a zoom is drawn at the size it is read at", resting.world === "auto", JSON.stringify(resting));
 
 await page.mouse.move(700, 400);
-await page.mouse.down();
-await page.mouse.move(660, 430, { steps: 6 });
-const midPan = await movingNow();
-say(
-	"a pan holds the world's layer, so the world moves as a matrix",
-	midPan.stage === "true" && midPan.world === "transform",
-	JSON.stringify(midPan),
-);
-await page.mouse.up();
-await settle(page, 900);
-const afterPan = await movingNow();
-say(
-	"…and gives it back, so the boards are drawn again at the size they are read at",
-	afterPan.stage === "false" && afterPan.world === "auto",
-	JSON.stringify(afterPan),
-);
+await page.mouse.wheel(0, 120);
+await settle(page, 150);
+const whileMoving = await promise();
+say("…and a pan does not make one", whileMoving.world === "auto", JSON.stringify(whileMoving));
+await page.keyboard.press("Control+Equal");
+await settle(page, 150);
+const onZoom = await promise();
+say("…and a zoom does not either", onZoom.world === "auto", JSON.stringify(onZoom));
 
 // Zoom in until the other boards leave the screen, and their bars should go with them.
 for (let step = 0; step < 10; step++) {
@@ -404,6 +400,15 @@ const STEP = 20;
 const STEPS = 8;
 await page.mouse.move(grab.x, grab.y);
 const before = await cameraAt();
+const cursorIn = () =>
+	page.evaluate(() => {
+		const frame = [...document.querySelectorAll(".board-node iframe")].find((f) => {
+			const r = f.getBoundingClientRect();
+			return r.width > 200 && r.height > 200;
+		});
+		return frame ? getComputedStyle(frame.contentDocument.documentElement).cursor : null;
+	});
+say("the board's own cursor is not a grab hand to begin with", (await cursorIn()) !== "grabbing", String(await cursorIn()));
 await page.mouse.down({ button: "middle" });
 const steps = [];
 let at = before;
@@ -414,8 +419,19 @@ for (let i = 1; i <= STEPS; i++) {
 	// in screen pixels, which is the world difference scaled back up.
 	steps.push(Math.round((at.x - now.x) * now.zoom));
 	at = now;
+	if (i === 4) {
+		/*
+		 * The feedback, which the stage's own cursor cannot give. `.stage[data-panning="true"]`
+		 * makes the cursor a grab hand for a pan on bare canvas, and an iframe's document has a
+		 * cursor of its own — so the identical gesture started over a board showed the board's
+		 * cursor while the canvas moved under it, which reads as nothing happening at all.
+		 */
+		say("…and the board under the hand says it is being dragged", (await cursorIn()) === "grabbing", String(await cursorIn()));
+	}
 }
 await page.mouse.up({ button: "middle" });
+await settle(page, 300);
+say("…and gives the board's own cursor back afterwards", (await cursorIn()) !== "grabbing", String(await cursorIn()));
 const travelled = Math.round((before.x - at.x) * at.zoom);
 const wanted = STEP * STEPS;
 say("a middle-drag over a board pans one for one", Math.abs(travelled - wanted) <= 2, `${travelled}px of canvas for ${wanted}px of mouse`);

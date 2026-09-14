@@ -125,11 +125,12 @@ say(
  * The world's `will-change` is read in the same breath and is now expected to be **absent**, which
  * reverses what this line said before. It used to be asserted as `transform` — the argument being
  * that taking the world's layer off would give up the cheap pan. The person reading a board at
- * 400% on a 2× display then reported that removing it sharpens the board; the promise to hold the
+ * 400% on a 2× display then reported that removing it sharpens the board: the promise to hold the
  * picture is exactly what stops the raster being remade at a new scale, and a software rasterizer
- * (which is what this suite runs on) does not honour it, so nothing here could see it. It is held
- * for the length of a gesture now — `.stage[data-moving="true"] .world`, asserted in `camera.mjs`
- * — so neither the pan nor the sharpness is given up, and at rest there is nothing to hold.
+ * (which is what this suite runs on) does not honour it, so nothing here could see it. Scoping the
+ * promise to a gesture was tried and reverted — it flashed under the pointer, and a camera moved
+ * without a gesture could leave it held over the wrong scale — so the pan pays for itself and
+ * `camera.mjs` asserts that nothing puts the promise back.
  */
 const raster = await page.evaluate(() => {
 	const bar = document.querySelector(".board-node .chrome");

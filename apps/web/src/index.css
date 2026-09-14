@@ -468,9 +468,28 @@ svg.lucide {
  * headless Chrome on a software rasterizer: removing the world's `will-change`, re-taking that
  * layer, and putting each iframe on a layer of its own all produced byte-identical pixels. Half
  * of that is still true and half of it is a GPU behaviour that a software rasterizer does not
- * have. On a 2× display at 400%, taking `will-change: transform` off the world — which used to be
- * permanent — sharpens the board at once, and `.stage[data-moving="true"] .world` above is that
- * fix without giving up the cheap pan.
+ * have.
+ *
+ * **The world carries no `will-change` now, and that is the fix.** On a 2× display at 400%,
+ * taking it off sharpens the board at once — because the declaration is a promise to hold the
+ * raster and apply the camera to it as a matrix, and a zoom is then the same picture stretched.
+ * It used to be permanent, so every zoom was paid for that way.
+ *
+ * **What was tried in between, and why it is not here.** Scoping the promise to a *gesture*
+ * (`.stage[data-moving="true"] .world`, with a 300ms tail, then narrowed to gestures that change
+ * the scale) does restore the cheap pan — and it flashes: a layer built and torn down under the
+ * pointer, worst over a board, where the frame's own layer is recomposed at the same moment. It
+ * also leaked: a camera moved without a gesture (an agent's `stage.show`, a restored view) could
+ * leave the promise held over a scale it no longer matched, which is the softness back through a
+ * side door. Two bugs for one optimisation, so the promise is gone and the pan pays for itself.
+ *
+ * **The cost, so it is not rediscovered as a mystery.** A pan is now a transform the main thread
+ * paints rather than a matrix over pictures the compositor holds. That was measured once, for the
+ * opposite decision: 16.6 documents repainted and 28ms of main thread per pan step against 0 —
+ * with twelve boards in view at 4× CPU throttle. With a handful of boards on screen it is the
+ * same work the app did before the promotion was ever added; if a deck with many boards open pans
+ * badly, the answer is `[data-scaling]` above plus a *scale*-only promise, or the canvas
+ * renderers, and both are worth measuring rather than guessing.
  *
  * What remains is the frame's own raster: an iframe draws its document at its own scale, and the
  * compositor upscales that picture past some zoom. The levers are the same three they were — lay
@@ -516,35 +535,6 @@ svg.lucide {
 	top: 0;
 	left: 0;
 	transform-origin: 0 0;
-}
-
-/*
- * The world's own layer, held only while the camera is moving.
- *
- * **`will-change: transform` is a promise, and the boards are what it costs.** It tells the
- * compositor to keep the picture it has and apply the camera to it as a matrix — which is what
- * makes a pan a matrix rather than a repaint of sixteen documents. The catch is on the other
- * side of the same promise: the raster is *not* remade when the transform changes, because not
- * remaking it is the point. So a zoom is the same picture stretched, and the boards come out
- * blurry at high zoom and stay blurry. It used to be on `.world` unconditionally, so that
- * promise was held for the life of the page and paid for at the one moment it is not wanted.
- *
- * Now it is made when the camera starts moving and dropped 300ms after it stops, the same shape
- * as the per-iframe layers under `[data-scaling]` above. While moving, a pan and a pinch cost
- * what they always did. At rest, nothing is promised, the compositor is free to redraw the world
- * at the scale it has settled at, and the boards are drawn again at the size they are read at.
- *
- * **How this was found, because the two measurements disagree and both are right.** Held in a
- * headless Chrome on a software rasterizer, the pixels are byte-identical with the declaration
- * and without it — that is the measurement the note below this one recorded, and it is why the
- * question was closed as "not the layers". On a real GPU — a 2× display, zoomed to 400% —
- * taking it off the world sharpens the board immediately, which is what the person reading it
- * reported and then confirmed. The raster lock is a GPU behaviour; a software rasterizer ignores
- * the hint. So the declaration is scoped rather than removed: neither the pan nor the sharpness
- * is given up, and `focus.mjs` asserts the pair (promoted while moving, not at rest).
- */
-.stage[data-moving="true"] .world {
-	will-change: transform;
 }
 
 /* --- a board on the stage ---------------------------------------------------- */

@@ -154,9 +154,8 @@ export function Stage(props: {
 	 *
 	 * The cursor's own state, and only that (`index.css`: `cursor: grabbing`). It is set on the
 	 * press and cleared on the release, so it is true *before* the camera has moved and false the
-	 * instant the hand stops. That is why it is not the signal the world's layer is held on, in
-	 * either direction: see `moving` below, which is a question about the camera rather than about
-	 * a hand.
+	 * instant the hand stops. Nothing else reads it: the camera's own state is not something this
+	 * signal can answer, because a wheel scroll pans the camera and presses nothing.
 	 */
 	const [panning, setPanning] = createSignal(false);
 	/**
@@ -179,29 +178,6 @@ export function Stage(props: {
 	 */
 	const [scaling, setScaling] = createSignal(false);
 	let scaleSettle: ReturnType<typeof setTimeout> | undefined;
-	/**
-	 * Whether the camera is moving at all — a pan as much as a scale.
-	 *
-	 * **And it is the promise that keeps the boards soft.** `will-change: transform` on the world
-	 * (`index.css`) tells the compositor to hold the picture it has and apply the camera to it as a
-	 * matrix. That is what makes a pan cheap — and it also means a *zoom* is the same picture,
-	 * stretched: the raster is not remade when the transform changes, which is the whole point of
-	 * the promise, so the boards come out blurry at 4× and stay that way. Held for the life of the
-	 * page, that promise is paid for at the one moment it is not wanted.
-	 *
-	 * So it is made while the camera is moving and dropped when it stops — the same shape as
-	 * `scaling` below, and for the same reason. At rest nothing is promoted, the compositor is
-	 * free to redraw the world at the settled scale, and the boards are drawn at the size they are
-	 * read at.
-	 *
-	 * Reported by the person reading a board at 400% on a 2× display: taking `will-change` off the
-	 * world sharpens the board. Measured here, in a headless Chrome on a software rasterizer, the
-	 * pixels are byte-identical either way — the hint's raster lock is a real-GPU behaviour, and a
-	 * software rasterizer ignores it. Both measurements are true, of different rasterizers; the
-	 * sharpness is the one anybody can see, so the declaration is scoped rather than removed.
-	 */
-	const [moving, setMoving] = createSignal(false);
-	let moveSettle: ReturnType<typeof setTimeout> | undefined;
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
 
 	/*
@@ -459,34 +435,6 @@ export function Stage(props: {
 	};
 	onCleanup(() => clearTimeout(scaleSettle));
 
-	/**
-	 * Say the camera is moving, and arrange to notice when it stops.
-	 *
-	 * The same 300ms tail, for the same reason: a gesture arrives as separate events and dropping
-	 * the layer between two frames of one gesture means paying for it twice.
-	 *
-	 * **Not `panning`, and the difference is not cosmetic.** `panning` is a gesture — a finger
-	 * down, a drag on bare canvas — so it is true before the camera has moved at all and false the
-	 * moment the hand lifts. The camera moves for reasons that are not a pan: a wheel scroll pans
-	 * it and sets no `panning` at all, a zoom key and a pinch do the same, and a `fit` is a jump
-	 * with no gesture behind it. It also moves in *steps*, so a flag that followed the hand would
-	 * drop the layer between two frames of one gesture — raised and dropped repeatedly, which is
-	 * the memory churn the budget exists to avoid. This one is set by every camera change and
-	 * survives 300ms of quiet.
-	 *
-	 * Called from `pushCamera`, which is the one place a gesture's camera goes through — so a pan,
-	 * a pinch, a zoom key and a `fit` all raise it, and `writeTransform` follows it in the same
-	 * frame. A camera that arrives from somewhere else (the server, another conversation's view)
-	 * goes through the sync effect below and is deliberately *not* a movement: there is no gesture
-	 * to make cheap, and leaving the promise off is what lets the boards be drawn again at the new
-	 * size.
-	 */
-	const nowMoving = () => {
-		if (!moving()) setMoving(true);
-		clearTimeout(moveSettle);
-		moveSettle = setTimeout(() => setMoving(false), 300);
-	};
-	onCleanup(() => clearTimeout(moveSettle));
 
 	/**
 	 * The focus view: one board, as a page.
@@ -523,7 +471,6 @@ export function Stage(props: {
 
 	const pushCamera = (cam: Camera) => {
 		if (cam.zoom !== localCamera.zoom) nowScaling();
-		nowMoving();
 		lastMoved = performance.now();
 		localCamera = cam;
 		writeTransform(cam);
@@ -1184,7 +1131,6 @@ export function Stage(props: {
 			data-focus={props.focus ? "true" : undefined}
 			data-panning={panning()}
 			data-scaling={scaling() && props.boards.filter(isVisible).length <= LAYER_BUDGET}
-			data-moving={moving()}
 			ref={element}
 			onWheel={onWheel}
 			onPointerDown={onPointerDown}

@@ -284,6 +284,18 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		if (!wantsPan) return;
 		event.preventDefault();
 		event.stopPropagation();
+		/*
+		 * The grab hand, which the stage's own cursor cannot supply.
+		 *
+		 * `.stage[data-panning="true"] { cursor: grabbing }` is the whole feedback for a pan on
+		 * bare canvas, and it cannot reach in here: an iframe's document has its own cursor. So the
+		 * one gesture that does the same thing — a middle-drag or a space-drag started over a board
+		 * — showed the board's own cursor while the canvas moved under the pointer, which reads as
+		 * nothing happening. On the frame's root, where the board's own CSS cannot outrank it
+		 * (inline), and taken off in `finish`. The frame document is this app's to style while it
+		 * holds it: the `touch-action` style below is injected the same way.
+		 */
+		doc.documentElement.style.cursor = "grabbing";
 
 		/*
 		 * The position is kept in **stage** pixels, converted with the geometry of the moment — not
@@ -315,6 +327,7 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 			last = at;
 		};
 		const finish = () => {
+			doc.documentElement.style.removeProperty("cursor");
 			doc.removeEventListener("pointermove", move, true);
 			doc.removeEventListener("pointerup", finish, true);
 			doc.removeEventListener("pointercancel", finish, true);
