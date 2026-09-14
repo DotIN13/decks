@@ -667,6 +667,7 @@ svg.lucide {
  */
 .board-node > .chrome .hide,
 .board-node > .chrome .present-open,
+.board-node > .chrome .doc-open,
 .board-node > .chrome .open-tab,
 .board-node > .chrome .focus-open {
 	display: grid;
@@ -685,6 +686,7 @@ svg.lucide {
 
 .board-node:hover > .chrome .hide,
 .board-node:hover > .chrome .present-open,
+.board-node:hover > .chrome .doc-open,
 .board-node:hover > .chrome .open-tab,
 .board-node:hover > .chrome .focus-open {
 	opacity: 1;
@@ -692,6 +694,7 @@ svg.lucide {
 
 .board-node > .chrome .hide:hover,
 .board-node > .chrome .present-open:hover,
+.board-node > .chrome .doc-open:hover,
 .board-node > .chrome .open-tab:hover,
 .board-node > .chrome .focus-open:hover {
 	background: var(--line);
@@ -796,6 +799,23 @@ svg.lucide {
    because under the canvas-per-board renderer the frame sits inside a canvas. */
 .board-node[data-inert="true"] .surface iframe {
 	pointer-events: none;
+}
+
+/*
+ * Except the document editor's own canvas.
+ *
+ * The rule above is about the *board's* frame: below half zoom a drag across a board belongs
+ * to the camera. The rich editor is not the board's frame — it is a surface that replaced it,
+ * opened by pressing a button — and the frame is a descendant of `.surface`, so the rule caught
+ * it too. The result was an editor that opened at whatever zoom the deck was fitted at and
+ * could not be clicked into at all: the canvas was inert, the caret never arrived, and typing
+ * went to a document nobody was listening to.
+ *
+ * So the editor's canvas keeps its pointer events at every zoom. Nothing else about the inert
+ * state changes: the panel's own buttons and the source fallback were never inside the frame.
+ */
+.board-node[data-inert="true"] .surface .grapes-editor iframe {
+	pointer-events: auto;
 }
 
 /*

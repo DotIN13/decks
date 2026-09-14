@@ -4,7 +4,7 @@ import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbo
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "./BoardFrame.tsx";
-import type { EditorHost, Tool } from "./Editor.ts";
+import { isRunOfWords, type EditorHost, type Tool } from "./Editor.ts";
 import type { FileDropHost } from "./file-drop.ts";
 import type { FrameGestureHost } from "./frame-gestures.ts";
 import { zoomKey } from "./zoom-keys.ts";
@@ -235,6 +235,19 @@ export function Stage(props: {
 			}
 			const typing = (event.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]");
 			if (typing) return;
+			/*
+			 * And an open editor owns the keyboard.
+			 *
+			 * A key pressed while the caret is in a board's document arrives here with the **frame** as
+			 * its target, so `typing` above cannot see it — the editable element is in another
+			 * document. `frame-gestures.ts` stops the ones it handles for a board's own field editor;
+			 * the rich document editor has no such gate, and its canvas is a frame of its own.
+			 *
+			 * What that cost: the shortcuts here are bare letters, so typing a heading containing a `d`
+			 * put the whole canvas into the focus view and threw the edit away — and every `v s c t e`
+			 * picked a tool. While something is being edited, none of it is a shortcut.
+			 */
+			if (props.editing) return;
 			/*
 			 * The view's own two keys, and deliberately *not* in `shortcut`: a board's keys are
 			 * forwarded there (`frame-gestures.ts`), so a `d` in that table would be a `d` typed
@@ -861,9 +874,14 @@ export function Stage(props: {
 		 *
 		 * The field editor is not lost for a flow board: it keeps a double-click on a *run* when the
 		 * board is zoomed in far enough to have live frames, which is the gesture `Editor.ts` owns.
-		 * This decides what a double-click on the document around it means.
+		 * This decides what a double-click on the document around it means — which is why the
+		 * element under the pointer is an argument and not an implementation detail. `Editor.ts`
+		 * listens for the gesture in the bubble phase and this in the capture phase, so asking
+		 * "is the thing under the pointer a run" here is what lets the first one have it; without
+		 * the question the rich editor took every double-click in a flow board, and the field
+		 * editor's half of that format stopped existing.
 		 */
-		editSource: (path, alt) => {
+		editSource: (path, alt, target) => {
 			const board = props.boards.find((candidate) => candidate.path === path);
 			if (!board || !props.onEditSource) return false;
 			if (alt) {
@@ -871,7 +889,17 @@ export function Stage(props: {
 				return true;
 			}
 			if (board.format === "component") return false;
-			props.onEditSource(path, board.format === "flow" && !board.shell ? "blocks" : "source");
+			if (board.format === "flow" && !board.shell) {
+				// A run of words is the field editor's; the document around it is the rich editor's.
+				// `nodeType` rather than `instanceof Element`: the target belongs to the board's own
+				// document, and a same-origin frame has its own realm — and therefore its own
+				// `Element` — so the obvious test is false for every element in the board.
+				const element = (target as Node | null)?.nodeType === 1 ? (target as Element) : undefined;
+				if (element && isRunOfWords(element)) return false;
+				props.onEditSource(path, "blocks");
+				return true;
+			}
+			props.onEditSource(path, "source");
 			return true;
 		},
 		zoom: (direction) => {

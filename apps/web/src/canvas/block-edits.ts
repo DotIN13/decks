@@ -40,9 +40,20 @@ import type { BoardPatch } from "@decks/protocol";
  *    and nothing has changed the structure yet.
  * 2. **Removals** next, **bottom-up**, so that removing a block never shifts the index of a
  *    block still to be removed.
- * 3. **Insertions** last, **top-down**, with `path` as an index into the *after* structure —
+ * 3. **Moves** after them, against the list the removals left — the surviving blocks, still
+ *    in the order they were written. Each is read against that list *as the moves before it
+ *    left it*, which is why the pass that emits them walks the target order from the left:
+ *    every index to its left is already final by the time it reads one.
+ * 4. **Insertions** last, **top-down**, with `path` as an index into the *after* structure —
  *    which the file now has, because the removals took out exactly the blocks missing from
- *    `after` and a reorder is refused rather than applied.
+ *    `after` and the moves put the survivors in the order `after` holds them.
+ *
+ * ### And a drag is one op
+ *
+ * A reorder used to be refused outright ("blocks were reordered — offer the source editor"),
+ * which made the editor a surface you could type on but not rearrange. It is expressible:
+ * `move-child` was built and tested on the server all along. The only question is which
+ * blocks to move, and the answer is the one the person made — see `arrange`.
  */
 
 /**
@@ -90,21 +101,18 @@ export interface BlockEdits {
 export function diffBlocks(before: readonly EditBlock[], after: readonly EditBlock[], rootId: string): BlockEdits {
 	const beforeIds = before.map((block) => block.id);
 	const afterIds = after.map((block) => block.id);
-
 	/*
-	 * **An index shift is not a move.** The design's first draft compared absolute indices,
-	 * so deleting one paragraph emitted a move for every block below it — noise of exactly
-	 * the kind this whole approach exists to avoid. What matters is the relative order of the
-	 * blocks that survive: a deletion above changes everyone's index and changes nobody's
-	 * order.
+	 * A block has to be nameable to be addressed, and `indexOf` would keep finding the first
+	 * of a pair. GrapesJS mints one `cid` per component and does not reuse them, so this is
+	 * not a case the editor can produce — and refusing is what stops the arithmetic below
+	 * from quietly rearranging the wrong block if it ever is.
 	 */
-	const survivors = beforeIds.filter((id) => afterIds.includes(id));
-	const stillInOrder = afterIds.filter((id) => beforeIds.includes(id));
-	const reordered = survivors.join("\u0000") !== stillInOrder.join("\u0000");
+	if (new Set(beforeIds).size !== beforeIds.length || new Set(afterIds).size !== afterIds.length) {
+		return { patches: [], refusals: ["two blocks claim the same identity — offer the source editor"] };
+	}
 
 	const content: BoardPatch[] = [];
 	const removals: BoardPatch[] = [];
-	const insertions: BoardPatch[] = [];
 
 	before.forEach((block, index) => {
 		const now = after.find((candidate) => candidate.id === block.id);
@@ -124,16 +132,95 @@ export function diffBlocks(before: readonly EditBlock[], after: readonly EditBlo
 		}
 	});
 
+	// Bottom-up, for the reason given at the top of the file.
+	removals.reverse();
+
+	/*
+	 * What the file holds once content and removals have run: the blocks that survive, still in
+	 * the order they were written. A reorder is a rearrangement of exactly this, and the two
+	 * lists are all the arithmetic needs — the removals already took out what is missing, so
+	 * the rest is `current` becoming `wanted`.
+	 */
+	const current = beforeIds.filter((id) => afterIds.includes(id));
+	const wanted = afterIds.filter((id) => beforeIds.includes(id));
+
+	const insertions: BoardPatch[] = [];
 	after.forEach((block, index) => {
 		if (beforeIds.includes(block.id)) return;
 		insertions.push({ op: "insert-child", id: rootId, path: [index], html: block.html });
 	});
 
-	// Bottom-up and top-down, for the reason given at the top of the file.
-	removals.reverse();
+	return { patches: [...content, ...removals, ...arrange(current, wanted, rootId), ...insertions], refusals: [] };
+}
 
-	return {
-		patches: [...content, ...removals, ...insertions],
-		refusals: reordered ? ["blocks were reordered — offer the source editor"] : [],
-	};
+/**
+ * The moves that put `current` into `wanted`'s order, each one valid when it runs.
+ *
+ * **A drag is one move, and this is built so it stays one.** Every block that nobody touched
+ * keeps its relative order, so the ones that did move are exactly the blocks outside a longest
+ * increasing run of the wanted positions — and one drag leaves exactly one block outside it.
+ * Asking that first is what makes "I dragged the paragraph to the top" read back as
+ * `moved child 3 of #body to 0` rather than as a shuffle of the paragraphs it passed, which is
+ * the same file and a different sentence.
+ *
+ * Two drags committed together put more than one block outside that run, and there the pass
+ * falls back to walking the target order from the left and pulling each block into place. It
+ * can take more moves than the minimum; it cannot be wrong, because every index to the left of
+ * the one being read is already final and the block wanted there is therefore at or to the
+ * right of it.
+ */
+function arrange(current: readonly string[], wanted: readonly string[], rootId: string): BoardPatch[] {
+	const order = [...current];
+	const moves: BoardPatch[] = [];
+	const moved = [...current].filter((id) => !stationary(current, wanted).has(id));
+
+	if (moved.length === 1) {
+		const id = moved[0]!;
+		const from = order.indexOf(id);
+		const to = wanted.indexOf(id);
+		if (from !== to) {
+			moves.push({ op: "move-child", id: rootId, path: [from], to });
+			order.splice(from, 1);
+			order.splice(to, 0, id);
+		}
+		return moves;
+	}
+
+	wanted.forEach((id, index) => {
+		if (order[index] === id) return;
+		const from = order.indexOf(id);
+		moves.push({ op: "move-child", id: rootId, path: [from], to: index });
+		order.splice(from, 1);
+		order.splice(index, 0, id);
+	});
+	return moves;
+}
+
+/**
+ * The blocks already in `wanted`'s relative order, in `current` — a longest increasing run.
+ *
+ * `current` and `wanted` hold the same identities, so each block's wanted index is a number
+ * and its position in `current` a sequence of them. A run that increases is a run that comes
+ * out in the same order in both, which is the set nobody has to move.
+ */
+function stationary(current: readonly string[], wanted: readonly string[]): Set<string> {
+	const at = new Map(wanted.map((id, index) => [id, index]));
+	const positions = current.map((id) => at.get(id) ?? 0);
+	const lengths = positions.map(() => 1);
+	const before = positions.map(() => -1);
+	let longest = -1;
+
+	positions.forEach((value, index) => {
+		for (let earlier = 0; earlier < index; earlier++) {
+			if (positions[earlier]! < value && lengths[earlier]! + 1 > lengths[index]!) {
+				lengths[index] = lengths[earlier]! + 1;
+				before[index] = earlier;
+			}
+		}
+		if (longest === -1 || lengths[index]! > lengths[longest]!) longest = index;
+	});
+
+	const keep = new Set<string>();
+	for (let index = longest; index !== -1; index = before[index]!) keep.add(current[index]!);
+	return keep;
 }

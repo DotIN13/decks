@@ -25,7 +25,15 @@ const sourceEditor = () => page.evaluate(() => Boolean(document.querySelector(".
 
 // Fly to it, then zoom in past `INTERACT_ZOOM`: below half zoom a board takes no pointer
 // events at all, so every assertion here would pass for the wrong reason.
-await page.locator('.board-node[data-path="boards/notes.html"] .chrome').dblclick();
+/*
+ * Fly to the board on the left end of its bar.
+ *
+ * Not the bar's centre: the acts at the right-hand end hold the button that opens the document
+ * editor, and a double-click that lands on it opens that editor instead of flying to the board
+ * — after which the board's own frame is gone and the run of words this check is about is in a
+ * different document.
+ */
+await page.locator('.board-node[data-path="boards/notes.html"] .chrome').dblclick({ position: { x: 24, y: 12 } });
 await settle(page, 900);
 for (let i = 0; i < 6; i++) {
 	const level = await page.evaluate(() =>

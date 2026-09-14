@@ -107,9 +107,12 @@ export interface FrameGestureHost {
 	 * Whether this board's double-click belongs to the source editor rather than the fields.
 	 *
 	 * Named by path because the frame knows which board it is and the selection does not have
-	 * to be it — a board can be double-clicked without having been clicked first.
+	 * to be it — a board can be double-clicked without having been clicked first. `target` is
+	 * what was under the pointer: on a flow board a double-click on a *run* is the field
+	 * editor's, and only a double-click on the document around it opens the rich editor — so
+	 * the answer depends on where in the board the gesture landed, not only on the board.
 	 */
-	editSource(path: string, alt: boolean): boolean;
+	editSource(path: string, alt: boolean, target: EventTarget | null): boolean;
 	/**
 	 * The arrow keys, when the focused board is a deck.
 	 *
@@ -529,7 +532,7 @@ export function attachFrameGestures(frame: HTMLIFrameElement, host: FrameGesture
 		 * gesture *on a board*, and asking which board is selected made ⌥ do nothing at all
 		 * on any board the user had not clicked first.
 		 */
-		if (!host.editSource(frame.dataset.path ?? "", event.altKey)) return;
+		if (!host.editSource(frame.dataset.path ?? "", event.altKey, event.target)) return;
 		event.preventDefault();
 		event.stopPropagation();
 	};

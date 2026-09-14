@@ -87,7 +87,20 @@ function createUi() {
 	const openSource = (path: string, kind: "source" | "blocks" = "source") => {
 		void fetch(`/api/board/${path}?raw=1`)
 			.then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
-			.then((source) => setEditingSource({ path, source, kind }))
+			.then((source) => {
+				/*
+				 * Already editing this file: a second arrival is not a second editor.
+				 *
+				 * The editor is keyed on the object this signal holds (`BoardFrame`'s `<Show keyed>`), so
+				 * setting it again tears the open editor down and builds a new one — and anything typed
+				 * into the first one goes with it. Two requests for the same file are easy to end up
+				 * with: a double-click on the board's bar can land on the button, and a press whose
+				 * pointerdown already dismissed the editor resolves after a second one has opened.
+				 */
+				const open = editingSource();
+				if (open?.path === path && open.kind === kind) return;
+				setEditingSource({ path, source, kind });
+			})
 			.catch(() => notice("error", `Could not read ${path} to edit it.`));
 	};
 

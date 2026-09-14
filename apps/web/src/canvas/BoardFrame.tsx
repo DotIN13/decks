@@ -778,7 +778,7 @@ export function BoardFrame(props: {
 				*/}
 				<Show when={props.onEditDocument}>
 					<button
-						class="present-open"
+						class="doc-open"
 						type="button"
 						data-glyph="true"
 						data-act="document"

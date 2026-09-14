@@ -107,6 +107,28 @@ export interface EditorHost {
 
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
 
+const INLINE = new Set<string>(INLINE_TAGS);
+
+/**
+ * Whether this element's content is a run of words rather than a layout of blocks.
+ *
+ * The browser's half of the question the server asks of the parse tree (`isRichRun` in
+ * `boards/inline-html.ts`), off one shared list so the two cannot drift. A `<p>` holding
+ * `<b>` and `<a>` is one run of rich text; a `<section>` holding an `<h3>` and a `<p>` is two
+ * runs with a box around them, and writing one field over that would replace a heading and a
+ * paragraph with a line.
+ *
+ * Exported because the decision is made in two places: the field editor asks it to know what
+ * it may retype, and `Stage` asks it to know which of the two editors a double-click belongs
+ * to — a run keeps the field editor, the document around it opens the rich one.
+ */
+export function isRunOfWords(element: Element): boolean {
+	for (const node of element.querySelectorAll("*")) {
+		if (!INLINE.has(node.tagName.toLowerCase())) return false;
+	}
+	return true;
+}
+
 export function attachEditor(frame: HTMLIFrameElement, path: string, host: EditorHost): () => void {
 	const doc = frame.contentDocument;
 	const win = frame.contentWindow;
@@ -690,23 +712,6 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	};
 
 	/**
-	 * Whether this element's content is a run of words rather than a layout of blocks.
-	 *
-	 * The browser's half of the question the server asks of the parse tree (`isRichRun` in
-	 * `boards/inline-html.ts`), off one shared list so the two cannot drift. A `<p>` holding
-	 * `<b>` and `<a>` is one run of rich text; a `<section>` holding an `<h3>` and a `<p>` is
-	 * two runs with a box around them, and writing one field over that would replace a
-	 * heading and a paragraph with a line.
-	 */
-	const inline = new Set<string>(INLINE_TAGS);
-	const isRun = (element: Element): boolean => {
-		for (const node of element.querySelectorAll("*")) {
-			if (!inline.has(node.tagName.toLowerCase())) return false;
-		}
-		return true;
-	};
-
-	/**
 	 * The whole run the pointer landed in, which is usually not the element it landed on.
 	 *
 	 * A double-click on a bold word lands on the `<b>`, and editing the `<b>` alone would be
@@ -719,11 +724,11 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	 * sticky's own words stops at the component, whose path is `[]`.
 	 */
 	const runAt = (clicked: HTMLElement, component: HTMLElement): HTMLElement | undefined => {
-		if (!isRun(clicked)) return undefined;
+		if (!isRunOfWords(clicked)) return undefined;
 		let run = clicked;
 		while (run !== component) {
 			const parent = run.parentElement;
-			if (!parent || !component.contains(parent) || !isRun(parent)) break;
+			if (!parent || !component.contains(parent) || !isRunOfWords(parent)) break;
 			run = parent;
 		}
 		return run;

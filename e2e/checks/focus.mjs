@@ -40,12 +40,12 @@ const bar = await page.evaluate((path) => {
 	}));
 }, NOTES);
 say(
-	"the bar above the board offers its address, focus, fullscreen and going away, in that order",
-	bar.length === 4 && bar.map((b) => b.cls).join(",") === "open-tab,focus-open,present-open,hide",
+	"the bar above the board offers editing it as a document, its address, focus, fullscreen and going away, in that order",
+	bar.length === 5 && bar.map((b) => b.cls).join(",") === "doc-open,open-tab,focus-open,present-open,hide",
 	JSON.stringify(bar.map((b) => b.cls)),
 );
 say(
-	"…and the four are the same width, glyph or word",
+	"…and the five are the same width, glyph or word",
 	new Set(bar.map((b) => b.w)).size === 1,
 	JSON.stringify(bar.map((b) => `${b.cls}:${b.w}`)),
 );

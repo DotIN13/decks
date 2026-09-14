@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { BoardPatch } from "@decks/protocol";
 import { diffBlocks, type EditBlock } from "./block-edits.ts";
 
 /**
@@ -99,30 +100,102 @@ test("two insertions come out top-down, each at the index it holds in the new do
 	]);
 });
 
-test("a reorder is refused rather than described", () => {
+test("a block dragged up becomes one move, naming the block that moved", () => {
 	/*
-	 * The blocks that survive have changed relative order, which none of the three ops
-	 * expresses without churn — a move would have to be composed out of a removal and an
-	 * insertion whose indices depend on each other. The design's answer is to say so and offer
-	 * the source editor, so this is a refusal and not an op.
+	 * The gesture the editor was missing. `move-child` was built and tested on the server all
+	 * along; what refused it was this mapper, which read a reorder as something it could not
+	 * describe and offered the source textarea instead. Which block to move is the whole
+	 * question — and it is the one the person dragged, not the two it passed.
 	 */
 	const { patches, refusals } = diffBlocks([HEADING, FIRST, SECOND], [SECOND, HEADING, FIRST], "body");
-	assert.deepEqual(patches, []);
-	assert.deepEqual(refusals, ["blocks were reordered — offer the source editor"]);
+	assert.deepEqual(refusals, []);
+	assert.deepEqual(patches, [{ op: "move-child", id: "body", path: [2], to: 0 }]);
 });
 
-test("a reorder beside a retype still refuses the whole commit", () => {
-	// The ops beside a refusal are not half an edit to apply — they are what the mapper managed
-	// to describe before it found something it could not, and a caller that sent them anyway
-	// would write the part it understood into a document it did not.
-	const edited = { ...FIRST, html: "<p>Changed.</p>", text: "Changed." };
-	const { refusals } = diffBlocks([HEADING, FIRST, SECOND], [SECOND, edited, HEADING], "body");
-	assert.equal(refusals.length, 1);
+test("a block dragged down is one move too — the moved block, not the ones above it", () => {
+	// The other direction, and the one a left-to-right pass gets wrong: pulling each block into
+	// place would move the first and second forward and leave the one that was dragged where it
+	// was, which is the same file and a sentence about the wrong block.
+	const { patches } = diffBlocks([HEADING, FIRST, SECOND], [FIRST, SECOND, HEADING], "body");
+	assert.deepEqual(patches, [{ op: "move-child", id: "body", path: [0], to: 2 }]);
 });
 
-test("a block that is both retyped and moved is a reorder, not an edit", () => {
-	// Deleting around a block is fine; moving it past another is the case with no op.
-	const edited = { ...THIRD, html: "<p>Changed third.</p>", text: "Changed third." };
-	const { refusals } = diffBlocks([HEADING, FIRST, SECOND, THIRD], [edited, HEADING, FIRST, SECOND], "body");
-	assert.equal(refusals.length, 1, "the survivors are out of order, whatever else changed");
+test("a move's index is read against the list the removals left, not the file as it loaded", () => {
+	/*
+	 * Two blocks deleted and the last one moved to the front. `path: [1]` is the moved block's
+	 * index *after* the removals — at load it was 3 — and the two `remove-child` ops come first,
+	 * bottom-up, exactly as they did before moves existed.
+	 */
+	const { patches, refusals } = diffBlocks([HEADING, FIRST, SECOND, THIRD], [THIRD, HEADING], "body");
+	assert.deepEqual(refusals, []);
+	assert.deepEqual(patches, [
+		{ op: "remove-child", id: "body", path: [2], before: "<p>A second one.</p>" },
+		{ op: "remove-child", id: "body", path: [1], before: "<p>The first paragraph.</p>" },
+		{ op: "move-child", id: "body", path: [1], to: 0 },
+	]);
+});
+
+test("a retype beside a move: the content first, and the move at its loaded index", () => {
+	const edited = { ...FIRST, html: "<p>Rewritten.</p>", text: "Rewritten." };
+	const { patches, refusals } = diffBlocks([HEADING, FIRST, SECOND], [SECOND, HEADING, edited], "body");
+	assert.deepEqual(refusals, []);
+	assert.deepEqual(patches, [
+		{ op: "html", id: "body", path: [1], before: "The first paragraph.", html: "<p>Rewritten.</p>" },
+		{ op: "move-child", id: "body", path: [2], to: 0 },
+	]);
+});
+
+test("an inserted block lands after the move, at the index it holds in the new document", () => {
+	const added = block("e", "<p>A brand new one.</p>");
+	const { patches } = diffBlocks([HEADING, FIRST], [FIRST, HEADING, added], "body");
+	assert.deepEqual(patches, [
+		{ op: "move-child", id: "body", path: [1], to: 0 },
+		{ op: "insert-child", id: "body", path: [2], html: "<p>A brand new one.</p>" },
+	]);
+});
+
+/**
+ * The ops read the way the server reads them: in order, each against the list the one before
+ * left. Here rather than imported from `boards/patch.ts` because that applier works on the
+ * file's bytes and this is about the order of identities — the question being asked is what
+ * document the mapper's own output produces, not whether it looks plausible.
+ */
+const applied = (ids: string[], patches: BoardPatch[]): string[] => {
+	const list = [...ids];
+	for (const patch of patches) {
+		if (patch.op === "remove-child") list.splice(patch.path[patch.path.length - 1]!, 1);
+		else if (patch.op === "insert-child") list.splice(patch.path[patch.path.length - 1]!, 0, patch.html);
+		else if (patch.op === "move-child") {
+			// Remove first, then insert at `to` in the list the removal left — the server's own
+			// composition of the two, which is why `to` is an index in the *moved* structure.
+			const [moved] = list.splice(patch.path[patch.path.length - 1]!, 1);
+			list.splice(patch.to, 0, moved!);
+		}
+	}
+	return list;
+};
+
+test("every permutation comes out as the document it was given, whatever it takes", () => {
+	/*
+	 * The property rather than a case: for a handful of orders, the ops the mapper emits — read
+	 * in sequence the way the server reads them — reconstruct the order the editor was left in.
+	 * This is what says the fallback pass is right for the reorders a single move cannot
+	 * describe, which is the part of this arithmetic that is easy to get subtly wrong.
+	 */
+	const all = [HEADING, FIRST, SECOND, THIRD];
+	const ids = all.map((b) => b.id);
+	const orders = [
+		[3, 0, 1, 2],
+		[3, 2, 1, 0],
+		[1, 0, 3, 2],
+		[2, 3, 1, 0],
+		[0, 2, 3, 1],
+		[1, 2, 3, 0],
+	];
+	for (const order of orders) {
+		const after = order.map((index) => all[index]!);
+		const { patches, refusals } = diffBlocks(all, after, "body");
+		assert.deepEqual(refusals, [], `order ${order.join("")} was refused`);
+		assert.deepEqual(applied(ids, patches), after.map((b) => b.id), `order ${order.join("")} came out wrong`);
+	}
 });

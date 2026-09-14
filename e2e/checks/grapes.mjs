@@ -160,18 +160,29 @@ say("…with no oversized dark furniture over it", dark.length === 0, JSON.strin
  * `board.css` draws a document through `body.board`, and GrapesJS's canvas body has no classes at
  * all: what that produced was the content flush in the top-left corner, which is what "the margins
  * are not preserved" means. Measured, because "the document is there" was true throughout.
+ *
+ * Polled, because GrapesJS writes its frame's document more than once and the editor dresses each
+ * one as it arrives — a single read taken the instant the components appear catches the page
+ * before it is dressed, which is a race in the check rather than a fault in the editor. What is
+ * asserted is the page a reader ends up looking at.
  */
-const pageLook = await page.evaluate(() => {
-	const frame = document.querySelector("#decks-document-canvas") ?? document.querySelector(".gjs-frame");
-	const doc = frame?.contentDocument;
-	if (!doc) return null;
-	const box = doc.querySelector(".doc > *")?.getBoundingClientRect();
-	return {
-		classes: doc.body?.className ?? "",
-		offset: box ? { x: Math.round(box.x), y: Math.round(box.y) } : null,
-		padding: doc.body ? `${getComputedStyle(doc.body).paddingTop} / ${getComputedStyle(doc.body).paddingLeft}` : "",
-	};
-});
+const look = () =>
+	page.evaluate(() => {
+		const frame = document.querySelector("#decks-document-canvas") ?? document.querySelector(".gjs-frame");
+		const doc = frame?.contentDocument;
+		if (!doc) return null;
+		const box = doc.querySelector(".doc > *")?.getBoundingClientRect();
+		return {
+			classes: doc.body?.className ?? "",
+			offset: box ? { x: Math.round(box.x), y: Math.round(box.y) } : null,
+			padding: doc.body ? `${getComputedStyle(doc.body).paddingTop} / ${getComputedStyle(doc.body).paddingLeft}` : "",
+		};
+	});
+let pageLook = await look();
+for (let i = 0; i < 30 && (pageLook?.offset?.x ?? 0) <= 8; i++) {
+	await settle(page, 100);
+	pageLook = await look();
+}
 say("the canvas body is the board's own page", (pageLook?.classes ?? "").includes("board"), JSON.stringify(pageLook));
 say("…so the document keeps its margins", (pageLook?.offset?.x ?? 0) > 8 && (pageLook?.offset?.y ?? 0) > 8, JSON.stringify(pageLook));
 

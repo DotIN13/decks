@@ -645,7 +645,21 @@ export function App() {
 						 */
 						onPresent={(path, at) => setPresenting(presentingFor(path, at))}
 						onEditSource={openSource}
-						onEditDocument={(path) => openSource(path, "blocks")}
+						onEditDocument={(path) => {
+							/*
+							 * Already editing this document: a second press on the button is not a second
+							 * editor.
+							 *
+							 * The editor is keyed on the object this signal holds, so re-opening the same file
+							 * builds a new one from scratch — and anything typed into the old one goes with it.
+							 * The button sits under the cursor that just pressed it, and a double-click on the
+							 * board's bar can land on it, so this is a press that happens by accident rather
+							 * than one meaning "start over".
+							 */
+							const open = editingSource();
+							if (open?.path === path && open.kind === "blocks") return;
+							openSource(path, "blocks");
+						}}
 						{...(focus() === undefined ? {} : { focus: focus()! })}
 						onFocusToggle={() => toggleFocus()}
 						onFocusBoard={(path) => toggleFocus(path)}
