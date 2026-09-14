@@ -401,15 +401,17 @@
 	}
 
 	/*
-	 * Nothing of GrapesJS's canvas chrome: no resize handle, no frame border.
+	 * No frame border, and no scrollbars.
 	 *
-	 * The handle is the black triangle. It is drawn at the canvas's own scale, so beside a narrow
-	 * canvas it read as a huge wedge over the page; filling the canvas and hiding the handle are
-	 * the same fix seen twice.
+	 * There is no resize handle to hide: GrapesJS 0.23's bundle contains no `resize` class at all,
+	 * and the first version of this rule was chasing one — which is why hiding it changed nothing
+	 * and the wedge only went when the theme background did. What is left is the canvas's own
+	 * scrollbars, styled by GrapesJS (`::-webkit-scrollbar` in the canvas document), and their
+	 * buttons are the small black arrows in the corner. The canvas is the board's size now, so
+	 * there is nothing to scroll; this says so rather than relying on that.
 	 */
-	.grapes-canvas [class*="resizer"],
-	.grapes-canvas [class*="resize"] {
-		display: none !important;
+	.grapes-canvas iframe {
+		overflow: hidden;
 	}
 
 	.grapes-canvas .gjs-frame {

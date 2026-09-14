@@ -154,6 +154,27 @@ const dark = await page.evaluate(() => {
 });
 say("…with no oversized dark furniture over it", dark.length === 0, JSON.stringify(dark).slice(0, 300));
 
+/*
+ * And it is the board's *page*, with the page's margins.
+ *
+ * `board.css` draws a document through `body.board`, and GrapesJS's canvas body has no classes at
+ * all: what that produced was the content flush in the top-left corner, which is what "the margins
+ * are not preserved" means. Measured, because "the document is there" was true throughout.
+ */
+const pageLook = await page.evaluate(() => {
+	const frame = document.querySelector("#decks-document-canvas") ?? document.querySelector(".gjs-frame");
+	const doc = frame?.contentDocument;
+	if (!doc) return null;
+	const box = doc.querySelector(".doc > *")?.getBoundingClientRect();
+	return {
+		classes: doc.body?.className ?? "",
+		offset: box ? { x: Math.round(box.x), y: Math.round(box.y) } : null,
+		padding: doc.body ? `${getComputedStyle(doc.body).paddingTop} / ${getComputedStyle(doc.body).paddingLeft}` : "",
+	};
+});
+say("the canvas body is the board's own page", (pageLook?.classes ?? "").includes("board"), JSON.stringify(pageLook));
+say("…so the document keeps its margins", (pageLook?.offset?.x ?? 0) > 8 && (pageLook?.offset?.y ?? 0) > 8, JSON.stringify(pageLook));
+
 // 1. Opening and leaving writes nothing at all.
 await page.keyboard.press("Escape");
 await settle(page, 500);

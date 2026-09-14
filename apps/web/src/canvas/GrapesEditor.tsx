@@ -172,8 +172,32 @@ export function GrapesEditor(props: {
 				for (const frame of host?.querySelectorAll("iframe") ?? []) {
 					// The one holding the document, not whichever came first: there is more than one
 					// frame in here, and the canvas is not the first of them.
-					if (!frame.contentDocument?.querySelector("[data-id]")) continue;
+					const document = frame.contentDocument;
+					if (!document?.querySelector("[data-id]")) continue;
 					frame.id = "decks-document-canvas";
+					/*
+					 * The board's own page, in the canvas.
+					 *
+					 * `board.css` draws a document through `body.board` — margins, type scale, the grid
+					 * — and GrapesJS's canvas body carries nothing at all. Without this the content sat
+					 * flush in the corner: the missing margins, and half the reason it looked unlike
+					 * the board it stands in for.
+					 */
+					for (const [name, value] of root.body) document.body.setAttribute(name, value);
+					/*
+					 * And the canvas is the board's size in **board pixels**, not the container's in
+					 * screen pixels.
+					 *
+					 * GrapesJS measures its canvas and writes the result inline, and what it measured
+					 * was a panel that the camera had scaled — so the document was laid out wider than
+					 * the frame it was in and ran off the right edge, clipped mid-sentence, with a
+					 * horizontal scrollbar whose arrow sat in the bottom-left corner. That arrow is
+					 * what the screenshot asks about; it is the symptom, not the fault.
+					 */
+					for (const element of host?.querySelectorAll(".gjs-cv-canvas__frames, .gjs-frame-wrapper, .gjs-frame, iframe") ?? []) {
+						(element as HTMLElement).style.setProperty("width", `${props.w}px`, "important");
+						(element as HTMLElement).style.setProperty("height", `${props.h}px`, "important");
+					}
 					if (naming) clearInterval(naming);
 					naming = undefined;
 					return;
@@ -320,12 +344,20 @@ export function GrapesEditor(props: {
  * its rendered HTML *and* its markdown attribute, and a mirror would arrive holding a
  * conversation frozen at that second.
  */
-function rootOf(source: string): { id: string; inner: string } | undefined {
+function rootOf(source: string): { id: string; inner: string; body: [string, string][] } | undefined {
 	const parsed = new DOMParser().parseFromString(source, "text/html");
 	const doc = parsed.querySelector(".doc");
 	const id = doc?.getAttribute("data-id");
 	if (!doc || !id) return undefined;
-	return { id, inner: doc.innerHTML };
+	/*
+	 * The board's own `<body>` attributes travel with it.
+	 *
+	 * `board.css` keys the whole page off them — `body.board` is where the document's margins,
+	 * its type scale and the grid background live — and GrapesJS's canvas body has neither the
+	 * class nor the attribute. What arrived was the document with the page's styling missing:
+	 * text flush against the top-left corner, which is the margins the screenshot is about.
+	 */
+	return { id, inner: doc.innerHTML, body: [...parsed.body.attributes].map((a) => [a.name, a.value]) };
 }
 
 /**
