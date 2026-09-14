@@ -400,15 +400,22 @@ const STEP = 20;
 const STEPS = 8;
 await page.mouse.move(grab.x, grab.y);
 const before = await cameraAt();
-const cursorIn = () =>
-	page.evaluate(() => {
-		const frame = [...document.querySelectorAll(".board-node iframe")].find((f) => {
-			const r = f.getBoundingClientRect();
-			return r.width > 200 && r.height > 200;
-		});
+const cursorIn = (path) =>
+	page.evaluate((wanted) => {
+		/*
+		 * The board the hand is actually on, not the first large one.
+		 *
+		 * This read `[...document.querySelectorAll(".board-node iframe")].find((f) => big)`,
+		 * which is a different question: on a deck with two boards over 200px it reads
+		 * whichever comes first in the DOM, and the assertion below then compares the cursor of
+		 * one board with a drag performed on another. It passed for as long as the fixture had
+		 * exactly one board that large in view, and broke the moment the arrangement changed —
+		 * which is what `grab.path` is for, and it was already being computed.
+		 */
+		const frame = document.querySelector(`.board-node[data-path="${wanted}"] iframe`);
 		return frame ? getComputedStyle(frame.contentDocument.documentElement).cursor : null;
-	});
-say("the board's own cursor is not a grab hand to begin with", (await cursorIn()) !== "grabbing", String(await cursorIn()));
+	}, path);
+say("the board's own cursor is not a grab hand to begin with", (await cursorIn(grab?.path)) !== "grabbing", String(await cursorIn(grab?.path)));
 await page.mouse.down({ button: "middle" });
 const steps = [];
 let at = before;
@@ -426,12 +433,12 @@ for (let i = 1; i <= STEPS; i++) {
 		 * cursor of its own — so the identical gesture started over a board showed the board's
 		 * cursor while the canvas moved under it, which reads as nothing happening at all.
 		 */
-		say("…and the board under the hand says it is being dragged", (await cursorIn()) === "grabbing", String(await cursorIn()));
+		say("…and the board under the hand says it is being dragged", (await cursorIn(grab.path)) === "grabbing", String(await cursorIn(grab.path)));
 	}
 }
 await page.mouse.up({ button: "middle" });
 await settle(page, 300);
-say("…and gives the board's own cursor back afterwards", (await cursorIn()) !== "grabbing", String(await cursorIn()));
+say("…and gives the board's own cursor back afterwards", (await cursorIn(grab?.path)) !== "grabbing", String(await cursorIn(grab?.path)));
 const travelled = Math.round((before.x - at.x) * at.zoom);
 const wanted = STEP * STEPS;
 say("a middle-drag over a board pans one for one", Math.abs(travelled - wanted) <= 2, `${travelled}px of canvas for ${wanted}px of mouse`);
