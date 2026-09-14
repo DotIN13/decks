@@ -293,15 +293,35 @@
 		right: 4px;
 	}
 
-	/* With both, the pen sits inboard of the ×. Alone — an agent mid-turn cannot be closed —
-	   it takes the ×'s place rather than leaving a gap where one would have been. */
-	.agent-list .row-act:has(> .close) > .agent-tagbtn {
+	/*
+	 * The strip is laid out from the right edge inwards, and each one has to be told its slot.
+	 *
+	 * Out of the flow means out of the flex row, so nothing lays them out but these rules — and
+	 * the slot a button takes is decided by **how many actions come after it**, because the DOM
+	 * order is the display order reversed: pen, mirror, ×.
+	 *
+	 * One slot is `--control-sm` plus the 2px between two of them, and the outermost stands 4px
+	 * off the edge. That is the whole arithmetic: 4px, then `--control-sm + 6px`, then
+	 * `2 * --control-sm + 8px`. Each `+` combinator below is one of those sentences — a slot-3
+	 * rule is more specific than the slot-2 rule it also matches, which is what lets the pen
+	 * climb past the second slot it would otherwise sit in.
+	 *
+	 * The mirror is what this was missing. It is a `.close` like the × — deliberately, they are
+	 * the same kind of control — and a second `.close` landed in the ×'s own slot: an × drawn
+	 * inside the picture-in-picture rectangle, each hiding the other's glyph.
+	 */
+	.agent-list .row-act:has(> .agent-tagbtn + .close) > .agent-tagbtn,
+	.agent-list .row-act:has(> .agent-mirrorbtn + .close) > .agent-mirrorbtn {
 		right: calc(var(--control-sm) + 6px);
+	}
+
+	.agent-list .row-act:has(> .agent-tagbtn + .close + .close) > .agent-tagbtn {
+		right: calc(2 * var(--control-sm) + 8px);
 	}
 
 	/*
 	 * And the first line reserves exactly what they cover: the width the whole body used to
-	 * lose, spent on the one line that had to lose it.
+	 * lose, spent on the one line that had to lose it — one slot, then two, then three.
 	 */
 	.agent-list .row-act:is(:hover, :focus-within) .agent-line {
 		padding-right: calc(var(--control-sm) + 2px);
@@ -309,6 +329,10 @@
 
 	.agent-list .row-act:is(:hover, :focus-within):has(> .close) .agent-line {
 		padding-right: calc(2 * var(--control-sm) + 4px);
+	}
+
+	.agent-list .row-act:is(:hover, :focus-within):has(> .close + .close) .agent-line {
+		padding-right: calc(3 * var(--control-sm) + 6px);
 	}
 
 	.agent-body {
@@ -522,13 +546,21 @@
 		 * Both buttons are drawn at all times here, so the first line reserves their column at
 		 * all times too — and 28px each rather than 22px, which is the one number this block
 		 * exists to change.
+		 *
+		 * Three slots on a phone, because three actions are drawn: 30px per slot (28 + the 2px
+		 * between them), the outermost 4px off the edge, so 30 / 60 / 90 and 4 / 34 / 64.
 		 */
 		.agent-list .row-act > :is(.close, .agent-tagbtn) {
 			top: 9px;
 		}
 
-		.agent-list .row-act:has(> .close) > .agent-tagbtn {
+		.agent-list .row-act:has(> .agent-tagbtn + .close) > .agent-tagbtn,
+		.agent-list .row-act:has(> .agent-mirrorbtn + .close) > .agent-mirrorbtn {
 			right: 34px;
+		}
+
+		.agent-list .row-act:has(> .agent-tagbtn + .close + .close) > .agent-tagbtn {
+			right: 64px;
 		}
 
 		.agent-list .row-act .agent-line {
@@ -537,6 +569,10 @@
 
 		.agent-list .row-act:has(> .close) .agent-line {
 			padding-right: 60px;
+		}
+
+		.agent-list .row-act:has(> .close + .close) .agent-line {
+			padding-right: 90px;
 		}
 	}
 

@@ -176,11 +176,15 @@ export function AgentRow(props: {
 				It shares `.close`'s styling deliberately: these are both things you can do
 				*to* the row rather than parts of what the row says, and a second vocabulary
 				for the second one would only be a second thing to keep in step.
+
+				`agent-mirrorbtn` is the one thing that has to be its own name. `.agent-list` lays these
+				buttons out by hand — they are out of the flow, so nothing else can — and "which slot
+				is this one in" is asked of the class. Without it the mirror took the ×'s slot.
 			*/}
 			<Show when={props.onMirror}>
 				{(mirror) => (
 					<button
-						class="close"
+						class="close agent-mirrorbtn"
 						type="button"
 						title={`Put ${name()}'s conversation on the canvas`}
 						aria-label={`Mirror ${name()} on the canvas`}
