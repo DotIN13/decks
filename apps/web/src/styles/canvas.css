@@ -420,6 +420,48 @@
 	}
 
 	/*
+	 * The line the dragged block would land on.
+	 *
+	 * GrapesJS calls this element its *placer*. It keeps it in the editor's own chrome and
+	 * writes `top`, `left` and `width` onto it inline as the pointer moves, so its position is
+	 * GrapesJS's and correct — and it is a zero-height transparent box, because every pixel of
+	 * its appearance lives in `grapes.min.css`, the theme this app does not load. A drag was
+	 * therefore silent: the block below greyed out and no line said where it would go.
+	 *
+	 * The height is set inline to `auto`, so the line is drawn as a border and not as a height —
+	 * 3px, and the same line turned for a document that flows the other way. `z-index` because
+	 * the canvas is an iframe and this is not: the indicator has to paint over it.
+	 */
+	.grapes-editor .gjs-placeholder {
+		position: absolute;
+		z-index: 3;
+		/* Off until the sorter turns it on for the length of a drag. */
+		display: none;
+		box-sizing: border-box;
+		pointer-events: none;
+		transition:
+			top 0.12s ease,
+			left 0.12s ease,
+			width 0.12s ease,
+			height 0.12s ease;
+	}
+
+	.grapes-editor .gjs-placeholder.horizontal {
+		border-top: 3px solid var(--color-accent, #3b5cf6);
+		border-radius: 2px;
+	}
+
+	.grapes-editor .gjs-placeholder.vertical {
+		border-left: 3px solid var(--color-accent, #3b5cf6);
+		border-radius: 2px;
+	}
+
+	/* GrapesJS's own wrapper inside the placer, which the theme paints; the line is the border. */
+	.grapes-editor .gjs-placeholder-int {
+		display: none;
+	}
+
+	/*
 	 * A refusal, over the document rather than beside it.
 	 *
 	 * It is the one case where this editor cannot say what somebody did, and the answer is the

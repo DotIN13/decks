@@ -1,6 +1,6 @@
 import { createSignal, onCleanup, onMount } from "solid-js";
 import type { BoardPatch } from "@decks/protocol";
-import { diffBlocks, type EditBlock } from "./block-edits.ts";
+import { diffBlocks, type EditBlock, type EditNode } from "./block-edits.ts";
 
 /**
  * A flow document, edited as a document — and saved as ops, not as a file.
@@ -328,7 +328,7 @@ export function GrapesEditor(props: {
 				if (!first) return [];
 				return (first.components().models ?? []).filter((child) => !!child.get("tagName"));
 			};
-			const snapshot = (): EditBlock[] => blocks().map((block) => ({ id: block.cid ?? "", ...inner(block) }));
+			const snapshot = (): EditBlock[] => blocks().map((block) => ({ id: block.cid ?? "", node: tree(block) }));
 
 			// The document as the editor loaded it. `before` and `html` are both read from the
 			// model, so an untouched block is byte-identical to itself and produces no op.
@@ -511,20 +511,38 @@ function rootOf(source: string): { id: string; inner: string; body: [string, str
 }
 
 /**
- * A block's payload and its words, both from the model.
+ * A block's tree — its own words, and the elements inside it, all the way down.
  *
  * Inner HTML, because `op: "html"` replaces the range *between* the addressed element's tags —
  * sending the outer markup would nest a paragraph inside a paragraph. The words are what the
  * server compares against the file, and it compares them as text with tags taken out, so a
  * payload carrying markup could never match.
  *
- * The words are extracted by parsing the string, not by reading the canvas: the component's own
- * element is GrapesJS's rendering of it, and asking it anything is how the editor's furniture
- * would find its way into an op.
+ * **The children are why this is a tree and not a string.** A block whose own content is a
+ * layout — a table, a list — cannot be retyped as one payload, so the mapper descends to the
+ * element that changed and addresses that by a longer path; the descent needs the same four
+ * facts at every level, and an index path counts *element* children, which is what the server
+ * walks too (`elementAt`).
+ *
+ * Both are read from the model, not from the canvas: the component's own element is GrapesJS's
+ * rendering of it, and asking it anything is how the editor's furniture would find its way into
+ * an op.
  */
-function inner(block: { components(): { models?: unknown[] }; toHTML(): string }): { html: string; text: string } {
-	const html = ((block.components().models ?? []) as { toHTML(): string }[]).map((child) => child.toHTML()).join("");
+function tree(component: {
+	get(name: string): unknown;
+	components(): { models?: unknown[] };
+	toHTML(): string;
+}): EditNode {
+	type Part = Parameters<typeof tree>[0];
+	const children = (component.components().models ?? []) as Part[];
+	const html = children.map((child) => child.toHTML()).join("");
 	const scratch = document.createElement("div");
 	scratch.innerHTML = html;
-	return { html, text: scratch.textContent ?? "" };
+	return {
+		tag: String(component.get("tagName") ?? "").toLowerCase(),
+		html,
+		outer: component.toHTML(),
+		text: scratch.textContent ?? "",
+		children: children.filter((child) => Boolean(child.get("tagName"))).map((child) => tree(child)),
+	};
 }

@@ -152,6 +152,69 @@ say(
 	JSON.stringify(moved[0] ?? ""),
 );
 
+/*
+ * ── And a block that holds blocks ───────────────────────────────────────────────────
+ *
+ * The table's cells hold a `<p>`, which is what a table written by an agent looks like — and what
+ * used to make typing in one impossible. The mapper addressed the *block*, so the payload was the
+ * whole `<table>`, and the server refused it in the sentence a person actually saw:
+ *
+ *     the <table> at child 4 of #body holds blocks rather than words; edit it with the file tools
+ *
+ * Nothing was written and the words were gone. The fix is a descent: the walk goes into a block
+ * that holds blocks and addresses the run of words inside it, five levels down — table, body,
+ * row, cell, paragraph — so the write is one line and the other cells are never re-serialised.
+ *
+ * A cell is not editable in GrapesJS (the `cell` type has no rich-text view), which is exactly
+ * why the paragraph inside it is the thing to type in: it is the only element in a table a person
+ * can put a caret into at all.
+ */
+await openButton.click();
+for (let i = 0; i < 40 && !(await editor()); i++) await settle(page, 250);
+await canvasReady();
+
+const cell = frame.locator(".doc td p", { hasText: "61%" }).first();
+await cell.dblclick();
+await settle(page, 250);
+// The caret goes in; the words are selected here rather than typed over, so the assertion is about
+// the commit and not about how a browser treats a double-click's selection.
+await page.evaluate(() => {
+	const canvas = document.querySelector("#decks-document-canvas")?.contentDocument;
+	const paragraph = [...(canvas?.querySelectorAll(".doc td p") ?? [])].find((el) => el.textContent?.trim() === "61%");
+	const range = canvas.createRange();
+	range.selectNodeContents(paragraph);
+	canvas.defaultView.getSelection().removeAllRanges();
+	canvas.defaultView.getSelection().addRange(range);
+});
+await page.keyboard.type("63%");
+await page.keyboard.press("Meta+s");
+
+let celled = after;
+for (let i = 0; i < 60 && celled === after; i++) {
+	await settle(page, 250);
+	celled = read(file);
+}
+/** The table row the edited cell is in, wherever the edit left it. */
+const row = (text) => text.split("\n").find((line) => line.includes("<p>Illness</p>")) ?? "";
+const beforeCell = after.split("\n");
+const afterCell = celled.split("\n");
+const movedCell = afterCell.filter((line, index) => line !== beforeCell[index]);
+say(
+	"typing in a cell of a table moves one line of the file",
+	celled !== after && movedCell.length === 1 && afterCell.length === beforeCell.length,
+	`${movedCell.length} line(s) moved, ${beforeCell.length} -> ${afterCell.length} lines`,
+);
+say(
+	"…the cell's own line, with the other cells untouched",
+	movedCell[0] === row(after).replace("<p>61%</p>", "<p>63%</p>"),
+	JSON.stringify(movedCell[0]?.trim() ?? "no line moved"),
+);
+say(
+	"…with nothing anywhere saying the table holds blocks",
+	!(await page.evaluate(() => document.body.innerText)).includes("holds blocks"),
+	"no refusal notice on the page",
+);
+
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 
 // Put the fixture back the way the next check expects it.

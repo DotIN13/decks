@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { BoardPatch } from "@decks/protocol";
-import { diffBlocks, type EditBlock } from "./block-edits.ts";
+import { diffBlocks, type EditBlock, type EditNode } from "./block-edits.ts";
 
 /**
  * The mapper, tested as arithmetic rather than through an editor.
@@ -11,14 +11,33 @@ import { diffBlocks, type EditBlock } from "./block-edits.ts";
  * GrapesJS, they are visible in an assertion.
  */
 
-/** A block of a document, as the editor's snapshot holds it. */
-const block = (id: string, html: string): EditBlock => ({
-	id,
+/**
+ * An element of a document, as the editor's snapshot holds it.
+ *
+ * The text is what the server compares against; here it is whatever the markup says, since these
+ * tests are about the arithmetic and not about extraction. The children are given only by the
+ * tests that are about descending into them.
+ */
+const node = (tag: string, html: string, children: EditNode[] = []): EditNode => ({
+	tag,
 	html,
-	// The text is what the server compares against; here it is whatever the markup says, since
-	// these tests are about the arithmetic and not about extraction.
+	outer: `<${tag}>${html}</${tag}>`,
 	text: html.replace(/<[^>]*>/g, ""),
+	children,
 });
+
+/**
+ * A block, from the markup of the block itself.
+ *
+ * The tag and the inner HTML are pulled out of one string so the fixtures read the way the file
+ * does — `block("b", "<p>The first paragraph.</p>")` is the element and its bytes, and the
+ * payload a content op carries is everything between its tags.
+ */
+const block = (id: string, markup: string, children: EditNode[] = []): EditBlock => {
+	const found = /^<([a-z0-9]+)[^>]*>([\s\S]*)<\/\1>$/.exec(markup);
+	if (!found) throw new Error(`a block has to be one element: ${markup}`);
+	return { id, node: node(found[1]!, found[2]!, children) };
+};
 
 const HEADING = block("a", "<h1>The round</h1>");
 const FIRST = block("b", "<p>The first paragraph.</p>");
@@ -35,7 +54,7 @@ test("an untouched document produces nothing at all", () => {
 });
 
 test("a retype is one op carrying the block's inner HTML and its words", () => {
-	const edited = { ...FIRST, html: "Rewritten, <b>with a mark</b>.", text: "Rewritten, with a mark." };
+	const edited = block("b", "<p>Rewritten, <b>with a mark</b>.</p>");
 	const { patches, refusals } = diffBlocks([HEADING, FIRST, SECOND], [HEADING, edited, SECOND], "body");
 
 	assert.deepEqual(refusals, []);
@@ -45,7 +64,7 @@ test("a retype is one op carrying the block's inner HTML and its words", () => {
 });
 
 test("adding a mark without changing a word is still an edit", () => {
-	const marked = { ...FIRST, html: "<p>The <b>first</b> paragraph.</p>", text: "The first paragraph." };
+	const marked = block("b", "<p>The <b>first</b> paragraph.</p>");
 	const { patches } = diffBlocks([FIRST], [marked], "body");
 	assert.equal(patches.length, 1, "compared as markup, so a new mark is a change even when the words are the same");
 });
@@ -53,7 +72,7 @@ test("adding a mark without changing a word is still an edit", () => {
 test("the three edits of the design's own run map to exactly three ops, in order", () => {
 	// Retype the first paragraph, delete the second, append a new one — the case the design
 	// reports, and the case whose *order* is the contract with the server.
-	const edited = { ...FIRST, html: "Rewritten, <b>with a mark</b>.", text: "Rewritten, with a mark." };
+	const edited = block("b", "<p>Rewritten, <b>with a mark</b>.</p>");
 	const added = block("e", "<p>A brand new paragraph.</p>");
 	const { patches, refusals } = diffBlocks([HEADING, FIRST, SECOND], [HEADING, edited, added], "body");
 
@@ -136,11 +155,11 @@ test("a move's index is read against the list the removals left, not the file as
 });
 
 test("a retype beside a move: the content first, and the move at its loaded index", () => {
-	const edited = { ...FIRST, html: "<p>Rewritten.</p>", text: "Rewritten." };
+	const edited = block("b", "<p>Rewritten.</p>");
 	const { patches, refusals } = diffBlocks([HEADING, FIRST, SECOND], [SECOND, HEADING, edited], "body");
 	assert.deepEqual(refusals, []);
 	assert.deepEqual(patches, [
-		{ op: "html", id: "body", path: [1], before: "The first paragraph.", html: "<p>Rewritten.</p>" },
+		{ op: "html", id: "body", path: [1], before: "The first paragraph.", html: "Rewritten." },
 		{ op: "move-child", id: "body", path: [2], to: 0 },
 	]);
 });
@@ -198,4 +217,68 @@ test("every permutation comes out as the document it was given, whatever it take
 		assert.deepEqual(refusals, [], `order ${order.join("")} was refused`);
 		assert.deepEqual(applied(ids, patches), after.map((b) => b.id), `order ${order.join("")} came out wrong`);
 	}
+});
+
+/*
+ * ── A block that holds blocks ────────────────────────────────────────────────────────
+ *
+ * The shape a single payload cannot describe, and the one a real document is full of: a table,
+ * a list, a `<blockquote>` of paragraphs. Sending the block's own inner HTML asks the server to
+ * replace a range that is a *layout*, and it refuses — `holds blocks rather than words` — so
+ * typing a date into one cell of a table used to be refused at the commit and nowhere else.
+ */
+
+/** The inside of a one-row table whose cells are the given words — the block's child, one level at a time. */
+const tbody = (cells: string[]): EditNode => {
+	const row = `<tr>${cells.map((cell) => `<td>${cell}</td>`).join("")}</tr>`;
+	return node("tbody", row, [node("tr", cells.map((cell) => `<td>${cell}</td>`).join(""), cells.map((cell) => node("td", cell)))]);
+};
+
+const TABLE = block("t", "<table><tbody><tr><td>61%</td><td>50%</td></tr></tbody></table>", [tbody(["61%", "50%"])]);
+
+test("a cell of a table is addressed where it is, not as the whole table", () => {
+	const edited = block("t", "<table><tbody><tr><td>62%</td><td>50%</td></tr></tbody></table>", [tbody(["62%", "50%"])]);
+	const { patches, refusals } = diffBlocks([TABLE], [edited], "body");
+
+	assert.deepEqual(refusals, []);
+	assert.deepEqual(patches, [
+		// The block, the body, the row, the cell — and the payload is the cell's own words.
+		{ op: "html", id: "body", path: [0, 0, 0, 0], before: "61%", html: "62%" },
+	]);
+});
+
+test("the cells nobody touched are never reached, so their bytes cannot move", () => {
+	// The other half of the same point: one op, not one per cell, and not a re-serialisation of
+	// the table. A payload for the whole block would rewrite every cell's whitespace.
+	const edited = block("t", "<table><tbody><tr><td>61%</td><td>51%</td></tr></tbody></table>", [tbody(["61%", "51%"])]);
+	const { patches } = diffBlocks([TABLE], [edited], "body");
+	assert.deepEqual(patches, [{ op: "html", id: "body", path: [0, 0, 0, 1], before: "50%", html: "51%" }]);
+});
+
+test("a mark inside a cell is one run inside a block", () => {
+	const edited = block("t", "<table><tbody><tr><td><b>61%</b></td><td>50%</td></tr></tbody></table>", [
+		tbody(["<b>61%</b>", "50%"]),
+	]);
+	const { patches, refusals } = diffBlocks([TABLE], [edited], "body");
+	assert.deepEqual(refusals, []);
+	assert.deepEqual(patches, [{ op: "html", id: "body", path: [0, 0, 0, 0], before: "61%", html: "<b>61%</b>" }]);
+});
+
+test("a change of shape inside a block is refused, not approximated", () => {
+	/*
+	 * A row added: the tree above the new row has one child where the file has two, and no op
+	 * says "insert a `<tr>` here" — the op set is about the editable root's children. The refusal
+	 * names the level that disagrees, and the caller offers the file in the same breath.
+	 */
+	const twoRows = node("tbody", "<tr><td>61%</td><td>50%</td></tr><tr><td>44%</td><td>48%</td></tr>", [
+		node("tr", "<td>61%</td><td>50%</td>", [node("td", "61%"), node("td", "50%")]),
+		node("tr", "<td>44%</td><td>48%</td>", [node("td", "44%"), node("td", "48%")]),
+	]);
+	const grown = block("t", "<table><tbody><tr><td>61%</td><td>50%</td></tr><tr><td>44%</td><td>48%</td></tr></tbody></table>", [
+		twoRows,
+	]);
+	const { patches, refusals } = diffBlocks([TABLE], [grown], "body");
+
+	assert.deepEqual(patches, []);
+	assert.deepEqual(refusals, ["the <tbody> at 0.0 changed shape"]);
 });

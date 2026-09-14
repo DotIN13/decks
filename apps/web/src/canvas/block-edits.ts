@@ -1,4 +1,4 @@
-import type { BoardPatch } from "@decks/protocol";
+import { INLINE_TAGS, type BoardPatch } from "@decks/protocol";
 
 /**
  * A GrapesJS edit, turned into the patch operations that already exist.
@@ -56,13 +56,40 @@ import type { BoardPatch } from "@decks/protocol";
  * blocks to move, and the answer is the one the person made — see `arrange`.
  */
 
+/** The tags a run of words may be made of — the same list the server asks with. */
+const INLINE = new Set<string>(INLINE_TAGS);
+
 /**
- * One top-level block of a document, as the editor sees it.
+ * One element of a document, as the editor's snapshot holds it.
  *
- * A block is one element child of the editable root — the whole design treats it as an
- * atomic run of HTML, one level deep, which is what makes the diff small and the indices
- * stable. Editing a word inside a block is a change to that block; nothing below it is ever
- * addressed here, so the editor's inline churn cannot reach the file as ops of its own.
+ * The block at the top and everything inside it are the same shape, because the descent below
+ * needs the same three facts at every level: what the element's own bytes are, what words they
+ * say, and which elements are inside it — the indices a deeper `path` is made of.
+ */
+export interface EditNode {
+	/** The tag, lowercased. */
+	tag: string;
+	/** This element's inner HTML — the payload a content op carries. */
+	html: string;
+	/**
+	 * The element whole, as the model wrote it. The payload an insertion carries, and the words a
+	 * removal is checked against: both are about the element itself rather than what is inside it,
+	 * and `checkBlock` refuses a payload with no element in it at all.
+	 */
+	outer: string;
+	/** The words inside it, markup out — what the server compares against the file. */
+	text: string;
+	/** Element children, in document order. Whitespace and comments are not children here. */
+	children: EditNode[];
+}
+
+/**
+ * One top-level block of a document: an element child of the editable root, and its identity.
+ *
+ * A block is the unit of *structure* — the thing that can be added, removed or moved — and the
+ * unit the diff is small over: an untouched block is one string comparison and is skipped whole,
+ * so its bytes cannot be rewritten. What is inside it is a separate question, and the one
+ * `contentOps` descends into when a single payload cannot describe the change.
  */
 export interface EditBlock {
 	/**
@@ -73,10 +100,8 @@ export interface EditBlock {
 	 * re-parse.
 	 */
 	id: string;
-	/** The block's inner HTML — the payload a content op carries. */
-	html: string;
-	/** The words in it — what the server compares against the file. See (3) above. */
-	text: string;
+	/** The block itself: its inner HTML, its words, and the elements inside it. */
+	node: EditNode;
 }
 
 /** What a commit amounts to: the ops to apply, and anything that made it unmappable. */
@@ -113,23 +138,16 @@ export function diffBlocks(before: readonly EditBlock[], after: readonly EditBlo
 
 	const content: BoardPatch[] = [];
 	const removals: BoardPatch[] = [];
+	const refusals: string[] = [];
 
 	before.forEach((block, index) => {
 		const now = after.find((candidate) => candidate.id === block.id);
 		if (!now) {
-			// The block's own HTML, whole, because removing one takes its tags with it.
-			removals.push({ op: "remove-child", id: rootId, path: [index], before: block.html });
+			// The block whole, because removing one takes its tags with it.
+			removals.push({ op: "remove-child", id: rootId, path: [index], before: block.node.outer });
 			return;
 		}
-		/*
-		 * Compared as markup, not as words: adding a `<b>` around a word leaves the text
-		 * alone and is still an edit. Two serialisations that mean the same thing differing
-		 * by a byte would cost one repeated op, which the server's own normaliser then writes
-		 * back unchanged — cheap, and far better than a changed mark going unnoticed.
-		 */
-		if (now.html !== block.html) {
-			content.push({ op: "html", id: rootId, path: [index], before: block.text, html: now.html });
-		}
+		contentOps(rootId, [index], block.node, now.node, content, refusals);
 	});
 
 	// Bottom-up, for the reason given at the top of the file.
@@ -147,10 +165,71 @@ export function diffBlocks(before: readonly EditBlock[], after: readonly EditBlo
 	const insertions: BoardPatch[] = [];
 	after.forEach((block, index) => {
 		if (beforeIds.includes(block.id)) return;
-		insertions.push({ op: "insert-child", id: rootId, path: [index], html: block.html });
+		insertions.push({ op: "insert-child", id: rootId, path: [index], html: block.node.outer });
 	});
 
-	return { patches: [...content, ...removals, ...arrange(current, wanted, rootId), ...insertions], refusals: [] };
+	return { patches: [...content, ...removals, ...arrange(current, wanted, rootId), ...insertions], refusals };
+}
+
+/**
+ * The content ops for one block — stopping at the smallest element that describes the change.
+ *
+ * A payload of the block's inner HTML works while what changed is a **run of words**: `<p>`,
+ * `<h2>`, `<li>` holding a sentence and its marks. It does not work for a block that *holds*
+ * blocks, which is an ordinary shape in a real document — a table, a list, a `<blockquote>` of
+ * paragraphs. Sending the whole table asks the server to replace a range that is a layout, and
+ * it refuses (`holds blocks rather than words`): typing a date into one cell of a table was
+ * unexpressible.
+ *
+ * So the two trees are walked together and the walk stops at the first level that describes the
+ * change. An element whose own content is a run of words is addressed where it is; one that
+ * holds blocks is descended into, and the run inside it is addressed by a longer path. A child
+ * whose bytes did not change is skipped whole — which is what keeps the write small, because
+ * the other cells are never re-serialised, they are never reached.
+ *
+ * **Compared as markup, not as words**, at every level: adding a `<b>` around a word leaves the
+ * text alone and is still an edit. Two serialisations that mean the same thing differing by a
+ * byte cost one op, which the server's own normaliser then writes back unchanged — cheap, and
+ * far better than a changed mark going unnoticed.
+ *
+ * A child count that disagrees is a change of **shape** — a row added, a paragraph split in two
+ * — and there is no op for it. That is refused rather than approximated, and the caller offers
+ * the file in the same breath.
+ */
+function contentOps(
+	id: string,
+	path: number[],
+	before: EditNode,
+	after: EditNode,
+	ops: BoardPatch[],
+	refusals: string[],
+): void {
+	if (before.html === after.html) return;
+	if (isRun(after)) {
+		ops.push({ op: "html", id, path, before: before.text, html: after.html });
+		return;
+	}
+	if (before.children.length !== after.children.length) {
+		refusals.push(`${describe(after.tag, path)} changed shape`);
+		return;
+	}
+	after.children.forEach((child, index) => contentOps(id, [...path, index], before.children[index]!, child, ops, refusals));
+}
+
+/**
+ * Whether this element's own content is a run of words rather than a layout of blocks.
+ *
+ * The client's half of the question the server asks of the file (`isRichRun` in
+ * `boards/inline-html.ts`), off the same list of tags — a payload the server would refuse is not
+ * one this should send.
+ */
+function isRun(node: EditNode): boolean {
+	return node.children.every((child) => INLINE.has(child.tag) && isRun(child));
+}
+
+/** An element as a refusal names it: `the <td> at 4.0.2`. */
+function describe(tag: string, path: number[]): string {
+	return `the <${tag}> at ${path.join(".")}`;
 }
 
 /**
