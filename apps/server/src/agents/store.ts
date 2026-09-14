@@ -154,6 +154,25 @@ export class AgentStore {
 	}
 
 	/**
+	 * Persist one agent's record and leave its transcript alone.
+	 *
+	 * For a change that is about the *row* rather than the conversation — a rename, a tag, the
+	 * boards it is holding — on a chat whose transcript has not been read. Writing the whole
+	 * pair would mean reading `chat.json` first, and reading a conversation nobody has opened
+	 * is the cost the list exists to avoid; writing an empty one over it would lose it. So
+	 * this is the narrow write for the narrow case.
+	 */
+	writeRecord(record: AgentRecord): void {
+		try {
+			const folder = this.folder(record.id);
+			mkdirSync(folder, { recursive: true });
+			atomicWrite(join(folder, "meta.json"), JSON.stringify(record, null, 2));
+		} catch {
+			/* the same trade as `write`: a lost row is not a lost chat */
+		}
+	}
+
+	/**
 	 * One agent's record, without its transcript.
 	 *
 	 * An unreadable `meta.json` means the row cannot be rebuilt at all, so this is

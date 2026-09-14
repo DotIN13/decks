@@ -548,9 +548,15 @@ export class DeckAgent {
 	 * **An agent nobody has spoken to is not written down.** `focused()` creates one on
 	 * demand so a deck is never agentless, so without this rule every boot would leave an
 	 * empty "Agent" row behind and the list would fill with them.
+	 *
+	 * A **restored** chat is the other case, and it is written even before anything is said to
+	 * it: the row is already on disk, so a rename, a tag or a board hung on it has somewhere to
+	 * go. Its transcript has not been read though — that is the whole point of restoring — which
+	 * is why `flush` writes the record on its own in that state rather than reading the
+	 * conversation to write it back.
 	 */
 	private save(): void {
-		if (this.translator.userMessages().length === 0) return;
+		if (!this.persisted()) return;
 		if (this.saving) return;
 		this.saving = setTimeout(() => {
 			this.saving = undefined;
@@ -612,13 +618,36 @@ export class DeckAgent {
 		return found?.kind === "tool" ? found.result : undefined;
 	}
 
+	/**
+	 * Whether there is a row to write.
+	 *
+	 * A restored chat has one already; a new one is not written down until the user has spoken
+	 * to it. Reading this as "has user messages" was right while every restored chat carried
+	 * its transcript in memory and wrong the moment they stopped: it silently dropped a rename
+	 * or a tag on a chat nobody had opened, because the guard could not tell "nothing to say
+	 * yet" from "not read yet".
+	 */
+	private persisted(): boolean {
+		return this.restored || this.translator.userMessages().length > 0;
+	}
+
 	/** Write the record now. */
 	private flush(): void {
-		if (this.translator.userMessages().length === 0) return;
+		if (!this.persisted()) return;
 		// Taken from the backend each time: a rewind moves the session, and a ref from
 		// start() would point at the branch that was abandoned.
 		this.resumeRef = this.backend?.sessionRef() ?? this.resumeRef;
-		this.store.write(this.record(), this.translator.history());
+		const record = this.record();
+		/*
+		 * An unread transcript is left exactly where it is.
+		 *
+		 * `record()` is the row, and it comes from the record itself when the transcript has not
+		 * been loaded (`storedLast`), so this write is complete without it. Reading the
+		 * conversation to rewrite it would undo the restore, and writing `history()` — which is
+		 * empty until something asks — would erase it.
+		 */
+		if (this.transcriptLoaded) this.store.write(record, this.translator.history());
+		else this.store.writeRecord(record);
 	}
 
 	private record(): AgentRecord {

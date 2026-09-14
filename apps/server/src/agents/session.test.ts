@@ -93,7 +93,7 @@ function agentOn(
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");
 	const last = () => sent.filter((message) => message.type === "context.changed").at(-1);
-	return { agent, sent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+	return { agent, store, sent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
 	test("a dormant chat greets the model it was restored with", () => {
@@ -694,6 +694,32 @@ test("a tool call's whole output is there to be asked for", () => {
 		assert.equal(agent.toolResult("t0"), "y".repeat(5000));
 		assert.equal(agent.toolResult("not-a-row"), undefined);
 		assert.equal(agent.toolResult("u1"), undefined, "a row that is not a tool call has no output");
+	} finally {
+		cleanup();
+	}
+});
+
+test("a restored row renamed before it is opened keeps its transcript", () => {
+	const items: ChatItem[] = [
+		{ kind: "user", id: "u1", text: "hello", at: 1 },
+		{ kind: "assistant", id: "a2", text: "on the board", at: 2 },
+	];
+	const { agent, store, cleanup } = agentOn([], {
+		restored: { id: "R", items, context: [], inPlay: [], createdAt: 1, lastLine: "on the board", lastAt: 2 },
+	});
+	try {
+		// Nothing has asked for the conversation, so this is a change to the row and nothing
+		// else — and it still has to be written, or a rename on a dormant chat would be lost.
+		agent.rename("Pi");
+		agent.dispose();
+
+		assert.equal(store.readRecord("R")?.name, "Pi", "the row went to disk");
+		assert.equal(store.readRecord("R")?.lastLine, "on the board", "with the preview it already had");
+		assert.deepEqual(
+			store.readItems("R").map((item) => item.id),
+			items.map((item) => item.id),
+			"and the transcript was neither read nor written over",
+		);
 	} finally {
 		cleanup();
 	}
