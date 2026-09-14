@@ -46,6 +46,7 @@ import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
 import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
+import { agentViews } from "./camera/agent-views.ts";
 import {closeHistory, historyShown, openHistory, setInspectable} from "./state/edge.ts";
 import { canvasBox, watchInsets } from "./camera/insets.ts";
 import { canHover, NARROW } from "./lib/media.ts";
@@ -102,6 +103,46 @@ export function App() {
 	 * on the grounds that the previous value is unknown.
 	 */
 
+	/**
+	 * The views this device has left behind, per conversation.
+	 *
+	 * Kept in `localStorage` rather than in the scratch record beside them (`agent-views.ts` says
+	 * why): a view is a fact about the machine looking, not about the deck, so it survives a
+	 * reload and belongs to this browser alone.
+	 */
+	const views = createMemo(() => agentViews(state.deck?.path ?? ""));
+
+	/**
+	 * Views of agents that are gone are dropped.
+	 *
+	 * The key is a map of agent id to view, and agents are removed all the time — a chat closed,
+	 * a session deleted — so without this it grows by one entry per conversation ever had, for
+	 * eyes that will never read them.
+	 */
+	createEffect(() => {
+		const ids = state.chats.map((chat) => chat.id);
+		if (ids.length > 0) views().retain(ids);
+	});
+
+	/**
+	 * The view you are in when the page goes away.
+	 *
+	 * Views are parked when you switch conversations, which covers everything except the one you
+	 * were in when the tab was closed or reloaded — and that is exactly the conversation a reload
+	 * is about, so without this the camera would come back for every chat but the one you left.
+	 *
+	 * `pagehide` rather than `beforeunload`: it fires on a reload, on a navigate, and when a phone
+	 * puts the page away, which is where `beforeunload` famously does not.
+	 */
+	onMount(() => {
+		const park = () => {
+			const id = state.focused;
+			if (id) views().keep(id, viewToPark(camera(), selected()));
+		};
+		addEventListener("pagehide", park);
+		onCleanup(() => removeEventListener("pagehide", park));
+	});
+
 	/*
 	 * Start measuring the chrome.
 	 *
@@ -142,6 +183,50 @@ export function App() {
 		});
 		const off = on((message) => handleFrame(message, frames));
 		onCleanup(off);
+	});
+
+	/**
+	 * Where the canvas should be looking when this conversation's boards arrive.
+	 *
+	 * The view this device left it in, or a fit of what it holds — `viewOnSwitch` decides, and
+	 * `undefined` there means "nothing on the canvas", which leaves the canvas alone.
+	 */
+	/**
+	 * Where the canvas looks after a switch, once the switch has actually happened.
+	 *
+	 * `switchAgent` asks for it; this answers — with the boards as the new conversation has them,
+	 * where the remembered view can be checked against what is really there. Nothing is left
+	 * waiting by a switch that is followed by another: `awaiting` is an id, and the second switch
+	 * replaces it before either answer arrives.
+	 */
+	const landed = () => {
+		const id = awaiting;
+		if (!id || id !== state.focused) return;
+		awaiting = undefined;
+		const playing = state.agents[id]?.inPlay ?? [];
+		const view = views().of(id);
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		const next = viewOnSwitch({ view, playing, boards: state.boards, viewport: size, region: canvasBox(size) });
+		if (next) setCamera(next);
+		/* The board selection follows the camera. It was global, which made it inconsistent
+		   with the *component* selection — the two are the same kind of fact. */
+		setSelected(selectionOnSwitch(view, playing));
+	};
+
+	/** The conversation a switch is waiting for the canvas of — see `landed`. */
+	let awaiting: string | undefined;
+
+	const openingCamera = createMemo(() => {
+		const id = state.focused;
+		if (!id) return undefined;
+		const size = { width: window.innerWidth, height: window.innerHeight };
+		return viewOnSwitch({
+			view: views().of(id),
+			playing: state.agents[id]?.inPlay ?? [],
+			boards: state.boards,
+			viewport: size,
+			region: canvasBox(size),
+		});
 	});
 
 	const move = (path: string, x: number, y: number) => {
@@ -207,6 +292,7 @@ export function App() {
 		hearBoard: (request, path) => files.hearBoard(request, path),
 		setAtTurn,
 		raise,
+		landed,
 	};
 
 	const editor: EditorHost = {
@@ -545,21 +631,23 @@ export function App() {
 		 * canvas leaves the camera alone, a remembered view comes back *exactly*, and an agent
 		 * with no memory gets a fit of what it holds.
 		 */
-		if (leaving) scratch.of(leaving).view = viewToPark(camera(), selected());
+		if (leaving) views().keep(leaving, viewToPark(camera(), selected()));
 
 		setState("focused", id);
 		setUnread(id, 0);
 		// A component selected in a board another agent was holding is not your selection.
 		setComponent(undefined);
 
-		const playing = state.agents[id]?.inPlay ?? [];
-		const view = scratch.peek(id)?.view;
-		const size = { width: window.innerWidth, height: window.innerHeight };
-		const next = viewOnSwitch({ view, playing, boards: state.boards, viewport: size, region: canvasBox(size) });
-		if (next) setCamera(next);
-		/* The board selection follows the camera. It was global, which made it inconsistent
-		   with the *component* selection three lines up — the two are the same kind of fact. */
-		setSelected(selectionOnSwitch(view, playing));
+		/*
+		 * The camera and the selection wait for the canvas itself.
+		 *
+		 * `agent.focus` is answered with the whole deck as the *new* stage sees it, and where the
+		 * boards are is half of what `viewOnSwitch` decides on — a remembered view that no longer
+		 * shows one of its own boards is a fit instead. Deciding it here would decide it against
+		 * the conversation being left, which is the one arrangement that is definitely not the one
+		 * about to be shown. `landed` is the other half.
+		 */
+		awaiting = id;
 
 		ensureHistory(id);
 		setDraft(undefined);
@@ -626,6 +714,17 @@ export function App() {
 					{(current) => (
 					<Stage
 						renderer={current}
+						/*
+						 * Where the canvas opens, decided here rather than in the canvas.
+						 *
+						 * `viewOnSwitch` is the same three cases a switch uses, so opening a
+						 * conversation on a reload and coming back to it later land in the same
+						 * place for the same reasons. Passing the decision rather than the view
+						 * also gets the ordering right: the conversation arrives with the agent
+						 * list, which is not always the first thing to arrive, and `undefined`
+						 * (not known yet) has to be told apart from "nothing remembered".
+						 */
+						opening={state.focused ? { camera: openingCamera() } : undefined}
 						boardsMayStart={boardsMayStart()}
 						// The panel's list and the rail's thumbnails are less urgent: after the canvas.
 						onBoardsStarted={canvasOpened}

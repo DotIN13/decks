@@ -3,6 +3,7 @@ import { reconcile } from "solid-js/store";
 import { PAGE, prepend } from "../chat/history-page.ts";
 import { receiveToolResult } from "../chat/tool-results.ts";
 import { viewToPark } from "../camera/agent-view.ts";
+import { agentViews } from "../camera/agent-views.ts";
 import { runStageCall } from "../canvas/stage-ops.ts";
 import { scratch } from "../state/agent.ts";
 import { setCamera } from "../state/camera.ts";
@@ -21,6 +22,14 @@ import { releaseBoards, setDraft, setUnread, setUsagePanel, setUsageReport, usag
 export interface FrameHooks {
 	/** A board asked for by a drop heard its path. */
 	hearBoard(request: string, path: string): void;
+	/**
+	 * The deck has arrived for the conversation we just switched to.
+	 *
+	 * The other half of a switch, because *where the boards are* is half of what decides where to
+	 * look: a view is restored only if it still shows one of the boards it was left on, and that
+	 * question cannot be asked of the conversation being left.
+	 */
+	landed(): void;
 	setAtTurn(at: { id: string; at: number } | undefined): void;
 	raise(kind: "done" | "ask" | "problem", banner: { title: string; body?: string; tag?: string; agent?: string }): void;
 }
@@ -66,6 +75,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * changed and leaves the rest — and their documents — alone.
 					 */
 					setState("boards", reconcile(message.deck.boards, { key: "path", merge: false }));
+					hooks.landed();
 					return;
 				case "board.patched": {
 					if (message.refused) {
@@ -322,7 +332,11 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							focused: () => state.focused,
 							setCamera: (next) => setCamera(next),
 							rememberView: (agentId, camera, selected) => {
-								scratch.of(agentId).view = viewToPark(camera, selected);
+								// On this device, like every other view (`camera/agent-views.ts`): an
+								// agent that moved a canvas nobody is looking at is remembered for the
+								// browser that was told, which is the same scope as the ones parked on
+								// a switch.
+								agentViews(state.deck?.path ?? "").keep(agentId, viewToPark(camera, selected));
 								// So `stage.camera()` answers for that agent's canvas rather than falling
 								// back to wherever the last person to look at anything was.
 								reportCamera(camera, agentId);
