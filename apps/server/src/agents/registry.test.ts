@@ -125,8 +125,16 @@ test("the transcript comes back, not only the row", () => {
 
 	const { registry } = registryOn(deck);
 	registry.restore();
-	const history = registry.get(id)?.translator.history() ?? [];
+	const restored = registry.get(id)!;
+	/*
+	 * Reading the row is not reading the conversation. The restore puts back what the list
+	 * draws — a name, a colour, a preview — and the transcript is read when a browser asks
+	 * for it, which is `chat.open`. That is the difference between a deck open that costs a
+	 * record per row and one that costs every conversation ever had.
+	 */
+	assert.deepEqual(restored.translator.history(), [], "nothing is read for a row nobody has opened");
 
+	const history = (restored.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>).items;
 	assert.deepEqual(
 		history.map((item) => item.kind),
 		["user", "assistant"],
@@ -153,6 +161,9 @@ test("a new message after a restore cannot land on a restored message's id", () 
 	const { registry } = registryOn(deck);
 	registry.restore();
 	const restored = registry.get(id)!;
+	// The stored rows are read when somebody asks for the conversation, which a browser does
+	// with `chat.open` — and the new message has to land after them, not on their ids.
+	restored.historyMessage();
 	restored.translator.user("three");
 	const after = restored.translator.history().map((item) => item.id);
 
@@ -234,7 +245,7 @@ test("restored rows keep their colour, so a chat does not change identity", () =
 	cleanup();
 });
 
-test("only the newest fifteen chats are kept", () => {
+test("every chat is kept, however many there are", () => {
 	const { deck, cleanup } = deckOn();
 
 	for (let index = 0; index < 20; index += 1) {
@@ -247,10 +258,10 @@ test("only the newest fifteen chats are kept", () => {
 	}
 
 	const { registry } = registryOn(deck);
-	assert.equal(registry.restore(), 15);
+	assert.equal(registry.restore(), 20, "no row is dropped on open");
 	const names = registry.chats().map((chat) => chat.name);
-	assert.ok(names.includes("Agent 19"), "the newest survives");
-	assert.ok(!names.includes("Agent 0"), "the oldest is pruned");
+	assert.ok(names.includes("Agent 19"), "the newest");
+	assert.ok(names.includes("Agent 0"), "and the oldest, which used to be pruned");
 	cleanup();
 });
 

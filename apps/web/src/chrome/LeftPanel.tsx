@@ -231,47 +231,55 @@ export function LeftPanel(props: {
 	const tally = createMemo(() => panelTally(sections()));
 
 	/*
-	 * How many board rows are drawn, across the sections in order.
+	 * How many rows are drawn, across the sections in order.
 	 *
 	 * A row is about a millisecond — a title, a picture from the cache, an icon — and a deck has
-	 * hundreds of boards: drawing every row the moment the deck arrived was 425 ms of the app's
-	 * first second, all of it before the chat it opened on could be drawn. So the first screenful
-	 * is drawn at once and the rest waits for the app and its canvas to have opened
-	 * (`listMayGrow`), then comes in sixty rows per idle moment. The counts in the section headers
-	 * are the whole list's all along; only rows below the fold are late.
+	 * hundreds of things in it, boards and now conversations alike. Drawing every row the moment
+	 * the deck arrived was 425 ms of the app's first second, all of it before the chat it opened
+	 * on could be drawn. So the first screenful is drawn at once and the rest as the reader
+	 * reaches for it — a chunk per approach to the bottom of the list.
+	 *
+	 * **Growth follows the scroll, not idle time.** It used to arrive sixty rows per idle moment,
+	 * which was harmless while a row cap bounded the list and would now draw every conversation
+	 * the deck has ever had, whether or not anybody looked. With nothing pruned
+	 * (`agents/registry.ts`), "draw it later" is the whole of what keeps a long deck from
+	 * spending its first second on rows below the fold.
+	 *
+	 * One budget for both tabs, because they share this scroller and only one is ever showing.
+	 * The counts in the section headers are the whole list's all along; only rows below the fold
+	 * are late.
 	 */
 	const FIRST_ROWS = 40;
 	const MORE_ROWS = 60;
+	/** How close to the bottom, in pixels, before the next chunk is drawn. */
+	const LOAD_MORE_AT = 400;
 	const [rowBudget, setRowBudget] = createSignal(FIRST_ROWS);
-	const totalRows = () => sections().reduce((sum, section) => sum + section.rows.length, 0);
-	let growing = false;
-	let stopped = false;
-	onCleanup(() => {
-		stopped = true;
-	});
-	const later = (fn: () => void) => {
-		const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-		if (idle) idle(fn, { timeout: 500 });
-		else window.setTimeout(fn, 50);
-	};
-	const grow = () => {
-		growing = false;
-		if (stopped || rowBudget() >= totalRows()) return;
-		setRowBudget((n) => n + MORE_ROWS);
-		growing = true;
-		later(grow);
-	};
-	createEffect(() => {
-		if (!(props.listMayGrow ?? true) || growing || rowBudget() >= totalRows()) return;
-		growing = true;
-		later(grow);
-	});
+	/** The sections of the list that is showing — boards, or agents. */
+	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agents() : sections());
+	const visibleRows = () => groups().reduce((sum, section) => sum + section.rows.length, 0);
 	/** How many of the section at `index`'s rows fit in what the sections above it left. */
-	const allowance = (index: number) => {
-		const all = sections();
+	const allowance = (index: number): number => {
+		const all = groups();
 		let before = 0;
 		for (let i = 0; i < index; i += 1) before += all[i]?.rows.length ?? 0;
 		return Math.max(0, rowBudget() - before);
+	};
+	/** Draw another chunk, whatever the scroll position — the keyboard's half of the same thing. */
+	const grow = () => {
+		if (rowBudget() >= visibleRows()) return;
+		setRowBudget((n) => n + MORE_ROWS);
+	};
+	/**
+	 * One chunk closer to the end, when the reader is nearly there.
+	 *
+	 * `listMayGrow` is the app saying its first paint is done; before that the budget stays at
+	 * one screenful, so opening a large deck cannot spend its first second on rows nobody has
+	 * scrolled to. A list shorter than its viewport produces no scroll event and needs none —
+	 * there is nothing below the fold to draw.
+	 */
+	const growIfNearEnd = () => {
+		if (!(props.listMayGrow ?? true) || !list) return;
+		if (list.scrollHeight - list.scrollTop - list.clientHeight < LOAD_MORE_AT) grow();
 	};
 
 	/*
@@ -306,13 +314,21 @@ export function LeftPanel(props: {
 	/*
 	 * Up and down walk the rows; Enter is the button's own, so nothing here has to fake it.
 	 * A list you can only reach with Tab is a list of seventy-eight tab stops.
+	 *
+	 * Down off the last *drawn* row draws another chunk and steps onto it. The last row on
+	 * screen is the end of the budget rather than the end of the list, and an arrows-only
+	 * reader who stops there would be told the list ended by a list that had not.
 	 */
 	const rove = (event: KeyboardEvent) => {
 		const all = rows();
 		if (all.length === 0) return;
 		const here = all.indexOf(document.activeElement as HTMLElement);
-		if (event.key === "ArrowDown") focusRow(here + 1);
-		else if (event.key === "ArrowUp") {
+		if (event.key === "ArrowDown") {
+			if (here >= all.length - 1 && rowBudget() < visibleRows()) {
+				grow();
+				requestAnimationFrame(() => focusRow(here + 1));
+			} else focusRow(here + 1);
+		} else if (event.key === "ArrowUp") {
 			if (here === 0) field?.focus();
 			else focusRow(here - 1);
 		} else if (event.key === "Home") focusRow(0);
@@ -480,10 +496,11 @@ export function LeftPanel(props: {
 					class="panel-list items"
 					data-density={density()}
 					onKeyDown={rove}
+					onScroll={growIfNearEnd}
 				>
 					<Show when={tab() === "agents"}>
 						<For each={agents()}>
-							{(section) => (
+							{(section, index) => (
 								<div class="panel-section" data-kind={section.kind}>
 									<div class="panel-meta meta">
 										<span class="truncate">{section.label}</span>
@@ -500,7 +517,7 @@ export function LeftPanel(props: {
 										match: the board rows above are the same object.
 									*/}
 									<div class="rowlist agent-list">
-									<For each={section.rows}>
+									<For each={section.rows.slice(0, allowance(index()))}>
 										{(row) => (
 											<AgentRow
 												row={row}

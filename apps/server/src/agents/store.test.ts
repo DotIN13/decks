@@ -115,17 +115,30 @@ test("the list is newest conversation first", () => {
 	cleanup();
 });
 
-test("prune keeps the newest and forgets the rest", () => {
+test("opening a deck keeps every chat, however many there are", () => {
 	const { deck, cleanup } = deckOn();
 	const store = new AgentStore(deck);
-	for (let index = 0; index < 20; index += 1) store.write(record({ id: `a${index}`, lastAt: index }), []);
+	for (let index = 0; index < 40; index += 1) store.write(record({ id: `a${index}`, lastAt: index }), []);
 
-	const kept = store.prune(15);
+	assert.equal(store.list().length, 40, "the whole list is a record each");
+	assert.equal(readdirSync(join(deck.path, ".decks", "agents")).length, 40, "and nothing is off the disk");
+	cleanup();
+});
 
-	assert.equal(kept.length, 15);
-	assert.equal(kept[0]?.record.id, "a19", "the newest survives");
-	assert.equal(kept.at(-1)?.record.id, "a5");
-	assert.equal(readdirSync(join(deck.path, ".decks", "agents")).length, 15, "and the rest are off the disk");
+test("the list draws a row from its record, without reading the transcript", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	// A record and no `chat.json` at all — what `list` would once have tried to load for every row.
+	mkdirSync(join(deck.path, ".decks", "agents", "agent-1"), { recursive: true });
+	writeFileSync(
+		join(deck.path, ".decks", "agents", "agent-1", "meta.json"),
+		JSON.stringify(record({ lastLine: "on the board" })),
+	);
+
+	const listed = store.list();
+	assert.equal(listed.length, 1);
+	assert.equal(listed[0]?.record.lastLine, "on the board", "the preview is on the record");
+	assert.deepEqual(store.readItems("agent-1"), [], "and the missing transcript is simply empty");
 	cleanup();
 });
 

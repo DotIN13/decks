@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ChatItem, ServerMessage } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
@@ -24,15 +24,6 @@ const COLORS = ["#3b5cf6", "#2eaf5a", "#e7af36", "#623be2", "#d92e3c", "#0f9ba8"
  * at once produce a canvas nobody can follow and a bill nobody expected.
  */
 const MAX_CHILDREN = 4;
-/**
- * How many past chats a deck keeps.
- *
- * A legibility limit again, not a storage one — the records are small. Every restart used to
- * leave a conversation behind on disk, so a deck worked in daily would list dozens of rows
- * nobody will open. The newest fifteen are the ones with any chance of being wanted; the
- * rest are pruned when the deck opens.
- */
-const KEEP_CHATS = 15;
 
 export class Registry {
 	private readonly agents: DeckAgent[] = [];
@@ -133,11 +124,19 @@ export class Registry {
 			/** Set only by `restore`: a chat from a previous run, with nothing running behind it. */
 			restored?: {
 				id: string;
-				items: ChatItem[];
 				context: string[];
 				inPlay: string[];
 				avatar?: string;
 				createdAt: number;
+				/**
+				 * What the row shows before its transcript has been read.
+				 *
+				 * A restored chat is a row first and a conversation second: the list draws it from
+				 * the record alone (`store.list`), so the last thing said and when have to come
+				 * from there rather than from a `chat.json` nobody has opened.
+				 */
+				lastLine?: string;
+				lastAt?: number;
 				model?: AgentModel;
 				mode?: AgentMode;
 				account?: string;
@@ -198,7 +197,7 @@ export class Registry {
 	 * decide whether the deck still needs its first agent — a restored deck does not.
 	 */
 	restore(): number {
-		for (const { record, items } of this.store.prune(KEEP_CHATS).reverse()) {
+		for (const { record } of this.store.list().reverse()) {
 			this.create({
 				name: record.name,
 				kind: record.kind,
@@ -207,9 +206,13 @@ export class Registry {
 				...(record.parentId ? { parentId: record.parentId } : {}),
 				restored: {
 					id: record.id,
-					items,
+					// The transcript is not read here. It is read when somebody opens the chat
+					// (`session.transcript`), which is the difference between a list that costs
+					// a directory read and one that costs every conversation ever had.
 					context: record.context,
 					inPlay: record.inPlay,
+					...(record.lastLine ? { lastLine: record.lastLine } : {}),
+					...(record.lastAt ? { lastAt: record.lastAt } : {}),
 					...(record.avatar ? { avatar: record.avatar } : {}),
 					createdAt: record.createdAt,
 					// The model and the mode the chat was last on. Forwarding them is the whole

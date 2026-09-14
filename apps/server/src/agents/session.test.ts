@@ -29,6 +29,7 @@ function agentOn(
 		models?: ModelOption[];
 		restored?: {
 			id: string;
+			/** The transcript to leave on disk for this row — see `agentOn`. */
 			items: ChatItem[];
 			context: string[];
 			inPlay: string[];
@@ -37,6 +38,8 @@ function agentOn(
 			model?: AgentModel;
 			usage?: AgentUsage;
 			account?: string;
+			lastLine?: string;
+			lastAt?: number;
 		};
 	} = {},
 ) {
@@ -49,6 +52,21 @@ function agentOn(
 	const deck = Deck.open(root);
 	const store = new AgentStore(deck);
 	if (options.models) store.rememberModels("pi", options.models);
+	/*
+	 * A restored chat's transcript is on disk, not in the option.
+	 *
+	 * The session reads it the first time something asks for the conversation, so a test that
+	 * wants a restored window writes what a real restart leaves behind — `chat.json` under the
+	 * agent's directory. `items` is this helper's shorthand for that and never reaches the
+	 * constructor, whose `restored` is about the *row* rather than the conversation.
+	 */
+	const { restored, ...rest } = options;
+	if (restored && restored.items.length > 0) {
+		const folder = join(deck.path, ".decks", "agents", restored.id);
+		mkdirSync(folder, { recursive: true });
+		writeFileSync(join(folder, "chat.json"), JSON.stringify(restored.items));
+	}
+	const { items: _transcript, ...row } = restored ?? ({} as NonNullable<typeof restored>);
 	const agent = new DeckAgent(
 		deck,
 		(message) => sent.push(message),
@@ -68,8 +86,9 @@ function agentOn(
 			boardPathOf: () => undefined,
 		},
 		// Given a store, but nothing reaches it here: an agent with no user message is never
-		// written down, which is what keeps these tests off the disk.
-		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store, ...options },
+		// written down, which is what keeps these tests off the disk. A restored row's transcript
+		// is the one thing that does — written above, read back only when asked for.
+		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store, ...rest, ...(restored ? { restored: row } : {}) },
 	);
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");
@@ -675,6 +694,32 @@ test("a tool call's whole output is there to be asked for", () => {
 		assert.equal(agent.toolResult("t0"), "y".repeat(5000));
 		assert.equal(agent.toolResult("not-a-row"), undefined);
 		assert.equal(agent.toolResult("u1"), undefined, "a row that is not a tool call has no output");
+	} finally {
+		cleanup();
+	}
+});
+
+/*
+ * A row before its conversation.
+ *
+ * The chat list draws every chat from its record and reads no transcript (`store.list`), so a
+ * restored row has to be able to say what it last was without its `chat.json`. This is the
+ * half that makes the list cheap; the history tests above are the other half, where asking
+ * for the conversation is what reads it.
+ */
+test("a restored row shows its last line before its transcript is read", () => {
+	const items = longChat(6);
+	const { agent, cleanup } = agentOn([], {
+		restored: { id: "R", items, context: [], inPlay: [], createdAt: 1, lastLine: "message 5", lastAt: 5 },
+	});
+	try {
+		assert.equal(agent.chat().lastLine, "message 5", "the record's own summary, not the transcript's");
+		assert.equal(agent.chat().lastAt, 5);
+
+		// Asking for the history is what reads `chat.json`, and the window then agrees with it.
+		const history = agent.historyMessage() as Extract<ServerMessage, { type: "chat.history" }>;
+		assert.equal(history.items.at(-1)?.id, items.at(-1)?.id, "the stored rows are read back");
+		assert.equal(agent.chat().lastLine, "message 5", "and the preview is unchanged");
 	} finally {
 		cleanup();
 	}

@@ -50,6 +50,16 @@ const RANK: Record<AgentStatus, number> = { waiting: 0, done: 1, working: 2, idl
 export const STACK_CAP = 3;
 
 /**
+ * How many rows the dropdown draws before it stops and says how many are left.
+ *
+ * Thirteen, and the number is a legibility limit rather than a layout one: the menu is a
+ * glance at who exists, and the panel is where a long list is meant to be read. It is not
+ * `STACK_CAP`'s three, because the corner is 106px of chrome and the menu is a card with a
+ * scroller's worth of room.
+ */
+export const DROPDOWN_CAP = 13;
+
+/**
  * The faces in the top-right corner: every *active* agent except the one you are in.
  *
  * Two exclusions, and they are different arguments. **Idle agents are not drawn at all** —
@@ -105,6 +115,19 @@ export function agentList(chats: AgentChat[], unread: Record<string, number>, fo
  * belongs in a list you can read rather than in 106px of chrome.
  */
 export function stackFaces(ordered: AgentChat[], cap: number = STACK_CAP): { shown: AgentChat[]; more: number } {
+	return { shown: ordered.slice(0, cap), more: Math.max(0, ordered.length - cap) };
+}
+
+/**
+ * The dropdown's rows, and how many were held back.
+ *
+ * The same shape as `stackFaces`, and for the same reason: a cap that does not say what it
+ * hid is a list that looks like it ended. The difference is what the caller does with `more`.
+ * The corner draws `+n` because its label is already a count of faces; the dropdown draws a
+ * sentence under the thirteenth row and points at the Agents panel, because a menu that
+ * stops at thirteen with nothing under it would read as the whole list.
+ */
+export function dropdownFaces(ordered: AgentChat[], cap: number = DROPDOWN_CAP): { shown: AgentChat[]; more: number } {
 	return { shown: ordered.slice(0, cap), more: Math.max(0, ordered.length - cap) };
 }
 

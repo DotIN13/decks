@@ -51,8 +51,8 @@ import type { Deck } from "../deck/loader.ts";
  *
  * One file is *not* per agent: **`models.json`**, the model list each runtime last offered,
  * which is a fact about the runtime rather than about any conversation (`rememberModels`).
- * It sits beside the agent directories, and `list()` only reads directories, so it is
- * invisible to everything else here.
+ * It sits beside the agent directories, and `list()` reads only agent directories and their
+ * records, so it is invisible to everything else here.
  */
 
 /** Where the remembered model lists live, beside the per-agent directories. */
@@ -105,7 +105,14 @@ export interface AgentRecord {
 	tags?: string[];
 	/** What *you* said it was doing, from the customise popup. Never written by the agent. */
 	userTags?: string[];
-	/** Ordering, and what `prune` keeps. */
+	/**
+	 * A summary of the transcript, not a copy of it. A row shows a preview of the last
+	 * thing said, and the only other place that line lives is `chat.json` — so without this
+	 * the list would have to read every conversation to draw itself, which is the cost that
+	 * made a row cap look necessary. Written at flush, read by `list()`.
+	 */
+	lastLine?: string;
+	/** Ordering, and the time the preview above was said. */
 	lastAt: number;
 }
 
@@ -147,32 +154,55 @@ export class AgentStore {
 	}
 
 	/**
-	 * One agent's record and transcript.
+	 * One agent's record, without its transcript.
 	 *
-	 * An unreadable `meta.json` means the row cannot be rebuilt at all, so it is skipped.
+	 * An unreadable `meta.json` means the row cannot be rebuilt at all, so this is
+	 * `undefined` and the row is skipped. Everything the list draws — a name, a colour, tags,
+	 * a preview, a time — has to be on the record, because the alternative is reading the
+	 * transcript to draw a row.
+	 */
+	readRecord(id: string): AgentRecord | undefined {
+		try {
+			return validate(JSON.parse(readFileSync(join(this.folder(id), "meta.json"), "utf8")) as unknown, id);
+		} catch {
+			return undefined;
+		}
+	}
+
+	/**
+	 * One agent's transcript.
+	 *
 	 * An unreadable `chat.json` is survivable and treated as an empty transcript: the chat
 	 * still resumes, and the runtime still has the conversation in its own context — better
 	 * a row with no visible history than no row.
 	 */
-	read(id: string): { record: AgentRecord; items: ChatItem[] } | undefined {
-		let record: AgentRecord;
-		try {
-			record = validate(JSON.parse(readFileSync(join(this.folder(id), "meta.json"), "utf8")) as unknown, id);
-		} catch {
-			return undefined;
-		}
-		let items: ChatItem[] = [];
+	readItems(id: string): ChatItem[] {
 		try {
 			const parsed = JSON.parse(readFileSync(join(this.folder(id), "chat.json"), "utf8")) as unknown;
-			if (Array.isArray(parsed)) items = parsed as ChatItem[];
+			return Array.isArray(parsed) ? (parsed as ChatItem[]) : [];
 		} catch {
-			/* covered above: a lost transcript is not a lost chat */
+			return [];
 		}
-		return { record, items };
 	}
 
-	/** Every readable record, newest conversation first. */
-	list(): Array<{ record: AgentRecord; items: ChatItem[] }> {
+	/** One agent's record and transcript. */
+	read(id: string): { record: AgentRecord; items: ChatItem[] } | undefined {
+		const record = this.readRecord(id);
+		return record === undefined ? undefined : { record, items: this.readItems(id) };
+	}
+
+	/**
+	 * Every readable record, newest conversation first — **without reading a transcript.**
+	 *
+	 * This is the whole list's cost, and splitting it from `read` above is the point. A deck
+	 * keeps one row per conversation and never drops one, and `list` used to hand every id
+	 * to `read`, which loaded its `chat.json` — 632 KB each on the live deck. Opening the
+	 * deck therefore cost the sum of every transcript it had ever written, which is what the
+	 * row cap was holding down. A record is a few hundred bytes, so the list is one
+	 * directory read and one small file per row, and a transcript is read only for the
+	 * conversation somebody actually opens (`session.transcript`).
+	 */
+	list(): Array<{ record: AgentRecord }> {
 		let ids: string[];
 		try {
 			ids = readdirSync(this.dir, { withFileTypes: true })
@@ -182,8 +212,9 @@ export class AgentStore {
 			return [];
 		}
 		return ids
-			.map((id) => this.read(id))
-			.filter((found): found is { record: AgentRecord; items: ChatItem[] } => found !== undefined)
+			.map((id) => this.readRecord(id))
+			.filter((record): record is AgentRecord => record !== undefined)
+			.map((record) => ({ record }))
 			.sort((a, b) => b.record.lastAt - a.record.lastAt);
 	}
 
@@ -323,13 +354,6 @@ export class AgentStore {
 			return {};
 		}
 	}
-
-	/** Keep the newest `keep` records and forget the rest. Returns what was kept. */
-	prune(keep: number): Array<{ record: AgentRecord; items: ChatItem[] }> {
-		const all = this.list();
-		for (const { record } of all.slice(keep)) this.forget(record.id);
-		return all.slice(0, keep);
-	}
 }
 
 /**
@@ -373,6 +397,15 @@ function validate(raw: unknown, id: string): AgentRecord {
 	const created = finite(source.createdAt, Date.now());
 	const model = modelOf(source.model);
 	const usage = usageOf(source.usage);
+	/*
+	 * Read back as well as written, which is the seam the account field once fell through: a
+	 * value `record()` writes and `validate()` ignores is a value lost on every restart, and
+	 * here that was both tag lists — an agent's stated tags never survived one. Cleaning
+	 * already happened on the way in, so this is not a second chance to rewrite them.
+	 */
+	const tags = strings(source.tags);
+	const userTags = strings(source.userTags);
+	const lastLine = typeof source.lastLine === "string" && source.lastLine ? source.lastLine : undefined;
 	return {
 		id,
 		kind: source.kind === "claude" ? "claude" : "pi",
@@ -397,6 +430,9 @@ function validate(raw: unknown, id: string): AgentRecord {
 		 * `ClaudeAccounts.has`, because only it knows.
 		 */
 		...(typeof source.account === "string" && source.account ? { account: source.account } : {}),
+		...(tags.length > 0 ? { tags } : {}),
+		...(userTags.length > 0 ? { userTags } : {}),
+		...(lastLine ? { lastLine } : {}),
 		lastAt: finite(source.lastAt, created),
 	};
 }

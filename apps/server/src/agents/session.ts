@@ -242,11 +242,19 @@ export class DeckAgent {
 			 */
 			restored?: {
 				id: string;
-				items: ChatItem[];
 				context: string[];
 				inPlay: string[];
 				avatar?: string;
 				createdAt: number;
+				/**
+				 * What the row shows before its transcript has been read.
+				 *
+				 * A restored chat is a row first and a conversation second: the list draws it from
+				 * its record alone (`store.list`), so the last thing said and when have to come
+				 * from there rather than from a `chat.json` nobody has opened.
+				 */
+				lastLine?: string;
+				lastAt?: number;
 				model?: AgentModel;
 				mode?: AgentMode;
 				/** What it last cost, so a dormant row can draw a ring — see `lastUsage`. */
@@ -359,9 +367,17 @@ export class DeckAgent {
 		 * `held` and `playing` are assigned rather than set through `setContext`, which
 		 * would broadcast a `context.changed` for an agent no browser has been told about
 		 * yet. The greeting is what carries this to a client, and it reads the same fields.
+		 *
+		 * The transcript is **not** put back here. It is read the first time somebody asks for
+		 * the conversation (`transcript`), because reading it for every row is what made the
+		 * chat list cost the sum of every chat ever held; the row draws from the record alone,
+		 * and `storedLast` is the part of the transcript a row needs.
 		 */
 		if (options.restored) {
-			this.translator.load(options.restored.items);
+			this.transcriptLoaded = false;
+			if (options.restored.lastLine) {
+				this.storedLast = { text: options.restored.lastLine, at: options.restored.lastAt ?? this.createdAt };
+			}
 			this.held = [...options.restored.context];
 			this.playing = options.restored.inPlay.filter((path) => this.held.includes(path));
 		}
@@ -387,6 +403,21 @@ export class DeckAgent {
 	private readonly store: AgentStore;
 	/** Restored from disk and not yet started — a row you can read but nothing is running. */
 	private readonly restored: boolean;
+	/**
+	 * Whether the stored transcript has been read into the window yet.
+	 *
+	 * True for anything that has never been to disk — a new agent's transcript is its own —
+	 * and false for a restored one until `transcript` runs. That is the whole of the lazy
+	 * load: one flag, read in one place.
+	 */
+	private transcriptLoaded = true;
+	/**
+	 * The last thing said, as the record has it, for a row whose transcript has not been read.
+	 *
+	 * Superseded by the window the moment the transcript loads — `chat()` asks the translator
+	 * first — so this only ever draws a preview for a chat nobody has opened.
+	 */
+	private storedLast: { text: string; at: number } | undefined;
 	private readonly createdAt: number;
 	private saving: ReturnType<typeof setTimeout> | undefined;
 	private currentMode: AgentMode | undefined;
@@ -537,7 +568,7 @@ export class DeckAgent {
 	 * does not, and that is a `statSync` rather than a piece of state to keep true.
 	 */
 	historyMessage(): ServerMessage {
-		const window = this.translator.history();
+		const window = this.transcript();
 		const shown = window.slice(-HISTORY_ITEMS);
 		return {
 			type: "chat.history",
@@ -546,6 +577,14 @@ export class DeckAgent {
 			// More behind it when the window holds rows it did not send, or the archive has any.
 			more: window.length > shown.length || this.store.hasArchive(this.id),
 		};
+	}
+
+	private transcript(): ChatItem[] {
+		if (!this.transcriptLoaded) {
+			this.transcriptLoaded = true;
+			this.translator.load(this.store.readItems(this.id));
+		}
+		return this.translator.history();
 	}
 
 	/**
@@ -557,7 +596,7 @@ export class DeckAgent {
 	 * seen it answers with its own last page — which, asked first, would skip every row between.
 	 */
 	earlier(before: string, limit: number): { items: ChatItem[]; more: boolean } {
-		const window = this.translator.history();
+		const window = this.transcript();
 		const at = window.findIndex((item) => item.id === before);
 		if (at > 0) {
 			const start = Math.max(0, at - limit);
@@ -569,7 +608,7 @@ export class DeckAgent {
 
 	/** A tool call's whole output, for a chip that was sent only a preview of it (`chat.tool`). */
 	toolResult(itemId: string): string | undefined {
-		const found = this.translator.history().find((item) => item.id === itemId) ?? this.store.findArchived(this.id, itemId);
+		const found = this.transcript().find((item) => item.id === itemId) ?? this.store.findArchived(this.id, itemId);
 		return found?.kind === "tool" ? found.result : undefined;
 	}
 
@@ -583,6 +622,10 @@ export class DeckAgent {
 	}
 
 	private record(): AgentRecord {
+		// The window's last line when it has one, and the record's when the transcript has
+		// never been read — a dormant row still shows a preview, and a flush on shutdown
+		// cannot make an old chat look like the newest one.
+		const last = this.translator.lastLine() ?? this.storedLast;
 		return {
 			id: this.id,
 			kind: this.kind,
@@ -601,9 +644,10 @@ export class DeckAgent {
 			...(this.identity.tags?.length ? { tags: this.identity.tags } : {}),
 			...(this.identity.userTags?.length ? { userTags: this.identity.userTags } : {}),
 			// The last thing actually said, not the time of this write — it is what the list
-			// is ordered by and what `prune` keeps, so a flush on shutdown must not make an
-			// old chat look like the newest one.
-			lastAt: this.translator.lastLine()?.at ?? this.createdAt,
+			// is ordered by, and a flush on shutdown must not make an old chat look like the
+			// newest one. Kept on the record so the list never has to read a transcript.
+			...(last ? { lastLine: last.text } : {}),
+			lastAt: last?.at ?? this.createdAt,
 		};
 	}
 
@@ -767,6 +811,9 @@ export class DeckAgent {
 	}
 
 	async prompt(text: string): Promise<void> {
+		// Before anything is appended: a restored chat's stored rows belong under the new
+		// message, not after it.
+		this.transcript();
 		await this.start();
 		if (!this.backend) {
 			this.translator.notice("error", `Not started: ${this.failure ?? "unknown reason"}`);
@@ -957,6 +1004,8 @@ export class DeckAgent {
 	 */
 	async rewindTo(entryId: string): Promise<{ cancelled: boolean; editorText?: string }> {
 		if (!this.backend) return { cancelled: true };
+		// A rewind truncates what is here, so what is here has to be everything there is.
+		this.transcript();
 		const result = await this.backend.rewindTo(entryId);
 		if (!result.cancelled) {
 			this.translator.truncateToUserMessage(result.editorText);
@@ -1224,7 +1273,7 @@ export class DeckAgent {
 
 	/** One row in the chat list. Unread is the browser's business, not ours. */
 	chat(): AgentChat {
-		const last = this.translator.lastLine();
+		const last = this.translator.lastLine() ?? this.storedLast;
 		return {
 			id: this.id,
 			name: this.identity.name,

@@ -1,7 +1,7 @@
 import type { AgentChat, AgentState } from "@decks/protocol";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agentList, agentOrder, agentStatus, closeWords, since, stackFaces, STACK_CAP } from "./agent-order.ts";
+import { agentList, agentOrder, agentStatus, closeWords, dropdownFaces, since, stackFaces, DROPDOWN_CAP, STACK_CAP } from "./agent-order.ts";
 
 /*
  * The corner subtracts one thing — the agent whose window this already is — and orders the
@@ -76,6 +76,25 @@ test("three faces, then a number", () => {
 	// Exactly at the cap there is no chip — `+0` is a control that says nothing.
 	assert.equal(stackFaces(agentOrder(chats.slice(0, 3), {})).more, 0);
 	assert.deepEqual(ids(stackFaces([]).shown), []);
+});
+
+/*
+ * Thirteen rows, then a sentence.
+ *
+ * The cap exists because nothing is pruned: the dropdown used to draw every chat, which was
+ * fine while the deck kept fifteen of them. What matters is that the remainder is *reported*
+ * rather than dropped — a menu that stops at the cap with no line under it reads as the whole
+ * list, and every agent below it becomes invisible.
+ */
+test("thirteen dropdown rows, and the rest counted", () => {
+	const many = Array.from({ length: 40 }, (_, i) => chat(`a${i}`, "idle", 100 - i));
+	const split = dropdownFaces(agentList(many, {}));
+	assert.equal(DROPDOWN_CAP, 13);
+	assert.equal(split.shown.length, 13);
+	assert.equal(split.more, 27);
+	// Exactly at the cap there is no line — `0 more` is a row that says nothing.
+	assert.equal(dropdownFaces(agentList(many.slice(0, 13), {})).more, 0);
+	assert.equal(dropdownFaces([]).more, 0);
 });
 
 test("the dropdown is what exists, not what is happening", () => {

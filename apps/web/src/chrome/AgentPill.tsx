@@ -22,7 +22,7 @@ import { Icon } from "../ui/icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
 import { runtimes } from "../state/deck.ts";
 import { canHover } from "../lib/media.ts";
-import { agentList, agentStatus, closeWords, rowWords } from "./agent-order.ts";
+import { agentList, agentStatus, closeWords, dropdownFaces, rowWords } from "./agent-order.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 
 /**
@@ -280,6 +280,17 @@ export function AgentMenu(props: {
 		run();
 	};
 
+	/*
+	 * The dropdown's rows, and what the cap held back.
+	 *
+	 * The menu used to draw every chat, which was fine while the deck kept fifteen of them
+	 * (`agent-order.ts` — `DROPDOWN_CAP`). Now that nothing is pruned it is unbounded, and a
+	 * card over the canvas is not where a hundred rows should land. The remainder is a
+	 * sentence rather than a bare number: the panel is the surface that scrolls, and this is
+	 * the only place that says so.
+	 */
+	const listed = () => dropdownFaces(agentList(props.chats, props.unread, props.focused));
+
 	return (
 		<Popover
 			placement={props.placement ?? "bottom-start"}
@@ -291,7 +302,7 @@ export function AgentMenu(props: {
 				return props.trigger(api);
 			}}
 		>
-			<For each={agentList(props.chats, props.unread, props.focused)}>
+			<For each={listed().shown}>
 				{(chat) => {
 					const status = () => agentStatus(chat.state, props.unread[chat.id] ?? 0);
 					const name = () => props.identities[chat.id]?.name ?? chat.name;
@@ -400,6 +411,23 @@ export function AgentMenu(props: {
 					);
 				}}
 			</For>
+
+			{/*
+			 * What the cap hid, said rather than counted away.
+			 *
+			 * The corner can get away with a bare `+n` because its label is already a count of
+			 * faces. Here a list that stopped at the cap with nothing under it would read as the
+			 * whole list, and every agent below the thirteenth would be invisible — so the number
+			 * is in a sentence, and the sentence names where the rest are.
+			 *
+			 * Not a `[data-row]`: the arrows should reach the agents, and a line that only reports
+			 * a count is not one to land on.
+			 */}
+			<Show when={listed().more > 0}>
+				<p class="m-0 px-2 py-1.5 text-[11px] leading-normal text-faint">
+					{listed().more} more {listed().more === 1 ? "agent" : "agents"} — open the Agents panel.
+				</p>
+			</Show>
 
 			<div class="rule" />
 
