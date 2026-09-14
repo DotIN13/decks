@@ -18,8 +18,31 @@ const { browser, page, errors } = await open({ width: 1400, height: 900 });
 try {
 	const inset = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--inset-left").trim());
 	const mounted = () => page.locator("[data-inset='left']").count();
+	/*
+	 * The published inset, waited for rather than read once.
+	 *
+	 * `camera/insets.ts` batches every measurement into one `requestAnimationFrame`, so a surface
+	 * appearing or going and `--inset-left` following it are a frame apart. Reading it straight
+	 * after the change is a coin flip on whether that frame has run, and this check lost that
+	 * coin toss on three CI runs in five while the camera was never actually wrong — which is
+	 * also why each assertion used to print the successor of its own verdict: the condition read
+	 * "276px" and the detail, one round trip later, read "0px".
+	 *
+	 * Waiting is not a weaker assertion. A camera that never takes the window back still fails,
+	 * one 2s timeout later, and the value it failed with is reported.
+	 */
+	const settled = (expected) =>
+		page
+			.waitForFunction(
+				(want) => getComputedStyle(document.documentElement).getPropertyValue("--inset-left").trim() === want,
+				expected,
+				{ timeout: 2000 },
+			)
+			.then(() => expected)
+			.catch(() => inset());
 
-	say("the panel is up, and declares its width", (await mounted()) === 1 && (await inset()) === "276px", await inset());
+	const up = await settled("276px");
+	say("the panel is up, and declares its width", (await mounted()) === 1 && up === "276px", up);
 
 	/*
 	 * A tab strip, and it is not the one that was removed.
@@ -141,7 +164,8 @@ try {
 	await toggle.click();
 	await page.waitForFunction(() => !document.querySelector("[data-inset='left']"), null, { timeout: 4000 });
 	say("folded, it declares no inset", (await mounted()) === 0);
-	say("…and the camera has the whole window back", (await inset()) === "0px", await inset());
+	const freed = await settled("0px");
+	say("…and the camera has the whole window back", freed === "0px", freed);
 	say(
 		"…and it takes no clicks where it used to be",
 		await page.evaluate(() => getComputedStyle(document.querySelector(".panel-shell")).pointerEvents === "none"),
@@ -159,8 +183,8 @@ try {
 	 */
 	await toggle.click();
 	await page.waitForSelector("[data-inset='left']", { timeout: 4000 });
-	await page.waitForTimeout(300);
-	say("unfolded, the camera is told again", (await inset()) === "276px", await inset());
+	const told = await settled("276px");
+	say("unfolded, the camera is told again", told === "276px", told);
 
 	// ⌘K brings it back with the cursor in the field: what the modal became, minus the tab.
 	await page.keyboard.press("Meta+k");
@@ -175,9 +199,9 @@ try {
 	 * frames the boards into the sliver beside it.
 	 */
 	await page.setViewportSize({ width: 900, height: 900 });
-	await page.waitForTimeout(400);
 	say("as a sheet it is still there", (await page.locator(".panel-shell, [data-sheet='true']").count()) >= 1);
-	say("…but it declares no inset", (await mounted()) === 0 && (await inset()) === "0px", `${await mounted()} / ${await inset()}`);
+	const none = await settled("0px");
+	say("…but it declares no inset", (await mounted()) === 0 && none === "0px", `${await mounted()} / ${none}`);
 	await page.keyboard.press("0");
 	await page.waitForFunction(`${ZOOM_IN_PAGE} > 5`, null, { timeout: 6000 });
 	say("…so fit still frames the deck at a workable zoom", (await zoom(page)) > 5, `${await zoom(page)}%`);
