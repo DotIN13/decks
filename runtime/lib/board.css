@@ -584,7 +584,6 @@ table.table,
 		background-image: none;
 	}
 }
-
 /* --- live components: a window onto something the app is holding ---------------- */
 
 /*
@@ -594,38 +593,105 @@ table.table,
  * The one property that matters to the canvas is on `.live-list`: `overflow-y: auto` is
  * what makes `frame-gestures.ts` give it the wheel while it has room and hand the scroll
  * back to the stage at the ends. Everything else is appearance.
+ *
+ * **And the appearance is the conversation column's, in a board's own palette.** A board
+ * carries its tokens rather than inheriting the app's (`--b-*`, the same ramp picone uses),
+ * so this is a translation of `apps/web/src/styles/stream.css` rather than a second opinion:
+ * the same 12px type, the same 7px between blocks, the same 24px tool row, the same 12px
+ * corner. If the column changes, this is the file that has to change with it — the two are
+ * one design looked at from two surfaces.
+ *
+ * What it is *not* is the floating column's cards. There, a reply needs a card because there
+ * is nothing behind it but a board; here the panel is the box already, so the agent's prose
+ * is flat and yours keeps its bubble. The asymmetry is width and tint, as it is there.
+ *
+ * The panel's own colours below are read off the running app rather than eyeballed.
+ *
+ * `--panel` is `#fff` in the light scheme and `#242424` in the dark one, which is this ramp's
+ * `grey-50` and `grey-1000` — **not** `--b-bg`, because a board's page colour is a step darker
+ * than a card and the mirror *is* the card. The board's own `--b-bg` happens to be white in
+ * the light scheme, which is why inheriting it looked right until the dark scheme was opened.
+ *
+ * The bubble's tint is a light wash in the light scheme and a navy in the dark one, and the app
+ * states the dark one as a *literal* (`#2b3a63`, in `styles/stream.css`) because the pale
+ * accent goes violet on a dark plate rather than merely failing to contrast. Same literal here,
+ * for the same reason: it is not a token in either palette.
  */
 .live {
 	--live-accent: var(--b-blue-600);
+	--live-panel: var(--b-grey-50);
+	--live-mine: var(--b-blue-200);
 	position: absolute;
 	display: flex;
 	overflow: hidden;
 	box-sizing: border-box;
 	flex-direction: column;
 	border: 1px solid var(--b-border-strong);
-	border-radius: 10px;
-	background: var(--b-bg);
+	border-radius: 12px;
+	background: var(--live-panel);
+	color: var(--b-fg);
+	font-family: var(--b-font);
+	font-size: 12px;
+	line-height: 1.5;
 }
 
+/* The dark half of both, written twice for the same reason the tokens at the top of this file
+   are: a board can be dark because the reader's system is, or because the file said so, and a
+   component that only honoured one of them would be in the wrong palette half the time. */
+[data-theme="dark"] .live {
+	--live-panel: var(--b-grey-1000);
+	--live-mine: #2b3a63;
+}
+
+@media (prefers-color-scheme: dark) {
+	html:not([data-theme="light"]) .live {
+		--live-panel: var(--b-grey-1000);
+		--live-mine: #2b3a63;
+	}
+}
+
+/*
+ * The head: a name, a live dot, and nothing else.
+ *
+ * It was a filled bar in the agent's own colour, which is a header for a *window* — and a
+ * mirror is not a window, it is one more thing on a canvas that already says whose chat is
+ * whose. What is left is the two facts a board cannot otherwise say: which conversation this
+ * is, and that something is feeding it.
+ */
 .live > .live-head {
 	display: flex;
 	align-items: center;
 	flex: none;
-	height: 26px;
-	padding: 0 10px;
-	gap: 6px;
-	background: var(--live-accent);
-	color: #fff;
+	height: 30px;
+	padding: 0 12px;
+	gap: 7px;
+	border-bottom: 1px solid var(--b-border);
 	font-size: 12px;
-	font-weight: 650;
+	font-weight: 600;
+}
+
+.live .live-dot {
+	width: 6px;
+	height: 6px;
+	flex: none;
+	border-radius: 999px;
+	background: var(--live-accent);
+}
+
+.live .live-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .live > .live-list {
 	display: flex;
 	flex: 1 1 auto;
 	flex-direction: column;
-	padding: 10px;
-	gap: 8px;
+	padding: 12px;
+	/* The column's own gap between turns (`stream-roll`), which is also the click-through
+	   target that lets a wheel over a gap belong to the canvas. */
+	gap: 10px;
 	/* Set here as well as inline, so a board that never runs the script still reads. */
 	overflow-y: auto;
 	overscroll-behavior: contain;
@@ -646,49 +712,348 @@ table.table,
  * putting it on the container's children rather than on the one kind of row that showed it
  * worst: the next row type added here inherits the fix instead of rediscovering the bug.
  */
-.live .live-turn {
+.live .live-turn,
+.live .live-working {
 	max-width: 100%;
 	flex: 0 0 auto;
-	font-size: 13px;
-	line-height: 1.5;
 	overflow-wrap: anywhere;
 }
 
-.live .live-ask {
-	align-self: flex-start;
-	max-width: 82%;
-	padding: 6px 10px;
-	border-radius: 10px;
-	background: var(--b-blue-200);
-	color: var(--b-fg);
+/* --- yours: narrower, right-aligned, tinted ------------------------------------- */
+
+/*
+ * The bubble, and the arithmetic is the column's: 88% of the width, 8px over 11px, a 12px
+ * corner, and the one-pixel asymmetry at the foot that CSS forces on every card in this app
+ * (padding is measured from the line box, which is not symmetrical around the words in it —
+ * see the note on `.stream-card`).
+ */
+.live .live-mine {
+	display: flex;
+	justify-content: flex-end;
 }
 
-.live .live-say > :first-child {
-	margin-top: 0;
+.live .live-bubble {
+	box-sizing: border-box;
+	max-width: 88%;
+	padding: 8px 11px 10px;
+	/* A tint alone loses its edge over a light board, so the border is not decoration: it is
+	   what keeps the bubble a bubble when the thing behind it is white. */
+	border: 1px solid color-mix(in srgb, var(--b-accent) 22%, transparent);
+	border-radius: 12px;
+	background: var(--live-mine);
+	/* Verbatim, so the line breaks you typed are the line breaks the agent was sent. */
+	white-space: pre-wrap;
 }
 
-.live .live-say > :last-child {
-	margin-bottom: 0;
+/* --- the agent's: flat, because the panel is the box ---------------------------- */
+
+.live .live-say {
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
 }
 
-/* Still arriving: a caret at the end of the last paragraph, the way the column does it. */
-.live .live-say[data-streaming="true"]::after {
-	display: inline-block;
-	width: 2px;
-	height: 1em;
-	margin-left: 2px;
-	background: var(--b-accent);
-	content: "";
-	vertical-align: text-bottom;
+/*
+ * The markdown, spaced the way the column spaces it: the gap lives on the container rather
+ * than on each block's margin, so a reply never begins or ends with dead space — the two
+ * things a chat bubble notices most.
+ */
+.live .live-body {
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
+}
+
+.live .live-body > * {
+	margin: 0;
+}
+
+/* A single newline inside a paragraph is a line break in a chat message, which is the one
+   place markdown's rules are wrong about this medium. */
+.live .live-body p,
+.live .live-body li,
+.live .live-body blockquote {
+	white-space: pre-wrap;
+}
+
+/* Weight and size, not an outline entry. A board's own `h2` is 22px, which inside a 560px
+   mirror would make a one-line heading the largest thing in the conversation. */
+.live .live-body h1,
+.live .live-body h2,
+.live .live-body h3,
+.live .live-body h4,
+.live .live-body h5,
+.live .live-body h6 {
+	margin: 0;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.live .live-body h1 {
+	font-size: 15px;
+}
+
+.live .live-body h2 {
+	font-size: 14px;
+}
+
+/*
+ * Inline code: a wash of the foreground rather than a plate of its own colour.
+ *
+ * The column's is `oklab(… / 0.09)` — white at 9% on the dark scheme, black at 9% on the
+ * light one — which is the one way to be legible on both plates. `--b-bg-layer` looked like
+ * the equivalent token and is not: on the dark scheme it *is* the panel's own colour, so a
+ * chip drawn in it is invisible exactly where the panel draws one.
+ */
+.live .live-body code {
+	padding: 1px 4px;
+	border-radius: 5px;
+	background: color-mix(in srgb, var(--b-fg) 9%, transparent);
+	font-size: inherit;
+}
+
+/* A fenced block: a step deeper than the panel it sits in, and never wider than it — a reply
+   that pasted a 200-column log must not stretch the mirror. */
+.live .live-body pre {
+	margin: 0;
+	padding: 8px 10px;
+	overflow-x: auto;
+	border: 0;
+	border-radius: 6px;
+	background: var(--b-bg-deep);
+	font-size: 11px;
+	line-height: 1.45;
+	white-space: pre;
+}
+
+.live .live-body pre code {
+	padding: 0;
+	background: none;
+}
+
+.live .live-body ul,
+.live .live-body ol {
+	padding-left: 1.3em;
+}
+
+.live .live-body blockquote {
+	padding-left: 10px;
+	border-left: 2px solid var(--b-border-strong);
+	color: var(--b-muted);
+}
+
+/*
+ * A table scrolls *inside* the reply, and the box that scrolls has to be an element: marked
+ * produces a bare `<table>`, where the column wraps its own in a `.md-table` div. `display:
+ * block` is what stands in for the wrapper — the table becomes the scrolling box — and
+ * `max-width: 100%` is what keeps a wide one inside the mirror instead of widening it.
+ */
+.live .live-body table {
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
+	border-collapse: collapse;
+	font-size: 11.5px;
+	line-height: 1.45;
+}
+
+.live .live-body th,
+.live .live-body td {
+	padding: 4px 8px;
+	border-bottom: 1px solid var(--b-border);
+	text-align: left;
+}
+
+.live .live-body a {
+	color: var(--b-accent);
+	text-decoration-color: var(--b-border-strong);
+}
+
+/* --- thinking: a disclosure, and quiet ----------------------------------------- */
+
+.live .live-think {
+	color: var(--b-faint);
+	font-size: 11.5px;
+}
+
+.live .live-think > button {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	text-decoration: underline dotted;
+}
+
+.live .live-think > button:focus-visible {
+	outline: 2px solid var(--b-accent);
+	outline-offset: 2px;
+}
+
+/*
+ * Bounded, and it scrolls. Thinking is not the reply and is not written to be read in full —
+ * a model can spend two thousand words getting to a one-line answer, and an unbounded
+ * disclosure pushes the reply itself out of a 900px mirror.
+ */
+.live .live-think > .body {
+	max-height: min(320px, 38vh);
+	margin-top: 4px;
+	padding-left: 8px;
+	overflow-y: auto;
+	border-left: 2px solid var(--b-border);
+	overscroll-behavior-y: contain;
+	white-space: pre-wrap;
+}
+
+/* --- tools: a log, not a list of widgets --------------------------------------- */
+
+/*
+ * One row, three uses: a call, a group of finished calls, and a call nested inside that
+ * group. They are the same markup and the same rules, which is the point — a group that
+ * looked like a header had rows of a different species hanging under it the moment you
+ * opened it.
+ */
+.live .live-tools {
+	display: flex;
+	flex-direction: column;
+	/* 2px, not 10: these are lines in a log, and a log's lines touch. */
+	gap: 2px;
 }
 
 .live .live-tool {
-	align-self: flex-start;
+	display: flex;
 	max-width: 100%;
-	overflow: hidden;
-	padding: 2px 8px;
-	border: 1px solid var(--b-border);
+	flex-direction: column;
+}
+
+/*
+ * No fill, no border, no radius at rest. A wash with a corner inside a panel with a corner is
+ * a pill inside a box, which is what "ugly tool calls" meant — a tool call is a *line in the
+ * turn*, with the same standing as the sentence under it, and what marks it out is the glyph
+ * and the mono type. The wash comes back on hover and while open, where it means "this one
+ * opens".
+ */
+.live .live-row {
+	display: flex;
+	width: 100%;
+	min-height: 24px;
+	align-items: center;
+	padding: 0 6px;
+	gap: 8px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: inherit;
+	cursor: default;
+	font: inherit;
+	text-align: left;
+	transition: background-color 120ms ease;
+}
+
+/* A row with something behind it is a control; one without keeps the cursor it had. */
+.live .live-row[title] {
+	cursor: pointer;
+}
+
+.live .live-row[title]:hover,
+.live .live-row[data-open="true"] {
+	background: var(--b-border);
+}
+
+.live .live-row:focus-visible {
+	outline: 2px solid var(--b-accent);
+	outline-offset: -1px;
+}
+
+/*
+ * The status cell: 12px whatever is in it. A spinner is 9px, a done dot is 5 and the alert
+ * is 11, and a cell that sized itself to its glyph would give the column a ragged left edge.
+ */
+.live .state {
+	display: inline-flex;
+	width: 12px;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	color: var(--b-faint);
+}
+
+.live .state > svg {
+	width: 11px;
+	height: 11px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+/* Done is a 5px dot, and deliberately the quietest thing in the row: most calls succeed, so
+   a saturated disc per row is a column of green telling you nothing you did not assume. */
+.live .live-tool[data-state="done"] .state::before {
+	width: 5px;
+	height: 5px;
 	border-radius: 999px;
+	background: var(--b-border-strong);
+	content: "";
+}
+
+/* Running is a spinner, because the message is "not finished yet" and motion says that
+   without words. picone's ring, its stroke, its period, and the same reduced-motion
+   bargain: slowed to 2s rather than stopped, since the motion *is* the content. */
+.live .live-tool[data-state="running"] .state::before {
+	width: 9px;
+	height: 9px;
+	box-sizing: border-box;
+	border: 1.5px solid color-mix(in srgb, var(--b-accent) 30%, transparent);
+	border-top-color: var(--b-accent);
+	border-radius: 999px;
+	animation: live-spin 0.67s linear infinite;
+	content: "";
+}
+
+@keyframes live-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.live .live-tool[data-state="running"] .state::before {
+		animation-duration: 2s;
+	}
+}
+
+.live .live-tool[data-state="error"] .state,
+.live .live-tool[data-state="error"] .title {
+	color: var(--b-danger);
+}
+
+/* The name: an identifier, so mono and uppercase — and it gives ground before the
+   description does, because an MCP tool is called `mcp__decks__stage_eval`. */
+.live .name {
+	max-width: 42%;
+	flex: 0 1 auto;
+	overflow: hidden;
+	min-width: 0;
+	color: var(--b-faint);
+	font-family: var(--b-mono);
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: 0.04em;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+/* The subject: the path, the command, the pattern. Arguments are code, so it keeps the mono
+   face and gives up the weight; it is the widest thing in the row. */
+.live .title {
+	flex: 1;
+	overflow: hidden;
+	min-width: 0;
 	color: var(--b-muted);
 	font-family: var(--b-mono);
 	font-size: 11px;
@@ -696,27 +1061,135 @@ table.table,
 	white-space: nowrap;
 }
 
-.live .live-tool[data-state="error"] {
-	border-color: var(--b-danger);
-	color: var(--b-danger);
+.live .imgs {
+	flex: none;
+	color: var(--b-faint);
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
 }
 
-.live .live-notice {
-	padding: 4px 8px;
-	border-radius: 6px;
-	background: var(--b-bg-deep);
+/* At the right end, where a disclosure belongs, and turned rather than swapped. */
+.live .twist {
+	width: 12px;
+	height: 12px;
+	flex: none;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	color: var(--b-faint);
+	opacity: 0.5;
+	transition: transform 120ms ease;
+}
+
+.live .live-row[data-open="true"] .twist {
+	transform: rotate(90deg);
+}
+
+/*
+ * What hangs off a row: the calls inside a group, and a call's own output.
+ *
+ * The left edges are arithmetic rather than a look, and they are picone's: the row is 6px of
+ * padding, a 12px status cell and an 8px gap, so its name starts 26px in — and `12 + 14` puts
+ * everything underneath in that same column. The rule lands on 12px, the centre of the glyph
+ * above it, so a block reads as hanging off that row rather than sitting beside it.
+ */
+.live .live-kids,
+.live .live-tool > pre {
+	margin: 2px 0 4px 12px;
+	padding-left: 14px;
+	box-shadow: inset 1px 0 0 0 var(--b-border);
+}
+
+.live .live-kids {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+/* The output: the mono face and the indent are what mark it as somebody else's text, so it
+   needs no fill and no rule across the top. Capped, so a stack trace cannot make a turn
+   twice as tall as the reply it belongs to. */
+.live .live-tool > pre {
+	max-height: 220px;
+	padding-top: 1px;
+	padding-bottom: 2px;
+	overflow: auto;
+	border: 0;
+	border-radius: 0;
+	background: none;
 	color: var(--b-muted);
-	font-size: 12px;
+	font-family: var(--b-mono);
+	font-size: 10.5px;
+	line-height: 1.55;
+	overflow-wrap: anywhere;
+	scrollbar-gutter: stable;
+	white-space: pre-wrap;
 }
 
+/* --- notices and the row that says it is still going ---------------------------- */
+
+/*
+ * A notice is a line, not a card.
+ *
+ * The column gives it a card because there is nothing behind the column; here there is, so
+ * the level is carried by colour alone — which is where the column ends up too. A failure to
+ * launch is exactly the thing worth being able to scroll back to, and it still is.
+ */
+.live .live-notice {
+	color: var(--b-muted);
+}
+
+/* The app's warn colour is `#e7af36` (`--color-warn`) — an amber the board ramp carries as
+   `yellow-400` rather than as its own `--b-warn`, which is a darker, more olive tone. Mixed
+   with the foreground at the same proportion, because a warning has to stay legible on both
+   plates. */
 .live .live-notice[data-level="warn"] {
-	background: var(--b-yellow-200);
-	color: var(--b-yellow-900);
+	color: color-mix(in srgb, var(--b-yellow-400) 70%, var(--b-fg));
 }
 
 .live .live-notice[data-level="error"] {
-	background: var(--b-red-200);
-	color: var(--b-red-700);
+	color: var(--b-danger);
+}
+
+/*
+ * The foot of the column while the agent is still going.
+ *
+ * The column draws a card with the working sign in it and the words "working…" or "running
+ * tools…"; a board has no sign to draw — the marks are the app's own svg — so it is a quiet
+ * line with a dot of the accent that throbs. Not decoration: without it a mirror of a busy
+ * agent is indistinguishable from a mirror of a finished one, which is the one thing a live
+ * view must never be.
+ */
+.live .live-working {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	color: var(--b-faint);
+	font-size: 11.5px;
+}
+
+.live .live-working::before {
+	width: 5px;
+	height: 5px;
+	flex: none;
+	border-radius: 999px;
+	background: var(--b-accent);
+	animation: live-throb 1.2s ease-in-out infinite;
+	content: "";
+}
+
+@keyframes live-throb {
+	50% {
+		opacity: 0.25;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.live .live-working::before {
+		animation: none;
+	}
 }
 
 /* Turns that arrived while you were reading further up. Both ways back mean the same. */
@@ -743,6 +1216,7 @@ table.table,
 	content: "Nothing is feeding this mirror — it is live only on the canvas.";
 	font-size: 12px;
 }
+
 
 /*
  * ── Flow boards and decks ─────────────────────────────────────────────────────────────

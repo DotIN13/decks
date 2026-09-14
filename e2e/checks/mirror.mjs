@@ -224,5 +224,130 @@ await page.mouse.wheel(0, 240);
 await settle(page, 400);
 say("past the last turn the canvas takes over", (await world()) !== parked, "a mirror cannot trap the pointer");
 
+// --- what it draws ---------------------------------------------------------------
+
+/*
+ * The shapes, which are the conversation column's rather than a mirror's own.
+ *
+ * This is the half of a mirror that is not about scrolling and is the part a reader actually
+ * looks at, so it is asserted the way it is seen: your turn is a bubble with a tint and a
+ * border, the agent's is flat prose on the panel, a run of finished tool calls is *one* row
+ * that opens, a notice is a line rather than a card, and the last row says the agent is still
+ * going. All of it is `apps/web/src/chat/`'s anatomy — `float-rows.ts`, `tool-groups.ts`, and
+ * the numbers in `styles/stream.css` — and none of it is a second opinion about what a
+ * transcript looks like.
+ *
+ * Fed as a fresh transcript (`from: 0` is a reset) so the assertions are about a known list
+ * rather than about whatever the section above left behind.
+ */
+const turns = [
+	{ kind: "user", id: "l1", text: "Which cell was it?", at: 0 },
+	{ kind: "tool", id: "l2", name: "read", title: "block-edits.ts", state: "done" },
+	{ kind: "tool", id: "l3", name: "read", title: "grapes-typing.mjs", state: "done" },
+	{ kind: "tool", id: "l4", name: "grep", title: "holds blocks rather than words", state: "done" },
+	{ kind: "tool", id: "l5", name: "bash", title: "node e2e/run.mjs grapes-typing", state: "running" },
+	{ kind: "notice", id: "l6", level: "warn", text: "This chat continues on the default model.", at: 0 },
+	{ kind: "assistant", id: "l7", text: "The `<td>` holding a table gets the **inner** cell, not the table.", at: 0 },
+];
+await feed(0, turns);
+await settle(page, 600);
+
+const look = await inside((doc) => {
+	const style = (selector, prop) => {
+		const el = doc.querySelector(selector);
+		return el ? getComputedStyle(el)[prop] : null;
+	};
+	const box = (selector) => {
+		const el = doc.querySelector(selector);
+		const rect = el?.getBoundingClientRect();
+		return rect ? { w: Math.round(rect.width), left: Math.round(rect.left), right: Math.round(rect.right) } : null;
+	};
+	return {
+		// Yours: a bubble, right-aligned, with a tint and an edge of its own.
+		bubble: {
+			bg: style(".live-bubble", "backgroundColor"),
+			border: style(".live-bubble", "borderTopWidth"),
+			radius: style(".live-bubble", "borderTopLeftRadius"),
+			box: box(".live-bubble"),
+			row: box(".live-mine"),
+		},
+		// The agent's: flat, because this panel is the box the column's card would be.
+		say: {
+			bg: style(".live-say", "backgroundColor"),
+			border: style(".live-say", "borderTopWidth"),
+			font: style(".live-say", "fontSize"),
+			line: style(".live-say", "lineHeight"),
+		},
+		// The log: one row for a run of finished calls, one for the call still going.
+		rows: [...doc.querySelectorAll(".live-turn.live-tools > .live-tool")].map((el) => ({
+			group: el.dataset.group !== undefined,
+			state: el.dataset.state,
+			h: Math.round(el.getBoundingClientRect().height),
+			name: el.querySelector(".name")?.textContent ?? "",
+			title: el.querySelector(".title")?.textContent ?? "",
+		})),
+		name: {
+			font: style(".live-tool .name", "fontFamily"),
+			size: style(".live-tool .name", "fontSize"),
+			transform: style(".live-tool .name", "textTransform"),
+		},
+		notice: {
+			bg: style(".live-notice", "backgroundColor"),
+			border: style(".live-notice", "borderTopWidth"),
+			colour: style(".live-notice", "color"),
+			text: doc.querySelector(".live-notice")?.textContent ?? "",
+		},
+		panel: style(".live", "backgroundColor"),
+	};
+});
+
+say("your turn is a bubble: tinted, edged, right-aligned", look.bubble.bg !== "rgba(0, 0, 0, 0)" && look.bubble.border === "1px" && look.bubble.radius === "12px", JSON.stringify(look.bubble));
+say("…and narrower than the row it sits in", look.bubble.box.w < look.bubble.row.w - 20, `${look.bubble.box.w} of ${look.bubble.row.w}`);
+say("…and it ends at the same edge as the column", look.bubble.box.right > look.bubble.row.right - 30, `${look.bubble.box.right} vs ${look.bubble.row.right}`);
+say("the agent's reply is not in a box", look.say.bg === "rgba(0, 0, 0, 0)" && look.say.border === "0px", JSON.stringify(look.say));
+say("…drawn at the column's own size", look.say.font === "12px" && Number.parseFloat(look.say.line) / 12 === 1.5, `${look.say.font}/${look.say.line}`);
+
+say("a run of finished calls is one row, and a running call is not in it", look.rows.length === 2 && look.rows[0].group === true && look.rows[0].name === "3 done", JSON.stringify(look.rows));
+say("…and the row still going keeps a line of its own", look.rows[1]?.state === "running" && look.rows[1]?.name === "bash", JSON.stringify(look.rows[1]));
+say(
+	"a tool row is a log line: a 24px row, mono, the name in capitals",
+	look.rows[1]?.h === 24 && look.name.transform === "uppercase" && /mono|JetBrains/i.test(look.name.font),
+	`${look.rows[1]?.h}px, ${look.name.size}, ${look.name.transform}`,
+);
+
+const opened = await inside((doc) => {
+	doc.querySelector(".live-tool[data-group] > .live-row").click();
+	return null;
+});
+void opened;
+await settle(page, 200);
+const nested = await inside((doc) => doc.querySelectorAll(".live-kids > .live-tool").length);
+say("…which opens to the calls it was hiding", nested === 3, `${nested} nested calls`);
+
+say("a notice is a line, not a card", look.notice.bg === "rgba(0, 0, 0, 0)" && look.notice.border === "0px" && look.notice.text.startsWith("This chat continues"), JSON.stringify(look.notice));
+
+/*
+ * The row at the foot, which is what makes a mirror live rather than merely recent: read off
+ * the items, so it needs nothing in the protocol the column does not already send.
+ */
+const workingRow = () => inside((doc) => doc.querySelector(".live-working")?.textContent ?? null);
+say("a call still running means the agent is working", (await workingRow()) === "running tools…", String(await workingRow()));
+
+/*
+ * …and the call finishing is what moves it on to the reply.
+ *
+ * Fed as a real turn is: the call ends, the reply streams, the reply ends. The two phrases the
+ * column uses are both here because both are a claim about the agent, and a mirror that got
+ * them wrong would be saying the wrong thing about a conversation somebody is watching.
+ */
+const finished = turns.slice(4).map((item) => (item.id === "l5" ? { ...item, state: "done" } : item));
+await feed(4, [...finished, { kind: "assistant", id: "l8", text: "Done.", at: 0, streaming: true }]);
+await settle(page, 400);
+say("a reply still arriving means the same", (await workingRow()) === "working…", String(await workingRow()));
+
+await feed(4, [...finished, { kind: "assistant", id: "l8", text: "Done.", at: 0 }]);
+await settle(page, 400);
+say("…and it goes when the turn does", (await workingRow()) === null, String(await workingRow()));
+
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();
