@@ -747,6 +747,22 @@ table.table,
 
 /* --- the agent's: flat, because the panel is the box ---------------------------- */
 
+/*
+ * A turn's card, and it is a grouping rather than a plate.
+ *
+ * The column's card has a background because there is a board behind it; here the panel is
+ * already the box, so a card drawn as a plate would be a box inside a box. What makes a turn
+ * read as one object is the arithmetic `Turn.tsx` uses — `flex flex-col gap-2`, so a reply and
+ * the calls it made sit 8px apart while turns sit 10px apart (`live-list` above). That is the
+ * whole difference between "a turn" and "the gap between turns", and on a uniform panel it is
+ * all there is.
+ */
+.live .live-agent {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
 .live .live-say {
 	display: flex;
 	flex-direction: column;

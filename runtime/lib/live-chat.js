@@ -25,28 +25,27 @@
  * work around: it is what makes three mirrors side by side a glance and one mirror
  * zoomed-in a transcript, with no mode for anybody to set.
  *
- * **What it draws is the conversation column's anatomy — one decision, made in
- * `apps/web/src/chat/` and repeated here in a board's own script.** A mirror is not a
- * second renderer with opinions of its own: it is the same transcript looked at from a
- * board, and a reader who has both open should not be able to tell which one taught them
- * the shapes. So, from `chat/float-rows.ts` and `chat/tool-groups.ts`:
+ * **What it draws is the conversation column's anatomy — and the shape of a transcript is
+ * decided in `apps/web/src/chat/`, not here.** The app posts *cards*: a reply and the calls it
+ * made are one card, a run of finished calls is one row inside it, a call's output is behind
+ * that row. So this file has no `floatRows`, no `toolSlots` and no `distinctNames`, and that is the
+ * point rather than an accident of packaging.
  *
- * - A run of consecutive tool calls in one turn is **one row**, not one row per call, and
- *   inside it the calls that finished cleanly hide behind a count while a running or failed
- *   one keeps a line of its own. `toolSlots` below is that rule, verbatim.
- * - An assistant turn with nothing in it yet is **no row at all**. A step that opens with a
- *   tool call would otherwise draw an empty box for as long as the tool takes.
- * - Thinking is a disclosure, collapsed, above the reply it belongs to.
- * - A tool call is a *line in a log*: a status glyph, the tool's name in mono, its subject,
- *   and the output behind the row rather than in it.
+ * It used to have all three, copied from `chat/float-rows.ts` and `chat/tool-groups.ts` with a
+ * note about keeping them in step — and they did not stay in step. The column drops a finished
+ * turn whose only content is thinking; the copy here kept it, so the same conversation had a
+ * row in a mirror that was nowhere in the column, and the two surfaces quietly disagreed about
+ * what was said. A duplicated rule is not fixed by a better comment about duplication. The fold
+ * runs once, in the module both ends are handed, and a board draws what it is given.
  *
- * And from `chat/Turn.tsx`, the one place the two surfaces deliberately differ: **the agent's
- * words are not in a box.** In the floating column there is nothing behind a reply, so flat
- * prose would be text lying directly on top of a board and the card is what makes it legible.
- * Here the panel *is* the box — the page's own `--b-bg` — so the box would be a box inside a
- * box, which is exactly the "pill in a pill" this app has already thrown away once. Yours keep
- * their bubble: the asymmetry moves from *box or no box* to **width and tint**, which is where
- * the column landed too.
+ * What is genuinely a mirror's own is the drawing. From `chat/Turn.tsx`, the one place the two
+ * surfaces deliberately differ: **the agent's words are not in a box.** In the floating column
+ * there is nothing behind a reply, so flat prose would be text lying directly on top of a board
+ * and the card is what makes it legible. Here the panel *is* the box — the page's own `--b-bg`
+ * — so the box would be a box inside a box, which is exactly the "pill in a pill" this app has
+ * already thrown away once. Yours keep their bubble: the asymmetry moves from *box or no box*
+ * to **width and tint**, which is where the column landed too. A card is therefore a turn's
+ * *grouping* — its parts 8px apart, 10px between turns — and not a plate.
  *
  * The open/closed state of every disclosure is kept in `openRows` and restored as rows are
  * redrawn, because a streaming reply redraws its own row on every frame — and a thinking
@@ -57,9 +56,6 @@
 const PIN_SLACK = 8;
 const RETRY_MS = 250;
 const RETRY_FOR_MS = 8000;
-
-/** How many distinct tool names a group's header shows before it starts counting them (`tool-groups.ts`). */
-const NAMES = 3;
 
 /** The svg shell every glyph here is drawn in — the app's icons are lucide, and so are these paths. */
 function glyph(paths) {
@@ -84,93 +80,6 @@ function chevron() {
 /** Failure gets a shape rather than a colour, so it survives a reader who cannot tell red from grey. */
 function triangle() {
 	return glyph(["m21.7 18-8-14a2 2 0 0 0-3.5 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3", "M12 9v4", "M12 17h.01"]);
-}
-
-/**
- * The transcript, condensed the way the column condenses it (`chat/float-rows.ts`).
- *
- * `index` is the **last** item the row covers, which is the only thing `render` needs: a
- * feed that starts at item *n* has to rebuild the row that contains item *n* and everything
- * after it — including a tool row that item *n* has just been added to.
- */
-function rowsOf(items) {
-	const rows = [];
-	let turn = items[0]?.id ?? "";
-	for (let index = 0; index < items.length; index++) {
-		const item = items[index];
-		if (item.kind === "user") turn = item.id;
-		if (item.kind === "assistant") {
-			if (!(item.text ?? "").trim() && !(item.thinking ?? "").trim()) continue;
-			rows.push({ kind: "assistant", item, index });
-			continue;
-		}
-		if (item.kind === "notice") {
-			rows.push({ kind: "notice", item, index });
-			continue;
-		}
-		if (item.kind === "user") {
-			rows.push({ kind: "user", item, index });
-			continue;
-		}
-		if (item.kind !== "tool") {
-			// A kind this build has never heard of still gets a row: dropping it would leave
-			// the transcript quietly out of step with what the agent actually did.
-			rows.push({ kind: "other", item, index });
-			continue;
-		}
-		const last = rows.at(-1);
-		if (last && last.kind === "tools" && last.turn === turn) {
-			last.calls.push(item);
-			last.index = index;
-			continue;
-		}
-		rows.push({ kind: "tools", item, index, turn, calls: [item] });
-	}
-	return rows;
-}
-
-/** A call that finished and finished cleanly — the only kind that may hide behind a count. */
-const collapsible = (call) => call.state === "done";
-
-/**
- * Which of a turn's tool calls may hide behind a count, and which may not (`tool-groups.ts`).
- *
- * Three ways of *not* grouping, and each one earns its place: the running call never
- * collapses (a progress indicator that stops indicating is not one), a failed call never
- * collapses (it is the one line in the turn worth the space), and a run of one is just a row
- * (a header over a single thing costs 24px and a click to say "1").
- */
-function toolSlots(calls) {
-	const slots = [];
-	let run = [];
-
-	const flush = () => {
-		if (run.length === 1) slots.push({ kind: "call", id: run[0].id, call: run[0] });
-		else if (run.length > 1) slots.push({ kind: "group", id: run[0].id, calls: run });
-		run = [];
-	};
-
-	for (const call of calls) {
-		if (collapsible(call)) {
-			run.push(call);
-			continue;
-		}
-		flush();
-		slots.push({ kind: "call", id: call.id, call });
-	}
-	flush();
-	return slots;
-}
-
-/** The names in a header: distinct, in the order they first ran, truncated (`tool-groups.ts`). */
-function namesOf(calls) {
-	const seen = [];
-	for (const call of calls) {
-		const name = (call.name ?? "").trim();
-		if (!name || seen.includes(name)) continue;
-		seen.push(name);
-	}
-	return { names: seen.slice(0, NAMES), more: Math.max(0, seen.length - NAMES) };
 }
 
 /**
@@ -211,7 +120,9 @@ export function mountLiveChat(host, api) {
 	host.append(head, list, chip);
 
 	/** What this board holds, kept so `from` in the next feed means something. */
-	let items = [];
+	let turns = [];
+	/** What the agent is doing, in the app's own words — or nothing when it is doing nothing. */
+	let working = "";
 	let pinned = true;
 	let unseen = 0;
 	let answered = false;
@@ -285,12 +196,18 @@ export function mountLiveChat(host, api) {
 		return wrap;
 	}
 
-	/** The header over the calls that went as expected — and it is one of those rows itself. */
+	/**
+	 * The header over the calls that went as expected — and it is one of those rows itself.
+	 *
+	 * The names in it arrive with the slot. They are the answer to *which calls are behind this
+	 * count*, which is data rather than wording, and the column's header says the same thing
+	 * because `chat/tool-groups.ts` worked it out once for both (`distinctNames`: deduped, in the
+	 * order they first ran, truncated to three with the rest as `+N`).
+	 */
 	function groupRow(slot, alone) {
 		const calls = slot.calls;
 		const open = openRows.has(`group:${slot.id}`);
-		const summary = namesOf(calls);
-		const names = summary.more > 0 ? `${summary.names.join(" · ")} +${summary.more}` : summary.names.join(" · ");
+		const names = slot.more > 0 ? `${slot.names.join(" · ")} +${slot.more}` : slot.names.join(" · ");
 		const word = alone ? (calls.length === 1 ? "tool" : "tools") : "done";
 
 		const wrap = document.createElement("div");
@@ -302,7 +219,7 @@ export function mountLiveChat(host, api) {
 		row.dataset.open = String(open);
 		row.title = open ? "Hide these calls" : "Show these calls";
 		row.setAttribute("aria-expanded", String(open));
-		row.setAttribute("aria-label", `${calls.length} finished tool calls: ${summary.names.join(", ")}`);
+		row.setAttribute("aria-label", `${calls.length} finished tool calls: ${slot.names.join(", ")}`);
 		row.addEventListener("click", () => {
 			if (openRows.has(`group:${slot.id}`)) openRows.delete(`group:${slot.id}`);
 			else openRows.add(`group:${slot.id}`);
@@ -336,7 +253,7 @@ export function mountLiveChat(host, api) {
 	 */
 	function sayRow(item) {
 		const el = document.createElement("div");
-		el.className = "live-turn live-say";
+		el.className = "live-say";
 		el.dataset.item = item.id;
 		el.dataset.streaming = item.streaming ? "true" : "false";
 		const thinking = (item.thinking ?? "").trim();
@@ -370,91 +287,96 @@ export function mountLiveChat(host, api) {
 		return el;
 	}
 
-	function draw(row) {
-		if (row.kind === "user") {
+	/**
+	 * One card, drawn.
+	 *
+	 * Three kinds, and the difference between them is the whole of what a mirror has to say
+	 * about a transcript: yours is a bubble, a notice is a line, and the agent's is a run of
+	 * parts — a reply with its thinking behind a disclosure, and the calls it made as rows.
+	 *
+	 * **The agent's card is a grouping, not a plate.** Its parts sit 8px apart and the cards
+	 * 10px apart, which is the column's own arithmetic (`stream-roll` and the card's own gap),
+	 * and is what makes a turn read as one object on a panel that is uniformly one colour. The
+	 * column's cards carry a background because they float over a board; this one would be a
+	 * box drawn in the box.
+	 */
+	function draw(card) {
+		if (card.kind === "mine") {
 			const el = document.createElement("div");
 			el.className = "live-turn live-mine";
-			el.dataset.item = row.item.id;
+			el.dataset.item = card.id;
 			const bubble = document.createElement("div");
 			bubble.className = "live-bubble";
 			// Verbatim, where the agent's side is markdown: it is the text that was sent.
-			bubble.textContent = row.item.text;
+			bubble.textContent = card.text;
 			el.append(bubble);
 			return el;
 		}
-		if (row.kind === "assistant") return sayRow(row.item);
-		if (row.kind === "notice") {
+		if (card.kind === "notice") {
 			const el = document.createElement("div");
 			el.className = "live-turn live-notice";
-			el.dataset.item = row.item.id;
-			el.dataset.level = row.item.level;
-			el.textContent = row.item.text;
+			el.dataset.item = card.id;
+			el.dataset.level = card.level;
+			el.textContent = card.text;
 			return el;
 		}
-		if (row.kind === "tools") {
-			const el = document.createElement("div");
-			el.className = "live-turn live-tools";
-			el.dataset.item = row.item.id;
-			const slots = toolSlots(row.calls);
-			for (const slot of slots) {
-				el.append(slot.kind === "group" ? groupRow(slot, slots.length === 1) : callRow(slot.call));
+		const el = document.createElement("article");
+		el.className = "live-turn live-agent";
+		el.dataset.item = card.id;
+		for (const part of card.parts) {
+			if (part.kind === "tools") {
+				const tools = document.createElement("div");
+				tools.className = "live-tools";
+				tools.dataset.item = part.id;
+				for (const slot of part.slots) {
+					tools.append(slot.kind === "group" ? groupRow(slot, part.slots.length === 1) : callRow(slot.call));
+				}
+				el.append(tools);
+				continue;
 			}
-			return el;
+			el.append(sayRow(part));
 		}
-		const el = document.createElement("div");
-		el.className = "live-turn live-other";
-		el.textContent = row.item.text ?? "";
 		return el;
 	}
 
 	/**
-	 * The row that says the agent is still going, at the foot of the column.
+	 * The line that says the agent is still going, at the foot of the column.
 	 *
-	 * The column draws this as a card with the working sign in it and the words "running tools…"
-	 * or "working…", taken from the state the server holds (`chat/working-sign.ts`). A mirror has
-	 * no sign to draw — the marks are the app's own svg — so it is a quiet line with a dot, in the
-	 * same two phrases. Read off the *items* rather than asking for a state, because a call still
-	 * running or a reply still arriving is the same fact said twice.
+	 * **The words are the app's, not this file's.** The column draws a card with the working
+	 * sign in it — "working…" for a turn with nothing to read yet, "typing…" for an answer
+	 * visibly arriving, "running tools…" for the long pause with no text in it — and
+	 * `chat/working-sign.ts` is the one place that decides which. A mirror has no sign to draw,
+	 * because the marks are the app's own svg, so it is a quiet line with a dot in the same
+	 * words, sent in the feed.
 	 *
-	 * **A running call is looked for anywhere in the transcript, not only at its end.** The cheap
-	 * version — ask what the last item is — was wrong in exactly the case that matters: a reply is
-	 * recorded when it is spoken and a call inside it when it starts, so an assistant message sits
-	 * after a running call for the second before that call finishes. That is a turn in progress,
-	 * and the column says "running tools…" about it.
+	 * It used to work them out from the transcript, and could only tell that *something* was
+	 * happening: all three states came out as "working…". Reading the items was defended as
+	 * needing nothing new in the protocol, which was true and not worth the word it lost.
 	 */
-	function workingElement() {
-		const last = items.at(-1);
-		const word = items.some((item) => item.kind === "tool" && item.state === "running")
-			? "running tools…"
-			: last?.kind === "assistant" && last.streaming
-				? "working…"
-				: "";
-		if (!word) return undefined;
+	function workingRow() {
+		if (!working) return undefined;
 		const el = document.createElement("div");
 		el.className = "live-working";
-		el.textContent = word;
+		el.textContent = working;
 		return el;
 	}
 
 	/**
 	 * Redraw from `from` onwards.
 	 *
-	 * Rows are recomputed from the items every time — cheap, and the only way a tool row that
-	 * just gained a call can be right — and the DOM is rebuilt from the one row that contains
-	 * item `from`. Everything before it is untouched by construction, so a conversation of two
-	 * thousand turns repaints one node when a turn arrives and one node per frame of it
-	 * streaming.
+	 * A card is self-contained now, so this is the simplest thing it could be: drop everything
+	 * from `from` and append the rest. A card that grew — a streaming reply, a call that
+	 * finished — is a card the app marked as changed, and its own id decides what is redrawn.
+	 * Everything before it is untouched by construction, so a conversation of two thousand
+	 * turns repaints one card when a turn arrives and one card per frame of it streaming.
 	 */
 	function render(from) {
-		const rows = rowsOf(items);
-		const found = rows.findIndex((row) => row.index >= from);
-		const start = found === -1 ? rows.length : found;
-		// The working row is not a row of the transcript and is rebuilt from the whole of it.
+		// The working line is not a card of the transcript and is rebuilt from the whole of it.
 		list.querySelector(".live-working")?.remove();
-		for (let index = list.children.length - 1; index >= start; index--) list.children[index].remove();
-		for (let index = start; index < rows.length; index++) list.append(draw(rows[index]));
-		const working = workingElement();
-		if (working) list.append(working);
+		for (let index = list.children.length - 1; index >= from; index--) list.children[index].remove();
+		for (let index = from; index < turns.length; index++) list.append(draw(turns[index]));
+		const foot = workingRow();
+		if (foot) list.append(foot);
 	}
 
 	const atBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight <= PIN_SLACK;
@@ -480,16 +402,17 @@ export function mountLiveChat(host, api) {
 	chip.addEventListener("click", toBottom);
 
 	function receive(feed) {
-		const before = items.length;
+		const before = turns.length;
 		/*
-		 * A `from` past the end of what this board holds is not an append: it would leave rows on
-		 * screen that nothing describes, because `render` rebuilds from the row that *contains*
-		 * `from` and there is no such row. The app never sends one — `liveDelta` answers with how
-		 * many items the two ends share — so this is about a malformed feed being a reset rather
-		 * than a stale list.
+		 * A `from` past the end of what this board holds is not an append: it would leave cards on
+		 * screen that nothing describes, because `render` rebuilds from `from` and there is nothing
+		 * there to rebuild from. The app never sends one — `liveDelta` answers with how many cards
+		 * the two ends share — so this is about a malformed feed being a reset rather than a stale
+		 * list.
 		 */
-		const from = feed.from > items.length ? 0 : feed.from;
-		items = [...items.slice(0, from), ...feed.items];
+		const from = feed.from > turns.length ? 0 : feed.from;
+		turns = [...turns.slice(0, from), ...feed.turns];
+		working = feed.working ?? "";
 		if (feed.identity) {
 			name.textContent = feed.identity.name;
 			if (feed.identity.color) host.style.setProperty("--live-accent", feed.identity.color);
@@ -508,7 +431,7 @@ export function mountLiveChat(host, api) {
 		}
 		// Only genuinely new turns count as missed; a turn growing while you read further
 		// up is not something you have not seen.
-		const added = items.length - before;
+		const added = turns.length - before;
 		if (added > 0) {
 			unseen += added;
 			chip.textContent = `↓ ${unseen} new`;
@@ -521,7 +444,7 @@ export function mountLiveChat(host, api) {
 		if (event.source !== window.parent) return;
 		const feed = event.data;
 		if (!feed || feed.decks !== "live.chat" || feed.agent !== agent) return;
-		if (typeof feed.from !== "number" || !Array.isArray(feed.items)) return;
+		if (typeof feed.from !== "number" || !Array.isArray(feed.turns)) return;
 		receive(feed);
 	});
 

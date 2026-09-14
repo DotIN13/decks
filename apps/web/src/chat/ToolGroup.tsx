@@ -1,9 +1,8 @@
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import { createSignal, Index, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
-import type { ToolItem } from "./float-rows.ts";
+import type { ToolSlot } from "./tool-groups.ts";
 import { ToolChip } from "./ToolChip.tsx";
-import { distinctNames, toolSlots, type ToolSlot } from "./tool-groups.ts";
 
 /**
  * A turn's tool calls, inside the turn's own card.
@@ -14,13 +13,16 @@ import { distinctNames, toolSlots, type ToolSlot } from "./tool-groups.ts";
  * adds the first, and the rules for what may hide are in `tool-groups.ts` where they can be
  * tested.
  *
+ * **The slots arrive decided**, from `chat/turn-cards.ts`, rather than being worked out here.
+ * The grouping is not this component's opinion and is not only this component's business: a
+ * mirror board draws the same rows, and it cannot import a `toolSlots` this file happens to
+ * call. So the fold runs once, in the module both surfaces are handed, and both draw it.
+ *
  * Not a card of its own. A turn that edited three files is *one* object in the column
  * however many calls it made, so these rows sit inside the agent's card with the reply,
  * which is also what keeps the count next to the sentence explaining it.
  */
-export function ToolGroup(props: { calls: ToolItem[] }) {
-	const slots = () => toolSlots(props.calls);
-
+export function ToolGroup(props: { slots: ToolSlot[] }) {
 	return (
 		<div class="stream-tools">
 			{/*
@@ -30,13 +32,13 @@ export function ToolGroup(props: { calls: ToolItem[] }) {
 			 * `Index` keys by position and updates in place, which is the same reason
 			 * `TurnBar` uses it.
 			 */}
-			<Index each={slots()}>
+			<Index each={props.slots}>
 				{(slot) => {
 					const grouped = () => (slot().kind === "group" ? (slot() as Extract<ToolSlot, { kind: "group" }>) : undefined);
 					const bare = () => (slot().kind === "call" ? (slot() as Extract<ToolSlot, { kind: "call" }>) : undefined);
 					return (
 						<Show when={grouped()} fallback={<Show when={bare()}>{(one) => <ToolChip item={one().call} />}</Show>}>
-							{(group) => <Group calls={group().calls} alone={slots().length === 1} />}
+							{(group) => <Group slot={group()} alone={props.slots.length === 1} />}
 						</Show>
 					);
 				}}
@@ -63,14 +65,10 @@ export function ToolGroup(props: { calls: ToolItem[] }) {
  * `data-state="done"` is not decoration either: a group only ever holds calls that finished
  * cleanly — that is what makes them groupable — so it takes the same quiet dot they do.
  */
-function Group(props: { calls: ToolItem[]; alone: boolean }) {
+function Group(props: { slot: Extract<ToolSlot, { kind: "group" }>; alone: boolean }) {
 	const [open, setOpen] = createSignal(false);
-	const count = () => props.calls.length;
-	const summary = () => distinctNames(props.calls);
-	const names = () => {
-		const { names, more } = summary();
-		return more > 0 ? `${names.join(" · ")} +${more}` : names.join(" · ");
-	};
+	const count = () => props.slot.calls.length;
+	const names = () => (props.slot.more > 0 ? `${props.slot.names.join(" · ")} +${props.slot.more}` : props.slot.names.join(" · "));
 	const word = () => (props.alone ? (count() === 1 ? "tool" : "tools") : "done");
 
 	return (
@@ -82,7 +80,7 @@ function Group(props: { calls: ToolItem[]; alone: boolean }) {
 				type="button"
 				data-open={open()}
 				aria-expanded={open()}
-				aria-label={`${count()} finished tool calls: ${summary().names.join(", ")}`}
+				aria-label={`${count()} finished tool calls: ${props.slot.names.join(", ")}`}
 				title={open() ? "Hide these calls" : "Show these calls"}
 				onClick={() => setOpen(!open())}
 			>
@@ -101,7 +99,7 @@ function Group(props: { calls: ToolItem[]; alone: boolean }) {
 			 */}
 			<Show when={open()}>
 				<div class="tool-kids">
-					<Index each={props.calls}>{(call) => <ToolChip item={call()} />}</Index>
+					<Index each={props.slot.calls}>{(call) => <ToolChip item={call()} />}</Index>
 				</div>
 			</Show>
 		</div>

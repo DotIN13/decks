@@ -13,6 +13,7 @@ import { Icon } from "../ui/icons.tsx";
 import { boardUrl, deckFileUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
+import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
 import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { measureFrame } from "./extent.ts";
@@ -141,6 +142,16 @@ export function BoardFrame(props: {
 	transcript?: (agentId: string) => readonly ChatItem[] | undefined;
 	/** Who that agent is, so a mirror can draw a header in their colour. */
 	agentIdentity?: (agentId: string) => { name: string; color: string } | undefined;
+	/**
+	 * What that agent is doing, in the column's own words (`chat/working-sign.ts`), or nothing.
+	 *
+	 * The mirror draws a working line at the foot of its transcript, and the words are the
+	 * column's — "typing…" while a reply arrives, "running tools…" for the long pause with no
+	 * text in it. Read here rather than derived from the transcript by the board, because a
+	 * board that derived it said "working…" for both and was therefore a second opinion about
+	 * what the agent is doing.
+	 */
+	working?: (agentId: string) => string | undefined;
 	/** The shared Chrome's state, for a board that is its status card (`live-web.js`). */
 	webStatus?: () => { status: WebStatus; code?: string } | undefined;
 	/** The user pressed Allow, Deny or Stop on that card. */
@@ -286,7 +297,8 @@ export function BoardFrame(props: {
 	 * transcript would be a loop if it were.
 	 */
 	const [wants, setWants] = createSignal<string | undefined>(undefined);
-	let sent: readonly ChatItem[] = [];
+	/** The cards last posted, so the next feed can say what changed rather than what is. */
+	let sent: readonly TurnCard[] = [];
 	/**
 	 * Whether this board has been answered at all.
 	 *
@@ -296,6 +308,8 @@ export function BoardFrame(props: {
 	 * broken rather than as empty, and is also the first thing anybody would try.
 	 */
 	let fed = false;
+	/** The working words last sent, so a change in them without a change in the turns still goes. */
+	let sentWorking: string | undefined;
 	createEffect(() => {
 		const agent = wants();
 		if (!agent || !props.transcript) return;
@@ -305,21 +319,37 @@ export function BoardFrame(props: {
 		 * The transcript comes out of a Solid store, so every item and everything nested in
 		 * one is a proxy — and the structured clone algorithm refuses those with a
 		 * `DataCloneError` that Solid reports as "Unknown error". The reactive read has
-		 * already happened by the time this runs, so unwrapping costs no tracking.
+		 * already happened by the time this runs, so unwrapping costs no tracking. The cards
+		 * are then built from plain items, so they are plain too — a `ToolChip`'s item is the
+		 * same object that was unwrapped here.
 		 */
 		const items = unwrap(props.transcript(agent) ?? []) as readonly ChatItem[];
-		const delta = liveDelta(sent, items);
-		if (!delta && fed) return;
+		const turns = turnCards(items);
+		const working = props.working?.(agent);
+		const delta = liveDelta(sent, turns);
+		/*
+		 * The working words are part of what a mirror holds, so a turn that does not change but
+		 * is now being worked on is still something to send — a tool call starting changes the
+		 * cards, and the moment the model begins its next sentence changes only this.
+		 *
+		 * Sent as an append of nothing for that case rather than as a reset: `from` past the end
+		 * is not a thing the board will act on, and a board that rebuilt the whole transcript
+		 * every time the state moved would throw a reader who had scrolled back up to the top
+		 * of the conversation.
+		 */
+		if (!delta && fed && working === sentWorking) return;
 		const frame = frameEl;
 		if (!frame) return;
-		sent = [...items];
+		sent = [...turns];
+		sentWorking = working;
 		fed = true;
 		pushLive(frame, {
 			decks: "live.chat",
 			agent,
-			from: delta?.from ?? 0,
-			items: delta ? delta.items : [...items],
-			total: items.length,
+			from: delta?.from ?? turns.length,
+			turns: delta?.turns ?? [],
+			total: turns.length,
+			...(working ? { working } : {}),
 			...(props.agentIdentity?.(agent) ? { identity: props.agentIdentity(agent) as { name: string; color: string } } : {}),
 		});
 	});

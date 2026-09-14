@@ -3,12 +3,12 @@ import ArrowDown from "lucide-solid/icons/arrow-down";
 import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 import { closeHistory, historyShown } from "../state/edge.ts";
-import { floatRows } from "./float-rows.ts";
 import { earlierLabel, hasEarlier, hiddenCount, LOAD_MORE_AT, WINDOW, windowOf } from "./history-page.ts";
 import { WorkingSign } from "./StatusLine.tsx";
+import { turnCards, type TurnCard } from "./turn-cards.ts";
 import { signPlacement } from "./working-sign.ts";
 import { attachSwipeClose } from "./swipe-close.ts";
-import { Turn, type AgentPart, type TurnCard } from "./Turn.tsx";
+import { Turn } from "./Turn.tsx";
 
 /**
  * The conversation: a column of cards over the boards.
@@ -175,50 +175,15 @@ export function Stream(props: {
 		return props.agentId;
 	});
 
-	const rows = createMemo(() => floatRows(shown()));
-	const itemById = createMemo(() => new Map(shown().map((item) => [item.id, item])));
-
 	/**
 	 * The rows, folded into one card per turn.
 	 *
-	 * `floatRows` gives a row per thing said and a row per run of tool calls; a *card* is
-	 * coarser than that, because a turn that edited three files is one object in the column
-	 * however many calls it made. So consecutive rows from the agent's side collapse into one
-	 * card, in order — and no turn check is needed to stop them merging across turns, because
-	 * what starts a turn is a user message, which puts a card of its own in between.
+	 * Which is `chat/turn-cards.ts`'s job now — the fold is shared with the mirror board, which
+	 * draws the same cards and used to draw its own slightly different set of them. What is left
+	 * here is the window: `shown()` is the part of the conversation in the DOM, and the fold is
+	 * applied to that rather than to everything held.
 	 */
-	const cards = createMemo<TurnCard[]>(() => {
-		const out: TurnCard[] = [];
-		const at = (id: string) => {
-			const item = itemById().get(id);
-			return item && item.kind !== "tool" ? item.at : undefined;
-		};
-		for (const row of rows()) {
-			if (row.kind === "user") {
-				const item = itemById().get(row.id);
-				out.push({
-					kind: "mine",
-					id: row.id,
-					text: row.text,
-					at: at(row.id),
-					...(item?.kind === "user" && item.entryId ? { entryId: item.entryId } : {}),
-				});
-				continue;
-			}
-			if (row.kind === "notice") {
-				out.push({ kind: "notice", id: row.id, text: row.text, level: row.level, at: at(row.id) });
-				continue;
-			}
-			const part: AgentPart =
-				row.kind === "tools"
-					? { kind: "tools", id: row.id, calls: row.calls }
-					: { kind: "text", id: row.id, text: row.text, streaming: row.streaming, ...(row.thinking ? { thinking: row.thinking } : {}) };
-			const last = out.at(-1);
-			if (last?.kind === "agent") last.parts.push(part);
-			else out.push({ kind: "agent", id: row.id, parts: [part], at: at(row.id) });
-		}
-		return out;
-	});
+	const cards = createMemo<TurnCard[]>(() => turnCards(shown()));
 
 	/*
 	 * A swipe toward the right edge puts the history away, and releasing mid-gesture puts it

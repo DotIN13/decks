@@ -1,4 +1,5 @@
 import type { ChatItem, WebStatus } from "@decks/protocol";
+import type { TurnCard } from "../chat/turn-cards.ts";
 
 /**
  * The channel between a live board and the transcript this app is already holding.
@@ -37,33 +38,50 @@ export type LiveWebReply = { decks: "live.web.answer"; id: string; ok: boolean }
  * What the app posts back.
  *
  * One shape for every update, and the index is the whole of it: **keep the first `from`
- * items you already hold, then append these**. `from: 0` is a reset, `from: length` is an
+ * cards you already hold, then append these**. `from: 0` is a reset, `from: length` is an
  * append, and `from: length - 1` is the streaming case where the last turn grew. A rewind
  * — which changes everything after the branch point — falls out as a small `from` without
  * needing a case of its own.
+ *
+ * **`turns` are cards, not chat items** (`chat/turn-cards.ts`): a reply and the calls it made
+ * are one card, not four rows. The board used to be sent the items and folded them itself,
+ * which made a board a second implementation of the transcript's shape — and a second
+ * implementation that had already drifted from this one. The wire carries the fold so there
+ * is one of it.
  */
 export interface LiveFeed {
 	decks: "live.chat";
 	agent: string;
 	from: number;
-	items: ChatItem[];
+	turns: TurnCard[];
 	/** So the board can draw a header without a second round trip. */
 	identity?: { name: string; color: string };
 	/** How many turns there are in total, for the board's own bookkeeping. */
 	total: number;
+	/**
+	 * What the agent is doing, in the column's own words — or nothing when it is doing nothing.
+	 *
+	 * Sent rather than derived, and that is the point: the board used to read it off the items
+	 * and said "working…" where the column says "typing…", which is the column's three words
+	 * collapsed into two. `chat/working-sign.ts` decides the phrasing for the dock, the column
+	 * and this together.
+	 */
+	working?: string;
 }
 
 /**
- * What can change about an item without its id changing.
+ * What can change about a card without its id changing.
  *
- * Compared by value rather than by reference because the store the items come from is a
- * proxy: two reads of an unchanged item are usually the same object and that is not
- * something to depend on. Lengths rather than contents, because the only edit a chat item
- * receives is an append — an assistant turn grows token by token, a tool call finishes —
- * and hashing a megabyte of transcript on every frame to learn that would be the wrong
- * trade.
+ * Compared by value rather than by reference because the cards are built from a store that
+ * hands out proxies: two reads of an unchanged item are usually the same object and that is
+ * not something to depend on. Lengths rather than contents, because the only edit a chat item
+ * receives is an append — an assistant turn grows token by token, a tool call finishes — and
+ * hashing a megabyte of transcript on every frame to learn that would be the wrong trade.
+ *
+ * A card's stamp is its parts' stamps joined, which is what makes "a reply inside turn four
+ * grew" come out as `from: 3` and nothing else resent.
  */
-function stamp(item: ChatItem): string {
+function stampItem(item: ChatItem): string {
 	switch (item.kind) {
 		case "assistant":
 			return `a:${item.id}:${item.text.length}:${item.thinking?.length ?? 0}:${item.streaming ? 1 : 0}`;
@@ -76,24 +94,37 @@ function stamp(item: ChatItem): string {
 	}
 }
 
+function stamp(card: TurnCard): string {
+	if (card.kind === "mine") return `m:${card.id}:${card.text.length}`;
+	if (card.kind === "notice") return `n:${card.id}:${card.level}:${card.text.length}`;
+	const parts = card.parts.map((part) =>
+		part.kind === "text"
+			? `s:${part.id}:${part.text.length}:${part.thinking?.length ?? 0}:${part.streaming ? 1 : 0}`
+			: `T:${part.id}:${part.slots
+					.map((slot) => (slot.kind === "call" ? stampItem(slot.call) : slot.calls.map(stampItem).join(",")))
+					.join("|")}`,
+	);
+	return `A:${card.id}:${parts.join(";")}`;
+}
+
 /**
  * What to send a board that already holds `sent`, so that it holds `next`.
  *
  * `undefined` when the two are the same, which is the common answer: this is asked on
  * every store update, and most of them are about a conversation this board is not of.
  */
-export function liveDelta(sent: readonly ChatItem[], next: readonly ChatItem[]): { from: number; items: ChatItem[] } | undefined {
+export function liveDelta(sent: readonly TurnCard[], next: readonly TurnCard[]): { from: number; turns: TurnCard[] } | undefined {
 	let common = 0;
 	const limit = Math.min(sent.length, next.length);
-	while (common < limit && stamp(sent[common] as ChatItem) === stamp(next[common] as ChatItem)) common++;
+	while (common < limit && stamp(sent[common] as TurnCard) === stamp(next[common] as TurnCard)) common++;
 	// Everything matched and there is no more of it: nothing to say.
 	if (common === sent.length && common === next.length) return undefined;
-	return { from: common, items: next.slice(common) };
+	return { from: common, turns: next.slice(common) };
 }
 
 /** Apply what `liveDelta` produced. The board's half of the same rule, kept here so it is tested. */
-export function applyDelta(held: readonly ChatItem[], delta: { from: number; items: ChatItem[] }): ChatItem[] {
-	return [...held.slice(0, delta.from), ...delta.items];
+export function applyDelta(held: readonly TurnCard[], delta: { from: number; turns: TurnCard[] }): TurnCard[] {
+	return [...held.slice(0, delta.from), ...delta.turns];
 }
 
 /**

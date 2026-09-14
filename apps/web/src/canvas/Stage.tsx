@@ -118,6 +118,8 @@ export function Stage(props: {
 	transcript?: (agentId: string) => readonly ChatItem[] | undefined;
 	/** Who an agent is, so a mirror can wear their colour. */
 	agentIdentity?: (agentId: string) => { name: string; color: string } | undefined;
+	/** What that agent is doing, in the sign's own words (`chat/working-sign.ts`). */
+	working?: (agentId: string) => string | undefined;
 	/** The shared Chrome's state, for its status card (`live-web.js`). */
 	webStatus?: () => { status: WebStatus; code?: string } | undefined;
 	/** Allow, Deny or Stop pressed on that card. */
@@ -1111,6 +1113,7 @@ export function Stage(props: {
 							previewSha={props.preview?.[board.path]}
 							{...(props.transcript ? { transcript: props.transcript } : {})}
 							{...(props.agentIdentity ? { agentIdentity: props.agentIdentity } : {})}
+							{...(props.working ? { working: props.working } : {})}
 							{...(props.webStatus ? { webStatus: props.webStatus } : {})}
 							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
 							onSelect={() => props.onSelect(board.path)}

@@ -31,9 +31,14 @@ import type { ToolItem } from "./float-rows.ts";
  *
  * `id` is the first call's id in both cases, which is what a keyed list wants — stable while
  * the run grows at its end, and never shared between two slots.
+ *
+ * A group carries its `names` and `more` because its header has to say which calls are behind
+ * it, and both surfaces that draw a header need the same answer: the column and a mirror
+ * board, which is handed these slots rather than the calls (`chat/turn-cards.ts`). Working the
+ * names out at the point of drawing is what left a mirror with its own copy of the rule.
  */
 export type ToolSlot =
-	| { kind: "group"; id: string; calls: ToolItem[] }
+	| { kind: "group"; id: string; calls: ToolItem[]; names: string[]; more: number }
 	| { kind: "call"; id: string; call: ToolItem };
 
 /** How many distinct names a header shows before it starts counting them instead. */
@@ -50,7 +55,7 @@ export function toolSlots(calls: readonly ToolItem[]): ToolSlot[] {
 	const flush = () => {
 		// A run of one is a row: see the third rule.
 		if (run.length === 1 && run[0]) slots.push({ kind: "call", id: run[0].id, call: run[0] });
-		else if (run.length > 1 && run[0]) slots.push({ kind: "group", id: run[0].id, calls: run });
+		else if (run.length > 1 && run[0]) slots.push({ kind: "group", id: run[0].id, calls: run, ...distinctNames(run) });
 		run = [];
 	};
 

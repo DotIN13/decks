@@ -1,26 +1,18 @@
 import { createSignal, Index, Match, Show, Switch } from "solid-js";
-import type { ToolItem } from "./float-rows.ts";
 import { Markdown } from "./Markdown.tsx";
 import { TimeMachine } from "./TimeMachine.tsx";
 import { ToolGroup } from "./ToolGroup.tsx";
+import type { AgentPart, TurnCard } from "./turn-cards.ts";
 
-/** A piece of what the agent did in one turn, in the order it happened. */
-export type AgentPart =
-	| { kind: "text"; id: string; text: string; streaming: boolean; thinking?: string }
-	| { kind: "tools"; id: string; calls: ToolItem[] };
-
-/**
- * One card in the column.
+/*
+ * A card, and the pieces of one, are `chat/turn-cards.ts`'s now.
  *
- * A turn is one card however many calls it made — `parts` is what the agent did, in order,
- * and the card is the object the reader drags their eye down. Notices are their own card
- * rather than a line inside one: a failure to launch is not something the agent said, and
- * burying it in a reply's card is how it gets missed.
+ * They were declared here, which was right while the column was the only thing that drew a
+ * transcript. A mirror board draws one too, and its copy of the fold had already drifted from
+ * this file's — so the fold moved to the one module both ends can be given, and these are
+ * re-exported for the readers that still import them from the component that draws them.
  */
-export type TurnCard =
-	| { kind: "mine"; id: string; at?: number; text: string; entryId?: string }
-	| { kind: "agent"; id: string; at?: number; parts: AgentPart[] }
-	| { kind: "notice"; id: string; at?: number; level: "info" | "warn" | "error"; text: string };
+export type { AgentPart, TurnCard };
 
 /**
  * One turn, as a card floating over the boards.
@@ -84,7 +76,7 @@ export function Turn(props: {
 								when={part().kind === "tools"}
 								fallback={<Said part={part() as Extract<AgentPart, { kind: "text" }>} />}
 							>
-								<ToolGroup calls={(part() as Extract<AgentPart, { kind: "tools" }>).calls} />
+								<ToolGroup slots={(part() as Extract<AgentPart, { kind: "tools" }>).slots} />
 							</Show>
 						)}
 					</Index>

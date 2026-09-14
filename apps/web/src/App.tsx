@@ -53,6 +53,7 @@ import { installViewport, obscured } from "./app/viewport.ts";
 import {finished} from "./alerts/policy.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./chat/UsageModal.tsx";
+import { workingWords } from "./chat/working-sign.ts";
 
 /**
  * The shell: a title bar, the stage, and the panels floating over it.
@@ -751,6 +752,20 @@ export function App() {
 						agentIdentity={(agentId) => {
 							const identity = state.identities[agentId];
 							return identity ? { name: identity.name, color: identity.color } : undefined;
+						}}
+						/*
+						 * What that agent is doing, in the sign's own words.
+						 *
+						 * The mirror draws a working line at the foot of its transcript, and it is the same
+						 * sentence the dock and the column say — `workingWords` is the one place that decides
+						 * between "working…", "typing…" and "running tools…". A board that read the words off
+						 * the transcript instead, as it used to, could only tell that *something* was
+						 * happening, and called all three of them "working…".
+						 */
+						working={(agentId) => {
+							const chat = state.chats.find((one) => one.id === agentId);
+							const identity = state.identities[agentId];
+							return chat && identity ? workingWords(chat.state, identity.name) : undefined;
 						}}
 						/* The canvas's own way out — Escape, over the canvas or inside a board. Clearing
 						   the browser's copy is the whole of it: the server keeps no preview state,

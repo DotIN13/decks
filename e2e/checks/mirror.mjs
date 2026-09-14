@@ -63,18 +63,37 @@ say("the file is a stub, not a transcript", source.length < 900 && source.includ
 // --- feeding it ------------------------------------------------------------------
 
 /*
- * Turns pushed in the way the app pushes them, so the rest of this is about the board's
- * own behaviour and not about whichever conversation the fixture happens to have.
+ * Cards pushed the way the app pushes them, so the rest of this is about the board's own
+ * behaviour and not about whichever conversation the fixture happens to have.
+ *
+ * **The fixture is cards, not chat items**, because that is the wire (`canvas/live-chat.ts`).
+ * The fold that turns a conversation into cards is the app's and is unit-tested
+ * (`chat/turn-cards.test.ts`); what a browser is needed for is the board drawing them, so the
+ * shapes are written out here rather than derived. `working` comes with the feed for the same
+ * reason: the words are the sign's own (`chat/working-sign.ts`), and a board that worked them
+ * out from the transcript called all three states "working…".
  */
 const agent = await inside((doc) => doc.querySelector(".live").dataset.agent);
-const feed = (from, items) =>
+const feed = (from, turns, working, identity = { name: "Probe", color: "#2eaf5a" }) =>
 	page.evaluate(
-		({ agent, from, items }) => {
+		({ agent, from, turns, working, identity }) => {
 			const frame = document.querySelector('.board-node[data-path^="boards/mirrors/"] iframe');
-			frame.contentWindow.postMessage({ decks: "live.chat", agent, from, items, total: from + items.length, identity: { name: "Probe", color: "#2eaf5a" } }, "*");
+			frame.contentWindow.postMessage(
+				{ decks: "live.chat", agent, from, turns, total: from + turns.length, identity, ...(working ? { working } : {}) },
+				"*",
+			);
 		},
-		{ agent, from, items },
+		{ agent, from, turns, working, identity },
 	);
+
+/** The pieces a card is made of, in the shapes `chat/turn-cards.ts` produces. */
+const mine = (id, text) => ({ kind: "mine", id, text, at: 0 });
+const said = (id, text, streaming = false) => ({ kind: "agent", id, at: 0, parts: [{ kind: "text", id, text, streaming }] });
+const notice = (id, text, level = "warn") => ({ kind: "notice", id, level, text, at: 0 });
+const call = (id, name, state = "done", title = name) => ({ kind: "tool", id, name, title, state });
+/** Calls hanging off one turn, already grouped: a run of finished calls behind a count, then the rest. */
+const tooling = (id, slots) => ({ kind: "agent", id, at: 0, parts: [{ kind: "tools", id, slots }] });
+const group = (id, calls) => ({ kind: "group", id, calls, names: [...new Set(calls.map((each) => each.name))].slice(0, 3), more: 0 });
 
 /*
  * Enough turns to overflow the board several times over, and a tool call in every one.
@@ -88,9 +107,16 @@ const feed = (from, items) =>
  */
 const many = [];
 for (let i = 1; i <= 40; i++) {
-	many.push({ kind: "user", id: `u${i}`, text: `Question ${i}`, at: 0 });
-	many.push({ kind: "tool", id: `t${i}`, name: "Bash", title: `cd /home/decks/projects/decks && something ${i}`, at: 0 });
-	many.push({ kind: "assistant", id: `a${i}`, text: `Answer **${i}**, long enough to take a line or two of the board it is drawn on.`, at: 0 });
+	many.push(mine(`u${i}`, `Question ${i}`));
+	many.push({
+		kind: "agent",
+		id: `a${i}`,
+		at: 0,
+		parts: [
+			{ kind: "tools", id: `t${i}`, slots: [{ kind: "call", id: `t${i}`, call: call(`t${i}`, "Bash", "done", `cd /home/decks/projects/decks && something ${i}`) }] },
+			{ kind: "text", id: `a${i}`, text: `Answer **${i}**, long enough to take a line or two of the board it is drawn on.`, streaming: false },
+		],
+	});
 }
 await feed(0, many);
 await settle(page, 800);
@@ -137,7 +163,7 @@ say("and it opens at the newest turn", state.max - state.top <= 8, JSON.stringif
 
 // --- pinned to now, until you scroll away ------------------------------------------
 
-await feed(many.length, [{ kind: "user", id: "u99", text: "one more", at: 0 }]);
+await feed(many.length, [mine("u99", "one more")]);
 await settle(page, 400);
 state = await list();
 say("a new turn while you are at the bottom follows", state.max - state.top <= 8 && state.turns === many.length + 1, JSON.stringify(state));
@@ -146,10 +172,7 @@ await inside((doc) => {
 	doc.querySelector(".live-list").scrollTop = 40;
 });
 await settle(page, 300);
-await feed(many.length + 1, [
-	{ kind: "user", id: "u100", text: "and another", at: 0 },
-	{ kind: "assistant", id: "a100", text: "and a reply", at: 0 },
-]);
+await feed(many.length + 1, [mine("u100", "and another"), said("a100", "and a reply")]);
 await settle(page, 400);
 state = await list();
 say("scroll away and it lets go rather than yanking you back", state.top === 40, JSON.stringify(state));
@@ -159,7 +182,7 @@ say("…and says how many you are missing", state.chip === "↓ 2 new", state.ch
  * A turn *growing* is not a turn you have missed. Without this the chip counted every
  * frame of a streaming answer, which is a number that means nothing and never stops.
  */
-await feed(many.length + 2, [{ kind: "assistant", id: "a100", text: "and a reply, still arriving", at: 0, streaming: true }]);
+await feed(many.length + 2, [said("a100", "and a reply, still arriving", true)]);
 await settle(page, 300);
 state = await list();
 say("a turn growing in place is not something you missed", state.chip === "↓ 2 new", state.chip);
@@ -233,23 +256,25 @@ say("past the last turn the canvas takes over", (await world()) !== parked, "a m
  * looks at, so it is asserted the way it is seen: your turn is a bubble with a tint and a
  * border, the agent's is flat prose on the panel, a run of finished tool calls is *one* row
  * that opens, a notice is a line rather than a card, and the last row says the agent is still
- * going. All of it is `apps/web/src/chat/`'s anatomy — `float-rows.ts`, `tool-groups.ts`, and
- * the numbers in `styles/stream.css` — and none of it is a second opinion about what a
+ * going. All of it is `apps/web/src/chat/`'s anatomy — the numbers in `styles/stream.css`, the
+ * shapes the fold in `turn-cards.ts` decides — and none of it is a second opinion about what a
  * transcript looks like.
+ *
+ * **And a turn is one card.** The calls made on the way to a reply hang off that reply's card,
+ * 8px apart, rather than being loose rows in the column separated by the 10px that means "a
+ * different turn". The two numbers are the whole difference, which is exactly why they are
+ * measured in the same breath as the rows.
  *
  * Fed as a fresh transcript (`from: 0` is a reset) so the assertions are about a known list
  * rather than about whatever the section above left behind.
  */
-const turns = [
-	{ kind: "user", id: "l1", text: "Which cell was it?", at: 0 },
-	{ kind: "tool", id: "l2", name: "read", title: "block-edits.ts", state: "done" },
-	{ kind: "tool", id: "l3", name: "read", title: "grapes-typing.mjs", state: "done" },
-	{ kind: "tool", id: "l4", name: "grep", title: "holds blocks rather than words", state: "done" },
-	{ kind: "tool", id: "l5", name: "bash", title: "node e2e/run.mjs grapes-typing", state: "running" },
-	{ kind: "notice", id: "l6", level: "warn", text: "This chat continues on the default model.", at: 0 },
-	{ kind: "assistant", id: "l7", text: "The `<td>` holding a table gets the **inner** cell, not the table.", at: 0 },
-];
-await feed(0, turns);
+const finishedCalls = [call("l2", "read", "done", "block-edits.ts"), call("l3", "read", "done", "grapes-typing.mjs"), call("l4", "grep", "done", "holds blocks rather than words")];
+const running = call("l5", "bash", "running", "node e2e/run.mjs grapes-typing");
+const answer = said("l7", "The `<td>` holding a table gets the **inner** cell, not the table.");
+/** The turn as it is while the bash call is still going, and once it has finished. */
+const turns = [mine("l1", "Which cell was it?"), tooling("l2", [group("l2", finishedCalls), { kind: "call", id: "l5", call: running }]), notice("l6", "This chat continues on the default model."), answer];
+const settled = [mine("l1", "Which cell was it?"), tooling("l2", [group("l2", [...finishedCalls, running])]), notice("l6", "This chat continues on the default model."), answer];
+await feed(0, turns, "running tools…");
 await settle(page, 600);
 
 const look = await inside((doc) => {
@@ -279,7 +304,8 @@ const look = await inside((doc) => {
 			line: style(".live-say", "lineHeight"),
 		},
 		// The log: one row for a run of finished calls, one for the call still going.
-		rows: [...doc.querySelectorAll(".live-turn.live-tools > .live-tool")].map((el) => ({
+		// The calls of the turn, and they are inside the turn's own card rather than in the column.
+		rows: [...doc.querySelectorAll(".live-agent .live-tools > .live-tool")].map((el) => ({
 			group: el.dataset.group !== undefined,
 			state: el.dataset.state,
 			h: Math.round(el.getBoundingClientRect().height),
@@ -327,25 +353,75 @@ say("…which opens to the calls it was hiding", nested === 3, `${nested} nested
 say("a notice is a line, not a card", look.notice.bg === "rgba(0, 0, 0, 0)" && look.notice.border === "0px" && look.notice.text.startsWith("This chat continues"), JSON.stringify(look.notice));
 
 /*
- * The row at the foot, which is what makes a mirror live rather than merely recent: read off
- * the items, so it needs nothing in the protocol the column does not already send.
+ * A turn is one card, and that is the change this check grew.
+ *
+ * The calls made on the way to a reply used to be rows of the column — siblings of the reply,
+ * separated by the same 10px that means "a different turn" — so a turn read as a scattered run
+ * of rows rather than as one object. What makes it one object is the column's own arithmetic:
+ * `flex flex-col gap-2` inside a card, the list's 10px between cards. Both are measured, since
+ * it is the *difference* between them that says "same turn" and neither number means anything
+ * on its own.
+ *
+ * Fed a turn that has both a call and a reply in it, because that is the shape the two numbers
+ * are about — the fixture above keeps its calls and its reply in separate turns, deliberately,
+ * to put a notice between them.
  */
-const workingRow = () => inside((doc) => doc.querySelector(".live-working")?.textContent ?? null);
-say("a call still running means the agent is working", (await workingRow()) === "running tools…", String(await workingRow()));
+await feed(0, [
+	mine("p1", "and what about the header?"),
+	{
+		kind: "agent",
+		id: "p2",
+		at: 0,
+		parts: [
+			{ kind: "tools", id: "p2t", slots: [{ kind: "call", id: "p2t", call: call("p2t", "read", "done", "header.css") }] },
+			{ kind: "text", id: "p2", text: "Two numbers, and the gap between them is the whole of it.", streaming: false },
+		],
+	},
+]);
+await settle(page, 300);
+const cards = await inside((doc) => {
+	const rect = (el) => el?.getBoundingClientRect();
+	const gap = (a, b) => Math.round(rect(b).top - rect(a).bottom);
+	const turn = doc.querySelector(".live-agent");
+	const parts = [...turn.children];
+	const turns = [...doc.querySelectorAll(".live-list > .live-turn")];
+	return {
+		parts: parts.length,
+		inside: parts.length > 1 ? gap(parts[0], parts[1]) : null,
+		between: turns.length > 1 ? gap(turns[0], turns[1]) : null,
+		// The calls are inside the card rather than beside it, which is the whole of it.
+		callsIn: turn.querySelectorAll(".live-tools > .live-tool").length,
+		callsOut: [...doc.querySelectorAll(".live-list > .live-tools")].length,
+	};
+});
+say("a turn's reply and the calls it made are one card", cards.callsIn === 1 && cards.callsOut === 0 && cards.parts === 2, JSON.stringify(cards));
+say("…its parts packed closer than two turns are", cards.inside === 8 && cards.between === 10, JSON.stringify(cards));
 
 /*
- * …and the call finishing is what moves it on to the reply.
+ * The line at the foot, in the app's own words.
  *
- * Fed as a real turn is: the call ends, the reply streams, the reply ends. The two phrases the
- * column uses are both here because both are a claim about the agent, and a mirror that got
- * them wrong would be saying the wrong thing about a conversation somebody is watching.
+ * **Sent, not derived.** The board used to work them out from the transcript and could only
+ * tell that *something* was happening, so all three of the sign's states came out as
+ * "working…". The words belong to `chat/working-sign.ts`, which is where the dock and the
+ * column get them, and a board draws what it is handed — so this asserts that it draws them,
+ * and that it stops when there is nothing to say.
  */
-const finished = turns.slice(4).map((item) => (item.id === "l5" ? { ...item, state: "done" } : item));
-await feed(4, [...finished, { kind: "assistant", id: "l8", text: "Done.", at: 0, streaming: true }]);
-await settle(page, 400);
-say("a reply still arriving means the same", (await workingRow()) === "working…", String(await workingRow()));
+const workingRow = () => inside((doc) => doc.querySelector(".live-working")?.textContent ?? null);
+// Back to the turn that is still going, which is what the line at the foot is about: the feed
+// above replaced the transcript with one that has nothing in flight in it.
+await feed(0, turns, "running tools…");
+await settle(page, 300);
+say("the words the app sends are the line at the foot", (await workingRow()) === "running tools…", String(await workingRow()));
 
-await feed(4, [...finished, { kind: "assistant", id: "l8", text: "Done.", at: 0 }]);
+/*
+ * …and they move on as the turn does: the call finishes, the reply streams under the same line,
+ * and the line goes when the turn does. Fed the way the app feeds it, one card at a time.
+ */
+await feed(0, [...settled, said("l8", "Done.", true)], "typing…");
+await settle(page, 400);
+say("a reply arriving says so, in the column's word for it", (await workingRow()) === "typing…", String(await workingRow()));
+
+await feed(0, [...settled, said("l8", "Done.", false)]);
 await settle(page, 400);
 say("…and it goes when the turn does", (await workingRow()) === null, String(await workingRow()));
 
