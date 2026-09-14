@@ -189,7 +189,20 @@ try {
 	// ⌘K brings it back with the cursor in the field: what the modal became, minus the tab.
 	await page.keyboard.press("Meta+k");
 	await page.waitForSelector("[data-inset='left']", { timeout: 4000 });
-	const focused = await page.evaluate(() => document.activeElement?.getAttribute("placeholder") ?? "");
+	/*
+	 * …and the cursor, which lands on the frame after the panel is in the document.
+	 *
+	 * `LeftPanel`'s own note says so: "Next frame, or there is nothing to focus yet on a panel
+	 * that was closed." So the element existing and the field having the cursor are a frame
+	 * apart, and reading `activeElement` once, immediately after the wait above, is the same
+	 * coin toss the inset assertions used to lose — which is where this check went next, once
+	 * the camera one stopped failing.
+	 */
+	const inField = () => page.evaluate(() => document.activeElement?.getAttribute("placeholder") ?? "");
+	const focused = await page
+		.waitForFunction(() => /search/i.test(document.activeElement?.getAttribute("placeholder") ?? ""), null, { timeout: 2500 })
+		.then(inField)
+		.catch(inField);
 	say("⌘K opens it with the cursor in the search field", /search/i.test(focused), focused);
 
 	/*
