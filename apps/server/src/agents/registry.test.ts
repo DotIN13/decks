@@ -190,6 +190,29 @@ test("an agent nobody spoke to is not written down", () => {
 	cleanup();
 });
 
+/*
+ * …unless it has arranged something.
+ *
+ * The rule above is about a chat nothing has happened in. Moving a board *is* something
+ * happening — and it happens on the canvas rather than in the transcript — so a stage whose
+ * only act was to drag a board still has something to write down, and losing it on the next
+ * restart would undo the arranging, which is the one kind of work that takes the longest to
+ * do by hand.
+ */
+test("a stage that has only moved a board is written down", () => {
+	const { deck, cleanup } = deckOn();
+	const agent = agentOn(deck);
+	agent.place("boards/plan.html", { x: -40, y: 80 });
+	agent.dispose();
+
+	const { registry } = registryOn(deck);
+	assert.equal(registry.restore(), 1, "the row survives, with the arrangement on it");
+	const [restored] = registry.all();
+	assert.deepEqual(restored?.positionOf("boards/plan.html"), { x: -40, y: 80 });
+	assert.equal(restored?.context.length, 0, "and it is still a chat nobody has said anything to");
+	cleanup();
+});
+
 test("closing a chat keeps it closed across a restart", () => {
 	const { deck, cleanup } = deckOn();
 

@@ -229,6 +229,9 @@ export class Registry {
 					// a directory read and one that costs every conversation ever had.
 					context: record.context,
 					inPlay: record.inPlay,
+					// The stage's own arrangement, which is part of what a conversation *is*: a reload that
+					// put every board back on the deck's layout would undo the arranging, every time.
+					...(record.positions ? { positions: record.positions } : {}),
 					...(record.lastLine ? { lastLine: record.lastLine } : {}),
 					...(record.lastAt ? { lastAt: record.lastAt } : {}),
 					...(record.avatar ? { avatar: record.avatar } : {}),
@@ -271,6 +274,17 @@ export class Registry {
 		const existing = this.get(this.focusedId);
 		if (existing) return existing;
 		return this.create();
+	}
+
+	/**
+	 * The focused agent, if there is one — without creating it.
+	 *
+	 * For a caller that only wants to *look* at the focused conversation. `App.send` is the one
+	 * that matters: every message out is scoped by the focused stage, and deciding what a deck's
+	 * first agent should be is not a thing a broadcast may do.
+	 */
+	focusedIfAny(): DeckAgent | undefined {
+		return this.get(this.focusedId);
 	}
 
 	focus(id: string): void {

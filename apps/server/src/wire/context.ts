@@ -1,6 +1,7 @@
 import type { Camera, ClientMessage, ServerMessage } from "@decks/protocol";
 import type { Registry } from "../agents/registry.ts";
 import type { BoardService } from "../boards/service.ts";
+import type { StageService } from "../stage/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../web/bridge.ts";
@@ -63,6 +64,13 @@ export interface WireContext {
 	readonly deck: Deck;
 	/** Writing, editing and deleting boards — `boards/service.ts`. */
 	readonly boards: BoardService;
+	/**
+	 * The canvas: what boards are where, moving one, showing them (`stage/service.ts`).
+	 *
+	 * Here for the drag and for a board created by a drop, both of which are the *stage's*
+	 * arrangement changes — the deck does not move a board.
+	 */
+	readonly stage: StageService;
 	readonly agents: Registry;
 	readonly web: WebBridge;
 	readonly claudeAccounts: ClaudeAccounts;

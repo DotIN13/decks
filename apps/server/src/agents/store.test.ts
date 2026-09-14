@@ -219,6 +219,56 @@ test("the model and the mode come back, because a resumed chat is opened on them
 });
 
 /**
+ * And the places a stage has made, which are storage in the same way the model is.
+ *
+ * Same seam, same trap: `record()` writes them and `validate()` has to read them back, or every
+ * restart puts the whole arrangement back on the deck's and the feature looks like it never
+ * worked. A place that is not two finite numbers is *no* place — an `undefined` reaching the
+ * browser is not a board where the deck says, it is a board at `NaN`.
+ */
+test("where a stage put a board comes back, and a broken place does not", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	store.write(
+		{
+			id: "one",
+			kind: "pi",
+			name: "Ada",
+			color: "#3b5cf6",
+			context: [],
+			inPlay: ["boards/plan.html"],
+			positions: { "boards/plan.html": { x: -40, y: 80 } },
+			createdAt: 1,
+			lastAt: 2,
+		},
+		[],
+	);
+	assert.deepEqual(store.read("one")?.record.positions, { "boards/plan.html": { x: -40, y: 80 } });
+
+	// Straight at the file, because this is about what a record from an older or a hand-edited
+	// build does on the way in.
+	const folder = join(deck.path, ".decks", "agents", "two");
+	mkdirSync(folder, { recursive: true });
+	writeFileSync(
+		join(folder, "meta.json"),
+		JSON.stringify({
+			version: 1,
+			id: "two",
+			kind: "pi",
+			name: "Rune",
+			color: "#3b5cf6",
+			context: [],
+			inPlay: [],
+			positions: { "boards/plan.html": { x: 1, y: "2" }, "boards/gone.html": { x: null, y: 3 }, "boards/notes.html": { x: 4, y: 5 } },
+			createdAt: 1,
+			lastAt: 2,
+		}),
+	);
+	assert.deepEqual(store.read("two")?.record.positions, { "boards/notes.html": { x: 4, y: 5 } });
+	cleanup();
+});
+
+/**
  * And a stored model that is not one is no model.
  *
  * These go straight into two runtimes' session options. A pair with no provider would be

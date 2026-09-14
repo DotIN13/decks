@@ -491,7 +491,31 @@ export class App {
 	}
 
 	send(message: ServerMessage): void {
-		this.hub?.broadcast(message);
+		this.hub?.broadcast(this.staged(message));
+	}
+
+	/**
+	 * The message as the focused stage sees it.
+	 *
+	 * **One seam, because a board's place belongs to the conversation.** Every message that carries
+	 * a board carries an `x` and a `y` — `deck.state`, `board.changed`, a resize, a watcher event,
+	 * a move — and on the wire they mean *where it is on the stage being drawn*. The alternative is
+	 * a scoping call at each of those sites, where the one that gets forgotten is a board drawn in
+	 * another conversation's place with nothing to say so.
+	 *
+	 * Nothing is created here: `focused()` builds a deck's first agent on demand, and scoping a
+	 * message must not be what creates a conversation.
+	 */
+	private staged(message: ServerMessage): ServerMessage {
+		const agent = this.agents.focusedIfAny();
+		if (!agent) return message;
+		if (message.type === "deck.state") {
+			return { ...message, deck: { ...message.deck, boards: message.deck.boards.map((board) => agent.stageBoard(board)) } };
+		}
+		if (message.type === "board.changed" && message.board) {
+			return { ...message, board: agent.stageBoard(message.board) };
+		}
+		return message;
 	}
 
 	dispose(): void {

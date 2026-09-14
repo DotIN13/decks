@@ -31,6 +31,15 @@ export const agents = {
 
 	"agent.focus": (message, _reply, wire) => {
 		wire.agents.focus(message.id);
+		/*
+		 * The whole canvas again, because it has just become a different one.
+		 *
+		 * Where each board sits belongs to the conversation (`AgentRecord.positions`), so switching
+		 * conversations switches the arrangement — and the browser is still holding the previous
+		 * stage's from whenever it was last sent one. `send` scopes it (`App.staged`), so the deck's
+		 * own state is the right thing to hand over here: what comes out is this stage's.
+		 */
+		wire.send({ type: "deck.state", deck: wire.deck.state() });
 	},
 
 	"agent.remove": (message, reply, wire) => {

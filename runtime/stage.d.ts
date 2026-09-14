@@ -312,6 +312,11 @@ export interface Stage {
 	 * done, what came out and what it means, then the numbers, the method and the names.
 	 *
 	 * Once the height is near twice the width, it is two boards.
+	 *
+	 * **Where it lands.** To the right of the boards currently on the canvas, aligned with their
+	 * top, so a board you write mid-conversation appears beside the ones the reader is already
+	 * looking at. Pass `at` to put it somewhere exact instead; a board that already has a place of
+	 * its own is never moved by the default.
 	 */
 	newBoard(options: {
 		title: string;
@@ -319,6 +324,8 @@ export interface Stage {
 		format?: "component" | "flow" | "slides";
 		w?: number;
 		h?: number;
+		/** A place on the canvas, in board coordinates. Rarely needed — the default is beside what is shown. */
+		at?: { x: number; y: number };
 	}): Promise<string>;
 
 	/**

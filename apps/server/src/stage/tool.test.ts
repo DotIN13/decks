@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { Camera } from "@decks/protocol";
+import type { Board, Camera } from "@decks/protocol";
 import { runtimeDir } from "@decks/runtime";
 import { Deck } from "../deck/loader.ts";
 import { StageService } from "./service.ts";
@@ -17,13 +17,15 @@ import { createStageTool, type QueuedWork, type SendSpec } from "./tool.ts";
  * Neither is reachable from a browser check — the e2e suite needs a model to make an agent
  * call a tool at all — and both are the part a model actually reads.
  */
-function toolOn(camera: Camera) {
+function toolOn(camera: Camera, options: { playing?: string[] } = {}) {
 	const root = mkdtempSync(join(tmpdir(), "decks-tool-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	writeFileSync(join(root, "boards", "plan.html"), `<!doctype html><title>plan</title><body class="board"></body>`);
 	const deck = Deck.open(root);
 
 	const sends: Array<{ target: string; spec: SendSpec }> = [];
+	/** Where this stage has put things, which is what the placement is asserted against. */
+	const places = new Map<string, { x: number; y: number }>();
 	const others = [
 		{ id: "a1", name: "Ada", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html"], holding: 1, tags: ["panel-css"], workspace: "political-llm", queued: 3 },
 		{ id: "a2", name: "Rune", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html", "boards/notes.html"], holding: 2, tags: [], workspace: "political-llm", queued: 0 },
@@ -46,6 +48,9 @@ function toolOn(camera: Camera) {
 			// below a reading of the loader's fallback instead.
 			const meta = `<meta name="board" content='{"w":${options.size?.w ?? 1000},"h":${options.size?.h ?? 700}}' />`;
 			writeFileSync(join(root, path), `<!doctype html><title>${options.title}</title>${meta}<body class="board"></body>`);
+			// Refreshed as the real one is: a board that is not in the deck's map cannot be
+			// placed, so a stub that only wrote the file would make every placement a no-op.
+			deck.refresh(path);
 			return path;
 		},
 		writeBoard: (path, html) => {
@@ -79,8 +84,23 @@ function toolOn(camera: Camera) {
 			identity: () => ({ name: "Ada", color: "#000", ...(room ? { workspace: room } : {}) }),
 			context: () => [],
 			setContext: () => {},
-			inPlay: () => [],
-			setInPlay: () => {},
+			inPlay: () => [...(options.playing ?? [])],
+			setInPlay: (paths: string[]) => {
+				if (options.playing) {
+					options.playing.length = 0;
+					options.playing.push(...paths);
+				}
+			},
+			// This stage's arrangement, which is what the tool places a board through.
+			stageBoard: (board: Board) => {
+				const at = places.get(board.path);
+				return at ? { ...board, x: at.x, y: at.y } : board;
+			},
+			positionOf: (path: string) => places.get(path),
+			place: (path: string, at: { x: number; y: number }) => {
+				places.set(path, at);
+				return at;
+			},
 			rename: () => {},
 			setAvatar: () => {},
 			setTags: (tags) => tags as string[],
@@ -103,6 +123,7 @@ function toolOn(camera: Camera) {
 	return {
 		tool,
 		sends,
+		places,
 		deck,
 		extents,
 		service,
@@ -122,6 +143,48 @@ test("newBoard says how much room the canvas has, after the path it returns", as
 	assert.equal(lines[1], "viewport 1440×900 px");
 	cleanup();
 });
+
+/*
+ * Where a board lands, which is the other half of what `newBoard` answers with.
+ *
+ * The rule is `deck/layout.ts` and the writing down is `stage/service.ts`; what is only true
+ * here is that the tool asks at all — and the two things that make the default safe to apply
+ * everywhere: a board somebody has already placed is left alone, and a place the agent names
+ * is used as it stands.
+ */
+test("a new board lands beside the ones on the canvas", async () => {
+	const playing = ["boards/plan.html"];
+	const { tool, deck, service, places, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 }, { playing });
+	// Somebody put the plan where it is, which is what makes it a board to be beside rather
+	// than one that is about to be laid out itself. On *this* stage: the tool's own agent is
+	// what a move belongs to now.
+	places.set("boards/plan.html", { x: 400, y: 200 });
+
+	const path = pathOf((await tool.run(`return await stage.newBoard({ title: "Beside", kind: "blank" })`)).text);
+	// The reference is where the board is *on this stage* — 400,200, not the deck's own 0,0.
+	const plan = places.get("boards/plan.html")!;
+	const width = deck.board("boards/plan.html")!.w;
+	assert.deepEqual(places.get(path), { x: plan.x + width + 160, y: plan.y }, "to the right of the board on the canvas, level with its top");
+	assert.notEqual(deck.board(path)?.x, plan.x + width + 160, "and the deck's arrangement is not what moved");
+	cleanup();
+});
+
+test("a place the agent names is used as it stands", async () => {
+	const { tool, places, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	const path = pathOf((await tool.run(`return await stage.newBoard({ title: "Placed", kind: "blank", at: { x: -40, y: -80 } })`)).text);
+	assert.deepEqual(places.get(path), { x: -40, y: -80 });
+	cleanup();
+});
+
+/**
+ * The path a `newBoard` returned.
+ *
+ * The tool answers with the JSON of whatever the code returned, and its notes follow on later
+ * lines — so the first line is the value and the rest is the advice that comes with it.
+ */
+function pathOf(text: string): string {
+	return JSON.parse(text.split("\n")[0] ?? '""') as string;
+}
 
 test("with no reading from a browser, it says nothing rather than making a number up", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
@@ -263,6 +326,11 @@ test("attach is most-recently-touched first, and re-attaching moves the board to
 			},
 			inPlay: () => [],
 			setInPlay: () => {},
+			// Nothing is placed in this test — it is about the ordering `attach` builds — so the
+			// arrangement is an empty stage's, which is also what its `inPlay` says.
+			stageBoard: (board: Board) => board,
+			positionOf: () => undefined,
+			place: (_path: string, at: { x: number; y: number }) => at,
 			rename: () => {},
 			setAvatar: () => {},
 			setTags: (tags) => tags as string[],

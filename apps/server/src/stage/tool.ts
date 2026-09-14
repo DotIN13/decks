@@ -6,7 +6,7 @@ import type { Stage } from "../../../../runtime/stage.d.ts";
 import { roster } from "../agents/workspaces.ts";
 import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, isBoardFormat, isBoardTemplate, WIDE_BOARD_W } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
-import type { StageService, WebTarget } from "./service.ts";
+import type { StageArrangement, StageService, WebTarget } from "./service.ts";
 
 /**
  * The canvas tool, defined once for every runtime (DESIGN §6.3).
@@ -98,7 +98,7 @@ export interface DelegateReport {
 	boards: string[];
 }
 
-export interface StageAgentHooks {
+export interface StageAgentHooks extends StageArrangement {
 	id: string;
 	identity(): Identity;
 	context(): string[];
@@ -292,7 +292,7 @@ export function createStageTool(deps: {
 
 	const stage: Stage = {
 		// --- reads ---------------------------------------------------------------
-		boards: async () => service.boards(),
+		boards: async () => service.boards(agent),
 		read: async (path: string) => service.read(path),
 		roots: async () => service.roots(),
 		resolve: async (file: string) => service.resolve(file),
@@ -315,7 +315,7 @@ export function createStageTool(deps: {
 		 * where the user left it until `show` is called. Returns the deck-relative path to
 		 * edit.
 		 */
-		newBoard: async (options: { title: string; template?: string; kind?: string; format?: string; w?: number; h?: number }) => {
+		newBoard: async (options: { title: string; template?: string; kind?: string; format?: string; w?: number; h?: number; at?: { x: number; y: number } }) => {
 			const title = options?.title?.trim();
 			if (!title) throw new Error("A board needs a title");
 			/*
@@ -366,6 +366,16 @@ export function createStageTool(deps: {
 				format,
 				size: { w: width, ...(options.h ? { h: options.h } : {}) },
 			});
+			/*
+			 * Where it lands: beside what is on the canvas, unless the agent said.
+			 *
+			 * Before `setInPlay` below, so the new board is not in the list of boards it is being
+			 * placed beside — `place` excludes it anyway, and the ordering is what makes that a
+			 * belt rather than a necessity. A position the agent passed is used as it stands: a
+			 * caller that has thought about where something goes is not improved on.
+			 */
+			if (options.at) service.move(agent, path, options.at);
+			else service.place(agent, [path], agent.inPlay());
 			agent.setContext([path, ...agent.context()]);
 			agent.setInPlay([...agent.inPlay(), path]);
 			/*
@@ -416,6 +426,8 @@ export function createStageTool(deps: {
 				name: found.name,
 				size: { ...(options?.w ? { w: options.w } : {}), ...(options?.h ? { h: options.h } : {}) },
 			});
+			// A mirror is a board like any other, and lands beside the ones on the canvas like one.
+			service.place(agent, [path], agent.inPlay());
 			agent.setContext([path, ...agent.context().filter((held) => held !== path)]);
 			agent.setInPlay([...agent.inPlay().filter((shown) => shown !== path), path]);
 			return { path, of: found.name, agent: found.id };
@@ -458,8 +470,13 @@ export function createStageTool(deps: {
 		attach: async (path: string | string[]) => {
 			const wanted = asList(path);
 			for (const one of wanted) {
-				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
+				if (!service.boards(agent).some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
 			}
+			// A board taken up is a board put on the canvas, and one nothing has ever placed is
+			// placed now, beside what is already there — the same default a new board gets, and
+			// for the same reason: a board from the middle of the deck would otherwise arrive at
+			// whatever place the auto-layout gave it, which is nowhere in particular.
+			service.place(agent, wanted, agent.inPlay().filter((playing) => !wanted.includes(playing)));
 			// Most-recently-touched first: the boards just attached lead the list — the last one
 			// named is the most recent — and boards already held that are not re-attached keep
 			// their existing recency behind them. Re-attaching a board is a fresh touch, which is
@@ -471,21 +488,21 @@ export function createStageTool(deps: {
 			// A board taken up is a board put on the canvas: attaching something the user
 			// then cannot see would make the rail the only evidence it happened.
 			agent.setInPlay([...agent.inPlay(), ...wanted]);
-			return service.boards().filter((board) => next.includes(board.path));
+			return service.boards(agent).filter((board) => next.includes(board.path));
 		},
 		detach: async (path: string | string[]) => {
 			const dropping = new Set(asList(path));
 			const next = agent.context().filter((held) => !dropping.has(held));
 			agent.setContext(next);
-			return service.boards().filter((board) => next.includes(board.path));
+			return service.boards(agent).filter((board) => next.includes(board.path));
 		},
 		context: async () => {
 			const held = agent.context();
-			return service.boards().filter((board) => held.includes(board.path));
+			return service.boards(agent).filter((board) => held.includes(board.path));
 		},
 		inPlay: async () => {
 			const playing = agent.inPlay();
-			return service.boards().filter((board) => playing.includes(board.path));
+			return service.boards(agent).filter((board) => playing.includes(board.path));
 		},
 
 		// --- the canvas ------------------------------------------------------------
@@ -500,8 +517,17 @@ export function createStageTool(deps: {
 		show: async (path: string | string[], options?: { fit?: "board" | "all"; highlight?: string }) => {
 			const paths = asList(path);
 			for (const one of paths) {
-				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
+				if (!service.boards(agent).some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
 			}
+			/*
+			 * Placed before the camera is told to fit, and that order is the whole point.
+			 *
+			 * The browser frames what it thinks the boards are, so a board moved after the fit is
+			 * a camera pointed at where the board used to be. `place` broadcasts as it goes, and
+			 * one socket carries both messages in order, so the browser has the new position by
+			 * the time the fit arrives.
+			 */
+			service.place(agent, paths, agent.inPlay().filter((playing) => !paths.includes(playing)));
 			agent.setInPlay(paths);
 			return service.show(agent.id, paths, options ?? {});
 		},
@@ -510,7 +536,7 @@ export function createStageTool(deps: {
 			const dropping = new Set(asList(path));
 			agent.setInPlay(agent.inPlay().filter((playing) => !dropping.has(playing)));
 		},
-		move: async (path: string, at: { x: number; y: number }) => service.move(path, at),
+		move: async (path: string, at: { x: number; y: number }) => service.move(agent, path, at),
 		camera: (async (at?: Camera) => {
 			if (!at) return agent.camera();
 			await service.setCamera(agent.id, at);

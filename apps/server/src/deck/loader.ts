@@ -6,6 +6,7 @@ import { readBoardMeta, readFlowMeta } from "./meta.ts";
 import { defaultWidth, formatOf, isBoardFile, liveKindOf, shellFor, slideHeight } from "./kinds.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
+import { placeBeside } from "./layout.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
 import { DEFAULT_BOARD_W } from "../boards/templates.ts";
 
@@ -21,9 +22,6 @@ import { DEFAULT_BOARD_W } from "../boards/templates.ts";
  */
 const DEFAULT_W = DEFAULT_BOARD_W;
 const DEFAULT_H = 800;
-/** Space between auto-placed boards, and how many go in a row before wrapping. */
-const GUTTER = 160;
-const PER_ROW = 3;
 
 export interface DeckWarning {
 	text: string;
@@ -247,16 +245,6 @@ export class Deck {
 		return existed;
 	}
 
-	/** Move a board and write the arrangement down. */
-	setPosition(boardPath: string, x: number, y: number): Board | undefined {
-		const board = this.board(boardPath);
-		if (!board) return undefined;
-		board.x = Math.round(x);
-		board.y = Math.round(y);
-		this.save();
-		return board;
-	}
-
 	/**
 	 * Resize a board that cannot say its own size, and write it down.
 	 *
@@ -438,26 +426,19 @@ function scanBoards(dir: string, deckRoot: string): string[] {
 /**
  * Give the boards nobody has arranged a place to be.
  *
- * Rows of three, left to right, starting below whatever is already placed — so a
- * board the agent just wrote appears next to its siblings instead of on top of
- * one, and dragging it somewhere makes that position permanent.
+ * Beside the arranged ones — to their right, aligned with their top — so a board that appears
+ * from outside appears *next to* the deck rather than at the far end of whichever row happens
+ * to be lowest. `deck/layout.ts` has the rule and the reasoning; this is where it is applied to
+ * a deck being opened, and a deck with nothing arranged at all comes out at the origin in rows,
+ * as it always did.
  */
 function autoPlace(boards: Board[], existing: Board[]): void {
-	if (boards.length === 0) return;
-	const startY = existing.length > 0 ? Math.max(...existing.map((b) => b.y + b.h)) + GUTTER : 0;
-	let x = existing.length > 0 ? Math.min(...existing.map((b) => b.x)) : 0;
-	let y = startY;
-	let rowHeight = 0;
+	const spots = placeBeside(boards, existing, existing);
 	boards.forEach((board, index) => {
-		if (index > 0 && index % PER_ROW === 0) {
-			x = existing.length > 0 ? Math.min(...existing.map((b) => b.x)) : 0;
-			y += rowHeight + GUTTER;
-			rowHeight = 0;
-		}
-		board.x = x;
-		board.y = y;
-		x += board.w + GUTTER;
-		rowHeight = Math.max(rowHeight, board.h);
+		const spot = spots[index];
+		if (!spot) return;
+		board.x = spot.x;
+		board.y = spot.y;
 	});
 }
 

@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Board, Camera, ServerMessage, StageCall, StageResult, WebStatus } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
+import { placeBeside } from "../deck/layout.ts";
 import { withBoardSize } from "../deck/meta.ts";
 
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
@@ -83,6 +84,23 @@ const FIT_WAIT_MS = 5000;
 /** And how long to wait for the *second* reading, after a width change. Best effort. */
 const FIT_REFLOW_MS = 1500;
 
+/**
+ * A stage's arrangement: where this conversation has put the boards it moved.
+ *
+ * Structural rather than `DeckAgent`, which is on the other side of this module — `session.ts`
+ * builds the tool that calls this service, so naming it here would be a cycle. And not named
+ * `Stage`, which is already the interface *agents* are given (`runtime/stage.d.ts`) and which
+ * `tool.ts` has in scope.
+ */
+export interface StageArrangement {
+	/** A board with this stage's place on it — the deck's, unless this stage moved it. */
+	stageBoard(board: Board): Board;
+	/** Where this stage has put a board, or `undefined` when it has never moved it. */
+	positionOf(path: string): { x: number; y: number } | undefined;
+	/** Put one there, for this stage. */
+	place(path: string, at: { x: number; y: number }): { x: number; y: number };
+}
+
 export class StageService {
 	/**
 	 * The user's shared Chrome, if the app has one (`web/bridge.ts`).
@@ -104,9 +122,18 @@ export class StageService {
 
 	// --- reads --------------------------------------------------------------------
 
-	boards(): Board[] {
+	/**
+	 * The deck's boards as one stage sees them.
+	 *
+	 * **`Board.x/y` means “where this board is on the stage being asked”** — the deck's own place,
+	 * overridden where the stage has put it somewhere else. One seam rather than an overlay in the
+	 * browser: `x`/`y` are read in a dozen places there (the world transform, a fit, a thumbnail,
+	 * a selection) and a missed one is a board drawn in the wrong place with nothing to say so.
+	 */
+	boards(stage?: StageArrangement): Board[] {
 		const holders = this.host.agents();
-		return this.deck.boards.map((board) => {
+		return this.deck.boards.map((placed) => {
+			const board = stage ? stage.stageBoard(placed) : placed;
 			// A measurement of an older revision is left off rather than reported: it is a
 			// number, and a number gets believed.
 			const content = this.host.extent(board.path, board.rev);
@@ -116,6 +143,11 @@ export class StageService {
 				inContext: holders.filter((agent) => agent.context.includes(board.path)).map((agent) => agent.id),
 			};
 		});
+	}
+
+	/** One board as that stage sees it — for the messages that carry a single board. */
+	board(path: string, stage?: StageArrangement): Board | undefined {
+		return this.boards(stage).find((board) => board.path === path);
 	}
 
 	read(path: string): string {
@@ -141,11 +173,72 @@ export class StageService {
 
 	// --- writes the server owns ----------------------------------------------------
 
-	move(path: string, at: { x: number; y: number }): Board {
-		const board = this.deck.setPosition(path, at.x, at.y);
+	/**
+	 * Move a board on one stage.
+	 *
+	 * The stage is the writer: `deck.json` is not touched, because this is a change to the canvas
+	 * you are looking at rather than to the arrangement a new conversation starts from. The
+	 * broadcast is the stage's board, so every browser watching this conversation — and the
+	 * comment on `board.move` has always said a second tab is looking at the same stage — draws it
+	 * where this stage put it, and a browser watching another conversation keeps its own.
+	 */
+	move(stage: StageArrangement, path: string, at: { x: number; y: number }): Board {
+		if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
+		stage.place(path, at);
+		const board = this.board(path, stage);
 		if (!board) throw new Error(`No such board: ${path}`);
 		this.host.broadcast({ type: "board.changed", path: board.path, rev: board.rev, board });
 		return board;
+	}
+
+	/**
+	 * Put boards that have no place of their own beside these, and say which moved.
+	 *
+	 * The default an agent gets when it does not say where something goes: **to the right of
+	 * what is on the canvas**, top-aligned with it — `deck/layout.ts` holds the rule and the
+	 * arithmetic. Two things are worth knowing here rather than there.
+	 *
+	 * **A board that has been arranged is left alone.** `deck.json` is the record of positions
+	 * somebody chose, and a board in it is one the user dragged or an agent placed on purpose, so
+	 * this is a no-op for it. That single test is also what makes the call safe to sprinkle
+	 * around `show` and `attach`: the boards already on the canvas are, by and large, already
+	 * arranged, and the ones this moves are the ones nobody has ever placed.
+	 *
+	 * **When nothing is on the canvas it sits beside the deck.** "To the right of the current
+	 * boards" has no current answer on an empty stage, and the deck is the next best thing to the
+	 * places it could mean — better than the origin, which on a real deck is a corner of a region
+	 * nobody is in.
+	 */
+	place(stage: StageArrangement, paths: string[], reference: string[]): Board[] {
+		// “Has a place of its own” is the *stage's* question now: a board this conversation has
+		// never moved is free to be given one, whatever the deck's arrangement or another
+		// conversation's does with it.
+		const fresh = paths.filter((path) => this.deck.board(path) && !stage.positionOf(path));
+		if (fresh.length === 0) return [];
+
+		const boxes = this.boards(stage);
+		// Every one of these resolved a line ago, from the same map — `boards()` is `deck.boards`.
+		// Kept 1:1 with `fresh` because `spots` is read by index.
+		const wanted = fresh.map((path) => boxes.find((board) => board.path === path)!);
+		const elsewhere = boxes.filter((board) => !fresh.includes(board.path));
+		// The boards to sit beside, minus the ones being placed: a board is not its own neighbour,
+		// and including it would push it a board's width to the right of where it already is.
+		const beside = elsewhere.filter((board) => reference.includes(board.path));
+		const spots = placeBeside(wanted, beside.length > 0 ? beside : elsewhere, elsewhere);
+
+		const moved: Board[] = [];
+		fresh.forEach((path, index) => {
+			const spot = spots[index];
+			if (!spot) return;
+			stage.place(path, spot);
+			const board = this.board(path, stage);
+			if (!board) return;
+			moved.push(board);
+			// The browser draws boards where it was told they are, so a placement that is not
+			// broadcast is a board in two places until the next reload.
+			this.host.broadcast({ type: "board.changed", path: board.path, rev: board.rev, board });
+		});
+		return moved;
 	}
 
 	/** A new board from a template — the shell, so the agent writes only the content. */

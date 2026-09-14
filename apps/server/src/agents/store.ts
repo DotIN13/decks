@@ -114,6 +114,21 @@ export interface AgentRecord {
 	 */
 	workspace?: string;
 	/**
+	 * Where **this stage** has put the boards it moved, by deck-relative path.
+	 *
+	 * The canvas is per conversation — its camera, what is in play, the cursors, the annotations —
+	 * and where a board *sits* belongs to that list rather than to the deck. One arrangement for
+	 * everybody meant an agent placing a board for its own stage moved it for the user and for
+	 * every other agent, and two agents working in different regions fought over the same two
+	 * numbers.
+	 *
+	 * So `deck.json` keeps the deck's own arrangement — what a stage starts from, and where a board
+	 * nobody has moved still is — and this is the stage's answer for the boards it has placed.
+	 * Absent means "no opinion", which is not the same as zero: a board at the origin is a place
+	 * somebody chose.
+	 */
+	positions?: Record<string, { x: number; y: number }>;
+	/**
 	 * A summary of the transcript, not a copy of it. A row shows a preview of the last
 	 * thing said, and the only other place that line lives is `chat.json` — so without this
 	 * the list would have to read every conversation to draw itself, which is the cost that
@@ -432,6 +447,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 	 */
 	const tags = strings(source.tags);
 	const userTags = strings(source.userTags);
+	const positions = positionsOf(source.positions);
 	const lastLine = typeof source.lastLine === "string" && source.lastLine ? source.lastLine : undefined;
 	return {
 		id,
@@ -465,12 +481,35 @@ function validate(raw: unknown, id: string): AgentRecord {
 		 * cap silently rewrites stored history.
 		 */
 		...(typeof source.workspace === "string" && source.workspace ? { workspace: source.workspace } : {}),
+		...(Object.keys(positions).length > 0 ? { positions } : {}),
 		...(lastLine ? { lastLine } : {}),
 		lastAt: finite(source.lastAt, created),
 	};
 }
 
 const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+/**
+ * The places a stage recorded, if they are places.
+ *
+ * Read back as well as written, for the reason spelled out above: a field `record()` writes and
+ * this ignores is a field lost on every restart, and here that would put every board back on the
+ * deck's arrangement and look like the feature had never existed. Each has to be two finite
+ * numbers — a half-written place is no place, and an `undefined` reaching the browser is not a
+ * board where the deck says, it is a board at `NaN`.
+ */
+function positionsOf(raw: unknown): Record<string, { x: number; y: number }> {
+	if (!raw || typeof raw !== "object") return {};
+	const out: Record<string, { x: number; y: number }> = {};
+	for (const [path, value] of Object.entries(raw as Record<string, unknown>)) {
+		if (!value || typeof value !== "object") continue;
+		const { x, y } = value as { x?: unknown; y?: unknown };
+		if (typeof x !== "number" || typeof y !== "number") continue;
+		if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+		out[path] = { x, y };
+	}
+	return out;
+}
 const MODES: AgentMode[] = ["manual", "acceptEdits", "plan", "auto"];
 
 /**

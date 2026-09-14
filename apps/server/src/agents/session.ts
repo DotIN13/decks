@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type {
 	AgentCapabilities,
 	AgentChat,
+	Board,
 	AgentKind,
 	AgentMode,
 	AgentModel,
@@ -149,6 +150,15 @@ export class DeckAgent {
 	 */
 	private playing: string[] = [];
 	/**
+	 * Where this stage has put the boards it moved, by path.
+	 *
+	 * A stage's own arrangement, over the deck's — see `AgentRecord.positions` for why this is not
+	 * `deck.json`. A path absent from here is a board this stage has never moved, which is a
+	 * different thing from a board at zero and is what decides whether a placement is free to
+	 * give it a place.
+	 */
+	private places = new Map<string, { x: number; y: number }>();
+	/**
 	 * Things to tell the agent before its next turn.
 	 *
 	 * Pi could do this through `pi.sendMessage({ deliverAs: "nextTurn" })`, which is an
@@ -273,6 +283,15 @@ export class DeckAgent {
 				tags?: string[];
 				userTags?: string[];
 				workspace?: string;
+				/**
+				 * Where this stage had put each board it moved (`AgentRecord.positions`).
+				 *
+				 * Restored with the conversation, because an arrangement is part of what a stage *is*: a
+				 * reload that put every board back on the deck's layout would undo the work of
+				 * arranging them, every time, for the one kind of state that takes the longest to
+				 * build by hand.
+				 */
+				positions?: Record<string, { x: number; y: number }>;
 			};
 		},
 	) {
@@ -290,6 +309,7 @@ export class DeckAgent {
 		 */
 		this.lastModel = options.restored?.model ?? options.model ?? sessionModelOf(options.resumeRef);
 		this.lastUsage = options.restored?.usage;
+		for (const [path, at] of Object.entries(options.restored?.positions ?? {})) this.places.set(path, at);
 		// What this runtime offered the last time one ran on this deck. A list that is a
 		// session out of date is worth more than a picker that cannot be opened; choosing
 		// from it starts the runtime, which republishes it (`setModel`).
@@ -500,6 +520,11 @@ export class DeckAgent {
 			queue: (agentId?: string) => this.host.queue(agentId ?? this.id),
 			recordRevision: (path: string) => this.host.recordRevision(path),
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
+			// This stage's arrangement, which the tool and the canvas both go through — see
+			// `stage/service.ts`'s `StageArrangement`.
+			stageBoard: (board: Board) => this.stageBoard(board),
+			positionOf: (path: string) => this.positionOf(path),
+			place: (path: string, at: { x: number; y: number }) => this.place(path, at),
 		};
 	}
 
@@ -550,11 +575,56 @@ export class DeckAgent {
 	 * shows the whole deck" fallback does not fire. It reads as the deck being gone.
 	 */
 	forget(path: string): boolean {
-		if (!this.held.includes(path) && !this.playing.includes(path)) return false;
+		const arranged = this.places.delete(path);
+		if (!this.held.includes(path) && !this.playing.includes(path)) {
+			// The place goes with the board whether or not it was in play: a path that comes back —
+			// a board restored from the shell, a file put back under the same name — should come back
+			// to the deck's arrangement rather than to where a stage that no longer has it left it.
+			if (arranged) this.save();
+			return arranged;
+		}
 		this.held = this.held.filter((held) => held !== path);
 		this.playing = this.playing.filter((playing) => playing !== path);
 		this.publishContext();
 		return true;
+	}
+
+	/**
+	 * Where this stage has put a board — `undefined` when it has never moved it.
+	 *
+	 * The question a placement asks: a board this stage has an opinion about is left exactly where
+	 * it is, and one it has never moved is free to be given a place. The deck's own arrangement is
+	 * not consulted, because it is not this stage's answer.
+	 */
+	positionOf(path: string): { x: number; y: number } | undefined {
+		return this.places.get(path);
+	}
+
+	/**
+	 * A board as this stage sees it: the deck's place, unless this stage has moved it.
+	 *
+	 * The one read the wire needs from a stage. Every message that carries a board carries an `x`
+	 * and a `y`, and on the wire they mean *where it is on the stage being drawn* — so the
+	 * override happens once, on the way out (`App.send`), rather than at each message that
+	 * happens to mention a board.
+	 */
+	stageBoard(board: Board): Board {
+		const at = this.places.get(board.path);
+		return at ? { ...board, x: at.x, y: at.y } : board;
+	}
+
+	/**
+	 * Put a board somewhere on this stage, and remember it.
+	 *
+	 * The only writer of a place. `deck.json` keeps the deck's own arrangement and is not touched:
+	 * moving a board is a change to the canvas you are looking at, not to the deck a new
+	 * conversation starts from.
+	 */
+	place(path: string, at: { x: number; y: number }): { x: number; y: number } {
+		const spot = { x: Math.round(at.x), y: Math.round(at.y) };
+		this.places.set(path, spot);
+		this.save();
+		return spot;
 	}
 
 	private publishContext(): void {
@@ -657,7 +727,9 @@ export class DeckAgent {
 	 * yet" from "not read yet".
 	 */
 	private persisted(): boolean {
-		return this.restored || this.translator.userMessages().length > 0;
+		// A stage that has arranged something has something to write down even before it has been
+		// spoken to: dragging a board is a decision about the canvas, not about the transcript.
+		return this.restored || this.translator.userMessages().length > 0 || this.places.size > 0;
 	}
 
 	/** Write the record now. */
@@ -702,6 +774,7 @@ export class DeckAgent {
 			...(this.identity.tags?.length ? { tags: this.identity.tags } : {}),
 			...(this.identity.userTags?.length ? { userTags: this.identity.userTags } : {}),
 			...(this.identity.workspace ? { workspace: this.identity.workspace } : {}),
+			...(this.places.size > 0 ? { positions: Object.fromEntries(this.places) } : {}),
 			// The last thing actually said, not the time of this write — it is what the list
 			// is ordered by, and a flush on shutdown must not make an old chat look like the
 			// newest one. Kept on the record so the list never has to read a transcript.

@@ -11,14 +11,21 @@ import type { WirePart } from "./context.ts";
  */
 export const boards = {
 	"board.move": (message, reply, wire) => {
-		const board = wire.deck.setPosition(message.path, message.x, message.y);
-		if (!board) {
+		/*
+		 * The user's drag, which is the same act as an agent's `stage.move`: a board is moved on
+		 * the **stage**, so the board goes where it was dragged for this conversation and the
+		 * deck's own arrangement is left alone. `wire.send` scopes the message on the way out
+		 * (`App.staged`), so what goes round is the board as this stage now sees it.
+		 */
+		const agent = wire.agents.focused();
+		try {
+			const board = wire.stage.move(agent, message.path, { x: message.x, y: message.y });
+			// Broadcast rather than reply: a second tab is looking at the same
+			// stage and the board has moved there too.
+			wire.send({ type: "board.changed", path: board.path, rev: board.rev, board });
+		} catch {
 			reply({ type: "error", text: `No such board: ${message.path}` });
-			return;
 		}
-		// Broadcast rather than reply: a second tab is looking at the same
-		// stage and the board has moved there too.
-		wire.send({ type: "board.changed", path: board.path, rev: board.rev, board });
 	},
 
 	"board.extent": (message, _reply, wire) => {
@@ -105,8 +112,10 @@ export const boards = {
 		const agent = wire.agents.focused();
 		agent.setInPlay([...agent.inPlay, path]);
 		if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
-			const placed = wire.deck.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
-			if (placed) wire.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
+			// Where the pointer dropped it, on this stage — the deck's arrangement is not the
+			// thing a drag is about (`AgentRecord.positions`).
+			const placed = wire.stage.move(agent, path, { x: message.at.x, y: message.at.y });
+			wire.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
 		}
 		// After the board is announced, so the asker already holds it when it hears the path.
 		if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });

@@ -66,16 +66,40 @@ test("boards nobody arranged get placed in rows, not on top of each other", () =
 	rmSync(root, { recursive: true, force: true });
 });
 
+test("boards nobody arranged go beside the arranged ones, not below them", () => {
+	const root = emptyDeck();
+	// One board somebody placed, and two nobody has ever placed.
+	writeFileSync(join(root, "deck.json"), JSON.stringify({ version: 1, name: "T", boards: { "boards/placed.html": { x: 1000, y: 2000 } } }));
+	writeFileSync(join(root, "boards", "placed.html"), board("Placed", 400, 300));
+	writeFileSync(join(root, "boards", "fresh.html"), board("Fresh", 300, 200));
+	const deck = Deck.open(root);
+
+	const placed = deck.board("boards/placed.html")!;
+	const fresh = deck.board("boards/fresh.html")!;
+	assert.equal(fresh.x, 1000 + 400 + 160, "to the right of what is arranged");
+	assert.equal(fresh.y, placed.y, "and level with its top");
+	// What this test is *not* about any more: whether a board has a place of its own is the
+	// stage's question (`AgentRecord.positions`), not the deck's. The deck only answers where a
+	// board nobody has moved is.
+	rmSync(root, { recursive: true, force: true });
+});
+
 test("a position in deck.json wins over the auto-layout, and survives a save", () => {
 	const root = emptyDeck();
 	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
-	writeFileSync(join(root, "deck.json"), JSON.stringify({ version: 1, name: "T", boards: { "boards/a.html": { x: 42, y: 99 } }, mine: 1 }));
+	writeFileSync(join(root, "boards", "b.html"), board("B", 800, 600));
+	writeFileSync(
+		join(root, "deck.json"),
+		JSON.stringify({ version: 1, name: "T", boards: { "boards/a.html": { x: 42, y: 99 }, "boards/b.html": { x: 900, y: 80 } }, mine: 1 }),
+	);
 	const deck = Deck.open(root);
 	assert.deepEqual([deck.boards[0]?.x, deck.boards[0]?.y], [42, 99]);
 
-	deck.setPosition("boards/a.html", 5, 6);
+	// A write of any kind rewrites the whole file — this one is a deletion, which is the path
+	// that no longer takes a position with it.
+	deck.remove("boards/b.html");
 	const written = JSON.parse(readFileSync(join(root, "deck.json"), "utf8"));
-	assert.deepEqual(written.boards["boards/a.html"], { x: 5, y: 6 });
+	assert.deepEqual(written.boards["boards/a.html"], { x: 42, y: 99 });
 	assert.equal(written.mine, 1, "an unknown key survives a write");
 	rmSync(root, { recursive: true, force: true });
 });
@@ -83,8 +107,8 @@ test("a position in deck.json wins over the auto-layout, and survives a save", (
 test("refreshing one board keeps its position and picks up its new size", () => {
 	const root = emptyDeck();
 	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
+	writeFileSync(join(root, "deck.json"), JSON.stringify({ version: 1, name: "T", boards: { "boards/a.html": { x: 300, y: 400 } } }));
 	const deck = Deck.open(root);
-	deck.setPosition("boards/a.html", 300, 400);
 	const before = deck.board("boards/a.html")!.rev;
 
 	writeFileSync(join(root, "boards", "a.html"), board("A renamed", 1000, 700));
@@ -110,9 +134,11 @@ test("removing a board deletes the file, forgets it, and takes its position with
 	const root = emptyDeck();
 	writeFileSync(join(root, "boards", "a.html"), board("A"));
 	writeFileSync(join(root, "boards", "b.html"), board("B"));
+	writeFileSync(
+		join(root, "deck.json"),
+		JSON.stringify({ version: 1, name: "T", boards: { "boards/a.html": { x: 40, y: 80 }, "boards/b.html": { x: 900, y: 80 } } }),
+	);
 	const deck = Deck.open(root);
-	deck.setPosition("boards/a.html", 40, 80);
-	deck.setPosition("boards/b.html", 900, 80);
 
 	assert.equal(deck.remove("boards/a.html"), true);
 	assert.equal(existsSync(join(root, "boards", "a.html")), false, "the file is gone");
@@ -224,8 +250,8 @@ test("resync reports what changed, what arrived and what went away — and nothi
 test("resync keeps a board's place on the canvas", () => {
 	const root = emptyDeck();
 	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
+	writeFileSync(join(root, "deck.json"), JSON.stringify({ version: 1, name: "T", boards: { "boards/a.html": { x: 640, y: 480 } } }));
 	const deck = Deck.open(root);
-	deck.setPosition("boards/a.html", 640, 480);
 
 	writeFileSync(join(root, "boards", "a.html"), board("A", 900, 700));
 	const [changed] = deck.resync().changed;
