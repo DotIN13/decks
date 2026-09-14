@@ -353,15 +353,68 @@
 		inset: 0;
 	}
 
-	/* GrapesJS writes its own inline sizing here; the box is the board's, so it is told. */
 	.grapes-canvas {
 		flex: 1 1 auto;
 		min-height: 0;
 	}
 
-	.grapes-canvas .gjs-cv-canvas {
-		width: 100%;
-		height: 100%;
+	/*
+	 * The canvas fills the panel, all the way down.
+	 *
+	 * GrapesJS writes inline pixel sizing on each of these as it measures itself, and it settled
+	 * on a *narrow* canvas inside a wide panel: the document laid out in a strip at the left and
+	 * clipped at its edge, with the rest of the editor empty. Its own resize handle sat at that
+	 * strip's corner, drawn at the strip's scale — the large black triangle over the page.
+	 *
+	 * `!important` because the widths are inline styles: there is no selector that outranks an
+	 * element's own `style` attribute, and the app's box is the one that should win — the editor
+	 * is standing in for a board of a known size.
+	 */
+	.grapes-canvas .gjs-editor,
+	.grapes-canvas .gjs-cv-canvas,
+	.grapes-canvas .gjs-cv-canvas__frames,
+	.grapes-canvas .gjs-frames,
+	.grapes-canvas .gjs-frame-wrapper,
+	.grapes-canvas .gjs-frame,
+	.grapes-canvas iframe {
+		width: 100% !important;
+		height: 100% !important;
+	}
+
+	/*
+	 * And none of GrapesJS's own theme shows through.
+	 *
+	 * `gjs-one-bg` and friends paint their editor chrome a dark grey, which beside a document on
+	 * white is what the black wedge over the page was: a dark container with a pale frame on top
+	 * of part of it. The panel stands in for a board, so its chrome is the board's own colours.
+	 */
+	.grapes-canvas .gjs-one-bg,
+	.grapes-canvas .gjs-two-color,
+	.grapes-canvas .gjs-editor,
+	.grapes-canvas .gjs-cv-canvas,
+	.grapes-canvas .gjs-cv-canvas__frames,
+	.grapes-canvas .gjs-frames,
+	.grapes-canvas .gjs-frame-wrapper {
+		/* The literal white, not `var(--bg)`: that variable is dark on the app's own chrome, so
+		   the rule resolved to the very colour it was written to remove. */
+		background: #fff !important;
+	}
+
+	/*
+	 * Nothing of GrapesJS's canvas chrome: no resize handle, no frame border.
+	 *
+	 * The handle is the black triangle. It is drawn at the canvas's own scale, so beside a narrow
+	 * canvas it read as a huge wedge over the page; filling the canvas and hiding the handle are
+	 * the same fix seen twice.
+	 */
+	.grapes-canvas [class*="resizer"],
+	.grapes-canvas [class*="resize"] {
+		display: none !important;
+	}
+
+	.grapes-canvas .gjs-frame {
+		border: 0 !important;
+		box-shadow: none !important;
 	}
 
 	/*

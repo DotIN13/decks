@@ -78,6 +78,34 @@ say("the editor opens", await editor(), "a .grapes-editor is on the canvas");
 say("the page reported no errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 
 /**
+ * How much of the panel the document actually occupies.
+ *
+ * Measured rather than assumed, because GrapesJS sizes its canvas itself and got it wrong: the
+ * document laid out in a narrow strip at the left of a wide panel, clipped at the strip's edge,
+ * with its resize handle drawn at that strip's scale as a black triangle over the page. A check
+ * that only asked whether the document was *there* passed the whole time.
+ */
+const fill = () =>
+	page.evaluate(() => {
+		const box = (selector) => {
+			const element = document.querySelector(selector);
+			if (!element) return undefined;
+			const rect = element.getBoundingClientRect();
+			return { w: Math.round(rect.width), h: Math.round(rect.height) };
+		};
+		const panel = box(".grapes-canvas");
+		const frame = box("#decks-document-canvas") ?? box(".gjs-frame");
+		// Both dimensions. The first version of this measured width only and passed with a frame
+		// 1116 wide and 220 tall, which is the same bug the screenshot shows in the other axis.
+		return {
+			panel,
+			frame,
+			percent: panel && frame ? Math.round((frame.w / panel.w) * 100) : null,
+			heightPercent: panel && frame ? Math.round((frame.h / panel.h) * 100) : null,
+		};
+	});
+
+/**
  * Polled, because GrapesJS renders into its canvas well after the panel appears: the frame
  * arrives first and stays empty for a second or two while the components are built into it, and
  * an assertion made in that window says the editor is broken when it is only early.
@@ -96,6 +124,35 @@ say(
 	opened.frames.some((frame) => frame.hasDoc && frame.hasP),
 	JSON.stringify(opened).slice(0, 400),
 );
+
+const filled = await fill();
+say(
+	"…and it fills the panel rather than a strip of it",
+	filled.percent !== null && filled.percent >= 95 && (filled.heightPercent ?? 0) >= 95,
+	JSON.stringify(filled),
+);
+
+/*
+ * And nothing large and dark left over it. GrapesJS draws its canvas resize handle at the
+ * canvas's own scale — beside a narrow canvas that was a black wedge across the page — so this
+ * asks the panel for anything big and near-black, which no chrome of ours is.
+ */
+const dark = await page.evaluate(() => {
+	const panel = document.querySelector(".grapes-canvas");
+	if (!panel) return [];
+	return [...panel.querySelectorAll("*")]
+		.map((element) => {
+			const rect = element.getBoundingClientRect();
+			const back = getComputedStyle(element).backgroundColor.match(/[\d.]+/g)?.map(Number) ?? [];
+			// Alpha-aware: the canvas frame is `rgba(0, 0, 0, 0)`, and a transparent element is
+			// not a black one — the first version of this flagged the iframe itself as the wedge.
+			const alpha = back.length >= 4 ? back[3] : 1;
+			const darkBack = back.length >= 3 && alpha > 0.5 && back[0] < 70 && back[1] < 70 && back[2] < 70;
+			return { cls: String(element.className).slice(0, 40), area: Math.round(rect.width * rect.height), darkBack };
+		})
+		.filter((entry) => entry.darkBack && entry.area > 20000);
+});
+say("…with no oversized dark furniture over it", dark.length === 0, JSON.stringify(dark).slice(0, 300));
 
 // 1. Opening and leaving writes nothing at all.
 await page.keyboard.press("Escape");
