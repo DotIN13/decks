@@ -250,6 +250,40 @@ await settle(page, 120);
 const whilePanning = await page.evaluate(() => document.querySelector(".stage").dataset.scaling);
 say("a scroll that only moves the camera does not ask for them", beforePan === "false" && whilePanning === "false", `${beforePan} -> ${whilePanning}`);
 
+/*
+ * The world's own layer, which is a different question from the boards' and has the opposite
+ * answer at rest.
+ *
+ * `will-change: transform` on `.world` is a promise: hold the picture, apply the camera as a
+ * matrix. It is what makes a pan cheap *and* what keeps a zoom soft, because the raster is not
+ * remade when the transform changes — which is the point of the promise. It used to be held for
+ * the life of the page. Now a *gesture* raises it and 300ms of quiet drops it, so a pan is still
+ * a matrix and the boards are drawn again at the scale the camera settled on.
+ */
+const movingNow = () =>
+	page.evaluate(() => ({
+		stage: document.querySelector(".stage").dataset.moving,
+		world: getComputedStyle(document.querySelector(".world")).willChange,
+	}));
+
+await page.mouse.move(700, 400);
+await page.mouse.down();
+await page.mouse.move(660, 430, { steps: 6 });
+const midPan = await movingNow();
+say(
+	"a pan holds the world's layer, so the world moves as a matrix",
+	midPan.stage === "true" && midPan.world === "transform",
+	JSON.stringify(midPan),
+);
+await page.mouse.up();
+await settle(page, 900);
+const afterPan = await movingNow();
+say(
+	"…and gives it back, so the boards are drawn again at the size they are read at",
+	afterPan.stage === "false" && afterPan.world === "auto",
+	JSON.stringify(afterPan),
+);
+
 // Zoom in until the other boards leave the screen, and their bars should go with them.
 for (let step = 0; step < 10; step++) {
 	await page.keyboard.press("Control+Equal");

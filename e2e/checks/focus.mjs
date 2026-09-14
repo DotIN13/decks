@@ -119,8 +119,17 @@ say(
  * board units that the camera's scale cancels) rather than from a `scale(1 / zoom)` transform,
  * because a transform inside the world's composited layer is resampled — rastered at the
  * camera's scale, scaled down by the bar, scaled back up by the camera — and the text came out
- * visibly soft at 4×. The assertion is the pair, so that "fixing" the blur by taking the layer
- * off the world fails here rather than passing quietly.
+ * visibly soft at 4×. The assertion is the pair, so that "fixing" the blur by counter-scaling the
+ * bar fails here rather than passing quietly.
+ *
+ * The world's `will-change` is read in the same breath and is now expected to be **absent**, which
+ * reverses what this line said before. It used to be asserted as `transform` — the argument being
+ * that taking the world's layer off would give up the cheap pan. The person reading a board at
+ * 400% on a 2× display then reported that removing it sharpens the board; the promise to hold the
+ * picture is exactly what stops the raster being remade at a new scale, and a software rasterizer
+ * (which is what this suite runs on) does not honour it, so nothing here could see it. It is held
+ * for the length of a gesture now — `.stage[data-moving="true"] .world`, asserted in `camera.mjs`
+ * — so neither the pan nor the sharpness is given up, and at rest there is nothing to hold.
  */
 const raster = await page.evaluate(() => {
 	const bar = document.querySelector(".board-node .chrome");
@@ -129,7 +138,7 @@ const raster = await page.evaluate(() => {
 });
 say(
 	"the bar is drawn at the size it is laid out, not scaled, so zooming cannot soften it",
-	raster.barTransform === "none" && raster.worldWillChange === "transform",
+	raster.barTransform === "none" && raster.worldWillChange === "auto",
 	JSON.stringify(raster),
 );
 
