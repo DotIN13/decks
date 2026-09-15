@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { GRID, insertAt, markupFor, snap } from "./gestures.ts";
+import { GRID, insertAt, markupFor, moveInTree, snap } from "./gestures.ts";
 import { bodyOf, type Part, type TreeNode } from "./node.ts";
 import type { EditorOp } from "@decks/protocol";
 
@@ -54,4 +54,22 @@ test("a palette press names the end of the body, because a new component is a ne
 	assert.deepEqual(op!.path, [1], "past the one component already there");
 	assert.match(op!.html, /class="card"/);
 	assert.deepEqual(emitted, [op], "and it is handed out immediately — the frame draws it when the write returns");
+});
+
+test("a reorder moves the node among its siblings, which is the order every path counts through", () => {
+	const a = el("p", [], [], true, "First");
+	const b = el("p", [], [], true, "Second");
+	const c = el("p", [], [], true, "Third");
+	const doc = el("div", [["class", "doc"]], [child(a), child(b), child(c)]);
+	const root = el("html", [], [child(el("head")), child(el("body", [["class", "board"]], [child(doc)]))]);
+	const order = () => doc.parts.filter((part) => part.kind === "element").map((part) => (part.node as TreeNode).content);
+
+	moveInTree(c, 0);
+	assert.deepEqual(order(), ["Third", "First", "Second"], "the third goes to the top");
+	moveInTree(c, 2);
+	assert.deepEqual(order(), ["First", "Second", "Third"], "and it can go back to the end");
+
+	const body = el("html", [], [child(el("head")), child(el("body", [["class", "board"]]))]);
+	assert.doesNotThrow(() => moveInTree(a, 0), "a node with no parent is left alone rather than thrown at");
+	void body;
 });

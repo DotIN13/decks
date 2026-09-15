@@ -22,7 +22,7 @@ import { COMPONENTS, PALETTE, type ComponentKind } from "@decks/board-kit";
 import type { EditorOp } from "@decks/protocol";
 import { nodeAt, pathOf } from "./address.ts";
 import { bodyOf, elementParts, type TreeNode } from "./node.ts";
-import { ops, rectOf } from "./ops.ts";
+import { ops, rectOf, wordsOf } from "./ops.ts";
 import { describe, isProjection, type Selection } from "./select.ts";
 
 /** What a palette offers: the kinds `board-kit` says can be placed, with their labels and sizes. */
@@ -79,6 +79,39 @@ function setStyle(node: TreeNode, changes: Record<string, string>): void {
 	else node.attrs[existing] = ["style", text];
 }
 
+/** Where a node sits among its parent's element children, and how many there are. */
+function siblingsOf(node: TreeNode): { parent: TreeNode; index: number; all: TreeNode[] } | undefined {
+	const parent = node.parent;
+	if (!parent) return undefined;
+	const all = elementParts(parent);
+	const index = all.indexOf(node);
+	return index === -1 ? undefined : { parent, index, all };
+}
+
+/**
+ * Move a node in the tree, so a re-render draws the order the drag showed.
+ *
+ * `to` counts among the *other* element children — the same reading as `move`'s own `to`, the index it
+ * ends up at — which is why the node is taken out before the reference is looked up.
+ *
+ * One thing this deliberately does not do: move the whitespace **parts** around it. The file's
+ * indentation belongs to the lines it sits among and the server's splice handles them; a preview that
+ * showed the moved block at its old indentation is a cosmetic difference in a rendering, not a wrong
+ * document. What has to move here is the element order, because every path counts through it.
+ */
+export function moveInTree(node: TreeNode, to: number): void {
+	const found = siblingsOf(node);
+	if (!found) return;
+	const rest = found.all.filter((sibling) => sibling !== node);
+	const next = rest[to] ?? null;
+	const parts = found.parent.parts;
+	const indexOf = (seek: TreeNode | null) =>
+		seek ? parts.findIndex((part) => part.kind === "element" && part.node === seek) : parts.length;
+	const from = indexOf(node);
+	const [moved] = parts.splice(from, 1);
+	parts.splice(indexOf(next), 0, moved!);
+}
+
 /** A name nothing in the board is using yet: `sticky`, `sticky-2`, … */
 function freshId(root: TreeNode, kind: string): string {
 	const taken = new Set<string>();
@@ -109,6 +142,88 @@ export function markupFor(root: TreeNode, kind: ComponentKind, at: { x: number; 
 	return `<div class="${spec.className}" data-id="${id}" style="${style}">${words}</div>`;
 }
 
+/**
+ * Where a dragged block would land among its siblings, from where the pointer is.
+ *
+ * Counted over the element children of the parent with the dragged node itself taken out — which is what
+ * makes the answer the index it *ends up at*, the way `move` means it, rather than the index of a
+ * neighbour to sit beside. The midpoint is the test: a block is above a sibling once the pointer is past
+ * half of it.
+ */
+function dropIndex(node: TreeNode, clientY: number): number {
+	const found = siblingsOf(node);
+	if (!found) return 0;
+	let index = 0;
+	for (const sibling of found.all) {
+		if (sibling === node) continue;
+		const box = (sibling.element as HTMLElement | undefined)?.getBoundingClientRect();
+		if (box && clientY > box.top + box.height / 2) index++;
+	}
+	return index;
+}
+
+/** The same order in the frame: the element goes before the sibling that should follow it. */
+function placeAmongSiblings(node: TreeNode, to: number): void {
+	const found = siblingsOf(node);
+	const parent = found?.parent.element;
+	const element = node.element as HTMLElement | undefined;
+	if (!found || !parent || !element) return;
+	const rest = found.all.filter((sibling) => sibling !== node);
+	const next = (rest[to]?.element as HTMLElement | undefined) ?? null;
+	parent.insertBefore(element, next);
+	moveInTree(node, to);
+}
+
+/**
+ * The caret: a double-click puts one in a run of words, and leaving the run writes what was typed.
+ *
+ * A **leaf** only — a heading, a paragraph, a cell — because a leaf is one run of words and its content is
+ * the file's. A **projection** is excluded on purpose: `[data-md]`'s element holds the *drawing*, and what
+ * a caret would write back is the rendering, not the markdown. Its source is a field rather than a caret,
+ * and that field is not built yet — which is the one visible gap left in this phase.
+ *
+ * The op is `text`, and it goes out with the words the editor was showing as its guard. Two details are
+ * what keep it honest:
+ *
+ * - **the caret is closed before the op is built**, so the element's content is the element's own again and
+ *   not an editing surface the browser is still mid-way through;
+ * - **a run nobody typed into emits nothing.** `contenteditable` alone can rewrite an element's markup
+ *   while a person only clicked it, and the file must not change because somebody put a caret in it and
+ *   then looked away.
+ */
+function openCaret(host: GestureHost, node: TreeNode, point: { x: number; y: number }): () => void {
+	const element = node.element as HTMLElement | undefined;
+	if (!element) return () => {};
+	const asWritten = element.textContent ?? "";
+
+	element.setAttribute("contenteditable", "plaintext-only");
+	element.focus();
+	/*
+	 * And the caret where the press was, rather than at the start of the run. `plaintext-only` is used
+	 * because a board's markup is the file's business: typing should produce words, and the allowlist on the
+	 * server decides what may be written around them.
+	 */
+	const doc = host.document();
+	const range = doc?.caretRangeFromPoint?.(point.x, point.y);
+	if (range) {
+		const selection = doc?.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
+	}
+
+	return () => {
+		element.removeAttribute("contenteditable");
+		if ((element.textContent ?? "") === asWritten) {
+			// No words changed: nothing to write, and the surface goes back to what it was.
+			return;
+		}
+		const path = pathOf(host.root(), node);
+		if (!path) return;
+		node.content = element.innerHTML;
+		host.emit({ op: "text", path, before: wordsOf(node), html: element.innerHTML });
+	};
+}
+
 /** Attach every gesture to the frame. Returns the undo, for `destroy`. */
 export function attachGestures(host: GestureHost): () => void {
 	const frame = host.document()?.defaultView;
@@ -117,12 +232,14 @@ export function attachGestures(host: GestureHost): () => void {
 	/** A gesture in progress: a drag, a resize, or nothing. */
 	let live:
 		| {
+				kind: "move" | "resize" | "reorder";
 				node: TreeNode;
 				element: HTMLElement;
 				from: { x: number; y: number };
 				start: { left: number; top: number; width: number; height: number };
-				resizing: boolean;
 				moved: boolean;
+				/** For a reorder: where among its siblings it would land, as the pointer stands. */
+				to: number;
 		  }
 		| undefined;
 
@@ -136,24 +253,35 @@ export function attachGestures(host: GestureHost): () => void {
 		const node = host.nodeFromEvent(target);
 		if (!node || isProjection(node)) return;
 		const rect = rectOf(node);
-		if (rect.left === undefined) return;
-
 		const element = node.element as HTMLElement | undefined;
 		if (!element) return;
 		const box = element.getBoundingClientRect();
-		const resizing = event.clientX > box.right - EDGE || event.clientY > box.bottom - EDGE;
+
+		/*
+		 * Three kinds of drag, decided by what the node *is* rather than by what kind of board it is on.
+		 *
+		 * - a node with `left`/`top` **moves**, or **resizes** if the press is in the outer eight pixels;
+		 * - a node without them **reorders**: a block in a document has no position of its own, so a drag
+		 *   can only mean where among its siblings it belongs.
+		 *
+		 * The third case is the one the twelve ops could not express at all for a block: `order` moved a
+		 * component within the body, and there was nothing for "this paragraph goes above that one".
+		 */
+		const placed = rect.left !== undefined;
+		const resizing = placed && (event.clientX > box.right - EDGE || event.clientY > box.bottom - EDGE);
 		live = {
+			kind: resizing ? "resize" : placed ? "move" : "reorder",
 			node,
 			element,
 			from: { x: event.clientX, y: event.clientY },
 			start: {
-				left: Number.parseFloat(rect.left),
+				left: number(rect.left),
 				top: number(rect.top),
 				width: number(rect.width) || box.width,
 				height: number(rect.height) || box.height,
 			},
-			resizing,
 			moved: false,
+			to: siblingsOf(node)?.index ?? 0,
 		};
 		element.setPointerCapture?.(event.pointerId);
 	}
@@ -166,18 +294,27 @@ export function attachGestures(host: GestureHost): () => void {
 		live.moved = true;
 
 		/*
-		 * The preview: the element moves, and the tree's own attributes move with it.
+		 * The preview. A drag moves the element and the tree's own copy of it; a reorder moves both in the
+		 * order they are in, so a re-render draws the order rather than the file's old one.
 		 *
-		 * The tree has to keep up — a re-render draws from it, and the next gesture measures the node
-		 * rather than the DOM. This is the only place the editor writes to its tree, and it is what makes a
-		 * drag need no round trip: what you see is already what the file is about to be.
+		 * The tree has to keep up — the next gesture measures the node rather than the DOM — and this is the
+		 * only place the editor writes to its tree. It is what makes a drag need no round trip: what you see
+		 * is already what the file is about to be.
 		 */
-		const changes: Record<string, string> = live.resizing
-			? {
-					width: `${Math.max(GRID, snap(live.start.width + dx))}px`,
-					height: `${Math.max(GRID, snap(live.start.height + dy))}px`,
-				}
-			: { left: `${snap(live.start.left + dx)}px`, top: `${snap(live.start.top + dy)}px` };
+		if (live.kind === "reorder") {
+			live.to = dropIndex(live.node, event.clientY);
+			placeAmongSiblings(live.node, live.to);
+			host.remark();
+			return;
+		}
+
+		const changes: Record<string, string> =
+			live.kind === "resize"
+				? {
+						width: `${Math.max(GRID, snap(live.start.width + dx))}px`,
+						height: `${Math.max(GRID, snap(live.start.height + dy))}px`,
+					}
+				: { left: `${snap(live.start.left + dx)}px`, top: `${snap(live.start.top + dy)}px` };
 		for (const [name, value] of Object.entries(changes)) live.element.style.setProperty(name, value);
 		setStyle(live.node, changes);
 		host.remark();
@@ -193,9 +330,15 @@ export function attachGestures(host: GestureHost): () => void {
 		 * And then the op — carrying only what the gesture changed, which is what keeps the diff to one
 		 * line: the server merges declarations into the ones already in the file.
 		 */
+		if (gesture.kind === "reorder") {
+			const op = ops.move(host.root(), gesture.node, gesture.to);
+			if (op) host.emit(op);
+			return;
+		}
+
 		const rect = rectOf(gesture.node);
 		const style: Record<string, string> = {};
-		if (gesture.resizing) {
+		if (gesture.kind === "resize") {
 			if (rect.width) style.width = rect.width;
 			if (rect.height) style.height = rect.height;
 		} else {
@@ -229,13 +372,43 @@ export function attachGestures(host: GestureHost): () => void {
 		}
 	}
 
+	/** The run being typed into, and how to close it. */
+	let caret: (() => void) | undefined;
+
+	function dblclick(event: MouseEvent): void {
+		if (!host.editing()) return;
+		const node = host.nodeFromEvent(event.target);
+		if (caret) {
+			const close = caret;
+			caret = undefined;
+			close();
+		}
+		if (!node || isProjection(node) || !node.leaf) return;
+		caret = openCaret(host, node, { x: event.clientX, y: event.clientY });
+	}
+
+	function leaveCaret(event: Event): void {
+		if (!caret) return;
+		// Escape closes the run as well as leaving it: a key that means "done" is the one people try.
+		if (event.type === "keydown" && (event as KeyboardEvent).key !== "Escape") return;
+		const close = caret;
+		caret = undefined;
+		close();
+	}
+
 	const doc = host.document();
+	doc?.addEventListener("dblclick", dblclick, true);
+	doc?.addEventListener("focusout", leaveCaret, true);
+	doc?.addEventListener("keydown", leaveCaret, true);
 	doc?.addEventListener("pointerdown", down, true);
 	doc?.addEventListener("pointermove", move, true);
 	doc?.addEventListener("pointerup", up, true);
 	doc?.addEventListener("keydown", key, true);
 
 	return () => {
+		doc?.removeEventListener("dblclick", dblclick, true);
+		doc?.removeEventListener("focusout", leaveCaret, true);
+		doc?.removeEventListener("keydown", leaveCaret, true);
 		doc?.removeEventListener("pointerdown", down, true);
 		doc?.removeEventListener("pointermove", move, true);
 		doc?.removeEventListener("pointerup", up, true);

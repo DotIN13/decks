@@ -144,5 +144,75 @@ say(
 	JSON.stringify({ op: removed?.op, path: removed?.path, before: String(removed?.before ?? "").slice(0, 40) }),
 );
 
+// --- the caret on a leaf ------------------------------------------------------------------------
+await clearOps();
+const words = await pointIn('[data-id="goal"] p', { x: 30, y: 8 });
+await page.mouse.dblclick(words.x, words.y);
+say(
+	"a double-click puts a caret in the run, as a plaintext surface rather than a rich one",
+	(await board.locator('[data-id="goal"] p').first().getAttribute("contenteditable")) === "plaintext-only",
+	String(await board.locator('[data-id="goal"] p').first().getAttribute("contenteditable")),
+);
+await page.keyboard.type(" and one more tab");
+await page.mouse.click((await pointIn(card)).x, (await pointIn(card)).y);
+const typed = await lastOp();
+say(
+	"…and leaving it emits one `text`, with the words that were there as the guard",
+	typed?.op === "text" && Array.isArray(typed?.path) && (typed?.before ?? "").length > 0 && /one more tab/.test(typed?.html ?? ""),
+	JSON.stringify({ op: typed?.op, path: typed?.path, before: String(typed?.before ?? "").slice(0, 30), html: String(typed?.html ?? "").slice(0, 60) }),
+);
+
+/*
+ * And the property that matters more than the gesture: **a caret opened and left writes nothing.**
+ * `contenteditable` alone can rewrite an element's markup while somebody only clicked it, and a file must
+ * not change because a person put a caret in it and looked away.
+ */
+await clearOps();
+await page.mouse.dblclick(words.x, words.y);
+await page.mouse.click((await pointIn(card)).x, (await pointIn(card)).y);
+say("a caret opened and left without typing emits nothing", (await ops()).length === 0, `${(await ops()).length} op(s)`);
+
+// --- reorder among siblings ---------------------------------------------------------------------
+await page.goto(`${WEB}/editor.html?board=${encodeURIComponent("boards/notes.html")}`, { waitUntil: "domcontentloaded" });
+await page.waitForFunction(() => window.__editorDev?.loaded === true, null, { timeout: 20000 });
+await page.locator("#mode").click();
+await clearOps();
+
+const flow = page.frameLocator(".board-frame");
+const paragraphs = await flow.locator(".doc > p").count();
+const firstText = await flow.locator(".doc > p").first().innerText();
+const first = await flow.locator(".doc > p").first().boundingBox();
+const third = await flow.locator(".doc > p").nth(2).boundingBox();
+const draggedText = await flow.locator(".doc > p").nth(2).innerText();
+
+/*
+ * Dropped two pixels below the *first paragraph's* top: above every sibling's midpoint, which is the
+ * condition `dropIndex` counts — so the block lands as early as that point allows, which is directly under
+ * the document's heading. A drop 200 pixels higher up was a no-op: it left the pointer below the siblings
+ * it was supposed to pass.
+ */
+await page.mouse.move(third.x + 40, third.y + 6);
+await page.mouse.down();
+await page.mouse.move(third.x + 40, first.y + 2, { steps: 12 });
+await page.mouse.up();
+const reordered = await lastOp();
+
+/*
+ * `to: 1` and not `to: 0`, because the index counts **every** element child of the parent and the document
+ * opens with a heading: a paragraph dropped at the top of the flow is the second child, which is the
+ * position it visibly takes. The first version of this asserted zero and called a correct gesture wrong.
+ */
+say(
+	"a block dragged above its siblings emits one `move`, to the index it ends up at",
+	reordered?.op === "move" && Array.isArray(reordered?.path) && reordered?.to === 1,
+	`of ${paragraphs} paragraphs, path ${JSON.stringify(reordered?.path)}, to ${reordered?.to}`,
+);
+say(
+	"…and the frame is already in that order, because the drag moved it there",
+	(await flow.locator(".doc > p").first().innerText()) === draggedText &&
+		(await flow.locator(".doc > p").first().innerText()) !== firstText,
+	`first paragraph now starts “${(await flow.locator(".doc > p").first().innerText()).slice(0, 40)}”`,
+);
+
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();
