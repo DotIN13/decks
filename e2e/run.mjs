@@ -67,6 +67,11 @@ const CHECKS = [
 	 */
 	{ file: "render-fidelity.mjs", needsAgent: false },
 	/*
+	 * What a press means: the four answers of phase 3's selection policy, driven by real presses
+	 * through the editor's frame.
+	 */
+	{ file: "select-nodes.mjs", needsAgent: false },
+	/*
 	 * A flow document edited as fields. This is the other half of the fixture's flow board,
 	 * and the first coverage in the suite of the *document* editor: the field half of
 	 * `Editor.ts` ran on component boards only, and the reason a flow board was handed to the

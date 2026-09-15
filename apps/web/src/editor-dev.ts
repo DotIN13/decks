@@ -45,6 +45,8 @@ const report = {
 	/** How many nodes there are, and how many of them found their element in the frame. */
 	handles: { nodes: 0, landed: 0 } as { nodes: number; landed: number } | null,
 	ops: [] as unknown[],
+	/** The selection, as much as a person or a check needs: where, what kind, and a projection's source. */
+	selection: null as { path: number[]; kind: string; id?: string; source?: string } | null,
 };
 
 declare global {
@@ -56,7 +58,16 @@ window.__editorDev = report;
 
 const host = document.querySelector("#editor") as HTMLElement;
 const out = document.querySelector("#ops") as HTMLElement;
-const status = document.querySelector("#status") as HTMLElement;
+const status = document.querySelector("#said") as HTMLElement;
+/**
+ * The mode control, and the reason it is a button.
+ *
+ * A key would be the app's to bind, and in the app it is: the mode arrives as a getter over the app's
+ * own signal. Here it is the page's, and it has to be pressable from outside — a check that has to
+ * guess where focus is before it can flip a mode is a check that fails for the wrong reason. Measured:
+ * a press inside the frame leaves focus in the frame, and `e` pressed on the page never arrives.
+ */
+const modeButton = document.querySelector("#mode") as HTMLButtonElement;
 
 /** Every node in the tree. */
 function countNodes(node: TreeNode): number {
@@ -148,18 +159,33 @@ async function main(): Promise<void> {
 			status.dataset.state = report.equal && landed === nodes ? "ok" : "bad";
 			if (!report.equal) console.warn("shape differs:", report.diff);
 		},
+		onSelect: (selection) => {
+			report.selection = selection
+				? {
+						path: selection.path,
+						kind: selection.kind,
+						...(selection.id === undefined ? {} : { id: selection.id }),
+						...(selection.source === undefined ? {} : { source: selection.source }),
+					}
+				: null;
+			out.textContent = JSON.stringify(report.selection, null, 1);
+		},
 		onOps: (patches) => {
 			report.ops.push(...patches);
-			out.textContent = JSON.stringify(report.ops, null, 1);
 		},
 	});
 
-	// `E` flips the mode, which is what the app's own control will drive.
-	window.addEventListener("keydown", (event) => {
-		if (event.key !== "e") return;
+	// The button, and `E` as well for a person at the keyboard.
+	const flip = (): void => {
 		const next = document.documentElement.dataset.mode === "edit" ? "browse" : "edit";
 		document.documentElement.dataset.mode = next;
-		status.textContent = `mode: ${next} — ${path}`;
+		modeButton.textContent = next;
+		status.textContent = `${path} — ${next}`;
+		editor?.setMode();
+	};
+	modeButton.addEventListener("click", flip);
+	window.addEventListener("keydown", (event) => {
+		if (event.key === "e") flip();
 	});
 }
 
