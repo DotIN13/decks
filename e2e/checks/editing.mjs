@@ -52,7 +52,9 @@ await paragraph.dblclick();
 await settle(page, 300);
 const opened = await page.evaluate(() => {
 	const win = document.querySelector('.board-node[data-path="boards/notes.html"] iframe').contentWindow;
-	const run = win.document.querySelector("[contenteditable='true']");
+	// `plaintext-only` rather than `true`: a run is a plaintext surface now, so a board's markup stays
+	// the file's business.
+	const run = win.document.querySelector("[contenteditable]");
 	return { tag: run?.tagName ?? null, text: (run?.textContent ?? "").slice(0, 30) };
 });
 say("a double-click in a document opens the run of words", opened.tag !== null && opened.text.length > 4, JSON.stringify(opened));

@@ -851,7 +851,18 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		if (!before.trim()) return false;
 		const at = pathTo(component, run);
 		if (!at) return false;
-		run.contentEditable = "true";
+		/*
+		 * `plaintext-only`, not `true`.
+		 *
+		 * A rich run inserts a `<div>` on Enter — a block inside a `<p>`, which is markup a leaf should not
+		 * hold and which leaves the run no longer behaving like one. This is the bug that was reported.
+		 * Measured, before this line: two Enters in a paragraph put `<div>`s in it.
+		 *
+		 * Note the residue, honestly: `plaintext-only` is not in every browser, and where it is unknown this
+		 * falls back to a rich run again. The complete fix — Enter producing a `<br>`, and any block the
+		 * browser inserts being flattened on the way out — is in `@decks/editor`, which replaces this file.
+		 */
+		run.contentEditable = "plaintext-only";
 		run.focus();
 		/*
 		 * Assigned after focusing, not before. Moving focus out of a `contenteditable`

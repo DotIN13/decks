@@ -175,6 +175,58 @@ function placeAmongSiblings(node: TreeNode, to: number): void {
 }
 
 /**
+ * A line break inside a run — a `<br>`, not a `\n` and not a block.
+ *
+ * Three candidates and only one of them works:
+ *
+ * - **a `<div>`** is what a rich `contenteditable` inserts on Enter, and it is a *block* inside a `<p>`:
+ *   invalid markup no leaf should hold, and the reason a run stops behaving like a run after Enter. This is
+ *   the bug that was reported.
+ * - **a `\n`** is what `plaintext-only` inserts: correct as text and *invisible* on screen, because a card's
+ *   paragraph does not have `white-space: pre-wrap`. The line the person typed would not be the line they see.
+ * - **a `<br>`** is inline — so `INLINE_TAGS` keeps it, the server writes it, and the file holds a line break
+ *   rather than a space — and it is what a line break in a paragraph *is*.
+ *
+ * So Enter is taken from the browser, whichever of the three it would have used.
+ */
+function insertBreak(doc: Document | undefined): void {
+	if (!doc) return;
+	/*
+	 * The DOM, not `execCommand`.
+	 *
+	 * `insertHTML` was the first choice — it keeps the browser's own caret and undo bookkeeping — and it is
+	 * wrong here, measured: inside a `plaintext-only` element Chromium *coerces* rich insertion to plain
+	 * text, so the `<br>` came out as a newline and the line break the person typed was invisible on screen.
+	 * The element is not the browser's to sanitise; it is a `<br>` and the file holds it.
+	 */
+	const selection = doc.getSelection?.();
+	if (!selection?.rangeCount) return;
+	const range = selection.getRangeAt(0);
+	range.deleteContents();
+	const br = doc.createElement("br");
+	range.insertNode(br);
+	range.setStartAfter(br);
+	range.collapse(true);
+	selection.removeAllRanges();
+	selection.addRange(range);
+}
+
+/**
+ * Blocks a browser put inside a leaf, turned into the line breaks they meant.
+ *
+ * The belt beside `plaintext-only`: where that attribute is unknown — it is not in every browser — the
+ * engine falls back to a rich run and Enter inserts a `<div>`, and the run stops being editable in the way
+ * a run should be. Flattening on close means the worst case is a line break that renders, rather than a
+ * paragraph full of blocks.
+ */
+export function flattenBlocks(element: HTMLElement): void {
+	const doc = element.ownerDocument;
+	for (const block of [...element.querySelectorAll("div, p, section, article, li, h1, h2, h3, h4, h5, h6")]) {
+		block.replaceWith(doc.createTextNode("\n"), ...block.childNodes, doc.createElement("br"));
+	}
+}
+
+/**
  * The caret: a double-click puts one in a run of words, and leaving the run writes what was typed.
  *
  * A **leaf** only — a heading, a paragraph, a cell — because a leaf is one run of words and its content is
@@ -213,7 +265,8 @@ function openCaret(host: GestureHost, node: TreeNode, point: { x: number; y: num
 
 	return () => {
 		element.removeAttribute("contenteditable");
-		if ((element.textContent ?? "") === asWritten) {
+		flattenBlocks(element);
+		if (element.textContent?.replace(/\s+/g, " ").trim() === asWritten.replace(/\s+/g, " ").trim()) {
 			// No words changed: nothing to write, and the surface goes back to what it was.
 			return;
 		}
@@ -394,8 +447,17 @@ export function attachGestures(host: GestureHost): () => void {
 
 	function leaveCaret(event: Event): void {
 		if (!caret) return;
-		// Escape closes the run as well as leaving it: a key that means "done" is the one people try.
-		if (event.type === "keydown" && (event as KeyboardEvent).key !== "Escape") return;
+		if (event.type === "keydown") {
+			const press = event as KeyboardEvent;
+			// Enter is a line break, and it is ours rather than the browser's — see `insertBreak`.
+			if (press.key === "Enter" && !press.shiftKey) {
+				event.preventDefault();
+				insertBreak(host.document());
+				return;
+			}
+			// Escape closes the run as well as leaving it: a key that means "done" is the one people try.
+			if (press.key !== "Escape") return;
+		}
 		const close = caret;
 		caret = undefined;
 		close();
