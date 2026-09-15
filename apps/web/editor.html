@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-mode="browse">
+	<head>
+		<meta charset="utf-8" />
+		<title>Editor — dev page</title>
+		<style>
+			:root {
+				color-scheme: dark;
+				--bg: #101114;
+				--line: #2a2d33;
+				--fg: #e6e8ec;
+				--muted: #9aa0aa;
+			}
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+				background: var(--bg);
+				color: var(--fg);
+				font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
+			}
+			#shell {
+				display: grid;
+				grid-template-columns: 1fr 340px;
+				height: 100%;
+			}
+			#left {
+				display: grid;
+				grid-template-rows: auto 1fr;
+				min-width: 0;
+			}
+			#status {
+				padding: 8px 12px;
+				border-bottom: 1px solid var(--line);
+				color: var(--muted);
+			}
+			#status[data-state="ok"] {
+				color: #6ee7a8;
+			}
+			#status[data-state="bad"] {
+				color: #fca5a5;
+			}
+			#editor {
+				overflow: auto;
+				padding: 12px;
+			}
+			.board-frame {
+				width: 100%;
+				min-height: 1200px;
+				border: 1px solid var(--line);
+				border-radius: 8px;
+				background: #fff;
+			}
+			aside {
+				display: grid;
+				grid-template-rows: auto 1fr;
+				border-left: 1px solid var(--line);
+				min-height: 0;
+			}
+			aside h1 {
+				margin: 0;
+				padding: 8px 12px;
+				border-bottom: 1px solid var(--line);
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				color: var(--muted);
+			}
+			#ops {
+				margin: 0;
+				padding: 12px;
+				overflow: auto;
+				white-space: pre-wrap;
+				font: 12px/1.5 ui-monospace, monospace;
+				color: var(--muted);
+			}
+		</style>
+	</head>
+	<body>
+		<div id="shell">
+			<div id="left">
+				<div id="status">loading…</div>
+				<div id="editor"></div>
+			</div>
+			<aside>
+				<h1>The ops it would send</h1>
+				<pre id="ops">[]</pre>
+			</aside>
+		</div>
+		<script type="module" src="/src/editor-dev.ts"></script>
+	</body>
+</html>

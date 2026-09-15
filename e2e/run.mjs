@@ -60,6 +60,13 @@ const CHECKS = [
 	 */
 	{ file: "present.mjs", needsAgent: false },
 	/*
+	 * The renderer's own check, and the one that decides whether the editor may replace the frame:
+	 * every board rendered by the new package, compared against the browser's parse of the same
+	 * bytes. It needs no agent and no canvas — it drives `apps/web/editor.html`, which mounts only
+	 * `@decks/editor`.
+	 */
+	{ file: "render-fidelity.mjs", needsAgent: false },
+	/*
 	 * A flow document edited as fields. This is the other half of the fixture's flow board,
 	 * and the first coverage in the suite of the *document* editor: the field half of
 	 * `Editor.ts` ran on component boards only, and the reason a flow board was handed to the
