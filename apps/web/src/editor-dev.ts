@@ -16,6 +16,7 @@
 import {
 	createEditor,
 	ops,
+	paletteOf,
 	parseBoard,
 	rectOf,
 	serialize,
@@ -205,6 +206,22 @@ async function main(): Promise<void> {
 		editor?.setMode();
 	};
 	modeButton.addEventListener("click", flip);
+
+	/*
+	 * The palette: one button per kind `board-kit` says a palette offers, and a press that puts one in.
+	 *
+	 * A new component lands in the middle of the view rather than under a cursor, because this page has no
+	 * canvas to press on — in the app the palette arms and the next press places it, which is the same
+	 * `editor.insert(kind, at)` at the end.
+	 */
+	const palette = document.querySelector("#palette") as HTMLElement;
+	for (const spec of paletteOf()) {
+		const button = document.createElement("button");
+		button.type = "button";
+		button.textContent = spec.label;
+		button.addEventListener("click", () => editor?.insert(spec.kind, { x: 120, y: 704 }));
+		palette.append(button);
+	}
 
 	/*
 	 * The first edit the editor can make, and the smallest one worth making: move the selected node

@@ -21,10 +21,13 @@
  * being edited lays out identically to one being read. That is the same reason a handle is an
  * attribute rather than a wrapper: nothing about editing may move the page.
  */
+import type { ComponentKind } from "@decks/board-kit";
+import type { EditorOp } from "@decks/protocol";
 import { nodeAt as nodeAtPath, pathOf as pathFor } from "./address.ts";
 import { collectHandles, HANDLE_ATTRIBUTE } from "./handles.ts";
 import type { TreeNode } from "./node.ts";
 import { parseBoard, type Tree } from "./parse.ts";
+import { attachGestures, insertAt } from "./gestures.ts";
 import { describe, isProjection, type Selection } from "./select.ts";
 import { serialize } from "./serialize.ts";
 import { shapeOf } from "./shape.ts";
@@ -49,7 +52,7 @@ export interface EditorOptions {
 }
 
 /** What a press may be made on: an element, an event's target, or nothing to clear the selection. */
-export type SelectionTarget = EventTarget | Node | undefined;
+export type SelectionTarget = EventTarget | Node | null | undefined;
 
 export interface Editor {
 	/** The tree, for tests and for anything the app wants to ask about the document. */
@@ -72,6 +75,8 @@ export interface Editor {
 	select(target: SelectionTarget): Selection | undefined;
 	/** Apply the mode to the frame now, rather than waiting for the next press. */
 	setMode(): void;
+	/** Put a new component in at a point in board pixels — what a palette button calls. */
+	insert(kind: ComponentKind, at: { x: number; y: number }): EditorOp | undefined;
 	destroy(): void;
 }
 
@@ -242,6 +247,9 @@ export function createEditor(frame: HTMLIFrameElement, options: EditorOptions): 
 		options.onSelect?.(selection);
 	}
 
+	/** The gestures, attached once the frame has a document to attach them to. */
+	let detachGestures: (() => void) | undefined;
+
 	/*
 	 * Two listeners, both gated, both in the capture phase so they see a press before the board does.
 	 *
@@ -272,6 +280,19 @@ export function createEditor(frame: HTMLIFrameElement, options: EditorOptions): 
 			},
 			true,
 		);
+
+		// And the gestures: drag, resize, delete, duplicate — each ending in one of the eight ops.
+		detachGestures?.();
+		detachGestures = attachGestures({
+			editing,
+			root: () => tree.root,
+			document: () => rendered,
+			selection: () => selection,
+			nodeFromEvent,
+			emit: (op) => options.onOps?.([op]),
+			remark: () => mark(),
+			rendered: () => undefined,
+		});
 	});
 
 	render();
@@ -302,7 +323,11 @@ export function createEditor(frame: HTMLIFrameElement, options: EditorOptions): 
 		setMode() {
 			applyMode();
 		},
+		insert(kind, at) {
+			return insertAt({ root: () => tree.root, emit: (op) => options.onOps?.([op]) }, kind, at);
+		},
 		destroy() {
+			detachGestures?.();
 			rendered = undefined;
 			selection = undefined;
 			frame.removeAttribute("srcdoc");
@@ -313,7 +338,10 @@ export function createEditor(frame: HTMLIFrameElement, options: EditorOptions): 
 export { parseBoard, serialize, shapeOf, nodeAtPath, pathFor, collectHandles };
 export { describe, isProjection, kindOf, sourceOf, selectable, STRUCTURAL, PROJECTION_ATTRIBUTES } from "./select.ts";
 export { ops, wordsOf, rectOf, addressOf } from "./ops.ts";
+export { GRID, snap, markupFor, insertAt, paletteOf } from "./gestures.ts";
+export type { GestureHost } from "./gestures.ts";
 export type { Op, SetOp, TextOp, InsertOp, RemoveOp, MoveOp, ReplaceOp, DuplicateOp, SourceOp } from "./ops.ts";
+export type { ComponentKind } from "@decks/board-kit";
 export type { Selection, SelectionKind } from "./select.ts";
 export type { TreeNode };
 export { elementParts, bodyOf } from "./node.ts";

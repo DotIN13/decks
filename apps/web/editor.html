@@ -38,7 +38,8 @@
 				color: var(--muted);
 			}
 			#mode,
-			#nudge {
+			#nudge,
+			#palette button {
 				padding: 2px 10px;
 				border: 1px solid var(--line);
 				border-radius: 999px;
@@ -46,6 +47,10 @@
 				color: inherit;
 				font: inherit;
 				cursor: pointer;
+			}
+			#palette {
+				display: inline-flex;
+				gap: 6px;
 			}
 			:root[data-mode="edit"] #mode {
 				border-color: #2563eb;
@@ -100,6 +105,7 @@
 				<div id="status">
 					<button id="mode" type="button">browse</button>
 					<button id="nudge" type="button">nudge +8px</button>
+					<span id="palette"></span>
 					<span id="said">loading…</span>
 				</div>
 				<div id="editor"></div>

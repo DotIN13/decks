@@ -72,6 +72,11 @@ const CHECKS = [
 	 */
 	{ file: "select-nodes.mjs", needsAgent: false },
 	/*
+	 * The gestures: drag, resize, duplicate, the palette, delete — one op each, driven by a real mouse.
+	 * The other half of the proof is `editor-ops.test.ts` on the server, where those ops write files.
+	 */
+	{ file: "gestures.mjs", needsAgent: false },
+	/*
 	 * A flow document edited as fields. This is the other half of the fixture's flow board,
 	 * and the first coverage in the suite of the *document* editor: the field half of
 	 * `Editor.ts` ran on component boards only, and the reason a flow board was handed to the
