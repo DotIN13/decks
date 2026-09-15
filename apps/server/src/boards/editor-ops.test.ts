@@ -114,3 +114,45 @@ test("duplicate copies the server's own bytes, offset for a placed one", () => {
 	assert.equal(copies.length, 2, html);
 	assert.equal(html.includes('data-id="risk-2"'), true, "and the copy has a name of its own");
 });
+
+/**
+ * The one thing in this file that is about a *decision* rather than a behaviour.
+ *
+ * A table whose rows the file writes directly has a `<tbody>` in both parses and in no byte of the
+ * file — 328 of the 89,313 elements in this deck are exactly that, all of them `<tbody>`s. Two facts,
+ * and they are the whole of the open question:
+ *
+ * 1. **The path must count it.** The cell below is `[0, 0, 0, 0]` — table, tbody, row, cell — and if
+ *    the client counted only what the file spells it would send `[0, 0, 0]` and the server would write
+ *    into the row rather than the cell. So an implied node is a step whether or not anybody can edit it.
+ * 2. **It cannot be written to**, and the server says so rather than guessing: its refusal is
+ *    *“cannot locate the tag”*, which is the backstop, not the design. The design question is whether the
+ *    editor should stamp a handle on it at all — see the board.
+ */
+const TABLE = `<!doctype html>
+<html lang="en">
+	<head><title>Table</title></head>
+	<body class="board">
+		<table>
+			<tr><td>1.4万</td><td>01:44</td></tr>
+		</table>
+	</body>
+</html>
+`;
+
+test("a cell inside an implied tbody is addressed through it, and edited", () => {
+	const { html } = applyPatches(TABLE, [{ op: "set", path: [0, 0, 0, 0], style: { "font-weight": "600" } }]);
+	assert.match(html, /<td style="font-weight:600">1.4万<\/td>/, html);
+});
+
+test("an edit aimed at the tbody itself is refused, because no byte of the file is the tbody", () => {
+	/*
+	 * And the sentence is the new one: a structural tag is refused by name, with what to do instead,
+	 * because the alternative is *“cannot locate the tag”* — true, and no help to anybody.
+	 */
+	assert.throws(
+		() => applyPatches(TABLE, [{ op: "set", path: [0, 0], style: { "border-top": "1px" } }]),
+		(error: Error) => error instanceof PatchRefused && /a <tbody> is a step in an address/.test(error.message),
+		`expected the structural refusal`,
+	);
+});

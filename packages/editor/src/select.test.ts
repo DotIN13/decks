@@ -56,6 +56,20 @@ test("the root, the head and the body are not things a press can select", () => 
 	assert.equal(selectable(p, root), true, "while a paragraph inside the body is");
 });
 
+test("a tag the parser invented is a step in a path and never a target", () => {
+	// `<table><tr><td>` — no tbody in the file, one in both parses. It takes the step, and it is not
+	// something to press: the cell is addressed *through* it, which is why it cannot be dropped either.
+	const cell = el("td", [], [], true, "1.4万");
+	const row = el("tr", [], [child(cell)]);
+	const tbody = el("tbody", [], [child(row)]);
+	const table = el("table", [], [child(tbody)]);
+	const root = board([child(table)]);
+	assert.equal(selectable(tbody, root), false, "a tbody is never a target");
+	assert.deepEqual(describe(tbody, root), undefined);
+	assert.equal(selectable(cell, root), true, "the cell inside it is");
+	assert.deepEqual(describe(cell, root)?.path, [0, 0, 0, 0], "table, tbody, row, cell — the step is counted");
+});
+
 test("a selection is the node, its path, its kind, and its name when it has one", () => {
 	const paragraph = el("p", [], [], true, "One refresh.");
 	const card = el("section", [["class", "card"], ["data-id", "goal"]], [child(el("h3", [], [], true, "Goal")), child(paragraph)]);

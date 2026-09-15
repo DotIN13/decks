@@ -1,4 +1,5 @@
 import { BOX_CLASSES, component, type ComponentKind } from "@decks/board-kit";
+import { STRUCTURAL_TAGS } from "@decks/protocol";
 import type { AnyBoardPatch, BoardPatch, EditorOp, Rect } from "@decks/protocol";
 import { parse } from "parse5";
 import { checkBlock, isRichRun, normalizeInline, textOfInline } from "./inline-html.ts";
@@ -971,6 +972,15 @@ function fromEditorOp(html: string, document: Node, patch: EditorOp): { html: st
 
 	const at = locate(document, patch.path);
 	if (!at) throw new PatchRefused(`there is nothing at ${describePath(patch.path)} of the body`);
+	/*
+	 * A structural tag is a step, never a target — the same list the editor reads before it lets a press
+	 * resolve at all, which is why this is a backstop rather than the design. The sentence is here because
+	 * the alternative is *“cannot locate the tag”*, which is true and tells nobody what to do instead.
+	 */
+	const tag = at.element.tagName.toLowerCase();
+	if ((STRUCTURAL_TAGS as readonly string[]).includes(tag)) {
+		throw new PatchRefused(`a <${tag}> is a step in an address, not something to edit: aim at a child of it`);
+	}
 
 	switch (patch.op) {
 		case "set":

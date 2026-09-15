@@ -19,6 +19,7 @@
  */
 import type { TreeNode } from "./node.ts";
 import { walk } from "./parse.ts";
+import { STRUCTURAL } from "./select.ts";
 
 export const HANDLE_ATTRIBUTE = "data-node";
 
@@ -32,6 +33,14 @@ export const HANDLE_ATTRIBUTE = "data-node";
 export function assignHandles(root: TreeNode): void {
 	let next = 0;
 	walk(root, (node) => {
+		/*
+		 * A structural tag is skipped: no handle, so nothing can press it.
+		 *
+		 * The handle *is* the editor's answer to "can this be edited", which is why the exclusion lives
+		 * here rather than in a rule somewhere down the line. A `<tbody>` keeps its place in every path —
+		 * it is an element child like any other — and never becomes a thing a press can land on.
+		 */
+		if (STRUCTURAL.has(node.tag)) return;
 		node.handle = `n${next++}`;
 	});
 }

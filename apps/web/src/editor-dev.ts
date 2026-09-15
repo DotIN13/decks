@@ -13,7 +13,18 @@
  * It is a *dev* page, served by the app's Vite because Vite is what turns TypeScript into something a
  * browser can run in this repo. Nothing on this page is part of the app.
  */
-import { createEditor, ops, parseBoard, rectOf, serialize, shapeOf, type Editor, type Selection, type TreeNode } from "@decks/editor";
+import {
+	createEditor,
+	ops,
+	parseBoard,
+	rectOf,
+	serialize,
+	shapeOf,
+	STRUCTURAL,
+	type Editor,
+	type Selection,
+	type TreeNode,
+} from "@decks/editor";
 
 const params = new URLSearchParams(location.search);
 const path = params.get("board") ?? "boards/plan.html";
@@ -46,7 +57,7 @@ const report = {
 	handles: { nodes: 0, landed: 0 } as { nodes: number; landed: number } | null,
 	ops: [] as unknown[],
 	/** The selection, as much as a person or a check needs: where, what kind, and a projection's source. */
-	selection: null as { path: number[]; kind: string; id?: string; source?: string } | null,
+	selection: null as { path: number[]; kind: string; tag?: string; id?: string; source?: string } | null,
 	/** The last selection as a node, so a button can make an op out of it. Not serialisable. */
 	last: null as Selection | null,
 };
@@ -71,9 +82,15 @@ const status = document.querySelector("#said") as HTMLElement;
  */
 const modeButton = document.querySelector("#mode") as HTMLButtonElement;
 
-/** Every node in the tree. */
+/**
+ * Every node that **should** carry a handle.
+ *
+ * Structural tags — a `<tbody>` no byte spells, the document frame itself — take a step in an address and
+ * never a target, so they are counted out of this on both sides: the property being checked is that every
+ * addressable node found its element, not that every element in a document is addressable.
+ */
 function countNodes(node: TreeNode): number {
-	let total = 1;
+	let total = STRUCTURAL.has(node.tag) ? 0 : 1;
 	for (const part of node.parts) if (part.kind === "element") total += countNodes(part.node);
 	return total;
 }
@@ -167,6 +184,7 @@ async function main(): Promise<void> {
 				? {
 						path: selection.path,
 						kind: selection.kind,
+						tag: selection.node.tag,
 						...(selection.id === undefined ? {} : { id: selection.id }),
 						...(selection.source === undefined ? {} : { source: selection.source }),
 					}

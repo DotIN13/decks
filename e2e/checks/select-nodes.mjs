@@ -126,5 +126,34 @@ say(
 	JSON.stringify(Object.keys(op ?? {})),
 );
 
+/*
+ * And the structural rule, on a board with a table.
+ *
+ * Every parser puts a `<tbody>` into a table whose file has none — and this deck has 328 of them — so the
+ * rule is: a tag that can exist without bytes **takes a step in an address and never a target**. The
+ * evidence is two counts and a press:
+ *
+ * - no `tbody` in the frame carries a handle, whatever the file spells;
+ * - the cells inside it do;
+ * - and a press on the table resolves to a cell, never to the body of it.
+ */
+await page.goto(`${WEB}/editor.html?board=${encodeURIComponent("boards/how-deep-is-the-deep-sea.html")}`, { waitUntil: "domcontentloaded" });
+await page.waitForFunction(() => window.__editorDev?.loaded === true, null, { timeout: 20000 });
+await page.locator("#mode").click();
+
+const table = page.frameLocator(".board-frame");
+const bodies = await table.locator("tbody[data-node]").count();
+const cells = await table.locator("tbody td[data-node]").count();
+say("no tbody carries a handle, so no press can resolve to one", bodies === 0, `${bodies} of them do`);
+say("…while the cells inside it do", cells > 0, `${cells} cell(s) with a handle`);
+
+await table.locator("tbody td").first().click();
+const inTable = await selection();
+say(
+	"a press in a table lands on a cell, one step past the tbody",
+	inTable?.tag === "td" && inTable.kind === "leaf" && inTable.path.length > 0,
+	JSON.stringify(inTable ? { kind: inTable.kind, tag: inTable.tag, path: inTable.path } : null),
+);
+
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();

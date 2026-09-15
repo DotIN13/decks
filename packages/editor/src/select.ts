@@ -22,9 +22,13 @@
  * the content is not editable as *elements* because it is not in the file, and it is editable as
  * *source*, which is what it is.
  */
+import { STRUCTURAL_TAGS } from "@decks/protocol";
 import type { TreeNode } from "./node.ts";
 import { bodyOf } from "./node.ts";
 import { pathOf } from "./address.ts";
+
+/** The tags a press can never resolve to: a step in a path, never a target. Shared, like `INLINE_TAGS`. */
+export const STRUCTURAL = new Set<string>(STRUCTURAL_TAGS);
 
 /** The attributes whose content belongs to a renderer rather than to the file. */
 export const PROJECTION_ATTRIBUTES = ["data-md", "data-mermaid", "data-embed", "data-live", "data-slides"] as const;
@@ -63,8 +67,13 @@ export function isProjection(node: TreeNode): boolean {
 export function selectable(node: TreeNode, root: TreeNode): boolean {
 	const body = bodyOf(root);
 	if (!body) return false;
-	if (node === body || node === root) return false;
-	if (["head", "html"].includes(node.tag)) return false;
+	/*
+	 * One list, not three special cases. The body, the head and the html element are not components —
+	 * a path is counted *from* the body and a press on the frame around a board means “not that one” —
+	 * and a `<tbody>` is not in the file at all. Same answer, same reason, one list: a step in an
+	 * address and never a target.
+	 */
+	if (STRUCTURAL.has(node.tag)) return false;
 	return pathOf(root, node) !== undefined;
 }
 

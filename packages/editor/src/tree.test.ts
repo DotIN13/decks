@@ -75,7 +75,11 @@ test("a handle per node, in document order, and the same handles twice running",
 		for (const part of node.parts) if (part.kind === "element") walk(part.node);
 	};
 	walk(root);
-	assert.deepEqual(order, ["html=n0", "head=n1", "body=n2", "section=n3", "h3=n4", "p=n5"]);
+	/*
+	 * Structural tags are skipped, so the numbering starts at the first thing that can be edited —
+	 * `html`, `head` and `body` take a step in a path and never get a handle (`STRUCTURAL_TAGS`).
+	 */
+	assert.deepEqual(order, ["html=undefined", "head=undefined", "body=undefined", "section=n0", "h3=n1", "p=n2"]);
 	const first = order.join(" ");
 	assignHandles(root);
 	order.length = 0;
@@ -88,9 +92,10 @@ test("a serialisation is a document: the leaf's own markup, and a handle on ever
 	const root = treeWith([child(el("section", [["data-id", "goal"]], [child(paragraph)])), child(el("br"))]);
 	const html = serialize({ root, doctype: "<!doctype html>" });
 	assert.match(html, /^<!doctype html>\n<html[^>]*>/);
-	assert.match(html, /<section data-id="goal" data-node="n3">/, "attributes keep their order, the handle is last");
-	assert.match(html, /<p class="lead" data-node="n4">One session, <a href="#x">one<\/a> refresh.<\/p>/, "a leaf is rendered from its own markup");
+	assert.match(html, /<section data-id="goal" data-node="n0">/, "attributes keep their order, the handle is last");
+	assert.match(html, /<p class="lead" data-node="n1">One session, <a href="#x">one<\/a> refresh.<\/p>/, "a leaf is rendered from its own markup");
 	assert.match(html, /<br [^>]*\/>/, "a void element does not get an end tag");
+	assert.match(html, /<body class="board">/, "and the body carries no handle at all");
 	assert.equal(html.includes("</br>"), false);
 });
 
