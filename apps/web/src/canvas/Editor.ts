@@ -903,6 +903,19 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	});
 
 	on("focusout", () => stopEditing(true));
+	/*
+	 * And the frame's own *window* losing focus, which is what a press outside the board does.
+	 *
+	 * A press on the canvas is a press on a `<div>`, and a `<div>` takes no focus by itself — the app moves
+	 * focus to the canvas for exactly this reason — but a window-level blur does **not** dispatch `focusout`
+	 * on the element that was focused. Measured: with the run open and focus on the frame, a click on bare
+	 * canvas took the focus (`frameFocus` true → false) and left the run `contenteditable`. The document's
+	 * `focusout` never fired. So the window's own event is listened for here, and it ends the edit the way a
+	 * click away should.
+	 */
+	const blurred = () => stopEditing(true);
+	win.addEventListener("blur", blurred);
+	cleanups.push(() => win.removeEventListener("blur", blurred));
 
 	on("keydown", (event) => {
 		if (editing) {

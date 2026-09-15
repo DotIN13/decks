@@ -53,6 +53,8 @@ export interface GestureHost {
 	emit(op: EditorOp): void;
 	/** Re-outline after a preview changed what "selected" looks like. */
 	remark(): void;
+	/** Let the selection go — for a press that landed outside the frame, where nothing is selected. */
+	clearSelection(): void;
 	/** Put a newly inserted node's markup in the frame, so the palette's press has something to show. */
 	rendered(): void;
 }
@@ -494,7 +496,29 @@ export function attachGestures(host: GestureHost): () => void {
 		close();
 	}
 
+
+	/*
+	 * Losing the whole frame ends the edit and the selection.
+	 *
+	 * A press outside the board cannot be seen from in here — the frame is a document of its own — so this is
+	 * the event that stands for it: the *window* blurs when focus leaves the frame entirely, which is what a
+	 * press on the canvas does (the app moves focus to the canvas for exactly this reason). What it must do
+	 * is everything a click away should: close the caret, drop the selection, and tell whoever asked, so an
+	 * inspector following the selection lets go too.
+	 */
+	function blurred(): void {
+		if (caret) {
+			const close = caret;
+			caret = undefined;
+			close();
+		}
+		host.clearSelection();
+	}
+
 	const doc = host.document();
+	const win = doc?.defaultView;
+	win?.addEventListener("blur", blurred);
+
 	doc?.addEventListener("dblclick", dblclick, true);
 	doc?.addEventListener("focusout", leaveCaret, true);
 	doc?.addEventListener("keydown", leaveCaret, true);
@@ -504,6 +528,7 @@ export function attachGestures(host: GestureHost): () => void {
 	doc?.addEventListener("keydown", key, true);
 
 	return () => {
+		win?.removeEventListener("blur", blurred);
 		doc?.removeEventListener("dblclick", dblclick, true);
 		doc?.removeEventListener("focusout", leaveCaret, true);
 		doc?.removeEventListener("keydown", leaveCaret, true);

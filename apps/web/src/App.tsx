@@ -693,6 +693,19 @@ export function App() {
 						onSelect={(path) => {
 							setSelected(path);
 							setComponent(undefined);
+							/*
+							 * A press outside every board takes the focus, which is how an edit inside one ends.
+							 *
+							 * The frame cannot hear a press that lands outside it, and a `<div>` cannot take focus
+							 * by itself — so without this the frame keeps focus, `focusout` never fires inside it,
+							 * and a run or a caret stays open with its outline drawn after somebody has clicked
+							 * away. Moving focus to the canvas is the one move every editor already understands:
+							 * the frame blurs, and each of them closes what it had open.
+							 *
+							 * Only for a press that named no board: a press *inside* one is the frame's own, and
+							 * taking focus from it there would end the edit the press was meant to make.
+							 */
+							if (!path) (document.querySelector(".stage") as HTMLElement | null)?.focus?.();
 						}}
 						onMove={move}
 						onHide={(path) => send({ type: "board.hide", path })}

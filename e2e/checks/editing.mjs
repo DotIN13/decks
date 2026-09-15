@@ -125,6 +125,30 @@ await page.keyboard.press("Escape");
 await settle(page, 400);
 say("…and Escape closes it", (await sourceEditor()) === false, "no source editor");
 
+/*
+ * A press **outside the board** ends the edit.
+ *
+ * The frame is a document of its own, so a press on the canvas is invisible from inside it — and a `<div>`
+ * takes no focus by itself, so the frame never learned it had lost focus: measured, the run stayed
+ * `contenteditable` with its border drawn after somebody had visibly clicked away. The app moves focus to
+ * the canvas for a press that named no board, and the editor closes on the frame's window losing focus.
+ *
+ * Nothing is written by the press: the run had not been typed into, so the commit finds no change.
+ */
+const openRun = async () =>
+	page.evaluate(() => {
+		const doc = document.querySelector('.board-node[data-path="boards/notes.html"] iframe').contentDocument;
+		return [...doc.querySelectorAll("[contenteditable]")].filter((e) => e.getAttribute("contenteditable") !== "false").length;
+	});
+const beforePressAway = read(file);
+await frame().locator(".doc p").first().dblclick();
+await settle(page, 600);
+say("a run is open before the press", (await openRun()) === 1, `${await openRun()} open`);
+await page.mouse.click(24, 940);
+await settle(page, 800);
+say("a press on the canvas outside the board ends the edit", (await openRun()) === 0, `${await openRun()} still open`);
+say("…and writes nothing, because nothing was typed", read(file) === beforePressAway, "the file is unchanged");
+
 // Put the fixture back the way the next check expects it.
 write(file, original);
 await settle(page, 600);

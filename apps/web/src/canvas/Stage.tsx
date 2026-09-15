@@ -1109,6 +1109,18 @@ export function Stage(props: {
 	return (
 		<div
 			class="stage"
+			/*
+			 * Focusable, and focused when a press lands outside a board.
+			 *
+			 * A press on the canvas is a press on a `<div>`, and a `<div>` takes no focus — so the board's
+			 * frame never learned it had lost it, `focusout` never fired inside it, and an open run or caret
+			 * stayed open with its outline on while the person had visibly clicked away. Measured: pressing
+			 * bare stage left the run `contenteditable` and its border drawn.
+			 *
+			 * `-1` because this is a place for focus to *land*, not something to tab to, and the outline is
+			 * suppressed because the ring would be chrome nobody asked for.
+			 */
+			tabindex={-1}
 			data-mode={props.mode}
 			data-renderer={props.renderer}
 			data-previewing={Boolean(props.preview)}
