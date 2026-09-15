@@ -5,7 +5,6 @@ import FilePenLine from "lucide-solid/icons/file-pen-line";
 import ExternalLink from "lucide-solid/icons/external-link";
 import Maximize from "lucide-solid/icons/maximize-2";
 import X from "lucide-solid/icons/x";
-import { GrapesEditor } from "./GrapesEditor.tsx";
 import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { unwrap } from "solid-js/store";
@@ -38,20 +37,15 @@ import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEve
  * happens to be empty.
  */
 /**
- * A board being edited, and by which editor.
+ * A board being edited: its file, in a textarea.
  *
- * One type for both surfaces because they have to stand in for the frame in exactly the same
- * way — same box, same size, same moment — and because `Stage` passes this through untouched
- * and would otherwise declare a second copy of it.
+ * It used to carry a `kind`, because a flow document could also be opened in a GrapesJS model that
+ * wrote ops rather than the file. That editor is gone — see `BoardEditor` below for what it did —
+ * so this is one surface standing in for the frame: same box, same size, same moment.
  */
 export interface BoardEditing {
-	kind: "source" | "blocks";
 	source: string;
 	onCommit: (text: string) => void;
-	/** `blocks` only: the batch a commit amounts to, already mapped to ops. */
-	onPatches?: (patches: BoardPatch[]) => void;
-	/** `blocks` only: the ops could not express it, so hand over the bytes. */
-	onSource?: () => void;
 	onCancel: () => void;
 }
 
@@ -95,24 +89,13 @@ export function BoardFrame(props: {
 	/** Only for a deck: take it fullscreen. */
 	onPresent?: () => void;
 	/**
-	 * The board being edited, and by which editor.
+	 * The board being edited, as its file in a textarea.
 	 *
-	 * `source` is the file in a textarea; `blocks` is a flow document in GrapesJS, which writes
-	 * ops rather than the file. Rendered *inside* this node rather than as a dialog, so the
-	 * canvas positions and scales it exactly as it does the frame it stands in for — which is
-	 * what makes the box feel like the board rather than like something on top of it.
+	 * Rendered *inside* this node rather than as a dialog, so the canvas positions and scales it
+	 * exactly as it does the frame it stands in for — which is what makes the box feel like the
+	 * board rather than like something on top of it.
 	 */
 	editing?: BoardEditing;
-	/**
-	 * Edit this board's *document*, in the editor that writes ops (`GrapesEditor`).
-	 *
-	 * A button rather than a gesture, because the gesture is taken: a double-click on a run of
-	 * words belongs to the field editor, which is the right answer for a run and the wrong one
-	 * for a page somebody wants to rearrange. Offered only where the app can answer it — a flow
-	 * document this app wrote, whose DOM tree is the file's tree — and absent everywhere else
-	 * rather than present and refusing.
-	 */
-	onEditDocument?: () => void;
 	/** Take this board off the canvas. It stays in the agent's context. */
 	onHide?: () => void;
 	/** Editing lives inside the frame, because the frame is same-origin (§4). */
@@ -815,23 +798,6 @@ export function BoardFrame(props: {
 					Not on a live board: a mirror in a bare tab has nobody to feed it, and says so
 					itself (`.live[data-state="alone"]`).
 				*/}
-				<Show when={props.onEditDocument}>
-					<button
-						class="doc-open"
-						type="button"
-						data-glyph="true"
-						data-act="document"
-						title="Edit this document (text, marks and paragraphs)"
-						aria-label={`Edit ${props.board.title} as a document`}
-						onPointerDown={(event) => event.stopPropagation()}
-						onClick={(event) => {
-							event.stopPropagation();
-							props.onEditDocument?.();
-						}}
-					>
-						<Icon of={FilePenLine} size={12} />
-					</button>
-				</Show>
 				<Show when={!props.board.live}>
 					<a
 						class="open-tab"
@@ -1075,37 +1041,34 @@ export function BoardFrame(props: {
 function BoardEditor(props: {
 	board: { path: string; w: number; h: number };
 	editing: {
-		kind: "source" | "blocks";
 		source: string;
 		onCommit: (text: string) => void;
-		onPatches?: (patches: BoardPatch[]) => void;
-		onSource?: () => void;
 		onCancel: () => void;
 	};
 }) {
+	/*
+	 * One editor, and it is the file.
+	 *
+	 * There was a second one here — a GrapesJS model over a flow document, writing ops instead of the
+	 * whole file — and this is what is left of it. It is gone because of what it did: it put its own
+	 * `wrapper` element between its canvas's body and the board's components, so every board's root
+	 * rule (`body.board > *`, where `position: absolute` lives) matched the wrapper and not one
+	 * component, and a page of positioned boxes drew as a stack of full-width blocks. Measured
+	 * alongside that: 0 of 57 components round-tripped byte-identically through its serialiser, and
+	 * its race guard refused every card with more than one child.
+	 *
+	 * What it bought was editing a flow document's *blocks* as a document. What that costs now is
+	 * that a flow document is edited by ⌥ and the text — which is what a board from somewhere else
+	 * has always needed anyway.
+	 */
 	return (
-		<Switch>
-			<Match when={props.editing.kind === "blocks"}>
-				<GrapesEditor
-					path={props.board.path}
-					source={props.editing.source}
-					w={props.board.w}
-					h={props.board.h}
-					onPatches={(patches) => props.editing.onPatches?.(patches)}
-					onSource={() => props.editing.onSource?.()}
-					onCancel={props.editing.onCancel}
-				/>
-			</Match>
-			<Match when={true}>
-				<SourceEditor
-					path={props.board.path}
-					source={props.editing.source}
-					w={props.board.w}
-					h={props.board.h}
-					onCommit={props.editing.onCommit}
-					onCancel={props.editing.onCancel}
-				/>
-			</Match>
-		</Switch>
+		<SourceEditor
+			path={props.board.path}
+			source={props.editing.source}
+			w={props.board.w}
+			h={props.board.h}
+			onCommit={props.editing.onCommit}
+			onCancel={props.editing.onCancel}
+		/>
 	);
 }

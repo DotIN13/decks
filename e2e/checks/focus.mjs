@@ -40,8 +40,16 @@ const bar = await page.evaluate((path) => {
 	}));
 }, NOTES);
 say(
-	"the bar above the board offers editing it as a document, its address, focus, fullscreen and going away, in that order",
-	bar.length === 5 && bar.map((b) => b.cls).join(",") === "doc-open,open-tab,focus-open,present-open,hide",
+	/*
+	 * Four buttons, and there used to be five: `doc-open` sat first in this bar and opened a GrapesJS
+	 * model over a flow document, which is where a document could be rearranged block by block. That
+	 * editor is gone — it drew the board as a stack of full-width blocks and refused most of the
+	 * writes it did make — so the bar is the address, focus, fullscreen and going away, and a
+	 * document is edited by ⌥ and the text. Asserted as an exact list rather than a "contains",
+	 * because a bar is the one place where an extra control is a change to every board's chrome.
+	 */
+	"the bar above the board offers its address, focus, fullscreen and going away, in that order",
+	bar.length === 4 && bar.map((b) => b.cls).join(",") === "open-tab,focus-open,present-open,hide",
 	JSON.stringify(bar.map((b) => b.cls)),
 );
 say(

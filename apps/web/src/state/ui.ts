@@ -71,20 +71,19 @@ function createUi() {
 	 * exists to avoid. `?raw=1` is the same parameter the shell uses to ask for the file
 	 * behind a board.
 	 */
-	const [editingSource, setEditingSource] = createSignal<{ path: string; source: string; kind: "source" | "blocks" } | undefined>();
+	const [editingSource, setEditingSource] = createSignal<{ path: string; source: string } | undefined>();
 
 	/**
-	 * Open a board for editing, as one of the two things an edit can be.
+	 * Open a board's file in the textarea.
 	 *
-	 * `source` is the file itself in a textarea, which is the only honest editor for a markdown
-	 * file, a deck, or a page from somewhere else — the file *is* the text in the box.
-	 *
-	 * `blocks` is a flow document in the rich editor (`canvas/GrapesEditor.tsx`): a surface over
-	 * the document that writes ops rather than the file, so an untouched byte stays untouched.
-	 * Which one a board gets is decided in `Stage`'s `editSource`, where the rule for the
-	 * in-frame field editor already lives, and ⌥ means the bytes in every case.
+	 * There is one document editor and it is the file itself. This used to take a `kind` as well,
+	 * because a flow document could be opened in a second editor that wrote ops off a GrapesJS
+	 * model rather than the whole file; that editor is gone (it drew the board as a stack of
+	 * blocks and refused most of the writes it did make), and with it the distinction. A board
+	 * is edited by its own gestures — a run of words retyped in place, a card dragged — or, with
+	 * ⌥, as the bytes it is.
 	 */
-	const openSource = (path: string, kind: "source" | "blocks" = "source") => {
+	const openSource = (path: string) => {
 		void fetch(`/api/board/${path}?raw=1`)
 			.then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
 			.then((source) => {
@@ -98,8 +97,8 @@ function createUi() {
 				 * pointerdown already dismissed the editor resolves after a second one has opened.
 				 */
 				const open = editingSource();
-				if (open?.path === path && open.kind === kind) return;
-				setEditingSource({ path, source, kind });
+				if (open?.path === path) return;
+				setEditingSource({ path, source });
 			})
 			.catch(() => notice("error", `Could not read ${path} to edit it.`));
 	};

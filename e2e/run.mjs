@@ -72,9 +72,6 @@ const CHECKS = [
 	 * focus view and the bar's own menu all ask the canvas which board is selected.
 	 */
 	{ file: "selection.mjs", needsAgent: false },
-	{ file: "grapes.mjs", needsAgent: false },
-	{ file: "grapes-typing.mjs", needsAgent: false },
-	{ file: "grapes-reorder.mjs", needsAgent: false },
 	/*
 	 * The focus view: the canvas as one page. Its own check rather than a section of
 	 * `modes.mjs`, because it needs the deck as it opens — a page that has been typed into by

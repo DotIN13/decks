@@ -646,21 +646,6 @@ export function App() {
 						 */
 						onPresent={(path, at) => setPresenting(presentingFor(path, at))}
 						onEditSource={openSource}
-						onEditDocument={(path) => {
-							/*
-							 * Already editing this document: a second press on the button is not a second
-							 * editor.
-							 *
-							 * The editor is keyed on the object this signal holds, so re-opening the same file
-							 * builds a new one from scratch — and anything typed into the old one goes with it.
-							 * The button sits under the cursor that just pressed it, and a double-click on the
-							 * board's bar can land on it, so this is a press that happens by accident rather
-							 * than one meaning "start over".
-							 */
-							const open = editingSource();
-							if (open?.path === path && open.kind === "blocks") return;
-							openSource(path, "blocks");
-						}}
 						{...(focus() === undefined ? {} : { focus: focus()! })}
 						onFocusToggle={() => toggleFocus()}
 						onFocusBoard={(path) => toggleFocus(path)}
@@ -669,7 +654,16 @@ export function App() {
 									editing: {
 										path: editingSource()!.path,
 										editing: {
-											kind: editingSource()!.kind,
+											/*
+											 * Committed as bytes, because that is what this editor edits.
+											 *
+											 * There used to be a second commit here — a batch of ops from a GrapesJS
+											 * model, with a fallback to the bytes when the ops could not express the
+											 * change. Both are gone with that editor, and this is the `source` op:
+											 * the whole file, written as the person typed it. Unchanged text is
+											 * dropped here rather than sent, so opening the editor and closing it
+											 * without touching anything is not a write.
+											 */
 											source: editingSource()!.source,
 											onCommit: (text: string) => {
 												const open = editingSource();
@@ -679,28 +673,6 @@ export function App() {
 												if (!board || text === open.source) return;
 												send({ type: "board.patch", path: open.path, rev: board.rev, patches: [{ op: "source", text }] });
 											},
-											/*
-											 * The rich editor's commit: a batch of ops from the mapper, sent with the
-											 * revision the frame is pinned to, exactly as an in-frame edit is. The
-											 * editor closes whatever the outcome — the server's refusal path re-reads
-											 * the board and tells the user (§6.5), which is the same answer the field
-											 * editor gets and should not be a second mechanism.
-											 */
-											onPatches: (patches: BoardPatch[]) => {
-												const open = editingSource();
-												setEditingSource(undefined);
-												if (!open) return;
-												const board = state.boards.find((candidate) => candidate.path === open.path);
-												if (!board) return;
-												send({ type: "board.patch", path: open.path, rev: board.rev, patches });
-											},
-											/*
-											 * Refused: the ops cannot express what was done. The file is handed over in
-											 * the same breath — the design's last step — rather than the edit being
-											 * dropped, because a person who rearranged a page with a mouse should not
-											 * have to work out that a mouse is the wrong tool.
-											 */
-											onSource: () => setEditingSource((open) => (open ? { ...open, kind: "source" } : open)),
 											onCancel: () => setEditingSource(undefined),
 										},
 									},

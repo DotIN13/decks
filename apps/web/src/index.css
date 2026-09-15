@@ -830,10 +830,6 @@ svg.lucide {
  * So the editor's canvas keeps its pointer events at every zoom. Nothing else about the inert
  * state changes: the panel's own buttons and the source fallback were never inside the frame.
  */
-.board-node[data-inert="true"] .surface .grapes-editor iframe {
-	pointer-events: auto;
-}
-
 /*
  * The canvas renderers (`lib/renderer.ts`).
  *
