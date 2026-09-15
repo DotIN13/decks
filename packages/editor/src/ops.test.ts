@@ -105,7 +105,11 @@ test("replace carries the element; duplicate carries where rather than what", ()
 		before: "One session, one refresh.",
 		html: "<p>One session, two tabs.</p>",
 	});
-	assert.deepEqual(ops.duplicate(root, paragraph, { to: 2 }), { op: "duplicate", path: [0, 1], to: 2 });
+	/*
+	 * A copy carries *where* rather than *what* — the server reads the original's own bytes, because a
+	 * client's DOM is a rendering and a card copied from it would come back re-spelled.
+	 */
+	assert.deepEqual(ops.duplicate(root, paragraph), { op: "duplicate", path: [0, 1] });
 	assert.deepEqual(ops.duplicate(root, paragraph, { offset: { x: 16, y: 170 } }), {
 		op: "duplicate",
 		path: [0, 1],

@@ -1,7 +1,8 @@
 import { BOX_CLASSES, component, type ComponentKind } from "@decks/board-kit";
-import type { BoardPatch, Rect } from "@decks/protocol";
+import type { AnyBoardPatch, BoardPatch, EditorOp, Rect } from "@decks/protocol";
 import { parse } from "parse5";
 import { checkBlock, isRichRun, normalizeInline, textOfInline } from "./inline-html.ts";
+import { formatBlock } from "./pretty.ts";
 import type { DefaultTreeAdapterMap } from "parse5";
 
 type Element = DefaultTreeAdapterMap["element"];
@@ -55,7 +56,7 @@ export interface PatchOutcome {
  */
 export function applyPatches(
 	html: string,
-	patches: BoardPatch[],
+	patches: AnyBoardPatch[],
 	name?: (html: string, kind: ComponentKind) => string,
 ): PatchOutcome {
 	let current = html;
@@ -68,7 +69,12 @@ export function applyPatches(
 	 * the cost of parsing a 4KB document a handful of times.
 	 */
 	for (const patch of patches) {
-		const named = patch.op === "insert" && !patch.id && name ? { ...patch, id: name(current, patch.kind) } : patch;
+		/*
+		 * The legacy `insert` mints its own name; the eight never do, because a new component's markup —
+		 * and the name inside it — is composed by whoever knows the catalogue.
+		 */
+		const named =
+			!isEditorOp(patch) && patch.op === "insert" && !patch.id && name ? { ...patch, id: name(current, patch.kind) } : patch;
 		const result = applyOne(current, named);
 		current = result.html;
 		summary.push(result.summary);
@@ -78,8 +84,20 @@ export function applyPatches(
 	return { html: current, summary, ids };
 }
 
-function applyOne(html: string, patch: BoardPatch): { html: string; summary: string; id: string } {
+/** The eight, and the twelve they retire, arriving through one door. */
+function applyOne(html: string, patch: AnyBoardPatch): { html: string; summary: string; id: string } {
 	const document = parse(html, { sourceCodeLocationInfo: true });
+
+	/*
+	 * The eight first: one addressing mode, translated immediately into the machine below.
+	 *
+	 * The machine still thinks in "a component, then a path walked in from it" — which is what the
+	 * twelve said — so a path from the body is decomposed into the nearest named ancestor and the walk
+	 * from there (`locate`). That is the whole of the translation, and it is why this is an adoption
+	 * rather than a rewrite: the guards, the splices and the indentation rules are the same code that
+	 * has been writing these boards all along.
+	 */
+	if (isEditorOp(patch)) return fromEditorOp(html, document, patch);
 
 	if (patch.op === "insert") {
 		const body = find(document, (node) => node.nodeName === "body");
@@ -110,16 +128,8 @@ function applyOne(html: string, patch: BoardPatch): { html: string; summary: str
 	if (patch.op === "insert-child" || patch.op === "remove-child" || patch.op === "move-child") {
 		return blockOp(html, document, patch);
 	}
-	/*
-	 * A `source` op is a whole-file write and never reaches here — `App.patch` handles it
-	 * before parsing, because there is nothing in a markdown file to parse. Refused rather
-	 * than ignored so that a caller which somehow gets one this far is told why instead of
-	 * watching it silently do nothing.
-	 */
-	if (patch.op === "source") throw new PatchRefused("a source edit replaces the whole file and is applied without parsing");
-
-	const element = findById(document, patch.id);
-	if (!element) throw new PatchRefused(`no component with data-id="${patch.id}"`);
+	const element = rootAt(document, patch.id);
+	if (!element) throw new PatchRefused(patch.id === "" ? "this board has no <body> to edit" : `no component with data-id="${patch.id}"`);
 	const location = element.sourceCodeLocation;
 	if (!location?.startTag) throw new PatchRefused(`cannot locate #${patch.id} in the source`);
 
@@ -422,8 +432,8 @@ function blockOp(
 	document: Node,
 	patch: Extract<BoardPatch, { op: "insert-child" | "remove-child" | "move-child" }>,
 ): { html: string; summary: string; id: string } {
-	const component = findById(document, patch.id);
-	if (!component) throw new PatchRefused(`no component with data-id="${patch.id}"`);
+	const component = rootAt(document, patch.id);
+	if (!component) throw new PatchRefused(patch.id === "" ? "this board has no <body> to edit" : `no component with data-id="${patch.id}"`);
 
 	if (patch.op === "insert-child") return addChild(html, document, patch.id, patch.path, patch.html);
 	if (patch.op === "remove-child") return dropChild(html, component, patch.id, patch.path, patch.before);
@@ -463,8 +473,8 @@ function addChild(
 	path: number[],
 	markup: string,
 ): { html: string; summary: string; id: string } {
-	const component = findById(document, componentId);
-	if (!component) throw new PatchRefused(`no component with data-id="${componentId}"`);
+	const component = rootAt(document, componentId);
+	if (!component) throw new PatchRefused(componentId === "" ? "this board has no <body> to put a block into" : `no component with data-id="${componentId}"`);
 
 	const parentPath = path.slice(0, -1);
 	const parent = elementAt(component, parentPath);
@@ -837,10 +847,228 @@ function findById(node: Node, id: string): Element | undefined {
 	return find(node, (element) => hasAttribute(element, "data-id", id));
 }
 
+/**
+ * The element an address starts from: a named component, or the **body** when the name is empty.
+ *
+ * `""` is the body's name because a path is counted from the body and something has to be able to say
+ * so. Nothing in a file carries it: it is a hole in the namespace the address needs, not a name anybody
+ * writes.
+ */
+function rootAt(node: Node, id: string): Element | undefined {
+	if (id === "") return find(node, (element) => element.nodeName === "body");
+	return findById(node, id);
+}
+
 function reparse(html: string, id: string): Element {
 	const element = findById(parse(html, { sourceCodeLocationInfo: true }), id);
 	if (!element) throw new PatchRefused(`lost #${id} while editing it`);
 	return element;
+}
+
+/** Whether this is one of the eight rather than one of the twelve being retired. */
+function isEditorOp(patch: AnyBoardPatch): patch is EditorOp {
+	return patch.op === "set" || patch.op === "replace" || !("id" in patch);
+}
+
+/** An element's own name, for a summary a person or an agent has to act on. */
+function nameOf(element: Element): string {
+	const named = element.attrs?.find((attribute) => attribute.name === "data-id")?.value;
+	return named ? `#${named}` : `<${element.tagName.toLowerCase()}>`;
+}
+
+/**
+ * An absolute path, decomposed into the machine the rest of this file speaks.
+ *
+ * The nearest ancestor that has a name — or the body, whose name is empty — plus the walk from there.
+ * This is the whole of the translation from the eight to the twelve, and it is where the two addressing
+ * modes meet: the wire counts from the body, and the splicer counts from something named, because a
+ * name is what a path is walked from when the file is the thing being edited.
+ */
+function locate(document: Node, path: number[]): { id: string; path: number[]; element: Element } | undefined {
+	const body = find(document, (node) => node.nodeName === "body");
+	if (!body) return undefined;
+	let cursor: Element = body;
+	let id = "";
+	let rest: number[] = [];
+	for (const index of path) {
+		const next = elementChildren(cursor)[index];
+		if (!next) return undefined;
+		cursor = next;
+		rest = [...rest, index];
+		const named = cursor.attrs?.find((attribute) => attribute.name === "data-id")?.value;
+		if (named) {
+			id = named;
+			rest = [];
+		}
+	}
+	return { id, path: rest, element: cursor };
+}
+
+/** A path re-resolved against the string as it is now — for the second attribute of one batch. */
+function reparsePath(html: string, path: number[]): Element {
+	const found = locate(parse(html, { sourceCodeLocationInfo: true }), path);
+	if (!found) throw new PatchRefused(`lost the element at ${describePath(path)} while editing it`);
+	return found.element;
+}
+
+/** A `set`: attributes, a style, or a new name, on the element an address names. */
+function setFromEditor(
+	html: string,
+	document: Node,
+	at: { id: string; path: number[]; element: Element },
+	patch: Extract<EditorOp, { op: "set" }>,
+): { html: string; summary: string; id: string } {
+	let next = html;
+	const said: string[] = [];
+	const target = `${nameOf(at.element)}${at.path.length > 0 ? ` at ${describePath(at.path)}` : ""}`;
+
+	for (const [name, value] of Object.entries(patch.attrs ?? {})) {
+		if (name === "data-id" && value !== null) {
+			if (!/^[A-Za-z][\w-]*$/.test(value)) {
+				throw new PatchRefused(`"${value}" is not a name a board can use: letters, digits and dashes`);
+			}
+			if (value !== at.id && findById(document, value)) throw new PatchRefused(`there is already a component called ${value}`);
+			next = writeAttribute(next, reparsePath(next, patch.path), "data-id", value);
+			said.push(`renamed ${target} to #${value}`);
+			continue;
+		}
+		next = writeAttribute(next, reparsePath(next, patch.path), name, value);
+		said.push(value === null ? `cleared ${name} on ${target}` : `set ${name}="${value}" on ${target}`);
+	}
+	if (patch.style) {
+		next = writeDeclarations(next, reparsePath(next, patch.path), patch.style);
+		said.push(`${describeMove(patch.style)} ${target}`);
+	}
+	return { html: next, summary: said.length > 0 ? said.join(" and ") : `changed ${target}`, id: at.id };
+}
+
+/**
+ * The eight, resolved and handed to the machine below.
+ *
+ * Worth noticing: **`set` and `replace` are the only two that need new code**, and `replace` is the one
+ * op the twelve had no equivalent for. Everything else is a translation into a legacy op that already
+ * writes the file correctly — which is what "one addressing mode, one family of ops" buys when the
+ * splicing underneath is already right.
+ */
+function fromEditorOp(html: string, document: Node, patch: EditorOp): { html: string; summary: string; id: string } {
+	if (patch.op === "source") throw new PatchRefused("a source edit replaces the whole file and is applied without parsing");
+	if (patch.op === "replace") return replaceElement(html, document, patch);
+
+	/*
+	 * An insertion names the place the block goes, which nothing is at yet — so the *parent* is located
+	 * and the last index travels along as the position.
+	 */
+	if (patch.op === "insert") {
+		const parent = locate(document, patch.path.slice(0, -1));
+		if (!parent) throw new PatchRefused(`there is nothing at ${describePath(patch.path.slice(0, -1))} to put a block into`);
+		return blockOp(html, document, {
+			op: "insert-child",
+			id: parent.id,
+			path: [...parent.path, patch.path[patch.path.length - 1] ?? 0],
+			html: patch.html,
+		});
+	}
+
+	const at = locate(document, patch.path);
+	if (!at) throw new PatchRefused(`there is nothing at ${describePath(patch.path)} of the body`);
+
+	switch (patch.op) {
+		case "set":
+			return setFromEditor(html, document, at, patch);
+		case "text":
+			// `text` carries markup, which is exactly what the legacy `html` op carried.
+			return retype(html, document, { op: "html", id: at.id, path: at.path, before: patch.before, html: patch.html });
+		case "remove":
+			return blockOp(html, document, { op: "remove-child", id: at.id, path: at.path, before: patch.before });
+		case "move":
+			return blockOp(html, document, { op: "move-child", id: at.id, path: at.path, to: patch.to });
+		case "duplicate":
+			return applyOne(html, { op: "duplicate", id: at.id, ...(patch.offset ? { offset: patch.offset } : {}) });
+	}
+}
+
+/**
+ * One element, written whole, into the range its own bytes occupy.
+ *
+ * The escape hatch: the other seven change an attribute, a run of words, or a node's presence, and this
+ * changes anything — which is what makes the set complete rather than merely useful. The guard is the
+ * same as everywhere else, compared as words, and the range is the element's own.
+ */
+function replaceElement(
+	html: string,
+	document: Node,
+	patch: Extract<EditorOp, { op: "replace" }>,
+): { html: string; summary: string; id: string } {
+	const at = locate(document, patch.path);
+	if (!at) throw new PatchRefused(`there is nothing at ${describePath(patch.path)} of the body`);
+	const target = at.element;
+	const location = target.sourceCodeLocation;
+	if (!location?.startTag) throw new PatchRefused(`cannot locate the <${target.tagName.toLowerCase()}> in the source`);
+
+	const held = html.slice(location.startOffset, location.endOffset);
+	if (words(textOfInline(held)) !== words(textOfInline(patch.before))) {
+		throw new PatchRefused(`${nameOf(target)} is not what it was when you started editing`);
+	}
+
+	const clean = checkBlock(patch.html);
+	if ("problem" in clean) throw new PatchRefused(`that markup cannot go into a board: ${clean.problem}`);
+
+	/*
+	 * The first line does not bring its own indentation: the splice starts at the element's own `<`, and
+	 * whatever precedes it on that line is already in the file.
+	 */
+	const indent = indentOf(html, location.startOffset);
+	const formatted = formatBlock(clean.html, indent);
+	const body = indent && formatted.startsWith(indent) ? formatted.slice(indent.length) : formatted;
+
+	return {
+		html: html.slice(0, location.startOffset) + body + html.slice(location.endOffset),
+		summary: `rewrote ${nameOf(target)}`,
+		id: at.id,
+	};
+}
+
+/** Two pieces of text are "the same words" when nothing but whitespace separates them. */
+/**
+ * A style attribute written general: any declaration, merged into the ones already there.
+ *
+ * `writeStyle` is the rect's own writer — it takes `Partial<Rect>` and can only produce
+ * `left`/`top`/`width`/`height`. That was right for the twelve, whose only style op was a move. It is
+ * wrong for a `set`, which may carry any declaration at all: measured, a `margin` through it came out as
+ * `style=""`, the declaration dropped silently on the floor.
+ *
+ * So this one keeps the author's own text. Every declaration that is not being changed comes out of the
+ * file exactly as it went in, spacing and all, and only the ones named are rewritten — a `set` touching
+ * one property is then a one-line diff, which is the property every write in this file exists to keep. A
+ * `null` removes the declaration, and the separator with it.
+ */
+function writeDeclarations(html: string, element: Element, style: Record<string, string | null>): string {
+	const existing = element.attrs?.find((attribute) => attribute.name === "style")?.value ?? "";
+	const spaced = /:\s/.test(existing);
+	const kept: string[] = [];
+	const seen = new Set<string>();
+	for (const piece of existing.split(";")) {
+		const text = piece.trim();
+		if (text === "") continue;
+		const name = text.slice(0, text.indexOf(":")).trim();
+		if (name === "") continue;
+		seen.add(name);
+		if (!(name in style)) {
+			kept.push(text);
+			continue;
+		}
+		const value = style[name];
+		if (value !== null) kept.push(spaced ? `${name}: ${value}` : `${name}:${value}`);
+	}
+	for (const [name, value] of Object.entries(style)) {
+		if (value === null || seen.has(name)) continue;
+		kept.push(spaced ? `${name}: ${value}` : `${name}:${value}`);
+	}
+	return writeAttribute(html, element, "style", kept.join("; "));
+}
+
+function words(text: string): string {
+	return text.replace(/\s+/g, "");
 }
 
 /** The whitespace at the start of the line an offset falls on, so inserts line up. */

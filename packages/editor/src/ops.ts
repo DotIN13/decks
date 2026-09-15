@@ -25,25 +25,27 @@
  *   a leaf's run, an inserted block, a replaced element — and the untouched bytes around it are the
  *   server's business.
  */
+import type { EditorOp } from "@decks/protocol";
 import { bodyOf, type TreeNode } from "./node.ts";
 import { pathOf } from "./address.ts";
 
 /**
- * One of the eight. The shape the protocol will carry once the two families are collapsed.
+ * One of the eight — and **the same eight the protocol carries**.
  *
- * Each is named *and* kept in the union, because a builder that returned the union would make every
- * caller narrow it again: `ops.move` produces a move, and the type says so.
+ * Not a copy of the union but the union itself, extracted per op: the editor builds these, the server
+ * dispatches on them, and the two agreeing about the wire should be a fact of the types rather than
+ * something a test has to check. Each op is named *and* kept in the union, because a builder returning
+ * the union would make every caller narrow it again — `ops.move` produces a move, and the type says so.
  */
-export type SetOp = { op: "set"; path: number[]; attrs?: Record<string, string | null>; style?: Record<string, string | null> };
-export type TextOp = { op: "text"; path: number[]; before: string; html: string };
-export type InsertOp = { op: "insert"; path: number[]; html: string };
-export type RemoveOp = { op: "remove"; path: number[]; before: string };
-export type MoveOp = { op: "move"; path: number[]; to: number };
-export type ReplaceOp = { op: "replace"; path: number[]; before: string; html: string };
-export type DuplicateOp = { op: "duplicate"; path: number[]; to?: number; offset?: { x: number; y: number } };
-export type SourceOp = { op: "source"; text: string };
-
-export type Op = SetOp | TextOp | InsertOp | RemoveOp | MoveOp | ReplaceOp | DuplicateOp | SourceOp;
+export type Op = EditorOp;
+export type SetOp = Extract<EditorOp, { op: "set" }>;
+export type TextOp = Extract<EditorOp, { op: "text" }>;
+export type InsertOp = Extract<EditorOp, { op: "insert" }>;
+export type RemoveOp = Extract<EditorOp, { op: "remove" }>;
+export type MoveOp = Extract<EditorOp, { op: "move" }>;
+export type ReplaceOp = Extract<EditorOp, { op: "replace" }>;
+export type DuplicateOp = Extract<EditorOp, { op: "duplicate" }>;
+export type SourceOp = Extract<EditorOp, { op: "source" }>;
 
 /** Nothing can be edited that has no path: the body's children and below, and not the head. */
 export function addressOf(root: TreeNode, node: TreeNode): number[] | undefined {
@@ -137,14 +139,15 @@ export const ops = {
 	/**
 	 * A copy the server makes from the file's own bytes.
 	 *
-	 * `offset` for a placed node — the copy lands beside the original — and `to` for one among siblings.
+	 * `offset` moves a placed copy beside its original. Where among siblings a copy lands is not an op
+	 * yet: nothing has needed it, and an op that lies about what it can do is worse than a missing one.
 	 * A client cannot copy faithfully: its DOM is a rendering, and a card's markup would come back
 	 * re-spelled.
 	 */
-	duplicate(root: TreeNode, node: TreeNode, where: { to?: number; offset?: { x: number; y: number } } = {}): DuplicateOp | undefined {
+	duplicate(root: TreeNode, node: TreeNode, where: { offset?: { x: number; y: number } } = {}): DuplicateOp | undefined {
 		const path = addressOf(root, node);
 		if (!path) return undefined;
-		return { op: "duplicate", path, ...(where.to === undefined ? {} : { to: where.to }), ...(where.offset ? { offset: where.offset } : {}) };
+		return { op: "duplicate", path, ...(where.offset ? { offset: where.offset } : {}) };
 	},
 
 	/** The whole file: a markdown board, or the ⌥ textarea. The only op for a document with no tree. */

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Board, BoardPatch, ServerMessage } from "@decks/protocol";
+import type { Board, BoardPatch, ServerMessage, AnyBoardPatch } from "@decks/protocol";
 import { applyPatches, mintId, PatchRefused } from "./patch.ts";
 import { Revisions } from "./snapshots.ts";
 import {
@@ -310,7 +310,7 @@ export class BoardService {
 	 * browser can re-read the frame and decide whether the gesture still means
 	 * anything.
 	 */
-	patch(path: string, rev: number, patches: BoardPatch[], reply: (message: ServerMessage) => void): void {
+	patch(path: string, rev: number, patches: AnyBoardPatch[], reply: (message: ServerMessage) => void): void {
 		const board = this.deck.board(path);
 		if (!board) {
 			reply({ type: "board.patched", path, rev: 0, refused: `No such board: ${path}` });
