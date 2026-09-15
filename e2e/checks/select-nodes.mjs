@@ -95,5 +95,36 @@ await board.locator("body").click({ position: { x: 12, y: 12 } });
 say("a press on empty space clears the selection", (await selection()) === null, JSON.stringify(await selection()));
 say("and takes the affordance with it", (await marked()) === 0, `${await marked()} outlined`);
 
+/*
+ * And the first write: a node, its address, and an op.
+ *
+ * Not a drag — that is phase 5 — but the whole path out of the editor: the selection is a node, the node
+ * has a path counted in the tree, the op carries that path and the style it is changing, and nothing
+ * else about the element is in it. What the app will send is this object.
+ */
+await board.locator('[data-id="goal"]').click({ position: { x: 4, y: 4 } });
+await page.locator("#nudge").click();
+const op = await page.evaluate(() => window.__editorDev?.ops?.at(-1) ?? null);
+say(
+	"an edit leaves as an op: the path from the body, and the style it changes",
+	op?.op === "set" && Array.isArray(op?.path) && typeof op?.style?.left === "string",
+	JSON.stringify(op),
+);
+say(
+	"…and the path is the one the selection reported",
+	JSON.stringify(op?.path) === JSON.stringify((await selection())?.path),
+	`op ${JSON.stringify(op?.path)} vs selection ${JSON.stringify((await selection())?.path)}`,
+);
+say(
+	"…with the element's other style kept, because the op changes one attribute of one element",
+	op?.style?.top === "168px" && op?.style?.left === "56px",
+	JSON.stringify(op?.style),
+);
+say(
+	"…and no markup of the element in it: this op cannot re-spell the thing it edits",
+	!("html" in (op ?? {})) && !("model" in (op ?? {})),
+	JSON.stringify(Object.keys(op ?? {})),
+);
+
 say("no page errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();

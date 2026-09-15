@@ -13,7 +13,7 @@
  * It is a *dev* page, served by the app's Vite because Vite is what turns TypeScript into something a
  * browser can run in this repo. Nothing on this page is part of the app.
  */
-import { createEditor, parseBoard, serialize, shapeOf, type Editor, type TreeNode } from "@decks/editor";
+import { createEditor, ops, parseBoard, rectOf, serialize, shapeOf, type Editor, type Selection, type TreeNode } from "@decks/editor";
 
 const params = new URLSearchParams(location.search);
 const path = params.get("board") ?? "boards/plan.html";
@@ -47,6 +47,8 @@ const report = {
 	ops: [] as unknown[],
 	/** The selection, as much as a person or a check needs: where, what kind, and a projection's source. */
 	selection: null as { path: number[]; kind: string; id?: string; source?: string } | null,
+	/** The last selection as a node, so a button can make an op out of it. Not serialisable. */
+	last: null as Selection | null,
 };
 
 declare global {
@@ -160,6 +162,7 @@ async function main(): Promise<void> {
 			if (!report.equal) console.warn("shape differs:", report.diff);
 		},
 		onSelect: (selection) => {
+			report.last = selection ?? null;
 			report.selection = selection
 				? {
 						path: selection.path,
@@ -184,6 +187,27 @@ async function main(): Promise<void> {
 		editor?.setMode();
 	};
 	modeButton.addEventListener("click", flip);
+
+	/*
+	 * The first edit the editor can make, and the smallest one worth making: move the selected node
+	 * eight pixels right, as an op.
+	 *
+	 * It is not a drag — that is phase 5 — it is the *write path* being exercised: a node, its address,
+	 * the rect it already has, and an op that leaves through `onOps`. What comes out is what the app
+	 * would send, so what this page prints is the contract.
+	 */
+	const nudgeButton = document.querySelector("#nudge") as HTMLButtonElement;
+	nudgeButton.addEventListener("click", () => {
+		const node = report.last?.node;
+		if (!node || !editor) return;
+		const rect = rectOf(node);
+		if (rect.left === undefined) return;
+		const left = `${Number.parseFloat(rect.left) + 8}px`;
+		const op = ops.set(editor.tree.root, node, { style: { ...rect, left } });
+		if (!op) return;
+		report.ops.push(op);
+		out.textContent = JSON.stringify(report.ops, null, 1);
+	});
 	window.addEventListener("keydown", (event) => {
 		if (event.key === "e") flip();
 	});

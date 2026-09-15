@@ -312,6 +312,8 @@ export function createEditor(frame: HTMLIFrameElement, options: EditorOptions): 
 
 export { parseBoard, serialize, shapeOf, nodeAtPath, pathFor, collectHandles };
 export { describe, isProjection, kindOf, sourceOf, selectable, PROJECTION_ATTRIBUTES } from "./select.ts";
+export { ops, wordsOf, rectOf, addressOf } from "./ops.ts";
+export type { Op, SetOp, TextOp, InsertOp, RemoveOp, MoveOp, ReplaceOp, DuplicateOp, SourceOp } from "./ops.ts";
 export type { Selection, SelectionKind } from "./select.ts";
 export type { TreeNode };
 export { elementParts, bodyOf } from "./node.ts";

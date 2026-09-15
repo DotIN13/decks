@@ -42,14 +42,18 @@ test("a leaf and a container, told apart by what is inside them", () => {
 });
 
 test("the root, the head and the body are not things a press can select", () => {
-	const root = board([child(el("p", [], [], true, "One refresh."))]);
+	const p = el("p", [], [], true, "One refresh.");
+	const root = board([child(p)]);
 	const body = bodyOf(root);
-	const head = root.parts[0];
-	assert.ok(body && head.kind === "element");
+	assert.ok(body);
+	const headPart = root.parts[0];
+	assert.ok(headPart && headPart.kind === "element");
+	const head = headPart.node;
+
 	assert.equal(selectable(body!, root), false, "the body is the root of a path, not a target");
-	assert.equal(selectable(root, root), false);
-	assert.equal(selectable(head.node, root), false);
-	assert.equal(selectable(root.parts[1]!.kind === "element" ? (root.parts[1] as { node: TreeNode }).node : body!, root), false);
+	assert.equal(selectable(root, root), false, "nor is the html element");
+	assert.equal(selectable(head, root), false, "and the head is not in a board's body at all");
+	assert.equal(selectable(p, root), true, "while a paragraph inside the body is");
 });
 
 test("a selection is the node, its path, its kind, and its name when it has one", () => {
