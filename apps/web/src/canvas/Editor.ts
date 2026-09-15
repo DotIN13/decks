@@ -1,4 +1,5 @@
 import { component } from "@decks/board-kit";
+import { insertBreak, normaliseRun } from "@decks/editor";
 import { INLINE_TAGS, type BoardPatch, type ComponentKind, type Rect } from "@decks/protocol";
 import { cameraMovedSince } from "./pan-signal.ts";
 
@@ -845,6 +846,18 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			if (mouse) host.notice("Double-click the words themselves, not the box around them.");
 			return false;
 		}
+		/*
+		 * The run's words, before anything else reads them.
+		 *
+		 * A paragraph in a file is written across indented lines, so its text is full of newlines and tabs.
+		 * Making all of that editable text is what pushed the words apart on screen and made every Enter look
+		 * like more space — measured, on `notes.html`, whose paragraphs wrap inside the `<p>`. `normaliseRun`
+		 * collapses each whitespace run to one space and trims the ends, so what is edited is the words.
+		 *
+		 * It runs before `before` and `markup` are captured, which is what keeps "open a caret and close it
+		 * without typing writes nothing" true: the commit compares against the element as it stands after this.
+		 */
+		normaliseRun(run);
 		const before = run.textContent ?? "";
 		// A void element has nothing to replace, and an empty run has nothing on screen to
 		// have aimed at — both are a click that missed rather than an edit.
@@ -896,6 +909,19 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			if (event.key === "Escape") {
 				event.preventDefault();
 				stopEditing(false);
+			}
+			/*
+			 * Enter is ours, and it is one `<br>`.
+			 *
+			 * Left to the browser, a rich run inserts a `<div>` — a block inside a `<p>`, which is markup a
+			 * leaf should not hold — and a `plaintext-only` run inserts a newline, which renders as a space
+			 * and accumulates. A `<br>` is inline, so the server keeps it, and it is what a line break in a
+			 * paragraph is. The same helper the editor package uses, so there is one implementation of this.
+			 */
+			if (event.key === "Enter" && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+				event.preventDefault();
+				insertBreak(doc);
+				return;
 			}
 			if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 				event.preventDefault();

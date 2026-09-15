@@ -189,7 +189,7 @@ function placeAmongSiblings(node: TreeNode, to: number): void {
  *
  * So Enter is taken from the browser, whichever of the three it would have used.
  */
-function insertBreak(doc: Document | undefined): void {
+export function insertBreak(doc: Document | undefined): void {
 	if (!doc) return;
 	/*
 	 * The DOM, not `execCommand`.
@@ -209,6 +209,35 @@ function insertBreak(doc: Document | undefined): void {
 	range.collapse(true);
 	selection.removeAllRanges();
 	selection.addRange(range);
+}
+
+/**
+ * The run's words, with the file's line wrapping collapsed — what a caret should be editing.
+ *
+ * A paragraph in a board's file is written across several indented lines, so its *text* is full of newlines
+ * and tabs. Opening a caret on it made all of that editable text: the words on screen were pushed apart by
+ * the file's formatting, and each Enter the browser inserted — a `\n` under `plaintext-only` — read as more
+ * of the same space. Collapsing every run of whitespace to a single space, and trimming the ends, is what
+ * makes the thing being edited the run's *words* rather than the file's layout.
+ *
+ * Nothing is written because of this: the commit compares against the element as it stands *after* this ran,
+ * so a caret opened and closed with nothing typed writes nothing at all.
+ */
+export function normaliseRun(element: HTMLElement): void {
+	const walk = (node: Node): void => {
+		for (const child of [...node.childNodes]) {
+			if (child.nodeType === 3) {
+				const text = child as CharacterData;
+				text.data = text.data.replace(/\s+/g, " ");
+			} else if (child.nodeType === 1) walk(child);
+		}
+	};
+	walk(element);
+	element.normalize();
+	const first = element.firstChild?.nodeType === 3 ? (element.firstChild as CharacterData) : null;
+	const last = element.lastChild?.nodeType === 3 ? (element.lastChild as CharacterData) : null;
+	if (first) first.data = first.data.replace(/^\s+/, "");
+	if (last) last.data = last.data.replace(/\s+$/, "");
 }
 
 /**
@@ -246,6 +275,8 @@ export function flattenBlocks(element: HTMLElement): void {
 function openCaret(host: GestureHost, node: TreeNode, point: { x: number; y: number }): () => void {
 	const element = node.element as HTMLElement | undefined;
 	if (!element) return () => {};
+	// Before `asWritten`, so the "did anything change" test compares against what the caret is showing.
+	normaliseRun(element);
 	const asWritten = element.textContent ?? "";
 
 	element.setAttribute("contenteditable", "plaintext-only");
