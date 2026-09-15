@@ -30,6 +30,20 @@ import { pathOf } from "./address.ts";
 /** The tags a press can never resolve to: a step in a path, never a target. Shared, like `INLINE_TAGS`. */
 export const STRUCTURAL = new Set<string>(STRUCTURAL_TAGS);
 
+/**
+ * Elements that are a thing, not words — and so are never a caret.
+ *
+ * `video`, `audio`, `canvas`, `iframe`, `object`, `embed` and `img` have no text content of their own: they
+ * *are* their content, and a `<video>` with nothing between its tags reads as a leaf to a rule about inline
+ * descendants. Measured, before this list: a double-click on a `<video>` opened a caret in it, and typing
+ * would have sent a `text` op whose payload was markup for an element that cannot hold any.
+ *
+ * It is the same shape of rule as `STRUCTURAL_TAGS` and the answer is the same one: they are **selectable**
+ * — deleted, duplicated, moved — and never typeable. An `<img>` inside a paragraph is unaffected: this asks
+ * about the node's *own* tag, and inside a leaf the image is part of the run.
+ */
+export const EMBEDDED = new Set(["video", "audio", "canvas", "iframe", "object", "embed", "img", "picture"]);
+
 /** The attributes whose content belongs to a renderer rather than to the file. */
 export const PROJECTION_ATTRIBUTES = ["data-md", "data-mermaid", "data-embed", "data-live", "data-slides"] as const;
 
@@ -49,6 +63,7 @@ export interface Selection {
 /** Which of the three kinds this node is. A projection wins over the leaf rule. */
 export function kindOf(node: TreeNode): SelectionKind {
 	if (isProjection(node)) return "projection";
+	if (EMBEDDED.has(node.tag)) return "container";
 	return node.leaf ? "leaf" : "container";
 }
 

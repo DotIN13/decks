@@ -23,7 +23,7 @@ import type { EditorOp } from "@decks/protocol";
 import { nodeAt, pathOf } from "./address.ts";
 import { bodyOf, elementParts, type TreeNode } from "./node.ts";
 import { ops, rectOf, wordsOf } from "./ops.ts";
-import { describe, isProjection, type Selection } from "./select.ts";
+import { describe, isProjection, kindOf, type Selection } from "./select.ts";
 
 /** What a palette offers: the kinds `board-kit` says can be placed, with their labels and sizes. */
 export const paletteOf = (): readonly (typeof PALETTE)[number][] => PALETTE;
@@ -383,7 +383,12 @@ export function attachGestures(host: GestureHost): () => void {
 			caret = undefined;
 			close();
 		}
-		if (!node || isProjection(node) || !node.leaf) return;
+		/*
+		 * `kindOf` rather than `node.leaf`, which is the whole point of having one classification: a `<video>`
+		 * reads as a leaf to a rule about inline descendants, and `kindOf` is where that is decided. Measured,
+		 * with the check in the wrong place: the fix looked right and the caret still opened in the video.
+		 */
+		if (!node || kindOf(node) !== "leaf") return;
 		caret = openCaret(host, node, { x: event.clientX, y: event.clientY });
 	}
 

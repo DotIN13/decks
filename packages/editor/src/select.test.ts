@@ -86,3 +86,17 @@ test("a selection is the node, its path, its kind, and its name when it has one"
 	const nothing = describe(bodyOf(root)!, root);
 	assert.equal(nothing, undefined, "a press on the body selects nothing");
 });
+
+test("an element that is a thing rather than words is selectable but never a caret", () => {
+	// Measured in the app: a `<video>` was a leaf by the inline rule, so a double-click opened a caret in
+	// it and typing would have sent a `text` op into an element that cannot hold text.
+	const video = el("video", [["src", "../assets/a.mp4"]], [], true, "");
+	const card = el("section", [["class", "card"]], [child(video)]);
+	const root = board([child(card)]);
+	assert.equal(kindOf(video), "container", "selectable, and not typeable");
+	assert.equal(selectable(video, root), true, "it can still be selected, deleted, duplicated");
+	assert.equal(kindOf(card), "container");
+	// And an image *inside* a run is not affected: this asks about the node's own tag.
+	const paragraph = el("p", [], [], true, 'See <img src="a.png"> here.');
+	assert.equal(kindOf(paragraph), "leaf", "a paragraph holding an image is still words");
+});
