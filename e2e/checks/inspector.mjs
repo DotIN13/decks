@@ -125,6 +125,22 @@ try {
 		path,
 		{ timeout: 20000 },
 	);
+	/*
+	 * Every other board off the canvas, because the fixture deck's boards **overlap**.
+	 *
+	 * `board.play` adds the fixture; it does not take the seven or eight boards the checks before this one
+	 * left on the canvas away. So this check pressed a coordinate 30px into the fixture's title bar and hit
+	 * a *different board's node* painted over it — reported here as `under: "div.board-node"` with nine nodes
+	 * on the canvas — which selected that board instead and left the inspector open. The assertion was red in
+	 * a full-suite run and green alone, and the difference was what else was in play. This is the same lesson
+	 * `geometry.mjs` learned the same afternoon: a press at a coordinate is only about the thing under it.
+	 */
+	const others = await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path));
+	const hide = await socket();
+	for (const other of others) if (other !== path) hide.send({ type: "board.hide", path: other });
+	await new Promise((resolve) => setTimeout(resolve, 700));
+	hide.close();
+	await page.waitForTimeout(500);
 	await page.evaluate((wanted) => {
 		[...document.querySelectorAll(".board-row")].find((item) => item.textContent.includes(wanted))?.click();
 	}, "inspector-fixture");
@@ -224,7 +240,8 @@ try {
 		const el = document.elementFromPoint(x, y);
 		if (!el) return "nothing";
 		const id = el.closest("[data-id]")?.getAttribute("data-id");
-		return `${el.tagName.toLowerCase()}.${(el.className || "").toString().split(" ")[0]}${id ? ` in [data-id=${id}]` : ""}`;
+		const owner = el.closest("[data-path]")?.getAttribute("data-path");
+		return `${el.tagName.toLowerCase()}.${(el.className || "").toString().split(" ")[0]}${id ? ` in [data-id=${id}]` : ""}${owner ? ` on ${owner}` : ""}`;
 	}, [bar.x + 30, bar.y + 8]);
 	say(
 		"…as does a press on the board's own title",
@@ -533,12 +550,21 @@ try {
 
 	// --- and it is off when the board is a map ----------------------------------------
 
-	await page.keyboard.press("0");
-	await page.waitForFunction(
-		() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "100%").replace(/[^0-9.]/g, "")) < 50,
-		null,
-		{ timeout: 5000 },
-	);
+	/*
+	 * Zoomed out past `INTERACT_ZOOM`, however many presses that takes.
+	 *
+	 * This was a single press of `0` — the app's fit-the-map key — and a 5s wait for the zoom to land under
+	 * 50%. With the fixture *alone* on the canvas the fit stops above that, so the wait timed out and took
+	 * the check's last two assertions with it. The claim here is the state, not the keystroke.
+	 */
+	for (let attempt = 0; attempt < 10; attempt++) {
+		const level = await page.evaluate(() =>
+			Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "100%").replace(/[^0-9.]/g, "")),
+		);
+		if (level < 50) break;
+		await page.keyboard.press(attempt === 0 ? "0" : "Control+Minus");
+		await page.waitForTimeout(250);
+	}
 	say("zoomed out past INTERACT_ZOOM the inspector goes away, like the palette", (await inspector.count()) === 0);
 
 	say("no page errors", errors.length === 0, errors.join(" | "));
