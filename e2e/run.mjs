@@ -98,6 +98,11 @@ const CHECKS = [
 	 */
 	{ file: "selection.mjs", needsAgent: false },
 	/*
+	 * A link on a board: a board in the deck opens beside the one that linked to it, anything
+	 * else opens in a tab, and neither of them navigates the frame the board is drawn in.
+	 */
+	{ file: "board-links.mjs", needsAgent: false },
+	/*
 	 * The focus view: the canvas as one page. Its own check rather than a section of
 	 * `modes.mjs`, because it needs the deck as it opens — a page that has been typed into by
 	 * the sections before it is not a page any more.

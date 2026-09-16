@@ -669,10 +669,53 @@ export function App() {
 
 	const flyTo = (board: Board) => {
 		setSelected(board.path);
+		flyToBoards(board);
+	};
+
+	/*
+	 * Frame these boards, whatever they are: the camera moves to hold them all.
+	 *
+	 * A function over a list rather than one board, because the two things that fly — a row in
+	 * the rail, and a board a link on another board opened (below) — both want the same
+	 * arithmetic, and the second one wants the *pair*: a board that arrives beside the one you
+	 * were reading is only useful if you can see it is beside it.
+	 */
+	const flyToBoards = (...boards: Board[]) => {
+		if (boards.length === 0) return;
 		const stage = document.querySelector(".stage");
 		if (!stage) return;
 		const view = { width: stage.clientWidth, height: stage.clientHeight };
-		setCamera(fitInto([boxOf(board)], view, canvasBox(view)));
+		setCamera(fitInto(boards.map(boxOf), view, canvasBox(view)));
+	};
+
+	/**
+	 * A link **on a board** that points at another board — the app's half of it.
+	 *
+	 * Returns whether the deck had that board, because the board itself cannot open one: the
+	 * canvas is the app's to arrange. A path the deck does not hold is a broken link, and the
+	 * one answer that is any use is saying so.
+	 *
+	 * **Placed, not stacked.** A board that arrives on top of the one the reader is reading is
+	 * a board they then have to drag apart; so it lands to the right of the link's own board,
+	 * and both are framed, because the pair is the thing being looked at. Only when it is not
+	 * already on the canvas: a board the user put somewhere is theirs, and following a link is
+	 * not a reason to move it.
+	 */
+	const openLinkedBoard = (path: string, from: string): boolean => {
+		const board = state.boards.find((one) => one.path === path);
+		if (!board) {
+			notice("warn", `No board at ${path} — the link points at something this deck does not have.`);
+			return false;
+		}
+		const playing = new Set(state.focused ? state.agents[state.focused]?.inPlay ?? [] : []);
+		const source = state.boards.find((one) => one.path === from);
+		const opening = !playing.has(path);
+		if (opening && source) move(path, source.x + source.w + 32, source.y);
+		send({ type: "board.play", path });
+		setSelected(path);
+		setComponent(undefined);
+		flyToBoards(...(source ? [source, board] : [board]));
+		return true;
 	};
 
 	/**
@@ -853,6 +896,16 @@ export function App() {
 							if (reply.decks === "live.web.answer") send({ type: "web.answer", id: reply.id, ok: reply.ok });
 							else send({ type: "web.stop" });
 						}}
+						/*
+						 * A link on a board, pointing at another board.
+						 *
+						 * The board will not follow it — a frame has no back button, so the board being read
+						 * would be replaced by the one it linked to — and asks here instead. Only a link to a
+						 * board file gets this far; everything else opened in a tab at the click. The answer is
+						 * whether this deck holds that board: `true` and it is on the canvas beside the board
+						 * that linked to it, `false` and there is a notice saying there is no board there.
+						 */
+						onOpenBoard={openLinkedBoard}
 						agentIdentity={(agentId) => {
 							const identity = state.identities[agentId];
 							return identity ? { name: identity.name, color: identity.color } : undefined;
@@ -1302,6 +1355,7 @@ export function App() {
 										board={deck}
 										at={showing.at}
 										onExit={() => setPresenting(undefined)}
+										onOpenBoard={openLinkedBoard}
 										onLeave={(at) => {
 											// Put the canvas's own frame on the slide you finished on, so
 											// leaving fullscreen is not a jump back in the talk.

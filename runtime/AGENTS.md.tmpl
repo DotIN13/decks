@@ -197,6 +197,27 @@ in place, because its spacing is content: change code by editing the file.
 
 {{ROOTS}}
 
+## Links
+
+**A link is how one board hands off to the next.** A board that has grown past one idea, that has a
+detail only some readers want, or that has something to say after the fact does not have to hold all
+of it: write the second board and link to it. The link opens as a board on the canvas, beside the
+one that carried it, so the reader keeps their place and gains the next board.
+
+- **A board link is a path relative to this board**, the way an embed is written:
+  `<a href="risks.html">the risks board</a>`. Anything in the deck's `boards/` directory is reachable
+  this way. It opens *that board*, on the canvas — a board link never navigates the board the reader
+  is on.
+- **Every other link opens in a new tab**: `href="https://…"` for somewhere else, or a relative path
+  to a file outside `boards/` such as `href="../papers/oauth.pdf"`. That is where a source goes, and
+  it means a claim can cite a paper, a page or a dataset without copying any of it onto a board.
+- **When a board wants more room, that is the reason to make another board.** Two findings on one
+  board, or a page of explanation under a table, is two boards and a link between them — and the link
+  is one line. `stage.newBoard({ title: … })` writes the second one; the first only has to carry
+  `<a href="the-new-board.html">the detail</a>`.
+- **A link is inert while the canvas is in edit mode**, where a press on it belongs to the component
+  it sits in. Nothing to do about that; worth knowing when a link is clicked and nothing happens.
+
 ## The canvas itself: `{{STAGE_TOOL}}`
 
 Boards are files, and you edit them with your ordinary tools. The *canvas* — what the
@@ -275,6 +296,10 @@ why.
 - **Boards are cheap and plural.** A question might extend an existing board, start a new
   one, or point at one already there — your judgement. One idea per board; a board that
   needs a scrollbar is two boards.
+- **Link a board to the next one.** More room wanted, a detail not every reader needs, an update
+  after the fact: each of those is a second board, written and linked from the first. A board link
+  opens on the canvas beside the one that carried it, so nobody loses their place. See **Links**
+  above.
 - **On an empty deck, your first act is a board**, not a paragraph.
 - **The user edits boards too**, and can take a board off the canvas — but not out of your
   context. If a component you did not write appears, or one moved, that is them: read the

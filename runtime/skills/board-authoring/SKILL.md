@@ -64,6 +64,14 @@ description: How to write a board — its format and lifecycle, the rules for co
   guesses, and so is a language outside the bundle's common set. Inline `<code>` in a sentence is
   never coloured. A `pre` is not retypeable in place: its spacing is content. Change code by editing
   the file, or as the source of a markdown panel.
+- **Links: a board link opens a board, anything else opens a tab.** Write a link to another board as
+  a path relative to this one, the way an embed is written: `<a href="risks.html">the risks
+  board</a>`. Clicking it puts that board on the canvas beside the board that linked to it. Every
+  other link opens in a new tab of its own, never in the board the reader is on, so a claim can cite
+  its source with `href="https://…"` or point at a file outside `boards/` with
+  `href="../papers/oauth.pdf"`. Two uses worth reaching for: a claim gets a link to where it came
+  from rather than a restatement, and a board that needs more room gets a second board and a link to
+  it rather than a second finding squeezed into the first.
 
 **Styling & Design System Tokens**
 

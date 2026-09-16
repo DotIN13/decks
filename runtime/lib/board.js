@@ -123,6 +123,122 @@
 
 	const nameOf = (path) => String(path).split("/").filter(Boolean).pop() ?? String(path);
 
+	// --- links -------------------------------------------------------------------
+
+	/*
+	 * What a click on a link means inside a board.
+	 *
+	 * **A link never navigates the frame.** A board document *is* the reader's page, so
+	 * sending it to example.com replaces the board with a foreign site at an address nobody
+	 * can get back from — a frame has no back button — and a link to a sibling board would do
+	 * the same thing, one board over. Both are losses, and neither is what the link's author
+	 * meant.
+	 *
+	 * So a click becomes one of two things, and **which one is decided here, in the click
+	 * itself**:
+	 *
+	 * - **a link to a board file** — a `.html` or `.md` path that resolves inside the deck —
+	 *   goes up to the app as a request to put that board on the canvas (`{ decks:
+	 *   "board.open" }`, and the deck-relative path). The app is the only thing here that knows
+	 *   the deck, so it decides whether there is a board there, and a path it does not hold is
+	 *   a notice rather than a board.
+	 * - **everything else** — another site, or a file in the deck that is not a board, a PDF or
+	 *   an image — opens in a tab of its own, by putting `target` on the anchor *before* the
+	 *   default action runs. Deliberately not `preventDefault` plus `window.open`: a real
+	 *   navigation keeps the tab, the address bar, the context menu and the middle click for
+	 *   free, and the browser's own new-tab behaviour is then the feature rather than an
+	 *   imitation of it.
+	 *
+	 * **It has to be decided here** rather than by asking the app. A tab can only be opened
+	 * from a user gesture, and an answer that arrives as a `postMessage` is one turn too late
+	 * for one: a `window.open` in the app's message handler opens an empty window and never
+	 * navigates it, measured rather than guessed. The cost is the glob below, which is
+	 * `deck/kinds.ts`'s — one list, two readers, and the same bargain `familyOf` makes with
+	 * `embedFamily` on the app's side.
+	 *
+	 * Deliberately silent in **edit mode**, where a press on a link is part of dragging or
+	 * retyping the component it sits in. `data-decks-edit` is the app's own flag on this
+	 * document (`canvas/BoardFrame.tsx` does the writing), so this needs no second channel to
+	 * ask about it.
+	 *
+	 * Opened as a plain file with no app above it, a board link opens in a tab as well: there
+	 * is nobody to ask, and a new tab beats losing the board being read.
+	 */
+	const BOARD_PREFIX = "/api/board/";
+	/** What a board file is called (`deck/kinds.ts`): the one thing about a board that a link can be read against. */
+	const BOARD_FILE = /\.(?:html?|mdx?)$/i;
+
+	/** The deck-relative path behind a `/api/board/…` URL, or null if it is not one. */
+	function boardPathOf(url) {
+		if (url.origin !== location.origin || !url.pathname.startsWith(BOARD_PREFIX)) return null;
+		const path = url.pathname.slice(BOARD_PREFIX.length);
+		// A percent-escape the browser let through but nothing can read is not a path.
+		try {
+			return decodeURIComponent(path);
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * Open a URL in its own tab.
+	 *
+	 * On the anchor when there is one, so the *browser* opens it: that is the difference
+	 * between a link and a script, and it is what keeps a link's own `target` — an author who
+	 * already wrote one has said where it should go.
+	 */
+	function openTab(url, anchor) {
+		if (!anchor) {
+			window.open(url, "_blank", "noopener");
+			return;
+		}
+		if (anchor.target !== "_blank") anchor.target = "_blank";
+		if (!/(^|\s)noopener(\s|$)/.test(anchor.rel)) anchor.rel = anchor.rel ? `${anchor.rel} noopener` : "noopener";
+	}
+
+	function onLinkClick(event) {
+		/*
+		 * Every one of these is a click the browser should handle exactly as it always has: a
+		 * modified or non-primary click is *already* "open in a new tab", and a link inside a
+		 * run of words while that run is open for typing belongs to the caret.
+		 */
+		if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+		if (document.documentElement.hasAttribute("data-decks-edit")) return;
+		const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
+		if (!anchor) return;
+		const raw = (anchor.getAttribute("href") ?? "").trim();
+		// A jump within this board is the one link that stays in it, and the one `urlFor` is
+		// not asked about.
+		if (!raw || raw.startsWith("#") || /^(mailto|tel|javascript):/i.test(raw)) return;
+
+		/*
+		 * **Relative means relative to the board** — the same rule `[data-embed]` follows, and
+		 * the reason a link and an embed of the same file agree about where it is. Everything
+		 * else is a URL and is left alone, which is also what keeps an absolute `/api/board/…`
+		 * href working as the browser reads it.
+		 */
+		const target = /^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("/") ? raw : urlFor(raw);
+		if (!target) return;
+		let url;
+		try {
+			url = new URL(target, location.href);
+		} catch {
+			return;
+		}
+
+		const path = boardPathOf(url);
+		if (path && BOARD_FILE.test(path) && window.parent !== window) {
+			event.preventDefault();
+			window.parent.postMessage({ decks: "board.open", path }, "*");
+			return;
+		}
+		openTab(url.href, anchor);
+	}
+
+	/* Capture, so a board's own scripts — a live component, a game, an embed's gesture
+	   guard — cannot swallow the click first: the link belongs to the document. */
+	document.addEventListener("click", onLinkClick, true);
+
 	// --- the board itself --------------------------------------------------------
 
 	function readMeta() {

@@ -2,6 +2,7 @@ import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import type { Board } from "@decks/protocol";
 import { type DeckHandle, slideKey } from "./slide-keys.ts";
 import { enterFullscreen, exitFullscreen, onFullscreenLeft } from "./fullscreen.ts";
+import { attachBoardOpen } from "./board-links.ts";
 
 /**
  * A board, fullscreen.
@@ -55,6 +56,15 @@ export function Present(props: {
 	onExit: () => void;
 	/** Where the deck ended up, so the canvas can follow rather than snapping back. */
 	onLeave?: (at: number) => void;
+	/**
+	 * A link **on** this board that points at another board (`canvas/board-links.ts`).
+	 *
+	 * The overlay draws its own frame rather than a `BoardFrame`, so it has to wire the same
+	 * ask up from the board's document. `true` means the board is on the canvas and this exits
+	 * the presentation, because the canvas is underneath the overlay and a board opened behind
+	 * it is a board nobody sees.
+	 */
+	onOpenBoard?: (path: string, from: string) => boolean;
 }) {
 	let frameEl: HTMLIFrameElement | undefined;
 	let layerEl: HTMLDivElement | undefined;
@@ -172,6 +182,7 @@ export function Present(props: {
 	 * reason Escape works in a document as well as in a deck.
 	 */
 	let frameListeners: (() => void) | undefined;
+	let detachLinks: (() => void) | undefined;
 	const listenInFrame = () => {
 		const doc = frameEl?.contentDocument;
 		if (!doc) return;
@@ -193,6 +204,7 @@ export function Present(props: {
 			window.removeEventListener("keydown", act, true);
 			window.removeEventListener("pointermove", wake);
 			frameListeners?.();
+			detachLinks?.();
 			clearTimeout(wakeTimer);
 		});
 	});
@@ -234,6 +246,15 @@ export function Present(props: {
 						frameListeners?.();
 						frameListeners = undefined;
 						listenInFrame();
+						/*
+						 * A link on the presented board, which the overlay's own frame has to ask about for
+						 * the same reason the canvas's does: the board will not navigate itself, and this is
+						 * the only thing listening on this side of it.
+						 */
+						detachLinks?.();
+						detachLinks = attachBoardOpen(element, (path) => {
+							if (props.onOpenBoard?.(path, props.board.path)) props.onExit();
+						});
 						if (slides()) ready();
 					});
 				}}

@@ -18,6 +18,7 @@ import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { measureFrame } from "./extent.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
 import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
+import { attachBoardOpen } from "./board-links.ts";
 import { paintFrame } from "../lib/theme.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
 import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "./picture.ts";
@@ -153,6 +154,14 @@ export function BoardFrame(props: {
 	/** The user pressed Allow, Deny or Stop on that card. */
 	onWebReply?: (reply: LiveWebReply) => void;
 	/**
+	 * A link **on** this board that points at another board (`canvas/board-links.ts`).
+	 *
+	 * `true` when the deck had that board and it is now on the canvas. A return value rather
+	 * than two callbacks because only the app knows the deck; `false` is a path this deck does
+	 * not hold, which the app has already said out loud.
+	 */
+	onOpenBoard?: (path: string, from: string) => boolean;
+	/**
 	 * How this board is put on the stage (`lib/renderer.ts`): a document in a box, a
 	 * document drawn into a canvas of its own, or a picture on the stage's one canvas.
 	 */
@@ -170,6 +179,7 @@ export function BoardFrame(props: {
 	let detachGestures: (() => void) | undefined;
 	let detachDrop: (() => void) | undefined;
 	let detachLive: (() => void) | undefined;
+	let detachLinks: (() => void) | undefined;
 	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
 	onCleanup(() => {
@@ -415,6 +425,7 @@ export function BoardFrame(props: {
 		detachGestures?.();
 		detachDrop?.();
 		detachLive?.();
+		detachLinks?.();
 		detachSelect?.();
 		/*
 		 * A press inside a board selects that board — **every** format, either mode.
@@ -465,6 +476,18 @@ export function BoardFrame(props: {
 			onWant: () => setWantsWeb(true),
 			onReply: (reply) => props.onWebReply?.(reply),
 		});
+		/*
+		 * A link on the board pointing at another board.
+		 *
+		 * The board refuses to navigate to it — a frame has no back button, so following the link
+		 * would replace the board being read (`lib/board.js`) — and asks up here instead. Only a
+		 * link to a board file gets this far: a link to anything else from the deck, or to
+		 * anywhere else at all, was opened in a tab by the board itself, in the click, which is
+		 * the only moment a browser will let a tab be opened.
+		 */
+		detachLinks = attachBoardOpen(frame, (path) => {
+			props.onOpenBoard?.(path, props.board.path);
+		});
 		reportExtent(frame, props.board.rev);
 	};
 
@@ -484,7 +507,8 @@ export function BoardFrame(props: {
 		detachGestures?.();
 		detachDrop?.();
 		detachLive?.();
-		detachSelect = detachEditor = detachGestures = detachDrop = detachLive = undefined;
+		detachLinks?.();
+		detachSelect = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = undefined;
 		clearTimeout(measuring);
 		if (frameEl === element) frameEl = undefined;
 	};

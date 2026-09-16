@@ -141,6 +141,13 @@ export function Stage(props: {
 	webStatus?: () => { status: WebStatus; code?: string } | undefined;
 	/** Allow, Deny or Stop pressed on that card. */
 	onWebReply?: (reply: LiveWebReply) => void;
+	/**
+	 * A link on a board pointing at another board — `true` once the deck has opened it.
+	 *
+	 * Handed straight through to the frame that asked (`BoardFrame`). `false` is a path this
+	 * deck does not hold, which the app has already said in a notice.
+	 */
+	onOpenBoard?: (path: string, from: string) => boolean;
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
 	/**
@@ -1150,6 +1157,7 @@ export function Stage(props: {
 							{...(props.working ? { working: props.working } : {})}
 							{...(props.webStatus ? { webStatus: props.webStatus } : {})}
 							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
+							{...(props.onOpenBoard ? { onOpenBoard: props.onOpenBoard } : {})}
 							onSelect={() => props.onSelect(board.path)}
 							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}
