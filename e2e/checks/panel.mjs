@@ -143,6 +143,42 @@ try {
 	);
 	say("…and nothing under the cursor moves", swap === null || swap.before.name === swap.after.name, JSON.stringify(swap));
 
+	/*
+	 * And the name clears the bin on the rows that have no dot to reserve its column for.
+	 *
+	 * A row with a dot already stops its name short of the rail, because the dot is in flow in
+	 * it. A row *without* one has nothing at the right of it, and that is where this went wrong:
+	 * measured before the rule, the ellipsis and the last two characters of
+	 * `a-board-bar-that-works-with-a-finger.html` were underneath the bin — and behind an *armed*
+	 * bin, which is held visible on purpose, they were underneath a danger-red wash. A delete
+	 * button that covers the word it is about to delete is the worst version of this panel.
+	 *
+	 * So: no overlap while the bin is showing, and the name narrower than it was — 28px of
+	 * filename, which is the bin and the row's own 8px gap. Which rows are allowed to keep the
+	 * width at rest is the design; that they give it up when the bin arrives is the assertion.
+	 */
+	const clear = async (locator) =>
+		locator.evaluate((el) => {
+			const name = el.querySelector(".nm").getBoundingClientRect();
+			const bin = el.querySelector(".board-del").getBoundingClientRect();
+			return { name: Math.round(name.width), clear: Math.round(bin.left - name.right), shows: getComputedStyle(el.querySelector(".board-del")).opacity === "1" };
+		});
+	const room = await (async () => {
+		const row = page.locator(".board-act").filter({ hasNot: page.locator(".dot") }).first();
+		if ((await row.count()) === 0) return null;
+		const before = await clear(row);
+		await row.hover();
+		await page.waitForTimeout(220);
+		const after = await clear(row);
+		await page.mouse.move(700, 500);
+		return { before, after };
+	})();
+	say(
+		"approaching a row with no dot takes the bin's column out of its name",
+		room === null || (room.after.shows && room.after.clear >= 0 && room.before.clear < 0 && room.after.name <= room.before.name - 28),
+		JSON.stringify(room),
+	);
+
 	await page.locator('[data-inset="left"] input').fill("risk");
 	await page.waitForTimeout(250);
 	say("the one field filters the whole list", (await page.locator(".board-row").count()) === 1, String(await page.locator(".board-row").count()));
@@ -222,4 +258,53 @@ try {
 	say("no page errors", errors.length === 0, errors.join(" | "));
 } finally {
 	await browser.close();
+}
+
+// --- a coarse pointer: the rail, where the bin is 28px and always drawn -----------------
+
+/*
+ * Its own context, because a touchscreen is a different layout of the same panel: the swap above
+ * is a hover, so on this side of the media query the bin is simply always there, and a finger
+ * needs a 28px target where a cursor needs a 20px one.
+ *
+ * The rail is one column on both devices and *cannot* be for all three marks here. The count and
+ * the bin share it — before this, the 28px bin hung 4px left of the counts, which is the sort of
+ * disagreement the eye reads as a sloping edge — and the dot stands clear of it, in a column of
+ * its own: a 28px target and a 20px rail cannot both have the edge when both are drawn at once,
+ * and the dot is the one of the two that can be somewhere else without being missed.
+ */
+{
+	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
+	try {
+		const rail = await page.evaluate(() => {
+			const mid = (el) => {
+				const b = el.getBoundingClientRect();
+				return Math.round((b.left + b.right) / 2);
+			};
+			const row = document.querySelector(".board-act:has(.dot)") ?? document.querySelector(".board-act");
+			const name = row.querySelector(".nm").getBoundingClientRect();
+			const bin = row.querySelector(".board-del").getBoundingClientRect();
+			return {
+				count: mid(document.querySelector(".panel-meta .n")),
+				bin: mid(row.querySelector(".board-del")),
+				dot: row.querySelector(".dot") ? mid(row.querySelector(".dot")) : null,
+				binShown: getComputedStyle(row.querySelector(".board-del")).opacity === "1",
+				clear: Math.round(bin.left - name.right),
+			};
+		});
+		say(
+			"on a finger the bin is centred on the counts' own column",
+			Math.abs(rail.count - rail.bin) <= 1,
+			JSON.stringify(rail),
+		);
+		say(
+			"…and the dot stands beside it rather than underneath",
+			rail.dot === null || rail.dot < rail.bin - 20,
+			JSON.stringify(rail),
+		);
+		say("…and the name clears the bin that is always drawn", rail.binShown && rail.clear >= 0, JSON.stringify(rail));
+		say("no page errors on a phone", errors.length === 0, errors.join(" | "));
+	} finally {
+		await browser.close();
+	}
 }

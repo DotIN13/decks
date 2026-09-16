@@ -689,6 +689,12 @@
 		flex: none;
 		align-items: center;
 		border-radius: var(--control-radius, 8px);
+		/*
+		 * What the row's right-hand edge has to hold back for the bin: 6px of the row's own
+		 * padding, the bin's 20px, and the 8px gap the row lays its items out with. A name that
+		 * wants the room reads this rather than repeating the arithmetic — see the rule below.
+		 */
+		--bin-room: 34px;
 		transition: background-color 120ms ease;
 	}
 
@@ -739,6 +745,27 @@
 		opacity: 1;
 	}
 
+	/*
+	 * And the name gets out of its way.
+	 *
+	 * A row with a dot on it needs nothing here: the dot is in flow in that column, so its name
+	 * stopped short of the bin's box before the pointer arrived. A row *without* one has nothing
+	 * at the right of it, so its name is allowed the whole width — and until this rule, it kept
+	 * the whole width while the bin was drawn in it. Measured on the live panel, the ellipsis and
+	 * the last two characters of `a-board-bar-that-works-with-a-finger.html` were underneath the
+	 * bin, and behind an *armed* bin they were covered by a danger-red wash: a delete button that
+	 * looks like it is sitting on the word it is about to delete.
+	 *
+	 * So approaching a row takes the bin's column out of the name. `--bin-room` is that column
+	 * measured from the row's right edge — 6px of the row's own padding, the bin, and the 8px gap
+	 * the row lays its items out with — so the name re-ellipsises 28px earlier and clears the bin
+	 * by the row's ordinary spacing. Only a row with no dot to give up is padded, which is why the
+	 * swap on a dotted row still moves nothing under the cursor.
+	 */
+	.board-act:not(:has(> .board-row > .dot)):is(:hover, :focus-within) > .board-row {
+		padding-right: var(--bin-room);
+	}
+
 	.board-del:hover {
 		background: color-mix(in srgb, var(--fg) 12%, transparent);
 		color: var(--fg);
@@ -770,16 +797,36 @@
 	 * permanently hidden behind a permanently visible bin. So on a coarse pointer they are
 	 * two columns rather than one: the bin keeps the edge, and the row is padded far enough
 	 * to put the dot beside it instead of underneath.
+	 *
+	 * The bin is 28px here, because a finger needs a target that size, and the rail it stands in
+	 * is 20px. It is therefore **centred on the rail rather than filling it** — 4px of overhang at
+	 * each end — which is the arrangement the foot's two density toggles already use: their boxes
+	 * are 24px around 12px glyphs, and the ink is what lines up with the counts above, not the box.
+	 * So `right: 4px` here is the 20px rail's own 6px + the 4px the wider box hangs past it, and the
+	 * name's room grows by those same 4px and not by the 8 the box gained.
 	 */
 	@media (pointer: coarse) {
+		.board-act {
+			--bin-room: 38px;
+		}
+
 		.board-del {
+			right: 2px;
 			width: 28px;
 			height: 28px;
 			opacity: 1;
 		}
 
+		/*
+		 * The rail is reserved on every row rather than only under a pointer, because on this side
+		 * of the media query the bin is drawn on every row — there is nothing to approach.
+		 *
+		 * It reads the same `--bin-room` as the fine-pointer rule above and on purpose: a tablet
+		 * with a trackpad in it matches both queries, and two rules that spelled their own numbers
+		 * would disagree by 4px on exactly the device that has both a finger and a cursor.
+		 */
 		.board-act > .board-row {
-			padding-right: 34px;
+			padding-right: var(--bin-room);
 		}
 
 		.board-act:is(:hover, :focus-within) > .board-row > .dot::before {
