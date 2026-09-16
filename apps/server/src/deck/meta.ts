@@ -107,7 +107,22 @@ export function withBoardSize(html: string, size: { w?: number; h?: number }): s
 	// The same last-resort width the loader uses, for the same reason: a record that is too
 	// narrow clips in silence, and one that is too wide is visible and one `fit` away.
 	const w = Math.max(1, Math.round(size.w ?? meta.w ?? DEFAULT_BOARD_W));
-	const h = Math.max(1, Math.round(size.h ?? meta.h ?? 800));
+	/*
+	 * A height nobody gave is **left out** rather than invented.
+	 *
+	 * It used to fall back to 800 and be written like any other number, which was wrong in the
+	 * one case that matters: a flow document's tag is `{"w":760,"bg":"plain"}` — the width is the
+	 * only size it declares, because its height is its content and the browser measures it. A drag
+	 * on the width of that board therefore wrote an `h` into the file that said nothing, had never
+	 * been asked for, and would have to be kept in step with a measurement that overwrites it.
+	 * Caught by `e2e/checks/geometry.mjs`, which asserts that the rest of the tag is untouched.
+	 *
+	 * Nothing is lost by omitting it: the loader has its own last-resort dimensions for a board
+	 * that declares none (`DEFAULT_BOARD_W`, and the height beside it), so a reader that needs a
+	 * number still gets one.
+	 */
+	const h = size.h !== undefined ? Math.max(1, Math.round(size.h)) : meta.h !== undefined ? Math.max(1, Math.round(meta.h)) : undefined;
+	const stated = { w, ...(h !== undefined ? { h } : {}) };
 
 	META.lastIndex = 0;
 	for (let tag = META.exec(html); tag; tag = META.exec(html)) {
@@ -125,15 +140,15 @@ export function withBoardSize(html: string, size: { w?: number; h?: number }): s
 		}
 		const replaced = tag[0].replace(
 			/content\s*=\s*(?:"[^"]*"|'[^']*')/i,
-			`content='${JSON.stringify({ w, h, ...rest })}'`,
+			`content='${JSON.stringify({ ...stated, ...rest })}'`,
 		);
 		// Single-quoted, because the JSON inside carries double quotes of its own. If the
 		// tag had no `content` at all there is nothing to replace, so one is added.
-		const written = replaced === tag[0] ? tag[0].replace(/\s*\/?>$/, ` content='${JSON.stringify({ w, h, ...rest })}'>`) : replaced;
+		const written = replaced === tag[0] ? tag[0].replace(/\s*\/?>$/, ` content='${JSON.stringify({ ...stated, ...rest })}'>`) : replaced;
 		return html.slice(0, tag.index) + written + html.slice(tag.index + tag[0].length);
 	}
 
-	const tag = `<meta name="board" content='${JSON.stringify({ w, h, bg: "grid" })}' />`;
+	const tag = `<meta name="board" content='${JSON.stringify({ ...stated, bg: "grid" })}' />`;
 	const title = /<\/title>/i.exec(html);
 	if (title) return `${html.slice(0, title.index + title[0].length)}\n\t\t${tag}${html.slice(title.index + title[0].length)}`;
 	const head = /<head[^>]*>/i.exec(html);

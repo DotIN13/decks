@@ -22,6 +22,15 @@ import type { WebStatus } from "./web.ts";
 export type ClientMessage =
 	| { type: "deck.open"; path: string }
 	| { type: "board.move"; path: string; x: number; y: number }
+	/**
+	 * A board dragged to a new size by the person holding the mouse.
+	 *
+	 * Where the number *lives* depends on the format, and the server decides that rather than
+	 * the browser: a component board's size is the one number in its own `<meta>` tag, a flow
+	 * document's width is in that tag and its height is its content, and a slide deck's height
+	 * follows from its aspect. Either dimension on its own is allowed.
+	 */
+	| { type: "board.resize"; path: string; w?: number; h?: number }
 	| { type: "board.patch"; path: string; rev: number; patches: BoardPatch[] }
 	/**
 	 * How much room this board's content takes, measured in the frame that is showing it.

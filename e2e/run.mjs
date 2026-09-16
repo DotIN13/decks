@@ -51,6 +51,7 @@ const CHECKS = [
 	{ file: "inspector.mjs", needsAgent: false },
 	{ file: "notifications.mjs", needsAgent: false },
 	{ file: "modes.mjs", needsAgent: false },
+	{ file: "geometry.mjs", needsAgent: false },
 	{ file: "agents-tab.mjs", needsAgent: false },
 	/*
 	 * Fullscreen for every format, on a board of each — which brings back the one thing the

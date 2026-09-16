@@ -77,6 +77,19 @@ export function BoardFrame(props: {
 	marks?: Mark[];
 	onSelect: () => void;
 	onMove: (x: number, y: number) => void;
+	/**
+	 * The board dragged to a new size, in board units.
+	 *
+	 * Sent on release rather than while dragging: a board's size is a number in its own file,
+	 * and the frame showing it is the file. So the drag previews the *box* — the node is drawn
+	 * at the size being asked for, with the document still at its old one inside it — and the
+	 * write happens once, at the end, which is also what makes one gesture one revision.
+	 *
+	 * Only the dimensions the format can hold arrive here. A component board sends both; a flow
+	 * document and a slide deck send the width, because a flow board's height is its content
+	 * and a deck's follows from its aspect (`wire/boards.ts` decides that, not this file).
+	 */
+	onResize?: (size: { w: number; h: number }) => void;
 	onOpen: () => void;
 	/**
 	 * How much room this board's content took, once the document had finished mounting.
@@ -213,6 +226,15 @@ export function BoardFrame(props: {
 	const [dragging, setDragging] = createSignal(false);
 	/** Where the board sits while a drag is in flight, before the server knows. */
 	const [ghost, setGhost] = createSignal<{ x: number; y: number } | null>(null);
+	/*
+	 * The size being dragged, held from the first move until the file comes back at it.
+	 *
+	 * The node is drawn at this size, so the box follows the pointer without waiting for a
+	 * round trip — and it keeps following after the pointer is up, because the write is a file
+	 * write and the frame reloads at the end of it. Dropping the drag's number on release would
+	 * snap the board home for a frame, which is the same flicker the move ghost exists to avoid.
+	 */
+	const [sizing, setSizing] = createSignal<{ w: number; h: number } | null>(null);
 
 	/**
 	 * Where this node sits: the board's world position, or a place its caller chose.
@@ -702,6 +724,76 @@ export function BoardFrame(props: {
 		listener.addEventListener("pointercancel", end as EventListener);
 	};
 
+	/**
+	 * The resize handle, dragged.
+	 *
+	 * The move drag's shape with the arithmetic turned through ninety degrees: the pointer's
+	 * travel in screen pixels divided by the zoom is world pixels, added to the size the board
+	 * had when the gesture started. No snapping — a board's size comes from `fit` and from what
+	 * its content needs, and the values in this deck are 1008 and 1354 rather than multiples of
+	 * anything, so a grid here would fight the numbers it is supposed to be producing.
+	 *
+	 * Only the width for a flow document or a slide deck, and the drag refuses to pretend
+	 * otherwise: the handle is drawn as a horizontal bar for those, and a height that cannot be
+	 * stored is not previewed as if it could.
+	 */
+	const startSizing = (event: PointerEvent) => {
+		if (!props.onResize) return;
+		if (event.button !== 0) return;
+		// The canvas pans on a press that reaches it, and the frame would take this as a click.
+		event.stopPropagation();
+		event.preventDefault();
+		props.onSelect();
+
+		const handle = event.currentTarget as HTMLElement;
+		handle.setPointerCapture(event.pointerId);
+		const from = { x: event.clientX, y: event.clientY };
+		const origin = { w: props.board.w, h: props.board.h };
+		const zoom = props.camera.zoom;
+		const both = props.board.format === "component";
+		let moved = false;
+
+		const move = (moveEvent: PointerEvent) => {
+			if (moveEvent.pointerId !== event.pointerId) return;
+			moved = true;
+			setSizing({
+				w: Math.max(320, Math.round(origin.w + (moveEvent.clientX - from.x) / zoom)),
+				h: both ? Math.max(200, Math.round(origin.h + (moveEvent.clientY - from.y) / zoom)) : origin.h,
+			});
+		};
+
+		const finish = (abandon = false) => {
+			handle.removeEventListener("pointermove", move as EventListener);
+			handle.removeEventListener("pointerup", end as EventListener);
+			handle.removeEventListener("pointercancel", end as EventListener);
+			const landed = abandon ? null : sizing();
+			if (landed && moved) props.onResize?.({ w: landed.w, h: landed.h });
+			// Nothing dragged: leave no box behind to wait for a file that is not coming.
+			if (abandon || !moved) setSizing(null);
+		};
+		const end = (endEvent: PointerEvent) => {
+			if (endEvent.pointerId !== event.pointerId) return;
+			finish();
+		};
+
+		handle.addEventListener("pointermove", move as EventListener);
+		handle.addEventListener("pointerup", end as EventListener);
+		handle.addEventListener("pointercancel", end as EventListener);
+	};
+
+	/*
+	 * The drag's number is let go of when the board *is* that size, which is when the write has
+	 * landed and the frame has reloaded at it. A flow document's height is the browser's to
+	 * report and arrives a beat later, so this watches the width there — the height it was
+	 * holding is the one it had, and the report replaces it.
+	 */
+	createEffect(() => {
+		const held = sizing();
+		if (!held) return;
+		const both = props.board.format === "component";
+		if (props.board.w === held.w && (!both || props.board.h === held.h)) setSizing(null);
+	});
+
 	return (
 		<div
 			class="board-node"
@@ -712,8 +804,8 @@ export function BoardFrame(props: {
 			style={{
 				left: `${at().x}px`,
 				top: `${at().y}px`,
-				width: `${props.board.w}px`,
-				height: `${props.board.h}px`,
+				width: `${(sizing()?.w ?? props.board.w)}px`,
+				height: `${(sizing()?.h ?? props.board.h)}px`,
 			}}
 		>
 			{/*
@@ -911,7 +1003,16 @@ export function BoardFrame(props: {
 			*/}
 			<div
 				class="surface"
-				style={{ width: `${props.board.w}px`, height: `${props.board.h}px` }}
+				/*
+				 * Drawn at the size being dragged, like the node. The document inside it is still
+				 * the old file until the write lands, so the difference between the two is the
+				 * empty panel the new area is — the honest picture of "this is the box you are
+				 * asking for, and the board has not been rewritten yet".
+				 */
+				style={{
+					width: `${(sizing()?.w ?? props.board.w)}px`,
+					height: `${(sizing()?.h ?? props.board.h)}px`,
+				}}
 				onPointerDown={(event) => {
 					props.onSelect();
 					if (inert() && event.pointerType !== "touch") startDrag(event);
@@ -1021,6 +1122,37 @@ export function BoardFrame(props: {
 						<span class="label">{cursor().label}</span>
 					</div>
 				)}
+			</Show>
+
+			/*
+			 * The resize handle, on the selected board.
+			 *
+			 * Selected rather than hovered: there is a *write* at the end of this, and the board a
+			 * press is about to rewrite is not the same claim as the one a pointer happens to be
+			 * over. Selection in this app already means "the board you are working on" — the
+			 * inspector is showing it, the bar's focus and fullscreen buttons act on it — and a
+			 * handle belongs to that sentence rather than to a passing cursor.
+			 *
+			 * Drawn as a bar rather than a square for a flow document and a slide deck, because
+			 * those have one dimension to give: their height is the content's or the aspect's. The
+			 * shape says which drag is about to start, so nothing has to explain it.
+			 */
+			<Show when={props.onResize && props.selected}>
+				<div
+					class="sizer"
+					/*
+					 * `--zoom` here, on this box alone, because that is what `--unit` is derived
+					 * from (`index.css`) and a handle on a canvas has to be a handle at every
+					 * zoom. On the node instead it would restyle the whole board's subtree on
+					 * every step of a pinch; the bar writes it on itself for the same reason.
+					 */
+					style={{ "--zoom": zoom() }}
+					data-axis={props.board.format === "component" ? "both" : "width"}
+					role="separator"
+					aria-label={`Resize ${props.board.title}`}
+					title="Drag to resize this board"
+					onPointerDown={startSizing}
+				/>
 			</Show>
 		</div>
 	);

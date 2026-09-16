@@ -98,6 +98,15 @@ export function Stage(props: {
 	editing?: { path: string; editing: BoardEditing };
 	onSelect: (path: string | undefined) => void;
 	onMove: (path: string, x: number, y: number) => void;
+	/** The board dragged to a new size, in board units. The file is what changes. */
+	onResize?: (path: string, size: { w: number; h: number }) => void;
+	/**
+	 * A double-click that landed on empty canvas, in stage pixels.
+	 *
+	 * The gesture that makes a board. Absent means the app does not want one, and nothing is
+	 * asked of the server.
+	 */
+	onCreateBoard?: (at: { x: number; y: number }) => void;
 	onHide?: (path: string) => void;
 	/** Per-board reload counters, from `stage.reload`. */
 	nonces?: Record<string, number>;
@@ -916,6 +925,31 @@ export function Stage(props: {
 		},
 	};
 
+	/**
+	 * When the camera was last dragged, so a double-click can tell itself apart from a pan.
+	 *
+	 * Chromium fires `dblclick` after two presses whatever happened between them, and a quick
+	 * pan is two presses with a lot happening between them — so without this, dragging the
+	 * canvas about would leave a new board behind at the end of it.
+	 */
+	let pannedAt = 0;
+
+	/**
+	 * A double-click on empty canvas: a board, there.
+	 *
+	 * "Empty" is anything that is not inside a `.board-node`. The stage's own background is the
+	 * common case, but a board's title bar is in *this* document too — a keystroke that lands in
+	 * a board never reaches here at all, because that is another document and its events do not
+	 * bubble out of a frame. So the test is the node, not the element.
+	 */
+	const onDblClick = (event: MouseEvent) => {
+		if (!props.onCreateBoard) return;
+		const target = event.target as HTMLElement | null;
+		if (target?.closest?.(".board-node")) return;
+		if (performance.now() - pannedAt < 400) return;
+		props.onCreateBoard(stagePoint(event));
+	};
+
 	const onPointerDown = (event: PointerEvent) => {
 		/*
 		 * Touch is its own gesture set, and it is asked of the event rather than of the
@@ -942,6 +976,7 @@ export function Stage(props: {
 		const move = (moveEvent: PointerEvent) => {
 			pushCamera(pan(localCamera, moveEvent.clientX - last.x, moveEvent.clientY - last.y));
 			last = { x: moveEvent.clientX, y: moveEvent.clientY };
+			pannedAt = performance.now();
 		};
 		const finish = () => {
 			element.removeEventListener("pointermove", move);
@@ -1102,6 +1137,7 @@ export function Stage(props: {
 							onSelect={() => props.onSelect(board.path)}
 							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}
+							{...(props.onResize ? { onResize: (size) => props.onResize?.(board.path, size) } : {})}
 							{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
 							onOpen={() => pushCamera(frame([boxOf(board)]))}
 							{...(props.onFocusBoard ? { focused: props.focus === board.path, onFocus: () => props.onFocusBoard?.(board.path) } : {})}
@@ -1132,6 +1168,7 @@ export function Stage(props: {
 			ref={element}
 			onWheel={onWheel}
 			onPointerDown={onPointerDown}
+			onDblClick={onDblClick}
 			style={{ cursor: spaceHeld() ? "grab" : undefined }}
 		>
 			{/*

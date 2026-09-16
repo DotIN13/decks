@@ -21,6 +21,56 @@ export const boards = {
 		wire.send({ type: "board.changed", path: board.path, rev: board.rev, board });
 	},
 
+	/*
+	 * A board dragged to a new size, by the person holding the mouse.
+	 *
+	 * **The format decides where the number goes**, and that decision lives here rather than in
+	 * the browser because it is a fact about the file:
+	 *
+	 * - a **component** board's size is the one number in its own `<meta>` tag, so the drag is a
+	 *   write — through `boards.resize`, which records a revision like every other write;
+	 * - a **flow** document's width is in that tag and its height *is its content*, measured by
+	 *   the browser and reported back (`board.extent`), so only the width is written;
+	 * - a **slide** deck's height follows from its aspect, so only the width is taken, and it
+	 *   goes to the record rather than the file — the deck's own layout is not this app's to
+	 *   rewrite, and `deck.setSize` derives the height from the aspect it already knows.
+	 *
+	 * Clamped, like everything else a browser sends: 320 wide is about the narrowest board this
+	 * app's own templates use, and the ceiling is well past the tallest board in the deck — a
+	 * resize is not the place to discover that a number was a typo.
+	 */
+	"board.resize": (message, reply, wire) => {
+		const board = wire.deck.board(message.path);
+		if (!board) {
+			reply({ type: "error", text: `No such board: ${message.path}` });
+			return;
+		}
+		const bounded = (value: unknown, low: number, high: number) =>
+			typeof value === "number" && Number.isFinite(value) ? Math.min(high, Math.max(low, Math.round(value))) : undefined;
+		const w = bounded(message.w, 320, 4000);
+		const h = bounded(message.h, 200, 8000);
+		if (w === undefined && h === undefined) return;
+
+		try {
+			if (board.format === "slides") {
+				const sized = wire.deck.setSize(message.path, { ...(w !== undefined ? { w } : {}) });
+				if (sized) wire.send({ type: "deck.state", deck: wire.deck.state() });
+				return;
+			}
+			/*
+			 * A flow document takes the width and keeps its own height. Sending both would fight the
+			 * measurement that is about to arrive: the frame reloads at the new width, reports the
+			 * height it found, and a stored height would win over it for exactly one revision.
+			 */
+			const wanted = board.format === "flow" ? { ...(w !== undefined ? { w } : {}) } : { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
+			if (wanted.w === undefined && wanted.h === undefined) return;
+			// `writeBoard` inside broadcasts the new board, so this one needs no second message.
+			wire.boards.resize(message.path, wanted);
+		} catch (error) {
+			reply({ type: "notice", level: "warn", text: (error as Error).message });
+		}
+	},
+
 	"board.extent": (message, _reply, wire) => {
 		wire.boards.noteExtent(message.path, { rev: message.rev, w: message.w, h: message.h });
 		/*

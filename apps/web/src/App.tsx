@@ -708,6 +708,26 @@ export function App() {
 							if (!path) (document.querySelector(".stage") as HTMLElement | null)?.focus?.();
 						}}
 						onMove={move}
+						/*
+						 * A resize is a write to the board's own file, so it goes to the server and
+						 * comes back as a `board.changed` — the frame reloads at the new size rather
+						 * than the app drawing a board it has not written. Nothing is previewed here
+						 * for that reason: the drag draws the box it is asking for, and the file
+						 * decides what is true.
+						 */
+						onResize={(path, size) => send({ type: "board.resize", path, ...size })}
+						/*
+						 * A double-click on empty canvas makes a blank board, centred where it landed.
+						 * `files.boardAt` owns the request-and-hear-the-path dance, because the server
+						 * mints the name and only it knows what the path is.
+						 */
+						onCreateBoard={(at) =>
+							void files.boardAt(at).then((path) => {
+								if (!path) return;
+								setSelected(path);
+								setComponent(undefined);
+							})
+						}
 						onHide={(path) => send({ type: "board.hide", path })}
 						nonces={state.nonces}
 						cursor={state.cursor}

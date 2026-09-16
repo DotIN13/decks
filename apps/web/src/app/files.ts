@@ -209,6 +209,42 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		void dropOnBoard(board.path, files, { x: board.w / 2, y: board.h / 2 });
 	};
 
+	/**
+	 * A blank board, centred on a point of the canvas.
+	 *
+	 * The double-click on empty canvas. Nothing is filled in afterwards — a blank board *is* the
+	 * whole act — so this is the drop path's request mechanism without a file: ask with a
+	 * `request`, hear the path back (`board.created`), and give up quietly if no path arrives.
+	 *
+	 * Centred rather than hung from the pointer's top-left corner, because a double-click names
+	 * the place somebody wants the board and the place is the board, not its corner. The size is
+	 * `blank`'s own (880×400, `boards/templates.ts`), sent for that arithmetic and not to choose
+	 * anything.
+	 */
+	const boardAt = async (at: { x: number; y: number }): Promise<string | undefined> => {
+		const stage = document.querySelector(".stage");
+		if (!stage) return undefined;
+		// `at` is already in stage pixels — the stage is the viewport (`camera/coords.ts`).
+		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
+		const size = { w: 880, h: 400 };
+		const request = `new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+		return new Promise<string | undefined>((resolve) => {
+			created.set(request, resolve);
+			send({
+				type: "board.create",
+				kind: "blank",
+				format: "component",
+				title: "Untitled",
+				size,
+				at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) },
+				request,
+			});
+			setTimeout(() => {
+				if (created.delete(request)) resolve(undefined);
+			}, 10_000);
+		});
+	};
+
 	/** A board asked for by a drop heard its path — see `board.created` in the frame switch. */
 	const hearBoard = (request: string, path: string): boolean => {
 		const waiting = created.get(request);
@@ -267,5 +303,5 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		});
 	};
 
-	return { drops, addFile, intoComposer, paste, hearBoard, install };
+	return { drops, addFile, intoComposer, paste, boardAt, hearBoard, install };
 }

@@ -16,6 +16,7 @@ import {
 	type BoardTemplate,
 } from "./templates.ts";
 import type { Deck } from "../deck/loader.ts";
+import { withBoardSize } from "../deck/meta.ts";
 
 /**
  * What the shell has to do for the board service, and nothing else.
@@ -141,6 +142,24 @@ export class BoardService {
 	 * returns the board as it now is, and the browser is told once rather than twice
 	 * (the watcher's event finds the same bytes and the same revision, and says nothing).
 	 */
+	/**
+	 * Set a board's size by editing the one number in its own file.
+	 *
+	 * The same write `stage.resize` makes, here rather than in the stage service because this
+	 * is the object that owns writing a board and recording a revision — a resize that skipped
+	 * the record would be the one edit the time machine did not have.
+	 *
+	 * The format rules are the caller's, not this one's: a flow document's height is its
+	 * content, and a deck's follows from its aspect, so those callers send one dimension.
+	 */
+	resize(path: string, size: { w?: number; h?: number }): Board {
+		const board = this.deck.board(path);
+		if (!board) throw new Error(`No such board: ${path}`);
+		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
+		const html = readFileSync(this.deck.fileOf(path), "utf8");
+		return this.writeBoard(path, withBoardSize(html, size));
+	}
+
 	writeBoard(path: string, html: string): Board {
 		const file = this.deck.fileOf(path);
 		writeFileSync(file, html);
