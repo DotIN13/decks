@@ -21,7 +21,7 @@
  * `usage.mjs`, which has been cut from the suite and is covered by nothing now. This file is
  * about which of the two is drawn at which width.
  */
-import { open, say, settle } from "../harness.mjs";
+import { open, resetStage, say, settle } from "../harness.mjs";
 
 const wrap = () => {
 	if (window.top !== window.self) return;
@@ -172,5 +172,52 @@ const agent = {
 	say("and it closes", (await page.evaluate(() => document.querySelectorAll(".usage-modal").length)) === 0);
 
 	say("no console errors on a phone", errors.length === 0, errors.join(" | "));
+	await browser.close();
+}
+
+// --- a coarse pointer: a board's bar, with a board on the screen ----------------------
+
+/*
+ * Its own context, and no synthetic agent in it.
+ *
+ * The block above replaces the focused agent with a fed one whose canvas is empty, on purpose —
+ * it is about a panel that is drawn at every width. A bar belongs to a *board*, though, and
+ * `resetStage` plays the deck onto the agent the **server** has focused: with a fed agent in
+ * place those plays land on a canvas the browser is not looking at, and the first version of
+ * this measured `.board-node > .chrome` as `null` three times. So: a real session, the deck
+ * played, and then the bar.
+ */
+{
+	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
+	await resetStage();
+	await settle(page, 1400);
+	const acts = await page.evaluate(() => {
+		const bar = document.querySelector(".board-node > .chrome");
+		if (!bar) return null;
+		const buttons = [...bar.querySelectorAll(".acts > *")];
+		const box = (el) => el.getBoundingClientRect();
+		const squares = buttons.filter((el) => el.className !== "present-open" || el.dataset.glyph === "true");
+		return {
+			count: buttons.length,
+			visible: buttons.filter((el) => getComputedStyle(el).opacity === "1").length,
+			rows: new Set(buttons.map((el) => Math.round(box(el).y))).size,
+			sizes: [...new Set(squares.map((el) => `${Math.round(box(el).width)}x${Math.round(box(el).height)}`))],
+			classes: buttons.map((el) => el.className),
+		};
+	});
+	say(
+		"a board's bar offers every control on a touchscreen, not only the one that removes it",
+		acts !== null && acts.count >= 4 && acts.visible === acts.count,
+		JSON.stringify(acts),
+	);
+	say("…all of them on one row", acts !== null && acts.rows === 1, `${acts?.rows} row(s) of ${acts?.count}`);
+	say(
+		"…and every square the same 24px target, which is not the size any of them had",
+		acts !== null && acts.sizes.length === 1 && Math.abs(Number.parseInt(acts.sizes[0], 10) - 24) <= 1,
+		JSON.stringify(acts?.sizes),
+	);
+
+
+	say("no console errors in a phone's board bar", errors.length === 0, errors.join(" | "));
 	await browser.close();
 }

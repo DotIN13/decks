@@ -759,11 +759,13 @@ export function AgentPill(props: {
 				the opposite of what reads naturally when you write the markup.
 
 				No confirmation. A single press is right for something this reversible, and the
-				guard against pressing it by accident is that editing *looks* different — the ring
-				around the canvas, `.stage[data-mode="edit"]::after`. A dialog in front of a mode
-				switch is a dialog you learn to dismiss without reading.
+				guard against pressing it by accident is that this button changes, the pencil for a hand
+				— what used to stand behind it was a ring around the whole canvas in edit mode, and that
+				ring is gone at the request of the person who works in this app (`index.css` says why).
+				A dialog in front of a mode switch is a dialog you learn to dismiss without reading.
 			*/}
 			<button
+
 				type="button"
 				class="iconbtn"
 				/*

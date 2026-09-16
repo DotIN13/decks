@@ -500,35 +500,20 @@ svg.lucide {
  */
 
 /*
- * Editing looks different, for as long as it lasts.
+ * There is deliberately no ring around the stage in edit mode, and this is where it was.
  *
- * This is what stands in for a confirmation dialog on the pencil. A mode that changes what a
- * click does has to be visible the whole time it is on — otherwise the first you know of it
- * is a component that has moved and been written to disk. A dialog in front of the switch
- * would be the other answer, and it is the worse one: a question asked every time is a
- * question dismissed without reading.
+ * It was an inset ring of the accent at 55%, around the whole canvas — the standing sign that
+ * a click was going to move something, standing in for a confirmation dialog on the pencil.
+ * The argument for it was that a mode which changes what a click does has to be visible the
+ * whole time it is on. The person who works in this app asked for it gone: a border painted
+ * around everything is read the way a border is read, as the edge of the app, and it was on
+ * screen for the whole session rather than for the moment that mattered.
  *
- * An inset ring rather than a border, so it costs no layout and cannot move the canvas by a
- * pixel when it appears. The accent at low strength: unmistakable against the stage's flat
- * ground, and quiet enough to work behind for an hour. The ring is the whole sign — there
- * was a word in the corner beside it, and a legend nobody needs is a legend in the way.
+ * What carries the sign now is the pencil's own pressed state and the palette's five tools —
+ * both in the chrome, neither over the work. `e2e/checks/modes.mjs` asserts that *neither*
+ * mode draws a ring, so this cannot come back by accident, and it asserts the tools are the
+ * difference in the one place they are drawn.
  */
-/*
- * `:not([data-previewing="true"])`, so the ring stands down under a preview.
- *
- * While a preview is up the frames take no pointer events, so nothing can be edited, and a
- * ring over a canvas where every board is inert is the app claiming something that is not
- * true. The mode itself is untouched: leave the preview and the ring comes straight back,
- * because you are still in edit mode and always were.
- */
-.stage[data-mode="edit"]:not([data-previewing="true"])::after {
-	position: absolute;
-	z-index: 4;
-	inset: 0;
-	content: "";
-	pointer-events: none;
-	box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 55%, transparent);
-}
 
 .world {
 	position: absolute;
@@ -680,6 +665,14 @@ svg.lucide {
  * its bar, so nothing noticed. The moment every board got one, `e2e/checks/tiers.mjs`'s
  * `locator(".chrome .hide").click()` matched two elements and Playwright's strict mode
  * refused — a selector that means "the ×" would have meant "one of the two".
+ *
+ * **One size, in one place: `--act`.** The box is `calc(var(--act) * var(--unit))`, and the
+ * coarse-pointer block below moves the whole cluster to 24 by setting that one number. It used
+ * to state `width: calc(18 * var(--unit))` five times here and then override `.hide` alone
+ * with a raw `24px` down there — so on a phone the × was a different size from the three beside
+ * it, and, because a raw length here is board pixels rather than screen pixels, it came out
+ * *smaller* than they were. Measured with an iPhone 14 Pro context: `9×9` for the × against
+ * `18×18` for its neighbours, five pixels lower in the same row.
  */
 .board-node > .chrome .hide,
 .board-node > .chrome .present-open,
@@ -687,8 +680,8 @@ svg.lucide {
 .board-node > .chrome .open-tab,
 .board-node > .chrome .focus-open {
 	display: grid;
-	width: calc(18 * var(--unit));
-	height: calc(18 * var(--unit));
+	width: calc(var(--act, 18) * var(--unit));
+	height: calc(var(--act, 18) * var(--unit));
 	padding: 0;
 	border: 0;
 	border-radius: calc(5 * var(--unit));
@@ -748,9 +741,9 @@ svg.lucide {
 	height: calc(12 * var(--unit));
 }
 
-/* The same box as the three beside it: one 18px square, whichever glyph is in it. */
+/* The same box as the three beside it: one square, whichever glyph is in it. */
 .board-node > .chrome .present-open[data-glyph="true"] {
-	width: calc(18 * var(--unit));
+	width: calc(var(--act, 18) * var(--unit));
 	padding: 0;
 }
 
@@ -2539,10 +2532,26 @@ svg.lucide {
 		border-radius: 0 8px 8px 0;
 	}
 
-	/* Hidden until hovered is hidden forever here. Both of these are the only route to
-	   what they do: taking a board off the canvas, and the time machine. */
-	.board-node > .chrome .hide {
-
+	/*
+	 * Hidden until hovered is hidden forever here, and that is true of **every** control in a
+	 * board's bar, not only the one that takes the board away.
+	 *
+	 * The acts are `opacity: 0` and revealed by `.board-node:hover`. A touchscreen has no
+	 * hover, so none of them were ever revealed — and only `.hide` was listed here, which is
+	 * why a phone showed the × alone: the board's address, the focus view and filling the
+	 * window with it were all in the DOM, at the right size, invisible, with the one control
+	 * that *removes* something as the only one offering itself. Measured with an iPhone 14 Pro
+	 * context before the fix: `.hide` at `opacity: 1`, the other three at `opacity: 0`.
+	 *
+	 * The five selectors are the five the shape rule uses, deliberately: the list of what a bar
+	 * draws has to be one list, or the next control added to it is visible everywhere except
+	 * the device where it is the only route to what it does.
+	 */
+	.board-node > .chrome .hide,
+	.board-node > .chrome .present-open,
+	.board-node > .chrome .doc-open,
+	.board-node > .chrome .open-tab,
+	.board-node > .chrome .focus-open {
 		opacity: 1;
 	}
 
@@ -2588,12 +2597,23 @@ svg.lucide {
 		height: 38px;
 	}
 
-	/* The board's own chrome is counter-scaled, so these are screen pixels at any zoom.
-	   24 rather than 44: the bar it sits in is 24 tall, and a target taller than the
-	   thing it belongs to would cover the board underneath it. */
-	.board-node > .chrome .hide {
-		width: 24px;
-		height: 24px;
+	/*
+	 * A finger's target, for the whole cluster: one number, four boxes.
+	 *
+	 * This was `.hide` alone at a raw `24px`, and every part of that was wrong. Alone, because
+	 * the other three stayed at their desktop 18 and sat 2.5 units higher in the row — a × that
+	 * was a different size from the buttons it belongs with, which is what "not well aligned"
+	 * was. Raw, because a length in this bar is **board** pixels, not screen ones: the bar is
+	 * counter-scaled by *multiplying* (`--unit`), not by a transform, so `24px` came out 9 screen
+	 * px at a phone's fitted zoom while everything around it was 18. `--act` is set once and the
+	 * shape rule multiplies it, so 24 here means 24 screen pixels at any zoom — which is what the
+	 * comment always claimed.
+	 *
+	 * 24 rather than 44: the bar it sits in is 24 tall, and a target taller than the thing it
+	 * belongs to would cover the board underneath it.
+	 */
+	.board-node > .chrome .acts {
+		--act: 24;
 	}
 
 	/* A 10px notch in a 14px column is not a target. */

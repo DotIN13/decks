@@ -121,6 +121,42 @@ say(
 	JSON.stringify(focused.nodes),
 );
 /*
+ * The way out is on screen, not only on the keyboard.
+ *
+ * The focus view has no title bar — deliberately, since the bar is how you identify a board
+ * among others and there are no others here — and that left `Escape` and `d` as the only
+ * exits. A keyboard shortcut is not a door: somebody who arrived with the mouse and never
+ * pressed a key has nothing to find. So there is one button, and this is the assertion that
+ * it is where the page's margin is rather than over the page.
+ */
+const exit = await page.evaluate(() => {
+	const button = document.querySelector(".focus-exit");
+	if (!button) return { present: false };
+	const box = button.getBoundingClientRect();
+	const page_ = document.querySelector(".focus-page")?.getBoundingClientRect();
+	return {
+		present: true,
+		label: button.getAttribute("aria-label"),
+		// Negative would mean the button overlaps the page's first line.
+		air: page_ ? Math.round(page_.top - box.bottom) : -1,
+		/*
+		 * What the page says is at the button's own centre.
+		 *
+		 * The first version of this button was in the page's top-right corner, where it was drawn
+		 * *under* the app's zoom pill: `z-20`, a sibling of the stage, so nothing painted inside
+		 * the stage can be above it. It reported `present: true`, `visible: visible`, and could
+		 * not be clicked — so the assertion has to ask the page, not the element.
+		 */
+		hit: (() => {
+			const at = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+			return at === button || button.contains(at) ? "the button" : (at?.className || at?.tagName || "nothing");
+		})(),
+	};
+});
+say("the focus view offers a way out that is not a key", exit.present && exit.label === "Leave the focus view", JSON.stringify(exit));
+say("…drawn in the page's own margin, so it covers nothing", exit.present && exit.air >= 0, `${exit.air}px of air between the button and the page's top edge`);
+say("…with nothing drawn over it, which is what makes it pressable", exit.hit === "the button", String(exit.hit));
+/*
  * The bar is laid out at the size it is drawn, and the world keeps its layer.
  *
  * Those two are one decision, not two: the bar's screen size comes from `--unit` (a length in
@@ -228,6 +264,26 @@ say(
 	"Escape puts the canvas back, with the same boards on it",
 	!returned.open && !returned.worldHidden && !returned.worldInert && returned.nodes.length === focused.nodes.length && returned.nodes.length > 1,
 	JSON.stringify({ hidden: returned.worldHidden, inert: returned.worldInert, nodes: returned.nodes.length, marked: markedBefore }),
+);
+
+/*
+ * And the same way out with the mouse.
+ *
+ * Entered by the key this time — the button in the bar was exercised at the top of this check
+ * — so what is asserted here is that the exit button is a second door into the same room and
+ * not a label on the first: the toggle is one function, reached three ways.
+ */
+await page.keyboard.press("d");
+await settle(page, 700);
+const backIn = await page.evaluate(() => Boolean(document.querySelector(".focus")));
+say("the view can also be entered by its key", backIn, String(backIn));
+await page.locator(".focus-exit").click();
+await settle(page, 700);
+const byButton = await state();
+say(
+	"…and the button on the page puts the canvas back",
+	!byButton.open && !byButton.worldHidden && !byButton.worldInert,
+	JSON.stringify({ open: byButton.open, hidden: byButton.worldHidden, inert: byButton.worldInert }),
 );
 
 say("no page errors", errors.length === 0, errors.join(" | "));

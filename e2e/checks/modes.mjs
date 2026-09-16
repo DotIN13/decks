@@ -90,13 +90,19 @@ const editing = await state();
 say("the pencil turns editing on", editing.mode === "edit", editing.mode);
 say("…the five tools come with it", editing.tools === 5, String(editing.tools));
 /*
- * The ring is what stands in for a confirmation dialog: one press is right for something
- * this reversible, so what stops an accident is that editing *looks* different for as long
- * as it lasts. A question asked every time is a question dismissed without reading. There
- * was a word in the corner as well; the ring carries it alone now.
+ * And no ring in either mode. There was one — an inset ring of the accent around the whole
+ * stage, standing in for a confirmation dialog on the pencil, on the argument that a mode
+ * which changes what a click does has to be visible the whole time it is on. It was asked
+ * for off: a border around everything reads as the edge of the app, and it was on screen for
+ * the whole session rather than for the moment that mattered.
+ *
+ * What carries the sign instead is the pair asserted just above and below this — the pencil's
+ * own pressed state, and the five tools that are drawn in edit mode and not in browse. Both
+ * are in the chrome, neither is painted over the work, and both are asserted rather than
+ * assumed, so the removal is a decision this check holds rather than a rule somebody deleted.
  */
-say("…and the canvas says so, with a ring around it", editing.ring !== "none", `${editing.ring}`);
-say("…and nothing but the ring: no word in the corner", editing.word === "none", `${editing.word}`);
+say("…and no ring around the canvas, because the tools are the sign now", editing.ring === "none", `${editing.ring}`);
+say("…and no word in the corner either", editing.word === "none", `${editing.word}`);
 say("…and the button now offers to stop", editing.toggle === "Stop editing", editing.toggle);
 
 if (clicked) {

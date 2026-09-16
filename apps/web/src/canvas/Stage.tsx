@@ -1,4 +1,6 @@
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
+import X from "lucide-solid/icons/x";
+import { Icon } from "../ui/icons.tsx";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
@@ -1177,30 +1179,60 @@ export function Stage(props: {
 			</div>
 			<Show when={focused()} keyed>
 				{(board) => (
-					/*
-					 * The focus view: this board as a page, in the stage's own box.
-					 *
-					 * The outer box is scrollable and the middle one is the page at the size it is
-					 * *drawn*, because a CSS transform does not change layout — a scroll container
-					 * holding only the scaled copy would scroll by the untransformed height, which
-					 * is the whole document and then some. So the page reserves `w × zoom`, the
-					 * document inside it is scaled from its own top-left corner, and the scroll
-					 * extent is honest.
-					 *
-					 * Nothing is re-fitted here: the zoom is the stage's (`focusZoom`), because the
-					 * gesture host that reports a wheel over the page belongs to the stage, and one
-					 * number with two owners is a number that disagrees with itself.
-					 */
-					<div class="focus" ref={(element) => (focusEl = element)}>
-						<div class="focus-page" style={{ width: `${board.w * focusZoom()}px`, height: `${board.h * focusZoom()}px` }}>
-							<div
-								class="focus-scaled"
-								style={{ width: `${board.w}px`, height: `${board.h}px`, transform: `scale(${focusZoom()})`, "transform-origin": "top left" }}
-							>
-								{boardNode(board, true)}
+					<>
+						{/*
+						 * The focus view: this board as a page, in the stage's own box.
+						 *
+						 * The outer box is scrollable and the middle one is the page at the size it is
+						 * *drawn*, because a CSS transform does not change layout — a scroll container
+						 * holding only the scaled copy would scroll by the untransformed height, which
+						 * is the whole document and then some. So the page reserves `w × zoom`, the
+						 * document inside it is scaled from its own top-left corner, and the scroll
+						 * extent is honest.
+						 *
+						 * Nothing is re-fitted here: the zoom is the stage's (`focusZoom`), because the
+						 * gesture host that reports a wheel over the page belongs to the stage, and one
+						 * number with two owners is a number that disagrees with itself.
+						 */}
+						<div class="focus" ref={(element) => (focusEl = element)}>
+							<div class="focus-page" style={{ width: `${board.w * focusZoom()}px`, height: `${board.h * focusZoom()}px` }}>
+								<div
+									class="focus-scaled"
+									style={{ width: `${board.w}px`, height: `${board.h}px`, transform: `scale(${focusZoom()})`, "transform-origin": "top left" }}
+								>
+									{boardNode(board, true)}
+								</div>
 							</div>
 						</div>
-					</div>
+						{/*
+						 * The way out, on screen.
+						 *
+						 * The focus view has no title bar, deliberately — the bar is how you *identify and
+						 * choose* a board among others, and there are no others here — but that left `Escape`
+						 * and `d` as the only exits, and a keyboard shortcut is not a door: somebody who
+						 * arrived with the mouse and never pressed a key has no way to learn either.
+						 *
+						 * **Centred in the page's top margin**, which is the one band of this view that is
+						 * reliably empty: `.focus` pads 32px at the top edge (`FOCUS_AIR`) and a 28px chip at
+						 * 2px from the top ends where the page begins, so it is beside the document and never
+						 * over it. The corners are not free — the first version sat in the top-right one and
+						 * was drawn *under* the zoom pill, which is `z-20` in the app's own bar and above
+						 * anything the stage paints, so it was visible and unclickable.
+						 *
+						 * A close glyph and the key, the way `Present` labels its own way out: the glyph says
+						 * what the button does, and the word teaches the shortcut to the next person.
+						 */}
+						<button
+							class="focus-exit"
+							type="button"
+							title="Leave the focus view — Esc"
+							aria-label="Leave the focus view"
+							onClick={() => props.onFocusToggle?.()}
+						>
+							<Icon of={X} size={13} />
+							<span>Esc</span>
+						</button>
+					</>
 				)}
 			</Show>
 		</div>

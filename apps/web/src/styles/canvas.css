@@ -263,6 +263,51 @@
 	}
 
 	/*
+	 * The focus view's way out, and the only chrome it has.
+	 *
+	 * In the stage's own box rather than in the page, so it holds still while the document
+	 * scrolls under it and cannot be scrolled off the top — and centred in the page's **top
+	 * margin**, which is the one band of this view that is reliably empty. `.focus` pads 32px
+	 * at the top edge (`FOCUS_AIR` in `Stage`) and this chip is 28px at 2px from the top, so it
+	 * ends where the page begins: it is beside the document and never over it, which matters
+	 * because the whole point of this view is reading the document.
+	 *
+	 * Not in a corner. The first version was in the top-right one, where it was drawn *under*
+	 * the app's zoom pill — `z-20`, a sibling of the stage, so nothing painted inside the stage
+	 * can be above it — and the result was a button that was visible, reported by every query
+	 * as present, and impossible to click. `e2e/checks/focus.mjs` now asks the page what is at
+	 * the button's own centre, which is the assertion that failure needed.
+	 */
+	.focus-exit {
+		position: absolute;
+		top: 2px;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 5;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		height: 28px;
+		padding: 0 10px;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--panel);
+		color: var(--muted);
+		font-family: var(--mono, monospace);
+		font-size: 11px;
+		cursor: pointer;
+	}
+
+	.focus-exit:hover {
+		color: var(--fg);
+	}
+
+	.focus-exit:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/*
 	 * The canvas, put away rather than taken apart — and *how* it is put away is the whole
 	 * assertion, measured rather than assumed.
 	 *
