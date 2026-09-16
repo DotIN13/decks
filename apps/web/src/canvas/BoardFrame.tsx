@@ -927,7 +927,7 @@ export function BoardFrame(props: {
 						title={
 							props.focused
 								? "Back to the canvas (or press d)"
-								: "Focus on this board — read and scroll it like a document (or press d)"
+								: "Focus on this board: read and scroll it like a document (or press d)"
 						}
 						aria-label={props.focused ? `Show the whole canvas instead of ${props.board.title}` : `Focus on ${props.board.title}`}
 						onPointerDown={(event) => event.stopPropagation()}

@@ -515,7 +515,7 @@ export function AgentMenu(props: {
 				data-row
 				data-flat="true"
 				aria-expanded={picking()}
-				aria-label="New agent — choose its runtime"
+				aria-label="New agent: choose its runtime"
 				title="The runtime cannot change once an agent exists"
 				onClick={() => setPicking((was) => !was)}
 			>
@@ -736,7 +736,7 @@ export function AgentPill(props: {
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-on={api.open ? "soft" : undefined}
-						title="Add an agent — pick its runtime"
+						title="Add an agent: pick its runtime"
 						aria-label="Add an agent"
 						onClick={api.toggle}
 					>
@@ -780,7 +780,7 @@ export function AgentPill(props: {
 				 */
 				data-on={props.mode === "edit" ? "soft" : undefined}
 				aria-pressed={props.mode === "edit"}
-				title={props.mode === "edit" ? "Stop editing — back to browsing" : "Edit the boards: drag components, retype text"}
+				title={props.mode === "edit" ? "Stop editing, back to browsing" : "Edit the boards: drag components, retype text"}
 				aria-label={props.mode === "edit" ? "Stop editing" : "Edit the boards"}
 				onClick={() => props.onMode(props.mode === "edit" ? "browse" : "edit")}
 			>

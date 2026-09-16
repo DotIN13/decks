@@ -260,7 +260,7 @@ export class AntigravityBackend implements AgentBackend {
 				);
 				return;
 			case "models":
-				notice("info", agyModels().map((model) => `${model.model} — ${model.label}`).join("\n"));
+				notice("info", agyModels().map((model) => `${model.model}: ${model.label}`).join("\n"));
 				return;
 			default:
 				notice("info", helpText(ANTIGRAVITY_COMMANDS));
@@ -294,7 +294,7 @@ export class AntigravityBackend implements AgentBackend {
 	setThinking(level: ThinkingLevel): void {
 		// Decks' scale has no counterpart in the CLI: the model slug is the effort. A dial
 		// that changed nothing would be worse than no dial, and `models()` says so.
-		this.context.notice("info", "Antigravity's reasoning level is part of the model choice — pick a -low/-medium/-high model instead.");
+		this.context.notice("info", "Antigravity's reasoning level is part of the model choice. Pick a -low/-medium/-high model instead.");
 	}
 
 	mode(): AgentMode | undefined {

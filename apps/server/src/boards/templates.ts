@@ -371,7 +371,7 @@ export function renderMirror(name: string, agentId: string, size?: { w?: number;
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>${escapeHtml(name)} — the conversation</title>
+		<title>${escapeHtml(name)}, the conversation</title>
 		<meta name="board" content='{"w":${w},"h":${h},"bg":"plain"}' />
 		<link rel="stylesheet" href="../../lib/board.css" />
 	</head>
@@ -409,7 +409,7 @@ export function renderWebBoard(size?: { w?: number; h?: number }): string {
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Your Chrome — shared with the deck</title>
+		<title>Your Chrome, shared with the deck</title>
 		<meta name="board" content='{"w":${w},"h":${h},"bg":"plain"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 	</head>

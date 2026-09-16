@@ -582,7 +582,7 @@ export function Inspector(props: {
 						<button
 							type="button"
 							data-act="front"
-							title="Bring to front (]) — paint order is document order"
+							title="Bring to front (]). Paint order is document order"
 							aria-label="Bring to front"
 							onClick={() => props.onEdit({ kind: "order", to: "front" })}
 						>

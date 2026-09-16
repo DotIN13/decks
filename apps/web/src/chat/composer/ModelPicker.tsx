@@ -296,7 +296,7 @@ export function ModelPicker(props: {
 									 * after its window had lifted — and it was only ever the last
 									 * refusal's word. A limit is said in the conversation that hit one.
 									 */
-									title={account.signedIn ? undefined : "This account has no credentials behind it — add it again in settings"}
+									title={account.signedIn ? undefined : "This account has no credentials behind it. Add it again in settings"}
 									disabled={!account.signedIn}
 									onClick={() => props.onAccount?.(account.id)}
 								>

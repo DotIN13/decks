@@ -363,7 +363,7 @@ export class OpencodeBackend implements AgentBackend {
 					"info",
 					this.available.length === 0
 						? "No models. Sign a provider in with `opencode auth login` in a terminal, then start a new chat."
-						: this.available.map((option) => `${option.provider}/${option.model} — ${option.label}`).join("\n"),
+						: this.available.map((option) => `${option.provider}/${option.model}: ${option.label}`).join("\n"),
 				);
 				return;
 			case "status":

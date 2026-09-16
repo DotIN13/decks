@@ -359,7 +359,7 @@ export function App() {
 			return;
 		}
 		if (!path) {
-			notice("warn", "No board to focus — put one on the canvas first.");
+			notice("warn", "No board to focus. Put one on the canvas first.");
 			return;
 		}
 		setFocus(path);

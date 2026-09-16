@@ -424,7 +424,7 @@ function Customise(props: {
 
 				<Show
 					when={props.tags.length > 0}
-					fallback={<p class="nt m-0">None yet. These are yours — the agent cannot see or overwrite them.</p>}
+					fallback={<p class="nt m-0">None yet. These are yours, and the agent cannot see or overwrite them.</p>}
 				>
 					<div class="tags">
 						<For each={props.tags}>

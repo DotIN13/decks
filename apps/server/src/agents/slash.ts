@@ -66,7 +66,7 @@ export function helpText(commands: SlashCommand[]): string {
 	if (commands.length === 0) return "No commands.";
 	const deck = commands.filter((command) => command.source === "deck");
 	const rest = commands.filter((command) => command.source !== "deck");
-	const lines = deck.map((command) => `/${command.name}${command.arg ? ` ${command.arg}` : ""} — ${command.hint ?? ""}`);
+	const lines = deck.map((command) => `/${command.name}${command.arg ? ` ${command.arg}` : ""}: ${command.hint ?? ""}`);
 	if (rest.length > 0) {
 		lines.push("");
 		lines.push(`And ${rest.length} from the runtime — type / to see them: ${rest.map((command) => `/${command.name}`).join(" ")}`);

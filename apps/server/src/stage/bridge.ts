@@ -112,13 +112,13 @@ export class StageBridge {
 			// caller is the process Decks spawned. A session id with anything but that token
 			// is refused the same way a bad per-agent token is — the identity did not hold.
 			if (typeof sessionID !== "string" || sessionID === "") return { text: "The canvas call did not say which opencode session it came from.", isError: true };
-			if (this.serverToken === undefined || token !== this.serverToken) return { text: "This canvas token is not valid any more — the agent it belonged to has gone.", isError: true };
+			if (this.serverToken === undefined || token !== this.serverToken) return { text: "This canvas token is not valid any more. The agent it belonged to has gone.", isError: true };
 			const held = this.bySession.get(sessionID);
 			if (!held) return { text: "This opencode session is not registered to a live Decks agent any more.", isError: true };
 			return held.tool.run(code);
 		}
 		const held = token ? this.byToken.get(token) : undefined;
-		if (!held) return { text: "This canvas token is not valid any more — the agent it belonged to has gone.", isError: true };
+		if (!held) return { text: "This canvas token is not valid any more. The agent it belonged to has gone.", isError: true };
 		return held.tool.run(code);
 	}
 

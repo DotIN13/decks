@@ -25,7 +25,7 @@ export const accounts = {
 		 */
 		const claude = [wire.agents.focused(), ...wire.agents.all()].find((agent) => agent.kind === "claude");
 		if (!claude) {
-			reply({ type: "notice", level: "warn", text: "Start a Claude agent first — signing in runs through one." });
+			reply({ type: "notice", level: "warn", text: "Start a Claude agent first. Signing in runs through one." });
 			return;
 		}
 		void claude.prompt("/login");

@@ -152,7 +152,7 @@ function sortByUrgency(chats: AgentChat[], unread: Record<string, number>): Agen
  */
 export function statusWords(status: AgentStatus, state: AgentState): string {
 	if (status === "waiting") return "Waiting for you";
-	if (status === "done") return "Done — not read yet";
+	if (status === "done") return "Done, not read yet";
 	if (status === "idle") return "Idle";
 	if (state === "tool") return "Running tools…";
 	if (state === "streaming") return "Typing…";
@@ -163,7 +163,7 @@ export function statusWords(status: AgentStatus, state: AgentState): string {
  * The same fact, in the register a 264px dropdown row can afford.
  *
  * Lower case and shorter than `statusWords`, and it carries a time where the hover card
- * carries a sentence — `done · 2m` rather than `Done — not read yet`. Two registers rather
+ * carries a sentence — `done · 2m` rather than `Done, not read yet`. Two registers rather
  * than one because the row's job is to be scanned in a list of six and the card's is to
  * answer a question, and a row wide enough for the card's phrasing would be the chat list.
  */

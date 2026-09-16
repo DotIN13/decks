@@ -451,7 +451,7 @@ export function Stream(props: {
 				 * button for it: a control that does nothing on a fresh agent looks broken.
 				 */}
 				<Show when={cards().length === 0}>
-					<div class="stream-card stream-notice">Nothing said yet — ask for something and it will show up here.</div>
+					<div class="stream-card stream-notice">Nothing said yet. Ask for something and it will show up here.</div>
 				</Show>
 
 				{/*

@@ -150,7 +150,7 @@ export function UsageModal(props: {
 									 * means the agent has not reported yet. A bar at zero would say the
 									 * context is empty, which is a different and usually false claim.
 									 */
-									<p class="usage-empty">No reading yet — an agent reports its context after its first reply.</p>
+									<p class="usage-empty">No reading yet. An agent reports its context after its first reply.</p>
 								}
 							>
 								{/*

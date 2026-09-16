@@ -140,7 +140,7 @@ export function PresentEmbed(props: {
 	});
 
 	return (
-		<div class="present embed-present" data-idle={idle()} data-family={family()} tabIndex={-1} ref={(el) => (layerEl = el)} role="dialog" aria-label={`${props.title} — fullscreen`}>
+		<div class="present embed-present" data-idle={idle()} data-family={family()} tabIndex={-1} ref={(el) => (layerEl = el)} role="dialog" aria-label={`${props.title} (fullscreen)`}>
 			<Switch>
 				<Match when={family() === "image"}>
 					<img class="present-image" src={url()} alt={props.title} />

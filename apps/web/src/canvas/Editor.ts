@@ -440,7 +440,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			if (host.fieldsOnly(path)) {
 				// A placed component in a reflowing document is an absolutely positioned box in
 				// a page: the two layout systems would fight and the file would show it.
-				host.notice("This board is a document — components go on a placed board, not a page.");
+				host.notice("This board is a document. Components go on a placed board, not a page.");
 				host.resetTool();
 				return;
 			}

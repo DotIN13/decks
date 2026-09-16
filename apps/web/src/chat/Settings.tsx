@@ -227,8 +227,8 @@ function Row(props: {
 		const act = props.account.signedIn
 			? `${name()} — choose it for a conversation in its model picker`
 			: props.account.isDefault
-				? "Claude Code is signed out — sign in with claude auth login"
-				: "Signed out — add it again to use it";
+				? "Claude Code is signed out. Sign in with claude auth login"
+				: "Signed out. Add it again to use it";
 		return props.account.isDefault
 			? `${act}. These are Claude Code's own credentials, so Decks cannot remove them: claude auth logout gives them up.`
 			: act;

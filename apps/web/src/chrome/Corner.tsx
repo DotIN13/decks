@@ -42,7 +42,7 @@ import { ContextRing } from "./ContextRing.tsx";
  * seeing it here is seeing the mechanism rather than a decoration.
  */
 const FORMATS: Array<{ format: "component" | "flow" | "slides"; label: string; extension: string; note: string; icon: LucideIcon }> = [
-	{ format: "component", label: "Board", extension: ".html", note: "Positioned boxes you drag and retype — what a board is here", icon: FilePlus },
+	{ format: "component", label: "Board", extension: ".html", note: "Positioned boxes you drag and retype: what a board is here", icon: FilePlus },
 	{ format: "flow", label: "Document", extension: ".html", note: "A document that reflows, as tall as its content", icon: FileText },
 	{ format: "slides", label: "Slides", extension: ".slides.html", note: "A reveal deck: one <section> per slide, paged with the arrow keys", icon: Presentation },
 ];
@@ -333,7 +333,7 @@ export function Corner(props: {
 				class="iconbtn"
 				data-on={historyButton() === "on" ? "true" : historyButton() === "yield" ? "yield" : undefined}
 				aria-pressed={historyButton() !== "off"}
-				title={historyButton() === "yield" ? "Conversation — the inspector has the edge (⌘/)" : "Conversation (⌘/)"}
+				title={historyButton() === "yield" ? "Conversation: the inspector has the edge (⌘/)" : "Conversation (⌘/)"}
 				aria-label={historyButton() === "off" ? "Show the conversation" : "Hide the conversation"}
 				onClick={() => toggleHistory()}
 			>

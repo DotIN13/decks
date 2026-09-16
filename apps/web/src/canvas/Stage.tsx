@@ -1262,7 +1262,7 @@ export function Stage(props: {
 						<button
 							class="focus-exit"
 							type="button"
-							title="Leave the focus view — Esc"
+							title="Leave the focus view (Esc)"
 							aria-label="Leave the focus view"
 							onClick={() => props.onFocusToggle?.()}
 						>

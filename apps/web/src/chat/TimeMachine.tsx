@@ -149,7 +149,7 @@ export function TimeMachine(props: {
 					<Icon of={RotateCcw} size={13} />
 				</span>
 				<span class="lb">Rewind to here</span>
-				<span class="nt">Take back everything after it — and these words go back into the input bar.</span>
+				<span class="nt">Take back everything after it, and these words go back into the input bar.</span>
 			</button>
 
 			<button
