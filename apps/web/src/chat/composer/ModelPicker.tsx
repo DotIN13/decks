@@ -157,7 +157,14 @@ export function ModelPicker(props: {
 				 * rather than as a tight layout. The card is `Popover`'s and shared, so the room is
 				 * asked for here, by the one component that knows it needs it.
 				 */}
-				<label class="field mb-1 mt-1.5 h-7">
+				{/*
+				 * `mx-2`, which is the thinking strip's own `px-2` — the point of it is that the search
+				 * field and the scale below it are the same width. They were not: the scale lives inside
+				 * a `px-2` wrapper and the field spanned the card's full content width, so the field
+				 * overhung the row of levels by 8px on each side and the card read as two different
+				 * widths stacked.
+				 */}
+				<label class="field mb-1 mt-1.5 mx-2 h-7">
 				<Icon of={Search} size={13} class="shrink-0 text-faint" />
 				<input
 					/*
