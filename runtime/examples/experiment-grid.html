@@ -2,8 +2,8 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>All three below-300 cells sit in the social framing condition</title>
-		<meta name="board" content='{"w":1100,"h":1104,"bg":"grid"}' />
+		<title>Sample-size shortfalls by condition and measure in a three-arm design</title>
+		<meta name="board" content='{"w":1100,"h":1064,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 		<script type="importmap">
 		{
@@ -19,20 +19,20 @@
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
-			<h1>All three below-300 cells sit in the social framing condition</h1>
+			<h1>Sample-size shortfalls by condition and measure in a three-arm design</h1>
 		</div>
 
-		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 112px; width: 1004px">
 			<p><b>The social framing arm returns fewer completions than the design needs.</b> Every below-300 cell is in one condition, which means it is a condition problem, not a measure problem: add enrollment, or the arm's estimates will be too wide to be useful.</p>
 		</div>
 
-		<section class="card" data-id="heatmap" style="left: 48px; top: 240px; width: 620px">
+		<section class="card" data-id="heatmap" style="left: 48px; top: 200px; width: 620px">
 			<h3>Expected completed sample, per cell</h3>
 			<div id="heat" style="position: relative; height: 430px"></div>
 			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">Cells are planned enrollments times expected completion. Hover a cell for its number; the scale runs from n = 150 (red) to n = 900 (green).</p>
 		</section>
 
-		<section class="card" data-id="conditions" style="left: 700px; top: 240px; width: 352px">
+		<section class="card" data-id="conditions" style="left: 700px; top: 200px; width: 352px">
 			<h3>The three conditions</h3>
 			<table class="table">
 				<thead><tr><th>Condition</th><th>Planned n</th></tr></thead>
@@ -44,17 +44,17 @@
 			</table>
 		</section>
 
-		<section class="card" data-id="why" style="left: 700px; top: 464px; width: 352px">
+		<section class="card" data-id="why" style="left: 700px; top: 424px; width: 352px">
 			<h3>Why one arm bleeds out</h3>
 			<p>The social framing started late: its pilot bounced at the attention check, and the fix shipped two weeks after the other arms began.</p>
 			<p style="color: var(--b-muted); font-size: 13px">At the current rate, the arm reaches its full n in June, a month after the field window closes.</p>
 		</section>
 
-		<div class="callout" data-id="verdict" data-tone="warn" style="left: 700px; top: 688px; width: 352px">
+		<div class="callout" data-id="verdict" data-tone="warn" style="left: 700px; top: 648px; width: 352px">
 			<p><b>The choice is a month or a change of plan.</b> Extend the window and hold the design, or cut attention-pass as a required cell and state the loss in the paper.</p>
 		</div>
 
-		<section class="card" data-id="table" style="left: 48px; top: 816px; width: 1004px">
+		<section class="card" data-id="table" style="left: 48px; top: 776px; width: 1004px">
 			<h3>The same grid, one row per measure</h3>
 			<table class="table" id="cells">
 				<thead>

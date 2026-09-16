@@ -2,8 +2,8 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>The two arms separate in the first two dimensions, and the third is one clinic's</title>
-		<meta name="board" content='{"w":1100,"h":1176,"bg":"grid"}' />
+		<title>Treatment-arm separation in a three-dimensional embedding</title>
+		<meta name="board" content='{"w":1100,"h":1136,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 		<script type="importmap">
 		{
@@ -19,27 +19,27 @@
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
-			<h1>The two arms separate in the first two dimensions, and the third is one clinic's</h1>
+			<h1>Treatment-arm separation in a three-dimensional embedding</h1>
 		</div>
 
-		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 112px; width: 1004px">
 			<p><b>240 respondents, embedded into three dimensions: the waitlist arm separates cleanly from control, and the discount arm sits between them.</b> The third dimension, the one the plot is built on, explains 9% of the variance and is almost entirely one recruiting clinic.</p>
 		</div>
 
-		<section class="card" data-id="scene" style="left: 48px; top: 240px; width: 680px">
+		<section class="card" data-id="scene" style="left: 48px; top: 200px; width: 680px">
 			<h3>The sample in the space the survey found</h3>
 			<div id="scene" style="position: relative; height: 400px; cursor: grab"></div>
 			<div id="arms" style="display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px"></div>
 			<p style="color: var(--b-muted); font-size: 12px; margin-top: 8px">Drag to turn the space. Hover a point for the respondent beneath it. The axes are the first three principal components of the survey responses.</p>
 		</section>
 
-		<section class="card" data-id="read" style="left: 760px; top: 240px; width: 292px">
+		<section class="card" data-id="read" style="left: 760px; top: 200px; width: 292px">
 			<h3>How to read it</h3>
 			<p>Each point is one respondent. The distances are the model's own: responses that agree sit together, and an arm that is its own cloud is an arm the survey is measuring.</p>
 			<p style="color: var(--b-muted); font-size: 13px">Points were picked at random; the arms have equal sample sizes by design.</p>
 		</section>
 
-		<section class="card" data-id="axes" style="left: 760px; top: 496px; width: 292px">
+		<section class="card" data-id="axes" style="left: 760px; top: 456px; width: 292px">
 			<h3>What each axis explains</h3>
 			<table class="table">
 				<thead><tr><th>Component</th><th>Variance</th><th>Separates</th></tr></thead>
@@ -51,11 +51,11 @@
 			</table>
 		</section>
 
-		<div class="callout" data-id="verdict" data-tone="warn" style="left: 760px; top: 744px; width: 292px">
+		<div class="callout" data-id="verdict" data-tone="warn" style="left: 760px; top: 704px; width: 292px">
 			<p><b>The third dimension is a warning, not a result.</b> A component that is one clinic is a component that is sampling, not attitude. Re-run the analysis with that clinic held out before writing about it.</p>
 		</div>
 
-		<section class="card" data-id="table" style="left: 48px; top: 920px; width: 1004px">
+		<section class="card" data-id="table" style="left: 48px; top: 880px; width: 1004px">
 			<h3>Separation, dimension by dimension</h3>
 			<table class="table">
 				<thead><tr><th>Dimension</th><th>Variance explained, percent</th><th>What sits apart on it</th><th>Reading</th></tr></thead>

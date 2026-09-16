@@ -2,8 +2,8 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Build time doubled in six weeks, and the queue is where it went</title>
-		<meta name="board" content='{"w":1100,"h":912,"bg":"grid"}' />
+		<title>Build duration and queue delay across sixteen releases</title>
+		<meta name="board" content='{"w":1100,"h":872,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 		<script type="importmap">
 		{
@@ -19,37 +19,37 @@
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
-			<h1>Build time doubled in six weeks, and the queue is where it went</h1>
+			<h1>Build duration and queue delay across sixteen releases</h1>
 		</div>
 
-		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 112px; width: 1004px">
 			<p><b>Median wall time is 13 minutes, up from 6 in June.</b> The builds themselves grew 40%; the rest is queue wait behind a single CI runner that started queueing every Friday.</p>
 		</div>
 
-		<div class="kpi" data-id="kpi-wall" style="left: 48px; top: 248px; width: 228px">
+		<div class="kpi" data-id="kpi-wall" style="left: 48px; top: 208px; width: 228px">
 			<span class="value" id="v-wall">0</span>
 			<span class="label">Median wall time, minutes</span>
 		</div>
-		<div class="kpi" data-id="kpi-queue" style="left: 308px; top: 248px; width: 228px">
+		<div class="kpi" data-id="kpi-queue" style="left: 308px; top: 208px; width: 228px">
 			<span class="value" id="v-queue">0</span>
 			<span class="label">Queue wait, minutes</span>
 		</div>
-		<div class="kpi" data-id="kpi-red" style="left: 568px; top: 248px; width: 228px">
+		<div class="kpi" data-id="kpi-red" style="left: 568px; top: 208px; width: 228px">
 			<span class="value" id="v-red">0</span>
 			<span class="label">Red builds, last 15</span>
 		</div>
-		<div class="kpi" data-id="kpi-deploys" style="left: 828px; top: 248px; width: 224px">
+		<div class="kpi" data-id="kpi-deploys" style="left: 828px; top: 208px; width: 224px">
 			<span class="value" id="v-deploys">0</span>
 			<span class="label">Deploys per day, last week</span>
 		</div>
 
-		<section class="card" data-id="chart" style="left: 48px; top: 368px; width: 640px">
+		<section class="card" data-id="chart" style="left: 48px; top: 328px; width: 640px">
 			<h3>Build duration by release, minutes</h3>
 			<div style="position: relative; height: 320px"><canvas id="chart"></canvas></div>
 			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">Wall time is the full run from push to ready; queue wait is time spent behind other jobs.</p>
 		</section>
 
-		<section class="card" data-id="releases" style="left: 720px; top: 368px; width: 332px">
+		<section class="card" data-id="releases" style="left: 720px; top: 328px; width: 332px">
 			<h3>The last five releases</h3>
 			<table class="table">
 				<thead><tr><th>Release</th><th>Wall, min</th><th>Result</th></tr></thead>
@@ -64,7 +64,7 @@
 			<p style="color: var(--b-muted); font-size: 12px; margin-top: 8px">The red build is the one that sat behind a Friday queue for 40 minutes.</p>
 		</section>
 
-		<div class="callout" data-id="next" data-tone="warn" style="left: 48px; top: 792px; width: 1004px">
+		<div class="callout" data-id="next" data-tone="warn" style="left: 48px; top: 752px; width: 1004px">
 			<p><b>What to do.</b> Add a second CI runner before the next Friday deploy, and put the integration suite behind a cache: two jobs now compile the same frontend twice, back to back.</p>
 		</div>
 
