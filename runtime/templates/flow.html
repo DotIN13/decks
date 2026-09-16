@@ -15,17 +15,17 @@
 	<!--
 		`flow` beside `board` is the whole declaration.
 
-		`board` is what makes the primitives apply; `flow` is what says the content reflows rather
-		than sitting in boxes you place. Together they make this file a board Decks wrote, served
-		as it is — same origin, no wrapper — where an HTML file with neither class is treated as a
-		document from somewhere else and sandboxed.
+		`board` is what makes the primitives apply. `flow` is what says the content reflows rather
+		than sitting in boxes you place. Together they make this file a board Decks wrote, served as
+		it is, in the same origin and with no wrapper. An HTML file with neither class is treated as
+		a document from somewhere else and sandboxed.
 	-->
 	<body class="board flow">
 		<!--
-			One component, full width, and the document goes inside it: ordinary HTML — headings,
-			paragraphs, lists, tables, `<img>`, an `<svg>` you drew. `[data-md]` renders markdown
-			and maths if you would rather write a block that way, and `[data-embed]` shows a file.
-			A double-click opens this file as its own source.
+			One component, full width, and the document goes inside it: ordinary HTML such as
+			headings, paragraphs, lists and tables, plus an `<img>` or an `<svg>` you drew. `[data-md]`
+			renders markdown and maths if you would rather write a block that way, and `[data-embed]`
+			shows a file. A double-click opens this file as its own source.
 
 			The headings below are the section names a reader scans: Summary, Overview, Problem,
 			Research question, Method, Result, Todos, Next. The shape is here so the document is
@@ -34,7 +34,7 @@
 		<div class="doc" data-id="body" style="left: 0; top: 0; width: 100%">
 			<h1>{{TITLE}}</h1>
 			<p><b>The finding, in one sentence somebody could repeat.</b> Then the detail they need
-			to believe it — and nothing that repeats the sentence.</p>
+			to believe it, and nothing that repeats the sentence.</p>
 
 			<h2>Summary</h2>
 			<p>What was done, what came out, what it means. Short: a reader who stops here should

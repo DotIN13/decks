@@ -86,6 +86,14 @@ test("a slide deck carries no map, because nothing in it could run one", () => {
 	assert.equal(renderFormat("slides", "Talk").includes("importmap"), false);
 });
 
+test("a template's copy is plain, with no em dashes in it", () => {
+	// The app has kept em dashes out of its own copy for a while, and a board is copy of the same
+	// kind. The rendered document is what is checked, not the source file: a dash can arrive
+	// through a substituted token as easily as through the template.
+	const rendered = [...BOARD_TEMPLATES.map((kind) => renderTemplate(kind, "T")), renderFormat("flow", "T"), renderFormat("slides", "T")];
+	for (const html of rendered) assert.equal(html.includes("—"), false, `an em dash reached ${html.slice(0, 40)}`);
+});
+
 test("a title is escaped, not injected", () => {
 	const html = renderTemplate("answer", 'Tom & Jerry <script>alert("x")</script>');
 	assert.ok(!html.includes("<script>alert"), "no injected element");

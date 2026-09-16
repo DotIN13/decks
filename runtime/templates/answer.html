@@ -9,49 +9,50 @@
 	</head>
 	<body class="board">
 		<!--
-			The question, the answer, and at most one thing that shows it. Widths come from the
-			board's own width ({{CONTENT}}), so this is a wide board on a laptop and a narrow one
-			on a phone without anything clipping. Read top to bottom, and the file is in that
-			order.
+			The question, the answer, and at most one thing that shows it.
+
+			Widths come from the board width ({{CONTENT}}), so this is wide on a laptop and narrow
+			on a phone. Read top to bottom, and keep the file in that order.
 		-->
 		<div class="text" data-id="question" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
 		</div>
 
 		<!--
-			The first sentence under the title *is* the answer.
+			The answer, in one sentence.
 
-			Not the background, not what you were asked, not how you found out. Somebody should
-			be able to read this out loud and be right. Then cut every sentence after it that
-			does not change what they do or believe.
+			Not the background, not what you were asked, not how you found out. A reader should be
+			able to say this sentence out loud and be right. Delete any sentence after it that does
+			not change what they do or believe.
 		-->
 		<div class="callout" data-id="answer" data-tone="accent" style="left: 48px; top: {{ROW1}}px; width: {{CONTENT}}px">
 			<p><b>The answer, in one sentence somebody could repeat.</b></p>
 		</div>
 
 		<!--
-			The evidence — and the only thing here that uses the import map. Five bars are worth
-			a library; three paragraphs are not.
+			The evidence. This card is the only thing here that uses the import map.
 
-			Delete this card if the answer is a comparison (a `.table`), a structure (an `<svg>`
-			you drew), or a quantity best said as one number (a `.kpi`). The script goes with it:
-			it imports lazily and only when this element is still on the board, so a board without
-			the chart never fetches d3 at all.
+			Delete it if the answer is a comparison (use a `.table`), a structure (use an `<svg>`
+			you drew), or one number (use a `.kpi`). Delete the script with it: the script imports
+			d3 only when this element is still on the board, so a board without the chart never
+			downloads d3.
 		-->
 		<section class="card" data-id="evidence" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
 			<h3>Where the difference is</h3>
-			<div id="chart" style="height: 168px"></div>
-			<p style="color: var(--b-muted); font-size: 12px">Sample months — replace the series and the labels.</p>
+			<div id="chart" style="height: 190px"></div>
+			<p style="color: var(--b-muted); font-size: 12px">Sample data. Replace the values, the months and the axis titles.</p>
 		</section>
 
 		<script type="module">
 			/*
-			 * A guarded import: the library is fetched only while the chart is on the board.
+			 * The import is inside `if (host)`, so the library is fetched only while the chart is
+			 * on the board. `import("d3")` resolves through the map in this file's head; edit that
+			 * map to change the version or to use `three`, `gsap` or `chart.js` instead.
 			 *
-			 * `import("d3")` resolves through the map in this file's head — edit that map to
-			 * change the version, or to reach for `three`, `gsap` or `chart.js` instead. Draw in
-			 * `board:ready` when the layout has to be settled first; here the host has a fixed
-			 * height, so the board measures the same whether the bars are drawn yet or not.
+			 * The chart has both axes and a title on each, because a plot without them does not
+			 * say what it measures. `board:ready` is where to draw when the layout has to be
+			 * settled first; here the host has a fixed height, so the board measures the same
+			 * before and after the bars appear.
 			 */
 			const host = document.querySelector("#chart");
 			if (host) {
@@ -64,11 +65,34 @@
 					{ month: "May", share: 0.9 },
 				];
 				const width = host.clientWidth || 600;
-				const height = 168;
+				const height = 190;
+				const margin = { top: 22, right: 8, bottom: 44, left: 56 };
+				const innerW = width - margin.left - margin.right;
+				const innerH = height - margin.top - margin.bottom;
+
 				const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
-				const x = d3.scaleBand().domain(data.map((d) => d.month)).range([0, width]).padding(0.34);
-				const y = d3.scaleLinear().domain([0, 1]).range([height - 24, 6]);
-				svg.selectAll("rect")
+				const plot = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+				const x = d3.scaleBand().domain(data.map((d) => d.month)).range([0, innerW]).padding(0.34);
+				const y = d3.scaleLinear().domain([0, 1]).range([innerH, 0]);
+
+				// The y axis, with the values the bars are read against.
+				plot.append("g")
+					.call(d3.axisLeft(y).ticks(4).tickFormat(d3.format(".0%")))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "11px"))
+					.call((axis) => axis.selectAll("line").style("stroke", "var(--b-border)"))
+					.call((axis) => axis.select(".domain").style("stroke", "var(--b-border-strong)"));
+
+				// The x axis, and the months the bars stand for.
+				plot.append("g")
+					.attr("transform", `translate(0,${innerH})`)
+					.call(d3.axisBottom(x).tickSize(0))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "11px").attr("dy", "1.6em"))
+					.call((axis) => axis.select(".domain").style("stroke", "var(--b-border-strong)"));
+
+				plot.selectAll("rect")
 					.data(data)
 					.join("rect")
 					.attr("x", (d) => x(d.month))
@@ -77,16 +101,22 @@
 					.attr("height", (d) => y(0) - y(d.share))
 					.attr("rx", 3)
 					.style("fill", "var(--b-accent)");
-				svg.selectAll("text")
-					.data(data)
-					.join("text")
-					.attr("x", (d) => x(d.month) + x.bandwidth() / 2)
-					.attr("y", height - 6)
+
+				// What each axis is. Without these, the reader has two sets of numbers and no claim.
+				plot.append("text")
+					.attr("x", 0)
+					.attr("y", -8)
+					.attr("text-anchor", "start")
+					.style("font-size", "11px")
+					.style("fill", "var(--b-muted)")
+					.text("share of visits, percent");
+				plot.append("text")
+					.attr("x", innerW / 2)
+					.attr("y", innerH + 34)
 					.attr("text-anchor", "middle")
 					.style("font-size", "11px")
-					.style("font-family", "var(--b-font)")
 					.style("fill", "var(--b-muted)")
-					.text((d) => d.month);
+					.text("month");
 			}
 		</script>
 

@@ -275,7 +275,7 @@ interface Rhythm {
 
 const ROWS: Record<BoardTemplate, Rhythm> = {
 	// The answer, then the one card that shows it.
-	answer: { first: 152, rows: [{ h: 56 }, { h: 264 }] },
+	answer: { first: 152, rows: [{ h: 56 }, { h: 288 }] },
 	// The options, the trade-off drawn, the recommendation.
 	design: { first: 152, subtitle: 35, rows: [{ h: 200, pair: true }, { h: 300 }, { h: 72 }] },
 	// The number, the series, how and what, what is left.

@@ -13,16 +13,16 @@
 	<body class="reveal">
 		<!--
 			Reveal's own format: one `<section>` per slide, inside `.reveal > .slides`. This file
-			opens in reveal unchanged, and Decks reads the same sections — `lib/slides.js` splits on
+			opens in reveal unchanged, and Decks reads the same sections. `lib/slides.js` splits on
 			them, takes `<aside class="notes">` out as the speaker note, and lays every slide out at
 			a fixed 960×540 scaled to the board.
 
 			Nested sections are reveal's vertical stacks. They become consecutive slides here: left
 			and right is one dimension, and a deck that branches has no honest thumbnail.
 
-			A `<script>` in this file will not run — the slides are inserted with `innerHTML` —
-			which is why this format has no import map in its head. Reveal's own runtime is inert
-			too: this view owns the keyboard, and a deck cannot run code in the board's origin.
+			A `<script>` in this file will not run, because the slides are inserted with `innerHTML`.
+			That is why this format has no import map in its head. Reveal's own runtime is inert too:
+			this view owns the keyboard, and a deck cannot run code in the board's origin.
 		-->
 		<div class="slides">
 			<section>
@@ -42,7 +42,7 @@
 			<section>
 				<h2>What is on a slide</h2>
 				<ul>
-					<li>Ordinary HTML — headings, lists, tables, images</li>
+					<li>Ordinary HTML: headings, lists, tables, images</li>
 					<li>Maths in <code>$…$</code>, rendered by KaTeX</li>
 					<li>Notes in <code>&lt;aside class="notes"&gt;</code>, kept and hidden</li>
 				</ul>

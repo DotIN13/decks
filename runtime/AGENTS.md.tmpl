@@ -159,6 +159,14 @@ want** — another library, another version, a different CDN — and import what
 need it: `const d3 = await import("d3")` at the point you draw, which is what keeps it free for a
 board that never gets there.
 
+**A plot says what its axes are.** Any chart gets an x axis and a y axis, a tick value on each, and
+a title on each saying what it counts and in what unit ("visits per month, count", not "value").
+Without them a reader has a shape and no claim, and cannot check the numbers. Both templates that
+ship a chart draw and label their axes; copy that.
+
+**Write board copy in plain words.** Short sentences, one job each, and no em dashes. The reader is
+deciding something, and a sentence they have to read twice is a sentence that did not earn its place.
+
 ## Showing the user's own documents
 
 `[data-embed]` renders a file where it sits: markdown, PDF (with `data-pages="3-5"`),

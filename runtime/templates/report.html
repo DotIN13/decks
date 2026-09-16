@@ -10,41 +10,43 @@
 	<body class="board">
 		<!--
 			The number first, then what it looks like over time, then how and what, then what is
-			left. The file is in that order, so a reader's eye and a `data-id` list agree.
+			left. Keep the file in that order, so the reading order and the order of the `data-id`s
+			are the same.
 
-			The line under the title is the finding, in a sentence somebody could repeat — not a
-			label for the shape. "What was done, and what it means" is what you replace.
+			The line under the title is the finding, in a sentence somebody could repeat. Replace
+			the sentence with what you found, not with a label for the shape.
 		-->
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
 			<p style="color: var(--b-muted)">The finding, in a sentence somebody could repeat.</p>
 		</div>
 
-		<!-- The number that matters, before anything that explains it. -->
+		<!-- The one number that matters, before anything that explains it. -->
 		<div class="kpi" data-id="headline" style="left: 48px; top: {{ROW1}}px; width: {{CONTENT}}px">
-			<span class="value">—</span>
-			<span class="label">the number that matters</span>
+			<span class="value">…</span>
+			<span class="label">what the number measures</span>
 		</div>
 
 		<!--
-			The result, as a picture over time — the one component here that uses the import map.
-			A series is what a library is for; if the result is a single number, delete this card
-			and keep the `.kpi` above. The script goes with it: the import runs only while this
-			element is on the board, so a report without a chart never fetches d3.
+			The result over time. This card is the only thing here that uses the import map.
 
-			Draw in `board:ready` when the layout has to be settled first, and keep a fixed height
-			on the host so the board measures the same with or without the drawing in it.
+			Delete it if the result is one number (keep the `.kpi` above) or a comparison (use a
+			`.table`). Delete the script with it: the script imports d3 only when this element is
+			still on the board, so a report without a chart never downloads d3.
+
+			Both axes have their own title and their own tick values. A plot without them does not
+			say what it measures, and a reader cannot check it.
 		-->
 		<section class="card" data-id="chart" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
-			<h3>The result, over time</h3>
+			<h3>The result over time</h3>
 			<div id="chart-host" style="height: 200px"></div>
-			<p style="color: var(--b-muted); font-size: 12px">Sample series — replace the data and the axis.</p>
+			<p style="color: var(--b-muted); font-size: 12px">Sample data. Replace the series and the two axis titles.</p>
 		</section>
 
 		<!--
-			Method: how, briefly. **Not a log.** Two or three steps somebody could repeat, in the
-			shortest words that are still true. What you tried and abandoned belongs here only if
-			the abandoning is the finding.
+			How it was done, briefly. This is not a log. Two or three steps somebody could repeat,
+			in the shortest words that are still true. What you tried and dropped belongs here only
+			if dropping it is the finding.
 		-->
 		<section class="card" data-id="method" style="left: 48px; top: {{ROW3}}px; width: {{COL}}px">
 			<h3>Method</h3>
@@ -53,60 +55,93 @@
 			</ol>
 		</section>
 
-		<!-- Result: what changed, said as a number wherever there is one to say. -->
+		<!-- What changed. Use a number whenever there is one to use. -->
 		<section class="card" data-id="result" style="left: {{COLX}}px; top: {{PAIRB}}px; width: {{COL}}px">
 			<h3>Result</h3>
 			<p>…</p>
 		</section>
 
-		<!-- What is left, if anything. Say "nothing" rather than deleting it. -->
+		<!-- What is left, if anything. Write "nothing" rather than deleting the callout. -->
 		<div class="callout" data-id="left" data-tone="warn" style="left: 48px; top: {{ROW4}}px; width: {{CONTENT}}px">
 			<p><b>Left to do.</b> …</p>
 		</div>
 
 		<script type="module">
 			/*
-			 * A guarded import. Delete the chart card and this never fetches anything: the map in
-			 * the head is names, not downloads.
+			 * A guarded import: d3 is fetched only while the chart is on the board, so deleting
+			 * the card removes the cost as well as the picture. The import resolves through the
+			 * map in this file's head.
+			 *
+			 * Axis titles are part of the chart, not decoration. Say what the x axis counts and
+			 * what the y axis measures, including the unit, or the reader has a shape and no claim.
 			 */
 			const host = document.querySelector("#chart-host");
 			if (host) {
 				const d3 = await import("d3");
-				const data = [3, 4, 3, 6, 5, 8, 7, 9, 8, 11, 12, 14].map((v, i) => ({
-					month: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][i],
-					value: v,
-				}));
+				const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+				const data = [3, 4, 3, 6, 5, 8, 7, 9, 8, 11, 12, 14].map((value, i) => ({ month: months[i], value }));
 				const width = host.clientWidth || 900;
 				const height = 200;
-				const pad = { top: 12, right: 8, bottom: 30, left: 26 };
+				const margin = { top: 22, right: 10, bottom: 44, left: 52 };
+				const innerW = width - margin.left - margin.right;
+				const innerH = height - margin.top - margin.bottom;
+
 				const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
-				const x = d3.scalePoint().domain(data.map((d) => d.month)).range([pad.left, width - pad.right]);
-				const y = d3.scaleLinear().domain([0, d3.max(data, (d) => d.value)]).nice().range([height - pad.bottom, pad.top]);
-				// The baseline, so the area reads as a quantity rather than a shape.
-				for (const tick of y.ticks(4)) {
-					svg.append("line").attr("x1", pad.left).attr("x2", width - pad.right).attr("y1", y(tick)).attr("y2", y(tick)).style("stroke", "var(--b-border)");
-				}
-				svg.append("path")
+				const plot = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+				const x = d3.scalePoint().domain(months).range([0, innerW]);
+				const y = d3.scaleLinear().domain([0, d3.max(data, (d) => d.value)]).nice().range([innerH, 0]);
+
+				// The y axis, with the values the line is read against, and a rule per tick.
+				plot.append("g")
+					.call(d3.axisLeft(y).ticks(4).tickSize(-innerW))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "11px"))
+					.call((axis) => axis.selectAll("line").style("stroke", "var(--b-border)"))
+					.call((axis) => axis.select(".domain").style("stroke", "none"));
+
+				// The x axis. Every other month, so the labels do not touch.
+				plot.append("g")
+					.attr("transform", `translate(0,${innerH})`)
+					.call(d3.axisBottom(x).tickValues(months.filter((_, i) => i % 2 === 0)).tickSize(0))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "11px").attr("dy", "1.6em"))
+					.call((axis) => axis.select(".domain").style("stroke", "var(--b-border-strong)"));
+
+				plot.append("path")
+					.datum(data)
+					.attr("fill", "var(--b-accent)")
+					.attr("opacity", 0.12)
+					.attr("d", d3.area().x((d) => x(d.month)).y0(y(0)).y1((d) => y(d.value)));
+				plot.append("path")
 					.datum(data)
 					.attr("fill", "none")
 					.attr("stroke", "var(--b-accent)")
 					.attr("stroke-width", 2)
 					.attr("d", d3.line().x((d) => x(d.month)).y((d) => y(d.value)));
-				svg.append("path")
-					.datum(data)
-					.attr("fill", "var(--b-accent)")
-					.attr("opacity", 0.12)
-					.attr("d", d3.area().x((d) => x(d.month)).y0(y(0)).y1((d) => y(d.value)));
-				svg.selectAll("text")
-					.data(data.filter((_, i) => i % 2 === 0))
-					.join("text")
-					.attr("x", (d) => x(d.month))
-					.attr("y", height - 10)
+				plot.selectAll("circle")
+					.data(data)
+					.join("circle")
+					.attr("cx", (d) => x(d.month))
+					.attr("cy", (d) => y(d.value))
+					.attr("r", 2.5)
+					.style("fill", "var(--b-accent)");
+
+				// What each axis is, in words, with the unit.
+				plot.append("text")
+					.attr("x", 0)
+					.attr("y", -8)
+					.attr("text-anchor", "start")
+					.style("font-size", "11px")
+					.style("fill", "var(--b-muted)")
+					.text("visits per month, count");
+				plot.append("text")
+					.attr("x", innerW / 2)
+					.attr("y", innerH + 34)
 					.attr("text-anchor", "middle")
 					.style("font-size", "11px")
-					.style("font-family", "var(--b-font)")
 					.style("fill", "var(--b-muted)")
-					.text((d) => d.month);
+					.text("month of the year");
 			}
 		</script>
 
