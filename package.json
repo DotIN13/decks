@@ -3,7 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A canvas-centric coding agent powered by Pi",
+  "description": "A canvas-centric coding agent: boards are local HTML files on an infinite canvas, written by an agent and edited by hand",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DotIN13/decks.git"
+  },
+  "homepage": "https://github.com/DotIN13/decks#readme",
+  "bugs": {
+    "url": "https://github.com/DotIN13/decks/issues"
+  },
+  "keywords": [
+    "agent",
+    "coding-agent",
+    "canvas",
+    "boards",
+    "html",
+    "pi",
+    "claude-code"
+  ],
   "workspaces": [
     "packages/*",
     "apps/*",

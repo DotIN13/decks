@@ -73,10 +73,13 @@ The agent executes code by design, so the account it runs as is the blast radius
 one of its own rather than running it as your admin user:
 
 ```bash
-sudo useradd --create-home --home-dir /home/decks --shell /bin/bash decks
+sudo useradd --create-home --home-dir /srv/decks --shell /bin/bash decks
 sudo passwd -l decks            # no password: no login path
-sudo chmod 750 /home/decks      # your admin user cannot read the credentials either
+sudo chmod 750 /srv/decks      # your admin user cannot read the credentials either
 ```
+
+`/srv/decks` is an example, and any path outside `/home` works; what matters is that it is
+the service user's own and that the `ReadWritePaths=` line in §7 names it.
 
 Two details that look like mistakes and are not:
 
@@ -86,21 +89,21 @@ Two details that look like mistakes and are not:
 - **No sudo, ever.** Do not add it to `sudo`, `wheel` or `adm`. Combined with
   `NoNewPrivileges=yes` in §7 there is no escalation path out of the account.
 
-Because `/home/decks` is `750`, your admin user cannot `cd` into it. Every command in the
+Because `/srv/decks` is `750`, your admin user cannot `cd` into it. Every command in the
 rest of this document therefore runs the `cd` *inside* the service user's shell:
 
 ```bash
-sudo -u decks -H bash -c "cd /home/decks/app && ..."
+sudo -u decks -H bash -c "cd /srv/decks/app && ..."
 ```
 
-`sudo -u decks -H cd /home/decks/app && ...` fails, because the `cd` runs as you.
+`sudo -u decks -H cd /srv/decks/app && ...` fails, because the `cd` runs as you.
 
 ## 5. The code
 
 ```bash
-sudo -u decks -H git clone <repo-url> /home/decks/app
-sudo -u decks -H bash -c "cd /home/decks/app && npm ci && npm run build"
-sudo -u decks -H mkdir -p /home/decks/data
+sudo -u decks -H git clone <repo-url> /srv/decks/app
+sudo -u decks -H bash -c "cd /srv/decks/app && npm ci && npm run build"
+sudo -u decks -H mkdir -p /srv/decks/data
 ```
 
 - **Do not pass `--omit=dev`.** `tsx` is a devDependency of `@decks/server` and the server
@@ -111,7 +114,7 @@ sudo -u decks -H mkdir -p /home/decks/data
   architecture, because the failure otherwise appears later as a confusing build error:
 
   ```bash
-  sudo -u decks -H bash -c "cd /home/decks/app && ./node_modules/.bin/esbuild --version"
+  sudo -u decks -H bash -c "cd /srv/decks/app && ./node_modules/.bin/esbuild --version"
   ```
 
 - A lockfile committed from one platform installs fine on another; the optional
@@ -130,7 +133,7 @@ need different privileges:
 sudo npx --yes playwright@<version> install-deps chromium
 
 # The browser itself, as the service user, into its own cache.
-sudo -u decks -H bash -c "cd /home/decks/app && npx playwright install chromium"
+sudo -u decks -H bash -c "cd /srv/decks/app && npx playwright install chromium"
 ```
 
 The version should match the `playwright` devDependency, so the dependency list matches the
@@ -157,10 +160,10 @@ starts and then cannot reach a model.
 scp ~/.pi/agent/auth.json ~/.pi/agent/models-store.json ~/.pi/agent/settings.json <host>:<stage>/
 
 # on the server
-sudo -u decks -H mkdir -p /home/decks/.pi/agent
-sudo -u decks -H chmod 700 /home/decks/.pi /home/decks/.pi/agent
+sudo -u decks -H mkdir -p /srv/decks/.pi/agent
+sudo -u decks -H chmod 700 /srv/decks/.pi /srv/decks/.pi/agent
 for f in auth.json models-store.json settings.json; do
-  sudo install -o decks -g decks -m 600 <stage>/$f /home/decks/.pi/agent/$f
+  sudo install -o decks -g decks -m 600 <stage>/$f /srv/decks/.pi/agent/$f
 done
 shred -u <stage>/*        # a staging copy of a key is still a copy of a key
 ```
@@ -189,11 +192,11 @@ Wants=network-online.target
 Type=simple
 User=decks
 Group=decks
-WorkingDirectory=/home/decks/app
+WorkingDirectory=/srv/decks/app
 
-Environment=HOME=/home/decks
+Environment=HOME=/srv/decks
 Environment=NODE_ENV=production
-Environment=DECKS_DATA_DIR=/home/decks/data
+Environment=DECKS_DATA_DIR=/srv/decks/data
 # Loopback only. The private-network proxy (§8) is the sole way in, so the
 # plain-HTTP port is unreachable from every interface on the host. It is also
 # the address the board-debug skill's browser connects back to.
@@ -210,7 +213,7 @@ RestartSec=3
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
-ReadWritePaths=/home/decks
+ReadWritePaths=/srv/decks
 ProtectControlGroups=yes
 ProtectKernelTunables=yes
 RestrictSUIDSGID=yes
@@ -293,7 +296,7 @@ knowing on a machine that also uses a corporate or campus resolver.
 ## 10. Updating
 
 ```bash
-sudo -u decks -H bash -c "cd /home/decks/app && git pull && npm ci && npm run build"
+sudo -u decks -H bash -c "cd /srv/decks/app && git pull && npm ci && npm run build"
 sudo systemctl restart decks
 ```
 
@@ -339,7 +342,7 @@ Then the containment checks, which are the ones people skip:
 ```bash
 sudo -u decks -H sudo -n true                # must fail
 sudo -u decks -H ls /home/<your-user>/       # must be denied
-cat /home/decks/.pi/agent/auth.json          # as your admin user: must be denied
+cat /srv/decks/.pi/agent/auth.json          # as your admin user: must be denied
 curl -m 5 http://<the-host-public-address>:4329/     # must not connect
 ```
 
@@ -356,7 +359,7 @@ sudo awk '{print $5, $6}' /proc/$(systemctl show -p MainPID --value decks)/mount
 - **One deck per deployment.** A deck is a working directory, so "which deck" and "which
   history" are one choice (§2). Serving two decks means two services with two data
   directories on two ports.
-- **The agent can modify its own deployment.** `/home/decks/app` is writable by the account
+- **The agent can modify its own deployment.** `/srv/decks/app` is writable by the account
   the agent runs as. That is convenient and worth knowing: an agent asked to fix a bug in
   Decks can edit the copy it is running from. Move the checkout outside the writable path if
   you would rather it could not.

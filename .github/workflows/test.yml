@@ -2,9 +2,9 @@ name: test
 
 # What this runs, and what it deliberately does not.
 #
-# **typecheck, the unit tests, and the twelve browser checks.** The browser checks were cut
-# from forty-five to twelve *for this*: the suite has to be fast enough to run on every push,
-# and at ~2 minutes over a throwaway copy of `example/` it is. The five that need a model are
+# **typecheck, the unit tests, and the browser checks.** The browser checks were cut
+# from forty-five *for this*: the suite has to be fast enough to run on every push, and at
+# ~2 minutes over a throwaway copy of `example/` it is. The checks that need a model are
 # not run here — they cost tokens against somebody's account, and a red build that means
 # "the API key expired" is a build people learn to ignore.
 #
@@ -17,7 +17,7 @@ name: test
 # as well as before the browser checks, because some unit tests measure a real page.
 #
 # Nothing here needs a third-party agent CLI: the opencode tests build their own fake child
-# process, so a machine with no opencode on it still runs all 512 server tests.
+# process, so a machine with no opencode on it still runs every server test.
 
 on:
   push:

@@ -8,7 +8,7 @@ npx playwright install chromium
 ```
 
 ```sh
-npm run test:e2e                        # the twelve that need no model  (~2m, 297 assertions)
+npm run test:e2e                        # the twenty-three that need no model  (~2m)
 DECKS_E2E_AGENT=1 npm run test:e2e      # and the five that prompt an agent — slower, spends tokens
 npm run test:e2e -- panel tiers         # just these
 DECKS_BACKEND=claude npm run test:e2e   # the same checks, on the Claude runtime
@@ -33,23 +33,22 @@ run went against a real deck and dragged boards around before anyone noticed.
 
 ## What is covered, and what is not
 
-There were forty-five of these and now there are twelve. The full suite took 8m 17s, and a
-suite nobody runs between edits is not protecting anything; the twelve run in 1m 58s. They
-were chosen for assertions per second and to cover one surface each, and they are 297 of the
-old 857 assertions.
+There were forty-five of these. The full suite took 8m 17s, a suite nobody runs between edits
+is not protecting anything, so it was cut to twelve. The set has grown back to twenty-three as
+surfaces came back, and what follows is the part that is still not covered.
 
-**The thirty-three that went are in git, not gone.** `git log --diff-filter=D --name-only --
-e2e/checks` lists them; restoring one is a `git show` and a line in `CHECKS`.
+**What went is in git, not gone.** `git log --diff-filter=D --name-only -- e2e/checks` lists
+it; restoring one is a `git show` and a line in `CHECKS`.
 
 Nothing asserts these any more, and the gaps are worth knowing before trusting a green run:
 
 | Gone | What is no longer checked |
 | --- | --- |
 | `mobile.mjs` (771 lines) | the phone layout, and every real touch — it was the only file dispatching them through CDP |
-| `embed-touch.mjs`, `embed-guard.mjs`, `embed-scroll.mjs`, `gestures.mjs` | gestures crossing into and out of an HTML embed |
+| `embed-touch.mjs`, `embed-guard.mjs`, `embed-scroll.mjs` | gestures crossing into and out of an HTML embed (`gestures.mjs` is back, for the canvas rather than for embeds) |
 | `board-kinds.mjs` | the three board formats — and `splitHtmlDeck` is now tested nowhere at all, since its unit test defers to this check |
 | `file-drop.mjs`, `drop-targets.mjs` | dropping and pasting a file, and where it lands |
-| `editing.mjs`, `rich-text.mjs`, `invented-component.mjs` | direct manipulation, marks edited in place, a component the agent invented |
+| `rich-text.mjs`, `invented-component.mjs` | marks edited in place, a component the agent invented (`editing.mjs` is back, for direct manipulation) |
 | `thumbs.mjs`, `rail-scroll.mjs`, `renderers.mjs` | thumbnails, the board list's scroll, both canvas renderers |
 | `chat-history.mjs`, `streaming.mjs` | paging back through a transcript, and the column while a reply arrives |
 | `accounts.mjs`, `accounts-per-agent.mjs`, `model-picker.mjs`, `usage.mjs` | the account and model surfaces, and the usage panel |
@@ -75,7 +74,7 @@ Removing the sleeps once took the suite from 189s to 33s, and the stricter waits
 they had been hiding: a revision preview was loading without its stylesheet, so the time
 machine showed the right *text* in an unstyled document. `resetStage` in `harness.mjs` is
 the one place that still breaks this rule — it sleeps 400ms twice per check, measured at
-810ms every time, which is about 8s of the twelve-check run.
+810ms every time, which is about 8s of a run.
 
 ## Writing one
 

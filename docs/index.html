@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Decks — a canvas-centric coding agent</title>
+		<meta
+			name="description"
+			content="Boards are local HTML files on an infinite canvas. The agent writes them, you and it edit them, and nothing scrolls away. Runs on Pi or Claude Code."
+		/>
+		<meta property="og:title" content="Decks — a canvas-centric coding agent" />
+		<meta
+			property="og:description"
+			content="Boards are local HTML files on an infinite canvas. The agent writes them, you and it edit them, and nothing scrolls away."
+		/>
+		<meta property="og:type" content="website" />
+		<link
+			rel="icon"
+			href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233b5cf6'/%3E%3Crect x='14' y='16' width='22' height='14' rx='3' fill='%23fff'/%3E%3Crect x='14' y='34' width='36' height='14' rx='3' fill='%23fff' opacity='.65'/%3E%3C/svg%3E"
+		/>
+		<style>
+			/* The palette is the board primitives' own (runtime/lib/board.css), so the page and
+			   the thing it describes read as one piece of software. */
+			:root {
+				--grey-50: #ffffff;
+				--grey-100: #fafafa;
+				--grey-200: #f2f2f2;
+				--grey-300: #eeeeee;
+				--grey-500: #aeaeae;
+				--grey-600: #808080;
+				--grey-700: #5c5c5c;
+				--grey-800: #3a3a3a;
+				--grey-1000: #242424;
+				--grey-1100: #161616;
+				--blue-200: #d7e2fc;
+				--blue-600: #3b5cf6;
+				--blue-900: #263fa9;
+				--green-700: #2eaf5a;
+
+				--bg: var(--grey-50);
+				--bg-soft: var(--grey-100);
+				--bg-layer: var(--grey-200);
+				--fg: var(--grey-1100);
+				--muted: var(--grey-700);
+				--faint: var(--grey-600);
+				--border: rgb(0 0 0 / 10%);
+				--border-strong: rgb(0 0 0 / 20%);
+				--accent: var(--blue-600);
+				--accent-soft: var(--blue-200);
+				--grid: rgb(0 0 0 / 4%);
+				--shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 12px 32px rgb(0 0 0 / 8%);
+				--radius: 12px;
+				--radius-sm: 8px;
+				--mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+				--font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--bg: var(--grey-1100);
+					--bg-soft: #1b1b1b;
+					--bg-layer: var(--grey-1000);
+					--fg: var(--grey-100);
+					--muted: var(--grey-500);
+					--faint: var(--grey-600);
+					--border: rgb(255 255 255 / 12%);
+					--border-strong: rgb(255 255 255 / 24%);
+					--accent-soft: #1e2a52;
+					--grid: rgb(255 255 255 / 5%);
+					--shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px rgb(0 0 0 / 30%);
+				}
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+			html {
+				-webkit-text-size-adjust: 100%;
+			}
+			body {
+				margin: 0;
+				background-color: var(--bg);
+				/* The canvas grid, faint enough to read as texture rather than graph paper. */
+				background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+				background-size: 32px 32px;
+				color: var(--fg);
+				font-family: var(--font);
+				font-size: 16px;
+				line-height: 1.6;
+				-webkit-font-smoothing: antialiased;
+			}
+			.wrap {
+				max-width: 1080px;
+				margin: 0 auto;
+				padding: 0 24px;
+			}
+			a {
+				color: var(--accent);
+				text-decoration: none;
+			}
+			a:hover {
+				text-decoration: underline;
+			}
+			a:focus-visible,
+			button:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+				border-radius: 4px;
+			}
+
+			/* --- hero ---------------------------------------------------------------- */
+			header.hero {
+				padding: 72px 0 8px;
+			}
+			.eyebrow {
+				display: inline-block;
+				margin: 0 0 20px;
+				padding: 4px 12px;
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				background: var(--bg-soft);
+				color: var(--muted);
+				font-size: 13px;
+			}
+			h1 {
+				margin: 0;
+				font-size: clamp(40px, 7vw, 64px);
+				font-weight: 650;
+				letter-spacing: -0.03em;
+				line-height: 1.02;
+			}
+			.lede {
+				max-width: 46ch;
+				margin: 20px 0 0;
+				font-size: clamp(18px, 2.4vw, 21px);
+				color: var(--muted);
+			}
+			.lede b {
+				color: var(--fg);
+				font-weight: 600;
+			}
+			.actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 12px;
+				margin: 28px 0 0;
+			}
+			.button {
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				padding: 10px 18px;
+				border: 1px solid transparent;
+				border-radius: var(--radius-sm);
+				background: var(--accent);
+				color: #fff;
+				font-size: 15px;
+				font-weight: 550;
+			}
+			.button:hover {
+				text-decoration: none;
+				filter: brightness(1.06);
+			}
+			.button.quiet {
+				background: var(--bg-soft);
+				border-color: var(--border);
+				color: var(--fg);
+			}
+			.button.quiet:hover {
+				border-color: var(--border-strong);
+			}
+
+			figure.shot {
+				margin: 48px 0 0;
+			}
+			figure.shot img {
+				display: block;
+				width: 100%;
+				height: auto;
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				box-shadow: var(--shadow);
+				background: var(--bg-soft);
+			}
+			figure.shot figcaption {
+				margin-top: 12px;
+				color: var(--faint);
+				font-size: 13px;
+			}
+
+			/* --- sections ------------------------------------------------------------ */
+			section {
+				padding: 72px 0 0;
+			}
+			h2 {
+				margin: 0 0 8px;
+				font-size: 13px;
+				font-weight: 600;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--faint);
+			}
+			.claim {
+				max-width: 62ch;
+				margin: 0 0 32px;
+				font-size: clamp(22px, 3vw, 28px);
+				font-weight: 600;
+				letter-spacing: -0.01em;
+				line-height: 1.3;
+			}
+			.three {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 32px;
+			}
+			.three h3 {
+				margin: 0 0 6px;
+				font-size: 17px;
+				font-weight: 600;
+			}
+			.three p {
+				margin: 0;
+				color: var(--muted);
+				font-size: 15px;
+			}
+
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				gap: 16px;
+			}
+			.card {
+				padding: 20px;
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				background: var(--bg-soft);
+			}
+			.card h3 {
+				margin: 0 0 6px;
+				font-size: 15px;
+				font-weight: 600;
+			}
+			.card p {
+				margin: 0;
+				color: var(--muted);
+				font-size: 14px;
+				line-height: 1.55;
+			}
+			.card code {
+				font-family: var(--mono);
+				font-size: 12.5px;
+				color: var(--fg);
+			}
+
+			/* --- install ------------------------------------------------------------- */
+			.install {
+				display: grid;
+				grid-template-columns: 1.1fr 0.9fr;
+				gap: 32px;
+				align-items: start;
+			}
+			.snippet {
+				position: relative;
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				background: var(--bg-layer);
+				padding: 20px 20px 20px;
+				overflow: hidden;
+			}
+			.snippet pre {
+				margin: 0;
+				overflow-x: auto;
+				font-family: var(--mono);
+				font-size: 13.5px;
+				line-height: 1.9;
+				color: var(--fg);
+			}
+			.snippet .c {
+				color: var(--faint);
+			}
+			.copy {
+				position: absolute;
+				top: 12px;
+				right: 12px;
+				padding: 4px 10px;
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				background: var(--bg-soft);
+				color: var(--muted);
+				font: inherit;
+				font-size: 12px;
+				cursor: pointer;
+			}
+			.copy:hover {
+				border-color: var(--border-strong);
+				color: var(--fg);
+			}
+			.notes {
+				margin: 0;
+				padding: 0;
+				list-style: none;
+				color: var(--muted);
+				font-size: 15px;
+			}
+			.notes li {
+				padding: 0 0 14px;
+			}
+			.notes b {
+				color: var(--fg);
+				font-weight: 600;
+			}
+
+			footer {
+				margin-top: 88px;
+				padding: 32px 0 64px;
+				border-top: 1px solid var(--border);
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px 24px;
+				align-items: baseline;
+				justify-content: space-between;
+				color: var(--muted);
+				font-size: 14px;
+			}
+			footer nav {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px 20px;
+			}
+
+			@media (max-width: 900px) {
+				.grid {
+					grid-template-columns: repeat(2, 1fr);
+				}
+				.install {
+					grid-template-columns: 1fr;
+				}
+			}
+			@media (max-width: 700px) {
+				.three {
+					grid-template-columns: 1fr;
+					gap: 24px;
+				}
+				header.hero {
+					padding-top: 48px;
+				}
+			}
+			@media (max-width: 520px) {
+				.grid {
+					grid-template-columns: 1fr;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				* {
+					transition: none !important;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="wrap">
+			<header class="hero">
+				<p class="eyebrow">A canvas-centric coding agent</p>
+				<h1>Decks</h1>
+				<p class="lede">
+					Boards are local HTML files of absolutely-positioned components, laid out on an infinite canvas
+					you pan and zoom. The agent writes them with its ordinary tools, and you drag, resize and retype
+					them. <b>Nothing scrolls away.</b>
+				</p>
+				<div class="actions">
+					<a class="button" href="#install">Get started</a>
+					<a class="button quiet" href="https://github.com/DotIN13/decks">GitHub</a>
+					<a class="button quiet" href="https://github.com/DotIN13/decks/blob/main/docs/DESIGN.md"
+						>Read the design</a
+					>
+				</div>
+
+				<figure class="shot">
+					<picture>
+						<source srcset="assets/stage-dark.png" media="(prefers-color-scheme: dark)" />
+						<img
+							src="assets/stage.png"
+							width="1600"
+							height="1000"
+							alt="The Decks canvas: four boards laid out on a grid, one of them a chart, with the conversation column down the right-hand side."
+						/>
+					</picture>
+					<figcaption>
+						The canvas holds boards; the conversation floats at the edge. The screenshot is the committed demo
+						deck.
+					</figcaption>
+				</figure>
+			</header>
+
+			<section id="idea">
+				<h2>The idea</h2>
+				<p class="claim">A chat scrolls away. A board stays where it was put.</p>
+				<div class="three">
+					<div>
+						<h3>Boards are files</h3>
+						<p>
+							Plain HTML in <code>boards/*.html</code>, absolutely positioned, rendered on an infinite
+							stage. Read one, diff one, open one in a browser with Decks not running.
+						</p>
+					</div>
+					<div>
+						<h3>The agent works where you look</h3>
+						<p>
+							It answers on a board, lays designs out on boards, and reports finished work on boards. The
+							chat says which board and why.
+						</p>
+					</div>
+					<div>
+						<h3>Boards pass between agents</h3>
+						<p>
+							A subagent is handed the <b>source</b> of the boards it was given, not a summary of them, and
+							it reports back by changing them.
+						</p>
+					</div>
+				</div>
+			</section>
+
+			<section id="features">
+				<h2>What is in it</h2>
+				<p class="claim">One tool for the canvas, one file for the artifact, two runtimes behind both.</p>
+				<div class="grid">
+					<div class="card">
+						<h3>TypeScript against the canvas</h3>
+						<p>
+							<code>stage_eval</code> runs code against a typed API injected into the agent's context
+							verbatim: start a board, put boards in play, hand work to a subagent.
+						</p>
+					</div>
+					<div class="card">
+						<h3>Editable by hand too</h3>
+						<p>
+							Double-click any run of words and retype it in place. The inspector changes a box's kind,
+							tone, embed target, name and order. Both edits land in the same file.
+						</p>
+					</div>
+					<div class="card">
+						<h3>Embeds</h3>
+						<p>
+							Markdown, PDF with page ranges, HTML, images, source. Anything a board cannot draw becomes a
+							chip naming the file, its size and its kind.
+						</p>
+					</div>
+					<div class="card">
+						<h3>Nine worked examples</h3>
+						<p>
+							New boards are blank on purpose. Nine finished ones (d3, three.js, GSAP, Chart.js) ship with
+							the app to borrow structure from.
+						</p>
+					</div>
+					<div class="card">
+						<h3>Pi or Claude Code</h3>
+						<p>
+							Chosen when you create an agent and fixed for its life, with Claude's modes and permission
+							prompts surfaced above the input bar.
+						</p>
+					</div>
+					<div class="card">
+						<h3>Files, by drag or finger</h3>
+						<p>
+							Drop files onto a board and they land where you dropped them, copied into the deck so a board
+							never breaks. Two fingers pan and pinch; panels become sheets.
+						</p>
+					</div>
+					<div class="card">
+						<h3>A time machine</h3>
+						<p>
+							Hover the timeline to see the boards as they were at that point in the conversation. Click to
+							rewind; restore the boards only if you ask.
+						</p>
+					</div>
+					<div class="card">
+						<h3>One deck, one directory</h3>
+						<p>
+							Boards, revisions, dropped files and the arrangement all live in the data directory. A deck
+							moves by moving the folder.
+						</p>
+					</div>
+				</div>
+			</section>
+
+			<section id="install">
+				<h2>Get started</h2>
+				<p class="claim">Three commands, and a model to answer.</p>
+				<div class="install">
+					<div class="snippet">
+						<button class="copy" type="button" data-copy="#cmd">copy</button>
+						<pre id="cmd"><span class="c"># Node 22.19 or newer</span>
+git clone https://github.com/DotIN13/decks.git
+cd decks
+npm ci
+npm run dev        <span class="c"># 127.0.0.1:4329, Vite on 4328</span>
+npm run dev:example  <span class="c"># the demo deck instead of yours</span></pre>
+					</div>
+					<ul class="notes">
+						<li>
+							<b>A model.</b> Decks reads the same <code>~/.pi/agent/</code> the Pi CLI uses, so
+							<code>pi auth</code> once is enough, or set <code>ANTHROPIC_API_KEY</code>. Without one the
+							canvas and the editor still work; only the agent does not.
+						</li>
+						<li>
+							<b>Chromium</b> for the browser checks and the agent's own board-debugging skill:
+							<code>npx playwright install chromium</code>.
+						</li>
+						<li>
+							<b>One person, one machine.</b> Decks has no authentication and the agent runs real shell
+							tools, so it binds to loopback. The
+							<a href="https://github.com/DotIN13/decks/blob/main/docs/DEPLOYMENT.md">deployment guide</a>
+							starts there.
+						</li>
+					</ul>
+				</div>
+			</section>
+
+			<footer>
+				<nav>
+					<a href="https://github.com/DotIN13/decks">GitHub</a>
+					<a href="https://github.com/DotIN13/decks/blob/main/docs/DESIGN.md">Design</a>
+					<a href="https://github.com/DotIN13/decks/blob/main/docs/DEPLOYMENT.md">Deployment</a>
+					<a href="https://github.com/DotIN13/decks/blob/main/SECURITY.md">Security</a>
+					<a href="https://github.com/DotIN13/decks/blob/main/LICENSE">License</a>
+				</nav>
+				<span>MIT · built for one person on one machine</span>
+			</footer>
+		</div>
+
+		<script>
+			// The one script on the page: copy the install block. It falls back to selecting the
+			// text, because a landing page that silently does nothing is worse than no button.
+			for (const button of document.querySelectorAll(".copy")) {
+				button.addEventListener("click", async () => {
+					const target = document.querySelector(button.dataset.copy);
+					if (!target) return;
+					const text = target.innerText.replace(/^#.*\n/gm, "");
+					try {
+						await navigator.clipboard.writeText(text);
+						button.textContent = "copied";
+					} catch {
+						const range = document.createRange();
+						range.selectNodeContents(target);
+						getSelection().removeAllRanges();
+						getSelection().addRange(range);
+						button.textContent = "select and copy";
+					}
+					setTimeout(() => (button.textContent = "copy"), 1600);
+				});
+			}
+		</script>
+	</body>
+</html>

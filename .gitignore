@@ -17,6 +17,11 @@ dist/
 # ~9 MB of vendored library on every change to the originals.
 /example/decks/lib/
 
+# And the examples, written by `App.refreshExamples` for the same reason: they are
+# `runtime/examples`, copied into every deck on open, so committing the demo deck's copy
+# would duplicate nine boards and let them drift from the originals.
+/example/decks/examples/
+
 # Local screenshot helpers, kept out of the tree because nothing references them.
 /check.mjs
 /shot.mjs
@@ -25,3 +30,11 @@ dist/
 # example/, which `npm run dev:example` points at. Real OAuth credentials and session
 # keys, so this is not source and must never be committed.
 /example/claude-accounts/
+
+# The shared-Chrome pairing code. `web-bridge.json` holds the code the extension pairs
+# with, written wherever the server runs, and it is a secret: a committed one is a live
+# one until somebody notices.
+/example/web-bridge.json
+
+# The antigravity runtime's own home, created under the data directory on first use.
+/example/antigravity-home/
