@@ -41,6 +41,14 @@ export interface StageHost {
 	camera(agentId: string): Camera;
 	/** Agents, for `stage.agents()` and for `inContext` on every board. */
 	agents(): Array<{ id: string; name: string; state: string; context: string[]; tags: string[] }>;
+	/**
+	 * Move a board on the stage this host is serving, and answer with the board as that stage sees it.
+	 *
+	 * On the host rather than the deck because the deck stopped having an arrangement: the position
+	 * belongs to an agent, and the host is what holds one.
+	 */
+	place(path: string, x: number, y: number): Board | undefined;
+
 }
 
 /**
@@ -141,8 +149,15 @@ export class StageService {
 
 	// --- writes the server owns ----------------------------------------------------
 
+	/**
+	 * A board moved **on the stage this service belongs to**.
+	 *
+	 * The deck has no arrangement to write to any more, so the move goes to the host, which is the
+	 * thing holding the agent whose canvas this is. What comes back is the board as that stage sees
+	 * it, so the caller broadcasts a position rather than a stale one.
+	 */
 	move(path: string, at: { x: number; y: number }): Board {
-		const board = this.deck.setPosition(path, at.x, at.y);
+		const board = this.host.place(path, at.x, at.y);
 		if (!board) throw new Error(`No such board: ${path}`);
 		this.host.broadcast({ type: "board.changed", path: board.path, rev: board.rev, board });
 		return board;

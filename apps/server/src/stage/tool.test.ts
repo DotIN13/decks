@@ -66,7 +66,7 @@ function toolOn(camera: Camera) {
 		awaitExtent: async (path) => extents.get(path),
 		call: async () => ({ ok: true }),
 		connected: () => true,
-		broadcast: () => {},
+		place: () => undefined, broadcast: () => {},
 		camera: () => camera,
 		agents: () => others,
 	});
@@ -242,7 +242,7 @@ test("attach is most-recently-touched first, and re-attaching moves the board to
 		awaitExtent: async () => undefined,
 		call: async () => ({ ok: true }),
 		connected: () => true,
-		broadcast: () => {},
+		place: () => undefined, broadcast: () => {},
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		agents: () => [],
 	});

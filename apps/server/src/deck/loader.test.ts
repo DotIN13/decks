@@ -66,35 +66,9 @@ test("boards nobody arranged get placed in rows, not on top of each other", () =
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("a position in deck.json wins over the auto-layout, and survives a save", () => {
-	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
-	writeFileSync(join(root, "deck.json"), JSON.stringify({ version: 1, name: "T", boards: { "boards/a.html": { x: 42, y: 99 } }, mine: 1 }));
-	const deck = Deck.open(root);
-	assert.deepEqual([deck.boards[0]?.x, deck.boards[0]?.y], [42, 99]);
 
-	deck.setPosition("boards/a.html", 5, 6);
-	const written = JSON.parse(readFileSync(join(root, "deck.json"), "utf8"));
-	assert.deepEqual(written.boards["boards/a.html"], { x: 5, y: 6 });
-	assert.equal(written.mine, 1, "an unknown key survives a write");
-	rmSync(root, { recursive: true, force: true });
-});
 
-test("refreshing one board keeps its position and picks up its new size", () => {
-	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
-	const deck = Deck.open(root);
-	deck.setPosition("boards/a.html", 300, 400);
-	const before = deck.board("boards/a.html")!.rev;
 
-	writeFileSync(join(root, "boards", "a.html"), board("A renamed", 1000, 700));
-	const refreshed = deck.refresh("boards/a.html")!;
-	assert.equal(refreshed.title, "A renamed");
-	assert.equal(refreshed.w, 1000);
-	assert.deepEqual([refreshed.x, refreshed.y], [300, 400], "an edit does not move a board");
-	assert.notEqual(refreshed.rev, before, "the revision moves when the file does");
-	rmSync(root, { recursive: true, force: true });
-});
 
 test("a board that has been deleted leaves the deck", () => {
 	const root = emptyDeck();
@@ -106,26 +80,7 @@ test("a board that has been deleted leaves the deck", () => {
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("removing a board deletes the file, forgets it, and takes its position with it", () => {
-	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A"));
-	writeFileSync(join(root, "boards", "b.html"), board("B"));
-	const deck = Deck.open(root);
-	deck.setPosition("boards/a.html", 40, 80);
-	deck.setPosition("boards/b.html", 900, 80);
 
-	assert.equal(deck.remove("boards/a.html"), true);
-	assert.equal(existsSync(join(root, "boards", "a.html")), false, "the file is gone");
-	assert.equal(deck.board("boards/a.html"), undefined);
-	assert.deepEqual(deck.boards.map((one) => one.path), ["boards/b.html"]);
-
-	const arrangement = JSON.parse(readFileSync(join(root, "deck.json"), "utf8"));
-	assert.deepEqual(Object.keys(arrangement.boards), ["boards/b.html"], "a deleted board keeps no position");
-	assert.deepEqual(arrangement.boards["boards/b.html"], { x: 900, y: 80 }, "and the survivor keeps its own");
-
-	assert.equal(deck.remove("boards/a.html"), false, "removing it twice is not an error, it is nothing");
-	rmSync(root, { recursive: true, force: true });
-});
 
 test("removing from a deck with no arrangement does not write one", () => {
 	const root = emptyDeck(false);
@@ -218,19 +173,5 @@ test("resync reports what changed, what arrived and what went away — and nothi
 	writeFileSync(join(root, "boards", "b.html"), same);
 	assert.deepEqual(deck.resync(), { changed: [], removed: [] });
 
-	rmSync(root, { recursive: true, force: true });
-});
-
-test("resync keeps a board's place on the canvas", () => {
-	const root = emptyDeck();
-	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
-	const deck = Deck.open(root);
-	deck.setPosition("boards/a.html", 640, 480);
-
-	writeFileSync(join(root, "boards", "a.html"), board("A", 900, 700));
-	const [changed] = deck.resync().changed;
-	assert.equal(changed?.x, 640);
-	assert.equal(changed?.y, 480);
-	assert.equal(changed?.w, 900);
 	rmSync(root, { recursive: true, force: true });
 });

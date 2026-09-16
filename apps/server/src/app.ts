@@ -86,6 +86,26 @@ export class App {
 			removed: (path) => this.agents.boardRemoved(path),
 		});
 		this.stage = new StageService(deck, {
+			/*
+
+			 * Move a board on the stage being served, and answer with the board as that stage sees it.
+
+			 * The deck has no arrangement to write to: a place belongs to an agent, so this writes on the
+
+			 * focused one, which is the stage the sandbox is running as.
+
+			 */
+
+			place: (path: string, x: number, y: number) => {
+
+				const agent = this.agents.focused();
+
+				agent.setPosition(path, x, y);
+
+				return deck.state(agent.positions()).boards.find((board) => board.path === path);
+
+			},
+
 			newBoard: ({ format, template, ...rest }) =>
 				this.boards.newBoard({ ...rest, template: template as BoardTemplate, ...(isBoardFormat(format) ? { format } : {}) }),
 			newMirror: (options) => this.boards.newMirror(options),

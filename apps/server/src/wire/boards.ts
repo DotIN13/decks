@@ -11,11 +11,19 @@ import type { WirePart } from "./context.ts";
  */
 export const boards = {
 	"board.move": (message, reply, wire) => {
-		const board = wire.deck.setPosition(message.path, message.x, message.y);
-		if (!board) {
+		if (!wire.deck.board(message.path)) {
 			reply({ type: "error", text: `No such board: ${message.path}` });
 			return;
 		}
+		/*
+		 * The move belongs to the stage that made it — the focused agent — and not to the deck, so what
+		 * is written down is this conversation's arrangement. The board sent back is the one *this stage*
+		 * sees, which is the same object when the caller is the stage that moved it.
+		 */
+		const agent = wire.agents.focused();
+		agent.setPosition(message.path, message.x, message.y);
+		const board = wire.deck.state(agent.positions()).boards.find((one) => one.path === message.path);
+		if (!board) return;
 		// Broadcast rather than reply: a second tab is looking at the same
 		// stage and the board has moved there too.
 		wire.send({ type: "board.changed", path: board.path, rev: board.rev, board });
@@ -54,7 +62,7 @@ export const boards = {
 		try {
 			if (board.format === "slides") {
 				const sized = wire.deck.setSize(message.path, { ...(w !== undefined ? { w } : {}) });
-				if (sized) wire.send({ type: "deck.state", deck: wire.deck.state() });
+				if (sized) wire.send({ type: "deck.state", deck: wire.deck.state(wire.agents.focused().positions()) });
 				return;
 			}
 			/*
@@ -95,7 +103,7 @@ export const boards = {
 		const flowing = wire.deck.board(message.path);
 		if (flowing?.format === "flow" && flowing.rev === message.rev) {
 			const resized = wire.deck.setSize(message.path, { h: message.h });
-			if (resized) wire.send({ type: "deck.state", deck: wire.deck.state() });
+			if (resized) wire.send({ type: "deck.state", deck: wire.deck.state(wire.agents.focused().positions()) });
 		}
 	},
 
@@ -155,7 +163,8 @@ export const boards = {
 		const agent = wire.agents.focused();
 		agent.setInPlay([...agent.inPlay, path]);
 		if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
-			const placed = wire.deck.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
+			agent.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
+			const placed = wire.deck.state(agent.positions()).boards.find((one) => one.path === path);
 			if (placed) wire.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
 		}
 		// After the board is announced, so the asker already holds it when it hears the path.

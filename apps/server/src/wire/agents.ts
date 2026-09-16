@@ -30,6 +30,13 @@ export const agents = {
 	},
 
 	"agent.focus": (message, _reply, wire) => {
+		/*
+		 * The arrangement comes with the switch. Positions were sent once and never again, which was
+		 * fine while they did not depend on the stage — now every conversation would keep showing the
+		 * arrangement of whichever one was opened first.
+		 */
+		wire.send({ type: "deck.state", deck: wire.deck.state(wire.agents.focused().positions()) });
+
 		wire.agents.focus(message.id);
 	},
 

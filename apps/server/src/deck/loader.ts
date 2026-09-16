@@ -108,8 +108,42 @@ export class Deck {
 		return this.boardsByPath.get(normalizeBoardPath(path));
 	}
 
-	state(): DeckState {
-		return { path: this.path, name: this.name, boards: this.boards, roots: this.resolved.roots };
+	/**
+	 * The deck as one stage sees it: `positions` overrides where a board sits, and the rest fall
+	 * through to `arrange`.
+	 *
+	 * Called with the focused agent's map, so what the client draws is that stage's arrangement.
+	 * Called with nothing, it is the deck's own arrangement — what a stage that has placed nothing
+	 * starts from.
+	 */
+	state(positions?: Record<string, { x: number; y: number }>): DeckState {
+		return { path: this.path, name: this.name, boards: this.arrange(positions), roots: this.resolved.roots };
+	}
+
+	/**
+	 * The boards, placed for one stage.
+	 *
+	 * A board with a position in `positions` takes it; every other board goes through the existing
+	 * `autoPlace`, with the boards that *do* have a position as its "already placed" — so the rows are
+	 * laid out under this stage's arrangement rather than under a deck-wide one that is not there any
+	 * more. Nothing is written: `autoPlace` computes, as it always has, and a stage's map holds only
+	 * what somebody moved.
+	 */
+	private arrange(positions?: Record<string, { x: number; y: number }>): Board[] {
+		if (!positions || Object.keys(positions).length === 0) {
+			const all = this.boards.map((board) => ({ ...board }));
+			autoPlace(all, []);
+			return all;
+		}
+		const placed: Board[] = [];
+		const unplaced: Board[] = [];
+		for (const board of this.boards) {
+			const at = positions[board.path];
+			if (at) placed.push({ ...board, x: Math.round(at.x), y: Math.round(at.y) });
+			else unplaced.push({ ...board });
+		}
+		autoPlace(unplaced, placed);
+		return [...placed, ...unplaced];
 	}
 
 	/** An absolute path for a deck-relative board, refusing anything outside. */
@@ -138,24 +172,13 @@ export class Deck {
 		}
 
 		const found = scanBoards(join(this.path, "boards"), this.path);
-		const positions = this.file.boards ?? {};
-		const placed: Board[] = [];
-		const unplaced: Board[] = [];
+		/*
+		 * No positions in the scan. Where a board sits is a stage's business now and this is only the
+		 * list of boards; `arrange` gives them a place when they are sent.
+		 */
+		const boards = found.map((path) => this.describe(path));
 
-		for (const path of found) {
-			const board = this.describe(path);
-			if (positions[path]) {
-				board.x = positions[path]!.x;
-				board.y = positions[path]!.y;
-				placed.push(board);
-			} else {
-				unplaced.push(board);
-			}
-		}
-
-		autoPlace(unplaced, placed);
-
-		this.boardsByPath = new Map([...placed, ...unplaced].map((board) => [board.path, board]));
+		this.boardsByPath = new Map(boards.map((board) => [board.path, board]));
 	}
 
 	/**
@@ -247,15 +270,7 @@ export class Deck {
 		return existed;
 	}
 
-	/** Move a board and write the arrangement down. */
-	setPosition(boardPath: string, x: number, y: number): Board | undefined {
-		const board = this.board(boardPath);
-		if (!board) return undefined;
-		board.x = Math.round(x);
-		board.y = Math.round(y);
-		this.save();
-		return board;
-	}
+/** Movement belongs to a stage now: `AgentRecord.positions`, written through `board.move`. */
 
 	/**
 	 * Resize a board that cannot say its own size, and write it down.
@@ -334,10 +349,9 @@ export class Deck {
 			 * make `deck.json` a second source of truth that goes stale the moment somebody
 			 * edits the board — the exact failure this feature had to avoid for markdown.
 			 */
-			boards[board.path] =
-				board.format === "component" ? { x: board.x, y: board.y } : { x: board.x, y: board.y, w: board.w, h: board.h };
 		}
-		this.file = { ...this.file, version: 1, name: this.file.name ?? this.name, boards };
+		// `roots` and the name stay; `boards` is gone, because nothing may write a position here again.
+		this.file = { ...this.file, version: 1, name: this.file.name ?? this.name };
 		const text = serializeDeckFile(this.file);
 		this.lastWritten = text;
 		writeFileSync(join(this.path, "deck.json"), text);
