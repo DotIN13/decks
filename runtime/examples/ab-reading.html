@@ -2,8 +2,8 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>The banner lifts signups by 3.1 points, and the interval is wide enough to trust it</title>
-		<meta name="board" content='{"w":1100,"h":1152,"bg":"grid"}' />
+		<title>Signup conversion by variant with 95% confidence intervals</title>
+		<meta name="board" content='{"w":1100,"h":1112,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 		<script type="importmap">
 		{
@@ -19,35 +19,35 @@
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
-			<h1>The banner lifts signups by 3.1 points, and the interval is wide enough to trust it</h1>
+			<h1>Signup conversion by variant with 95% confidence intervals</h1>
 		</div>
 
-		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 112px; width: 1004px">
 			<p><b>Signup conversion rose from 12.4% to 15.5% over 21 days.</b> The 95% confidence interval on the gain runs from 1.9 to 4.4 points: a real lift, and the revenue case should use the lower bound, not the point estimate.</p>
 		</div>
 
-		<section class="card" data-id="chart" style="left: 48px; top: 240px; width: 640px">
+		<section class="card" data-id="chart" style="left: 48px; top: 200px; width: 640px">
 			<h3>Signup conversion by variant, with 95% confidence intervals</h3>
 			<div id="chart" style="position: relative; height: 460px"></div>
 			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">Hover a bar for the sample size, the rate and the interval. The interval is what separates a claim from a guess.</p>
 		</section>
 
-		<div class="kpi" data-id="kpi-control" style="left: 720px; top: 240px; width: 332px">
+		<div class="kpi" data-id="kpi-control" style="left: 720px; top: 200px; width: 332px">
 			<span class="value">12.4%</span>
 			<span class="label">Control, n = 9,480</span>
 		</div>
-		<div class="kpi" data-id="kpi-banner" style="left: 720px; top: 368px; width: 332px">
+		<div class="kpi" data-id="kpi-banner" style="left: 720px; top: 328px; width: 332px">
 			<span class="value">15.5%</span>
 			<span class="label">Banner, n = 9,512</span>
 		</div>
-		<div class="callout" data-id="verdict" data-tone="ok" style="left: 720px; top: 496px; width: 332px">
+		<div class="callout" data-id="verdict" data-tone="ok" style="left: 720px; top: 456px; width: 332px">
 			<p><b>The verdict.</b> 3.1 point gain, and the lower bound of the interval is 1.9. Ship the banner, and price the expected revenue at the 1.9, not the 3.1.</p>
 		</div>
-		<div class="callout" data-id="method" style="left: 720px; top: 648px; width: 332px">
+		<div class="callout" data-id="method" style="left: 720px; top: 608px; width: 332px">
 			<p><b>The method.</b> 21 days, 19,000 visitors split 50/50 at the edge. Guardrails: checkout rate and cancellation rate were watched daily and neither moved.</p>
 		</div>
 
-		<section class="card" data-id="guards" style="left: 48px; top: 816px; width: 1004px">
+		<section class="card" data-id="guards" style="left: 48px; top: 776px; width: 1004px">
 			<h3>What else moved, watched as guardrails</h3>
 			<table class="table">
 				<thead><tr><th>Metric</th><th>Control</th><th>Banner</th><th>Difference</th><th>Reading</th></tr></thead>

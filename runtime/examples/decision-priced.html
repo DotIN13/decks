@@ -2,8 +2,8 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Harbor wins until delivery weight passes 35%; after that it is Meridian</title>
-		<meta name="board" content='{"w":1100,"h":896,"bg":"grid"}' />
+		<title>Sensitivity of a supplier ranking to criterion weights</title>
+		<meta name="board" content='{"w":1100,"h":856,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 		<script type="importmap">
 		{
@@ -19,26 +19,26 @@
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
-			<h1>Harbor wins until delivery weight passes 35%; after that it is Meridian</h1>
+			<h1>Sensitivity of a supplier ranking to criterion weights</h1>
 		</div>
 
-		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 112px; width: 1004px">
 			<p><b>At neutral weights, Harbor leads the three priced options.</b> The verdict survives every weight you can move, except one: weight delivery above 35% and Meridian takes it, on the strength of its calendar.</p>
 		</div>
 
-		<section class="card" data-id="weights" style="left: 48px; top: 240px; width: 460px">
+		<section class="card" data-id="weights" style="left: 48px; top: 200px; width: 460px">
 			<h3>The weights, your call</h3>
 			<div id="sliders" style="margin-top: 14px"></div>
 			<p style="color: var(--b-muted); font-size: 12px; margin-top: 16px">Sliders set how much each criterion counts. Weights are what the meeting is about, so the board lets the room argue with them.</p>
 		</section>
 
-		<section class="card" data-id="scores" style="left: 540px; top: 240px; width: 512px">
+		<section class="card" data-id="scores" style="left: 540px; top: 200px; width: 512px">
 			<h3>Weighted score by supplier, points of 100</h3>
 			<div id="scores" style="position: relative; height: 330px; margin-top: 6px"></div>
 			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">A score is the weighted sum of each supplier's rating on the four criteria. Bars move as the weights do.</p>
 		</section>
 
-		<div class="callout" data-id="recommendation" data-tone="ok" style="left: 48px; top: 800px; width: 1004px">
+		<div class="callout" data-id="recommendation" data-tone="ok" style="left: 48px; top: 760px; width: 1004px">
 			<p id="rec" style="font-size: 15px"><b>With these weights, Harbor leads at 72 points and Meridian is on 71. Meridian takes the lead once delivery passes 35% of the weight.</b></p>
 		</div>
 

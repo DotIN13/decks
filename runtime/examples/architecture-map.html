@@ -2,8 +2,8 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Checkout sits on three downstream services, and one of them is the payments gateway nobody owns</title>
-		<meta name="board" content='{"w":1100,"h":1072,"bg":"grid"}' />
+		<title>Service ownership in the checkout dependency graph</title>
+		<meta name="board" content='{"w":1100,"h":1032,"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
 		<script type="importmap">
 		{
@@ -19,21 +19,21 @@
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
-			<h1>Checkout sits on three downstream services, and one of them nobody owns</h1>
+			<h1>Service ownership in the checkout dependency graph</h1>
 		</div>
 
-		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 112px; width: 1004px">
 			<p><b>Every cart and place-order call on this surface passes through catalog, inventory and payments.</b> Payments has no owner on the roster and its on-call rotation points at a mailbox that no longer exists.</p>
 		</div>
 
-		<section class="card" data-id="graph" style="left: 48px; top: 240px; width: 1004px">
+		<section class="card" data-id="graph" style="left: 48px; top: 200px; width: 1004px">
 			<h3>Service graph, drawn from the traffic matrix</h3>
 			<div id="graph" style="position: relative; height: 340px"></div>
 			<div id="legend" style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px"></div>
 			<p style="color: var(--b-muted); font-size: 12px; margin-top: 8px">A line points from a caller to the service it depends on. Node size is requests per second. Click a node to see what it reaches; drag to rearrange.</p>
 		</section>
 
-		<section class="card" data-id="ownership" style="left: 48px; top: 728px; width: 512px">
+		<section class="card" data-id="ownership" style="left: 48px; top: 688px; width: 512px">
 			<h3>Who owns what</h3>
 			<table class="table">
 				<thead>
@@ -50,7 +50,7 @@
 			</table>
 		</section>
 
-		<div class="callout" data-id="next" data-tone="warn" style="left: 608px; top: 728px; width: 444px">
+		<div class="callout" data-id="next" data-tone="warn" style="left: 608px; top: 688px; width: 444px">
 			<p><b>What to do first.</b> Put payments and ledger on an owner and a real rotation, then look at checkout: its three downstream hops are the only path in the graph that a single change can break all at once.</p>
 		</div>
 
