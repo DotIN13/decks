@@ -65,7 +65,8 @@ test("help describes the deck's own and only names the runtime's", () => {
 		{ name: "doctor", hint: "Check the install", source: "runtime" },
 		{ name: "review", hint: "Review the branch", source: "runtime" },
 	]);
-	assert.match(text, /\/login — Sign in/);
+	// The joiner is the UI's, and the copy change that made it a colon is why this line moved with it.
+	assert.match(text, /\/login: Sign in/);
 	assert.match(text, /And 2 from the runtime/);
 	assert.match(text, /\/doctor \/review/);
 	// The runtime's hints are not repeated: that is what the menu is for.

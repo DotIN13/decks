@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { toUsageReport } from "./usage.ts";
+import { eventPercent, toUsageReport } from "./usage.ts";
 
 /**
  * A real answer from a live account, trimmed but not tidied.
@@ -177,4 +177,30 @@ test("junk is a report with nothing in it rather than a throw", () => {
 		assert.equal(report.session.costUsd, 0);
 		assert.equal(report.kind, "claude");
 	}
+});
+
+/*
+ * The rate-limit event's figure, which is a fraction where `/usage` states a percentage.
+ *
+ * The bug this pins: the warning said "1% used" for a subscription at 83%, because `0.83` was
+ * rounded as if it were already a percentage. Both conventions are here on purpose, so that a
+ * change to either one has to argue with a test rather than with somebody's notification.
+ */
+test("a rate-limit event's utilisation is a fraction, and is scaled to a percentage", () => {
+	assert.equal(eventPercent(0.83), 83);
+	assert.equal(eventPercent(0.5), 50);
+	assert.equal(eventPercent(1), 100);
+	assert.equal(eventPercent(0.007), 1);
+});
+
+test("...and a figure that is already a percentage is left alone", () => {
+	assert.equal(eventPercent(83), 83);
+	assert.equal(eventPercent(4), 4);
+});
+
+test("...with nothing to report read as nothing, not as zero", () => {
+	assert.equal(eventPercent(undefined), null);
+	assert.equal(eventPercent(null), null);
+	assert.equal(eventPercent("83"), null);
+	assert.equal(eventPercent(Number.NaN), null);
 });

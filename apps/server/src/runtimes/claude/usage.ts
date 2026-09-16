@@ -232,3 +232,25 @@ function percent(value: unknown): number | null {
 	if (typeof value !== "number" || !Number.isFinite(value)) return null;
 	return Math.max(0, Math.min(100, value));
 }
+
+/**
+ * The utilisation on a **rate-limit event**, which does not use the convention above.
+ *
+ * `SDKRateLimitInfo.utilization` is the one figure in this file whose unit is written down
+ * nowhere: the SDK's type for it is `utilization?: number` with no comment, where every window in
+ * the `/usage` payload is documented as "Percentage of the window used, 0-100" and is read by
+ * `percent` without scaling. The event's number arrives as a **fraction** instead: a window at 83%
+ * comes in as `0.83`, and rounding that as if it were already a percentage is what made a
+ * subscription four fifths of the way through its five-hour limit announce itself as "1% used".
+ *
+ * The two conventions cannot be told apart arithmetically at the boundary, and where this is read
+ * is what settles it: it is only used for an `allowed_warning`, which no server sends at or below
+ * one percent of a window. So `<= 1` is a fraction and anything above it is already a percentage.
+ * If a payload ever disagrees, it is this function's test that should fail rather than a person's
+ * notification looking wrong.
+ */
+export function eventPercent(value: unknown): number | null {
+	if (typeof value !== "number" || !Number.isFinite(value)) return null;
+	const scaled = value <= 1 ? value * 100 : value;
+	return Math.max(0, Math.min(100, Math.round(scaled)));
+}

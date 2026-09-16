@@ -25,7 +25,7 @@ import { handleClaudeMessage, newStreamState } from "./events.ts";
 import { isTransientAuthFailure, MAX_TRANSIENT_RETRIES, retryDelayMs } from "./transient.ts";
 import { accountEnvironment, epochMs } from "./accounts.ts";
 import { qualifiedToolName, stageMcpServer } from "./tools.ts";
-import { toUsageReport } from "./usage.ts";
+import { eventPercent, toUsageReport } from "./usage.ts";
 
 /**
  * Claude Code behind one Decks agent (DESIGN §6.2).
@@ -903,7 +903,11 @@ export class ClaudeBackend implements AgentBackend {
 			const window = info.rateLimitType ?? "limit";
 			if (this.warnedAbout !== window) {
 				this.warnedAbout = window;
-				const share = typeof info.utilization === "number" ? ` (${Math.round(info.utilization)}% used)` : "";
+				// `eventPercent`, not `Math.round`: this event's figure is a fraction, and rounding it as a
+				// percentage is what made every warning say "1% used". See the function for what is known
+				// and what is inferred.
+				const used = eventPercent(info.utilization);
+				const share = used === null ? "" : ` (${used}% used)`;
 				notice("warn", `This Claude subscription is close to its ${limitWindow(window)} limit${share}.`);
 			}
 			return;
