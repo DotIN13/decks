@@ -1,5 +1,4 @@
 import type { AgentModel, AgentState, AgentUsage, ChatItem, ExtensionUiPrompt, ModelOption } from "@decks/protocol";
-import type { AgentView } from "../camera/agent-view.ts";
 
 /**
  * Everything the browser keeps about one agent, in one record.
@@ -65,9 +64,13 @@ export interface AgentRecord {
 
 /** The part that is never drawn, and therefore must not be reactive. */
 export interface AgentScratch {
-	/** Where its canvas was when you last left it (`camera/agent-view.ts`). */
-	view?: AgentView;
-	/** Its history has arrived and is held. */
+	/**
+	 * Its history has arrived and is held.
+	 *
+	 * The view it was left in used to live here too, in memory and gone on a reload. It is
+	 * `camera/agent-views.ts`'s now, in `localStorage`, because where you were looking is a fact
+	 * about *this device* rather than about the conversation.
+	 */
 	historyHeld: boolean;
 	/** Its history has been asked for and has not arrived. */
 	historyAsked: boolean;

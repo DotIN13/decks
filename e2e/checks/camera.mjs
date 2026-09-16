@@ -48,10 +48,39 @@ say(
 	`drift ${anchor.drift.x.toFixed(4)}/${anchor.drift.y.toFixed(4)} world px at ${anchor.zoom.toFixed(2)}x`,
 );
 
-// 2. `0` fits everything. Clicked in the middle, not the corner: the corner is where the
-// floating panels live, and a click there summons one over the very point being clicked.
-await page.mouse.move(700, 500);
-await page.locator(".stage").click({ position: { x: 700, y: 450 } });
+/*
+ * 2. `0` fits everything. Clicked in the middle, not the corner: the corner is where the floating
+ * panels live, and a click there summons one over the very point being clicked.
+ *
+ * **Bare stage, hit-tested rather than guessed.** Whether a board is under a given point depends
+ * on the arrangement and on how the fit framed it — and a click that lands in a board goes into
+ * *that document*, so every keystroke after it arrives there instead of here. That is a real
+ * check (it is the one three sections down, deliberately), so here it is a precondition: the
+ * point is found, and the assertion below says out loud that the focus is on the canvas. Without
+ * it the failure surfaced as "nothing arrived" — about the key, three assertions later, saying
+ * nothing about why.
+ */
+const bare = await page.evaluate(() => {
+	const stage = document.querySelector(".stage").getBoundingClientRect();
+	/*
+	 * The middle of the canvas: clear of the floats by construction — the left panel is 276px
+	 * wide, the corner cluster runs along the top, the dock along the bottom — and hit-tested
+	 * anyway, because that is the one thing the geometry does not promise.
+	 */
+	const floats = ".board-node, .panel-shell, .dock, .pill, .stream";
+	for (let y = Math.round(stage.top + 120); y < stage.bottom - 200; y += 16) {
+		for (let x = Math.round(stage.left + 340); x < stage.right - 160; x += 16) {
+			if (!document.elementFromPoint(x, y)?.closest(floats)) return { x, y };
+		}
+	}
+	return null;
+});
+if (bare) await page.mouse.click(bare.x, bare.y);
+say(
+	"the canvas has the focus, not a board",
+	await page.evaluate(() => !document.querySelector(".board-node iframe")?.contentDocument?.hasFocus()),
+	`clicked ${JSON.stringify(bare)}`,
+);
 await page.keyboard.press("0");
 await settle(page, 400);
 const fitted = await page.evaluate(() => {
@@ -128,26 +157,29 @@ say("…and ⌘0 fits everything again", Math.abs(refit - fittedZoom) < 0.01, `$
  * `preventDefault` Chrome zooms the page *as well* — the camera would still move and this
  * check would still pass, while the app quietly grew a step every time somebody pressed it.
  */
-// Not awaited before the keystroke: `page.evaluate` blocks until its promise settles, so
-// awaiting here would hold the press until the listener had already timed out.
-const refused = page.evaluate(
-	() =>
-		new Promise((resolve) => {
-			const spy = (event) => {
-				// The modifier arrives as a keydown of its own and is nobody's shortcut, so
-				// resolving on the first event would answer about `Control` rather than `=`.
-				if (event.key === "Control" || event.key === "Meta" || event.key === "Shift") return;
-				removeEventListener("keydown", spy);
-				resolve(event.defaultPrevented);
-			};
-			addEventListener("keydown", spy);
-			setTimeout(() => resolve("nothing arrived"), 3000);
-		}),
-);
-await settle(page, 200);
+/*
+ * Installed and *confirmed* installed before the key is pressed.
+ *
+ * This started a `page.evaluate` and did not await it, because the promise it returns cannot
+ * settle until the key arrives — which left the keystroke free to beat the listener. It did, on
+ * two runs of the whole suite out of three, and the verdict was the string "nothing arrived":
+ * a failure that says nothing about whether the app declined the zoom. So the listener now
+ * writes its verdict down and returns at once, the press follows an *awaited* install, and the
+ * verdict is waited for rather than assumed.
+ */
+await page.evaluate(() => {
+	window.__declined = undefined;
+	addEventListener("keydown", (event) => {
+		// The modifier arrives as a keydown of its own and is nobody's shortcut, so the answer
+		// comes from the key after it rather than from `Control`.
+		if (event.key === "Control" || event.key === "Meta" || event.key === "Shift") return;
+		window.__declined = event.defaultPrevented;
+	});
+});
 await page.keyboard.press("Control+Equal");
-const verdict = await refused;
-say("…and the browser's own page zoom is declined", verdict === true, String(verdict));
+await page.waitForFunction(() => window.__declined !== undefined, null, { timeout: 3000 }).catch(() => {});
+const verdict = await page.evaluate(() => window.__declined);
+say("…and the browser's own page zoom is declined", verdict === true, String(verdict ?? "nothing arrived"));
 await page.keyboard.press("Control+Digit0");
 await settle(page, 400);
 

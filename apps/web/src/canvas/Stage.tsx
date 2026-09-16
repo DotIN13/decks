@@ -70,6 +70,13 @@ export function Stage(props: {
 	 * boards may start. Until it is true no board has a document (`admitted` below).
 	 */
 	boardsMayStart: boolean;
+	/**
+	 * What the canvas should do when this conversation's boards first arrive.
+	 *
+	 * `undefined` means *not known yet* — see the opening effect below — and an object with no
+	 * `camera` means nothing was remembered, so the canvas fits what it has.
+	 */
+	opening?: { camera?: Camera };
 	/** Every board on screen at the open has been let in, so less urgent documents may start. */
 	onBoardsStarted?: () => void;
 	boards: Board[];
@@ -1072,13 +1079,22 @@ export function Stage(props: {
 	});
 
 
-	// Fit everything the first time boards arrive, so the deck opens looking at
-	// itself rather than at world origin.
+	/*
+	 * Where the canvas opens, the first time this conversation's boards arrive.
+	 *
+	 * The view this device left it in, when there is one — and otherwise a fit, so the deck opens
+	 * looking at itself rather than at world origin.
+	 *
+	 * `props.opening` is `undefined` until the focused conversation is known, which is not always
+	 * before the boards are: fitting at that moment and being told where to look a frame later is
+	 * a canvas that lands somewhere and then jumps. So the effect waits for the answer rather
+	 * than for the boards alone.
+	 */
 	let fitted = false;
 	createEffect(() => {
-		if (fitted || props.boards.length === 0 || view().width === 0) return;
+		if (fitted || !props.opening || props.boards.length === 0 || view().width === 0) return;
 		fitted = true;
-		props.setCamera(frame(props.boards.map(boxOf)));
+		props.setCamera(props.opening.camera ?? frame(props.boards.map(boxOf)));
 	});
 
 	/*
