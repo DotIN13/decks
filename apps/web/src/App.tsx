@@ -15,7 +15,7 @@ import { Settings } from "./chat/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import type { Presenting } from "./state/ui.ts";
 import { createAlerts } from "./app/alerts.ts";
-import { camera, setCamera } from "./state/camera.ts";
+import { camera, glide, moveCamera, setCamera } from "./state/camera.ts";
 import { handleFrame, type FrameHooks } from "./app/frames.ts";
 import { createFileDrops } from "./app/files.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
@@ -669,7 +669,7 @@ export function App() {
 
 	const flyTo = (board: Board) => {
 		setSelected(board.path);
-		flyToBoards(board);
+		flyToBoards([board], { animate: true });
 	};
 
 	/*
@@ -679,13 +679,18 @@ export function App() {
 	 * the rail, and a board a link on another board opened (below) — both want the same
 	 * arithmetic, and the second one wants the *pair*: a board that arrives beside the one you
 	 * were reading is only useful if you can see it is beside it.
+	 *
+	 * `animate` is what the two of them ask for and nothing else does: after a link or a press a
+	 * camera that *arrives* says which way it went, where a camera that jumps leaves you to work
+	 * out how the board you are now looking at relates to the one you were. `fitAll` below stays
+	 * instant, because a keyboard shortcut is a hand and a chat switch is a change of context.
 	 */
-	const flyToBoards = (...boards: Board[]) => {
+	const flyToBoards = (boards: Board[], options?: { animate?: boolean }) => {
 		if (boards.length === 0) return;
 		const stage = document.querySelector(".stage");
 		if (!stage) return;
 		const view = { width: stage.clientWidth, height: stage.clientHeight };
-		setCamera(fitInto(boards.map(boxOf), view, canvasBox(view)));
+		moveCamera(fitInto(boards.map(boxOf), view, canvasBox(view)), options);
 	};
 
 	/**
@@ -714,7 +719,7 @@ export function App() {
 		send({ type: "board.play", path });
 		setSelected(path);
 		setComponent(undefined);
-		flyToBoards(...(source ? [source, board] : [board]));
+		flyToBoards(source ? [source, board] : [board], { animate: true });
 		return true;
 	};
 
@@ -775,6 +780,7 @@ export function App() {
 						marks={marks()}
 						boards={stageBoards()}
 						camera={camera()}
+						glide={glide()}
 						setCamera={setCameraAndReport}
 						selected={selected()}
 						/*

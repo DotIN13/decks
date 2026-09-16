@@ -218,6 +218,23 @@ export async function ready(page, { timeout = 30000 } = {}) {
 }
 
 /**
+ * Wait for the camera to stop moving.
+ *
+ * A press at a coordinate is only about the thing under it — the same lesson `geometry.mjs` and
+ * `inspector.mjs` both learned the hard way, and the reason their comments are as long as they
+ * are. A camera that *arrives* rather than jumping adds a new way to be wrong about that: measure
+ * a component's box while the view is still gliding and the press lands wherever the box has got
+ * to by then, which is a mis-click reported as a wrong name three assertions later.
+ *
+ * So a check that moves the camera with a gesture — a row in the panel, a link on a board — and
+ * then presses coordinates waits here first. `data-gliding` is the stage's own answer, and it is
+ * there for exactly this; the transform-only checks in `glide.mjs` read it frame by frame.
+ */
+export async function still(page, { timeout = 5000 } = {}) {
+	await page.waitForFunction(() => document.querySelector(".stage")?.dataset.gliding !== "true", null, { timeout });
+}
+
+/**
  * Wait for the canvas to be empty.
  *
  * The counterpart of `ready`, and needed as often: an agent holding nothing puts nothing in

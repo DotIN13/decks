@@ -2,7 +2,7 @@ import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
 import { Icon } from "../ui/icons.tsx";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
-import { boxOf, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
+import { between, boxOf, easeOutCubic, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "./BoardFrame.tsx";
@@ -82,6 +82,15 @@ export function Stage(props: {
 	boards: Board[];
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
+	/**
+	 * A camera to *arrive* at rather than jump to, when the app has asked for one.
+	 *
+	 * A request with a token, so the stage can tell a new one from the one it is already carrying
+	 * out, and the duration. See `state/camera.ts` for who asks; this file owns the pixels and the
+	 * clock, which is why the arithmetic is a pure function in `camera/camera.ts` and the loop is
+	 * here.
+	 */
+	glide?: { token: number; ms: number };
 	selected?: string;
 	/**
 	 * The board being read on its own, if any — the canvas as a page rather than a map.
@@ -174,6 +183,17 @@ export function Stage(props: {
 	let lastMoved = 0;
 	let rafId: number | undefined;
 	let pendingCamera: Camera | undefined;
+	/*
+	 * One glide at a time, and this is its identity.
+	 *
+	 * Anything that moves the camera itself — a wheel, a pinch, a drag, a key, an op — bumps the
+	 * token, and the loop below stops the moment its token is not the current one. A camera the
+	 * person is holding must never be argued with, and this counter is the whole of the mechanism
+	 * that guarantees it.
+	 */
+	let glideToken = 0;
+	let glideRaf: number | undefined;
+	let lastGlideToken = -1;
 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
 	/**
 	 * A pan *gesture* is in flight — a finger down, a drag on bare canvas, space and a drag.
@@ -204,6 +224,14 @@ export function Stage(props: {
 	 */
 	const [scaling, setScaling] = createSignal(false);
 	let scaleSettle: ReturnType<typeof setTimeout> | undefined;
+	/**
+	 * Whether the camera is gliding right now — for the checks, not for the drawing.
+	 *
+	 * `data-panning` and `data-scaling` are the other two halves of "the camera is moving and this
+	 * is what kind of work that is"; this is the third case, a move the app made on the reader's
+	 * behalf, and a check has no other way to wait for it to arrive without sleeping.
+	 */
+	const [gliding, setGliding] = createSignal(false);
 	const [spaceHeld, setSpaceHeld] = createSignal(false);
 
 	/*
@@ -495,7 +523,16 @@ export function Stage(props: {
 		untrack(fitFocus);
 	});
 
-	const pushCamera = (cam: Camera) => {
+	/**
+	 * Move the camera now: the body `pushCamera` has always been, given the name it deserves.
+	 *
+	 * A glide is **not a second way to move the camera**. It is a loop that calls this, which is why
+	 * an arrival gets everything a finger already had for free: the scale settle (a zooming glide
+	 * sets it for its duration, so the boards are redrawn once, at the end), the `lastMoved` stamp
+	 * board admission reads, and the camera signal going up once per frame, so the zoom readout
+	 * ticks and `camera()` is never a lie about where the view is going.
+	 */
+	const writeCamera = (cam: Camera) => {
 		if (cam.zoom !== localCamera.zoom) nowScaling();
 		lastMoved = performance.now();
 		localCamera = cam;
@@ -510,15 +547,82 @@ export function Stage(props: {
 		}
 	};
 
-	// Sync from external camera changes (fit, server, initial load) and viewport resizes.
-	// Gesture handlers use pushCamera directly for the fast path.
+	const cancelGlide = () => {
+		glideToken++;
+		if (glideRaf !== undefined) {
+			cancelAnimationFrame(glideRaf);
+			glideRaf = undefined;
+		}
+		setGliding(false);
+	};
+
+	/** A gesture, and the hand wins: it ends any glide before writing its own camera. */
+	const pushCamera = (cam: Camera) => {
+		cancelGlide();
+		writeCamera(cam);
+	};
+
+	/**
+	 * Arrive at `to` over `ms`, from wherever the camera is *now*.
+	 *
+	 * From the pixels rather than from the previous target, so two moves in a row read as a change
+	 * of mind rather than as the view travelling backwards to a place it never went. The last frame
+	 * writes `to` itself, not `between(from, to, 1)` — see the note on `between` about what `a +
+	 * (b - a) * 1` does to a fit.
+	 */
+	const glideTo = (to: Camera, ms: number) => {
+		const from = localCamera;
+		if (from.x === to.x && from.y === to.y && from.zoom === to.zoom) {
+			writeCamera(to);
+			return;
+		}
+		const mine = ++glideToken;
+		const at = performance.now();
+		setGliding(true);
+		const step = (now: number) => {
+			if (mine !== glideToken) return;
+			const t = Math.min(1, (now - at) / ms);
+			writeCamera(t >= 1 ? to : between(from, to, easeOutCubic(t)));
+			if (t >= 1) {
+				glideRaf = undefined;
+				setGliding(false);
+				return;
+			}
+			glideRaf = requestAnimationFrame(step);
+		};
+		glideRaf = requestAnimationFrame(step);
+	};
+
+	/*
+	 * Sync from external camera changes (a fit, an op, the opening view, a glide the app asked for)
+	 * and from viewport resizes.
+	 *
+	 * `localCamera` is what the pixels say, and it is deliberately **not** reactive: the test below
+	 * is "has somebody else moved the camera", and a glide's own frames write both it and the signal
+	 * the app holds. An effect that cancelled on every incoming change would therefore cancel the
+	 * glide with it — so a change that matches the pixels is one of ours, and not news.
+	 */
 	createEffect(() => {
-		localCamera = props.camera;
-		writeTransform(props.camera);
+		const target = props.camera;
+		const asked = props.glide;
+		view(); // a resize re-frames without moving the camera
+		const moved = target.x !== localCamera.x || target.y !== localCamera.y || target.zoom !== localCamera.zoom;
+		const fresh = asked !== undefined && asked.token !== lastGlideToken;
+		if (fresh) lastGlideToken = asked.token;
+		if (fresh && moved && asked.ms > 0) {
+			glideTo(target, asked.ms);
+			return;
+		}
+		if (moved) {
+			cancelGlide();
+			localCamera = target;
+		}
+		writeTransform(target);
 	});
 
 	onCleanup(() => {
 		if (rafId !== undefined) cancelAnimationFrame(rafId);
+		if (glideRaf !== undefined) cancelAnimationFrame(glideRaf);
 	});
 
 	/**
@@ -1189,6 +1293,7 @@ export function Stage(props: {
 			data-focus={props.focus ? "true" : undefined}
 			data-panning={panning()}
 			data-scaling={scaling() && props.boards.filter(isVisible).length <= LAYER_BUDGET}
+			data-gliding={gliding()}
 			ref={element}
 			onWheel={onWheel}
 			onPointerDown={onPointerDown}

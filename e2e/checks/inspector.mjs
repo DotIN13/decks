@@ -23,7 +23,7 @@
 // about boards rather than about the protocol, and it lives in its own package.
 import { BOX_CLASSES } from "@decks/board-kit";
 import { rmSync } from "node:fs";
-import { boardPath, differ, open, rangeOfAttr, read, say, socket, write } from "../harness.mjs";
+import { boardPath, differ, open, rangeOfAttr, read, say, socket, still, write } from "../harness.mjs";
 
 /**
  * Wait until the file *says* something, rather than until it differs.
@@ -144,6 +144,9 @@ try {
 	await page.evaluate((wanted) => {
 		[...document.querySelectorAll(".board-row")].find((item) => item.textContent.includes(wanted))?.click();
 	}, "inspector-fixture");
+	// That press moved the camera, and it takes 260ms to arrive: every `pick` below is a
+	// coordinate, so it waits for the view to stop before measuring anything.
+	await still(page);
 	await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });
 
 	const frame = () => page.frameLocator(`.board-node[data-path="${path}"] iframe`);

@@ -1,5 +1,5 @@
 import type { Camera } from "@decks/protocol";
-import { createSignal } from "solid-js";
+import { batch, createSignal } from "solid-js";
 
 /**
  * Where the canvas is looking.
@@ -21,4 +21,49 @@ import { createSignal } from "solid-js";
  */
 const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
 
-export { camera, setCamera };
+/**
+ * How long the camera takes to arrive when it is asked to glide rather than jump.
+ *
+ * 260ms: long enough to read as movement, short enough that a click still feels like a click. It
+ * also lands inside the 300ms `Stage`'s scale settle waits for, so a glide that changes the zoom
+ * asks the boards to be drawn again **once, at the end**, rather than every frame.
+ */
+export const GLIDE_MS = 260;
+
+/**
+ * The glide the app has been asked for, or nothing.
+ *
+ * A **request**, not a schedule: `Stage` owns the pixels and the clock, so this carries a token
+ * that tells one request from another plus the duration, and the stage does the rest. Two moves
+ * in a row give two tokens and the second wins — the loop interpolates from wherever the camera
+ * *is*, so nothing travels backwards.
+ */
+const [glide, setGlide] = createSignal<{ token: number; ms: number } | undefined>(undefined);
+
+/** A counter, because a token has to be a token: `0` is `undefined`'s job. */
+let glides = 0;
+
+/** Whether the person reading has asked for less movement. */
+export const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Move the camera — and *glide* to it when it is something else that decided where to look.
+ *
+ * `animate` is on for the two gestures that move the camera **for** you, a board link and a row in
+ * the panel, and behind `stage.show`/`stage.camera`'s own `animate: true`. Everything you drive
+ * yourself — a wheel, a pinch, a drag, the zoom menu — never comes through here at all, and must
+ * not: smoothing input is lag, and the whole point of the pan work was to remove it.
+ *
+ * The two signals are written **together** on purpose. The camera is the destination and the glide
+ * is the journey, and a reader that caught one without the other would see the view jump to where
+ * it was going and then glide from where it already was.
+ */
+export function moveCamera(next: Camera, options?: { animate?: boolean }): void {
+	const calm = reducedMotion();
+	batch(() => {
+		setCamera(next);
+		setGlide(options?.animate && !calm ? { token: ++glides, ms: GLIDE_MS } : undefined);
+	});
+}
+
+export { camera, glide, setCamera };

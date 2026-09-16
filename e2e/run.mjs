@@ -109,6 +109,12 @@ const CHECKS = [
 	 */
 	{ file: "focus.mjs", needsAgent: false },
 	{ file: "camera.mjs", needsAgent: false },
+	/*
+	 * A camera that *arrives*. Its own check rather than a section of `camera.mjs`, because that
+	 * one is about the camera's arithmetic and this one is about a clock: it samples the world
+	 * transform every frame while a move is happening, which is a thing no other check does.
+	 */
+	{ file: "glide.mjs", needsAgent: false },
 	{ file: "context.mjs", needsAgent: false },
 	{ file: "per-agent.mjs", needsAgent: false },
 	/*
