@@ -43,6 +43,15 @@ export type AgentSectionKind = "wants" | "working" | "quiet" | "workspace" | "un
 export type AgentGroup = "attention" | "workspace";
 
 export interface AgentRow {
+	/**
+	 * The chat's id, and the row's own name for it.
+	 *
+	 * Not decoration and not a convenience: the panel keeps this list in a store so that a
+	 * state change *updates* a row instead of re-drawing the list, and `reconcile` joins the old
+	 * rows to the new ones by one key at every level. Carried on the row rather than read off
+	 * `chat.id` at the call site because the key has to be a property of the object itself.
+	 */
+	id: string;
 	chat: AgentChat;
 	status: AgentStatus;
 	unread: number;
@@ -61,6 +70,15 @@ export interface AgentRow {
 }
 
 export interface AgentSection {
+	/**
+	 * What `reconcile` joins this section on, unique within the list it is in.
+	 *
+	 * The kind in the attention grouping, and `ws:` + the workspace's name in the workspace one,
+	 * where the bare `ws:` is the empty name — which is the section an agent with no workspace is
+	 * in. Prefixed there and not here because a workspace is a word a person types and `quiet`
+	 * is a heading this file owns; the prefix is what keeps the two from ever being one section.
+	 */
+	id: string;
 	kind: AgentSectionKind;
 	/** The whole label, sentence case, without the count. Never uppercase. */
 	label: string;
@@ -128,6 +146,7 @@ export function agentSections(input: AgentListInput): AgentSection[] {
 		const identity = input.identities[chat.id];
 		const unread = input.unread[chat.id] ?? 0;
 		return {
+			id: chat.id,
 			chat,
 			status: agentStatus(chat.state, unread),
 			unread,
@@ -144,7 +163,7 @@ export function agentSections(input: AgentListInput): AgentSection[] {
 	const out: AgentSection[] = [];
 	for (const section of SECTIONS) {
 		const mine = matching.filter((row) => section.holds.includes(row.status)).sort(byRecency);
-		if (mine.length > 0) out.push({ kind: section.kind, label: section.label, rows: mine });
+		if (mine.length > 0) out.push({ id: section.kind, kind: section.kind, label: section.label, rows: mine });
 	}
 	return out;
 }
@@ -194,17 +213,17 @@ function workspaceSections(rows: AgentRow[]): AgentSection[] {
 			if (right === mine) return 1;
 			return b.length - a.length || left.localeCompare(right);
 		})
-		.map(([name, group]) => section("workspace", name, group));
+		.map(([name, group]) => section("workspace", `ws:${name}`, name, group));
 
 	const loose = groups.get("");
-	return loose ? [...named, section("unfiled", "No workspace", loose)] : named;
+	return loose ? [...named, section("unfiled", "ws:", "No workspace", loose)] : named;
 }
 
 /** One section, with its rows ranked and its heading given the one thing about the group. */
-function section(kind: AgentSectionKind, label: string, rows: AgentRow[]): AgentSection {
+function section(kind: AgentSectionKind, id: string, label: string, rows: AgentRow[]): AgentSection {
 	const ranked = [...rows].sort(byRecency);
 	const note = sectionNote(ranked);
-	return { kind, label, rows: ranked, ...(note ? { note } : {}) };
+	return { id, kind, label, rows: ranked, ...(note ? { note } : {}) };
 }
 
 /**

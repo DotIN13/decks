@@ -4,12 +4,13 @@ import Rows3 from "lucide-solid/icons/rows-3";
 import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
 import { Icon } from "../ui/icons.tsx";
 import { BoardRow, BoardTile } from "./BoardRow.tsx";
 import { panelSections, panelTally } from "./panel-groups.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentRow } from "./AgentRow.tsx";
-import { agentFoot, agentSections, agentTally, type AgentGroup } from "./agent-sections.ts";
+import { agentFoot, agentSections, agentTally, type AgentGroup, type AgentSection } from "./agent-sections.ts";
 
 /**
  * The left panel: one surface, **one list**, and a button that makes it go away.
@@ -197,17 +198,8 @@ export function LeftPanel(props: {
 		props.onSearch?.("");
 	};
 
-	const agents = () =>
-		agentSections({
-			chats: props.chats ?? [],
-			identities: props.identities ?? {},
-			unread: props.unread ?? {},
-			focused: props.focused,
-			query: query(),
-			group: group(),
-		});
-	/** Every agent, unfiltered — what the foot counts and the placeholder says. */
-	const allAgents = () => agentTally(agentSections({ chats: props.chats ?? [], identities: props.identities ?? {}, unread: props.unread ?? {}, focused: props.focused }));
+	const density = () => props.density ?? ownDensity();
+	const group = () => props.group ?? ownGroup();
 
 	/**
 	 * The workspaces in use, for the popup's suggestions.
@@ -222,8 +214,48 @@ export function LeftPanel(props: {
 		return [...names].sort();
 	});
 
-	const density = () => props.density ?? ownDensity();
-	const group = () => props.group ?? ownGroup();
+	/** Everything the list is derived from. One function, so the store below cannot be given a
+	 *  different question from the one the foot counts. */
+	const agentInput = () => ({
+		chats: props.chats ?? [],
+		identities: props.identities ?? {},
+		unread: props.unread ?? {},
+		focused: props.focused,
+		query: query(),
+		group: group(),
+	});
+
+	/**
+	 * The Agents tab's list, held in a store so that a state change *updates* a row instead of
+	 * re-drawing the list.
+	 *
+	 * This is the whole of the fix for a list that flickered while an agent worked.
+	 * `agentSections` builds fresh objects on every call and `<For>` keys by reference, so
+	 * deriving straight into the markup meant that *any* change at all — one agent moving from
+	 * `streaming` to `tool`, a tag arriving, a workspace being declared somewhere else — made
+	 * every section and every row a new object, and `For` had no choice but to throw the DOM away
+	 * and draw it again. Fourteen rows, their avatars, the pulse on a working face and any popup
+	 * somebody had open: gone and back, several times a minute, for as long as an agent was
+	 * running. `e2e/checks/panel-steady.mjs` is that, measured.
+	 *
+	 * `reconcile` is the other half. Given the list it drew last time and the list it has now, it
+	 * keeps the object it already had wherever it can and writes only the fields that moved,
+	 * joining old to new by `id` at every level. That is what `AgentSection.id` and `AgentRow.id`
+	 * are for, and why neither is optional. The store hands back the same proxy for the same
+	 * object, so `For` recognises the rows it already drew: it moves the ones that reordered, and
+	 * re-creates only the ones that are genuinely new. What a state change is left with is a word
+	 * and a colour on the row it was about.
+	 *
+	 * An **effect** rather than a memo, because `reconcile` is a setter and there has to be a
+	 * store for it to write into. It runs in the same task as the update that caused it, before
+	 * anything is painted, so the list is never a frame behind what the socket said.
+	 */
+	const [agentList, setAgentList] = createStore<AgentSection[]>(agentSections(agentInput()));
+	createEffect(() => setAgentList(reconcile(agentSections(agentInput()))));
+
+	/** Every agent, unfiltered — what the foot counts and the placeholder says. */
+	const allAgents = createMemo(() => agentTally(agentSections({ chats: props.chats ?? [], identities: props.identities ?? {}, unread: props.unread ?? {}, focused: props.focused })));
+
 	let list: HTMLDivElement | undefined;
 	let field: HTMLInputElement | undefined;
 
@@ -286,7 +318,7 @@ export function LeftPanel(props: {
 	const LOAD_MORE_AT = 400;
 	const [rowBudget, setRowBudget] = createSignal(FIRST_ROWS);
 	/** The sections of the list that is showing — boards, or agents. */
-	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agents() : sections());
+	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentList : sections());
 	const visibleRows = () => groups().reduce((sum, section) => sum + section.rows.length, 0);
 	/** How many of the section at `index`'s rows fit in what the sections above it left. */
 	const allowance = (index: number): number => {
@@ -418,7 +450,16 @@ export function LeftPanel(props: {
 							same object at `h-6`.
 						*/}
 						<div class="seg w-full" role="tablist" aria-label="Panel">
-							<For each={["boards", "agents"] as PanelTab[]}>
+							{/*
+								**Agents first, then Boards.**
+
+								The order is the panel's own reading order rather than a claim about
+								which list matters more: the agents are the thing that *changes* while
+								you watch, and a list you check on is read before a list you browse.
+								The panel still opens on Boards, because that is the canvas you were
+								already looking at.
+							*/}
+							<For each={["agents", "boards"] as PanelTab[]}>
 								{(name) => (
 									<button
 										type="button"
@@ -435,7 +476,11 @@ export function LeftPanel(props: {
 										onKeyDown={(event) => {
 											if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
 											event.preventDefault();
-											const next: PanelTab = name === "boards" ? "agents" : "boards";
+											/* Left and right are the strip's order, which is this array's:
+											   `agents` then `boards` — so the other one is named here rather
+											   than derived, and these two lines are what a third tab would
+											   have to change. */
+											const next: PanelTab = name === "agents" ? "boards" : "agents";
 											goTab(next);
 											document.getElementById(`${ids}-tab-${next}`)?.focus();
 										}}
@@ -530,7 +575,7 @@ export function LeftPanel(props: {
 					onScroll={growIfNearEnd}
 				>
 					<Show when={tab() === "agents"}>
-						<For each={agents()}>
+						<For each={agentList}>
 							{(section, index) => (
 								<div class="panel-section" data-kind={section.kind}>
 									<div class="panel-meta meta">
@@ -577,7 +622,7 @@ export function LeftPanel(props: {
 
 						{/* The same shape of empty state the boards list has, and the same reasoning:
 						    a panel that is blank for a good reason still looks broken without it. */}
-						<Show when={agents().length === 0}>
+						<Show when={agentList.length === 0}>
 							<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
 								{allAgents().total === 0 ? "No agents yet. Start one with `+`." : `No agent matches “${query().trim()}”.`}
 							</p>
@@ -682,7 +727,7 @@ export function LeftPanel(props: {
 					*/}
 					<span class="truncate">
 						{tab() === "agents"
-							? agentFoot(allAgents(), query().trim() ? agentTally(agents()).total : undefined)
+							? agentFoot(allAgents(), query().trim() ? agentTally(agentList).total : undefined)
 							: tally().shown === props.boards.length
 								? `${props.boards.length} board${props.boards.length === 1 ? "" : "s"}${tally().held > 0 ? ` · ${tally().held} held` : ""}`
 								: `${tally().shown} of ${props.boards.length} match`}

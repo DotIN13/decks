@@ -67,6 +67,44 @@ test("every agent appears exactly once", () => {
 	assert.equal(new Set(ids).size, ids.length);
 });
 
+/*
+ * The keys the panel's store joins on, asserted here because nothing else would notice them.
+ *
+ * `LeftPanel` keeps this list in a store and hands old and new to `reconcile`, which matches by
+ * one key at every level. A section or a row without that key is matched by *position* instead,
+ * which does not fail loudly: the list still says the right thing, it just re-draws itself, and
+ * an open popup silently attaches to whoever took the row's place. That is what the panel did
+ * for as long as an agent worked, and the ids are what stopped it.
+ */
+test("every section and every row carries the id reconcile joins on", () => {
+	for (const section of [...list(), ...grouped()]) {
+		assert.equal(typeof section.id, "string");
+		assert.ok(section.id.length > 0, "an empty id would join every section to every other");
+		for (const row of section.rows) assert.equal(row.id, row.chat.id, "a row's id is the chat's");
+	}
+});
+
+test("…and no two sections in one list share it", () => {
+	for (const sections of [list(), grouped()]) {
+		const ids = sections.map((section) => section.id);
+		assert.equal(new Set(ids).size, ids.length, ids.join(", "));
+	}
+	/*
+	 * The two axes name the same fact differently, and a workspace is a word a person types —
+	 * so `quiet` is a heading here and could also be somebody's project. The prefix is what
+	 * keeps them apart, and this is the line that would fail if it went.
+	 */
+	const named = agentSections({
+		chats,
+		identities: { ...rooms, ada: { ...identities.ada!, workspace: "quiet" } },
+		unread,
+		focused: "ada",
+		group: "workspace",
+	});
+	assert.deepEqual(named[0]?.id, "ws:quiet");
+	assert.notEqual(named[0]?.id, list()[2]?.id, "a workspace called `quiet` is not the Quiet heading");
+});
+
 test("a row carries both tag lists, kept apart", () => {
 	const iris = list()[0]?.rows[0];
 	assert.deepEqual(iris?.tags, ["e2e"], "the agent's own");

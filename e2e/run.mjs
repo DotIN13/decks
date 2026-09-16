@@ -111,6 +111,12 @@ const CHECKS = [
 	{ file: "camera.mjs", needsAgent: false },
 	{ file: "context.mjs", needsAgent: false },
 	{ file: "per-agent.mjs", needsAgent: false },
+	/*
+	 * The agents list under the socket's own traffic: what a state change is allowed to touch.
+	 * Not a section of `agents-tab.mjs`, because that check is about what a row *says* and this
+	 * one is about what the DOM does when the same row's state changes underneath it.
+	 */
+	{ file: "panel-steady.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },
