@@ -127,11 +127,23 @@
 		gap: 4px;
 	}
 
+	/*
+	 * The count, right-aligned in the rail's column and free to grow leftward.
+	 *
+	 * It was centred in a fixed 20px, which is fine until the deck is bigger than the column: `601`
+	 * is 19.2px of those 20, and a four-digit count spills past the panel's own padding — measured,
+	 * `6001` put the number's right edge at 261.5 against the rail's 259, and the three-digit one at
+	 * 258.6, so even the *right edge* of a count moved as it gained a digit. Right-aligned, a count
+	 * ends on the rail's line whatever it says: that is the line a row's dot and its bin end on, and
+	 * the line the field above it ends on. The digits grow into the label's spare width instead,
+	 * where there is room at any count — the deck this was written against lists 605 boards.
+	 */
 	.panel-meta > .n {
 		display: grid;
-		width: 20px;
+		min-width: 20px;
 		flex: none;
-		place-items: center;
+		align-items: center;
+		justify-items: end;
 	}
 
 	/*

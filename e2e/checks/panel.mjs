@@ -179,6 +179,44 @@ try {
 		JSON.stringify(room),
 	);
 
+	/*
+	 * And a count ends on the rail's line whatever it says.
+	 *
+	 * The count was centred in a fixed 20px. That is right for three digits — `601` is 19.2px of
+	 * those 20 — and wrong for four: measured, `6001` put the number's right edge at 264.6 where the
+	 * rail's is 259, and its box could not hold it. So the number moved as the deck grew, which is
+	 * the one thing a count in a column must not do. Right-aligned with a minimum width, every count
+	 * ends on the same line a row's dot and its bin end on, and the digits grow leftward into the
+	 * label's spare width instead.
+	 *
+	 * Faked by writing the number in, because the CSS is what is under test and a deck of six
+	 * thousand boards is not something to build. The heading is put back afterwards: `n` is the
+	 * element the assertions below read.
+	 */
+	const ends = await page.evaluate(() => {
+		const n = document.querySelector(".panel-meta .n");
+		if (!n) return null;
+		const said = n.textContent;
+		const read = (text) => {
+			n.textContent = text;
+			const range = document.createRange();
+			range.selectNodeContents(n);
+			return { right: Math.round(range.getBoundingClientRect().right), spills: n.scrollWidth > Math.ceil(n.clientWidth) };
+		};
+		const rows = ["4", "600", "6001"].map(read);
+		n.textContent = said;
+		return {
+			rail: Math.round(document.querySelector(".board-act .board-del").getBoundingClientRect().right),
+			rights: rows.map((row) => row.right),
+			spills: rows.some((row) => row.spills),
+		};
+	});
+	say(
+		"a count ends on the rail's line whatever it says",
+		ends === null || (ends.rights.every((right) => right === ends.rail) && !ends.spills),
+		JSON.stringify(ends),
+	);
+
 	await page.locator('[data-inset="left"] input').fill("risk");
 	await page.waitForTimeout(250);
 	say("the one field filters the whole list", (await page.locator(".board-row").count()) === 1, String(await page.locator(".board-row").count()));
