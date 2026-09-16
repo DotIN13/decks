@@ -149,6 +149,14 @@ export class DeckAgent {
 	 */
 	private playing: string[] = [];
 	/**
+	 * Where this stage has put its boards, by path.
+	 *
+	 * Beside `playing`, and for the same reason: it is the canvas this conversation is looking at,
+	 * and it is per conversation. Empty means nothing has been moved here, and `Deck.arrange` gives
+	 * every board a place under this stage's own boards.
+	 */
+	private places: Record<string, { x: number; y: number }> = {};
+	/**
 	 * Things to tell the agent before its next turn.
 	 *
 	 * Pi could do this through `pi.sendMessage({ deliverAs: "nextTurn" })`, which is an
@@ -458,6 +466,13 @@ export class DeckAgent {
 		if (!snapshot) return;
 		if (Array.isArray(snapshot.context)) this.setContext(snapshot.context.filter((path) => typeof path === "string"));
 		if (Array.isArray(snapshot.inPlay)) this.setInPlay(snapshot.inPlay.filter((path) => typeof path === "string"));
+		if (snapshot.positions && typeof snapshot.positions === "object") {
+			const kept: Record<string, { x: number; y: number }> = {};
+			for (const [path, at] of Object.entries(snapshot.positions)) {
+				if (typeof path === "string" && at && Number.isFinite(at.x) && Number.isFinite(at.y)) kept[path] = { x: at.x, y: at.y };
+			}
+			this.places = kept;
+		}
 		if (snapshot.identity?.name) this.rename(snapshot.identity.name);
 		if (snapshot.identity?.avatar) this.setAvatar(snapshot.identity.avatar);
 		/*
@@ -489,6 +504,8 @@ export class DeckAgent {
 			setContext: (paths: string[]) => this.setContext(paths),
 			inPlay: () => [...this.playing],
 			setInPlay: (paths: string[]) => this.setInPlay(paths),
+			positions: () => ({ ...this.places }),
+			setPosition: (path: string, x: number, y: number) => this.setPosition(path, x, y),
 			rename: (name: string) => this.rename(name),
 			setTags: (tags: unknown) => this.setTags(tags),
 			setWorkspace: (workspace: unknown) => this.setWorkspace(workspace),
@@ -529,6 +546,25 @@ export class DeckAgent {
 	}
 
 	/** Set what is on the canvas. Anything shown is held, so showing can attach. */
+	/** Where this stage has put its boards: what the client draws, and what a switch has to send. */
+	positions(): Record<string, { x: number; y: number }> {
+		return { ...this.places };
+	}
+
+	/**
+	 * Move one board **on this stage**, and write it down.
+	 *
+	 * The deck's own arrangement is not touched, and a position is not copied into any board's file:
+	 * this map is the whole record of the move, and `Deck.arrange` reads it when the boards are sent.
+	 * The write is the debounced `save()` the rest of the stage state uses, so a drag across the
+	 * canvas is one write rather than sixty.
+	 */
+	setPosition(path: string, x: number, y: number): void {
+		if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+		this.places[path] = { x: Math.round(x), y: Math.round(y) };
+		this.save();
+	}
+
 	setInPlay(paths: string[]): void {
 		const wanted = paths.filter((path, index) => paths.indexOf(path) === index);
 		// A board shown for the first time is the most recent touch, so it leads the held
@@ -694,6 +730,7 @@ export class DeckAgent {
 			...(this.parentId ? { parentId: this.parentId } : {}),
 			context: [...this.held],
 			inPlay: [...this.playing],
+			...(Object.keys(this.places).length > 0 ? { positions: { ...this.places } } : {}),
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),

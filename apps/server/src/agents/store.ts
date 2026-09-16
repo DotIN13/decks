@@ -70,6 +70,16 @@ export interface AgentRecord {
 	parentId?: string;
 	context: string[];
 	inPlay: string[];
+	/**
+	 * Where this conversation has put its boards.
+	 *
+	 * **Per stage, not per deck.** A board's place belongs to the arrangement you are looking at, so
+	 * the same board can sit differently in this chat and the next. Absent means "this stage has not
+	 * placed it", which falls through to `Deck.arrange` — the same `autoPlace` rule the deck always
+	 * applied, over this stage's boards. No `w`/`h`: a board's size is its file's `<meta>`, or its own
+	 * measured extent, and a copy here would go stale.
+	 */
+	positions?: Record<string, { x: number; y: number }>;
 	createdAt: number;
 	/** The model (and thinking level) the chat was last on, so a dormant row can still say what it will use. */
 	model?: AgentModel;

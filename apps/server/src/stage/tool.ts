@@ -105,6 +105,9 @@ export interface StageAgentHooks {
 	setContext(paths: string[]): void;
 	inPlay(): string[];
 	setInPlay(paths: string[]): void;
+	/** Where this stage has put its boards. Optional so a host that does not arrange can omit it. */
+	positions?(): Record<string, { x: number; y: number }>;
+	setPosition?(path: string, x: number, y: number): void;
 	rename(name: string): void;
 	setAvatar(url: string): void;
 	/** Replaces the agent's own tags and returns them as stored — see `agents/tags.ts`. */
@@ -144,6 +147,13 @@ export interface StageSnapshot {
 	context: string[];
 	/** What was on the canvas — a set, so a rewind restores the whole view. */
 	inPlay: string[];
+	/**
+	 * Where this stage had put its boards, so a rewind restores the arrangement too.
+	 *
+	 * Optional, and the only member here that is: a snapshot written before this existed has no
+	 * `positions`, and restoring one must leave the stage to `arrange` rather than to nothing.
+	 */
+	positions?: Record<string, { x: number; y: number }>;
 	camera: Camera;
 	identity: Identity;
 }
@@ -713,6 +723,9 @@ export function createStageTool(deps: {
 	};
 
 	const snapshot = (): StageSnapshot => ({
+		// The arrangement this stage is looking at, so a resume or a rewind restores where the boards
+		// were and not merely which ones were up.
+		positions: deps.agent.positions?.(),
 		context: agent.context(),
 		inPlay: agent.inPlay(),
 		camera: agent.camera(),
