@@ -11,8 +11,9 @@ import { templatesDir } from "@decks/runtime";
  * `runtime/templates` beside the primitives and the skills so they can be read and edited
  * rather than being buried in a string.
  *
- * Substitution is three tokens and no template engine, the same as `pi/context.ts` does
- * for `AGENTS.md.tmpl`.
+ * Substitution is a handful of tokens and no template engine, the same as `pi/context.ts` does
+ * for `AGENTS.md.tmpl`: `{{TITLE}}`, `{{W}}`, `{{H}}`, and `{{IMPORTMAP}}`, which becomes the
+ * library map every new board's head carries (`IMPORT_MAP` below).
  */
 
 /**
@@ -266,7 +267,7 @@ export function renderTemplate(kind: BoardTemplate, title: string, size?: { w?: 
 	 * that would clip the steps in silence on the one screen nobody checks.
 	 */
 	const h = Math.round(size?.h ?? Math.max(SIZE[kind].h, boxes.BOTTOM ?? 0));
-	let out = source.replaceAll("{{TITLE}}", escapeHtml(title)).replaceAll("{{W}}", String(w)).replaceAll("{{H}}", String(h));
+	let out = source.replaceAll("{{TITLE}}", escapeHtml(title)).replaceAll("{{W}}", String(w)).replaceAll("{{H}}", String(h)).replaceAll("{{IMPORTMAP}}", importMapTag());
 	for (const [token, value] of Object.entries(boxes)) out = out.replaceAll(`{{${token}}}`, String(value));
 	return out;
 }
@@ -291,7 +292,7 @@ export function renderFormat(format: Exclude<BoardFormat, "component">, title: s
 	const w = Math.round(size?.w ?? defaultFormatWidth(format));
 	// Both templates are HTML now, so the title is escaped for both. It was left raw for the
 	// markdown one, where an entity is shown literally rather than decoded.
-	return source.replaceAll("{{TITLE}}", escapeHtml(title)).replaceAll("{{W}}", String(w));
+	return source.replaceAll("{{TITLE}}", escapeHtml(title)).replaceAll("{{W}}", String(w)).replaceAll("{{IMPORTMAP}}", importMapTag());
 }
 
 /**
@@ -304,8 +305,47 @@ function defaultFormatWidth(format: Exclude<BoardFormat, "component">): number {
 	return format === "slides" ? 960 : 720;
 }
 
+/**
+ * The libraries a new board can import by bare name, and the exact version each resolves to.
+ *
+ * One map, substituted into every new board's head through `{{IMPORTMAP}}`, so the versions are
+ * bumped in one place rather than in seven templates. **It costs a board nothing.** An import map
+ * is a table of names — the browser fetches a library only when a board actually imports it, and
+ * nothing is fetched at all for a board that never does.
+ *
+ * Pinned rather than `@latest`, because a file's bytes are supposed to say what it renders; an
+ * agent that wants another version edits the map in the board it is writing, which is the one it
+ * will be read from. `three/addons/` is a prefix mapping, so `three/addons/controls/OrbitControls.js`
+ * resolves beside the same `three` build the map names — those two have to match, or a scene ends up
+ * with two copies of the library and an object from one is not an object from the other.
+ */
+const IMPORT_MAP = JSON.stringify(
+	{
+		imports: {
+			d3: "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+			three: "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+			"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+			gsap: "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+			"chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm",
+		},
+	},
+	null,
+	2,
+);
+
+/**
+ * The tag a `{{IMPORTMAP}}` token becomes.
+ *
+ * The JSON keeps its own two-space indentation rather than the document's tabs: an agent edits
+ * this map in the file, and a JSON block that lines up like JSON is one it can edit without
+ * counting tabs.
+ */
+function importMapTag(): string {
+	return `<script type="importmap">\n${IMPORT_MAP}\n\t\t</script>`;
+}
+
 const FORMAT_FALLBACK: Record<Exclude<BoardFormat, "component">, string> = {
-	flow: `<!doctype html>\n<html lang="en">\n\t<head>\n\t\t<meta charset="utf-8" />\n\t\t<title>{{TITLE}}</title>\n\t\t<meta name="board" content='{"w":{{W}}}' />\n\t\t<link rel="stylesheet" href="../lib/board.css" />\n\t</head>\n\t<body class="board flow">\n\t\t<div class="doc" data-id="body" style="left: 0; top: 0; width: 100%">\n\t\t\t<h1>{{TITLE}}</h1>\n\t\t</div>\n\t\t<script src="../lib/board.js"></script>\n\t</body>\n</html>\n`,
+	flow: `<!doctype html>\n<html lang="en">\n\t<head>\n\t\t<meta charset="utf-8" />\n\t\t<title>{{TITLE}}</title>\n\t\t<meta name="board" content='{"w":{{W}}}' />\n\t\t<link rel="stylesheet" href="../lib/board.css" />\n\t\t{{IMPORTMAP}}\n\t</head>\n\t<body class="board flow">\n\t\t<div class="doc" data-id="body" style="left: 0; top: 0; width: 100%">\n\t\t\t<h1>{{TITLE}}</h1>\n\t\t</div>\n\t\t<script src="../lib/board.js"></script>\n\t</body>\n</html>\n`,
 	slides: `<!doctype html>\n<html lang="en">\n\t<head>\n\t\t<meta charset="utf-8" />\n\t\t<title>{{TITLE}}</title>\n\t</head>\n\t<body class="reveal">\n\t\t<div class="slides">\n\t\t\t<section>\n\t\t\t\t<h1>{{TITLE}}</h1>\n\t\t\t</section>\n\t\t</div>\n\t</body>\n</html>\n`,
 };
 
@@ -338,6 +378,7 @@ const FALLBACK = `<!doctype html>
 		<title>{{TITLE}}</title>
 		<meta name="board" content='{"w":{{W}},"h":{{H}},"bg":"grid"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
+		{{IMPORTMAP}}
 	</head>
 	<body class="board">
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 900px">

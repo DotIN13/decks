@@ -1,11 +1,12 @@
 /*
  * The board runtime: what turns a file of absolutely-positioned divs into a board.
  *
- * A board's head asks for exactly two things — `board.css` and this file. Anything
- * else it needs (markdown, maths, diagrams, PDFs) is fetched from the same `lib/`
- * directory the moment a component actually uses it, so a board of three stickies
- * does not pay for pdf.js and the agent does not have to remember which script
- * tag goes with which component.
+ * A board's head asks for `board.css`, this file, and — on a board this app wrote — an import
+ * map. Anything it needs (markdown, maths, diagrams, PDFs) is fetched from the same `lib/`
+ * directory the moment a component actually uses it, so a board of three stickies does not pay
+ * for pdf.js and the agent does not have to remember which script tag goes with which component.
+ * The map is the same bargain for the libraries an agent reaches for itself: a table of names,
+ * pinned to versions, and nothing fetched until a board imports one.
  *
  * **It draws nothing of its own.** It used to route an arrow between two components
  * named by id, and that is gone on purpose: a line whose position is decided at mount

@@ -208,10 +208,13 @@ reason.
   example deck's two boards are built that way. The cost is accepted and was paid
   knowingly: `lib/` is re-synced on every open (§2.1), so existing user boards lost their
   arrows on their next restart, with no compatibility path.
-- The head asks for exactly two files. `board.js` loads whatever a component actually
-  uses — marked, KaTeX, mermaid, pdf.js — from the same `lib/`, so a board of three
-  stickies does not pay for pdf.js and the agent does not have to remember which
-  script tag goes with which component.
+- The head asks for a stylesheet, a runtime, and an inert import map. `board.js` loads whatever a
+  component actually uses — marked, KaTeX, mermaid, pdf.js — from the same `lib/`, so a board of
+  three stickies does not pay for pdf.js and the agent does not have to remember which script tag
+  goes with which component. The map is the same bargain for the libraries an agent picks for
+  itself (`d3`, `three`, `gsap`, `chart.js` on a new board): a table of names, and nothing fetched
+  until a board imports one — which is why a static `import` at the top of a module is not the same
+  thing, and why the skill asks for `await import("d3")` where the chart is drawn.
 - `board.js` sets `window.__boardReady` when fonts and every mount are done. The app
   waits for it before measuring; the agent's Playwright waits for it before shooting.
   Without it a screenshot is a race, and the race is usually lost.

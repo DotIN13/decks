@@ -42,15 +42,12 @@ description: How to write a board — its format and lifecycle, the rules for co
 - **Embed External Media:** Embed local files via
   `<div class="embed" data-embed="../path" style="...">`. For interactive HTML embeds, include
   `<script src="../lib/embed-guest.js"></script>` to forward canvas scroll and pinch gestures.
-- **Charting and animation — load the library from a CDN.** A `<script>` or `<link>` with an
-  absolute `https://` URL is the normal way and needs no setup; boards are same-origin and carry no
-  CSP. Pin the version (`d3@7.9.0`, never `@latest`) so the file's bytes still say what it shows.
-  The deck's `lib/` keeps a few copies for offline work — a fallback, not the default. Execute
-  rendering inside the `board:ready` event listener:
-
-```js
-document.addEventListener("board:ready", () => { /* chart render logic */ });
-```
+- **Charts, 3D and animation — import from the head's import map.** Every new board carries one,
+  naming `d3`, `three` (with `three/addons/`), `gsap` and `chart.js` pinned on jsDelivr; edit it for
+  anything else, and reach for a library with `const d3 = await import("d3")` where you draw — on
+  `board:ready` if the layout has to be settled — rather than at the top of a module, so a board
+  that never gets there pays nothing. Unsure of an API? Download the file the map names and read it:
+  `curl -s <url>` works, and `cdn.jsdelivr.net/npm/<package>@<version>/` serves the whole package.
 
 **Styling & Design System Tokens**
 

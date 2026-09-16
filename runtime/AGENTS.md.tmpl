@@ -145,9 +145,19 @@ build a board with anything beyond cards and text. In short: `.card`,
 **A diagram is one you draw.** There is no connector between two components — a line
 routed at mount time has no position in the file, so neither you nor the user can say
 where it goes without loading the page. Put an `<svg>` with a `viewBox` inside a box
-component and choose the coordinates yourself; when the data is the point, load d3 (or another
-charting library) from a CDN in the board itself. The skill has a worked example, and
+component and choose the coordinates yourself; when the data is the point, import a
+charting library from the board's own import map. The skill has a worked example, and
 `boards/plan.html` in the example deck is one.
+
+**Charts, 3D and animation have a catalog in the head.** Every new board carries an
+`<script type="importmap">` naming `d3`, `three` (and `three/addons/`), `gsap` and `chart.js`,
+each pinned to a version on a CDN. It costs the board nothing — a map is a table of names, and
+nothing is downloaded until something imports one — so reach for them freely: a chart, a scene, a
+measured diagram or a movement often says the thing better than another card of prose does, and
+making the canvas carry the argument is the point of the canvas. **Edit that map whenever you
+want** — another library, another version, a different CDN — and import what you need where you
+need it: `const d3 = await import("d3")` at the point you draw, which is what keeps it free for a
+board that never gets there.
 
 ## Showing the user's own documents
 

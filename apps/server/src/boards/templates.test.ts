@@ -19,6 +19,47 @@ test("every kind renders a board the loader can read", () => {
 	}
 });
 
+/**
+ * The import map a new board carries, parsed.
+ *
+ * Extracted rather than imported from `templates.ts`, deliberately: what matters is the document a
+ * browser is handed, and a test that read the constant would pass with a broken substitution.
+ */
+const importMapOf = (html: string): { imports: Record<string, string> } => {
+	const match = /<script type="importmap">\s*([\s\S]*?)\s*<\/script>/.exec(html);
+	assert.ok(match, "the board carries an import map");
+	assert.equal((html.match(/type="importmap"/g) ?? []).length, 1, "exactly one, because a second is ignored");
+	return JSON.parse(match[1]!) as { imports: Record<string, string> };
+};
+
+test("a new board's head names the libraries it may import, pinned over https", () => {
+	for (const kind of BOARD_TEMPLATES) {
+		const { imports } = importMapOf(renderTemplate(kind, "T"));
+		for (const name of ["d3", "three", "three/addons/", "gsap", "chart.js"]) {
+			assert.ok(imports[name], `${kind} can import ${name}`);
+			assert.match(imports[name]!, /^https:\/\//, `${kind}: ${name} is a URL a browser can fetch`);
+			assert.equal(imports[name]!.includes("@latest"), false, `${kind}: ${name} is pinned to a version`);
+		}
+	}
+	// And the same map on a flow document, which is a board too.
+	assert.ok(importMapOf(renderFormat("flow", "Notes")).imports.three);
+});
+
+test("three and its addons resolve to the same build", () => {
+	const { imports } = importMapOf(renderTemplate("answer", "T"));
+	const version = (url: string) => /three@([\d.]+)/.exec(url)?.[1];
+	assert.ok(version(imports.three!), "three names a version");
+	// Two builds of three in one page is a scene where an object from one is not an object from
+	// the other, and the failure reads as "my code does nothing".
+	assert.equal(version(imports["three/addons/"]!), version(imports.three!));
+});
+
+test("a slide deck carries no map, because nothing in it could run one", () => {
+	// A deck's sections are rendered by the shell rather than executed — a `<script>` inside one is
+	// text — so a map there would be a promise the format cannot keep.
+	assert.equal(renderFormat("slides", "Talk").includes("importmap"), false);
+});
+
 test("a title is escaped, not injected", () => {
 	const html = renderTemplate("answer", 'Tom & Jerry <script>alert("x")</script>');
 	assert.ok(!html.includes("<script>alert"), "no injected element");
