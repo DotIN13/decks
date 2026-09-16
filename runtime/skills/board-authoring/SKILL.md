@@ -41,11 +41,14 @@ description: How to write a board — its format and lifecycle, the rules for co
 - **Embed External Media:** Embed local files via
   `<div class="embed" data-embed="../path" style="...">`. For interactive HTML embeds, include
   `<script src="../lib/embed-guest.js"></script>` to forward canvas scroll and pinch gestures.
-- **Dynamic D3 Scripts:** Load `../lib/d3.min.js` when programmatic charting is required. Execute
-  visual rendering inside the `board:ready` event listener:
+- **Charting and animation — load the library from a CDN.** A `<script>` or `<link>` with an
+  absolute `https://` URL is the normal way and needs no setup; boards are same-origin and carry no
+  CSP. Pin the version (`d3@7.9.0`, never `@latest`) so the file's bytes still say what it shows.
+  The deck's `lib/` keeps a few copies for offline work — a fallback, not the default. Execute
+  rendering inside the `board:ready` event listener:
 
 ```js
-document.addEventListener("board:ready", () => { /* D3 render logic */ });
+document.addEventListener("board:ready", () => { /* chart render logic */ });
 ```
 
 **Styling & Design System Tokens**

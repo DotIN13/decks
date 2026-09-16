@@ -13,11 +13,13 @@ is complementary: pointers to the board, not the substance. If a sentence can be
 ## File structure
 
 - `boards/*.html` — the standalone HTML boards you create, read, and edit in place.
-- `lib/` — vendored, system-managed runtime primitives (`board.css`, `board.js`, `d3.min.js`).
-  **Never edit files here directly**; a board's own CSS goes in a `<style>` in that board.
+- `lib/` — system-managed primitives (`board.css`, `board.js`, and a few vendored libraries).
+  **Never edit files here directly**; a board's own CSS goes in a `<style>` in that board. Load a
+  library from a CDN by default; what is here is for offline work.
 - `assets/` — media, screenshots, drag-and-drop artifacts, and the datasets that power your
   visualizations.
-- `deck.json` — where boards sit on the canvas. The user drags boards; leave it alone.
+- `deck.json` — the deck's name, the roots embeds may reach, and a size for the boards that cannot state
+  one in their own file. Where a board *sits* belongs to the conversation, not to this file. Leave it alone.
 
 
 Boards right now:
@@ -141,8 +143,8 @@ build a board with anything beyond cards and text. In short: `.card`,
 **A diagram is one you draw.** There is no connector between two components — a line
 routed at mount time has no position in the file, so neither you nor the user can say
 where it goes without loading the page. Put an `<svg>` with a `viewBox` inside a box
-component and choose the coordinates yourself; `d3` is vendored beside the board for the
-case where the data is the point. The skill has a worked example, and
+component and choose the coordinates yourself; when the data is the point, load d3 (or another
+charting library) from a CDN in the board itself. The skill has a worked example, and
 `boards/plan.html` in the example deck is one.
 
 ## Showing the user's own documents
