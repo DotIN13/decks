@@ -291,11 +291,6 @@ export function createEditor(frame: HTMLIFrameElement, options: EditorOptions): 
 			nodeFromEvent,
 			emit: (op) => options.onOps?.([op]),
 			remark: () => mark(),
-			clearSelection: () => {
-				selection = undefined;
-				mark();
-				options.onSelect?.(undefined);
-			},
 			rendered: () => undefined,
 		});
 	});

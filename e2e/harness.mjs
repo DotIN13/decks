@@ -537,3 +537,84 @@ export async function openAllBoards(page) {
 export function settle(page, ms = 350) {
 	return page.waitForTimeout(ms);
 }
+
+/**
+ * Where two versions of a file differ, as a **byte range** rather than a line count.
+ *
+ * This replaces two assertions that counted lines:
+ *
+ *     after.split("\n").filter((line, index) => line !== before[index])
+ *
+ * and called the result "moves one line of the file". It does not measure that, and the reason is
+ * worth writing down because the shape of the mistake is easy to repeat. Measured on `boards/notes.html`,
+ * one retyped paragraph reported **24** — and 24 is `42 - 18`: the file had 44 lines before and 42 after,
+ * so from the deletion at line 18 **every line after it differs at its own index**. The count is the
+ * *position* of an edit in the file, not its size, and it moves when the file's length moves.
+ *
+ * That made a real fix look like a failure. The editor collapses a run's wrapping when it opens it, so
+ * that the words being typed are the words in the file rather than the file's indentation — which turns a
+ * five-line paragraph into one line, deliberately. A line count can only report that as "the rest of the
+ * file changed".
+ *
+ * What is worth asserting is a region: which bytes differ, and whether they lie inside the node the editor
+ * says it is editing. This finds that region the only way it can be found without a diff library — the
+ * longest common prefix and the longest common suffix — and returns offsets into the *old* file, which is
+ * the version the node's byte range comes from.
+ */
+export function differ(before, after) {
+	let start = 0;
+	while (start < before.length && start < after.length && before[start] === after[start]) start++;
+	let tail = 0;
+	while (
+		tail < before.length - start &&
+		tail < after.length - start &&
+		before[before.length - 1 - tail] === after[after.length - 1 - tail]
+	)
+		tail++;
+	return {
+		start,
+		/** One past the last changed byte, in the old file and in the new one. */
+		endBefore: before.length - tail,
+		endAfter: after.length - tail,
+		/** The changed text on each side, so a detail line can show it. */
+		before: before.slice(start, before.length - tail),
+		after: after.slice(start, after.length - tail),
+		lines: { before: before.split("\n").length, after: after.split("\n").length },
+		/** Open tags on each side: a bound on markup the edit added or removed. */
+		tags: { before: (before.match(/<[a-zA-Z]/g) ?? []).length, after: (after.match(/<[a-zA-Z]/g) ?? []).length },
+	};
+}
+
+/**
+ * The byte range of the `nth` `<tag>…</tag>` in a file, so a check can say what an edit is *inside of*.
+ *
+ * The open tag is matched by name and closed at its `>`, because a tag with attributes is the common case
+ * (`<p class="lead">`) and `indexOf("<p>")` would miss it.
+ */
+export function rangeOf(html, tag, nth = 1) {
+	let at = -1;
+	for (let i = 0; i < nth; i++) at = html.indexOf("<" + tag, at + 1);
+	if (at === -1) return undefined;
+	const open = html.indexOf(">", at);
+	const close = open === -1 ? -1 : html.indexOf("</" + tag + ">", open);
+	return open === -1 || close === -1 ? undefined : { start: at, end: close + tag.length + 3, open: open + 1, close };
+}
+
+/**
+ * The byte range of the element carrying an attribute, found by its value.
+ *
+ * For the case where the thing named is not a tag but a component: the file addresses a card by
+ * `data-id`, and what an edit to that card may touch is the card's own bytes. Nesting of the same tag is
+ * not handled, and does not need to be — the elements this is pointed at hold no element of their own kind.
+ */
+export function rangeOfAttr(html, attr, value) {
+	const needle = attr + '="' + value + '"';
+	const at = html.indexOf(needle);
+	if (at === -1) return undefined;
+	const start = html.lastIndexOf("<", at);
+	const name = /^<([a-zA-Z][\w-]*)/.exec(html.slice(start, at));
+	if (start === -1 || !name) return undefined;
+	const open = html.indexOf(">", at);
+	const close = open === -1 ? -1 : html.indexOf("</" + name[1] + ">", open);
+	return open === -1 || close === -1 ? undefined : { start, end: close + name[1].length + 3, open: open + 1, close };
+}

@@ -7,12 +7,15 @@
  * touched alone. A markdown board is the case where that argument fails, because what is on
  * screen was drawn from words that are not in the file, and it keeps the source editor.
  *
- * So the assertions are the ones that matter for an edit anywhere in this app: **one line of
- * the file moved**, the rest of it byte-identical, and the frame was not reloaded to show
- * what the editor had already drawn. Plus the half that must *not* run: a document has no
+ * So the assertions are the ones that matter for an edit anywhere in this app: **the bytes that
+ * changed are inside the run that was opened**, its own tags and every other tag are as the file had
+ * them, and the frame was not reloaded to show what the editor had already drawn. A *region* of the
+ * file, not a count of lines — the harness says why, and the reason is not academic: the count this
+ * replaced reported 24 lines for one retyped paragraph, because the editor's collapse of the run's
+ * wrapping removes two lines and every line after a deletion differs at its own index. Plus the half that must *not* run: a document has no
  * grid, no box to resize and nowhere to place a component, so the geometry half is off.
  */
-import { boardPath, open, read, resetStage, say, settle, write } from "../harness.mjs";
+import { boardPath, differ, open, rangeOf, read, resetStage, say, settle, write } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 1000, edit: true });
 await resetStage(page);
@@ -61,7 +64,7 @@ say("a double-click in a document opens the run of words", opened.tag !== null &
 say("…and not the file as source", (await sourceEditor()) === false, "no source editor");
 
 /*
- * 2. Typing in it moves one line of the file, and nothing else.
+ * 2. Typing in it rewrites the bytes of that run, and nothing outside them.
  *
  * A marker on the frame's own window first: the editor mutates the DOM it is typing into, so
  * a reload would be invisible in the file and obvious here — and a reload is what the browser
@@ -76,14 +79,24 @@ await frame().locator(".doc h2").first().click();
 await settle(page, 900);
 
 const after = read(file);
-const before = original.split("\n");
-const moved = after.split("\n").filter((line, index) => line !== before[index]);
+const diff = differ(original, after);
+const run = rangeOf(original, "p");
 say(
-	"typing in a run moves one line of the file",
-	moved.length === 1 && moved[0].includes("And that is the finding."),
-	`${moved.length} line(s): ${moved.map((line) => JSON.stringify(line)).join(" ")}`,
+	"typing in a run rewrites bytes inside the run it opened, and nowhere else",
+	/*
+	 * The typed words are looked for in the **whole new file**, not in the changed region: a minimal region
+	 * excludes every character that matches at the ends, and "And that is the finding." keeps the full stop
+	 * the paragraph already ended with — so the region ends at "…finding" and the assertion would fail on a
+	 * diff that is exactly right.
+	 */
+	run !== undefined && diff.start >= run.start && diff.endBefore <= run.end && after.includes("And that is the finding."),
+	`${diff.after.length} byte(s) rewritten at ${diff.start}…${diff.endBefore} of ${original.length}${run ? `, inside the <p> at ${run.start}…${run.end}` : ", and there is no <p> in the file"} — now reads ${JSON.stringify(diff.after.slice(-90))}`,
 );
-say("…and leaves the rest of it byte for byte", after.split("\n").length === before.length, `${before.length} lines before, ${after.split("\n").length} after`);
+say(
+	"…and leaves that run's own tags — and every other tag — as the file had them",
+	run !== undefined && diff.start >= run.open && diff.endBefore <= run.close && diff.tags.after === diff.tags.before,
+	`the change starts ${run ? diff.start - run.open : -1} byte(s) inside the <p>; ${diff.tags.before} → ${diff.tags.after} tag(s), ${diff.lines.before} → ${diff.lines.after} line(s)`,
+);
 say(
 	"…and redraws rather than reloads the document",
 	(await page.evaluate(() => document.querySelector('.board-node[data-path="boards/notes.html"] iframe').contentWindow.__stillHere)) === 7,

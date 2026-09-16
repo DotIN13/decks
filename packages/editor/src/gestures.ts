@@ -53,8 +53,6 @@ export interface GestureHost {
 	emit(op: EditorOp): void;
 	/** Re-outline after a preview changed what "selected" looks like. */
 	remark(): void;
-	/** Let the selection go — for a press that landed outside the frame, where nothing is selected. */
-	clearSelection(): void;
 	/** Put a newly inserted node's markup in the frame, so the palette's press has something to show. */
 	rendered(): void;
 }
@@ -498,13 +496,21 @@ export function attachGestures(host: GestureHost): () => void {
 
 
 	/*
-	 * Losing the whole frame ends the edit and the selection.
+	 * Losing the whole frame ends the **edit**. It does not end the selection, and that distinction was
+	 * learned the hard way.
 	 *
-	 * A press outside the board cannot be seen from in here — the frame is a document of its own — so this is
-	 * the event that stands for it: the *window* blurs when focus leaves the frame entirely, which is what a
-	 * press on the canvas does (the app moves focus to the canvas for exactly this reason). What it must do
-	 * is everything a click away should: close the caret, drop the selection, and tell whoever asked, so an
-	 * inspector following the selection lets go too.
+	 * A press outside the board cannot be seen from in here — the frame is a document of its own — so the
+	 * window's blur stands for it. The first version made it do everything a click away should, selection
+	 * included, and that quietly broke every control that acts *on* a selection: pressing a button in the
+	 * host page moves focus out of the frame, so the selection was cleared a moment before the button's own
+	 * handler ran. `e2e/checks/select-nodes.mjs` caught it — the dev page's nudge button made no op, and
+	 * there was no way to tell which of four guards had refused (the page now says which).
+	 *
+	 * The frame cannot tell the two cases apart: focus leaving for the empty canvas should drop the
+	 * selection, and focus leaving for the app's own toolbar must not. **The surface that knows is the
+	 * surface that owns the press**, so the app clears the selection when a press names no board, and the
+	 * frame only closes the caret. A press *inside* the frame on empty space still clears it here — that one
+	 * is unambiguous, and `selection` in `index.ts` does it.
 	 */
 	function blurred(): void {
 		if (caret) {
@@ -512,7 +518,6 @@ export function attachGestures(host: GestureHost): () => void {
 			caret = undefined;
 			close();
 		}
-		host.clearSelection();
 	}
 
 	const doc = host.document();

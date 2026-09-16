@@ -23,7 +23,7 @@
 // about boards rather than about the protocol, and it lives in its own package.
 import { BOX_CLASSES } from "@decks/board-kit";
 import { rmSync } from "node:fs";
-import { boardPath, open, read, say, socket, write } from "../harness.mjs";
+import { boardPath, differ, open, rangeOfAttr, read, say, socket, write } from "../harness.mjs";
 
 /**
  * Wait until the file *says* something, rather than until it differs.
@@ -193,15 +193,28 @@ try {
 			return null;
 		});
 	await pick("note");
+	/*
+	 * Waited for rather than slept on, and that is a fix rather than a tidy-up: both of these were a
+	 * `waitForTimeout(200)` and then a count, and the second one reported a failure in a full-suite run
+	 * while passing in isolation — a 200ms race between a press and the state it changes. A duration is not
+	 * evidence that anything happened; the count going to zero is.
+	 */
+	const gone = async (timeout = 4000) => {
+		const deadline = Date.now() + timeout;
+		while (Date.now() < deadline) {
+			if ((await inspector.count()) === 0) return true;
+			await page.waitForTimeout(50);
+		}
+		return false;
+	};
+
 	const bare = await bareStage();
 	await page.mouse.click(bare.x, bare.y);
-	await page.waitForTimeout(200);
-	say("a press on bare canvas lets it go too", (await inspector.count()) === 0, JSON.stringify(bare));
+	say("a press on bare canvas lets it go too", await gone(), JSON.stringify(bare));
 
 	await pick("note");
 	await page.locator(`.board-node[data-path="${path}"] .chrome`).click({ position: { x: 30, y: 8 } });
-	await page.waitForTimeout(200);
-	say("…as does a press on the board's own title", (await inspector.count()) === 0);
+	say("…as does a press on the board's own title", await gone());
 
 	/*
 	 * And the panel itself does not, which is the constraint the other three are bounded
@@ -346,11 +359,17 @@ try {
 	await page.keyboard.type("## What lands\n\n1. The heading above is drawn, not written.\n2. Only this line is different.");
 	await page.keyboard.press("ControlOrMeta+Enter");
 	const sourced = await until(fixture, /Only this line is different/);
-	const movedLines = sourced.split("\n").filter((line, index) => line !== beforeSource.split("\n")[index]);
+	const sourceDiff = differ(beforeSource, sourced);
+	const panel = rangeOfAttr(beforeSource, "data-id", "notes");
 	say(
-		"committing a whole markdown source moves one line of the file",
-		movedLines.length === 1 && movedLines[0] === "\t\t\t2. Only this line is different.",
-		`${movedLines.length} line(s): ${movedLines.map((line) => JSON.stringify(line)).join(" ")}`,
+		"committing a whole markdown source rewrites bytes inside the panel that owns it, and nowhere else",
+		panel !== undefined && sourceDiff.start >= panel.start && sourceDiff.endBefore <= panel.end && sourced.includes("Only this line is different"),
+		`${sourceDiff.before.length} → ${sourceDiff.after.length} byte(s) at ${sourceDiff.start}…${sourceDiff.endBefore}, of ${beforeSource.length} → ${sourced.length}${panel ? `, inside [data-id="notes"] at ${panel.start}…${panel.end}` : ", and there is no such panel"}; was ${JSON.stringify(sourceDiff.before.slice(0, 70))}; now ${JSON.stringify(sourceDiff.after.slice(0, 70))}`,
+	);
+	say(
+		"…and leaves the tags around it as the file had them",
+		panel !== undefined && sourceDiff.tags.after === sourceDiff.tags.before,
+		`${sourceDiff.tags.before} → ${sourceDiff.tags.after} tag(s), ${sourceDiff.lines.before} → ${sourceDiff.lines.after} line(s)`,
 	);
 	say(
 		"the panel re-renders in place, without reloading the frame",

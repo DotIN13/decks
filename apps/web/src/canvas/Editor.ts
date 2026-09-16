@@ -924,6 +924,27 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 				stopEditing(false);
 			}
 			/*
+			 * A newline in the **source textarea** is the textarea's own, and this branch is why that has to
+			 * be said out loud.
+			 *
+			 * The two key rules below are about a *run of words in the board*: Enter is one `<br>`, and
+			 * ⌘/Ctrl+Enter commits. Applied to the source editor as well they broke it, silently and in the
+			 * worst way — a plain Enter was swallowed by `insertBreak` (which inserts into the *frame's*
+			 * document, where the textarea's selection is not), so the newline never reached the textarea.
+			 * A source typed as "## What lands\n\n1. …\n2. …" therefore arrived as one line, and the
+			 * commit wrote that one line into the file: `e2e/checks/inspector.mjs` read the board back and
+			 * found `## What lands` where a list had been, while the frame went on drawing the list the
+			 * editor had already rendered. The source *is* lines — that is the whole of what this editor
+			 * edits — and a `<br>` is markup in a document that is not markup yet.
+			 */
+			if (editing.kind === "source") {
+				if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+					event.preventDefault();
+					stopEditing(true);
+				}
+				return;
+			}
+			/*
 			 * Enter is ours, and it is one `<br>`.
 			 *
 			 * Left to the browser, a rich run inserts a `<div>` — a block inside a `<p>`, which is markup a

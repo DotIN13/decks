@@ -14,6 +14,8 @@
  * browser can run in this repo. Nothing on this page is part of the app.
  */
 import {
+	addressOf,
+	bodyOf,
 	createEditor,
 	ops,
 	paletteOf,
@@ -61,6 +63,8 @@ const report = {
 	selection: null as { path: number[]; kind: string; tag?: string; id?: string; source?: string } | null,
 	/** The last selection as a node, so a button can make an op out of it. Not serialisable. */
 	last: null as Selection | null,
+	/** Why the last nudge made no op, if it made none. Empty when it worked. */
+	why: "",
 };
 
 declare global {
@@ -234,14 +238,29 @@ async function main(): Promise<void> {
 	const nudgeButton = document.querySelector("#nudge") as HTMLButtonElement;
 	nudgeButton.addEventListener("click", () => {
 		const node = report.last?.node;
-		if (!node || !editor) return;
-		const rect = rectOf(node);
-		if (rect.left === undefined) return;
-		const left = `${Number.parseFloat(rect.left) + 8}px`;
-		const op = ops.set(editor.tree.root, node, { style: { ...rect, left } });
-		if (!op) return;
-		report.ops.push(op);
+		// A button that does nothing and says nothing is the worst of the three outcomes: the check that
+		// exercises this path reported `null` and there was no way to tell which of four guards had
+		// refused. It now says which one, in the panel the check reads.
+		report.why = "";
+		if (!node || !editor) {
+			report.why = "nothing is selected";
+		} else {
+			const rect = rectOf(node);
+			const from = rect.left;
+			const path = addressOf(editor.tree.root, node);
+			const body = bodyOf(editor.tree.root);
+			if (from === undefined) report.why = `no left in ${JSON.stringify(rect)}`;
+			else if (!path)
+				report.why = `no path: root <${editor.tree.root.tag}>, body ${body ? `<${body.tag}>` : "none"}, node <${node.tag}> parent ${node.parent ? `<${node.parent.tag}>` : "none"}`;
+			else {
+				const left = `${Number.parseFloat(from) + 8}px`;
+				const op = ops.set(editor.tree.root, node, { style: { ...rect, left } });
+				if (!op) report.why = "ops.set refused a node that has a path";
+				else report.ops.push(op);
+			}
+		}
 		out.textContent = JSON.stringify(report.ops, null, 1);
+		if (report.why) status.textContent = `nudge did nothing — ${report.why}`;
 	});
 	window.addEventListener("keydown", (event) => {
 		if (event.key === "e") flip();
