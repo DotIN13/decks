@@ -180,6 +180,15 @@ export interface ShowOptions {
 	fit?: "board" | "all";
 	/** A `data-id` on the board to outline, so the user's eye lands on it. */
 	highlight?: string;
+	/**
+	 * Arrive at the framed view rather than jumping to it: 260ms, easing out.
+	 *
+	 * Off by default, and deliberately. An op says where to look, and something that reads the
+	 * camera a frame after calling this should see where it was told to look — the two gestures
+	 * that move the camera *for* the user (a link on a board, a row in the panel) glide without
+	 * being asked, because those are a person's hands and the journey is the point.
+	 */
+	animate?: boolean;
 }
 
 export interface Stage {
@@ -510,9 +519,13 @@ export interface Stage {
 	 * Where **your** canvas is looking — not where the user is, unless they are reading you.
 	 * Setting it follows the same rule as `show`: applied if you are on screen, remembered
 	 * against your chat if you are not.
+	 *
+	 * `animate: true` glides there rather than jumping — see `ShowOptions.animate`, and note that
+	 * it is a *request*: a reduced-motion setting on the reader's machine makes it instant, and
+	 * the call still answers normally, because a preference is not a failure.
 	 */
 	camera(): Promise<Camera>;
-	camera(at: Camera): Promise<void>;
+	camera(at: Camera, options?: { animate?: boolean }): Promise<void>;
 
 	/** Reload a board's frame, if you changed something the watcher cannot see. */
 	reload(path: string): Promise<void>;

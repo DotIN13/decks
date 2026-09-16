@@ -6,7 +6,7 @@ import { viewToPark } from "../camera/agent-view.ts";
 import { agentViews } from "../camera/agent-views.ts";
 import { runStageCall } from "../canvas/stage-ops.ts";
 import { scratch } from "../state/agent.ts";
-import { setCamera } from "../state/camera.ts";
+import { moveCamera } from "../state/camera.ts";
 import { reportCamera } from "./camera-report.ts";
 import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
 import { ensureHistory, resolveEarlier } from "../state/history.ts";
@@ -330,7 +330,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							 * in `canvas/stage-ops.ts`, which is where the reasoning lives.
 							 */
 							focused: () => state.focused,
-							setCamera: (next) => setCamera(next),
+							setCamera: (next, options) => moveCamera(next, options),
 							rememberView: (agentId, camera, selected) => {
 								// On this device, like every other view (`camera/agent-views.ts`): an
 								// agent that moved a canvas nobody is looking at is remembered for the

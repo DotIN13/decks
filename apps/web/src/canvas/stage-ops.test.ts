@@ -19,13 +19,18 @@ const board = (path: string, x: number, y: number): Board => ({ path, format: "c
 
 function host(focused: string | undefined) {
 	const moved: Camera[] = [];
+	/** The same calls, carrying the flag the caller asked for — see the tests at the end. */
+	const animated: Array<{ camera: Camera }> = [];
 	const remembered: Array<{ agentId: string; camera: Camera; selected?: string }> = [];
 	const selected: Array<string | undefined> = [];
 	const api: StageOpsHost = {
 		boards: () => [board("boards/plan.html", 0, 0), board("boards/risks.html", 6000, 0)],
 		viewport: () => ({ width: 1200, height: 800 }),
 		focused: () => focused,
-		setCamera: (camera) => moved.push(camera),
+		setCamera: (camera, options) => {
+			moved.push(camera);
+			if (options?.animate) animated.push({ camera });
+		},
 		rememberView: (agentId, camera, select) => remembered.push({ agentId, camera, ...(select ? { selected: select } : {}) }),
 		select: (path) => selected.push(path),
 		reload: () => {},
@@ -33,7 +38,7 @@ function host(focused: string | undefined) {
 		annotate: () => {},
 		toast: () => {},
 	};
-	return { api, moved, remembered, selected };
+	return { api, moved, animated, remembered, selected };
 }
 
 const call = (agentId: string, op: StageCall["op"], args: unknown): StageCall => ({ id: "c1", agentId, op, args });
@@ -95,4 +100,44 @@ test("a call with no agent behind it still works, because the id is newer than t
 	const { api, moved } = host("A");
 	runStageCall({ id: "c1", agentId: "", op: "camera", args: { x: 1, y: 2, zoom: 1 } }, api);
 	assert.equal(moved.length, 1);
+});
+
+/*
+ * And whether the move is one the agent asked to *watch*.
+ *
+ * `animate` is the agent's own request and it is off by default: an op says where to look, and
+ * anything that reads the camera a frame after calling it should see what it asked for. The two
+ * gestures that glide do it in `App.tsx`, where a person's hands are — this is only about the
+ * flag travelling from the call to the host, which is the half a check can see without a model
+ * driving it. What the browser does with the flag is `e2e/checks/glide.mjs`.
+ */
+test("an op that asked to arrive says so, and one that did not does not", () => {
+	const plain = host("A");
+	runStageCall(call("A", "show", { paths: ["boards/plan.html"] }), plain.api);
+	assert.equal(plain.moved.length, 1, "show moved the camera");
+	assert.equal(plain.animated.length, 0, "show without the flag moved it instantly");
+
+	const asked = host("A");
+	runStageCall(call("A", "show", { paths: ["boards/plan.html"], animate: true }), asked.api);
+	assert.deepEqual(asked.animated, [{ camera: asked.moved[0]! }]);
+
+	const place = host("A");
+	runStageCall(call("A", "camera", { x: 10, y: 20, zoom: 0.5, animate: true }), place.api);
+	assert.deepEqual(place.animated, [{ camera: { x: 10, y: 20, zoom: 0.5 } }]);
+
+	const quiet = host("A");
+	runStageCall(call("A", "camera", { x: 1, y: 2, zoom: 1 }), quiet.api);
+	assert.deepEqual(quiet.moved, [{ x: 1, y: 2, zoom: 1 }]);
+	assert.equal(quiet.animated.length, 0);
+});
+
+test("a remembered view is not animated, whatever it asked for", () => {
+	// Nothing moved on this screen, so there is nothing to glide: the view waits for the chat it
+	// belongs to and arrives framed the moment that chat is opened.
+	const { api, moved, animated, remembered } = host("A");
+	const result = runStageCall(call("B", "show", { paths: ["boards/plan.html"], animate: true }), api) as { deferred?: string };
+	assert.ok(result.deferred, "expected a deferred result");
+	assert.equal(moved.length, 0);
+	assert.equal(animated.length, 0);
+	assert.equal(remembered.length, 1);
 });

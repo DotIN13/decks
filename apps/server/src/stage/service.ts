@@ -293,8 +293,8 @@ export class StageService {
 	 * arrives, framed as it intended, the moment you open that chat. The result says which
 	 * happened, so an agent working in the background is told rather than lied to.
 	 */
-	async setCamera(agentId: string, at: Camera): Promise<unknown> {
-		return this.ask(agentId, { op: "camera", args: at });
+	async setCamera(agentId: string, at: Camera, options: { animate?: boolean } = {}): Promise<unknown> {
+		return this.ask(agentId, { op: "camera", args: { ...at, animate: options.animate } });
 	}
 
 	/**
@@ -305,7 +305,7 @@ export class StageService {
 	 * conversation — §7). Typed rather than `unknown` because `stage.d.ts` promises the
 	 * shape to the agent, and the agent writes code against what that file says.
 	 */
-	async show(agentId: string, paths: string[], options: { fit?: "board" | "all"; highlight?: string } = {}): Promise<{ shown: string[]; deferred?: string }> {
+	async show(agentId: string, paths: string[], options: { fit?: "board" | "all"; highlight?: string; animate?: boolean } = {}): Promise<{ shown: string[]; deferred?: string }> {
 		for (const path of paths) {
 			if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
 		}

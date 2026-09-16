@@ -487,8 +487,13 @@ export function createStageTool(deps: {
 		 * camera fits it, and anything not already held is attached — showing a board is
 		 * working on it, and requiring a separate attach would be a step to forget.
 		 * `show(await stage.context())` puts everything back.
+		 *
+		 * `animate: true` makes the camera **arrive** rather than jump — 260ms, easing out. It is off
+		 * by default: an op states where to look, and something watching the camera a frame later
+		 * should see what was asked for. The board's own links and the panel glide without being
+		 * asked, because those are a person's hands.
 		 */
-		show: async (path: string | string[], options?: { fit?: "board" | "all"; highlight?: string }) => {
+		show: async (path: string | string[], options?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }) => {
 			const paths = asList(path);
 			for (const one of paths) {
 				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
@@ -502,13 +507,13 @@ export function createStageTool(deps: {
 			agent.setInPlay(agent.inPlay().filter((playing) => !dropping.has(playing)));
 		},
 		move: async (path: string, at: { x: number; y: number }) => service.move(path, at),
-		camera: (async (at?: Camera) => {
+		camera: (async (at?: Camera, options?: { animate?: boolean }) => {
 			if (!at) return agent.camera();
-			await service.setCamera(agent.id, at);
+			await service.setCamera(agent.id, at, options ?? {});
 			return undefined;
 		}) as {
 			(): Promise<Camera>;
-			(at: Camera): Promise<void>;
+			(at: Camera, options?: { animate?: boolean }): Promise<void>;
 		},
 		reload: async (path: string) => service.reload(agent.id, path),
 		cursor: async (path: string, at: { x: number; y: number } | null) =>

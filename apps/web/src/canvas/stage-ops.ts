@@ -20,7 +20,15 @@ export interface StageOpsHost {
 	viewport(): { width: number; height: number };
 	/** Which conversation is on screen, so an op that moves the view can tell whose it is. */
 	focused(): string | undefined;
-	setCamera(camera: Camera): void;
+	/**
+	 * Move the view, and *arrive* at it when the caller asked for that.
+	 *
+	 * `animate` is the agent's own request — `stage.show(paths, { animate: true })` — and it is off
+	 * by default, which is not an oversight: an op is a statement about where to look, and the
+	 * people reading this file's checks measure it a frame later. A gesture is the other way round
+	 * (`App.tsx`), because a click *is* about the journey to what was clicked.
+	 */
+	setCamera(camera: Camera, options?: { animate?: boolean }): void;
 	/**
 	 * Keep a view for an agent that is not the one on screen.
 	 *
@@ -82,7 +90,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			const waiting = defer(call, host, wanted, boards[0]!.path);
 			if (waiting) return { shown: boards.map((board) => board.path), ...waiting };
 
-			host.setCamera(wanted);
+			host.setCamera(wanted, { animate: args.animate === true });
 			host.select(boards[0]!.path);
 
 			if (typeof args.highlight === "string") highlight(boards[0]!.path, args.highlight);
@@ -98,7 +106,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			const waiting = defer(call, host, wanted);
 			if (waiting) return { camera: wanted, ...waiting };
 
-			host.setCamera(wanted);
+			host.setCamera(wanted, { animate: args.animate === true });
 			return { camera: { x, y, zoom } };
 		}
 
