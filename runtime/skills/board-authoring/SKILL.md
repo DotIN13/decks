@@ -11,8 +11,9 @@ description: How to write a board — its format and lifecycle, the rules for co
   class: `class="board"` (absolute positioned boxes), `class="board flow"` (single reflowing document
   via `.doc`), or `class="reveal"` (slides named `*.slides.html`).
 - **Creation & Sizing:** Initialize via `stage.newBoard({ title, kind, format })`. Keep boards under
-  ~1200px wide (matching viewport) to avoid downscaling. Use `stage.fit(path)` post-render to
-  shrinkwrap canvas boundaries, or `stage.resize(path, { w, h })` to set dimensions directly.
+  ~1200px wide (matching viewport) to avoid downscaling. Use `stage.fit(path)` post-render to take
+  the content's height; the width is left as it is, and `stage.resize(path, { w, h })` sets a size
+  directly.
 - **Layout Order:** Match DOM order strictly to visual reading order (top-to-bottom, left-to-right).
   Standardize section headings using `<h3 class="text">` with approved tags: *Summary, Overview,
   Problem, Research question, Method, Result, Todos, Next*.

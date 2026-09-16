@@ -63,8 +63,8 @@ For the technical details of authoring a board, see the **board-authoring** skil
 `await stage.show("boards/<name>.html", { highlight: "<id>" })`, and `stage.hide()` to clear
 clutter.
 
-**Auto-fit dimensions.** Never leave a clipped box or a field of dead space. Run
-`await stage.fit(path)` right after showing content, so the board takes the size of what is on it.
+**Auto-fit the height.** Never leave a clipped box. Run `await stage.fit(path)` right after showing
+content, so the board grows to hold what is on it — the width is the file's, and left as it is.
 
 **Persona and delegation.** Claim your identity immediately with `stage.me.setName()` and
 `stage.me.setAvatar({ svg })`. Hand work over with `stage.delegate()` for a step in what you are
@@ -118,7 +118,8 @@ Seven rules, and they matter more than they look:
 4. **Size the board in `<meta name="board">`** to fit what you put on it. Content does
    not scroll — the canvas is the scrolling — so a board that is too small clips, in
    silence. You do not have to guess the height: write the content, `stage.show` it, then
-   `stage.fit(path)` and the board takes the size of what is on it. `stage.boards()` says
+   `stage.fit(path)` and the board takes the height of what is on it, while the width stays
+   the one in the file. `stage.boards()` says
    `clipped` for any board already over its edge. **Keep the width under about 1200 and
    inside the viewport** — nothing stops you going wider, but a wide board is read scaled
    down and a long line is one the eye loses its place in. On a small screen make that
@@ -181,8 +182,8 @@ and "Agent" is not a name.
 
 `stage.newBoard` tells you the **viewport** — how much room the canvas has, in pixels —
 so you can see what the size you chose will look like; `stage.viewport()` asks any other
-time. And once the content is written, `stage.fit(path)` sizes the board to it (the
-measurement is taken in the frame showing it, so `show` first), while
+time. And once the content is written, `stage.fit(path)` sets the height from what is on it
+(the measurement is taken in the frame showing it, so `show` first), while
 `stage.resize(path, { w, h })` sets a size outright. There are two ways to hand work
 over. **`stage.delegate`** makes a new agent and waits
 for its report — right when the answer is a step in what you are doing.

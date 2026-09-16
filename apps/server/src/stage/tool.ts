@@ -444,23 +444,14 @@ export function createStageTool(deps: {
 		},
 
 		/**
-		 * Size a board to what is on it: the height from the content, the width only if
-		 * something has been pushed past the edge.
+		 * Size a board to its content: the height, and only the height.
+		 *
+		 * The width is left exactly as the file has it. A fit that changed it would be a call that
+		 * reflows somebody's document to a number it measured for a moment, and it was wrong in a
+		 * second way on a flow board, where the width it read back was the frame's own.
 		 */
 		fit: async (path: string, options?: { margin?: number }) => {
 			const { board, content } = await service.fit(path, options);
-			/*
-			 * A fit can no longer clip — it takes the width the content needs — so what the
-			 * note is for has changed. It used to report the failure the clamp created; now
-			 * it says when the board it produced is wider than a board is worth being, which
-			 * is a thing to fix in the content rather than an error.
-			 */
-			if (board.w > WIDE_BOARD_W) {
-				const room = viewport()?.width;
-				notes.push(
-					`${board.path} came out ${board.w} wide — over ${WIDE_BOARD_W}, which is wide for reading${room ? ` and ${room > 0 && board.w > room ? "wider than this screen" : "inside this screen"}` : ""}. Narrow a component or split the board rather than leaving it this wide.`,
-				);
-			}
 			return { path: board.path, w: board.w, h: board.h, content };
 		},
 

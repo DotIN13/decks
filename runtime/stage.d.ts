@@ -438,25 +438,18 @@ export interface Stage {
 	resize(path: string, size: { w?: number; h?: number }): Promise<{ path: string; w: number; h: number }>;
 
 	/**
-	 * Size a board to what is on it — **both dimensions**.
+	 * Size a board to its content — **the height, and only the height**.
 	 *
 	 *     await stage.fit("boards/plan.html");            // -> { path, w, h, content }
 	 *     await stage.fit("boards/plan.html", { margin: 80 });
 	 *
-	 * The width shrinks as well as grows: a board left at the width it was guessed at has a
-	 * column of empty grid down its right-hand side, and a reader cannot tell that from a
-	 * board whose author meant it. **Nothing is clamped** — the board becomes the size of
-	 * what is on it, so a fit can no longer leave content past the edge.
+	 * The height is the one number a board cannot state for itself: it is what the content came to
+	 * once it was laid out, and only the browser knows it. This reads the measurement the frame
+	 * reported and writes that, plus a margin (`margin`, 48 by default).
 	 *
-	 * **Two passes, because narrowing reflows.** Changing the width changes the height that
-	 * was being measured, so `fit` sets the width, waits for the browser to lay the board
-	 * out again, and takes the height from that second reading. You do not have to do
-	 * anything about this; it is why one call can take two round trips.
-	 *
-	 * A board that comes out over about 1200 wide is reported back as a note, because that is
-	 * wide for reading and the fix is in the content: narrow a component, or split the board.
-	 * It is a note and not a refusal — a wide board is a thing you can see and drag, where a
-	 * silently clipped one is not.
+	 * **The width is left alone.** It is the author's, written in the board's own `<meta>`, and a
+	 * board pinned to a measured width reflows its text every time the measurement changes. Use
+	 * `stage.resize` when you mean to change a width.
 	 *
 	 * The measurement is taken in the frame showing the board, because that is the only
 	 * place a board is laid out. So **the board has to be on the canvas**: a board nobody

@@ -90,13 +90,8 @@ export interface WebHost {
 /** The room `fit` leaves under the content — the margin a board's own components start at. */
 const FIT_MARGIN = 48;
 
-/** The narrowest `fit` will make a board. Below this a board is not small, it is broken. */
-const FIT_MIN_W = 320;
 /** How long `fit` waits for the frame to load and report, before saying nobody looked. */
 const FIT_WAIT_MS = 5000;
-
-/** And how long to wait for the *second* reading, after a width change. Best effort. */
-const FIT_REFLOW_MS = 1500;
 
 export class StageService {
 	/**
@@ -210,30 +205,24 @@ export class StageService {
 	}
 
 	/**
-	 * Size a board to what is on it — **both** dimensions, in two passes.
+	 * Size a board to its content — **the height, and only the height**.
 	 *
-	 * This used to grow the width and never shrink it, on the reasoning that narrowing a
-	 * board reflows its text and so changes the height being measured. True, and the wrong
-	 * conclusion: a board left at the width it was guessed at is a board with a column of
-	 * empty grid down its right-hand side, and a reader cannot tell that from a board whose
-	 * author meant it. Reflow is a reason to measure twice, not a reason not to look.
+	 * The width is the author's. It is written when the board is created, in its own `<meta>`, and a
+	 * fit that narrowed it would be undoing a decision it cannot see the reason for: 1900 wide with
+	 * room to spare is one person's mistake and another person's margin. A board pinned to a
+	 * measured width would also reflow its text every time the measurement changed. `stage.resize`
+	 * is how a width is set when somebody means it.
 	 *
-	 * So: set the width, wait for the browser to lay the board out again, and take the
-	 * height from *that* reading. One extra round trip, on a call that already waits for
-	 * one, and only when the width actually moves.
+	 * The height is the one number a board cannot state for itself: it is what the content came to
+	 * once it was laid out, and only the browser knows it. So this reads what the frame measured and
+	 * writes that, plus the margin a board's own components start at.
 	 *
-	 * **Nothing is clamped.** The width used to be held under `min(viewport, 1600)`, which
-	 * meant a fit could leave the very thing it was asked to prevent: a board narrowed to a
-	 * ceiling with its content overflowing, `clipped` on `stage.boards()` and a reader with
-	 * no idea. A fit that reports success and hides content is worse than a wide board, and
-	 * a wide board is a thing a person can see and drag.
-	 *
-	 * So this makes the board the size of what is on it, and the width to *aim* under —
-	 * `WIDE_BOARD_W`, 1200 — is guidance carried in the guidelines and in `stage.d.ts`
-	 * rather than a number enforced here. `minWidth` still applies, because a board narrower
-	 * than its own chrome is unreadable in a different way.
+	 * It used to take the width too, in two passes: set the width, wait for the reflow, measure the
+	 * height that produced. That made `fit` the one call that could silently reflow a board — and on
+	 * a **flow** document, whose `.doc` is `width: 100%` of the frame, the "content width" it read
+	 * back was the frame's own width, so every fit added the margin and grew the board by 48px.
 	 */
-	async fit(path: string, options?: { margin?: number; viewport?: number; minWidth?: number }): Promise<{ board: Board; content: { w: number; h: number } }> {
+	async fit(path: string, options?: { margin?: number }): Promise<{ board: Board; content: { w: number; h: number } }> {
 		// The record first: an agent calls this straight after writing the content, and
 		// the revision we wait for a measurement of has to be the one now on disk.
 		this.deck.refresh(path);
@@ -241,39 +230,10 @@ export class StageService {
 		if (!board) throw new Error(`No such board: ${path}`);
 
 		const margin = Math.max(0, Math.min(400, Math.round(options?.margin ?? FIT_MARGIN)));
-		const floor = Math.max(FIT_MIN_W, Math.round(options?.minWidth ?? FIT_MIN_W));
 
 		const measured = await this.measure(path, board.rev);
-		const w = Math.max(floor, measured.w + margin);
-
-		/*
-		 * One pass when the width is already right, which is the ordinary case — an agent
-		 * fitting a board it just wrote at a sensible width is asking about the height.
-		 */
-		if (w === board.w) {
-			const h = measured.h + margin;
-			return { board: h === board.h ? board : this.resize(path, { h }), content: measured };
-		}
-
-		/*
-		 * Two passes: the width, then the height of the board that width produced.
-		 *
-		 * The second reading is **best effort**. A frame re-measures on every revision, so
-		 * it usually arrives in a frame or two — but the width is the change that was asked
-		 * for and it is already written, and refusing the whole call because the browser was
-		 * slow would leave the board worse than it started. So a reading that does not come
-		 * falls back to the one already taken, which is right whenever the content did not
-		 * reflow — and components carry their own widths, so mostly it did not.
-		 */
-		const narrowed = this.resize(path, { w });
-		const after = (await this.host.awaitExtent(path, narrowed.rev, FIT_REFLOW_MS)) ?? measured;
-		const h = after.h + margin;
-		/*
-		 * The second reading is the one handed back, because it is the one that describes
-		 * the board as it now is — and it is what says whether the content still overflows
-		 * a board held at the ceiling.
-		 */
-		return { board: h === narrowed.h ? narrowed : this.resize(path, { h }), content: after };
+		const h = measured.h + margin;
+		return { board: h === board.h ? board : this.resize(path, { h }), content: measured };
 	}
 
 	/**

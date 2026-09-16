@@ -8,7 +8,7 @@ Your code is the body of an async function with `stage` in scope; whatever you r
 
 **Keep the canvas to what matters.** `stage.show(paths)` sets what is on the canvas and fits the camera to it. `stage.hide(paths)` takes a board off the canvas but keeps it in your context. `stage.attach` / `stage.detach` are the context itself, which is what the rail beside the canvas lists. The camera never moves unless you call `show`.
 
-**A board does not scroll, so a board that is too small clips — silently.** `stage.fit(path)` sizes it to what is on it, **width and height**: write the content, `show` it, then fit. It shrinks a board that is wider than its content as well as growing one that is narrower, clamped to the ceiling below. The measurement is taken in the frame showing the board, so it has to be on the canvas; `stage.boards()` carries the same reading as `content` and `clipped`. `stage.resize(path, { w, h })` sets a size outright.
+**A board does not scroll, so a board that is too small clips — silently.** `stage.fit(path)` writes the height the frame measured, plus a margin: write the content, `show` it, then fit. The **width is left alone**, so set it with `stage.resize(path, { w })` when you mean to. The measurement is taken in the frame showing the board, so it has to be on the canvas; `stage.boards()` carries the same reading as `content` and `clipped`.
 
 **Two rules, and they are what a board is judged on.**
 

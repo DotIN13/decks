@@ -314,7 +314,7 @@ test("fit says to put the board on the canvas rather than guessing a height", as
 	cleanup();
 });
 
-test("fit takes both dimensions from the content, and narrows a board with room to spare", async () => {
+test("fit takes the height from the content and leaves the width alone", async () => {
 	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const board = deck.board("boards/plan.html");
 	assert.equal(board?.w, 1600, "a board that says nothing about itself gets the ceiling");
@@ -324,59 +324,39 @@ test("fit takes both dimensions from the content, and narrows a board with room 
 	const fitted = deck.board("boards/plan.html");
 	assert.equal(fitted?.h, 1448, "the content, plus the margin its components start at");
 	/*
-	 * The change this test exists for. `fit` used to grow the width and never shrink it, so
-	 * a board guessed at 1200 with 700 of content kept a column of empty grid down its
-	 * right-hand side — and a reader cannot tell that from a board whose author meant it.
+	 * The change this test exists for. `fit` used to take the width too, in two passes, which made
+	 * it the one call that could reflow a document to a number it measured for a moment — and on a
+	 * flow board, whose `.doc` is `width: 100%` of the frame, the width it read back was the frame's
+	 * own, so every fit grew the board by the margin.
 	 */
-	assert.equal(fitted?.w, 748, "and the width comes down to the content too");
+	assert.equal(fitted?.w, 1600, "and the width is exactly what the file said");
 	cleanup();
 });
 
-test("fit still grows a board its content has outgrown", async () => {
+test("fit still grows the height past a board its content has outgrown", async () => {
 	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const board = deck.board("boards/plan.html");
 	extents.set("boards/plan.html", { rev: board!.rev, w: 1300, h: 600 });
 
 	await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
-	assert.equal(deck.board("boards/plan.html")?.w, 1300);
+	assert.equal(deck.board("boards/plan.html")?.w, 1600, "the width is not what grew");
 	assert.equal(deck.board("boards/plan.html")?.h, 600);
 	cleanup();
 });
 
 /*
- * The ceiling is the same one `newBoard` applies: `min(viewport, 1600)`. A board wider than
- * the room the canvas has is read scaled down, so growing past it does not help — and the
- * note says so rather than leaving the agent to find the clipping later.
+ * And a wide board stays wide: the width is the author's, and a fit is not the place to disagree
+ * with it silently. Nothing is said about it either — a note on every fit of a wide board is a
+ * note nobody reads, and narrowing is `stage.resize`'s job.
  */
-/*
- * A fit takes the width the content needs, and says when that came out wide.
- *
- * It used to clamp to `min(viewport, 1600)` — which meant a fit could produce the very thing
- * it exists to prevent: a board held at a ceiling with its content past the edge, `clipped`
- * on `stage.boards()`, and a reader with no idea. A wide board is a thing a person can see
- * and drag; a silently clipped one is not.
- */
-test("fit takes the width the content needs, and says so when that is wide", async () => {
+test("a fit of a wide board leaves it wide and says nothing about width", async () => {
 	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const board = deck.board("boards/plan.html");
 	extents.set("boards/plan.html", { rev: board!.rev, w: 1900, h: 600 });
 
 	const result = await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
-	assert.equal(deck.board("boards/plan.html")?.w, 1900, "the content, not the viewport");
-	assert.match(result.text, /came out 1900 wide — over 1200/);
-	assert.match(result.text, /Narrow a component or split the board/);
-	cleanup();
-});
-
-test("a fit that comes out under the wide mark says nothing about width", async () => {
-	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 2560, height: 1400 });
-	const board = deck.board("boards/plan.html");
-	extents.set("boards/plan.html", { rev: board!.rev, w: 1000, h: 600 });
-
-	const result = await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
-	assert.equal(deck.board("boards/plan.html")?.w, 1000);
-	// The note is for a board that came out wide. An ordinary fit should be quiet — a warning
-	// on every call is a warning nobody reads.
+	assert.equal(deck.board("boards/plan.html")?.w, 1600, "the width the file has, not the content's");
+	assert.equal(deck.board("boards/plan.html")?.h, 600);
 	assert.equal(/came out \d+ wide/.test(result.text), false, result.text);
 	cleanup();
 });
