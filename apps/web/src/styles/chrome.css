@@ -279,7 +279,9 @@
 		display: grid;
 		width: 100%;
 		align-items: start;
-		padding: 7px 8px;
+		/* 6px across, the card's padding and this adding up to the same inset the search field and the
+		   thinking scale use — one number in three places, which is how a list stays in one column. */
+		padding: 7px 6px;
 		gap: 2px 9px;
 		grid-template-columns: 16px 1fr;
 		border: 0;

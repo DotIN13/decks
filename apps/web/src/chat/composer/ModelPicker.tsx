@@ -167,15 +167,15 @@ export function ModelPicker(props: {
 				 * asked for here, by the one component that knows it needs it.
 				 */}
 				{/*
-				 * `m-2`: the thinking strip's own `px-2`, applied on all four sides.
+				 * `m-1.5`: the thinking strip's own inset, applied on all four sides.
 				 *
 				 * Left and right are what make the field and the scale below it the same width — the
 				 * scale lives inside a `px-2` wrapper, and the field used to span the card's whole
 				 * content width, so it overhung the row of levels by 8px a side and the card read as two
-				 * widths stacked. Top is 8px for the same reason as the sides: they were 6px while the
-				 * sides were 8, which is a difference nobody can name and everybody can see.
+				 * widths stacked. All four are the same number — 6px, which with the card's own 6px of
+				 * padding puts the field 13px from every edge of the card.
 				 */}
-				<label class="field m-2 h-7">
+				<label class="field m-1.5 h-7">
 				<Icon of={Search} size={13} class="shrink-0 text-faint" />
 				<input
 					/*
@@ -270,7 +270,7 @@ export function ModelPicker(props: {
 					own line the row becomes what it actually is — a scale from `off` to `max`,
 					evenly divided, read left to right.
 				*/}
-				<div class="px-2 py-1">
+				<div class="px-1.5 py-1">
 					<span class="meta">Thinking</span>
 					<div class="seg mt-1 w-full" data-scale="true">
 						<For each={levels()}>
@@ -302,7 +302,7 @@ export function ModelPicker(props: {
 			*/}
 			<Show when={(props.accounts?.length ?? 0) > 1 && props.onAccount}>
 				<div class="rule" />
-				<div class="px-2 py-1">
+				<div class="px-1.5 py-1">
 					<span class="meta">Subscription</span>
 					<div class="mt-1">
 						<For each={props.accounts ?? []}>
