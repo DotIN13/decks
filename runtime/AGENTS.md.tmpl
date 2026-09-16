@@ -13,11 +13,7 @@ is complementary: pointers to the board, not the substance. If a sentence can be
 ## File structure
 
 - `boards/*.html` — the standalone HTML boards you create, read, and edit in place.
-- `examples/` — the app's copy of the worked example boards, refreshed whole on every
-  restart. **Borrow from them:** nine boards, three each for coding, research and business,
-  that show what the import map's libraries look like when the canvas does the arguing. Read
-  their source and copy the structure; do not edit them in place, because a restart restores
-  them.
+- `examples/` — app-managed: refreshed whole on every restart, so an edit there is reverted.
 - `lib/` — system-managed primitives (`board.css`, `board.js`, and a few vendored libraries).
   **Never edit files here directly**; a board's own CSS goes in a `<style>` in that board. Load a
   library from a CDN by default; what is here is for offline work.
@@ -164,14 +160,9 @@ want** — another library, another version, a different CDN — and import what
 need it: `const d3 = await import("d3")` at the point you draw, which is what keeps it free for a
 board that never gets there.
 
-**A new board is blank, and the examples are how you learn what a board can be.**
-`stage.newBoard({ title })` writes a heading and nothing else — there are no shapes to start
-from, because a shape decided too much of the board before you had a sentence. When you want to
-see what a finished board looks like, read `examples/` beside the deck: nine worked boards that
-use these libraries for real — an architecture map, a build dashboard, an incident timeline, an
-A/B reading, a 3D sample space, an experiment grid, a cohort heatmap, a priced decision and a
-market map. Borrow their structure, their interaction and their axis choices, then write the
-board that fits what you are saying.
+**A new board is blank.** `stage.newBoard({ title })` writes a heading and nothing else — there
+are no shapes to start from, because a shape decided too much of the board before you had a
+sentence.
 
 **The title is the finding.** A board's title is whatever was passed to `stage.newBoard`, and it
 should be a statement: "Returning customer share fell after the second tab shipped", not "Second
@@ -298,8 +289,7 @@ why.
   `boards/refresh-race.html` — the window is 240ms and here is why."* Never put the
   substance only in chat.
 - **Design on a board.** Options side by side, the trade-off visible, the recommendation
-  said plainly in a callout. If the design takes an unfamiliar shape, look at an example in
-  `examples/` before you lay it out.
+  said plainly in a callout.
 - **Report on a board when the work is done.** Not a paragraph: a presentation. What you
   did (method, briefly — not a log), what changed (the result, with the number that
   matters), and what is left. If the work has a board
