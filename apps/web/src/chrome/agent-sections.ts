@@ -254,28 +254,36 @@ function sectionNote(rows: AgentRow[]): string | undefined {
 /**
  * What the sections add up to, for the foot.
  *
- * Summed from the sections rather than from the input, so the foot cannot disagree with the
- * list above it. `active` is anything not quiet — the number that answers "is this deck
- * spending money right now".
+ * **Counted from the rows and not from the headings**, which is the whole of why it is written
+ * this way. It used to switch on `section.kind`, and a kind is an urgency word only under the
+ * attention axis: under the workspace axis every agent in a project counted as active (a
+ * finished one included) and `wants` was always zero (a waiting one included). Both numbers
+ * looked maintained while being wrong — the comment said what they meant, a test asserted them —
+ * and nothing failed when the workspace cut became the default. A row's own `status` means the
+ * same thing whichever way the list is cut up.
+ *
+ * `active` is anything not quiet, the number that answers "is this deck spending money right
+ * now". **Neither clause is in the foot today**: it prints the total and nothing else, for the
+ * reason its own body gives. They are here because they are the numbers it would print, and
+ * because the heading notes and a badge will want them.
  */
 export function agentTally(sections: AgentSection[]): { total: number; active: number; wants: number } {
-	let total = 0;
-	let active = 0;
-	let wants = 0;
-	for (const section of sections) {
-		total += section.rows.length;
-		if (section.kind !== "quiet" && section.kind !== "unfiled") active += section.rows.length;
-		if (section.kind === "wants") wants += section.rows.length;
-	}
-	return { total, active, wants };
+	const rows = sections.flatMap((section) => section.rows);
+	return {
+		total: rows.length,
+		active: rows.filter((row) => row.status === "waiting" || row.status === "working").length,
+		wants: rows.filter((row) => row.status === "waiting").length,
+	};
 }
 
 /**
- * The foot's sentence: `5 agents · 3 active · 1 wants you`.
+ * The foot's sentence: the number of agents, or how many of them a search matched.
  *
- * Built here rather than in the markup so it can be asserted without a DOM, and so the two
- * conditional clauses cannot drift apart. The clauses are dropped when they are zero, because
- * "0 wants you" is a sentence about nothing.
+ * Built here rather than in the markup so it can be asserted without a DOM. It takes the whole
+ * tally even though it prints one field of it, which is what the caller has: the clause it used
+ * to print (`3 active · 1 wants you`) was the three headings above it read out again, and the
+ * argument for dropping it is in the body. Keeping the parameter shape means the numbers stay
+ * available to whoever puts a clause back, and that they have to be right for both cuts by then.
  */
 export function agentFoot(tally: { total: number; active: number; wants: number }, matching?: number): string {
 	if (matching !== undefined) return `${matching} of ${tally.total} match`;

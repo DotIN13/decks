@@ -147,6 +147,20 @@ test("the tally comes from the sections, so the foot cannot disagree", () => {
 	assert.deepEqual(agentTally([]), { total: 0, active: 0, wants: 0 });
 });
 
+test("…and it does not depend on which way the list is cut", () => {
+	/*
+	 * The trap this replaces. It switched on `section.kind`, and a kind is an urgency word only
+	 * under the attention axis: filed by workspace, every agent in a project counted as active
+	 * (Wren is `done` and was counted) and `wants` was always 0 (Iris is `waiting` and was not),
+	 * which read as `{total 5, active 4, wants 0}`. The test above could not see any of that,
+	 * because it only ever ran the attention cut.
+	 */
+	assert.deepEqual(agentTally(grouped()), { total: 5, active: 3, wants: 1 });
+	assert.deepEqual(agentTally(list()), agentTally(grouped()), "one list, two cuts, one answer");
+	// Basil is in no workspace at all, which is the third section, and he is still counted once.
+	assert.equal(agentTally(grouped()).total, 5);
+});
+
 test("the foot counts, and leaves the rest to the headings", () => {
 	// It read `5 agents · 3 active · 1 wants you` — the three section headings, each of which
 	// already carries its own count, said again under them.
