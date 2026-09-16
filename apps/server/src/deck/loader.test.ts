@@ -53,7 +53,9 @@ test("boards nobody arranged get placed in rows, not on top of each other", () =
 	const root = emptyDeck();
 	for (const name of ["a", "b", "c", "d"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
 	const deck = Deck.open(root);
-	const boxes = deck.boards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h }));
+	// Through `state()`: the arrangement is computed when the boards are sent, not stored on them, which
+	// is what a stage's positions made true. The board list itself is only the list of boards.
+	const boxes = deck.state().boards.map((b) => ({ path: b.path, x: b.x, y: b.y, w: b.w, h: b.h }));
 	for (const a of boxes) {
 		for (const b of boxes) {
 			if (a.path === b.path) continue;
