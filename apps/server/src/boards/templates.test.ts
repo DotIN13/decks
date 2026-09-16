@@ -45,6 +45,32 @@ test("a new board's head names the libraries it may import, pinned over https", 
 	assert.ok(importMapOf(renderFormat("flow", "Notes")).imports.three);
 });
 
+test("a long title gets its own room, so nothing lands on top of it", () => {
+	const rowOne = (title: string, w?: number) => {
+		const html = renderTemplate("answer", title, w ? { w } : undefined);
+		return Number(/data-id="answer"[^>]*top: (\d+)px/.exec(html)?.[1]);
+	};
+	// One line at the default width: the shape's own first row, unchanged.
+	assert.equal(rowOne("Short"), 152);
+	// A title that wraps needs more room, and that is the case that used to overlap: the first
+	// row has always been a fixed number, and a title is whatever the caller passed.
+	const twoLines = rowOne("A title long enough to wrap on a narrow board, twice over");
+	assert.ok(twoLines > 152, `two lines pushes the row down (${twoLines})`);
+	const fourLines = rowOne("A title long enough to wrap on a narrow board, three times over and then some", 390);
+	assert.ok(fourLines > twoLines, `more lines push it further (${fourLines})`);
+	// And the board grows to hold what moved, rather than the content moving into the title.
+	assert.ok((readBoardMeta(renderTemplate("answer", "x".repeat(200), { w: 390 })).h ?? 0) > 600);
+});
+
+test("a template's chart imports the library only while the chart is on the board", () => {
+	// The whole point of an import map is that it costs nothing until something is imported; a
+	// template that imported d3 at the top would charge every board for a card the agent may have
+	// deleted. Both chart templates guard on the element, so deleting it removes the cost too.
+	for (const kind of ["answer", "report"] as const) {
+		assert.match(renderTemplate(kind, "T"), /if \(host\) \{[\s\S]*await import\("d3"\)/, `${kind} guards its import`);
+	}
+});
+
 test("three and its addons resolve to the same build", () => {
 	const { imports } = importMapOf(renderTemplate("answer", "T"));
 	const version = (url: string) => /three@([\d.]+)/.exec(url)?.[1];

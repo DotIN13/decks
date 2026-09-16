@@ -9,9 +9,9 @@
 	</head>
 	<body class="board">
 		<!--
-			Goal, approach, steps — in that order down the page and in that order in the
-			file. Widths come from the board's own width ({{CONTENT}}, {{COL}}), so the pair
-			folds into one column on a narrow board without this file changing.
+			Goal, approach, the shape of the work, then the steps somebody would actually follow.
+			Widths come from the board's own width ({{CONTENT}}, {{COL}}), so the pair folds into
+			one column on a narrow board without this file changing.
 		-->
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
@@ -24,27 +24,50 @@
 
 		<section class="card" data-id="approach" style="left: {{COLX}}px; top: {{PAIRB}}px; width: {{COL}}px">
 			<h3>Approach</h3>
-			<p>…</p>
+			<p>How it gets done, in a line — the decision the steps follow from.</p>
 		</section>
 
 		<!--
-			Steps somebody could follow without you in the room: one line each, in the order
-			they happen, each ending somewhere a person can look. A step that needs a
-			paragraph is two steps, and a step you cannot say the end of is a question.
+			The shape of the work.
+
+			Drawn rather than described: an `<svg>` inside a card puts its coordinates in the file,
+			so you and a reader can both see where a milestone is and move it. Move the dots to move
+			the plan; a sentence about a schedule cannot do that.
 		-->
-		<section class="card" data-id="steps" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
+		<section class="card" data-id="timeline" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
+			<h3>When</h3>
+			<svg viewBox="0 0 900 180" style="width: 100%; height: 180px" role="img" aria-label="Milestones along a line">
+				<line x1="70" y1="96" x2="860" y2="96" style="stroke: var(--b-border-strong)" stroke-width="2" />
+				<circle cx="70" cy="96" r="8" style="fill: var(--b-accent)" />
+				<circle cx="330" cy="96" r="7" style="fill: var(--b-bg); stroke: var(--b-border-strong); stroke-width: 2" />
+				<circle cx="600" cy="96" r="7" style="fill: var(--b-bg); stroke: var(--b-border-strong); stroke-width: 2" />
+				<circle cx="860" cy="96" r="8" style="fill: var(--b-ok)" />
+
+				<text x="70" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">now</text>
+				<text x="70" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">…</text>
+
+				<text x="330" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">milestone</text>
+				<text x="330" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">…</text>
+
+				<text x="600" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">milestone</text>
+				<text x="600" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">…</text>
+
+				<text x="860" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">done</text>
+				<text x="860" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">…</text>
+			</svg>
+		</section>
+
+		<!--
+			Steps somebody could follow without you in the room: one line each, in the order they
+			happen, each ending somewhere a person can look. A step that needs a paragraph is two
+			steps, and a step you cannot say the end of is a question.
+		-->
+		<section class="card" data-id="steps" style="left: 48px; top: {{ROW3}}px; width: {{CONTENT}}px">
 			<h3>Steps</h3>
 			<ol>
 				<li>…</li>
 			</ol>
 		</section>
-
-		<!--
-			If a step needs a picture rather than a paragraph, draw it: one component that
-			owns its boxes and the arrows between them, at coordinates you chose. There is
-			no connector between two components, on purpose — a line placed at mount time
-			is not in the file, so nobody can read it or edit it. See board-authoring.
-		-->
 
 		<script src="../lib/board.js"></script>
 	</body>

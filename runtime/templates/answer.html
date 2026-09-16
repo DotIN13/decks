@@ -9,39 +9,86 @@
 	</head>
 	<body class="board">
 		<!--
-			One column, read top to bottom, and the file is in that order — which is the rule
-			rather than a habit: a reader's eye and a `data-id` list should agree, or neither
-			you nor the person you are answering can say where anything is.
-
-			Widths come from the board's own width ({{CONTENT}}, {{COL}}), so this same file
-			is a wide board on a laptop and a narrow one on a phone without clipping either.
+			The question, the answer, and at most one thing that shows it. Widths come from the
+			board's own width ({{CONTENT}}), so this is a wide board on a laptop and a narrow one
+			on a phone without anything clipping. Read top to bottom, and the file is in that
+			order.
 		-->
 		<div class="text" data-id="question" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
 		</div>
 
 		<!--
-			The answer, in one screen — and the first sentence *is* the answer.
+			The first sentence under the title *is* the answer.
 
-			Not the background, not what you were asked, not how you found out. Somebody
-			should be able to read this line out loud and be right. Then cut every sentence
-			after it that does not change what they do or believe.
-
-			If the answer is a comparison it is a `.card.table`, not three paragraphs; if it
-			is a structure it is an `<svg>`; if it is a quantity it is a `.kpi`. A third
-			paragraph in here is one of those three you have not drawn yet.
+			Not the background, not what you were asked, not how you found out. Somebody should
+			be able to read this out loud and be right. Then cut every sentence after it that
+			does not change what they do or believe.
 		-->
-		<section class="card" data-id="answer" style="left: 48px; top: {{ROW1}}px; width: {{CONTENT}}px">
-			<p>…</p>
-		</section>
+		<div class="callout" data-id="answer" data-tone="accent" style="left: 48px; top: {{ROW1}}px; width: {{CONTENT}}px">
+			<p><b>The answer, in one sentence somebody could repeat.</b></p>
+		</div>
 
 		<!--
-			More below this, not beside it, unless two things really are a pair — then use
-			x = 48 and x = {{COLX}}, in that order in the file.
+			The evidence — and the only thing here that uses the import map. Five bars are worth
+			a library; three paragraphs are not.
 
-			And prefer not adding it. A second card that explains the first one usually means
-			the first one is not yet saying it.
+			Delete this card if the answer is a comparison (a `.table`), a structure (an `<svg>`
+			you drew), or a quantity best said as one number (a `.kpi`). The script goes with it:
+			it imports lazily and only when this element is still on the board, so a board without
+			the chart never fetches d3 at all.
 		-->
+		<section class="card" data-id="evidence" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
+			<h3>Where the difference is</h3>
+			<div id="chart" style="height: 168px"></div>
+			<p style="color: var(--b-muted); font-size: 12px">Sample months — replace the series and the labels.</p>
+		</section>
+
+		<script type="module">
+			/*
+			 * A guarded import: the library is fetched only while the chart is on the board.
+			 *
+			 * `import("d3")` resolves through the map in this file's head — edit that map to
+			 * change the version, or to reach for `three`, `gsap` or `chart.js` instead. Draw in
+			 * `board:ready` when the layout has to be settled first; here the host has a fixed
+			 * height, so the board measures the same whether the bars are drawn yet or not.
+			 */
+			const host = document.querySelector("#chart");
+			if (host) {
+				const d3 = await import("d3");
+				const data = [
+					{ month: "Jan", share: 0.42 },
+					{ month: "Feb", share: 0.61 },
+					{ month: "Mar", share: 0.55 },
+					{ month: "Apr", share: 0.78 },
+					{ month: "May", share: 0.9 },
+				];
+				const width = host.clientWidth || 600;
+				const height = 168;
+				const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
+				const x = d3.scaleBand().domain(data.map((d) => d.month)).range([0, width]).padding(0.34);
+				const y = d3.scaleLinear().domain([0, 1]).range([height - 24, 6]);
+				svg.selectAll("rect")
+					.data(data)
+					.join("rect")
+					.attr("x", (d) => x(d.month))
+					.attr("y", (d) => y(d.share))
+					.attr("width", x.bandwidth())
+					.attr("height", (d) => y(0) - y(d.share))
+					.attr("rx", 3)
+					.style("fill", "var(--b-accent)");
+				svg.selectAll("text")
+					.data(data)
+					.join("text")
+					.attr("x", (d) => x(d.month) + x.bandwidth() / 2)
+					.attr("y", height - 6)
+					.attr("text-anchor", "middle")
+					.style("font-size", "11px")
+					.style("font-family", "var(--b-font)")
+					.style("fill", "var(--b-muted)")
+					.text((d) => d.month);
+			}
+		</script>
 
 		<script src="../lib/board.js"></script>
 	</body>

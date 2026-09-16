@@ -122,6 +122,22 @@ const GUTTER = 48;
  */
 const STACK_BELOW = 720;
 
+/*
+ * The heading's arithmetic, for the one box whose height is not the template's.
+ *
+ * Measured off the rendered templates rather than guessed: one wrapped line of `<h1>` is 38px, the
+ * heading starts at 40, and the muted line under it is 21px a line. The two character widths are
+ * averages for the sizes concerned, and `HEADING_SLACK` is there because the estimate is allowed to
+ * be wrong in one direction only.
+ */
+const HEADING_TOP = 40;
+const H1_LINE = 38;
+const H1_MARGIN = 12;
+const H1_CHARS = 15.5;
+const P_LINE = 21;
+const P_CHARS = 7.4;
+const HEADING_SLACK = 8;
+
 /**
  * The widest a board of this shape should be when nobody said.
  *
@@ -139,10 +155,10 @@ const STACK_BELOW = 720;
  * drag; unpicking a cramped comparison is not.
  */
 const SIZE: Record<BoardTemplate, { w: number; h: number }> = {
-	answer: { w: 880, h: 480 },
-	design: { w: 1000, h: 620 },
-	report: { w: 1200, h: 700 },
-	plan: { w: 880, h: 680 },
+	answer: { w: 880, h: 600 },
+	design: { w: 1000, h: 900 },
+	report: { w: 1200, h: 1080 },
+	plan: { w: 880, h: 1000 },
 	blank: { w: 880, h: 400 },
 };
 
@@ -199,19 +215,32 @@ export function boardWidth(wanted: number | undefined, viewport: number | undefi
  * - `PAIRB` — the top of a pair's *second* card, which is the pair's own row until it folds
  * - `BOTTOM` — where the content ends, which is what the board's height is measured against
  */
-function layout(w: number, rhythm: Rhythm): Record<string, number> {
+function layout(w: number, rhythm: Rhythm, title: string): Record<string, number> {
 	const content = w - MARGIN * 2;
 	const stacked = content < STACK_BELOW;
 	const col = stacked ? content : Math.floor((content - GUTTER) / 2);
+	/*
+	 * Where the first row starts, which is the one number a template cannot state for itself.
+	 *
+	 * Everything else here is the shape's; the heading's height is the *caller's* — `{{TITLE}}` is
+	 * whatever they passed, and eight words are three lines on a narrow board and one on a wide
+	 * one. A fixed first row therefore collides with the title exactly on the small board nobody
+	 * looks at, so the room is estimated from the title's length and the content width, and the
+	 * estimate errs high: overlapping text is the failure that cannot be seen from the source.
+	 */
+	const titleLines = Math.max(1, Math.ceil(title.length / Math.max(8, content / H1_CHARS)));
+	const subtitleLines = rhythm.subtitle ? Math.ceil(rhythm.subtitle / Math.max(12, content / P_CHARS)) : 0;
+	const heading = HEADING_TOP + H1_MARGIN + H1_LINE * titleLines + (subtitleLines > 0 ? P_LINE * subtitleLines + H1_MARGIN : 0) + HEADING_SLACK;
+	const first = Math.max(rhythm.first, heading + GUTTER);
 	const tokens: Record<string, number> = {
 		CONTENT: content,
 		COL: col,
 		COLX: stacked ? MARGIN : MARGIN + col + GUTTER,
 		// A shape with no pair still substitutes it: a token left unreplaced would ship
 		// `{{PAIRB}}` into a board, and `templates.test.ts` refuses that for every kind.
-		PAIRB: rhythm.first,
+		PAIRB: first,
 	};
-	let y = rhythm.first;
+	let y = first;
 	rhythm.rows.forEach((row, index) => {
 		tokens[`ROW${index + 1}`] = y;
 		if (row.pair) {
@@ -234,15 +263,25 @@ function layout(w: number, rhythm: Rhythm): Record<string, number> {
  */
 interface Rhythm {
 	first: number;
+	/**
+	 * How many characters the muted line under the title holds, when a kind has one.
+	 *
+	 * Here rather than read from the template because the room it needs is part of the arithmetic
+	 * `layout` does — a subtitle that wraps to two lines on a narrow board is two lines of heading.
+	 */
+	subtitle?: number;
 	rows: Array<{ h: number; pair?: boolean }>;
 }
 
 const ROWS: Record<BoardTemplate, Rhythm> = {
-	answer: { first: 152, rows: [{ h: 220 }] },
-	design: { first: 168, rows: [{ h: 220, pair: true }, { h: 110 }] },
-	// The number first, then the two columns that explain it, then what is left.
-	report: { first: 168, rows: [{ h: 110 }, { h: 230, pair: true }, { h: 110 }] },
-	plan: { first: 152, rows: [{ h: 210, pair: true }, { h: 190 }] },
+	// The answer, then the one card that shows it.
+	answer: { first: 152, rows: [{ h: 56 }, { h: 264 }] },
+	// The options, the trade-off drawn, the recommendation.
+	design: { first: 152, subtitle: 35, rows: [{ h: 200, pair: true }, { h: 300 }, { h: 72 }] },
+	// The number, the series, how and what, what is left.
+	report: { first: 168, subtitle: 50, rows: [{ h: 72 }, { h: 296 }, { h: 230, pair: true }, { h: 72 }] },
+	// Goal and approach, the milestones, the steps.
+	plan: { first: 152, rows: [{ h: 180, pair: true }, { h: 248 }, { h: 230 }] },
 	blank: { first: 152, rows: [] },
 };
 
@@ -260,7 +299,7 @@ export function renderTemplate(kind: BoardTemplate, title: string, size?: { w?: 
 	const file = join(templatesDir(), `${kind}.html`);
 	const source = existsSync(file) ? readFileSync(file, "utf8") : FALLBACK;
 	const w = Math.round(size?.w ?? SIZE[kind].w);
-	const boxes = layout(w, ROWS[kind]);
+	const boxes = layout(w, ROWS[kind], title);
 	/*
 	 * The height follows the layout rather than the table, because folding the columns adds
 	 * a row: a `plan` is 780 tall at 1000 and taller at 390, and a height that did not know

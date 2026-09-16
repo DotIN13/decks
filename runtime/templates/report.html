@@ -9,21 +9,15 @@
 	</head>
 	<body class="board">
 		<!--
-			The number first, then how and what, then what is left.
+			The number first, then what it looks like over time, then how and what, then what is
+			left. The file is in that order, so a reader's eye and a `data-id` list agree.
 
-			The headline used to sit in a third column beside method and result, which read
-			left → right → back → down and put the one thing worth seeing where the eye
-			arrives last. It is the executive summary: it goes at the top, full width, and
-			the file reads in the order the page does.
+			The line under the title is the finding, in a sentence somebody could repeat — not a
+			label for the shape. "What was done, and what it means" is what you replace.
 		-->
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
-			<p style="color: var(--b-muted)">What was done, and what it means.</p>
-			<!--
-				Replace that line with the finding, in a sentence somebody could repeat. It is
-				the most-read text on the board and "what was done, and what it means" is a
-				label for the shape rather than a thing you learned.
-			-->
+			<p style="color: var(--b-muted)">The finding, in a sentence somebody could repeat.</p>
 		</div>
 
 		<!-- The number that matters, before anything that explains it. -->
@@ -33,14 +27,27 @@
 		</div>
 
 		<!--
-			Method: how, briefly. **Not a log.**
-			
-			Two or three steps somebody could repeat, in the shortest words that are still
-			true. What you tried and abandoned belongs here only if the abandoning is the
-			finding.
+			The result, as a picture over time — the one component here that uses the import map.
+			A series is what a library is for; if the result is a single number, delete this card
+			and keep the `.kpi` above. The script goes with it: the import runs only while this
+			element is on the board, so a report without a chart never fetches d3.
+
+			Draw in `board:ready` when the layout has to be settled first, and keep a fixed height
+			on the host so the board measures the same with or without the drawing in it.
 		-->
-		<section class="card" data-id="method" style="left: 48px; top: {{ROW2}}px; width: {{COL}}px">
-			<h4>Method</h4>
+		<section class="card" data-id="chart" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
+			<h3>The result, over time</h3>
+			<div id="chart-host" style="height: 200px"></div>
+			<p style="color: var(--b-muted); font-size: 12px">Sample series — replace the data and the axis.</p>
+		</section>
+
+		<!--
+			Method: how, briefly. **Not a log.** Two or three steps somebody could repeat, in the
+			shortest words that are still true. What you tried and abandoned belongs here only if
+			the abandoning is the finding.
+		-->
+		<section class="card" data-id="method" style="left: 48px; top: {{ROW3}}px; width: {{COL}}px">
+			<h3>Method</h3>
 			<ol>
 				<li>…</li>
 			</ol>
@@ -48,14 +55,60 @@
 
 		<!-- Result: what changed, said as a number wherever there is one to say. -->
 		<section class="card" data-id="result" style="left: {{COLX}}px; top: {{PAIRB}}px; width: {{COL}}px">
-			<h4>Result</h4>
+			<h3>Result</h3>
 			<p>…</p>
 		</section>
 
 		<!-- What is left, if anything. Say "nothing" rather than deleting it. -->
-		<div class="callout" data-id="left" data-tone="warn" style="left: 48px; top: {{ROW3}}px; width: {{CONTENT}}px">
-			<strong>Left to do.</strong> <span>…</span>
+		<div class="callout" data-id="left" data-tone="warn" style="left: 48px; top: {{ROW4}}px; width: {{CONTENT}}px">
+			<p><b>Left to do.</b> …</p>
 		</div>
+
+		<script type="module">
+			/*
+			 * A guarded import. Delete the chart card and this never fetches anything: the map in
+			 * the head is names, not downloads.
+			 */
+			const host = document.querySelector("#chart-host");
+			if (host) {
+				const d3 = await import("d3");
+				const data = [3, 4, 3, 6, 5, 8, 7, 9, 8, 11, 12, 14].map((v, i) => ({
+					month: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][i],
+					value: v,
+				}));
+				const width = host.clientWidth || 900;
+				const height = 200;
+				const pad = { top: 12, right: 8, bottom: 30, left: 26 };
+				const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
+				const x = d3.scalePoint().domain(data.map((d) => d.month)).range([pad.left, width - pad.right]);
+				const y = d3.scaleLinear().domain([0, d3.max(data, (d) => d.value)]).nice().range([height - pad.bottom, pad.top]);
+				// The baseline, so the area reads as a quantity rather than a shape.
+				for (const tick of y.ticks(4)) {
+					svg.append("line").attr("x1", pad.left).attr("x2", width - pad.right).attr("y1", y(tick)).attr("y2", y(tick)).style("stroke", "var(--b-border)");
+				}
+				svg.append("path")
+					.datum(data)
+					.attr("fill", "none")
+					.attr("stroke", "var(--b-accent)")
+					.attr("stroke-width", 2)
+					.attr("d", d3.line().x((d) => x(d.month)).y((d) => y(d.value)));
+				svg.append("path")
+					.datum(data)
+					.attr("fill", "var(--b-accent)")
+					.attr("opacity", 0.12)
+					.attr("d", d3.area().x((d) => x(d.month)).y0(y(0)).y1((d) => y(d.value)));
+				svg.selectAll("text")
+					.data(data.filter((_, i) => i % 2 === 0))
+					.join("text")
+					.attr("x", (d) => x(d.month))
+					.attr("y", height - 10)
+					.attr("text-anchor", "middle")
+					.style("font-size", "11px")
+					.style("font-family", "var(--b-font)")
+					.style("fill", "var(--b-muted)")
+					.text((d) => d.month);
+			}
+		</script>
 
 		<script src="../lib/board.js"></script>
 	</body>

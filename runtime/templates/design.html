@@ -9,12 +9,9 @@
 	</head>
 	<body class="board">
 		<!--
-			Read top to bottom: what is being decided, the options side by side, then the
-			answer. The file is in that order, and within the pair it is left then right —
-			so the DOM and the eye agree at any width.
-
-			On a narrow board the pair folds into one column ({{COLX}} becomes 48 and the
-			second card drops to {{PAIRB}}), and this file does not change to do it.
+			What is being decided, the options side by side, the trade-off drawn, then the answer.
+			Read top to bottom and left to right; on a narrow board the pair folds into one column
+			({{COLX}} becomes 48 and the second card drops to {{PAIRB}}) without this file changing.
 		-->
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
@@ -22,30 +19,60 @@
 		</div>
 
 		<!--
-			The options, as columns of the same width. Left first.
-			
-			Say what each one *costs*, not what it is. Two cards that describe two designs are
-			a pair nobody can choose between; two cards that name the trade-off each one makes
-			are a decision. If the options differ along more than two axes, they are a
-			`.card.table` with a row per axis rather than a pair of paragraphs.
+			The options. Say what each one *costs*, not what it is: two cards that describe two
+			designs are a pair nobody can choose between, and two cards that name the trade-off each
+			one makes are a decision. If they differ along more than two axes, replace the pair with
+			one `.table` and a row per axis.
 		-->
 		<section class="card" data-id="option-a" style="left: 48px; top: {{ROW1}}px; width: {{COL}}px">
 			<h3>Option A</h3>
-			<p>…</p>
+			<p>What it costs, in a line.</p>
+			<p><span class="chip">…</span> <span class="chip">…</span></p>
 		</section>
+
 		<section class="card" data-id="option-b" style="left: {{COLX}}px; top: {{PAIRB}}px; width: {{COL}}px">
 			<h3>Option B</h3>
-			<p>…</p>
+			<p>What it costs, in a line.</p>
+			<p><span class="chip">…</span> <span class="chip">…</span></p>
 		</section>
 
 		<!--
-			The recommendation, said plainly, in a callout so the eye lands on it.
-			
-			Name one, and give the reason in the same breath. "Either could work" is not a
-			recommendation; it is the question handed back.
+			The trade-off, drawn by hand.
+
+			There is no connector between two components on purpose — a line placed at mount time
+			is not in the file, so nobody can read it or edit it. An `<svg>` inside a card *is* the
+			file: these coordinates are the drawing. Move a dot and you have moved the argument.
 		-->
-		<div class="callout" data-id="recommendation" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
-			<strong>Recommendation.</strong> <span>…</span>
+		<section class="card" data-id="tradeoff" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
+			<h3>The trade-off</h3>
+			<svg viewBox="0 0 900 210" style="width: 100%; height: 210px" role="img" aria-label="Cost against value, with each option placed">
+				<!-- The frame: an axis pair, and the halfway lines the quadrants are read from. -->
+				<line x1="70" y1="180" x2="870" y2="180" style="stroke: var(--b-border-strong)" stroke-width="1.5" />
+				<line x1="70" y1="180" x2="70" y2="20" style="stroke: var(--b-border-strong)" stroke-width="1.5" />
+				<line x1="70" y1="100" x2="870" y2="100" style="stroke: var(--b-border)" stroke-dasharray="4 6" />
+				<line x1="470" y1="20" x2="470" y2="180" style="stroke: var(--b-border)" stroke-dasharray="4 6" />
+				<text x="870" y="198" text-anchor="end" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">cost to build →</text>
+				<text x="70" y="14" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">↑ value now</text>
+
+				<!-- Option A, where the argument puts it. -->
+				<circle cx="250" cy="58" r="9" style="fill: var(--b-accent)" />
+				<text x="266" y="62" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">Option A</text>
+				<text x="266" y="80" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">cheap, and visible this week</text>
+
+				<!-- Option B. -->
+				<circle cx="640" cy="132" r="9" style="fill: var(--b-muted)" />
+				<text x="656" y="136" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">Option B</text>
+				<text x="656" y="154" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">dearer, and pays off later</text>
+			</svg>
+		</section>
+
+		<!--
+			The recommendation, said plainly, in a callout so the eye lands on it. Name one, and
+			give the reason in the same breath. "Either could work" is not a recommendation; it is
+			the question handed back.
+		-->
+		<div class="callout" data-id="recommendation" data-tone="accent" style="left: 48px; top: {{ROW3}}px; width: {{CONTENT}}px">
+			<p><b>Recommendation.</b> Option A, because …</p>
 		</div>
 
 		<script src="../lib/board.js"></script>
