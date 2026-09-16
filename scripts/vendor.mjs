@@ -12,6 +12,12 @@
  * build hangs itself off a global named after an internal build step. So esbuild
  * flattens it into one module with one default export.
  *
+ * highlight.js is the second, and for the ordinary reason: a highlighter is a core and a
+ * directory of grammars, and copying the entry alone gives a board that 404s on the first
+ * `language-ts` it meets. Bundling it also decides *which* grammars a board carries — the
+ * `common` set, the thirty-odd that ordinary code is written in — where copying the whole
+ * package would ship a hundred and ninety and a board would pay for them.
+ *
  *     npm run vendor
  */
 import { build } from "esbuild";
@@ -92,10 +98,29 @@ await build({
 });
 console.log(`[vendor] mermaid.bundle.mjs`);
 
+const hljsOut = join(out, "hljs.bundle.mjs");
+await build({
+	stdin: {
+		// The package's own entry for the common grammars; `es/` is where its `import`
+		// condition points, and what has to be named here is the specifier it publishes.
+		contents: 'export { default } from "highlight.js/lib/common";',
+		resolveDir: root,
+		loader: "js",
+	},
+	bundle: true,
+	format: "esm",
+	minify: true,
+	platform: "browser",
+	target: ["es2022"],
+	outfile: hljsOut,
+	logLevel: "error",
+});
+console.log(`[vendor] hljs.bundle.mjs`);
+
 // A note beside the files saying where they came from, since `lib/` is copied
 // into decks and someone will eventually find it there without this repo.
 const versions = Object.fromEntries(
-	["d3", "marked", "katex", "mermaid", "pdfjs-dist"].map((name) => [
+	["d3", "marked", "katex", "mermaid", "pdfjs-dist", "highlight.js"].map((name) => [
 		name,
 		JSON.parse(readFileSync(join(modules, name, "package.json"), "utf8")).version,
 	]),

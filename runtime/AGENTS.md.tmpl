@@ -187,6 +187,14 @@ Inside the deck, any path works. Outside it, the file must be under a root decla
 in `deck.json` — a path that is not renders as a card saying so, which means a
 missing root is visible rather than silent.
 
+**Code is coloured already.** A fenced block that names its language (\`\`\`ts), and a source file an
+embed draws, are highlighted on mount, the way maths and Mermaid are. The runtime carries the
+grammars and colours them from the board's own `--b-code-*` tokens, so a code block is light and
+dark with everything around it, and there is nothing to add to a board to get it. A fence with no
+language is drawn plain rather than guessed at, and an embed whose file name says nothing useful
+takes `data-lang="sql"`. Inline `<code>` in a sentence is never coloured. A `pre` is not retypeable
+in place, because its spacing is content: change code by editing the file.
+
 {{ROOTS}}
 
 ## The canvas itself: `{{STAGE_TOOL}}`

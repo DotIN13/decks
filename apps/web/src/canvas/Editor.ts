@@ -847,6 +847,25 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			return false;
 		}
 		/*
+		 * A code block is not a field, for two reasons that are the same reason twice: its
+		 * spacing is content, and its colour is not.
+		 *
+		 * `normaliseRun` collapses every run of whitespace to one space, which is right for a
+		 * paragraph written across indented lines and destroys a `pre`: the indentation and the
+		 * line breaks are most of what the block says. And `board.js` now puts the syntax inside
+		 * the element as `hljs-*` spans, which the run editor would faithfully write into the
+		 * file — a board gaining a copy of its own rendering, which is the one thing this whole
+		 * area refuses to allow (§6.5).
+		 *
+		 * So the gesture is refused with the routes that do exist named in the sentence. A
+		 * rendered markdown panel is unaffected: its code is edited as its *source*, in the
+		 * textarea over it, because that is how a rendered component is edited at all.
+		 */
+		if (run.closest("pre")) {
+			if (mouse) host.notice("Code keeps its own spacing, and the board draws its colours. Ask the agent to change it.");
+			return false;
+		}
+		/*
 		 * The run's words, before anything else reads them.
 		 *
 		 * A paragraph in a file is written across indented lines, so its text is full of newlines and tabs.
@@ -922,6 +941,17 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			if (event.key === "Escape") {
 				event.preventDefault();
 				stopEditing(false);
+				/*
+				 * And then stop, because there is no longer an edit.
+				 *
+				 * `stopEditing` has just cleared `editing`, and everything below this point reads
+				 * it: the Escape branch fell through to `editing.kind` and threw
+				 * "Cannot read properties of undefined" on every Escape that closed an edit. It was
+				 * invisible in the app — the editor had already closed and the exception left an
+				 * error in the console and nothing else — and it is the reason this is a `return`
+				 * rather than a second guard: the rest of the handler is about an edit that is open.
+				 */
+				return;
 			}
 			/*
 			 * A newline in the **source textarea** is the textarea's own, and this branch is why that has to

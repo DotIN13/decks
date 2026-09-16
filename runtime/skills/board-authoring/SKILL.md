@@ -56,6 +56,14 @@ description: How to write a board — its format and lifecycle, the rules for co
   serves the whole package.
 - **Copy: plain words and short sentences, no em dashes.** A board is read once, by somebody deciding
   something, so a sentence they have to read twice is a sentence that did not earn its place.
+- **Code is coloured, and the fence or the file says what it is.** A fenced block that names its
+  language (\`\`\`ts), and a source file an embed draws (the language comes from the extension, or
+  from `data-lang="sql"` when the name says nothing useful), are highlighted by the runtime with
+  nothing added to the board. The colours are the `--b-code-*` tokens, so a code block is light and
+  dark with the rest of the board. A fence with no language is drawn plain, because the runtime never
+  guesses, and so is a language outside the bundle's common set. Inline `<code>` in a sentence is
+  never coloured. A `pre` is not retypeable in place: its spacing is content. Change code by editing
+  the file, or as the source of a markdown panel.
 
 **Styling & Design System Tokens**
 

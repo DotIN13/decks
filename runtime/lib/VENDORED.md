@@ -9,3 +9,4 @@ renames noted in `scripts/vendor.mjs`.
 - katex 0.16.47
 - mermaid 11.17.2
 - pdfjs-dist 5.7.284
+- highlight.js 11.12.0
