@@ -118,16 +118,20 @@ a board contains lives in the board file. Where it sits lives in the record of t
 canvas it is — `AgentRecord.positions`, under `.decks/agents/<id>/`, beside what that conversation
 is holding and showing (`§6.2`). So two conversations can look at one deck from two arrangements,
 the way they already keep two cameras, and a drag in one moves nothing for the other. A board no
-stage has placed is laid out by `Deck.arrange` — the rows-of-three rule `autoPlace` has always
-applied — and the place it works out is written down on that stage the first time it is sent, so a
-board lands once instead of chasing whatever was dragged last.
+stage has placed takes the place the deck itself was laid out with, and a board with neither goes
+through `Deck.arrange` — the rows-of-three rule `autoPlace` has always applied. Either place is
+written down on that stage the first time it is sent, so a board lands once instead of chasing
+whatever was dragged last.
 
 The deck's own file is then the deck's own facts: its name, the roots embeds may reach, and a size
 for the two kinds of board that have nowhere in their file to keep one (a foreign page and a slide
 deck). It is read forgivingly and written completely: an unparseable field is a default plus a
 warning, never a refusal to open, and keys this build does not understand survive a write
 (`schema.ts`). It is a file a person is expected to open. An older file's `boards` map is read for
-its sizes; its positions are dropped, because a position in that file has no stage to belong to.
+its sizes, and its positions become the **seed** a stage starts from — handed to the first
+conversation that asks and then written into that conversation's own record, so a deck somebody
+laid out by hand does not open in rows of three. The map is gone from the file on the next write,
+which is what makes it a migration rather than a second source of truth.
 
 ### 2.1 `lib/` is a copy, and the copy is refreshed
 

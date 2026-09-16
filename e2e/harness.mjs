@@ -352,6 +352,15 @@ export async function socket() {
 export async function resetStage() {
 	const deck = await deckState();
 	const wanted = deck.boards.map((board) => board.path);
+	/*
+	 * And where the fixture puts them, not wherever the last check left them.
+	 *
+	 * A board's place belongs to the conversation now, so it survives from one check to the next: a
+	 * drag in `gestures.mjs` is still in force when `selection.mjs` flies to `plan.html` and expects
+	 * its neighbours. `/api/deck` answers with the deck's own arrangement — the seed a stage starts
+	 * from — so putting each board back is one `board.move` per board, the same message a drag sends.
+	 */
+	const places = deck.boards.filter((board) => Number.isFinite(board.x) && Number.isFinite(board.y));
 	const link = await socket();
 	/*
 	 * Confirmed, for the *focused* agent, and retried until it is.
@@ -373,7 +382,10 @@ export async function resetStage() {
 	let agent;
 	while (Date.now() < deadline) {
 		agent = link.last("agents")?.focused ?? agent;
-		if (agent) for (const path of wanted) link.send({ type: "board.play", path });
+		if (agent) {
+			for (const board of places) link.send({ type: "board.move", path: board.path, x: board.x, y: board.y });
+			for (const path of wanted) link.send({ type: "board.play", path });
+		}
 		await new Promise((resolve) => setTimeout(resolve, 400));
 		landed = link.received.filter((m) => m.type === "context.changed" && m.agentId === agent).at(-1)?.inPlay ?? [];
 		if (agent && wanted.every((path) => landed.includes(path))) break;

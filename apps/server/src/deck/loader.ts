@@ -32,12 +32,22 @@ export interface DeckWarning {
 /**
  * The open deck: `deck.json`, the boards on disk, and the roots embeds may reach.
  *
- * Holds no agent state and no camera — those belong to a session and a browser
- * respectively. What it owns is the arrangement, which is why it is also the only
- * thing that writes `deck.json`.
+ * Holds no agent state and no camera — those belong to a session and a browser respectively. What it
+takes from the file is the deck's own facts: its name, the roots, a size for a board that cannot
+state one, and the arrangement an older file laid its boards out in, which it hands to a stage as a
+seed and never writes back.
  */
 export class Deck {
 	private file: DeckFile = { version: 1 };
+	/**
+	 * The places an older `deck.json` laid its boards out in — the arrangement a stage is seeded from.
+	 *
+	 * Read, never written: a place belongs to a stage now, so this is handed to a conversation the first
+	 * time it asks and then recorded in that conversation's own record (`App.stageState`). It is not in
+	 * `file`, so the next `save()` drops it from the disk for good — a conversation started after that
+	 * seeds nothing, which is the end state the migration is for.
+	 */
+	private seeds: Record<string, { x: number; y: number }> = {};
 	private boardsByPath = new Map<string, Board>();
 	/**
 	 * `mtime:size` per board file, so `resync` can skip what has not moved.
@@ -109,14 +119,16 @@ export class Deck {
 	}
 
 	/**
-	 * The deck as one stage sees it: `positions` overrides where a board sits, and every board the
-	 * stage has not placed goes through the deck's own auto-layout.
+	 * The deck as one stage sees it: `positions` overrides where a board sits, then the place the deck
+	 * itself was laid out with, and a board with neither goes through the auto-layout.
 	 *
 	 * Called with the focused agent's map, so what the client draws is that stage's arrangement. Called
-	 * with nothing, it is the arrangement a stage that has placed nothing starts from.
+	 * with nothing, it is the arrangement a stage that has placed nothing starts from — which is the
+	 * deck's own, because that is what `seeds` is.
 	 *
-	 * `onPlace` is handed every place that had to be *worked out* rather than read, which is what lets
-	 * the caller write it down on the stage and stop working it out. See `arrange`.
+	 * `onPlace` is handed every place that was *not* read from the stage's own map — seeded or worked
+	 * out — which is what lets the caller write it down on the stage and stop asking again. See
+	 * `arrange`.
 	 */
 	state(
 		positions?: Record<string, { x: number; y: number }>,
@@ -128,10 +140,10 @@ export class Deck {
 	/**
 	 * The boards, placed for one stage.
 	 *
-	 * A board with a position in `positions` takes it; every other board goes through the existing
-	 * `autoPlace`, with the boards that *do* have a position as its "already placed" — so the rows are
-	 * laid out under this stage's arrangement rather than under a deck-wide one that is not there any
-	 * more.
+	 * A board with a position in `positions` takes it; one the deck was laid out with takes the seed;
+	 * every other board goes through the existing `autoPlace`, with the boards that *do* have a place as
+	 * its "already placed" — so the rows are laid out under this stage's arrangement rather than under a
+	 * deck-wide one that is not there any more.
 	 *
 	 * **The places `autoPlace` computes are reported, not kept.** This function is called on every
 	 * send, and a board placed beside the frontier *now* would chase it the next time somebody moved
@@ -145,9 +157,20 @@ export class Deck {
 		const placed: Board[] = [];
 		const unplaced: Board[] = [];
 		for (const board of this.boards) {
-			const at = positions?.[board.path];
-			if (at) placed.push({ ...board, x: Math.round(at.x), y: Math.round(at.y) });
-			else unplaced.push({ ...board });
+			const own = positions?.[board.path];
+			/*
+			 * The stage's own place, or the one the deck was laid out with.
+			 *
+			 * A seed is reported through `onPlace` exactly as a computed place is, which is what makes
+			 * this a migration: the stage writes the deck's arrangement into its own record on the first
+			 * send, and the map in `deck.json` stops mattering from then on.
+			 */
+			const at = own ?? this.seeds[board.path];
+			if (at) {
+				const spot = { x: Math.round(at.x), y: Math.round(at.y) };
+				placed.push({ ...board, ...spot });
+				if (!own) onPlace?.(board.path, spot);
+			} else unplaced.push({ ...board });
 		}
 		autoPlace(unplaced, placed);
 		for (const board of unplaced) onPlace?.(board.path, { x: board.x, y: board.y });
@@ -167,11 +190,13 @@ export class Deck {
 		if (existsSync(deckFile)) {
 			const parsed = parseDeckFile(readFileSync(deckFile, "utf8"));
 			this.file = parsed.file;
+			this.seeds = parsed.arrangement;
 			this.warnings.push(...parsed.warnings);
 		} else {
 			// A directory of boards with no deck.json is still a deck; it just has
 			// no arrangement yet. Opening one must not require writing to it.
 			this.file = { version: 1 };
+			this.seeds = {};
 		}
 
 		this.resolved = resolveRoots(this.path, declaredRoots(this.file));

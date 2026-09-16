@@ -25,11 +25,12 @@ test("a deck file round-trips, keeping keys it does not know about", () => {
 	assert.ok(written.indexOf('"sizes"') < written.indexOf('"somethingNewer"'));
 });
 
-test("a legacy boards map gives up its sizes and loses its positions", () => {
-	const { file, warnings } = parseDeckFile('{"boards":{"a.html":{"x":10,"y":20,"w":500}}}');
-	// The size is a fact about a board that has nowhere else to keep it; the place belongs to a
-	// stage now, and this file is not one.
+test("a legacy boards map gives up its sizes, and its places become the seed", () => {
+	const { file, arrangement, warnings } = parseDeckFile('{"boards":{"a.html":{"x":10,"y":20,"w":500}}}');
+	// The size is a fact about a board that has nowhere else to keep it. The place belongs to a stage
+	// now, so it is not written back — but it is kept as the arrangement a stage starts from.
 	assert.deepEqual(file.sizes, { "a.html": { w: 500 } });
+	assert.deepEqual(arrangement, { "a.html": { x: 10, y: 20 } });
 	assert.equal("boards" in file, false, "the old key is consumed, so a write does not carry it on");
 	assert.deepEqual(warnings, []);
 });

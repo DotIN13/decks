@@ -161,7 +161,7 @@ test("a size a board cannot state itself survives a save and a reload", () => {
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("a legacy boards map gives its sizes to a stage that keeps them", () => {
+test("a legacy boards map gives its sizes, and seeds the stage with its places", () => {
 	const root = emptyDeck();
 	writeFileSync(join(root, "boards", "saved.html"), foreign("Saved"));
 	writeFileSync(
@@ -169,10 +169,27 @@ test("a legacy boards map gives its sizes to a stage that keeps them", () => {
 		JSON.stringify({ version: 1, name: "T", boards: { "boards/saved.html": { x: 120, y: 340, w: 900, h: 700 } } }),
 	);
 	const deck = Deck.open(root);
-	// The size is carried over; the position is not, because a position in this file has no stage to
-	// belong to and the auto-layout is the honest answer.
+	// The size is carried over, because this board's file has nowhere to keep one.
 	assert.deepEqual([deck.board("boards/saved.html")?.w, deck.board("boards/saved.html")?.h], [900, 700]);
-	assert.deepEqual([deck.state().boards[0]?.x, deck.state().boards[0]?.y], [0, 0]);
+
+	/*
+	 * And the place is the seed a stage starts from — reported through `onPlace` so the stage writes
+	 * it down and the map stops mattering. A deck somebody laid out by hand must not open in rows of
+	 * three the day the map stops being authoritative.
+	 */
+	const kept: Record<string, { x: number; y: number }> = {};
+	const state = deck.state(undefined, (path, at) => (kept[path] = at));
+	assert.deepEqual([state.boards[0]?.x, state.boards[0]?.y], [120, 340], "the deck's own arrangement");
+	assert.deepEqual(kept, { "boards/saved.html": { x: 120, y: 340 } }, "and the caller is told, so it can keep it");
+
+	// A stage that already has a place is not seeded again, and the map is gone from the file the
+	// first time anything writes it — which is what makes this a migration and not a second store.
+	const again: string[] = [];
+	deck.state(kept, (path) => again.push(path));
+	assert.deepEqual(again, []);
+	deck.save();
+	const written = JSON.parse(readFileSync(join(root, "deck.json"), "utf8")) as Record<string, unknown>;
+	assert.equal("boards" in written, false, "the old map is not written back");
 	rmSync(root, { recursive: true, force: true });
 });
 

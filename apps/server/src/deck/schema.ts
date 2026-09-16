@@ -33,15 +33,26 @@ export interface DeckFile {
 
 export interface ParsedDeckFile {
 	file: DeckFile;
+	/**
+	 * The arrangement an older `boards` map held, kept as a **seed** rather than as state.
+	 *
+	 * Where a board sits belongs to a stage now, so this is never written back and never read after
+	 * the first send. It is the place a conversation that has not moved that board starts from, so a
+	 * deck somebody laid out by hand does not open in rows of three the day the map stops being
+	 * authoritative. The stage records whatever it is handed, and the map is gone from the file on
+	 * the next write — which is what makes this a migration rather than a second source of truth.
+	 */
+	arrangement: Record<string, { x: number; y: number }>;
 	warnings: string[];
 }
 
 /**
  * The keys this build understands.
  *
- * `boards` is here and not on `DeckFile`: it is the older name for `sizes`, carrying a
- * position as well, and it is consumed so that a write drops it rather than carrying it
- * forward forever. Nothing reads an `x` or a `y` out of it.
+ * `boards` is here and not on `DeckFile`: it is the older name for `sizes`, carrying a position as
+ * well, and it is consumed so that a write drops it rather than carrying it forward forever. Its
+ * `w`/`h` become sizes and its `x`/`y` become the arrangement a stage is seeded from, and neither
+ * is copied onto the file.
  */
 const KNOWN = new Set(["version", "name", "boards", "sizes", "roots"]);
 
@@ -52,11 +63,11 @@ export function parseDeckFile(text: string): ParsedDeckFile {
 		raw = JSON.parse(text);
 	} catch (error) {
 		warnings.push(`deck.json is not valid JSON (${(error as Error).message}); starting from defaults.`);
-		return { file: { version: 1 }, warnings };
+		return { file: { version: 1 }, arrangement: {}, warnings };
 	}
 	if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
 		warnings.push("deck.json is not an object; starting from defaults.");
-		return { file: { version: 1 }, warnings };
+		return { file: { version: 1 }, arrangement: {}, warnings };
 	}
 
 	const source = raw as Record<string, unknown>;
@@ -70,13 +81,11 @@ export function parseDeckFile(text: string): ParsedDeckFile {
 	/*
 	 * Sizes, and where they come from.
 	 *
-	 * `boards` is read first and `sizes` second, so the current key wins when a file has
-	 * both — which is what a deck saved by this build but hand-edited from an older one
-	 * looks like. A legacy entry's `x`/`y` is deliberately not read: the arrangement is a
-	 * stage's now, and there is nobody here to attribute it to.
+	 * `boards` is read first and `sizes` second, so the current key wins when a file has both — which
+	 * is what a deck saved by this build but hand-edited from an older one looks like.
 	 *
-	 * A size is dropped silently when absent and warned about when present and wrong — a
-	 * size of `0` or `-40` is a board nobody can see.
+	 * A size is dropped silently when absent and warned about when present and wrong — a size of `0`
+	 * or `-40` is a board nobody can see.
 	 */
 	const sizes: Record<string, { w?: number; h?: number }> = {};
 	for (const container of [source.boards, source.sizes]) {
@@ -95,6 +104,24 @@ export function parseDeckFile(text: string): ParsedDeckFile {
 	}
 	if (Object.keys(sizes).length > 0) file.sizes = sizes;
 
+	/*
+	 * And the places, which are a seed rather than a size.
+	 *
+	 * Only the older `boards` map has them: a file this build wrote does not, because a place belongs
+	 * to a stage. A pair that is not two finite numbers is dropped with a warning — the board still
+	 * exists, and the auto-layout is where it would have gone anyway.
+	 */
+	const arrangement: Record<string, { x: number; y: number }> = {};
+	if (source.boards && typeof source.boards === "object" && !Array.isArray(source.boards)) {
+		for (const [path, value] of Object.entries(source.boards as Record<string, unknown>)) {
+			const at = value as { x?: unknown; y?: unknown } | null;
+			const x = Number(at?.x);
+			const y = Number(at?.y);
+			if (Number.isFinite(x) && Number.isFinite(y)) arrangement[normalizeBoardPath(path)] = { x: Math.round(x), y: Math.round(y) };
+			else warnings.push(`deck.json: ignoring the position of "${path}". x and y must be numbers.`);
+		}
+	}
+
 	if (source.roots !== undefined) {
 		if (Array.isArray(source.roots)) file.roots = source.roots as DeckFile["roots"];
 		else warnings.push("deck.json: roots must be an array; ignoring it.");
@@ -104,7 +131,7 @@ export function parseDeckFile(text: string): ParsedDeckFile {
 		if (!KNOWN.has(key)) file[key] = value;
 	}
 
-	return { file, warnings };
+	return { file, arrangement, warnings };
 }
 
 /** Forward slashes everywhere, no leading "./", so one board has one key. */
