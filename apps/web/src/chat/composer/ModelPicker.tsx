@@ -79,7 +79,16 @@ export function ModelPicker(props: {
 	return (
 		<Popover
 			placement="top"
-			class="w-[min(320px,calc(100vw-16px))]"
+			/*
+			 * 344 rather than 320: a little more room for a model name, which is what the card is mostly
+			 * made of. The field and the thinking scale are both sized by this, so widening the card widens
+			 * them together and they stay the same width as each other — which a wider *margin* could not
+			 * do without pulling the field out of line with the scale and the rows.
+			 *
+			 * The phone term is unchanged: on a narrow screen the card is the viewport less its margin,
+			 * and there is nothing for a wider cap to do.
+			 */
+			class="w-[min(344px,calc(100vw-16px))]"
 			label="Model and thinking level"
 			trigger={(api) => {
 				dismiss = () => {
@@ -158,13 +167,15 @@ export function ModelPicker(props: {
 				 * asked for here, by the one component that knows it needs it.
 				 */}
 				{/*
-				 * `mx-2`, which is the thinking strip's own `px-2` — the point of it is that the search
-				 * field and the scale below it are the same width. They were not: the scale lives inside
-				 * a `px-2` wrapper and the field spanned the card's full content width, so the field
-				 * overhung the row of levels by 8px on each side and the card read as two different
-				 * widths stacked.
+				 * `m-2`: the thinking strip's own `px-2`, applied on all four sides.
+				 *
+				 * Left and right are what make the field and the scale below it the same width — the
+				 * scale lives inside a `px-2` wrapper, and the field used to span the card's whole
+				 * content width, so it overhung the row of levels by 8px a side and the card read as two
+				 * widths stacked. Top is 8px for the same reason as the sides: they were 6px while the
+				 * sides were 8, which is a difference nobody can name and everybody can see.
 				 */}
-				<label class="field mb-1 mt-1.5 mx-2 h-7">
+				<label class="field m-2 h-7">
 				<Icon of={Search} size={13} class="shrink-0 text-faint" />
 				<input
 					/*
