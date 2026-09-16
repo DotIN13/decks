@@ -67,6 +67,45 @@ test("every agent appears exactly once", () => {
 	assert.equal(new Set(ids).size, ids.length);
 });
 
+/*
+ * The keys the panel's store joins on, asserted here because nothing else would notice them.
+ *
+ * `LeftPanel` keeps this list in a store and hands old and new to `reconcile`, which matches by
+ * one key at every level. A section or a row without that key is matched by *position* instead,
+ * which does not fail loudly: the list still says the right thing, it just re-draws itself, and
+ * an open popup silently attaches to whoever took the row's place. That is what the panel did
+ * for as long as an agent worked, and the ids are what stopped it.
+ */
+test("every section and every row carries the id reconcile joins on", () => {
+	for (const section of [...list(), ...grouped()]) {
+		assert.equal(typeof section.id, "string");
+		assert.ok(section.id.length > 0, "an empty id would join every section to every other");
+		for (const row of section.rows) assert.equal(row.id, row.chat.id, "a row's id is the chat's");
+	}
+});
+
+test("…and no two sections in one list share it", () => {
+	for (const sections of [list(), grouped()]) {
+		const ids = sections.map((section) => section.id);
+		assert.equal(new Set(ids).size, ids.length, ids.join(", "));
+	}
+	/*
+	 * The two axes name the same fact differently, and a workspace is a word a person types —
+	 * so `quiet` is a heading here and could also be somebody's project. The prefix is what
+	 * keeps them apart, and this is the line that would fail if it went.
+	 */
+	const named = agentSections({
+		chats,
+		identities: { ...rooms, ada: { ...identities.ada!, workspace: "quiet" } },
+		unread,
+		focused: "ada",
+		group: "workspace",
+	});
+	const theirs = named.find((section) => section.label === "quiet");
+	assert.equal(theirs?.id, "ws:quiet");
+	assert.notEqual(theirs?.id, list()[2]?.id, "a workspace called `quiet` is not the Quiet heading");
+});
+
 test("a row carries both tag lists, kept apart", () => {
 	const iris = list()[0]?.rows[0];
 	assert.deepEqual(iris?.tags, ["e2e"], "the agent's own");
@@ -139,45 +178,76 @@ const rooms: Record<string, Identity> = {
 const grouped = (query?: string, focused = "ada") =>
 	agentSections({ chats, identities: rooms, unread, focused, query, group: "workspace" });
 
-test("filed by workspace: the focused agent's project first, `No workspace` last", () => {
-	assert.deepEqual(grouped().map((section) => section.label), ["political-llm", "irb-84069", "No workspace"]);
+test("filed by workspace: alphabetical, and `No workspace` last", () => {
+	// `irb-84069` before `political-llm` because that is the order of the names, and the focus is
+	// in `political-llm` — which is exactly the case the rule this replaced put first.
+	assert.deepEqual(grouped().map((section) => section.label), ["irb-84069", "political-llm", "No workspace"]);
 	assert.deepEqual(grouped().map((section) => section.kind), ["workspace", "workspace", "unfiled"]);
+	assert.deepEqual(grouped(undefined, "iris").map((section) => section.label), ["irb-84069", "political-llm", "No workspace"], "the focus does not move a heading");
 	// Basil is in none, and that is a section rather than an absence: a list that hid him would
 	// be a list where an agent goes missing by not being told about a project.
 	assert.deepEqual(grouped().at(-1)?.rows.map((row) => row.chat.id), ["basil"]);
 });
 
-test("…and the rows inside keep urgency order", () => {
-	const [project, other] = grouped();
-	// Ada is working and Pi is typing, so Ada leads; Iris is waiting and Wren finished, so Iris
-	// leads — the same ranking the attention axis uses, under a heading that says nothing about it.
-	assert.deepEqual(project?.rows.map((row) => row.chat.id), ["ada", "pi"]);
-	assert.deepEqual(other?.rows.map((row) => row.chat.id), ["iris", "wren"]);
+test("…and a big workspace does not climb above a small one", () => {
+	/*
+	 * Size was once the ranking, and it is the one thing a reader cannot predict: five agents
+	 * starting in one project would move every heading under it. The name is a place.
+	 */
+	const crowd = ["a1", "a2", "a3", "a4", "a5"].map((id, index) => chat(id, `Agent ${index}`, "idle", now - index * 1_000));
+	const filed = agentSections({
+		chats: [...crowd, chat("z1", "Zed", "idle", now)],
+		identities: {
+			...Object.fromEntries(crowd.map((one) => [one.id, { name: one.name, color: "#8", workspace: "zeta" }])),
+			z1: { name: "Zed", color: "#9", workspace: "alpha" },
+		},
+		unread: {},
+		group: "workspace",
+	});
+	assert.deepEqual(filed.map((section) => section.label), ["alpha", "zeta"]);
+	assert.deepEqual(filed.map((section) => section.rows.length), [1, 5]);
+});
+
+test("…and the rows are in the order they last said something", () => {
+	/*
+	 * An idle agent that spoke five seconds ago leads a waiting one that has been silent for an
+	 * hour, in a group whose heading is already saying somebody is waiting. The row order is the
+	 * order of messages under both axes: a row moves when the agent says something, and not when
+	 * it opens a tool, changes state or has a tag edited.
+	 */
+	const filed = agentSections({
+		chats: [chat("quiet", "Quiet", "waiting", now - 3_600_000), chat("chatty", "Chatty", "idle", now - 5_000)],
+		identities: {
+			quiet: { name: "Quiet", color: "#6", workspace: "irb-84069" },
+			chatty: { name: "Chatty", color: "#7", workspace: "irb-84069" },
+		},
+		unread: {},
+		group: "workspace",
+	});
+	assert.deepEqual(filed[0]?.rows.map((row) => row.chat.id), ["chatty", "quiet"]);
+	assert.equal(filed[0]?.note, "1 wants you", "and the urgency is in the heading rather than in the order");
 });
 
 test("…with the count of who needs you in the heading, because the heading does not say", () => {
-	assert.equal(grouped()[0]?.note, "2 working", "Ada is running tools and Pi is typing");
-	assert.equal(grouped()[1]?.note, "1 wants you", "waiting wins over working");
+	assert.equal(grouped()[0]?.note, "1 wants you", "Iris is waiting, and waiting wins over working");
+	assert.equal(grouped()[1]?.note, "2 working", "Ada is running tools and Pi is typing");
 	assert.equal(grouped()[2]?.note, undefined, "and silence when the group is quiet");
 });
 
-test("the focused agent's project leads whatever its size", () => {
-	// The panel sits beside the conversation you are in, so the group you are in is the one you
-	// are most likely to be looking for — and it is the only heading that does not move as
-	// other agents start and stop.
-	const list = agentSections({
-		chats,
-		identities: { ...rooms, pi: { ...rooms.pi!, workspace: "irb-84069" } },
-		unread,
-		focused: "ada",
-		group: "workspace",
-	});
-	assert.deepEqual(list[0]?.label, "political-llm");
+test("the focused agent does not move a heading", () => {
+	/*
+	 * It used to lead, on the argument that the panel sits beside the conversation you are in.
+	 * The argument for a fixed order is stronger: a heading that moves when you switch agent is
+	 * one you have to re-find, and switching agent is the thing you do most on this panel.
+	 */
+	const focus = (id: string) => agentSections({ chats, identities: rooms, unread, focused: id, group: "workspace" }).map((section) => section.label);
+	assert.deepEqual(focus("ada"), ["irb-84069", "political-llm", "No workspace"]);
+	assert.deepEqual(focus("iris"), ["irb-84069", "political-llm", "No workspace"]);
+	assert.deepEqual(focus("basil"), ["irb-84069", "political-llm", "No workspace"], "the one in no workspace moves nothing either");
 });
 
-test("…and with nobody focused, biggest first then alphabetical", () => {
+test("…and with nobody focused the same order, because the order never depended on who is", () => {
 	const list = agentSections({ chats, identities: rooms, unread, group: "workspace" });
-	// Both projects have two members and nobody is focused, so the tie is the name.
 	assert.deepEqual(list.map((section) => section.label), ["irb-84069", "political-llm", "No workspace"]);
 	const swapped = agentSections({
 		chats,
@@ -185,9 +255,8 @@ test("…and with nobody focused, biggest first then alphabetical", () => {
 		unread,
 		group: "workspace",
 	});
-	// Zeta has two, alpha and the one Wren is left in have one each — the two singletons break
-	// on the name. `No workspace` is still last, and is not part of that ordering.
-	assert.deepEqual(swapped.map((section) => section.label), ["zeta", "alpha", "irb-84069", "No workspace"]);
+	// Zeta holds two and alpha one, and alpha is still first: the count is not part of this.
+	assert.deepEqual(swapped.map((section) => section.label), ["alpha", "irb-84069", "zeta", "No workspace"]);
 });
 
 test("search finds a project by name, in either grouping", () => {

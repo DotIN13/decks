@@ -56,9 +56,16 @@ try {
 	 * board is in the agents list. So the invariant that actually mattered, every item
 	 * appearing exactly once, holds trivially rather than by argument; it is still checked
 	 * below, on the boards list, because that is where it could still break.
+	 *
+	 * **Agents is the first tab and Boards is the one that is showing**, and both halves are
+	 * asserted because they are different decisions. The order is the panel's reading order:
+	 * the agents are the list that changes while you watch, so it is read first. The default is
+	 * the canvas you were already looking at, which is what the app opens on.
 	 */
 	const tabs = await page.getByRole("tab").allInnerTexts();
-	say("two tabs, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Boards", "Agents"]), JSON.stringify(tabs));
+	say("two tabs, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Agents", "Boards"]), JSON.stringify(tabs));
+	const selected = await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent));
+	say("…agents first, and the panel opens on Boards", JSON.stringify(selected) === JSON.stringify(["Boards"]), JSON.stringify(selected));
 
 	/*
 	 * The header is 32px, both controls, which is `--control-md` — the height a labelled chip
