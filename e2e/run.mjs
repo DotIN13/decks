@@ -61,6 +61,13 @@ const CHECKS = [
 	 */
 	{ file: "present.mjs", needsAgent: false },
 	/*
+	 * Code on a board: which blocks the runtime claims, and where their colours come from. Its
+	 * own check because it is the one renderer whose output lives inside markup the file also
+	 * wrote — so what it must *not* touch (a fence with no language, inline code) is as much
+	 * of the subject as what it does.
+	 */
+	{ file: "highlighting.mjs", needsAgent: false },
+	/*
 	 * The renderer's own check, and the one that decides whether the editor may replace the frame:
 	 * every board rendered by the new package, compared against the browser's parse of the same
 	 * bytes. It needs no agent and no canvas — it drives `apps/web/editor.html`, which mounts only

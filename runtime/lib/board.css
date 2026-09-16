@@ -9,6 +9,10 @@
  * Everything here assumes absolute positioning: a component's `left`/`top`/`width`
  * live in its own `style` attribute, because that is the one place both an agent
  * editing text and a person dragging a box can agree on.
+ *
+ * `board.js` renders markdown, maths, diagrams, PDFs, embeds and code — the last of these
+ * coloured from the `--b-code-*` tokens in the palette below, so syntax is in the same
+ * palette as everything else and light and dark are decided in the same two places.
  */
 
 :root {
@@ -37,6 +41,20 @@
 	--b-red-700: #d92e3c;
 	--b-purple-700: #623be2;
 
+	/* The shades syntax needs and the semantic ramp did not have: a green, a red and an
+	   amber dark enough to read as 12px text on white, and the light halves of the same
+	   three (plus a purple and a blue) for a dark board. They live here rather than in a
+	   theme beside the highlighter because a code block is read in the board's own two
+	   palettes, like everything else on it. */
+	--b-green-400: #5ed48c;
+	--b-green-800: #1c7a3f;
+	--b-red-400: #ef8a93;
+	--b-red-800: #b0232f;
+	--b-yellow-300: #e6c46b;
+	--b-yellow-800: #7d6119;
+	--b-purple-300: #b9a9fb;
+	--b-blue-400: #8fb0ff;
+
 	/* Semantic, light. */
 	--b-bg: var(--b-grey-50);
 	--b-bg-deep: var(--b-grey-100);
@@ -55,6 +73,21 @@
 	--b-danger: var(--b-red-700);
 	--b-grid: rgb(0 0 0 / 5%);
 	--b-shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 12px rgb(0 0 0 / 5%);
+
+	/* Syntax, in six families rather than a colour per token type: the words a language is
+	   built from, the values it holds, the names it calls, the types it declares, the
+	   attributes a reader follows, and the prose about the code. A seventh colour is a
+	   palette nobody can read. `board.js` writes the `hljs-*` classes onto the spans; the
+	   map from those to these is in the code section below. */
+	--b-code-comment: var(--b-faint);
+	--b-code-keyword: var(--b-purple-700);
+	--b-code-string: var(--b-green-800);
+	--b-code-number: var(--b-red-800);
+	--b-code-name: var(--b-blue-900);
+	--b-code-type: var(--b-yellow-800);
+	--b-code-attr: var(--b-muted);
+	--b-code-add: var(--b-green-200);
+	--b-code-del: var(--b-red-200);
 
 	--b-radius: 10px;
 	--b-radius-sm: 6px;
@@ -78,6 +111,15 @@
 	--b-sticky-edge: #6b5726;
 	--b-grid: rgb(255 255 255 / 6%);
 	--b-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
+	--b-code-comment: var(--b-muted);
+	--b-code-keyword: var(--b-purple-300);
+	--b-code-string: var(--b-green-400);
+	--b-code-number: var(--b-red-400);
+	--b-code-name: var(--b-blue-400);
+	--b-code-type: var(--b-yellow-300);
+	--b-code-attr: var(--b-grey-400);
+	--b-code-add: #16351f;
+	--b-code-del: #3a1a1c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -94,6 +136,15 @@
 		--b-sticky-edge: #6b5726;
 		--b-grid: rgb(255 255 255 / 6%);
 		--b-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
+		--b-code-comment: var(--b-muted);
+		--b-code-keyword: var(--b-purple-300);
+		--b-code-string: var(--b-green-400);
+		--b-code-number: var(--b-red-400);
+		--b-code-name: var(--b-blue-400);
+		--b-code-type: var(--b-yellow-300);
+		--b-code-attr: var(--b-grey-400);
+		--b-code-add: #16351f;
+		--b-code-del: #3a1a1c;
 	}
 }
 
@@ -333,6 +384,109 @@ pre code {
 	background: none;
 }
 
+/* --- code, coloured --------------------------------------------------------- */
+
+/*
+ * Syntax arriving as `hljs-*` classes on spans `board.js` put inside a `pre` or a `code`.
+ *
+ * The highlighter is vendored with its grammars and *without* a theme, which is the whole
+ * reason this file has the last word on what a string looks like: these are the board's own
+ * tokens, so a code block is light or dark with everything around it, and a board that
+ * styles itself is not fighting a third-party theme for the colour of a keyword.
+ *
+ * The mapping is coarse on purpose — six families across every grammar in the bundle.
+ * Anything not named here keeps the code's own colour, which is why punctuation, operators
+ * and sub-language markers are absent: they are the words around the words.
+ */
+
+/* Prose about the code: a comment, a quoted block, a licence header. */
+.hljs-comment,
+.hljs-quote {
+	color: var(--b-code-comment);
+}
+
+/* Structure: what a language is built from, and what a document is made of. */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-meta {
+	color: var(--b-code-keyword);
+}
+
+/* Data: what a program says rather than what it does — and what a diff gained. */
+.hljs-string,
+.hljs-regexp,
+.hljs-char,
+.hljs-addition {
+	color: var(--b-code-string);
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-deletion {
+	color: var(--b-code-number);
+}
+
+/* Names the code calls or declares, and a heading inside a highlighted document. */
+.hljs-title,
+.hljs-function,
+.hljs-section,
+.hljs-link {
+	color: var(--b-code-name);
+}
+
+/* Types, classes, tags, and what a language hands you for free. */
+.hljs-type,
+.hljs-built_in,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-class,
+.hljs-selector-id {
+	color: var(--b-code-type);
+}
+
+/* Attributes and variables: the names a reader follows through the block. */
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params,
+.hljs-property,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+	color: var(--b-code-attr);
+}
+
+/*
+ * A diff, where the colour of the line is the whole message.
+ *
+ * A wash behind the words rather than a marker in front of them: the `pre` already has a
+ * border, and a rule per line would read as a table of one column. On a language that is
+ * not a diff these two classes are never emitted, so nothing here is reached.
+ */
+.hljs-addition {
+	border-radius: 3px;
+	background: var(--b-code-add);
+}
+
+.hljs-deletion {
+	border-radius: 3px;
+	background: var(--b-code-del);
+}
+
+/* `hljs-emphasis` and `hljs-strong` are markdown's, and a highlighted markdown block is
+   rare enough that they arrive as classes rather than as tags: honour them rather than
+   printing the asterisks. */
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: 700;
+}
+
 blockquote {
 	margin: 0 0 calc(var(--b-unit) * 1.5);
 	padding-left: calc(var(--b-unit) * 1.5);
@@ -521,6 +675,12 @@ table.table,
 	font-size: 12px;
 	tab-size: 4;
 	white-space: pre;
+}
+
+/* The file is the block, so its `code` element inherits the size rather than taking the
+   inline-code one (`code { font-size: 0.9em }` is a size relative to prose). */
+.embed[data-kind="text"] > .embed-body > pre code {
+	font-size: inherit;
 }
 
 /* Truncated, or a file we can only name: the way out, at the end of the body. */

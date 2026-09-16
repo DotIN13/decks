@@ -166,6 +166,7 @@
 		const marked = window.marked;
 		target.innerHTML = marked.parse(dedent(stripFrontMatter(source)), { gfm: true, breaks: false });
 		await renderMath(target);
+		await highlightCode(target);
 	}
 
 	/**
@@ -188,6 +189,138 @@
 		if (lines.length === 0) return text;
 		if (!lines.every((line) => /^[A-Za-z_][\w-]*\s*:/.test(line) || /^\s+\S/.test(line))) return text;
 		return text.slice(match[0].length);
+	}
+
+	// --- code --------------------------------------------------------------------
+
+	/**
+	 * Which grammar an extension means, for a source file drawn as an embed.
+	 *
+	 * A fenced block in markdown says its own language (```ts), and a file says it with its
+	 * extension — so this is the one place that second question is answered. An extension
+	 * that is not here is drawn as it is, which is the honest answer for a `.txt` or a
+	 * `.csv`: they are text and not a language, and a highlighter told otherwise invents
+	 * structure that is not in the file. `.toml` and `.env` are read as `ini` because that
+	 * is the nearest grammar the highlighter has, and it is close enough to be useful.
+	 */
+	const LANGUAGE_BY_EXTENSION = {
+		ts: "typescript", tsx: "typescript", mts: "typescript", cts: "typescript",
+		js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
+		py: "python", rb: "ruby", go: "go", rs: "rust", java: "java", kt: "kotlin", kts: "kotlin",
+		c: "c", h: "c", cc: "cpp", cpp: "cpp", hpp: "cpp", cs: "csharp", swift: "swift", php: "php",
+		sh: "bash", bash: "bash", zsh: "bash", fish: "bash",
+		sql: "sql", css: "css", scss: "scss", less: "less",
+		json: "json", jsonl: "json", yaml: "yaml", yml: "yaml",
+		toml: "ini", ini: "ini", cfg: "ini", conf: "ini", env: "ini",
+		diff: "diff", patch: "diff",
+	};
+
+	/**
+	 * The highlighter, fetched the first time a board actually shows code.
+	 *
+	 * Vendored and not a stylesheet from a CDN, for the reason every other renderer here is:
+	 * a board has to draw itself with no network, and a code block that is coloured on one
+	 * machine and plain on another is a board that reads differently to the person looking at
+	 * it and to the agent reading a screenshot of it.
+	 *
+	 * It carries the grammars and never a theme. The colours are `board.css`'s — the same
+	 * tokens as everything else on the board — so light and dark are decided by the same two
+	 * rules as the rest of the palette, and a board that styles itself does not fight a
+	 * third-party theme for the foreground colour of a string.
+	 */
+	let highlightReady;
+	function highlighter() {
+		if (!highlightReady) {
+			highlightReady = needModule("hljs.bundle.mjs").then((module) => module.default ?? module);
+		}
+		return highlightReady;
+	}
+
+	/** The elements a `highlightCode` call has already taken, so nothing is coloured twice. */
+	const highlighting = new WeakSet();
+
+	/**
+	 * How much code is worth colouring, in characters.
+	 *
+	 * A highlighter is a tokeniser, and this one runs on the main thread while the board is
+	 * being read. A text embed is allowed to draw the first 256 KB of a file, and a JSON dump
+	 * that size is not read line by line by anybody — the first 64 KB is already more than a
+	 * person scrolls. Past this the block is drawn as it was, which is what it did before
+	 * there was a highlighter here.
+	 */
+	const HIGHLIGHT_LIMIT = 64 * 1024;
+
+	/** The language an element names in its class, or the one its caller already knows. */
+	function languageOf(element, fallback) {
+		const named = /(?:^|\s)(?:lang|language)-([\w+#.]+)/i.exec(element.className ?? "");
+		return String(named?.[1] ?? fallback ?? "").trim().toLowerCase() || null;
+	}
+
+	/**
+	 * Colour every code block under `root` — and load the highlighter only if there is one.
+	 *
+	 * Three rules here are decisions rather than implementation details:
+	 *
+	 * - **A language that is not named is not guessed at.** `highlightAuto` scores every
+	 *   grammar against the text and picks the winner: slow, and wrong often enough on a
+	 *   five-line fragment to be worse than plain. A fence with no language is drawn plain,
+	 *   the same way it is on GitHub.
+	 * - **The scan and the claim on each element happen before the first `await`.** Two of these
+	 *   run over the same document — the renderer that drew a markdown panel, and the pass at
+	 *   the end of `start` that finds what the file itself carries — and an element claimed
+	 *   twice would be wrapped in spans twice.
+	 * - **A failure is a plain block, never a broken board.** One grammar throwing on one file
+	 *   must not take the rest of the page with it.
+	 */
+	async function highlightCode(root, fallback) {
+		if (!root?.querySelectorAll) return;
+
+		const blocks = [];
+		const consider = (element) => {
+			if (!element || highlighting.has(element)) return;
+			const text = element.textContent ?? "";
+			if (!text.trim() || text.length > HIGHLIGHT_LIMIT) return;
+			highlighting.add(element);
+			blocks.push(element);
+		};
+
+		/*
+		 * Blocks and only blocks. A `pre` is the block; its `code` child is what gets the
+		 * classes, and a `pre` written without one is coloured itself. Inline `<code>` in a
+		 * sentence is left alone on purpose: it lives inside a run of words that a person can
+		 * retype, and spans put inside it would be markup the run editor would faithfully spell
+		 * back into the file. Markdown's fenced blocks are `pre > code` and are unaffected — an
+		 * inline code span has no language class and would not be coloured anyway.
+		 */
+		const candidates = [...root.querySelectorAll("pre")];
+		if (root.matches?.("pre")) candidates.unshift(root);
+		for (const pre of candidates) {
+			const first = pre.firstElementChild;
+			consider(first?.tagName === "CODE" ? first : pre);
+		}
+		if (blocks.length === 0) return;
+
+		let hljs;
+		try {
+			hljs = await highlighter();
+		} catch (error) {
+			console.warn("[board] the highlighter did not load:", error);
+			return;
+		}
+
+		for (const element of blocks) {
+			const language = languageOf(element, fallback);
+			if (!language || !hljs.getLanguage(language)) continue;
+			try {
+				element.innerHTML = hljs.highlight(element.textContent ?? "", { language, ignoreIllegals: true }).value;
+				// Both classes, always: the highlighted element says which grammar produced it, even
+				// when the grammar came from a file's extension rather than from a fence. A board's
+				// own stylesheet can then key on one language, and a check can read the answer out.
+				element.classList.add("hljs", `language-${language}`);
+			} catch (error) {
+				console.warn(`[board] could not highlight ${element.tagName.toLowerCase()} as ${language}:`, error);
+			}
+		}
 	}
 
 	/** KaTeX, but only if the text plausibly contains maths. */
@@ -697,9 +830,14 @@
 				const total = Number(String(response.headers.get("content-range") ?? "").split("/")[1]);
 				const partial = Number.isFinite(total) ? total > TEXT_LIMIT : whole.length >= TEXT_LIMIT;
 				const pre = document.createElement("pre");
+				const code = document.createElement("code");
 				// textContent: this is somebody else's file, and it is text.
-				pre.textContent = text;
+				code.textContent = text;
+				pre.appendChild(code);
 				body.appendChild(pre);
+				// The extension says what the file is; `data-lang` is the way out for a file whose
+				// name says nothing useful (`queries.txt` that is really SQL).
+				await highlightCode(pre, host.dataset.lang || LANGUAGE_BY_EXTENSION[extension]);
 				if (partial) {
 					const rest = document.createElement("a");
 					rest.className = "more";
@@ -837,6 +975,7 @@
 					? async (into, markup) => {
 							into.innerHTML = markup;
 							await renderMath(into);
+							await highlightCode(into);
 						}
 					: (into, markdown) => renderMarkdown(into, markdown),
 			});
@@ -926,6 +1065,16 @@
 		}
 
 		await Promise.allSettled(work);
+
+		/*
+		 * Code the *file* carries, which no renderer above has seen.
+		 *
+		 * Everything the runtime drew has already been coloured by whatever drew it, and this
+		 * pass finds what is left: a `<pre>` an agent typed into a board, and a flow board's own
+		 * prose. Last, so a block inside a panel that was rendered has been claimed already and
+		 * is not looked at twice.
+		 */
+		await highlightCode(document.body);
 
 		// Fonts last: text laid out in a fallback face and then reflowed is the
 		// other half of a screenshot taken too early.
