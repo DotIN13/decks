@@ -9,9 +9,11 @@
 	</head>
 	<body class="board">
 		<!--
-			Goal, approach, the shape of the work, then the steps somebody would actually follow.
-			Widths come from the board's own width ({{CONTENT}}, {{COL}}), so the pair folds into
-			one column on a narrow board without this file changing.
+			Goal, approach, the shape of the work, then the steps somebody would follow. Widths come
+			from the board width ({{CONTENT}}, {{COL}}), so the pair folds into one column on a
+			narrow board without this file changing.
+
+			Everything here is an example. Keep the shape, replace the words and the dates.
 		-->
 		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
@@ -19,41 +21,39 @@
 
 		<section class="card" data-id="goal" style="left: 48px; top: {{ROW1}}px; width: {{COL}}px">
 			<h3>Goal</h3>
-			<p>One sentence that would survive being read out loud.</p>
+			<p>Every support agent can see the returning-customer count by the end of March.</p>
 		</section>
 
 		<section class="card" data-id="approach" style="left: {{COLX}}px; top: {{PAIRB}}px; width: {{COL}}px">
 			<h3>Approach</h3>
-			<p>How it gets done, in a line: the decision the steps follow from.</p>
+			<p>One card on the dashboard, built from the monthly visitor count we already keep.</p>
 		</section>
 
 		<!--
-			The shape of the work.
-
-			Drawn rather than described: an `<svg>` inside a card puts its coordinates in the file,
-			so you and a reader can both see where a milestone is and move it. Move the dots to move
-			the plan; a sentence about a schedule cannot do that.
+			The shape of the work, drawn rather than described. An `<svg>` inside a card puts its
+			coordinates in the file, so you and a reader can both see where a milestone is and move
+			it. Move a dot to move the plan; a sentence about a schedule cannot do that.
 		-->
 		<section class="card" data-id="timeline" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
 			<h3>When</h3>
-			<svg viewBox="0 0 900 180" style="width: 100%; height: 180px" role="img" aria-label="Milestones along a line">
+			<svg viewBox="0 0 900 180" style="width: 100%; height: 180px" role="img" aria-label="Four milestones along a line">
 				<line x1="70" y1="96" x2="860" y2="96" style="stroke: var(--b-border-strong)" stroke-width="2" />
 				<circle cx="70" cy="96" r="8" style="fill: var(--b-accent)" />
 				<circle cx="330" cy="96" r="7" style="fill: var(--b-bg); stroke: var(--b-border-strong); stroke-width: 2" />
 				<circle cx="600" cy="96" r="7" style="fill: var(--b-bg); stroke: var(--b-border-strong); stroke-width: 2" />
 				<circle cx="860" cy="96" r="8" style="fill: var(--b-ok)" />
 
-				<text x="70" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">now</text>
-				<text x="70" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">…</text>
+				<text x="70" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">today</text>
+				<text x="70" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">March 3</text>
 
-				<text x="330" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">milestone</text>
-				<text x="330" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">…</text>
+				<text x="330" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">layout agreed</text>
+				<text x="330" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">March 5</text>
 
-				<text x="600" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">milestone</text>
-				<text x="600" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">…</text>
+				<text x="600" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">on staging</text>
+				<text x="600" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">March 10</text>
 
-				<text x="860" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">done</text>
-				<text x="860" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">…</text>
+				<text x="860" y="66" text-anchor="middle" style="fill: var(--b-fg); font-size: 13px; font-family: var(--b-font); font-weight: 600">shipped</text>
+				<text x="860" y="126" text-anchor="middle" style="fill: var(--b-muted); font-size: 12px; font-family: var(--b-font)">March 12</text>
 			</svg>
 		</section>
 
@@ -65,7 +65,10 @@
 		<section class="card" data-id="steps" style="left: 48px; top: {{ROW3}}px; width: {{CONTENT}}px">
 			<h3>Steps</h3>
 			<ol>
-				<li>…</li>
+				<li>Agree the card layout with two support agents.</li>
+				<li>Add the returning-customer query to the dashboard build.</li>
+				<li>Review on staging with two weeks of real data.</li>
+				<li>Ship behind the feature flag and tell support.</li>
 			</ol>
 		</section>
 

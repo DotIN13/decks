@@ -9,64 +9,63 @@
 	</head>
 	<body class="board">
 		<!--
-			The question, the answer, and at most one thing that shows it.
+			The question as a statement, the answer in one sentence, and one thing that shows it.
 
-			Widths come from the board width ({{CONTENT}}), so this is wide on a laptop and narrow
-			on a phone. Read top to bottom, and keep the file in that order.
+			`{{TITLE}}` is the title the board was created with. Make it a finding, not a topic:
+			"Returning customer share fell after the second tab shipped" and not "Second tab
+			analysis". Everything below is an example. Keep the shape, replace the words and numbers.
 		-->
 		<div class="text" data-id="question" style="left: 48px; top: 40px; width: {{CONTENT}}px">
 			<h1>{{TITLE}}</h1>
 		</div>
 
 		<!--
-			The answer, in one sentence.
-
-			Not the background, not what you were asked, not how you found out. A reader should be
-			able to say this sentence out loud and be right. Delete any sentence after it that does
-			not change what they do or believe.
+			The answer, in one sentence: the thing a reader could repeat out loud and be right
+			about. Not the background, not how you found out.
 		-->
 		<div class="callout" data-id="answer" data-tone="accent" style="left: 48px; top: {{ROW1}}px; width: {{CONTENT}}px">
-			<p><b>The answer, in one sentence somebody could repeat.</b></p>
+			<p><b>Share of visits from returning customers fell from 42% in January to 31% in May.</b></p>
 		</div>
 
 		<!--
-			The evidence. This card is the only thing here that uses the import map.
+			The evidence, and the only card here that uses the import map.
 
-			Delete it if the answer is a comparison (use a `.table`), a structure (use an `<svg>`
-			you drew), or one number (use a `.kpi`). Delete the script with it: the script imports
-			d3 only when this element is still on the board, so a board without the chart never
-			downloads d3.
+			The plot has a title saying what it shows, and a title on each axis saying what it
+			counts and in what unit. Delete this card if the answer is a comparison (use a
+			`.table`), a structure (an `<svg>` you drew) or one number (a `.kpi`). Delete the script
+			with it: the script imports d3 only while this element is on the board, so a board
+			without the chart never downloads d3.
 		-->
 		<section class="card" data-id="evidence" style="left: 48px; top: {{ROW2}}px; width: {{CONTENT}}px">
-			<h3>Where the difference is</h3>
+			<h3>Share of customer visits across January to May</h3>
 			<div id="chart" style="height: 190px"></div>
-			<p style="color: var(--b-muted); font-size: 12px">Sample data. Replace the values, the months and the axis titles.</p>
+			<p style="color: var(--b-muted); font-size: 12px">Example data, five months of one store.</p>
 		</section>
 
 		<script type="module">
 			/*
-			 * The import is inside `if (host)`, so the library is fetched only while the chart is
+			 * The import sits inside `if (host)`, so the library is fetched only while the chart is
 			 * on the board. `import("d3")` resolves through the map in this file's head; edit that
 			 * map to change the version or to use `three`, `gsap` or `chart.js` instead.
 			 *
-			 * The chart has both axes and a title on each, because a plot without them does not
-			 * say what it measures. `board:ready` is where to draw when the layout has to be
-			 * settled first; here the host has a fixed height, so the board measures the same
-			 * before and after the bars appear.
+			 * Every plot gets a title and a titled axis for each direction, because a chart without
+			 * them shows a shape and makes no claim. `board:ready` is where to draw when the layout
+			 * has to be settled first; here the host has a fixed height, so the board measures the
+			 * same before and after the bars appear.
 			 */
 			const host = document.querySelector("#chart");
 			if (host) {
 				const d3 = await import("d3");
 				const data = [
 					{ month: "Jan", share: 0.42 },
-					{ month: "Feb", share: 0.61 },
-					{ month: "Mar", share: 0.55 },
-					{ month: "Apr", share: 0.78 },
-					{ month: "May", share: 0.9 },
+					{ month: "Feb", share: 0.38 },
+					{ month: "Mar", share: 0.41 },
+					{ month: "Apr", share: 0.34 },
+					{ month: "May", share: 0.31 },
 				];
 				const width = host.clientWidth || 600;
 				const height = 190;
-				const margin = { top: 22, right: 8, bottom: 44, left: 56 };
+				const margin = { top: 22, right: 8, bottom: 48, left: 56 };
 				const innerW = width - margin.left - margin.right;
 				const innerH = height - margin.top - margin.bottom;
 
@@ -74,17 +73,17 @@
 				const plot = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
 				const x = d3.scaleBand().domain(data.map((d) => d.month)).range([0, innerW]).padding(0.34);
-				const y = d3.scaleLinear().domain([0, 1]).range([innerH, 0]);
+				const y = d3.scaleLinear().domain([0, 0.5]).range([innerH, 0]);
 
-				// The y axis, with the values the bars are read against.
+				// The values the bars are read against, and a rule per tick.
 				plot.append("g")
-					.call(d3.axisLeft(y).ticks(4).tickFormat(d3.format(".0%")))
+					.call(d3.axisLeft(y).ticks(4).tickFormat(d3.format(".0%")).tickSize(-innerW))
 					.style("color", "var(--b-muted)")
 					.call((axis) => axis.selectAll("text").style("font-size", "11px"))
 					.call((axis) => axis.selectAll("line").style("stroke", "var(--b-border)"))
-					.call((axis) => axis.select(".domain").style("stroke", "var(--b-border-strong)"));
+					.call((axis) => axis.select(".domain").style("stroke", "none"));
 
-				// The x axis, and the months the bars stand for.
+				// The months, under the bars.
 				plot.append("g")
 					.attr("transform", `translate(0,${innerH})`)
 					.call(d3.axisBottom(x).tickSize(0))
@@ -102,7 +101,7 @@
 					.attr("rx", 3)
 					.style("fill", "var(--b-accent)");
 
-				// What each axis is. Without these, the reader has two sets of numbers and no claim.
+				// What each axis is, in words, with the unit.
 				plot.append("text")
 					.attr("x", 0)
 					.attr("y", -8)
@@ -112,11 +111,11 @@
 					.text("share of visits, percent");
 				plot.append("text")
 					.attr("x", innerW / 2)
-					.attr("y", innerH + 34)
+					.attr("y", innerH + 38)
 					.attr("text-anchor", "middle")
 					.style("font-size", "11px")
 					.style("fill", "var(--b-muted)")
-					.text("month");
+					.text("calendar month");
 			}
 		</script>
 

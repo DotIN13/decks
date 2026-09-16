@@ -279,7 +279,7 @@ const ROWS: Record<BoardTemplate, Rhythm> = {
 	// The options, the trade-off drawn, the recommendation.
 	design: { first: 152, subtitle: 35, rows: [{ h: 200, pair: true }, { h: 300 }, { h: 72 }] },
 	// The number, the series, how and what, what is left.
-	report: { first: 168, subtitle: 50, rows: [{ h: 72 }, { h: 296 }, { h: 230, pair: true }, { h: 72 }] },
+	report: { first: 168, subtitle: 50, rows: [{ h: 72 }, { h: 296 }, { h: 190, pair: true }, { h: 72 }] },
 	// Goal and approach, the milestones, the steps.
 	plan: { first: 152, rows: [{ h: 180, pair: true }, { h: 248 }, { h: 230 }] },
 	blank: { first: 152, rows: [] },

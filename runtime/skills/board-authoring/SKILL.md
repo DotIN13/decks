@@ -47,10 +47,13 @@ description: How to write a board — its format and lifecycle, the rules for co
   anything else, and reach for a library with `const d3 = await import("d3")` where you draw, on
   `board:ready` if the layout has to be settled. Import inside the code path that needs it rather
   than at the top of a module, so a board that never gets there pays nothing.
-- **A plot says what its axes are.** Draw both axes, and give each of them a tick value and a title
-  saying what it counts and in what unit ("visits per month, count", not "value"). A chart without
-  them shows a shape and makes no claim. Unsure of an API? Download the file the map names and read
-  it: `curl -s <url>` works, and `cdn.jsdelivr.net/npm/<package>@<version>/` serves the whole package.
+- **Title: the finding, not the topic.** The title comes from `stage.newBoard({ title })`. Write it
+  as a statement ("Returning customer share fell after the second tab shipped"), never a question.
+- **A plot says what it shows, and what its axes are.** Give it a title of its own, both axes, a tick
+  value on each, and a title on each saying what it counts and in what unit ("share of visits,
+  percent"). A chart without them shows a shape and makes no claim. Unsure of an API? Download the
+  file the map names and read it: `curl -s <url>` works, and `cdn.jsdelivr.net/npm/<package>@<version>/`
+  serves the whole package.
 - **Copy: plain words and short sentences, no em dashes.** A board is read once, by somebody deciding
   something, so a sentence they have to read twice is a sentence that did not earn its place.
 
