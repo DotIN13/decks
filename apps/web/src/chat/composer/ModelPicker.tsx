@@ -3,7 +3,7 @@ import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Search from "lucide-solid/icons/search";
 import Sparkles from "lucide-solid/icons/sparkles";
-import { createMemo, createSignal, For, onMount, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { Icon } from "../../ui/icons.tsx";
 import { Popover } from "../../ui/Popover.tsx";
 import { levelsFor, nearestLevel, optionFor } from "./thinking.ts";
@@ -151,19 +151,25 @@ export function ModelPicker(props: {
 				);
 			}}
 		>
-			<label class="field mb-1 h-7">
+			{/*
+				 * `mt-1.5`, because the field was 6px under the card's top edge — measurably, and
+				 * visibly: a search box jammed against the edge of its own card reads as a mistake
+				 * rather than as a tight layout. The card is `Popover`'s and shared, so the room is
+				 * asked for here, by the one component that knows it needs it.
+				 */}
+				<label class="field mb-1 mt-1.5 h-7">
 				<Icon of={Search} size={13} class="shrink-0 text-faint" />
 				<input
-					ref={(el) => {
-						/*
-						 * Two frames, matching `Popover`'s own placement pass.
-						 *
-						 * The card is `visibility: hidden` until it has been measured and put in
-						 * its corner, and a hidden element cannot take focus — `onMount` focused
-						 * nothing at all and the search field looked broken on a keyboard.
-						 */
-						onMount(() => requestAnimationFrame(() => requestAnimationFrame(() => el.focus())));
-					}}
+					/*
+					 * **No autofocus.** It used to take the cursor two frames after opening, because the
+					 * card is `visibility: hidden` until `Popover` has measured it and a hidden element
+					 * cannot be focused — so the first attempt focused nothing and the field looked broken
+					 * on a keyboard. The double `requestAnimationFrame` fixed that and made every *click*
+					 * on the chip move the cursor out of the message box: pressing the model chip to look
+					 * at it, then typing, typed into the search filter instead of into the turn. That is
+					 * the worse of the two, so the field is not focused at all now. A keyboard path that
+					 * opens this deliberately can ask for the cursor back the day it exists.
+					 */
 					type="text"
 					placeholder="Search models"
 					aria-label="Search models"
