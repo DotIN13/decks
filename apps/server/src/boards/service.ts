@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Board, BoardPatch, ServerMessage, AnyBoardPatch } from "@decks/protocol";
+import type { Board, BoardPatch, DeckState, ServerMessage, AnyBoardPatch } from "@decks/protocol";
 import { applyPatches, mintId, PatchRefused } from "./patch.ts";
 import { Revisions } from "./snapshots.ts";
 import {
@@ -29,6 +29,15 @@ import { withBoardSize } from "../deck/meta.ts";
 export interface BoardHooks {
 	/** To every browser. `board.changed` is the message this service exists to send. */
 	send(message: ServerMessage): void;
+	/**
+	 * The deck as the focused stage sees it — where every board on it sits for the conversation being
+	 * looked at.
+	 *
+	 * The service holds the boards; it does not know what a stage is, and the loader's copy of a board
+	 * has carried no place of its own since positions became per stage. So a broadcast asks for the
+	 * arrangement rather than sending the board it happens to be holding — see `placed`.
+	 */
+	state(): DeckState;
 	/** The user committed an edit — the agent holding that board is told (§6.5). */
 	edited(path: string, summary: string): void;
 	/** A board is gone: every agent must drop it, or a dead path empties the rail. */
@@ -74,6 +83,18 @@ export class BoardService {
 		this.deck = deck;
 		this.revisions.setDeck(deck);
 		this.extents.clear();
+	}
+
+	/**
+	 * One board as the focused stage sees it.
+	 *
+	 * Every broadcast that carries a board goes through this, because the loader's board is a *file* — a
+	 * revision, a size, a title — and has not carried a place of its own since positions became per
+	 * stage. Sending it raw is a board at the origin, on every write, for everyone; the failure looks
+	 * like "the drag did not stick" on one surface only, which is what makes it worth one function.
+	 */
+	private placed(board: Board): Board {
+		return this.hooks.state().boards.find((one) => one.path === board.path) ?? board;
 	}
 
 	/**
@@ -166,7 +187,7 @@ export class BoardService {
 		this.revisions.record(path, html);
 		const board = this.deck.refresh(path);
 		if (!board) throw new Error(`No such board: ${path}`);
-		this.hooks.send({ type: "board.changed", path, rev: board.rev, board });
+		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
 		return board;
 	}
 
@@ -208,7 +229,7 @@ export class BoardService {
 		// The watcher would find it in 80ms; refreshing now means the caller can attach
 		// and show it in the same turn without a race.
 		const board = this.deck.refresh(path);
-		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board });
+		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
 		return path;
 	}
 
@@ -235,7 +256,7 @@ export class BoardService {
 		writeFileSync(file, html);
 		this.revisions.record(path, html);
 		const board = this.deck.refresh(path);
-		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board });
+		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
 		return path;
 	}
 
@@ -254,7 +275,7 @@ export class BoardService {
 		writeFileSync(file, html);
 		this.revisions.record(path, html);
 		const board = this.deck.refresh(path);
-		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board });
+		if (board) this.hooks.send({ type: "board.changed", path, rev: board.rev, board: this.placed(board) });
 		return path;
 	}
 
@@ -383,7 +404,7 @@ export class BoardService {
 				this.revisions.record(path, source.text);
 				this.deck.resync();
 				reply({ type: "board.patched", path, rev: this.deck.board(path)?.rev ?? board.rev });
-				this.hooks.send({ type: "deck.state", deck: this.deck.state() });
+				this.hooks.send({ type: "deck.state", deck: this.hooks.state() });
 			} catch (error) {
 				reply({ type: "board.patched", path, rev: board.rev, refused: (error as Error).message });
 			}
@@ -415,7 +436,7 @@ export class BoardService {
 			this.hooks.send({ type: "board.patched", path, rev: updated?.rev ?? board.rev });
 			if (updated) {
 				updated.lastWrittenBy = "you";
-				this.hooks.send({ type: "board.changed", path, rev: updated.rev, board: updated });
+				this.hooks.send({ type: "board.changed", path, rev: updated.rev, board: this.placed(updated) });
 			}
 			this.hooks.edited(path, summary.join(", "));
 		} catch (error) {
@@ -443,7 +464,7 @@ export class BoardService {
 			writeFileSync(this.deck.fileOf(path), content);
 			this.revisions.pop(path);
 			const updated = this.deck.refresh(path);
-			if (updated) this.hooks.send({ type: "board.changed", path, rev: updated.rev, board: updated });
+			if (updated) this.hooks.send({ type: "board.changed", path, rev: updated.rev, board: this.placed(updated) });
 			this.hooks.send({ type: "board.patched", path, rev: updated?.rev ?? 0 });
 		} catch (error) {
 			reply({ type: "error", text: `Could not undo: ${(error as Error).message}` });

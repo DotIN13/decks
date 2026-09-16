@@ -76,7 +76,7 @@ export class Deck {
 		syncRuntimeLib(runtimeLib, join(absolute, "lib"));
 		const deckFile = join(absolute, "deck.json");
 		if (!existsSync(deckFile)) {
-			writeFileSync(deckFile, serializeDeckFile({ version: 1, name: name ?? basename(absolute), boards: {}, roots: [] }));
+			writeFileSync(deckFile, serializeDeckFile({ version: 1, name: name ?? basename(absolute), roots: [] }));
 		}
 		return Deck.open(absolute);
 	}
@@ -109,15 +109,20 @@ export class Deck {
 	}
 
 	/**
-	 * The deck as one stage sees it: `positions` overrides where a board sits, and the rest fall
-	 * through to `arrange`.
+	 * The deck as one stage sees it: `positions` overrides where a board sits, and every board the
+	 * stage has not placed goes through the deck's own auto-layout.
 	 *
-	 * Called with the focused agent's map, so what the client draws is that stage's arrangement.
-	 * Called with nothing, it is the deck's own arrangement — what a stage that has placed nothing
-	 * starts from.
+	 * Called with the focused agent's map, so what the client draws is that stage's arrangement. Called
+	 * with nothing, it is the arrangement a stage that has placed nothing starts from.
+	 *
+	 * `onPlace` is handed every place that had to be *worked out* rather than read, which is what lets
+	 * the caller write it down on the stage and stop working it out. See `arrange`.
 	 */
-	state(positions?: Record<string, { x: number; y: number }>): DeckState {
-		return { path: this.path, name: this.name, boards: this.arrange(positions), roots: this.resolved.roots };
+	state(
+		positions?: Record<string, { x: number; y: number }>,
+		onPlace?: (path: string, at: { x: number; y: number }) => void,
+	): DeckState {
+		return { path: this.path, name: this.name, boards: this.arrange(positions, onPlace), roots: this.resolved.roots };
 	}
 
 	/**
@@ -126,23 +131,26 @@ export class Deck {
 	 * A board with a position in `positions` takes it; every other board goes through the existing
 	 * `autoPlace`, with the boards that *do* have a position as its "already placed" — so the rows are
 	 * laid out under this stage's arrangement rather than under a deck-wide one that is not there any
-	 * more. Nothing is written: `autoPlace` computes, as it always has, and a stage's map holds only
-	 * what somebody moved.
+	 * more.
+	 *
+	 * **The places `autoPlace` computes are reported, not kept.** This function is called on every
+	 * send, and a board placed beside the frontier *now* would chase it the next time somebody moved
+	 * a board down — the reason the caller writes what it is told into the stage's map, so a board
+	 * lands once and the frontier moves on without it.
 	 */
-	private arrange(positions?: Record<string, { x: number; y: number }>): Board[] {
-		if (!positions || Object.keys(positions).length === 0) {
-			const all = this.boards.map((board) => ({ ...board }));
-			autoPlace(all, []);
-			return all;
-		}
+	private arrange(
+		positions?: Record<string, { x: number; y: number }>,
+		onPlace?: (path: string, at: { x: number; y: number }) => void,
+	): Board[] {
 		const placed: Board[] = [];
 		const unplaced: Board[] = [];
 		for (const board of this.boards) {
-			const at = positions[board.path];
+			const at = positions?.[board.path];
 			if (at) placed.push({ ...board, x: Math.round(at.x), y: Math.round(at.y) });
 			else unplaced.push({ ...board });
 		}
 		autoPlace(unplaced, placed);
+		for (const board of unplaced) onPlace?.(board.path, { x: board.x, y: board.y });
 		return [...placed, ...unplaced];
 	}
 
@@ -251,9 +259,10 @@ export class Deck {
 	 * safe: it resolves through `resolveInDeck`, which throws on anything that climbs out of
 	 * the deck, so a path from the wire cannot reach a file this deck does not own.
 	 *
-	 * The arrangement is rewritten only if it mentioned this board. A deck with no
+	 * The record is rewritten only if it mentioned this board's size. A deck with no
 	 * `deck.json` is a valid deck — opening one must not write to it, and neither should
-	 * deleting from one that never had positions to lose.
+	 * deleting from one that never had a size to lose. A board's *place* is not here at all
+	 * any more: it belongs to a stage, which is where a delete already takes it in turn.
 	 *
 	 * Nothing here touches `.decks/revisions`. The versions of a deleted board stay on disk
 	 * under their shas, which is the whole of what makes this recoverable by hand; the caller
@@ -266,11 +275,9 @@ export class Deck {
 		const existed = existsSync(absolute);
 		if (existed) rmSync(absolute);
 		this.boardsByPath.delete(path);
-		if (this.file.boards?.[path]) this.save();
+		if (this.file.sizes?.[path]) this.save();
 		return existed;
 	}
-
-/** Movement belongs to a stage now: `AgentRecord.positions`, written through `board.move`. */
 
 	/**
 	 * Resize a board that cannot say its own size, and write it down.
@@ -334,24 +341,30 @@ export class Deck {
 	}
 
 	/**
-	 * Write `deck.json` from the boards as they now sit.
+	 * Write `deck.json` from the deck as it now is.
 	 *
-	 * Positions are rebuilt from the live boards, but every other key in the file —
-	 * including ones this build does not know about — is carried through, because
-	 * the file belongs to the user as much as to us.
+	 * **A size and never a place.** A place belongs to a stage and is written to that agent's record;
+	 * what is left for this file is the size of a board that cannot state one itself, and only for the
+	 * formats in that position:
+	 *
+	 * - a **component** board's numbers are in its own `<meta>`, and copying them here would make
+	 *   `deck.json` a second source of truth that goes stale the moment somebody edits the board —
+	 *   the exact failure this feature had to avoid for markdown;
+	 * - a **flow** document takes both, because a foreign one cannot measure itself and our own keeps
+	 *   its measured height here until the browser reports a new one;
+	 * - a **slide** deck takes the width alone. Its height follows from the aspect it already knows,
+	 *   and storing one would be a second number to keep in step with the first.
+	 *
+	 * Every other key in the file — including ones this build does not know about — is carried
+	 * through, because the file belongs to the user as much as to us.
 	 */
 	save(): void {
-		const boards: Record<string, { x: number; y: number; w?: number; h?: number }> = {};
+		const sizes: Record<string, { w?: number; h?: number }> = {};
 		for (const board of this.boards) {
-			/*
-			 * A size is written only for the formats that have nowhere else to keep it. A
-			 * component board's numbers are in its own `<meta>`, and copying them here would
-			 * make `deck.json` a second source of truth that goes stale the moment somebody
-			 * edits the board — the exact failure this feature had to avoid for markdown.
-			 */
+			if (board.format === "component") continue;
+			sizes[board.path] = { w: board.w, ...(board.format === "slides" ? {} : { h: board.h }) };
 		}
-		// `roots` and the name stay; `boards` is gone, because nothing may write a position here again.
-		this.file = { ...this.file, version: 1, name: this.file.name ?? this.name };
+		this.file = { ...this.file, version: 1, name: this.file.name ?? this.name, sizes };
 		const text = serializeDeckFile(this.file);
 		this.lastWritten = text;
 		writeFileSync(join(this.path, "deck.json"), text);
@@ -373,9 +386,9 @@ export class Deck {
 		 * Where the size comes from, per format.
 		 *
 		 * A component board says its own, in `<meta name="board">`, and always has. Anything
-		 * else has nowhere in the file to put a number, so `deck.json` carries it beside the
-		 * position — the same file the user's drags already write, which means a resize and a
-		 * move are one mechanism rather than two.
+		 * else has nowhere in the file to put a number, so `deck.json` carries it — the record
+		 * this class already writes for the deck, which means a resize is one mechanism and not
+		 * a second store.
 		 *
 		 * A flow board's height is the exception to the exception: it is never stored,
 		 * because the browser measures it and reports it back (`board.reported`). Until that
@@ -383,7 +396,7 @@ export class Deck {
 		 * — a board that grows into its content on load looks like it is arriving, where one
 		 * that shrinks looks broken.
 		 */
-		const stored = this.file.boards?.[path];
+		const stored = this.file.sizes?.[path];
 		const width = format === "component" ? meta.w ?? DEFAULT_W : stored?.w ?? meta.w ?? defaultWidth(format);
 		const height =
 			format === "component"

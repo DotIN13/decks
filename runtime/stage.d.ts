@@ -513,7 +513,12 @@ export interface Stage {
 	 */
 	hide(path: string | string[]): Promise<void>;
 
-	/** Move a board on the canvas. Persists to deck.json, so it is a real rearrangement. */
+	/**
+	 * Move a board on the canvas.
+	 *
+	 * The move is written to **this conversation's** arrangement, so it is a real rearrangement for you
+	 * and does not move the board for anybody else — the same board can sit differently in two chats.
+	 */
 	move(path: string, at: { x: number; y: number }): Promise<Board>;
 
 	/**

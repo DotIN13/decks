@@ -46,6 +46,23 @@ test("a record and its transcript come back as they went in", () => {
 	cleanup();
 });
 
+test("a stage's arrangement is read back, and a bad entry does not cost the good ones", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+
+	store.write(record({ positions: { "boards/plan.html": { x: 120, y: 340 } } }), items);
+	assert.deepEqual(store.read("agent-1")?.record.positions, { "boards/plan.html": { x: 120, y: 340 } });
+
+	// The field is written and read on both sides, which is the seam the tag lists once fell
+	// through: a value `record()` writes and `validate()` ignores is lost on every restart.
+	writeFileSync(
+		join(deck.path, ".decks", "agents", "agent-1", "meta.json"),
+		JSON.stringify({ ...record(), positions: { "boards/plan.html": { x: "left", y: 0 }, "boards/notes.html": { x: 8, y: 16 } } }),
+	);
+	assert.deepEqual(store.read("agent-1")?.record.positions, { "boards/notes.html": { x: 8, y: 16 } });
+	cleanup();
+});
+
 test("the id comes from the directory, not from what the file claims", () => {
 	const { deck, cleanup } = deckOn();
 	const store = new AgentStore(deck);

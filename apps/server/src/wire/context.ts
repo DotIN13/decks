@@ -1,4 +1,4 @@
-import type { Camera, ClientMessage, ServerMessage } from "@decks/protocol";
+import type { Camera, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
 import type { Registry } from "../agents/registry.ts";
 import type { BoardService } from "../boards/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
@@ -66,6 +66,17 @@ export interface WireContext {
 	readonly agents: Registry;
 	readonly web: WebBridge;
 	readonly claudeAccounts: ClaudeAccounts;
+
+	/**
+	 * The deck as the focused stage sees it, with any place that had to be worked out written down on
+	 * that stage.
+	 *
+	 * Every frame that sends boards goes through this rather than `deck.state()`, because a bare
+	 * `deck.state()` is the deck's auto-layout and not the arrangement the conversation is looking at.
+	 * The seeding is the other half: what `Deck.arrange` computes is a *frontier* answer, and a board
+	 * that is re-placed on every send chases whatever was moved last (see `Deck.arrange`).
+	 */
+	stageState(): DeckState;
 
 	/** The camera a browser last reported, and the per-agent readings beside it. */
 	lastCamera: Camera;

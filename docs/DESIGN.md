@@ -30,7 +30,7 @@ One directory holds everything Decks stores, named by one variable, and the deck
 ```
 $DECKS_DATA_DIR/     default ~/.decks · npm run dev uses <repo>/data · tests a scratch dir
   decks/
-    deck.json        the arrangement, and the roots embeds may reach
+    deck.json        the deck's name, the roots embeds may reach, and a size a board cannot state
     boards/*.html    the boards
     lib/             the primitives, copied in and refreshed on open (§2.1)
     assets/          images the boards use, and the files the user drops on them
@@ -97,8 +97,9 @@ the honest first screen, and `example/` is a data directory you opt into
 
 **The transcripts are not in the deck.** They are Pi's, at
 `~/.pi/agent/sessions/<slug of the deck path>/`. Moving a deck leaves its conversations
-behind unless that directory is copied to the new path's slug; boards, revisions and
-arrangement travel with the folder.
+behind unless that directory is copied to the new path's slug; boards, revisions and each
+conversation's arrangement travel with the folder — a stage's positions live in its own agent
+record under `.decks/agents/`, inside the deck.
 
 What copying them buys is narrower than it sounds, and worth stating so nobody expects
 more: **nothing in the app resumes a session.** Every start is a new conversation, so the
@@ -112,13 +113,21 @@ The deck directory is the agent's cwd. That is the whole integration: the agent'
 `read`, `write`, `edit` and `grep` already work on boards, so there are no board CRUD
 tools to keep in sync with a schema.
 
-**Two sources of truth, split on purpose.** What a board *contains* lives in the board
-file. Where boards *sit* lives in `deck.json`. A drag writes the second and never the
-first; an agent's edit writes the first and never the second.
+**Where a board *sits* belongs to the conversation, and where it *is* belongs to the file.** What
+a board contains lives in the board file. Where it sits lives in the record of the agent whose
+canvas it is — `AgentRecord.positions`, under `.decks/agents/<id>/`, beside what that conversation
+is holding and showing (`§6.2`). So two conversations can look at one deck from two arrangements,
+the way they already keep two cameras, and a drag in one moves nothing for the other. A board no
+stage has placed is laid out by `Deck.arrange` — the rows-of-three rule `autoPlace` has always
+applied — and the place it works out is written down on that stage the first time it is sent, so a
+board lands once instead of chasing whatever was dragged last.
 
-`deck.json` is read forgivingly and written completely: an unparseable field is a
-default plus a warning, never a refusal to open, and keys this build does not
-understand survive a write (`schema.ts`). It is a file a person is expected to open.
+The deck's own file is then the deck's own facts: its name, the roots embeds may reach, and a size
+for the two kinds of board that have nowhere in their file to keep one (a foreign page and a slide
+deck). It is read forgivingly and written completely: an unparseable field is a default plus a
+warning, never a refusal to open, and keys this build does not understand survive a write
+(`schema.ts`). It is a file a person is expected to open. An older file's `boards` map is read for
+its sizes; its positions are dropped, because a position in that file has no stage to belong to.
 
 ### 2.1 `lib/` is a copy, and the copy is refreshed
 
@@ -288,9 +297,11 @@ path is exercised constantly rather than theoretically.
 
 `Deck` (`deck/loader.ts`) holds `deck.json`, the boards found under `boards/`, and the
 resolved roots. It owns no agent and no camera: the camera belongs to the browser
-looking, the selection belongs to the frame. Boards nobody has arranged are auto-placed
-in rows so a board the agent just wrote appears beside its siblings instead of on top
-of one; dragging it makes that position permanent.
+looking, the selection belongs to the frame, and **the arrangement belongs to the agent's
+record** — `Deck.state(positions)` puts a conversation's boards where that conversation put
+them. Boards it has not been given a place for are auto-placed in rows, under the ones it has,
+so a board the agent just wrote appears beside its siblings rather than on top of one; dragging
+it makes that position the stage's.
 
 The watcher (`deck/watcher.ts`) coalesces per path — a single save fires several
 filesystem events, and without the quiet period a board reloads three times per edit.
@@ -466,9 +477,9 @@ variable alone, and rebuilt by walking `sessionManager.getBranch()`. Rewinding t
 conversation then rewinds what is in context and what is on screen, because the
 transcript is the record.
 
-What is restored is a *set*: the snapshot carries `inPlay: string[]`, not one shown board,
-so a rewind puts back the arrangement the user was looking at rather than a single frame of
-it.
+What is restored is a *set*, and a place for each: the snapshot carries `inPlay: string[]` and the
+stage's `positions`, not one shown board, so a rewind puts back the arrangement the user was
+looking at rather than a single frame of it.
 
 ### 6.5 Direct manipulation
 
@@ -1050,10 +1061,13 @@ bars, so a pan composites one layer instead of re-laying-out a dozen documents.
 - **A board row owns a live document, so its identity must not change.** Solid re-creates
   a row whose item is a new object, and re-creating a row reloads the iframe in it — so
   replacing the boards array reloaded every board on screen. That was what "moving a
-  board refreshes the page" turned out to be: a drag writes `deck.json`, the watcher
-  reports it, and the whole deck arrived as new objects. Board updates are now merged in
-  place (`reconcile` keyed on the path), and the server no longer reports its own
-  `deck.json` write back — a hand edit still gets through, because the bytes differ.
+  board refreshes the page" turned out to be: a drag wrote `deck.json`, the watcher
+  reported it, and the whole deck arrived as new objects. A drag writes the conversation's
+  own record now — a file under `.decks/`, which the watcher ignores — but a board change
+  still arrives as a new object, so the merge is what keeps a row's document alive. Board
+  updates are merged in place (`reconcile` keyed on the path), and the server no longer
+  reports its own `deck.json` write back — a hand edit still gets through, because the
+  bytes differ.
 - **A user's own edit must not reload the board they are editing.** The editor applies the
   change to the live document, so a reload can only replace what is already correct — with
   a white flash, losing scroll position and selection. The frame is therefore *pinned* to

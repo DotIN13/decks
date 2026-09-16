@@ -143,6 +143,14 @@ export class Registry {
 				id: string;
 				context: string[];
 				inPlay: string[];
+				/**
+				 * Where this conversation had put its boards — the arrangement it was looking at.
+				 *
+				 * A stage's own, and the reason this is on the restored record at all: a dragged board
+				 * surviving a restart is the behaviour the per-stage change exists to keep, and the
+				 * position map is the only place it lives.
+				 */
+				positions?: Record<string, { x: number; y: number }>;
 				avatar?: string;
 				createdAt: number;
 				/**
@@ -229,6 +237,7 @@ export class Registry {
 					// a directory read and one that costs every conversation ever had.
 					context: record.context,
 					inPlay: record.inPlay,
+					...(record.positions ? { positions: record.positions } : {}),
 					...(record.lastLine ? { lastLine: record.lastLine } : {}),
 					...(record.lastAt ? { lastAt: record.lastAt } : {}),
 					...(record.avatar ? { avatar: record.avatar } : {}),
@@ -271,6 +280,20 @@ export class Registry {
 		const existing = this.get(this.focusedId);
 		if (existing) return existing;
 		return this.create();
+	}
+
+	/**
+	 * The agent the browser is looking at, **without creating one**.
+	 *
+	 * `focused()` mints an agent on demand because a deck nobody has spoken to should still have a
+	 * row to speak *in* — right when somebody is about to talk to it, wrong for a read that only
+	 * wants to know where that conversation put its boards. A broadcast must not start a runtime as
+	 * a side effect of being sent, and "no stage" is a real answer: the deck's own auto-layout.
+	 *
+	 * `undefined` after a dispose and before the first agent on a fresh deck.
+	 */
+	looking(): DeckAgent | undefined {
+		return this.get(this.focusedId);
 	}
 
 	focus(id: string): void {

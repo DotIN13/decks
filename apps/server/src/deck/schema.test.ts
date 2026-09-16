@@ -6,14 +6,14 @@ test("a deck file round-trips, keeping keys it does not know about", () => {
 	const source = `{
   "version": 1,
   "name": "Example",
-  "boards": { "boards/a.html": { "x": 10, "y": 20 } },
+  "sizes": { "boards/a.html": { "w": 640, "h": 480 } },
   "roots": ["../shared"],
   "somethingNewer": { "keep": true }
 }`;
 	const { file, warnings } = parseDeckFile(source);
 	assert.deepEqual(warnings, []);
 	assert.equal(file.name, "Example");
-	assert.deepEqual(file.boards, { "boards/a.html": { x: 10, y: 20 } });
+	assert.deepEqual(file.sizes, { "boards/a.html": { w: 640, h: 480 } });
 	assert.deepEqual(file.somethingNewer, { keep: true });
 
 	// A future field survives a write, because the file belongs to the user too.
@@ -22,7 +22,28 @@ test("a deck file round-trips, keeping keys it does not know about", () => {
 	assert.equal(written.at(-1), "\n");
 	// version first, then the parts a human scans for.
 	assert.ok(written.indexOf('"version"') < written.indexOf('"name"'));
-	assert.ok(written.indexOf('"boards"') < written.indexOf('"somethingNewer"'));
+	assert.ok(written.indexOf('"sizes"') < written.indexOf('"somethingNewer"'));
+});
+
+test("a legacy boards map gives up its sizes and loses its positions", () => {
+	const { file, warnings } = parseDeckFile('{"boards":{"a.html":{"x":10,"y":20,"w":500}}}');
+	// The size is a fact about a board that has nowhere else to keep it; the place belongs to a
+	// stage now, and this file is not one.
+	assert.deepEqual(file.sizes, { "a.html": { w: 500 } });
+	assert.equal("boards" in file, false, "the old key is consumed, so a write does not carry it on");
+	assert.deepEqual(warnings, []);
+});
+
+test("sizes is the current key, and it wins where a file has both", () => {
+	const { file } = parseDeckFile('{"boards":{"a.html":{"x":1,"y":2,"w":500}},"sizes":{"a.html":{"w":800}}}');
+	assert.deepEqual(file.sizes, { "a.html": { w: 800 } });
+});
+
+test("a size that is not a positive number is dropped, not fatal", () => {
+	const { file, warnings } = parseDeckFile('{"sizes":{"a.html":{"w":"wide"},"b.html":{"w":640}}}');
+	assert.deepEqual(file.sizes, { "b.html": { w: 640 } });
+	assert.equal(warnings.length, 1);
+	assert.match(warnings[0]!, /a\.html/);
 });
 
 test("a broken deck file opens the deck anyway, with a warning", () => {
@@ -32,11 +53,9 @@ test("a broken deck file opens the deck anyway, with a warning", () => {
 	assert.match(warnings[0]!, /not valid JSON/);
 });
 
-test("a position that is not a pair of numbers is dropped, not fatal", () => {
-	const { file, warnings } = parseDeckFile('{"boards":{"a.html":{"x":"left","y":0},"b.html":{"x":1,"y":2}}}');
-	assert.deepEqual(file.boards, { "b.html": { x: 1, y: 2 } });
-	assert.equal(warnings.length, 1);
-	assert.match(warnings[0]!, /a\.html/);
+test("a deck file without sizes writes none, so a deck nobody resized stays tidy", () => {
+	const written = serializeDeckFile({ version: 1, name: "T" });
+	assert.equal(written.includes("sizes"), false);
 });
 
 test("a newer version is a warning, not a refusal", () => {

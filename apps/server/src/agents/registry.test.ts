@@ -95,6 +95,68 @@ test("a chat that was spoken to comes back after a restart", () => {
 	cleanup();
 });
 
+test("where a conversation put its boards comes back after a restart", () => {
+	const { deck, cleanup } = deckOn();
+	const agent = agentOn(deck);
+	agent.translator.user("put those two down here");
+	agent.setInPlay(["boards/plan.html", "boards/notes.html"]);
+	// Two boards, placed differently from any auto-layout — the whole point of a stage owning
+	// its arrangement is that these numbers are not derivable from the deck.
+	agent.setPosition("boards/plan.html", 120, 340);
+	agent.setPosition("boards/notes.html", 900, 80);
+	const id = agent.id;
+	agent.dispose();
+
+	const { registry } = registryOn(deck);
+	registry.restore();
+	assert.deepEqual(registry.get(id)?.positions(), {
+		"boards/plan.html": { x: 120, y: 340 },
+		"boards/notes.html": { x: 900, y: 80 },
+	});
+	cleanup();
+});
+
+test("two conversations keep two arrangements of one deck, and the switch is what chooses", () => {
+	const { deck, cleanup } = deckOn();
+	// Two chats, each with its own mind about where the plan goes.
+	const one = agentOn(deck);
+	one.rename("One");
+	one.translator.user("here");
+	one.setPosition("boards/plan.html", 10, 20);
+	const two = agentOn(deck);
+	two.rename("Two");
+	two.translator.user("no, here");
+	two.setPosition("boards/plan.html", 900, 400);
+	const [firstId, secondId] = [one.id, two.id];
+	one.dispose();
+	two.dispose();
+
+	const { registry } = registryOn(deck);
+	registry.restore();
+	/*
+	 * What the wire's `agent.focus` does, in the order it now does it: focus first, then read the
+	 * arrangement — the bug this order pins down was sending the state *before* switching, which
+	 * handed the browser the arrangement it was leaving.
+	 */
+	registry.focus(firstId);
+	assert.deepEqual(registry.looking()?.positions(), { "boards/plan.html": { x: 10, y: 20 } });
+	assert.deepEqual(
+		[
+			deck.state(registry.looking()!.positions()).boards.find((board) => board.path === "boards/plan.html")?.x,
+			deck.state(registry.looking()!.positions()).boards.find((board) => board.path === "boards/plan.html")?.y,
+		],
+		[10, 20],
+	);
+
+	registry.focus(secondId);
+	assert.deepEqual(registry.looking()?.positions(), { "boards/plan.html": { x: 900, y: 400 } });
+
+	// And back again — the arrangement is a property of the chat, not a last-writer-wins row.
+	registry.focus(firstId);
+	assert.deepEqual(registry.looking()?.positions(), { "boards/plan.html": { x: 10, y: 20 } });
+	cleanup();
+});
+
 test("a dormant row still reports what its runtime can do", () => {
 	const { deck, cleanup } = deckOn();
 	const agent = agentOn(deck);
@@ -669,8 +731,7 @@ test("a reply is delivered as a notice in the sender's transcript — and never 
 	cleanup();
 });
 
-test("a workspace survives a restart, because a dormant chat has no session to ask", () => {
-	const { deck, cleanup } = deckOn();
+test("a workspace survives a restart, because a dormant chat has no session to ask", () => {	const { deck, cleanup } = deckOn();
 	const agent = agentOn(deck);
 	agent.rename("Rune");
 	// One thing said, so there is a record at all: an agent nobody has spoken to is not

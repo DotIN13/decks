@@ -443,6 +443,15 @@ function validate(raw: unknown, id: string): AgentRecord {
 	const tags = strings(source.tags);
 	const userTags = strings(source.userTags);
 	const lastLine = typeof source.lastLine === "string" && source.lastLine ? source.lastLine : undefined;
+	/*
+	 * And the stage's own arrangement, read back for the same reason.
+	 *
+	 * This is the field the whole per-stage change is *for*: without it, every restart puts every
+	 * conversation back to the deck's auto-layout, and the one thing that had to keep working — a board
+	 * you dragged staying where you dragged it — does not. Validated here rather than trusted, because
+	 * it arrives from a file and is fed to `Deck.arrange` as coordinates.
+	 */
+	const positions = placesOf(source.positions);
 	return {
 		id,
 		kind: source.kind === "claude" ? "claude" : "pi",
@@ -453,6 +462,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(typeof source.parentId === "string" ? { parentId: source.parentId } : {}),
 		context: strings(source.context),
 		inPlay: strings(source.inPlay),
+		...(positions ? { positions } : {}),
 		createdAt: created,
 		...(model ? { model } : {}),
 		...(usage ? { usage } : {}),
@@ -482,6 +492,26 @@ function validate(raw: unknown, id: string): AgentRecord {
 
 const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 const MODES: AgentMode[] = ["manual", "acceptEdits", "plan", "auto"];
+
+/**
+ * Where a stage put its boards, if the stored value is one.
+ *
+ * A pair of finite numbers per path and nothing else: this arrives from a file and is handed to
+ * `Deck.arrange` as coordinates, so a string from an older hand-edit drops the entry rather than
+ * pulling a board to `NaN`. Whole-map-or-nothing would lose the good entries to the bad one, which is
+ * what the map having one key per board is for.
+ */
+function placesOf(raw: unknown): Record<string, { x: number; y: number }> | undefined {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+	const kept: Record<string, { x: number; y: number }> = {};
+	for (const [path, value] of Object.entries(raw as Record<string, unknown>)) {
+		const at = value as { x?: unknown; y?: unknown } | null;
+		const x = Number(at?.x);
+		const y = Number(at?.y);
+		if (path && Number.isFinite(x) && Number.isFinite(y)) kept[path] = { x, y };
+	}
+	return Object.keys(kept).length > 0 ? kept : undefined;
+}
 
 /**
  * The stored model, if it is one.

@@ -4,11 +4,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Deck } from "./loader.ts";
+import { slideHeight } from "./kinds.ts";
 import { realPathOf } from "./roots.ts";
 
 function board(title: string, w?: number, h?: number): string {
 	const meta = w && h ? `<meta name="board" content='{"w":${w},"h":${h}}'>` : "";
 	return `<!doctype html><html><head><title>${title}</title>${meta}</head><body class="board"></body></html>`;
+}
+
+/** A deck in reveal's own markup — a size this app keeps in the record rather than the file. */
+function slideDeck(title: string): string {
+	return `<!doctype html><html><head><title>${title}</title></head><body class="reveal"><div class="slides"></div></body></html>`;
+}
+
+/** A page from somewhere else: neither class, so it is sandboxed and cannot measure itself. */
+function foreign(title: string): string {
+	return `<!doctype html><html><head><title>${title}</title></head><body><p>Saved.</p></body></html>`;
 }
 
 function emptyDeck(withFile = true) {
@@ -65,6 +76,103 @@ test("boards nobody arranged get placed in rows, not on top of each other", () =
 	}
 	// Three to a row, so the fourth starts a new one.
 	assert.equal(boxes[3]?.y! > boxes[0]?.y!, true);
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("a stage's own place wins over the auto-layout, and the deck file is not where it is written", () => {
+	const root = emptyDeck();
+	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
+	const deck = Deck.open(root);
+	const state = deck.state({ "boards/a.html": { x: 42, y: 99 } });
+	assert.deepEqual([state.boards[0]?.x, state.boards[0]?.y], [42, 99]);
+
+	// The place belongs to a stage's own record — `AgentRecord.positions` — and nowhere else, so the
+	// deck file it used to be written to does not gain one.
+	const arrangement = JSON.parse(readFileSync(join(root, "deck.json"), "utf8")) as Record<string, unknown>;
+	assert.equal("boards" in arrangement, false);
+	assert.equal("sizes" in arrangement, false);
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("a board nobody placed lands under this stage's arrangement, not the deck's", () => {
+	const root = emptyDeck();
+	for (const name of ["a", "b", "c", "d"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
+	const deck = Deck.open(root);
+	// One board down at y=2000, and three with no place of their own.
+	const state = deck.state({ "boards/a.html": { x: 0, y: 2000 } });
+	const others = state.boards.filter((one) => one.path !== "boards/a.html");
+	// The rows start under the stage's own arrangement rather than at the origin — which is the one
+	// line the per-stage change actually touched: whose boards `autoPlace` counts as placed.
+	for (const other of others) assert.ok(other.y > 2300, `${other.path} sits below the placed board`);
+	assert.equal(new Set(others.map((one) => one.y)).size, 1, "three fit on the first row");
+	assert.deepEqual(others.map((one) => one.x), [0, 560, 1120]);
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("the auto-layout reports the places it worked out, and a stage that keeps them stops chasing", () => {
+	const root = emptyDeck();
+	for (const name of ["a", "b", "c", "d"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
+	const deck = Deck.open(root);
+	const places: Record<string, { x: number; y: number }> = { "boards/a.html": { x: 0, y: 0 } };
+	const worked: string[] = [];
+	deck.state(places, (path, at) => {
+		worked.push(path);
+		places[path] = at;
+	});
+	assert.deepEqual(worked.sort(), ["boards/b.html", "boards/c.html", "boards/d.html"]);
+
+	// Keeping them is the whole point: move the one board that *was* placed and the others stay put.
+	// Derived on every send, they would follow the frontier down — a board that moves because you
+	// moved a different one, which is what "haunted" means here.
+	const before = deck.state(places).boards.map((one) => [one.path, one.x, one.y] as const);
+	const after = deck.state({ ...places, "boards/a.html": { x: 0, y: 6000 } }).boards.map((one) => [one.path, one.x, one.y] as const);
+	for (const [path, x, y] of before) {
+		if (path === "boards/a.html") continue;
+		assert.deepEqual(after.find((entry) => entry[0] === path)?.slice(1), [x, y], `${path} did not move`);
+	}
+
+	// And with every place kept, a send has nothing left to work out.
+	const again: string[] = [];
+	deck.state({ ...places, "boards/a.html": { x: 0, y: 6000 } }, (path) => again.push(path));
+	assert.deepEqual(again, []);
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("a size a board cannot state itself survives a save and a reload", () => {
+	const root = emptyDeck();
+	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
+	writeFileSync(join(root, "boards", "talk.slides.html"), slideDeck("Talk"));
+	writeFileSync(join(root, "boards", "saved.html"), foreign("Saved"));
+	const deckFile = Deck.open(root);
+	deckFile.setSize("boards/talk.slides.html", { w: 1440 });
+	deckFile.setSize("boards/saved.html", { w: 900, h: 700 });
+
+	const written = JSON.parse(readFileSync(join(root, "deck.json"), "utf8")) as { sizes: Record<string, unknown> };
+	assert.deepEqual(written.sizes["boards/saved.html"], { w: 900, h: 700 });
+	// A slide deck's height follows from its aspect, so only the width is kept — one number, not two
+	// that can disagree.
+	assert.deepEqual(written.sizes["boards/talk.slides.html"], { w: 1440 });
+	assert.equal("boards/a.html" in written.sizes, false, "a component board's size is in its own <meta>");
+
+	const again = Deck.open(root);
+	assert.deepEqual([again.board("boards/saved.html")?.w, again.board("boards/saved.html")?.h], [900, 700]);
+	assert.equal(again.board("boards/talk.slides.html")?.w, 1440);
+	assert.equal(again.board("boards/talk.slides.html")?.h, slideHeight(1440, undefined));
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("a legacy boards map gives its sizes to a stage that keeps them", () => {
+	const root = emptyDeck();
+	writeFileSync(join(root, "boards", "saved.html"), foreign("Saved"));
+	writeFileSync(
+		join(root, "deck.json"),
+		JSON.stringify({ version: 1, name: "T", boards: { "boards/saved.html": { x: 120, y: 340, w: 900, h: 700 } } }),
+	);
+	const deck = Deck.open(root);
+	// The size is carried over; the position is not, because a position in this file has no stage to
+	// belong to and the auto-layout is the honest answer.
+	assert.deepEqual([deck.board("boards/saved.html")?.w, deck.board("boards/saved.html")?.h], [900, 700]);
+	assert.deepEqual([deck.state().boards[0]?.x, deck.state().boards[0]?.y], [0, 0]);
 	rmSync(root, { recursive: true, force: true });
 });
 

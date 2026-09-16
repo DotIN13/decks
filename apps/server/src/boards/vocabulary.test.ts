@@ -40,23 +40,33 @@ test("board.css reads every tone a callout may carry", () => {
 
 test("the authoring skill teaches exactly the classes in the vocabulary", () => {
 	const text = skill();
-	// The list under "Built-in component classes", which is what an agent reads before it
-	// writes a board. Every name here has to be real, and every real class has to be here.
-	const section = text.slice(text.indexOf("## Built-in component classes"), text.indexOf("**They nest.**"));
-	const taught = [...section.matchAll(/^- `([a-z]+)`$/gm)].map((match) => match[1]);
+	/*
+	 * The bullet an agent reads before it writes a board.
+	 *
+	 * The list it used to be — one bullet per class — became a sentence when the skill was
+	 * rewritten, so this reads the sentence. What it is checking has not changed: every name here
+	 * has to be real, and every real class has to be here. Backticked `.name`s, so the tooltip-ish
+	 * mentions of `lib/board.css` and `data-tone` beside them stay out of the count.
+	 */
+	const start = text.indexOf("- **Core Primitives:**");
+	const end = start === -1 ? -1 : text.indexOf("\n\n", start);
+	// The whole bullet, wrapping and all: a markdown list item is several lines, and reading only
+	// the first would quietly count three classes and pass a claim it never checked.
+	const bullet = start === -1 ? "" : text.slice(start, end === -1 ? undefined : end);
+	const taught = [...bullet.matchAll(/`\.([a-z]+)/g)].map((match) => match[1]!);
 	assert.deepEqual(
 		[...taught].sort(),
 		BOARD_CLASSES.map((entry) => entry.name).sort(),
 	);
 
 	/*
-	 * And in the order the paragraph below it claims.
+	 * And in the order the paragraph claims.
 	 *
-	 * The skill says "the first four are interchangeable box classes", which is a statement
-	 * about *position*: reorder these bullets and that sentence quietly becomes false. The
+	 * The skill says the first four are "interchangeable box containers", which is a statement
+	 * about *position*: reorder these names and that sentence quietly becomes false. The
 	 * comparison above would not notice, so this one does.
 	 */
-	assert.deepEqual([...taught.slice(0, 4)].sort(), [...BOX_CLASSES].sort(), "the four box classes must be the first four listed");
+	assert.deepEqual([...taught.slice(0, 4)].sort(), [...BOX_CLASSES].sort(), "the four box classes must be the first four named");
 });
 
 test("the four box classes are exactly the ones the vocabulary marks as boxes", () => {

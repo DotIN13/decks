@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { runtimeLib } from "@decks/runtime";
-import type { Camera, ClientMessage, ServerMessage, StageCall } from "@decks/protocol";
+import type { Board, Camera, ClientMessage, DeckState, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { BoardService } from "./boards/service.ts";
 import { runtimeList } from "./runtimes/registry.ts";
@@ -82,6 +82,12 @@ export class App {
 		this.deck = deck;
 		this.boards = new BoardService(deck, {
 			send: (message) => this.send(message),
+			/*
+			 * The arrangement, not the deck — `BoardService` broadcasts a board on every write, and the
+			 * loader's copy of one has no place of its own any more. It asks rather than is handed the
+			 * positions so that the seeding `stageState` does happens on this path too.
+			 */
+			state: () => this.stageState(),
 			edited: (path, summary) => this.agents.userEdited(path, summary),
 			removed: (path) => this.agents.boardRemoved(path),
 		});
@@ -102,9 +108,12 @@ export class App {
 
 				agent.setPosition(path, x, y);
 
-				return deck.state(agent.positions()).boards.find((board) => board.path === path);
+				return this.stageState().boards.find((board) => board.path === path);
 
 			},
+
+			// `stage.boards()` reads the arrangement the conversation is looking at, not the loader's list.
+			boards: () => this.stageState().boards,
 
 			newBoard: ({ format, template, ...rest }) =>
 				this.boards.newBoard({ ...rest, template: template as BoardTemplate, ...(isBoardFormat(format) ? { format } : {}) }),
@@ -364,7 +373,7 @@ export class App {
 				if (this.deck.isOwnWrite()) return;
 				// A hand edit, then: the arrangement is whatever the file now says.
 				this.deck.reload();
-				this.send({ type: "deck.state", deck: this.deck.state() });
+				this.send({ type: "deck.state", deck: this.stageState() });
 				return;
 			}
 			if (change.kind === "board") {
@@ -386,14 +395,14 @@ export class App {
 				}
 				this.send(
 					board
-						? { type: "board.changed", path: change.path, rev: board.rev, board }
+						? { type: "board.changed", path: change.path, rev: board.rev, board: this.placed(board) }
 						: { type: "board.changed", path: change.path, rev: 0, removed: true },
 				);
 				return;
 			}
 			// An asset under the deck moved. A board may be showing it, and the frame
 			// has no way to know, so every board reloads — cheap, and rare.
-			this.send({ type: "deck.state", deck: this.deck.state() });
+			this.send({ type: "deck.state", deck: this.stageState() });
 		});
 
 		/*
@@ -425,7 +434,7 @@ export class App {
 		const { changed, removed } = this.deck.resync();
 		for (const board of changed) {
 			this.boards.recordRevision(board.path);
-			this.send({ type: "board.changed", path: board.path, rev: board.rev, board });
+			this.send({ type: "board.changed", path: board.path, rev: board.rev, board: this.placed(board) });
 		}
 		for (const path of removed) {
 			// A dead path left in a context silently empties the rail and the canvas.
@@ -448,7 +457,7 @@ export class App {
 	}
 
 	greet(reply: (message: ServerMessage) => void): void {
-		reply({ type: "deck.state", deck: this.deck.state() });
+		reply({ type: "deck.state", deck: this.stageState() });
 		/*
 		 * And what this install can run.
 		 *
@@ -506,8 +515,46 @@ export class App {
 		this.claudeAccounts.sweepAgents(this.agents.all().map((agent) => agent.id));
 		});
 		this.watch();
-		this.send({ type: "deck.state", deck: this.deck.state() });
+		this.send({ type: "deck.state", deck: this.stageState() });
 		for (const warning of this.deck.warnings) this.send({ type: "notice", level: "warn", text: warning });
+	}
+
+	/**
+	 * The deck as the focused stage sees it, with the places it had to work out written down on it.
+	 *
+	 * **Every outbound board list goes through this**, including the ones `boards/service.ts` sends,
+	 * because `Deck.state()` on its own is the auto-layout and not the arrangement the conversation is
+	 * looking at. It is one function rather than a rule repeated at six call sites: the failure mode of
+	 * the rule is a board jumping to the origin on somebody else's write, which is easy to miss and
+	 * hard to attribute.
+	 *
+	 * The seeding half matters as much as the reading half. `Deck.arrange` places a board the stage has
+	 * not placed beside the frontier *as it is at that moment*, so leaving the result unrecorded means
+	 * a board drifts every time a different one is dragged down. Writing the computed place onto the
+	 * stage is what makes a board land once — `setPosition` is the debounced write the rest of the
+	 * stage state already uses, so this is not a write per send.
+	 *
+	 * **It never creates an agent.** `Registry.focused()` mints one on demand for a deck nobody has
+	 * spoken to, which is right for a prompt and wrong here: this is called from broadcast paths, and a
+	 * `board.changed` must not start a runtime as a side effect of being sent. No stage means the
+	 * deck's own auto-layout, which is what a deck with nobody looking at it has anyway.
+	 */
+	stageState(): DeckState {
+		const agent = this.agents.looking();
+		if (!agent) return this.deck.state();
+		const seeded: Array<{ path: string; x: number; y: number }> = [];
+		const state = this.deck.state(agent.positions(), (path, at) => seeded.push({ path, ...at }));
+		for (const { path, x, y } of seeded) agent.setPosition(path, x, y);
+		return state;
+	}
+
+	/**
+	 * One board as the focused stage sees it — the same resolution `stageState` does, for the one caller
+	 * that has the board already. A broadcast that carried the loader's copy instead would put the board
+	 * at the origin for everybody, because the loader's boards have no place of their own any more.
+	 */
+	private placed(board: Board): Board {
+		return this.stageState().boards.find((one) => one.path === board.path) ?? board;
 	}
 
 	send(message: ServerMessage): void {

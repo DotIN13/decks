@@ -61,6 +61,26 @@ function firstLine(task: string): string {
 }
 
 /**
+ * Where a stage put its boards, if the stored value is one.
+ *
+ * The one validator for two readers — a restored record and a rewind's snapshot — because they are the
+ * same map arriving by different roads and used to have a copy of this loop each. A pair of finite
+ * numbers per path and nothing else: entries that are not that are dropped rather than the whole map,
+ * so one hand-edit cannot cost a stage its whole arrangement.
+ */
+function cleanPlaces(raw: unknown): Record<string, { x: number; y: number }> | undefined {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+	const kept: Record<string, { x: number; y: number }> = {};
+	for (const [path, value] of Object.entries(raw as Record<string, unknown>)) {
+		const at = value as { x?: unknown; y?: unknown } | null;
+		const x = Number(at?.x);
+		const y = Number(at?.y);
+		if (path && Number.isFinite(x) && Number.isFinite(y)) kept[path] = { x, y };
+	}
+	return Object.keys(kept).length > 0 ? kept : undefined;
+}
+
+/**
  * One agent, and everything about it that is not Pi's.
  *
  * The transcript, the identity, the state, the dialog bridge. The backend is
@@ -261,6 +281,12 @@ export class DeckAgent {
 				id: string;
 				context: string[];
 				inPlay: string[];
+				/**
+				 * Where this conversation had put its boards, so the arrangement it was looking at comes
+				 * back with it. Absent on a record written before a stage could have one, and the stage
+				 * then falls to the auto-layout rather than to nothing.
+				 */
+				positions?: Record<string, { x: number; y: number }>;
 				avatar?: string;
 				createdAt: number;
 				/**
@@ -408,6 +434,13 @@ export class DeckAgent {
 			}
 			this.held = [...options.restored.context];
 			this.playing = options.restored.inPlay.filter((path) => this.held.includes(path));
+			/*
+			 * And where this conversation had put its boards, which is a stage's own state and has no
+			 * other home: the record is read here rather than the model record, so a board dragged before
+			 * a restart is in the same place after it.
+			 */
+			const kept = cleanPlaces(options.restored.positions);
+			if (kept) this.places = kept;
 		}
 
 		this.bridge = new ExtensionUiBridge({
@@ -467,11 +500,8 @@ export class DeckAgent {
 		if (Array.isArray(snapshot.context)) this.setContext(snapshot.context.filter((path) => typeof path === "string"));
 		if (Array.isArray(snapshot.inPlay)) this.setInPlay(snapshot.inPlay.filter((path) => typeof path === "string"));
 		if (snapshot.positions && typeof snapshot.positions === "object") {
-			const kept: Record<string, { x: number; y: number }> = {};
-			for (const [path, at] of Object.entries(snapshot.positions)) {
-				if (typeof path === "string" && at && Number.isFinite(at.x) && Number.isFinite(at.y)) kept[path] = { x: at.x, y: at.y };
-			}
-			this.places = kept;
+			const kept = cleanPlaces(snapshot.positions);
+			if (kept) this.places = kept;
 		}
 		if (snapshot.identity?.name) this.rename(snapshot.identity.name);
 		if (snapshot.identity?.avatar) this.setAvatar(snapshot.identity.avatar);
