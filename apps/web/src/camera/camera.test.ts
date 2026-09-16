@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { breathingRoom, clampZoom, EDGE_FLOOR, fit, fitInto, keepVisible, MAX_ZOOM, MIN_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
+import { between, breathingRoom, clampZoom, easeOutCubic, EDGE_FLOOR, fit, fitInto, keepVisible, MAX_ZOOM, MIN_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
 
 const view = { width: 1200, height: 800 };
 
@@ -175,4 +175,49 @@ test("a board flown to inside the chrome stays above INTERACT_ZOOM", () => {
 	const region = { x: 288, y: 52, width: 1400 - 288 - 344, height: 900 - 52 - 12 };
 	const camera = fitInto([{ x: 0, y: 0, w: 1600, h: 1000 }], view, region);
 	assert.ok(camera.zoom >= 0.4, `zoom ${camera.zoom}`);
+});
+
+test("a glide's two ends are the cameras it was given, exactly", () => {
+	const from = { x: 0.1, y: -12.5, zoom: 0.3 };
+	const to = { x: 0.3, y: 4000.25, zoom: 2.4 };
+	assert.equal(between(from, to, 0), from);
+	assert.equal(between(from, to, 1), to);
+	// And not by arithmetic: `0.1 + (0.3 - 0.1)` is 0.30000000000000004, so a last frame that
+	// multiplied its way to the end would leave every glide a hair off the fit it was asked for.
+	assert.equal(between(from, to, 1).x, 0.3);
+	assert.equal(between(from, to, -3), from, "a t outside the move is clamped, not extrapolated");
+	assert.equal(between(from, to, 4), to);
+});
+
+test("halfway through a glide is halfway for the camera's position, and the geometric mean for its zoom", () => {
+	const from = { x: -1000, y: 500, zoom: 0.2 };
+	const to = { x: 2000, y: -1500, zoom: 2.4 };
+	const half = between(from, to, 0.5);
+	assert.equal(half.x, 500);
+	assert.equal(half.y, -500);
+	// 0.69, not the 1.3 a linear interpolation would give: zoom is a ratio, and the *rate* of
+	// scaling is what a person sees. The wrong one lurches and then crawls.
+	assert.ok(Math.abs(half.zoom - Math.sqrt(0.2 * 2.4)) < 1e-12, `zoom ${half.zoom}`);
+});
+
+test("a glide never overshoots and never goes backwards", () => {
+	const from = { x: 0, y: 0, zoom: 1 };
+	const to = { x: 900, y: -400, zoom: 0.25 };
+	let last = from;
+	for (let step = 0; step <= 40; step++) {
+		const at = between(from, to, easeOutCubic(step / 40));
+		assert.ok(at.x >= last.x && at.y <= last.y && at.zoom <= last.zoom, `overshot at step ${step}: ${JSON.stringify(at)}`);
+		assert.ok(at.x <= to.x && at.y >= to.y && at.zoom >= to.zoom, `past the target at step ${step}`);
+		last = at;
+	}
+	assert.deepEqual(last, to);
+});
+
+test("the ease leaves at speed and arrives slowly", () => {
+	assert.equal(easeOutCubic(0), 0);
+	assert.equal(easeOutCubic(1), 1);
+	// The first tenth of the time is already a quarter of the distance; the last tenth is 1%.
+	assert.ok(easeOutCubic(0.1) > 0.25, String(easeOutCubic(0.1)));
+	assert.ok(1 - easeOutCubic(0.9) < 0.01, String(1 - easeOutCubic(0.9)));
+	for (let t = 0; t < 1; t += 0.05) assert.ok(easeOutCubic(t) < easeOutCubic(t + 0.05), `not rising at ${t}`);
 });

@@ -45,6 +45,36 @@ export function clampZoom(zoom: number): number {
 	return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
 }
 
+/**
+ * Where a camera `t` of the way from one place to another is.
+ *
+ * The two ends are returned **as given** rather than computed, because `a + (b - a) * 1` is not
+ * always `b` in floating point — and the last frame of a glide is the one that has to land on
+ * the camera the caller asked for, exactly, or every glide leaves the view a hair off the fit.
+ *
+ * Zoom is interpolated **geometrically**, so the *rate* of scaling is even: `zoom` is a ratio,
+ * and lerping it linearly spends the first third of a long move lurching and the last third
+ * crawling. Moving from 0.2 to 2.4 therefore passes through 0.69 halfway, not 1.3.
+ */
+export function between(from: Camera, to: Camera, t: number): Camera {
+	if (t <= 0) return from;
+	if (t >= 1) return to;
+	return {
+		x: from.x + (to.x - from.x) * t,
+		y: from.y + (to.y - from.y) * t,
+		zoom: from.zoom * Math.pow(to.zoom / from.zoom, t),
+	};
+}
+
+/**
+ * Leaves at speed, arrives slowly.
+ *
+ * `1 - (1 - t)³`, and the shape is the whole argument for it: the middle of a camera move is
+ * uninteresting and the end is the destination, so the end is what should be quiet. An
+ * ease-in-out starts by hesitating, which reads as the app thinking about it.
+ */
+export const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
 /** World -> screen, in CSS pixels relative to the stage element. */
 export function toScreen(camera: Camera, view: Viewport, world: { x: number; y: number }) {
 	return {
