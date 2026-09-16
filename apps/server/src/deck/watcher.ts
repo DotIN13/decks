@@ -18,6 +18,11 @@ function ignored(path: string): boolean {
 	return (
 		path === ".decks" ||
 		path.startsWith(".decks/") ||
+		// `examples/` is the app's copy of the shipped example boards, refreshed whole on
+		// restart — an agent editing one must not reload every board on the canvas, any
+		// more than a change to `lib/` at runtime is allowed to. They are reference files,
+		// never boards: the loader only reads `boards/`.
+		path.startsWith("examples/") ||
 		path.startsWith(".git/") ||
 		path.startsWith("node_modules/")
 	);

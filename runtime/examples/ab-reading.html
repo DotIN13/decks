@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>The banner lifts signups by 3.1 points, and the interval is wide enough to trust it</title>
+		<meta name="board" content='{"w":1100,"h":1152,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
+			<h1>The banner lifts signups by 3.1 points, and the interval is wide enough to trust it</h1>
+		</div>
+
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+			<p><b>Signup conversion rose from 12.4% to 15.5% over 21 days.</b> The 95% confidence interval on the gain runs from 1.9 to 4.4 points: a real lift, and the revenue case should use the lower bound, not the point estimate.</p>
+		</div>
+
+		<section class="card" data-id="chart" style="left: 48px; top: 240px; width: 640px">
+			<h3>Signup conversion by variant, with 95% confidence intervals</h3>
+			<div id="chart" style="position: relative; height: 460px"></div>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">Hover a bar for the sample size, the rate and the interval. The interval is what separates a claim from a guess.</p>
+		</section>
+
+		<div class="kpi" data-id="kpi-control" style="left: 720px; top: 240px; width: 332px">
+			<span class="value">12.4%</span>
+			<span class="label">Control, n = 9,480</span>
+		</div>
+		<div class="kpi" data-id="kpi-banner" style="left: 720px; top: 368px; width: 332px">
+			<span class="value">15.5%</span>
+			<span class="label">Banner, n = 9,512</span>
+		</div>
+		<div class="callout" data-id="verdict" data-tone="ok" style="left: 720px; top: 496px; width: 332px">
+			<p><b>The verdict.</b> 3.1 point gain, and the lower bound of the interval is 1.9. Ship the banner, and price the expected revenue at the 1.9, not the 3.1.</p>
+		</div>
+		<div class="callout" data-id="method" style="left: 720px; top: 648px; width: 332px">
+			<p><b>The method.</b> 21 days, 19,000 visitors split 50/50 at the edge. Guardrails: checkout rate and cancellation rate were watched daily and neither moved.</p>
+		</div>
+
+		<section class="card" data-id="guards" style="left: 48px; top: 816px; width: 1004px">
+			<h3>What else moved, watched as guardrails</h3>
+			<table class="table">
+				<thead><tr><th>Metric</th><th>Control</th><th>Banner</th><th>Difference</th><th>Reading</th></tr></thead>
+				<tbody>
+					<tr><td>Signup rate, percent</td><td>12.4</td><td>15.5</td><td>+3.1</td><td><span class="chip" style="color: var(--b-ok)">the lift</span></td></tr>
+					<tr><td>Checkouts per signup</td><td>3.8</td><td>3.9</td><td>+0.1</td><td><span class="chip">unchanged</span></td></tr>
+					<tr><td>Cancellations, week one, percent</td><td>5.9</td><td>5.7</td><td>-0.2</td><td><span class="chip">unchanged</span></td></tr>
+					<tr><td>Median order value, dollars</td><td>41</td><td>40</td><td>-1</td><td><span class="chip">unchanged</span></td></tr>
+					<tr><td>Support contacts per 1,000 signups</td><td>12</td><td>13</td><td>+1</td><td><span class="chip" style="color: var(--b-warn)">watch</span></td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<script type="module">
+			const host = document.querySelector("#chart");
+			if (host) {
+				const d3 = await import("d3");
+
+				const data = [
+					{ variant: "Control", rate: 12.4, ci: 1.1, n: 9480 },
+					{ variant: "Banner", rate: 15.5, ci: 1.3, n: 9512 },
+				];
+
+				const width = host.clientWidth || 600;
+				const height = 460;
+				const margin = { top: 24, right: 24, bottom: 52, left: 64 };
+				const innerW = width - margin.left - margin.right;
+				const innerH = height - margin.top - margin.bottom;
+
+				const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height).style("display", "block");
+				const plot = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+				const x = d3.scaleBand().domain(data.map((d) => d.variant)).range([0, innerW]).padding(0.4);
+				const y = d3.scaleLinear().domain([0, 20]).range([innerH, 0]);
+
+				// The axis each direction counts in, named and with a unit.
+				plot.append("g").call(d3.axisLeft(y).ticks(5).tickFormat((d) => `${d}%`).tickSize(-innerW))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "11px"))
+					.call((axis) => axis.selectAll("line").style("stroke", "var(--b-border)"))
+					.call((axis) => axis.select(".domain").style("stroke", "none"));
+				plot.append("g").attr("transform", `translate(0,${innerH})`).call(d3.axisBottom(x).tickSize(0))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "12px").attr("dy", "1.6em"))
+					.call((axis) => axis.select(".domain").style("stroke", "var(--b-border-strong)"));
+				plot.append("text").attr("x", 0).attr("y", -8).style("font-size", "11px").style("fill", "var(--b-muted)").text("signup rate, percent");
+				plot.append("text").attr("x", innerW / 2).attr("y", innerH + 42).attr("text-anchor", "middle").style("font-size", "11px").style("fill", "var(--b-muted)").text("variant, 19,192 visitors split evenly");
+
+				const tooltip = d3.select(host).append("div").style("position", "absolute").style("left", "0").style("top", "0")
+					.style("pointer-events", "none").style("opacity", "0").style("z-index", "5")
+					.style("background", "var(--b-bg-layer)").style("border", "1px solid var(--b-border-strong)").style("border-radius", "6px")
+					.style("padding", "10px 12px").style("font-size", "12px").style("box-shadow", "var(--b-shadow)");
+
+				// The bars, and the interval drawn as a line with caps: the error bar is the
+				// whole argument, so it is the heaviest mark on the plot.
+				plot.selectAll("rect").data(data).join("rect")
+					.attr("x", (d) => x(d.variant)).attr("y", (d) => y(d.rate)).attr("width", x.bandwidth())
+					.attr("height", (d) => y(0) - y(d.rate)).attr("rx", 4)
+					.style("fill", (d) => (d.variant === "Banner" ? "var(--b-accent)" : "var(--b-muted)"))
+					.style("opacity", 0.9);
+				plot.selectAll("line.ci").data(data).join("line")
+					.attr("class", "ci").attr("x1", (d) => x(d.variant) + x.bandwidth() / 2).attr("x2", (d) => x(d.variant) + x.bandwidth() / 2)
+					.attr("y1", (d) => y(d.rate + d.ci)).attr("y2", (d) => y(d.rate - d.ci))
+					.attr("stroke", "var(--b-fg)").attr("stroke-width", 2);
+				plot.selectAll("line.cap").data(data).join("line")
+					.attr("class", "cap")
+					.attr("x1", (d) => x(d.variant) + x.bandwidth() / 2 - 9).attr("x2", (d) => x(d.variant) + x.bandwidth() / 2 + 9)
+					.attr("y1", (d) => y(d.rate + d.ci)).attr("y2", (d) => y(d.rate + d.ci))
+					.attr("stroke", "var(--b-fg)").attr("stroke-width", 2);
+				plot.selectAll("line.cap2").data(data).join("line")
+					.attr("class", "cap2")
+					.attr("x1", (d) => x(d.variant) + x.bandwidth() / 2 - 9).attr("x2", (d) => x(d.variant) + x.bandwidth() / 2 + 9)
+					.attr("y1", (d) => y(d.rate - d.ci)).attr("y2", (d) => y(d.rate - d.ci))
+					.attr("stroke", "var(--b-fg)").attr("stroke-width", 2);
+				plot.selectAll("text.rate").data(data).join("text")
+					.attr("class", "rate").attr("x", (d) => x(d.variant) + x.bandwidth() / 2).attr("y", (d) => y(d.rate + d.ci) - 12)
+					.attr("text-anchor", "middle").style("font-size", "13px").style("font-weight", "600").style("fill", "var(--b-fg)")
+					.text((d) => `${d.rate}%`);
+
+				plot.selectAll("rect.hit").data(data).join("rect")
+					.attr("class", "hit").attr("x", (d) => x(d.variant)).attr("width", x.bandwidth())
+					.attr("y", 0).attr("height", innerH).style("fill", "transparent").style("cursor", "pointer")
+					.on("mouseenter", (event, d) => {
+						tooltip.style("opacity", "1").html(`<b>${d.variant}</b><br>${d.rate}% signups<br>n = ${d.n.toLocaleString()}<br>95% CI ${(d.rate - d.ci).toFixed(1)}% to ${(d.rate + d.ci).toFixed(1)}%`)
+							.style("left", `${event.offsetX + 14}px`).style("top", `${event.offsetY - 10}px`);
+					}).on("mousemove", (event) => tooltip.style("left", `${event.offsetX + 14}px`).style("top", `${event.offsetY - 10}px`))
+					.on("mouseleave", () => tooltip.style("opacity", "0"));
+			}
+		</script>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

@@ -36,9 +36,16 @@ export function skillsDir(): string {
 	return resolve(HERE, "skills");
 }
 
-/** The shells a new board starts from, one file per kind. */
-export function templatesDir(): string {
-	return resolve(HERE, "templates");
+/**
+ * The example boards a deck is seeded with, refreshed on every restart.
+ *
+ * Nine worked boards — three for coding, three for research, three for business — that use
+ * the library catalog a blank board's head carries. They are copied into each deck's
+ * `examples/` beside the primitives (`deck/lib-sync.ts`), where agents read them to borrow
+ * structure from, and where a browser can open them against the deck's own `lib/`.
+ */
+export function examplesDir(): string {
+	return resolve(HERE, "examples");
 }
 
 /**
@@ -87,7 +94,7 @@ export function antigravityServer(): string {
 export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean }> = [
 	{ path: "lib", what: "the board primitives, copied into every deck", dir: true },
 	{ path: "skills", what: "what an agent is taught with", dir: true },
-	{ path: "templates", what: "the shells a new board starts from", dir: true },
+	{ path: "examples", what: "the worked boards agents borrow from, copied into every deck", dir: true },
 	{ path: "AGENTS.md.tmpl", what: "the deck context, with the board list filled in" },
 	{ path: "stage.d.ts", what: "the canvas API, injected verbatim" },
 	{ path: "tool-description.txt", what: "the canvas tool's words, for every runtime" },

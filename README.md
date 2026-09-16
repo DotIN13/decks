@@ -120,7 +120,7 @@ deck directory.
 | `apps/web` | the browser: the stage and its gestures (`canvas/`, `camera/`), the conversation (`chat/`), the chrome (`chrome/`) and the stores (`state/`) |
 | `packages/protocol` | every frame and every shape both sides must agree on, split by subject |
 | `packages/board-kit` | the board vocabulary as data: the classes, the tones, the kinds a palette can place |
-| `runtime/` | what the agents' runtimes read — the board primitives, the skills, the templates, the canvas API, the tool's own words, and the shims for the two runtimes outside this process |
+| `runtime/` | what the agents' runtimes read — the board primitives, the skills, the example boards, the canvas API, the tool's own words, and the shims for the two runtimes outside this process |
 | `extension/` | the Chrome extension that shares one of your tabs with a deck |
 | `e2e/` | the browser checks, driven with Playwright over a throwaway copy of `example/` |
 

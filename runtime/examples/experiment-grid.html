@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>All three below-300 cells sit in the social framing condition</title>
+		<meta name="board" content='{"w":1100,"h":1104,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
+			<h1>All three below-300 cells sit in the social framing condition</h1>
+		</div>
+
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+			<p><b>The social framing arm returns fewer completions than the design needs.</b> Every below-300 cell is in one condition, which means it is a condition problem, not a measure problem: add enrollment, or the arm's estimates will be too wide to be useful.</p>
+		</div>
+
+		<section class="card" data-id="heatmap" style="left: 48px; top: 240px; width: 620px">
+			<h3>Expected completed sample, per cell</h3>
+			<div id="heat" style="position: relative; height: 430px"></div>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">Cells are planned enrollments times expected completion. Hover a cell for its number; the scale runs from n = 150 (red) to n = 900 (green).</p>
+		</section>
+
+		<section class="card" data-id="conditions" style="left: 700px; top: 240px; width: 352px">
+			<h3>The three conditions</h3>
+			<table class="table">
+				<thead><tr><th>Condition</th><th>Planned n</th></tr></thead>
+				<tbody>
+					<tr><td>Personal framing</td><td>900</td></tr>
+					<tr><td>Social framing</td><td>900</td></tr>
+					<tr><td>Control</td><td>900</td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<section class="card" data-id="why" style="left: 700px; top: 464px; width: 352px">
+			<h3>Why one arm bleeds out</h3>
+			<p>The social framing started late: its pilot bounced at the attention check, and the fix shipped two weeks after the other arms began.</p>
+			<p style="color: var(--b-muted); font-size: 13px">At the current rate, the arm reaches its full n in June, a month after the field window closes.</p>
+		</section>
+
+		<div class="callout" data-id="verdict" data-tone="warn" style="left: 700px; top: 688px; width: 352px">
+			<p><b>The choice is a month or a change of plan.</b> Extend the window and hold the design, or cut attention-pass as a required cell and state the loss in the paper.</p>
+		</div>
+
+		<section class="card" data-id="table" style="left: 48px; top: 816px; width: 1004px">
+			<h3>The same grid, one row per measure</h3>
+			<table class="table" id="cells">
+				<thead>
+					<tr><th>Measure</th><th data-key="personal" style="cursor: pointer">Personal framing</th><th data-key="social" style="cursor: pointer">Social framing</th><th data-key="control" style="cursor: pointer">Control</th><th>Reading</th></tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 8px">Click a condition heading to sort the rows by its expected n.</p>
+		</section>
+
+		<script type="module">
+			const host = document.querySelector("#heat");
+			if (host) {
+				const d3 = await import("d3");
+
+				const measures = ["Response rate", "Completion", "Attention pass"];
+				const conditions = ["Personal framing", "Social framing", "Control"];
+				const n = {
+					"Personal framing": [620, 540, 480],
+					"Social framing": [290, 240, 180],
+					"Control": [880, 760, 700],
+				};
+
+				const width = host.clientWidth || 580;
+				const height = 430;
+				const margin = { top: 20, right: 10, bottom: 52, left: 130 };
+				const innerW = width - margin.left - margin.right;
+				const innerH = height - margin.top - margin.bottom;
+
+				const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height).style("display", "block");
+				const plot = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+				const x = d3.scaleBand().domain(conditions).range([0, innerW]).padding(0.06);
+				const y = d3.scaleBand().domain(measures).range([0, innerH]).padding(0.1);
+				const color = d3.scaleSequential(d3.interpolateRdYlGn).domain([150, 900]);
+
+				plot.append("g").call(d3.axisLeft(y).tickSize(0)).style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "12px"))
+					.call((axis) => axis.select(".domain").style("stroke", "none"));
+				plot.append("g").attr("transform", `translate(0,${innerH})`).call(d3.axisBottom(x).tickSize(0))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "12px").attr("dy", "1.6em"))
+					.call((axis) => axis.select(".domain").style("stroke", "none"));
+				plot.append("text").attr("x", -110).attr("y", -6).style("font-size", "11px").style("fill", "var(--b-muted)").text("measure");
+				plot.append("text").attr("x", innerW / 2).attr("y", innerH + 40).attr("text-anchor", "middle").style("font-size", "11px").style("fill", "var(--b-muted)").text("condition, 900 enrolled each");
+
+				const tooltip = d3.select(host).append("div").style("position", "absolute").style("left", "0").style("top", "0")
+					.style("pointer-events", "none").style("opacity", "0").style("z-index", "5")
+					.style("background", "var(--b-bg-layer)").style("border", "1px solid var(--b-border-strong)").style("border-radius", "6px")
+					.style("padding", "8px 10px").style("font-size", "12px").style("box-shadow", "var(--b-shadow)");
+
+				const cells = plot.selectAll("rect.cell").data(conditions.flatMap((condition) => measures.map((measure, mi) => ({ condition, measure, value: n[condition][mi] })))).join("rect")
+					.attr("class", "cell")
+					.attr("x", (d) => x(d.condition)).attr("y", (d) => y(d.measure))
+					.attr("width", x.bandwidth()).attr("height", y.bandwidth()).attr("rx", 5)
+					.style("fill", (d) => color(d.value))
+					.style("cursor", "pointer")
+					.on("mouseenter", (event, d) => {
+						d3.select(event.currentTarget).style("stroke", "var(--b-fg)").style("stroke-width", 2);
+						tooltip.style("opacity", "1").html(`<b>${d.condition}</b> &middot; ${d.measure}<br>expected n = ${d.value}`).style("left", `${event.offsetX + 12}px`).style("top", `${event.offsetY + 10}px`);
+					}).on("mousemove", (event) => tooltip.style("left", `${event.offsetX + 12}px`).style("top", `${event.offsetY + 10}px`))
+					.on("mouseleave", (event) => { d3.select(event.currentTarget).style("stroke", "none"); tooltip.style("opacity", "0"); });
+
+				// The number inside each cell, in mono so it reads as a figure.
+				plot.selectAll("text.value").data(cells.data()).join("text")
+					.attr("x", (d) => x(d.condition) + x.bandwidth() / 2).attr("y", (d) => y(d.measure) + y.bandwidth() / 2 + 4)
+					.attr("text-anchor", "middle").style("font-size", "12px").style("font-family", "var(--b-mono)")
+					.style("fill", "#1a1a1a")
+					.text((d) => d.value);
+			}
+
+			// The table below, one row per measure, with the three conditions as columns. Sorting is
+			// whole rows and the numbers are the same ones the heatmap draws, so the two views of
+			// the grid cannot disagree.
+			const body = document.querySelector("#cells tbody");
+			const gridRows = [
+				{ measure: "Response rate", personal: 620, social: 290, control: 880 },
+				{ measure: "Completion", personal: 540, social: 240, control: 760 },
+				{ measure: "Attention pass", personal: 480, social: 180, control: 700 },
+			];
+			const readingOf = (row) => {
+				const lowest = ["personal", "social", "control"].sort((a, b) => row[a] - row[b])[0];
+				const word = lowest === "social" ? "social framing lowest" : `${lowest} lowest`;
+				return { word, tone: row[lowest] < 300 ? "var(--b-danger)" : "var(--b-warn)" };
+			};
+			const draw = (rows) => {
+				body.innerHTML = "";
+				for (const row of rows) {
+					const reading = readingOf(row);
+					const tr = document.createElement("tr");
+					tr.innerHTML = `<td>${row.measure}</td><td>${row.personal}</td><td>${row.social}</td><td>${row.control}</td><td><span class="chip" style="color: ${reading.tone}">${reading.word}</span></td>`;
+					body.appendChild(tr);
+				}
+			};
+			draw(gridRows);
+			let sort = { key: null, dir: 1 };
+			for (const th of document.querySelectorAll("#cells th[data-key]")) {
+				th.addEventListener("click", () => {
+					const key = th.dataset.key;
+					sort = { key, dir: sort.key === key ? -sort.dir : 1 };
+					draw([...gridRows].sort((a, b) => (a[key] - b[key]) * sort.dir));
+				});
+			}
+		</script>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

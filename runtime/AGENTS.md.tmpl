@@ -13,6 +13,11 @@ is complementary: pointers to the board, not the substance. If a sentence can be
 ## File structure
 
 - `boards/*.html` — the standalone HTML boards you create, read, and edit in place.
+- `examples/` — the app's copy of the worked example boards, refreshed whole on every
+  restart. **Borrow from them:** nine boards, three each for coding, research and business,
+  that show what the import map's libraries look like when the canvas does the arguing. Read
+  their source and copy the structure; do not edit them in place, because a restart restores
+  them.
 - `lib/` — system-managed primitives (`board.css`, `board.js`, and a few vendored libraries).
   **Never edit files here directly**; a board's own CSS goes in a `<style>` in that board. Load a
   library from a CDN by default; what is here is for offline work.
@@ -159,6 +164,15 @@ want** — another library, another version, a different CDN — and import what
 need it: `const d3 = await import("d3")` at the point you draw, which is what keeps it free for a
 board that never gets there.
 
+**A new board is blank, and the examples are how you learn what a board can be.**
+`stage.newBoard({ title })` writes a heading and nothing else — there are no shapes to start
+from, because a shape decided too much of the board before you had a sentence. When you want to
+see what a finished board looks like, read `examples/` beside the deck: nine worked boards that
+use these libraries for real — an architecture map, a build dashboard, an incident timeline, an
+A/B reading, a 3D sample space, an experiment grid, a cohort heatmap, a priced decision and a
+market map. Borrow their structure, their interaction and their axis choices, then write the
+board that fits what you are saying.
+
 **The title is the finding.** A board's title is whatever was passed to `stage.newBoard`, and it
 should be a statement: "Returning customer share fell after the second tab shipped", not "Second
 tab analysis" and not a question. A title that names the topic makes the reader read the rest to
@@ -279,15 +293,16 @@ happening** — so what you have to say goes on a board, and the chat says which
 why.
 
 - **Answer on a board.** A question is answered by writing a board, or by adding to one
-  that is already about this, and then showing it. `stage.newBoard({ title, kind:
-  "answer" })` writes the shell; you write the content. Then say so in chat: *"On
+  that is already about this, and then showing it. `stage.newBoard({ title })` writes a blank
+  board; you write the content. Then say so in chat: *"On
   `boards/refresh-race.html` — the window is 240ms and here is why."* Never put the
   substance only in chat.
 - **Design on a board.** Options side by side, the trade-off visible, the recommendation
-  said plainly in a callout. `kind: "design"` starts that shape.
+  said plainly in a callout. If the design takes an unfamiliar shape, look at an example in
+  `examples/` before you lay it out.
 - **Report on a board when the work is done.** Not a paragraph: a presentation. What you
   did (method, briefly — not a log), what changed (the result, with the number that
-  matters), and what is left. `kind: "report"` starts that shape. If the work has a board
+  matters), and what is left. If the work has a board
   already, add the report to it rather than making a second one.
 - **Curate the canvas.** Hold what you are working from; show what the user should be
   looking at *now*; hide the rest. `stage.show` is the only thing that moves their view,

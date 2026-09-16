@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, wri
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { describeSync, syncRuntimeLib } from "./lib-sync.ts";
+import { describeSync, syncExamplesDir, syncRuntimeLib } from "./lib-sync.ts";
 
 const scratch: string[] = [];
 const dir = (name: string) => {
@@ -33,6 +33,23 @@ test("a deck with no lib gets the whole of it", () => {
 	assert.deepEqual(sync.written.sort(), ["board.css", "wasm/openjpeg.wasm"]);
 	assert.equal(sync.same, 0);
 	assert.equal(readFileSync(join(to, "wasm/openjpeg.wasm"), "utf8"), "binary");
+});
+
+test("examples land in the deck the same way the primitives do", () => {
+	const from = dir("examples");
+	const to = join(dir("deck"), "examples");
+	put(from, "architecture-map.html", "<!doctype html><title>map</title>");
+	put(from, "ab-reading.html", "<!doctype html><title>ab</title>");
+
+	const sync = syncExamplesDir(from, to);
+
+	assert.deepEqual(sync.written.sort(), ["ab-reading.html", "architecture-map.html"]);
+	assert.equal(readFileSync(join(to, "ab-reading.html"), "utf8"), "<!doctype html><title>ab</title>");
+	// And the same bargain as lib/: an unchanged restart writes nothing, an example this
+	// build stops shipping is pruned from the deck's copy.
+	assert.deepEqual(syncExamplesDir(from, to).written, []);
+	put(to, "retired-example.html", "nobody ships this any more");
+	assert.deepEqual(syncExamplesDir(from, to).removed, ["retired-example.html"]);
 });
 
 test("an unchanged restart writes nothing at all", () => {

@@ -222,28 +222,23 @@ export interface Stage {
 	 * Write the shell of a new board and return its path, ready to fill in.
 	 *
 	 * This exists so that answering on a board costs about as little as answering in
-	 * chat: doctype, meta, stylesheet, script and a titled first section, written for
-	 * you. Edit the returned path to put the content in.
+	 * chat: doctype, meta, stylesheet, script and a titled heading, written for you.
+	 * **Every board starts blank** — a heading and nothing else, on purpose. There are
+	 * no templates to choose between; the shape of a board is the writer's decision,
+	 * and what a finished board can look like is in the examples (`examples/` in the
+	 * deck, refreshed by the app on every restart), to borrow from rather than to be
+	 * created from. Edit the returned path to put the content in.
 	 *
 	 * The board is attached and put on the canvas. The camera does not move — call `show`
 	 * when you want the user looking at it.
 	 *
-	 *     const path = await stage.newBoard({ title: "Why the second tab fails", kind: "answer" });
+	 *     const path = await stage.newBoard({ title: "Why the second tab fails" });
 	 *     // then edit(path): replace the placeholder with the finding, in a sentence
 	 *     // somebody could repeat — "The second tab reuses the first one's socket" — and
 	 *     // stop there. Not the background, not the method, not what you were asked.
 	 *
-	 * Kinds are shapes, not rules — change anything afterwards:
-	 *
-	 * - `answer` — a question as the heading, the answer in one screen
-	 * - `design` — options as columns, with a callout for the recommendation
-	 * - `report` — method, result, what is left; for when work is done
-	 * - `plan`   — goal, approach, steps
-	 * - `blank`  — a heading and nothing else
-	 *
-	 * **`format` is what the board is as a file**, which is a different question from its
-	 * shape — an answer can be written as boxes or as prose. **All three are single HTML
-	 * files**; only the body says which:
+	 * **`format` is the only choice a new board makes**, and it is what the board *is as a
+	 * file*. **All three are single HTML files**; only the body says which:
 	 *
 	 * - `component` (default) — `<body class="board">`, absolutely-positioned boxes with
 	 *   `data-id`s. The only format the drag-and-retype editor can work on.
@@ -258,16 +253,14 @@ export interface Stage {
 	 *   nothing reflows when it is presented — and a `<script>` in it does not run, so a deck
 	 *   cannot bring its own runtime.
 	 *
-	 * A format that is not `component` has no shape to choose, so `kind` is ignored for one
-	 * and the result says so. The **file extension is derived** from the format and is not
-	 * yours to name: a board's format is read back out of its filename, so the two must not
-	 * be able to disagree.
+	 * The **file extension is derived** from the format and is not yours to name: a board's
+	 * format is read back out of its filename, so the two must not be able to disagree.
 	 *
 	 *     const deck = await stage.newBoard({ title: "The plan, out loud", format: "slides" });
-	 *     // -> "boards/the-plan-out-loud.slides.html", three sections in it to replace
+	 *     // -> "boards/the-plan-out-loud.slides.html", one blank slide in it
 	 *
 	 *     const doc = await stage.newBoard({ title: "Notes on the refresh", format: "flow" });
-	 *     // -> "boards/notes-on-the-refresh.html", one .doc component to write into
+	 *     // -> "boards/notes-on-the-refresh.html", one empty .doc component to write into
 	 *
 	 * **The result tells you the viewport and the width it chose** — `viewport 1440x900 px`,
 	 * then the width with the advice beside it — because that is the moment both are worth
@@ -277,12 +270,12 @@ export interface Stage {
 	 * you pass is used, whatever it is — so this is advice rather than a rule: keep a board
 	 * under about 1200 and inside the viewport, because a board wider than the room the
 	 * canvas has is read scaled down and a long line is one the eye loses its place in. On a
-	 * phone-sized viewport, make that session's boards *small* rather than merely narrower;
-	 * the templates fold their columns to fit. Very wide or very tall is two boards.
+	 * phone-sized viewport, make that session's boards *small* rather than merely narrower.
+	 * Very wide or very tall is two boards.
 	 *
-	 * With no `w`, a board is sized to its shape and to the screen: 880 for the shapes that
-	 * are one column, 1000 for `design`, 1200 for `report`, 720 for a `flow` document and
-	 * 960 for a deck — each capped by the viewport when there is one to measure.
+	 * With no `w`, a board is sized to its format and to the screen: 880 for a component
+	 * board — the measure prose actually wants — 720 for a `flow` document and 960 for a
+	 * deck, each capped by the viewport when there is one to measure.
 	 *
 	 * **Reading order.** DOM order is visual order, top to bottom. One column or two; where
 	 * two components share a row, write the left one first. The reader has the picture and
@@ -315,7 +308,6 @@ export interface Stage {
 	 */
 	newBoard(options: {
 		title: string;
-		kind?: "answer" | "design" | "report" | "plan" | "blank";
 		format?: "component" | "flow" | "slides";
 		w?: number;
 		h?: number;

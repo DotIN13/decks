@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Harbor wins until delivery weight passes 35%; after that it is Meridian</title>
+		<meta name="board" content='{"w":1100,"h":896,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
+			<h1>Harbor wins until delivery weight passes 35%; after that it is Meridian</h1>
+		</div>
+
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+			<p><b>At neutral weights, Harbor leads the three priced options.</b> The verdict survives every weight you can move, except one: weight delivery above 35% and Meridian takes it, on the strength of its calendar.</p>
+		</div>
+
+		<section class="card" data-id="weights" style="left: 48px; top: 240px; width: 460px">
+			<h3>The weights, your call</h3>
+			<div id="sliders" style="margin-top: 14px"></div>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 16px">Sliders set how much each criterion counts. Weights are what the meeting is about, so the board lets the room argue with them.</p>
+		</section>
+
+		<section class="card" data-id="scores" style="left: 540px; top: 240px; width: 512px">
+			<h3>Weighted score by supplier, points of 100</h3>
+			<div id="scores" style="position: relative; height: 330px; margin-top: 6px"></div>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">A score is the weighted sum of each supplier's rating on the four criteria. Bars move as the weights do.</p>
+		</section>
+
+		<div class="callout" data-id="recommendation" data-tone="ok" style="left: 48px; top: 800px; width: 1004px">
+			<p id="rec" style="font-size: 15px"><b>With these weights, Harbor leads at 72 points and Meridian is on 71. Meridian takes the lead once delivery passes 35% of the weight.</b></p>
+		</div>
+
+		<script type="module">
+			const d3 = await import("d3");
+
+			const criteria = [
+				{ key: "delivery", name: "Delivery speed", from: "How fast a new order ships. Meridian is same-week; Atlas is monthly.", ratings: { Harbor: 64, Meridian: 77, Atlas: 50 } },
+				{ key: "cost", name: "Unit cost", from: "Per unit, delivered and landed. Harbor is the cheapest of the three.", ratings: { Harbor: 82, Meridian: 62, Atlas: 55 } },
+				{ key: "support", name: "Support", from: "A dedicated engineer and a defined SLA. Atlas is the strongest.", ratings: { Harbor: 66, Meridian: 64, Atlas: 92 } },
+				{ key: "capacity", name: "Capacity", from: "Peak throughput in units per week. Atlas and Meridian have the room.", ratings: { Harbor: 72, Meridian: 80, Atlas: 88 } },
+			];
+			const options = ["Harbor", "Meridian", "Atlas"];
+			const weights = { delivery: 25, cost: 30, support: 20, capacity: 25 };
+			const colors = { Harbor: "var(--b-accent)", Meridian: "var(--b-ok)", Atlas: "var(--b-warn)" };
+
+			const scoreOf = (option) => {
+				const total = Object.values(weights).reduce((a, b) => a + b, 0);
+				return criteria.reduce((sum, criterion) => sum + (weights[criterion.key] / total) * criterion.ratings[option], 0);
+			};
+
+			// The sliders, one row per criterion, with the weight as a percent beside the name.
+			const sliderHost = document.querySelector("#sliders");
+			for (const criterion of criteria) {
+				const row = document.createElement("div");
+				row.style.cssText = "display:flex;align-items:center;gap:12px;margin-bottom:14px";
+				const label = document.createElement("label");
+				label.style.cssText = "width:128px;font-size:13px;flex:none";
+				label.textContent = criterion.name;
+				label.title = criterion.from;
+				const input = document.createElement("input");
+				input.type = "range";
+				input.min = 0;
+				input.max = 100;
+				input.value = weights[criterion.key];
+				input.dataset.key = criterion.key;
+				input.style.cssText = "flex:1;accent-color:var(--b-accent)";
+				const value = document.createElement("span");
+				value.style.cssText = "width:34px;text-align:right;font-family:var(--b-mono);font-size:12px;color:var(--b-muted);flex:none";
+				value.textContent = `${weights[criterion.key]}%`;
+				input.addEventListener("input", () => {
+					weights[criterion.key] = Number(input.value);
+					value.textContent = `${input.value}%`;
+					redraw(true);
+				});
+				row.append(label, input, value);
+				sliderHost.appendChild(row);
+			}
+
+			// The bars, drawn once and moved in place: the score changes, the layout does not.
+			const host = document.querySelector("#scores");
+			const width = host.clientWidth || 470;
+			const height = 330;
+			const margin = { top: 10, right: 64, bottom: 30, left: 96 };
+			const innerW = width - margin.left - margin.right;
+			const innerH = height - margin.top - margin.bottom;
+			const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height).style("display", "block");
+			const plot = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+			const x = d3.scaleLinear().domain([0, 100]).range([0, innerW]);
+			const y = d3.scaleBand().domain(options).range([0, innerH]).padding(0.35);
+			const axis = d3.axisBottom(x).ticks(5).tickFormat((d) => `${d}`);
+
+			plot.append("g").attr("transform", `translate(0,${innerH})`).call(axis).style("color", "var(--b-muted)")
+				.call((g) => g.selectAll("text").style("font-size", "11px"))
+				.call((g) => g.selectAll("line").style("stroke", "var(--b-border)"))
+				.call((g) => g.select(".domain").style("stroke", "var(--b-border-strong)"));
+			plot.append("text").attr("x", innerW / 2).attr("y", innerH + 26).attr("text-anchor", "middle").style("font-size", "11px").style("fill", "var(--b-muted)").text("weighted score, points of 100");
+			plot.append("g").call(d3.axisLeft(y).tickSize(0)).style("color", "var(--b-fg)")
+				.call((g) => g.selectAll("text").style("font-size", "13px").style("font-weight", "600"))
+				.call((g) => g.select(".domain").style("stroke", "none"));
+
+			const bar = plot.selectAll("rect").data(options).join("rect")
+				.attr("y", (option) => y(option)).attr("height", y.bandwidth()).attr("rx", 5)
+				.style("fill", (option) => colors[option]);
+			const valueText = plot.selectAll("text.score").data(options).join("text")
+				.attr("x", (option) => x(scoreOf(option)) + 8).attr("y", (option) => y(option) + y.bandwidth() / 2 + 4)
+				.style("font-size", "13px").style("font-family", "var(--b-mono)").style("fill", "var(--b-fg)");
+
+			const rec = document.querySelector("#rec");
+			const verdict = () => {
+				const ordered = options.map((option) => ({ option, score: scoreOf(option) })).sort((a, b) => b.score - a.score);
+				const [first, second] = ordered;
+				const note =
+					first.option === "Harbor"
+						? "Meridian takes the lead once delivery passes 35% of the weight."
+						: first.option === "Meridian"
+							? "That is the flip: delivery is past 35% of the weight, and Meridian's calendar wins the room."
+							: "Atlas leads here on support and capacity, not on delivery.";
+				return `With these weights, ${first.option} leads at ${Math.round(first.score)} points and ${second.option} is on ${Math.round(second.score)}. ${note}`;
+			};
+			const redraw = (animated) => {
+				const t = animated ? d3.transition().duration(320).ease(d3.easeCubicOut) : null;
+				bar.transition(t).attr("width", (option) => Math.max(2, x(scoreOf(option))));
+				valueText.transition(t).attr("x", (option) => x(scoreOf(option)) + 8).text((option) => Math.round(scoreOf(option)));
+				rec.innerHTML = `<b>${verdict()}</b>`;
+			};
+			redraw(false);
+		</script>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

@@ -51,11 +51,30 @@ const NOTHING_TO_DO: LibSync = { written: [], removed: [], same: 0 };
  */
 export function syncRuntimeLib(runtimeLib: string, deckLib: string): LibSync {
 	if (!existsSync(runtimeLib)) return NOTHING_TO_DO;
+	return syncDirectory(runtimeLib, deckLib);
+}
 
+/**
+ * Bring a deck's `examples/` up to this build's, the same bargain as `lib/`.
+ *
+ * The examples are the worked boards agents borrow from: nine files shipped in
+ * `runtime/examples` and copied into every deck, content-compared and pruned exactly
+ * like the primitives, so a restart that changes nothing writes nothing and the deck
+ * holds no example this build no longer ships. They are reference files, not boards
+ * — the loader only reads `boards/` — which is why the watcher ignores the directory
+ * (`watcher.ts`): an agent editing an example must not reload every board on the
+ * canvas.
+ */
+export function syncExamplesDir(runtimeExamples: string, deckExamples: string): LibSync {
+	if (!existsSync(runtimeExamples)) return NOTHING_TO_DO;
+	return syncDirectory(runtimeExamples, deckExamples);
+}
+
+function syncDirectory(from: string, to: string): LibSync {
 	const result: LibSync = { written: [], removed: [], same: 0 };
-	mkdirSync(deckLib, { recursive: true });
-	copyChanged(runtimeLib, deckLib, deckLib, result);
-	prune(runtimeLib, deckLib, deckLib, result);
+	mkdirSync(to, { recursive: true });
+	copyChanged(from, to, to, result);
+	prune(from, to, to, result);
 	return result;
 }
 

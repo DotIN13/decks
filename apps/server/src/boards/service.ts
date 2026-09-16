@@ -6,14 +6,13 @@ import { Revisions } from "./snapshots.ts";
 import {
 	extensionFor,
 	MIRROR_SIZE,
+	renderBlank,
 	renderFormat,
 	renderMirror,
-	renderTemplate,
 	renderWebBoard,
 	slugFor,
 	WEB_BOARD_SIZE,
 	type BoardFormat,
-	type BoardTemplate,
 } from "./templates.ts";
 import type { Deck } from "../deck/loader.ts";
 import { withBoardSize } from "../deck/meta.ts";
@@ -192,22 +191,24 @@ export class BoardService {
 	}
 
 	/**
-	 * Write a new board from a template, and return its deck-relative path (§2).
+	 * Write a new board, blank, and return its deck-relative path (§2).
 	 *
 	 * The name is minted from the title and made unique by suffixing, so an agent answering
 	 * three questions about the same thing gets `-2` and `-3` rather than an error.
 	 */
-	newBoard(options: { title: string; template: BoardTemplate; format?: BoardFormat; size?: { w?: number; h?: number } }): string {
+	newBoard(options: { title: string; format?: BoardFormat; size?: { w?: number; h?: number } }): string {
 		/*
 		 * The extension comes from the format and from nowhere else.
 		 *
 		 * `deck/kinds.ts` reads a board's format back out of its name, so these two cannot be
 		 * allowed to disagree: a file asked for as slides and written as `.md` would simply
-		 * *be* a flow board, correctly, with nothing anywhere to say why.
+		 * *be* a flow board, correctly, with nothing anywhere to say why. The board itself is
+		 * always blank when it is created — there are no templates any more; the examples a
+		 * board can be modelled on live in `examples/` beside the deck, refreshed on restart.
 		 */
 		const format = options.format ?? "component";
 		const extension = extensionFor(format);
-		const base = slugFor(options.title, options.template);
+		const base = slugFor(options.title);
 		let path = `boards/${base}${extension}`;
 		for (let suffix = 2; existsSync(join(this.deck.path, path)); suffix++) {
 			path = `boards/${base}-${suffix}${extension}`;
@@ -215,13 +216,7 @@ export class BoardService {
 		}
 
 		const file = this.deck.fileOf(path);
-		/*
-		 * The shape only applies to a component board. A slide deck and a markdown document
-		 * are already the shape they are — there is no `report`-flavoured deck — so the
-		 * template argument is ignored for them rather than being refused, which keeps
-		 * `newBoard({ format: "slides" })` from needing a second argument nobody would set.
-		 */
-		const html = format === "component" ? renderTemplate(options.template, options.title, options.size) : renderFormat(format, options.title, options.size);
+		const html = format === "component" ? renderBlank(options.title, options.size) : renderFormat(format, options.title, options.size);
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, html);
 		this.revisions.record(path, html);
@@ -246,7 +241,7 @@ export class BoardService {
 	 * which is also what makes the menu item safe to press twice.
 	 */
 	newMirror(options: { agentId: string; name: string; size?: { w?: number; h?: number } }): string {
-		const path = `boards/mirrors/${slugFor(options.name || options.agentId, "blank")}.html`;
+		const path = `boards/mirrors/${slugFor(options.name || options.agentId, "mirror")}.html`;
 		const file = this.deck.fileOf(path);
 		// The same agent behind the same name: hand back the window that is already open.
 		if (existsSync(file) && readFileSync(file, "utf8").includes(`data-agent="${options.agentId}"`)) return path;

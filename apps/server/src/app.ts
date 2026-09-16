@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { runtimeLib } from "@decks/runtime";
+import { examplesDir, runtimeLib } from "@decks/runtime";
 import type { Board, Camera, ClientMessage, DeckState, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { BoardService } from "./boards/service.ts";
 import { runtimeList } from "./runtimes/registry.ts";
-import { isBoardFormat, type BoardTemplate } from "./boards/templates.ts";
+import { isBoardFormat } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
@@ -16,7 +16,7 @@ import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
 import { claudeIdentity } from "./runtimes/claude/backend.ts";
 import { mapSeries } from "./series.ts";
 import { DECK_DIR, type Config } from "./config.ts";
-import { describeSync, syncRuntimeLib } from "./deck/lib-sync.ts";
+import { describeSync, syncExamplesDir, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { watchDeck } from "./deck/watcher.ts";
 import { Hub } from "./ws.ts";
@@ -115,8 +115,7 @@ export class App {
 			// `stage.boards()` reads the arrangement the conversation is looking at, not the loader's list.
 			boards: () => this.stageState().boards,
 
-			newBoard: ({ format, template, ...rest }) =>
-				this.boards.newBoard({ ...rest, template: template as BoardTemplate, ...(isBoardFormat(format) ? { format } : {}) }),
+			newBoard: ({ format, ...rest }) => this.boards.newBoard({ ...rest, ...(isBoardFormat(format) ? { format } : {}) }),
 			newMirror: (options) => this.boards.newMirror(options),
 			writeBoard: (path, html) => this.boards.writeBoard(path, html),
 			extent: (path, rev) => this.boards.extent(path, rev),
@@ -312,9 +311,13 @@ export class App {
 		const deck = existing ? Deck.open(config.deck) : Deck.create(config.deck, App.runtimeLib);
 		// A deck this build did not create has whichever `lib/` created it, so every
 		// start brings the primitives forward. `Deck.create` has just done it for a new
-		// one. Before `attach()`, deliberately: the watcher is not running yet, so the
-		// one restart that does rewrite files cannot also reload every board twice.
+		// one. The examples are refreshed for both, in the same breath: the nine worked
+		// boards live here after every restart, at their current content, so the copy
+		// never drifts from what this build ships. Before `attach()`, deliberately: the
+		// watcher is not running yet, so the one restart that does rewrite files cannot
+		// also reload every board twice.
 		if (existing) App.refreshLib(deck);
+		App.refreshExamples(deck);
 		return new App(config, deck);
 	}
 
@@ -332,9 +335,28 @@ export class App {
 		for (const gone of sync.removed) console.log(`[decks] lib/ removed ${gone} — this build no longer ships it`);
 	}
 
+	/**
+	 * Bring a deck's `examples/` up to this build's.
+	 *
+	 * The same content-compared copy as `refreshLib`, so a restart that changed nothing
+	 * writes nothing. Logged rather than sent as a notice, for the same reason: on a
+	 * normal restart it changes nothing and says nothing.
+	 */
+	private static refreshExamples(deck: Deck): void {
+		const sync = syncExamplesDir(App.runtimeExamples, join(deck.path, "examples"));
+		const summary = describeSync(sync);
+		if (summary) console.log(`[decks] examples/ ${summary}`);
+		for (const gone of sync.removed) console.log(`[decks] examples/ removed ${gone} — this build no longer ships it`);
+	}
+
 	/** Where the shipped primitives live, copied into every deck and refreshed on open. */
 	static get runtimeLib(): string {
 		return runtimeLib();
+	}
+
+	/** Where the shipped examples live, copied into every deck and refreshed on open. */
+	static get runtimeExamples(): string {
+		return examplesDir();
 	}
 
 	attach(hub: Hub): void {
@@ -502,6 +524,7 @@ export class App {
 		const existing = existsSync(join(deckPath, "deck.json")) || existsSync(join(deckPath, "boards"));
 		this.deck = existing ? Deck.open(deckPath) : Deck.create(deckPath, App.runtimeLib);
 		if (existing) App.refreshLib(this.deck);
+		App.refreshExamples(this.deck);
 		this.stage.setDeck(this.deck);
 		this.boards.setDeck(this.deck);
 		// An agent's cwd is the deck, and a Pi session's cwd cannot move, so opening

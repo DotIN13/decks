@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Seventeen minutes of degraded service, an alert eight minutes late, and a rollback that ended it</title>
+		<meta name="board" content='{"w":1100,"h":1000,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
+			<h1>Seventeen minutes of degraded service, an alert eight minutes late, and a rollback that ended it</h1>
+		</div>
+
+		<div class="callout" data-id="finding" data-tone="danger" style="left: 48px; top: 152px; width: 1004px">
+			<p><b>3,400 checkouts failed between 17:42 and 18:37.</b> The retry storm staved off a service outage for the first 17 minutes, and the alert that should have fired at 17:50 did not arrive until 17:58.</p>
+		</div>
+
+		<section class="card" data-id="timeline" style="left: 48px; top: 240px; width: 1004px">
+			<h3>The outage, minute by minute</h3>
+			<div id="timeline-host" style="position: relative; height: 210px">
+				<svg id="tl" viewBox="0 0 972 190" width="100%" height="190" style="display: block"></svg>
+			</div>
+			<button id="replay" style="margin-top: 8px; padding: 6px 16px; border-radius: 8px; border: 1px solid var(--b-border-strong); background: var(--b-accent-soft); color: var(--b-fg); font: inherit; font-size: 13px; cursor: pointer">Replay the sequence</button>
+		</section>
+
+		<section class="card" data-id="impact" style="left: 48px; top: 568px; width: 312px">
+			<h3>What it cost</h3>
+			<table class="table">
+				<tbody>
+					<tr><td>Degraded for</td><td><b>21 minutes</b></td></tr>
+					<tr><td>Failed checkouts</td><td><b>3,400</b></td></tr>
+					<tr><td>Revenue lost</td><td><b>38k</b></td></tr>
+					<tr><td>Customer tickets</td><td><b>57</b></td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<section class="card" data-id="alert-gap" style="left: 384px; top: 568px; width: 328px">
+			<h3>Where the 8 minutes went</h3>
+			<p>The error budget rule only watches the payments gateway, and this failure was downstream of it.</p>
+			<p style="color: var(--b-muted); font-size: 13px">The rollback went out at 18:11 to prove the point: the previous release was green, and everything that followed was its own retry loop.</p>
+		</section>
+
+		<section class="card" data-id="fix" style="left: 736px; top: 568px; width: 316px">
+			<h3>The fix, one line</h3>
+			<pre data-id="diff" style="background: var(--b-bg-layer); border: 1px solid var(--b-border); border-radius: 6px; padding: 12px; font-family: var(--b-mono); font-size: 12px; line-height: 1.7; overflow-x: auto"><code><span style="color: var(--b-danger)">- if (retryCount &gt; 3) {</span>
+<span style="color: var(--b-ok)">+ if (retryCount &gt; 1) {</span>
+<span style="color: var(--b-muted)">  scheduleRetry(orderId);</span>
+<span style="color: var(--b-muted)">}</span></code></pre>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 8px">Three retries was a storm in disguise. Two is the ceiling the queue can absorb.</p>
+		</section>
+
+		<div class="callout" data-id="next" data-tone="ok" style="left: 48px; top: 804px; width: 1004px">
+			<p><b>The three changes that make this a non-event.</b></p>
+			<p style="margin-top: 8px"><label style="display:block; padding: 3px 0"><input type="checkbox" /> Alert on the checkout error budget, not just payments.</label>
+			<label style="display:block; padding: 3px 0"><input type="checkbox" /> Canary the release: 5% of traffic before the full roll.</label>
+			<label style="display:block; padding: 3px 0"><input type="checkbox" /> Runbook for "checkouts failing, payments fine", owned by the checkout team.</label></p>
+		</div>
+
+		<script type="module">
+			// The timeline is drawn once, then replayed with gsap: the severity band sweeps in,
+			// the marker walks the minutes, and each event label pops as it is reached.
+			const host = document.querySelector("#timeline-host");
+			const svg = document.querySelector("#tl");
+			if (host && svg) {
+				const { gsap } = await import("gsap");
+
+				// Minutes after 17:30; the x scale is 30 + minute * 12.5 across the 972px band.
+				const events = [
+					{ m: 12, label: "17:42 degraded", tone: "var(--b-warn)" },
+					{ m: 20, label: "17:50 first report", tone: "var(--b-warn)" },
+					{ m: 28, label: "17:58 alert fires", tone: "var(--b-danger)" },
+					{ m: 41, label: "18:11 rollback", tone: "var(--b-danger)" },
+					{ m: 67, label: "18:37 recovered", tone: "var(--b-ok)" },
+				];
+				const X = (m) => 30 + m * 12.5;
+				const band = svg.querySelector ? svg : null;
+
+				// The severity band: five states read left to right, each a rect with its own
+				// colour, all drawn but hidden until the replay reveals them.
+				const states = [
+					{ from: 0, to: 12, tone: "var(--b-ok)" },
+					{ from: 12, to: 28, tone: "var(--b-warn)" },
+					{ from: 28, to: 41, tone: "var(--b-danger)" },
+					{ from: 41, to: 67, tone: "var(--b-warn)" },
+					{ from: 67, to: 70, tone: "var(--b-ok)" },
+				];
+				const bandGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+				for (const state of states) {
+					const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+					rect.setAttribute("x", X(state.from));
+					rect.setAttribute("y", 24);
+					rect.setAttribute("width", X(state.to) - X(state.from));
+					rect.setAttribute("height", 44);
+					rect.setAttribute("rx", 4);
+					rect.setAttribute("fill", state.tone);
+					rect.setAttribute("opacity", 0.85);
+					rect.setAttribute("class", "state");
+					bandGroup.appendChild(rect);
+				}
+				svg.appendChild(bandGroup);
+
+				// The axis: six ticks, the event times, and the label under each.
+				const axis = document.createElementNS("http://www.w3.org/2000/svg", "g");
+				for (const tick of [0, 12, 20, 28, 41, 67, 70]) {
+					const lineEl = document.createElementNS("http://www.w3.org/2000/svg", "line");
+					lineEl.setAttribute("x1", X(tick)); lineEl.setAttribute("x2", X(tick));
+					lineEl.setAttribute("y1", 24); lineEl.setAttribute("y2", 178);
+					lineEl.setAttribute("stroke", "var(--b-border)");
+					axis.appendChild(lineEl);
+				}
+				for (const event of events) {
+					const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+					dot.setAttribute("cx", X(event.m)); dot.setAttribute("cy", 46);
+					dot.setAttribute("r", 5); dot.setAttribute("fill", event.tone);
+					dot.setAttribute("stroke", "var(--b-bg)"); dot.setAttribute("stroke-width", 2);
+					axis.appendChild(dot);
+					const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+					text.setAttribute("x", X(event.m)); text.setAttribute("y", 176);
+					text.setAttribute("text-anchor", "middle"); text.setAttribute("font-size", 11);
+					text.setAttribute("fill", "var(--b-muted)");
+					text.textContent = event.label;
+					axis.appendChild(text);
+				}
+				// What the axis counts, in words.
+				const caption = document.createElementNS("http://www.w3.org/2000/svg", "text");
+				caption.setAttribute("x", 30); caption.setAttribute("y", 14);
+				caption.setAttribute("font-size", 11); caption.setAttribute("fill", "var(--b-faint)");
+				caption.textContent = "minutes from 17:30 on Friday, by incident log";
+				svg.appendChild(caption);
+				svg.appendChild(axis);
+
+				// The marker the replay moves: a ring that walks the minutes.
+				const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+				marker.setAttribute("r", 9); marker.setAttribute("fill", "none");
+				marker.setAttribute("stroke", "var(--b-accent)"); marker.setAttribute("stroke-width", 3);
+				marker.setAttribute("cx", X(0)); marker.setAttribute("cy", 46);
+				svg.appendChild(marker);
+
+				// The sweep that hides then reveals the band, and the same timeline that walks
+				// the marker: the replay is one story, not two animations that happen to match.
+				const sweep = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+				sweep.setAttribute("x", 30); sweep.setAttribute("y", 24);
+				sweep.setAttribute("height", 44); sweep.setAttribute("width", 912);
+				sweep.setAttribute("fill", "var(--b-bg)");
+				sweep.setAttribute("class", "sweep");
+				svg.appendChild(sweep);
+
+				let tl = null;
+				const play = () => {
+					if (tl) tl.kill();
+					tl = gsap.timeline({ defaults: { ease: "power1.inOut" } });
+					tl.fromTo(".state", { opacity: 0 }, { opacity: 0.85, duration: 0.3, stagger: 0.25 });
+					tl.to(marker, { attr: { cx: X(20) }, duration: 0.6 }, 0.2);
+					tl.to(marker, { attr: { cx: X(28) }, duration: 0.4 }, 1.7);
+					tl.to(marker, { attr: { cx: X(41) }, duration: 0.6 }, 2.6);
+					tl.to(marker, { attr: { cx: X(67) }, duration: 0.9 }, 3.5);
+					tl.to(sweep, { width: 0, duration: 4.9, ease: "power1.inOut" }, 0);
+				};
+				document.querySelector("#replay").addEventListener("click", play);
+				play();
+			}
+		</script>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

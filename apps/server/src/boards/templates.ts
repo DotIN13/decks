@@ -1,32 +1,21 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { templatesDir } from "@decks/runtime";
-
 /**
- * The shells a new board starts from.
+ * The document a new board starts from: a blank one.
  *
- * A board is fifteen lines of document before any content, and answering in the chat
- * column costs nothing — so an agent asked to answer on boards will answer in chat unless
- * the boilerplate goes away. These are that boilerplate, one file per shape, kept in
- * `runtime/templates` beside the primitives and the skills so they can be read and edited
- * rather than being buried in a string.
+ * There are no templates any more. Every board the app creates is blank on purpose — the
+ * heading is the title, nothing else — because a served shape turned out to be the wrong
+ * bargain: it decided a board's look before the agent had a sentence, and a board that
+ * starts shaped is a board the writer keeps the shape of. What an agent reaches for now is
+ * the *examples* (`examples/` in the deck, refreshed from `runtime/examples/` on every
+ * restart) — worked boards for coding, research and business that show the import map's
+ * libraries in use, to borrow structure from rather than to be created from.
  *
- * Substitution is a handful of tokens and no template engine, the same as `pi/context.ts` does
- * for `AGENTS.md.tmpl`: `{{TITLE}}`, `{{W}}`, `{{H}}`, and `{{IMPORTMAP}}`, which becomes the
- * library map every new board's head carries (`IMPORT_MAP` below).
+ * Substitution is a handful of tokens and no template engine, the same as `pi/context.ts`
+ * does for `AGENTS.md.tmpl`: `{{TITLE}}`, `{{W}}`, `{{H}}`, and `{{IMPORTMAP}}`, which
+ * becomes the library map every new board's head carries (`IMPORT_MAP` below).
  */
 
 /**
- * The *shape* a new board starts with — not its file format.
- *
- * These two were one word until board formats arrived, and the collision was not
- * survivable: an `answer` can be written as component HTML or as markdown, so one field
- * could not mean both. `template` is this; `format` is `BoardFormat` below.
- */
-export type BoardTemplate = "answer" | "design" | "report" | "plan" | "blank";
-
-/**
- * What a board *is*, as a file.
+ * What a board *is*, as a file — the only choice a new board makes.
  *
  * - `component` — absolutely-positioned boxes with `data-id`s. What every board was, and
  *   the only format Decks' own drag-and-retype editor can work on.
@@ -35,8 +24,6 @@ export type BoardTemplate = "answer" | "design" | "report" | "plan" | "blank";
  * - `slides` — reveal's markdown dialect, one slide at a time, aspect-locked.
  */
 export type BoardFormat = "component" | "flow" | "slides";
-
-export const BOARD_TEMPLATES: readonly BoardTemplate[] = ["answer", "design", "report", "plan", "blank"];
 
 export const BOARD_FORMATS: readonly BoardFormat[] = ["component", "flow", "slides"];
 
@@ -47,12 +34,8 @@ export const BOARD_FORMATS: readonly BoardFormat[] = ["component", "flow", "slid
  * filename that could disagree is the one failure this design set out to make impossible:
  * `deck/kinds.ts` reads a board's format back *out of* its name, so a file called `.md` that
  * was asked for as slides would simply be a flow board and nothing would say why.
- *
- * `component` has five shapes to choose between (`BoardTemplate`) and so has no single
- * template file; the other two are one file each, because a slide deck and a markdown
- * document are already the shape they are.
  */
-const FORMATS: Record<BoardFormat, { extension: string; template?: string }> = {
+const FORMATS: Record<BoardFormat, { extension: string }> = {
 	component: { extension: ".html" },
 	/*
 	 * `.html`, not `.md` — every board this app writes is a single HTML file.
@@ -62,15 +45,12 @@ const FORMATS: Record<BoardFormat, { extension: string; template?: string }> = {
 	 * flow board *is* the document: it carries board.css and board.js, says
 	 * `class="board flow"`, and holds its content in one full-bleed component. Markdown is
 	 * still read (`deck/kinds.ts`); it is no longer what gets created.
-	 *
-	 * The extension it shares with `component` is not a collision: the body class is what
-	 * says which, and a file cannot disagree with itself about that.
 	 */
-	flow: { extension: ".html", template: "flow.html" },
+	flow: { extension: ".html" },
 	// `.slides.html` rather than `.slides.md`: HTML *is* reveal, and markdown is a plugin in
 	// it. Both are read (`lib/slides.js` picks its splitter from the extension); a deck this
 	// app creates is the native one.
-	slides: { extension: ".slides.html", template: "slides.html" },
+	slides: { extension: ".slides.html" },
 };
 
 /** The extension a board of this format takes. */
@@ -107,239 +87,134 @@ export const WIDE_BOARD_W = 1200;
  */
 export const DEFAULT_BOARD_W = 1600;
 
-/** The margin every template leaves around its content, on both sides. */
-const MARGIN = 48;
-
-/** The gap between two columns, and the gap between rows. */
-const GUTTER = 48;
-
 /**
- * The content width under which a pair of cards stops being a pair.
- *
- * Two columns of 300px are two columns; two columns of 130px are a mistake with a rule
- * through the middle. Below this the second card goes *under* the first, which is also the
- * reading order the file already has — so the layout changes and the DOM does not.
- */
-const STACK_BELOW = 720;
-
-/*
- * The heading's arithmetic, for the one box whose height is not the template's.
- *
- * Measured off the rendered templates rather than guessed: one wrapped line of `<h1>` is 38px, the
- * heading starts at 40, and the muted line under it is 21px a line. The two character widths are
- * averages for the sizes concerned, and `HEADING_SLACK` is there because the estimate is allowed to
- * be wrong in one direction only.
- */
-const HEADING_TOP = 40;
-const H1_LINE = 38;
-const H1_MARGIN = 12;
-const H1_CHARS = 15.5;
-const P_LINE = 21;
-const P_CHARS = 7.4;
-const HEADING_SLACK = 8;
-
-/**
- * The widest a board of this shape should be when nobody said.
- *
- * Not "the widest it may be": each of these is the smallest width that holds the shape
- * without stuffing it, and every one is under `MAX_BOARD_W` by a distance.
- *
- * **880 for the shapes that are mostly one column**, because that is nearer the measure
- * prose actually wants — a `flow` board is 720 for the same reason, and a component board
- * being 1000 while a markdown board was 720 meant the format decided the line length rather
- * than the reading did. `answer` and `blank` are a single column of text; `plan` has a pair
- * above its steps and reads fine at 368 a column, which was looked at rather than assumed.
- *
- * `design` keeps 1000 and `report` 1200: a pair of options wants room to be compared, and a
- * report is the only shape with a number, two columns *and* a tail. Widening a board is one
- * drag; unpicking a cramped comparison is not.
- */
-const SIZE: Record<BoardTemplate, { w: number; h: number }> = {
-	answer: { w: 880, h: 600 },
-	design: { w: 1000, h: 900 },
-	report: { w: 1200, h: 1080 },
-	plan: { w: 880, h: 1000 },
-	blank: { w: 880, h: 400 },
-};
-
-/**
- * A width a board may actually be: what was asked for, or the shape's own, clamped.
+ * A width a board may actually be: what was asked for, or the format's own, clamped.
  *
  * `viewport` is the room the canvas has (`stage.viewport()`), and `undefined` means nobody
- * is looking — a board written by an agent nobody is watching gets the ceiling rather than
- * a guess, because a guess would be indistinguishable from a measurement at the point it
- * got used.
- *
- * A phone is the case that makes this worth having: at a 390px viewport every default here
- * is wider than the screen, and a board wider than the screen is read scaled down. Clamping
- * to 390 is what makes `renderTemplate` fold its columns instead.
+ * is looking — a board written by an agent nobody is watching gets the format's default
+ * rather than a guess, because a guess would be indistinguishable from a measurement at the
+ * point it got used. The format's own default is 880 for a component board — the measure
+ * prose actually wants — 720 for a flow document, and 960 for a deck, which is the logical
+ * width a slide is laid out at so it opens at 1:1 with its own layout.
  */
-export function boardWidth(wanted: number | undefined, viewport: number | undefined, kind: BoardTemplate = "blank", format: BoardFormat = "component"): number {
+export function boardWidth(wanted: number | undefined, viewport: number | undefined, format: BoardFormat = "component"): number {
 	/*
 	 * The room on screen, or nothing — and **no ceiling of our own**.
 	 *
 	 * This used to be `min(viewport, 1600)`, which capped a board on a large screen at a
 	 * number nobody had asked for. What is left is the screen: a default should fit the
-	 * device it will be read on, which is what keeps a phone's boards narrow, and on a big
-	 * screen every shape's own width is already well under anything worth calling wide.
+	 * device it will be read on, which is what keeps a phone's boards narrow.
 	 */
 	const room = viewport && viewport > 0 ? viewport : Number.POSITIVE_INFINITY;
 	// A width somebody typed is theirs, whatever it is. The default is the only thing this
 	// function decides, and an agent that means 1800 has a reason we cannot see from here.
 	if (wanted) return Math.round(wanted);
-	/*
-	 * Whose default it is depends on the format, because a shape only belongs to a component
-	 * board. A `flow` board asked for through the stage API used to get the *blank shape's*
-	 * 1000 — a wide measure for prose — while the same board asked for with the `+` button
-	 * got 720, which is the documented one. Two routes to one request answering differently
-	 * is the defect; the format's own default is the answer to both.
-	 */
-	const own = format === "component" ? SIZE[kind].w : defaultFormatWidth(format);
+	const own = format === "component" ? 880 : defaultFormatWidth(format);
 	return Math.max(320, Math.min(own, room));
 }
 
 /**
- * Where a template's rows and columns land, at the width it is being drawn.
+ * The document for a new component board: a blank one.
  *
- * Templates carry no pixel widths of their own any more; they are written against these
- * tokens, so one file is a two-column board at 1200 and a single column at 390. That is
- * the whole of what "never wider than the viewport" costs, and the alternative was a board
- * whose content is clipped in silence on the one screen nobody checks.
- *
- * The tokens, and they are the vocabulary a template is written in:
- *
- * - `CONTENT` — the full width inside the margins
- * - `COL` — one column of a pair, or the full width when a pair has folded
- * - `COLX` — the x of a pair's second card: beside the first, or back at the margin
- * - `ROW1`, `ROW2`, … — the top of each row, in the order the file reads
- * - `PAIRB` — the top of a pair's *second* card, which is the pair's own row until it folds
- * - `BOTTOM` — where the content ends, which is what the board's height is measured against
+ * Heading and nothing else, on purpose, and the whole of what "no templates" means — every
+ * board starts the same, and what it becomes is the agent's decision rather than the
+ * shell's. The comment in the board is the only guidance: the title is the finding, the
+ * import map in the head can reach any library, and the examples beside the deck show what
+ * that looks like.
  */
-function layout(w: number, rhythm: Rhythm, title: string): Record<string, number> {
-	const content = w - MARGIN * 2;
-	const stacked = content < STACK_BELOW;
-	const col = stacked ? content : Math.floor((content - GUTTER) / 2);
-	/*
-	 * Where the first row starts, which is the one number a template cannot state for itself.
-	 *
-	 * Everything else here is the shape's; the heading's height is the *caller's* — `{{TITLE}}` is
-	 * whatever they passed, and eight words are three lines on a narrow board and one on a wide
-	 * one. A fixed first row therefore collides with the title exactly on the small board nobody
-	 * looks at, so the room is estimated from the title's length and the content width, and the
-	 * estimate errs high: overlapping text is the failure that cannot be seen from the source.
-	 */
-	const titleLines = Math.max(1, Math.ceil(title.length / Math.max(8, content / H1_CHARS)));
-	const subtitleLines = rhythm.subtitle ? Math.ceil(rhythm.subtitle / Math.max(12, content / P_CHARS)) : 0;
-	const heading = HEADING_TOP + H1_MARGIN + H1_LINE * titleLines + (subtitleLines > 0 ? P_LINE * subtitleLines + H1_MARGIN : 0) + HEADING_SLACK;
-	const first = Math.max(rhythm.first, heading + GUTTER);
-	const tokens: Record<string, number> = {
-		CONTENT: content,
-		COL: col,
-		COLX: stacked ? MARGIN : MARGIN + col + GUTTER,
-		// A shape with no pair still substitutes it: a token left unreplaced would ship
-		// `{{PAIRB}}` into a board, and `templates.test.ts` refuses that for every kind.
-		PAIRB: first,
-	};
-	let y = first;
-	rhythm.rows.forEach((row, index) => {
-		tokens[`ROW${index + 1}`] = y;
-		if (row.pair) {
-			tokens.PAIRB = stacked ? y + row.h + GUTTER : y;
-			y += stacked ? (row.h + GUTTER) * 2 : row.h + GUTTER;
-		} else {
-			y += row.h + GUTTER;
-		}
-	});
-	tokens.BOTTOM = y - GUTTER + MARGIN;
-	return tokens;
-}
+export function renderBlank(title: string, size?: { w?: number; h?: number }): string {
+	const w = Math.round(size?.w ?? 880);
+	const h = Math.round(size?.h ?? 400);
+	return `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>${escapeHtml(title)}</title>
+		<meta name="board" content='{"w":${w},"h":${h},"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		${importMapTag()}
+	</head>
+	<body class="board">
+		<!--
+			A blank board, by design: the app creates nothing but these.
 
-/**
- * Each shape's vertical rhythm: where the first row starts, and the rows after it.
- *
- * Heights are nominal — these are placeholder cards, and `stage.fit` is what makes a board
- * the size of its real content. What matters here is the *order*, because it is the order
- * the file is written in and the order a reader's eye takes.
- */
-interface Rhythm {
-	first: number;
-	/**
-	 * How many characters the muted line under the title holds, when a kind has one.
-	 *
-	 * Here rather than read from the template because the room it needs is part of the arithmetic
-	 * `layout` does — a subtitle that wraps to two lines on a narrow board is two lines of heading.
-	 */
-	subtitle?: number;
-	rows: Array<{ h: number; pair?: boolean }>;
-}
+			The heading is the title, and the title is the finding. Write it as a statement
+			("Returning customer share fell after the second tab shipped") rather than a topic or
+			a question, then fill the canvas under it.
 
-const ROWS: Record<BoardTemplate, Rhythm> = {
-	// The answer, then the one card that shows it.
-	answer: { first: 152, rows: [{ h: 56 }, { h: 288 }] },
-	// The options, the trade-off drawn, the recommendation.
-	design: { first: 152, subtitle: 35, rows: [{ h: 200, pair: true }, { h: 300 }, { h: 72 }] },
-	// The number, the series, how and what, what is left.
-	report: { first: 168, subtitle: 50, rows: [{ h: 72 }, { h: 296 }, { h: 190, pair: true }, { h: 72 }] },
-	// Goal and approach, the milestones, the steps.
-	plan: { first: 152, rows: [{ h: 180, pair: true }, { h: 248 }, { h: 230 }] },
-	blank: { first: 152, rows: [] },
-};
+			Whatever goes under it reads top to bottom and so does the file: one column, or a
+			pair at x = 48 and x = 536 with the left one first. Lead with the finding and stop
+			when it is said. A table beats a paragraph about a comparison, a diagram beats a
+			paragraph about a structure, a number beats an adjective. Then \`stage.fit\` it, so
+			the board is the size of what is on it rather than the size you guessed.
 
-export function isBoardTemplate(value: unknown): value is BoardTemplate {
-	return typeof value === "string" && (BOARD_TEMPLATES as readonly string[]).includes(value);
-}
+			For what a finished board can look like, read the examples in \`examples/\` beside
+			this deck: worked boards for coding, research and business that use the libraries
+			this head's import map names. Borrow their structure; do not start from one.
+		-->
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: ${Math.max(320, w - 96)}px">
+			<h1>${escapeHtml(title)}</h1>
+		</div>
 
-/**
- * The document for a new board of this shape.
- *
- * A missing template file is a broken install rather than a reason to refuse: fall back to
- * the blank shape's markup so a deck can still be worked in.
- */
-export function renderTemplate(kind: BoardTemplate, title: string, size?: { w?: number; h?: number }): string {
-	const file = join(templatesDir(), `${kind}.html`);
-	const source = existsSync(file) ? readFileSync(file, "utf8") : FALLBACK;
-	const w = Math.round(size?.w ?? SIZE[kind].w);
-	const boxes = layout(w, ROWS[kind], title);
-	/*
-	 * The height follows the layout rather than the table, because folding the columns adds
-	 * a row: a `plan` is 780 tall at 1000 and taller at 390, and a height that did not know
-	 * that would clip the steps in silence on the one screen nobody checks.
-	 */
-	const h = Math.round(size?.h ?? Math.max(SIZE[kind].h, boxes.BOTTOM ?? 0));
-	let out = source.replaceAll("{{TITLE}}", escapeHtml(title)).replaceAll("{{W}}", String(w)).replaceAll("{{H}}", String(h)).replaceAll("{{IMPORTMAP}}", importMapTag());
-	for (const [token, value] of Object.entries(boxes)) out = out.replaceAll(`{{${token}}}`, String(value));
-	return out;
+		<script src="../lib/board.js"></script>
+	</body>
+</html>
+`;
 }
 
 /**
  * The document for a new board of a format that is not component HTML.
  *
- * Two tokens and no layout, which is the difference from `renderTemplate`: a flow board has
- * no boxes to place and a slide is laid out at a fixed logical size, so neither needs the
- * width arithmetic that a component template is written against. `{{W}}` is still
- * substituted because a markdown board can declare its own measure in front-matter, which
- * is the only way an agent can size one.
- *
- * A missing template file is a broken install rather than a reason to refuse — the same
- * bargain `renderTemplate` makes — so it falls back to the smallest honest document of that
- * format rather than throwing.
+ * One token and no layout, which is the difference from `renderBlank`: a flow board has no
+ * boxes to place and a slide is laid out at a fixed logical size, so neither needs width
+ * arithmetic. Both are blank too — a flow document is a title and an empty section, a slide
+ * deck is one empty slide — for the same reason a component board is: the shape is the
+ * agent's to make.
  */
 export function renderFormat(format: Exclude<BoardFormat, "component">, title: string, size?: { w?: number }): string {
-	const name = FORMATS[format].template;
-	const file = name ? join(templatesDir(), name) : "";
-	const source = file && existsSync(file) ? readFileSync(file, "utf8") : FORMAT_FALLBACK[format];
 	const w = Math.round(size?.w ?? defaultFormatWidth(format));
-	// Both templates are HTML now, so the title is escaped for both. It was left raw for the
-	// markdown one, where an entity is shown literally rather than decoded.
-	return source.replaceAll("{{TITLE}}", escapeHtml(title)).replaceAll("{{W}}", String(w)).replaceAll("{{IMPORTMAP}}", importMapTag());
+	if (format === "slides") {
+		return `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>${escapeHtml(title)}</title>
+		<meta name="board" content='{"w":${w},"aspect":"16:9"}' />
+	</head>
+	<body class="reveal">
+		<div class="slides">
+			<section>
+				<h1>${escapeHtml(title)}</h1>
+			</section>
+		</div>
+	</body>
+</html>
+`;
+	}
+	return `<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>${escapeHtml(title)}</title>
+		<!--
+			No height: a flow board's is measured, never stored. The browser reports what its
+			content came to and the deck follows, so this board cannot clip.
+		-->
+		<meta name="board" content='{"w":${w},"bg":"plain"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		${importMapTag()}
+	</head>
+	<body class="board flow">
+		<div class="doc" data-id="body" style="left: 0; top: 0; width: 100%">
+			<h1>${escapeHtml(title)}</h1>
+		</div>
+		<script src="../lib/board.js"></script>
+	</body>
+</html>
+`;
 }
 
-/**
- * 960 for a deck, because that is the logical width a slide is laid out at, so it opens at
- * 1:1 with its own layout; 720 for prose, because a line much wider is one the eye loses its
- * place in. The same two numbers `deck/kinds.ts` uses for a board that declares nothing —
- * they are here as well because this is where a *new* one is written.
- */
+/** 960 for a deck, because that is the logical width a slide is laid out at; 720 for prose. */
 function defaultFormatWidth(format: Exclude<BoardFormat, "component">): number {
 	return format === "slides" ? 960 : 720;
 }
@@ -348,9 +223,9 @@ function defaultFormatWidth(format: Exclude<BoardFormat, "component">): number {
  * The libraries a new board can import by bare name, and the exact version each resolves to.
  *
  * One map, substituted into every new board's head through `{{IMPORTMAP}}`, so the versions are
- * bumped in one place rather than in seven templates. **It costs a board nothing.** An import map
- * is a table of names — the browser fetches a library only when a board actually imports it, and
- * nothing is fetched at all for a board that never does.
+ * bumped in one place. **It costs a board nothing.** An import map is a table of names — the
+ * browser fetches a library only when a board actually imports it, and nothing is fetched at
+ * all for a board that never does.
  *
  * Pinned rather than `@latest`, because a file's bytes are supposed to say what it renders; an
  * agent that wants another version edits the map in the board it is writing, which is the one it
@@ -383,19 +258,15 @@ function importMapTag(): string {
 	return `<script type="importmap">\n${IMPORT_MAP}\n\t\t</script>`;
 }
 
-const FORMAT_FALLBACK: Record<Exclude<BoardFormat, "component">, string> = {
-	flow: `<!doctype html>\n<html lang="en">\n\t<head>\n\t\t<meta charset="utf-8" />\n\t\t<title>{{TITLE}}</title>\n\t\t<meta name="board" content='{"w":{{W}}}' />\n\t\t<link rel="stylesheet" href="../lib/board.css" />\n\t\t{{IMPORTMAP}}\n\t</head>\n\t<body class="board flow">\n\t\t<div class="doc" data-id="body" style="left: 0; top: 0; width: 100%">\n\t\t\t<h1>{{TITLE}}</h1>\n\t\t</div>\n\t\t<script src="../lib/board.js"></script>\n\t</body>\n</html>\n`,
-	slides: `<!doctype html>\n<html lang="en">\n\t<head>\n\t\t<meta charset="utf-8" />\n\t\t<title>{{TITLE}}</title>\n\t</head>\n\t<body class="reveal">\n\t\t<div class="slides">\n\t\t\t<section>\n\t\t\t\t<h1>{{TITLE}}</h1>\n\t\t\t</section>\n\t\t</div>\n\t</body>\n</html>\n`,
-};
-
 /**
  * A file name from a title: lower case, words joined by dashes, ASCII only where it can be.
  *
  * Titles are often not English — the first board written in this app was in Chinese — so
  * anything left after stripping the shape of a filename is kept rather than mangled, and a
- * title that reduces to nothing falls back to the kind.
+ * title that reduces to nothing falls back to `fallback` (the word that names what is being
+ * made: `board`, `mirror`, `web`).
  */
-export function slugFor(title: string, kind: BoardTemplate): string {
+export function slugFor(title: string, fallback = "board"): string {
 	const slug = title
 		.toLowerCase()
 		.replace(/['"`]/g, "")
@@ -403,31 +274,12 @@ export function slugFor(title: string, kind: BoardTemplate): string {
 		.replace(/^-+|-+$/g, "")
 		.slice(0, 48)
 		.replace(/-+$/g, "");
-	return slug || kind;
+	return slug || fallback;
 }
 
 function escapeHtml(text: string): string {
 	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-
-const FALLBACK = `<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<title>{{TITLE}}</title>
-		<meta name="board" content='{"w":{{W}},"h":{{H}},"bg":"grid"}' />
-		<link rel="stylesheet" href="../lib/board.css" />
-		{{IMPORTMAP}}
-	</head>
-	<body class="board">
-		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 900px">
-			<h1>{{TITLE}}</h1>
-		</div>
-
-		<script src="../lib/board.js"></script>
-	</body>
-</html>
-`;
 
 /** The default size of a mirror: tall and narrow, because a conversation is a column. */
 export const MIRROR_SIZE = { w: 560, h: 900 };

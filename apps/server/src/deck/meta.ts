@@ -26,7 +26,7 @@ const CONTENT = /content\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
 /**
  * An attribute value as the browser would see it.
  *
- * The board templates write this tag single-quoted, so the JSON inside keeps its own
+ * A new board writes this tag single-quoted, so the JSON inside keeps its own
  * double quotes and needs nothing doing to it. But a board written by hand — or by an
  * editor that normalises quotes — arrives double-quoted, and then the only legal way to
  * carry `{"w":800}` is `content="{&quot;w&quot;:800}"`. That parsed as invalid JSON and was

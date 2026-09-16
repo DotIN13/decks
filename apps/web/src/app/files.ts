@@ -162,7 +162,6 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 			created.set(request, resolve);
 			send({
 				type: "board.create",
-				kind: "blank",
 				format: "component",
 				title: files.length === 1 ? files[0]!.name : `${files.length} files`,
 				size: { w: width, h: height },
@@ -218,8 +217,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	 *
 	 * Centred rather than hung from the pointer's top-left corner, because a double-click names
 	 * the place somebody wants the board and the place is the board, not its corner. The size is
-	 * `blank`'s own (880×400, `boards/templates.ts`), sent for that arithmetic and not to choose
-	 * anything.
+	 * the blank board's own (880×400), sent for that arithmetic and not to choose anything.
 	 */
 	const boardAt = async (at: { x: number; y: number }): Promise<string | undefined> => {
 		const stage = document.querySelector(".stage");
@@ -232,7 +230,6 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 			created.set(request, resolve);
 			send({
 				type: "board.create",
-				kind: "blank",
 				format: "component",
 				title: "Untitled",
 				size,

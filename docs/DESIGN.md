@@ -440,19 +440,26 @@ is for.
 
 **A board has to be cheaper than a paragraph.** If answering on a board costs fifteen
 lines of boilerplate and answering in chat costs nothing, the chat wins every time — so
-`stage.newBoard({ title, kind })` writes the shell, mints a unique slug from the title,
+`stage.newBoard({ title })` writes the shell, mints a unique slug from the title,
 attaches the board, puts it in play, and returns the deck-relative path. It does not move
 the camera, and it refuses to overwrite an existing board.
 
-The shells are files, not strings in a TypeScript module: `runtime/templates/<kind>.html`
-for `answer`, `design`, `report`, `plan` and `blank`, beside `runtime/lib` and
-`runtime/skills` where they can be read and edited like anything else. Each is a real
-board — a sized `<meta name="board">`, both `lib` tags, a title and one placeholder
-section with `data-id`s — and substitution is `{{TITLE}}`/`{{W}}`/`{{H}}`, the same shape
-`agents/context.ts` already uses for `AGENTS.md.tmpl`. No template engine.
+**The shell is blank, and there are no templates.** A board is a heading and the import
+map, and nothing else: a served shape decided too much of the board before the writer had
+a sentence, and a board that starts shaped is a board the writer keeps the shape of. What
+an agent reaches for instead is the **examples** (`runtime/examples`, copied into every
+deck's `examples/` on restart by `deck/lib-sync.ts`, the same content-compared copy as
+`lib/`). Nine worked boards — three for coding, three for research, three for business —
+use the libraries the import map names, and the deck context tells the agent to borrow
+their structure rather than to start from one. The blank document is a string in
+`boards/templates.ts` because it is four lines and there is one of it; the examples are
+files, because they are meant to be read and copied.
 
 The write itself lives in `boards/service.ts`, which is where board writes and their
-revisions live; the extension reaches it through `StageService`.
+revisions live; the extension reaches it through `StageService`. The old `kind` and
+`template` arguments are still accepted and ignored, because the signature is in the
+`stage.d.ts` every agent has already read and breaking it mid-turn would cost somebody a
+turn to save a deprecation.
 
 ### 6.3 `stage_eval`
 

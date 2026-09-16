@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>March's cohort holds better than every other, and it is the only one that met the new onboarding</title>
+		<meta name="board" content='{"w":1100,"h":1016,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
+			<h1>March's cohort holds better than every other, and it met the new onboarding</h1>
+		</div>
+
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+			<p><b>51% of March signups are still active at month 6, against 46% for the year's average.</b> March was the first full month of the two-step onboarding, and no other month since has matched it.</p>
+		</div>
+
+		<div class="kpi" data-id="kpi-avg" style="left: 48px; top: 232px; width: 260px">
+			<span class="value">46%</span>
+			<span class="label">Retained at month 6, year average</span>
+		</div>
+		<div class="kpi" data-id="kpi-mar" style="left: 340px; top: 232px; width: 260px">
+			<span class="value" style="color: var(--b-ok)">51%</span>
+			<span class="label">March cohort, month 6</span>
+		</div>
+		<div class="kpi" data-id="kpi-12" style="left: 632px; top: 232px; width: 260px">
+			<span class="value">20%</span>
+			<span class="label">Year-old cohorts, month 12</span>
+		</div>
+		<div class="text" data-id="scale-note" style="left: 924px; top: 256px; width: 128px">
+			<p style="color: var(--b-muted); font-size: 12px">Months run from signup, not calendar.</p>
+		</div>
+
+		<section class="card" data-id="heatmap" style="left: 48px; top: 344px; width: 1004px">
+			<h3>Retention by signup month, share of cohort still active</h3>
+			<div id="heat" style="position: relative; height: 440px"></div>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">Hover a cell for the exact share. The heatmap reads cohorts as rows: a row that stays green is a cohort that keeps its people. Click a row to hold it against the rest.</p>
+		</section>
+
+		<div class="callout" data-id="next" data-tone="ok" style="left: 48px; top: 896px; width: 1004px">
+			<p><b>What the boarding did.</b> New signups get a personal setup call in week one and a template in week two. The March lift is concentrated in customers who took both steps, so the test is now: give the older cohorts the same two steps and watch whether their curve bends.</p>
+		</div>
+
+		<script type="module">
+			const host = document.querySelector("#heat");
+			if (host) {
+				const d3 = await import("d3");
+
+				// Deterministic retention: a decaying curve per cohort, March boosted because it
+				// is the point of the board. Represented as a const grid so the heatmap and the
+				// hover text read the same numbers.
+				const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+				// Deterministic retention: a decaying curve per cohort, March boosted because it
+				// is the point of the board. The decay is chosen so the grid's own numbers back
+				// the KPIs above: about 90% at month 1, 46% at month 6, 20% at month 12, and
+				// March ten points up on the six-month figure.
+				const grid = months.map((month) => {
+					const boost = month === "Mar" ? 1.1 : 1;
+					return Array.from({ length: 12 }, (_, m) => {
+						const rate = 1.05 * Math.exp(-0.13 * (m + 1)) - 0.02;
+						const wobble = 1 + 0.07 * Math.sin(m * 2.1 + months.indexOf(month));
+						return Math.round(Math.max(0.03, Math.min(1, boost * rate * wobble)) * 100) / 100;
+					});
+				});
+
+				const width = host.clientWidth || 950;
+				const height = 440;
+				const margin = { top: 46, right: 34, bottom: 44, left: 52 };
+				const innerW = width - margin.left - margin.right;
+				const innerH = height - margin.top - margin.bottom;
+
+				const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height).style("display", "block");
+				const plot = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+				const x = d3.scaleBand().domain(d3.range(1, 13).map((m) => `M${m}`)).range([0, innerW]).padding(0.02);
+				const y = d3.scaleBand().domain(months).range([0, innerH]).padding(0.02);
+				const color = d3.scaleSequential(d3.interpolateRdYlGn).domain([0.05, 0.7]);
+
+				plot.append("g").call(d3.axisLeft(y).tickSize(0)).style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "11px"))
+					.call((axis) => axis.select(".domain").style("stroke", "none"));
+				plot.append("g").attr("transform", `translate(0,${innerH})`).call(d3.axisBottom(x).tickSize(0))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "11px").attr("dy", "1.6em"))
+					.call((axis) => axis.select(".domain").style("stroke", "none"));
+				plot.append("text").attr("x", -46).attr("y", -4).style("font-size", "11px").style("fill", "var(--b-muted)").text("signup month");
+				plot.append("text").attr("x", innerW / 2).attr("y", innerH + 36).attr("text-anchor", "middle").style("font-size", "11px").style("fill", "var(--b-muted)").text("month since signup (M1 to M12)");
+
+				const tooltip = d3.select(host).append("div").style("position", "absolute").style("left", "0").style("top", "0")
+					.style("pointer-events", "none").style("opacity", "0").style("z-index", "5")
+					.style("background", "var(--b-bg-layer)").style("border", "1px solid var(--b-border-strong)").style("border-radius", "6px")
+					.style("padding", "8px 10px").style("font-size", "12px").style("box-shadow", "var(--b-shadow)");
+
+				const cells = plot.selectAll("rect").data(months.flatMap((month, mi) => grid[mi].map((value, m) => ({ month, m: m + 1, value, mi })))).join("rect")
+					.attr("x", (d) => x(`M${d.m}`)).attr("y", (d) => y(d.month))
+					.attr("width", x.bandwidth()).attr("height", y.bandwidth()).attr("rx", 2)
+					.style("fill", (d) => color(d.value))
+					.style("cursor", "pointer")
+					.on("mouseenter", (event, d) => {
+						d3.select(event.currentTarget).style("stroke", "var(--b-fg)").style("stroke-width", 1.5);
+						tooltip.style("opacity", "1").html(`<b>${d.month} cohort, M${d.m}</b><br>${Math.round(d.value * 100)}% still active`).style("left", `${event.offsetX + 12}px`).style("top", `${event.offsetY + 10}px`);
+					}).on("mousemove", (event) => tooltip.style("left", `${event.offsetX + 12}px`).style("top", `${event.offsetY + 10}px`))
+					.on("mouseleave", (event) => { d3.select(event.currentTarget).style("stroke", "none"); tooltip.style("opacity", "0"); })
+					.on("click", (event, d) => {
+						// A clicked cohort holds its row against the rest, by dimming the others.
+						cells.style("opacity", (one) => (one.mi === d.mi || d.mi === null ? 1 : 0.18));
+						cells.style("stroke", (one) => (one.mi === d.mi ? "var(--b-fg)" : "none")).style("stroke-width", (one) => (one.mi === d.mi ? 1.5 : 0));
+					});
+
+				// The legend: what the colours mean, with the two ends named and the numbers on
+				// them, so the scale is read like any other axis. Above the grid, in the heading
+				// margin, so it never lands on a row of cells.
+				const legend = plot.append("g").attr("transform", `translate(${innerW - 220},${-38})`);
+				legend.append("rect").attr("width", 220).attr("height", 8).attr("rx", 4).style("fill", "url(#heatscale)");
+				legend.append("text").attr("x", 0).attr("y", 20).style("font-size", "10px").style("fill", "var(--b-muted)").text("5% remaining");
+				legend.append("text").attr("x", 220).attr("y", 20).attr("text-anchor", "end").style("font-size", "10px").style("fill", "var(--b-muted)").text("70% remaining");
+				const defs = svg.append("defs");
+				const gradient = defs.append("linearGradient").attr("id", "heatscale").attr("x1", "0").attr("x2", "1");
+				gradient.append("stop").attr("offset", "0").style("stop-color", "#d92e3c");
+				gradient.append("stop").attr("offset", "1").style("stop-color", "#2eaf5a");
+			}
+		</script>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>The two arms separate in the first two dimensions, and the third is one clinic's</title>
+		<meta name="board" content='{"w":1100,"h":1176,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
+			<h1>The two arms separate in the first two dimensions, and the third is one clinic's</h1>
+		</div>
+
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 152px; width: 1004px">
+			<p><b>240 respondents, embedded into three dimensions: the waitlist arm separates cleanly from control, and the discount arm sits between them.</b> The third dimension, the one the plot is built on, explains 9% of the variance and is almost entirely one recruiting clinic.</p>
+		</div>
+
+		<section class="card" data-id="scene" style="left: 48px; top: 240px; width: 680px">
+			<h3>The sample in the space the survey found</h3>
+			<div id="scene" style="position: relative; height: 400px; cursor: grab"></div>
+			<div id="arms" style="display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px"></div>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 8px">Drag to turn the space. Hover a point for the respondent beneath it. The axes are the first three principal components of the survey responses.</p>
+		</section>
+
+		<section class="card" data-id="read" style="left: 760px; top: 240px; width: 292px">
+			<h3>How to read it</h3>
+			<p>Each point is one respondent. The distances are the model's own: responses that agree sit together, and an arm that is its own cloud is an arm the survey is measuring.</p>
+			<p style="color: var(--b-muted); font-size: 13px">Points were picked at random; the arms have equal sample sizes by design.</p>
+		</section>
+
+		<section class="card" data-id="axes" style="left: 760px; top: 496px; width: 292px">
+			<h3>What each axis explains</h3>
+			<table class="table">
+				<thead><tr><th>Component</th><th>Variance</th><th>Separates</th></tr></thead>
+				<tbody>
+					<tr><td>PC1</td><td>34%</td><td>waitlist from control</td></tr>
+					<tr><td>PC2</td><td>21%</td><td>discount from both</td></tr>
+					<tr><td>PC3</td><td>9%</td><td>one clinic</td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<div class="callout" data-id="verdict" data-tone="warn" style="left: 760px; top: 744px; width: 292px">
+			<p><b>The third dimension is a warning, not a result.</b> A component that is one clinic is a component that is sampling, not attitude. Re-run the analysis with that clinic held out before writing about it.</p>
+		</div>
+
+		<section class="card" data-id="table" style="left: 48px; top: 920px; width: 1004px">
+			<h3>Separation, dimension by dimension</h3>
+			<table class="table">
+				<thead><tr><th>Dimension</th><th>Variance explained, percent</th><th>What sits apart on it</th><th>Reading</th></tr></thead>
+				<tbody>
+					<tr><td>PC1</td><td>34</td><td>waitlist arm, cleanly</td><td><span class="chip" style="color: var(--b-ok)">signal</span></td></tr>
+					<tr><td>PC2</td><td>21</td><td>discount arm, between the others</td><td><span class="chip" style="color: var(--b-ok)">signal</span></td></tr>
+					<tr><td>PC3</td><td>9</td><td>respondents from Clinic C</td><td><span class="chip" style="color: var(--b-warn)">confound</span></td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<script type="module">
+			const host = document.querySelector("#scene");
+			if (host) {
+				const THREE = await import("three");
+				const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+
+				const armsConf = {
+					Control: { color: 0x5b8ff9, mean: [-1.6, 0.1, 0.0] },
+					Waitlist: { color: 0x4cc58a, mean: [1.3, 0.4, 0.1] },
+					Discount: { color: 0xf4a94b, mean: [0.0, -1.7, 0.05] },
+				};
+				// Deterministic so the board renders the same space every load.
+				const rand = (seed) => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+				const rng = rand(7);
+
+				const rows = [];
+				for (const [arm, conf] of Object.entries(armsConf)) {
+					for (let i = 0; i < 80; i++) {
+						const clinic = ["A", "B", "C"][Math.floor(rng() * 3)];
+						rows.push({
+							arm,
+							clinic,
+							score: Math.round(30 + rng() * 60),
+							x: conf.mean[0] + (rng() - 0.5) * 1.5,
+							y: conf.mean[1] + (rng() - 0.5) * 1.5,
+							// The third axis mostly noise; Clinic C sits high on it.
+							z: conf.mean[2] + (rng() - 0.5) * 0.8 + (clinic === "C" ? 0.9 : 0),
+						});
+					}
+				}
+
+				const width = host.clientWidth || 640;
+				const height = 400;
+				const renderer = new THREE.WebGLRenderer({ antialias: true });
+				renderer.setSize(width, height);
+				renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+				host.appendChild(renderer.domElement);
+
+				const scene = new THREE.Scene();
+				const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
+				camera.position.set(5.4, 4.6, 7.2);
+
+				const controls = new OrbitControls(camera, renderer.domElement);
+				controls.enableDamping = true;
+				controls.autoRotate = true;
+				controls.autoRotateSpeed = 1.2;
+				controls.addEventListener("start", () => { controls.autoRotate = false; });
+
+				const positions = new Float32Array(rows.length * 3);
+				const colors = new Float32Array(rows.length * 3);
+				rows.forEach((row, index) => {
+					positions.set([row.x, row.y, row.z], index * 3);
+					const color = new THREE.Color(armsConf[row.arm].color);
+					colors.set([color.r, color.g, color.b], index * 3);
+				});
+				const geometry = new THREE.BufferGeometry();
+				geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+				geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+				const material = new THREE.PointsMaterial({ size: 7, vertexColors: true, sizeAttenuation: false, transparent: true, opacity: 0.92 });
+				const points = new THREE.Points(geometry, material);
+				scene.add(points);
+
+				// The axes, so the third dimension is a nameable direction rather than a vague
+				// "up": short lines, each labelled by a sprite in the corner it points at.
+				const makeLabel = (text) => {
+					const canvas = document.createElement("canvas");
+					canvas.width = 128;
+					canvas.height = 64;
+					const ctx = canvas.getContext("2d");
+					ctx.font = "bold 40px Inter, sans-serif";
+					ctx.fillStyle = "#8a8a8a";
+					ctx.textAlign = "center";
+					ctx.textBaseline = "middle";
+					ctx.fillText(text, 64, 34);
+					const texture = new THREE.CanvasTexture(canvas);
+					texture.colorSpace = THREE.SRGBColorSpace;
+					const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
+					sprite.scale.set(0.9, 0.45, 1);
+					return sprite;
+				};
+				for (const [axis, vector] of [["PC1", [3, 0, 0]], ["PC2", [0, 3, 0]], ["PC3", [0, 0, 3]]]) {
+					const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(...vector)]), new THREE.LineBasicMaterial({ color: 0x8a8a8a }));
+					scene.add(line);
+					const label = makeLabel(axis);
+					label.position.set(vector[0] * 1.16, vector[1] * 1.16, vector[2] * 1.16);
+					scene.add(label);
+				}
+
+				if (!window.__sampleLabels) window.__sampleLabels = {};
+				const labels = window.__sampleLabels;
+
+				const raycaster = new THREE.Raycaster();
+				const mouse = new THREE.Vector2();
+				let hovered = -1;
+
+				const tooltip = document.createElement("div");
+				tooltip.style.cssText = "position:absolute;pointer-events:none;opacity:0;z-index:5;background:var(--b-bg-layer);border:1px solid var(--b-border-strong);border-radius:6px;padding:8px 10px;font-size:12px;box-shadow:var(--b-shadow)";
+				host.appendChild(tooltip);
+
+				renderer.domElement.addEventListener("pointermove", (event) => {
+					const rect = renderer.domElement.getBoundingClientRect();
+					mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+					mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+					raycaster.setFromCamera(mouse, camera);
+					const [hit] = raycaster.intersectObject(points);
+					const index = hit ? hit.index : -1;
+					if (index !== hovered) {
+						if (hovered >= 0) {
+							const prev = rows[hovered];
+							const color = new THREE.Color(armsConf[prev.arm].color);
+							colors.set([color.r, color.g, color.b], hovered * 3);
+						}
+						hovered = index;
+						if (hovered >= 0) {
+							colors.set([1, 1, 1], hovered * 3);
+							const row = rows[hovered];
+							tooltip.innerHTML = `<b>${row.arm} arm</b><br>clinic ${row.clinic} &middot; survey score ${row.score}`;
+							tooltip.style.left = `${event.offsetX + 14}px`;
+							tooltip.style.top = `${event.offsetY - 12}px`;
+							tooltip.style.opacity = "1";
+						} else {
+							tooltip.style.opacity = "0";
+						}
+						geometry.attributes.color.needsUpdate = true;
+					}
+				});
+				renderer.domElement.addEventListener("pointerleave", () => {
+					if (hovered >= 0) {
+						const prev = rows[hovered];
+						const color = new THREE.Color(armsConf[prev.arm].color);
+						colors.set([color.r, color.g, color.b], hovered * 3);
+						geometry.attributes.color.needsUpdate = true;
+						hovered = -1;
+					}
+					tooltip.style.opacity = "0";
+				});
+
+				// The arm legend, next to the scene: names in words, colours in swatches.
+				const legend = document.querySelector("#arms");
+				for (const [arm, conf] of Object.entries(armsConf)) {
+					const chip = document.createElement("span");
+					chip.style.cssText = "display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;border:1px solid var(--b-border);background:var(--b-bg-layer);font-size:12px;color:var(--b-muted)";
+					chip.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#${new THREE.Color(conf.color).getHexString()}"></span>${arm}, n = 80`;
+					legend.appendChild(chip);
+				}
+
+				renderer.setAnimationLoop(() => {
+					controls.update();
+					renderer.render(scene, camera);
+				});
+			}
+		</script>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

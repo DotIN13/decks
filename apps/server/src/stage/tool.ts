@@ -4,7 +4,7 @@ import type { AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel 
 import { toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
 import { roster } from "../agents/workspaces.ts";
-import { BOARD_FORMATS, BOARD_TEMPLATES, boardWidth, isBoardFormat, isBoardTemplate, WIDE_BOARD_W } from "../boards/templates.ts";
+import { BOARD_FORMATS, boardWidth, isBoardFormat, WIDE_BOARD_W } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService, WebTarget } from "./service.ts";
 
@@ -329,50 +329,40 @@ export function createStageTool(deps: {
 			const title = options?.title?.trim();
 			if (!title) throw new Error("A board needs a title");
 			/*
-			 * What the board *is as a file*, which is a different question from its shape.
+			 * What the board *is as a file*, which is all a new board is allowed to choose.
 			 *
 			 * `component` is every board this app wrote before formats existed and stays the
 			 * default, so an agent that says nothing gets what it has always got. The other
-			 * two are documents rather than boxes: `flow` is markdown that reflows, `slides`
+			 * two are documents rather than boxes: `flow` is a document that reflows, `slides`
 			 * is a reveal deck. The extension is derived from this and never named — see
 			 * `boards/templates.ts`.
 			 */
 			const format = options.format ?? "component";
 			if (!isBoardFormat(format)) throw new Error(`Unknown format ${format}; use one of ${BOARD_FORMATS.join(", ")}`);
 			/*
-			 * `kind` still works, and is the old name for this.
-			 *
-			 * It meant the template shape until board formats arrived and needed the word.
-			 * Accepted rather than refused because this signature is in the `stage.d.ts`
-			 * every agent has already read: an agent mid-turn is working from the contract
-			 * as it was when its session opened, and breaking that costs somebody a turn to
-			 * save a deprecation.
+			 * There are no templates any more — every board starts blank — but the arguments
+			 * are still accepted rather than refused. This signature is in the `stage.d.ts`
+			 * every agent has already read: an agent mid-turn is working from the contract as
+			 * it was when its session opened, and breaking that costs somebody a turn to save
+			 * a deprecation. What used to be a shape is now nothing shaped; the board is blank
+			 * however it was asked for.
 			 */
-			const template = options.template ?? options.kind ?? "blank";
-			if (!isBoardTemplate(template)) throw new Error(`Unknown template ${template}; use one of ${BOARD_TEMPLATES.join(", ")}`);
-			/*
-			 * A shape asked for alongside a format that has no shapes is a misunderstanding
-			 * worth a sentence rather than a silent drop. There is no `report`-flavoured slide
-			 * deck: a deck and a markdown document are already the shape they are.
-			 */
-			if (format !== "component" && (options.template ?? options.kind)) {
-				notes.push(`a ${format} board has no template shape — ${template} was ignored`);
+			if (options.template ?? options.kind) {
+				notes.push("new boards are blank — there are no templates any more, so the shape asked for was ignored.");
 			}
 
 			/*
-			 * The width, when nobody said one: the shape's own, held inside the screen.
+			 * The width, when nobody said one: the format's own, held inside the screen.
 			 *
 			 * A phone is what makes it worth doing rather than suggesting: at a 390px
-			 * viewport every default is wider than the screen, and the template folds its
-			 * columns to fit rather than being clipped. There is no ceiling of ours in it any
-			 * more — a width that *was* asked for is used at any size, and 1200 is advice in
-			 * the note below.
+			 * viewport every default is wider than the screen, and the board has to fit the
+			 * room it is read in. There is no ceiling of ours in it any more — a width that
+			 * *was* asked for is used at any size, and 1200 is advice in the note below.
 			 */
 			const view = viewport();
-			const width = boardWidth(options.w, view?.width, template, format);
+			const width = boardWidth(options.w, view?.width, format);
 			const path = service.newBoard({
 				title,
-				template,
 				format,
 				size: { w: width, ...(options.h ? { h: options.h } : {}) },
 			});

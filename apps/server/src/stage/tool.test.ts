@@ -114,7 +114,7 @@ function toolOn(camera: Camera) {
 
 test("newBoard says how much room the canvas has, after the path it returns", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	const result = await tool.run(`return await stage.newBoard({ title: "Sizing", kind: "answer" })`);
+	const result = await tool.run(`return await stage.newBoard({ title: "Sizing" })`);
 
 	assert.equal(result.isError, false);
 	const lines = result.text.split("\n");
@@ -125,7 +125,7 @@ test("newBoard says how much room the canvas has, after the path it returns", as
 
 test("with no reading from a browser, it says nothing rather than making a number up", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-	const result = await tool.run(`return await stage.newBoard({ title: "Sizing", kind: "answer" })`);
+	const result = await tool.run(`return await stage.newBoard({ title: "Sizing" })`);
 
 	assert.equal(/viewport \d+/.test(result.text), false, "no measurement, because nobody took one");
 	// The *advice* is still said, because it still applies: a board nobody is looking at is
@@ -144,26 +144,26 @@ test("with no reading from a browser, it says nothing rather than making a numbe
  * the screen rather than a limit being enforced. So what is asserted is the shape of the
  * default and the fact that an explicit width is never touched.
  */
-test("a default width is the shape's own, or the screen when the screen is smaller", async () => {
+test("a default width is the format's own, or the screen when the screen is smaller", async () => {
 	/** The width the file was written with — the only place a board's size lives. */
 	const widthOf = (text: string) => Number(/"w":(\d+)/.exec(text)?.[1]);
 
 	const wide = toolOn({ x: 0, y: 0, zoom: 1, width: 1920, height: 1080 });
-	const onWide = await wide.tool.run(`return await stage.newBoard({ title: "Wide", kind: "report" })`);
-	assert.equal(widthOf(wide.read("boards/wide.html")), 1200, "the shape's own width, on a screen with room to spare");
-	assert.match(onWide.text, /board width 1200/);
+	const onWide = await wide.tool.run(`return await stage.newBoard({ title: "Wide" })`);
+	assert.equal(widthOf(wide.read("boards/wide.html")), 880, "the format's own width, on a screen with room to spare");
+	assert.match(onWide.text, /board width 880/);
 	wide.cleanup();
 
 	const phone = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
-	const onPhone = await phone.tool.run(`return await stage.newBoard({ title: "Phone", kind: "report" })`);
+	const onPhone = await phone.tool.run(`return await stage.newBoard({ title: "Phone" })`);
 	assert.equal(widthOf(phone.read("boards/phone.html")), 390, "the screen, when the screen is smaller");
 	assert.match(onPhone.text, /board width 390 — keep a board under 1200/);
 	phone.cleanup();
 
-	// A huge screen is not an invitation: the shape's own width is still the answer.
+	// A huge screen is not an invitation: the format's own width is still the answer.
 	const huge = toolOn({ x: 0, y: 0, zoom: 1, width: 3840, height: 2160 });
-	await huge.tool.run(`return await stage.newBoard({ title: "Huge", kind: "report" })`);
-	assert.equal(widthOf(huge.read("boards/huge.html")), 1200);
+	await huge.tool.run(`return await stage.newBoard({ title: "Huge" })`);
+	assert.equal(widthOf(huge.read("boards/huge.html")), 880);
 	huge.cleanup();
 
 	/*
@@ -172,7 +172,7 @@ test("a default width is the shape's own, or the screen when the screen is small
 	 * narrow one; a caller who means 1800 has a reason that cannot be seen from in there.
 	 */
 	const asked = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
-	await asked.tool.run(`return await stage.newBoard({ title: "Asked", kind: "report", w: 1800 })`);
+	await asked.tool.run(`return await stage.newBoard({ title: "Asked", w: 1800 })`);
 	assert.equal(widthOf(asked.read("boards/asked.html")), 1800);
 	asked.cleanup();
 });
@@ -185,7 +185,7 @@ test("the viewport is the canvas in pixels, not divided by the zoom", async () =
 
 test("the note is per run: a call that did not start a board carries no viewport line", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
-	await tool.run(`return await stage.newBoard({ title: "One", kind: "blank" })`);
+	await tool.run(`return await stage.newBoard({ title: "One" })`);
 	const second = await tool.run(`return (await stage.boards()).length`);
 
 	assert.equal(second.text.includes("viewport"), false);
@@ -380,7 +380,7 @@ test("a format reaches the service, and decides the file", async () => {
 	assert.match(deck.text, /board width 960/, "a deck opens 1:1 with a slide's own layout");
 
 	// Nothing said is a component board, which is what every board was before formats.
-	const board = await tool.run(`return await stage.newBoard({ title: "Ordinary", kind: "answer" })`);
+	const board = await tool.run(`return await stage.newBoard({ title: "Ordinary" })`);
 	assert.match(board.text.split("\n")[0] ?? "", /boards\/ordinary\.html/);
 	cleanup();
 });
@@ -397,13 +397,14 @@ test("an unknown format is refused by name rather than quietly becoming a board"
 	cleanup();
 });
 
-test("a shape asked for alongside a format that has none is said, not silently dropped", async () => {
+test("a shape asked for is answered with a blank board, and the note says so", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
 	const result = await tool.run(`return await stage.newBoard({ title: "Talk", format: "slides", kind: "report" })`);
 
 	assert.equal(result.isError, false);
-	// There is no report-flavoured slide deck; a deck is already the shape it is.
-	assert.match(result.text, /a slides board has no template shape — report was ignored/);
+	// Templates are gone: every board starts blank, whatever shape was asked for, and the
+	// agent is told rather than left wondering what happened to the shape.
+	assert.match(result.text, /there are no templates any more/);
 	cleanup();
 });
 

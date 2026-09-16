@@ -10,10 +10,13 @@ description: How to write a board — its format and lifecycle, the rules for co
 - **Single HTML File:** Boards are standalone documents declaring their format via the `<body>`
   class: `class="board"` (absolute positioned boxes), `class="board flow"` (single reflowing document
   via `.doc`), or `class="reveal"` (slides named `*.slides.html`).
-- **Creation & Sizing:** Initialize via `stage.newBoard({ title, kind, format })`. Keep boards under
-  ~1200px wide (matching viewport) to avoid downscaling. Use `stage.fit(path)` post-render to take
-  the content's height; the width is left as it is, and `stage.resize(path, { w, h })` sets a size
-  directly.
+- **Creation & Sizing:** Initialize via `stage.newBoard({ title, format })`. Every new board is
+  blank — a heading and nothing else — because a served shape decided too much of the board
+  before the writer had a sentence. For what a finished board can look like, read the worked
+  examples the app copies into `examples/` on every restart and borrow their structure. Keep
+  boards under ~1200px wide (matching viewport) to avoid downscaling. Use `stage.fit(path)`
+  post-render to take the content's height; the width is left as it is, and
+  `stage.resize(path, { w, h })` sets a size directly.
 - **Layout Order:** Match DOM order strictly to visual reading order (top-to-bottom, left-to-right).
   Standardize section headings using `<h3 class="text">` with approved tags: *Summary, Overview,
   Problem, Research question, Method, Result, Todos, Next*.
@@ -46,7 +49,10 @@ description: How to write a board — its format and lifecycle, the rules for co
   naming `d3`, `three` (with `three/addons/`), `gsap` and `chart.js` pinned on jsDelivr. Edit it for
   anything else, and reach for a library with `const d3 = await import("d3")` where you draw, on
   `board:ready` if the layout has to be settled. Import inside the code path that needs it rather
-  than at the top of a module, so a board that never gets there pays nothing.
+  than at the top of a module, so a board that never gets there pays nothing. **Nine worked
+  examples show these in use — read `examples/` in the deck and copy their moves.** The three that
+  cover the map: `architecture-map.html` (d3 force), `sample-space.html` (three), and
+  `build-dashboard.html` (chart.js + gsap).
 - **Title: the finding, not the topic.** The title comes from `stage.newBoard({ title })`. Write it
   as a statement ("Returning customer share fell after the second tab shipped"), never a question.
 - **A plot says what it shows, and what its axes are.** Give it a title of its own, both axes, a tick

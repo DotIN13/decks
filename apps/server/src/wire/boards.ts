@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { isBoardFormat, isBoardTemplate } from "../boards/templates.ts";
+import { isBoardFormat } from "../boards/templates.ts";
 import type { WirePart } from "./context.ts";
 
 /**
@@ -140,14 +140,12 @@ export const boards = {
 	 * agent's context — so the agent you are talking to can see the thing you just
 	 * made without being told about it.
 	 *
-	 * An unknown `kind` becomes `blank` rather than an error. This arrives from a
-	 * button today, and the worst outcome of a bad template name should be an empty
-	 * board rather than a refusal.
+	 * An unknown `kind` and an unknown `format` are the same bargain: the worst outcome of a
+	 * bad name should be an empty board rather than a refusal, and every board is blank
+	 * anyway — the `kind` left over from when there were templates is ignored, whatever it
+	 * says, and a format that is not one of the three becomes a component board.
 	 */
 	"board.create": (message, reply, wire) => {
-		const template = isBoardTemplate(message.kind) ? message.kind : "blank";
-		// An unknown format is component, for the same reason an unknown template is
-		// blank: the worst outcome of a typo should be an ordinary empty board.
 		const format = isBoardFormat(message.format) ? message.format : "component";
 		/*
 		 * A title, a size and a place when the browser has something to put on the board: a
@@ -160,7 +158,7 @@ export const boards = {
 		const w = bounded(message.size?.w, 320, 2400);
 		const h = bounded(message.size?.h, 240, 4000);
 		const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
-		const path = wire.boards.newBoard({ title, template, format, ...(size ? { size } : {}) });
+		const path = wire.boards.newBoard({ title, format, ...(size ? { size } : {}) });
 		const agent = wire.agents.focused();
 		agent.setInPlay([...agent.inPlay, path]);
 		if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
