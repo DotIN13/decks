@@ -130,6 +130,29 @@ const handleAt = (wanted) =>
 		};
 	}, wanted);
 
+/*
+ * And no board's node draws text of its own that came from the source.
+ *
+ * This is the one place a mistake of this kind can be caught, and it took a person looking at the canvas
+ * to find it: a `/* … *\/` written in the **children** position of JSX is not a comment, it is text — and
+ * it is *valid* JSX, so `tsc` is happy and esbuild strips it. This app compiles JSX with Solid's preset,
+ * which does not, so ninety words of a source file rendered as a text node inside every `.board-node` and
+ * sat under eight boards. Nothing in the toolchain objects. The DOM does.
+ */
+const stray = await page.evaluate(() => {
+	const found = [];
+	for (const el of document.querySelectorAll("*")) {
+		if (el.tagName === "STYLE" || el.tagName === "SCRIPT") continue;
+		for (const child of el.childNodes) {
+			if (child.nodeType === 3 && (child.textContent ?? "").includes("/*")) {
+				found.push(`${el.tagName.toLowerCase()}.${(el.className || "").toString().split(" ")[0]}: ${(child.textContent ?? "").replace(/\s+/g, " ").slice(0, 60)}`);
+			}
+		}
+	}
+	return found;
+});
+say("no comment from a source file is drawn on the canvas", stray.length === 0, stray.slice(0, 2).join(" | "));
+
 const both = await handleAt(componentPath);
 say(
 	"selecting a board puts a square handle on its bottom-right corner",

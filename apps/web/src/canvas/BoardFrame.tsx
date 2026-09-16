@@ -1130,23 +1130,31 @@ export function BoardFrame(props: {
 				)}
 			</Show>
 
-			/*
+			{/*
 			 * The resize handle, on the selected board — **one handle, every kind of document**.
 			 *
-			 * Selected rather than hovered: there is a *write* at the end of this, and the board a
-			 * press is about to rewrite is not the same claim as the one a pointer happens to be
-			 * over. Selection in this app already means "the board you are working on" — the
-			 * inspector is showing it, the bar's focus and fullscreen buttons act on it — and a
-			 * handle belongs to that sentence rather than to a passing cursor.
+			 * Selected rather than hovered: there is a *write* at the end of this, and the board a press is
+			 * about to rewrite is not the same claim as the one a pointer happens to be over. Selection in
+			 * this app already means "the board you are working on" — the inspector is showing it, the bar's
+			 * focus and fullscreen buttons act on it — and a handle belongs to that sentence rather than to
+			 * a passing cursor.
 			 *
-			 * It used to be a square on a component board and a long flat bar on a flow document or a
-			 * slide deck, on the theory that the shape would say how many dimensions the drag would
-			 * write. It made the handle a *different object* per format for a difference that is not
-			 * the handle's to express: a flow document's height is its content's and a deck's is its
-			 * aspect's, so those two drags write the width — and that is decided by the server, which
-			 * is the only thing that knows what the file can hold. What the handle says is *where the
-			 * resize is*, which is the bottom-right corner in every case.
+			 * It used to be a square on a component board and a long flat bar on a flow document or a slide
+			 * deck, on the theory that the shape would say how many dimensions the drag would write. It made
+			 * the handle a *different object* per format for a difference that is not the handle's to
+			 * express: a flow document's height is its content's and a deck's is its aspect's, so those two
+			 * drags write the width — and that is decided by the server, which is the only thing that knows
+			 * what the file can hold. What the handle says is *where the resize is*, which is the
+			 * bottom-right corner in every case.
+			 *
+			 * The braces are load-bearing, and this is worth knowing before adding another comment here: a
+			 * block comment written in the **children** position of JSX is not a comment, it is text. It is
+			 * also valid JSX, so the type checker is happy and esbuild strips it — and Solid's compiler, which
+			 * is what runs in this app, renders it as a text node. This one put ninety words of source under
+			 * eight boards on the canvas. `e2e/checks/geometry.mjs` asserts that nothing drawn on the canvas
+			 * came out of a source comment, because the DOM is the only place this is catchable.
 			 */
+			}
 			<Show when={props.onResize && props.selected}>
 				<div
 					class="sizer"
