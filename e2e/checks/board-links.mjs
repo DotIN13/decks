@@ -167,6 +167,32 @@ await settle(page, 1200);
 const edited = await onCanvas();
 say("in edit mode a link is part of the component, and does nothing", !edited.includes(LINKED), edited.join(" "));
 
+// --- and from a presented board ---------------------------------------------------------
+
+/*
+ * The overlay draws its own frame rather than a `BoardFrame`, so it wires the same ask up
+ * itself (`Present.tsx`) — and a board opened there has to end the presentation, because the
+ * canvas it lands on is underneath the overlay.
+ */
+await editMode(page, false);
+link.send({ type: "board.hide", path: LINKED });
+await settle(page, 500);
+await focus(SOURCE);
+const presented = await page.evaluate((wanted) => {
+	const button = document.querySelector(`.board-node[data-path="${wanted}"] .chrome .present-open`);
+	if (!button) return false;
+	button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+	button.click();
+	return true;
+}, SOURCE);
+await settle(page, 900);
+const overlay = await page.evaluate(() => Boolean(document.querySelector(".present")));
+await page.frameLocator(".present .present-frame").locator('a[href="risks.html"]').click();
+await settle(page, 1000);
+const closed = await page.evaluate(() => !document.querySelector(".present"));
+const landed = (await onCanvas()).includes(LINKED);
+say("a link on a presented board opens it, and ends the presentation", presented && overlay && closed && landed, JSON.stringify({ presented, overlay, closed, landed }));
+
 link.close();
 say("no console errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 await browser.close();
