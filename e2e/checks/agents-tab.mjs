@@ -12,6 +12,10 @@
  * minutes per assertion, and which cannot be produced on demand at all. The tag *rules* are
  * unit-tested in `agents/tags.ts`; what a browser is needed for is whether the rows draw
  * them, and whether the customise popup reaches the server.
+ *
+ * Two things about the list itself are pinned here as well, because they are decisions rather
+ * than accidents: **the axis it opens on** (workspace), and **the order of the headings and the
+ * rows inside them** (the names, A to Z, and the time each agent last said something).
  */
 import { open, say, settle } from "../harness.mjs";
 
@@ -167,6 +171,31 @@ if (!shown) await page.locator('[aria-label*="boards panel" i]').first().click()
 await page.waitForSelector(".panel-shell", { timeout: 5000 });
 await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 500);
+
+/*
+ * What the panel opens on, before a single control is pressed: the **workspace** axis.
+ *
+ * The question a panel of a dozen agents is usually opened with is which project somebody is
+ * on, and a project heading is a place that stays where it is while turns start and end. None
+ * of these five has declared a project yet, so the whole list is one heading, `No workspace` —
+ * which is itself worth asserting: the heading has to exist, or these agents would go missing
+ * by not having been told something.
+ */
+const opened = await page.evaluate(() => ({
+	axis: [...document.querySelectorAll(".panel-foot .seg[data-seg='agents'] button")].map((button) => `${button.textContent?.trim()}${button.dataset.on === "true" ? "*" : ""}`),
+	sections: [...document.querySelectorAll(".panel-section")].map((one) => `${one.dataset.kind}:${one.querySelectorAll(".agent-row").length}`),
+	label: document.querySelector(".panel-meta > span")?.textContent,
+}));
+say("the agents list opens cut by workspace", JSON.stringify(opened.axis) === JSON.stringify(["Attention", "Workspace*"]), JSON.stringify(opened.axis));
+say(
+	"…which is one heading here, since none of these five has a project",
+	JSON.stringify(opened.sections) === JSON.stringify(["unfiled:5"]) && opened.label === "No workspace",
+	JSON.stringify([opened.sections, opened.label]),
+);
+
+/* The other axis is one press away, and the rest of this section is about it. */
+await page.locator(".panel-foot .seg[data-seg='agents'] button", { hasText: /^Attention$/ }).click();
+await settle(page, 400);
 
 const panel = await page.evaluate(() => ({
 	sections: [...document.querySelectorAll(".panel-section")].map((section) => `${section.dataset.kind}:${section.querySelectorAll(".agent-row").length}`),
@@ -394,7 +423,7 @@ for (const [id, name, tags, workspace] of [
 await settle(page, 500);
 
 const attention = await page.evaluate(() => [...document.querySelectorAll(".panel-section")].map((one) => one.dataset.kind));
-say("attention is the default, before anybody asks for the other axis", JSON.stringify(attention) === JSON.stringify(["wants", "working", "quiet"]), JSON.stringify(attention));
+say("the attention axis is still the one that was asked for", JSON.stringify(attention) === JSON.stringify(["wants", "working", "quiet"]), JSON.stringify(attention));
 /* The chip is drawn in both groupings: a fact about an agent is not a decoration of the
    section it happens to be under, and in this one the heading says nothing about a project. */
 const chipped = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => `${row.querySelector(".lb")?.textContent}:${row.querySelector(".tag.ws")?.textContent ?? "-"}`));
@@ -413,23 +442,59 @@ const filed = await page.evaluate(() => {
 	}));
 });
 /*
- * The focused agent's project first whatever its size, then the biggest, then the name — and
- * `No workspace` last, which is where an agent nobody has told about a project belongs. That
- * last heading is the one that has to exist: a list that hid them would be a list an agent can
- * vanish from by not being told something.
+ * **Alphabetical, and the focused agent does not lead.** Ada is focused and is in
+ * `political-llm`, which sorts second here; a heading that moved to the front for being the
+ * conversation on screen would move again every time an agent is switched.
+ *
+ * `No workspace` is last, which is where an agent nobody has told about a project belongs. That
+ * heading is the one that has to exist: a list that hid them would be a list an agent can vanish
+ * from by not being told something.
  */
 say(
-	"…and by workspace: three sections, the focused agent's project first",
-	JSON.stringify(filed.map((one) => one.label)) === JSON.stringify(["political-llm", "irb-84069", "No workspace"]),
+	"…and by workspace: three sections, in the order of their names",
+	JSON.stringify(filed.map((one) => one.label)) === JSON.stringify(["irb-84069", "political-llm", "No workspace"]),
 	JSON.stringify(filed.map((one) => one.label)),
 );
-say("…with the rows in urgency order inside a heading", JSON.stringify(filed[0]?.rows) === JSON.stringify(["Ada", "Pi"]), JSON.stringify(filed[0]?.rows));
+say("…with the focused agent's project second, where its name puts it", filed[1]?.label === "political-llm", JSON.stringify(filed.map((one) => one.label)));
+say("…the rows in the order they last said something", JSON.stringify(filed[1]?.rows) === JSON.stringify(["Ada", "Pi"]), JSON.stringify(filed[1]?.rows));
 say(
 	"…and the heading says who needs you, which the heading itself does not",
-	filed[0]?.note === "2 working" && filed[1]?.note === null && filed[2]?.note === "1 wants you",
+	filed[0]?.note === null && filed[1]?.note === "2 working" && filed[2]?.note === "1 wants you",
 	JSON.stringify(filed.map((one) => one.note)),
 );
 say("…and nothing is lost in the count", filed.reduce((sum, one) => sum + Number(one.count), 0) === 5, JSON.stringify(filed.map((one) => one.count)));
+
+/*
+ * **A message moves a row, and nothing else does.** Basil is dormant and Iris has been waiting
+ * for a minute and a half; both are in `No workspace`. Give Basil a fresh message and it leads
+ * the heading while Iris, the one that needs an answer, stays under it — with the heading saying
+ * so. That is the rule the row order follows, and it is not urgency: a row moves when its agent
+ * says something, not when it opens a tool or changes state.
+ */
+await feed({
+	type: "agents",
+	defaultKind: "pi",
+	focused: "a1",
+	chats: [
+		chat("a1", "Ada", "claude", "tool", "Reading panel.css", 4_000),
+		chat("a2", "Pi", "pi", "streaming", "Writing the report", 20_000),
+		chat("a3", "Iris", "claude", "waiting", "Allow this command?", 90_000),
+		chat("a4", "Wren", "pi", "idle", "Done, 12 boards measured", 900_000),
+		chat("a5", "Basil", "claude", "idle", "Just arrived", 1_000, { dormant: true }),
+	],
+});
+await settle(page, 500);
+
+const moved = await page.evaluate(() =>
+	[...document.querySelectorAll(".panel-section")].map((section) => ({
+		label: section.querySelector(".panel-meta > span")?.textContent,
+		note: section.querySelector(".panel-meta .note")?.textContent ?? null,
+		rows: [...section.querySelectorAll(".agent-row")].map((row) => row.querySelector(".lb")?.textContent),
+	})),
+);
+const loose = moved.find((one) => one.label === "No workspace");
+say("a new message moves a row to the top of its heading", JSON.stringify(loose?.rows) === JSON.stringify(["Basil", "Iris"]), JSON.stringify(loose?.rows));
+say("…while the one waiting stays where it is, and the heading still says so", loose?.note === "1 wants you", JSON.stringify(loose?.note));
 
 /* Searching by project works in either grouping — which is what makes it a way to *find* one. */
 await page.locator(".panel-shell input").first().fill("irb");

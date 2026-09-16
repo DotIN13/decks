@@ -32,15 +32,19 @@ export type AgentSectionKind = "wants" | "working" | "quiet" | "workspace" | "un
 /**
  * How the list is cut up.
  *
- * **Attention** is what a panel of agents is for and stays the default: a list you open when
- * you want to know who needs you. **Workspace** answers the other question — who is on this
- * project — and it is a *second* answer rather than a replacement, because the two are read at
- * different times and neither is derivable from the other.
+ * **Workspace** is the default: the question a panel of a dozen agents is opened with is
+ * usually which project somebody is on, and a project is a stable thing to look for where
+ * "who needs you" is a ranking that moves under the reader as turns start and end. Urgency is
+ * not lost with the headings — every workspace heading carries its own note (`2 want you`) and
+ * every row carries its state — and the attention axis is one press away in the foot.
  *
- * Inside a workspace section the rows are still in urgency order, so switching axes loses the
- * headings and not the ranking.
+ * **Attention** is the other answer: the same agents cut into waiting, working and quiet. The
+ * two are read at different times and neither is derivable from the other.
+ *
+ * Inside a section, either way, the rows are in the order they last *said* something — see
+ * `byRecency` — so the axis changes the headings and not the ranking.
  */
-export type AgentGroup = "attention" | "workspace";
+export type AgentGroup = "workspace" | "attention";
 
 export interface AgentRow {
 	/**
@@ -169,7 +173,18 @@ export function agentSections(input: AgentListInput): AgentSection[] {
 }
 
 /**
- * Most recent first, which is all there is to rank by inside one heading.
+ * Newest message first, which is the row order under **both** axes.
+ *
+ * `lastAt` is the time of the last thing the agent said, not the time of the last write
+ * (`protocol/chat.ts` says so on the field, and the server keeps it on the transcript for
+ * exactly this reason). So a row moves to the top of its section when it says something, and
+ * not when it opens a tool, changes state or has its tags edited — which is what the user
+ * asked the list to be ordered by, and what stops the list re-sorting itself for reasons
+ * nobody watching it can see.
+ *
+ * It is deliberately *not* urgency: an idle agent that spoke ten seconds ago leads a waiting
+ * one that has said nothing for an hour, in a group whose heading already says somebody is
+ * waiting. Two orderings would be two answers to one question.
  *
  * An agent that has never run sorts last rather than first: `lastAt` absent is not "now", and
  * a chat nobody has said anything to is not the newest thing that happened.
@@ -179,22 +194,21 @@ const byRecency = (a: AgentRow, b: AgentRow) => (b.chat.lastAt ?? 0) - (a.chat.l
 /**
  * The same list, cut by workspace instead of by urgency.
  *
- * Three rules, and each is a decision rather than an accident:
+ * **Alphabetical, and nothing else.** A heading's position is a place, not a rank: the whole
+ * point of grouping by project is that the project you are looking for is always in the same
+ * place, and a rule that moved a group (because it is the focus, or because it grew) would make
+ * the reader re-find it every time an agent started or stopped. So the order is the order of the
+ * names, and it does not depend on who is focused, who is busy or how many are in each.
  *
- * - **The focused agent's workspace comes first**, whatever its size. The panel is beside the
- *   conversation you are in, so the group you are in is the one you are most likely to be
- *   looking for — and it is the only heading whose position does not change as other agents
- *   start and stop.
- * - Then the biggest, then alphabetically. Size is the answer to "where is everybody"; the name
- *   is the tie-break, so two groups of two do not swap places between renders.
- * - **`No workspace` is last, and always drawn** when anybody is in none. A section that
- *   appears and disappears as agents declare themselves would move every row under it, and an
- *   agent in no workspace is a fact the list should be able to state — it is where the ones that
- *   have not been told about any project are.
+ * `No workspace` is **last, and always drawn** when anybody is in none. Last because it is not a
+ * project and has no place in the alphabet of them; always, because a section that appears and
+ * disappears as agents declare themselves would move every row under it, and an agent in no
+ * workspace is a fact the list should be able to state. It is where the ones nobody has told
+ * about a project are, which is the common state rather than an error.
  *
- * Rows inside a section keep urgency order, so switching axes loses the headings and not the
- * ranking. The `note` is what puts urgency back into the heading: a group with somebody waiting
- * in it says so, without the rows having to be read.
+ * Rows inside a section are in the order they last said something, exactly as they are under the
+ * attention axis — see `byRecency`. The `note` is what puts urgency back into the heading: a
+ * group with somebody waiting in it says so, without the rows having to be read.
  */
 function workspaceSections(rows: AgentRow[]): AgentSection[] {
 	const groups = new Map<string, AgentRow[]>();
@@ -205,15 +219,10 @@ function workspaceSections(rows: AgentRow[]): AgentSection[] {
 		else groups.set(name, [row]);
 	}
 
-	const mine = rows.find((row) => row.current)?.workspace;
-	const named = [...groups.entries()]
-		.filter(([name]) => name)
-		.sort(([left, a], [right, b]) => {
-			if (left === mine) return -1;
-			if (right === mine) return 1;
-			return b.length - a.length || left.localeCompare(right);
-		})
-		.map(([name, group]) => section("workspace", `ws:${name}`, name, group));
+	const named = [...groups.keys()]
+		.filter((name) => name)
+		.sort((left, right) => left.localeCompare(right))
+		.map((name) => section("workspace", `ws:${name}`, name, groups.get(name) ?? []));
 
 	const loose = groups.get("");
 	return loose ? [...named, section("unfiled", "ws:", "No workspace", loose)] : named;

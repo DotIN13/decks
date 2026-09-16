@@ -166,7 +166,8 @@ export function LeftPanel(props: {
 	/** Move an agent into a workspace, or out of one with `null`. */
 	onAgentWorkspace?: (id: string, workspace: string | null) => void;
 	/**
-	 * Which axis the agents list is cut by — see `AgentGroup`. Uncontrolled when absent.
+	 * Which axis the agents list is cut by — see `AgentGroup`. Uncontrolled when absent, and
+	 * **workspace** is what it opens on.
 	 *
 	 * A preference rather than state that belongs to a caller, on the same terms as `density`:
 	 * it is how this list draws itself, and the panel is the only thing that reads it. It is
@@ -178,7 +179,11 @@ export function LeftPanel(props: {
 }) {
 	const ids = createUniqueId();
 	const [ownDensity, setOwnDensity] = createSignal<Density>("list");
-	const [ownGroup, setOwnGroup] = createSignal<AgentGroup>("attention");
+	/*
+	 * Workspace, which is the axis this list opens on. `AgentGroup` argues it: a project is a
+	 * place you look for, and "who needs you" is a ranking that moves as turns start and end.
+	 */
+	const [ownGroup, setOwnGroup] = createSignal<AgentGroup>("workspace");
 	const [query, setQuery] = createSignal("");
 	const [tab, setTab] = createSignal<PanelTab>("boards");
 	const sheet = createSheet();

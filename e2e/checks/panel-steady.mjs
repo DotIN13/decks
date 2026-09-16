@@ -107,6 +107,17 @@ await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 400);
 
 /*
+ * The **attention** axis, which is now the second press rather than the first.
+ *
+ * What this check is about is what a state change costs the DOM, and the interesting case is one
+ * that moves a row between headings. Under the workspace axis, which the panel opens on, none of
+ * these agents has a project, so they are all in one heading and no state change can move
+ * anything. The workspace case is measured lower down, on purpose.
+ */
+await page.locator(".panel-foot .seg[data-seg='agents'] button", { hasText: /^Attention$/ }).click();
+await settle(page, 400);
+
+/*
  * The whole measurement happens inside the page, in one place, for one reason: an element is
  * not something that can be handed back over `page.evaluate`. Every question below is about
  * *which* element, so the references stay here and only the verdicts come out.
