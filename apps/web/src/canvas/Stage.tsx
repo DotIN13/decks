@@ -579,9 +579,21 @@ export function Stage(props: {
 		const mine = ++glideToken;
 		const at = performance.now();
 		setGliding(true);
-		const step = (now: number) => {
+		/*
+		 * `performance.now()`, not the timestamp `requestAnimationFrame` hands the callback.
+		 *
+		 * They are different clocks, and `at` above is a `performance.now()`. The frame's own
+		 * timestamp is when the frame *started*, which is routinely **before** the moment the press
+		 * that started this glide was handled — a press arrives during a frame. So `now - at` came out
+		 * negative on the first frame, the number was clamped to zero, and the move spent its first
+		 * frames re-drawing where it already was: on a loaded machine that cost 20% of the travel,
+		 * measured — the camera sat at the start for 50ms and then finished late. It was invisible in
+		 * a frame-by-frame assertion, which is happy to see *some* intermediate value, and obvious in
+		 * a chart of the curve the samples were supposed to be on.
+		 */
+		const step = () => {
 			if (mine !== glideToken) return;
-			const t = Math.min(1, (now - at) / ms);
+			const t = Math.min(1, (performance.now() - at) / ms);
 			writeCamera(t >= 1 ? to : between(from, to, easeOutCubic(t)));
 			if (t >= 1) {
 				glideRaf = undefined;
