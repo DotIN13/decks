@@ -213,8 +213,24 @@ try {
 	say("a press on bare canvas lets it go too", await gone(), JSON.stringify(bare));
 
 	await pick("note");
-	await page.locator(`.board-node[data-path="${path}"] .chrome`).click({ position: { x: 30, y: 8 } });
-	say("…as does a press on the board's own title", await gone());
+	const bar = await page.locator(`.board-node[data-path="${path}"] .chrome`).boundingBox();
+	await page.mouse.click(bar.x + 30, bar.y + 8);
+	/*
+	 * The detail names what the press actually landed on, because this one assertion fails in a full-suite
+	 * run and passes alone: it is order-dependent, so the useful question is not "did the inspector close"
+	 * but "what was under the pointer" — and `elementFromPoint` is the only thing that answers it.
+	 */
+	const under = await page.evaluate(([x, y]) => {
+		const el = document.elementFromPoint(x, y);
+		if (!el) return "nothing";
+		const id = el.closest("[data-id]")?.getAttribute("data-id");
+		return `${el.tagName.toLowerCase()}.${(el.className || "").toString().split(" ")[0]}${id ? ` in [data-id=${id}]` : ""}`;
+	}, [bar.x + 30, bar.y + 8]);
+	say(
+		"…as does a press on the board's own title",
+		await gone(),
+		JSON.stringify({ bar, under, inspectors: await inspector.count(), nodes: await page.locator(".board-node").count(), selected: await page.locator(".board-node[data-selected='true']").count() }),
+	);
 
 	/*
 	 * And the panel itself does not, which is the constraint the other three are bounded

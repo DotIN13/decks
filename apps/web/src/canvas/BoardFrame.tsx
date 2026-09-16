@@ -837,7 +837,13 @@ export function BoardFrame(props: {
 			*/}
 			<div
 				class="chrome"
-				style={{ "--zoom": zoom(), width: `${props.board.w}px` }}
+				/*
+				 * The size being dragged, like the node and the surface — not the record's, which is the
+				 * size the *file* still holds. The bar is the board's own width, so it is the most visible
+				 * thing about a resize: leaving it on `props.board.w` meant the board grew and its title
+				 * stayed behind, a bar hanging over 60 pixels of nothing until the write landed.
+				 */
+				style={{ "--zoom": zoom(), width: `${(sizing()?.w ?? props.board.w)}px` }}
 				onPointerDown={startDrag}
 				onDblClick={() => props.onOpen()}
 			>
@@ -1125,7 +1131,7 @@ export function BoardFrame(props: {
 			</Show>
 
 			/*
-			 * The resize handle, on the selected board.
+			 * The resize handle, on the selected board — **one handle, every kind of document**.
 			 *
 			 * Selected rather than hovered: there is a *write* at the end of this, and the board a
 			 * press is about to rewrite is not the same claim as the one a pointer happens to be
@@ -1133,9 +1139,13 @@ export function BoardFrame(props: {
 			 * inspector is showing it, the bar's focus and fullscreen buttons act on it — and a
 			 * handle belongs to that sentence rather than to a passing cursor.
 			 *
-			 * Drawn as a bar rather than a square for a flow document and a slide deck, because
-			 * those have one dimension to give: their height is the content's or the aspect's. The
-			 * shape says which drag is about to start, so nothing has to explain it.
+			 * It used to be a square on a component board and a long flat bar on a flow document or a
+			 * slide deck, on the theory that the shape would say how many dimensions the drag would
+			 * write. It made the handle a *different object* per format for a difference that is not
+			 * the handle's to express: a flow document's height is its content's and a deck's is its
+			 * aspect's, so those two drags write the width — and that is decided by the server, which
+			 * is the only thing that knows what the file can hold. What the handle says is *where the
+			 * resize is*, which is the bottom-right corner in every case.
 			 */
 			<Show when={props.onResize && props.selected}>
 				<div
@@ -1147,7 +1157,6 @@ export function BoardFrame(props: {
 					 * every step of a pinch; the bar writes it on itself for the same reason.
 					 */
 					style={{ "--zoom": zoom() }}
-					data-axis={props.board.format === "component" ? "both" : "width"}
 					role="separator"
 					aria-label={`Resize ${props.board.title}`}
 					title="Drag to resize this board"

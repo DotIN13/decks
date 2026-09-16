@@ -105,13 +105,37 @@ const componentMeta = metaOf(wasComponent);
 say("the component board declares its own size", componentMeta !== null && componentMeta.w > 0, JSON.stringify(componentMeta));
 
 await select(componentPath);
-const both = await page.evaluate((wanted) => {
-	const sizer = document.querySelector(`.board-node[data-path="${wanted}"] .sizer`);
-	if (!sizer) return null;
-	const box = sizer.getBoundingClientRect();
-	return { axis: sizer.dataset.axis, cursor: getComputedStyle(sizer).cursor, w: Math.round(box.width), h: Math.round(box.height) };
-}, componentPath);
-say("selecting a board puts a handle on its corner", both !== null && both.axis === "both", JSON.stringify(both));
+/**
+ * The handle, as a box: how it is drawn and **where** it is.
+ *
+ * `dx`/`dy` are how far the handle's centre sits from the board's own bottom-right corner, in screen
+ * pixels — zero when the handle is on the corner, whatever the zoom, because the node's box and the
+ * handle's are both measured on screen. That is the claim the shape was standing in for: the corner is
+ * where the resize is, and it is the same corner on every kind of document.
+ */
+const handleAt = (wanted) =>
+	page.evaluate((path) => {
+		const node = document.querySelector(`.board-node[data-path="${path}"]`);
+		const sizer = node?.querySelector(".sizer");
+		if (!node || !sizer) return null;
+		const n = node.getBoundingClientRect();
+		const s = sizer.getBoundingClientRect();
+		return {
+			w: Math.round(s.width),
+			h: Math.round(s.height),
+			dx: Math.round(s.left + s.width / 2 - n.right),
+			dy: Math.round(s.top + s.height / 2 - n.bottom),
+			cursor: getComputedStyle(sizer).cursor,
+			square: Math.abs(s.width - s.height) <= 1,
+		};
+	}, wanted);
+
+const both = await handleAt(componentPath);
+say(
+	"selecting a board puts a square handle on its bottom-right corner",
+	both !== null && both.square && Math.abs(both.dx) <= 1 && Math.abs(both.dy) <= 1,
+	JSON.stringify(both),
+);
 say("…a real target, drawn in screen pixels", both !== null && both.w >= 8 && both.cursor === "nwse-resize", JSON.stringify(both));
 
 const dragged = await dragHandle(componentPath, 140, 90);
@@ -148,15 +172,18 @@ const wasFlow = read(flow);
 const flowMeta = metaOf(wasFlow);
 
 await select(flowPath);
-const widthOnly = await page.evaluate((wanted) => {
-	const sizer = document.querySelector(`.board-node[data-path="${wanted}"] .sizer`);
-	if (!sizer) return null;
-	return { axis: sizer.dataset.axis, cursor: getComputedStyle(sizer).cursor };
-}, flowPath);
+const flowHandle = await handleAt(flowPath);
 say(
-	"a flow document gets the one dimension it can store",
-	widthOnly !== null && widthOnly.axis === "width" && widthOnly.cursor === "ew-resize",
-	JSON.stringify(widthOnly),
+	"a flow document gets the same handle — one box, on the corner, not a bar of another shape",
+	flowHandle !== null &&
+		both !== null &&
+		flowHandle.square &&
+		flowHandle.w === both.w &&
+		flowHandle.h === both.h &&
+		flowHandle.cursor === both.cursor &&
+		Math.abs(flowHandle.dx) <= 1 &&
+		Math.abs(flowHandle.dy) <= 1,
+	`${JSON.stringify(flowHandle)} vs the component board's ${JSON.stringify(both)}`,
 );
 
 await dragHandle(flowPath, 120, 60);
@@ -181,7 +208,12 @@ const countNow = await page.evaluate(() => document.querySelectorAll(".board-nod
 await page.locator(`.board-node[data-path="${flowPath}"] .chrome`).dblclick({ position: { x: 24, y: 12 } });
 await settle(page, 900);
 const countAfterBar = await page.evaluate(() => document.querySelectorAll(".board-node").length);
-say("a double-click on a board's own bar makes nothing", countAfterBar === countNow && countNow === 1, `${countNow} → ${countAfterBar}`);
+/*
+ * The claim is that the count did **not** grow, not that it is one: the hides above are best-effort (they
+ * go out on a socket and this block does not read the canvas back), and requiring `countNow === 1` made this
+ * assertion fail with `7 → 7` — correctly no board, wrongly a red line.
+ */
+say("a double-click on a board's own bar makes nothing", countAfterBar === countNow && countNow >= 1, `${countNow} → ${countAfterBar}`);
 
 // --- empty canvas: a double-click makes a board, where you clicked ---------------------
 

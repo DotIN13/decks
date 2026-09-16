@@ -782,12 +782,12 @@ svg.lucide {
 	touch-action: none;
 }
 
-.board-node > .sizer[data-axis="width"] {
-	right: calc(-13 * var(--unit));
-	width: calc(26 * var(--unit));
-	height: calc(10 * var(--unit));
-	cursor: ew-resize;
-}
+/*
+ * No `[data-axis]` variant: the handle is one box on every format. There was a flat bar for the
+ * documents that can only be asked for a width, and it made the thing you grab move and change shape
+ * with the kind of file behind it — for a distinction the *server* owns (it decides which dimensions a
+ * format can hold). The corner is where the resize is; what it writes is the file's business.
+ */
 
 /* A fingertip has no corner to aim at, so it gets twice the box. */
 @media (pointer: coarse) {
@@ -796,12 +796,6 @@ svg.lucide {
 		height: calc(24 * var(--unit));
 		right: calc(-12 * var(--unit));
 		bottom: calc(-12 * var(--unit));
-	}
-
-	.board-node > .sizer[data-axis="width"] {
-		right: calc(-22 * var(--unit));
-		width: calc(44 * var(--unit));
-		height: calc(20 * var(--unit));
 	}
 }
 
