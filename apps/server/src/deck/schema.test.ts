@@ -13,7 +13,6 @@ test("a deck file round-trips, keeping keys it does not know about", () => {
 	const { file, warnings } = parseDeckFile(source);
 	assert.deepEqual(warnings, []);
 	assert.equal(file.name, "Example");
-	assert.deepEqual(file.sizes, { "boards/a.html": { w: 640, h: 480 } });
 	assert.deepEqual(file.somethingNewer, { keep: true });
 
 	// A future field survives a write, because the file belongs to the user too.
@@ -22,27 +21,29 @@ test("a deck file round-trips, keeping keys it does not know about", () => {
 	assert.equal(written.at(-1), "\n");
 	// version first, then the parts a human scans for.
 	assert.ok(written.indexOf('"version"') < written.indexOf('"name"'));
-	assert.ok(written.indexOf('"sizes"') < written.indexOf('"somethingNewer"'));
+	assert.ok(written.indexOf('"roots"') < written.indexOf('"somethingNewer"'));
+	/*
+	 * And a `sizes` map that was in the source is gone from the write. A board's size is its own file's
+	 * business — `withBoardSize` writes it there — and a copy here was what made a resize that wrote
+	 * the file look like it had done nothing.
+	 */
+	assert.equal(written.includes('"sizes"'), false);
 });
 
-test("a legacy boards map gives up its sizes, and its places become the seed", () => {
+test("a legacy boards map gives up its places as a seed, and none of its sizes", () => {
 	const { file, arrangement, warnings } = parseDeckFile('{"boards":{"a.html":{"x":10,"y":20,"w":500}}}');
-	// The size is a fact about a board that has nowhere else to keep it. The place belongs to a stage
-	// now, so it is not written back — but it is kept as the arrangement a stage starts from.
-	assert.deepEqual(file.sizes, { "a.html": { w: 500 } });
+	// The place belongs to a stage now, so it is not written back — but it is kept as the arrangement a
+	// stage starts from. The size is not kept anywhere: it belonged to the board, and the board's file
+	// is where one lives.
 	assert.deepEqual(arrangement, { "a.html": { x: 10, y: 20 } });
 	assert.equal("boards" in file, false, "the old key is consumed, so a write does not carry it on");
+	assert.equal("sizes" in file, false);
 	assert.deepEqual(warnings, []);
 });
 
-test("sizes is the current key, and it wins where a file has both", () => {
-	const { file } = parseDeckFile('{"boards":{"a.html":{"x":1,"y":2,"w":500}},"sizes":{"a.html":{"w":800}}}');
-	assert.deepEqual(file.sizes, { "a.html": { w: 800 } });
-});
-
-test("a size that is not a positive number is dropped, not fatal", () => {
-	const { file, warnings } = parseDeckFile('{"sizes":{"a.html":{"w":"wide"},"b.html":{"w":640}}}');
-	assert.deepEqual(file.sizes, { "b.html": { w: 640 } });
+test("a position that is not a pair of numbers is dropped, not fatal", () => {
+	const { arrangement, warnings } = parseDeckFile('{"boards":{"a.html":{"x":"left","y":0},"b.html":{"x":1,"y":2}}}');
+	assert.deepEqual(arrangement, { "b.html": { x: 1, y: 2 } });
 	assert.equal(warnings.length, 1);
 	assert.match(warnings[0]!, /a\.html/);
 });
@@ -54,9 +55,10 @@ test("a broken deck file opens the deck anyway, with a warning", () => {
 	assert.match(warnings[0]!, /not valid JSON/);
 });
 
-test("a deck file without sizes writes none, so a deck nobody resized stays tidy", () => {
+test("a deck file with no board state writes neither key", () => {
 	const written = serializeDeckFile({ version: 1, name: "T" });
 	assert.equal(written.includes("sizes"), false);
+	assert.equal(written.includes("boards"), false);
 });
 
 test("a newer version is a warning, not a refusal", () => {

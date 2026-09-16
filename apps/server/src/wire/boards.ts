@@ -39,9 +39,10 @@ export const boards = {
 	 *   write — through `boards.resize`, which records a revision like every other write;
 	 * - a **flow** document's width is in that tag and its height *is its content*, measured by
 	 *   the browser and reported back (`board.extent`), so only the width is written;
-	 * - a **slide** deck's height follows from its aspect, so only the width is taken, and it
-	 *   goes to the record rather than the file — the deck's own layout is not this app's to
-	 *   rewrite, and `deck.setSize` derives the height from the aspect it already knows.
+	 * - a **slide** deck's height follows from its aspect, so only the width is taken — and it goes to
+	 *   the file like every other size: the `<meta>` tag of an HTML deck, front-matter of a markdown
+	 *   one. `deck.json` used to keep it, which made a deck's width the one number you could not read
+	 *   off the deck.
 	 *
 	 * Clamped, like everything else a browser sends: 320 wide is about the narrowest board this
 	 * app's own templates use, and the ceiling is well past the tallest board in the deck — a
@@ -61,8 +62,8 @@ export const boards = {
 
 		try {
 			if (board.format === "slides") {
-				const sized = wire.deck.setSize(message.path, { ...(w !== undefined ? { w } : {}) });
-				if (sized) wire.send({ type: "deck.state", deck: wire.stageState() });
+				// `writeBoard` inside broadcasts the new board, so this one needs no second message.
+				if (w !== undefined) wire.boards.resize(message.path, { w });
 				return;
 			}
 			/*
@@ -91,9 +92,9 @@ export const boards = {
 		 *
 		 * Three guards, and each one is a loop that was easy to write by accident:
 		 *
-		 * - `setSize` returns nothing when the numbers already match, so a
-		 *   measurement that agrees with the record neither saves nor bumps `rev`,
-		 *   and the frame that produced it is not reloaded to be asked again;
+		 * - `setHeight` returns nothing when the number already matches, so a measurement
+		 *   that agrees with the board neither broadcasts nor bumps `rev`, and the frame
+		 *   that produced it is not reloaded to be asked again;
 		 * - only the height is taken. The width is the user's, from a drag, and a
 		 *   measurement that also set it would fight the drag that caused it;
 		 * - the reading must be for the revision the board is actually at, or a
@@ -102,7 +103,7 @@ export const boards = {
 		 */
 		const flowing = wire.deck.board(message.path);
 		if (flowing?.format === "flow" && flowing.rev === message.rev) {
-			const resized = wire.deck.setSize(message.path, { h: message.h });
+			const resized = wire.deck.setHeight(message.path, message.h);
 			if (resized) wire.send({ type: "deck.state", deck: wire.stageState() });
 		}
 	},

@@ -92,17 +92,45 @@ export function readBoardMeta(html: string): BoardMeta {
 /**
  * The same document with a different size in it.
  *
- * Sizing a board is editing one number in one tag, which is exactly the kind of edit an
- * agent should not be doing by hand: the tag is JSON inside an HTML attribute, the file is
- * the only place the size is written down, and the write has to keep every other byte
- * where it was. So the server does it, and `stage.resize` / `stage.fit` are the two ways
- * to ask.
+ * Sizing a board is editing the one place that board keeps its size, which is exactly the kind of edit
+ * an agent should not be doing by hand. For HTML it is JSON inside an attribute and the write has to
+ * keep every other byte where it was. For markdown it is front-matter — and until this knew that, a
+ * resize wrote a `<meta>` tag in above the `---`, where the front-matter parser stopped seeing it and
+ * a reader saw the tag as text.
  *
- * Other keys in the tag — `bg`, `theme`, anything a later version adds — are carried
- * through. A board with no tag at all gets one, because a board written by hand is still
- * a board and refusing to resize it would be a rule about how it was authored.
+ * Other keys are carried through, in either place: `bg`, `theme` and anything a later version adds to
+ * the tag; `title`, `aspect` and the rest of the front-matter. A board with neither gets one, because
+ * a board written by hand is still a board and refusing to resize it would be a rule about how it was
+ * authored.
  */
-export function withBoardSize(html: string, size: { w?: number; h?: number }): string {
+export function withBoardSize(path: string, source: string, size: { w?: number; h?: number }): string {
+	if (!HTML_FILE.test(path)) return withFrontMatterWidth(source, size);
+	return withTagSize(source, size);
+}
+
+/**
+ * A markdown board's width, in the front-matter it already reads.
+ *
+ * **A height called on its own is nothing to write.** A markdown board's height is its content's and
+ * the browser measures it, so a number in the file would be one nothing reads and every later write
+ * has to carry — which is what `stage.fit` would otherwise add on every call.
+ */
+function withFrontMatterWidth(source: string, size: { w?: number; h?: number }): string {
+	if (size.w === undefined) return source;
+	const width = Math.max(1, Math.round(size.w));
+	const line = `w: ${width}`;
+	const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source);
+	if (!block) return `---\n${line}\n---\n\n${source}`;
+	const lines = (block[1] ?? "").split(/\r?\n/);
+	const at = lines.findIndex((one) => /^w\s*:/.test(one));
+	if (at >= 0) lines[at] = line;
+	else lines.unshift(line);
+	const rest = source.slice(block[0].length).replace(/^\r?\n/, "");
+	return `---\n${lines.join("\n")}\n---\n\n${rest}`;
+}
+
+/** The HTML half: one number, in the one `<meta name="board">` tag. */
+function withTagSize(html: string, size: { w?: number; h?: number }): string {
 	const meta = readBoardMeta(html);
 	// The same last-resort width the loader uses, for the same reason: a record that is too
 	// narrow clips in silence, and one that is too wide is visible and one `fit` away.

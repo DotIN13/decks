@@ -21,6 +21,16 @@ import { DEFAULT_BOARD_W } from "../boards/templates.ts";
  */
 const DEFAULT_W = DEFAULT_BOARD_W;
 const DEFAULT_H = 800;
+/**
+ * A flow board's height until a frame measures it, and a *foreign* one's for good.
+ *
+ * The short one, because a board that grows into its content on load looks like it is arriving where
+ * one that shrinks looks broken. The long one, because a sandboxed document from somewhere else
+ * cannot measure itself at all, so its placeholder has to be a usable page rather than a box that
+ * grows.
+ */
+const FLOW_H = 240;
+const FOREIGN_H = 600;
 /** Space between auto-placed boards, and how many go in a row before wrapping. */
 const GUTTER = 160;
 const PER_ROW = 3;
@@ -268,6 +278,13 @@ export class Deck {
 			board.y = previous.y;
 			board.inContext = previous.inContext;
 			board.lastWrittenBy = previous.lastWrittenBy;
+			/*
+			 * A flow board's height is its content's, and only a frame knows it: the file cannot state one,
+			 * so the reading the last look produced is the best answer until the next look. Without this,
+			 * editing a flow board shrank it to the placeholder for a beat — and a board that jumps is the
+			 * thing `refresh` exists to avoid.
+			 */
+			if (board.format === "flow") board.h = previous.h;
 		} else {
 			autoPlace([board], this.boards);
 		}
@@ -285,9 +302,10 @@ export class Deck {
 	 * the deck, so a path from the wire cannot reach a file this deck does not own.
 	 *
 	 * The record is rewritten only if it mentioned this board's size. A deck with no
-	 * `deck.json` is a valid deck — opening one must not write to it, and neither should
-	 * deleting from one that never had a size to lose. A board's *place* is not here at all
-	 * any more: it belongs to a stage, which is where a delete already takes it in turn.
+	 * The file is not rewritten at all. A size is not here any more — it is the board's own file's, and
+	 * a flow board's height is a reading — so a delete has nothing in `deck.json` to prune. A deck
+	 * with no `deck.json` is a valid deck: opening one must not write to it. A board's *place* belongs
+	 * to a stage, which is where a delete already takes it in turn.
 	 *
 	 * Nothing here touches `.decks/revisions`. The versions of a deleted board stay on disk
 	 * under their shas, which is the whole of what makes this recoverable by hand; the caller
@@ -300,99 +318,29 @@ export class Deck {
 		const existed = existsSync(absolute);
 		if (existed) rmSync(absolute);
 		this.boardsByPath.delete(path);
-		if (this.file.sizes?.[path]) this.save();
 		return existed;
 	}
 
 	/**
-	 * Resize a board that cannot say its own size, and write it down.
+	 * Keep a height a frame measured, for this session.
 	 *
-	 * Only for `flow` and `slides`: a component board's size lives in its own `<meta>` tag
-	 * and is changed by editing the file, which is what `stage.resize` does. Refused rather
-	 * than silently ignored for those, because a resize that reports success and changes
-	 * nothing is worse than one that says no.
+	 * The one number a board cannot state itself: a flow document's height is what its content came to,
+	 * and only the browser knows it. Written nowhere — a height is a reading, and one recorded beside
+	 * the board would be a second answer to "how tall is this" that goes stale the moment the content
+	 * changes, which is exactly the shadowing this file used to do to a width. Kept on the board, so
+	 * `deck.state` carries it while the process is up, and re-measured on the next load.
 	 *
-	 * A slide deck takes the width and derives the height, so the two can never disagree
-	 * with the aspect. A flow board takes both, and the height is normally the browser's own
-	 * measurement coming back.
-	 *
-	 * Returns the board only when something actually moved. Nothing written, no save, and no
-	 * `rev` bump when the numbers already match — which is what stops a measurement that
-	 * agrees with the file from reloading the frame that produced it, forever.
+	 * Returns the board only when the number actually moved, which is what stops a measurement that
+	 * agrees with the board from broadcasting a `deck.state` and reloading the frame that produced it,
+	 * forever.
 	 */
-	setSize(boardPath: string, size: { w?: number; h?: number }): Board | undefined {
+	setHeight(boardPath: string, h: number): Board | undefined {
 		const board = this.board(boardPath);
-		if (!board || board.format === "component") return undefined;
-		const width = size.w !== undefined && size.w > 0 ? Math.round(size.w) : board.w;
-		const height =
-			board.format === "slides"
-				? slideHeight(width, this.aspectOf(boardPath))
-				: size.h !== undefined && size.h > 0
-					? Math.round(size.h)
-					: board.h;
-		if (width === board.w && height === board.h) return undefined;
-		board.w = width;
+		if (!board || board.format !== "flow") return undefined;
+		const height = Number.isFinite(h) && h > 0 ? Math.round(h) : undefined;
+		if (height === undefined || height === board.h) return undefined;
 		board.h = height;
-		this.save();
 		return board;
-	}
-
-	/** A deck's declared aspect, re-read because it lives in the file — front-matter, or the board tag for an HTML deck. */
-	private aspectOf(boardPath: string): string | undefined {
-		try {
-			return readFlowMeta(boardPath, readFileSync(join(this.path, boardPath), "utf8")).aspect;
-		} catch {
-			return undefined;
-		}
-	}
-
-	/** The bytes this process last wrote to `deck.json`, so its own echo is known. */
-	private lastWritten: string | undefined;
-
-	/**
-	 * Whether `deck.json` on disk is exactly what we last wrote.
-	 *
-	 * Saving the arrangement makes the watcher fire, and treating that as news meant
-	 * every drag broadcast the whole deck back to the browser that had just moved a
-	 * board. A hand edit still gets through — the bytes differ.
-	 */
-	isOwnWrite(): boolean {
-		if (this.lastWritten === undefined) return false;
-		try {
-			return readFileSync(join(this.path, "deck.json"), "utf8") === this.lastWritten;
-		} catch {
-			return false;
-		}
-	}
-
-	/**
-	 * Write `deck.json` from the deck as it now is.
-	 *
-	 * **A size and never a place.** A place belongs to a stage and is written to that agent's record;
-	 * what is left for this file is the size of a board that cannot state one itself, and only for the
-	 * formats in that position:
-	 *
-	 * - a **component** board's numbers are in its own `<meta>`, and copying them here would make
-	 *   `deck.json` a second source of truth that goes stale the moment somebody edits the board —
-	 *   the exact failure this feature had to avoid for markdown;
-	 * - a **flow** document takes both, because a foreign one cannot measure itself and our own keeps
-	 *   its measured height here until the browser reports a new one;
-	 * - a **slide** deck takes the width alone. Its height follows from the aspect it already knows,
-	 *   and storing one would be a second number to keep in step with the first.
-	 *
-	 * Every other key in the file — including ones this build does not know about — is carried
-	 * through, because the file belongs to the user as much as to us.
-	 */
-	save(): void {
-		const sizes: Record<string, { w?: number; h?: number }> = {};
-		for (const board of this.boards) {
-			if (board.format === "component") continue;
-			sizes[board.path] = { w: board.w, ...(board.format === "slides" ? {} : { h: board.h }) };
-		}
-		this.file = { ...this.file, version: 1, name: this.file.name ?? this.name, sizes };
-		const text = serializeDeckFile(this.file);
-		this.lastWritten = text;
-		writeFileSync(join(this.path, "deck.json"), text);
 	}
 
 	private describe(path: string): Board {
@@ -408,35 +356,34 @@ export class Deck {
 		// the first load, a watcher event, a `resync` — leaves the same mark behind.
 		this.signatures.set(path, signatureOf(absolute));
 		/*
-		 * Where the size comes from, per format.
+		 * Where the size comes from: **the board's own file**, and nowhere else.
 		 *
-		 * A component board says its own, in `<meta name="board">`, and always has. Anything
-		 * else has nowhere in the file to put a number, so `deck.json` carries it — the record
-		 * this class already writes for the deck, which means a resize is one mechanism and not
-		 * a second store.
-		 *
-		 * A flow board's height is the exception to the exception: it is never stored,
-		 * because the browser measures it and reports it back (`board.reported`). Until that
-		 * first measurement it gets a placeholder, and the placeholder is deliberately short
-		 * — a board that grows into its content on load looks like it is arriving, where one
-		 * that shrinks looks broken.
+		 * A component board says both numbers in `<meta name="board">`; a flow document says its width
+		 * in the same tag (or in front-matter, if it is markdown) and its height *is its content*, so
+		 * what it declares is a placeholder; a slide deck says its width and derives its height from the
+		 * aspect. And `deck.json` no longer keeps a copy: preferring one meant a resize that wrote
+		 * the file — which is what every resize does — could appear to do nothing, and a flow board's
+		 * width was unchangeable for as long as the record disagreed with the file.
 		 */
-		const stored = this.file.sizes?.[path];
-		const width = format === "component" ? meta.w ?? DEFAULT_W : stored?.w ?? meta.w ?? defaultWidth(format);
+		const width = meta.w ?? (format === "component" ? DEFAULT_W : defaultWidth(format));
 		const height =
 			format === "component"
 				? meta.h ?? DEFAULT_H
 				: format === "slides"
 					? slideHeight(width, meta.aspect)
 					: /*
-						 * A *sandboxed* flow board — a document from somewhere else — cannot measure
-						 * itself, so its placeholder has to be a usable size rather than one that
-						 * grows into its content. Everything else gets the short one, because a board
-						 * that grows on load looks like it is arriving where one that shrinks looks
-						 * broken. Keyed on the shell rather than on the extension: a flow board this
-						 * app wrote is HTML too, and it measures itself like any other board.
+						 * A flow document's height is its content's, and the browser replaces whatever is here with
+						 * the truth as soon as it loads — so a height in the file is a *starting* answer, and what a
+						 * resize wrote belongs there for the next load to start from.
+						 *
+						 * A *sandboxed* flow board — a document from somewhere else — never gets that measurement, so
+						 * for it this is the answer, not a start. Hence the two placeholders: a usable page for a
+						 * document nobody can measure, and the short one for ours, because a board that grows into its
+						 * content on load looks like it is arriving where one that shrinks looks broken. Keyed on the
+						 * shell rather than the extension: a flow board this app wrote is HTML too, and measures
+						 * itself like any other.
 						 */
-						(stored?.h ?? (shell === "foreign" ? 600 : 240));
+						meta.h ?? (shell === "foreign" ? FOREIGN_H : FLOW_H);
 		return {
 			path,
 			// `.slides.html` before `.html`, or a deck with no title of its own is called

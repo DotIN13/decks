@@ -113,25 +113,25 @@ The deck directory is the agent's cwd. That is the whole integration: the agent'
 `read`, `write`, `edit` and `grep` already work on boards, so there are no board CRUD
 tools to keep in sync with a schema.
 
-**Where a board *sits* belongs to the conversation, and where it *is* belongs to the file.** What
-a board contains lives in the board file. Where it sits lives in the record of the agent whose
-canvas it is — `AgentRecord.positions`, under `.decks/agents/<id>/`, beside what that conversation
-is holding and showing (`§6.2`). So two conversations can look at one deck from two arrangements,
-the way they already keep two cameras, and a drag in one moves nothing for the other. A board no
-stage has placed takes the place the deck itself was laid out with, and a board with neither goes
-through `Deck.arrange` — the rows-of-three rule `autoPlace` has always applied. Either place is
-written down on that stage the first time it is sent, so a board lands once instead of chasing
-whatever was dragged last.
+**Where a board *sits*, and how big it *is*, belong to the board and its conversation.** What a
+board contains lives in the board file, and so does its size: one `<meta name="board">` tag for HTML,
+front-matter for markdown, a height the browser measures for anything that reflows. Where it sits
+lives in the record of the agent whose canvas it is — `AgentRecord.positions`, under
+`.decks/agents/<id>/`, beside what that conversation is holding and showing (`§6.2`). So two
+conversations can look at one deck from two arrangements, the way they already keep two cameras, and
+a drag in one moves nothing for the other. A board no stage has placed takes the place the deck
+itself was laid out with, and a board with neither goes through `Deck.arrange` — the rows-of-three
+rule `autoPlace` has always applied. Either place is written down on that stage the first time it is
+sent, so a board lands once instead of chasing whatever was dragged last.
 
-The deck's own file is then the deck's own facts: its name, the roots embeds may reach, and a size
-for the two kinds of board that have nowhere in their file to keep one (a foreign page and a slide
-deck). It is read forgivingly and written completely: an unparseable field is a default plus a
-warning, never a refusal to open, and keys this build does not understand survive a write
-(`schema.ts`). It is a file a person is expected to open. An older file's `boards` map is read for
-its sizes, and its positions become the **seed** a stage starts from — handed to the first
-conversation that asks and then written into that conversation's own record, so a deck somebody
-laid out by hand does not open in rows of three. The map is gone from the file on the next write,
-which is what makes it a migration rather than a second source of truth.
+**`deck.json` is then the deck's own facts and nothing else**: its name, and the roots its embeds may
+reach. The app never writes it — a place belongs to a stage and a size to the board, so there is no
+board state left in it to rewrite — and it is read forgivingly: an unparseable field is a default plus
+a warning, never a refusal to open. An older file's `boards` map is read for its places, which become
+the **seed** a stage starts from: handed to the first conversation that asks, written into that
+conversation's own record, so a deck somebody laid out by hand does not open in rows of three. Its
+`w`/`h`, and a newer `sizes` map, are ignored — a size is the board's own file's business, and
+preferring a copy here is what made a resize that wrote the file look like it had done nothing.
 
 ### 2.1 `lib/` is a copy, and the copy is refreshed
 

@@ -201,7 +201,7 @@ export class StageService {
 		if (!board) throw new Error(`No such board: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
 		const html = readFileSync(this.deck.fileOf(path), "utf8");
-		return this.host.writeBoard(path, withBoardSize(html, size));
+		return this.host.writeBoard(path, withBoardSize(path, html, size));
 	}
 
 	/**

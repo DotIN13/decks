@@ -178,7 +178,7 @@ export class BoardService {
 		if (!board) throw new Error(`No such board: ${path}`);
 		if (size.w === undefined && size.h === undefined) throw new Error("A resize needs a width, a height, or both");
 		const html = readFileSync(this.deck.fileOf(path), "utf8");
-		return this.writeBoard(path, withBoardSize(html, size));
+		return this.writeBoard(path, withBoardSize(path, html, size));
 	}
 
 	writeBoard(path: string, html: string): Board {

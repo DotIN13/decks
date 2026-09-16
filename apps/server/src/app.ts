@@ -367,11 +367,12 @@ export class App {
 				return;
 			}
 			if (change.kind === "deck") {
-				// Our own `save()` coming back around. The browsers already know — they
-				// asked for it — and re-reading the deck to tell them again is what made a
-				// drag reload every board on screen.
-				if (this.deck.isOwnWrite()) return;
-				// A hand edit, then: the arrangement is whatever the file now says.
+				/*
+				 * A hand edit, always: **the app never writes `deck.json`** any more, so there is no echo of
+				 * its own to tell apart from somebody's. A place belongs to a stage and a size belongs to the
+				 * board's file, so the only things left in here — the name, the roots, and an older build's
+				 * arrangement — are the user's to change.
+				 */
 				this.deck.reload();
 				this.send({ type: "deck.state", deck: this.stageState() });
 				return;

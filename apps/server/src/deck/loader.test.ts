@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Deck } from "./loader.ts";
+import { withBoardSize } from "./meta.ts";
 import { slideHeight } from "./kinds.ts";
 import { realPathOf } from "./roots.ts";
 
@@ -138,30 +139,44 @@ test("the auto-layout reports the places it worked out, and a stage that keeps t
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("a size a board cannot state itself survives a save and a reload", () => {
+test("a board's size is its own file's, and deck.json's copy is ignored", () => {
 	const root = emptyDeck();
 	writeFileSync(join(root, "boards", "a.html"), board("A", 800, 600));
-	writeFileSync(join(root, "boards", "talk.slides.html"), slideDeck("Talk"));
-	writeFileSync(join(root, "boards", "saved.html"), foreign("Saved"));
-	const deckFile = Deck.open(root);
-	deckFile.setSize("boards/talk.slides.html", { w: 1440 });
-	deckFile.setSize("boards/saved.html", { w: 900, h: 700 });
+	// A resize writes the file, whichever format it is: the tag for HTML, front-matter for markdown.
+	writeFileSync(join(root, "boards", "saved.html"), withBoardSize("boards/saved.html", foreign("Saved"), { w: 900, h: 700 }));
+	writeFileSync(join(root, "boards", "talk.slides.html"), withBoardSize("boards/talk.slides.html", slideDeck("Talk"), { w: 1440 }));
+	/*
+	 * And an older `deck.json`'s numbers are not read at all.
+	 *
+	 * This is the shadowing the record used to do: `describe` preferred its copy of a width over the
+	 * file's, so a resize — which writes the file — appeared to do nothing, and a flow board's width
+	 * could not be changed for as long as the two disagreed.
+	 */
+	writeFileSync(
+		join(root, "deck.json"),
+		JSON.stringify({
+			version: 1,
+			name: "T",
+			boards: {
+				"boards/saved.html": { x: 0, y: 0, w: 320, h: 240 },
+				"boards/talk.slides.html": { x: 0, y: 0, w: 400 },
+			},
+		}),
+	);
 
-	const written = JSON.parse(readFileSync(join(root, "deck.json"), "utf8")) as { sizes: Record<string, unknown> };
-	assert.deepEqual(written.sizes["boards/saved.html"], { w: 900, h: 700 });
-	// A slide deck's height follows from its aspect, so only the width is kept — one number, not two
-	// that can disagree.
-	assert.deepEqual(written.sizes["boards/talk.slides.html"], { w: 1440 });
-	assert.equal("boards/a.html" in written.sizes, false, "a component board's size is in its own <meta>");
-
-	const again = Deck.open(root);
-	assert.deepEqual([again.board("boards/saved.html")?.w, again.board("boards/saved.html")?.h], [900, 700]);
-	assert.equal(again.board("boards/talk.slides.html")?.w, 1440);
-	assert.equal(again.board("boards/talk.slides.html")?.h, slideHeight(1440, undefined));
+	const deck = Deck.open(root);
+	assert.deepEqual([deck.board("boards/saved.html")?.w, deck.board("boards/saved.html")?.h], [900, 700], "the file's numbers, not the record's");
+	assert.equal(deck.board("boards/talk.slides.html")?.w, 1440);
+	assert.equal(deck.board("boards/talk.slides.html")?.h, slideHeight(1440, undefined));
+	assert.deepEqual(
+		[deck.board("boards/a.html")?.w, deck.board("boards/a.html")?.h],
+		[800, 600],
+		"and a component board is its own <meta> as it always was",
+	);
 	rmSync(root, { recursive: true, force: true });
 });
 
-test("a legacy boards map gives its sizes, and seeds the stage with its places", () => {
+test("a legacy boards map gives its places as a seed, and none of its sizes", () => {
 	const root = emptyDeck();
 	writeFileSync(join(root, "boards", "saved.html"), foreign("Saved"));
 	writeFileSync(
@@ -169,27 +184,27 @@ test("a legacy boards map gives its sizes, and seeds the stage with its places",
 		JSON.stringify({ version: 1, name: "T", boards: { "boards/saved.html": { x: 120, y: 340, w: 900, h: 700 } } }),
 	);
 	const deck = Deck.open(root);
-	// The size is carried over, because this board's file has nowhere to keep one.
-	assert.deepEqual([deck.board("boards/saved.html")?.w, deck.board("boards/saved.html")?.h], [900, 700]);
+	// A size in this file is not a size any more: the board's own file is the only place one lives, and
+	// this board's file says nothing, so it takes the placeholder for a foreign page.
+	assert.notDeepEqual([deck.board("boards/saved.html")?.w, deck.board("boards/saved.html")?.h], [900, 700]);
 
 	/*
-	 * And the place is the seed a stage starts from — reported through `onPlace` so the stage writes
-	 * it down and the map stops mattering. A deck somebody laid out by hand must not open in rows of
-	 * three the day the map stops being authoritative.
+	 * The place is the seed a stage starts from — reported through `onPlace` so the stage writes it
+	 * down and the map stops mattering. A deck somebody laid out by hand must not open in rows of three
+	 * the day the map stops being authoritative.
 	 */
 	const kept: Record<string, { x: number; y: number }> = {};
 	const state = deck.state(undefined, (path, at) => (kept[path] = at));
 	assert.deepEqual([state.boards[0]?.x, state.boards[0]?.y], [120, 340], "the deck's own arrangement");
 	assert.deepEqual(kept, { "boards/saved.html": { x: 120, y: 340 } }, "and the caller is told, so it can keep it");
 
-	// A stage that already has a place is not seeded again, and the map is gone from the file the
-	// first time anything writes it — which is what makes this a migration and not a second store.
+	// A stage that already has a place is not seeded again — and reading a deck writes nothing at all,
+	// which is why the old map is still on disk for the next conversation to seed from.
+	const before = readFileSync(join(root, "deck.json"), "utf8");
 	const again: string[] = [];
 	deck.state(kept, (path) => again.push(path));
 	assert.deepEqual(again, []);
-	deck.save();
-	const written = JSON.parse(readFileSync(join(root, "deck.json"), "utf8")) as Record<string, unknown>;
-	assert.equal("boards" in written, false, "the old map is not written back");
+	assert.equal(readFileSync(join(root, "deck.json"), "utf8"), before, "nothing about reading a deck writes it");
 	rmSync(root, { recursive: true, force: true });
 });
 
