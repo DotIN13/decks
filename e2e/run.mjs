@@ -103,6 +103,12 @@ const CHECKS = [
 	 */
 	{ file: "board-links.mjs", needsAgent: false },
 	/*
+	 * A board's own code, run by pressing something on it. The one path where a click is not the
+	 * permission: the board carries the words, the server reads them out of the file, and the
+	 * first run asks. Needs no model, because nothing is prompted — the run is a click.
+	 */
+	{ file: "board-eval.mjs", needsAgent: false },
+	/*
 	 * The focus view: the canvas as one page. Its own check rather than a section of
 	 * `modes.mjs`, because it needs the deck as it opens — a page that has been typed into by
 	 * the sections before it is not a page any more.

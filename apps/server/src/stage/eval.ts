@@ -28,7 +28,31 @@ export interface EvalOutcome {
 
 const TIMEOUT_MS = 20_000;
 
-export async function runEval(code: string, stage: unknown, timeoutMs = TIMEOUT_MS): Promise<EvalOutcome> {
+/**
+ * What a run may be given besides the stage object.
+ *
+ * `scope` is how a caller adds names to the snippet's world — a board's `event` is the one
+ * that exists today. There is no way to take one away: the snippet is already inside a
+ * `new Function` in this process, so the fenced-off version of this would be a claim rather
+ * than a fact, and the honest boundary is the caller's decision to run the code at all
+ * (see `boards/eval-trust.ts` and the prompt it raises).
+ *
+ * The identifier check is not a security boundary either; it is what keeps a typo in a
+ * scope key from producing JavaScript that does not compile and a sentence about it.
+ */
+export interface RunOptions {
+	timeoutMs?: number;
+	scope?: Record<string, unknown>;
+}
+
+/** A name a function parameter list will accept. */
+const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
+
+export async function runEval(code: string, stage: unknown, options: number | RunOptions = {}): Promise<EvalOutcome> {
+	const settings: RunOptions = typeof options === "number" ? { timeoutMs: options } : options;
+	const timeoutMs = settings.timeoutMs ?? TIMEOUT_MS;
+	const scope = settings.scope ?? {};
+	const names = Object.keys(scope).filter((name) => IDENTIFIER.test(name));
 	const logs: string[] = [];
 	const record = (level: string) => (...args: unknown[]) => {
 		const text = args.map((arg) => (typeof arg === "string" ? arg : safeJson(arg))).join(" ");
@@ -50,7 +74,8 @@ export async function runEval(code: string, stage: unknown, timeoutMs = TIMEOUT_
 	 */
 	let javascript: string;
 	try {
-		const result = await transform(`async function __decksRun(stage, console) {\n${code}\n}`, {
+		const parameters = ["stage", "console", ...names].join(", ");
+		const result = await transform(`async function __decksRun(${parameters}) {\n${code}\n}`, {
 			loader: "ts",
 			target: "es2022",
 		});
@@ -61,11 +86,8 @@ export async function runEval(code: string, stage: unknown, timeoutMs = TIMEOUT_
 
 	let run: () => Promise<unknown>;
 	try {
-		const factory = new Function(`${javascript}\nreturn __decksRun;`)() as (
-			stage: unknown,
-			console: unknown,
-		) => Promise<unknown>;
-		run = () => factory(stage, console);
+		const factory = new Function(`${javascript}\nreturn __decksRun;`)() as (...args: unknown[]) => Promise<unknown>;
+		run = () => factory(stage, console, ...names.map((name) => scope[name]));
 	} catch (error) {
 		return { value: undefined, logs, error: `Could not build: ${(error as Error).message}` };
 	}

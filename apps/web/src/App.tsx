@@ -724,6 +724,19 @@ export function App() {
 	};
 
 	/**
+	 * A component on a board carrying code was pressed.
+	 *
+	 * The board posts the name of its code block; the frame's own path goes with it, and the
+	 * server reads the code out of that board's file, asks once whether this board is trusted,
+	 * and runs it with the stage API (`apps/server/src/wire/boards.ts`). Nothing to draw here:
+	 * the run announces itself in the focused conversation, and whatever becomes visible is
+	 * the board's own code doing it through `stage`.
+	 */
+	const evalBoard = (path: string, id: string, value: unknown): void => {
+		send({ type: "board.eval", path, id, ...(value !== undefined ? { value } : {}) });
+	};
+
+	/**
 	 * Open the conversation around a turn — the deck's scrub, which is what the spine is
 	 * for.
 	 *
@@ -912,6 +925,7 @@ export function App() {
 						 * that linked to it, `false` and there is a notice saying there is no board there.
 						 */
 						onOpenBoard={openLinkedBoard}
+						onBoardEval={evalBoard}
 						agentIdentity={(agentId) => {
 							const identity = state.identities[agentId];
 							return identity ? { name: identity.name, color: identity.color } : undefined;
@@ -1362,6 +1376,7 @@ export function App() {
 										at={showing.at}
 										onExit={() => setPresenting(undefined)}
 										onOpenBoard={openLinkedBoard}
+										onBoardEval={evalBoard}
 										onLeave={(at) => {
 											// Put the canvas's own frame on the slide you finished on, so
 											// leaving fullscreen is not a jump back in the talk.

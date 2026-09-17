@@ -157,6 +157,8 @@ export function Stage(props: {
 	 * deck does not hold, which the app has already said in a notice.
 	 */
 	onOpenBoard?: (path: string, from: string) => boolean;
+	/** A component on a board carrying code was pressed (`canvas/board-eval.ts`). */
+	onBoardEval?: (path: string, id: string, value: unknown) => void;
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
 	/**
@@ -1274,6 +1276,7 @@ export function Stage(props: {
 							{...(props.webStatus ? { webStatus: props.webStatus } : {})}
 							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
 							{...(props.onOpenBoard ? { onOpenBoard: props.onOpenBoard } : {})}
+							{...(props.onBoardEval ? { onBoardEval: props.onBoardEval } : {})}
 							onSelect={() => props.onSelect(board.path)}
 							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}

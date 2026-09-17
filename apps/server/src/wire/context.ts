@@ -1,6 +1,8 @@
 import type { Camera, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
 import type { Registry } from "../agents/registry.ts";
 import type { BoardService } from "../boards/service.ts";
+import type { EvalTrust } from "../boards/eval-trust.ts";
+import type { StageService } from "../stage/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../web/bridge.ts";
@@ -66,6 +68,17 @@ export interface WireContext {
 	readonly agents: Registry;
 	readonly web: WebBridge;
 	readonly claudeAccounts: ClaudeAccounts;
+	/**
+	 * The stage, for the one frame that runs a board's own code (`wire/boards.ts`).
+	 *
+	 * It is here because a board's run is an agent's run with a different actor: the code
+	 * gets the same `stage` object (`stage/tool.ts`) and the same service behind it.
+	 */
+	readonly stage: StageService;
+	/** Which boards may run their own code, and the list the question writes (`boards/eval-trust.ts`). */
+	readonly evalTrust: EvalTrust;
+	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */
+	readonly port: number;
 
 	/**
 	 * The deck as the focused stage sees it, with any place that had to be worked out written down on

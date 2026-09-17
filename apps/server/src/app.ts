@@ -5,6 +5,7 @@ import { examplesDir, runtimeLib } from "@decks/runtime";
 import type { Board, Camera, ClientMessage, DeckState, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { BoardService } from "./boards/service.ts";
+import { EvalTrust } from "./boards/eval-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
 import { isBoardFormat } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
@@ -46,6 +47,12 @@ export class App {
 	readonly stage: StageService;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
 	readonly boards: BoardService;
+	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
+	readonly evalTrust: EvalTrust;
+	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */
+	get port(): number {
+		return this.config.port;
+	}
 	/** The canvas tool's other end, for the runtimes that are not in this process. */
 	readonly bridge = new StageBridge();
 	/** The user's own Chrome, shared through the Decks extension (`web/bridge.ts`). */
@@ -80,6 +87,7 @@ export class App {
 		deck: Deck,
 	) {
 		this.deck = deck;
+		this.evalTrust = new EvalTrust(config.dataDir);
 		this.boards = new BoardService(deck, {
 			send: (message) => this.send(message),
 			/*

@@ -65,3 +65,17 @@ test("a cycle in the returned value does not crash the report", async () => {
 	assert.match(safeJson(outcome.value), /\[circular\]/);
 	assert.throws(() => JSON.stringify(outcome.value), TypeError);
 });
+
+test("names in the scope are parameters of the run", async () => {
+	const outcome = await runEval("return `${event.board}:${event.value}`;", stage, {
+		scope: { event: { board: "boards/plan.html", value: "opus" } },
+	});
+	assert.equal(outcome.error, undefined);
+	assert.equal(outcome.value, "boards/plan.html:opus");
+});
+
+test("a scope key that is not an identifier is skipped, not fatal", async () => {
+	const outcome = await runEval("return typeof event;", stage, { scope: { "not an identifier": 1, event: { id: "go" } } });
+	assert.equal(outcome.error, undefined);
+	assert.equal(outcome.value, "object");
+});

@@ -180,6 +180,14 @@ export interface StageTool {
 	readonly promptSnippet: string;
 	readonly guidelines: string[];
 	readonly parameterDescription: string;
+	/**
+	 * The `stage` object this tool runs code against.
+	 *
+	 * Exposed for the one other caller that needs a full stage with a different actor: a
+	 * board running its own code (`stage/board-actor.ts`), which takes this same object and
+	 * never goes through `run`.
+	 */
+	readonly stage: Stage;
 	run(code: string): Promise<StageToolResult>;
 	snapshot(): StageSnapshot;
 }
@@ -725,6 +733,7 @@ export function createStageTool(deps: {
 		promptSnippet: "Run TypeScript against the canvas: show boards, hold them in context, name yourself",
 		guidelines: GUIDELINES,
 		parameterDescription: "TypeScript, run as an async function body with `stage` in scope. Return a value to see it.",
+		stage,
 		snapshot,
 
 		async run(code: string): Promise<StageToolResult> {

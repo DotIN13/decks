@@ -1,6 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import type { ServerMessage } from "@decks/protocol";
 import { isBoardFormat } from "../boards/templates.ts";
-import type { WirePart } from "./context.ts";
+import { codeFor } from "../boards/eval-code.ts";
+import { boardActor } from "../stage/board-actor.ts";
+import { runEval, safeJson } from "../stage/eval.ts";
+import { createStageTool } from "../stage/tool.ts";
+import type { Registry } from "../agents/registry.ts";
+import type { WireContext, WirePart } from "./context.ts";
 
 /**
  * The board frames: the user's half of the canvas, and the two ways the past comes back.
@@ -237,4 +243,130 @@ export const boards = {
 			text: restored === 0 ? "Those boards are already as they were." : `Restored ${restored} board${restored === 1 ? "" : "s"}.`,
 		});
 	},
+
+	/**
+	 * A component on a board was pressed, and the board carries code for it.
+	 *
+	 * Everything that makes this safe is a decision made here rather than in the board:
+	 *
+	 * - **The path is the app's**, stamped from the frame the message came from
+	 *   (`canvas/board-eval.ts`), so a board cannot ask for another board's trust.
+	 * - **The code is the file's**, read here (`boards/eval-code.ts`) rather than sent by the
+	 *   board, so what ran is always recoverable from the board on disk.
+	 * - **The trust list is the person's** (`boards/eval-trust.ts`), and the first ask is a
+	 *   question with the board's name in it rather than a click.
+	 */
+	"board.eval": (message, reply, wire) => {
+		void runBoardEval(message.path, message.id, message.value, reply, wire);
+	},
 } satisfies WirePart;
+
+/**
+ * Read one board's code for one component, confirm the board is trusted, and run it.
+ *
+ * Async and unawaited by the frame handler for one reason: the trust question is a dialog,
+ * and a handler that blocked would hold the socket. The answer arrives on its own frame
+ * (`extension.ui.answer`), so all this has to do is wait.
+ */
+async function runBoardEval(
+	path: string,
+	id: string,
+	value: unknown,
+	reply: (message: ServerMessage) => void,
+	wire: WireContext,
+): Promise<void> {
+	if (!wire.deck.board(path)) {
+		reply({ type: "notice", level: "warn", text: `There is no board at ${path} to run anything.` });
+		return;
+	}
+
+	let html: string;
+	try {
+		html = readFileSync(wire.deck.fileOf(path), "utf8");
+	} catch (error) {
+		reply({ type: "notice", level: "error", text: `Could not read ${path}: ${(error as Error).message}` });
+		return;
+	}
+
+	const code = codeFor(html, id);
+	if (code === undefined) {
+		reply({ type: "notice", level: "warn", text: `Nothing on ${path} answers "${id}".` });
+		return;
+	}
+
+	/*
+	 * The question, once per board.
+	 *
+	 * A conversation is needed to ask it and to hold the notice afterwards, and `focused()`
+	 * is what every other frame that needs a stage uses — it mints one for a deck nobody has
+	 * spoken to, which is the right answer here too: a click on a board is a thing a person
+	 * did, and it should be legible in a chat.
+	 */
+	const focused = wire.agents.focused();
+	if (!wire.evalTrust.allows(path)) {
+		const answer = await focused.bridge.choose({
+			title: "Run this board's code?",
+			message: `${path} wants to run the code behind "${id}". It runs with the stage API inside the Decks server, so it can do anything the server can: read files, write boards, move the canvas, message agents.`,
+			options: [
+				{ label: "Allow" },
+				{ label: "Always allow this board", description: `Remember ${path}, and stop asking` },
+				{ label: "No", description: "Run nothing" },
+			],
+		});
+		if (answer === "Always allow this board") wire.evalTrust.allow(path);
+		else if (answer !== "Allow") {
+			reply({ type: "notice", level: "info", text: `${path} was not allowed to run "${id}".` });
+			return;
+		}
+	}
+
+	/*
+	 * The same stage object an agent gets, with the board as the actor (`stage/board-actor.ts`).
+	 *
+	 * `event` is the one name added to the snippet's scope: which component was pressed, what
+	 * it carried, and the board it sits on.
+	 */
+	const conversation = {
+		id: focused.id,
+		context: () => [...focused.context],
+		setContext: (paths: string[]) => focused.setContext(paths),
+		inPlay: () => [...focused.inPlay],
+		setInPlay: (paths: string[]) => focused.setInPlay(paths),
+		positions: () => focused.positions(),
+		setPosition: (board: string, x: number, y: number) => focused.setPosition(board, x, y),
+		camera: () => wire.cameras.get(focused.id) ?? wire.lastCamera,
+		queue: () => focused.queue(),
+		agents: () => wire.agents.summaries(),
+		send: (fromId: string, target: string, spec: Parameters<Registry["send"]>[2]) => wire.agents.send(fromId, target, spec),
+		recordRevision: (board: string) => wire.boards.recordRevision(board),
+		boardPathOf: (file: string) => wire.boards.boardPathOf(file),
+	};
+	const actor = boardActor({ path, conversation });
+	const stage = createStageTool({ stage: wire.stage, agent: actor, port: wire.port }).stage;
+
+	const event = {
+		id,
+		board: path,
+		path,
+		...(value !== undefined ? { value } : {}),
+	};
+	const outcome = await runEval(code, stage, { scope: { event } });
+
+	/*
+	 * One notice, always — the run is announced whether it worked or not.
+	 *
+	 * That is the design's second mitigation and the one worth having: a thing that starts on
+	 * its own and says nothing reads as a fault, and an agent reading the conversation later
+	 * needs to know a click did something. The first line of the code is in it because that is
+	 * what makes the notice checkable against the file.
+	 */
+	const first = code.split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
+	const said = first.length > 80 ? `${first.slice(0, 80)}…` : first;
+	if (outcome.error) {
+		focused.translator.notice("error", `${path} ran "${id}" and failed: ${outcome.error}`);
+		reply({ type: "notice", level: "error", text: `${path}: ${outcome.error}` });
+		return;
+	}
+	const returned = outcome.value === undefined ? "" : ` → ${safeJson(outcome.value).replace(/\s+/g, " ").slice(0, 200)}`;
+	focused.translator.notice("info", `${path} ran "${id}": ${said}${returned}`);
+}

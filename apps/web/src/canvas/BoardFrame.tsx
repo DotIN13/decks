@@ -19,6 +19,7 @@ import { measureFrame } from "./extent.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
 import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
 import { attachBoardOpen } from "./board-links.ts";
+import { attachBoardEval } from "./board-eval.ts";
 import { paintFrame } from "../lib/theme.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
 import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "./picture.ts";
@@ -162,6 +163,13 @@ export function BoardFrame(props: {
 	 */
 	onOpenBoard?: (path: string, from: string) => boolean;
 	/**
+	 * A component on this board carrying code was pressed (`canvas/board-eval.ts`).
+	 *
+	 * The board posted the name of the code block; the path is stamped here, from the board
+	 * this frame is showing, and the server reads the code out of that board's file.
+	 */
+	onBoardEval?: (path: string, id: string, value: unknown) => void;
+	/**
 	 * How this board is put on the stage (`lib/renderer.ts`): a document in a box, a
 	 * document drawn into a canvas of its own, or a picture on the stage's one canvas.
 	 */
@@ -180,6 +188,7 @@ export function BoardFrame(props: {
 	let detachDrop: (() => void) | undefined;
 	let detachLive: (() => void) | undefined;
 	let detachLinks: (() => void) | undefined;
+	let detachEval: (() => void) | undefined;
 	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
 	onCleanup(() => {
@@ -426,6 +435,7 @@ export function BoardFrame(props: {
 		detachDrop?.();
 		detachLive?.();
 		detachLinks?.();
+		detachEval?.();
 		detachSelect?.();
 		/*
 		 * A press inside a board selects that board — **every** format, either mode.
@@ -488,6 +498,14 @@ export function BoardFrame(props: {
 		detachLinks = attachBoardOpen(frame, (path) => {
 			props.onOpenBoard?.(path, props.board.path);
 		});
+		/*
+		 * A component carrying code, pressed. The board sends the block's name and this frame's
+		 * own path goes with it, which is what stops one board asking to run another's code
+		 * (`canvas/board-eval.ts`).
+		 */
+		detachEval = props.onBoardEval
+			? attachBoardEval(frame, (ask) => props.onBoardEval?.(props.board.path, ask.id, ask.value))
+			: undefined;
 		reportExtent(frame, props.board.rev);
 	};
 
@@ -508,7 +526,8 @@ export function BoardFrame(props: {
 		detachDrop?.();
 		detachLive?.();
 		detachLinks?.();
-		detachSelect = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = undefined;
+		detachEval?.();
+		detachSelect = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachEval = undefined;
 		clearTimeout(measuring);
 		if (frameEl === element) frameEl = undefined;
 	};
