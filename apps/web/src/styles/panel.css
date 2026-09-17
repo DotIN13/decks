@@ -128,7 +128,7 @@
 	}
 
 	/*
-	 * The count, right-aligned and free to grow leftward, ending on the rail's own line.
+	 * The count, right-aligned and free to grow leftward, ending on its own list's line.
 	 *
 	 * Two things are being fixed in one rule, and they pull in opposite directions.
 	 *
@@ -140,20 +140,26 @@
 	 * label's spare width, where there is room at any count — the deck this was written against
 	 * lists 650 boards.
 	 *
-	 * But right-aligned against the *box* is not right-aligned against the column: the box is 20px
-	 * and every glyph in it is smaller — the dot is a 6px circle and the bin's icon is 12px, both
-	 * centred, so their ink ends at 252 and 255 while a count ending at the box edge (259) sat seven
-	 * pixels to the right of everything below it. That is the alignment the eye reads as wrong. The
-	 * `padding-right` is the half of the gap between the ink and the box edge on the dot's side, so a
-	 * one-digit count lands centred on the column and a four-digit one still ends on that line.
+	 * But right-aligned against the *box* is not right-aligned against the column. `--count-inset` is
+	 * how far the ink ends before the box does, and it is not one number, because the two lists do not
+	 * repeat the same thing down the right edge: the boards list repeats a **6px dot** (whose ink ends
+	 * at 252, seven pixels inside the box) and the agents list repeats its **timestamp**, text that
+	 * ends at 255, four inside. One value would have put one list's counts three pixels off the line
+	 * its own rows stand on. Everything in the rail is centred in a 20px box and smaller than it — the
+	 * dot is 6px, the bin's icon 12px — so "the line" is always some ink inside the box, never the box.
 	 */
 	.panel-meta > .n {
 		display: grid;
 		min-width: 20px;
-		padding-right: 7px;
+		padding-right: var(--count-inset, 4px);
 		flex: none;
 		align-items: center;
 		justify-items: end;
+	}
+
+	/* The boards list's right-hand mark is the dot, whose circle ends seven pixels inside the box. */
+	.panel-list[data-tab="boards"] .panel-meta > .n {
+		--count-inset: 7px;
 	}
 
 	/*

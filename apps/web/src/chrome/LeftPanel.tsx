@@ -575,6 +575,16 @@ export function LeftPanel(props: {
 					 * and mounts a document for every board in the deck at once.
 					 */
 					class="panel-list items"
+					/*
+					 * Which list this is, for the stylesheet and for a check.
+					 *
+					 * The two lists share every class they can (`panel-list`, `panel-section`, `panel-meta`)
+					 * because they are one surface with two contents. They do not share what their rows repeat
+					 * down the right edge: a dot in the boards list, a timestamp in the agents one — and the
+					 * count in the heading has to end on *that* line, so the two inset it differently. Same
+					 * argument as `data-kind` on a section: name the thing rather than infer it from content.
+					 */
+					data-tab={tab()}
 					data-density={density()}
 					onKeyDown={rove}
 					onScroll={growIfNearEnd}

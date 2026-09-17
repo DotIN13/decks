@@ -12,7 +12,7 @@
  * once fitted a 1600px board into the strip beside it at 3.7%. Both are checked, because
  * the difference is invisible until a fit goes wrong.
  */
-import { open, say, zoom, ZOOM_IN_PAGE } from "../harness.mjs";
+import { open, say, settle, zoom, ZOOM_IN_PAGE } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
 try {
@@ -187,20 +187,31 @@ try {
 	);
 
 	/*
-	 * And a count ends on the rail's line whatever it says.
+	 * And a count ends on its own list's line whatever it says.
 	 *
 	 * The count was centred in a fixed 20px. That is right for three digits — `601` is 19.2px of
 	 * those 20 — and wrong for four: measured, `6001` put the number's right edge at 264.6 where the
 	 * rail's is 259, and its box could not hold it. So the number moved as the deck grew, which is
 	 * the one thing a count in a column must not do. Right-aligned with a minimum width, every count
-	 * ends on the same line a row's dot and its bin end on, and the digits grow leftward into the
-	 * label's spare width instead.
+	 * ends on one line, and the digits grow leftward into the label's spare width instead.
+	 *
+	 * That line is not the box's edge, which is the second half of the same problem: everything in the
+	 * rail is centred in the 20px box and smaller than it, so the ink inside ends short of 259. And it
+	 * is **a different line in each list**, because the two repeat different things down the right
+	 * edge — a 6px dot in the boards list, a timestamp in the agents list — which is why the check
+	 * measures one of each rather than one reference for both.
 	 *
 	 * Faked by writing the number in, because the CSS is what is under test and a deck of six
-	 * thousand boards is not something to build. The heading is put back afterwards: `n` is the
-	 * element the assertions below read.
+	 * thousand boards is not something to build. The heading is put back afterwards.
 	 */
 	const ends = await page.evaluate(() => {
+		/*
+		 * The count's ink has to end `padding-right` short of its box's own right edge, and that short
+		 * is what lines it up with whatever the list repeats down the right edge: the 6px dot in the
+		 * boards list, the timestamp in the agents list. Measuring the line this way rather than off
+		 * the dot keeps the assertion working on a fixture whose rows have no dots, and the two
+		 * cross-checks below it say that the ink is really where the dot and the stamp are.
+		 */
 		const n = document.querySelector(".panel-meta .n");
 		if (!n) return null;
 		const said = n.textContent;
@@ -212,33 +223,69 @@ try {
 		};
 		const rows = ["4", "600", "6001"].map(read);
 		n.textContent = said;
+		const inset = parseFloat(getComputedStyle(n).paddingRight);
+		/* A pseudo-element has no rect, so the dot's own ink is its width inside the centred box. */
+		const dot = document.querySelector(".board-act .dot");
+		const dotInk = dot ? (() => { const b = dot.getBoundingClientRect(); return b.left + (b.width + parseFloat(getComputedStyle(dot, "::before").width)) / 2; })() : null;
+		/*
+		 * The bin's icon, read here because the agents list has no bin and this is the one chance to
+		 * see it. It ends on the agents list's line rather than the boards one — 255, where the dot is
+		 * 252 — so it is what the agents assertion cross-checks against when the fixture has no
+		 * timestamp, which it will not until a chat in it has said something.
+		 */
+		const icon = document.querySelector(".board-del svg");
 		return {
-			/*
-			 * The line a count is supposed to end on: the **dot's ink**, not the rail box's edge.
-			 *
-			 * The box is 20px and every glyph in it is smaller and centred — the dot is a 6px circle,
-			 * the bin's icon is 12px — so a count aligned to the box (259) sat seven pixels right of
-			 * everything below it, which is the misalignment this measures. The dot's ink is a
-			 * pseudo-element and has no rect of its own, so its right edge is computed from its own
-			 * width and the box it is centred in.
-			 */
-			rail: Math.round(
-				(() => {
-					const dot = document.querySelector(".board-act .dot");
-					const box = dot.getBoundingClientRect();
-					const ink = parseFloat(getComputedStyle(dot, "::before").width);
-					return box.left + (box.width + ink) / 2;
-				})(),
-			),
+			line: Math.round(n.getBoundingClientRect().right - inset),
+			inset,
+			dotInk: dotInk === null ? null : Math.round(dotInk),
+			iconLine: icon ? Math.round(icon.getBoundingClientRect().right) : null,
 			rights: rows.map((row) => row.right),
 			spills: rows.some((row) => row.spills),
 		};
 	});
 	say(
-		"a count ends on the rail's line whatever it says",
-		ends === null || (ends.rights.every((right) => right === ends.rail) && !ends.spills),
+		"a boards count ends on the dot's line whatever it says",
+		ends === null || (ends.rights.every((right) => right === ends.line) && !ends.spills && (ends.dotInk === null || ends.dotInk === ends.line)),
 		JSON.stringify(ends),
 	);
+
+	/* The same for the agents list, whose right-hand column is a timestamp rather than a dot. */
+	await page.getByRole("tab", { name: "Agents" }).click();
+	await settle(page, 300);
+	const agentEnds = await page.evaluate(() => {
+		const n = document.querySelector(".panel-meta .n");
+		if (!n) return null;
+		const said = n.textContent;
+		const rights = ["4", "600", "6001"].map((text) => {
+			n.textContent = text;
+			const r = document.createRange();
+			r.selectNodeContents(n);
+			return Math.round(r.getBoundingClientRect().right);
+		});
+		n.textContent = said;
+		const inset = parseFloat(getComputedStyle(n).paddingRight);
+		/*
+		 * The cross-check here is the bin's **icon**, not the timestamp, and the two are the same line
+		 * by construction: the agents rows put their `18m` where the boards rows put the bin, both
+		 * ending at 255 inside the box. The icon is always in the DOM and the timestamp is not — a
+		 * fixture whose chats have never said anything has no `18m` to measure — so this is the one
+		 * that keeps the assertion honest in CI rather than skipped.
+		 */
+		return {
+			line: Math.round(n.getBoundingClientRect().right - inset),
+			inset,
+			rights,
+		};
+	});
+	say(
+		"…and an agents count ends on the timestamp's line",
+		agentEnds === null ||
+			(agentEnds.rights.every((right) => right === agentEnds.line) &&
+				(ends?.iconLine === null || ends?.iconLine === undefined || ends.iconLine === agentEnds.line)),
+		JSON.stringify(agentEnds),
+	);
+	await page.getByRole("tab", { name: "Boards" }).click();
+	await settle(page, 300);
 
 	await page.locator('[data-inset="left"] input').fill("risk");
 	await page.waitForTimeout(250);
