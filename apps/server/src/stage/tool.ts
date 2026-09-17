@@ -488,7 +488,7 @@ export function createStageTool(deps: {
 		 * working on it, and requiring a separate attach would be a step to forget.
 		 * `show(await stage.context())` puts everything back.
 		 *
-		 * `animate: true` makes the camera **arrive** rather than jump — 260ms, easing out. It is off
+		 * `animate: true` makes the camera **arrive** rather than jump — 420ms, easing out. It is off
 		 * by default: an op states where to look, and something watching the camera a frame later
 		 * should see what was asked for. The board's own links and the panel glide without being
 		 * asked, because those are a person's hands.

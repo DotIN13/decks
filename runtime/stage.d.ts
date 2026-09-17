@@ -181,7 +181,7 @@ export interface ShowOptions {
 	/** A `data-id` on the board to outline, so the user's eye lands on it. */
 	highlight?: string;
 	/**
-	 * Arrive at the framed view rather than jumping to it: 260ms, easing out.
+	 * Arrive at the framed view rather than jumping to it: 420ms, easing out.
 	 *
 	 * Off by default, and deliberately. An op says where to look, and something that reads the
 	 * camera a frame after calling this should see where it was told to look — the two gestures

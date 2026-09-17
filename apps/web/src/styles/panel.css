@@ -128,19 +128,29 @@
 	}
 
 	/*
-	 * The count, right-aligned in the rail's column and free to grow leftward.
+	 * The count, right-aligned and free to grow leftward, ending on the rail's own line.
 	 *
-	 * It was centred in a fixed 20px, which is fine until the deck is bigger than the column: `601`
-	 * is 19.2px of those 20, and a four-digit count spills past the panel's own padding — measured,
-	 * `6001` put the number's right edge at 261.5 against the rail's 259, and the three-digit one at
-	 * 258.6, so even the *right edge* of a count moved as it gained a digit. Right-aligned, a count
-	 * ends on the rail's line whatever it says: that is the line a row's dot and its bin end on, and
-	 * the line the field above it ends on. The digits grow into the label's spare width instead,
-	 * where there is room at any count — the deck this was written against lists 605 boards.
+	 * Two things are being fixed in one rule, and they pull in opposite directions.
+	 *
+	 * The count used to be **centred** in a fixed 20px, which is fine until the deck is bigger than
+	 * the column: `601` is 19.2px of those 20, and a four-digit count spilled past the panel's own
+	 * padding — measured, `6001` put the number's right edge at 264.6 where the rail's is 259, and a
+	 * three-digit one at 258.6, so even the *right edge* of a count moved as it gained a digit.
+	 * Right-aligned, a count ends on the same line whatever it says, and the digits grow into the
+	 * label's spare width, where there is room at any count — the deck this was written against
+	 * lists 650 boards.
+	 *
+	 * But right-aligned against the *box* is not right-aligned against the column: the box is 20px
+	 * and every glyph in it is smaller — the dot is a 6px circle and the bin's icon is 12px, both
+	 * centred, so their ink ends at 252 and 255 while a count ending at the box edge (259) sat seven
+	 * pixels to the right of everything below it. That is the alignment the eye reads as wrong. The
+	 * `padding-right` is the half of the gap between the ink and the box edge on the dot's side, so a
+	 * one-digit count lands centred on the column and a four-digit one still ends on that line.
 	 */
 	.panel-meta > .n {
 		display: grid;
 		min-width: 20px;
+		padding-right: 7px;
 		flex: none;
 		align-items: center;
 		justify-items: end;

@@ -213,7 +213,23 @@ try {
 		const rows = ["4", "600", "6001"].map(read);
 		n.textContent = said;
 		return {
-			rail: Math.round(document.querySelector(".board-act .board-del").getBoundingClientRect().right),
+			/*
+			 * The line a count is supposed to end on: the **dot's ink**, not the rail box's edge.
+			 *
+			 * The box is 20px and every glyph in it is smaller and centred — the dot is a 6px circle,
+			 * the bin's icon is 12px — so a count aligned to the box (259) sat seven pixels right of
+			 * everything below it, which is the misalignment this measures. The dot's ink is a
+			 * pseudo-element and has no rect of its own, so its right edge is computed from its own
+			 * width and the box it is centred in.
+			 */
+			rail: Math.round(
+				(() => {
+					const dot = document.querySelector(".board-act .dot");
+					const box = dot.getBoundingClientRect();
+					const ink = parseFloat(getComputedStyle(dot, "::before").width);
+					return box.left + (box.width + ink) / 2;
+				})(),
+			),
 			rights: rows.map((row) => row.right),
 			spills: rows.some((row) => row.spills),
 		};

@@ -24,11 +24,13 @@ const [camera, setCamera] = createSignal<Camera>({ x: 0, y: 0, zoom: 1 });
 /**
  * How long the camera takes to arrive when it is asked to glide rather than jump.
  *
- * 260ms: long enough to read as movement, short enough that a click still feels like a click. It
- * also lands inside the 300ms `Stage`'s scale settle waits for, so a glide that changes the zoom
- * asks the boards to be drawn again **once, at the end**, rather than every frame.
+ * 420ms: long enough to see the direction of the movement and read it as an arrival, which 260ms
+ * was not — at 260 the first 50ms carried half the travel, so it read as a jump with a tail. The
+ * scale settle is not a constraint on this number: `Stage`'s `nowScaling` re-arms its own 300ms
+ * timer on every frame the zoom moves, so it fires 300ms after the glide lands whatever the
+ * duration, and a zooming glide still asks for one redraw at the end rather than sixty.
  */
-export const GLIDE_MS = 260;
+export const GLIDE_MS = 420;
 
 /**
  * The glide the app has been asked for, or nothing.
