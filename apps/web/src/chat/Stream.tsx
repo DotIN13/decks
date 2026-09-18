@@ -1,5 +1,6 @@
 import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
+import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, Index, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 import { closeHistory, historyShown } from "../state/edge.ts";
@@ -45,6 +46,8 @@ export function Stream(props: {
 	items: ChatItem[];
 	/** Whose conversation this is, so the window resets when you switch chats. */
 	agentId: string;
+	/** The header element, once mounted: the app makes it the float's drag handle. */
+	onHead?: (element: HTMLDivElement) => void;
 	/** Whether the server holds anything older than `items` (`chat/history-page.ts`). */
 	more: boolean;
 	/** Fetch the page before the oldest row held. Answers with how many arrived. */
@@ -72,6 +75,8 @@ export function Stream(props: {
 	onRestore: (entryId: string) => void;
 }) {
 	let column!: HTMLElement;
+	let head: HTMLDivElement | undefined;
+	onMount(() => { if (head) props.onHead?.(head); });
 	let scroller!: HTMLDivElement;
 	const [pinned, setPinned] = createSignal(true);
 	/** How many cards are below the fold, which is what the jump pill counts. */
@@ -430,6 +435,21 @@ export function Stream(props: {
 			 * would lose to it… no: it would lose to any utility, which is the same rule read
 			 * from the other end. The strong half has to be the variant.
 			 */}
+			{/*
+			 * The header: whose thread this is, and the handle to move it by.
+			 *
+			 * The column is a float now. A float needs somewhere to take hold of that is not a
+			 * card, and a title that says whose turns these are once it has been moved away
+			 * from the corner that used to say so. The × is the same `closeHistory` the corner's
+			 * button calls, so the two never disagree.
+			 */}
+			<div class="stream-head" ref={head}>
+				<span class="stream-head-name">{props.name}</span>
+				<span class="stream-head-state">{props.state === "idle" ? "" : props.state}</span>
+				<button type="button" class="iconbtn stream-head-x" title="Hide the conversation" aria-label="Hide the conversation" onClick={() => closeHistory()}>
+					<Icon of={X} size={13} />
+				</button>
+			</div>
 			<div
 				class="stream-roll max-[1100px]:pointer-events-auto"
 				ref={scroller}

@@ -48,3 +48,28 @@ const SIZE = 15;
 export function Icon(props: { of: LucideIcon; size?: number; class?: string }) {
 	return <Dynamic component={props.of} size={props.size ?? SIZE} strokeWidth={STROKE} class={props.class} />;
 }
+
+/**
+ * The app's own mark: boards of unequal size laid out on a canvas, the drawing the favicon
+ * is cut from (`public/favicon.svg`, which says why the asymmetry matters). Ink is
+ * `currentColor`, so it takes the colour of the text beside it; the two fainter boards are
+ * opacities of that ink, which is fine here where the ground is known.
+ */
+export function DecksMark(props: { size?: number; class?: string }) {
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			viewBox="0 0 32 32"
+			width={props.size ?? 20}
+			height={props.size ?? 20}
+			class={props.class}
+			role="img"
+			aria-label="Decks"
+			fill="currentColor"
+		>
+			<rect x="2" y="4" width="15" height="13" rx="3" />
+			<rect x="20" y="4" width="10" height="24" rx="3" opacity="0.5" />
+			<rect x="2" y="20" width="15" height="8" rx="3" opacity="0.72" />
+		</svg>
+	);
+}

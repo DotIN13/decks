@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Board, BoardPatch, DeckState, ServerMessage, AnyBoardPatch } from "@decks/protocol";
+import type { Board, DeckState, ServerMessage, AnyBoardPatch } from "@decks/protocol";
 import { applyPatches, mintId, PatchRefused } from "./patch.ts";
 import { Revisions } from "./snapshots.ts";
+import { Authors, Seen } from "./authors.ts";
 import {
 	extensionFor,
 	MIRROR_SIZE,
@@ -66,6 +67,8 @@ export interface BoardHooks {
  */
 export class BoardService {
 	readonly revisions: Revisions;
+	private readonly authors: Authors;
+	private readonly seenAt: Seen;
 	private readonly extents = new Map<string, { rev: number; w: number; h: number }>();
 	/** `stage.fit` calls waiting for the frame to load and report. */
 	private readonly extentWaiters = new Set<{ path: string; rev: number; resolve: (extent: { w: number; h: number } | undefined) => void }>();
@@ -75,13 +78,67 @@ export class BoardService {
 		private readonly hooks: BoardHooks,
 	) {
 		this.revisions = new Revisions(deck);
+		this.authors = new Authors(deck.path);
+		this.seenAt = new Seen(deck.path);
+		this.restamp();
 	}
 
 	/** Another data directory was opened, so the deck and its revision store move with it. */
 	setDeck(deck: Deck): void {
 		this.deck = deck;
 		this.revisions.setDeck(deck);
+		this.authors.setDeck(deck.path);
+		this.seenAt.setDeck(deck.path);
+		this.restamp();
 		this.extents.clear();
+	}
+
+	/**
+	 * Say who wrote a board, and tell every browser if that is news.
+	 *
+	 * **Authorship is said, never detected.** A file event has no author, so nothing here reads
+	 * one off the disk: an agent that fits, shows or reports a board through the stage tool is
+	 * its writer (`stage/tool.ts`), and the canvas editor's patch is the person's. `who` is an
+	 * agent id or `"you"`. Kept in `.decks/authors.json`, so the byline outlives a restart.
+	 */
+	wrote(path: string, who: string): void {
+		const board = this.deck.board(path);
+		if (!board) return;
+		const changed = this.authors.set(path, who);
+		if (board.lastWrittenBy === who && !changed) return;
+		board.lastWrittenBy = who;
+		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? board;
+		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: { ...placed, lastWrittenBy: who } });
+	}
+
+	/**
+	 * The person looked at a board: its preview on the dashboard, or the focus view.
+	 *
+	 * Stamped with the later of now and the file's own time, so a clock that disagrees with the
+	 * disk cannot leave a board marked that has just been read. Nothing is sent when the board was
+	 * already read since its last write, which is every press after the first.
+	 */
+	seen(path: string, now = Date.now()): void {
+		const board = this.deck.board(path);
+		if (!board) return;
+		if ((board.seenAt ?? 0) >= (board.modifiedAt ?? 0)) return;
+		const at = Math.max(now, board.modifiedAt ?? 0);
+		this.seenAt.set(path, at);
+		board.seenAt = at;
+		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? board;
+		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: { ...placed, seenAt: at } });
+	}
+
+	/** Put the stored bylines back on the deck's records: the loader re-describes boards from disk and knows no authors. */
+	restamp(): void {
+		for (const [path, who] of this.authors.entries()) {
+			const board = this.deck.board(path);
+			if (board) board.lastWrittenBy = who;
+		}
+		for (const [path, at] of this.seenAt.entries()) {
+			const board = this.deck.board(path);
+			if (board) board.seenAt = at;
+		}
 	}
 
 	/**
@@ -119,6 +176,13 @@ export class BoardService {
 	}
 
 	/** Nobody is looking at that board any more, or it is gone. */
+	/** A board left the deck by the disk rather than by the button: drop its reading and its byline. */
+	forgetBoard(path: string): void {
+		this.forgetExtent(path);
+		this.authors.forget(path);
+		this.seenAt.forget(path);
+	}
+
 	forgetExtent(path: string): void {
 		this.extents.delete(path);
 	}
@@ -309,6 +373,8 @@ export class BoardService {
 		}
 		this.hooks.removed(path);
 		this.forgetExtent(path);
+		this.authors.forget(path);
+		this.seenAt.forget(path);
 		this.hooks.send({ type: "board.changed", path, rev: 0, removed: true });
 	}
 
@@ -431,6 +497,7 @@ export class BoardService {
 			this.hooks.send({ type: "board.patched", path, rev: updated?.rev ?? board.rev });
 			if (updated) {
 				updated.lastWrittenBy = "you";
+				this.authors.set(path, "you");
 				this.hooks.send({ type: "board.changed", path, rev: updated.rev, board: this.placed(updated) });
 			}
 			this.hooks.edited(path, summary.join(", "));

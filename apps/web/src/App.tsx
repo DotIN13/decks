@@ -1,15 +1,10 @@
-import type { BoardPatch, Board, Camera, Identity, ThinkingLevel } from "@decks/protocol";
+import type { Board, Camera, ThinkingLevel } from "@decks/protocol";
+import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
-import MessageSquare from "lucide-solid/icons/message-square";
-import Minus from "lucide-solid/icons/minus";
 import Moon from "lucide-solid/icons/moon";
-import Layers from "lucide-solid/icons/layers";
 import SettingsIcon from "lucide-solid/icons/settings";
-import LayoutGrid from "lucide-solid/icons/layout-grid";
-import PanelLeft from "lucide-solid/icons/panel-left";
-import Plus from "lucide-solid/icons/plus";
 import Sun from "lucide-solid/icons/sun";
-import {createEffect, createMemo, createSignal, onCleanup, onMount, Show} from "solid-js";
+import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show} from "solid-js";
 import type { EditorHost } from "./canvas/Editor.ts";
 import { Settings } from "./chat/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
@@ -24,10 +19,16 @@ import { scratch } from "./state/agent.ts";
 import { ensureHistory, loadEarlier } from "./state/history.ts";
 import { frameRevs, patchBoard } from "./state/patches.ts";
 import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
-import { on, send, start, started } from "./state/socket.ts";
+import { on, send, start } from "./state/socket.ts";
+import { Icon } from "./ui/icons.tsx";
 import {clearDialog, clearPreview, dialog, preview, setState, state} from "./state/deck.ts";
-import { notice, working } from "./state/notices.ts";
-import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
+import { notice } from "./state/notices.ts";
+import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport, surface, setSurface, dispatchTab, setDispatchTab, dispatchPreview, setDispatchPreview} from "./state/ui.ts";
+import { installRoute, type Place } from "./app/route.ts";
+import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
+import { makeFloat } from "./chrome/float.ts";
+import { DispatchView } from "./chrome/DispatchView.tsx";
+import { wantsYou } from "./chrome/dispatch-view.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
@@ -48,10 +49,9 @@ import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
 import { agentViews } from "./camera/agent-views.ts";
 import {closeHistory, historyShown, openHistory, setInspectable} from "./state/edge.ts";
-import { canvasBox, watchInsets } from "./camera/insets.ts";
+import { canvasBox, insets, watchInsets } from "./camera/insets.ts";
 import { canHover, NARROW } from "./lib/media.ts";
 import { installViewport, obscured } from "./app/viewport.ts";
-import {finished} from "./alerts/policy.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
 import { UsageModal } from "./chat/UsageModal.tsx";
 import { workingWords } from "./chat/working-sign.ts";
@@ -144,6 +144,323 @@ export function App() {
 	});
 
 	/*
+	 * Where the person is, from the hash.
+	 *
+	 * The middle of the window is one of two surfaces: the dispatch dashboard, or an agent's
+	 * stage. Neither is set by a gesture directly. A gesture writes the hash through `go`,
+	 * and the one place that reads the hash sets the signals, so a press, the browser's Back
+	 * button, a reload and a pasted link all arrive by the same road. The stage's agent is
+	 * `state.focused`, which the server owns: arriving at `#/agent/x` asks for x the way a
+	 * row in the panel does, and the camera comes back from `agent-views.ts` as it always has.
+	 */
+	const [routeAgent, setRouteAgent] = createSignal<string | undefined>();
+	let setWantFocusedStage: (value: boolean) => void = () => {};
+	const applyPlace = (place: Place) => {
+		if (place.surface === "dispatch") {
+			setSurface("dispatch");
+			setDispatchTab(place.tab);
+			setDispatchPreview(place.board);
+			setRouteAgent(undefined);
+			setWantFocusedStage(false);
+			return;
+		}
+		setSurface("stage");
+		setDispatchPreview(undefined);
+		if (place.agent === "") {
+			// `#/stage`: whoever the server says is focused. Named once that is known, below.
+			setRouteAgent(undefined);
+			setWantFocusedStage(true);
+			return;
+		}
+		setWantFocusedStage(false);
+		setRouteAgent(place.agent);
+		if (place.agent !== state.focused) {
+			requested = place.agent;
+			focusAgent(place.agent);
+		}
+	};
+	/*
+	 * The stage follows the server's focus, and the hash follows the stage.
+	 *
+	 * Focus is the server's: closing the conversation on screen moves it to the nearest row,
+	 * and a `#/agent/x` for an x that does not exist is answered with whoever is focused.
+	 * Either way the canvas already shows that agent, so the hash is replaced to say so
+	 * rather than left naming one that is not there. A change we asked for ourselves is
+	 * not a correction: `requested` is the id a route asked for, and its answer is skipped.
+	 */
+	let requested: string | undefined;
+	createEffect(
+		watch(
+			() => state.focused,
+			(id) => {
+				if (surface() !== "stage" || !id) return;
+				if (requested) {
+					if (id === requested) requested = undefined;
+					return;
+				}
+				if (id !== routeAgent()) go({ surface: "stage", agent: id }, { replace: true });
+			},
+			{ defer: true },
+		),
+	);
+	createEffect(
+		watch(
+			() => state.chats.map((chat) => chat.id).join(","),
+			() => {
+				// The roster arrived without the agent a route asked for: the ask is over.
+				if (!requested || state.chats.length === 0 || state.chats.some((chat) => chat.id === requested)) return;
+				requested = undefined;
+				if (surface() === "stage" && state.focused) go({ surface: "stage", agent: state.focused }, { replace: true });
+			},
+			{ defer: true },
+		),
+	);
+	/*
+	 * Reading a board is what takes its "changed" mark off the dashboard: its preview there, or
+	 * the focus view on a stage. Said once per opening; the server ignores a board already read
+	 * since its last write, and the next write brings the mark back.
+	 */
+	createEffect(
+		watch(
+			() => {
+				const path = surface() === "dispatch" ? dispatchPreview() : focus();
+				// The file's time is part of the key: a board rewritten while it is open is still
+				// being read, so the mark must not come back under the reader's eyes.
+				return path ? `${state.boards.find((board) => board.path === path)?.modifiedAt ?? 0}|${path}` : undefined;
+			},
+			(key) => {
+				if (key) send({ type: "board.seen", path: key.slice(key.indexOf("|") + 1) });
+			},
+		),
+	);
+	const [wantFocusedStage, setWantFocusedStageSignal] = createSignal(false);
+	setWantFocusedStage = setWantFocusedStageSignal;
+	createEffect(() => {
+		const id = state.focused;
+		if (!wantFocusedStage() || !id) return;
+		setWantFocusedStage(false);
+		go({ surface: "stage", agent: id }, { replace: true });
+	});
+	/* Installed once the socket is open (below, with the frame handler): landing on
+	   `#/agent/x` asks the server for x, and a send before `start` is a throw. */
+	let route: ReturnType<typeof installRoute> | undefined;
+	const go = (place: Place, options?: { replace?: boolean }) => route?.go(place, options);
+	/** A stage, from anywhere. Switching agent while already on one replaces the entry, so five presses are one Back. */
+	const openStage = (id: string) => go({ surface: "stage", agent: id }, { replace: surface() === "stage" });
+	/** Back to the dashboard, on the tab it was left on. */
+	const goHome = () => go({ surface: "dispatch", tab: dispatchTab() });
+	/*
+	 * Escape goes Home from a stage, and ⌘1 ⌘2 ⌘3 pick a dashboard tab.
+	 *
+	 * After everything that owns Escape ahead of this: a field, a dialog, a selection
+	 * (`app/keys.ts`), the conversation when it is showing, a board being presented. Only a
+	 * stage with nothing to let go of goes back to the dashboard.
+	 */
+	onMount(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.defaultPrevented) return;
+			const target = event.target as HTMLElement | null;
+			const inField = !!target?.closest?.("input, textarea, select, [contenteditable]");
+			if ((event.metaKey || event.ctrlKey) && !event.altKey && ["1", "2", "3"].includes(event.key) && surface() === "dispatch" && !inField) {
+				event.preventDefault();
+				const tab = ({ "1": "boards", "2": "tasks", "3": "cron" } as const)[event.key as "1" | "2" | "3"];
+				go({ surface: "dispatch", tab });
+				return;
+			}
+			if (event.key !== "Escape" || inField) return;
+			if (surface() !== "stage") return;
+			// Everything that owns Escape on a stage keeps it: a selection, a dialog, a board
+			// being presented or read in the focus view, the conversation, the source editor,
+			// the file picker, settings, the cheat sheet and the usage panel.
+			if (component() || dialog() || presenting() || historyShown() || focus() || editingSource() || picking() || settings() || ops() || usagePanel()) return;
+			event.preventDefault();
+			goHome();
+		};
+		window.addEventListener("keydown", onKeyDown);
+		onCleanup(() => window.removeEventListener("keydown", onKeyDown));
+	});
+
+	/*
+	 * The bar's destination, decided in one place.
+	 *
+	 * Where a line lands depends on which surface is up, who is focused, and whether the
+	 * text names an agent. The word on the bar is this same function run without sending,
+	 * so the label and the frame cannot disagree. `barText` is what the composer holds right
+	 * now, reported on every keystroke, so an @ name changes the word as it is typed.
+	 */
+	const [barText, setBarText] = createSignal("");
+	/*
+	 * The dispatcher: the agent behind the dashboard's bar. Made by the server, one per
+	 * deck, and kept out of every list a person picks an agent from — `visibleChats` is what
+	 * the sidebar, the pill and the corner draw. On the dashboard the bar, its model picker
+	 * and the conversation float are the dispatcher's; on a stage they are the focused
+	 * agent's. `barAgent` is that one switch.
+	 */
+	/*
+	 * Two dispatchers to tell apart. The **template** is the one with no parent: it never
+	 * places anything, it holds the model, thinking and mode the composer sets on the
+	 * dashboard, and every task's dispatcher is spawned from it. A **task's dispatcher** is
+	 * a child of the template, one per task, and its transcript is that task's log: the
+	 * float on the dashboard shows the one whose row was last opened, else the template.
+	 */
+	const dispatcherId = createMemo(() => state.chats.find((chat) => chat.role === "dispatcher" && !chat.parentId)?.id);
+	const visibleChats = createMemo(() => state.chats.filter((chat) => chat.role !== "dispatcher"));
+	const [logAgent, setLogAgent] = createSignal<string | undefined>(undefined);
+	const barAgent = () => (surface() === "dispatch" ? dispatcherId() : state.focused);
+	const barChat = createMemo(() => state.chats.find((chat) => chat.id === barAgent()));
+	const streamAgent = () => (surface() === "dispatch" ? (logAgent() && state.chats.some((chat) => chat.id === logAgent()) ? logAgent() : dispatcherId()) : state.focused);
+	const streamChat = createMemo(() => state.chats.find((chat) => chat.id === streamAgent()));
+	const barContext = () => {
+		const focusedId = state.focused;
+		const nameOf = (id: string) => state.identities[id]?.name ?? state.chats.find((chat) => chat.id === id)?.name ?? id;
+		return {
+			surface: surface(),
+			...(focusedId ? { focused: { id: focusedId, name: nameOf(focusedId) } } : {}),
+			agents: visibleChats().map((chat) => ({ id: chat.id, name: nameOf(chat.id) })),
+		};
+	};
+	const sendFromBar = (text: string) => {
+		const dest = destination(text, barContext());
+		switch (dest.kind) {
+			case "task":
+				send({ type: "task.create", task: { text }, requestedBy: "you" });
+				return;
+			case "prompt": {
+				const line = dest.named ? stripMention(text, dest.name) : text;
+				if (dest.id === state.focused) clearMarks(dest.id);
+				send({ type: "agent.prompt", id: dest.id, text: line });
+				return;
+			}
+			case "note":
+				notice("info", "Notes on a component are not built yet.");
+				return;
+			default:
+				notice("info", "Pick an agent first, or go Home and dispatch it.");
+		}
+	};
+
+	/*
+	 * The two floats: the composer and the conversation.
+	 *
+	 * Both are the app's own chrome, kept where they are by default. Taken by the grip or
+	 * the header they go where they are put, clamped to the surface, snapping home within
+	 * 24px, remembered per person in localStorage as a corner and an offset so a narrower
+	 * window keeps them on screen. Neither is an inset: a float over the canvas does not move
+	 * what is centred on the canvas, which is the rule `camera/insets.ts` keeps.
+	 */
+	let dockEl: HTMLDivElement | undefined;
+	/** How much of a put-away composer still shows: the tab that brings it back. */
+	const STOW_TAB = 36;
+	let unstowComposer = () => {};
+	let streamEl: HTMLElement | undefined;
+	/*
+	 * The canvas column the floats may move in. The insets come from the signal, not from
+	 * the `--inset-*` variables: the variables are written after the signal settles, so an
+	 * effect on `insets()` that read them got the previous fold's numbers, and a float
+	 * parked on the left stood still when the sidebar folded and then moved when it opened.
+	 */
+	const workBox = () => {
+		const work = document.querySelector(".work");
+		const rect = work?.getBoundingClientRect();
+		const { left, right } = insets();
+		return { x: left, y: 0, w: (rect?.width ?? window.innerWidth) - left - right, h: rect?.height ?? window.innerHeight };
+	};
+	const floatsOff = () => window.innerWidth < 1100;
+	/*
+	 * `pin: "bottom"` writes the position as a `bottom` rather than a `top`. The composer is
+	 * a column whose status row comes and goes above the box (it leaves when the conversation
+	 * opens), and pinned by its top the box slid up into the row's place. Pinned by its
+	 * bottom, the box stays where it was put and the row appears above it, which is what the
+	 * dock's own CSS does at home. `read` is what a drag then starts from, because the top
+	 * the float remembers is stale the moment the height changes.
+	 */
+	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number }) =>
+		makeFloat(el, {
+			...(stow ? { stow } : {}),
+			key,
+			handle,
+			ignore,
+			home,
+			bounds: workBox,
+			size: () => ({ w: el.offsetWidth, h: el.offsetHeight }),
+			disabled: floatsOff,
+			pin,
+			read: () => ({ x: el.offsetLeft, y: el.offsetTop }),
+			apply: (p, atHome, stowed) => {
+				/*
+				 * Put away, everything but the tab is out of reach as well as out of sight:
+				 * `inert`, so Tab does not walk into a text box that is off the screen.
+				 */
+				el.toggleAttribute("data-stowed", stowed);
+				for (const child of el.children) if (!child.classList.contains("dock-stowtab")) child.toggleAttribute("inert", stowed);
+				if (atHome || !p) {
+					el.removeAttribute("data-floating");
+					el.style.left = "";
+					el.style.top = "";
+					el.style.bottom = "";
+					return;
+				}
+				el.setAttribute("data-floating", "true");
+				el.style.left = `${p.x}px`;
+				if (pin === "bottom") {
+					el.style.top = "";
+					el.style.bottom = `${workBox().h - (p.y + el.offsetHeight)}px`;
+				} else {
+					el.style.bottom = "";
+					el.style.top = `${p.y}px`;
+				}
+			},
+		});
+	onMount(() => {
+		const dock = dockEl;
+		const handle = dock?.querySelector<HTMLElement>(".dockbox");
+		if (!dock || !handle) return;
+		const float = mountFloat(dock, "composer", handle, "textarea, input, button, select, a, [role='menu'], [role='listbox'], .sendbtn", () => {
+			const box = workBox();
+			return { x: box.x + box.w / 2 - dock.offsetWidth / 2, y: box.h - dock.offsetHeight - 12 };
+		}, "bottom", { tab: STOW_TAB });
+		unstowComposer = () => float.unstow();
+		/*
+		 * Two things bring it back on their own, because both are the app asking for the
+		 * person's attention *in the bar*: a question that needs an answer, and a line put
+		 * into the box for them (a comment on a component, a dropped file).
+		 */
+		createEffect(() => {
+			if ((dialog() || draft()) && float.stowed()) float.unstow();
+		});
+		/* The bounds are the canvas column, which is measured after mount and moves when the
+		   sidebar folds. A float restored against the wrong column sits 264px to the left. */
+		createEffect(() => {
+			insets();
+			float.restore();
+		});
+		/* How tall the composer is, as a variable: the focus view pads its foot by it so a
+		   page scrolls clear of the bar. Measured, because the bar grows with its text. */
+		if (typeof ResizeObserver !== "undefined") {
+			const publish = () => document.documentElement.style.setProperty("--dock-h", `${Math.round(dock.getBoundingClientRect().height)}px`);
+			const watcher = new ResizeObserver(publish);
+			watcher.observe(dock);
+			publish();
+			onCleanup(() => watcher.disconnect());
+		}
+		onCleanup(() => float.dispose());
+	});
+	const mountStreamFloat = (head: HTMLDivElement) => {
+		const stream = streamEl ?? (head.closest(".stream") as HTMLElement | null);
+		if (!stream) return;
+		const float = mountFloat(stream, "conversation", head, "button, a", () => {
+			const box = workBox();
+			// The panel's own CSS: `right: 12px`, `top: 64px` (the gutter is 0 once it is a panel).
+			return { x: box.x + box.w - stream.offsetWidth - 12, y: 64 };
+		});
+		createEffect(() => {
+			insets();
+			float.restore();
+		});
+		onCleanup(() => float.dispose());
+	};
+
+	/*
 	 * Start measuring the chrome.
 	 *
 	 * Before the socket, deliberately: the first `deck.state` can arrive with boards in it
@@ -183,6 +500,8 @@ export function App() {
 		});
 		const off = on((message) => handleFrame(message, frames));
 		onCleanup(off);
+		route = installRoute({ onPlace: applyPlace });
+		onCleanup(() => route?.dispose());
 	});
 
 	/**
@@ -239,7 +558,15 @@ export function App() {
 	};
 
 	const focusedChat = createMemo(() => state.chats.find((chat) => chat.id === state.focused));
-	const transcript = createMemo(() => (state.focused ? state.agents[state.focused]?.transcript ?? [] : []));
+	/* The conversation float shows whoever the bar addresses: the dispatcher on the
+	   dashboard, the focused agent on a stage. Its history is asked for when it is shown. */
+	const transcript = createMemo(() => {
+		const id = streamAgent();
+		return id ? state.agents[id]?.transcript ?? [] : [];
+	});
+	createEffect(() => {
+		if (historyShown()) ensureHistory(streamAgent());
+	});
 	const busy = createMemo(() => {
 		const chat = focusedChat();
 		return chat ? chat.state !== "idle" : false;
@@ -771,6 +1098,48 @@ export function App() {
 				 * document lives in a different element under each renderer, and moving an iframe
 				 * reloads it anyway, so a clean remount is the honest version of the same cost.
 				 */}
+				<div class="surface" data-surface={surface()}>
+					{/*
+					 * The dashboard in front by default, the stage behind it, and a press slides
+					 * one over the other. The layer behind is `data-hidden` and `inert`, the same
+					 * two attributes the canvas uses for its world behind the focus view: a `Show`
+					 * here would tear down every board document to reach the dashboard.
+					 */}
+					<div class="surface-layer" data-layer="dispatch" data-hidden={surface() === "dispatch" ? undefined : "true"} inert={surface() === "dispatch" ? undefined : true} aria-hidden={surface() !== "dispatch"}>
+						<DispatchView
+							tab={dispatchTab()}
+							onTab={(tab) => go({ surface: "dispatch", tab })}
+							boards={state.boards}
+							identities={state.identities}
+							chats={visibleChats()}
+							contexts={state.contexts}
+							tasks={state.tasks}
+							schedules={state.schedules}
+							onOpenLog={(id) => {
+								setLogAgent(id);
+								openHistory();
+							}}
+							preview={dispatchPreview()}
+							onPreview={(path) => go({ surface: "dispatch", tab: dispatchTab(), ...(path ? { board: path } : {}) })}
+							onOpenOnCanvas={(path) => {
+								/* Whoever holds it, else the agent you were last with. `agent.focus` goes
+								   first on the wire, so the play is attributed to the right stage. */
+								const holder = Object.entries(state.contexts).find(([, paths]) => paths.includes(path))?.[0] ?? state.focused;
+								if (!holder) {
+									notice("info", "No agent to open it with. Make one first.");
+									return;
+								}
+								openStage(holder);
+								send({ type: "board.play", path });
+							}}
+							onOpenAgent={openStage}
+							onCancelTask={(id) => send({ type: "task.cancel", id })}
+							onRetryTask={(id) => send({ type: "task.retry", id })}
+							onRunSchedule={(id) => send({ type: "schedule.run", id })}
+							onCancelSchedule={(id) => send({ type: "schedule.cancel", id })}
+						/>
+					</div>
+					<div class="surface-layer" data-layer="stage" data-hidden={surface() === "stage" ? undefined : "true"} inert={surface() === "stage" ? undefined : true} aria-hidden={surface() !== "stage"}>
 				<Show when={renderer()} keyed>
 					{(current) => (
 					<Stage
@@ -786,7 +1155,10 @@ export function App() {
 						 * (not known yet) has to be told apart from "nothing remembered".
 						 */
 						opening={state.focused ? { camera: openingCamera() } : undefined}
-						boardsMayStart={boardsMayStart()}
+						/* Board documents start only once a stage is on screen. The dashboard is
+						   metadata and pictures; the first press pays for the mount, as the design
+						   says, and a person who never opens a stage never pays it. */
+						boardsMayStart={boardsMayStart() && surface() === "stage"}
 						// The panel's list and the rail's thumbnails are less urgent: after the canvas.
 						onBoardsStarted={canvasOpened}
 						mode={mode()}
@@ -952,6 +1324,8 @@ export function App() {
 					/>
 					)}
 				</Show>
+					</div>
+				</div>
 
 				{/*
 					The two top clusters, and the tools are inside the left one.
@@ -965,13 +1339,18 @@ export function App() {
 				<AgentPill
 					mode={mode()}
 					onMode={setMode}
-					chats={state.chats}
+					chats={visibleChats()}
 					identities={state.identities}
 					focused={state.focused}
 					unread={unread}
-					onFocus={focusAgent}
+					onFocus={openStage}
 					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					onClose={closeAgent}
+					surface={surface()}
+					onHome={goHome}
+					wantsYou={wantsYou(state.tasks)}
+					tab={dispatchTab()}
+					onTab={(tab) => go({ surface: "dispatch", tab })}
 					boardsOpen={boardsOpen()}
 					onToggleBoards={() => showBoards(!boardsOpen())}
 					tool={tool()}
@@ -987,13 +1366,14 @@ export function App() {
 				/>
 
 				<Corner
-					chats={state.chats}
+					chats={visibleChats()}
 					identities={state.identities}
 					focused={state.focused}
 					unread={unread}
-					onFocus={focusAgent}
+					onFocus={openStage}
 					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					onClose={closeAgent}
+					surface={surface()}
 					zoom={camera().zoom}
 					onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))}
 					/*
@@ -1006,7 +1386,18 @@ export function App() {
 					 * it is what "where am I" means.
 					 */
 					onFit={() => fitAll(stageBoards(), setCamera)}
-					onNewBoard={(format) => send({ type: "board.create", ...(format && format !== "component" ? { format } : {}) })}
+					onNewBoard={(format) => {
+						/* From the dashboard a new board is made for the agent you were last with, and
+						   the stage opens so it lands somewhere you can see. */
+						if (surface() === "dispatch") {
+							if (!state.focused) {
+								notice("info", "Make an agent first: a board is made on an agent's canvas.");
+								return;
+							}
+							openStage(state.focused);
+						}
+						send({ type: "board.create", ...(format && format !== "component" ? { format } : {}) });
+					}}
 					/*
 					 * Off the canvas, one message per board, and *not* out of the context.
 					 * `board.hide` has always drawn that line — the context is the agent's, and
@@ -1096,7 +1487,7 @@ export function App() {
 				*/}
 				<LeftPanel
 					boards={state.boards}
-					listMayGrow={boardsStarted()}
+					listMayGrow={boardsStarted() || surface() === "dispatch"}
 					current={selected()}
 					inPlay={state.focused ? state.agents[state.focused]?.inPlay ?? [] : []}
 					holdings={state.contexts}
@@ -1110,10 +1501,10 @@ export function App() {
 					 * `focusAgent` rather than a bare `agent.focus`, because switching moves the
 					 * canvas, the camera, the transcript and the draft together.
 					 */
-					chats={state.chats}
+					chats={visibleChats()}
 					identities={state.identities}
 					unread={unread}
-					onFocusAgent={focusAgent}
+					onFocusAgent={openStage}
 					onCloseAgent={closeAgent}
 					onMirrorAgent={(id) => send({ type: "agent.mirror", agentId: id })}
 					/* Your tags, which the agent cannot see or overwrite — a separate field from
@@ -1123,6 +1514,11 @@ export function App() {
 					   agent declares one and you can move it, and whoever wrote last is where it is. */
 					onAgentWorkspace={(id, workspace) => send({ type: "agent.workspace", id, workspace })}
 					onPick={(board) => {
+						/* On the dashboard a board row is a preview; on a stage it is the canvas. */
+						if (surface() === "dispatch") {
+							go({ surface: "dispatch", tab: dispatchTab(), board: board.path });
+							return;
+						}
 						send({ type: "board.play", path: board.path });
 						flyTo(board);
 					}}
@@ -1203,18 +1599,19 @@ export function App() {
 				 * the same edge is wanted by the inspector and only one of them may have it.
 				 */}
 				<Stream
+					onHead={mountStreamFloat}
 					items={transcript()}
 					/*
 					 * Reaching back, in two parts: whether there is anything there, and how to
 					 * ask for it. The column owns the window over what is held; the server owns
 					 * everything older (`agents/store.ts`), and this is the seam between them.
 					 */
-					more={state.focused ? state.agents[state.focused]?.moreHistory === true : false}
-					onEarlier={() => (state.focused ? loadEarlier(state.focused) : Promise.resolve(0))}
-					agentId={state.focused ?? ""}
-					state={focusedChat()?.state ?? "idle"}
-					name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
-					agent={focusedChat()?.kind ?? state.defaultKind}
+					more={streamAgent() ? state.agents[streamAgent()!]?.moreHistory === true : false}
+					onEarlier={() => (streamAgent() ? loadEarlier(streamAgent()!) : Promise.resolve(0))}
+					agentId={streamAgent() ?? ""}
+					state={streamChat()?.state ?? "idle"}
+					name={state.identities[streamAgent() ?? ""]?.name ?? streamChat()?.name ?? "It"}
+					agent={streamChat()?.kind ?? state.defaultKind}
 					{...(atTurn() ? { scrollTo: atTurn()! } : {})}
 					previewing={preview()?.entryId ?? null}
 					onPreview={(entryId) => {
@@ -1253,7 +1650,12 @@ export function App() {
 				 * is the whole reason it is a row and not a chip that comes and goes: the box
 				 * you type into must not move between turns.
 				 */}
-				<div class="dock">
+				<div class="dock" ref={dockEl}>
+					{/* Only drawn while the bar is put away behind the right edge (a hard throw
+					    at it, `float.ts`): the one part of it left on screen, and the way back. */}
+					<button type="button" class="dock-stowtab" aria-label="Bring the input bar back" title="Bring the input bar back" onClick={() => unstowComposer()}>
+						<Icon of={ChevronLeft} size={16} />
+					</button>
 					<Show when={dialog()}>
 						{(prompt) => (
 							<Dialog
@@ -1270,29 +1672,29 @@ export function App() {
 					</Show>
 
 					<StatusLine
-						state={focusedChat()?.state ?? "idle"}
-						name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
-						agent={focusedChat()?.kind ?? state.defaultKind}
+						state={barChat()?.state ?? "idle"}
+						name={state.identities[barAgent() ?? ""]?.name ?? barChat()?.name ?? "It"}
+						agent={barChat()?.kind ?? state.defaultKind}
 					/>
 
+					{/* On the dashboard every control here is the dispatcher's: its model, its
+					    thinking level, its mode and its usage. `barAgent` is the one switch. */}
 					<Composer
 						draft={draft()}
-						agentId={state.focused}
-						usage={state.focused ? state.agents[state.focused]?.usage : undefined}
-						onUsage={() => openUsage(state.focused)}
+						agentId={barAgent()}
+						usage={barAgent() ? state.agents[barAgent()!]?.usage : undefined}
+						onUsage={() => openUsage(barAgent())}
 						busy={busy()}
-						model={state.focused ? state.agents[state.focused]?.model : undefined}
-						models={state.focused ? state.agents[state.focused]?.models ?? [] : []}
-						commands={focusedChat()?.commands ?? []}
-						runtime={focusedChat()?.kind}
-						modes={focusedChat()?.capabilities?.modes ?? []}
-						mode={focusedChat()?.mode}
-						onMode={(mode) => send({ type: "agent.setMode", id: state.focused ?? "", mode })}
-						onSend={(text) => {
-							/* A new turn clears what the last one pointed at — see `clearMarks`. */
-							if (state.focused) clearMarks(state.focused);
-							send({ type: "agent.prompt", id: state.focused ?? "", text });
-						}}
+						model={barAgent() ? state.agents[barAgent()!]?.model : undefined}
+						models={barAgent() ? state.agents[barAgent()!]?.models ?? [] : []}
+						commands={barChat()?.commands ?? []}
+						runtime={barChat()?.kind}
+						modes={barChat()?.capabilities?.modes ?? []}
+						mode={barChat()?.mode}
+						onMode={(mode) => send({ type: "agent.setMode", id: barAgent() ?? "", mode })}
+						onSend={sendFromBar}
+						onText={setBarText}
+						destination={destinationLabel(destination(barText(), barContext()))}
 						onAbort={() => send({ type: "agent.abort", id: state.focused ?? "" })}
 						/*
 						 * `thinking` comes back with the model now. Switching to a model that does
@@ -1303,14 +1705,14 @@ export function App() {
 						onModel={(provider, model, thinking) =>
 							send({
 								type: "agent.setModel",
-								id: state.focused ?? "",
+								id: barAgent() ?? "",
 								provider,
 								model,
 								...(thinking ? { thinking } : {}),
 							})
 						}
 						onThinking={(thinking: ThinkingLevel) =>
-							send({ type: "agent.thinking", id: state.focused ?? "", thinking })
+							send({ type: "agent.thinking", id: barAgent() ?? "", thinking })
 						}
 						/*
 						 * Which subscription this conversation spends.

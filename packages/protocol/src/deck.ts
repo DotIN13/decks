@@ -79,6 +79,25 @@ export interface Board {
 	inContext: string[];
 	/** Agent id, or "you". Drawn as a fading tint on the board's edge. */
 	lastWrittenBy?: string;
+	/**
+	 * The file's last modification, as `mtimeMs`.
+	 *
+	 * The one field the dashboard's first half sorts by: "the latest boards a
+	 * workspace generated" has nothing to order on without it. The loader reads it on
+	 * every scan (the same `stat` that builds the change signature) but kept it
+	 * private; this publishes it. Optional because every fixture and every older
+	 * record predates it — the server always sends it, and a reader treats its
+	 * absence as "unknown" rather than "zero" (`?? 0` in `workspace-panel.ts`).
+	 */
+	modifiedAt?: number;
+	/**
+	 * When the person last looked at this board: its preview on the dashboard, or the focus view.
+	 *
+	 * The dashboard's "changed" mark is for news, and a board somebody has read is not news until
+	 * it is written again: a card is marked only while `modifiedAt` is newer than this. Kept by the
+	 * server (`.decks/seen.json`), so a board read on the laptop is read on the phone too.
+	 */
+	seenAt?: number;
 }
 
 export interface DeckState {

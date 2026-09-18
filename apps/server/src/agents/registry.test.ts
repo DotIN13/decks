@@ -489,6 +489,11 @@ test("summaries reports the twenty newest boards, the true total, and the runtim
  * the list under its real id so `spawn` can find it and write its notices to it.
  */
 class SpyChild extends DeckAgent {
+		tagsSet: string[] = [];
+		override setTags(tags: unknown): string[] {
+			this.tagsSet = super.setTags(tags);
+			return this.tagsSet;
+		}
 	readonly models: Array<[string, string, ThinkingLevel | undefined]> = [];
 	readonly modes: AgentMode[] = [];
 	readonly thinkings: ThinkingLevel[] = [];
@@ -507,12 +512,14 @@ class SpyChild extends DeckAgent {
 	}
 }
 
-function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; parentId: string; child: () => SpyChild | undefined; sent: ServerMessage[] } {
+function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; parentId: string; child: () => SpyChild | undefined; created: () => { name?: string; parentId?: string; kind?: AgentKind; workspace?: string; model?: unknown } | undefined; sent: ServerMessage[] } {
 	const sent: ServerMessage[] = [];
 	let child: SpyChild | undefined;
+	let createdWith: { name?: string; parentId?: string; kind?: AgentKind; workspace?: string; model?: unknown } | undefined;
 
 	class SpyRegistry extends Registry {
-		override create(options: { name?: string; parentId?: string; kind?: AgentKind } = {}) {
+		override create(options: { name?: string; parentId?: string; kind?: AgentKind; workspace?: string; model?: unknown } = {}) {
+			createdWith = options;
 			const agent = new SpyChild(
 				deck,
 				() => {},
@@ -573,7 +580,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 	);
 	parent.translator.user("delegate something");
 	(registry as unknown as { agents: DeckAgent[] }).agents.push(parent);
-	return { registry, parentId: parent.id, child: () => child, sent };
+	return { registry, parentId: parent.id, child: () => child, created: () => createdWith, sent };
 }
 
 test("spawn passes the asked-for kind to create, and the child is that runtime", async () => {
@@ -582,6 +589,28 @@ test("spawn passes the asked-for kind to create, and the child is that runtime",
 
 	await registry.spawn(parentId, { task: "survey the deck", kind: "claude", boards: ["boards/plan.html"] });
 	assert.equal(child()?.kind, "claude", "the child was created on the runtime asked for, not the default");
+	cleanup();
+});
+
+test("create makes a peer, not a child: no parent, the creator's workspace, and the tags asked for", async () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, parentId, child, created } = spawnHarness(deck, "pi");
+	registry.get(parentId)?.setWorkspace("political-llm");
+
+	const made = await registry.createFor(parentId, { name: "Survey", tags: ["survey-design"] });
+	assert.equal(made.name, "Survey");
+	assert.equal(created()?.parentId, undefined, "nobody waits for it, so it reports to nobody");
+	assert.equal(created()?.workspace, "political-llm", "it opens where the creator is");
+	assert.deepEqual(child()?.tagsSet, ["survey-design"], "set as its own, so the panel says what it is for");
+	cleanup();
+});
+
+test("create passes a named model and thinking level to the new agent's backend", async () => {
+	const { deck, cleanup } = deckOn();
+	const { registry, parentId, child } = spawnHarness(deck, "pi");
+
+	await registry.createFor(parentId, { name: "Maps", model: "pi/deepseek-v4", thinking: "low" });
+	assert.deepEqual(child()?.models, [["pi", "deepseek-v4", "low"]]);
 	cleanup();
 });
 
@@ -765,5 +794,45 @@ test("the summaries carry the workspace, and `undefined` is a real answer", () =
 	const byId = new Map(registry.summaries().map((row) => [row.id, row]));
 	assert.equal(byId.get(one.id)?.workspace, "political-llm");
 	assert.equal(byId.get(two.id)?.workspace, undefined, "an agent in none is absent, not empty");
+	cleanup();
+});
+
+test("a turn's boards are the ones the agent named, not the ones that moved meanwhile", async () => {
+	const { deck, cleanup } = deckOn();
+	writeFileSync(join(deck.path, "boards", "other.html"), "<!doctype html><title>Other</title><body class=\"board\"></body>");
+	deck.refresh("boards/other.html");
+	const wrote: Array<[string, string]> = [];
+	class NamingAgent extends DeckAgent {
+		override async prompt(): Promise<void> {
+			// Somebody else rewrites a board during the turn; this agent only names its own.
+			writeFileSync(join(deck.path, "boards", "other.html"), "<!doctype html><title>Other, rewritten</title><body class=\"board\"></body>");
+			deck.refresh("boards/other.html");
+			this.workedOn("boards/plan.html");
+			this.workedOn("boards/plan.html");
+			this.workedOn("boards/gone.html");
+		}
+	}
+	const agent = new NamingAgent(
+		deck,
+		() => {},
+		{} as StageService,
+		{
+			port: 4329,
+			camera: () => ({ x: 0, y: 0, zoom: 1 }),
+			agents: () => [],
+			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
+			send: () => ({ queued: true as const, position: 1 }),
+			queue: () => [],
+			report: () => {},
+			brief: (task: string) => task,
+			recordRevision: () => undefined,
+			wrote: (path: string, who: string) => void wrote.push([path, who]),
+			boardPathOf: () => undefined,
+		},
+		{ color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
+	);
+	const result = await agent.run("do it");
+	assert.deepEqual(result.boards, ["boards/plan.html"]);
+	assert.deepEqual(wrote, [["boards/plan.html", agent.id], ["boards/plan.html", agent.id]]);
 	cleanup();
 });

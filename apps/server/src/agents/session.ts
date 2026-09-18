@@ -1,26 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import type {
-	AgentCapabilities,
-	AgentChat,
-	AgentKind,
-	AgentMode,
-	AgentModel,
-	AgentState,
-	AgentUsage,
-	Camera,
-	ChatItem,
-	Identity,
-	ModelOption,
-	ServerMessage,
-	SlashCommand,
-	ThinkingLevel,
-	UsageReport,
-} from "@decks/protocol";
+import type { AgentCapabilities, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
-import { createStageTool, type DelegateReport, type DelegateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
+import { createStageTool, type CreateSpec, type DelegateReport, type DelegateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
+import type { TaskResult, TaskSpec } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentStateStore } from "./agent-state.ts";
@@ -205,6 +190,12 @@ export class DeckAgent {
 	 * timer cannot fire under any of them.
 	 */
 	private drainTimer: ReturnType<typeof setTimeout> | undefined;
+	/** `"dispatcher"` for the deck's dispatcher; see `AgentChat.role`. */
+	readonly role: "dispatcher" | undefined;
+	/** The task the dispatcher is placing right now, while its turn over it runs. */
+	deciding: string | undefined;
+	/** Whether that turn has handed the task to somebody yet — set by the registry's `send`. */
+	decidedSend = false;
 	private tool: StageTool | undefined;
 
 	constructor(
@@ -218,6 +209,8 @@ export class DeckAgent {
 			spawn(parentId: string, spec: DelegateSpec): Promise<DelegateReport>;
 			/** Put work in another agent's queue, without waiting for it. */
 			send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
+			/** Make an agent, idle, for a send to follow. Optional: a host without a registry has none. */
+			create?(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string }>;
 			/**
 			 * Deliver a finished item's report to the agent that asked for it.
 			 *
@@ -228,6 +221,31 @@ export class DeckAgent {
 			/** What is waiting for one agent, for `stage.queue`. */
 			queue(agentId: string): QueuedWork[];
 			/**
+			 * A queued item belonging to a task was popped: the task is now running.
+			 *
+			 * Optional so a unit fixture that is not testing tasks can leave it out;
+			 * absent means no dashboard and the drain's calls are no-ops.
+			 */
+			taskStarted?(taskId: string): void;
+			/**
+			 * A queued item belonging to a task ended — turn finished or thrown.
+			 *
+			 * The report and the boards the turn wrote are the task's own account of
+			 * what happened, so they travel back: the dashboard's `result` is what it
+			 * can show next to a done task. Optional on the same terms as `taskStarted`.
+			 */
+			taskFinished?(finish: { taskId: string; ok: boolean; report: string; boards: string[] }): void;
+			/**
+			 * The dispatcher's turn over a task ended. `sent` says whether it handed the work
+			 * to somebody (the registry saw a `send` during the turn); `report` is what it
+			 * said, which is the reason shown beside a task nobody took.
+			 */
+			decided?(outcome: { taskId: string; sent: boolean; report: string }): void;
+			/** Make a dashboard task — `stage.task`. Optional on the same terms. */
+			task?(spec: TaskSpec): TaskResult;
+			/** Make a schedule — `stage.schedule`. Optional on the same terms. */
+			schedule?(spec: ScheduleSpec): Schedule | { error: string };
+			/**
 			 * The briefing a handed-over task is run with — the same one `delegate` uses.
 			 *
 			 * Called when the item *runs*, not when it was queued, so the receiver reads the
@@ -236,6 +254,8 @@ export class DeckAgent {
 			 */
 			brief(task: string, boards: string[]): string;
 			recordRevision(path: string): string | undefined;
+			/** This agent said it wrote a board; optional on the same terms as `taskStarted`. */
+			wrote?(path: string, who: string): void;
 			boardPathOf(file: string): string | undefined;
 		},
 		options: {
@@ -277,6 +297,8 @@ export class DeckAgent {
 			 * (`agents/store.ts`). Its presence is also what makes the agent dormant: it
 			 * exists, it can be read, and it starts nothing until it is prompted.
 			 */
+			/** The deck's dispatcher, and nothing else so far. See `AgentChat.role`. */
+			role?: "dispatcher";
 			restored?: {
 				id: string;
 				context: string[];
@@ -313,6 +335,7 @@ export class DeckAgent {
 		this.id = options.restored?.id ?? randomUUID();
 		this.store = options.store;
 		this.restored = options.restored !== undefined;
+		this.role = options.role;
 		/*
 		 * What the conversation was last on, before any runtime exists to ask.
 		 *
@@ -463,7 +486,7 @@ export class DeckAgent {
 	private readonly snapshots: AgentStateStore;
 	private readonly store: AgentStore;
 	/** Restored from disk and not yet started — a row you can read but nothing is running. */
-	private readonly restored: boolean;
+	private restored: boolean;
 	/**
 	 * Whether the stored transcript has been read into the window yet.
 	 *
@@ -544,8 +567,21 @@ export class DeckAgent {
 			camera: () => this.host.camera(this.id),
 			spawn: (spec: DelegateSpec) => this.host.spawn(this.id, spec),
 			send: (target: string, spec: SendSpec) => this.host.send(this.id, target, spec),
+			create: (spec: CreateSpec) => {
+				if (!this.host.create) throw new Error("This deck cannot make agents.");
+				return this.host.create(this.id, spec);
+			},
 			queue: (agentId?: string) => this.host.queue(agentId ?? this.id),
+			task: (spec: TaskSpec): TaskResult => {
+				if (!this.host.task) throw new Error("This deck has no dashboard.");
+				return this.host.task(spec);
+			},
+			schedule: (spec: ScheduleSpec): Schedule | { error: string } => {
+				if (!this.host.schedule) throw new Error("This deck has no dashboard.");
+				return this.host.schedule(spec);
+			},
 			recordRevision: (path: string) => this.host.recordRevision(path),
+			worked: (path: string) => this.workedOn(path),
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
 		};
 	}
@@ -753,6 +789,7 @@ export class DeckAgent {
 		return {
 			id: this.id,
 			kind: this.kind,
+			...(this.role ? { role: this.role } : {}),
 			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
 			name: this.identity.name,
 			...(this.identity.avatar ? { avatar: this.identity.avatar } : {}),
@@ -1016,14 +1053,34 @@ export class DeckAgent {
 	 * rather than by watching what tools it called: an agent might write a board with
 	 * `bash` and a heredoc, and the parent still wants to know the board changed.
 	 */
+	/**
+	 * Run one turn of handed-over work, and say which boards it was about.
+	 *
+	 * **The boards are the ones the agent named, not the ones that moved.** This used to hash
+	 * every board before the turn and list whatever differed after it, which credited the turn
+	 * with anything anybody wrote meanwhile: another agent's board, the person's retype. Now the
+	 * list is what the agent fitted, showed or reported through the stage tool during the turn
+	 * (`workedOn`), in the order it first named them.
+	 */
 	async run(text: string): Promise<{ report: string; boards: string[] }> {
-		const before = new Map(this.deck.boards.map((board) => [board.path, board.rev]));
+		this.worked = new Set();
 		await this.prompt(text);
-		const boards = this.deck.boards
-			.filter((board) => before.get(board.path) !== board.rev)
-			.map((board) => board.path);
+		const boards = [...this.worked].filter((path) => this.deck.board(path));
 		return { report: this.translator.lastAssistantText(), boards };
 	}
+
+	/**
+	 * The agent fitted, showed or reported this board: it is its writer, and the board is part of
+	 * what this turn did. The stage tool calls this; nothing reads authorship off the disk.
+	 */
+	workedOn(path: string): void {
+		if (!this.deck.board(path)) return;
+		this.worked.add(path);
+		this.host.wrote?.(path, this.id);
+	}
+
+	/** Boards named through the stage tool since the last `run` began. */
+	private worked = new Set<string>();
 
 	// --- work handed over by another agent -------------------------------------------
 
@@ -1058,6 +1115,17 @@ export class DeckAgent {
 		return [...this.work];
 	}
 
+	/**
+	 * Take a queued task back out — the dashboard's cancel, which must not leave work
+	 * that then runs. The sender's arrival notice stays; the task is what goes.
+	 */
+	cancelWork(taskId: string): boolean {
+		const before = this.work.length;
+		this.work = this.work.filter((item) => item.taskId !== taskId);
+		if (this.work.length === 0) this.cancelDrain();
+		return this.work.length < before;
+	}
+
 	/** How much is waiting, for the chat list and for `stage.agents()`. */
 	get queued(): number {
 		return this.work.length;
@@ -1090,8 +1158,31 @@ export class DeckAgent {
 		if (this.state !== "idle") return;
 		const item = this.work.shift();
 		if (!item) return;
+		/*
+		 * A task to *place*, for the dispatcher: the briefing is the item itself (it was
+		 * composed with the roster in it, `tasks/brief.ts`), the turn is marked so a `send`
+		 * during it is read as the placement, and the end of the turn says whether one came.
+		 */
+		if (item.decide) {
+			this.deciding = item.decide;
+			this.decidedSend = false;
+			try {
+				const result = await this.run(item.task);
+				this.host.decided?.({ taskId: item.decide, sent: this.decidedSend, report: result.report });
+			} catch (error) {
+				this.host.decided?.({ taskId: item.decide, sent: this.decidedSend, report: (error as Error).message });
+			} finally {
+				this.deciding = undefined;
+			}
+			this.armDrain();
+			return;
+		}
 		try {
+			// Told before the turn so the dashboard can draw "running": this is the
+			// moment the task became somebody's actual work.
+			if (item.taskId) this.host.taskStarted?.(item.taskId);
 			const result = await this.run(this.host.brief(item.task, item.boards));
+			if (item.taskId) this.host.taskFinished?.({ taskId: item.taskId, ok: true, report: result.report, boards: result.boards });
 			// A report the sender asked for is delivered to them as a notice, not as a queued
 			// task. The distinction is the whole of the no-loop rule: an item in a queue runs a
 			// turn when it drains, and a turn that answers a report with another report is two
@@ -1102,6 +1193,7 @@ export class DeckAgent {
 				if (report) this.host.report(item.from, `${this.identity.name} finished "${firstLine(item.task)}": ${report}`);
 			}
 		} catch (error) {
+			if (item.taskId) this.host.taskFinished?.({ taskId: item.taskId, ok: false, report: "", boards: [] });
 			this.translator.notice("error", `Queued work from ${item.fromName} failed: ${(error as Error).message}`);
 		}
 		// Belt and braces: the state hook re-arms on the way back to idle, but a turn that
@@ -1431,6 +1523,7 @@ export class DeckAgent {
 			name: this.identity.name,
 			...(this.identity.avatar ? { avatar: this.identity.avatar } : {}),
 			...(this.parentId ? { parentId: this.parentId } : {}),
+			...(this.role ? { role: this.role } : {}),
 			state: this.state,
 			...(last ? { lastLine: last.text, lastAt: last.at } : {}),
 			unread: 0,
@@ -1467,6 +1560,32 @@ export class DeckAgent {
 
 	answerDialog(...args: Parameters<ExtensionUiBridge["answer"]>): void {
 		this.bridge.answer(...args);
+	}
+
+	/** The model this conversation is on, live if a runtime is up, else as last recorded. */
+	currentModel(): AgentModel | undefined {
+		return this.backend?.model() ?? this.lastModel;
+	}
+
+	/**
+	 * Put the runtime away and keep the conversation: a dormant chat, readable, that the
+	 * next prompt starts again. For an agent whose one job is done (a task's dispatcher)
+	 * and whose transcript is the reason it is kept. Everything `dispose` does except the
+	 * parts that mean "gone": the record and transcript are flushed first, the canvas token
+	 * is revoked so a stray call from the dying process is refused, and the memoised start
+	 * is cleared so `start()` can build a fresh runtime.
+	 */
+	async sleep(): Promise<void> {
+		if (this.state !== "idle" || this.work.length > 0) return;
+		this.cancelDrain();
+		if (this.saving) clearTimeout(this.saving);
+		this.saving = undefined;
+		this.flush();
+		this.stageBridge?.revoke(this.id);
+		this.backend?.dispose();
+		this.backend = undefined;
+		this.starting = undefined;
+		this.restored = true;
 	}
 
 	dispose(): void {

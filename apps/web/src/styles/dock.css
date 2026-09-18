@@ -183,13 +183,20 @@
 		height: 30px;
 		padding: 0;
 		border: 0;
-		border-radius: 999px;
+		/* The same corner as every other control: it was the one circle in the chrome. The
+		   accent, asked for by name: the one filled button in the bar is the one that sends. */
+		border-radius: var(--control-radius, 8px);
 		background: var(--color-accent);
 		color: #fff;
 		cursor: pointer;
 		transition:
 			background-color 120ms ease,
+			box-shadow 120ms ease,
 			opacity 120ms ease;
+	}
+
+	.sendbtn:hover {
+		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
 	}
 
 	@media (pointer: coarse) {
@@ -209,8 +216,10 @@
 		background: var(--color-danger);
 	}
 
+	/* Nothing to send: outlined and faint, the same rest state as every chip beside it. */
 	.sendbtn[disabled] {
-		background: var(--line);
+		background: transparent;
+		box-shadow: inset 0 0 0 1px var(--line);
 		color: var(--faint);
 		cursor: default;
 	}

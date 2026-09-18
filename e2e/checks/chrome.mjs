@@ -121,7 +121,9 @@ say(
 );
 
 await settle(page, 600);
-await page.locator(".stream .tool > .row:not([disabled])").first().click();
+// A *call's* row, inside the group opened above — not the group's own row, which is the
+// first `.tool > .row` in the column and whose click would fold the calls away again.
+await page.locator(".stream .tool-kids .tool > .row:not([disabled])").first().click();
 await page.waitForSelector(".stream .tool pre", { timeout: 5000 });
 say("a chip still expands to its output", (await page.locator(".stream .tool pre").count()) > 0);
 
@@ -179,7 +181,9 @@ await page.locator(".stream .stream-mine").first().hover();
  */
 await page.locator(".stream .stream-mine .stream-rw").first().click();
 await page.waitForSelector(".popover", { timeout: 6000 });
-await page.locator(".popover [data-row]").filter({ hasText: /^Preview$/ }).first().click();
+// By the row's label, not the row's whole text: a described row reads "Preview" and then
+// its sentence, and the sentence is not the thing being pressed.
+await page.locator(".popover [data-row]").filter({ has: page.locator(".lb", { hasText: /^Preview$/ }) }).first().click();
 await page.waitForFunction(() => document.querySelector(".stage")?.dataset.previewing === "true", null, { timeout: 8000 });
 const previewing = await page.evaluate(() => ({
 	stage: document.querySelector(".stage")?.dataset.previewing,

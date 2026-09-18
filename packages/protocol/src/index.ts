@@ -20,6 +20,7 @@
 export * from "./deck.ts";
 export * from "./chat.ts";
 export * from "./usage.ts";
+export * from "./tasks.ts";
 export * from "./transcript.ts";
 export * from "./boards.ts";
 export * from "./stage.ts";

@@ -220,7 +220,12 @@
 		 * paragraph is behind a floating panel is not a view of one document; it is a view of one
 		 * document and a panel.
 		 */
-		padding: 32px var(--inset-right, 0px) 32px var(--inset-left, 0px);
+		/* The composer floats over the foot of this box, so the last lines of a page would sit
+		   under it: the bottom padding is the composer's measured height (`--dock-h`, written
+		   by `App`) plus the air the top has, so the page scrolls clear of the bar. */
+		/* The page starts under the toolbars, not beside them: the top is the measured chrome
+		   inset plus air, so the first line is never behind the pill. */
+		padding: calc(var(--inset-top, 52px) + 12px) var(--inset-right, 0px) calc(var(--dock-h, 96px) + 32px) var(--inset-left, 0px);
 		inset: 0;
 		background: var(--canvas, var(--panel));
 		/* Scrolling a page is not dragging a canvas: no inertia chain to the shell. */
@@ -278,28 +283,86 @@
 	 * as present, and impossible to click. `e2e/checks/focus.mjs` now asks the page what is at
 	 * the button's own centre, which is the assertion that failure needed.
 	 */
+	/* A raised chip in the app's own button system: the card colour, a strong hairline, the
+	   shared shadow, a close glyph, the word, and the key as a keycap. */
 	.focus-exit {
 		position: absolute;
-		top: 2px;
-		left: 50%;
+		/* Level with the two toolbars, in the band between them: a 28px chip centred on their
+		   40px, and the page begins 18px under it. */
+		top: 18px;
+		/* Centred on the canvas column, not the layer: the sidebar is a full-height column
+		   now and the top-left pill starts beside it, so the layer's own middle can sit
+		   under the pill while editing. The dock makes the same subtraction. */
+		left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
 		transform: translateX(-50%);
 		z-index: 5;
 		display: flex;
 		align-items: center;
 		gap: 6px;
 		height: 28px;
-		padding: 0 10px;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: var(--panel);
-		color: var(--muted);
-		font-family: var(--mono, monospace);
-		font-size: 11px;
+		padding: 0 8px 0 8px;
+		border: 1px solid var(--line-strong);
+		border-radius: var(--control-radius, 8px);
+		background: var(--raise, var(--panel));
+		box-shadow: var(--shadow);
+		color: var(--fg);
+		font: inherit;
+		font-size: 12px;
+		font-weight: 600;
 		cursor: pointer;
+		transition:
+			border-color 120ms ease,
+			background-color 120ms ease;
+	}
+
+	.focus-exit > svg {
+		color: var(--muted);
+	}
+
+	.focus-exit > kbd {
+		display: inline-grid;
+		box-sizing: border-box;
+		min-width: 18px;
+		height: 16px;
+		padding: 0 4px;
+		margin-left: 2px;
+		border: 1px solid var(--line-strong);
+		border-bottom-width: 2px;
+		border-radius: 4px;
+		background: var(--layer, var(--bg));
+		color: var(--muted);
+		font: inherit;
+		font-size: 10px;
+		font-weight: 500;
+		place-items: center;
 	}
 
 	.focus-exit:hover {
+		border-color: var(--fg);
+	}
+
+	.focus-exit:hover > svg {
 		color: var(--fg);
+	}
+
+	/*
+	 * On a phone the two toolbars span the whole top, so the chip goes under them: its top
+	 * is the measured chrome inset plus a little air, and the page starts below it. A
+	 * finger-sized target, since a finger is what presses it there.
+	 */
+	@media (max-width: 760px) {
+		.focus {
+			padding-top: calc(var(--inset-top, 52px) + 52px);
+			/* Zoomed in with two fingers the page is wider than the screen, and the rest of
+			   it has to be reachable: sideways scrolling, which a desktop page never needs
+			   because its zoom keys stop where the page fits. */
+			overflow-x: auto;
+		}
+		.focus-exit {
+			top: calc(var(--inset-top, 52px) + 8px);
+			height: 36px;
+			padding: 0 12px;
+		}
 	}
 
 	.focus-exit:focus-visible {

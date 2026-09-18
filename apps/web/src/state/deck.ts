@@ -1,4 +1,4 @@
-import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckState, type Identity, type RuntimeInfo, type WebStatus } from "@decks/protocol";
+import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckState, type Identity, type RuntimeInfo, type Schedule, type Task, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
 import { emptyAgent, type AgentRecord } from "./agent.ts";
 
@@ -83,8 +83,15 @@ function createDeck() {
 		/** The Claude subscriptions this install can use (`chat/Settings.tsx`). */
 		accounts: ClaudeAccount[];
 		/**
-		 * Which of them a **new** agent starts on. `default` is the CLI's own login.
+		 * The dashboard's second half: tasks and schedules, from the `tasks` frame.
 		 *
+		 * Two lists because they are two kinds of thing — one is a row with a state, the
+		 * other a row with a next firing — and one frame because they are one pipeline.
+		 */
+		tasks: Task[];
+		schedules: Schedule[];
+		/**
+		 * Which of them a **new** agent starts on. `default` is the CLI's own login.
 		 * Not "which one is spending": each agent records its own, on its own record
 		 * (`state/agent.ts`, `spending`). With three agents on three subscriptions one row
 		 * cannot answer it.
@@ -101,6 +108,8 @@ function createDeck() {
 		defaultKind: "pi" as AgentKind,
 		runtimes: [] as RuntimeInfo[],
 		accounts: [] as ClaudeAccount[],
+		tasks: [] as Task[],
+		schedules: [] as Schedule[],
 		activeAccount: "default",
 	});
 }

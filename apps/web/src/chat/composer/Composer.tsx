@@ -78,6 +78,14 @@ export function Composer(props: {
 	/** Files dropped on the bar: the app copies them into the deck and hands back mentions. */
 	onDropFiles?: (files: File[]) => void;
 	/**
+	 * Where a line will land, in a word: "to dispatcher", "to Sable", "note on risk-model".
+	 * A label and not a control. It is read from where you are and what you typed, so the
+	 * bar carries no chips and nobody has to guess where Return sends a sentence.
+	 */
+	destination?: string;
+	/** The text as it is typed, so the destination word can follow an @ name. */
+	onText?: (text: string) => void;
+	/**
 	 * How full this agent's context is, for the dial under the box.
 	 *
 	 * Back on this component after a detour through the corner's `⋯`. It reports rather than
@@ -370,6 +378,12 @@ export function Composer(props: {
 					if (files.length > 0) props.onDropFiles(files);
 				}}
 			>
+				{/* The grip. The bar is a float, and this is the one place a drag may start
+				    that is not the padding: the field and the buttons keep their own gestures. */}
+				<span class="dock-grip" aria-hidden="true" />
+				<Show when={props.destination}>
+					{(word) => <span class="dock-to">{word()}</span>}
+				</Show>
 				<textarea
 					/*
 					 * Grows to about six lines and then scrolls. Six because that is a
@@ -395,7 +409,10 @@ export function Composer(props: {
 					   another one, and the field is the honest place to say so. */
 					placeholder={props.busy ? "Steer this turn…" : "Draft something on a board, or ask…"}
 					value={text()}
-					onInput={(event) => setText(event.currentTarget.value)}
+					onInput={(event) => {
+						setText(event.currentTarget.value);
+						props.onText?.(event.currentTarget.value);
+					}}
 					onCompositionStart={() => (composing = true)}
 					onCompositionEnd={() => {
 						composing = false;

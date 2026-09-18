@@ -13,11 +13,13 @@
 @import "./styles/chrome.css";
 @import "./styles/agents.css";
 @import "./styles/panel.css";
+@import "./styles/dispatch.css";
 @import "./styles/inspector.css";
 @import "./styles/stream.css";
 @import "./styles/dock.css";
 @import "./styles/usage.css";
 @import "./styles/canvas.css";
+@import "./styles/shell.css";
 
 /*
  * The app's tokens, handed to Tailwind so utilities speak the design language.
@@ -171,6 +173,11 @@
 	--faint: var(--color-grey-600);
 	--line: rgb(0 0 0 / 10%);
 	--line-strong: rgb(0 0 0 / 20%);
+	/* The hairline around a *floating window*: the toolbars, the composer, the conversation,
+	   the sidebar, a menu, the preview panel. The same as `--line-strong` here; in dark it is
+	   quieter, because a large box on a dark ground needs far less edge than a chip does to
+	   be seen, and 24% rimmed every float in white. Chips, fields and rings keep the token. */
+	--border-strong: var(--line-strong);
 	/*
 	 * The ground under a small filled thing: a tag, a runtime, a provider chip.
 	 *
@@ -183,7 +190,9 @@
 	 * Solid, and off the app's own ramp, so a chip is the same chip wherever it is put.
 	 */
 	--fill: var(--color-grey-400);
-	--shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 8px 24px rgb(0 0 0 / 8%);
+	/* The board's own `--b-shadow`: 12px of reach, not 24. A float in the shell is drawn with
+	   the same weight as a card on a board, so the two read as one program. */
+	--shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 12px rgb(0 0 0 / 5%);
 	/*
 	 * The same shadow, sized for a row rather than a panel — see `.chat-float .fsroll`.
 	 *
@@ -200,7 +209,9 @@
 	 * to say "higher" without a border.
 	 */
 	--shadow-menu: 0 1px 1px rgb(0 0 0 / 6%), 0 4px 10px rgb(0 0 0 / 10%), 0 16px 36px rgb(0 0 0 / 12%);
-	--stage: var(--color-grey-300);
+	/* One rung above white, like the board's `--b-bg-deep`: the floats sit a rung *below*
+	   it (`--layer`), so a float reads as a thing on the ground rather than a hole in it. */
+	--stage: var(--color-grey-100);
 	color-scheme: light;
 }
 
@@ -213,10 +224,11 @@
 	--faint: var(--color-grey-600);
 	--line: rgb(255 255 255 / 12%);
 	--line-strong: rgb(255 255 255 / 24%);
+	--border-strong: #ffffff1f;
 	/* One rung up from `--panel` here, where light is a few down from it: the eye reads a
 	   chip by how far it is from its ground, not by which way. */
 	--fill: var(--color-grey-800);
-	--shadow: 0 1px 2px rgb(0 0 0 / 50%), 0 10px 30px rgb(0 0 0 / 40%);
+	--shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
 	--shadow-row: 0 1px 2px rgb(0 0 0 / 45%), 0 3px 12px rgb(0 0 0 / 38%);
 	--shadow-menu: 0 1px 1px rgb(0 0 0 / 50%), 0 4px 12px rgb(0 0 0 / 55%), 0 18px 44px rgb(0 0 0 / 50%);
 	--stage: #101010;
@@ -237,8 +249,11 @@
  */
 @media (pointer: coarse) {
 	:root {
-		--control: 44px;
-		--control-sm: 34px;
+		/* 40, not 44: a 44px control in a 40px pill made every toolbar a row of squares
+		   taller than the bar, and two toolbars of them overlapped on a 390px phone. 40 is
+		   still a fingertip, and the pill grows to hold it. */
+		--control: 40px;
+		--control-sm: 30px;
 	}
 }
 

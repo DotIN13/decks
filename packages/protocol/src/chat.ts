@@ -100,6 +100,13 @@ export interface AgentChat {
 	avatar?: string;
 	/** A subagent is a chat too, tagged with the parent it reports to. */
 	parentId?: string;
+	/**
+	 * The deck's dispatcher: the agent the dashboard's bar talks to. It hands each task
+	 * to the right agent with `stage.send` and never does the work itself. One per deck,
+	 * made by the server, and **not in the agent lists** — the browser draws it only as
+	 * the conversation behind the dashboard.
+	 */
+	role?: "dispatcher";
 	state: AgentState;
 	lastLine?: string;
 	lastAt?: number;

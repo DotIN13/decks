@@ -133,6 +133,11 @@ export const boards = {
 		agent.setInPlay([...agent.inPlay, message.path]);
 	},
 
+	/** The person read it, so it is no longer news on the dashboard until it is written again. */
+	"board.seen": (message, _reply, wire) => {
+		wire.boards.seen(message.path);
+	},
+
 	"board.hide": (message, _reply, wire) => {
 		const agent = wire.agents.focused();
 		agent.setInPlay(agent.inPlay.filter((path) => path !== message.path));

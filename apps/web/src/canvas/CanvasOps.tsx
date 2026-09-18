@@ -185,7 +185,7 @@ export function CanvasOps(props: { onClose: () => void }) {
 															*/}
 															<Match when={"cap" in token && token.cap}>
 																{(cap) => (
-																	<kbd class="inline-grid min-w-[1.7em] place-items-center rounded-[5px] border border-line-strong bg-bg-deep px-1.5 py-px font-mono text-[11px] leading-[1.5] text-fg shadow-[0_1px_0_var(--line-strong)]">
+																	<kbd class="inline-grid min-w-[1.7em] place-items-center rounded-[5px] border border-[var(--line-strong)] bg-bg-deep px-1.5 py-px font-mono text-[11px] leading-[1.5] text-fg shadow-[0_1px_0_var(--line-strong)]">
 																		{cap()}
 																	</kbd>
 																)}

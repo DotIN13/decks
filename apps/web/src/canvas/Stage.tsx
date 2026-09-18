@@ -851,6 +851,38 @@ export function Stage(props: {
 		const drawer = edges.move(finger);
 
 		const step = touches.move(finger);
+		/*
+		 * In the focus view the fingers belong to the page, as the wheel does: the camera
+		 * behind it is not on screen, and a pinch that zoomed it left the page exactly as it
+		 * was, which is what "touch zoom does nothing on a phone" was. Two fingers scale the
+		 * page about their midpoint, one finger scrolls it, both ways: on a phone a zoomed
+		 * page is wider than the box and the box scrolls sideways there (`canvas.css`).
+		 */
+		if (props.focus) {
+			if (step.kind === "pinch") {
+				claimed.clear();
+				edges.cancel();
+				const span = (pair: [Finger, Finger]) => Math.hypot(pair[1].x - pair[0].x, pair[1].y - pair[0].y);
+				const from = span(step.from);
+				const factor = from > 0 ? span(step.to) / from : 1;
+				const box = focusEl;
+				const before = focusZoom();
+				const after = Math.min(4, Math.max(0.1, before * factor));
+				setFocusZoom(after);
+				if (box) {
+					const midY = (step.to[0].y + step.to[1].y) / 2;
+					const midX = (step.to[0].x + step.to[1].x) / 2;
+					box.scrollTop = (box.scrollTop + midY) * (after / before) - midY;
+					// Sideways only matters once the page is wider than the box (a phone, zoomed
+					// in); a centred page has no horizontal scroll and this is a no-op.
+					box.scrollLeft = (box.scrollLeft + midX) * (after / before) - midX;
+				}
+			} else if (step.kind === "pan" && !drawer && focusEl) {
+				focusEl.scrollTop -= step.dy;
+				focusEl.scrollLeft -= step.dx;
+			}
+			return step;
+		}
 		if (step.kind === "pinch") {
 			claimed.clear();
 			edges.cancel();
@@ -1411,7 +1443,8 @@ export function Stage(props: {
 							onClick={() => props.onFocusToggle?.()}
 						>
 							<Icon of={X} size={13} />
-							<span>Esc</span>
+							<span>Leave</span>
+							<kbd>Esc</kbd>
 						</button>
 					</>
 				)}

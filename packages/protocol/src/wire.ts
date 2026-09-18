@@ -18,6 +18,7 @@ import type { ExtensionUiAnswer, ExtensionUiPrompt } from "./extension-ui.ts";
 import type { StageCall, StageResult, Camera } from "./stage.ts";
 import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
+import type { Schedule, ScheduleSpec, Task, TaskSpec } from "./tasks.ts";
 import type { WebStatus } from "./web.ts";
 export type ClientMessage =
 	| { type: "deck.open"; path: string }
@@ -65,6 +66,8 @@ export type ClientMessage =
 	 */
 	| { type: "agent.mirror"; agentId: string }
 	| { type: "board.play"; path: string }
+	/** The person looked at this board (dashboard preview, focus view): clears its "changed" mark. */
+	| { type: "board.seen"; path: string }
 	| { type: "board.hide"; path: string }
 	/**
 	 * A new, empty board, put on the canvas.
@@ -206,6 +209,23 @@ export type ClientMessage =
 	| { type: "web.answer"; id: string; ok: boolean }
 	/** Detach from the shared tab — the Stop button on the status board. */
 	| { type: "web.stop" }
+	/**
+	 * A task, from the dashboard's third tab or from `stage.task`.
+	 *
+	 * The server answers with the whole `tasks` broadcast. `agentId` names the agent a
+	 * person chose; with it absent, the dispatcher rule chooses (`tasks/dispatch.ts`) and
+	 * its decision is recorded on the task. A task that finds nobody is `blocked`, and
+	 * the reason travels on it.
+	 */
+	| { type: "task.create"; task: TaskSpec; requestedBy?: string }
+	/** Take a task back. Only one that has not run can be: a running task is aborted in its chat. */
+	| { type: "task.cancel"; id: string }
+	/** Run the dispatcher again on a blocked or failed task, or reassign a cancelled one. */
+	| { type: "task.retry"; id: string }
+	| { type: "schedule.create"; schedule: ScheduleSpec }
+	| { type: "schedule.cancel"; id: string }
+	/** Make and dispatch the task a schedule would have made, now. */
+	| { type: "schedule.run"; id: string }
 	/** Make (or find) the status board and put it on the canvas. */
 	| { type: "web.board" }
 	/** A fresh pairing code; the extension has to be paired again. Answered with `web.status`. */
@@ -320,5 +340,11 @@ export type ServerMessage =
 	| { type: "agent.account"; id: string; account: string }
 	/** The shared browser's state, on connect and whenever it changes (`WebStatus`). */
 	| { type: "web.status"; status: WebStatus; code?: string }
+	/**
+	 * The dashboard's whole state: tasks and schedules, sent on connect and re-sent on
+	 * every change to either. One frame rather than two because they are one pipeline
+	 * and one panel draws them together.
+	 */
+	| { type: "tasks"; tasks: Task[]; schedules: Schedule[] }
 	| { type: "error"; text: string };
 

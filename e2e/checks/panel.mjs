@@ -26,7 +26,7 @@ try {
 	 * after the change is a coin flip on whether that frame has run, and this check lost that
 	 * coin toss on three CI runs in five while the camera was never actually wrong — which is
 	 * also why each assertion used to print the successor of its own verdict: the condition read
-	 * "276px" and the detail, one round trip later, read "0px".
+	 * "264px" and the detail, one round trip later, read "0px".
 	 *
 	 * Waiting is not a weaker assertion. A camera that never takes the window back still fails,
 	 * one 2s timeout later, and the value it failed with is reported.
@@ -41,8 +41,24 @@ try {
 			.then(() => expected)
 			.catch(() => inset());
 
-	const up = await settled("276px");
-	say("the panel is up, and declares its width", (await mounted()) === 1 && up === "276px", up);
+	// 264px: the panel is a full-height column at the window's edge now, not a card 12px in.
+	const up = await settled("264px");
+	say("the panel is up, and declares its width", (await mounted()) === 1 && up === "264px", up);
+
+	/*
+	 * The width is the person's. The handle straddles the panel's right edge; the canvas
+	 * hears about the new width the way it hears about the fold, from the measured inset,
+	 * so the assertion is on `--inset-left` rather than on the panel's own style.
+	 */
+	const edge = await page.locator(".panel-resize").boundingBox();
+	await page.mouse.move(edge.x + 4, 400);
+	await page.mouse.down();
+	await page.mouse.move(edge.x + 4 + 96, 410, { steps: 6 });
+	await page.mouse.up();
+	say("dragging the panel's edge makes it wider, and the canvas is told", (await settled("360px")) === "360px", await inset());
+	say("the width is remembered", (await page.evaluate(() => localStorage.getItem("decks.panel-width"))) === "360");
+	await page.locator(".panel-resize").dblclick();
+	say("a double-click on the edge puts the width back", (await settled("264px")) === "264px", await inset());
 
 	/*
 	 * A tab strip, and it is not the one that was removed.
@@ -64,7 +80,8 @@ try {
 	 */
 	const tabs = await page.getByRole("tab").allInnerTexts();
 	say("two tabs, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Agents", "Boards"]), JSON.stringify(tabs));
-	const selected = await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent));
+	// Scoped to the panel: the dispatch dashboard behind the stage has a tab strip of its own.
+	const selected = await page.evaluate(() => [...document.querySelectorAll('.panel-shell [role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent));
 	say("…agents first, and the panel opens on Boards", JSON.stringify(selected) === JSON.stringify(["Boards"]), JSON.stringify(selected));
 
 	/*
@@ -327,8 +344,8 @@ try {
 	 */
 	await toggle.click();
 	await page.waitForSelector("[data-inset='left']", { timeout: 4000 });
-	const told = await settled("276px");
-	say("unfolded, the camera is told again", told === "276px", told);
+	const told = await settled("264px");
+	say("unfolded, the camera is told again", told === "264px", told);
 
 	// ⌘K brings it back with the cursor in the field: what the modal became, minus the tab.
 	await page.keyboard.press("Meta+k");

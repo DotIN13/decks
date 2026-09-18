@@ -44,7 +44,12 @@ export interface Board {
 	clipped?: boolean;
 	/** Ids of agents holding this board in context. */
 	inContext: string[];
-	/** Who wrote it last: an agent id, or "you" for the user. */
+	/**
+	 * Who wrote it last: an agent id, or "you" for the user.
+	 *
+	 * Said, not detected: an agent becomes a board's writer by calling `newBoard`, `fit`, a
+	 * one-board `show`, or `report` on it. A file written and never named has no writer.
+	 */
 	lastWrittenBy?: string;
 }
 
@@ -460,6 +465,19 @@ export interface Stage {
 	 */
 	fit(path: string, options?: { margin?: number }): Promise<{ path: string; w: number; h: number; content?: { w: number; h: number } }>;
 
+	/**
+	 * Say which boards carry your work. **This is how the deck knows who wrote what.**
+	 *
+	 *     await stage.report("boards/plan.html");
+	 *     await stage.report(["boards/plan.html", "boards/risks.html"]);
+	 *
+	 * Nothing watches which files you edit. You become a board's writer, and the board is listed
+	 * under a task you were handed, when you name it: `newBoard`, `fit` and a `show` of one board
+	 * all do, so the usual write, show, fit loop needs nothing more. `report` is for the rest: a
+	 * board you edited and left where it was, or several at once. It moves nothing.
+	 */
+	report(path: string | string[]): Promise<{ reported: string[] }>;
+
 	// --- your context -------------------------------------------------------------
 
 	/**
@@ -723,8 +741,98 @@ export interface Stage {
 		reply?: boolean;
 	}): Promise<{ queued: true; position: number }>;
 
+	/**
+	 * Make a new agent with no task, and return at once — for a `send` to follow.
+	 *
+	 *     const made = await stage.create({ name: "Survey", workspace: "political-llm", tags: ["survey-design"] });
+	 *     await stage.send(made.agent, { task: "…", reply: false });
+	 *
+	 * The gap between the other two: `delegate` makes an agent and **waits** for it, `send`
+	 * needs one that already exists. This makes one, idle, as a peer — not your child, so
+	 * nobody waits for it and it does not count against the subagent limit — and hands back
+	 * its id. Use it when nobody on the deck covers the topic. Check `stage.agents()` first:
+	 * a second agent on a topic one already holds is a second conversation to keep track of.
+	 *
+	 * It opens in your workspace and on your model and account unless told otherwise.
+	 * `model` is `provider/model`, as the picker lists them; a model the runtime cannot open
+	 * is a notice in your transcript and the agent stays on the default. `tags` are set as
+	 * its own, so the panel says what it is for.
+	 */
+	create(spec: {
+		name: string;
+		workspace?: string;
+		tags?: string[];
+		kind?: "pi" | "claude" | "opencode" | "antigravity";
+		model?: string;
+		thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+		mode?: "manual" | "acceptEdits" | "plan" | "auto";
+	}): Promise<{ agent: string; name: string }>;
+
 	/** What is waiting for an agent: yours, or another's if you name it. */
 	queue(agentId?: string): Promise<QueuedWork[]>;
+
+	/**
+	 * Make a schedule: a task the deck makes on its own, at a time of day, on the days named.
+	 *
+	 *     await stage.schedule({
+	 *       name: "Morning digest",
+	 *       at: "09:00",                 // HH:MM, the server's local time
+	 *       days: [1, 2, 3, 4, 5],       // 0 is Sunday, 6 is Saturday
+	 *       workspace: "political-llm",
+	 *       kind: "digest",              // or "custom", with `task`: the work, as an instruction
+	 *     });
+	 *     // -> the schedule, with its id and `nextRunAt`
+	 *
+	 * Each firing becomes a task on the dashboard and goes through the dispatcher like any
+	 * other; the Cron tab lists the schedules. A `digest` is the deck's own morning digest
+	 * of a workspace; a `custom` job carries its `task` text and, optionally, `boards`. A
+	 * time that is not HH:MM, a day outside 0 to 6, or a custom job with no text is refused
+	 * with a sentence.
+	 */
+	schedule(spec: {
+		name: string;
+		at: string;
+		days: number[];
+		workspace: string;
+		kind: "digest" | "custom";
+		task?: string;
+		boards?: string[];
+	}): Promise<{ id: string; name: string; at: string; days: number[]; workspace: string; kind: "digest" | "custom"; task?: string; boards: string[]; nextRunAt: number }>;
+
+	/**
+	 * Make a dashboard task, and let the deck decide which agent takes it.
+	 *
+	 * The counterpart to `send` for work with no obvious owner: instead of naming an
+	 * agent, the text is handed to the dashboard's dispatcher rule, which picks by
+	 * workspace, then by who is idle and least loaded, and puts it in that agent's
+	 * queue. (A person may still name one with `agentId`, and their word wins.) The
+	 * task lives on the dashboard's workspace tab, where it can be cancelled, retried
+	 * and watched to done.
+	 *
+	 *     await stage.task({ text: "Remeasure the panel numbers across all boards.", workspace: "political-llm" });
+	 *     // -> { id: "…", state: "assigned" | "blocked", agentId?, agentName?, why }
+	 *
+	 * `blocked` is not an error: it is the rule's honest answer that nobody should do
+	 * it, with the reason in `why`, and a person can retry it from the panel. The
+	 * receiver runs it as a queued item, exactly as a `send` would.
+	 */
+	task(spec: {
+		text: string;
+		/** The workspace to stay inside, if any — the first filter the rule applies. */
+		workspace?: string;
+		/** Boards handed to the assigned agent with the task, for the brief. */
+		boards?: string[];
+		/** An agent named by a person; wins over the rule. */
+		agentId?: string;
+	}): Promise<{
+		id: string;
+		/** assigned — in a queue; blocked — nobody fit, see `why`; open — not yet decided. */
+		state: "open" | "assigned" | "blocked" | "running" | "done" | "failed" | "cancelled";
+		agentId?: string;
+		agentName?: string;
+		/** Where it went, or why nowhere. */
+		why: string;
+	}>;
 }
 
 declare const stage: Stage;

@@ -61,7 +61,9 @@ export function decksStage(deps: { tool: StageTool; agent: StageAgentHooks }): I
 			 * answer except where two writes share a second.
 			 *
 			 * Keyed off the tool result rather than the watcher because the watcher cannot
-			 * say *who* wrote the file or *when* in the conversation.
+			 * say *when* in the conversation the file was written. It names no author: who
+			 * wrote a board is what the agent says through the stage tool (`worked`), and
+			 * nothing ever read a `by` from here.
 			 */
 			pi.on("tool_result", async (event) => {
 				// The event carries the tool's name, its input and whether it failed —
@@ -78,7 +80,7 @@ export function decksStage(deps: { tool: StageTool; agent: StageAgentHooks }): I
 				if (!board) return;
 
 				const sha = agent.recordRevision(board);
-				if (sha) pi.appendEntry("board-rev", { path: board, sha, by: agent.id });
+				if (sha) pi.appendEntry("board-rev", { path: board, sha });
 			});
 		},
 	};

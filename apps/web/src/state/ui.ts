@@ -123,6 +123,20 @@ function createUi() {
 	const [settings, setSettings] = createSignal(false);
 
 	/**
+	 * Which surface fills the middle of the window: the dispatch dashboard, or an agent's
+	 * stage. Derived from the hash by `app/route.ts` and never set by a gesture directly, so
+	 * a press and the browser's Back button are the same code path. The layer behind stays
+	 * mounted and inert.
+	 */
+	const [surface, setSurface] = createSignal<"dispatch" | "stage">("dispatch");
+
+	/** The dashboard's tab. Also from the hash; the last one is kept for an empty hash. */
+	const [dispatchTab, setDispatchTab] = createSignal<"boards" | "tasks" | "cron">("boards");
+
+	/** A board opened as a preview over the gallery, by path. Nothing when none is. */
+	const [preview, setPreview] = createSignal<string | undefined>();
+
+	/**
 	 * Words the server has handed to the input bar: the message a rewind took back.
 	 *
 	 * Stamped, so rewinding twice to the same message is two handovers rather than one the
@@ -242,6 +256,12 @@ function createUi() {
 	return {
 		focus,
 		setFocus,
+		surface,
+		setSurface,
+		dispatchTab,
+		setDispatchTab,
+		preview,
+		setPreview,
 		presenting,
 		setPresenting,
 		editingSource,
@@ -306,6 +326,12 @@ export const {
 	setBoardsOpen,
 	settings,
 	setSettings,
+	surface,
+	setSurface,
+	dispatchTab,
+	setDispatchTab,
+	preview: dispatchPreview,
+	setPreview: setDispatchPreview,
 	draft,
 	setDraft,
 	ops,

@@ -154,12 +154,16 @@ try {
 			content: Math.round(body.scrollHeight),
 			overflow: getComputedStyle(body).overflowY,
 			window: window.innerHeight,
-			cardsFit: Math.round(document.querySelector(".stream-card").getBoundingClientRect().height) < roll.clientHeight,
+			roll: roll.clientHeight,
 		};
 	});
 	say("…and opened it is capped rather than as long as the model felt", opened.height <= 340, `${opened.height}px of ${opened.content}px`);
 	say("…with the rest reachable by scrolling it", opened.content > opened.height && opened.overflow === "auto", `overflow-y ${opened.overflow}`);
-	say("…so the card it is in still fits the column", opened.cardsFit);
+	// The conversation is a 420px panel now, and this turn holds a table *and* the thinking,
+	// so "the card fits the column" is not a property a fixed panel can promise. What it does
+	// promise is that an opened thinking block takes at most half the roll, so the turn's own
+	// words and the next turn are never pushed out of reach by it.
+	say("…and it takes at most half the panel", opened.height <= opened.roll / 2 + 1, `${opened.height}px of a ${opened.roll}px roll`);
 
 	say("no console errors", errors.length === 0, errors.join(" | "));
 } finally {

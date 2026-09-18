@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import type { AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
+import type { AgentKind, AgentMode, AgentState, Camera, Identity, Schedule, ScheduleSpec, TaskResult, TaskSpec, ThinkingLevel } from "@decks/protocol";
 import { toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
 import { roster } from "../agents/workspaces.ts";
@@ -78,6 +77,27 @@ export interface SendSpec {
 	reply?: boolean;
 }
 
+/**
+ * A new agent made with no task, for a `send` to follow — `stage.create`.
+ *
+ * `delegate` makes an agent *and waits for it*, which is wrong for something that has to
+ * hand work over and stop; `send` needs an agent that already exists. This is the gap
+ * between them: an agent is made, idle, and the caller's next line is a send to it. It is
+ * a peer, not a child: nobody is waiting for it, so it has no parent to report to.
+ */
+export interface CreateSpec {
+	name: string;
+	/** The workspace it opens in; the creator's when left out. */
+	workspace?: string;
+	/** What it is for, a few words each — set as its tags so the panel says so. */
+	tags?: string[];
+	kind?: AgentKind;
+	/** `provider/model`. Left out, it opens on the creator's own model. */
+	model?: string;
+	thinking?: ThinkingLevel;
+	mode?: AgentMode;
+}
+
 /** One item waiting in an agent's queue. */
 export interface QueuedWork {
 	/** The agent that sent it, and what it was calling itself at the time. */
@@ -86,8 +106,22 @@ export interface QueuedWork {
 	task: string;
 	boards: string[];
 	at: number;
+	/**
+	 * The dashboard task this item belongs to, when the dashboard made it.
+	 *
+	 * Carried so the drain can report back: the task turns `assigned` into `running`
+	 * when this item pops, and `done` or `failed` when its turn ends. Without it a
+	 * task would sit in `assigned` forever and the panel would have to guess.
+	 */
+	taskId?: string;
 	/** The sender asked for the report back — see `SendSpec.reply`. */
 	reply?: boolean;
+	/**
+	 * A dashboard task this item asks the *dispatcher* to place rather than to do. While it
+	 * runs, a `send` from the dispatcher is read as the answer; ending without one blocks
+	 * the task with what the dispatcher said.
+	 */
+	decide?: string;
 }
 
 export interface DelegateReport {
@@ -121,8 +155,22 @@ export interface StageAgentHooks {
 	spawn(spec: DelegateSpec): Promise<DelegateReport>;
 	/** Queue work for an agent that already exists, and return without waiting. */
 	send(target: string, spec: SendSpec): { queued: true; position: number };
+	/** Make an agent and return at once; optional so a host with no registry can omit it. */
+	create?(spec: CreateSpec): Promise<{ agent: string; name: string }>;
 	/** What is waiting for an agent — this one, unless another is named. */
 	queue(agentId?: string): QueuedWork[];
+	/**
+	 * Make a dashboard task: the deck decides which agent it belongs to.
+	 *
+	 * An agent asking for work to be done *somewhere* — a fan-out it does not want to
+	 * supervise, a board it has no right to write — hands the text to the same rule
+	 * and the same queue the panel uses, and gets back where it went. Optional so a
+	 * caller with no dashboard (a board actor) can leave it out; the stage verb then
+	 * refuses with a sentence.
+	 */
+	task?(spec: TaskSpec): TaskResult;
+	/** Make a schedule — `stage.schedule`. Optional on the same terms as `task`. */
+	schedule?(spec: ScheduleSpec): Schedule | { error: string };
 	/**
 	 * Store the board's current bytes as a revision and return its id.
 	 *
@@ -131,6 +179,12 @@ export interface StageAgentHooks {
 	 * bytes are the same revision.
 	 */
 	recordRevision(path: string): string | undefined;
+	/**
+	 * The agent worked on this board: it becomes its writer, and the board joins what the turn
+	 * reports. Called by `newBoard`, `fit`, a one-board `show` and `report`. Optional so a host
+	 * with no deck record (a board actor) can leave it out.
+	 */
+	worked?(path: string): void;
 	/** Deck-relative path for an absolute one, or undefined if it is not a board. */
 	boardPathOf(file: string): string | undefined;
 }
@@ -244,6 +298,7 @@ const GUIDELINES = [
 	"Keep the canvas to what matters now: stage.show narrows it, stage.hide takes a board off it without dropping it from your context.",
 	"Board files are edited in place — Write, Edit, cat > file. Never a temp-file-and-rename (sed -i, an atomic save): it replaces the file the canvas is watching.",
 	"After writing a board, stage.fit it rather than guessing whether it clips. A board does not scroll, so content past its edge is simply not drawn.",
+	"Nothing watches which files you edit: a board is yours, on the dashboard and under a task you were handed, once you stage.fit it, stage.show it on its own, or stage.report it. Edited a board without showing it? stage.report(path).",
 	/*
 	 * The one guideline that is about the *chat list* rather than the canvas.
 	 *
@@ -376,6 +431,7 @@ export function createStageTool(deps: {
 			});
 			agent.setContext([path, ...agent.context()]);
 			agent.setInPlay([...agent.inPlay(), path]);
+			agent.worked?.(path);
 			/*
 			 * The size of the thing you are about to fill, and the advice that goes with it.
 			 *
@@ -450,7 +506,24 @@ export function createStageTool(deps: {
 		 */
 		fit: async (path: string, options?: { margin?: number }) => {
 			const { board, content } = await service.fit(path, options);
+			agent.worked?.(board.path);
 			return { path: board.path, w: board.w, h: board.h, content };
+		},
+
+		/**
+		 * Say which boards carry your work, without moving anything.
+		 *
+		 * `fit` and a one-board `show` already say it. This is for the rest: a board edited and
+		 * left where it was, or several at once. You become each board's writer, and they are
+		 * what a task you were handed lists as its boards.
+		 */
+		report: async (path: string | string[]) => {
+			const paths = asList(path);
+			for (const one of paths) {
+				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
+			}
+			for (const one of paths) agent.worked?.(one);
+			return { reported: paths };
 		},
 
 		// --- context -------------------------------------------------------------
@@ -507,6 +580,10 @@ export function createStageTool(deps: {
 				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
 			}
 			agent.setInPlay(paths);
+			// One board named is the focusing gesture: "look at what I made". Several is arranging
+			// the canvas — `show(context)` puts everything back — and is nobody's byline.
+			const [only] = paths;
+			if (only !== undefined && paths.length === 1) agent.worked?.(only);
 			return service.show(agent.id, paths, options ?? {});
 		},
 		/** Take boards off the canvas, keeping them in context. */
@@ -618,8 +695,66 @@ export function createStageTool(deps: {
 				...(spec.reply ? { reply: true } : {}),
 			});
 		},
+		/**
+		 * Make an agent and return at once, so the next line can `send` to it.
+		 *
+		 * For work nobody on the deck covers: a dispatcher that finds no agent on the topic
+		 * makes one here rather than blocking on a `delegate`, and hands the work over the
+		 * way it would to anyone else.
+		 */
+		create: async (spec: CreateSpec) => {
+			if (!spec?.name?.trim()) throw new Error("A new agent needs a name");
+			if (!agent.create) throw new Error("This deck cannot make agents.");
+			return agent.create({ ...spec, name: spec.name.trim() });
+		},
 		/** What is waiting for an agent: yours, or another's if you name it. */
 		queue: async (agentId?: string) => agent.queue(agentId),
+
+		/**
+		 * Make a dashboard task and let the deck decide who takes it.
+		 *
+		 * The counterpart to `send` for work that has no obvious owner: instead of
+		 * naming an agent, the text is handed to the dashboard's dispatcher rule, which
+		 * picks by workspace, then by who is idle and least loaded, and puts it in that
+		 * agent's queue. What the caller gets back says where it went and why — or that
+		 * nobody could take it, which is a blocked task a person can retry on the panel.
+		 */
+		task: async (spec: TaskSpec) => {
+			if (!spec?.text?.trim()) throw new Error("A task needs a description");
+			if (!agent.task) throw new Error("This deck has no dashboard.");
+			return agent.task({
+				text: spec.text.trim(),
+				...(spec.workspace ? { workspace: spec.workspace } : {}),
+				...(spec.boards ? { boards: spec.boards } : {}),
+				...(spec.agentId ? { agentId: spec.agentId } : {}),
+			});
+		},
+
+		/**
+		 * Make a schedule: a task the deck makes on its own, at a time, on the days named.
+		 *
+		 * The dashboard's Cron tab is the list of these. The server checks the fields — a
+		 * time is "HH:MM", days are 0 (Sunday) to 6, a custom job needs its text — and answers
+		 * with the schedule made, or a sentence saying what was wrong with it.
+		 */
+		schedule: async (spec: ScheduleSpec) => {
+			if (!spec?.name?.trim()) throw new Error("A schedule needs a name");
+			if (!spec.at || !Array.isArray(spec.days)) throw new Error("A schedule needs a time (HH:MM) and its days (0 Sunday to 6 Saturday)");
+			if (!spec.workspace?.trim()) throw new Error("A schedule needs a workspace to write into");
+			if (spec.kind !== "digest" && spec.kind !== "custom") throw new Error('A schedule\'s kind is "digest" or "custom"');
+			if (!agent.schedule) throw new Error("This deck has no dashboard.");
+			const made = agent.schedule({
+				name: spec.name.trim(),
+				at: spec.at.trim(),
+				days: spec.days,
+				workspace: spec.workspace.trim(),
+				kind: spec.kind,
+				...(spec.task ? { task: spec.task } : {}),
+				...(spec.boards ? { boards: spec.boards } : {}),
+			});
+			if ("error" in made) throw new Error(made.error);
+			return made;
+		},
 
 		/**
 		 * The user's own Chrome, shared with the deck through the Decks extension.

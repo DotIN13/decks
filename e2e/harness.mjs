@@ -146,7 +146,12 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 			/* private mode, or a page that has no storage access yet */
 		}
 	}, scheme);
-	await page.goto(`${WEB}/`, { waitUntil: "load" });
+	/*
+	 * `#/stage`: the focused agent's stage. The app opens on the dispatch dashboard by
+	 * default, and every check in this suite was written against a canvas on screen; the
+	 * hash asks for that without knowing the agent's id, which the greeting supplies.
+	 */
+	await page.goto(`${WEB}/#/stage`, { waitUntil: "load" });
 	/*
 	 * Answer permission questions, because a check cannot.
 	 *

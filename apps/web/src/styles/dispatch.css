@@ -1,0 +1,871 @@
+/*
+ * The dashboard's own shapes: the strip, the band, the shelves and cards, the task rows,
+ * the preview.
+ *
+ * Same split as `panel.css`: a shape spelled in more than one place is here, layout is a
+ * class attribute next to the markup. Nothing re-states `chrome.css` — the strip is its
+ * `.seg`, the filter chips its `.chipbtn`, the search its `.field`, the preview panel
+ * its `.float`, the close button its `.iconbtn`.
+ *
+ * Every selector is `.dispatch` or `.dispatch-*`, so the file can be dropped without a
+ * trace. Inside `@layer components` like the rest, so a utility on the same element
+ * still wins.
+ *
+ * Imported from `chrome/DispatchView.tsx` for now. `index.css` explains why area files
+ * belong in *its* import list instead (tie-breaking inside the layer is source order,
+ * and a JS import makes that order the bundler's); this file has no ties with the
+ * others by construction, but the line should move there when `index.css` is next open.
+ */
+@layer components {
+	.dispatch {
+		display: flex;
+		height: 100%;
+		min-height: 0;
+		flex-direction: row;
+		gap: 12px;
+		color: var(--fg);
+		font-size: 12.5px;
+	}
+	/* The panes: the whole width alone, a column on the left when a preview is up. */
+	.dispatch-side {
+		display: flex;
+		flex: 1;
+		min-width: 0;
+		min-height: 0;
+		flex-direction: column;
+	}
+	.dispatch[data-preview="true"] .dispatch-side {
+		flex: 0 0 clamp(300px, 32%, 440px);
+	}
+
+	/* --- the strip, drawn in the top-left pill ------------------------------------------
+	 *
+	 * Three buttons that look like the pill's own: the panel toggle's corner, the panel
+	 * toggle's grey wash when chosen, and plain words otherwise. No accent and no round
+	 * ends, because a control drawn in another colour and another shape than everything
+	 * beside it reads as a badge rather than as a place to go.
+	 */
+	/* Three columns of one width, the widest label's, so the three read as one row of
+	   equal buttons rather than three words of different lengths. */
+	.dispatch-tabs {
+		display: grid;
+		grid-auto-flow: column;
+		grid-auto-columns: 1fr;
+		align-items: center;
+		gap: 2px;
+		width: max-content;
+	}
+	.dispatch-tabs > button {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		height: var(--control, 28px);
+		padding: 0 10px;
+		border: 0;
+		border-radius: var(--control-radius, 7px);
+		background: transparent;
+		color: var(--muted);
+		font: inherit;
+		font-size: 12px;
+		line-height: 1;
+		justify-content: center;
+		cursor: pointer;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+	.dispatch-tabs > button:hover {
+		background: var(--line);
+		color: var(--fg);
+	}
+	/* A narrow phone: the three words with less air around them, so the two toolbars
+	   still meet with room between them at 320px. */
+	@media (max-width: 360px) {
+		.dispatch-tabs > button {
+			padding: 0 6px;
+			font-size: 11.5px;
+		}
+	}
+	.dispatch-tabs > button[data-on="true"] {
+		background: var(--raise);
+		color: var(--fg);
+		font-weight: 600;
+		box-shadow: inset 0 0 0 1px var(--line-strong);
+	}
+	.dispatch-tabs > button[data-on="true"]:hover {
+		background: var(--raise);
+	}
+	.dispatch-tabs > button:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+	.dispatch-badge {
+		display: inline-grid;
+		min-width: 16px;
+		height: 16px;
+		padding: 0 4px;
+		margin-left: 6px;
+		place-items: center;
+		border-radius: 8px;
+		background: var(--color-warn);
+		color: #1a1200;
+		font-size: 10px;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+		vertical-align: 1px;
+	}
+
+	/* --- panes ---------------------------------------------------------------------------- */
+	.dispatch-pane {
+		display: flex;
+		min-height: 0;
+		flex: 1;
+		flex-direction: column;
+	}
+	.dispatch-scroll {
+		min-height: 0;
+		flex: 1;
+		overflow-y: auto;
+		padding: 0 12px 12px;
+		scrollbar-width: thin;
+	}
+
+	.dispatch-empty {
+		margin: 0;
+		padding: 8px 2px;
+		color: var(--faint);
+		font-size: 12px;
+	}
+	.dispatch-n {
+		color: var(--faint);
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+	}
+	.dispatch-link {
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--color-accent);
+		cursor: pointer;
+		font: inherit;
+		font-size: inherit;
+	}
+	.dispatch-link:hover {
+		text-decoration: underline;
+	}
+	.dispatch-link:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+		border-radius: 3px;
+	}
+
+	/* --- the chip: one shape, five states ---------------------------------------------- */
+	.dispatch-chip {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		height: 18px;
+		padding: 0 7px;
+		border-radius: 8px;
+		background: var(--line);
+		color: var(--muted);
+		font-size: 10.5px;
+		font-weight: 500;
+		line-height: 1;
+		white-space: nowrap;
+	}
+	/* A chip that goes somewhere: the writer's conversation, the task that wrote the board. */
+	button.dispatch-chip {
+		border: 0;
+		font-family: inherit;
+		cursor: pointer;
+	}
+	button.dispatch-chip:hover,
+	button.dispatch-chip:focus-visible {
+		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+		color: var(--color-accent);
+		outline: none;
+	}
+	.dispatch-task[data-spot="true"] {
+		border-color: var(--color-accent);
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 22%, transparent);
+	}
+	.dispatch-chip[data-s="running"] {
+		background: color-mix(in srgb, var(--color-ok) 16%, transparent);
+		color: color-mix(in srgb, var(--color-ok) 80%, var(--fg));
+	}
+	.dispatch-chip[data-s="refused"],
+	.dispatch-chip[data-s="changed"] {
+		background: color-mix(in srgb, var(--color-warn) 22%, transparent);
+		color: color-mix(in srgb, var(--color-warn) 55%, var(--fg));
+	}
+	.dispatch-chip[data-s="queued"] {
+		background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		color: var(--color-accent);
+	}
+	.dispatch-chip[data-s="done"],
+	.dispatch-chip[data-s="cancelled"] {
+		background: var(--line);
+		color: var(--faint);
+	}
+
+	/* --- the in-flight band --------------------------------------------------------------- */
+	.dispatch-band {
+		flex: none;
+		margin: 0 12px 8px;
+		padding: 8px 10px 6px;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--layer, var(--bg-deep));
+	}
+	.dispatch-band-head {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+		padding-bottom: 4px;
+		font-size: 11.5px;
+	}
+	.dispatch-rows {
+		display: flex;
+		flex-direction: column;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.dispatch-row {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 10px;
+		padding: 6px 0;
+		border-top: 1px solid var(--line);
+	}
+	.dispatch-row-text {
+		min-width: 0;
+		flex: 1 1 40%;
+		overflow: hidden;
+		font-weight: 600;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dispatch-row-mid {
+		min-width: 0;
+		flex: 1 1 40%;
+		overflow: hidden;
+		color: var(--muted);
+		font-size: 12px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* --- the gallery ------------------------------------------------------------------------ */
+	.dispatch-gallery {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.dispatch-gallery-bar {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 2px 0 4px;
+	}
+	.dispatch-filters {
+		display: flex;
+		flex: none;
+		gap: 4px;
+	}
+	.dispatch-search {
+		height: var(--control-md, 26px);
+		max-width: 280px;
+		border-radius: var(--control-radius, 8px);
+	}
+	.dispatch-search > input::-webkit-search-cancel-button {
+		-webkit-appearance: none;
+		appearance: none;
+	}
+
+	.dispatch-shelf {
+		border-top: 1px solid var(--line);
+	}
+	.dispatch-shelf-head {
+		display: flex;
+		width: 100%;
+		align-items: baseline;
+		gap: 8px;
+		padding: 8px 2px;
+		border: 0;
+		background: none;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		text-align: left;
+	}
+	.dispatch-shelf-head:hover .dispatch-shelf-name {
+		color: var(--color-accent);
+	}
+	.dispatch-shelf-name {
+		font-size: 12.5px;
+		font-weight: 600;
+	}
+	.dispatch-shelf-meta {
+		min-width: 0;
+		overflow: hidden;
+		color: var(--faint);
+		font-size: 11.5px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dispatch-shelf[data-folded="true"] .dispatch-shelf-name {
+		color: var(--muted);
+		font-weight: 500;
+	}
+	.dispatch-more {
+		margin: 0;
+		padding: 6px 2px 8px;
+		color: var(--faint);
+		font-size: 11.5px;
+	}
+
+	/*
+	 * As many columns as fit, none narrower than 240px, and a card never wider than 360:
+	 * a card is a picture of a board read at a glance, and three columns of a 2400px
+	 * window made each one a poster. On a wide window there are more of them, not bigger
+	 * ones. The cap is on the card rather than the track, because `auto-fill` counts
+	 * columns by a track's maximum: with `minmax(220px, 320px)` a 1180px grid got three
+	 * columns and 220px of nothing beside them.
+	 */
+	.dispatch-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+		gap: 10px;
+		padding-bottom: 10px;
+	}
+	.dispatch-card {
+		display: flex;
+		min-width: 0;
+		max-width: 360px;
+		flex-direction: column;
+		gap: 5px;
+	}
+	/* The picture and the name are the button; the chips under them are their own controls. */
+	.dispatch-card-open {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		gap: 5px;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		text-align: left;
+	}
+	.dispatch-card-open:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+		border-radius: 8px;
+	}
+	.dispatch-card-pic {
+		display: block;
+		aspect-ratio: 4 / 3;
+		overflow: hidden;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--panel);
+		transition: border-color 120ms ease, box-shadow 120ms ease;
+	}
+	.dispatch-card:hover .dispatch-card-pic {
+		border-color: var(--line-strong);
+		box-shadow: var(--shadow-row);
+	}
+	.dispatch-card[data-changed="true"] .dispatch-card-pic {
+		border-color: color-mix(in srgb, var(--color-warn) 60%, var(--line));
+	}
+	.dispatch-card-pic > img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: top left;
+	}
+	.dispatch-card-tile {
+		display: grid;
+		height: 100%;
+		padding: 10px;
+		place-items: center;
+		color: var(--muted);
+		font-size: 11.5px;
+		line-height: 1.35;
+		text-align: center;
+		overflow-wrap: anywhere;
+	}
+	.dispatch-card-name {
+		overflow: hidden;
+		color: var(--fg);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dispatch-card-chips {
+		display: flex;
+		min-width: 0;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+
+	/* --- the note over a list, and the groups ------------------------------------------- */
+	.dispatch-note {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 8px;
+		padding: 4px 0 2px;
+	}
+	.dispatch-hint {
+		color: var(--faint);
+		font-size: 11.5px;
+	}
+	.dispatch-sec {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		margin: 10px 0 6px;
+		color: var(--muted);
+		font-size: 11.5px;
+	}
+	.dispatch-sec > b {
+		color: var(--fg);
+		font-size: 12.5px;
+		font-weight: 600;
+	}
+	.dispatch-sec > .dispatch-link {
+		margin-left: auto;
+		font-size: 11.5px;
+	}
+	.dispatch-chip[data-s="plain"] {
+		background: var(--line);
+		color: var(--muted);
+	}
+
+	/* --- cards: a task, or a schedule ------------------------------------------------------ */
+	.dispatch-tasks,
+	.dispatch-cron {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 10px;
+	}
+	.dispatch-task {
+		position: relative;
+		display: flex;
+		min-width: 0;
+		max-width: 480px;
+		flex-direction: column;
+		gap: 6px;
+		padding: 10px 12px 8px;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		background: var(--layer, var(--panel));
+	}
+	.dispatch-task[data-s="refused"] {
+		border-color: color-mix(in srgb, var(--color-warn) 40%, var(--line));
+		background: color-mix(in srgb, var(--color-warn) 7%, var(--layer, var(--panel)));
+	}
+	.dispatch-task[data-s="running"] {
+		border-color: color-mix(in srgb, var(--color-ok) 45%, var(--line));
+	}
+	.dispatch-task-head {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 6px;
+	}
+	.dispatch-task-when {
+		margin-left: auto;
+		color: var(--faint);
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	/* The sentence: three lines of it, the rest on a press. */
+	.dispatch-task-text {
+		display: -webkit-box;
+		margin: 0;
+		overflow: hidden;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		color: var(--fg);
+		cursor: pointer;
+		font-size: 13px;
+		font-weight: 500;
+		line-height: 1.4;
+		overflow-wrap: anywhere;
+	}
+	.dispatch-task-text[data-open] {
+		display: block;
+		cursor: default;
+		white-space: pre-wrap;
+	}
+	.dispatch-task-text[data-plain] {
+		font-weight: 400;
+	}
+	.dispatch-task-route {
+		display: -webkit-box;
+		min-width: 0;
+		overflow: hidden;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		color: var(--muted);
+		font-size: 11.5px;
+		line-height: 1.4;
+		overflow-wrap: anywhere;
+	}
+	.dispatch-task-route b {
+		color: var(--fg);
+		font-weight: 600;
+	}
+	.dispatch-task-route[data-tone="warn"] {
+		color: color-mix(in srgb, var(--color-warn) 60%, var(--fg));
+	}
+	.dispatch-task-out {
+		display: flex;
+		min-width: 0;
+		flex-direction: column;
+		gap: 6px;
+		padding-top: 6px;
+		border-top: 1px solid var(--line);
+	}
+	.dispatch-task-report {
+		min-width: 0;
+		font-size: 11.5px;
+	}
+	.dispatch-task-report > summary {
+		display: flex;
+		min-width: 0;
+		align-items: baseline;
+		gap: 6px;
+		color: var(--muted);
+		cursor: pointer;
+		line-height: 1.4;
+		list-style: none;
+	}
+	.dispatch-task-report > summary::-webkit-details-marker {
+		display: none;
+	}
+	.dispatch-task-report > summary > b {
+		flex: none;
+		color: var(--fg);
+		font-weight: 600;
+	}
+	.dispatch-task-report > summary > span {
+		display: -webkit-box;
+		min-width: 0;
+		overflow: hidden;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+	}
+	.dispatch-task-report[open] > summary > span {
+		display: none;
+	}
+	.dispatch-task-report-body {
+		max-height: 320px;
+		margin-top: 6px;
+		overflow: auto;
+		padding: 6px 8px;
+		border: 1px solid var(--line);
+		border-radius: 6px;
+		background: var(--bg);
+		color: var(--fg);
+		font-size: 12px;
+		line-height: 1.45;
+		overflow-wrap: anywhere;
+		scrollbar-width: thin;
+	}
+	.dispatch-task-report-body .md {
+		font-size: 12px;
+	}
+	.dispatch-task-wrote {
+		display: flex;
+		min-width: 0;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.dispatch-pic {
+		display: inline-flex;
+		max-width: 100%;
+		align-items: center;
+		gap: 6px;
+		padding: 3px 7px 3px 3px;
+		border: 1px solid var(--line);
+		border-radius: 6px;
+		background: var(--bg);
+		color: var(--fg);
+		cursor: pointer;
+		font: inherit;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		transition: border-color 120ms ease, background-color 120ms ease;
+	}
+	.dispatch-pic:hover {
+		border-color: var(--line-strong);
+		background: var(--line);
+	}
+	.dispatch-pic:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+	.dispatch-pic-img {
+		display: block;
+		flex: none;
+		width: 40px;
+		height: 26px;
+		overflow: hidden;
+		border: 1px solid var(--line);
+		border-radius: 3px;
+		background: var(--panel);
+	}
+	.dispatch-pic-img > img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: top left;
+	}
+	.dispatch-pic-tile {
+		display: grid;
+		height: 100%;
+		place-items: center;
+		color: var(--faint);
+		font-family: var(--font-sans, inherit);
+		font-size: 11px;
+		font-weight: 600;
+	}
+	.dispatch-pic-name {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dispatch-task-foot {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 4px;
+		margin-top: auto;
+		padding-top: 4px;
+	}
+	.dispatch-task-who {
+		min-width: 0;
+		overflow: hidden;
+		color: var(--faint);
+		font-size: 11px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dispatch-ib {
+		display: inline-grid;
+		flex: none;
+		width: 26px;
+		height: 26px;
+		place-items: center;
+		border: 1px solid var(--line);
+		border-radius: 7px;
+		background: var(--bg);
+		color: var(--muted);
+		cursor: pointer;
+		transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+	}
+	.dispatch-ib:hover {
+		border-color: var(--line-strong);
+		background: var(--line);
+		color: var(--fg);
+	}
+	.dispatch-ib:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+	.dispatch-ib[data-tone="danger"] {
+		color: color-mix(in srgb, var(--color-danger) 70%, var(--fg));
+	}
+	.dispatch-sched-time {
+		color: var(--fg);
+		font-size: 15px;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+	}
+	.dispatch-sched-time > small {
+		margin-left: 6px;
+		color: var(--muted);
+		font-size: 11.5px;
+		font-weight: 400;
+	}
+	@media (pointer: coarse) {
+		.dispatch-ib {
+			width: var(--control-sm, 30px);
+			height: var(--control-sm, 30px);
+		}
+	}
+	.dispatch-act {
+		display: inline-flex;
+		align-items: center;
+		height: 24px;
+		padding: 0 9px;
+		border: 1px solid var(--line);
+		border-radius: var(--control-radius, 8px);
+		background: transparent;
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: 11.5px;
+		transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+	}
+	.dispatch-act:hover {
+		border-color: var(--line-strong);
+		background: var(--line);
+		color: var(--fg);
+	}
+	.dispatch-act:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+	/* The one that acts, in the accent: "Open on canvas" is the step from looking to going,
+	   and it is asked for as the blue button. */
+	.dispatch-act[data-primary] {
+		border-color: transparent;
+		background: var(--color-accent);
+		color: #fff;
+	}
+	.dispatch-act[data-primary]:hover {
+		border-color: transparent;
+		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
+		color: #fff;
+	}
+
+	/* --- the preview: the right of the dashboard, full height, beside the panes ---------- */
+	.dispatch-preview {
+		display: flex;
+		flex: 1;
+		min-width: 0;
+		min-height: 0;
+		padding-bottom: 12px;
+		animation: dispatch-slide 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+	}
+	.dispatch-preview-panel {
+		display: flex;
+		flex: 1;
+		min-width: 0;
+		min-height: 0;
+		flex-direction: column;
+		overflow: hidden;
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-panel, 12px);
+		background: var(--layer, var(--panel));
+		box-shadow: var(--shadow);
+	}
+	.dispatch-preview-head {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 8px 8px 14px;
+		border-bottom: 1px solid var(--line);
+	}
+	.dispatch-preview-path {
+		overflow: hidden;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dispatch-preview-zoom {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 2px;
+	}
+	.dispatch-preview-percent {
+		min-width: 44px;
+		padding: 2px 4px;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		color: var(--muted);
+		font: inherit;
+		font-size: 11.5px;
+		font-variant-numeric: tabular-nums;
+		cursor: pointer;
+	}
+	.dispatch-preview-percent:hover,
+	.dispatch-preview-percent:focus-visible {
+		background: var(--hover, color-mix(in oklab, var(--fg) 8%, transparent));
+		color: var(--fg);
+	}
+	.dispatch-preview-held {
+		flex: none;
+		color: var(--faint);
+		font-size: 11.5px;
+	}
+	/* The room the board is drawn in: it scrolls when the board is taller than the panel. */
+	.dispatch-preview-scroll {
+		flex: 1;
+		min-height: 0;
+		overflow: auto;
+		padding: 12px 12px 160px;
+		background: var(--stage);
+		scrollbar-width: thin;
+	}
+	/* The board's box at its scaled size, centred; the frame inside is laid out at the
+	   board's own size and scaled from its top-left corner to fit. */
+	.dispatch-preview-fit {
+		position: relative;
+		margin: 0 auto;
+		overflow: hidden;
+		border: 1px solid var(--line);
+		border-radius: 6px;
+		background: var(--panel);
+		box-shadow: var(--shadow-row);
+	}
+	.dispatch-preview-frame {
+		position: absolute;
+		top: 0;
+		left: 0;
+		display: block;
+		border: 0;
+		background: var(--panel);
+		transform-origin: 0 0;
+	}
+
+	@keyframes dispatch-slide {
+		from {
+			opacity: 0;
+			translate: 24px 0;
+		}
+	}
+	@keyframes dispatch-fade {
+		from {
+			opacity: 0;
+		}
+	}
+	@keyframes dispatch-rise {
+		from {
+			opacity: 0;
+			transform: translateY(6px);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.dispatch-preview,
+		.dispatch-preview-panel {
+			animation: none;
+		}
+		.dispatch-act,
+		.dispatch-card-pic,
+		.dispatch-chip {
+			transition: none;
+		}
+	}
+}

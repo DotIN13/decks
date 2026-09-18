@@ -417,6 +417,13 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				 * The shared Chrome. The code rides only on the greeting's copy, so a later
 				 * status keeps the code the greeting brought rather than dropping it.
 				 */
+				case "tasks":
+					// The dashboard's whole second half in one frame. `reconcile` like the
+					// agents list: a task row changing state must update in place, not be
+					// rebuilt — the state chip is the thing the reader is watching.
+					setState("tasks", reconcile(message.tasks, { key: "id", merge: false }));
+					setState("schedules", reconcile(message.schedules, { key: "id", merge: false }));
+					return;
 				case "web.status":
 					setState("web", { status: message.status, code: message.code ?? state.web?.code });
 					return;

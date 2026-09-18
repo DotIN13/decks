@@ -2,6 +2,8 @@ import { PALETTE, type ComponentKind } from "@decks/board-kit";
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
+import ArrowLeft from "lucide-solid/icons/arrow-left";
+import House from "lucide-solid/icons/house";
 import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
@@ -23,6 +25,8 @@ import { runtimes } from "../state/deck.ts";
 import { canHover } from "../lib/media.ts";
 import { agentList, agentStatus, closeWords, dropdownFaces, rowWords, workspaceRuns } from "./agent-order.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
+import { DispatchTabs } from "./DispatchView.tsx";
+import type { DispatchTab } from "./dispatch-view.ts";
 
 /**
  * The top-left cluster: the panel, the agent, the tools, undo.
@@ -583,7 +587,25 @@ export function AgentPill(props: {
 	onTool: (tool: Tool) => void;
 	/** Undo the last edit to the selected board. Absent when there is nothing to undo. */
 	onUndo?: () => void;
+	/**
+	 * Which surface is up. On a stage the pill is the agent's, with Home grown into it; on
+	 * the dashboard it is the deck's, and the editing controls hide because there is no
+	 * board to edit. One element with two faces, so the eye has one thing to follow.
+	 */
+	surface?: "dispatch" | "stage";
+	/** Back to the dashboard. Drawn only on a stage. */
+	onHome?: () => void;
+	/** How many tasks want a person: the badge on Home, and on the Boards tab. */
+	wantsYou?: number;
+	/**
+	 * The dashboard's tabs, drawn in the pill where the agent and the + are on a stage.
+	 * On the dashboard the pill is the deck's, and the deck's three views are the thing to
+	 * switch between; the agents are the sidebar's.
+	 */
+	tab?: DispatchTab;
+	onTab?: (tab: DispatchTab) => void;
 }) {
+	const onStage = () => props.surface !== "dispatch";
 	const active = () => props.chats.find((chat) => chat.id === props.focused);
 	const name = () => {
 		const chat = active();
@@ -609,7 +631,13 @@ export function AgentPill(props: {
 			 * wide as that comes to. The name's own `max-w` is what stops a long one running
 			 * away with the line.
 			 */
-			class="float pill absolute top-3 left-3 z-20 w-max"
+			class="float pill absolute top-3 z-20 w-max"
+			/*
+			 * Clear of the sidebar, which is a full-height column now: the pill starts where
+			 * the canvas does. An inline style rather than a class, because the inset is a
+			 * measured variable (`camera/insets.ts`) and a utility class cannot read one.
+			 */
+			style={{ left: "calc(var(--inset-left, 0px) + 12px)", transition: "left 160ms ease" }}
 			data-inset="top"
 		>
 			{/*
@@ -635,6 +663,49 @@ export function AgentPill(props: {
 			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
 
 			{/*
+			 * Home, grown into the pill on a stage.
+			 *
+			 * The one way back to the dashboard that is always on screen. Its badge is the
+			 * count of tasks that want a person, because a refused dispatch is the one thing
+			 * the dashboard has to say to somebody who is looking at a canvas. The segment
+			 * animates from zero width so the pill reads as one thing changing face rather
+			 * than two toolbars swapping.
+			 */}
+			<span class="pill-home" data-on={onStage() ? "true" : undefined} aria-hidden={!onStage()}>
+				<button
+					type="button"
+					class="chipbtn pill-home-btn max-[480px]:hidden"
+					title="Back to the dashboard (Esc)"
+					aria-label="Home: back to the dashboard"
+					tabindex={onStage() ? 0 : -1}
+					onClick={() => props.onHome?.()}
+				>
+					<Icon of={ArrowLeft} size={13} />
+					<span>Home</span>
+					<Show when={(props.wantsYou ?? 0) > 0}>
+						<span class="pill-home-n">{props.wantsYou}</span>
+					</Show>
+				</button>
+				{/* On a phone the same door is one icon, like the buttons beside it: the two
+				    toolbars share 390px there, and a labelled chip was the difference between
+				    meeting and overlapping. The badge rides on its corner. */}
+				<button
+					type="button"
+					class="iconbtn pill-home-icon hidden max-[480px]:grid"
+					title="Back to the dashboard"
+					aria-label="Home: back to the dashboard"
+					tabindex={onStage() ? 0 : -1}
+					onClick={() => props.onHome?.()}
+				>
+					<Icon of={House} size={17} />
+					<Show when={(props.wantsYou ?? 0) > 0}>
+						<span class="pill-home-n pill-home-icon-n">{props.wantsYou}</span>
+					</Show>
+				</button>
+				<span class="pill-sep" aria-hidden="true" />
+			</span>
+
+			{/*
 			 * The active agent, with the same ring it would carry in the corner — which is also
 			 * why it has no face over there. A face in two corners is one too many.
 			 *
@@ -649,11 +720,18 @@ export function AgentPill(props: {
 			 * characters. Past that a name is not being read but recognised, and the dropdown
 			 * spells it out in full.
 			*/}
+			{/* On the dashboard: the three views, and nothing about agents. The sidebar has them. */}
+			<Show when={!onStage()}>
+				<DispatchTabs tab={props.tab ?? "boards"} onTab={(tab) => props.onTab?.(tab)} badge={props.wantsYou} />
+			</Show>
+
+			<Show when={onStage()}>
+			{/* The face, the name and the chevron are one group: the agents menu opens from the
+			    chevron and lines up with the group (`data-popover-anchor`, read by `ui/Popover`). */}
+			<span class="flex items-center gap-1" data-popover-anchor>
 			<Show
 				when={active()}
-				fallback={
-					<span class="label px-1">No agent</span>
-				}
+				fallback={<span class="label px-1">No agent</span>}
 			>
 				{(chat) => (
 					<span class="flex flex-none items-center gap-[7px] pl-0.5">
@@ -693,7 +771,7 @@ export function AgentPill(props: {
 				trigger={(api) => (
 					<button
 						type="button"
-						class="iconbtn"
+						class="iconbtn max-[360px]:hidden"
 						ref={api.ref}
 						aria-haspopup="menu"
 						aria-expanded={api.open}
@@ -706,6 +784,7 @@ export function AgentPill(props: {
 					</button>
 				)}
 			/>
+			</span>
 
 			{/*
 				Add an agent, one press from the toolbar.
@@ -747,7 +826,8 @@ export function AgentPill(props: {
 				<AgentChoices onPick={(kind) => props.onNew(kind)} />
 			</Popover>
 
-			<span class="pill-sep" aria-hidden="true" />
+			<span class="pill-sep max-[360px]:hidden" aria-hidden="true" />
+			</Show>
 
 			{/*
 				Browse or edit, and it is the first thing after the agent because it changes what
@@ -764,8 +844,8 @@ export function AgentPill(props: {
 				ring is gone at the request of the person who works in this app (`index.css` says why).
 				A dialog in front of a mode switch is a dialog you learn to dismiss without reading.
 			*/}
+			<Show when={onStage()}>
 			<button
-
 				type="button"
 				class="iconbtn"
 				/*
@@ -917,6 +997,7 @@ export function AgentPill(props: {
 						</button>
 					</>
 				)}
+			</Show>
 			</Show>
 			</Show>
 		</div>

@@ -64,6 +64,12 @@ const STEP = 1.25;
  */
 
 export function Corner(props: {
+	/**
+	 * Which surface is up. Zoom, fit and clear are canvas tools and fold away on the
+	 * dashboard, where there is no canvas; the faces, new board, the conversation and
+	 * More are on both.
+	 */
+	surface?: "dispatch" | "stage";
 	chats: AgentChat[];
 	identities: Record<string, Identity>;
 	focused: string | undefined;
@@ -139,6 +145,9 @@ export function Corner(props: {
 
 	return (
 		<div class="float pill absolute top-3 right-3 z-20" data-inset="top">
+			{/* On the dashboard the corner is two buttons: the dispatcher's conversation and the
+			    menu. The faces are the sidebar's there, and a new board belongs to a stage. */}
+			<Show when={props.surface !== "dispatch"}>
 			<AgentStack
 				chats={props.chats}
 				identities={props.identities}
@@ -163,6 +172,7 @@ export function Corner(props: {
 			 * route between the two. `--control-md` rather than `--control`, because a labelled
 			 * chip is read far more often than it is pressed.
 			 */}
+			<Show when={props.surface !== "dispatch"}>
 			<span class="flex items-center max-[1100px]:hidden">
 				<Popover
 					placement="bottom-end"
@@ -232,17 +242,8 @@ export function Corner(props: {
 			 * with the other two, where a fourth 44px target would push the pill into the
 			 * agent cluster.
 			 */}
-			<button
-				type="button"
-				class="iconbtn max-[640px]:hidden"
-				title="Fit the boards on the canvas (0)"
-				aria-label="Fit the boards on the canvas"
-				onClick={() => props.onFit()}
-			>
-				<Icon of={Maximize} size={15} />
-			</button>
-
 			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
+			</Show>
 
 			{/*
 			 * What the canvas holds: one board more, or none at all.
@@ -317,7 +318,20 @@ export function Corner(props: {
 				<Icon of={Eraser} size={15} />
 			</button>
 
+			{/* Fit, after Clear: the three canvas verbs read left to right as add, take away,
+			    frame what is left. It used to sit beside the zoom readout. */}
+			<button
+				type="button"
+				class="iconbtn max-[640px]:hidden"
+				title="Fit the boards on the canvas (0)"
+				aria-label="Fit the boards on the canvas"
+				onClick={() => props.onFit()}
+			>
+				<Icon of={Maximize} size={15} />
+			</button>
+
 			<span class="pill-sep max-[1100px]:hidden" aria-hidden="true" />
+			</Show>
 
 			{/*
 			 * The conversation, and its three states.
@@ -330,10 +344,16 @@ export function Corner(props: {
 			 */}
 			<button
 				type="button"
-				class="iconbtn"
+				class="iconbtn max-[360px]:hidden"
 				data-on={historyButton() === "on" ? "true" : historyButton() === "yield" ? "yield" : undefined}
 				aria-pressed={historyButton() !== "off"}
-				title={historyButton() === "yield" ? "Conversation: the inspector has the edge (⌘/)" : "Conversation (⌘/)"}
+				title={
+					props.surface === "dispatch"
+						? "Messages with the dispatcher (⌘/)"
+						: historyButton() === "yield"
+							? "Conversation: the inspector has the edge (⌘/)"
+							: "Conversation (⌘/)"
+				}
 				aria-label={historyButton() === "off" ? "Show the conversation" : "Hide the conversation"}
 				onClick={() => toggleHistory()}
 			>
@@ -407,6 +427,17 @@ export function Corner(props: {
 					</button>
 					<span class="rule hidden pointer-coarse:block" />
 				</Show>
+
+				{/* The conversation, as a row, on the narrowest phones: at 320px the dashboard's
+				    three tabs and the panel toggle leave the corner room for one button, and the
+				    menu is the one that has to stay. */}
+				<button type="button" role="menuitem" data-row data-flat="true" class="hidden max-[360px]:flex" onClick={() => toggleHistory()}>
+					<span class="ic">
+						<Icon of={MessageSquare} size={15} />
+					</span>
+					<span class="lb flex-1">{historyButton() === "off" ? "Show the conversation" : "Hide the conversation"}</span>
+				</button>
+				<span class="rule hidden max-[360px]:block" />
 
 				{/*
 					The same three, as rows, on a screen too narrow for them.

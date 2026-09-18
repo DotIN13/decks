@@ -3,6 +3,7 @@ import type { Registry } from "../agents/registry.ts";
 import type { BoardService } from "../boards/service.ts";
 import type { EvalTrust } from "../boards/eval-trust.ts";
 import type { StageService } from "../stage/service.ts";
+import type { TaskService } from "../tasks/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../web/bridge.ts";
@@ -68,6 +69,8 @@ export interface WireContext {
 	readonly agents: Registry;
 	readonly web: WebBridge;
 	readonly claudeAccounts: ClaudeAccounts;
+	/** Tasks and schedules — the dashboard's store (takes frames, not boards). */
+	readonly tasks: TaskService;
 	/**
 	 * The stage, for the one frame that runs a board's own code (`wire/boards.ts`).
 	 *

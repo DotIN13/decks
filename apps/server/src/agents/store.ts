@@ -68,6 +68,8 @@ export interface AgentRecord {
 	avatar?: string;
 	color: string;
 	parentId?: string;
+	/** The deck's dispatcher, kept across restarts so the deck never grows a second one. */
+	role?: "dispatcher";
 	context: string[];
 	inPlay: string[];
 	/**
@@ -460,6 +462,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(typeof source.avatar === "string" ? { avatar: source.avatar } : {}),
 		color: typeof source.color === "string" ? source.color : "#3b5cf6",
 		...(typeof source.parentId === "string" ? { parentId: source.parentId } : {}),
+		...(source.role === "dispatcher" ? { role: "dispatcher" as const } : {}),
 		context: strings(source.context),
 		inPlay: strings(source.inPlay),
 		...(positions ? { positions } : {}),

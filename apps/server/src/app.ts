@@ -9,6 +9,8 @@ import { EvalTrust } from "./boards/eval-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
 import { isBoardFormat } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
+import { TaskService } from "./tasks/service.ts";
+import { TaskStore } from "./tasks/store.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./web/bridge.ts";
@@ -31,6 +33,9 @@ import { Hub } from "./ws.ts";
 /** How long an account's identity is worth reusing before asking the CLI again. */
 const IDENTITY_TTL_MS = 60_000;
 
+/** How long the dashboard waits between looks at its schedules. */
+const TASKS_MS = 30_000;
+
 const RESYNC_MS = 4000;
 
 /**
@@ -47,6 +52,8 @@ export class App {
 	readonly stage: StageService;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
 	readonly boards: BoardService;
+	/** Tasks and schedules: the dashboard's store, rule and scheduler (`tasks/service.ts`). */
+	readonly tasks: TaskService;
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */
@@ -61,6 +68,8 @@ export class App {
 	private unwatch: (() => void) | undefined;
 	/** The safety net under the watcher — see `watch()`. */
 	private resyncTimer: NodeJS.Timeout | undefined;
+	/** The dashboard's scheduler — see `watch()`. */
+	private tasksTimer: NodeJS.Timeout | undefined;
 	/**
 	 * Where the browser last said it was looking.
 	 *
@@ -150,6 +159,24 @@ export class App {
 		 */
 		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.status", status }));
 		this.stage.web = Object.assign(this.web, { board: () => this.boards.newWebBoard() }) as typeof this.web & { board: () => string };
+		/*
+		 * The dashboard: tasks and schedules, per deck like the agents they belong to.
+		 *
+		 * Its `registry` is the three things it may touch — the roster the rule ranks, the
+		 * queue it writes into, and the queue it takes a cancelled task back out of — so
+		 * the service stays a service and the registry stays a registry. Warnings about a
+		 * corrupt store ride the same notice strip an agent uses.
+		 */
+		this.tasks = new TaskService(
+			new TaskStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text })),
+			{
+				roster: () => this.agents.summaries(),
+				deliver: (target, spec) => this.agents.deliver(target, spec),
+				removeQueued: (agentId, taskId) => this.agents.removeQueued(agentId, taskId),
+				decide: (task) => this.agents.decide(task),
+			},
+			(message) => this.send(message),
+		);
 		this.agents = new Registry(
 			deck,
 			(message) => this.send(message),
@@ -159,10 +186,21 @@ export class App {
 				defaultKind: config.backend,
 				camera: (agentId) => this.cameras.get(agentId) ?? this.lastCamera,
 				recordRevision: (path) => this.boards.recordRevision(path),
+				wrote: (path, who) => this.boards.wrote(path, who),
 				boardPathOf: (file) => this.boards.boardPathOf(file),
 				accounts: this.claudeAccounts,
 				accountsChanged: () => void this.publishAccounts(),
 				bridge: this.bridge,
+				tasks: {
+					create: (spec, fromId) => this.tasks.create(spec, undefined, fromId),
+					started: (taskId) => this.tasks.taskStarted(taskId),
+					finished: (finish) => this.tasks.taskFinished(finish),
+					agentRemoved: (id) => this.tasks.agentRemoved(id),
+					assigned: (placement) => this.tasks.assignedByDispatcher(placement),
+					decided: (outcome) => this.tasks.decided(outcome),
+					schedule: (spec) => this.tasks.createSchedule(spec),
+					scheduled: (outcome) => this.tasks.scheduled(outcome),
+				},
 			},
 		);
 	}
@@ -379,6 +417,8 @@ export class App {
 		 * deck.
 		 */
 		if (this.agents.restore() === 0) this.agents.create();
+		// And the dashboard's dispatcher, one per deck, whether the deck is new or restored.
+		this.agents.ensureDispatcher();
 		/*
 		 * After the rows are back: drop per-agent account links for agents this install no
 		 * longer has. `remove` covers the ordinary close; this covers a chat pruned while the
@@ -404,6 +444,7 @@ export class App {
 				 * arrangement — are the user's to change.
 				 */
 				this.deck.reload();
+				this.boards.restamp();
 				this.send({ type: "deck.state", deck: this.stageState() });
 				return;
 			}
@@ -422,7 +463,7 @@ export class App {
 				// dead path silently empties the rail and the canvas (DeckAgent.forget).
 				if (!board) {
 					this.agents.boardRemoved(change.path);
-					this.boards.forgetExtent(change.path);
+					this.boards.forgetBoard(change.path);
 				}
 				this.send(
 					board
@@ -453,6 +494,18 @@ export class App {
 		clearInterval(this.resyncTimer);
 		this.resyncTimer = setInterval(() => this.resyncBoards(), RESYNC_MS);
 		this.resyncTimer.unref?.();
+
+		/*
+		 * And the dashboard's scheduler under it, on its own slower beat.
+		 *
+		 * A task lands at :09:00, not :09:00:00 — the digest does not care about the
+		 * second — so thirty seconds is a fine quantum and downtime of less than that
+		 * costs nothing. `unref`, like the resync, so a headless run can exit with
+		 * schedules waiting.
+		 */
+		clearInterval(this.tasksTimer);
+		this.tasksTimer = setInterval(() => this.tasks.tick(), TASKS_MS);
+		this.tasksTimer.unref?.();
 	}
 
 	/**
@@ -470,7 +523,7 @@ export class App {
 		for (const path of removed) {
 			// A dead path left in a context silently empties the rail and the canvas.
 			this.agents.boardRemoved(path);
-			this.boards.forgetExtent(path);
+			this.boards.forgetBoard(path);
 			this.send({ type: "board.changed", path, rev: 0, removed: true });
 		}
 	}
@@ -518,6 +571,9 @@ export class App {
 		// And the shared browser, with the code the extension pairs with: the status board
 		// shows it when nothing is connected yet, and the browser is where the user reads it.
 		reply({ type: "web.status", status: this.web.status(), code: this.web.code() });
+		// And the dashboard's tasks and schedules, with the boards: everything the panel
+		// draws is part of the greeting, so a reconnect is a refresh.
+		reply({ type: "tasks", ...this.tasks.summary() });
 	}
 
 	/**
@@ -535,10 +591,15 @@ export class App {
 		App.refreshExamples(this.deck);
 		this.stage.setDeck(this.deck);
 		this.boards.setDeck(this.deck);
+		// Tasks and schedules belong to the deck they name, so a switch is a fresh read —
+		// the dashboard that opens here is the new deck's, not the old one's.
+		this.tasks.reset(this.deck);
 		// An agent's cwd is the deck, and a Pi session's cwd cannot move, so opening
 		// another deck starts again rather than re-pointing what is running.
 		void this.agents.reset(this.deck).then(() => {
 			if (this.agents.restore() === 0) this.agents.create();
+		// And the dashboard's dispatcher, one per deck, whether the deck is new or restored.
+		this.agents.ensureDispatcher();
 		/*
 		 * After the rows are back: drop per-agent account links for agents this install no
 		 * longer has. `remove` covers the ordinary close; this covers a chat pruned while the

@@ -23,17 +23,26 @@
 	 * 40% words over 100% words reads as grime, and it moves when the camera does.
 	 */
 	.float {
-		border: 1px solid var(--line);
+		border: 1px solid var(--border-strong);
 		border-radius: var(--radius-panel, 12px);
-		background: var(--panel);
+		background: var(--layer, var(--panel));
 		box-shadow: var(--shadow);
+	}
+
+	/* A toolbar keeps the strong line where the other floats take the quieter window
+	   border in dark: it is a small box of controls, read like a chip, not a window. */
+	.float.pill {
+		border-color: var(--line-strong);
 	}
 
 	/* A cluster of controls, 40px tall, the shape of both top corners. */
 	.pill {
 		display: flex;
 		align-items: center;
-		height: 40px;
+		/* 12px taller than its controls, whatever size they are: 40 around 28px buttons on a
+		   desktop, 52 around 40px ones under a finger. A fixed 40 made the phone's buttons
+		   fill the bar edge to edge. */
+		height: calc(var(--control, 28px) + 12px);
 		padding: 0 6px;
 		gap: 4px;
 	}
@@ -83,9 +92,16 @@
 		outline-offset: 1px;
 	}
 
+	/*
+	 * On: a raised card, not an accent fill. The one system every control here follows —
+	 * outlined or quiet at rest, a wash on hover, a card in `--raise` with a strong hairline
+	 * when chosen, and black only for the one thing that acts — leaves the accent for links,
+	 * focus and the agents' own colours, which is where it means something.
+	 */
 	.iconbtn[data-on="true"] {
-		background: var(--color-accent);
-		color: #fff;
+		background: var(--raise);
+		color: var(--fg);
+		box-shadow: inset 0 0 0 1px var(--line-strong);
 	}
 
 	.iconbtn[data-on="soft"] {
@@ -108,7 +124,36 @@
 	 * oklab mix is the one the picker's `+` uses.
 	 */
 	.iconbtn[data-on="true"]:hover {
+		background: var(--raise);
+		box-shadow: inset 0 0 0 1px var(--fg);
+	}
+
+	/*
+	 * The one place the accent fills a button: a tool that is *on* in a toolbar. The
+	 * selected tool in the palette and the conversation button are the two things a person
+	 * looks up to check from across the window, and a blue square is read from further away
+	 * than a white one. Asked for by name; everywhere else "chosen" stays the raised card.
+	 */
+	.pill .iconbtn[data-on="true"] {
+		background: var(--color-accent);
+		color: #fff;
+		box-shadow: none;
+	}
+
+	.pill .iconbtn[data-on="true"]:hover {
 		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
+		box-shadow: none;
+	}
+
+	.pill .iconbtn[data-on="yield"] {
+		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+		color: var(--color-accent);
+		box-shadow: none;
+	}
+
+	.pill .iconbtn[data-on="yield"]:hover {
+		background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+		box-shadow: none;
 	}
 
 	.iconbtn[data-on="soft"]:hover {
@@ -118,12 +163,14 @@
 	/* And the third state, for the same reason: the conversation button while the inspector
 	   has the edge is a tinted accent, and the grey wash over it read as *off*. */
 	.iconbtn[data-on="yield"]:hover {
-		background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+		box-shadow: inset 0 0 0 1px var(--line-strong);
 	}
 
+	/* Wanted but yielded: the card, dimmed, with a dashed hairline — held, not off. */
 	.iconbtn[data-on="yield"] {
-		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
-		color: var(--color-accent);
+		background: var(--raise);
+		color: var(--muted);
+		box-shadow: inset 0 0 0 1px var(--line);
 	}
 
 	.iconbtn[disabled] {
@@ -168,20 +215,23 @@
 		height: var(--control-md, 26px);
 		padding: 0 8px;
 		gap: 5px;
-		border: 0;
+		box-sizing: border-box;
+		border: 1px solid var(--line);
 		border-radius: var(--control-radius, 7px);
-		background: var(--line);
+		background: transparent;
 		color: var(--muted);
 		cursor: pointer;
 		font: inherit;
-		font-size: 11px;
+		font-size: 12px;
 		transition:
 			background-color 120ms ease,
+			border-color 120ms ease,
 			color 120ms ease;
 	}
 
 	.chipbtn:hover {
-		background: var(--line-strong);
+		border-color: var(--line-strong);
+		background: var(--line);
 		color: var(--fg);
 	}
 
@@ -207,7 +257,20 @@
 	   merely labelled — you should be able to see that a session is in plan mode without
 	   reading the word. */
 	.chipbtn[data-on="true"] {
-		background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		border-color: var(--line-strong);
+		background: var(--raise);
+		color: var(--fg);
+		font-weight: 600;
+	}
+
+	/* The permission mode chip in the composer keeps the accent tint when a mode other than
+	   the ordinary one is set: a standing change you should see without reading the word. */
+	.dockbox .chipbtn[data-on="true"] {
+		border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+		/* Mixed over the raised card's white, not over the grey layer: a translucent tint on
+		   the layer came out dull, and a chip that is on should be the brightest thing in the
+		   row. */
+		background: color-mix(in srgb, var(--color-accent) 10%, var(--raise, var(--panel)));
 		color: var(--color-accent);
 	}
 
@@ -247,7 +310,7 @@
 		z-index: 40;
 		box-sizing: border-box;
 		padding: 6px;
-		border: 1px solid var(--line-strong);
+		border: 1px solid var(--border-strong);
 		border-radius: 12px;
 		background: var(--panel);
 		box-shadow: var(--shadow-menu);
@@ -653,9 +716,9 @@
 		align-items: center;
 		padding: 0 11px;
 		gap: 6px;
-		border: 0;
+		border: 1px solid var(--line);
 		border-radius: var(--control-radius, 6px);
-		background: var(--line);
+		background: transparent;
 		color: var(--fg);
 		cursor: pointer;
 		font: inherit;
@@ -667,7 +730,8 @@
 	}
 
 	.btn:hover {
-		background: var(--line-strong);
+		border-color: var(--line-strong);
+		background: var(--line);
 	}
 
 	.btn:focus-visible {
@@ -677,12 +741,14 @@
 
 	/* The one that acts. One per row of them, or the accent has stopped meaning anything. */
 	.btn[data-primary="true"] {
-		background: var(--color-accent);
-		color: #fff;
+		border-color: transparent;
+		background: var(--fg);
+		color: var(--bg);
 	}
 
 	.btn[data-primary="true"]:hover {
-		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
+		border-color: transparent;
+		background: color-mix(in oklab, var(--fg) 82%, var(--bg));
 	}
 
 	/*
@@ -701,6 +767,12 @@
 	 * says "being edited", which is the only moment the two need distinguishing. A 1px box
 	 * around a value that is usually only read is a border earning nothing.
 	 */
+	/*
+	 * A text field, in the same system as the buttons beside it: a hairline at rest, a
+	 * stronger one on hover, and on focus the raised card with the composer's soft accent
+	 * halo rather than a hard ring. It was a grey slab that went darker on hover, the one
+	 * control left that filled itself to be seen.
+	 */
 	.field {
 		display: flex;
 		min-width: 0;
@@ -708,27 +780,30 @@
 		align-items: center;
 		box-sizing: border-box;
 		height: var(--field, 24px);
-		padding: 0 6px;
-		gap: 4px;
-		border: 0;
-		border-radius: 5px;
-		background: var(--line);
+		padding: 0 7px;
+		gap: 5px;
+		border: 1px solid var(--line);
+		border-radius: var(--control-radius, 8px);
+		background: transparent;
 		color: var(--fg);
 		font: inherit;
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
-		transition: background-color 120ms ease;
+		transition:
+			background-color 120ms ease,
+			border-color 120ms ease,
+			box-shadow 120ms ease;
 	}
 
 	.field:hover {
-		background: var(--line-strong);
+		border-color: var(--line-strong);
 	}
 
 	.field:focus-within,
 	.field:focus {
-		background: var(--bg);
-		outline: 2px solid var(--color-accent);
-		outline-offset: -1px;
+		border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+		background: var(--raise, var(--bg));
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
 	}
 
 	.field > .k {
@@ -754,20 +829,23 @@
 	}
 
 	/* A segmented control: pick one of a few, all visible. */
+	/* The hairline is an inset shadow, not a border: a border adds two pixels to a tray whose
+	   height is its buttons plus padding, and the panel's strip has to stay 32px. */
 	.seg {
 		display: flex;
 		flex: none;
 		padding: 2px;
 		gap: 2px;
-		border-radius: 6px;
-		background: var(--line);
+		border-radius: var(--control-radius, 8px);
+		background: transparent;
+		box-shadow: inset 0 0 0 1px var(--line);
 	}
 
 	.seg > button {
 		flex: 1;
 		height: 20px;
 		border: 0;
-		border-radius: 4px;
+		border-radius: calc(var(--control-radius, 8px) - 2px);
 		background: transparent;
 		color: var(--muted);
 		cursor: pointer;
@@ -778,11 +856,16 @@
 			color 120ms ease;
 	}
 
+	.seg > button:hover {
+		background: var(--line);
+		color: var(--fg);
+	}
+
 	.seg > button[data-on="true"] {
-		background: var(--panel);
+		background: var(--raise);
 		color: var(--fg);
 		font-weight: 600;
-		box-shadow: var(--shadow-row);
+		box-shadow: inset 0 0 0 1px var(--line-strong);
 	}
 
 	/*

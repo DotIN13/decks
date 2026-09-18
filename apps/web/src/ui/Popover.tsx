@@ -69,22 +69,36 @@ export function Popover(props: {
 	 */
 	const place = () => {
 		if (!trigger || !card) return;
+		/*
+		 * What the card hangs from is not always the button that opened it.
+		 *
+		 * A button in a toolbar pill sits 6px inside the pill's edge, so a card placed from
+		 * the button's own box landed flush against the pill's bottom and, for the corner's
+		 * menu, 7px short of the pill's corner. In a pill the vertical gap is measured from
+		 * the pill, and an `-end` card lines up with the pill's edge. A `[data-popover-anchor]`
+		 * around the trigger says what a `-start` card should line up with: the agents menu
+		 * opens from a chevron but belongs to the face and name beside it.
+		 */
+		const pill = trigger.closest(".pill");
+		const group = trigger.closest("[data-popover-anchor]");
 		const t = trigger.getBoundingClientRect();
+		const bar = (pill ?? trigger).getBoundingClientRect();
+		const along = (group ?? trigger).getBoundingClientRect();
 		const c = card.getBoundingClientRect();
 		const placement = props.placement ?? "top-start";
 		const above = placement.startsWith("top");
 
 		let left: number;
-		if (placement.endsWith("-end")) left = t.right - c.width;
-		else if (placement.endsWith("-start")) left = t.left;
+		if (placement.endsWith("-end")) left = (pill ? bar : t).right - c.width;
+		else if (placement.endsWith("-start")) left = along.left;
 		else left = t.left + t.width / 2 - c.width / 2;
 
-		let top = above ? t.top - c.height - GUTTER : t.bottom + GUTTER;
+		let top = above ? bar.top - c.height - GUTTER : bar.bottom + GUTTER;
 
 		left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - c.width - MARGIN));
 		// If it does not fit on the side asked for, take the other one before giving up.
-		if (above && top < MARGIN) top = t.bottom + GUTTER;
-		else if (!above && top + c.height > window.innerHeight - MARGIN) top = t.top - c.height - GUTTER;
+		if (above && top < MARGIN) top = bar.bottom + GUTTER;
+		else if (!above && top + c.height > window.innerHeight - MARGIN) top = bar.top - c.height - GUTTER;
 		top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - c.height - MARGIN));
 
 		setAt({ left, top });

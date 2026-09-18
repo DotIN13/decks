@@ -5,9 +5,10 @@ import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { Icon } from "../ui/icons.tsx";
+import { DecksMark, Icon } from "../ui/icons.tsx";
 import { BoardRow, BoardTile } from "./BoardRow.tsx";
 import { panelSections, panelTally } from "./panel-groups.ts";
+import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentRow } from "./AgentRow.tsx";
 import { agentFoot, agentSections, agentTally, type AgentGroup, type AgentSection } from "./agent-sections.ts";
@@ -187,6 +188,54 @@ export function LeftPanel(props: {
 	const [query, setQuery] = createSignal("");
 	const [tab, setTab] = createSignal<PanelTab>("boards");
 	const sheet = createSheet();
+
+	/*
+	 * The width is the person's to set, by the handle on the panel's right edge. Only beside
+	 * the canvas: a sheet covers the screen on a phone and keeps the width it always had.
+	 * Nothing else is told, because everything beside the panel reads `--inset-left`, which
+	 * is measured from this box (`camera/insets.ts`).
+	 */
+	const [width, setWidth] = createSignal(clampPanelWidth(loadPanelWidth(), window.innerWidth));
+	const [resizing, setResizing] = createSignal(false);
+	const resizeTo = (next: number) => setWidth(clampPanelWidth(next, window.innerWidth));
+	onMount(() => {
+		// A window made narrower takes the panel down with it; the saved width is kept.
+		const onResize = () => setWidth(clampPanelWidth(loadPanelWidth(), window.innerWidth));
+		window.addEventListener("resize", onResize);
+		onCleanup(() => window.removeEventListener("resize", onResize));
+	});
+	const onHandleDown = (event: PointerEvent) => {
+		if (event.button !== 0) return;
+		const handle = event.currentTarget as HTMLElement;
+		const from = width();
+		const start = event.clientX;
+		event.preventDefault();
+		handle.setPointerCapture(event.pointerId);
+		setResizing(true);
+		// The composer and the pill glide when the sidebar folds; following a drag, a glide
+		// is a lag. Said on the root so their own stylesheets can answer it.
+		document.documentElement.dataset.panelResizing = "true";
+		const move = (moved: PointerEvent) => resizeTo(from + moved.clientX - start);
+		const end = () => {
+			handle.removeEventListener("pointermove", move);
+			handle.removeEventListener("pointerup", end);
+			handle.removeEventListener("pointercancel", end);
+			setResizing(false);
+			delete document.documentElement.dataset.panelResizing;
+			savePanelWidth(width());
+		};
+		handle.addEventListener("pointermove", move);
+		handle.addEventListener("pointerup", end);
+		handle.addEventListener("pointercancel", end);
+	};
+	const onHandleKey = (event: KeyboardEvent) => {
+		const step = event.key === "ArrowLeft" ? -16 : event.key === "ArrowRight" ? 16 : 0;
+		if (event.key === "Home") resizeTo(PANEL_WIDTH);
+		else if (step !== 0) resizeTo(width() + step);
+		else return;
+		event.preventDefault();
+		savePanelWidth(width());
+	};
 
 	/*
 	 * Switching tabs clears the query.
@@ -426,12 +475,52 @@ export function LeftPanel(props: {
 				aria-hidden={!props.open}
 				data-sheet={sheet() ? "true" : undefined}
 				aria-label="Boards"
-				class={`float panel-shell fixed z-10 flex w-[264px] max-w-[86vw] flex-col p-2 ${
+				/*
+				 * A stationary column, not a card. Beside the canvas it runs the full height of
+				 * the window at the left edge, with the deck mark on top, so the two surfaces
+				 * (the dashboard and a stage) share one sidebar that never moves while the
+				 * middle slides. A sheet keeps the geometry it had: it covers the canvas on a
+				 * phone and starts under the pill.
+				 */
+				style={sheet() ? undefined : { width: `${width()}px` }}
+				data-resizing={resizing() ? "true" : undefined}
+				class={`float panel-shell fixed flex w-[264px] max-w-[86vw] flex-col p-2 ${
 					sheet()
-						? "top-[calc(max(12px,env(safe-area-inset-top))_+_52px)] bottom-0 left-0"
-						: "top-[calc(max(12px,env(safe-area-inset-top))_+_52px)] bottom-[calc(12px_+_env(safe-area-inset-bottom))] left-[max(12px,env(safe-area-inset-left))]"
+						? /* Over the composer (10) on a phone, under the toolbars (20): the two used to
+						     share 10, and the bar, later in the document, drew across the sheet's foot. */
+							"z-[12] top-[calc(max(12px,env(safe-area-inset-top))_+_52px)] bottom-0 left-0"
+						: "z-10 top-0 bottom-0 left-0 rounded-none border-y-0 border-l-0"
 				}`}
 			>
+				<Show when={!sheet()}>
+					{/* The right edge, as something to take hold of. A separator in the ARIA
+					    sense: focusable, arrow keys move it, Home puts the default back, and so
+					    does a double-click. */}
+					<div
+						class="panel-resize"
+						role="separator"
+						aria-orientation="vertical"
+						aria-label="Sidebar width"
+						aria-valuemin={PANEL_MIN}
+						aria-valuemax={PANEL_MAX}
+						aria-valuenow={width()}
+						tabindex={props.open ? 0 : -1}
+						title="Drag to resize. Double-click to reset."
+						onPointerDown={onHandleDown}
+						onKeyDown={onHandleKey}
+						onDblClick={() => {
+							resizeTo(PANEL_WIDTH);
+							savePanelWidth(width());
+						}}
+					/>
+				</Show>
+				<Show when={!sheet()}>
+					{/* The deck's mark, where a title bar would have put it. One deck, one word. */}
+					<div class="panel-mark" aria-hidden="true">
+						<span class="panel-mark-glyph"><DecksMark size={14} /></span>
+						<span class="panel-mark-name">Decks</span>
+					</div>
+				</Show>
 				{/*
 					The header: which list, then a field over it.
 
@@ -505,7 +594,7 @@ export function LeftPanel(props: {
 						vertical, and a `flex-basis: 0` beats a stated height — so the field measured
 						its input's min-content and came out 19px instead of 32.
 					*/}
-					<label class="field h-8 flex-none gap-1.5 rounded-md pointer-coarse:h-10 pointer-coarse:gap-2 pointer-coarse:px-2.5">
+					<label class="field h-8 flex-none gap-1.5 rounded-lg pointer-coarse:h-10 pointer-coarse:gap-2 pointer-coarse:px-2.5">
 						<Icon of={Search} class="flex-none text-faint" size={13} />
 						{/*
 							16px on a touch keyboard, like the composer's field and for the same reason:

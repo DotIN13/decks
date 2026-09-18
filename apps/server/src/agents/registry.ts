@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
-import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ServerMessage } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, Schedule, ScheduleSpec, ServerMessage, TaskResult, TaskSpec } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
+import { dispatcherBrief } from "../tasks/brief.ts";
 import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
-import type { DelegateReport, DelegateSpec, QueuedWork, SendSpec } from "../stage/tool.ts";
+import type { CreateSpec, DelegateReport, DelegateSpec, SendSpec } from "../stage/tool.ts";
+import type { TaskFinish } from "../tasks/service.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
@@ -43,6 +45,8 @@ export class Registry {
 			defaultKind: AgentKind;
 			camera(agentId: string): Camera;
 			recordRevision(path: string): string | undefined;
+			/** An agent said it wrote this board — the byline the gallery shows. Optional so a bare test host can omit it. */
+			wrote?(path: string, who: string): void;
 			boardPathOf(file: string): string | undefined;
 			/** The Claude subscriptions this install can use, for the backends that can. */
 			accounts?: ClaudeAccountSwitcher;
@@ -50,6 +54,28 @@ export class Registry {
 			accountsChanged?(): void;
 			/** The canvas tool's HTTP end, for a runtime that is not in this process. */
 			bridge?: StageBridge;
+			/**
+			 * The dashboard, when the deck has one — the seam an agent and a removal reach it through.
+			 *
+			 * Separate from `TaskService` itself so the registry can stay a registry: it hands
+			 * the stage its `task` verb, reports a queue item's life back, and tells the
+			 * service when an assigned agent goes away. Absent means no dashboard, and every
+			 * hook is a no-op.
+			 */
+			tasks?: {
+				create(spec: TaskSpec, fromId?: string): TaskResult;
+				started(taskId: string): void;
+				finished(finish: TaskFinish): void;
+				agentRemoved(id: string): void;
+				/** The dispatcher handed a task to an agent: the registry saw its `send`. */
+				assigned(placement: { taskId: string; agentId: string; agentName: string; why: string }): void;
+				/** The dispatcher's turn over a task ended, with or without a `send`. */
+				decided(outcome: { taskId: string; sent: boolean; report: string }): void;
+				/** Make a schedule — `stage.schedule`. */
+				schedule(spec: ScheduleSpec): Schedule | { error: string };
+				/** A deciding dispatcher made a schedule for its task instead of sending it: the task is done. */
+				scheduled(outcome: { taskId: string; schedule: Schedule }): void;
+			};
 		},
 	) {
 		this.store = new AgentStore(deck);
@@ -77,7 +103,9 @@ export class Registry {
 	 * the absence the panel draws one section for.
 	 */
 	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number }> {
-		return this.agents.map((agent) => {
+		// Not the dispatcher: it is the dashboard's, and an agent deciding who to hand work
+		// to must not hand it to the thing that hands work out.
+		return this.agents.filter((agent) => agent.role !== "dispatcher").map((agent) => {
 			const chat = agent.chat();
 			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand
 			// something to can see, in one call, both what they are doing and how much is
@@ -129,6 +157,8 @@ export class Registry {
 			mode?: AgentMode;
 			/** The Claude subscription to open on — a delegating parent's, handed down. */
 			account?: string;
+			/** The deck's dispatcher. Made by `ensureDispatcher`, never by a person. */
+			role?: "dispatcher";
 			/**
 			 * The workspace to open in — a delegating parent's, or a chat's own record.
 			 *
@@ -181,10 +211,43 @@ export class Registry {
 				agents: () => this.summaries(),
 				spawn: (parentId, spec) => this.spawn(parentId, spec),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
+				create: (fromId, spec) => this.createFor(fromId, spec),
 			report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
 				queue: (agentId) => this.get(agentId)?.queue() ?? [],
+				/**
+				 * A dashboard task popped and its turn ended: reported to the deck's own
+				 * service, which records the state. Never awaited — the session has a turn
+				 * to finish and the dashboard only records.
+				 */
+				taskStarted: (taskId) => this.host.tasks?.started(taskId),
+				taskFinished: (finish) => this.host.tasks?.finished(finish),
+				decided: (outcome) => {
+					this.host.tasks?.decided(outcome);
+					// A task's dispatcher has done its one job: the runtime goes, the log stays.
+					if (agent.role === "dispatcher" && agent.parentId) void agent.sleep().then(() => this.publish());
+				},
+				task: (spec: TaskSpec): TaskResult => {
+					if (!this.host.tasks) throw new Error("This deck has no dashboard.");
+					return this.host.tasks.create(spec, agent.id);
+				},
+				/*
+				 * A schedule from a deciding dispatcher is that task's answer: the person asked
+				 * for something recurring, and what they get is the schedule rather than one
+				 * turn of it. So the task is done, with the schedule as its result, and the
+				 * dispatcher's turn does not count as "sent nothing".
+				 */
+				schedule: (spec: ScheduleSpec) => {
+					if (!this.host.tasks) throw new Error("This deck has no dashboard.");
+					const made = this.host.tasks.schedule(spec);
+					if (!("error" in made) && agent.role === "dispatcher" && agent.deciding && !agent.decidedSend) {
+						agent.decidedSend = true;
+						this.host.tasks.scheduled({ taskId: agent.deciding, schedule: made });
+					}
+					return made;
+				},
 				brief: (task, boards) => brief(task, boards, this.deck),
 				recordRevision: (path) => this.host.recordRevision(path),
+				wrote: (path, who) => this.host.wrote?.(path, who),
 				boardPathOf: (file) => this.host.boardPathOf(file),
 			},
 			{
@@ -230,6 +293,7 @@ export class Registry {
 				color: record.color,
 				...(record.resumeRef ? { resumeRef: record.resumeRef } : {}),
 				...(record.parentId ? { parentId: record.parentId } : {}),
+				...(record.role ? { role: record.role } : {}),
 				restored: {
 					id: record.id,
 					// The transcript is not read here. It is read when somebody opens the chat
@@ -332,6 +396,9 @@ export class Registry {
 		// And the symlink that said which subscription it spent. Nothing else of an agent
 		// lives in the account store, so this is the whole of that cleanup.
 		this.host.accounts?.releaseAgent?.(id);
+		// And the work it was assigned: a dashboard task it was carrying comes back out of
+		// its queue and is re-decided, so nothing points at a ghost (tasks/service.ts).
+		this.host.tasks?.agentRemoved(id);
 		for (const child of this.agents) child.orphan(id);
 
 		// The focus moves to whatever is nearest, or to a new agent on the next request —
@@ -437,6 +504,51 @@ export class Registry {
 	}
 
 	/**
+	 * Make an agent with no task, for a `send` to follow — `stage.create`.
+	 *
+	 * A peer rather than a child: it has no parent to report to and is not counted against
+	 * `MAX_CHILDREN`, because the one making it is not going to wait for it. It opens on the
+	 * creator's account, workspace and model unless told otherwise. For a task's dispatcher
+	 * the model is the dashboard's composer, which is where a person says what new work
+	 * should run on; a model named here is the dispatcher's own decision, and a model the
+	 * runtime cannot open is a notice in the creator's transcript, not an error.
+	 */
+	async createFor(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string }> {
+		const from = this.get(fromId);
+		if (!from) throw new Error("The creating agent is gone");
+		const workspace = spec.workspace ?? from.workspace;
+		const inherited = !spec.model && (!spec.kind || spec.kind === from.kind) ? from.currentModel() : undefined;
+		const made = this.create({
+			name: spec.name,
+			...(spec.kind ? { kind: spec.kind } : {}),
+			...(inherited ? { model: inherited } : {}),
+			...(from.accountId() ? { account: from.accountId() as string } : {}),
+			...(workspace ? { workspace } : {}),
+		});
+		if (spec.tags?.length) made.setTags(spec.tags);
+		if (spec.model?.includes("/")) {
+			const [provider, ...rest] = spec.model.split("/");
+			try {
+				await made.setModel(provider!, rest.join("/"), spec.thinking);
+			} catch (error) {
+				from.translator.notice("warn", `${made.chat().name} stays on the default model: ${(error as Error).message}`);
+			}
+		} else if (spec.thinking) {
+			await made.setThinking(spec.thinking);
+		}
+		if (spec.mode) {
+			if (made.chat().capabilities.modes.includes(spec.mode)) {
+				await made.start();
+				await made.setMode(spec.mode);
+			} else {
+				from.translator.notice("warn", `${made.chat().name} stays in its default mode: ${made.chat().kind} cannot do "${spec.mode}".`);
+			}
+		}
+		this.publish();
+		return { agent: made.id, name: made.chat().name };
+	}
+
+	/**
 	 * Put work in an existing agent's queue and return — the handover that does not block.
 	 *
 	 * Where `spawn` makes an agent and waits for it, this hands a task to somebody who is
@@ -452,12 +564,16 @@ export class Registry {
 		const from = this.get(fromId);
 		if (!from) throw new Error("The sending agent is gone");
 
-		const byId = this.get(target);
-		const named = this.agents.filter((agent) => agent.chat().name.toLowerCase() === target.toLowerCase());
-		if (!byId && named.length > 1) throw new Error(`More than one agent is called ${target}; use the id from stage.agents().`);
-		const to = byId ?? named[0];
-		if (!to) throw new Error(`No agent ${target}. Use an id or a name from stage.agents().`);
-
+		const to = this.resolve(target);
+		if (to.role === "dispatcher") throw new Error("The dispatcher hands work out; it does not take any. Send to an agent from stage.agents().");
+		/*
+		 * The dispatcher placing a task: its `send` during the deciding turn *is* the
+		 * dashboard's answer, so the item carries the task's id (which is what turns the
+		 * task running and done as the receiver's queue drains) and the dashboard hears who
+		 * took it. A second send in the same turn is refused rather than split.
+		 */
+		const placing = from.role === "dispatcher" ? from.deciding : undefined;
+		if (from.role === "dispatcher" && placing && from.decidedSend) throw new Error("This task was already handed to an agent; one send per task.");
 		// Only boards that exist, and no context change on the receiver: what it is holding is
 		// its own decision, and a sender that could rewrite it would be a sender that can take
 		// somebody's canvas away. The source rides in the briefing instead.
@@ -468,10 +584,111 @@ export class Registry {
 			task: spec.task.trim(),
 			boards: handed,
 			at: Date.now(),
+			...(placing ? { taskId: placing } : {}),
+			...(spec.reply ? { reply: true } : {}),
+		});
+		if (placing) {
+			from.decidedSend = true;
+			this.host.tasks?.assigned({ taskId: placing, agentId: to.id, agentName: to.chat().name, why: firstLineOf(spec.task) });
+		}
+		this.publish();
+		return { queued: true, position };
+	}
+
+	/**
+	 * The deck's dispatcher: one agent, made here and never by a person, on the default
+	 * runtime. It answers the dashboard's bar, and its transcript is the dashboard's log.
+	 * Hidden from the lists (`AgentChat.role`), and never the focused stage: a person who
+	 * lands on it would find an agent that refuses to do anything but hand work out.
+	 */
+	ensureDispatcher(): DeckAgent {
+		const have = this.agents.find((agent) => agent.role === "dispatcher");
+		if (have) {
+			this.unfocusDispatcher();
+			return have;
+		}
+		const made = this.create({ name: "Dispatcher", role: "dispatcher" });
+		this.unfocusDispatcher();
+		return made;
+	}
+
+	private unfocusDispatcher(): void {
+		const focused = this.get(this.focusedId);
+		if (focused?.role !== "dispatcher") return;
+		this.focusedId = this.agents.find((agent) => agent.role !== "dispatcher")?.id;
+		this.publish();
+	}
+
+	/**
+	 * Ask a dispatcher to place a task: a **new one for this task**, spawned from the
+	 * template with the model, thinking, mode and account the composer set there, so its
+	 * transcript is this task's own log and two tasks never share a context. It is not
+	 * handed the roster: the brief tells it to read `stage.agents()` itself. The briefing
+	 * goes into its queue as a `decide` item and runs the moment it is up; when the turn
+	 * ends the runtime is stopped and the conversation kept (`DeckAgent.sleep`).
+	 */
+	decide(task: { id: string; text: string; boards: string[]; workspace?: string }): { dispatcherId: string } {
+		const template = this.ensureDispatcher();
+		const model = template.currentModel();
+		const mode = template.chat().mode;
+		const account = template.accountId();
+		const dispatcher = this.create({
+			name: "Dispatcher",
+			role: "dispatcher",
+			parentId: template.id,
+			kind: template.kind,
+			...(model ? { model } : {}),
+			...(mode ? { mode } : {}),
+			...(account ? { account } : {}),
+		});
+		this.unfocusDispatcher();
+		dispatcher.enqueue({
+			from: "deck",
+			fromName: "The dashboard",
+			task: dispatcherBrief(task),
+			boards: [],
+			at: Date.now(),
+			decide: task.id,
+		});
+		this.publish();
+		return { dispatcherId: dispatcher.id };
+	}
+
+	/**
+	 * Put work in an existing agent's queue with **no sending agent** — the dashboard's
+	 * half of `send`. The same resolution by id or name, the same queue, the same cap;
+	 * the sender it names is the dashboard, so a queue notice reads "The dashboard
+	 * queued work for you" and a drain keeps it that way.
+	 */
+	deliver(target: string, spec: SendSpec & { taskId: string; fromName: string }): { queued: true; position: number } {
+		const to = this.resolve(target);
+		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
+		const position = to.enqueue({
+			from: "deck",
+			fromName: spec.fromName,
+			task: spec.task.trim(),
+			boards: handed,
+			at: Date.now(),
+			taskId: spec.taskId,
 			...(spec.reply ? { reply: true } : {}),
 		});
 		this.publish();
 		return { queued: true, position };
+	}
+
+	/** Take a dashboard task back out of an agent's queue — a cancelled task must not run. */
+	removeQueued(agentId: string, taskId: string): boolean {
+		return this.get(agentId)?.cancelWork(taskId) ?? false;
+	}
+
+	/** One agent, by id or by a name that only one agent answers to. */
+	private resolve(target: string): DeckAgent {
+		const byId = this.get(target);
+		const named = this.agents.filter((agent) => agent.chat().name.toLowerCase() === target.toLowerCase());
+		if (!byId && named.length > 1) throw new Error(`More than one agent is called ${target}; use the id from stage.agents().`);
+		const to = byId ?? named[0];
+		if (!to) throw new Error(`No agent ${target}. Use an id or a name from stage.agents().`);
+		return to;
 	}
 
 	/** Every agent holding this board hears what the user did to it. */
@@ -564,7 +781,13 @@ function brief(task: string, boards: string[], deck: Deck): string {
 
 	parts.push(
 		"",
+		"Boards you changed are listed with this work only if you named them: `stage.fit`, a `stage.show` of one board, or `stage.report(paths)`.",
 		"When you are done, reply with a short report: what you changed, and anything the parent agent needs to decide.",
 	);
 	return parts.join("\n");
+}
+
+/** The first line of a piece of work, for the dashboard's "why" beside a placed task. */
+function firstLineOf(text: string): string {
+	return text.trim().split("\n")[0]?.trim().slice(0, 160) ?? "";
 }

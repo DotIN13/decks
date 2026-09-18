@@ -278,6 +278,7 @@ export class Deck {
 			board.y = previous.y;
 			board.inContext = previous.inContext;
 			board.lastWrittenBy = previous.lastWrittenBy;
+			board.seenAt = previous.seenAt;
 			/*
 			 * A flow board's height is its content's, and only a frame knows it: the file cannot state one,
 			 * so the reading the last look produced is the best answer until the next look. Without this,
@@ -401,6 +402,14 @@ export class Deck {
 			// never reloads. A content hash also means an edit that puts a board back
 			// the way it was does not churn every open frame.
 			rev: revisionOf(source),
+			// The *other* reading of the same file, published because the dashboard's
+			// first half sorts by it: "what did this workspace generate lately" has no
+			// answer without a time. A reading and not a promise — a board touched
+			// without being edited has a new time and the same revision, which is
+			// exactly what "latest" should mean to a person looking for new boards.
+			// `signatureOf` has already stat-ed the file by now; this is the stat whose
+			// number it kept private.
+			modifiedAt: modifiedAtOf(absolute),
 			...(meta.poster ? { poster: meta.poster } : {}),
 			...(live ? { live } : {}),
 			inContext: [],
@@ -415,6 +424,15 @@ function signatureOf(absolute: string): string {
 		return `${stats.mtimeMs}:${stats.size}`;
 	} catch {
 		return "";
+	}
+}
+
+/** The last modification, as the dashboard sorts by — `0` if the file went away mid-scan. */
+function modifiedAtOf(absolute: string): number {
+	try {
+		return statSync(absolute).mtimeMs;
+	} catch {
+		return 0;
 	}
 }
 

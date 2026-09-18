@@ -7,7 +7,8 @@ import type { Camera } from "@decks/protocol";
 import { runtimeDir } from "@decks/runtime";
 import { Deck } from "../deck/loader.ts";
 import { StageService } from "./service.ts";
-import { createStageTool, type QueuedWork, type SendSpec } from "./tool.ts";
+import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec } from "./tool.ts";
+import type { ScheduleSpec } from "@decks/protocol";
 
 /**
  * What the tool *says*, as opposed to what it does (DESIGN §6.3).
@@ -24,6 +25,8 @@ function toolOn(camera: Camera) {
 	const deck = Deck.open(root);
 
 	const sends: Array<{ target: string; spec: SendSpec }> = [];
+	const created: CreateSpec[] = [];
+	const scheduled: ScheduleSpec[] = [];
 	const others = [
 		{ id: "a1", name: "Ada", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html"], holding: 1, tags: ["panel-css"], workspace: "political-llm", queued: 3 },
 		{ id: "a2", name: "Rune", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html", "boards/notes.html"], holding: 2, tags: [], workspace: "political-llm", queued: 0 },
@@ -34,6 +37,7 @@ function toolOn(camera: Camera) {
 	let room: string | undefined;
 	/** What a browser would have reported, if one were looking. */
 	const extents = new Map<string, { rev: number; w: number; h: number }>();
+	const worked: string[] = [];
 	const service = new StageService(deck, {
 		newMirror: () => "boards/mirrors/x.html",
 		newBoard: (options) => {
@@ -95,14 +99,26 @@ function toolOn(camera: Camera) {
 				sends.push({ target, spec });
 				return { queued: true, position: sends.length };
 			},
+			create: async (spec) => {
+				created.push(spec);
+				return { agent: `new-${created.length}`, name: spec.name };
+			},
+			schedule: (spec) => {
+				scheduled.push(spec);
+				return { id: "s-1", ...spec, task: spec.task, boards: spec.boards ?? [], createdAt: 1, nextRunAt: 2, missed: 0, enabled: true };
+			},
 			queue: () => waiting,
 			recordRevision: () => undefined,
+			worked: (path) => void worked.push(path),
 			boardPathOf: () => undefined,
 		},
 	});
 	return {
 		tool,
+		worked,
 		sends,
+		created,
+		scheduled,
 		deck,
 		extents,
 		service,
@@ -202,6 +218,66 @@ test("send needs an address and a task, and passes both on", async () => {
 	const ok = await tool.run(`return await stage.send(" Kit ", { task: "Remeasure", boards: ["boards/plan.html"] })`);
 	assert.equal(ok.isError, false);
 	assert.deepEqual(sends, [{ target: "Kit", spec: { task: "Remeasure", boards: ["boards/plan.html"] } }]);
+	cleanup();
+});
+
+test("schedule checks the shape, hands the rest to the deck, and returns what was made", async () => {
+	const { tool, scheduled, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+
+	assert.match((await tool.run(`return await stage.schedule({ name: " ", at: "09:00", days: [1], workspace: "w", kind: "digest" })`)).text, /needs a name/);
+	assert.match((await tool.run(`return await stage.schedule({ name: "x", at: "09:00", days: [1], workspace: "w", kind: "weekly" })`)).text, /"digest" or "custom"/);
+	assert.equal(scheduled.length, 0);
+
+	const made = await tool.run(`return await stage.schedule({ name: " Morning digest ", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", kind: "digest" })`);
+	assert.equal(made.isError, false);
+	assert.match(made.text, /"id": "s-1"/);
+	assert.deepEqual(scheduled, [{ name: "Morning digest", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", kind: "digest" }]);
+	cleanup();
+});
+
+test("a board is the agent's once it is named: newBoard, fit, a one-board show and report, and nothing else", async () => {
+	const { tool, worked, extents, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
+
+	await tool.run(`await stage.newBoard({ title: "One" }); await stage.newBoard({ title: "Two" });`);
+	assert.deepEqual(worked, ["boards/one.html", "boards/two.html"]);
+	worked.length = 0;
+	// The stub writes the file and no more; the watcher is what would tell the deck.
+	deck.refresh("boards/one.html");
+	deck.refresh("boards/two.html");
+
+	// Arranging the canvas, reading and attaching are not authorship.
+	const arranged = await tool.run(`await stage.show(["boards/one.html", "boards/two.html"]); await stage.attach("boards/one.html"); await stage.read("boards/one.html"); await stage.hide("boards/two.html");`);
+	assert.equal(arranged.isError, false, arranged.text);
+	assert.deepEqual(worked, []);
+
+	const shown = await tool.run(`await stage.show("boards/one.html", { highlight: "x" });`);
+	assert.equal(shown.isError, false, shown.text);
+	assert.deepEqual(worked, ["boards/one.html"]);
+
+	const rev = deck.board("boards/two.html")!.rev;
+	extents.set("boards/two.html", { rev, w: 900, h: 1200 });
+	const fitted = await tool.run(`return await stage.fit("boards/two.html")`);
+	assert.equal(fitted.isError, false, fitted.text);
+	assert.deepEqual(worked, ["boards/one.html", "boards/two.html"]);
+
+	const reported = await tool.run(`return await stage.report(["boards/one.html", "boards/two.html"])`);
+	assert.match(reported.text, /"reported"/);
+	assert.equal(worked.length, 4);
+	assert.match((await tool.run(`return await stage.report("boards/none.html")`)).text, /No such board/);
+	assert.equal(worked.length, 4);
+	cleanup();
+});
+
+test("create needs a name, trims it, and hands the rest to the registry", async () => {
+	const { tool, created, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+
+	assert.match((await tool.run(`return await stage.create({ name: "  " })`)).text, /needs a name/);
+	assert.equal(created.length, 0);
+
+	const made = await tool.run(`return await stage.create({ name: " Survey ", workspace: "political-llm", tags: ["survey-design"] })`);
+	assert.equal(made.isError, false);
+	assert.match(made.text, /"agent": "new-1"/);
+	assert.deepEqual(created, [{ name: "Survey", workspace: "political-llm", tags: ["survey-design"] }]);
 	cleanup();
 });
 
