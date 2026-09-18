@@ -1,4 +1,4 @@
-import { lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -551,7 +551,7 @@ export class ClaudeAccounts {
 			/* nothing there, which is the ordinary case */
 		}
 		if (local && !local.isSymbolicLink()) {
-			if (!this.adopt(at, target)) return;
+			if (!this.adopt(at, target, join(dirname(at), DISPLACED, basename(at)))) return;
 		} else if (local) {
 			// A link pointing somewhere else: ours to replace.
 			try {
@@ -578,15 +578,24 @@ export class ClaudeAccounts {
 	 * Move what was written locally back to where it should have gone.
 	 *
 	 * Returns whether `at` is now free to be replaced by a link. Nothing is ever overwritten:
-	 * an entry moves only into a name that does not exist, two directories are merged child by
-	 * child instead, and anything that would still collide is left exactly where it is — which
-	 * costs that one account a shared directory and loses nobody a transcript.
+	 * an entry moves only into a name that is free, two directories are merged child by child,
+	 * and **a name the shared store already has is won by the shared copy** — the local one is
+	 * moved into `<config dir>/displaced/…`, contents and all, rather than left where it is.
+	 *
+	 * That last clause is the bug this was rewritten for. It used to give up on a collision and
+	 * return false, and false travels *up*: one stale duplicate of one transcript inside
+	 * `projects/` meant the directory was never emptied, never removed and never linked, and
+	 * the account went on reading a private store instead. On this install that cost the
+	 * Stanford account 53 transcripts it could not see — a resume of a conversation created
+	 * before the account existed answered *No conversation found with session ID*, and the turn
+	 * ended as `error_during_execution`. The comment above has always promised "loses nobody a
+	 * transcript"; this is the version where that is true.
 	 *
 	 * Recursive, because the collision is usually one level down. An account signed in before
 	 * any of this existed has `projects/<deck>/` and so does the config home: the directories
 	 * collide, the transcripts inside them do not.
 	 */
-	private adopt(at: string, target: string): boolean {
+	private adopt(at: string, target: string, aside: string): boolean {
 		const kind = (path: string): "none" | "dir" | "other" => {
 			try {
 				return lstatSync(path).isDirectory() ? "dir" : "other";
@@ -600,10 +609,19 @@ export class ClaudeAccounts {
 				renameSync(at, target);
 				return true;
 			}
-			if (kind(target) !== "dir" || kind(at) !== "dir") return false;
-			let whole = true;
-			for (const child of readdirSync(at)) if (!this.adopt(join(at, child), join(target, child))) whole = false;
-			if (!whole) return false;
+			/*
+			 * A name the shared store already has. The shared copy is the live one — it is what
+			 * every other account and every other agent has been reading and writing — so the
+			 * local copy is moved aside rather than merged over it or left blocking the link.
+			 */
+			if (kind(at) !== "dir" || kind(target) !== "dir") {
+				mkdirSync(dirname(aside), { recursive: true });
+				renameSync(at, freeName(aside));
+				return true;
+			}
+			for (const child of readdirSync(at)) {
+				if (!this.adopt(join(at, child), join(target, child), join(aside, child))) return false;
+			}
 			rmSync(at, { recursive: true, force: true });
 			return true;
 		} catch {
@@ -904,6 +922,23 @@ export class ClaudeAccounts {
 		for (const account of this.list()) if (account.id !== DEFAULT_ACCOUNT) this.share(this.configDir(account.id));
 		this.repoint();
 	}
+}
+
+/**
+ * Where an entry that cannot be adopted goes: the account's own directory, not the shared
+ * store. It is the account's stale copy of something the shared store already has, so it
+ * belongs to that account and goes when the account does (`discard`).
+ */
+const DISPLACED = "displaced";
+
+/** A path nothing is using, so moving into it cannot overwrite anything. */
+function freeName(path: string): string {
+	if (!existsSync(path)) return path;
+	for (let n = 2; n < 100; n += 1) {
+		const candidate = `${path}.${n}`;
+		if (!existsSync(candidate)) return candidate;
+	}
+	return `${path}.${Date.now()}`;
 }
 
 /** Take only what is the right shape, and drop the rest. */

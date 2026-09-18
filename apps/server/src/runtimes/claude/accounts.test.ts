@@ -172,6 +172,34 @@ test("transcripts already written into an account are adopted back out", () => {
 	cleanup();
 });
 
+test("a transcript the shared store already has does not cost the account the link", () => {
+	const { accounts, home, cleanup } = store();
+	const { id, configDir } = accounts.begin();
+	writeFileSync(join(configDir, ".credentials.json"), "{}");
+	accounts.remember({ id, email: "one@example.com" });
+	/*
+	 * The shape that broke this: the account has its own `projects/`, every name in it is also
+	 * in the shared store as an older copy of the same session, and one of the sessions the
+	 * shared store has and it does not is the one a conversation is trying to resume. One
+	 * collision used to abandon the adoption, so `projects/` was never linked, and the account
+	 * went on reading 11 transcripts while the store it should have seen had 64.
+	 */
+	rmSync(join(configDir, "projects"), { force: true });
+	mkdirSync(join(configDir, "projects", "-a-deck"), { recursive: true });
+	mkdirSync(join(home, "projects", "-a-deck"), { recursive: true });
+	writeFileSync(join(configDir, "projects", "-a-deck", "same.jsonl"), "stale");
+	writeFileSync(join(home, "projects", "-a-deck", "same.jsonl"), "live");
+	writeFileSync(join(home, "projects", "-a-deck", "elsewhere.jsonl"), "live");
+
+	accounts.sweep();
+
+	assert.equal(readlinkSync(join(configDir, "projects")), join(home, "projects"), "linked anyway");
+	assert.equal(readFileSync(join(home, "projects", "-a-deck", "same.jsonl"), "utf8"), "live", "the shared copy is the one kept");
+	assert.equal(existsSync(join(configDir, "projects", "-a-deck", "elsewhere.jsonl")), true, "and the session only the shared store had is visible to the account now");
+	assert.equal(readFileSync(join(configDir, "displaced", "projects", "-a-deck", "same.jsonl"), "utf8"), "stale", "the local copy is kept, in the account's own directory");
+	cleanup();
+});
+
 test("signing in adds an account, makes it active, and points the symlink at it", () => {
 	const { accounts, dir, cleanup } = store();
 	const id = add(accounts, "one@example.com");

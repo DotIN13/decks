@@ -23,6 +23,7 @@ import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from ".
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";
 import { isTransientAuthFailure, MAX_TRANSIENT_RETRIES, retryDelayMs } from "./transient.ts";
+import { isStaleSession } from "./stale-session.ts";
 import { accountEnvironment, epochMs } from "./accounts.ts";
 import { qualifiedToolName, stageMcpServer } from "./tools.ts";
 import { eventPercent, toUsageReport } from "./usage.ts";
@@ -135,6 +136,13 @@ export class ClaudeBackend implements AgentBackend {
 	private warnedAbout: string | undefined;
 	/** How many times this turn has been retried past a busy login (`transient.ts`). */
 	private transientTries = 0;
+	/**
+	 * How many times this turn has been asked again after the session it was told to resume
+	 * turned out not to be in this account's store (`stale-session.ts`). One, deliberately: a
+	 * second restart would mean the fresh session is missing too, and that is a sentence for a
+	 * person rather than another attempt.
+	 */
+	private staleTries = 0;
 
 	private constructor(private readonly context: AgentBackendContext) {
 		/*
@@ -314,12 +322,18 @@ export class ClaudeBackend implements AgentBackend {
 					}
 					handleClaudeMessage(translator, state, message);
 					// After the translator, so `lastAssistantText` is the reply this turn gave.
-					if (message.type === "result") this.retryTransient();
+					if (message.type === "result") {
+						this.recoverStaleSession(translator.lastAssistantText());
+						this.retryTransient();
+					}
 				}
 			} catch (error) {
 				if (this.closed) return;
 				this.streaming = false;
 				translator.setState("idle");
+				// Before reporting a stop: the same failure arrives here when the first turn cannot
+				// open the session it was told to resume, and that one is recoverable.
+				if (this.recoverStaleSession((error as Error).message)) return;
 				notice("error", `Claude stopped: ${(error as Error).message}`);
 			}
 		})();
@@ -994,6 +1008,82 @@ export class ClaudeBackend implements AgentBackend {
 		}, wait);
 		// Never a reason to hold the process open: a deck shutting down mid-wait should shut down.
 		timer.unref?.();
+	}
+
+	/**
+	 * A turn that failed because the session it was told to resume is not in this account's
+	 * store. Asked again once, in a fresh session.
+	 *
+	 * The id can be right and the store still be the wrong one, with nothing about the person,
+	 * the deck or the task at fault: `--resume` is looked up inside the config directory the
+	 * process is handed (`claude/accounts.ts`), and that directory can have moved under a
+	 * stored id. It did here: the id was written before the per-agent link existed, the account
+	 * it ended up on kept a private `projects/` instead of the shared store, and the session was
+	 * in the 53 transcripts that copy did not have. The morning's scheduled task ended as
+	 * `error_during_execution` with a session id quoted back at somebody who could do nothing
+	 * with it. `stale-session.ts` says why this reads prose rather than a field.
+	 *
+	 * What starting fresh costs is the conversation's memory of itself, and that was already
+	 * the cost — the memory is unreachable either way, and this way the work still happens.
+	 *
+	 * Returns whether it took the failure over, so the caller does not also report a stop.
+	 */
+	private recoverStaleSession(said: string | undefined): boolean {
+		const { translator, notice } = this.context;
+		if (!isStaleSession(said)) {
+			this.staleTries = 0;
+			return false;
+		}
+		/*
+		 * A turn that already changed a board is not repeated — the rule the busy-login retry
+		 * follows too. Here it also means the failure stands: the turn did something, so "ask it
+		 * again in a fresh session" is not a repair, it is a second attempt at work already done.
+		 */
+		const again = translator.turnTouchedAnything() ? undefined : translator.lastUserText();
+		if (!again) return false;
+		if (this.staleTries >= 1) {
+			this.staleTries = 0;
+			notice(
+				"error",
+				"Claude cannot find this conversation's session in this account's transcript store, so this turn cannot be asked again. Send it once more and it starts a fresh conversation.",
+			);
+			return true;
+		}
+		this.staleTries += 1;
+		notice("warn", "Claude cannot find this conversation's session in this account's transcript store, so it starts a fresh one and asks again.");
+		// The reply is not an answer, and leaving it in the transcript is what made this read
+		// as a result rather than a failure.
+		translator.dropLastAssistant();
+		this.context.historyChanged?.();
+		// Forgotten before the restart, so the new query is opened without `--resume`.
+		this.sessionId = undefined;
+		void this.restartQuery(again);
+		return true;
+	}
+
+	/**
+	 * Open a fresh session and ask the same thing in it.
+	 *
+	 * The same moves `rewindTo` makes to replace a query: stop feeding the old one, open the new
+	 * one, then let the old one end. Nothing is resumed, which is the whole point of it.
+	 */
+	private async restartQuery(text: string): Promise<void> {
+		const previous = this.session;
+		this.closed = true;
+		this.wake?.();
+		this.queue = [];
+		try {
+			await this.startQuery();
+			this.push(text);
+		} catch (error) {
+			this.closed = false;
+			this.context.notice("error", `Claude could not start a new session: ${(error as Error).message}`);
+		}
+		try {
+			await previous.return(undefined);
+		} catch {
+			/* a query that has already ended is not a problem worth raising */
+		}
 	}
 
 	/** Read after each turn, because Decks' `usage()` is synchronous and this is not. */
