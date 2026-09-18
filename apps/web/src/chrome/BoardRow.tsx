@@ -2,7 +2,7 @@ import type { Board } from "@decks/protocol";
 import Trash2 from "lucide-solid/icons/trash-2";
 import { createSignal, onCleanup, Show } from "solid-js";
 import { RailItem } from "./BoardRail.tsx";
-import { picture } from "../canvas/thumb-cache.ts";
+import { BoardPicture } from "./BoardPicture.tsx";
 import { Icon } from "../ui/icons.tsx";
 import { deckFileUrl } from "../lib/api.ts";
 import { basename } from "./panel-groups.ts";
@@ -28,20 +28,13 @@ const ARMED_MS = 4000;
  *
  * ### Why it never mounts a document
  *
- * A thumbnail in this app is the board itself, scaled down (DESIGN §6.6) — that is what
- * `RailItem` does, and at 150px wide with a load budget behind it, it is right. At 20×14 it
- * would be absurd: seventy-eight live documents parsing `board.css`, KaTeX and Mermaid to
- * fill a space the size of a full stop. So the row takes what is already there and never
- * asks for more:
- *
- * 1. the photograph `thumb-cache.ts` has of this exact revision, if one has been taken,
- * 2. the `<meta name="poster">` the board offered, if it did,
- * 3. otherwise an empty bordered rectangle — the same box, the same size, so the list does
- *    not reflow when a picture arrives.
- *
- * The empty rectangle is the honest state and it is common on a fresh session, which is the
- * cost of not commissioning pictures: the panel shows what the app happens to know. It is
- * also why the border matters more than the fill — a rectangle *is* a board, at this size.
+ * At 20×14 a live document would be absurd: seventy-eight of them parsing `board.css`, KaTeX
+ * and Mermaid to fill a space the size of a full stop. The row draws the server's picture of
+ * the board (`BoardPicture`), which exists for every board and is taken again when the board
+ * changes. Where the server cannot take pictures, it is the `<meta name="poster">` the board
+ * offered, and otherwise an empty bordered rectangle: the same box, the same size, so the
+ * list does not reflow when a picture arrives. The border matters more than the fill, because
+ * a rectangle *is* a board at this size.
  */
 export function BoardRow(props: {
 	board: Board;
@@ -174,23 +167,11 @@ export function BoardRow(props: {
  * worth having for a context of seven boards an agent chose, and not for seventy-eight; that
  * is why it is a toggle in the foot and not the default.
  *
- * ### This is the one place that commissions a photograph
- *
- * And it has to be, or nothing does. A thumbnail in this app is the board itself, scaled
- * down: `RailItem` mounts the real document in an iframe, waits for `board.js` to finish
- * drawing markdown and maths, and photographs it on idle into `thumb-cache`. That used to
- * happen in the full-screen browse modal, which was the only surface doing it — and the
- * modal lost its trigger when the title bar went, so the cache stopped being filled and
- * every 20×14 row in the list drew an empty rectangle for ever.
- *
- * So the grid delegates to `RailItem` rather than drawing its own picture. One
- * implementation of "a board, photographed", already budgeted so a screen of them does not
- * mount seventy-eight documents at once, and already covered by the thumbnail checks. The
- * 20×14 rows then draw from the cache it fills, which is why browsing the deck once is what
- * makes the panel's rows look like something.
+ * The grid delegates to `RailItem` rather than drawing its own picture, so a board as a tile
+ * is one thing wherever it is drawn.
  */
 export function BoardTile(props: { board: Board; current?: boolean; dim?: boolean; onPick: () => void }) {
-	return <RailItem board={props.board} current={props.current ?? false} offCanvas={props.dim} cache onPick={props.onPick} />;
+	return <RailItem board={props.board} current={props.current ?? false} offCanvas={props.dim} onPick={props.onPick} />;
 }
 
 /**
@@ -205,17 +186,13 @@ export function BoardTile(props: { board: Board; current?: boolean; dim?: boolea
  * reader has to rule out.
  */
 function BoardThumb(props: { board: Board; class?: string }) {
-	const shot = () => shotOf(props.board);
+	/* What is drawn where the server cannot take pictures: the poster the board offered, or nothing. */
+	const poster = () => (props.board.poster ? <img src={deckFileUrl(props.board.poster, props.board.rev)} alt="" /> : undefined);
 	return (
 		<span class={`board-thumb ${props.class ?? ""}`}>
 			{/* `alt=""` on purpose: the filename is right beside it, and "the-shell.html
 			    (thumbnail)" read out after "the-shell.html" is noise. */}
-			<Show when={shot()}>{(src) => <img src={src()} alt="" />}</Show>
+			<BoardPicture board={props.board} fallback={poster()} />
 		</span>
 	);
-}
-
-/** A photograph of this revision, or the poster the board offered, or nothing. Reactive. */
-function shotOf(board: Board): string | undefined {
-	return picture(board) ?? (board.poster ? deckFileUrl(board.poster, board.rev) : undefined);
 }

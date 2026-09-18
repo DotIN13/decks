@@ -8,7 +8,15 @@
  * Precedence, highest first: a note target the person picked on a board; an `@Name` in the
  * text; then the surface, which is the dispatcher on the dispatch surface and the focused
  * agent on a stage. A stage with nobody focused has nowhere to send to, and says so.
+ *
+ * `@Dispatcher` is a name like any other, and works from any bar: on an agent's stage it
+ * turns the line into a task for the dispatcher to place, which is otherwise a trip Home.
+ * It is a reserved word rather than an agent, because the dispatcher is kept out of every
+ * list a person picks an agent from; an agent that really is called Dispatcher keeps its name.
  */
+
+/** The word that addresses the dispatcher, as typed after an `@`. Matched without case. */
+export const DISPATCHER_NAME = "Dispatcher";
 
 export interface BarContext {
 	surface: "dispatch" | "stage";
@@ -21,7 +29,8 @@ export type Destination =
 	| { kind: "note"; board: string; component: string }
 	/** `named` is true when an `@` in the text chose the agent, false when the stage did. */
 	| { kind: "prompt"; id: string; name: string; named: boolean }
-	| { kind: "task" }
+	/** `named` is present when `@Dispatcher` in the text chose it, and the token is to be taken out. */
+	| { kind: "task"; named?: true }
 	| { kind: "nowhere" };
 
 /** Characters that may appear in an agent name; a mention ends at the first one that is not. */
@@ -57,13 +66,11 @@ function findMention(text: string, names: readonly string[]): Mention | undefine
 
 export function destination(text: string, context: BarContext): Destination {
 	if (context.note) return { kind: "note", board: context.note.board, component: context.note.component };
-	const mention = findMention(
-		text,
-		context.agents.map((a) => a.name),
-	);
+	const mention = findMention(text, [...context.agents.map((a) => a.name), DISPATCHER_NAME]);
 	if (mention) {
 		const agent = context.agents.find((a) => a.name.toLowerCase() === mention.name.toLowerCase());
 		if (agent) return { kind: "prompt", id: agent.id, name: agent.name, named: true };
+		if (mention.name.toLowerCase() === DISPATCHER_NAME.toLowerCase()) return { kind: "task", named: true };
 	}
 	if (context.surface === "dispatch") return { kind: "task" };
 	if (context.focused) return { kind: "prompt", id: context.focused.id, name: context.focused.name, named: false };

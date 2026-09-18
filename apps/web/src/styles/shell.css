@@ -354,6 +354,52 @@
 	.stream[data-landing="true"] {
 		transition: none;
 	}
+	/*
+	 * Under a finger, or on a narrow screen, the conversation is not a float: it stands on the
+	 * composer, as wide as the composer, and stays there.
+	 *
+	 * It used to keep the desktop's place, hung 64px from the top at a fixed 420px, which on a
+	 * phone left it against the toolbar with half a screen of canvas between it and the bar
+	 * you were typing into, 12px off centre because only its right edge had a margin. The
+	 * bottom is the composer's own: its 12px, its measured height (`--dock`), the keyboard and
+	 * the safe area, and 8px of air. The height gives way before the toolbar does.
+	 *
+	 * `!important` on the size only: `resize: both` writes an inline width and height on a
+	 * laptop, and a window then narrowed would keep them. After the floating rules on
+	 * purpose, being the same specificity.
+	 */
+	@media (max-width: 1100px), (pointer: coarse) {
+		.stream[data-shown="true"] {
+			--stream-foot: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+			top: auto;
+			bottom: var(--stream-foot);
+			height: min(420px, calc(100% - var(--stream-foot) - 72px)) !important;
+			min-height: 0;
+			resize: none;
+		}
+		.stream-head {
+			cursor: default;
+		}
+	}
+	/* Narrow: the composer's own margins. The width is a utility in the markup (`Stream.tsx`). */
+	@media (max-width: 1100px) {
+		.stream[data-shown="true"] {
+			left: max(12px, env(safe-area-inset-left));
+			right: max(12px, env(safe-area-inset-right));
+			width: auto !important;
+		}
+	}
+	/* A wide tablet: the composer's column and the composer's width (`.dock` in `index.css`),
+	   by arithmetic rather than a transform, which would make this the containing block of the
+	   time machine's fixed menu (see `stream.css`). */
+	@media (min-width: 1101px) and (pointer: coarse) {
+		.stream[data-shown="true"] {
+			--stream-w: min(720px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));
+			left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2 - var(--stream-w) / 2);
+			right: auto;
+			width: var(--stream-w) !important;
+		}
+	}
 	@media (prefers-reduced-motion: reduce) {
 		.dock[data-snapping="true"],
 		.stream[data-snapping="true"] {

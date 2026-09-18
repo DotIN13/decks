@@ -753,7 +753,8 @@ export interface Stage {
 	 * its id. Use it when nobody on the deck covers the topic. Check `stage.agents()` first:
 	 * a second agent on a topic one already holds is a second conversation to keep track of.
 	 *
-	 * It opens in your workspace and on your model and account unless told otherwise.
+	 * It opens in your workspace, on your runtime, and on your model and account unless told
+	 * otherwise. Name a `kind` and it is that runtime instead, on that runtime's default model.
 	 * `model` is `provider/model`, as the picker lists them; a model the runtime cannot open
 	 * is a notice in your transcript and the agent stays on the default. `tags` are set as
 	 * its own, so the panel says what it is for.
@@ -772,15 +773,38 @@ export interface Stage {
 	queue(agentId?: string): Promise<QueuedWork[]>;
 
 	/**
+	 * The time where the person is.
+	 *
+	 *     await stage.now();
+	 *     // -> { iso: "2026-09-18T12:19:40-07:00", timezone: "America/Los_Angeles", offset: "UTC−7",
+	 *     //      weekday: "Friday", words: "Friday 18 September 2026, 12:19 (America/Los_Angeles, UTC−7)", epoch: 1789759180000 }
+	 *
+	 * The person sets their timezone once, in Settings, and everything they say about time is
+	 * in it: "this afternoon", "by Friday", "since yesterday". Your shell's `date` agrees with
+	 * this. Use it rather than the date your session started on, which a long conversation
+	 * outlives. `epoch` is the same instant as every timestamp the stage API returns.
+	 */
+	now(): Promise<{ iso: string; timezone: string; offset: string; weekday: string; words: string; epoch: number }>;
+
+	/**
 	 * Make a schedule: a task the deck makes on its own, at a time of day, on the days named.
 	 *
 	 *     await stage.schedule({
 	 *       name: "Morning papers",
-	 *       at: "09:00",                 // HH:MM, the server's local time
+	 *       at: "09:00",                 // HH:MM, in the person's timezone
 	 *       days: [1, 2, 3, 4, 5],       // 0 is Sunday, 6 is Saturday
 	 *       workspace: "political-llm",  // the workspace it writes into
 	 *       task: "Write one board for each notable paper posted since yesterday.",
 	 *     });
+	 *
+	 * **Never convert a time yourself.** `at` and `days` are read in the person's own timezone
+	 * (`stage.now()` names it), which is what "every weekday at nine" means. When they name
+	 * another place, pass it and leave the hour as they said it:
+	 *
+	 *     await stage.schedule({ ..., at: "09:00", timezone: "Europe/London" });  // nine in London
+	 *
+	 * `timezone` is an IANA name. The schedule keeps it, so it stays nine in London through
+	 * both of London's clock changes, whatever the person's own zone does.
 	 *     // -> the schedule, with its id and `nextRunAt`
 	 *
 	 * Each firing becomes a task on the dashboard and goes through the dispatcher like any
@@ -793,10 +817,12 @@ export interface Stage {
 		name: string;
 		at: string;
 		days: number[];
+		/** An IANA zone for `at` and `days`. Leave it out for the person's own. */
+		timezone?: string;
 		workspace: string;
 		task: string;
 		boards?: string[];
-	}): Promise<{ id: string; name: string; at: string; days: number[]; workspace: string; task: string; boards: string[]; nextRunAt: number }>;
+	}): Promise<{ id: string; name: string; at: string; days: number[]; timezone?: string; workspace: string; task: string; boards: string[]; nextRunAt: number }>;
 
 	/**
 	 * Make a dashboard task, and let the deck decide which agent takes it.

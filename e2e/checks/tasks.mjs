@@ -119,6 +119,34 @@ for (let i = 0; i < 30 && !scheduled; i++) {
 }
 say("a schedule is drawn on the Cron tab with its next run and its own words", /next in/.test(scheduled) && scheduled.includes("political-llm") && scheduled.includes("what changed since yesterday"), scheduled);
 
+/*
+ * The deck's timezone. The hour on a card is the person's hour, so the card says which clock
+ * it is on, and choosing a zone moves every job that follows the deck's clock at once. A job
+ * made with a zone of its own keeps it.
+ */
+LINK.send({ type: "schedule.create", schedule: { name: "London nine", at: "09:00", days: [1], workspace: "political-llm", task: "x", timezone: "Europe/London" } });
+LINK.send({ type: "settings.set", timezone: "America/Los_Angeles" });
+const cronCard = async (name) => {
+	for (let i = 0; i < 30; i++) {
+		await settle(page, 200);
+		const text = await page.evaluate((wanted) => [...document.querySelectorAll(".dispatch-rows li")].map((row) => row.textContent ?? "").find((row) => row.includes(wanted)) ?? "", name);
+		if (text) return text;
+	}
+	return "";
+};
+let zoned = "";
+for (let i = 0; i < 20 && !/P[DS]T/.test(zoned); i++) zoned = await cronCard("Morning digest");
+say("a job on the deck's clock names the zone chosen in Settings", /09:00\s*P[DS]T/.test(zoned), zoned);
+const pinned = await cronCard("London nine");
+say("a job made with its own timezone keeps it", /09:00\s*(GMT|BST)/.test(pinned) && !/P[DS]T/.test(pinned), pinned);
+const told = LINK.last("settings");
+say("every browser is told the deck's zone and the machine's", told?.settings?.timezone === "America/Los_Angeles" && typeof told?.machineZone === "string" && told.machineZone.length > 0, JSON.stringify(told));
+LINK.send({ type: "settings.set", timezone: "Not/AZone" });
+await settle(page, 400);
+say("a name that is not a timezone is refused, and the zone stays", LINK.last("settings")?.settings?.timezone === "America/Los_Angeles");
+LINK.send({ type: "settings.set", timezone: null });
+await page.locator(".dispatch-rows li", { hasText: "London nine" }).first().getByRole("button", { name: "remove" }).click();
+
 await page.locator(".dispatch-rows li", { hasText: "Morning digest" }).first().getByRole("button", { name: "remove" }).click();
 let gone = false;
 for (let i = 0; i < 30 && !gone; i++) {

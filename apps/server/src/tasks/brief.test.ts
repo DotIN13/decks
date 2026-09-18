@@ -72,3 +72,10 @@ test("a long message with no file falls back to quoting it", () => {
 	const text = dispatcherBrief({ id: "t5", text: long, boards: [] });
 	assert.match(text, new RegExp(`> ${"x".repeat(700)}`));
 });
+
+test("the brief says what time it is where the person is, when it is told", () => {
+	const text = dispatcherBrief({ id: "t6", text: "Every weekday at nine, check the inbox.", boards: [], now: "Friday 18 September 2026, 12:19 (America/Los_Angeles, UTC−7)" });
+	assert.match(text, /It is now Friday 18 September 2026, 12:19 \(America\/Los_Angeles, UTC−7\)\./);
+	assert.match(text, /unless you pass `timezone`/);
+	assert.doesNotMatch(dispatcherBrief({ id: "t7", text: "x", boards: [] }), /It is now/);
+});

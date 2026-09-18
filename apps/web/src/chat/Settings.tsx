@@ -4,6 +4,9 @@ import X from "lucide-solid/icons/x";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { RENDERERS, type RendererChoice } from "../lib/renderer.ts";
 import { Icon } from "../ui/icons.tsx";
+import { browserZone, clockTime } from "../lib/time.ts";
+import { state } from "../state/deck.ts";
+import { send } from "../state/socket.ts";
 import { AlertSettings } from "../alerts/AlertSettings.tsx";
 import type { AlertPrefs } from "../alerts/policy.ts";
 
@@ -188,6 +191,7 @@ export function Settings(props: {
 						</button>
 					</section>
 
+					<TimeSettings />
 					<RendererSettings renderer={props.renderer} onChange={props.onRenderer} canvasApi={props.canvasApi} />
 					<YourChrome web={props.web} onRepair={props.onWebRepair} onStop={props.onWebStop} onBoard={props.onWebBoard} />
 				</div>
@@ -418,6 +422,93 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
  * a switch is a yes or no. The note under the row is the part that matters on a browser
  * without the API: the choice is kept, and this says which renderer is actually running.
  */
+/**
+ * The deck's timezone: one zone for the whole deck, kept by the server.
+ *
+ * Unlike every other group here it is not this browser's setting. Schedules fire in it with
+ * no browser open, agents are told it, and the app draws its times in it, so it is read from
+ * the server's `settings` frame and changed with a message, and every open browser follows.
+ *
+ * Nothing is guessed. Until a zone is chosen the server is on its machine's clock, which on a
+ * hosted box is UTC, and the group says so beside this browser's own zone with one button to
+ * take it: a zone chosen silently would move the person's schedules without telling them.
+ */
+function TimeSettings() {
+	const chosen = () => state.settings.timezone;
+	const mine = browserZone();
+	const zones = (): string[] => {
+		try {
+			return (Intl as unknown as { supportedValuesOf(key: string): string[] }).supportedValuesOf("timeZone");
+		} catch {
+			return [mine, "UTC"];
+		}
+	};
+	const [draft, setDraft] = createSignal("");
+	const [tick, setTick] = createSignal(Date.now());
+	onMount(() => {
+		const timer = setInterval(() => setTick(Date.now()), 30_000);
+		onCleanup(() => clearInterval(timer));
+	});
+	const known = (zone: string) => zone === "UTC" || zones().includes(zone);
+	const set = (timezone: string | null) => {
+		send({ type: "settings.set", timezone });
+		setDraft("");
+	};
+	const inForce = () => chosen() ?? state.machineZone;
+	return (
+		<section class="set-group" data-group="time">
+			<header>
+				<span class="set-title">Time</span>
+				<span class="set-note">One timezone for the whole deck. Schedules fire in it, agents are told it, and every time in the app is drawn in it. Changing it moves the schedules with it, and none runs twice that day.</span>
+			</header>
+			<div class="set-row">
+				<span class="set-k">
+					<span class="lb">{chosen() ? chosen() : `Not set: the server's own clock, ${state.machineZone || "unknown"}`}</span>
+					<span class="nt" data-zone-now>
+						It is {clockTime(tick(), inForce() || undefined)} there now.
+						{!chosen() && state.machineZone !== mine ? ` This browser is on ${mine}.` : ""}
+					</span>
+				</span>
+				<Show when={chosen() !== mine}>
+					<button type="button" class="dispatch-act" data-primary={!chosen() || undefined} onClick={() => set(mine)}>
+						Use {mine}
+					</button>
+				</Show>
+			</div>
+			<div class="set-row">
+				<span class="set-k">
+					<span class="lb">Another timezone</span>
+					<span class="nt">An IANA name, such as Asia/Shanghai.</span>
+				</span>
+				<span class="set-zone">
+					<input
+						class="field"
+						list="set-zones"
+						placeholder="Search timezones"
+						aria-label="Timezone"
+						value={draft()}
+						onInput={(event) => setDraft(event.currentTarget.value.trim())}
+						onKeyDown={(event) => {
+							if (event.key === "Enter" && known(draft())) set(draft());
+						}}
+					/>
+					<datalist id="set-zones">
+						<For each={zones()}>{(zone) => <option value={zone} />}</For>
+					</datalist>
+					<button type="button" class="dispatch-act" disabled={!known(draft()) || draft() === chosen()} onClick={() => set(draft())}>
+						Set
+					</button>
+					<Show when={chosen()}>
+						<button type="button" class="dispatch-act" title={`Back to the server's own clock, ${state.machineZone}`} onClick={() => set(null)}>
+							Clear
+						</button>
+					</Show>
+				</span>
+			</div>
+		</section>
+	);
+}
+
 function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: RendererChoice) => void; canvasApi: boolean }) {
 	const running = () => (props.canvasApi || props.renderer === "dom" ? props.renderer : "dom");
 	const note = () => {

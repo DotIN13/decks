@@ -186,22 +186,6 @@ export const boards = {
 	},
 
 	/*
-	 * Declared since the first commit, and never wired up.
-	 *
-	 * **The typed table is what found it.** This variant has been in `ClientMessage` all
-	 * along with no sender anywhere in the app and no case in the old switch, so it fell to
-	 * `default:` and answered "Not implemented yet" — which is what it still answers, by name
-	 * rather than by accident. The gauntlet this passed through is the one the table was built
-	 * for: a frame either has an answer or it does not compile.
-	 *
-	 * Either somebody builds commenting on boards, or the variant goes. What is no longer true
-	 * is that nobody knows.
-	 */
-	"board.comment": (_message, reply) => {
-		reply({ type: "notice", level: "warn", text: "Not implemented yet: board.comment" });
-	},
-
-	/*
 	 * A mirror, from the Agents tab.
 	 *
 	 * Created *and* played, the way `board.create` is, because nobody asks for a

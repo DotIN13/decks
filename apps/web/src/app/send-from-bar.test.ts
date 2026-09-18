@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { destination, destinationLabel, stripMention, type BarContext } from "./send-from-bar.ts";
+import { destination, destinationLabel, DISPATCHER_NAME, stripMention, type BarContext } from "./send-from-bar.ts";
 
 const agents = [
 	{ id: "a1", name: "Ada" },
@@ -55,6 +55,19 @@ test("without a mention, the dispatch surface goes to the dispatcher", () => {
 
 test("without a mention, a stage goes to the focused agent, unnamed", () => {
 	assert.deepEqual(destination("build the board", stage), { kind: "prompt", id: "s1", name: "Sable", named: false });
+});
+
+test("@Dispatcher reaches the dispatcher from any bar, and an agent of that name keeps it", () => {
+	assert.deepEqual(destination("@Dispatcher find someone for this", stage), { kind: "task", named: true });
+	assert.deepEqual(destination("hand this to @dispatcher, please", stage), { kind: "task", named: true });
+	assert.deepEqual(destination("@Dispatcher do it", { surface: "stage", agents }), { kind: "task", named: true });
+	assert.deepEqual(destination("@Dispatcher do it", dispatch), { kind: "task", named: true });
+	assert.deepEqual(destination("@Sable ask @Dispatcher", stage), { kind: "prompt", id: "s1", name: "Sable", named: true });
+	assert.deepEqual(destination("@Dispatchers do it", stage), { kind: "prompt", id: "s1", name: "Sable", named: false });
+	const taken: BarContext = { ...stage, agents: [...agents, { id: "d1", name: "Dispatcher" }] };
+	assert.deepEqual(destination("@Dispatcher hi", taken), { kind: "prompt", id: "d1", name: "Dispatcher", named: true });
+	assert.equal(stripMention("@dispatcher find someone", DISPATCHER_NAME), "find someone");
+	assert.equal(destinationLabel({ kind: "task", named: true }), "to dispatcher");
 });
 
 test("a stage with no focused agent has nowhere to go", () => {

@@ -1,0 +1,53 @@
+/*
+ * A board as a picture (`chrome/BoardPicture.tsx`): a box the size of whatever holds it, the
+ * picture filling it from the top left, and the picture that is still on its way laid over it
+ * and clear, so nothing moves when it lands. New selectors only, which is what lets this be a
+ * file of its own (see the note on `@import` order at the top of `index.css`).
+ */
+@layer components {
+	.board-picture {
+		position: relative;
+		display: block;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+	}
+	.board-picture > img {
+		position: absolute;
+		inset: 0;
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: top left;
+	}
+	.board-picture > img[data-thumb="waiting"] {
+		opacity: 0;
+	}
+	.board-picture > img[data-thumb="ready"] {
+		animation: board-picture-in 160ms ease;
+	}
+	@keyframes board-picture-in {
+		from {
+			opacity: 0;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.board-picture > img[data-thumb="ready"] {
+			animation: none;
+		}
+	}
+}
+
+/* The board itself, scaled down: what a tile draws where the server cannot take pictures
+   (`BoardRail.tsx`). It used to be a direct child of `.thumb`, which is where these came from. */
+@layer components {
+	.board-picture > iframe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		border: 0;
+		pointer-events: none;
+		transform-origin: 0 0;
+	}
+}

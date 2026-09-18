@@ -144,6 +144,38 @@ export function createHttpApp(app: App): Express {
 	);
 
 	/**
+	 * A picture of a board, for the dashboard's gallery (`boards/thumbs.ts`).
+	 *
+	 * The answer waits for the picture: an `<img>` has no way to be told "later", and a
+	 * request that is held is what lets the newest-first queue know who is still looking.
+	 * `v` is the revision the browser knows, and it is only there to make the URL a new one
+	 * when the board changes, which is what allows the year of caching: the picture served is
+	 * always of the board as it is now. 503 when there is no Chromium here, 404 for no such
+	 * board; the gallery draws its plain tile for either.
+	 */
+	api.get(
+		"/thumb/*path",
+		asyncRoute(async (req, res) => {
+			const board = app.deck.board(normalizeBoardPath(wildcard(req)));
+			if (!board) {
+				res.status(404).end();
+				return;
+			}
+			let gone = false;
+			res.on("close", () => (gone = !res.writableEnded));
+			try {
+				const file = await app.thumbs.get(board, req.query.scheme === "dark" ? "dark" : "light", () => gone);
+				if (gone) return;
+				res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
+				res.type("jpeg");
+				await sendFile(res, file);
+			} catch (error) {
+				if (!gone) res.status(503).type("text").send((error as Error).message);
+			}
+		}),
+	);
+
+	/**
 	 * The board primitives, reachable from a document not served under `/board`.
 	 *
 	 * A revision preview is served at `/api/revision/<sha>`, so the `../lib/board.css` in

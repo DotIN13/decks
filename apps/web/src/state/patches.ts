@@ -92,6 +92,12 @@ export function coalesce(patches: BoardPatch[]): BoardPatch[] {
 		 * intervening op would reorder edits — a remove between two updates, an insert
 		 * between two texts — and the server applies a batch in order for a reason.
 		 */
+		/* Two drawings of one board: each is the whole list, so the file only ever sees the last. */
+		if (patch.op === "ink" && last.op === "ink") {
+			out[out.length - 1] = patch;
+			continue;
+		}
+
 		if (patch.op === "update" && last.op === "update" && last.id === patch.id) {
 			out[out.length - 1] = {
 				op: "update",

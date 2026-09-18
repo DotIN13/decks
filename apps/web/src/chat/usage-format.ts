@@ -1,3 +1,4 @@
+import { dayKey, formatDateTime } from "../lib/time.ts";
 /**
  * Numbers in the usage panel, said the way a person would say them.
  *
@@ -85,8 +86,8 @@ export function resetsAt(iso: string | null, now: number): string | null {
 	const at = new Date(iso);
 	if (Number.isNaN(at.getTime())) return null;
 
-	const sameDay = at.toDateString() === new Date(now).toDateString();
-	return at.toLocaleString(undefined, { hour: "numeric", minute: "2-digit", ...(sameDay ? {} : { month: "short", day: "numeric" }) });
+	const sameDay = dayKey(at) === dayKey(now);
+	return formatDateTime(at, { hour: "numeric", minute: "2-digit", ...(sameDay ? {} : { month: "short", day: "numeric" }) });
 }
 
 /** What the runtime's behaviour keys mean in words. */

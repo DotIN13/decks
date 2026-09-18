@@ -107,6 +107,41 @@
 	}
 
 	/*
+	 * The field is a box that is edited, not a textarea (`DraftField.tsx`), because a comment
+	 * in it is a pill and only a real inline node behaves like one object. So what a textarea
+	 * did by being one is said here: it grows with its words to about six lines (114px is six
+	 * of 13px at 1.45) and then scrolls, keeps its line breaks, and breaks a long path rather
+	 * than widening the bar. 16px under a finger, or the browser zooms the page on focus.
+	 */
+	[data-slot="composer-input"] {
+		position: relative;
+		display: block;
+		width: 100%;
+		min-width: 0;
+		min-height: 22px;
+		max-height: 114px;
+		overflow-y: auto;
+		padding: 0 4px;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+		cursor: text;
+	}
+	@media (pointer: coarse) {
+		[data-slot="composer-input"] {
+			font-size: 16px;
+		}
+	}
+	/* The placeholder is out of flow, so the caret sits in front of it and not after it. */
+	[data-slot="composer-input"][data-empty]::before {
+		content: attr(data-placeholder);
+		position: absolute;
+		inset: 0;
+		padding: inherit;
+		color: var(--faint);
+		pointer-events: none;
+	}
+
+	/*
 	 * The controls row, and the two sizes the board fixes for it.
 	 *
 	 * Set as custom properties rather than as widths, so `.iconbtn` and `.chipbtn` come

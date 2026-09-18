@@ -18,6 +18,8 @@ export interface DispatchBriefTask {
 	promptPath?: string;
 	/** The name of the cron job that started this task, when one did rather than a person. */
 	schedule?: string;
+	/** The time in the person's zone, as a sentence (`nowWords`). Passed in, so this stays pure. */
+	now?: string;
 }
 
 /** A message longer than this, or with more lines, is pointed at rather than quoted. */
@@ -83,6 +85,7 @@ export function dispatcherBrief(task: DispatchBriefTask): string {
 		"",
 		...work,
 		...(scope ? ["", scope] : []),
+		...(task.now ? ["", `It is now ${task.now}. A time of day in the message is in that timezone, and so is a schedule you make unless you pass \`timezone\`.`] : []),
 		"",
 		"## How",
 		"",

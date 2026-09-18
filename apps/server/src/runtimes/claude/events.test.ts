@@ -110,6 +110,20 @@ test("compaction is a system frame, not a type of its own", () => {
 	assert.match(notice.text, /Compacted/);
 });
 
+test("compacting holds the agent at working, and a failed compaction says why", () => {
+	const { translator, state, sent } = transcript();
+	const feed = (message: unknown) => handleClaudeMessage(translator, state, message as SDKMessage);
+	// The only frame for as long as the summary takes to write.
+	feed({ type: "system", subtype: "status", status: "compacting" });
+	const states = sent.filter((message) => message.type === "agent.state");
+	assert.equal((states.at(-1) as { state?: string } | undefined)?.state, "thinking");
+
+	feed({ type: "system", subtype: "status", status: null, compact_result: "failed", compact_error: "Not enough messages to compact." });
+	const notice = items(translator).find((item) => item.kind === "notice") as Extract<ChatItem, { kind: "notice" }>;
+	assert.equal(notice.level, "warn");
+	assert.match(notice.text, /Not enough messages/);
+});
+
 test("a tool result's content is either an array of blocks or a bare string", () => {
 	assert.deepEqual(readClaudeToolResult("plain"), { text: "plain", images: 0 });
 	assert.deepEqual(readClaudeToolResult([{ type: "text", text: "a" }, { type: "image" }]), { text: "a", images: 1 });

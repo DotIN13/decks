@@ -433,3 +433,39 @@ try {
 		await browser.close();
 	}
 }
+
+/*
+ * Under a finger the conversation stands on the composer: same left edge, same width, 8px of
+ * air, and clear of the toolbar. It used to hang from the top of the screen at the desktop's
+ * 420px, half a screen away from the bar being typed into. A phone is the narrow rule; a
+ * tablet on its side is wider than 1100px, so it is the `pointer: coarse` rule and the one
+ * that also has to stop the panel being dragged.
+ */
+for (const device of ["iPhone 14 Pro", "iPad Pro 11 landscape"]) {
+	const { browser, page, errors } = await open({ device });
+	try {
+		await page.evaluate(() => document.querySelector('.pill button[title^="Conversation"]')?.click());
+		await page.waitForSelector(".stream[data-shown='true']", { timeout: 6000 });
+		await page.waitForTimeout(400);
+		const box = await page.evaluate(() => {
+			const r = (s) => document.querySelector(s).getBoundingClientRect();
+			const stream = r(".stream");
+			const dock = r(".dock");
+			const style = getComputedStyle(document.querySelector(".stream"));
+			return {
+				gap: Math.round(dock.top - stream.bottom),
+				left: Math.round(stream.left - dock.left),
+				width: Math.round(stream.width - dock.width),
+				top: Math.round(stream.top),
+				resize: style.resize,
+				floating: document.querySelector(".stream").hasAttribute("data-floating"),
+			};
+		});
+		say(`${device}: the conversation stands 8px above the composer`, box.gap === 8, JSON.stringify(box));
+		say(`${device}: …at the composer's left edge and width`, Math.abs(box.left) <= 1 && Math.abs(box.width) <= 1, JSON.stringify(box));
+		say(`${device}: …clear of the toolbar, and not resizable or floating`, box.top >= 64 && box.resize === "none" && !box.floating, JSON.stringify(box));
+		say(`${device}: no page errors`, errors.length === 0, errors.join(" | "));
+	} finally {
+		await browser.close();
+	}
+}

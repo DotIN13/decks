@@ -1,3 +1,4 @@
+import { formatDate } from "../lib/time.ts";
 import type { Board, Identity } from "@decks/protocol";
 
 /**
@@ -122,7 +123,7 @@ export function relativeTime(at: number, now = Date.now()): string {
 	if (delta < hour) return `${Math.floor(delta / minute)}m ago`;
 	if (delta < day) return `${Math.floor(delta / hour)}h ago`;
 	if (delta < 30 * day) return `${Math.floor(delta / day)}d ago`;
-	return new Date(at).toLocaleDateString();
+	return formatDate(at);
 }
 
 /** The mirror for a future instant — "next 12h" — what a schedule row wants. */
@@ -136,5 +137,5 @@ export function untilTime(at: number, now = Date.now()): string {
 	if (delta < hour) return `in ${Math.floor(delta / minute)}m`;
 	if (delta < day) return `in ${Math.floor(delta / hour)}h`;
 	if (delta < 30 * day) return `in ${Math.floor(delta / day)}d`;
-	return new Date(at).toLocaleDateString();
+	return formatDate(at);
 }

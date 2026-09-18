@@ -14,6 +14,7 @@ import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
 import FileText from "lucide-solid/icons/file-text";
 import Pencil from "lucide-solid/icons/pencil";
+import Brush from "lucide-solid/icons/brush";
 import Hand from "lucide-solid/icons/hand";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
@@ -573,6 +574,9 @@ export function AgentPill(props: {
 	 */
 	mode: CanvasMode;
 	onMode: (mode: CanvasMode) => void;
+	/** Whether the draw tool is on, and how to turn it on and off. Browse mode only. */
+	drawing: boolean;
+	onDrawing: (drawing: boolean) => void;
 	chats: AgentChat[];
 	identities: Record<string, Identity>;
 	focused: string | undefined;
@@ -866,6 +870,26 @@ export function AgentPill(props: {
 			>
 				<Icon of={props.mode === "edit" ? Hand : Pencil} size={15} />
 			</button>
+
+			{/*
+				Draw on the boards, while browsing. Held rather than chosen, like the pencil beside
+				it, so it wears the same soft wash; its own tools are a row of their own
+				(`InkBar.tsx`), because a pen, a marker, five colours and undo do not fit in here.
+				Not offered while editing: a press there already means "this component".
+			*/}
+			<Show when={props.mode === "browse"}>
+				<button
+					type="button"
+					class="iconbtn"
+					data-on={props.drawing ? "soft" : undefined}
+					aria-pressed={props.drawing}
+					title={props.drawing ? "Stop drawing" : "Draw on the boards"}
+					aria-label={props.drawing ? "Stop drawing" : "Draw on the boards"}
+					onClick={() => props.onDrawing(!props.drawing)}
+				>
+					<Icon of={Brush} size={15} />
+				</button>
+			</Show>
 
 
 			{/*

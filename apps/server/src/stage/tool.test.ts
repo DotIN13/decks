@@ -232,6 +232,18 @@ test("schedule checks the shape, hands the rest to the deck, and returns what wa
 	assert.equal(made.isError, false);
 	assert.match(made.text, /"id": "s-1"/);
 	assert.deepEqual(scheduled, [{ name: "Morning digest", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", task: "Write the morning digest." }]);
+
+	// A named place is passed through as said, never converted; a name that is not a zone is refused.
+	assert.match((await tool.run(`return await stage.schedule({ name: "x", at: "09:00", days: [1], workspace: "w", task: "x", timezone: "London" })`)).text, /not a timezone/);
+	await tool.run(`return await stage.schedule({ name: "London nine", at: "09:00", days: [1], workspace: "w", task: "x", timezone: "Europe/London" })`);
+	assert.equal(scheduled[1]?.timezone, "Europe/London");
+	assert.equal(scheduled[1]?.at, "09:00");
+
+	// And the time where the person is: the process clock's zone, with the same instant as an epoch.
+	const now = JSON.parse((await tool.run(`return await stage.now()`)).text) as { iso: string; timezone: string; epoch: number; words: string };
+	assert.equal(now.timezone, new Intl.DateTimeFormat().resolvedOptions().timeZone);
+	assert.equal(Math.floor(new Date(now.iso).getTime() / 1000), Math.floor(now.epoch / 1000));
+	assert.match(now.words, new RegExp(now.timezone.replace("/", "\\/")));
 	cleanup();
 });
 

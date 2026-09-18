@@ -51,6 +51,8 @@ const CHECKS = [
 	{ file: "inspector.mjs", needsAgent: false },
 	{ file: "notifications.mjs", needsAgent: false },
 	{ file: "modes.mjs", needsAgent: false },
+	/* Commenting on selected words and drawing on a board, both while browsing. */
+	{ file: "annotate.mjs", needsAgent: false },
 	{ file: "geometry.mjs", needsAgent: false },
 	{ file: "agents-tab.mjs", needsAgent: false },
 	/*

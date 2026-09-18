@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, Schedule, ScheduleSpec, ServerMessage, TaskResult, TaskSpec } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { dispatcherBrief } from "../tasks/brief.ts";
+import { nowWords, processZone } from "../clock.ts";
 import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
 import type { CreateSpec, DelegateReport, DelegateSpec, SendSpec } from "../stage/tool.ts";
@@ -43,6 +44,8 @@ export class Registry {
 			port: number;
 			/** The runtime a new agent gets unless it asks for another one. */
 			defaultKind: AgentKind;
+			/** The runtime chosen for the dashboard's dispatcher, if one has been (`settings.ts`). */
+			dispatcherKind?: () => AgentKind | undefined;
 			camera(agentId: string): Camera;
 			recordRevision(path: string): string | undefined;
 			/** An agent said it wrote this board — the byline the gallery shows. Optional so a bare test host can omit it. */
@@ -517,10 +520,18 @@ export class Registry {
 		const from = this.get(fromId);
 		if (!from) throw new Error("The creating agent is gone");
 		const workspace = spec.workspace ?? from.workspace;
-		const inherited = !spec.model && (!spec.kind || spec.kind === from.kind) ? from.currentModel() : undefined;
+		/*
+		 * The creator's runtime unless another is named. It used to be the server's default,
+		 * which was the same thing while every dispatcher was the default runtime, and is not
+		 * now: a Claude dispatcher handing its Claude model to a new Pi agent is a model that
+		 * agent cannot open. The dashboard's bar chooses the runtime new work runs on, as it
+		 * chooses the model.
+		 */
+		const kind = spec.kind ?? from.kind;
+		const inherited = !spec.model && kind === from.kind ? from.currentModel() : undefined;
 		const made = this.create({
 			name: spec.name,
-			...(spec.kind ? { kind: spec.kind } : {}),
+			kind,
 			...(inherited ? { model: inherited } : {}),
 			...(from.accountId() ? { account: from.accountId() as string } : {}),
 			...(workspace ? { workspace } : {}),
@@ -602,12 +613,19 @@ export class Registry {
 	 * lands on it would find an agent that refuses to do anything but hand work out.
 	 */
 	ensureDispatcher(): DeckAgent {
-		const have = this.agents.find((agent) => agent.role === "dispatcher");
+		/*
+		 * One template per runtime that has been chosen, because a runtime is fixed when an
+		 * agent is made: choosing Claude in the dashboard's bar cannot change the Pi dispatcher,
+		 * it can only put a Claude one in its place. The others stay, hidden like every
+		 * dispatcher, holding the model and mode they were left on for when they are chosen again.
+		 */
+		const kind = this.host.dispatcherKind?.() ?? this.host.defaultKind;
+		const have = this.agents.find((agent) => agent.role === "dispatcher" && !agent.parentId && agent.kind === kind);
 		if (have) {
 			this.unfocusDispatcher();
 			return have;
 		}
-		const made = this.create({ name: "Dispatcher", role: "dispatcher" });
+		const made = this.create({ name: "Dispatcher", role: "dispatcher", kind });
 		this.unfocusDispatcher();
 		return made;
 	}
@@ -645,7 +663,7 @@ export class Registry {
 		dispatcher.enqueue({
 			from: "deck",
 			fromName: "The dashboard",
-			task: dispatcherBrief(task),
+			task: dispatcherBrief({ ...task, now: nowWords(Date.now(), processZone()) }),
 			boards: [],
 			at: Date.now(),
 			decide: task.id,
@@ -763,7 +781,8 @@ export class Registry {
  * same bytes the user is looking at, and reports by changing them.
  */
 function brief(task: string, boards: string[], deck: Deck): string {
-	const parts = [task.trim()];
+	// When the work runs, not when it was queued: "since yesterday" is read against this.
+	const parts = [task.trim(), "", `It is now ${nowWords(Date.now(), processZone())}.`];
 
 	if (boards.length > 0) {
 		parts.push(

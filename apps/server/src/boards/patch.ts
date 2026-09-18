@@ -1,4 +1,4 @@
-import { BOX_CLASSES, component, type ComponentKind } from "@decks/board-kit";
+import { BOX_CLASSES, cleanStrokes, component, INK_LAYER, inkLayerMarkup, type ComponentKind } from "@decks/board-kit";
 import { STRUCTURAL_TAGS } from "@decks/protocol";
 import type { AnyBoardPatch, BoardPatch, EditorOp, Rect } from "@decks/protocol";
 import { parse } from "parse5";
@@ -98,6 +98,7 @@ function applyOne(html: string, patch: AnyBoardPatch): { html: string; summary: 
 	 * rather than a rewrite: the guards, the splices and the indentation rules are the same code that
 	 * has been writing these boards all along.
 	 */
+	if (patch.op === "ink") return writeInk(html, document, patch.strokes);
 	if (isEditorOp(patch)) return fromEditorOp(html, document, patch);
 
 	if (patch.op === "insert") {
@@ -868,7 +869,41 @@ function reparse(html: string, id: string): Element {
 
 /** Whether this is one of the eight rather than one of the twelve being retired. */
 function isEditorOp(patch: AnyBoardPatch): patch is EditorOp {
+	if (patch.op === "ink") return false;
 	return patch.op === "set" || patch.op === "replace" || !("id" in patch);
+}
+
+/**
+ * The hand-drawn layer, written whole.
+ *
+ * One `<svg data-ink-layer>` as the last thing in the body before its scripts, so the strokes
+ * sit over every component and the components' own positions in the body do not move. The
+ * markup is made here from checked strokes (`cleanStrokes`), never taken from the wire, and an
+ * empty list removes the layer, so a board whose drawing was erased is the file it was before.
+ */
+function writeInk(html: string, document: Node, raw: unknown): { html: string; summary: string; id: string } {
+	const body = find(document, (node) => node.nodeName === "body") as Element | undefined;
+	if (!body?.sourceCodeLocation?.endTag) throw new PatchRefused("this board has no </body> to draw before");
+	const strokes = cleanStrokes(raw);
+	const said = strokes.length === 0 ? "erased the hand drawing" : `drew on the board by hand: ${strokes.length} ${strokes.length === 1 ? "stroke" : "strokes"}, in the svg marked ${INK_LAYER}`;
+	const children = elementChildren(body);
+	const layer = children.find((child) => child.tagName === "svg" && child.attrs?.some((attribute) => attribute.name === INK_LAYER));
+	if (layer) {
+		const location = layer.sourceCodeLocation;
+		if (!location) throw new PatchRefused("cannot locate the drawing in the source");
+		if (strokes.length === 0) {
+			return { html: html.slice(0, trimBack(html, location.startOffset)) + html.slice(location.endOffset), summary: said, id: "" };
+		}
+		const markup = inkLayerMarkup(strokes, indentOf(html, location.startOffset));
+		return { html: html.slice(0, location.startOffset) + markup + html.slice(location.endOffset), summary: said, id: "" };
+	}
+	if (strokes.length === 0) return { html, summary: said, id: "" };
+	// Before the scripts the body ends with, so `board.js` stays the last thing in it.
+	let first = children.length;
+	while (first > 0 && children[first - 1]?.tagName === "script") first--;
+	const at = children[first]?.sourceCodeLocation?.startOffset ?? body.sourceCodeLocation.endTag.startOffset;
+	const indent = indentOf(html, at);
+	return { html: `${html.slice(0, at)}${inkLayerMarkup(strokes, indent)}\n${indent}${html.slice(at)}`, summary: said, id: "" };
 }
 
 /** An element's own name, for a summary a person or an agent has to act on. */

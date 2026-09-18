@@ -1,3 +1,4 @@
+import { dayKey, formatDate, yearOf } from "../lib/time.ts";
 import type { AgentKind, AgentState, ChatItem } from "@decks/protocol";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import X from "lucide-solid/icons/x";
@@ -393,13 +394,14 @@ export function Stream(props: {
 		 * invisible surface that ate the wheel would be a canvas that had stopped working for
 		 * no visible reason.
 		 *
-		 * Under 1100px it becomes a full-width sheet, and the override is a utility rather than
-		 * a `@media` block in the stylesheet — a media query inside `@layer components` still
+		 * Under 1100px it is as wide as the composer, and the width's override is a utility rather
+		 * than a `@media` block in the stylesheet — a media query inside `@layer components` still
 		 * loses to a utility on the same element, so the responsive half has to be the strong
-		 * one. The base geometry stays in `stream.css`, where it can read `--dock` and `env()`.
+		 * one. The base geometry stays in `stream.css`, where it can read `--dock` and `env()`,
+		 * and where it stands under a finger or on a narrow screen is in `shell.css`.
 		 */
 		<section
-			class="stream max-[1100px]:left-0 max-[1100px]:w-auto"
+			class="stream max-[1100px]:w-auto"
 			ref={column}
 			data-shown={historyShown()}
 			aria-label="The conversation"
@@ -577,14 +579,13 @@ export function Stream(props: {
  */
 function divides(before: number | undefined, at: number | undefined): string | undefined {
 	if (!at || !before) return undefined;
-	const day = (ms: number) => new Date(ms).toDateString();
-	if (day(before) === day(at)) return undefined;
-	const today = new Date();
-	if (day(at) === today.toDateString()) return "Today";
-	if (day(at) === new Date(today.getTime() - 86_400_000).toDateString()) return "Yesterday";
-	const date = new Date(at);
-	const sameYear = date.getFullYear() === today.getFullYear();
-	return date.toLocaleDateString(undefined, { day: "numeric", month: "long", ...(sameYear ? {} : { year: "numeric" }) });
+	// Days in the deck's timezone (`lib/time.ts`): "Yesterday" is the person's yesterday.
+	if (dayKey(before) === dayKey(at)) return undefined;
+	const today = Date.now();
+	if (dayKey(at) === dayKey(today)) return "Today";
+	if (dayKey(at) === dayKey(today - 86_400_000)) return "Yesterday";
+	const sameYear = yearOf(at) === yearOf(today);
+	return formatDate(at, { day: "numeric", month: "long", ...(sameYear ? {} : { year: "numeric" }) });
 }
 
 /** An item id is user data; escape it before it goes in a selector. */

@@ -27,6 +27,17 @@ export function boardUrl(board: Pick<Board, "path" | "rev">): string {
 	return `/api/board/${path}?rev=${board.rev}`;
 }
 
+/**
+ * The server's picture of a board (`boards/thumbs.ts` over there), in the app's scheme.
+ *
+ * `v` is the revision, for the same reason `rev` is in `boardUrl`: the picture is cached for
+ * a year, and an edited board has to be a URL the browser has never seen.
+ */
+export function thumbUrl(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string {
+	const path = board.path.split("/").map(encodeURIComponent).join("/");
+	return `/api/thumb/${path}?v=${board.rev}&scheme=${scheme}`;
+}
+
 /** A deck-relative path (a poster, an asset) as a URL. */
 export function deckFileUrl(path: string, rev?: number): string {
 	const encoded = path.split("/").map(encodeURIComponent).join("/");

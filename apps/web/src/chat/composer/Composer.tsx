@@ -1,13 +1,17 @@
-import type { AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { AgentKind, AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Square from "lucide-solid/icons/square";
-import { createEffect, createMemo, createSignal, For, onMount, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { carriesFiles } from "../../canvas/file-drop.ts";
-import { withMention } from "./mention.ts";
+import type { BoardComment } from "../../canvas/comments.ts";
+import { DraftField, type DraftFieldApi } from "./DraftField.tsx";
+import { commentLabel, draftComments, draftForAgent, draftIsEmpty, draftText, normalize, textDraft, type Draft, type DraftMention } from "./draft.ts";
 import { Icon } from "../../ui/icons.tsx";
 import { Hints } from "./Hints.tsx";
 import { ModeMenu } from "./ModeMenu.tsx";
+import { RuntimeMenu } from "./RuntimeMenu.tsx";
+import { parkedDrafts, reconcilePills } from "./parked.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { ContextDial } from "./ContextDial.tsx";
 import { filterCommands, SlashMenu } from "./SlashMenu.tsx";
@@ -52,7 +56,21 @@ export function Composer(props: {
 	modes: AgentMode[];
 	mode: AgentMode | undefined;
 	onMode: (mode: AgentMode) => void;
-	onSend: (text: string) => void;
+	/**
+	 * Choose the runtime of the agent behind the bar. Supplied only on the dashboard, where
+	 * that agent is the dispatcher; a stage's agent had its runtime fixed when it was made.
+	 */
+	onRuntime?: (kind: AgentKind) => void;
+	/** The typed words, and the ids of the comments whose pills were in the field with them. */
+	onSend: (text: string, comments: string[]) => void;
+	/**
+	 * The comments kept for this agent's next message (`state/comments.ts`). Each is a pill in
+	 * the field; this list is what a pill's id stands for, and what puts the pills back after a
+	 * reload, when the field's own draft is gone and the comments are not.
+	 */
+	comments?: BoardComment[];
+	/** Pills the person deleted: their comments are no longer going anywhere. */
+	onCommentsGone?: (ids: string[]) => void;
 	onAbort: () => void;
 	/** `thinking` is new: what `nearestLevel` kept when the model changed under it. */
 	onModel: (provider: string, model: string, thinking?: ThinkingLevel) => void;
@@ -68,7 +86,7 @@ export function Composer(props: {
 	 * requests — an effect on the text alone would treat the second as one it had already
 	 * carried out, which is the same reason `atTurn` carries one.
 	 */
-	draft: { text: string; at: number; agentId?: string; insert?: boolean } | undefined;
+	draft: { text: string; at: number; agentId?: string; insert?: boolean; comment?: string } | undefined;
 	/**
 	 * The draft above has been put in the field: forget it. A handover happens once — a draft
 	 * still held after it was taken is one that can be put back by anything that re-reads it,
@@ -96,7 +114,8 @@ export function Composer(props: {
 	/** The runtime's own usage report, from the row at the foot of the dial's popup. */
 	onUsage: () => void;
 	/**
-	 * Whose conversation this is. What you have typed is parked under it when you switch.
+	 * Whose conversation this is: who a handed-over draft is for, and whose usage this shows.
+	 * What you have typed is kept under `page`, below, not under this.
 	 *
 	 * The text used to be one signal, cleared only on send or Escape — so a half-written
 	 * prompt followed you to the next agent, addressed to it, one Enter from being sent to a
@@ -104,6 +123,11 @@ export function Composer(props: {
 	 * this the sharpest edge of the three the audit found.
 	 */
 	agentId: string | undefined;
+	/**
+	 * The page the bar is on, `home` or `agent:<id>` (`parked.ts`). What is typed is kept per
+	 * page, so leaving a page, or the dispatcher behind Home changing, never loses a message.
+	 */
+	page: string;
 	/**
 	 * Button one of three: the file picker the app already has (`canvas/FilePicker`).
 	 *
@@ -113,56 +137,37 @@ export function Composer(props: {
 	 */
 	onAttach?: () => void;
 }) {
-	const [text, setText] = createSignal("");
+	/*
+	 * The field holds a document, not a string (`draft.ts`, ported from picone): runs of text,
+	 * and pills for the comments going with the message. `text` is derived from it, and is what
+	 * the slash menu and the destination word read.
+	 */
+	const [nodes, setNodes] = createSignal<Draft>([]);
+	const text = createMemo(() => draftText(nodes()));
+	let field: DraftFieldApi | undefined;
+	/** Replace what the field holds, for a change nobody typed. */
+	const put = (draft: Draft) => {
+		const next = normalize(draft);
+		setNodes(next);
+		field?.set(next);
+		props.onText?.(draftText(next));
+		if (held !== undefined) parked.set(held, next);
+	};
+	const pillFor = (comment: BoardComment): DraftMention => ({ type: "mention", kind: "comment", id: comment.id, label: commentLabel(comment.quote) });
+	const describe = (node: DraftMention) => {
+		const comment = props.comments?.find((candidate) => candidate.id === node.id);
+		return comment ? `“${comment.quote}”\n${comment.text}` : undefined;
+	};
 
 	/**
-	 * What you had typed to each agent, by id.
+	 * What you had typed on each page: Home, and each agent's stage (`parked.ts`).
 	 *
-	 * Kept here rather than in `App.tsx` because the input's value is the composer's own
-	 * state and always has been — hoisting it would mean every keystroke crossing a component
-	 * boundary to be handed straight back. A plain `Map`: nothing renders from it, and it is
-	 * read once per switch.
+	 * Keyed by the page rather than by the agent behind the bar, and written on every change
+	 * rather than only on a switch, so a draft outlives a change of page, a change of the
+	 * dispatcher's runtime, and a reload. `held` is the page the field is showing.
 	 */
-	const parked = new Map<string, string>();
+	const parked = parkedDrafts(typeof localStorage === "undefined" ? undefined : localStorage);
 	let held: string | undefined;
-	let input!: HTMLTextAreaElement;
-
-	/*
-	 * Growing the box: `field-sizing` where there is one, and a measurement where there is not.
-	 *
-	 * `field-sizing: content` is the whole of how this field grows, and it is a Chromium
-	 * feature — WebKit does not implement it. So on an iPhone, which is the *one* place this
-	 * matters most, the bar was one line tall for ever: you typed a paragraph into a 22px slot
-	 * and could see the last few words of it. The desktop, being Chromium, looked perfect.
-	 *
-	 * Asked of the browser rather than of the platform, because the fallback should switch
-	 * itself off the day WebKit ships the property, and a user-agent test never does. Where
-	 * the property exists this code does nothing at all: no measuring, no inline height, and
-	 * the CSS keeps doing the job it already did.
-	 *
-	 * `height: auto` before reading `scrollHeight` is not a flourish — with an inline height
-	 * already set from the last keystroke, the scroll height is that height and the box can
-	 * only ever grow. The `max-h` utility caps it and the textarea scrolls past the cap, so
-	 * six lines remains six lines.
-	 */
-	const growsItself = typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("field-sizing", "content");
-	const fit = () => {
-		if (growsItself || !input) return;
-		input.style.height = "auto";
-		input.style.height = `${input.scrollHeight}px`;
-	};
-	/*
-	 * One effect for every path that changes the words, because there are five of them: a
-	 * keystroke, a command picked from the menu, a draft handed back by a rewind, Escape
-	 * clearing the field, and a send. They all set this signal, so tracking it is tracking
-	 * all of them — and it runs after the DOM has the new value, which is when a measurement
-	 * is worth taking.
-	 */
-	createEffect(() => {
-		void text();
-		fit();
-	});
-	onMount(fit);
 
 	/*
 	 * A draft handed over replaces what is in the field, and takes the caret.
@@ -177,25 +182,25 @@ export function Composer(props: {
 	 * put the words back even though they are the same words.
 	 */
 	/*
-	 * Park what is typed under the agent you are leaving, and restore that agent's own words.
+	 * Restore the words of the page being arrived at.
 	 *
-	 * Tracks `props.agentId` only. Reading `text()` here would make this run on every
+	 * Tracks `props.page` only. Reading `text()` here would make this run on every
 	 * keystroke and park a half-word against the *current* agent — which is harmless but
 	 * means the effect is doing work per character to answer a question asked per switch. So
 	 * the outgoing text is read untracked, and `held` is the id it belongs to.
 	 */
 	createEffect(() => {
-		const next = props.agentId;
+		const next = props.page;
 		if (next === held) return;
-		if (held !== undefined) {
-			const outgoing = untrack(text);
-			if (outgoing) parked.set(held, outgoing);
-			else parked.delete(held);
-		}
+		// What was on the page being left is already remembered: every change is (`put`, `onDraft`).
 		held = next;
-		const restored = next ? parked.get(next) ?? "" : "";
-		setText(restored);
-		if (input) input.value = restored;
+		/*
+		 * The page's own words, made to agree with the comments still waiting for it: a pill
+		 * whose comment has gone is dropped, and a comment with no pill gets one, so the bar
+		 * shows exactly what will be sent.
+		 */
+		const waiting = untrack(() => props.comments ?? []);
+		put(reconcilePills(parked.get(next) ?? [], waiting.map((comment) => comment.id), (id) => pillFor(waiting.find((comment) => comment.id === id)!)));
 	});
 
 	createEffect(() => {
@@ -213,16 +218,13 @@ export function Composer(props: {
 		untrack(() => {
 			// A draft addressed to one conversation is not put into another's field.
 			if (handed.agentId === undefined || handed.agentId === props.agentId) {
-				const current = text();
-				const next = handed.insert
-					? withMention(current, input ? input.selectionEnd ?? current.length : current.length, handed.text)
-					: { text: handed.text, caret: handed.text.length };
-				setText(next.text);
-				if (input) {
-					input.value = next.text;
-					input.focus();
-					input.setSelectionRange(next.caret, next.caret);
-				}
+				const kept = handed.comment ? props.comments?.find((candidate) => candidate.id === handed.comment) : undefined;
+				// A comment kept on a board arrives as a pill; a dropped file as its `@path`, spaced
+				// from its neighbours; anything else replaces what is there.
+				if (kept) field?.append(pillFor(kept));
+				else if (handed.insert) field?.insertText(handed.text);
+				else put(textDraft(handed.text));
+				field?.focus();
 			}
 			props.onDraftTaken?.();
 		});
@@ -272,14 +274,12 @@ export function Composer(props: {
 		 * one — so the Enter after a completion sends rather than completing again.
 		 */
 		const value = `/${command.name} `;
-		setText(value);
-		input.value = value;
-		input.focus();
-		input.setSelectionRange(value.length, value.length);
+		put(textDraft(value));
+		field?.focus();
 	};
 
 	/** Whether there is anything to send. Also what decides send against stop, below. */
-	const sendable = () => text().trim() !== "";
+	const sendable = () => !draftIsEmpty(nodes());
 
 	const send = () => {
 		// Enter with a command menu open completes the highlighted row instead of sending
@@ -292,14 +292,13 @@ export function Composer(props: {
 			pick(chosen);
 			return;
 		}
-		const value = text().trim();
-		if (!value) return;
-		props.onSend(value);
-		setText("");
-		input.value = "";
-		// And forget the parked copy, or switching away and back would bring back a prompt
-		// that has already been sent.
-		if (props.agentId) parked.delete(props.agentId);
+		if (draftIsEmpty(nodes())) return;
+		// The comments go as ids beside the words: what the agent reads for each is composed
+		// from the comment itself (`commentBlock`), not from what its pill happens to show.
+		props.onSend(draftForAgent(nodes()), draftComments(nodes()));
+		// `put` forgets the page's parked copy with it, or switching away and back would bring
+		// back a prompt that has already been sent.
+		put([]);
 	};
 
 	/*
@@ -384,39 +383,33 @@ export function Composer(props: {
 				<Show when={props.destination}>
 					{(word) => <span class="dock-to">{word()}</span>}
 				</Show>
-				<textarea
-					/*
-					 * Grows to about six lines and then scrolls. Six because that is a
-					 * paragraph — long enough to see a whole thought before sending it, short
-					 * enough that the bar has not eaten the canvas it is floating over. 114px is
-					 * six of 13px at 1.45.
-					 *
-					 * The 8px above the controls is the *row's* margin and not this field's
-					 * padding, which is where it started: a textarea's padding is inside its
-					 * scroll box, so once the draft was long enough to scroll the gap went with
-					 * it and the seventh line sat on top of the buttons.
-					 *
-					 * 16px on a touch keyboard or the browser zooms the page when the field
-					 * takes focus, which leaves the canvas at a scale nobody chose and the
-					 * chrome half off screen.
-					 */
-					class="dockfield block max-h-[114px] min-h-[22px] w-full px-1 [field-sizing:content] pointer-coarse:text-[16px]"
-					ref={input}
-					rows="1"
+				{/*
+					The field: text, and a pill for each comment going with it (`DraftField.tsx`).
+					It grows with its words on its own, being a box rather than a textarea, up to
+					the six lines the stylesheet caps it at.
+				*/}
+				<DraftField
+					ref={(api) => (field = api)}
+					draft={nodes()}
+					describe={describe}
 					// The field had no accessible name at all; the placeholder is not one.
-					aria-label="Message this agent"
-					/* While a turn is running what you type is steering it, not starting
-					   another one, and the field is the honest place to say so. */
+					label="Message this agent"
+					/* A turn in progress does not stop you talking to it. Text sent now steers this turn rather than
+					   starting another one, and the field is the honest place to say so. */
 					placeholder={props.busy ? "Steer this turn…" : "Draft something on a board, or ask…"}
-					value={text()}
-					onInput={(event) => {
-						setText(event.currentTarget.value);
-						props.onText?.(event.currentTarget.value);
+					onDraft={(draft) => {
+						setNodes(draft);
+						if (held !== undefined) parked.set(held, draft);
+						props.onText?.(draftText(draft));
+						// A pill the person deleted: its comment is not going anywhere now.
+						const here = new Set(draftComments(draft));
+						const gone = (props.comments ?? []).filter((comment) => !here.has(comment.id)).map((comment) => comment.id);
+						if (gone.length > 0) props.onCommentsGone?.(gone);
 					}}
-					onCompositionStart={() => (composing = true)}
-					onCompositionEnd={() => {
-						composing = false;
-						endedAt = Date.now();
+					onCaret={() => {}}
+					onComposing={(now) => {
+						composing = now;
+						if (!now) endedAt = Date.now();
 					}}
 					onKeyDown={(event) => {
 						// Every branch below is destructive — one moves a selection, one clears
@@ -451,8 +444,8 @@ export function Composer(props: {
 							}
 						}
 						if (event.key === "Escape") {
-							setText("");
-							input.value = "";
+							put([]);
+							props.onCommentsGone?.((props.comments ?? []).map((comment) => comment.id));
 							return;
 						}
 						if (event.key === "Enter" && !event.shiftKey) {
@@ -473,6 +466,9 @@ export function Composer(props: {
 
 					{/* Mode before model, because it is the larger decision: what the agent may
 					    do at all, rather than which one is doing it. */}
+					<Show when={props.onRuntime}>
+						{(choose) => <RuntimeMenu kind={props.runtime as AgentKind | undefined} onKind={(kind) => choose()(kind)} />}
+					</Show>
 					<ModeMenu modes={props.modes} mode={props.mode} onMode={props.onMode} />
 					<ModelPicker
 						model={props.model}

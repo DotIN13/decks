@@ -14,6 +14,8 @@ import { For, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 import { BoardChip } from "./BoardChip.tsx";
 import { daysLabel, schedulePaused } from "./dispatch-view.ts";
+import { timeZone, zoneShortName } from "../lib/time.ts";
+import { state } from "../state/deck.ts";
 import { relativeTime, untilTime } from "./workspace-panel.ts";
 
 export interface CronListProps {
@@ -53,6 +55,10 @@ export function CronList(props: CronListProps) {
 								</div>
 								<div class="dispatch-sched-time">
 									{schedule.at}
+									{/* Which clock the hour is on: the job's own zone, else the deck's. */}
+									<span class="dispatch-cron-zone" title={schedule.timezone ?? timeZone() ?? (state.machineZone || undefined) ?? ""}>
+										{zoneShortName(schedule.timezone ?? timeZone() ?? (state.machineZone || undefined))}
+									</span>
 									<small>{schedule.name}</small>
 								</div>
 								<p class="dispatch-task-text" data-open data-plain>

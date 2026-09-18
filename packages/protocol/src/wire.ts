@@ -13,7 +13,7 @@ import type {
 	RuntimeInfo,
 	ThinkingLevel,
 } from "./chat.ts";
-import type { Board, DeckState } from "./deck.ts";
+import type { Board, DeckSettings, DeckState } from "./deck.ts";
 import type { ExtensionUiAnswer, ExtensionUiPrompt } from "./extension-ui.ts";
 import type { StageCall, StageResult, Camera } from "./stage.ts";
 import type { ChatItem } from "./transcript.ts";
@@ -114,7 +114,6 @@ export type ClientMessage =
 	 * deleted board back, and the arrangement in `deck.json` goes with it.
 	 */
 	| { type: "board.delete"; path: string }
-	| { type: "board.comment"; path: string; id: string; text: string }
 	/**
 	 * Where the browser is looking, and which conversation's view that is.
 	 *
@@ -226,6 +225,15 @@ export type ClientMessage =
 	| { type: "schedule.cancel"; id: string }
 	/** Make and dispatch the task a schedule would have made, now. */
 	| { type: "schedule.run"; id: string }
+	/** Choose the deck's timezone, or `null` to go back to the machine's. */
+	| { type: "settings.set"; timezone: string | null }
+	/**
+	 * Choose the runtime the dashboard's dispatcher is, from the dashboard's bar.
+	 *
+	 * Not `agent.create`: nobody makes a dispatcher. The server keeps one per runtime it has
+	 * been asked for, and this says which of them answers the bar and places the next task.
+	 */
+	| { type: "dispatcher.setKind"; kind: AgentKind }
 	/** Make (or find) the status board and put it on the canvas. */
 	| { type: "web.board" }
 	/** A fresh pairing code; the extension has to be paired again. Answered with `web.status`. */
@@ -346,5 +354,7 @@ export type ServerMessage =
 	 * and one panel draws them together.
 	 */
 	| { type: "tasks"; tasks: Task[]; schedules: Schedule[] }
+	/** The deck's settings, and the zone the server's machine is on when none is chosen. */
+	| { type: "settings"; settings: DeckSettings; machineZone: string }
 	| { type: "error"; text: string };
 

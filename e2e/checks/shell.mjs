@@ -40,6 +40,47 @@ say("the app opens on the dashboard, and writes the hash", (await hash()) === "#
 say("the dashboard's tabs are drawn in the top-left pill", (await page.locator('.pill [role="tab"]').count()) === 3);
 
 /*
+ * Every card has a picture the server took (`boards/thumbs.ts`), of a board this browser
+ * has never had open. It used to be a grey tile with the title on it until the board had
+ * been on this browser's canvas. 640 real pixels wide, and asked for by revision so it can
+ * be cached for a year.
+ */
+{
+	const ready = await page
+		.waitForFunction(
+			() => {
+				const pictures = [...document.querySelectorAll(".dispatch-card-pic .board-picture")];
+				return pictures.length > 0 && pictures.every((one) => one.dataset.state === "ready");
+			},
+			undefined,
+			{ timeout: 30000 },
+		)
+		.then(() => true)
+		.catch(() => false);
+	const pictures = await page.evaluate(() =>
+		[...document.querySelectorAll('.dispatch-card-pic img[data-thumb="ready"]')].map((one) => ({ w: one.naturalWidth, src: one.getAttribute("src") })),
+	);
+	say("every gallery card gets a picture taken by the server", ready && pictures.length > 0, JSON.stringify(pictures));
+	say("…640 pixels wide, asked for by revision and scheme", pictures.every((one) => one.w === 640 && /\/api\/thumb\/.+\?v=\d+&scheme=(light|dark)$/.test(one.src)), JSON.stringify(pictures));
+	const again = await page.evaluate(async (src) => {
+		const started = performance.now();
+		const answer = await fetch(src, { cache: "no-store" });
+		return { status: answer.status, type: answer.headers.get("content-type"), cache: answer.headers.get("cache-control"), ms: Math.round(performance.now() - started) };
+	}, pictures[0]?.src);
+	/* The left panel's rows draw the same pictures: there is no second way to picture a board,
+	   and no board is mounted as a document to make one. */
+	await page.waitForFunction(() => [...document.querySelectorAll(".board-thumb .board-picture")].some((one) => one.dataset.state === "ready"), undefined, { timeout: 15000 }).catch(() => {});
+	const rows = await page.evaluate(() => ({
+		rows: document.querySelectorAll(".board-row").length,
+		ready: document.querySelectorAll('.board-thumb .board-picture[data-state="ready"]').length,
+		server: [...document.querySelectorAll(".board-thumb img")].every((one) => (one.getAttribute("src") ?? "").startsWith("/api/thumb/")),
+		frames: document.querySelectorAll(".panel-shell iframe").length,
+	}));
+	say("the left panel's rows draw the server's pictures too, with no document mounted", rows.rows > 0 && rows.ready === rows.rows && rows.server && rows.frames === 0, JSON.stringify(rows));
+	say("…and a second ask is answered from the disk, cacheable for a year", again.status === 200 && again.type === "image/jpeg" && /immutable/.test(again.cache ?? "") && again.ms < 300, JSON.stringify(again));
+}
+
+/*
  * The preview zooms, and the gesture is heard inside the board's frame. The frame is a
  * separate document, so a ⌘-wheel over it reaches nothing in the app unless the preview
  * listens there too, which is how this was broken without anything failing.
@@ -74,6 +115,7 @@ await settle(page, 300);
 const agentsTab = page.locator('.panel-shell [role="tab"]', { hasText: "Agents" });
 if (await agentsTab.count()) await agentsTab.first().click();
 await settle(page, 400);
+say("the dashboard's bar offers the dispatcher's runtime", (await page.locator(".dock .runtime-chip").count()) === 1 && /^Dispatcher runtime: \S/.test((await page.locator(".dock .runtime-chip").getAttribute("aria-label")) ?? ""), await page.locator(".dock .runtime-chip").getAttribute("aria-label"));
 say("no board document is started while the dashboard is up", (await documents()) === 0, `${await documents()} documents`);
 await page.fill(".dockfield", "half a line, typed before the switch");
 await page.locator('.panel-shell .agent-row[data-current="true"] button[data-agent]').first().click();
@@ -83,11 +125,20 @@ const before = await documents();
 say("a row in the panel opens that agent's stage", (await hash()) === `#/agent/${agentId}` && (await surface()) === "stage", `${await hash()} ${await surface()}`);
 say("Home grows into the pill on a stage", (await page.locator('.pill-home[data-on="true"]').count()) === 1);
 say("the bar's word is the agent's on a stage", /^to /.test((await page.locator(".dock-to").textContent()) ?? "") && !/dispatcher/.test((await page.locator(".dock-to").textContent()) ?? ""), await page.locator(".dock-to").textContent());
+say("…and a stage's bar does not: its agent's runtime was fixed when it was made", (await page.locator(".dock .runtime-chip").count()) === 0);
+/* @Dispatcher is a name from any bar: on a stage it turns the line into a task. Read off the
+   bar's own word, which is the send's decision run without sending. */
+await page.fill(".dockfield", "@Dispatcher find someone for this");
+await settle(page, 200);
+say("@Dispatcher on a stage addresses the dispatcher", (await page.locator(".dock-to").textContent()) === "to dispatcher", await page.locator(".dock-to").textContent());
+await page.fill(".dockfield", "");
+await settle(page, 200);
+say("…and without it the bar is the agent's again", /^to /.test((await page.locator(".dock-to").textContent()) ?? "") && !/dispatcher/.test((await page.locator(".dock-to").textContent()) ?? ""));
 
 await page.click('[aria-label="Home: back to the dashboard"]');
 await settle(page, 700);
 say("Home comes back to the dashboard, on the tab it left", (await hash()) === "#/boards" && (await surface()) === "dispatch", `${await hash()}`);
-say("the draft survives the switch", (await page.inputValue(".dockfield")) === "half a line, typed before the switch");
+say("the draft survives the switch", (await page.locator(".dockfield").evaluate((el) => el.textContent)) === "half a line, typed before the switch");
 say("the bar's word is the dispatcher's on the dashboard", (await page.locator(".dock-to").textContent()) === "to dispatcher", await page.locator(".dock-to").textContent());
 say("no board document was torn down by the switch", (await documents()) === before, `${before} -> ${await documents()}`);
 

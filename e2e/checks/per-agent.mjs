@@ -62,7 +62,7 @@ const look = () =>
 			world: world ? (world.getAttribute("style") ?? "").replace(/\s+/g, " ") : "?",
 			zoom: document.querySelector('.pill [aria-label^="Zoom"]')?.textContent?.trim(),
 			shown: [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path),
-			typed: document.querySelector("textarea")?.value ?? "",
+			typed: document.querySelector(".dockfield")?.textContent ?? "",
 			selected: document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null,
 			dialog: document.querySelector(".dialog-card")?.innerText?.replace(/\s+/g, " ").trim() ?? null,
 		};
@@ -82,7 +82,7 @@ const goTo = async (name) => {
 
 await page.keyboard.press("0");
 await settle(page, 700);
-await page.locator("textarea").first().fill("meant for Ada");
+await page.locator(".dockfield").fill("meant for Ada");
 await page.locator(".board-node .chrome").first().click();
 await settle(page, 350);
 await feed({ type: "extension.ui.prompt", agentId: "A", prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });
@@ -116,7 +116,7 @@ say("…nor Ada's question", bo.dialog === null, JSON.stringify(bo.dialog));
 
 // --- and Bo's own draft stays Bo's ---------------------------------------------------
 
-await page.locator("textarea").first().fill("meant for Bo");
+await page.locator(".dockfield").fill("meant for Bo");
 await settle(page, 250);
 
 // --- back to Ada: everything exactly as it was --------------------------------------

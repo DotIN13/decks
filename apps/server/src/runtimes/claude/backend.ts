@@ -531,8 +531,18 @@ export class ClaudeBackend implements AgentBackend {
 				this.context.showUsage?.();
 				return;
 			default:
-				// The CLI's own commands — /compact, /doctor — run inside the
-				// session and answer back through the stream.
+				/*
+				 * The CLI's own commands — /compact, /doctor — run inside the session and answer
+				 * back through the stream, and **every one of them ends in a `result` frame**, the
+				 * way a turn does (measured: `/compact` sends `status: compacting`, then nothing
+				 * until the summary is written, then `init` and `result`; `/context` sends `init`
+				 * and `result`). So it is a turn as far as "is anything running" goes. Without
+				 * this the shell took its "thinking" back the moment the command was queued, and
+				 * a compaction that runs for a minute showed an idle agent: the row said done,
+				 * and the queue handed it the next piece of work in the middle of it.
+				 */
+				this.streaming = true;
+				this.context.translator.setState("thinking");
 				this.push(`/${name}${args ? ` ${args}` : ""}`);
 		}
 	}

@@ -1,3 +1,4 @@
+import { isoIn, isZone, nowWords, offsetLabel, partsIn, processZone } from "../clock.ts";
 import { readFileSync } from "node:fs";
 import type { AgentKind, AgentMode, AgentState, Camera, Identity, Schedule, ScheduleSpec, TaskResult, TaskSpec, ThinkingLevel } from "@decks/protocol";
 import { toolDescription as toolDescriptionPath } from "@decks/runtime";
@@ -731,6 +732,25 @@ export function createStageTool(deps: {
 		},
 
 		/**
+		 * The time where the person is: the deck's timezone (Settings, Time), which the
+		 * server's own clock follows. For "since yesterday" and "by Friday", and for a
+		 * session long enough that the date it was started on has passed.
+		 */
+		now: async () => {
+			const at = Date.now();
+			const zone = processZone();
+			const parts = partsIn(at, zone);
+			return {
+				iso: isoIn(at, zone),
+				timezone: zone,
+				offset: offsetLabel(at, zone),
+				weekday: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][parts.weekday] ?? "",
+				words: nowWords(at, zone),
+				epoch: at,
+			};
+		},
+
+		/**
 		 * Make a schedule: a task the deck makes on its own, at a time, on the days named.
 		 *
 		 * The dashboard's Cron tab is the list of these. The server checks the fields — a
@@ -742,11 +762,13 @@ export function createStageTool(deps: {
 			if (!spec.at || !Array.isArray(spec.days)) throw new Error("A schedule needs a time (HH:MM) and its days (0 Sunday to 6 Saturday)");
 			if (!spec.workspace?.trim()) throw new Error("A schedule needs a workspace to write into");
 			if (!spec.task?.trim()) throw new Error("A schedule needs `task`: the work, as an instruction to the agent that will run it");
+			if (spec.timezone !== undefined && !isZone(spec.timezone)) throw new Error(`"${String(spec.timezone)}" is not a timezone. Use an IANA name, like "America/Los_Angeles", or leave it out for the person's own`);
 			if (!agent.schedule) throw new Error("This deck has no dashboard.");
 			const made = agent.schedule({
 				name: spec.name.trim(),
 				at: spec.at.trim(),
 				days: spec.days,
+				...(spec.timezone ? { timezone: spec.timezone } : {}),
 				workspace: spec.workspace.trim(),
 				task: spec.task.trim(),
 				...(spec.boards ? { boards: spec.boards } : {}),

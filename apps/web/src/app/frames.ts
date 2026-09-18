@@ -11,7 +11,9 @@ import { reportCamera } from "./camera-report.ts";
 import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
 import { ensureHistory, resolveEarlier } from "../state/history.ts";
 import { boardChanged, forgetInFlight, forgetPatches, patchAccepted, patchRefused } from "../state/patches.ts";
+import { forgetInk } from "../state/ink.ts";
 import { notice } from "../state/notices.ts";
+import { setTimeZone } from "../lib/time.ts";
 import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../alerts/policy.ts";
@@ -106,6 +108,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				case "board.changed": {
 					if (message.removed) {
 						forgetPatches(message.path);
+						forgetInk(message.path);
 						setState("boards", (boards) => boards.filter((board) => board.path !== message.path));
 						return;
 					}
@@ -423,6 +426,12 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					// rebuilt — the state chip is the thing the reader is watching.
 					setState("tasks", reconcile(message.tasks, { key: "id", merge: false }));
 					setState("schedules", reconcile(message.schedules, { key: "id", merge: false }));
+					return;
+				case "settings":
+					// The zone first, so everything the store change redraws is drawn in it.
+					setTimeZone(message.settings.timezone);
+					setState("settings", reconcile(message.settings));
+					setState("machineZone", message.machineZone);
 					return;
 				case "web.status":
 					setState("web", { status: message.status, code: message.code ?? state.web?.code });

@@ -1,4 +1,4 @@
-import type { Board, Camera, ThinkingLevel } from "@decks/protocol";
+import type { AgentKind, Board, Camera, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
 import Moon from "lucide-solid/icons/moon";
@@ -25,7 +25,7 @@ import {clearDialog, clearPreview, dialog, preview, setState, state} from "./sta
 import { notice } from "./state/notices.ts";
 import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport, surface, setSurface, dispatchTab, setDispatchTab, dispatchPreview, setDispatchPreview} from "./state/ui.ts";
 import { installRoute, type Place } from "./app/route.ts";
-import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
+import { destination, destinationLabel, DISPATCHER_NAME, stripMention } from "./app/send-from-bar.ts";
 import { makeFloat } from "./chrome/float.ts";
 import { DispatchView } from "./chrome/DispatchView.tsx";
 import { wantsYou } from "./chrome/dispatch-view.ts";
@@ -33,6 +33,13 @@ import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice,
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
 import { Inspector } from "./canvas/Inspector.tsx";
+import { InkBar } from "./chrome/InkBar.tsx";
+import { pageKey } from "./chat/composer/parked.ts";
+import { CommentPopup } from "./canvas/CommentPopup.tsx";
+import { commentBlock, withComments } from "./canvas/comments.ts";
+import { markComment, unmarkComments } from "./canvas/comment-select.ts";
+import { addComment, commenting, removeComment, setCommenting, takeComments, waitingComments } from "./state/comments.ts";
+import { drawing, setDrawing } from "./state/ink.ts";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import { Stage } from "./canvas/Stage.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
@@ -303,7 +310,12 @@ export function App() {
 	 * a child of the template, one per task, and its transcript is that task's log: the
 	 * float on the dashboard shows the one whose row was last opened, else the template.
 	 */
-	const dispatcherId = createMemo(() => state.chats.find((chat) => chat.role === "dispatcher" && !chat.parentId)?.id);
+	/* One template per runtime that has been chosen (`RuntimeMenu`); the bar's is the chosen one. */
+	const dispatcherId = createMemo(() => {
+		const templates = state.chats.filter((chat) => chat.role === "dispatcher" && !chat.parentId);
+		const wanted = state.settings.dispatcherKind ?? state.defaultKind;
+		return (templates.find((chat) => chat.kind === wanted) ?? templates[0])?.id;
+	});
 	const visibleChats = createMemo(() => state.chats.filter((chat) => chat.role !== "dispatcher"));
 	const [logAgent, setLogAgent] = createSignal<string | undefined>(undefined);
 	const barAgent = () => (surface() === "dispatch" ? dispatcherId() : state.focused);
@@ -319,14 +331,26 @@ export function App() {
 			agents: visibleChats().map((chat) => ({ id: chat.id, name: nameOf(chat.id) })),
 		};
 	};
-	const sendFromBar = (text: string) => {
-		const dest = destination(text, barContext());
+	const sendFromBar = (typed: string, commentIds: string[] = []) => {
+		const dest = destination(typed, barContext());
+		/*
+		 * The comments whose pills were in the field go in front of the words, whoever the words
+		 * are for, and stop waiting. They are kept under the agent whose canvas they were made
+		 * on, which is the focused one: the only place a comment can be made is its stage.
+		 */
+		// In the order their pills sat in the text, which is the order `[comment n]` counts in.
+		const held = state.focused && commentIds.length > 0 ? takeComments(state.focused) : [];
+		const notes = commentIds.flatMap((id) => held.filter((note) => note.id === id));
+		unmarkComments(notes.map((note) => note.id));
+		const text = withComments(typed, notes);
 		switch (dest.kind) {
 			case "task":
-				send({ type: "task.create", task: { text }, requestedBy: "you" });
+				send({ type: "task.create", task: { text: dest.named ? withComments(stripMention(typed, DISPATCHER_NAME), notes) : text }, requestedBy: "you" });
+				// From a stage nothing on screen changes, so it is said: the task is on the dashboard.
+				if (surface() === "stage") notice("info", "Handed to the dispatcher. It is on the dashboard's Tasks tab.");
 				return;
 			case "prompt": {
-				const line = dest.named ? stripMention(text, dest.name) : text;
+				const line = dest.named ? withComments(stripMention(typed, dest.name), notes) : text;
 				if (dest.id === state.focused) clearMarks(dest.id);
 				send({ type: "agent.prompt", id: dest.id, text: line });
 				return;
@@ -338,6 +362,34 @@ export function App() {
 				notice("info", "Pick an agent first, or go Home and dispatch it.");
 		}
 	};
+
+	/*
+	 * A comment on selected words (`canvas/comments.ts`), ending one of the two ways the popup
+	 * offers. Kept, it becomes a pill in the input bar, to go with this agent's next message,
+	 * and its words stay marked on the board. Sent, it is a message of its own, to the agent whose canvas this is,
+	 * and a busy agent takes it as steering exactly as it takes a typed line.
+	 */
+	const endComment = (text: string, how: "keep" | "send") => {
+		const target = commenting();
+		const agentId = state.focused;
+		if (!target || !agentId) return;
+		const note = { id: `c${Date.now().toString(36)}`, board: target.path, quote: target.quote, text, at: Date.now(), ...(target.component ? { component: target.component } : {}) };
+		if (how === "keep") {
+			addComment(agentId, note);
+			markComment(note.id, target.range);
+			// Handed to the composer the way a dropped file is: a one-shot draft, here a pill.
+			setDraft({ text: "", at: Date.now(), insert: true, agentId, comment: note.id });
+		} else {
+			clearMarks(agentId);
+			send({ type: "agent.prompt", id: agentId, text: commentBlock([note]) });
+		}
+		target.frame.contentDocument?.getSelection()?.removeAllRanges();
+		setCommenting(undefined);
+	};
+	/* The popup belongs to browsing with the pen down; anything else puts it away. */
+	createEffect(() => {
+		if (mode() !== "browse" || drawing() || surface() !== "stage") setCommenting(undefined);
+	});
 
 	/*
 	 * The two floats: the composer and the conversation.
@@ -366,6 +418,9 @@ export function App() {
 		return { x: left, y: 0, w: (rect?.width ?? window.innerWidth) - left - right, h: rect?.height ?? window.innerHeight };
 	};
 	const floatsOff = () => window.innerWidth < 1100;
+	/* Under a finger the conversation stands on the composer and is not dragged (`shell.css`). */
+	const coarse = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : undefined;
+	const conversationFixed = () => floatsOff() || coarse?.matches === true;
 	/*
 	 * `pin: "bottom"` writes the position as a `bottom` rather than a `top`. The composer is
 	 * a column whose status row comes and goes above the box (it leaves when the conversation
@@ -374,7 +429,7 @@ export function App() {
 	 * dock's own CSS does at home. `read` is what a drag then starts from, because the top
 	 * the float remembers is stale the moment the height changes.
 	 */
-	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number }) =>
+	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number }, off: () => boolean = floatsOff) =>
 		makeFloat(el, {
 			...(stow ? { stow } : {}),
 			key,
@@ -383,7 +438,7 @@ export function App() {
 			home,
 			bounds: workBox,
 			size: () => ({ w: el.offsetWidth, h: el.offsetHeight }),
-			disabled: floatsOff,
+			disabled: off,
 			pin,
 			read: () => ({ x: el.offsetLeft, y: el.offsetTop }),
 			apply: (p, atHome, stowed) => {
@@ -415,7 +470,7 @@ export function App() {
 		const dock = dockEl;
 		const handle = dock?.querySelector<HTMLElement>(".dockbox");
 		if (!dock || !handle) return;
-		const float = mountFloat(dock, "composer", handle, "textarea, input, button, select, a, [role='menu'], [role='listbox'], .sendbtn", () => {
+		const float = mountFloat(dock, "composer", handle, "[data-slot='composer-input'], textarea, input, button, select, a, [role='menu'], [role='listbox'], .sendbtn", () => {
 			const box = workBox();
 			return { x: box.x + box.w / 2 - dock.offsetWidth / 2, y: box.h - dock.offsetHeight - 12 };
 		}, "bottom", { tab: STOW_TAB });
@@ -452,7 +507,7 @@ export function App() {
 			const box = workBox();
 			// The panel's own CSS: `right: 12px`, `top: 64px` (the gutter is 0 once it is a panel).
 			return { x: box.x + box.w - stream.offsetWidth - 12, y: 64 };
-		});
+		}, "top", undefined, conversationFixed);
 		createEffect(() => {
 			insets();
 			float.restore();
@@ -1338,7 +1393,13 @@ export function App() {
 				*/}
 				<AgentPill
 					mode={mode()}
-					onMode={setMode}
+					onMode={(next) => {
+						// A press while editing means "this component", so the pen is put down first.
+						if (next === "edit") setDrawing(false);
+						setMode(next);
+					}}
+					drawing={drawing()}
+					onDrawing={setDrawing}
 					chats={visibleChats()}
 					identities={state.identities}
 					focused={state.focused}
@@ -1450,6 +1511,24 @@ export function App() {
 					pickFile={() => editor.pickFile(shape()?.path)}
 					onClose={() => setComponent(undefined)}
 				/>
+
+				<Show when={commenting()} keyed>
+					{(target) => (
+						<CommentPopup
+							target={target}
+							moved={() => [camera(), focus(), insets()]}
+							left={insets().left}
+							canSend={!!state.focused}
+							onKeep={(text) => endComment(text, "keep")}
+							onSend={(text) => endComment(text, "send")}
+							onClose={() => setCommenting(undefined)}
+						/>
+					)}
+				</Show>
+
+				<Show when={drawing() && mode() === "browse" && surface() === "stage"}>
+					<InkBar onDone={() => setDrawing(false)} />
+				</Show>
 
 				<Show when={ops()}>
 					<CanvasOps onClose={() => setOps(false)} />
@@ -1682,6 +1761,7 @@ export function App() {
 					<Composer
 						draft={draft()}
 						agentId={barAgent()}
+						page={pageKey(surface(), state.focused)}
 						usage={barAgent() ? state.agents[barAgent()!]?.usage : undefined}
 						onUsage={() => openUsage(barAgent())}
 						busy={busy()}
@@ -1692,7 +1772,13 @@ export function App() {
 						modes={barChat()?.capabilities?.modes ?? []}
 						mode={barChat()?.mode}
 						onMode={(mode) => send({ type: "agent.setMode", id: barAgent() ?? "", mode })}
+						{...(surface() === "dispatch" ? { onRuntime: (kind: AgentKind) => send({ type: "dispatcher.setKind", kind }) } : {})}
 						onSend={sendFromBar}
+						comments={surface() === "stage" ? waitingComments(state.focused) : []}
+						onCommentsGone={(ids) => {
+							for (const id of ids) if (state.focused) removeComment(state.focused, id);
+							unmarkComments(ids);
+						}}
 						onText={setBarText}
 						destination={destinationLabel(destination(barText(), barContext()))}
 						onAbort={() => send({ type: "agent.abort", id: state.focused ?? "" })}

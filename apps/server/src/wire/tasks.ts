@@ -44,4 +44,19 @@ export const tasks = {
 		const outcome = wire.tasks.runNow(message.id);
 		if ("error" in outcome) reply({ type: "notice", level: "warn", text: outcome.error });
 	},
+
+	/*
+	 * The deck's timezone. Here rather than in a file of its own because what it moves is
+	 * the schedules: the answer a person sees is the Cron tab's times changing.
+	 */
+	"settings.set": (message, reply, wire) => {
+		const outcome = wire.setTimezone(message.timezone);
+		if (outcome) reply({ type: "notice", level: "warn", text: outcome.error });
+	},
+
+	/* The dispatcher's runtime, from the dashboard's bar. Beside the tasks because it decides who places them. */
+	"dispatcher.setKind": (message, reply, wire) => {
+		const outcome = wire.setDispatcherKind(message.kind);
+		if (outcome) reply({ type: "notice", level: "warn", text: outcome.error });
+	},
 } satisfies WirePart;

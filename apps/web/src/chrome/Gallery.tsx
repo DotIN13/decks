@@ -1,8 +1,8 @@
 /**
  * The gallery: every board, as a picture, shelved by workspace.
  *
- * A picture where there is one (`thumb-cache`), the title on a plain tile where there
- * is not yet — the tile is the placeholder the picture replaces, so the grid never
+ * The server's picture of each board (`BoardPicture`), the title on a plain tile where there
+ * is not one yet — the tile is the placeholder the picture replaces, so the grid never
  * jumps when a photograph lands. Pressing a card previews the live board over the
  * dashboard; it does not move the camera, because looking is not the same as going.
  *
@@ -10,7 +10,7 @@
  * gesture and not two lists to reconcile.
  */
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { picture } from "../canvas/thumb-cache.ts";
+import { BoardPicture } from "./BoardPicture.tsx";
 import { fileName, filterCards, type GalleryCard, type GalleryFilter, type GalleryGroup } from "./dispatch-view.ts";
 
 export interface GalleryProps {
@@ -114,14 +114,15 @@ export function Gallery(props: GalleryProps) {
  * and a button cannot hold a button.
  */
 function Card(props: { card: GalleryCard; onPreview: (path: string) => void; onOpenAgent: (id: string) => void; onOpenTask: (id: string) => void }) {
-	const src = () => picture(props.card.board);
 	return (
 		<div class="dispatch-card" role="group" aria-label={props.card.board.title} data-changed={props.card.changed}>
 			<button type="button" class="dispatch-card-open" onClick={() => props.onPreview(props.card.board.path)}>
 				<span class="dispatch-card-pic">
-					<Show when={src()} fallback={<span class="dispatch-card-tile">{props.card.board.title}</span>}>
-						{(url) => <img src={url()} alt="" loading="lazy" draggable={false} />}
-					</Show>
+					<BoardPicture
+						board={props.card.board}
+						waiting={<span class="dispatch-card-tile">{props.card.board.title}</span>}
+						fallback={<span class="dispatch-card-tile">{props.card.board.title}</span>}
+					/>
 				</span>
 				<span class="dispatch-card-name">{fileName(props.card.board.path)}</span>
 			</button>

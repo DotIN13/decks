@@ -20,6 +20,8 @@
 @import "./styles/usage.css";
 @import "./styles/canvas.css";
 @import "./styles/shell.css";
+@import "./styles/ink.css";
+@import "./styles/board-picture.css";
 
 /*
  * The app's tokens, handed to Tailwind so utilities speak the design language.

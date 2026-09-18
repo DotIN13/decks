@@ -101,14 +101,17 @@ export interface TaskResult {
 /**
  * When a schedule fires.
  *
- * `at` is "HH:MM" in the server's local time — "every morning at nine"
- * is a person's habit, and a person's habits live in their timezone. `days` uses
+ * `at` is "HH:MM" in `timezone`, an IANA name such as "America/Los_Angeles"; with none,
+ * in the deck's own timezone (Settings, Time). "Every morning at nine" is a person's
+ * habit, and a person's habits live in their timezone. `days` uses
  * `Date.getDay()`, so 0 is Sunday and 6 is Saturday; `[]` means never, which is how
  * a schedule is paused without deleting it.
  */
 export interface ScheduleWhen {
 	at: string;
 	days: number[];
+	/** The zone `at` and `days` are read in. Absent: the deck's, which follows the setting. */
+	timezone?: string;
 }
 
 /** What the panel hands in to create a schedule. */
@@ -117,6 +120,8 @@ export interface ScheduleSpec {
 	at: string;
 	/** `Date.getDay()`: 0 Sunday .. 6 Saturday. */
 	days: number[];
+	/** An IANA zone for `at` and `days`, when the job is not on the deck's own clock. */
+	timezone?: string;
 	/**
 	 * The workspace whose agent writes the task.
 	 *

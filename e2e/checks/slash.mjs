@@ -150,7 +150,7 @@ try {
 	await settle(page, 250);
 	await page.keyboard.press("Tab");
 	await settle(page, 200);
-	say("Tab completes the highlighted command", (await field.inputValue()) === "/compact ", JSON.stringify(await field.inputValue()));
+	say("Tab completes the highlighted command", (await field.evaluate((el) => el.textContent)) === "/compact ", JSON.stringify(await field.evaluate((el) => el.textContent)));
 	say("…and the trailing space closes the menu", (await menu.count()) === 0);
 
 	/*
@@ -159,7 +159,7 @@ try {
 	 * Completing used to insert `/compact [notes]`, which reads as a form and is not one:
 	 * Enter on it sent the seven literal characters as the argument.
 	 */
-	say("…without pasting the argument placeholder in", !(await field.inputValue()).includes("[notes]"));
+	say("…without pasting the argument placeholder in", !(await field.evaluate((el) => el.textContent)).includes("[notes]"));
 
 	// --- ranking ----------------------------------------------------------------------
 
@@ -196,7 +196,7 @@ try {
 	await page.keyboard.press("Escape");
 	await settle(page, 200);
 	say("Escape dismisses the menu", (await menu.count()) === 0);
-	say("…by clearing the draft, because a command is the whole message", (await field.inputValue()) === "");
+	say("…by clearing the draft, because a command is the whole message", (await field.evaluate((el) => el.textContent)) === "");
 
 	// --- the hints --------------------------------------------------------------------
 

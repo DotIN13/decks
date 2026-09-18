@@ -1,10 +1,15 @@
 import type { ScheduleWhen } from "@decks/protocol";
+import { addCalendarDays, instantIn, isZone, partsIn, processZone } from "../clock.ts";
 
 /**
  * When a schedule fires: the arithmetic, pure and testable.
  *
- * A schedule is `at` in the server's local time on the days in `days`
- * (`Date.getDay()`: 0 Sunday .. 6 Saturday). Three questions are worth asking about
+ * A schedule is `at` on the days in `days` (`Date.getDay()`: 0 Sunday .. 6 Saturday), read
+ * in a timezone: the schedule's own `timezone` when it has one ("every weekday at nine,
+ * London time"), else the process clock, which is the deck's Time setting once one is
+ * chosen (`settings.ts`). The zone is an argument to every calculation here (`clock.ts`),
+ * so a run is built from a calendar date and a clock time in that zone and is right on the
+ * days the clocks change. Three questions are worth asking about
  * such a schedule, and all three are answerable without a clock:
  *
  * - `nextRun` — the first instant after a given one;
@@ -36,59 +41,50 @@ export function validateWhen(when: ScheduleWhen): ScheduleWhen {
 	if (Number.isNaN(minutes)) throw new Error(`"${when.at}" is not a time. Use HH:MM, like "09:00".`);
 	const valid = (value: number) => Number.isInteger(value) && value >= 0 && value <= 6;
 	if (!when.days.every(valid)) throw new Error("A schedule's days are 0 (Sunday) to 6 (Saturday), and one of the entries is not.");
+	if (when.timezone !== undefined && !isZone(when.timezone)) throw new Error(`"${when.timezone}" is not a timezone. Use an IANA name, like "America/Los_Angeles".`);
 	return when;
 }
 
-/** Local midnight of the day `ts` is in. */
-function startOfDay(ts: number): number {
-	const at = new Date(ts);
-	return new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();
+/** The zone a schedule is read in: its own, else the process clock's. */
+export function zoneOf(when: ScheduleWhen): string {
+	return when.timezone && isZone(when.timezone) ? when.timezone : processZone();
 }
 
-/**
- * The local calendar day `days` after the day `ts` is in.
- *
- * `Date#setDate` rather than adding 24 hours: across a daylight-saving transition a
- * local day is 23 or 25 hours long, and adding a fixed number of milliseconds skips
- * or repeats a day.
- */
-function addDays(ts: number, days: number): number {
-	const at = new Date(startOfDay(ts));
-	at.setDate(at.getDate() + days);
-	return at.getTime();
+/** Midnight, in `zone`, of the calendar day `ts` falls on there. */
+function startOfDay(ts: number, zone: string): number {
+	const at = partsIn(ts, zone);
+	return instantIn(zone, at.year, at.month, at.day, 0);
 }
 
-/**
- * The first instant this schedule fires strictly after `after`, or `0` for never.
- *
- * Walks at most a week of days: a non-empty day set wraps within seven days, so the
- * search is bounded and cheap. `0` is also what an empty day set means — a schedule
- * paused by clearing its days never fires, and never is a number here.
- */
+/** The first instant after `after` at which the schedule fires, or `0` when it never does. */
 export function nextRun(when: ScheduleWhen, after: number): number {
 	const minutes = atMinutes(when.at);
 	if (Number.isNaN(minutes) || when.days.length === 0) return 0;
-	const time = minutes * 60_000;
+	const zone = zoneOf(when);
+	const from = partsIn(after, zone);
 	for (let offset = 0; offset <= 7; offset++) {
-		const day = addDays(after, offset);
-		if (!when.days.includes(new Date(day).getDay())) continue;
-		const candidate = day + time;
+		const day = addCalendarDays(from.year, from.month, from.day, offset);
+		if (!when.days.includes(day.weekday)) continue;
+		const candidate = instantIn(zone, day.year, day.month, day.day, minutes);
 		if (candidate > after) return candidate;
 	}
 	return 0;
 }
 
-/** Instants of this schedule strictly between `from` and `to` — the runs a dead server skipped. */
+/** How many runs fall strictly between two instants. */
 export function missedBetween(when: ScheduleWhen, from: number, to: number): number {
 	const minutes = atMinutes(when.at);
 	if (Number.isNaN(minutes) || when.days.length === 0) return 0;
-	const time = minutes * 60_000;
+	const zone = zoneOf(when);
+	const first = partsIn(from, zone);
 	let missed = 0;
 	// From `from`'s own day to `to`'s day, inclusive: an instant on `from`'s own day
 	// after `from` can be a missed run too, when the server came back after it.
-	for (let day = addDays(from, 0); day <= startOfDay(to); day = addDays(day, 1)) {
-		const candidate = day + time;
-		if (candidate > from && candidate < to) missed += 1;
+	for (let offset = 0; ; offset++) {
+		const day = addCalendarDays(first.year, first.month, first.day, offset);
+		const candidate = instantIn(zone, day.year, day.month, day.day, minutes);
+		if (instantIn(zone, day.year, day.month, day.day, 0) > to) break;
+		if (when.days.includes(day.weekday) && candidate > from && candidate < to) missed += 1;
 	}
 	return missed;
 }
@@ -111,10 +107,15 @@ export interface TickOutcome {
  * `missed` counts as it goes.
  */
 export function tick(when: ScheduleWhen, lastRunAt: number | undefined, now: number): TickOutcome {
-	let cursor = lastRunAt ?? 0;
+	const today = startOfDay(now, zoneOf(when));
+	/*
+	 * A schedule that has never run has missed nothing. Its cursor starts at the end of
+	 * yesterday, not at zero: from zero this walked every day since 1970, which cost
+	 * seconds a tick and reported twenty thousand skipped runs on a job made that morning.
+	 */
+	let cursor = lastRunAt ?? today - 1;
 	let missed = 0;
 	let next = nextRun(when, cursor);
-	const today = startOfDay(now);
 	// Runs strictly before today are too old to want. Skip and count until the cursor
 	// walks into today (or tomorrow, when nothing of today is left).
 	while (next > 0 && next < today) {

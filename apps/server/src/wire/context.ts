@@ -1,4 +1,4 @@
-import type { Camera, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
+import type { AgentKind, Camera, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
 import type { Registry } from "../agents/registry.ts";
 import type { BoardService } from "../boards/service.ts";
 import type { EvalTrust } from "../boards/eval-trust.ts";
@@ -105,6 +105,11 @@ export interface WireContext {
 
 	/** Point the whole app at another data directory (§2). */
 	openDeck(path: string): void;
+
+	/** Choose the deck's timezone, or `null` for the machine's. Returns a sentence when it is not one. */
+	setTimezone(zone: string | null): { error: string } | undefined;
+	/** Choose the dispatcher's runtime; an error names why that runtime cannot be used here. */
+	setDispatcherKind(kind: AgentKind): { error: string } | undefined;
 
 	/** The install's Claude subscriptions, republished after anything moves one. */
 	publishAccounts(reply?: Reply, options?: { reread?: boolean }): Promise<void>;

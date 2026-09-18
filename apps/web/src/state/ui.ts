@@ -142,7 +142,7 @@ function createUi() {
 	 * Stamped, so rewinding twice to the same message is two handovers rather than one the
 	 * composer has already acted on.
 	 */
-	const [draft, setDraft] = createSignal<{ text: string; at: number; agentId?: string; insert?: boolean } | undefined>(undefined);
+	const [draft, setDraft] = createSignal<{ text: string; at: number; agentId?: string; insert?: boolean; /** A kept comment, by id: it arrives as a pill. */ comment?: string } | undefined>(undefined);
 
 	/**
 	 * Whether the canvas cheat sheet is open (see `CanvasOps`).

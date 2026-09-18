@@ -150,3 +150,5 @@ export type BoxClass = (typeof BOX_CLASSES)[number];
  */
 export const CALLOUT_TONES = ["warn", "danger", "ok"] as const;
 export type CalloutTone = (typeof CALLOUT_TONES)[number];
+
+export * from "./ink.ts";

@@ -946,3 +946,33 @@ test("the mapper's order is the order that works: content, then removals bottom-
 	// The heading and the doc's own lines were never in the batch, so they are untouched.
 	assert.ok(html.startsWith(FLOW.slice(0, FLOW.indexOf("\t\t\t<h1>"))));
 });
+
+// --- ink ----------------------------------------------------------------------------
+
+const INK = [{ id: "s1", tool: "pen" as const, color: "red" as const, size: 4, points: [10, 10, 0.5, 60, 40, 0.5] }];
+
+test("a drawing is written as one svg before the body's scripts, and nothing else moves", () => {
+	const drawn = applyPatches(BOARD, [{ op: "ink", strokes: INK }]);
+	assert.match(drawn.summary[0] ?? "", /drew on the board by hand: 1 stroke/);
+	const at = drawn.html.indexOf("<svg class=\"ink\" data-ink-layer");
+	assert.ok(at > 0, "the layer is in the file");
+	const script = drawn.html.indexOf("<script");
+	assert.ok(script < 0 || at < script, "and board.js is still the last thing in the body");
+	assert.equal(drawn.html.replace(/[\t ]*<svg class="ink"[\s\S]*?<\/svg>\n/, ""), BOARD, "every other byte is as it was");
+});
+
+test("drawing again replaces the layer, and erasing everything gives the file back", () => {
+	const once = applyPatches(BOARD, [{ op: "ink", strokes: INK }]).html;
+	const twice = applyPatches(once, [{ op: "ink", strokes: [...INK, { ...INK[0]!, id: "s2", color: "blue" as const }] }]).html;
+	assert.equal(twice.match(/data-ink-layer/g)?.length, 1, "one layer, however often it is written");
+	assert.equal(twice.match(/<path /g)?.length, 2);
+	const erased = applyPatches(twice, [{ op: "ink", strokes: [] }]);
+	assert.equal(erased.html, BOARD);
+	assert.equal(erased.summary[0], "erased the hand drawing");
+});
+
+test("what is written is made from checked strokes, never from what the socket sent", () => {
+	const hostile = [{ ...INK[0]!, id: '"><script>alert(1)</script>' }, { ...INK[0]!, color: "url(javascript:1)" }];
+	const drawn = applyPatches(BOARD, [{ op: "ink", strokes: hostile as never }]);
+	assert.equal(drawn.html, BOARD, "neither stroke survives, so there is nothing to write");
+});

@@ -605,6 +605,18 @@ test("create makes a peer, not a child: no parent, the creator's workspace, and 
 	cleanup();
 });
 
+test("create opens the new agent on its creator's runtime, not the server's default", async () => {
+	const { deck, cleanup } = deckOn();
+	// The creator is a Pi agent, and anything made without a kind would come out as Claude here.
+	const { registry, parentId, created } = spawnHarness(deck, "claude");
+
+	await registry.createFor(parentId, { name: "Survey" });
+	assert.equal(created()?.kind, "pi", "the dashboard's bar chooses the runtime new work runs on");
+	await registry.createFor(parentId, { name: "Maps", kind: "opencode" });
+	assert.equal(created()?.kind, "opencode", "a runtime that is named still wins");
+	cleanup();
+});
+
 test("create passes a named model and thinking level to the new agent's backend", async () => {
 	const { deck, cleanup } = deckOn();
 	const { registry, parentId, child } = spawnHarness(deck, "pi");

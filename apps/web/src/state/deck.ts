@@ -1,5 +1,6 @@
-import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckState, type Identity, type RuntimeInfo, type Schedule, type Task, type WebStatus } from "@decks/protocol";
+import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type Schedule, type Task, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
+import { trackZoneWith } from "../lib/time.ts";
 import { emptyAgent, type AgentRecord } from "./agent.ts";
 
 /**
@@ -90,6 +91,9 @@ function createDeck() {
 		 */
 		tasks: Task[];
 		schedules: Schedule[];
+		/** The deck's own settings, kept by the server, and the zone its machine is on. */
+		settings: DeckSettings;
+		machineZone: string;
 		/**
 		 * Which of them a **new** agent starts on. `default` is the CLI's own login.
 		 * Not "which one is spending": each agent records its own, on its own record
@@ -110,12 +114,18 @@ function createDeck() {
 		accounts: [] as ClaudeAccount[],
 		tasks: [] as Task[],
 		schedules: [] as Schedule[],
+		settings: {} as DeckSettings,
+		machineZone: "",
 		activeAccount: "default",
 	});
 }
 
 /** The app's one deck, built by the factory above. */
 export const [state, setState] = createDeck();
+
+// A time drawn anywhere is drawn again when the deck's timezone changes: `lib/time.ts`
+// reads this on every format, and stays free of Solid itself.
+trackZoneWith(() => void state.settings.timezone);
 
 /**
  * What this install can run, in the protocol's order.

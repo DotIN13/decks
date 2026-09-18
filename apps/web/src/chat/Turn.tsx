@@ -1,3 +1,4 @@
+import { clockTime } from "../lib/time.ts";
 import { createSignal, Index, Match, Show, Switch } from "solid-js";
 import { Markdown } from "./Markdown.tsx";
 import { TimeMachine } from "./TimeMachine.tsx";
@@ -201,7 +202,7 @@ function Said(props: { part: Extract<AgentPart, { kind: "text" }> }) {
 function clock(at: number | undefined): string | undefined {
 	if (!at) return undefined;
 	try {
-		return new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+		return clockTime(at);
 	} catch {
 		return undefined;
 	}

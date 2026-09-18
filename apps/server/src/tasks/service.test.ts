@@ -334,3 +334,43 @@ test("a tick counts and skips a run from before today, then fires today's", () =
 	assert.match(asked[0]?.text ?? "", /digest/);
 	cleanup();
 });
+test("moving the deck's clock re-reads a schedule without running today's job twice", () => {
+	const { asked, service, cleanup } = harness([ada]);
+	const before = process.env.TZ;
+	process.env.TZ = "UTC";
+	try {
+		const schedule = service.createSchedule({ name: "Morning papers", at: "08:00", days: [0, 1, 2, 3, 4, 5, 6], workspace: "decks", task: "Write the boards." });
+		const pinned = service.createSchedule({ name: "London nine", at: "09:00", days: [0, 1, 2, 3, 4, 5, 6], workspace: "decks", task: "x", timezone: "Europe/London" });
+		if ("error" in schedule || "error" in pinned) throw new Error("not made");
+		// It ran today at 08:00 UTC. It is now 19:00 UTC, which is noon in Los Angeles.
+		const now = Date.UTC(2026, 8, 18, 19, 0);
+		schedule.lastRunAt = Date.UTC(2026, 8, 18, 8, 0);
+		const londonNext = pinned.nextRunAt;
+
+		process.env.TZ = "America/Los_Angeles";
+		service.rezone(now);
+		// 08:00 in Los Angeles today (15:00 UTC) has passed, but the job already ran today:
+		// nothing is made, and the next run is tomorrow's 08:00 there.
+		assert.equal(asked.length, 0);
+		assert.equal(schedule.nextRunAt, Date.UTC(2026, 8, 19, 15, 0));
+		service.tick(now + 60_000);
+		assert.equal(asked.length, 0);
+		// A schedule with its own zone did not move.
+		assert.equal(pinned.nextRunAt, londonNext);
+	} finally {
+		if (before === undefined) delete process.env.TZ;
+		else process.env.TZ = before;
+		cleanup();
+	}
+});
+
+test("a schedule keeps the timezone it was made with, and a bad one is refused", () => {
+	const { service, cleanup } = harness([ada]);
+	const made = service.createSchedule({ name: "London nine", at: "09:00", days: [1], workspace: "decks", task: "x", timezone: "Europe/London" });
+	assert.ok(!("error" in made));
+	assert.equal((made as Schedule).timezone, "Europe/London");
+	const bad = service.createSchedule({ name: "x", at: "09:00", days: [1], workspace: "decks", task: "x", timezone: "London" });
+	assert.ok("error" in bad);
+	assert.match(bad.error, /not a timezone/);
+	cleanup();
+});

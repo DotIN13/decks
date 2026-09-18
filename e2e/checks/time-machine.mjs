@@ -137,7 +137,7 @@ try {
 	 * thing differently.
 	 */
 	await settle(page, 600);
-	const draft = await page.locator(".dockfield").inputValue();
+	const draft = await page.locator(".dockfield").evaluate((el) => el.textContent);
 	say("the rewound message comes back in the input bar", draft === rewound, JSON.stringify(draft.slice(0, 60)));
 	const toasts = await page.locator(".notice").allInnerTexts();
 	say("…and the notice just says it happened", toasts.some((text) => text.trim() === "Rewound."), JSON.stringify(toasts));

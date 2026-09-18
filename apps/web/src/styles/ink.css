@@ -1,0 +1,202 @@
+/*
+ * Drawing and commenting on boards while browsing: the sheet a stroke is drawn on, the row
+ * of drawing tools, the comment popup over a selection, and the comment pill in the bar.
+ *
+ * Only new selectors live here, so the import order against `index.css` cannot change which
+ * of two rules for one selector wins (see the note on splitting `index.css`).
+ */
+@layer components {
+	/* The sheet over a board. `touch-action: none` is what lets a pencil and a finger draw
+	   rather than scroll; the stage gets its fingers from `InkLayer` by hand. */
+	.ink-input {
+		position: absolute;
+		left: 0;
+		top: 0;
+		overflow: visible;
+		pointer-events: auto;
+		touch-action: none;
+		cursor: crosshair;
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-touch-callout: none;
+	}
+	.ink-input[data-tool="eraser"] {
+		cursor: cell;
+	}
+	.ink-input[data-tool="lasso"] {
+		cursor: default;
+	}
+	.ink-loop,
+	.ink-selection {
+		fill: none;
+		stroke: var(--color-accent);
+		stroke-width: 1.5;
+		stroke-dasharray: 5 4;
+		vector-effect: non-scaling-stroke;
+	}
+	.ink-selection {
+		fill: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		cursor: move;
+	}
+
+	/* The drawing tools: a second row under the top-left cluster. */
+	.inkbar {
+		position: absolute;
+		z-index: 30;
+		top: calc(var(--control, 28px) + 32px);
+		left: calc(var(--inset-left, 0px) + 12px);
+		max-width: calc(100% - var(--inset-left, 0px) - 24px);
+		gap: 2px;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+	.inkbar .iconbtn:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+	.inkbar-swatches,
+	.inkbar-widths {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.inkbar-swatch {
+		display: grid;
+		flex: none;
+		width: var(--control, 28px);
+		height: var(--control, 28px);
+		place-items: center;
+		border-radius: 50%;
+	}
+	.inkbar-swatch::before {
+		content: "";
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--swatch);
+		box-shadow: 0 0 0 1px var(--line-strong);
+	}
+	.inkbar-swatch[data-on="true"]::before {
+		box-shadow:
+			0 0 0 2px var(--layer, var(--panel)),
+			0 0 0 4px var(--swatch);
+	}
+	.inkbar-width > span {
+		display: block;
+		width: 16px;
+		border-radius: 4px;
+		background: currentColor;
+	}
+}
+
+@layer components {
+	/* The comment popup: fixed to the window, because the selection it sits under is in a
+	   scaled document and the arithmetic (`CommentPopup.tsx`) ends in window pixels. */
+	.comment-popup {
+		position: fixed;
+		z-index: 60;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 4px;
+		font-size: 12px;
+	}
+	.comment-popup[data-open="true"] {
+		width: min(340px, calc(100vw - 16px));
+		padding: 10px;
+	}
+	.comment-start,
+	.comment-act {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		height: 26px;
+		padding: 0 9px;
+		border-radius: 7px;
+		color: var(--fg);
+		font-size: 12px;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+	.comment-start:hover,
+	.comment-act:hover:not(:disabled) {
+		background: var(--line);
+	}
+	.comment-act {
+		border: 1px solid var(--line-strong);
+	}
+	.comment-act[data-primary="true"] {
+		border-color: var(--fg);
+		background: var(--fg);
+		color: var(--bg);
+	}
+	.comment-act[data-primary="true"]:hover:not(:disabled) {
+		background: var(--fg);
+		opacity: 0.88;
+	}
+	.comment-act:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+	.comment-act kbd {
+		display: inline-grid;
+		place-items: center;
+		color: var(--faint);
+	}
+	.comment-quote {
+		display: -webkit-box;
+		overflow: hidden;
+		padding-left: 8px;
+		border-left: 2px solid #f2b200;
+		color: var(--muted);
+		line-height: 1.45;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+	}
+	.comment-field {
+		width: 100%;
+		min-height: 64px;
+		padding: 7px 9px;
+		border: 1px solid var(--line-strong);
+		border-radius: 8px;
+		background: var(--bg);
+		color: var(--fg);
+		font-size: 13px;
+		line-height: 1.45;
+		resize: vertical;
+	}
+	.comment-field:focus {
+		border-color: var(--color-accent);
+		outline: none;
+	}
+	.comment-acts {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	/*
+	 * A comment going with the message: a pill, an icon and the words, in the input bar's own text. Picone's pill
+	 * (its `markdown.css`), in this app's colours: one object, selected whole or not at all,
+	 * never broken across two lines, and sized by the sentence it sits in.
+	 */
+	[data-slot="composer-input"] [data-component="mention-pill"] {
+		display: inline;
+		padding: 1px 4px;
+		border-radius: 4px;
+		background: color-mix(in srgb, #f2b200 22%, transparent);
+		color: var(--fg);
+		font-weight: 500;
+		white-space: nowrap;
+		cursor: text;
+		-webkit-user-select: all;
+		user-select: all;
+	}
+	[data-slot="composer-input"] [data-component="mention-pill"] [data-slot="pill-icon"] {
+		display: inline;
+		margin-inline-end: 3px;
+		vertical-align: -0.1em;
+		opacity: 0.7;
+	}
+}

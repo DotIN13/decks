@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { examplesDir, runtimeLib } from "@decks/runtime";
-import type { Board, Camera, ClientMessage, DeckState, ServerMessage, StageCall } from "@decks/protocol";
+import type { AgentKind, Board, Camera, ClientMessage, DeckState, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { BoardService } from "./boards/service.ts";
 import { EvalTrust } from "./boards/eval-trust.ts";
@@ -11,9 +11,11 @@ import { isBoardFormat } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
 import { TaskService } from "./tasks/service.ts";
 import { TaskStore } from "./tasks/store.ts";
+import { SettingsStore } from "./settings.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./web/bridge.ts";
+import { ThumbService } from "./boards/thumbs.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
 import { claudeIdentity } from "./runtimes/claude/backend.ts";
@@ -54,6 +56,8 @@ export class App {
 	readonly boards: BoardService;
 	/** Tasks and schedules: the dashboard's store, rule and scheduler (`tasks/service.ts`). */
 	readonly tasks: TaskService;
+	/** The deck's own settings. Built first: it sets the clock everything after it reads. */
+	readonly settings: SettingsStore;
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */
@@ -64,6 +68,7 @@ export class App {
 	readonly bridge = new StageBridge();
 	/** The user's own Chrome, shared through the Decks extension (`web/bridge.ts`). */
 	readonly web: WebBridge;
+	readonly thumbs: ThumbService;
 	private hub: Hub | undefined;
 	private unwatch: (() => void) | undefined;
 	/** The safety net under the watcher — see `watch()`. */
@@ -167,6 +172,15 @@ export class App {
 		 * the service stays a service and the registry stays a registry. Warnings about a
 		 * corrupt store ride the same notice strip an agent uses.
 		 */
+		/*
+		 * Board pictures for the dashboard, taken by this server of itself. `127.0.0.1` whatever
+		 * the host is: `0.0.0.0` is somewhere to listen, not somewhere to go.
+		 */
+		this.thumbs = new ThumbService({
+			origin: () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`,
+			dir: join(deck.path, ".decks", "thumbs"),
+		});
+		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text }));
 		this.tasks = new TaskService(
 			new TaskStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text })),
 			{
@@ -184,6 +198,7 @@ export class App {
 			{
 				port: config.port,
 				defaultKind: config.backend,
+				dispatcherKind: () => this.settings.get().dispatcherKind,
 				camera: (agentId) => this.cameras.get(agentId) ?? this.lastCamera,
 				recordRevision: (path) => this.boards.recordRevision(path),
 				wrote: (path, who) => this.boards.wrote(path, who),
@@ -574,6 +589,39 @@ export class App {
 		// And the dashboard's tasks and schedules, with the boards: everything the panel
 		// draws is part of the greeting, so a reconnect is a refresh.
 		reply({ type: "tasks", ...this.tasks.summary() });
+		reply(this.settingsMessage());
+	}
+
+	settingsMessage(): ServerMessage {
+		return { type: "settings", settings: this.settings.get(), machineZone: this.settings.machineZone() };
+	}
+
+	/**
+	 * Choose the deck's timezone. The clock moves at once, every schedule on the deck's
+	 * clock is re-read against it, and every browser hears both.
+	 */
+	setTimezone(zone: string | null): { error: string } | undefined {
+		const outcome = this.settings.setTimezone(zone);
+		if ("error" in outcome) return outcome;
+		this.tasks.rezone();
+		this.send(this.settingsMessage());
+		return undefined;
+	}
+
+	/**
+	 * Choose the runtime the dashboard's dispatcher is. A runtime this machine cannot start is
+	 * refused with its own reason; otherwise the dispatcher of that kind is found or made, and
+	 * every browser hears the setting and the chat list.
+	 */
+	setDispatcherKind(kind: AgentKind): { error: string } | undefined {
+		const runtime = runtimeList().find((candidate) => candidate.kind === kind);
+		if (!runtime) return { error: `"${kind}" is not a runtime this server has.` };
+		if (!runtime.available) return { error: runtime.reason ?? `${runtime.label} is not installed on this machine.` };
+		this.settings.setDispatcherKind(kind);
+		this.agents.ensureDispatcher();
+		this.send(this.settingsMessage());
+		this.agents.publish();
+		return undefined;
 	}
 
 	/**
@@ -591,6 +639,8 @@ export class App {
 		App.refreshExamples(this.deck);
 		this.stage.setDeck(this.deck);
 		this.boards.setDeck(this.deck);
+		// The new deck's clock first: its schedules are read against it.
+		this.settings.setDeck(this.deck.path);
 		// Tasks and schedules belong to the deck they name, so a switch is a fresh read —
 		// the dashboard that opens here is the new deck's, not the old one's.
 		this.tasks.reset(this.deck);
@@ -651,6 +701,14 @@ export class App {
 	}
 
 	send(message: ServerMessage): void {
+		/*
+		 * Every change to a board is announced through here, whoever made it, which makes it
+		 * the one place to keep the board's picture up with it (`boards/thumbs.ts`).
+		 */
+		if (message.type === "board.changed") {
+			if (message.removed) this.thumbs.forget(message.path);
+			else if (message.board) this.thumbs.changed(message.board);
+		}
 		this.hub?.broadcast(message);
 	}
 
@@ -660,6 +718,7 @@ export class App {
 		clearInterval(this.resyncTimer);
 		this.resyncTimer = undefined;
 		this.web.dispose();
+		this.thumbs.dispose();
 		this.agents.dispose();
 	}
 }

@@ -87,3 +87,48 @@ test("tick with nothing scheduled produces nothing due", () => {
 	assert.equal(outcome.due, 0);
 	assert.equal(outcome.missed, 0);
 });
+// --- a schedule in a named zone: independent of the machine's own clock ---------------
+
+const LA = "America/Los_Angeles";
+
+test("a schedule with a timezone fires at that zone's hour, whatever the server is on", () => {
+	const job: ScheduleWhen = { at: "08:00", days: [0, 1, 2, 3, 4, 5, 6], timezone: LA };
+	// Friday 18 September 2026, 12:00 UTC is 05:00 in Los Angeles: today's 08:00 is 15:00 UTC.
+	assert.equal(nextRun(job, Date.UTC(2026, 8, 18, 12, 0)), Date.UTC(2026, 8, 18, 15, 0));
+	// At 16:00 UTC it has passed: the next is tomorrow's.
+	assert.equal(nextRun(job, Date.UTC(2026, 8, 18, 16, 0)), Date.UTC(2026, 8, 19, 15, 0));
+});
+
+test("the weekday is the zone's weekday, not the server's", () => {
+	// Mondays at 23:00 in Los Angeles is Tuesday 06:00 UTC.
+	const job: ScheduleWhen = { at: "23:00", days: [1], timezone: LA };
+	const next = nextRun(job, Date.UTC(2026, 8, 20, 0, 0)); // Saturday evening in Los Angeles
+	assert.equal(next, Date.UTC(2026, 8, 22, 6, 0));
+});
+
+test("08:00 stays 08:00 across both clock changes", () => {
+	const job: ScheduleWhen = { at: "08:00", days: [0, 1, 2, 3, 4, 5, 6], timezone: LA };
+	// Spring forward, Sunday 8 March 2026: Saturday's run is 16:00 UTC, Sunday's is 15:00 UTC.
+	const saturday = nextRun(job, Date.UTC(2026, 2, 7, 12, 0));
+	assert.equal(saturday, Date.UTC(2026, 2, 7, 16, 0));
+	assert.equal(nextRun(job, saturday), Date.UTC(2026, 2, 8, 15, 0));
+	// Fall back, Sunday 1 November 2026: Saturday's is 15:00 UTC, Sunday's is 16:00 UTC.
+	const october = nextRun(job, Date.UTC(2026, 9, 31, 12, 0));
+	assert.equal(october, Date.UTC(2026, 9, 31, 15, 0));
+	assert.equal(nextRun(job, october), Date.UTC(2026, 10, 1, 16, 0));
+});
+
+test("'before today' in the missed-run rule is the zone's today", () => {
+	const job: ScheduleWhen = { at: "08:00", days: [0, 1, 2, 3, 4, 5, 6], timezone: LA };
+	// Last ran two Los Angeles mornings ago; looked at 11:00 in Los Angeles today.
+	const now = Date.UTC(2026, 8, 18, 18, 0);
+	const outcome = tick(job, Date.UTC(2026, 8, 16, 15, 0), now);
+	assert.equal(outcome.missed, 1);
+	assert.equal(outcome.due, Date.UTC(2026, 8, 18, 15, 0));
+	assert.equal(outcome.next, Date.UTC(2026, 8, 19, 15, 0));
+});
+
+test("a timezone that is not one is refused with a sentence", () => {
+	assert.throws(() => validateWhen({ at: "09:00", days: [1], timezone: "Pacific" }), /not a timezone/);
+	assert.doesNotThrow(() => validateWhen({ at: "09:00", days: [1], timezone: "Europe/London" }));
+});

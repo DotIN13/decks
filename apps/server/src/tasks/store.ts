@@ -224,6 +224,7 @@ function cleanSchedules(raw: unknown): Schedule[] {
 			name: schedule.name,
 			at,
 			days,
+			...(typeof schedule.timezone === "string" && schedule.timezone ? { timezone: schedule.timezone } : {}),
 			workspace: typeof schedule.workspace === "string" ? schedule.workspace : "",
 			/*
 			 * A schedule stored before digests stopped being a kind of their own has

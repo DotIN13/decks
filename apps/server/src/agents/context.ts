@@ -1,3 +1,4 @@
+import { processZone } from "../clock.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { agentsTemplate, stageDts } from "@decks/runtime";
 import type { Deck } from "../deck/loader.ts";
@@ -20,6 +21,19 @@ import type { Deck } from "../deck/loader.ts";
  * four levels of `../../..` computed here; they are `@decks/runtime`'s now, and there is a
  * test over there that the directories exist.
  */
+
+/**
+ * The person's timezone, as a fact that does not go stale.
+ *
+ * A system prompt is written once per session, so it says *which* clock the person is on
+ * and how to read it, and leaves the time itself to the places written when work runs
+ * (a handed-over brief carries "now") and to `stage.now()`. The zone is the process
+ * clock's, which is the deck's Time setting once one is chosen (`settings.ts`).
+ */
+export function timeLine(): string {
+	const zone = processZone();
+	return `**The person's timezone is ${zone}.** Times and dates they mention ("this afternoon", "by Friday", "every weekday at nine") are in it. \`date\` in your shell prints it, and \`await stage.now()\` returns the time there. Timestamps from the stage API are epoch milliseconds.`;
+}
 
 export function deckContext(deck: Deck, toolName: string): string {
 	const template = agentsTemplate();
@@ -56,6 +70,7 @@ export function deckContext(deck: Deck, toolName: string): string {
 		.replaceAll("{{DECK_PATH}}", deck.path)
 		.replaceAll("{{BOARDS}}", boardList)
 		.replaceAll("{{ROOTS}}", rootList)
+		.replaceAll("{{TIME}}", timeLine())
 		/*
 		 * Last, and deliberately: the tool has a different name on each runtime — Pi
 		 * registers `stage_eval`, while through the SDK's MCP server the model sees

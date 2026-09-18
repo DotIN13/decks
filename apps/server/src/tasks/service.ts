@@ -117,6 +117,26 @@ export class TaskService {
 	}
 
 	/**
+	 * The deck's clock moved (Settings, Time): re-read every schedule that follows it.
+	 *
+	 * "08:00" now names a different instant. If that instant is earlier today, the rule in
+	 * `tick` would fire it at once, as it does for a server that came back at 09:05. But
+	 * nothing was down: the job ran today, at the hour the old clock gave it. So a run that
+	 * is only due because the clock moved is counted as today's, and not made again. A
+	 * schedule with a zone of its own did not move and is left alone.
+	 */
+	rezone(now = Date.now()): void {
+		for (const schedule of this.schedules) {
+			if (schedule.timezone) continue;
+			const outcome = tick(schedule, schedule.lastRunAt ?? schedule.createdAt, now);
+			if (outcome.due > 0) schedule.lastRunAt = outcome.due;
+			schedule.nextRunAt = outcome.next;
+		}
+		this.persistSchedules();
+		this.emitTasks();
+	}
+
+	/**
 	 * A different deck is a different dashboard: drop what was held and re-read.
 	 *
 	 * Called by `App.openDeck`, which swaps the whole deck out from under everything. The
@@ -289,7 +309,7 @@ export class TaskService {
 
 	createSchedule(spec: ScheduleSpec): Schedule | { error: string } {
 		try {
-			validateWhen({ at: spec.at, days: spec.days });
+			validateWhen({ at: spec.at, days: spec.days, ...(spec.timezone ? { timezone: spec.timezone } : {}) });
 		} catch (error) {
 			return { error: (error as Error).message };
 		}
@@ -302,11 +322,12 @@ export class TaskService {
 			name: spec.name.trim(),
 			at: spec.at,
 			days: spec.days,
+			...(spec.timezone ? { timezone: spec.timezone } : {}),
 			workspace: spec.workspace,
 			task: spec.task.trim(),
 			boards: spec.boards ?? [],
 			createdAt: now,
-			nextRunAt: nextRun({ at: spec.at, days: spec.days }, now),
+			nextRunAt: nextRun({ at: spec.at, days: spec.days, ...(spec.timezone ? { timezone: spec.timezone } : {}) }, now),
 			missed: 0,
 			enabled: true,
 		};
@@ -353,7 +374,8 @@ export class TaskService {
 		let tasksMoved = false;
 		for (const schedule of this.schedules) {
 			if (!schedule.enabled) continue;
-			const outcome = tick(schedule, schedule.lastRunAt, now);
+			// Never run: the cursor is when it was made, so a job made at ten for nine waits for tomorrow.
+			const outcome = tick(schedule, schedule.lastRunAt ?? schedule.createdAt, now);
 			if (outcome.missed > 0 || schedule.nextRunAt !== outcome.next || (outcome.due > 0 && schedule.lastRunAt !== outcome.due)) schedulesMoved = true;
 			if (outcome.due === 0) {
 				schedule.nextRunAt = outcome.next;

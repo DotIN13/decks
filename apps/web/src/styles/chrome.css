@@ -454,6 +454,16 @@
 	 * not say by itself that commands still ask, and the place to say so is here.
 	 */
 	:is(.popover, .rowlist) [data-row] > .nt,
+	/* The Time group's picker: a field, then the buttons that act on it, on one line. */
+	.set-zone {
+		display: flex;
+		flex: none;
+		align-items: center;
+		gap: 6px;
+	}
+	.set-zone > .field {
+		width: 210px;
+	}
 	.set-k > .nt {
 		color: var(--faint);
 		font-size: 11px;

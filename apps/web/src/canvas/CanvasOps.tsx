@@ -25,7 +25,8 @@ import { tokens } from "./keycaps.ts";
  *
  * Every row is checked against the code that implements it: `Stage.shortcut` and
  * `TOOL_KEYS` for the camera and the tools, `Editor.ts` for selection and editing,
- * `file-drop.ts` for the drop, `BoardFrame.tsx` for the board's own chrome. A cheat sheet
+ * `file-drop.ts` for the drop, `BoardFrame.tsx` for the board's own chrome, `InkLayer.tsx`
+ * and `comment-select.ts` for reading a board. A cheat sheet
  * that lies is worse than none, so where the two disagree this file is the one that is
  * wrong.
  */
@@ -46,6 +47,16 @@ function pointerGroups(): Group[] {
 				{ keys: "+ · -", what: "zoom about the centre" },
 				{ keys: "0", what: "fit every board on screen" },
 				{ keys: "1", what: "fit the selected board" },
+			],
+		},
+		{
+			title: "Reading a board",
+			rows: [
+				{ keys: "select words", what: "comment on them: kept in the input bar for your next message, or sent now" },
+				{ keys: "the brush", what: "draw on the board: pen, marker, eraser, lasso" },
+				{ keys: "⌘Z · ⇧⌘Z", what: "undo · redo a stroke, while drawing" },
+				{ keys: "⌫", what: "delete the strokes the lasso holds" },
+				{ keys: "Escape", what: "put the pen down" },
 			],
 		},
 		{
@@ -80,6 +91,7 @@ function pointerGroups(): Group[] {
 				{ keys: "the speech-bubble button", what: "the conversation, opened and closed" },
 				{ keys: "click a turn on the right spine", what: "the conversation at that turn" },
 				{ keys: "/", what: "commands, in the input bar" },
+				{ keys: "@Name · @Dispatcher", what: "send the line to that agent · to the dispatcher, from any bar" },
 			],
 		},
 	];
@@ -94,6 +106,15 @@ function touchGroups(): Group[] {
 				{ keys: "drag", what: "pan the canvas" },
 				{ keys: "pinch", what: "zoom about the fingers" },
 				{ keys: "drag inside an embed", what: "scrolls the embed, not the canvas" },
+			],
+		},
+		{
+			title: "Reading a board",
+			rows: [
+				{ keys: "select words", what: "comment on them: kept in the input bar for your next message, or sent now" },
+				{ keys: "the brush", what: "draw on the board: pen, marker, eraser, lasso" },
+				{ keys: "a pencil", what: "draws with its pressure, and from then on a finger moves the canvas" },
+				{ keys: "two fingers", what: "always the canvas, even while drawing" },
 			],
 		},
 		{
@@ -121,6 +142,7 @@ function touchGroups(): Group[] {
 				{ keys: "swipe the conversation right", what: "put it away" },
 				{ keys: "the two title-bar buttons", what: "the same two panels, either way" },
 				{ keys: "/", what: "commands, in the input bar" },
+				{ keys: "@Name · @Dispatcher", what: "send the line to that agent · to the dispatcher, from any bar" },
 			],
 		},
 	];

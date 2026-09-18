@@ -6,7 +6,7 @@
  * list — because `BoardPatch` is a wire type and this file is where the wire lives. Nothing
  * that only wants the vocabulary should import it from here.
  */
-import type { ComponentKind } from "@decks/board-kit";
+import type { ComponentKind, InkStroke } from "@decks/board-kit";
 
 export type { ComponentKind };
 
@@ -118,7 +118,16 @@ export type BoardPatch =
 	| { op: "remove"; id: string }
 	| { op: "duplicate"; id: string; offset?: { x: number; y: number } }
 	| { op: "rename"; id: string; to: string }
-	| { op: "order"; id: string; to: "front" | "back" };
+	| { op: "order"; id: string; to: "front" | "back" }
+	/**
+	 * What is drawn on the board by hand, whole: the list as it now is.
+	 *
+	 * Strokes rather than markup. The server writes the `<svg data-ink-layer>` itself
+	 * (`@decks/board-kit`, `ink.ts`), so nothing a socket sends is spliced into a file as HTML,
+	 * and an empty list takes the layer out again. Whole rather than a delta because undo, redo,
+	 * erase and a lasso move are all "the list is now this".
+	 */
+	| { op: "ink"; strokes: InkStroke[] };
 
 /** What the server accepts today: the eight, or one of the twelve being retired. */
 export type AnyBoardPatch = BoardPatch | EditorOp;

@@ -39,6 +39,14 @@ export function handleClaudeMessage(t: Translator, state: ClaudeStreamState, mes
 			// rather than a type of its own.
 			if (message.subtype === "init") t.setState("thinking");
 			else if (message.subtype === "compact_boundary") t.notice("info", "Compacted the conversation.");
+			else if (message.subtype === "status") {
+				// Compaction says when it starts and how it ended, and nothing in between. The
+				// start is the only frame for as long as the summary takes, so it is what holds
+				// the row at "working"; a failure is said, because no boundary follows one.
+				const status = message as { status?: string | null; compact_result?: string; compact_error?: string };
+				if (status.status === "compacting") t.setState("thinking");
+				if (status.compact_result === "failed") t.notice("warn", `Could not compact: ${status.compact_error?.trim() || "no reason given"}`);
+			}
 			else if (message.subtype === "local_command_output") {
 				// How a slash command answers: /login's device-code URL lands here line by
 				// line, /doctor and /status print their diagnostics here too.
