@@ -6,7 +6,6 @@ import { join } from "node:path";
 import type { Schedule, ServerMessage, TaskRosterEntry } from "@decks/protocol";
 import { TaskService, type DeliverSpec, type TaskRegistry } from "./service.ts";
 import { TaskStore } from "./store.ts";
-import { digestBoardPath } from "./digest.ts";
 
 /**
  * The service against a fake registry: the rule sees a roster, the queue is a map.
@@ -21,7 +20,7 @@ function harness(roster: TaskRosterEntry[] = []) {
 	const queue = new Map<string, DeliverSpec[]>();
 	const messages: ServerMessage[] = [];
 	/** What the dispatcher agent was asked to place, in order. */
-	const asked: Array<{ id: string; text: string; boards: string[]; workspace?: string; promptPath?: string }> = [];
+	const asked: Array<{ id: string; text: string; boards: string[]; workspace?: string; promptPath?: string; schedule?: string }> = [];
 	const registry: TaskRegistry = {
 		roster: () => roster,
 		decide: (task) => {
@@ -89,7 +88,7 @@ test("a named agent skips the dispatcher: the rule checks it and the queue takes
 test("a deciding turn that makes a schedule finishes the task with the schedule as its result", () => {
 	const { service, cleanup } = harness([ada]);
 	const result = service.create({ text: "every weekday at nine, digest for political-llm" });
-	const made = service.createSchedule({ name: "Morning digest", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", kind: "digest" });
+	const made = service.createSchedule({ name: "Morning digest", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", task: "Write a digest of what changed in political-llm since yesterday." });
 	assert.ok(!("error" in made));
 	service.scheduled({ taskId: result.id, schedule: made as Schedule });
 	const task = service.get(result.id);
@@ -233,35 +232,45 @@ test("retry refuses a running task", () => {
 	cleanup();
 });
 
-test("a schedule makes a digest task through the same pipeline", () => {
+test("a schedule's task goes through the same pipeline, and says which cron job made it", () => {
 	const { asked, service, cleanup } = harness([ada]);
 	const schedule = service.createSchedule({
 		name: "Morning digest",
 		at: "09:00",
 		days: [0, 1, 2, 3, 4, 5, 6],
 		workspace: "political-llm",
-		kind: "digest",
+		task: "Write a digest of what changed since yesterday.",
 	});
 	if ("error" in schedule) throw new Error(schedule.error);
-	// Run now, at a fixed clock so the digest names a deterministic board.
 	const outcome = service.runNow(schedule.id);
 	if ("error" in outcome) throw new Error(outcome.error);
-	// The same pipeline as the bar: open, and asked of the dispatcher with the digest's text.
+	// The same pipeline as the bar: open, and asked of the dispatcher in the schedule's words.
 	assert.equal(outcome.state, "open");
 	assert.equal(asked.length, 1);
-	assert.match(asked[0]?.text ?? "", new RegExp(digestBoardPath(Date.now()).replace(/\./g, "\\.")));
+	assert.equal(asked[0]?.text, "Write a digest of what changed since yesterday.");
 	assert.equal(asked[0]?.workspace, "political-llm");
+	assert.equal(asked[0]?.schedule, "Morning digest");
+	// A task a person typed names no cron job.
+	service.create({ text: "Tidy the boards directory." });
+	assert.equal(asked[1]?.schedule, undefined);
 	cleanup();
 });
 
-test("a custom schedule runs its own words", () => {
+test("a schedule with no task text is refused: there is one kind, and it is its words", () => {
+	const { service, cleanup } = harness([ada]);
+	const outcome = service.createSchedule({ name: "Morning digest", at: "09:00", days: [1], workspace: "w", task: "  " });
+	assert.ok("error" in outcome);
+	assert.match(outcome.error, /text of the task/);
+	cleanup();
+});
+
+test("a schedule runs its own words", () => {
 	const { asked, service, cleanup } = harness([ada]);
 	const schedule = service.createSchedule({
 		name: "Weekly tidy",
 		at: "18:00",
 		days: [5],
 		workspace: "political-llm",
-		kind: "custom",
 		task: "Tidy the boards directory.",
 	});
 	if ("error" in schedule) throw new Error(schedule.error);
@@ -273,7 +282,7 @@ test("a custom schedule runs its own words", () => {
 
 test("a bad schedule is refused with a sentence", () => {
 	const { service, cleanup } = harness([ada]);
-	const outcome = service.createSchedule({ name: "x", at: "nine", days: [1], workspace: "w", kind: "digest" });
+	const outcome = service.createSchedule({ name: "x", at: "nine", days: [1], workspace: "w", task: "x" });
 	assert.ok("error" in outcome);
 	assert.match(outcome.error, /HH:MM/);
 	cleanup();
@@ -286,7 +295,6 @@ test("a tick runs a due schedule's task through the same pipeline, once", () => 
 		at: "09:00",
 		days: [0, 1, 2, 3, 4, 5, 6],
 		workspace: "political-llm",
-		kind: "custom",
 		task: "Check the inbox.",
 	});
 	if ("error" in schedule) throw new Error(schedule.error);
@@ -313,7 +321,7 @@ test("a tick counts and skips a run from before today, then fires today's", () =
 		at: "09:00",
 		days: [0, 1, 2, 3, 4, 5, 6],
 		workspace: "political-llm",
-		kind: "digest",
+		task: "Write the morning digest.",
 	});
 	if ("error" in schedule) throw new Error(schedule.error);
 	const today = new Date();

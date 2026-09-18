@@ -14,16 +14,33 @@ test("the brief carries the work, where to look, and the one call to make", () =
 	assert.match(text, /stage\.send\("<agent name or id>", \{ task: .*reply: false \}\)/);
 	assert.match(text, /Task id, for the record: `t1`/);
 	// The person wrote to a dispatcher; the agent doing the work is not told to dispatch.
-	assert.match(text, /leave all of that out and say what is to be done/);
+	assert.match(text, /remove all of that from the message or the prompt file when you hand off/);
+	// And the stop rule agrees: the prompt file is the one thing a dispatcher may write.
+	assert.match(text, /The one thing you may write is the prompt file/);
+	assert.doesNotMatch(text, /do not write anything/);
 	// Nobody on the topic: make an agent and send to it, on a cost-effective model.
-	assert.match(text, /await stage\.create\(\{ name:/);
-	assert.match(text, /DeepSeek V4\.1 or Claude Opus/);
+	assert.match(text, /make one with `await stage\.create\(\)`/);
+	// No model is named in the text: the dashboard's own choice is the default.
+	assert.match(text, /Leave `model` out, so it opens on the model chosen in the dashboard's bar/);
+	assert.doesNotMatch(text, /DeepSeek|Opus/);
 	assert.match(text, /particularly hard/);
 	// Something recurring is a schedule, not a send.
-	assert.match(text, /await stage\.schedule\(\{ name:/);
-	assert.match(text, /0 Sunday to 6 Saturday/);
+	assert.match(text, /make a schedule with `await stage\.schedule\(\)` and send it to nobody/);
+	// The call's shape is in `stage.d.ts`, not repeated here, and there is no digest kind.
+	assert.doesNotMatch(text, /kind:/);
+	// The fork comes before the numbered steps, so "stop" after a schedule is not followed by a step 3.
+	assert.ok(text.indexOf("**A. Something recurring**") < text.indexOf("**B. Anything else:**"));
+	assert.ok(text.indexOf("**B. Anything else:**") < text.indexOf("1. Use `await stage.agents()`"));
+	// And the brief says, once, that it overrides the deck's board rules for this turn.
+	assert.match(text, /you write no board, set no name, tags or workspace/);
 	// No roster is baked in: the agent looks it up live.
 	assert.doesNotMatch(text, /Who is on the deck/);
+});
+
+test("a task a cron job started says so, by the job's name", () => {
+	const text = dispatcherBrief({ id: "t5", text: "Write the morning digest.", boards: [], workspace: "decks", schedule: "Morning digest" });
+	assert.match(text, /The cron job `Morning digest` started this task in the \*\*decks\*\* workspace\./);
+	assert.doesNotMatch(text, /The person asked for it/);
 });
 
 test("a task with no workspace or boards has no scope line", () => {

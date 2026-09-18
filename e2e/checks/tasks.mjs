@@ -110,14 +110,14 @@ const retried = await waitRow2("open");
 say("retry asks the dispatcher again", retried.includes("dispatcher is deciding"), retried);
 
 // --- a schedule the server holds, on the Cron tab -----------------------------
-LINK.send({ type: "schedule.create", schedule: { name: "Morning digest", at: "09:00", days: [0, 1, 2, 3, 4, 5, 6], workspace: "political-llm", kind: "digest" } });
+LINK.send({ type: "schedule.create", schedule: { name: "Morning digest", at: "09:00", days: [0, 1, 2, 3, 4, 5, 6], workspace: "political-llm", task: "Write a digest of what changed since yesterday." } });
 await page.locator('.pill [role="tab"]', { hasText: "Cron" }).click();
 let scheduled = "";
 for (let i = 0; i < 30 && !scheduled; i++) {
 	await settle(page, 250);
 	scheduled = await page.evaluate(() => [...document.querySelectorAll(".dispatch-cron, .dispatch-rows li")].map((row) => row.textContent ?? "").find((text) => text.includes("Morning digest")) ?? "");
 }
-say("a schedule is drawn on the Cron tab with its next run", /next in/.test(scheduled) && scheduled.includes("political-llm"), scheduled);
+say("a schedule is drawn on the Cron tab with its next run and its own words", /next in/.test(scheduled) && scheduled.includes("political-llm") && scheduled.includes("what changed since yesterday"), scheduled);
 
 await page.locator(".dispatch-rows li", { hasText: "Morning digest" }).first().getByRole("button", { name: "remove" }).click();
 let gone = false;

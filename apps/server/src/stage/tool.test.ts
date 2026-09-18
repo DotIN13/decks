@@ -224,14 +224,14 @@ test("send needs an address and a task, and passes both on", async () => {
 test("schedule checks the shape, hands the rest to the deck, and returns what was made", async () => {
 	const { tool, scheduled, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 
-	assert.match((await tool.run(`return await stage.schedule({ name: " ", at: "09:00", days: [1], workspace: "w", kind: "digest" })`)).text, /needs a name/);
-	assert.match((await tool.run(`return await stage.schedule({ name: "x", at: "09:00", days: [1], workspace: "w", kind: "weekly" })`)).text, /"digest" or "custom"/);
+	assert.match((await tool.run(`return await stage.schedule({ name: " ", at: "09:00", days: [1], workspace: "w", task: "x" })`)).text, /needs a name/);
+	assert.match((await tool.run(`return await stage.schedule({ name: "x", at: "09:00", days: [1], workspace: "w", kind: "digest" })`)).text, /needs `task`/);
 	assert.equal(scheduled.length, 0);
 
-	const made = await tool.run(`return await stage.schedule({ name: " Morning digest ", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", kind: "digest" })`);
+	const made = await tool.run(`return await stage.schedule({ name: " Morning digest ", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", task: " Write the morning digest. " })`);
 	assert.equal(made.isError, false);
 	assert.match(made.text, /"id": "s-1"/);
-	assert.deepEqual(scheduled, [{ name: "Morning digest", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", kind: "digest" }]);
+	assert.deepEqual(scheduled, [{ name: "Morning digest", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", task: "Write the morning digest." }]);
 	cleanup();
 });
 

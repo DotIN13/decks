@@ -101,7 +101,7 @@ export interface TaskResult {
 /**
  * When a schedule fires.
  *
- * `at` is "HH:MM" in the server's local time — the digest's "every morning at nine"
+ * `at` is "HH:MM" in the server's local time — "every morning at nine"
  * is a person's habit, and a person's habits live in their timezone. `days` uses
  * `Date.getDay()`, so 0 is Sunday and 6 is Saturday; `[]` means never, which is how
  * a schedule is paused without deleting it.
@@ -110,9 +110,6 @@ export interface ScheduleWhen {
 	at: string;
 	days: number[];
 }
-
-/** The two kinds of task a schedule can make. */
-export type ScheduleKind = "digest" | "custom";
 
 /** What the panel hands in to create a schedule. */
 export interface ScheduleSpec {
@@ -124,16 +121,15 @@ export interface ScheduleSpec {
 	 * The workspace whose agent writes the task.
 	 *
 	 * On the schedule rather than invented by the rule: a scheduling decision is a
-	 * person's, and it is the one field that decides where the digest lands.
+	 * person's, and it is the one field that decides where the work lands.
 	 */
 	workspace: string;
 	/**
-	 * `digest` makes the task from the digest template (`tasks/digest.ts`); `custom`
-	 * runs the text in `task` verbatim. One kind is a habit, the other is a job.
+	 * The work, as an instruction to the agent that will run it. Each firing makes a task
+	 * with this text. There is one kind of schedule: a digest is a task like any other,
+	 * written here in the person's own words.
 	 */
-	kind: ScheduleKind;
-	/** The task text, for `custom`. */
-	task?: string;
+	task: string;
 	boards?: string[];
 }
 
@@ -142,8 +138,7 @@ export interface Schedule extends ScheduleWhen {
 	id: string;
 	name: string;
 	workspace: string;
-	kind: ScheduleKind;
-	task?: string;
+	task: string;
 	boards: string[];
 	createdAt: number;
 	/**

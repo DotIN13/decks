@@ -225,8 +225,14 @@ function cleanSchedules(raw: unknown): Schedule[] {
 			at,
 			days,
 			workspace: typeof schedule.workspace === "string" ? schedule.workspace : "",
-			kind: schedule.kind === "custom" ? "custom" : "digest",
-			...(typeof schedule.task === "string" ? { task: schedule.task } : {}),
+			/*
+			 * A schedule stored before digests stopped being a kind of their own has
+			 * `kind: "digest"` and no text. It is kept, as the task it always meant.
+			 */
+			task:
+				typeof schedule.task === "string" && schedule.task.trim()
+					? schedule.task
+					: "Write a digest board for this workspace: one line for each board changed since yesterday, saying who wrote it. Then stage.show it.",
 			boards: strings(schedule.boards),
 			createdAt: numberAt(schedule.createdAt, 0),
 			...(numberAt(schedule.lastRunAt, 0) > 0 ? { lastRunAt: numberAt(schedule.lastRunAt, 0) } : {}),

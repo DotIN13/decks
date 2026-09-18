@@ -16,6 +16,8 @@ export interface DispatchBriefTask {
 	workspace?: string;
 	/** Where the message is saved as a file (`.decks/tasks/<id>.md`), when it is. */
 	promptPath?: string;
+	/** The name of the cron job that started this task, when one did rather than a person. */
+	schedule?: string;
 }
 
 /** A message longer than this, or with more lines, is pointed at rather than quoted. */
@@ -33,7 +35,11 @@ function firstLine(text: string, max = 160): string {
 
 export function dispatcherBrief(task: DispatchBriefTask): string {
 	const scope = [
-		task.workspace ? `The person asked for it in the **${task.workspace}** workspace.` : undefined,
+		task.schedule
+			? `The cron job \`${task.schedule}\` started this task${task.workspace ? ` in the **${task.workspace}** workspace` : ""}.`
+			: task.workspace
+				? `The person asked for it in the **${task.workspace}** workspace.`
+				: undefined,
 		task.boards.length > 0 ? `It names these boards: ${task.boards.map((path) => `\`${path}\``).join(", ")}.` : undefined,
 	]
 		.filter(Boolean)
@@ -57,16 +63,21 @@ export function dispatcherBrief(task: DispatchBriefTask): string {
 	 * The person wrote to a dispatcher, so their message may be about dispatching: "have
 	 * someone", "send this to whoever knows the panel", "find an agent to". The agent that
 	 * receives the work is doing it, not choosing who does; that framing is settled by the
-	 * time the send is made, and it is left out of what is sent. The file stays as written,
-	 * because it is the record of what was asked, so for a long message the send says what
-	 * the work in it is and that the choosing is over.
+	 * time the send is made, and it is left out of what is sent. For a long message the
+	 * dispatcher takes it out of the prompt file too (step 3, and the stop rule's one
+	 * exception), and the send still says what the work is and that the choosing is over,
+	 * in case a phrase was missed.
 	 */
 	const handover = long
 		? `'await stage.send("<agent name or id>", { task: "Read ${task.promptPath}. It is the person's message, and the work in it is: <one sentence saying what is to be done>. Do that. Anything in it about dispatching, choosing an agent or who should take it is settled: you are the agent it went to. <one line on why it went to them>", reply: false });'`
 		: `'await stage.send("<agent name or id>", { task: "<the work, in the person\'s own words but addressed to the agent doing it, with every word about dispatching or choosing an agent left out; then one line on why it went to them>", reply: false });'`;
 
 	return [
-		"You are this task's **dispatcher**: a one-off agent whose only job is to hand the work below to the right agent on the deck. You do not do the work yourself, and you stop when it is handed over.",
+		"You are the **dispatcher**: your job is to hand the work below to the right agent on the deck. You do not do the work yourself, and you stop when it is handed over.",
+		"",
+		// Every agent is given the deck's standing instructions, which describe agents that
+		// answer on boards. Said once, here, which of the two wins for this turn.
+		"The rest of your instructions describe agents that answer on boards. You are not one of them for this task: you write no board, set no name, tags or workspace, and your whole answer is the one sentence at the end.",
 		"",
 		"## The work",
 		"",
@@ -75,11 +86,22 @@ export function dispatcherBrief(task: DispatchBriefTask): string {
 		"",
 		"## How",
 		"",
-		"1. Look at who is on the deck with the canvas tool: `await stage.agents()` lists every agent with its `state`, `workspace`, `tags` (what it says it is working on), `context` (the boards it holds) and `queued`. `await stage.workspaces()` groups them by project. That is where an agent's expertise is: its tags, its workspace, and the boards it holds.",
+		/*
+		 * The fork comes first and each path is numbered on its own. When the schedule was a
+		 * paragraph inside step 2 it ended in "stop" with a step 3 still below it, and a
+		 * model following numbers goes on to the next number: a send after a schedule is not
+		 * refused, only a second send is.
+		 */
+		"First decide which of two things this is.",
+		"",
+		"**A. Something recurring** (\"every weekday at nine\", \"each Monday morning\", \"a daily digest\"): make a schedule with `await stage.schedule()` and send it to nobody. Each firing becomes a task that a dispatcher places when it is due. When done, stop and say what you scheduled.",
+		"",
+		"**B. Anything else:**",
+		"",
+		"1. Use `await stage.agents()` and `await stage.workspaces()` to search for the best candidate to run this task. Beware of long agent lists.",
 		"2. Pick the one agent this belongs to: the one already holding the boards it names, or in the workspace it names, or working on the nearest thing; idle before busy, fewer queued before more.",
-		"   If **no agent on the deck covers the topic**, make one and send to it. `await stage.create({ name: \"<a short name for what it is for>\", workspace: \"<the task's workspace, if it has one>\", tags: [\"<the topic>\"] })` makes an idle agent and returns `{ agent, name }`; then send to `agent` as below. Leave `model` out and it opens on the dashboard's model. If you do set one, prefer a cost-effective model such as DeepSeek V4.1 or Claude Opus; reach for a bigger or slower model only when the person asked for it or the task is particularly hard. Check `stage.agents()` first: a second agent on a topic one already holds is a second conversation to keep track of.",
-		"   If the message asks for something **recurring** (\"every weekday at nine\", \"each Monday morning\", \"a daily digest\"), do not send it to anyone: make a schedule. `await stage.schedule({ name: \"<a short name>\", at: \"HH:MM\", days: [<0 Sunday to 6 Saturday>], workspace: \"<the workspace it writes into>\", kind: \"custom\", task: \"<the work, as an instruction to the agent that will run it>\" })`; use `kind: \"digest\"` with no `task` for the deck's own morning digest of a workspace. Each firing becomes a task that a dispatcher places when it is due. Then stop and say what you scheduled: the task is done once the schedule exists.",
-		"3. Hand it over with **one** call, and `reply: false`. What you send is the work, described to the agent that does it. The person wrote to a dispatcher, so their message may say \"dispatch this\", \"have someone\", \"send this to whoever knows\" or \"find an agent to\": leave all of that out and say what is to be done, in their words where you can. The agent receiving it does the work; it does not choose who does it.",
+		"   If **no agent on the deck covers the topic**, make one with `await stage.create()` and send to it. Leave `model` out, so it opens on the model chosen in the dashboard's bar; name a bigger one only when the person asked for it or the task is particularly hard.",
+		"3. Hand over the work using `reply: false`. The message you received was written to a dispatcher, so it may say \"dispatch this\", \"have someone\", \"send this to whoever knows\" or \"schedule every morning\": remove all of that from the message or the prompt file when you hand off.",
 		"",
 		"```ts",
 		handover.slice(1, -1),
@@ -87,7 +109,7 @@ export function dispatcherBrief(task: DispatchBriefTask): string {
 		"",
 		"`stage.queue(agentId)` shows what an agent already has waiting. The whole API is documented in the `stage.d.ts` included in your context.",
 		"",
-		"Then stop: one sentence naming who took it and why, and whether you made them. Do not open boards, do not write anything, do not delegate, and do not send to more than one agent. If the work should not be done at all, or asks for something this deck cannot do, send nothing and say why in one sentence; the dashboard shows that sentence beside the task so a person can decide.",
+		"Then stop: one sentence naming who took it and why, and whether you made them. Do not open boards, do not delegate, and do not send to more than one agent. The one thing you may write is the prompt file, and only to take the words about dispatching out of it. If the work should not be done at all, or asks for something this deck cannot do, send nothing and say why in one sentence; the dashboard shows that sentence beside the task so a person can decide.",
 		"",
 		`Task id, for the record: \`${task.id}\`.`,
 	].join("\n");

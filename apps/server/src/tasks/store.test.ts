@@ -28,7 +28,7 @@ const schedule: Schedule = {
 	at: "09:00",
 	days: [1, 2, 3, 4, 5],
 	workspace: "political-llm",
-	kind: "digest",
+	task: "Write the morning digest.",
 	boards: [],
 	createdAt: 1,
 	lastRunAt: 2,
@@ -115,4 +115,14 @@ test("a task's dispatcher id survives a round trip through the file", () => {
 	const store = new TaskStore(dir, () => {});
 	store.saveTasks([{ ...task, dispatcherId: "d-1" }]);
 	assert.equal(new TaskStore(dir, () => {}).loadTasks()[0]?.dispatcherId, "d-1", "the reader used to drop it, and the row lost its log after a restart");
+});
+
+test("a schedule stored as a digest, with no text, is kept as the task it meant", () => {
+	const dir = deckDir();
+	mkdirSync(join(dir, ".decks"), { recursive: true });
+	const { task: _text, ...old } = schedule;
+	writeFileSync(join(dir, ".decks", "schedules.json"), JSON.stringify({ version: 1, schedules: [{ ...old, kind: "digest" }] }), "utf8");
+	const [read] = new TaskStore(dir, () => {}).loadSchedules();
+	assert.match(read?.task ?? "", /digest board/);
+	assert.equal("kind" in (read ?? {}), false);
 });

@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import type { Schedule, ScheduleSpec, ServerMessage, Task, TaskResult, TaskRosterEntry, TaskSpec } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { dispatch } from "./dispatch.ts";
-import { digestTask } from "./digest.ts";
 import { nextRun, tick, validateWhen } from "./schedule.ts";
 import { TaskStore } from "./store.ts";
 
@@ -29,7 +28,7 @@ export interface TaskRegistry {
 	 * Ask the dispatcher agent to place a task. It answers through `assignedByDispatcher`
 	 * (its `send` during the turn) and `decided` (the turn's end), not through a return.
 	 */
-	decide(task: { id: string; text: string; boards: string[]; workspace?: string; promptPath?: string }): { dispatcherId: string };
+	decide(task: { id: string; text: string; boards: string[]; workspace?: string; promptPath?: string; schedule?: string }): { dispatcherId: string };
 	/** Every agent, with the fields the rule ranks on. */
 	roster(): TaskRosterEntry[];
 	/**
@@ -181,12 +180,15 @@ export class TaskService {
 			// The message as a file first, so the briefing can point at it rather than
 			// quote it when it is long, and so the text outlives the queue it rides in.
 			const promptPath = this.store.savePrompt(task);
+			// A task a cron job made says so, by the job's name: nobody typed it this morning.
+			const schedule = task.source ? this.schedules.find((entry) => entry.id === task.source?.scheduleId)?.name : undefined;
 			const { dispatcherId } = this.registry.decide({
 				id: task.id,
 				text: task.text,
 				boards: task.boards,
 				...(task.workspace ? { workspace: task.workspace } : {}),
 				...(promptPath ? { promptPath } : {}),
+				...(schedule ? { schedule } : {}),
 			});
 			task.dispatcherId = dispatcherId;
 		} catch (error) {
@@ -293,7 +295,7 @@ export class TaskService {
 		}
 		if (!spec.name?.trim()) return { error: "A schedule needs a name." };
 		if (!spec.workspace) return { error: "A schedule needs a workspace to write into." };
-		if (spec.kind === "custom" && !spec.task?.trim()) return { error: "A custom schedule needs the text of the task it makes." };
+		if (!spec.task?.trim()) return { error: "A schedule needs the text of the task it makes." };
 		const now = Date.now();
 		const schedule: Schedule = {
 			id: randomUUID(),
@@ -301,8 +303,7 @@ export class TaskService {
 			at: spec.at,
 			days: spec.days,
 			workspace: spec.workspace,
-			kind: spec.kind,
-			...(spec.kind === "custom" ? { task: spec.task?.trim() } : {}),
+			task: spec.task.trim(),
 			boards: spec.boards ?? [],
 			createdAt: now,
 			nextRunAt: nextRun({ at: spec.at, days: spec.days }, now),
@@ -336,7 +337,7 @@ export class TaskService {
 	runNow(id: string): TaskResult | { error: string } {
 		const schedule = this.schedules.find((entry) => entry.id === id);
 		if (!schedule) return { error: "That schedule is gone." };
-		return this.create(scheduleTask(schedule, Date.now()), { scheduleId: schedule.id });
+		return this.create(scheduleTask(schedule), { scheduleId: schedule.id });
 	}
 
 	/**
@@ -368,7 +369,7 @@ export class TaskService {
 			schedule.missed += outcome.missed;
 			if (inFlight) continue;
 			tasksMoved = true;
-			this.create(scheduleTask(schedule, now), { scheduleId: schedule.id });
+			this.create(scheduleTask(schedule), { scheduleId: schedule.id });
 		}
 		if (schedulesMoved) this.persistSchedules();
 		if (tasksMoved) this.persist();
@@ -474,10 +475,10 @@ export class TaskService {
 	}
 }
 
-/** The task a schedule makes: the digest template, or its own words. */
-function scheduleTask(schedule: Schedule, now: number): TaskSpec {
+/** The task a schedule makes: its own words. */
+function scheduleTask(schedule: Schedule): TaskSpec {
 	return {
-		text: schedule.kind === "digest" ? digestTask(now) : (schedule.task ?? "").trim(),
+		text: schedule.task.trim(),
 		workspace: schedule.workspace,
 		boards: schedule.boards,
 	};

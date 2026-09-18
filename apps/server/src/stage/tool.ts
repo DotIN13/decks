@@ -734,22 +734,21 @@ export function createStageTool(deps: {
 		 * Make a schedule: a task the deck makes on its own, at a time, on the days named.
 		 *
 		 * The dashboard's Cron tab is the list of these. The server checks the fields — a
-		 * time is "HH:MM", days are 0 (Sunday) to 6, a custom job needs its text — and answers
+		 * time is "HH:MM", days are 0 (Sunday) to 6, a job needs its text — and answers
 		 * with the schedule made, or a sentence saying what was wrong with it.
 		 */
 		schedule: async (spec: ScheduleSpec) => {
 			if (!spec?.name?.trim()) throw new Error("A schedule needs a name");
 			if (!spec.at || !Array.isArray(spec.days)) throw new Error("A schedule needs a time (HH:MM) and its days (0 Sunday to 6 Saturday)");
 			if (!spec.workspace?.trim()) throw new Error("A schedule needs a workspace to write into");
-			if (spec.kind !== "digest" && spec.kind !== "custom") throw new Error('A schedule\'s kind is "digest" or "custom"');
+			if (!spec.task?.trim()) throw new Error("A schedule needs `task`: the work, as an instruction to the agent that will run it");
 			if (!agent.schedule) throw new Error("This deck has no dashboard.");
 			const made = agent.schedule({
 				name: spec.name.trim(),
 				at: spec.at.trim(),
 				days: spec.days,
 				workspace: spec.workspace.trim(),
-				kind: spec.kind,
-				...(spec.task ? { task: spec.task } : {}),
+				task: spec.task.trim(),
 				...(spec.boards ? { boards: spec.boards } : {}),
 			});
 			if ("error" in made) throw new Error(made.error);

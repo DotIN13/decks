@@ -627,7 +627,7 @@ export class Registry {
 	 * goes into its queue as a `decide` item and runs the moment it is up; when the turn
 	 * ends the runtime is stopped and the conversation kept (`DeckAgent.sleep`).
 	 */
-	decide(task: { id: string; text: string; boards: string[]; workspace?: string }): { dispatcherId: string } {
+	decide(task: { id: string; text: string; boards: string[]; workspace?: string; promptPath?: string; schedule?: string }): { dispatcherId: string } {
 		const template = this.ensureDispatcher();
 		const model = template.currentModel();
 		const mode = template.chat().mode;

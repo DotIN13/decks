@@ -775,18 +775,18 @@ export interface Stage {
 	 * Make a schedule: a task the deck makes on its own, at a time of day, on the days named.
 	 *
 	 *     await stage.schedule({
-	 *       name: "Morning digest",
+	 *       name: "Morning papers",
 	 *       at: "09:00",                 // HH:MM, the server's local time
 	 *       days: [1, 2, 3, 4, 5],       // 0 is Sunday, 6 is Saturday
-	 *       workspace: "political-llm",
-	 *       kind: "digest",              // or "custom", with `task`: the work, as an instruction
+	 *       workspace: "political-llm",  // the workspace it writes into
+	 *       task: "Write one board for each notable paper posted since yesterday.",
 	 *     });
 	 *     // -> the schedule, with its id and `nextRunAt`
 	 *
 	 * Each firing becomes a task on the dashboard and goes through the dispatcher like any
-	 * other; the Cron tab lists the schedules. A `digest` is the deck's own morning digest
-	 * of a workspace; a `custom` job carries its `task` text and, optionally, `boards`. A
-	 * time that is not HH:MM, a day outside 0 to 6, or a custom job with no text is refused
+	 * other; the Cron tab lists the schedules. `task` is the work, written as an instruction
+	 * to the agent that will run it, and `boards` optionally names boards to hand over with
+	 * it. A time that is not HH:MM, a day outside 0 to 6, or a job with no text is refused
 	 * with a sentence.
 	 */
 	schedule(spec: {
@@ -794,10 +794,9 @@ export interface Stage {
 		at: string;
 		days: number[];
 		workspace: string;
-		kind: "digest" | "custom";
-		task?: string;
+		task: string;
 		boards?: string[];
-	}): Promise<{ id: string; name: string; at: string; days: number[]; workspace: string; kind: "digest" | "custom"; task?: string; boards: string[]; nextRunAt: number }>;
+	}): Promise<{ id: string; name: string; at: string; days: number[]; workspace: string; task: string; boards: string[]; nextRunAt: number }>;
 
 	/**
 	 * Make a dashboard task, and let the deck decide which agent takes it.

@@ -34,7 +34,7 @@ export function CronList(props: CronListProps) {
 				<span class="flex-1" />
 				<span class="dispatch-hint">Ask in the bar: "every weekday at nine, digest for alpha". The dispatcher makes the schedule.</span>
 			</div>
-			<Show when={n() > 0} fallback={<p class="dispatch-empty">Nothing scheduled. Say when in the bar and the morning digest starts here.</p>}>
+			<Show when={n() > 0} fallback={<p class="dispatch-empty">Nothing scheduled. Say what and when in the bar, and the job starts here.</p>}>
 				<div class="dispatch-sec">
 					<b>Scheduled</b>
 					<span class="dispatch-n">{n()}</span>
@@ -56,7 +56,7 @@ export function CronList(props: CronListProps) {
 									<small>{schedule.name}</small>
 								</div>
 								<p class="dispatch-task-text" data-open data-plain>
-									{schedule.kind === "digest" ? `The morning digest for ${schedule.workspace}.` : schedule.task || "A custom task."}
+									{schedule.task}
 								</p>
 								<div class="dispatch-task-route">
 									<Show when={schedule.lastRunAt} fallback={<span>has not run yet</span>}>
@@ -77,7 +77,7 @@ export function CronList(props: CronListProps) {
 								</Show>
 								<div class="dispatch-task-foot">
 									<span class="dispatch-task-who">
-										{schedule.kind === "digest" ? "digest" : "task"} · {schedule.workspace}
+										{schedule.workspace}
 									</span>
 									<span class="flex-1" />
 									<button type="button" class="dispatch-ib" aria-label="run now" title="Run now: the same job, once, this minute" onClick={() => props.onRunSchedule(schedule.id)}>
