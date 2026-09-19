@@ -54,8 +54,8 @@ type Browser = import("playwright").Browser;
 
 export type ThumbScheme = "light" | "dark";
 
-/** How wide a picture is, in real pixels. A gallery card is ~220 CSS px; this survives retina. */
-export const THUMB_WIDTH = 640;
+/** How wide a picture is, in real pixels. A gallery card is ~220 CSS px; 640 read soft on a retina grid. */
+export const THUMB_WIDTH = 720;
 /** The gallery's card: `aspect-ratio: 4 / 3`, cropped from the board's top left. */
 const ASPECT = 3 / 4;
 const CONCURRENCY = 2;
@@ -71,6 +71,15 @@ export interface ThumbHost {
 	dir: string;
 	/** How long a changed board is left to settle. For tests; `SETTLE_MS` otherwise. */
 	settleMs?: number;
+	/**
+	 * A flow document's height, as the page laid it out (`measured` below), for the deck to keep.
+	 *
+	 * A flow board's height is its content's and the file cannot state it, so until a browser
+	 * has shown one on the canvas the record carries a 240px placeholder: the dashboard's preview
+	 * showed the top 240px of a page and the picture was cut off the same way. The page that
+	 * takes the picture has laid the document out, which is the one thing a measurement needs.
+	 */
+	measured?: (path: string, rev: number, h: number) => void;
 }
 
 interface Job {
@@ -83,17 +92,41 @@ interface Job {
 	waiting: Array<{ resolve: (file: string) => void; reject: (error: Error) => void; gone: () => boolean }>;
 }
 
-/** What a picture is called on disk. The path is hashed: it has slashes and any script in it. */
+/**
+ * What a picture is called on disk. The path is hashed: it has slashes and any script in it. The
+ * width is in the name so that a change to `THUMB_WIDTH` is a miss rather than a smaller picture
+ * served for as long as the board stays unchanged.
+ */
 export function thumbName(path: string, rev: number, scheme: ThumbScheme): string {
-	return `${createHash("sha1").update(path).digest("hex").slice(0, 16)}-${rev}-${scheme}.jpg`;
+	return `${createHash("sha1").update(path).digest("hex").slice(0, 16)}-${rev}-${scheme}-${THUMB_WIDTH}.jpg`;
 }
 
-/** The part of a board a card shows: its full width, and as much height as 4:3 allows. */
+/** Every picture of this board in this scheme, at any revision and width. */
+function pictureOf(path: string, scheme: ThumbScheme): RegExp {
+	return new RegExp(`^${thumbName(path, 0, scheme).slice(0, 16)}-\\d+-${scheme}(-\\d+)?\\.jpg$`);
+}
+
+/**
+ * The part of a board a card shows: its full width, and as much height as 4:3 allows.
+ *
+ * `h` is the board's own height for a component board and a slide, and what the page measured
+ * for a flow document, whose record may still be carrying the placeholder.
+ */
 export function thumbClip(board: Pick<Board, "w" | "h">): { width: number; height: number; scale: number } {
 	const width = Math.max(200, Math.round(board.w));
 	const height = Math.max(150, Math.min(Math.round(board.h), Math.round(width * ASPECT)));
 	return { width, height, scale: THUMB_WIDTH / width };
 }
+
+/** In the page: how far down the board's components reach, the way `canvas/extent.ts` measures it. */
+const MEASURE = `(() => {
+	let h = 0;
+	for (const el of document.querySelectorAll("body > [data-id]")) {
+		const r = el.getBoundingClientRect();
+		if (r.width > 0 && r.height > 0 && r.bottom > h) h = r.bottom;
+	}
+	return Math.ceil(h);
+})()`;
 
 export class ThumbService {
 	private browser: Promise<Browser> | undefined;
@@ -161,8 +194,8 @@ export class ThumbService {
 		this.schemes = new Set();
 		try {
 			for (const name of readdirSync(this.host.dir)) {
-				if (name.endsWith("-light.jpg")) this.schemes.add("light");
-				else if (name.endsWith("-dark.jpg")) this.schemes.add("dark");
+				if (/-light(-\d+)?\.jpg$/.test(name)) this.schemes.add("light");
+				else if (/-dark(-\d+)?\.jpg$/.test(name)) this.schemes.add("dark");
 			}
 		} catch {
 			/* nothing taken yet: nothing is wanted until somebody asks */
@@ -194,11 +227,10 @@ export class ThumbService {
 			 * older revision of the same board, which nobody will ever ask for.
 			 */
 			if (ahead) {
-				const prefix = thumbName(board.path, 0, scheme).slice(0, 17);
-				const suffix = `-${scheme}.jpg`;
+				const any = pictureOf(board.path, scheme);
 				this.queue = this.queue.filter((one) => {
 					const name = one.file.slice(this.host.dir.length + 1);
-					const stale = name.startsWith(prefix) && name.endsWith(suffix) && one.board.rev !== board.rev && one.ahead === true;
+					const stale = any.test(name) && one.board.rev !== board.rev && one.ahead === true;
 					if (stale) {
 						this.byFile.delete(one.file);
 						for (const w of one.waiting) w.reject(new Error("a newer revision replaced it"));
@@ -251,10 +283,15 @@ export class ThumbService {
 			}
 			throw new Error(this.broken);
 		}
-		const clip = thumbClip(job.board);
+		/*
+		 * The viewport is the tallest the picture can be, not the board's height: a flow document
+		 * whose record still says 240px would otherwise be laid out in a 240px window and measured
+		 * as one.
+		 */
+		const full = thumbClip({ w: job.board.w, h: Number.MAX_SAFE_INTEGER });
 		const context = await browser.newContext({
-			viewport: { width: clip.width, height: clip.height },
-			deviceScaleFactor: clip.scale,
+			viewport: { width: full.width, height: full.height },
+			deviceScaleFactor: full.scale,
 			colorScheme: job.scheme,
 			reducedMotion: "reduce",
 		});
@@ -265,6 +302,14 @@ export class ThumbService {
 			// `board.js` sets this after fonts, markdown, maths and diagrams. A board that never
 			// says so is drawn as it stands: a late picture beats none.
 			await page.waitForFunction("window.__boardReady === true", undefined, { timeout: READY_MS }).catch(() => {});
+			let clip = thumbClip(job.board);
+			if (job.board.format === "flow") {
+				const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
+				if (measured > 0) {
+					clip = thumbClip({ w: job.board.w, h: measured });
+					this.host.measured?.(job.board.path, job.board.rev, measured);
+				}
+			}
 			const shot = await page.screenshot({
 				type: "jpeg",
 				quality: 82,
@@ -283,11 +328,10 @@ export class ThumbService {
 	/** A board's earlier revisions, in this scheme: nobody will ask for them again. */
 	private forgetOlder(job: Job): void {
 		const mine = thumbName(job.board.path, job.board.rev, job.scheme);
-		const prefix = mine.slice(0, 17);
-		const suffix = `-${job.scheme}.jpg`;
+		const any = pictureOf(job.board.path, job.scheme);
 		try {
 			for (const name of readdirSync(this.host.dir)) {
-				if (name !== mine && name.startsWith(prefix) && name.endsWith(suffix)) rmSync(join(this.host.dir, name), { force: true });
+				if (name !== mine && any.test(name)) rmSync(join(this.host.dir, name), { force: true });
 			}
 		} catch {
 			/* a directory that cannot be listed keeps its old pictures, which costs bytes and nothing else */
