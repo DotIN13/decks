@@ -196,8 +196,13 @@
 		background: color-mix(in srgb, var(--color-ok) 16%, transparent);
 		color: color-mix(in srgb, var(--color-ok) 80%, var(--fg));
 	}
-	.dispatch-chip[data-s="refused"],
+	/* The writer's chip carries the news too: "changed 45m · by Kestrel", when there is news. */
 	.dispatch-chip[data-s="changed"] {
+		background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+		color: var(--color-accent);
+		font-weight: 600;
+	}
+	.dispatch-chip[data-s="refused"] {
 		background: color-mix(in srgb, var(--color-warn) 22%, transparent);
 		color: color-mix(in srgb, var(--color-warn) 55%, var(--fg));
 	}
@@ -370,6 +375,7 @@
 		border-radius: 8px;
 	}
 	.dispatch-card-pic {
+		position: relative;
 		display: block;
 		aspect-ratio: 4 / 3;
 		overflow: hidden;
@@ -382,8 +388,34 @@
 		border-color: var(--line-strong);
 		box-shadow: var(--shadow-row);
 	}
+	/*
+	 * The mark, in three parts, because on a shelf of thirty pale tiles a hairline is not a mark.
+	 * The spine sits inside the radius and reads as one shape with the frame; the frame and its
+	 * ring make the card gain a halo rather than a line. It stays on the accent colour rather than
+	 * the warn one: nothing is wrong with a board an agent has just finished.
+	 */
 	.dispatch-card[data-changed="true"] .dispatch-card-pic {
-		border-color: color-mix(in srgb, var(--color-warn) 60%, var(--line));
+		border-color: color-mix(in srgb, var(--color-accent) 55%, var(--line));
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent);
+	}
+	.dispatch-card[data-changed="true"] .dispatch-card-pic::before {
+		content: "";
+		position: absolute;
+		inset: 0 auto 0 0;
+		width: 3px;
+		background: var(--color-accent);
+		z-index: 2;
+	}
+	/* One pulse, and only for a mark that arrived under a reader's eyes (`Gallery.tsx`). */
+	@keyframes dispatch-news-arrives {
+		from {
+			opacity: 0;
+			transform: scaleY(0.25);
+		}
+	}
+	.dispatch-card[data-arrived="true"] .dispatch-card-pic::before {
+		transform-origin: center top;
+		animation: dispatch-news-arrives 900ms ease-out 1;
 	}
 	.dispatch-card-pic > img {
 		display: block;
@@ -450,6 +482,21 @@
 	.dispatch-chip[data-s="plain"] {
 		background: var(--line);
 		color: var(--muted);
+	}
+	/* The count on a shelf says how many of its cards are news before a card is read. */
+	.dispatch-shelf-changed[data-any="true"] {
+		color: var(--color-accent);
+		font-weight: 600;
+	}
+	/* A dot on the Boards tab, not a number: the number that tab carries means waiting on you. */
+	.dispatch-tab-dot {
+		position: absolute;
+		top: 4px;
+		right: 3px;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--color-accent);
 	}
 
 	/* --- cards: a task, or a schedule ------------------------------------------------------ */
@@ -874,6 +921,9 @@
 		.dispatch-card-pic,
 		.dispatch-chip {
 			transition: none;
+		}
+		.dispatch-card[data-arrived="true"] .dispatch-card-pic::before {
+			animation: none;
 		}
 	}
 }

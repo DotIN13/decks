@@ -50,6 +50,11 @@ export interface DispatchTabsProps {
 	onTab: (tab: DispatchTab) => void;
 	/** The number on the Boards tab; nothing is drawn for zero. */
 	badge?: number;
+	/**
+	 * How many boards are news. A dot rather than a number, because the number this tab already
+	 * carries means "waiting on you", and two meanings under one badge is one meaning too many.
+	 */
+	news?: number;
 }
 
 /** The strip alone, for a caller that wants to place it elsewhere than over the panes. */
@@ -78,6 +83,9 @@ export function DispatchTabs(props: DispatchTabsProps) {
 						}}
 					>
 						{DISPATCH_TAB_LABEL[name]}
+						<Show when={name === "boards" && (props.news ?? 0) > 0}>
+							<span class="dispatch-tab-dot" aria-label={`${props.news} boards changed`} />
+						</Show>
 						<Show when={name === "boards" && (props.badge ?? 0) > 0}>
 							<span class="dispatch-badge" aria-label={`${props.badge} waiting on you`}>
 								{props.badge}

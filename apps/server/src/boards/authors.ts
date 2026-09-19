@@ -68,24 +68,49 @@ class PathNotes<T> {
 }
 
 /**
- * Who last wrote each board: `.decks/authors.json`, a map of board path to an agent id or `"you"`.
+ * Who last named each board, and when: `.decks/authors.json`, a map of board path to the writer
+ * and the moment they said it.
  *
  * A file event cannot say who wrote a file, so authorship is never read off the disk. It is
  * *said*: an agent that fits, shows or reports a board through the stage tool is its writer, and
  * the canvas editor's patch is the person's. This is where those statements are kept, so the
- * gallery's "by" chip survives a restart.
+ * gallery's "by" chip survives a restart — and so does the time, which is what tells the
+ * dashboard that a board a person read is news again.
+ *
+ * A file written by an older version holds a bare `"agent-1"`, which reads as *the writer, at a
+ * time nobody recorded*: the byline comes back and the act has no date, so the board is timed off
+ * the file exactly as it was before this existed.
  */
-export class Authors extends PathNotes<string> {
+export interface Author {
+	who: string;
+	/** When they said it, or `0` for a byline written before the time was kept. */
+	at: number;
+}
+
+export class Authors extends PathNotes<Author> {
 	constructor(deckPath: string) {
-		super(deckPath, "authors.json", (value) => (typeof value === "string" && value ? value : undefined));
+		super(deckPath, "authors.json", (value) => {
+			if (typeof value === "string") return value ? { who: value, at: 0 } : undefined;
+			if (!value || typeof value !== "object") return undefined;
+			const { who, at } = value as { who?: unknown; at?: unknown };
+			if (typeof who !== "string" || !who) return undefined;
+			return { who, at: typeof at === "number" && Number.isFinite(at) ? at : 0 };
+		});
+	}
+
+	/** Say who named it, and when. True when either moved, so a caller can skip a broadcast that says nothing. */
+	say(path: string, who: string, at: number): boolean {
+		const was = this.get(path);
+		if (was && was.who === who && was.at === at) return false;
+		return this.set(path, { who, at });
 	}
 }
 
 /**
  * When the person last looked at each board: `.decks/seen.json`, board path to a timestamp.
  *
- * The dashboard marks a board "changed" only while the file is newer than this, so reading a
- * board clears its mark and the next write brings it back.
+ * The dashboard marks a board "changed" only while the newest act on it is newer than this, so
+ * reading a board clears its mark and the next act brings it back.
  */
 export class Seen extends PathNotes<number> {
 	constructor(deckPath: string) {

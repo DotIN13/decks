@@ -19,28 +19,33 @@ function serviceOn(root: string): { deck: Deck; service: BoardService; sent: Ser
 	return { deck, service, sent };
 }
 
-test("an agent's byline reaches every browser once, is on disk, and comes back after a reload and a restart", () => {
+test("an agent's byline and act time reach every browser, are on disk, and come back after a reload and a restart", () => {
 	const root = mkdtempSync(join(tmpdir(), "decks-wrote-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	writeFileSync(join(root, "boards", "plan.html"), `<!doctype html><title>Plan</title><body class="board"></body>`);
 	const { deck, service, sent } = serviceOn(root);
 
-	service.wrote("boards/plan.html", "agent-1");
-	service.wrote("boards/plan.html", "agent-1");
-	service.wrote("boards/none.html", "agent-1");
+	service.wrote("boards/plan.html", "agent-1", 1000);
+	service.wrote("boards/plan.html", "agent-1", 1000);
+	service.wrote("boards/plan.html", "agent-1", 2000);
+	service.wrote("boards/none.html", "agent-1", 3000);
 	const changes = sent.filter((message) => message.type === "board.changed");
-	assert.equal(changes.length, 1, "a repeat says nothing, and a board that is not there says nothing");
+	assert.equal(changes.length, 2, "the same act twice says nothing, a later act does, and a board that is not there says nothing");
 	assert.equal(changes[0]?.type === "board.changed" && changes[0].board?.lastWrittenBy, "agent-1");
-	assert.match(readFileSync(join(root, ".decks", "authors.json"), "utf8"), /"boards\/plan\.html": "agent-1"/);
+	assert.equal(changes[0]?.type === "board.changed" && changes[0].board?.namedAt, 1000);
+	assert.equal(changes[1]?.type === "board.changed" && changes[1].board?.namedAt, 2000);
+	assert.match(readFileSync(join(root, ".decks", "authors.json"), "utf8"), /"boards\/plan\.html": \{\s*"who": "agent-1",\s*"at": 2000\s*\}/);
 
 	// The loader re-describes boards from disk and knows no authors.
 	deck.reload();
 	assert.equal(deck.board("boards/plan.html")?.lastWrittenBy, undefined);
 	service.restamp();
 	assert.equal(deck.board("boards/plan.html")?.lastWrittenBy, "agent-1");
+	assert.equal(deck.board("boards/plan.html")?.namedAt, 2000, "the act time comes back with the byline");
 
 	// A new process on the same deck.
 	assert.equal(serviceOn(root).deck.board("boards/plan.html")?.lastWrittenBy, "agent-1");
+	assert.equal(serviceOn(root).deck.board("boards/plan.html")?.namedAt, 2000);
 
 	// Gone from the disk, gone from the file.
 	service.forgetBoard("boards/plan.html");

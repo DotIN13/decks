@@ -18,7 +18,8 @@ import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
-import { releaseBoards, setDraft, setUnread, setUsagePanel, setUsageReport, usagePanel } from "../state/ui.ts";
+import { releaseBoards, setDraft, setUnread, setUsagePanel, setUsageReport, usagePanel, surface } from "../state/ui.ts";
+import { watchedBeingNamed } from "./watching.ts";
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
@@ -114,6 +115,14 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					}
 					if (!message.board) return;
 					const board = message.board;
+					/*
+					 * An agent named this board while its own stage was the one on screen: it was watched
+					 * being written, so it is not news. Reading it is how the browser says so, and the read
+					 * stamp is the server's, so the mark clears on every device signed in.
+					 */
+					if (watchedBeingNamed(board, { surface: surface(), focused: state.focused })) {
+						send({ type: "board.seen", path: board.path });
+					}
 					/*
 					 * Whose write it was, which decides whether the frame may reload: our own
 					 * (already on screen), the echo that overtook our acknowledgement, or

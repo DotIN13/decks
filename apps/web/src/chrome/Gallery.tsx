@@ -9,7 +9,7 @@
  * The chips and the field narrow the same list, so "changed, matching *plan*" is one
  * gesture and not two lists to reconcile.
  */
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { BoardPicture } from "./BoardPicture.tsx";
 import { fileName, filterCards, type GalleryCard, type GalleryFilter, type GalleryGroup } from "./dispatch-view.ts";
 
@@ -35,6 +35,30 @@ export function Gallery(props: GalleryProps) {
 	const [folded, setFolded] = createSignal<Record<string, boolean>>({});
 	const isFolded = (group: GalleryGroup) => folded()[group.name] ?? group.collapsed;
 	const toggle = (group: GalleryGroup) => setFolded((was) => ({ ...was, [group.name]: !isFolded(group) }));
+
+	/*
+	 * The paths that started being news since the last build, for the one pulse on the spine.
+	 *
+	 * Deliberately not a per-card effect: every card is a new object on every store change (the
+	 * groups are derived), so `<For>` re-creates the components and a card can never observe its
+	 * own `changed` going from false to true. Watched here, where the previous set can be kept.
+	 *
+	 * The first build is not an arrival — a dashboard opened on a shelf of marks is not a shelf of
+	 * marks arriving — so it only fills the set.
+	 */
+	const [arrived, setArrived] = createSignal<ReadonlySet<string>>(new Set());
+	let wasNews: Set<string> | undefined;
+	createEffect(() => {
+		const now = new Set(props.groups.flatMap((group) => group.cards).filter((card) => card.changed).map((card) => card.board.path));
+		const before = wasNews;
+		wasNews = now;
+		if (!before) return;
+		const fresh = new Set([...now].filter((path) => !before.has(path)));
+		if (fresh.size === 0) return;
+		setArrived(fresh);
+		const timer = setTimeout(() => setArrived(new Set()), 1000);
+		onCleanup(() => clearTimeout(timer));
+	});
 
 	const every = createMemo(() => props.groups.flatMap((group) => group.cards));
 	const count = (id: GalleryFilter) => filterCards(every(), id, "").length;
@@ -76,20 +100,22 @@ export function Gallery(props: GalleryProps) {
 								<section class="dispatch-shelf" data-folded={isFolded(group)}>
 									<button type="button" class="dispatch-shelf-head" aria-expanded={!isFolded(group)} onClick={() => toggle(group)}>
 										<span class="dispatch-shelf-name">{group.name}</span>
-										<span class="dispatch-shelf-meta">
-											{group.changed} changed
-											<Show when={group.agents.length > 0}>
-												{" · "}
-												{group.agents.join(", ")}
-											</Show>
-										</span>
+								<span class="dispatch-shelf-meta">
+									<span class="dispatch-shelf-changed" data-any={group.changed > 0}>
+										{group.changed} changed
+									</span>
+									<Show when={group.agents.length > 0}>
+										{" · "}
+										{group.agents.join(", ")}
+									</Show>
+								</span>
 										<span class="flex-1" />
 										<span class="dispatch-n">{cards().length}</span>
 									</button>
 									<Show when={!isFolded(group)}>
 										<Show when={cards().length > 0} fallback={<p class="dispatch-empty">Nothing here yet.</p>}>
 											<div class="dispatch-grid">
-												<For each={cards()}>{(card) => <Card card={card} onPreview={props.onPreview} onOpenAgent={props.onOpenAgent} onOpenTask={props.onOpenTask} />}</For>
+												<For each={cards()}>{(card) => <Card card={card} arrived={arrived().has(card.board.path)} onPreview={props.onPreview} onOpenAgent={props.onOpenAgent} onOpenTask={props.onOpenTask} />}</For>
 											</div>
 										</Show>
 										<Show when={group.more > 0 && !narrowed()}>
@@ -112,10 +138,15 @@ export function Gallery(props: GalleryProps) {
  * A group rather than one button: the picture and the name open the preview, and two of the
  * chips are controls of their own ("by Kestrel" opens Kestrel, "from a task" shows the task),
  * and a button cannot hold a button.
+ *
+ * The mark is carried by four things, because one of them is not enough on a shelf of thirty
+ * tiles: the accent spine on the picture, its accent frame and ring, the chip under the name,
+ * and one pulse when the mark arrives while somebody is looking at the dashboard. `arrived`
+ * comes from the gallery, which is the only place that can tell arriving from already there.
  */
-function Card(props: { card: GalleryCard; onPreview: (path: string) => void; onOpenAgent: (id: string) => void; onOpenTask: (id: string) => void }) {
+function Card(props: { card: GalleryCard; arrived: boolean; onPreview: (path: string) => void; onOpenAgent: (id: string) => void; onOpenTask: (id: string) => void }) {
 	return (
-		<div class="dispatch-card" role="group" aria-label={props.card.board.title} data-changed={props.card.changed}>
+		<div class="dispatch-card" role="group" aria-label={props.card.board.title} data-changed={props.card.changed} data-arrived={props.arrived}>
 			<button type="button" class="dispatch-card-open" onClick={() => props.onPreview(props.card.board.path)}>
 				<span class="dispatch-card-pic">
 					<BoardPicture
@@ -127,19 +158,18 @@ function Card(props: { card: GalleryCard; onPreview: (path: string) => void; onO
 				<span class="dispatch-card-name">{fileName(props.card.board.path)}</span>
 			</button>
 			<span class="dispatch-card-chips">
-				<Show when={props.card.changed}>
-					<span class="dispatch-chip" data-s="changed">
-						changed
-					</span>
-				</Show>
 				<Show when={props.card.writtenBy}>
-					<Show when={props.card.writerId} fallback={<span class="dispatch-chip">by {props.card.writtenBy}</span>}>
+					<Show when={props.card.writerId} fallback={<span class="dispatch-chip" data-s={chipState(props.card)}>{chipText(props.card)}</span>}>
 						{(id) => (
-							<button type="button" class="dispatch-chip" data-link title={`Open ${props.card.writtenBy}'s conversation`} onClick={() => props.onOpenAgent(id())}>
-								by {props.card.writtenBy}
+							<button type="button" class="dispatch-chip" data-s={chipState(props.card)} data-link title={`Open ${props.card.writtenBy}'s conversation`} onClick={() => props.onOpenAgent(id())}>
+								{chipText(props.card)}
 							</button>
 						)}
 					</Show>
+				</Show>
+				{/* A board with no byline still has news: a script or an outside editor wrote it. */}
+				<Show when={props.card.changed && !props.card.writtenBy}>
+					<span class="dispatch-chip" data-s="changed">changed {props.card.changedAgo}</span>
 				</Show>
 				<Show when={props.card.fromTask}>
 					{(task) => (
@@ -151,4 +181,18 @@ function Card(props: { card: GalleryCard; onPreview: (path: string) => void; onO
 			</span>
 		</div>
 	);
+}
+
+/**
+ * What the writer's chip says: "changed 45m · by Kestrel" when the board is news, "by Kestrel"
+ * when it is not. One chip carries both facts, because a shelf has no room for a second one.
+ */
+function chipText(card: GalleryCard): string {
+	if (!card.changed) return `by ${card.writtenBy}`;
+	return `changed ${card.changedAgo} · by ${card.writtenBy}`;
+}
+
+/** The chip's state, which is what the stylesheet colours it by. `changed` leads when it is news. */
+function chipState(card: GalleryCard): string {
+	return card.changed ? "changed" : "plain";
 }

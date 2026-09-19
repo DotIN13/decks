@@ -28,7 +28,7 @@ import { installRoute, type Place } from "./app/route.ts";
 import { destination, destinationLabel, DISPATCHER_NAME, stripMention } from "./app/send-from-bar.ts";
 import { makeFloat } from "./chrome/float.ts";
 import { DispatchView } from "./chrome/DispatchView.tsx";
-import { wantsYou } from "./chrome/dispatch-view.ts";
+import { isNews, wantsYou } from "./chrome/dispatch-view.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
@@ -1410,6 +1410,7 @@ export function App() {
 					surface={surface()}
 					onHome={goHome}
 					wantsYou={wantsYou(state.tasks)}
+					news={state.boards.filter((board) => isNews(board)).length}
 					tab={dispatchTab()}
 					onTab={(tab) => go({ surface: "dispatch", tab })}
 					boardsOpen={boardsOpen()}

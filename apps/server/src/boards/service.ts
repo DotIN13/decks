@@ -94,21 +94,26 @@ export class BoardService {
 	}
 
 	/**
-	 * Say who wrote a board, and tell every browser if that is news.
+	 * Say who named a board, and when, and tell every browser if that is news.
 	 *
 	 * **Authorship is said, never detected.** A file event has no author, so nothing here reads
 	 * one off the disk: an agent that fits, shows or reports a board through the stage tool is
 	 * its writer (`stage/tool.ts`), and the canvas editor's patch is the person's. `who` is an
 	 * agent id or `"you"`. Kept in `.decks/authors.json`, so the byline outlives a restart.
+	 *
+	 * The time is the act's own clock rather than the file's. `seen()` takes the later of the two
+	 * because a read must never leave a mark behind; here the opposite is wanted, because an
+	 * agent's `show` or `report` touches no file and the file's time would be somebody else's.
 	 */
-	wrote(path: string, who: string): void {
+	wrote(path: string, who: string, now = Date.now()): void {
 		const board = this.deck.board(path);
 		if (!board) return;
-		const changed = this.authors.set(path, who);
-		if (board.lastWrittenBy === who && !changed) return;
+		const changed = this.authors.say(path, who, now);
+		if (board.lastWrittenBy === who && board.namedAt === now && !changed) return;
 		board.lastWrittenBy = who;
+		board.namedAt = now;
 		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? board;
-		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: { ...placed, lastWrittenBy: who } });
+		this.hooks.send({ type: "board.changed", path, rev: board.rev, board: { ...placed, lastWrittenBy: who, namedAt: now } });
 	}
 
 	/**
@@ -131,9 +136,11 @@ export class BoardService {
 
 	/** Put the stored bylines back on the deck's records: the loader re-describes boards from disk and knows no authors. */
 	restamp(): void {
-		for (const [path, who] of this.authors.entries()) {
+		for (const [path, author] of this.authors.entries()) {
 			const board = this.deck.board(path);
-			if (board) board.lastWrittenBy = who;
+			if (!board) continue;
+			board.lastWrittenBy = author.who;
+			if (author.at > 0) board.namedAt = author.at;
 		}
 		for (const [path, at] of this.seenAt.entries()) {
 			const board = this.deck.board(path);
@@ -496,9 +503,9 @@ export class BoardService {
 			// so the browser's optimistic edit is confirmed without waiting on the disk.
 			this.hooks.send({ type: "board.patched", path, rev: updated?.rev ?? board.rev });
 			if (updated) {
-				updated.lastWrittenBy = "you";
-				this.authors.set(path, "you");
-				this.hooks.send({ type: "board.changed", path, rev: updated.rev, board: this.placed(updated) });
+				// The person's own act, named and timed like an agent's, so the dashboard knows it is
+				// not news to them rather than reading it off the file they just moved.
+				this.wrote(path, "you");
 			}
 			this.hooks.edited(path, summary.join(", "));
 		} catch (error) {

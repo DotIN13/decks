@@ -278,6 +278,7 @@ export class Deck {
 			board.y = previous.y;
 			board.inContext = previous.inContext;
 			board.lastWrittenBy = previous.lastWrittenBy;
+			board.namedAt = previous.namedAt;
 			board.seenAt = previous.seenAt;
 			/*
 			 * A flow board's height is its content's, and only a frame knows it: the file cannot state one,

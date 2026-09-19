@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Board, Identity, Task } from "@decks/protocol";
 import {
+	agoLabel,
 	daysLabel,
 	fileName,
 	filterCards,
@@ -82,7 +83,7 @@ test("wantsYou counts blocked and failed only", () => {
 test("galleryGroups shelves by holder, puts unheld boards last and folded, and marks what changed", () => {
 	const boards = [
 		board("boards/a-old.html", { modifiedAt: NOW - 48 * HOUR, lastWrittenBy: "a1" }),
-		board("boards/a-new.html", { modifiedAt: NOW - HOUR, lastWrittenBy: "you" }),
+		board("boards/a-new.html", { modifiedAt: NOW - HOUR, lastWrittenBy: "a1", namedAt: NOW - HOUR }),
 		board("boards/b.html", { modifiedAt: NOW - 2 * HOUR }),
 		board("boards/nobody.html", { modifiedAt: NOW - 3 * HOUR }),
 	];
@@ -100,7 +101,7 @@ test("galleryGroups shelves by holder, puts unheld boards last and folded, and m
 	);
 	assert.equal(alpha.changed, 1);
 	assert.equal(alpha.collapsed, false);
-	assert.equal(alpha.cards[0]!.writtenBy, "you");
+	assert.equal(alpha.cards[0]!.writtenBy, "Ada");
 	assert.equal(alpha.cards[0]!.fromTask?.id, wrote.id);
 	assert.equal(alpha.cards[1]!.writtenBy, "Ada");
 	assert.equal(alpha.cards[1]!.changed, false);
@@ -159,7 +160,7 @@ test("holderNames names the agents holding a path", () => {
 	assert.deepEqual(holderNames("boards/x.html", identities, { a1: ["boards/x.html"], b1: [], ghost: ["boards/x.html"] }), ["Ada", "ghost"]);
 });
 
-test("a board is news until the person reads it, and again once it is written after that", () => {
+test("a board is news until the person reads it, and again once it is named after that", () => {
 	const written = board("boards/plan.html", { modifiedAt: NOW - HOUR });
 	assert.equal(isNews(written, NOW), true);
 	assert.equal(isNews({ ...written, seenAt: NOW - HOUR }, NOW), false, "read at the moment it was written");
@@ -170,6 +171,64 @@ test("a board is news until the person reads it, and again once it is written af
 	const groups = galleryGroups([{ ...written, seenAt: NOW - 60_000 }], identities, { a1: ["boards/plan.html"] }, [], NOW);
 	assert.equal(groups[0]!.changed, 0);
 	assert.equal(groups[0]!.cards[0]!.changed, false);
+});
+
+/*
+ * The mark is about the act, not the file. `report` and `show` name a board and write nothing, so
+ * before `namedAt` the most common thing an agent does left no trace at all, while a person's own
+ * drag was marked as news.
+ */
+test("an act names a board as news even though no file moved", () => {
+	const reported = board("boards/plan.html", { modifiedAt: NOW - 3 * HOUR, lastWrittenBy: "a1", namedAt: NOW - 60_000 });
+	assert.equal(isNews(reported, NOW), true);
+	assert.equal(isNews({ ...reported, seenAt: NOW - 30_000 }, NOW), false, "read after the act: no longer news");
+	// The act decides even when the file is older than the last read, which is every `report`.
+	assert.equal(isNews({ ...reported, seenAt: NOW - 2 * HOUR }, NOW), true, "named after the last look");
+});
+
+test("the person's own act is not news to them", () => {
+	const mine = board("boards/plan.html", { modifiedAt: NOW - 60_000, lastWrittenBy: "you", namedAt: NOW - 59_000 });
+	assert.equal(isNews(mine, NOW), false);
+	// Unless an agent named it afterwards.
+	assert.equal(isNews({ ...mine, lastWrittenBy: "a1", namedAt: NOW - 30_000 }, NOW), true);
+	// A file that moved after the person's own act is somebody else's write, whatever the byline says.
+	assert.equal(isNews({ ...mine, modifiedAt: NOW - 10_000 }, NOW), true);
+	/*
+	 * A byline kept from before acts were timed. Every record already on a deck is in this shape,
+	 * and the person's own edit is the likeliest reason that file moved, so it is not news either.
+	 */
+	assert.equal(isNews(board("boards/legacy.html", { modifiedAt: NOW - 60_000, lastWrittenBy: "you" }), NOW), false);
+	// An agent's byline with no time is the other way round: an old record is still news.
+	assert.equal(isNews(board("boards/legacy-agent.html", { modifiedAt: NOW - 60_000, lastWrittenBy: "a1" }), NOW), true);
+});
+
+test("a file written with no byline at all is still news", () => {
+	assert.equal(isNews(board("boards/script.html", { modifiedAt: NOW - 60_000 }), NOW), true);
+});
+
+test("the card says how long ago, and only when it is news", () => {
+	const act = board("boards/plan.html", { modifiedAt: NOW - 3 * HOUR, lastWrittenBy: "a1", namedAt: NOW - 45 * 60 * 1000 });
+	const groups = galleryGroups([act], identities, { a1: ["boards/plan.html"] }, [], NOW);
+	assert.equal(groups[0]!.cards[0]!.changedAgo, "45m");
+	assert.equal(groups[0]!.cards[0]!.writtenBy, "Ada");
+	const read = galleryGroups([{ ...act, seenAt: NOW - 60_000 }], identities, { a1: ["boards/plan.html"] }, [], NOW);
+	assert.equal(read[0]!.cards[0]!.changed, false);
+	assert.equal(read[0]!.cards[0]!.changedAgo, undefined, "a card that is not news carries no age");
+});
+
+test("a shelf sorts by the newest act, so a reported board leads its own shelf", () => {
+	const written = board("boards/written.html", { modifiedAt: NOW - 4 * HOUR });
+	const reported = board("boards/reported.html", { modifiedAt: NOW - 6 * HOUR, lastWrittenBy: "a1", namedAt: NOW - 60_000 });
+	const groups = galleryGroups([written, reported], identities, { a1: ["boards/written.html", "boards/reported.html"] }, [], NOW);
+	assert.deepEqual(groups[0]!.cards.map((one) => one.board.path), ["boards/reported.html", "boards/written.html"]);
+});
+
+test("the age is a phrase a chip can hold", () => {
+	assert.equal(agoLabel(NOW - 30_000, NOW), "now");
+	assert.equal(agoLabel(NOW - 45 * 60 * 1000, NOW), "45m");
+	assert.equal(agoLabel(NOW - 5 * HOUR, NOW), "5h");
+	assert.equal(agoLabel(NOW - 26 * HOUR, NOW), "1d");
+	assert.equal(agoLabel(NOW + HOUR, NOW), "now", "a clock ahead of the person's is not a negative age");
 });
 
 test("a card carries the writer's id only when that agent is still on the deck", () => {

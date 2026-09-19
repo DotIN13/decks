@@ -601,6 +601,8 @@ export function AgentPill(props: {
 	onHome?: () => void;
 	/** How many tasks want a person: the badge on Home, and on the Boards tab. */
 	wantsYou?: number;
+	/** How many boards an agent named since the person last read them: the dot on the Boards tab. */
+	news?: number;
 	/**
 	 * The dashboard's tabs, drawn in the pill where the agent and the + are on a stage.
 	 * On the dashboard the pill is the deck's, and the deck's three views are the thing to
@@ -726,7 +728,7 @@ export function AgentPill(props: {
 			*/}
 			{/* On the dashboard: the three views, and nothing about agents. The sidebar has them. */}
 			<Show when={!onStage()}>
-				<DispatchTabs tab={props.tab ?? "boards"} onTab={(tab) => props.onTab?.(tab)} badge={props.wantsYou} />
+				<DispatchTabs tab={props.tab ?? "boards"} onTab={(tab) => props.onTab?.(tab)} badge={props.wantsYou} news={props.news} />
 			</Show>
 
 			<Show when={onStage()}>

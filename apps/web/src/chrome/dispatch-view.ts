@@ -96,8 +96,10 @@ export interface GalleryCard {
 	writerId?: string;
 	/** The newest finished task that wrote this board, when one did. */
 	fromTask?: Task;
-	/** Modified within the last day. */
+	/** Named by somebody else since the person last read it. */
 	changed: boolean;
+	/** How long ago that was, as "45m" or "2h", for the mark on the card. */
+	changedAgo?: string;
 }
 
 /** One workspace's shelf of the gallery. */
@@ -124,14 +126,41 @@ export const GROUP_CAP = 9;
 const CHANGED_WITHIN = 24 * 60 * 60 * 1000;
 
 /**
- * Whether a board is news: written within the last day, and not read since.
+ * Whether a board is news: an agent named it, and the person had not read it since.
  *
- * `seenAt` is when the person last opened its preview or read it in the focus view. A board
- * they have looked at is not news until somebody writes it again.
+ * Two times can be the newest one, and they mean different things. `namedAt` is the last act that
+ * named a writer: an agent fitting, showing or reporting a board, or the person's own edit.
+ * `modifiedAt` is the file, whoever moved it. The later of the two is what a reader is being told
+ * about, with one exception — the person's own act, when it is also the newest, is not news to
+ * them. `seenAt` is when they last looked, on any device.
  */
 export function isNews(board: Board, now = Date.now()): boolean {
-	const modified = board.modifiedAt ?? 0;
-	return modified > now - CHANGED_WITHIN && modified > (board.seenAt ?? 0);
+	const named = board.namedAt ?? 0;
+	const file = board.modifiedAt ?? 0;
+	/*
+	 * The person's own act is not news to them. `named === 0` is a byline kept from before acts
+	 * were timed, which is every record already on a deck: their own edit is the likeliest reason
+	 * that file moved, and the mark clears on a read either way. A *timed* act older than the file
+	 * is the other case — something else wrote it afterwards — and that is news.
+	 */
+	if (board.lastWrittenBy === "you" && (named === 0 || named >= file)) return false;
+	const at = Math.max(named, file);
+	return at > (board.seenAt ?? 0) && at > now - CHANGED_WITHIN;
+}
+
+/** How long ago a board was named, short enough for a chip: "now", "45m", "2h", "1d". */
+export function agoLabel(at: number, now = Date.now()): string {
+	const minutes = Math.max(0, Math.floor((now - at) / 60_000));
+	if (minutes < 1) return "now";
+	if (minutes < 60) return `${minutes}m`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h`;
+	return `${Math.floor(hours / 24)}d`;
+}
+
+/** The mark on the newest act, for a card whose board has one. */
+function actAt(board: Board): number {
+	return Math.max(board.namedAt ?? 0, board.modifiedAt ?? 0);
 }
 
 /** The writer's byline: the agent's name for an id, "you" for the person, else the id itself. */
@@ -171,12 +200,14 @@ export function galleryGroups(
 	const card = (board: Board): GalleryCard => {
 		const fromTask = taskThatWrote(tasks, board.path);
 		const writtenBy = writerName(identities, board.lastWrittenBy);
+		const changed = isNews(board, now);
 		return {
 			board,
 			...(writtenBy ? { writtenBy } : {}),
 			...(board.lastWrittenBy && identities[board.lastWrittenBy] ? { writerId: board.lastWrittenBy } : {}),
 			...(fromTask ? { fromTask } : {}),
-			changed: isNews(board, now),
+			changed,
+			...(changed ? { changedAgo: agoLabel(actAt(board), now) } : {}),
 		};
 	};
 	// Uncapped: the cap is applied here, after the unheld boards have joined the tail.
@@ -204,7 +235,9 @@ export function galleryGroups(
 		.map(([name, shelf]) => {
 			const cards = shelf.boards
 				.map(card)
-				.sort((a, b) => (b.board.modifiedAt ?? 0) - (a.board.modifiedAt ?? 0));
+				/* Newest act first, which is not the same as the newest file: a board an agent reported
+				   was named later than it was last written, and it belongs at the top of its shelf. */
+				.sort((a, b) => actAt(b.board) - actAt(a.board) || a.board.path.localeCompare(b.board.path));
 			const real = name !== WORKSPACE_NONE();
 			return {
 				name,
