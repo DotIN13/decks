@@ -179,6 +179,12 @@ export class App {
 		this.thumbs = new ThumbService({
 			origin: () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`,
 			dir: join(deck.path, ".decks", "thumbs"),
+			// The same guards as `board.extent` on the wire: a flow board, at the revision measured.
+			measured: (path, rev, h) => {
+				const board = this.deck.board(path);
+				if (board?.format !== "flow" || board.rev !== rev) return;
+				if (this.deck.setHeight(path, h)) this.send({ type: "deck.state", deck: this.stageState() });
+			},
 		});
 		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text }));
 		this.tasks = new TaskService(

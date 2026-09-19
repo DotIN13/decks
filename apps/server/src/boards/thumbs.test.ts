@@ -20,6 +20,7 @@ const board = (path: string, rev = 1, w = 1000, h = 2000): Board => ({ path, rev
 
 function fake() {
 	const opened: Array<{ url: string; viewport: unknown; scale: unknown; scheme: unknown }> = [];
+	const clips: number[] = [];
 	const gates: Array<() => void> = [];
 	let live = 0;
 	let most = 0;
@@ -33,7 +34,11 @@ function fake() {
 					await new Promise<void>((resolve) => gates.push(resolve));
 				},
 				waitForFunction: async () => {},
-				screenshot: async () => Buffer.from("jpeg"),
+				evaluate: async () => 1234,
+				screenshot: async (options: { clip: { height: number } }) => {
+					clips.push(options.clip.height);
+					return Buffer.from("jpeg");
+				},
 			}),
 			close: async () => {
 				live--;
@@ -45,20 +50,21 @@ function fake() {
 		gates.shift()?.();
 		await new Promise((resolve) => setTimeout(resolve, 5));
 	};
-	return { browser, opened, release, most: () => most, waiting: () => gates.length };
+	return { browser, opened, clips, release, most: () => most, waiting: () => gates.length };
 }
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
 test("a card shows the board's full width and as much height as 4:3 allows", () => {
 	assert.deepEqual(thumbClip({ w: 1000, h: 3000 }), { width: 1000, height: 750, scale: THUMB_WIDTH / 1000 });
+	assert.equal(THUMB_WIDTH, 720);
 	// A slide is shorter than 4:3, and is not padded out to it.
 	assert.deepEqual(thumbClip({ w: 960, h: 540 }), { width: 960, height: 540, scale: THUMB_WIDTH / 960 });
 });
 
 test("a picture's name is safe for a file system and changes with the revision and the scheme", () => {
 	const name = thumbName("boards/深海/plan one.html", 7, "light");
-	assert.match(name, /^[0-9a-f]{16}-7-light\.jpg$/);
+	assert.match(name, /^[0-9a-f]{16}-7-light-720\.jpg$/);
 	assert.notEqual(name, thumbName("boards/深海/plan one.html", 8, "light"));
 	assert.notEqual(name, thumbName("boards/深海/plan one.html", 7, "dark"));
 });
@@ -82,6 +88,7 @@ test("two at a time, the newest request first, and the picture is kept on disk",
 	assert.ok(files.every((file) => existsSync(file) && readFileSync(file, "utf8") === "jpeg"));
 	assert.equal(chrome.opened[0]?.scheme, "light");
 	assert.deepEqual(chrome.opened[0]?.viewport, { width: 1000, height: 750 });
+	assert.deepEqual(chrome.clips, [750, 750, 750, 750], "a component board is clipped to its own height, at most 4:3");
 
 	// Asked again: answered from the disk, with no page.
 	const before = chrome.opened.length;
@@ -200,5 +207,22 @@ test("a deleted board's pictures are deleted with it", async () => {
 	await Promise.all(both);
 	thumbs.forget("boards/a.html");
 	assert.deepEqual(readdirSync(dir), [thumbName("boards/b.html", 1, "dark")]);
+	thumbs.dispose();
+});
+
+test("a flow document is measured in the page, pictured to that height, and the deck is told", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "thumbs-"));
+	const chrome = fake();
+	const told: Array<[string, number, number]> = [];
+	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir, measured: (path, rev, h) => told.push([path, rev, h]) }, async () => chrome.browser);
+	// The record still carries the 240px placeholder; the page says 1234.
+	const flow = { ...board("boards/notes.html", 3, 720, 240), format: "flow" } as Board;
+	const asked = thumbs.get(flow, "light");
+	await tick();
+	await chrome.release();
+	await asked;
+	assert.deepEqual(chrome.opened[0]?.viewport, { width: 720, height: 540 }, "laid out in the tallest window a picture can be");
+	assert.deepEqual(chrome.clips, [540], "1234 is taller than 4:3 allows, so the picture is 4:3");
+	assert.deepEqual(told, [["boards/notes.html", 3, 1234]]);
 	thumbs.dispose();
 });

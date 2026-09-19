@@ -61,7 +61,7 @@ say("the dashboard's tabs are drawn in the top-left pill", (await page.locator('
 		[...document.querySelectorAll('.dispatch-card-pic img[data-thumb="ready"]')].map((one) => ({ w: one.naturalWidth, src: one.getAttribute("src") })),
 	);
 	say("every gallery card gets a picture taken by the server", ready && pictures.length > 0, JSON.stringify(pictures));
-	say("…640 pixels wide, asked for by revision and scheme", pictures.every((one) => one.w === 640 && /\/api\/thumb\/.+\?v=\d+&scheme=(light|dark)$/.test(one.src)), JSON.stringify(pictures));
+	say("…720 pixels wide, asked for by revision and scheme", pictures.every((one) => one.w === 720 && /\/api\/thumb\/.+\?v=\d+&scheme=(light|dark)$/.test(one.src)), JSON.stringify(pictures));
 	const again = await page.evaluate(async (src) => {
 		const started = performance.now();
 		const answer = await fetch(src, { cache: "no-store" });
