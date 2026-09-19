@@ -4,6 +4,19 @@ import type { ClientMessage, ServerMessage } from "@decks/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 
 /**
+ * What one connected browser is looking at.
+ *
+ * Only the conversation, because that is the one thing the server answers differently per
+ * screen: which agent's stage is up decides the arrangement a board list carries and the
+ * `focused` an `agents` frame names. Everything else about where a person is lives in that
+ * browser's own hash (`web/src/app/route.ts`).
+ */
+export interface View {
+	/** The agent this browser's stage is on. `undefined` until it has said. */
+	focused?: string;
+}
+
+/**
  * Every connected browser, and the one way to talk to them.
  *
  * A deck is a single-user thing on localhost, but not a single-*window* thing:
@@ -12,7 +25,7 @@ import { WebSocketServer, type WebSocket } from "ws";
  * answering that socket's question.
  */
 export class Hub {
-	private readonly sockets = new Set<WebSocket>();
+	private readonly sockets = new Map<WebSocket, View>();
 	private readonly server: WebSocketServer;
 
 	/**
@@ -26,8 +39,8 @@ export class Hub {
 	 */
 	constructor(
 		httpServer: Server,
-		private readonly onMessage: (message: ClientMessage, reply: (message: ServerMessage) => void) => void,
-		private readonly onConnect: (reply: (message: ServerMessage) => void) => void,
+		private readonly onMessage: (message: ClientMessage, reply: (message: ServerMessage) => void, view: View) => void,
+		private readonly onConnect: (reply: (message: ServerMessage) => void, view: View) => void,
 	) {
 		void httpServer;
 		this.server = new WebSocketServer({
@@ -55,7 +68,8 @@ export class Hub {
 	}
 
 	private accept(socket: WebSocket): void {
-		this.sockets.add(socket);
+		const view: View = {};
+		this.sockets.set(socket, view);
 		const reply = (message: ServerMessage) => send(socket, message);
 
 		socket.on("message", (data) => {
@@ -67,7 +81,7 @@ export class Hub {
 				return;
 			}
 			try {
-				this.onMessage(message, reply);
+				this.onMessage(message, reply, view);
 			} catch (error) {
 				// One bad message must not take the socket down with it: the browser
 				// gets told, and the next frame is handled as normal.
@@ -80,11 +94,16 @@ export class Hub {
 		socket.on("close", () => this.sockets.delete(socket));
 		socket.on("error", () => this.sockets.delete(socket));
 
-		this.onConnect(reply);
+		this.onConnect(reply, view);
 	}
 
 	broadcast(message: ServerMessage): void {
-		for (const socket of this.sockets) send(socket, message);
+		for (const socket of this.sockets.keys()) send(socket, message);
+	}
+
+	/** To every connected browser, each given the message as its own view should see it. */
+	each(render: (view: View) => ServerMessage): void {
+		for (const [socket, view] of this.sockets) send(socket, render(view));
 	}
 
 	get connections(): number {
@@ -92,7 +111,7 @@ export class Hub {
 	}
 
 	close(): void {
-		for (const socket of this.sockets) socket.close();
+		for (const socket of this.sockets.keys()) socket.close();
 		this.sockets.clear();
 		this.server.close();
 	}

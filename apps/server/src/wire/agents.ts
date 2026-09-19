@@ -29,7 +29,7 @@ export const agents = {
 		void wire.publishAccounts();
 	},
 
-	"agent.focus": (message, _reply, wire) => {
+	"agent.focus": (message, reply, wire) => {
 		/*
 		 * The arrangement comes with the switch, and **after** it.
 		 *
@@ -39,7 +39,8 @@ export const agents = {
 		 * browser the arrangement it was leaving.
 		 */
 		wire.agents.focus(message.id);
-		wire.send({ type: "deck.state", deck: wire.stageState() });
+		// To the asker alone: the focus is this browser's, and every other one is still where it was.
+		reply({ type: "deck.state", deck: wire.stageState() });
 	},
 
 	"agent.remove": (message, reply, wire) => {
@@ -203,6 +204,8 @@ export const agents = {
 		if (!agent) return;
 		// Async now: Claude's handle comes from copying a session file, which Pi
 		// can do from memory.
+		// Answered after the frame is over, so the browser that asked is kept to move to the fork.
+		const view = wire.viewing;
 		void agent.forkFrom(message.entryId).then((resumeRef) => {
 			if (!resumeRef) {
 				_reply({ type: "notice", level: "warn", text: "There is nothing before that message to fork from." });
@@ -223,6 +226,7 @@ export const agents = {
 				...(agent.model ? { model: agent.model } : {}),
 				...(agent.mode ? { mode: agent.mode } : {}),
 			});
+			if (view) view.focused = child.id;
 			wire.agents.focus(child.id);
 		});
 	},

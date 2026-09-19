@@ -23,8 +23,8 @@ try {
 const httpServer = createServer(createHttpApp(app));
 const hub = new Hub(
 	httpServer,
-	(message, reply) => app.handle(message, reply),
-	(reply) => app.greet(reply),
+	(message, reply, view) => app.handle(message, reply, view),
+	(reply, view) => app.greet(reply, view),
 );
 app.attach(hub);
 

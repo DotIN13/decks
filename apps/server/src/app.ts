@@ -24,7 +24,8 @@ import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncExamplesDir, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { watchDeck } from "./deck/watcher.ts";
-import { Hub } from "./ws.ts";
+import { Hub, type View } from "./ws.ts";
+import type { DeckAgent } from "./agents/session.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -70,6 +71,8 @@ export class App {
 	readonly web: WebBridge;
 	readonly thumbs: ThumbService;
 	private hub: Hub | undefined;
+	/** The browser whose frame is being handled right now, if any — see `handle`. */
+	viewing: View | undefined;
 	private unwatch: (() => void) | undefined;
 	/** The safety net under the watcher — see `watch()`. */
 	private resyncTimer: NodeJS.Timeout | undefined;
@@ -557,11 +560,32 @@ export class App {
 	 * feature's. The cases moved to `wire/`, and what is left is the one line that says
 	 * where they went.
 	 */
-	handle(message: ClientMessage, reply: Reply): void {
-		dispatch(message, reply, this);
+	handle(message: ClientMessage, reply: Reply, view?: View): void {
+		if (!view) {
+			dispatch(message, reply, this);
+			return;
+		}
+		/*
+		 * Each browser has its own conversation, so a frame is handled as the browser that sent it.
+		 *
+		 * The registry keeps one "focused agent", which every frame about "the stage you are on" reads:
+		 * a board moved, a board placed, a prompt with no id. Setting it to this browser's before the
+		 * frame and reading it back after is what lets a phone and a laptop sit on two different
+		 * conversations — without it, opening a chat on one moved the other to it too.
+		 */
+		this.agents.look(view.focused);
+		this.viewing = view;
+		try {
+			dispatch(message, reply, this);
+		} finally {
+			this.viewing = undefined;
+			view.focused = this.agents.looking()?.id;
+		}
 	}
 
-	greet(reply: (message: ServerMessage) => void): void {
+	greet(reply: (message: ServerMessage) => void, view?: View): void {
+		// A new browser starts on the conversation last opened anywhere, and moves on its own after.
+		if (view) view.focused = this.agents.looking()?.id;
 		reply({ type: "deck.state", deck: this.stageState() });
 		/*
 		 * And what this install can run.
@@ -688,8 +712,7 @@ export class App {
 	 * `board.changed` must not start a runtime as a side effect of being sent. No stage means the
 	 * deck's own auto-layout, which is what a deck with nobody looking at it has anyway.
 	 */
-	stageState(): DeckState {
-		const agent = this.agents.looking();
+	stageState(agent: DeckAgent | undefined = this.agents.looking()): DeckState {
 		if (!agent) return this.deck.state();
 		const seeded: Array<{ path: string; x: number; y: number }> = [];
 		const state = this.deck.state(agent.positions(), (path, at) => seeded.push({ path, ...at }));
@@ -715,7 +738,39 @@ export class App {
 			if (message.removed) this.thumbs.forget(message.path);
 			else if (message.board) this.thumbs.changed(message.board);
 		}
-		this.hub?.broadcast(message);
+		this.hub?.each((view) => this.forView(message, view));
+	}
+
+	/**
+	 * A broadcast as one browser should see it.
+	 *
+	 * Three frames depend on which conversation is on screen: `agents` names it, and `deck.state` and
+	 * `board.changed` carry that stage's arrangement. They are built for the registry's focus, which is
+	 * whichever browser acted last, so a browser on another conversation gets them rebuilt for its own.
+	 * A browser whose conversation was closed is moved to the registry's, which is the nearest row.
+	 */
+	private forView(message: ServerMessage, view: View): ServerMessage {
+		const shared = this.agents.looking();
+		if (view === this.viewing) return message;
+		const own = this.agents.get(view.focused);
+		if (!own) {
+			view.focused = shared?.id;
+			return message;
+		}
+		if (own === shared) return message;
+		switch (message.type) {
+			case "agents":
+				return { ...message, focused: own.id };
+			case "deck.state":
+				return { ...message, deck: this.stageState(own) };
+			case "board.changed": {
+				if (!message.board) return message;
+				const placed = this.stageState(own).boards.find((one) => one.path === message.path);
+				return placed ? { ...message, board: { ...message.board, x: placed.x, y: placed.y } } : message;
+			}
+			default:
+				return message;
+		}
 	}
 
 	dispose(): void {

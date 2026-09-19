@@ -7,6 +7,7 @@ import type { TaskService } from "../tasks/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../web/bridge.ts";
+import type { View } from "../ws.ts";
 
 /** How a frame answers the socket it came from — and only that socket. */
 export type Reply = (message: ServerMessage) => void;
@@ -99,6 +100,9 @@ export interface WireContext {
 	readonly cameras: Map<string, Camera>;
 	/** The canvas calls waiting on a browser, keyed by call id. */
 	readonly pendingStage: Map<string, PendingStage>;
+
+	/** The browser whose frame is being handled, for a handler that answers it later (`fork.from`). */
+	readonly viewing: View | undefined;
 
 	/** To every connected browser, including the one that asked. */
 	send(message: ServerMessage): void;
