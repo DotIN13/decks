@@ -71,6 +71,16 @@ const waitRow = async (state) => {
  */
 const opened = await waitRow("open");
 say("a sentence in the bar is handed to the dispatcher, and the task is open while it decides", opened.includes("dispatcher is deciding"), opened);
+/*
+ * The cards are a grid with air between them. A rule once landed between `.dispatch-tasks,` and
+ * the block it shared with `.dispatch-cron`, which handed the list the new rule's declarations
+ * instead: one 480px column of cards with their borders touching, and nothing went red.
+ */
+const lay = await page.evaluate(() => {
+	const style = getComputedStyle(document.querySelector(".dispatch-tasks"));
+	return { display: style.display, gap: style.rowGap };
+});
+say("the task cards are laid out as a grid with a gap", lay.display === "grid" && lay.gap === "10px", JSON.stringify(lay));
 const openRow = page.locator('.dispatch-task[data-state="open"]', { hasText: TASK }).first();
 say("the open task's row offers its own dispatcher log", (await openRow.getByRole("button", { name: "dispatcher log" }).count()) === 1);
 await openRow.getByRole("button", { name: "dispatcher log" }).click();
