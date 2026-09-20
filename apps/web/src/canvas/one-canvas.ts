@@ -41,6 +41,8 @@ export interface OneCanvasHost {
 	settledZoom: () => number;
 	/** Whether the camera's scale is moving; a capture during a pinch is deferred. */
 	scaling: () => boolean;
+	/** Whether the camera is moving at all; a capture during a pan is deferred too. */
+	moving: () => boolean;
 	/** Which renderer is running: everything here is inert unless it is `one-canvas`. */
 	renderer: () => string;
 	/** The stage element, for the background colour the scene is cleared to. */
@@ -204,7 +206,7 @@ export function createOneCanvas(host: OneCanvasHost): OneCanvas {
 		for (const node of frames) {
 			const path = (node as HTMLElement).dataset?.path;
 			if (!path) continue;
-			if (host.scaling()) stale.add(path);
+			if (host.scaling() || host.moving()) stale.add(path);
 			else host.queue.add(path, () => capture(path));
 		}
 	};
@@ -215,7 +217,7 @@ export function createOneCanvas(host: OneCanvasHost): OneCanvas {
 	 * does nothing on a pan, because `needsRedraw` says the size has not changed.
 	 */
 	createEffect(() => {
-		if (host.renderer() !== "one-canvas" || host.scaling()) return;
+		if (host.renderer() !== "one-canvas" || host.scaling() || host.moving()) return;
 		const zoom = host.settledZoom();
 		const dpr = window.devicePixelRatio || 1;
 		for (const board of host.boards()) {

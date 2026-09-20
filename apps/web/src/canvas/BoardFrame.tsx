@@ -183,6 +183,11 @@ export function BoardFrame(props: {
 	 * it is — the picture is stretched — and draws once, at the new size, when it stops.
 	 */
 	scaling: boolean;
+	/**
+	 * Whether the camera is moving at all, scale or position. A pan makes Chrome report
+	 * every drawable as changed; a draw then is work thrown away at the next step.
+	 */
+	moving: boolean;
 	/** The stage's side of a canvas renderer: the redraw queue, and the darkroom (`picture.ts`). */
 	pictures: PictureHost;
 }) {
@@ -570,6 +575,7 @@ export function BoardFrame(props: {
 		<iframe
 			ref={(element) => {
 				frameEl = element;
+				drawable = false;
 				// The first src has to be set here rather than as an attribute: the
 				// effect above is what owns this attribute, and letting JSX also
 				// write it would navigate twice on mount.
@@ -585,7 +591,10 @@ export function BoardFrame(props: {
 			attr:drawable=""
 			onLoad={(event) => {
 				wire(event.currentTarget);
-				if (props.renderer === "canvas-per-board") drawPicture(true);
+				// Nothing to draw here: a document that has just loaded has no snapshot
+				// recorded yet, so a draw now throws — after the resize has already cleared
+				// whatever the canvas was holding. The canvas's own `paint` event is what
+				// says the document is drawable, and it draws it.
 			}}
 		/>
 	);
@@ -612,12 +621,23 @@ export function BoardFrame(props: {
 	let have: { w: number; h: number } | undefined;
 	/** The document changed while the scale was moving; draw it at rest even if the size is right. */
 	let stale = false;
+	/**
+	 * Whether this document has ever been drawable.
+	 *
+	 * A resize clears the canvas, and a draw of a document whose first snapshot has not been
+	 * recorded throws — so a redraw asked for before the document is ready wipes the picture
+	 * and puts nothing back, which is a blank board until the next paint event. Chrome says
+	 * when a document is drawable by firing `paint`; until it has, nothing here touches the
+	 * canvas.
+	 */
+	let drawable = false;
 	const [drawn, setDrawn] = createSignal(false);
 
 	const drawPicture = (resize: boolean) => {
 		const canvas = canvasEl;
 		const frame = frameEl;
 		if (!canvas || !frame || !frame.isConnected || frame.parentElement !== canvas) return;
+		if (!drawable) return;
 		const ctx = elementContext(canvas);
 		if (!ctx) return;
 		const dpr = window.devicePixelRatio || 1;
@@ -658,14 +678,17 @@ export function BoardFrame(props: {
 	const onPaint = (event: Event) => {
 		const changed = (event as PaintEvent).changedElements;
 		if (changed && frameEl && !changed.includes(frameEl)) return;
+		// Chrome has a snapshot of this document, which is the only thing that makes a draw
+		// safe: before it, a draw throws and the resize that preceded it has already cleared.
+		drawable = true;
 		// While the scale is moving the picture is being stretched; a draw now would be at
 		// the old size and thrown away at rest anyway. Remembered rather than dropped, so a
 		// board that finished rendering during a zoom is drawn once the zoom rests.
-		if (props.scaling) {
+		if (props.scaling || props.moving) {
 			stale = true;
 			return;
 		}
-		drawPicture(false);
+		props.pictures.queue.add(props.board.path, () => drawPicture(false));
 	};
 
 	/*
@@ -675,7 +698,7 @@ export function BoardFrame(props: {
 	 * says so.
 	 */
 	createEffect(() => {
-		if (props.renderer !== "canvas-per-board" || props.scaling) return;
+		if (props.renderer !== "canvas-per-board" || props.scaling || props.moving) return;
 		const zoom = props.camera.zoom;
 		void props.mounted;
 		const size = pictureSize(props.board, zoom, window.devicePixelRatio || 1);

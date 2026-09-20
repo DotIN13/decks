@@ -227,6 +227,17 @@ export function Stage(props: {
 	const [scaling, setScaling] = createSignal(false);
 	let scaleSettle: ReturnType<typeof setTimeout> | undefined;
 	/**
+	 * Whether the camera is moving at all — a pan as well as a zoom.
+	 *
+	 * `scaling` answers "is the picture the wrong size"; this answers "is the picture in
+	 * motion", and the canvas renderers need the second one too. A pan repaints the page, so
+	 * Chrome reports every drawable element as changed on every step, and a renderer that
+	 * reads a `paint` event as "this document changed" redraws every board on every step of
+	 * a pan for nothing. Same tail as the scale settle, for the same reason.
+	 */
+	const [moving, setMoving] = createSignal(false);
+	let moveSettle: ReturnType<typeof setTimeout> | undefined;
+	/**
 	 * Whether the camera is gliding right now — for the checks, not for the drawing.
 	 *
 	 * `data-panning` and `data-scaling` are the other two halves of "the camera is moving and this
@@ -484,6 +495,13 @@ export function Stage(props: {
 	 * one gesture would pay for them twice. 300ms is longer than any gap inside a gesture
 	 * and shorter than anyone would notice holding.
 	 */
+	const nowMoving = () => {
+		if (!moving()) setMoving(true);
+		clearTimeout(moveSettle);
+		moveSettle = setTimeout(() => setMoving(false), 160);
+	};
+	onCleanup(() => clearTimeout(moveSettle));
+
 	const nowScaling = () => {
 		if (!scaling()) setScaling(true);
 		clearTimeout(scaleSettle);
@@ -536,6 +554,7 @@ export function Stage(props: {
 	 */
 	const writeCamera = (cam: Camera) => {
 		if (cam.zoom !== localCamera.zoom) nowScaling();
+		if (cam.x !== localCamera.x || cam.y !== localCamera.y || cam.zoom !== localCamera.zoom) nowMoving();
 		lastMoved = performance.now();
 		localCamera = cam;
 		writeTransform(cam);
@@ -1230,6 +1249,7 @@ export function Stage(props: {
 		camera: () => localCamera,
 		settledZoom: () => props.camera.zoom,
 		scaling,
+		moving,
 		renderer: () => props.renderer,
 		stage: () => element,
 		queue: redraws,
@@ -1273,6 +1293,7 @@ export function Stage(props: {
 							 */
 							renderer={alone ? "dom" : props.renderer}
 							scaling={scaling()}
+							moving={moving()}
 							pictures={oneCanvas.pictures}
 							camera={props.camera}
 							mounted={alone || (admission.mayHaveDocument(board) && admission.isMounted(board))}
