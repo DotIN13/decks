@@ -127,13 +127,13 @@ export class App {
 
 			 */
 
-			place: (path: string, x: number, y: number) => {
+			place: (agentId: string, path: string, x: number, y: number) => {
 
-				const agent = this.agents.focused();
+				const agent = this.agents.get(agentId) ?? this.agents.focused();
 
 				agent.setPosition(path, x, y);
 
-				return this.stageState().boards.find((board) => board.path === path);
+				return this.stageState(agent).boards.find((board) => board.path === path);
 
 			},
 
@@ -228,6 +228,13 @@ export class App {
 				defaultKind: config.backend,
 				dispatcherKind: () => this.settings.get().dispatcherKind,
 				camera: (agentId) => this.cameras.get(agentId) ?? this.lastCamera,
+				/*
+				 * A board joining a canvas was given a place (`agents/session.ts`). The browsers draw a
+				 * board where the deck state says it is, so the state goes out here — before the
+				 * `context.changed` that says the board is on the canvas, which is the order the two
+				 * arrive in.
+				 */
+				arranged: () => this.send({ type: "deck.state", deck: this.stageState() }),
 				recordRevision: (path) => this.boards.recordRevision(path),
 				wrote: (path, who) => this.boards.wrote(path, who),
 				boardPathOf: (file) => this.boards.boardPathOf(file),
@@ -734,7 +741,14 @@ export class App {
 	stageState(agent: DeckAgent | undefined = this.agents.looking()): DeckState {
 		if (!agent) return this.deck.state();
 		const seeded: Array<{ path: string; x: number; y: number }> = [];
-		const state = this.deck.state(agent.positions(), (path, at) => seeded.push({ path, ...at }));
+		/*
+		 * The canvas goes with the positions, and it is what the auto-layout is measured against: a
+		 * board with no place of its own is put beside **the boards on this canvas**, not below every
+		 * board this stage has ever been given a place for. The second is what the deck-wide layout
+		 * did, and on a deck of 900 boards it is a column a million pixels tall with three boards
+		 * visible anywhere in it.
+		 */
+		const state = this.deck.state(agent.positions(), (path, at) => seeded.push({ path, ...at }), agent.inPlay);
 		for (const { path, x, y } of seeded) agent.setPosition(path, x, y);
 		return state;
 	}

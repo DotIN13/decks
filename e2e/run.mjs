@@ -133,6 +133,12 @@ const CHECKS = [
 	{ file: "focus.mjs", needsAgent: false },
 	{ file: "camera.mjs", needsAgent: false },
 	/*
+	 * Where a board lands when nobody said where, and whether the camera goes with it. Beside
+	 * `camera.mjs` because the two halves are one experience: a board placed near what you have
+	 * and a view that never moves to it is still a board you cannot find.
+	 */
+	{ file: "placement.mjs", needsAgent: false },
+	/*
 	 * A camera that *arrives*. Its own check rather than a section of `camera.mjs`, because that
 	 * one is about the camera's arithmetic and this one is about a clock: it samples the world
 	 * transform every frame while a move is happening, which is a thing no other check does.

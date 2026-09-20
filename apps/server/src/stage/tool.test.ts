@@ -38,6 +38,8 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	/** What a browser would have reported, if one were looking. */
 	const extents = new Map<string, { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
 	const worked: string[] = [];
+	/** Every `stage.move`, with the stage it was written on. */
+	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
 	const service = new StageService(deck, {
 		newMirror: () => "boards/mirrors/x.html",
 		newBoard: (options) => {
@@ -75,7 +77,12 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		...(views ? { views: async () => views } : {}),
 		call: async () => ({ ok: true }),
 		connected: () => true,
-		place: () => undefined, broadcast: () => {},
+		/* Who a move was written for, so a test can read back *whose* canvas it landed on. */
+		place: (agentId, path, x, y) => {
+			moved.push({ agentId, path, x, y });
+			return deck.board(path);
+		},
+		broadcast: () => {},
 		camera: () => camera,
 		agents: () => others,
 	});
@@ -121,6 +128,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	return {
 		tool,
 		worked,
+		moved,
 		sends,
 		created,
 		scheduled,
@@ -724,5 +732,15 @@ test("fit reports the height, the words, the smallest type and any spill, and na
 	assert.match(over.text, /640 words/);
 	assert.match(over.text, /smallest text is 11px/);
 	assert.match(over.text, /96 px wider than the board/);
+	cleanup();
+});
+
+test("a move is written on the canvas of the agent that asked, not on whichever chat is open", async () => {
+	const { tool, moved, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
+	const result = await tool.run(`await stage.move("boards/plan.html", { x: 40, y: 80 }); return "done"`);
+	assert.equal(result.isError, false, result.text);
+	// `a1` is this tool's own agent. It used to be whoever the browser last acted on, so an agent
+	// tidying its own canvas moved the board on somebody else's and left its own where it was.
+	assert.deepEqual(moved, [{ agentId: "a1", path: "boards/plan.html", x: 40, y: 80 }]);
 	cleanup();
 });

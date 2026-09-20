@@ -43,6 +43,28 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	/** Boards asked for with a `request`, waiting to hear their paths (`board.created`). */
 	const created = new Map<string, (path: string) => void>();
 
+	/**
+	 * Ask the server for a board and hear back which path it got.
+	 *
+	 * The server mints the name, so every caller that wants to *do* something with a board it
+	 * asked for — fill it with the file that was dropped, select it, fly to it — has to wait to
+	 * be told what it is called. `ask` is handed the request id to put on its own message, which
+	 * is what lets one registry serve `board.create` and `agent.mirror` alike.
+	 *
+	 * Ten seconds, then `undefined`: a promise that never settles is a button that never comes
+	 * back, and the caller can say so in a sentence.
+	 */
+	const askForBoard = (ask: (request: string) => void): Promise<string | undefined> => {
+		const request = `ask-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+		return new Promise<string | undefined>((resolve) => {
+			created.set(request, resolve);
+			ask(request);
+			setTimeout(() => {
+				if (created.delete(request)) resolve(undefined);
+			}, 10_000);
+		});
+	};
+
 	const dropOnBoard = async (path: string, files: File[], at: { x: number; y: number }) => {
 		const board = state.boards.find((candidate) => candidate.path === path);
 		if (!board) return;
@@ -157,9 +179,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		const height = Math.max(400, Math.max(...boxes.map((box) => box.top + box.height)) + 48);
 		// `at` is already in stage pixels: the stage is the viewport (`camera/coords.ts`).
 		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
-		const request = `drop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-		const path = await new Promise<string | undefined>((resolve) => {
-			created.set(request, resolve);
+		const path = await askForBoard((request) =>
 			send({
 				type: "board.create",
 				format: "component",
@@ -167,11 +187,8 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 				size: { w: width, h: height },
 				at: { x: Math.round(middle.x - width / 2), y: Math.round(middle.y - height / 2) },
 				request,
-			});
-			setTimeout(() => {
-				if (created.delete(request)) resolve(undefined);
-			}, 10_000);
-		});
+			}),
+		);
 		if (!path) {
 			notice("warn", "The board for that file was not made. Try dropping it again.");
 			return;
@@ -225,9 +242,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		// `at` is already in stage pixels — the stage is the viewport (`camera/coords.ts`).
 		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
 		const size = { w: 880, h: 400 };
-		const request = `new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-		return new Promise<string | undefined>((resolve) => {
-			created.set(request, resolve);
+		return askForBoard((request) =>
 			send({
 				type: "board.create",
 				format: "component",
@@ -235,11 +250,8 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 				size,
 				at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) },
 				request,
-			});
-			setTimeout(() => {
-				if (created.delete(request)) resolve(undefined);
-			}, 10_000);
-		});
+			}),
+		);
 	};
 
 	/** A board asked for by a drop heard its path — see `board.created` in the frame switch. */
@@ -300,5 +312,5 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		});
 	};
 
-	return { drops, addFile, intoComposer, paste, boardAt, hearBoard, install };
+	return { drops, addFile, intoComposer, paste, boardAt, askForBoard, hearBoard, install };
 }

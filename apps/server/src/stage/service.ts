@@ -51,7 +51,7 @@ export interface StageHost {
 	 * On the host rather than the deck because the deck stopped having an arrangement: the position
 	 * belongs to an agent, and the host is what holds one.
 	 */
-	place(path: string, x: number, y: number): Board | undefined;
+	place(agentId: string, path: string, x: number, y: number): Board | undefined;
 	/**
 	 * Every board as this stage sees it — the arrangement, not the loader's zeroes.
 	 *
@@ -163,14 +163,19 @@ export class StageService {
 	// --- writes the server owns ----------------------------------------------------
 
 	/**
-	 * A board moved **on the stage this service belongs to**.
+	 * A board moved **on the canvas of the agent that asked**.
 	 *
 	 * The deck has no arrangement to write to any more, so the move goes to the host, which is the
 	 * thing holding the agent whose canvas this is. What comes back is the board as that stage sees
 	 * it, so the caller broadcasts a position rather than a stale one.
+	 *
+	 * The agent is named rather than assumed. It used to be whichever conversation the browser
+	 * acted on last, which is only the same agent when you happen to be watching the one that
+	 * called: a background agent tidying its own canvas moved a board on yours instead, and its own
+	 * stayed where it was.
 	 */
-	move(path: string, at: { x: number; y: number }): Board {
-		const board = this.host.place(path, at.x, at.y);
+	move(agentId: string, path: string, at: { x: number; y: number }): Board {
+		const board = this.host.place(agentId, path, at.x, at.y);
 		if (!board) throw new Error(`No such board: ${path}`);
 		this.host.broadcast({ type: "board.changed", path: board.path, rev: board.rev, board });
 		return board;

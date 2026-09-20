@@ -27,6 +27,8 @@ function agentOn(
 		accounts?: any;
 		/** What this runtime last offered here, as `AgentStore.rememberModels` would have left it. */
 		models?: ModelOption[];
+		/** What the browser last said this conversation was looking at, for the placement rule. */
+		camera?: { x: number; y: number; zoom: number; width?: number; height?: number };
 		restored?: {
 			id: string;
 			/** The transcript to leave on disk for this row — see `agentOn`. */
@@ -60,7 +62,7 @@ function agentOn(
 	 * agent's directory. `items` is this helper's shorthand for that and never reaches the
 	 * constructor, whose `restored` is about the *row* rather than the conversation.
 	 */
-	const { restored, ...rest } = options;
+	const { restored, camera, ...rest } = options;
 	if (restored && restored.items.length > 0) {
 		const folder = join(deck.path, ".decks", "agents", restored.id);
 		mkdirSync(folder, { recursive: true });
@@ -73,7 +75,7 @@ function agentOn(
 		{} as StageService,
 		{
 			port: 4329,
-			camera: () => ({ x: 0, y: 0, zoom: 1 }),
+			camera: () => camera ?? { x: 0, y: 0, zoom: 1, width: 1440, height: 900 },
 			agents: () => [],
 			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true as const, position: 1 }),
@@ -749,4 +751,56 @@ test("a restored row shows its last line before its transcript is read", () => {
 	} finally {
 		cleanup();
 	}
+});
+
+/*
+ * Where a board lands when it joins the canvas (`deck/place.ts`).
+ *
+ * The bug these pin down: every way of putting a board on a canvas fell through to the deck's own
+ * auto-layout, which stacks *every board a stage has a place for* into rows of three. On a real
+ * deck that is a column a million pixels tall, so a board arrived forty screens from the one being
+ * read and nothing moved to show it.
+ */
+test("a board joining the canvas lands where the conversation is looking", () => {
+	const { agent, cleanup } = agentOn(["one.html"], { camera: { x: 6000, y: 6000, zoom: 1, width: 1440, height: 900 } });
+	agent.setInPlay(["boards/one.html"], { place: true });
+	const at = agent.positions()["boards/one.html"];
+	assert.ok(at, "the board was given a place");
+	assert.ok(Math.hypot(at.x - 6000, at.y - 6000) < 2000, `${JSON.stringify(at)} is in the view, not below the deck`);
+	cleanup();
+});
+
+test("a board whose only place is the old deck-wide column is placed again, beside the canvas", () => {
+	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
+	// One board on the canvas, and another carrying the sort of place the deck-wide layout left.
+	agent.setPosition("boards/one.html", 0, 0);
+	agent.setInPlay(["boards/one.html"], { place: true });
+	agent.setPosition("boards/two.html", 0, 967_333);
+	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
+
+	const two = agent.positions()["boards/two.html"];
+	assert.ok(two && two.y < 10_000, `the board came back from ${two?.y} to the canvas`);
+	const one = agent.positions()["boards/one.html"];
+	assert.deepEqual(one, { x: 0, y: 0 }, "and the board already on the canvas did not move");
+	assert.notDeepEqual(two, one, "nor did the newcomer land on top of it");
+	cleanup();
+});
+
+test("hiding a board and playing it again puts it back where it was", () => {
+	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
+	agent.setPosition("boards/one.html", 0, 0);
+	agent.setPosition("boards/two.html", 1760, 0);
+	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
+	agent.setInPlay(["boards/one.html"], { place: true });
+	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
+	assert.deepEqual(agent.positions()["boards/two.html"], { x: 1760, y: 0 }, "a place beside the canvas is the user's, and is kept");
+	cleanup();
+});
+
+test("restoring a canvas places nothing: the arrangement is the one the person left", () => {
+	const { agent, cleanup } = agentOn(["one.html"]);
+	agent.setPosition("boards/one.html", 0, 900_000);
+	agent.setInPlay(["boards/one.html"]);
+	assert.deepEqual(agent.positions()["boards/one.html"], { x: 0, y: 900_000 }, "no place was worked out");
+	cleanup();
 });

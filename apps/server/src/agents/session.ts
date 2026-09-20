@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { AgentCapabilities, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
+import { type Box, joinSpot, keepsPlace } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, type CreateSpec, type DelegateReport, type DelegateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
@@ -205,6 +206,13 @@ export class DeckAgent {
 		private readonly host: {
 			port: number;
 			camera(agentId: string): Camera;
+			/**
+			 * A board was given a place: the arrangement changed, so the deck state has to go out.
+			 *
+			 * Optional because a unit fixture has no browsers to tell; absent means the place is
+			 * recorded and nothing is broadcast, which is exactly right for a test.
+			 */
+			arranged?(): void;
 			agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; tags: string[]; kind: AgentKind; holding: number }>;
 			spawn(parentId: string, spec: DelegateSpec): Promise<DelegateReport>;
 			/** Put work in another agent's queue, without waiting for it. */
@@ -556,7 +564,7 @@ export class DeckAgent {
 			context: () => [...this.held],
 			setContext: (paths: string[]) => this.setContext(paths),
 			inPlay: () => [...this.playing],
-			setInPlay: (paths: string[]) => this.setInPlay(paths),
+			setInPlay: (paths: string[]) => this.setInPlay(paths, { place: true }),
 			positions: () => ({ ...this.places }),
 			setPosition: (path: string, x: number, y: number) => this.setPosition(path, x, y),
 			rename: (name: string) => this.rename(name),
@@ -631,8 +639,18 @@ export class DeckAgent {
 		this.save();
 	}
 
-	setInPlay(paths: string[]): void {
+	/**
+	 * Set what is on the canvas.
+	 *
+	 * `place` is what tells this call apart from the two that merely *restate* the canvas — a
+	 * record read back from disk and a rewind — and it is the difference between "these boards
+	 * are joining now" and "this is what was already there". Only a join places anything: a
+	 * restore that re-ran the placement would rearrange a canvas the person laid out, every
+	 * time the server came back up.
+	 */
+	setInPlay(paths: string[], options: { place?: boolean } = {}): void {
 		const wanted = paths.filter((path, index) => paths.indexOf(path) === index);
+		if (options.place) this.placeJoining(wanted);
 		// A board shown for the first time is the most recent touch, so it leads the held
 		// list rather than joining the end. This is one of the two places a board first
 		// enters `held` — the other is `stage.attach`, which fronts them itself — and both
@@ -640,6 +658,81 @@ export class DeckAgent {
 		for (const path of wanted) if (!this.held.includes(path)) this.held.unshift(path);
 		this.playing = wanted;
 		this.publishContext();
+	}
+
+	/**
+	 * Give every board that is joining the canvas a place near what is already on it.
+	 *
+	 * The rule and the arithmetic are in `deck/place.ts`; what is here is the state it needs —
+	 * which boards are staying, where they are, and the camera this conversation is looking
+	 * through. Three cases, in order:
+	 *
+	 * - a board with no place of its own gets one, in the middle of the view and clear of the
+	 *   boards already there. This is every new board: `stage.newBoard`, the ＋ in the corner, a
+	 *   mirror, a file that appeared in `boards/`;
+	 * - a board whose place is visible, or within a board's length of the ones on the canvas,
+	 *   keeps it. Hiding a board and playing it again puts it back where it was;
+	 * - a board whose place is neither is placed again. That is the board picked out of the rail
+	 *   on a deck where the old deck-wide auto-layout had already stacked 900 boards into a
+	 *   column a million pixels tall: its recorded place is real, and it is nowhere near you.
+	 *
+	 * Places written here are the stage's own, exactly as a drag is, so this happens once per
+	 * board rather than on every send.
+	 */
+	private placeJoining(wanted: string[]): void {
+		const joining = wanted.filter((path) => !this.playing.includes(path) && this.deck.board(path));
+		if (joining.length === 0) return;
+		const boxOf = (path: string): Box | undefined => {
+			const board = this.deck.board(path);
+			const at = this.places[path];
+			return board && at ? { x: at.x, y: at.y, w: board.w, h: board.h } : undefined;
+		};
+		const onCanvas = wanted
+			.filter((path) => this.playing.includes(path))
+			.map(boxOf)
+			.filter((box): box is Box => box !== undefined);
+		const camera = this.host.camera(this.id);
+		/*
+		 * What a newcomer has to keep clear of: the boards on the canvas, and any board that is
+		 * merely *near* — placed, hidden, and close enough that playing it again would put it back
+		 * where it is. Landing on one of those is a collision nobody sees until the board is played.
+		 * Everything else is filtered out by the same test, which is what keeps this cheap on a deck
+		 * whose stages still carry a place for all 900 boards.
+		 */
+		const occupied = [...onCanvas];
+		for (const [path, at] of Object.entries(this.places)) {
+			if (wanted.includes(path)) continue;
+			const box = boxOf(path);
+			if (box && keepsPlace(box, onCanvas, camera)) occupied.push(box);
+		}
+		let placed = false;
+		for (const path of joining) {
+			const board = this.deck.board(path);
+			if (!board) continue;
+			const size = { w: board.w, h: board.h };
+			const held = this.places[path];
+			if (held && keepsPlace({ ...held, ...size }, onCanvas, camera)) {
+				onCanvas.push({ ...held, ...size });
+				occupied.push({ ...held, ...size });
+				continue;
+			}
+			const spot = joinSpot(size, occupied, camera);
+			this.places[path] = spot;
+			// Both lists: the newcomer is part of the canvas the next one is measured against, and
+			// part of what it has to miss.
+			onCanvas.push({ ...spot, ...size });
+			occupied.push({ ...spot, ...size });
+			placed = true;
+		}
+		if (!placed) return;
+		this.save();
+		/*
+		 * The browser draws a board where the deck state says it is, so a place worked out here
+		 * has to be sent before the canvas is told the board is on it — which is the order these
+		 * two lines are in. Without it the frame is drawn at the old place and `show` frames an
+		 * empty patch of canvas.
+		 */
+		this.host.arranged?.();
 	}
 
 	/**

@@ -1054,6 +1054,42 @@ export function App() {
 		flyToBoards([board], { animate: true });
 	};
 
+	/**
+	 * Put a board on the canvas and fly to it — **after** the server has said where it landed.
+	 *
+	 * A board joining a canvas is placed beside the boards already on it (`deck/place.ts`), so the
+	 * place it had a moment ago is not where it will be: on a deck this app has been used on for a
+	 * while, every board carries a place from the old deck-wide layout, hundreds of thousands of
+	 * pixels down. Flying to the board as it is *now* would land the camera on empty canvas and
+	 * leave the board off screen, which is the bug this fixes rather than a race worth ignoring.
+	 *
+	 * So the flight waits for two frames from the server, in the order they are sent: the deck
+	 * state, which carries the new place, and the context, which says the board is on the canvas.
+	 */
+	const [framing, setFraming] = createSignal<{ path: string; asked: number } | undefined>();
+	/** Fly to a board once the server has placed it and put it on the canvas. */
+	const frameWhenPlaced = (path: string) => setFraming({ path, asked: Date.now() });
+	const playAndFrame = (path: string) => {
+		send({ type: "board.play", path });
+		frameWhenPlaced(path);
+	};
+	createEffect(() => {
+		const wanted = framing();
+		if (!wanted) return;
+		/* Given up on after ten seconds, so a board that never arrives cannot fly the camera
+		   somewhere a minute later, when the person is reading something else. */
+		if (Date.now() - wanted.asked > 10_000) {
+			setFraming(undefined);
+			return;
+		}
+		const playing = state.focused ? state.agents[state.focused]?.inPlay ?? [] : [];
+		if (!playing.includes(wanted.path)) return;
+		const board = state.boards.find((one) => one.path === wanted.path);
+		if (!board) return;
+		setFraming(undefined);
+		flyTo(board);
+	});
+
 	/*
 	 * Frame these boards, whatever they are: the camera moves to hold them all.
 	 *
@@ -1185,7 +1221,7 @@ export function App() {
 									return;
 								}
 								openStage(holder);
-								send({ type: "board.play", path });
+								playAndFrame(path);
 							}}
 							onOpenAgent={openStage}
 							onCancelTask={(id) => send({ type: "task.cancel", id })}
@@ -1458,7 +1494,17 @@ export function App() {
 							}
 							openStage(state.focused);
 						}
-						send({ type: "board.create", ...(format && format !== "component" ? { format } : {}) });
+						/* Asked for by name, so the camera can arrive on it: the server places a new
+						   board in the middle of this canvas's view and clear of what is there, which
+						   is near but not always on screen when the middle is taken. */
+						void files
+							.askForBoard((request) => send({ type: "board.create", ...(format && format !== "component" ? { format } : {}), request }))
+							.then((path) => {
+								if (!path) return;
+								setSelected(path);
+								setComponent(undefined);
+								frameWhenPlaced(path);
+							});
 					}}
 					/*
 					 * Off the canvas, one message per board, and *not* out of the context.
@@ -1586,7 +1632,9 @@ export function App() {
 					unread={unread}
 					onFocusAgent={openStage}
 					onCloseAgent={closeAgent}
-					onMirrorAgent={(id) => send({ type: "agent.mirror", agentId: id })}
+					onMirrorAgent={(id) =>
+						void files.askForBoard((request) => send({ type: "agent.mirror", agentId: id, request })).then((path) => path && frameWhenPlaced(path))
+					}
 					/* Your tags, which the agent cannot see or overwrite — a separate field from
 					   `stage.me.setTags`, for the reason `protocol/Identity` gives. */
 					onAgentTags={(id, tags) => send({ type: "agent.tags", id, tags })}
@@ -1599,8 +1647,7 @@ export function App() {
 							go({ surface: "dispatch", tab: dispatchTab(), board: board.path });
 							return;
 						}
-						send({ type: "board.play", path: board.path });
-						flyTo(board);
+						playAndFrame(board.path);
 					}}
 					/*
 					 * Delete the file. The row asks twice before this is called (`BoardRow.tsx`).

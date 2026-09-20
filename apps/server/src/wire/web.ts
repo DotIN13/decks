@@ -25,6 +25,6 @@ export const web = {
 	"web.board": (_message, _reply, wire) => {
 		const path = wire.boards.newWebBoard();
 		const agent = wire.agents.focused();
-		agent.setInPlay([...agent.inPlay.filter((shown) => shown !== path), path]);
+		agent.setInPlay([...agent.inPlay.filter((shown) => shown !== path), path], { place: true });
 	},
 } satisfies WirePart;

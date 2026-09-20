@@ -143,8 +143,9 @@ export class Deck {
 	state(
 		positions?: Record<string, { x: number; y: number }>,
 		onPlace?: (path: string, at: { x: number; y: number }) => void,
+		onCanvas?: readonly string[],
 	): DeckState {
-		return { path: this.path, name: this.name, boards: this.arrange(positions, onPlace), roots: this.resolved.roots };
+		return { path: this.path, name: this.name, boards: this.arrange(positions, onPlace, onCanvas), roots: this.resolved.roots };
 	}
 
 	/**
@@ -163,7 +164,22 @@ export class Deck {
 	private arrange(
 		positions?: Record<string, { x: number; y: number }>,
 		onPlace?: (path: string, at: { x: number; y: number }) => void,
+		onCanvas?: readonly string[],
 	): Board[] {
+		/*
+		 * What the layout is measured against, and what is worth writing down.
+		 *
+		 * A place is a fact about a canvas: it says where a board sits among the boards beside it. So
+		 * a stage that says which of its boards are on the canvas gets both halves narrowed to those
+		 * — the frontier a new board lands under, and the places that are recorded. A board nobody
+		 * has put on a canvas still comes out of here with coordinates, because the protocol wants
+		 * numbers, but they are not kept and nothing draws them.
+		 *
+		 * Called with no canvas — a deck with nobody looking at it, and every test of the layout
+		 * itself — this is the deck-wide auto-layout it always was.
+		 */
+		const shown = onCanvas ? new Set(onCanvas) : undefined;
+		const keeping = (path: string) => !shown || shown.has(path);
 		const placed: Board[] = [];
 		const unplaced: Board[] = [];
 		for (const board of this.boards) {
@@ -179,11 +195,11 @@ export class Deck {
 			if (at) {
 				const spot = { x: Math.round(at.x), y: Math.round(at.y) };
 				placed.push({ ...board, ...spot });
-				if (!own) onPlace?.(board.path, spot);
+				if (!own && keeping(board.path)) onPlace?.(board.path, spot);
 			} else unplaced.push({ ...board });
 		}
-		autoPlace(unplaced, placed);
-		for (const board of unplaced) onPlace?.(board.path, { x: board.x, y: board.y });
+		autoPlace(unplaced, shown ? placed.filter((board) => shown.has(board.path)) : placed);
+		for (const board of unplaced) if (keeping(board.path)) onPlace?.(board.path, { x: board.x, y: board.y });
 		return [...placed, ...unplaced];
 	}
 

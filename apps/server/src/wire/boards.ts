@@ -139,7 +139,9 @@ export const boards = {
 	 */
 	"board.play": (message, _reply, wire) => {
 		const agent = wire.agents.focused();
-		agent.setInPlay([...agent.inPlay, message.path]);
+		// A board picked out of the rail is a board joining the canvas, so it is placed beside what
+		// is on it unless the place it already has is somewhere you can see (`deck/place.ts`).
+		agent.setInPlay([...agent.inPlay, message.path], { place: true });
 	},
 
 	/** The person read it, so it is no longer news on the dashboard until it is written again. */
@@ -180,12 +182,19 @@ export const boards = {
 		const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
 		const path = wire.boards.newBoard({ title, format, ...(size ? { size } : {}) });
 		const agent = wire.agents.focused();
-		agent.setInPlay([...agent.inPlay, path]);
+		/*
+		 * The place first, then the canvas. A drop and a double-click name the point themselves, and
+		 * a place that is already there is a place `setInPlay` keeps — so this order is what stops
+		 * the board being put in the middle of the view for one frame and then moved to the cursor.
+		 * With no point named — the ＋ in the corner — there is nothing to keep and the board lands
+		 * in the middle of what you are looking at.
+		 */
 		if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
 			agent.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
-			const placed = wire.stageState().boards.find((one) => one.path === path);
-			if (placed) wire.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
 		}
+		agent.setInPlay([...agent.inPlay, path], { place: true });
+		const placed = wire.stageState().boards.find((one) => one.path === path);
+		if (placed) wire.send({ type: "board.changed", path: placed.path, rev: placed.rev, board: placed });
 		// After the board is announced, so the asker already holds it when it hears the path.
 		if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
 	},
@@ -210,7 +219,9 @@ export const boards = {
 		}
 		const path = wire.boards.newMirror({ agentId: of.id, name: of.name });
 		const agent = wire.agents.focused();
-		agent.setInPlay([...agent.inPlay, path]);
+		agent.setInPlay([...agent.inPlay, path], { place: true });
+		// After the board is placed, so the browser that asked can fly to where it actually landed.
+		if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });
 	},
 
 	"boards.restore": (message, reply, wire) => {
@@ -329,7 +340,7 @@ async function runBoardEval(
 		context: () => [...focused.context],
 		setContext: (paths: string[]) => focused.setContext(paths),
 		inPlay: () => [...focused.inPlay],
-		setInPlay: (paths: string[]) => focused.setInPlay(paths),
+		setInPlay: (paths: string[]) => focused.setInPlay(paths, { place: true }),
 		positions: () => focused.positions(),
 		setPosition: (board: string, x: number, y: number) => focused.setPosition(board, x, y),
 		camera: () => wire.cameras.get(focused.id) ?? wire.lastCamera,

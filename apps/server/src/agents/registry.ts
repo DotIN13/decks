@@ -47,6 +47,8 @@ export class Registry {
 			/** The runtime chosen for the dashboard's dispatcher, if one has been (`settings.ts`). */
 			dispatcherKind?: () => AgentKind | undefined;
 			camera(agentId: string): Camera;
+			/** Say that a board was placed, so the deck state goes out before the canvas changes. */
+			arranged?(): void;
 			recordRevision(path: string): string | undefined;
 			/** An agent said it wrote this board — the byline the gallery shows. Optional so a bare test host can omit it. */
 			wrote?(path: string, who: string): void;
@@ -211,6 +213,8 @@ export class Registry {
 			{
 				port: this.host.port,
 				camera: (agentId: string) => this.host.camera(agentId),
+				// A board that was given a place: the browsers need the arrangement, not just the canvas.
+				arranged: () => this.host.arranged?.(),
 				agents: () => this.summaries(),
 				spawn: (parentId, spec) => this.spawn(parentId, spec),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),

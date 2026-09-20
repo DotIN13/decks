@@ -64,7 +64,8 @@ export type ClientMessage =
 	 * browser, from a transcript this app already holds (`canvas/live-chat.ts`). Asking
 	 * twice for the same agent lands on the board that already exists.
 	 */
-	| { type: "agent.mirror"; agentId: string }
+	/** A live view of one conversation, as a board. `request` asks for a `board.created` naming it. */
+	| { type: "agent.mirror"; agentId: string; request?: string }
 	| { type: "board.play"; path: string }
 	/** The person looked at this board (dashboard preview, focus view): clears its "changed" mark. */
 	| { type: "board.seen"; path: string }

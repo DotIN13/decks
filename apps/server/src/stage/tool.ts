@@ -594,7 +594,7 @@ export function createStageTool(deps: {
 			const dropping = new Set(asList(path));
 			agent.setInPlay(agent.inPlay().filter((playing) => !dropping.has(playing)));
 		},
-		move: async (path: string, at: { x: number; y: number }) => service.move(path, at),
+		move: async (path: string, at: { x: number; y: number }) => service.move(agent.id, path, at),
 		camera: (async (at?: Camera, options?: { animate?: boolean }) => {
 			if (!at) return agent.camera();
 			await service.setCamera(agent.id, at, options ?? {});

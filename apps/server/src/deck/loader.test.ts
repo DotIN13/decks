@@ -317,3 +317,28 @@ test("resync reports what changed, what arrived and what went away — and nothi
 
 	rmSync(root, { recursive: true, force: true });
 });
+
+test("a board nobody has put on a canvas is not given a place to keep", () => {
+	const root = emptyDeck();
+	for (const name of ["a", "b"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
+	const deck = Deck.open(root);
+	const worked: string[] = [];
+	// The canvas is the third argument: only what is on it is worth a place, because a place is a
+	// fact about where a board sits among the boards beside it. Recording one for every board in the
+	// deck is what built the column a new board used to land at the bottom of.
+	deck.state({}, (path) => worked.push(path), ["boards/a.html"]);
+	assert.deepEqual(worked, ["boards/a.html"]);
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("the fallback layout measures itself against the canvas, not every board the stage has placed", () => {
+	const root = emptyDeck();
+	for (const name of ["a", "b", "c"]) writeFileSync(join(root, "boards", `${name}.html`), board(name.toUpperCase(), 400, 300));
+	const deck = Deck.open(root);
+	// `c` is nowhere near: the sort of place the old deck-wide layout left behind. `a` is the canvas.
+	const places = { "boards/a.html": { x: 0, y: 0 }, "boards/c.html": { x: 0, y: 900_000 } };
+	const state = deck.state(places, undefined, ["boards/a.html", "boards/b.html"]);
+	const b = state.boards.find((one) => one.path === "boards/b.html");
+	assert.ok(b && b.y < 10_000, `the unplaced board landed at ${b?.y}, beside the canvas rather than below the deck`);
+	rmSync(root, { recursive: true, force: true });
+});
