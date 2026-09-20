@@ -78,4 +78,7 @@ export function moveCamera(next: Camera, options?: { animate?: boolean; ms?: num
 export const OPEN_MS = 360;
 export const CLOSE_MS = 350;
 
+/** Leaving a board's page for the canvas: the fall into it reversed, a beat quicker. */
+export const LEAVE_BOARD_MS = 360;
+
 export { camera, glide, setCamera };

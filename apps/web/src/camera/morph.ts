@@ -79,3 +79,29 @@ export function morphFrame(from: Camera, to: Camera, s: number, box: WorldBox, v
 	const at = { x: a.x + (b.x - a.x) * s, y: a.y + (b.y - a.y) * s };
 	return { zoom, x: middle.x - (at.x - view.width / 2) / zoom, y: middle.y - (at.y - view.height / 2) / zoom };
 }
+
+/**
+ * The camera that draws a board exactly where the reading view will put its page.
+ *
+ * Opening a board is the camera arriving and the page taking over on the last frame, so the last
+ * frame has to *be* the page: the same scale, the same place on the screen. The page's place is
+ * the reading view's own layout — centred between the side insets, a line under the top inset,
+ * never wider than the window less its air, never past life size — and it is worked out here from
+ * the same numbers the stylesheet uses (`styles/canvas.css`, `.focus`).
+ */
+export function cameraOntoPage(
+	board: WorldBox,
+	view: Viewport,
+	insets: { left: number; right: number; top: number },
+	air = 32,
+): Camera {
+	const zoom = Math.min(1, Math.max(120, view.width - air * 2) / Math.max(1, board.w));
+	const room = view.width - insets.left - insets.right;
+	const left = insets.left + (room - board.w * zoom) / 2;
+	const top = insets.top + 12;
+	return {
+		zoom,
+		x: board.x - (left - view.width / 2) / zoom,
+		y: board.y - (top - view.height / 2) / zoom,
+	};
+}

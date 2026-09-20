@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { toScreen } from "./camera.ts";
-import { boundsOf, cameraInto, morphFrame } from "./morph.ts";
+import { boundsOf, cameraInto, cameraOntoPage, morphFrame } from "./morph.ts";
 
 /*
  * The first frame of opening a canvas has to put its boards inside the card that was pressed,
@@ -48,4 +48,17 @@ test("in the middle of the grow the boards stay on the line from the card to the
 		assert.ok(Math.abs(at.x - expected.x) < 0.5 && Math.abs(at.y - expected.y) < 0.5, `s=${s}: ${at.x},${at.y} vs ${expected.x},${expected.y}`);
 		assert.ok(at.x > 0 && at.x < view.width && at.y > 0 && at.y < view.height, "never off the screen");
 	}
+});
+
+test("the camera for a board's page puts it where the reading view draws the page", () => {
+	const view = { width: 1400, height: 900 };
+	const insets = { left: 0, right: 0, top: 52 };
+	const board = { x: 2000, y: 600, w: 1000, h: 700 };
+	const camera = cameraOntoPage(board, view, insets);
+	assert.equal(camera.zoom, 1, "a board narrower than the window is read at its own size");
+	const corner = toScreen(camera, view, { x: board.x, y: board.y });
+	assert.ok(Math.abs(corner.x - 200) < 0.5, "centred: (1400 - 1000) / 2");
+	assert.ok(Math.abs(corner.y - 64) < 0.5, "a line under the top inset");
+	const wide = cameraOntoPage({ x: 0, y: 0, w: 2000, h: 900 }, view, insets);
+	assert.ok(Math.abs(wide.zoom - (1400 - 64) / 2000) < 1e-9, "a wide board is fitted to the window less its air");
 });

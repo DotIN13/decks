@@ -10,8 +10,9 @@ import { Settings } from "./chat/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import type { Presenting } from "./state/ui.ts";
 import { createAlerts } from "./app/alerts.ts";
-import { camera, CLOSE_MS, glide, moveCamera, OPEN_MS, setCamera } from "./state/camera.ts";
-import { createCanvasMorph } from "./app/canvas-morph.ts";
+import { camera, CLOSE_MS, GLIDE_MS, glide, LEAVE_BOARD_MS, moveCamera, OPEN_MS, reducedMotion, setCamera } from "./state/camera.ts";
+import { cameraOntoPage } from "./camera/morph.ts";
+import { createCanvasMorph, flyAlong } from "./app/canvas-morph.ts";
 import { handleFrame, type FrameHooks } from "./app/frames.ts";
 import { createFileDrops } from "./app/files.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
@@ -906,19 +907,63 @@ export function App() {
 	 * at all the view has nothing to be a view *of*, and a canvas that went blank on a keypress
 	 * and needed the same key to come back would read as a fault.
 	 */
+	/*
+	 * Opening a board is the camera arriving, and the page taking over on the last frame.
+	 *
+	 * The reading view is not a camera trick — the canvas stops being drawn and a page is laid
+	 * out — so the arrival has to end *exactly* where that page will be (`cameraOntoPage`), at the
+	 * same scale, and then the page replaces the canvas with nothing to see. The camera you had is
+	 * kept, and the way out flies back to it rather than to a fit, so the canvas is where you put
+	 * it down. `GLIDE_MS` in, a little less out; nothing but the swap with reduced motion.
+	 */
+	let focusReturn: { camera: Camera; path: string } | undefined;
+	const stageGeometry = () => {
+		const stageEl = document.querySelector(".stage");
+		if (!stageEl) return undefined;
+		const rect = stageEl.getBoundingClientRect();
+		const style = getComputedStyle(stageEl);
+		const px = (name: string, fallback: number) => {
+			const value = parseFloat(style.getPropertyValue(name));
+			return Number.isFinite(value) ? value : fallback;
+		};
+		return { view: { width: rect.width, height: rect.height }, insets: { left: px("--inset-left", 0), right: px("--inset-right", 0), top: px("--inset-top", 52) } };
+	};
+	const enterFocus = (path: string) => {
+		const board = stageBoards().find((one) => one.path === path);
+		const geometry = stageGeometry();
+		if (!board || !geometry || reducedMotion()) {
+			setFocus(path);
+			return;
+		}
+		focusReturn = { camera: camera(), path };
+		flyAlong(camera(), cameraOntoPage(board, geometry.view, geometry.insets), boxOf(board), geometry.view, GLIDE_MS, () => {
+			// Only if nothing else was asked for while it flew.
+			if (focusReturn?.path === path) setFocus(path);
+		});
+	};
+	const leaveFocus = () => {
+		const back = focusReturn;
+		focusReturn = undefined;
+		setFocus(undefined);
+		const board = back ? stageBoards().find((one) => one.path === back.path) : undefined;
+		const geometry = stageGeometry();
+		if (!back || !board || !geometry || reducedMotion()) return;
+		flyAlong(camera(), back.camera, boxOf(board), geometry.view, LEAVE_BOARD_MS);
+	};
+
 	const toggleFocus = (wanted?: string) => {
 		// The board's own button names it, so that path wins; the key and the rule behind it
 		// pass nothing and get the target below.
 		const path = wanted ?? focusTarget();
-		if (focus() === path) {
-			setFocus(undefined);
+		if (focus() !== undefined && (focus() === path || wanted === undefined)) {
+			leaveFocus();
 			return;
 		}
 		if (!path) {
 			notice("warn", "No board to focus. Put one on the canvas first.");
 			return;
 		}
-		setFocus(path);
+		enterFocus(path);
 	};
 
 	/**
