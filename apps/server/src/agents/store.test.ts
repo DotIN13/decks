@@ -533,3 +533,28 @@ test("a remembered row missing a provider or a model is not a row", () => {
 	assert.deepEqual(known[0], { provider: "claude", model: "claude-opus-5", label: "claude-opus-5", reasoning: false });
 	cleanup();
 });
+
+/*
+ * The runtime survives a restart, whichever of the four it is.
+ *
+ * The record kept `kind` and the reader threw it away: anything that was not `claude` came back
+ * as `pi`. So an antigravity chat restarted as a pi chat holding an antigravity model, pi said
+ * that model was not available any more and moved the conversation to its own default — and the
+ * record was written back as `pi`, which made it permanent.
+ */
+test("a record keeps the runtime it was written with, all four of them", () => {
+	const { deck, cleanup } = deckOn();
+	const store = new AgentStore(deck);
+	for (const kind of ["pi", "claude", "opencode", "antigravity"]) {
+		const folder = join(deck.path, ".decks", "agents", `agent-${kind}`);
+		mkdirSync(folder, { recursive: true });
+		writeFileSync(join(folder, "meta.json"), JSON.stringify({ kind, name: kind, createdAt: 1, lastAt: 2 }));
+		assert.equal(store.read(`agent-${kind}`)?.record.kind, kind);
+	}
+	// And a name that is not a runtime at all is still the default rather than a crash.
+	const folder = join(deck.path, ".decks", "agents", "agent-x");
+	mkdirSync(folder, { recursive: true });
+	writeFileSync(join(folder, "meta.json"), JSON.stringify({ kind: "gemini-cli", name: "X", createdAt: 1, lastAt: 2 }));
+	assert.equal(store.read("agent-x")?.record.kind, "pi");
+	cleanup();
+});

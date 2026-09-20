@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type AgentKind, type AgentMode, type AgentModel, type AgentUsage, type ChatItem, type ModelOption, type ThinkingLevel } from "@decks/protocol";
+import { AGENT_KINDS, type AgentKind, type AgentMode, type AgentModel, type AgentUsage, type ChatItem, type ModelOption, type ThinkingLevel } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 
 /**
@@ -456,7 +456,18 @@ function validate(raw: unknown, id: string): AgentRecord {
 	const positions = placesOf(source.positions);
 	return {
 		id,
-		kind: source.kind === "claude" ? "claude" : "pi",
+		/*
+		 * Every runtime, not two of them.
+		 *
+		 * This read `source.kind === "claude" ? "claude" : "pi"`, written when there were two
+		 * runtimes and never widened when there were four — so an opencode or antigravity chat was
+		 * silently a pi chat again after one restart, whatever its record said. What that looks
+		 * like from the outside is the model changing on its own: the pi backend resumes the
+		 * conversation, finds `antigravity/gemini-3.8-flash-medium` in a catalog that has no such
+		 * provider, says the model is not available any more, and falls back to pi's own default.
+		 * The record is then written back as `pi`, so the runtime is lost for good.
+		 */
+		kind: AGENT_KINDS.includes(source.kind as AgentKind) ? (source.kind as AgentKind) : "pi",
 		...(typeof source.resumeRef === "string" ? { resumeRef: source.resumeRef } : {}),
 		name: typeof source.name === "string" && source.name ? source.name : "Agent",
 		...(typeof source.avatar === "string" ? { avatar: source.avatar } : {}),
