@@ -29,9 +29,9 @@ export interface StageHost {
 	/** Write a board's file, record the revision, and tell everyone. */
 	writeBoard(path: string, html: string): Board;
 	/** What the canvas last measured of this board, if what it measured was this revision. */
-	extent(path: string, rev: number): { w: number; h: number } | undefined;
+	extent(path: string, rev: number): { w: number; h: number; page?: number } | undefined;
 	/** Wait for a measurement of this revision — every frame takes one when it loads. */
-	awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number } | undefined>;
+	awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number; page?: number } | undefined>;
 	/** Words counted and the smallest type on the board at this revision, when a browser reported them. */
 	/** Press every control on the board in a headless page and report the views that break it. Advice: absent when it cannot run. */
 	views?(path: string): Promise<{ controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } | undefined>;
@@ -242,16 +242,22 @@ export class StageService {
 
 		const measured = await this.measure(path, board.rev);
 		/*
-		 * The margin is a component board's, and only a component board's.
+		 * The margin is room under the last *placed* box, and nothing else.
 		 *
-		 * There, the height is a stored number and the margin is the room a writer would have
-		 * left below the last box. A **flow** board's height is not stored: the browser measures
-		 * it and the deck takes that number (`wire/boards.ts`, `board.extent`). The `<meta>` tag
-		 * is read by `board.js`, which makes it the body's height — so a margin here is a document
-		 * 48px taller than the rectangle the canvas gives it, which is a page that scrolls inside
-		 * its own board. The two numbers have to be the same number.
+		 * A board of boxes ends where its bottom box ends, and a writer would have left a little
+		 * air under it — so the fitted height is that edge plus a margin. A document ends in its
+		 * own bottom padding, which is already part of what the browser measured, and adding to it
+		 * would make the board 48px taller than the page it is showing: a rectangle with a strip
+		 * of nothing along the bottom.
+		 *
+		 * Which of the two a board is comes from the reading rather than from the file:
+		 * `measured.h` is the greater of the furthest block edge and the document's own height,
+		 * and `measured.page` is that second number alone. When the document is the taller of the
+		 * two it has already accounted for its own room. An older frame sends no `page` at all,
+		 * and then the margin is added, which is what every board did before this.
 		 */
-		const h = board.format === "flow" ? measured.h : measured.h + margin;
+		const ends = measured.page !== undefined && measured.page >= measured.h;
+		const h = ends ? measured.h : measured.h + margin;
 		const reading = this.host.reading?.(path, board.rev) ?? {};
 		// Six seconds at most: the check is advice, and a fit that hangs on it is worse than one without it.
 		const views = await Promise.race([this.host.views?.(path) ?? Promise.resolve(undefined), new Promise<undefined>((done) => setTimeout(() => done(undefined), 6000))]).catch(() => undefined);
@@ -267,7 +273,7 @@ export class StageService {
 	 * rather than guessing, which is the only honest answer and also a useful one — it
 	 * means "put it on the canvas".
 	 */
-	private async measure(path: string, rev: number): Promise<{ w: number; h: number }> {
+	private async measure(path: string, rev: number): Promise<{ w: number; h: number; page?: number }> {
 		const extent = this.host.extent(path, rev) ?? (await this.host.awaitExtent(path, rev, FIT_WAIT_MS));
 		if (!extent) {
 			throw new Error(

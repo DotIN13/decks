@@ -17,15 +17,19 @@
 /**
  * What a board *is*, as a file — the only choice a new board makes.
  *
- * - `component` — absolutely-positioned boxes with `data-id`s. What every board was, and
- *   the only format Decks' own drag-and-retype editor can work on.
- * - `flow` — a document that reflows: markdown, or HTML that is not a component board.
- *   Its height is whatever its content is; see `deck/kinds.ts`.
- * - `slides` — reveal's markdown dialect, one slide at a time, aspect-locked.
+ * - `board` — an HTML document with `data-id`s on its root-level blocks. A block that
+ *   states where it goes is placed; a block that does not flows. Its height is whatever
+ *   its content is, unless the file states one.
+ * - `slides` — a reveal deck, one `<section>` per slide, laid out at a fixed size and
+ *   scaled rather than reflowed.
+ *
+ * There were two board formats until this was written — `component` for placed boxes and
+ * `flow` for a document — and they are one. Both words are still accepted from a caller
+ * (`asBoardFormat`) and both mean `board`.
  */
-export type BoardFormat = "component" | "flow" | "slides";
+export type BoardFormat = "board" | "slides";
 
-export const BOARD_FORMATS: readonly BoardFormat[] = ["component", "flow", "slides"];
+export const BOARD_FORMATS: readonly BoardFormat[] = ["board", "slides"];
 
 /**
  * What a new board of each format is called, and what it starts from.
@@ -36,17 +40,16 @@ export const BOARD_FORMATS: readonly BoardFormat[] = ["component", "flow", "slid
  * was asked for as slides would simply be a flow board and nothing would say why.
  */
 const FORMATS: Record<BoardFormat, { extension: string }> = {
-	component: { extension: ".html" },
 	/*
 	 * `.html`, not `.md` — every board this app writes is a single HTML file.
 	 *
-	 * A flow board used to be markdown, which meant the deck held two kinds of file and the
-	 * markdown ones had to be wrapped in a synthesised document to be shown at all. An HTML
-	 * flow board *is* the document: it carries board.css and board.js, says
-	 * `class="board flow"`, and holds its content in one full-bleed component. Markdown is
-	 * still read (`deck/kinds.ts`); it is no longer what gets created.
+	 * A document board used to be markdown, which meant the deck held two kinds of file and
+	 * the markdown ones had to be wrapped in a synthesised document to be shown at all. An
+	 * HTML board *is* the document: it carries board.css and board.js and holds its content
+	 * in blocks of its own. Markdown is still read (`deck/kinds.ts`); it is no longer what
+	 * gets created.
 	 */
-	flow: { extension: ".html" },
+	board: { extension: ".html" },
 	// `.slides.html` rather than `.slides.md`: HTML *is* reveal, and markdown is a plugin in
 	// it. Both are read (`lib/slides.js` picks its splitter from the extension); a deck this
 	// app creates is the native one.
@@ -60,6 +63,18 @@ export function extensionFor(format: BoardFormat): string {
 
 export function isBoardFormat(value: unknown): value is BoardFormat {
 	return typeof value === "string" && (BOARD_FORMATS as readonly string[]).includes(value);
+}
+
+/**
+ * A format from whatever a caller said, including the two words that are now one thing.
+ *
+ * `component` and `flow` named the formats this one replaced, and they are all over the
+ * wire, the agent tool's arguments and anybody's notes. Both answer `board`; anything
+ * unrecognised answers nothing, and the caller's own default takes over.
+ */
+export function asBoardFormat(value: unknown): BoardFormat | undefined {
+	if (isBoardFormat(value)) return value;
+	return value === "component" || value === "flow" ? "board" : undefined;
 }
 
 /**
@@ -78,26 +93,16 @@ export function isBoardFormat(value: unknown): value is BoardFormat {
 export const WIDE_BOARD_W = 1200;
 
 /**
- * What a board with no size of its own is given.
- *
- * A *fallback dimension* rather than a maximum: `deck/loader.ts` hands it to a board whose
- * `<meta>` tag says nothing, and `deck/meta.ts` uses it when a resize arrives with no width.
- * Neither is a cap on anything, which is why it kept the number the old ceiling had and not
- * the name.
- */
-export const DEFAULT_BOARD_W = 1600;
-
-/**
  * A width a board may actually be: what was asked for, or the format's own, clamped.
  *
  * `viewport` is the room the canvas has (`stage.viewport()`), and `undefined` means nobody
  * is looking — a board written by an agent nobody is watching gets the format's default
  * rather than a guess, because a guess would be indistinguishable from a measurement at the
- * point it got used. The format's own default is 880 for a component board — the measure
- * prose actually wants — 720 for a flow document, and 960 for a deck, which is the logical
- * width a slide is laid out at so it opens at 1:1 with its own layout.
+ * point it got used. The format's own default is 1000 for a board, which is about as wide as
+ * one is read at, and 960 for a deck, which is the logical width a slide is laid out at so it
+ * opens at 1:1 with its own layout.
  */
-export function boardWidth(wanted: number | undefined, viewport: number | undefined, format: BoardFormat = "component"): number {
+export function boardWidth(wanted: number | undefined, viewport: number | undefined, format: BoardFormat = "board"): number {
 	/*
 	 * The room on screen, or nothing — and **no ceiling of our own**.
 	 *
@@ -109,29 +114,46 @@ export function boardWidth(wanted: number | undefined, viewport: number | undefi
 	// A width somebody typed is theirs, whatever it is. The default is the only thing this
 	// function decides, and an agent that means 1800 has a reason we cannot see from here.
 	if (wanted) return Math.round(wanted);
-	const own = format === "component" ? 880 : defaultFormatWidth(format);
-	return Math.max(320, Math.min(own, room));
+	return Math.max(320, Math.min(defaultFormatWidth(format), room));
 }
 
 /**
- * The document for a new component board: a blank one.
+ * The document for a new board: a blank one.
  *
  * Heading and nothing else, on purpose, and the whole of what "no templates" means — every
  * board starts the same, and what it becomes is the agent's decision rather than the
  * shell's. The comment in the board is the only guidance: the title is the finding, the
  * import map in the head can reach any library, and the examples beside the deck show what
  * that looks like.
+ *
+ * **No height in the meta tag.** A height there is a floor the content can raise and never
+ * a ceiling, so leaving it out is what makes a new board exactly as tall as what gets
+ * written on it. `stage.fit` writes one in once there is something to measure.
+ *
+ * The one block it starts with is the document: `.doc`, which board.css puts at the origin at
+ * the full width of the board, as tall as its own content. A block beside it that states a
+ * `left` and a `top` is placed at that point instead, and is the thing a person can drag. That
+ * is the whole of the layout model, and board.css's `body.board > *` is what makes it work:
+ * every root-level block is out of the flow, so two of them cannot push each other about.
  */
 export function renderBlank(title: string, size?: { w?: number; h?: number }): string {
-	const w = Math.round(size?.w ?? 880);
-	const h = Math.round(size?.h ?? 400);
+	const w = Math.round(size?.w ?? defaultFormatWidth("board"));
+	// A stated height is a floor and a new board wants none — but a caller that asked for a
+	// size meant it, so an explicit one is written and the content raises it if it needs to.
+	const h = size?.h ? `,"h":${Math.round(size.h)}` : "";
 	return `<!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<title>${escapeHtml(title)}</title>
-		<meta name="board" content='{"w":${w},"h":${h},"bg":"grid"}' />
+		<meta name="board" content='{"w":${w}${h},"bg":"plain"}' />
 		<link rel="stylesheet" href="../lib/board.css" />
+		<style>
+			/* The design is yours. These are a starting measure, not a house style, and they say
+			   \`.board .doc\` because that is what board.css's own rule for it says. */
+			.board .doc { padding: 40px 48px; font-size: 17px; line-height: 1.5 }
+			.board .doc h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.2; letter-spacing: -0.01em }
+		</style>
 		${importMapTag()}
 	</head>
 	<body class="board">
@@ -140,19 +162,24 @@ export function renderBlank(title: string, size?: { w?: number; h?: number }): s
 
 			The heading is the title, and the title is the finding. Write it as a statement
 			("Returning customer share fell after the second tab shipped") rather than a topic or
-			a question, then fill the canvas under it.
+			a question, then fill the block under it.
 
-			Whatever goes under it reads top to bottom and so does the file: one column, or a
-			pair at x = 48 and x = 536 with the left one first. Lead with the finding and stop
-			when it is said. A table beats a paragraph about a comparison, a diagram beats a
-			paragraph about a structure, a number beats an adjective. Then \`stage.fit\` it, so
-			the board is the size of what is on it rather than the size you guessed.
+			Every root-level block is out of the page's flow, so write inside this one: it is the
+			width of the board and as tall as its content, which is what makes what you put in it
+			read as a document, top to bottom. A block beside it that states a \`left\` and a
+			\`top\` is placed at that point instead, and can be dragged. Both live in one file, and
+			neither of them is a format.
+
+			Lead with the finding and stop when it is said. A table beats a paragraph about a
+			comparison, a diagram beats a paragraph about a structure, a number beats an
+			adjective. Then \`stage.fit\` it, so the board is the size of what is on it rather
+			than the size you guessed.
 
 			For what a finished board can look like, read the examples in \`examples/\` beside
 			this deck: worked boards for coding, research and business that use the libraries
 			this head's import map names. Borrow their structure; do not start from one.
 		-->
-		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: ${Math.max(320, w - 96)}px">
+		<div class="doc" data-id="doc">
 			<h1>${escapeHtml(title)}</h1>
 		</div>
 
@@ -163,18 +190,14 @@ export function renderBlank(title: string, size?: { w?: number; h?: number }): s
 }
 
 /**
- * The document for a new board of a format that is not component HTML.
+ * The document for a new deck of slides: one empty slide.
  *
- * One token and no layout, which is the difference from `renderBlank`: a flow board has no
- * boxes to place and a slide is laid out at a fixed logical size, so neither needs width
- * arithmetic. Both are blank too — a flow document is a title and an empty section, a slide
- * deck is one empty slide — for the same reason a component board is: the shape is the
- * agent's to make.
+ * No width arithmetic and no layout, which is the difference from a board: a slide is laid
+ * out at a fixed logical size. Blank too, for the same reason — the shape is the agent's.
  */
-export function renderFormat(format: Exclude<BoardFormat, "component">, title: string, size?: { w?: number }): string {
-	const w = Math.round(size?.w ?? defaultFormatWidth(format));
-	if (format === "slides") {
-		return `<!doctype html>
+export function renderSlides(title: string, size?: { w?: number }): string {
+	const w = Math.round(size?.w ?? defaultFormatWidth("slides"));
+	return `<!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
@@ -190,36 +213,9 @@ export function renderFormat(format: Exclude<BoardFormat, "component">, title: s
 	</body>
 </html>
 `;
-	}
-	return `<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<title>${escapeHtml(title)}</title>
-		<!-- No height: a page's height is measured, never stored, so it cannot clip. -->
-		<meta name="board" content='{"w":${w},"bg":"plain"}' />
-		<!-- Colour and type tokens only (light and dark). The design is yours, in the style below. -->
-		<link rel="stylesheet" href="../lib/theme.css" />
-		<style>
-			/* board.js sets the body to the board's width, so padding has to count inside it. */
-			*, *::before, *::after { box-sizing: border-box; }
-			body { margin: 0; padding: 40px 48px; font: 17px/1.5 var(--b-font); color: var(--b-fg); background: var(--b-bg); }
-			h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.2; letter-spacing: -0.01em; }
-		</style>
-		${importMapTag()}
-	</head>
-	<body class="board flow">
-		<header data-id="title">
-			<h1>${escapeHtml(title)}</h1>
-		</header>
-		<main data-id="main"></main>
-		<script src="../lib/board.js"></script>
-	</body>
-</html>
-`;
 }
 
-function defaultFormatWidth(format: Exclude<BoardFormat, "component">): number {
+function defaultFormatWidth(format: BoardFormat): number {
 	return format === "slides" ? 960 : 1000;
 }
 

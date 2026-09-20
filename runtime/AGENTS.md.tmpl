@@ -24,7 +24,9 @@ Plain words and short sentences, no em dashes. Every axis, column and number say
 
 ## How to write one
 
-A board is an ordinary, self-contained HTML page that you design. There is no component library to learn: write your own CSS in the `<style>` in the head and lay the page out in normal flow with flexbox or grid. Do not position things absolutely.
+A board is an ordinary, self-contained HTML page that you design. There is no component library to learn: write your own CSS in the `<style>` in the head, and inside a block lay things out normally with flexbox or grid.
+
+**Every root-level block is out of the page's flow.** `board.css` puts the direct children of `<body>` in absolute position, so write inside one block rather than stacking several. The `.doc` block below covers the board, is as tall as its content, and is what makes what you write in it read as a document. To put something at a particular spot instead, add another root-level block with a `left` and a `top` in its own `style`: that one is placed there, and the person can drag it. Both live in one file; there is no second format to choose.
 
 `const path = await stage.newBoard({ title })` writes this shell. Fill it in with the Write tool:
 
@@ -35,28 +37,32 @@ A board is an ordinary, self-contained HTML page that you design. There is no co
 	<meta charset="utf-8" />
 	<title>The finding, as a sentence</title>
 	<meta name="board" content='{"w":1000,"bg":"plain"}' />
-	<link rel="stylesheet" href="../lib/theme.css" />
+	<link rel="stylesheet" href="../lib/board.css" />
 	<style>
-		*, *::before, *::after { box-sizing: border-box; }
-		body { margin: 0; padding: 40px 48px; font: 17px/1.5 var(--b-font); color: var(--b-fg); background: var(--b-bg); }
+		.board .doc { padding: 40px 48px; font-size: 17px; line-height: 1.5 }  /* board.css's own rule is `.board .doc`, so match it or be outranked */
 		/* your design */
 	</style>
 </head>
-<body class="board flow">
-	<header data-id="title"><h1>The finding, as a sentence</h1></header>
-	<main data-id="main"> … </main>
+<body class="board">
+	<div class="doc" data-id="doc">
+		<h1>The finding, as a sentence</h1>
+		…
+	</div>
+	<!-- and a box placed at a point, when you want one:
+	<aside class="card" data-id="aside" style="left: 640px; top: 96px; width: 280px">…</aside> -->
 	<script src="../lib/board.js"></script>
 </body>
 </html>
 ```
 
-- `theme.css` defines only colour and type tokens, and they follow the app's light and dark mode. Use them instead of hardcoded colours: `--b-fg --b-muted --b-faint --b-bg --b-bg-deep --b-bg-layer --b-border --b-border-strong --b-accent --b-accent-soft --b-ok --b-warn --b-danger --b-radius --b-font --b-mono`.
-- Give each top-level block of `<body>` a stable, meaningful `data-id`: it is how the person comments on a block and how you point at one. Keep `board.js` last: it tells the canvas when the page is ready and how tall it is.
+- `board.css` brings the colour and type tokens, which follow the app's light and dark mode. Use them instead of hardcoded colours: `--b-fg --b-muted --b-faint --b-bg --b-bg-deep --b-bg-layer --b-border --b-border-strong --b-accent --b-accent-soft --b-ok --b-warn --b-danger --b-radius --b-font --b-mono`.
+- **No height in the `<meta>` tag.** A board is as tall as what is on it: the browser measures it and the canvas takes that number. A height you do write is a floor the content can raise, which is how you leave room under the last block on purpose.
+- Give each root-level block a stable, meaningful `data-id`: it is how the person comments on a block and how you point at one. Keep `board.js` last: it tells the canvas when the page is ready and how tall it is.
 - A diagram is an inline `<svg viewBox>` you draw. A chart can use `const d3 = await import("d3")` in a `<script type="module">`: the import map in the head names `d3`, `chart.js`, `three` and `gsap`, so keep it.
 - Then `await stage.show(path)` and `await stage.fit(path)`. **`fit` answers with what the browser measured: the height, the word count, the smallest type, anything wider than the board, any box that cuts off its own content, and what happens when each control is pressed. It says which of them is wrong.** A view behind a tab is part of the board, and `fit` is the only one who looks at it unless you do. Act on that instead of taking a screenshot, and when it answers "One screen" the board is done: stop polishing.
 - Edit a board in place (Write, Edit). Never `sed -i` or another rename-save: the canvas stops watching a replaced file. Never edit `lib/`.
 - A link to another board is a relative path, `<a href="other.html">`, and opens beside this one; every other link opens a new tab. `<div data-embed="../path/file.pdf" data-pages="1-2"></div>` shows a real file where it sits. {{ROOTS}}
-- Two other formats exist for when they are asked for: `format: "slides"` is a reveal deck, and `format: "component"` is absolutely positioned boxes on `board.css`, which the board-authoring skill describes.
+- One other format exists, for when it is asked for: `format: "slides"` is a reveal deck, one `<section>` per slide, paged with the arrow keys.
 
 The person edits, draws on and comments on boards too. Keep any `<svg data-ink-layer>` you find at the end of a body, and read a board again before assuming it says what you last wrote. A comment arrives as a message naming the board, the block's `data-id` and the words they selected.
 

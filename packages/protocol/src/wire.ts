@@ -26,10 +26,10 @@ export type ClientMessage =
 	/**
 	 * A board dragged to a new size by the person holding the mouse.
 	 *
-	 * Where the number *lives* depends on the format, and the server decides that rather than
-	 * the browser: a component board's size is the one number in its own `<meta>` tag, a flow
-	 * document's width is in that tag and its height is its content, and a slide deck's height
-	 * follows from its aspect. Either dimension on its own is allowed.
+	 * Where the number *lives* is the server's to decide rather than the browser's: a board's
+	 * size is written into its own `<meta>` tag, and a slide deck's height follows from its
+	 * aspect instead. Either dimension on its own is allowed, and a height written there is a
+	 * floor — the content raises it when it needs more room, and never clips.
 	 */
 	| { type: "board.resize"; path: string; w?: number; h?: number }
 	| { type: "board.patch"; path: string; rev: number; patches: BoardPatch[] }
@@ -40,8 +40,13 @@ export type ClientMessage =
 	 * is laid out — so the reading travels the other way from most of this file. It
 	 * carries the `rev` it was taken at, because a measurement of a document that has
 	 * since been rewritten is not a measurement of anything.
+	 *
+	 * `h` is the room the content needs: the furthest edge of the root-level blocks, or the
+	 * document's own height, whichever is greater. `page` is that second number on its own,
+	 * so `stage.fit` can tell the two apart — a board of placed boxes is fitted with a margin
+	 * of room under the last one, and a document that ends in its own bottom padding is not.
 	 */
-	| { type: "board.extent"; path: string; rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
+	| { type: "board.extent"; path: string; rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
 	| { type: "board.undo"; path: string }
 	/**
 	 * A component on a board was pressed, and the board carries code for it.
@@ -86,15 +91,15 @@ export type ClientMessage =
 	 * server, and an unknown one falls back to `blank` rather than failing — the worst
 	 * outcome of a typo should be an empty board.
 	 *
-	 * `format` is what the board *is as a file* — `component`, `flow` or `slides` — and it
-	 * is a different question from `kind`, which is the shape it starts with. An `answer`
-	 * can be written as component HTML or as markdown, so one field could not mean both.
+	 * `format` is what the board *is as a file*: `board` or `slides`. It is a different
+	 * question from `kind`, which is the shape it starts with.
 	 *
 	 * **The extension is not on the wire, deliberately.** The server derives it from the
-	 * format (`.html`, `.md`, `.slides.html`), because a board's format is read back out of
-	 * its filename — so a caller that could name the file could ask for a slide deck and be
-	 * handed a flow board, correctly, with nothing to say why. Absent means `component`,
-	 * which is what every board was before formats existed.
+	 * format (`.html`, `.slides.html`), because a board's format is read back out of its
+	 * filename — so a caller that could name the file could ask for a slide deck and be
+	 * handed a board, correctly, with nothing to say why. Absent means `board`. The words
+	 * `component` and `flow` are still accepted and both mean `board`: they named the two
+	 * formats that are now one.
 	 */
 	/**
 	 * A new board. `title`, `size` and `at` are for a board made to hold something — a file

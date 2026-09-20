@@ -39,10 +39,17 @@ test("a frame's measurement reaches the deck, and fit writes it back", async () 
 		app.handle({ type: "board.extent", path: "boards/tall.html", rev: before.rev, w: 648, h: 690 }, () => {});
 		const measured = boardOf(app);
 		assert.deepEqual(measured.content, { w: 648, h: 690 });
-		assert.equal(measured.clipped, true, "690 of content in 400 of board");
+		/*
+		 * The board was 400 tall and its content came to 690, and it is 690 now: a height in the
+		 * file is a floor the content raises, so there is no such thing as a board that clips
+		 * what is written on it. It used to be marked `clipped` and left at 400 until somebody
+		 * fitted it, which is the failure nobody sees.
+		 */
+		assert.equal(measured.h, 690, "the measurement raised the board past the number in its file");
+		assert.equal(measured.clipped, false, "and nothing is cut off, so nothing is marked");
 
 		const { board: fitted } = await app.stage.fit("boards/tall.html");
-		assert.equal(fitted.h, 738, "the content plus the margin components start at");
+		assert.equal(fitted.h, 738, "the content plus the room a fit leaves under the last block");
 		// And the width is the file's, untouched: a fit is a height, not a resize.
 		assert.equal(fitted.w, 900, "the width the board declares");
 

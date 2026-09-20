@@ -40,25 +40,28 @@ export interface Board {
 	path: string;
 	title: string;
 	/**
-	 * What this board is, as a file — `component`, `flow` or `slides` (`deck/kinds.ts`).
+	 * What this board is, as a file — a `board` or a deck of `slides` (`deck/kinds.ts`).
 	 *
-	 * On the wire because the browser needs it before the frame has loaded: which editor a
-	 * board admits, whether its height is measured or fixed, and whether ← → mean anything
-	 * are all decided from this, and asking the frame would mean deciding them a beat late.
+	 * There were three: `component` for positioned boxes and `flow` for a document that
+	 * reflows. They are one now. A board is an HTML document whose root-level blocks are
+	 * absolutely positioned, and a block that is not placed is a block that flows — which is
+	 * a property of the element, read where it matters (the editor asks the browser for a
+	 * node's computed position) rather than a property of the file. What is left in this
+	 * field is the one difference a reader can see before the frame loads: a deck is paged
+	 * with the arrow keys and is laid out at a fixed size, and a board is not.
 	 */
-	format: "component" | "flow" | "slides";
+	format: "board" | "slides";
 	/**
 	 * How the frame has to be *given* this board, when the file is not a document already.
 	 *
-	 * Absent for a component board and for a flow board: both are complete documents this
-	 * app wrote. Present for a file that has to be rendered *into* one — `content`, which is
-	 * a `.md` or a deck in either dialect — and for `foreign`, an HTML page from somewhere
-	 * else, which gets a document too and is put in a sandboxed frame inside it because it
-	 * may carry scripts.
+	 * Absent for a board this app wrote: it is a complete document already. Present for a
+	 * file that has to be rendered *into* one — `content`, which is a `.md` or a deck in
+	 * either dialect — and for `foreign`, an HTML page from somewhere else, which gets a
+	 * document too and is put in a sandboxed frame inside it because it may carry scripts.
 	 *
 	 * On the wire because the browser sizes on it: a sandboxed page cannot be measured from
-	 * outside, so that one board keeps a stored height where every other flow board reports
-	 * its own.
+	 * outside, so that one board keeps the height in its file where every other board
+	 * reports its own.
 	 */
 	shell?: "content" | "foreign";
 	/**

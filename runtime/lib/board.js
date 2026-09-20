@@ -304,7 +304,27 @@
 		const board = document.body;
 		board.classList.add("board");
 		if (Number.isFinite(Number(meta.w))) board.style.width = `${Number(meta.w)}px`;
-		if (Number.isFinite(Number(meta.h))) board.style.height = `${Number(meta.h)}px`;
+		/*
+		 * A height in the tag is the board's; **no height in the tag is the content's**.
+		 *
+		 * board.css gives the body a fallback height, which is right for a board that states its
+		 * size and wrong for one that does not: the body would be a rectangle of a size nobody
+		 * chose. So a board with no stated height takes its content's, and never less than the
+		 * frame it is being drawn in — `100vh` inside a frame is the rectangle the canvas gave
+		 * this board, so the body is the board even when everything on it is placed and nothing
+		 * is in the flow. Without that floor the body of a board of boxes measures zero, and a
+		 * click meant for the board lands on nothing.
+		 *
+		 * Nothing is clipped either way. A board does not scroll — `overflow: hidden` on the body
+		 * is propagated to the frame's own viewport by the HTML rules, so it is the *frame* that
+		 * crops, and the frame is that same rectangle. The measurement follows a beat later
+		 * (`canvas/extent.ts`) and the rectangle becomes the content's height. A height that *is*
+		 * stated is a floor rather than a ceiling, which is the server's half of the same rule
+		 * (`deck/loader.ts`).
+		 */
+		const stated = Number.isFinite(Number(meta.h)) ? Number(meta.h) : undefined;
+		board.style.height = stated === undefined ? "auto" : `${stated}px`;
+		board.style.minHeight = stated === undefined ? "100vh" : "";
 		board.dataset.bg = typeof meta.bg === "string" ? meta.bg : "grid";
 		if (typeof meta.theme === "string") document.documentElement.dataset.theme = meta.theme;
 	}
@@ -1214,15 +1234,19 @@
 			work.push(mountSlides(element));
 		}
 		/*
-		 * Maths in a flow board's own markup.
+		 * Maths in a document block's own markup.
 		 *
-		 * A `[data-md]` component gets KaTeX because the markdown renderer runs it over what
-		 * it rendered. A flow board written as HTML has no such moment — the prose is in the
-		 * file — so `$…$` sat there as three characters. Offered to the whole document rather
-		 * than per component because a flow board *is* one document, and `renderMath` looks
-		 * for a delimiter before loading anything, so a board with no maths pays nothing.
+		 * A `[data-md]` component gets KaTeX because the markdown renderer runs it over what it
+		 * rendered. Prose written as HTML has no such moment — it is in the file — so `$…$` sat
+		 * there as three characters. Offered to the `.doc` block rather than to the whole body,
+		 * because a `$` on a board of boxes is usually a price and two of them are usually two
+		 * prices; inside a document it is the notation the writer meant. `renderMath` looks for a
+		 * delimiter before loading anything, so a board with no maths pays nothing.
+		 *
+		 * `body.flow` is the same block before the two board formats became one.
 		 */
-		if (document.body.classList.contains("flow")) {
+		for (const doc of document.querySelectorAll(".doc")) work.push(renderMath(doc));
+		if (document.body.classList.contains("flow") && !document.querySelector(".doc")) {
 			work.push(renderMath(document.body));
 		}
 
@@ -1232,9 +1256,9 @@
 		 * Code the *file* carries, which no renderer above has seen.
 		 *
 		 * Everything the runtime drew has already been coloured by whatever drew it, and this
-		 * pass finds what is left: a `<pre>` an agent typed into a board, and a flow board's own
-		 * prose. Last, so a block inside a panel that was rendered has been claimed already and
-		 * is not looked at twice.
+		 * pass finds what is left: a `<pre>` an agent typed into a board, and a document block's
+		 * own prose. Last, so a block inside a panel that was rendered has been claimed already
+		 * and is not looked at twice.
 		 */
 		await highlightCode(document.body);
 

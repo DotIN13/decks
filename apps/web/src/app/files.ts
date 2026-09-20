@@ -182,7 +182,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		const path = await askForBoard((request) =>
 			send({
 				type: "board.create",
-				format: "component",
+				format: "board",
 				title: files.length === 1 ? files[0]!.name : `${files.length} files`,
 				size: { w: width, h: height },
 				at: { x: Math.round(middle.x - width / 2), y: Math.round(middle.y - height / 2) },
@@ -245,7 +245,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		return askForBoard((request) =>
 			send({
 				type: "board.create",
-				format: "component",
+				format: "board",
 				title: "Untitled",
 				size,
 				at: { x: Math.round(middle.x - size.w / 2), y: Math.round(middle.y - size.h / 2) },

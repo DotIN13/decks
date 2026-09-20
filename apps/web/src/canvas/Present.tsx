@@ -219,6 +219,9 @@ export function Present(props: {
 			class="present"
 			data-idle={idle()}
 			data-format={props.board.format}
+			/* A board that had to be wrapped in a shell has no measured height of its own, so it
+			   is the one presented as a page that scrolls (`styles/canvas.css`). */
+			data-shell={props.board.shell ?? undefined}
 			tabIndex={-1}
 			ref={(element) => {
 				layerEl = element;
@@ -242,9 +245,11 @@ export function Present(props: {
 				 * flag's `overflow: hidden` would take away the scrolling it is there to do.
 				 */
 				src={`/api/board/${props.board.path}?${slides() ? "present=1&" : ""}rev=${props.board.rev}`}
-				/* A component board is shown at the size it was laid out at. A flow document
-				    is a page: CSS gives it the window and the document scrolls inside it. */
-				style={props.board.format === "component" ? { width: `${props.board.w}px`, height: `${props.board.h}px` } : undefined}
+				/* A board is shown at the size it was written at, which is the size it is read at
+				    on the canvas. A board that had to be wrapped in a shell — a markdown file or a
+				    page from somewhere else — is a document nobody measured: CSS gives that one the
+				    window and lets it scroll. */
+				style={props.board.shell || props.board.format === "slides" ? undefined : { width: `${props.board.w}px`, height: `${props.board.h}px` }}
 				ref={(element) => {
 					frameEl = element;
 					element.addEventListener("load", () => {

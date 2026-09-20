@@ -1,4 +1,4 @@
-import { DEFAULT_BOARD_W } from "../boards/templates.ts";
+import { defaultWidth, formatOf } from "./kinds.ts";
 /**
  * What a board says about itself, read from the top of the file.
  *
@@ -105,7 +105,7 @@ export function readBoardMeta(html: string): BoardMeta {
  */
 export function withBoardSize(path: string, source: string, size: { w?: number; h?: number }): string {
 	if (!HTML_FILE.test(path)) return withFrontMatterWidth(source, size);
-	return withTagSize(source, size);
+	return withTagSize(source, size, defaultWidth(formatOf(path)));
 }
 
 /**
@@ -130,24 +130,23 @@ function withFrontMatterWidth(source: string, size: { w?: number; h?: number }):
 }
 
 /** The HTML half: one number, in the one `<meta name="board">` tag. */
-function withTagSize(html: string, size: { w?: number; h?: number }): string {
+function withTagSize(html: string, size: { w?: number; h?: number }, fallback: number): string {
 	const meta = readBoardMeta(html);
-	// The same last-resort width the loader uses, for the same reason: a record that is too
-	// narrow clips in silence, and one that is too wide is visible and one `fit` away.
-	const w = Math.max(1, Math.round(size.w ?? meta.w ?? DEFAULT_BOARD_W));
+	// The same default the loader uses, and it has to be the same one: a file that says nothing
+	// about its width would otherwise be given one number on disk and read back as another.
+	const w = Math.max(1, Math.round(size.w ?? meta.w ?? fallback));
 	/*
 	 * A height nobody gave is **left out** rather than invented.
 	 *
 	 * It used to fall back to 800 and be written like any other number, which was wrong in the
-	 * one case that matters: a flow document's tag is `{"w":760,"bg":"plain"}` — the width is the
+	 * one case that matters: a document board's tag is `{"w":760,"bg":"plain"}` — the width is the
 	 * only size it declares, because its height is its content and the browser measures it. A drag
 	 * on the width of that board therefore wrote an `h` into the file that said nothing, had never
 	 * been asked for, and would have to be kept in step with a measurement that overwrites it.
 	 * Caught by `e2e/checks/geometry.mjs`, which asserts that the rest of the tag is untouched.
 	 *
-	 * Nothing is lost by omitting it: the loader has its own last-resort dimensions for a board
-	 * that declares none (`DEFAULT_BOARD_W`, and the height beside it), so a reader that needs a
-	 * number still gets one.
+	 * Nothing is lost by omitting it: the loader has its own starting height for a board that
+	 * declares none, and the browser replaces that with the content's as soon as anybody looks.
 	 */
 	const h = size.h !== undefined ? Math.max(1, Math.round(size.h)) : meta.h !== undefined ? Math.max(1, Math.round(meta.h)) : undefined;
 	const stated = { w, ...(h !== undefined ? { h } : {}) };
@@ -186,7 +185,7 @@ function withTagSize(html: string, size: { w?: number; h?: number }): string {
 
 
 /**
- * What a *flow* board says about itself — a markdown file or a plain HTML document.
+ * What a board says about itself — an HTML document or a markdown file.
  *
  * The interesting field is the title, and the interesting decision is that it comes from the
  * **content**. A rail listing `notes.md`, `report.html`, `talk.slides.md` has no information
@@ -206,8 +205,8 @@ function withTagSize(html: string, size: { w?: number; h?: number }): string {
  * and inventing a place would be a second way to describe a file that already describes
  * itself.
  */
-export function readFlowMeta(path: string, source: string): BoardMeta {
-	const meta: BoardMeta = HTML_FILE.test(path) ? sized(readBoardMeta(source)) : {};
+export function readMeta(path: string, source: string): BoardMeta {
+	const meta: BoardMeta = HTML_FILE.test(path) ? readBoardMeta(source) : {};
 	const front = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(source);
 	if (front) {
 		for (const line of (front[1] ?? "").split(/\r?\n/)) {
@@ -241,18 +240,3 @@ export function readFlowMeta(path: string, source: string): BoardMeta {
 /** Whether a path is HTML, for deciding where its metadata lives. */
 const HTML_FILE = /\.html?$/i;
 
-/**
- * The size fields of a board's own tag, and nothing else.
- *
- * `readBoardMeta` also returns the title and the poster; the title is settled by
- * `readFlowMeta`'s own ladder (front-matter, `<title>`, `<h1>`, filename) and a poster is a
- * component board's business. Taking only `w`, `h` and `aspect` keeps one answer per
- * question.
- */
-function sized(meta: BoardMeta): BoardMeta {
-	return {
-		...(meta.w !== undefined ? { w: meta.w } : {}),
-		...(meta.h !== undefined ? { h: meta.h } : {}),
-		...(meta.aspect !== undefined ? { aspect: meta.aspect } : {}),
-	};
-}

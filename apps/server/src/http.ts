@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { renderShell } from "./boards/shell.ts";
 import { normalizeBoardPath } from "./deck/schema.ts";
-import { readFlowMeta } from "./deck/meta.ts";
+import { readMeta } from "./deck/meta.ts";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cacheControlFor, compressedStatic } from "./static.ts";
@@ -116,13 +116,9 @@ export function createHttpApp(app: App): Express {
 			 * the shell stays *relative* and a nested board resolves its own sibling.
 			 */
 			const board = req.query.raw === undefined ? app.deck.board(normalizeBoardPath(requested)) : undefined;
-			/*
-			 * `format !== "component"` is a narrowing rather than a second condition: a board
-			 * that needs a shell is never a component board — `shellFor` only answers for a
-			 * `.md` file or an HTML page with no board class, and `formatOf` calls both of
-			 * those flow. Written out so the compiler knows it too.
-			 */
-			if (board?.shell && board.format !== "component") {
+			// A board that has to be rendered *into* a document: a `.md`, a deck, or a page
+			// from somewhere else (`deck/kinds.ts`).
+			if (board?.shell) {
 				res.type("html").send(
 					renderShell({
 						path: board.path,
@@ -382,7 +378,7 @@ function sendFile(res: Response, target: string): Promise<void> {
  */
 function aspectOf(deck: { path: string }, boardPath: string): string | undefined {
 	try {
-		return readFlowMeta(boardPath, readFileSync(join(deck.path, boardPath), "utf8")).aspect;
+		return readMeta(boardPath, readFileSync(join(deck.path, boardPath), "utf8")).aspect;
 	} catch {
 		return undefined;
 	}

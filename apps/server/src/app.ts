@@ -188,8 +188,8 @@ export class App {
 			origin: () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`,
 			dir: join(deck.path, ".decks", "thumbs"),
 			/*
-			 * The same guards as `board.extent` on the wire — a flow board, at the revision
-			 * measured — and one more: **a reader's browser outranks this one.**
+			 * The same guards as `board.extent` on the wire — the revision measured, and never a
+			 * deck — and one more: **a reader's browser outranks this one.**
 			 *
 			 * This measurement is taken in the server's own Chromium, with the server's fonts. A
 			 * reader's browser has theirs, and the same document comes to a different height in
@@ -203,7 +203,7 @@ export class App {
 			 */
 			measured: (path, rev, h) => {
 				const board = this.deck.board(path);
-				if (board?.format !== "flow" || board.rev !== rev) return;
+				if (!board || board.format === "slides" || board.rev !== rev) return;
 				if (this.boards.extent(path, rev)) return;
 				if (this.deck.setHeight(path, h)) this.send({ type: "deck.state", deck: this.stageState() });
 			},

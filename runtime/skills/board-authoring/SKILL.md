@@ -1,6 +1,6 @@
 ---
 name: board-authoring
-description: How to write a board. The default is a one-screen page you design yourself on the theme tokens; this also covers the positioned "component" format and its board.css vocabulary, diagrams, embeds and links. Read before building anything beyond a title, a visual and a few words.
+description: How to write a board. One format: a one-screen page you design, whose root-level blocks are placed where they say they go. Covers the board.css vocabulary, diagrams, embeds and links. Read before building anything beyond a title, a visual and a few words.
 ---
 
 # Board authoring
@@ -24,15 +24,22 @@ description: How to write a board. The default is a one-screen page you design y
   or under it that shows the chosen row. Another: two or three tabs over one chart area.
 - When the person asks for something to use as it stands (a message to send, a section of a protocol, a full list, code), the board holds that thing in full and nothing else. The one-screen rule limits what you add, not what they asked for.
 
-**The default format: a page you design**
+**One format: a page you design, with placed blocks**
 
-- `stage.newBoard({ title })` writes `<body class="board flow">` with `../lib/theme.css`, a `<style>`
-  block, a `<header data-id="title">` and an empty `<main data-id="main">`. Its height is measured,
-  so it cannot clip. Write your own CSS; lay out with flexbox or grid in normal flow.
-- `theme.css` is tokens only, light and dark: `--b-fg --b-muted --b-faint --b-bg --b-bg-deep
+- `stage.newBoard({ title })` writes `<body class="board">` with `../lib/board.css`, a `<style>`
+  block and one block: `<div class="doc" data-id="doc">`. Write your own CSS; inside a block, lay
+  out with flexbox or grid.
+- **Root-level blocks are out of the page's flow.** `board.css` puts every direct child of
+  `<body>` in absolute position, so put your content inside one block rather than stacking
+  several. `.doc` covers the board and is as tall as its content, which is what makes it read as
+  a document. A block that states a `left` and a `top` of its own is placed at that point, on an
+  8px grid, and is the thing a person can drag. One file holds both; there is no second format.
+- The height is measured, so a board cannot clip. Leave `h` out of `<meta name="board">`; a height
+  you do write is a floor the content can raise, which is how you keep room under the last block.
+- `board.css` brings the tokens, light and dark: `--b-fg --b-muted --b-faint --b-bg --b-bg-deep
   --b-bg-layer --b-border --b-border-strong --b-accent --b-accent-soft --b-ok --b-warn --b-danger
   --b-radius --b-font --b-mono`. Never hardcode a colour the tokens cover.
-- Every top-level block of `<body>` gets a stable, meaningful `data-id`. `board.js` stays last.
+- Every root-level block gets a stable, meaningful `data-id`. `board.js` stays last.
 - Patterns that work: a highlighted row in a comparison table; before and after side by side; a
   sequence diagram with three lifelines; a row of large numbers with a one-line label each; one
   chart with a labelled axis and the winning series in the accent colour.
@@ -40,18 +47,16 @@ description: How to write a board. The default is a one-screen page you design y
   smallest type and any content wider than the board. Fix what it says is over; when it says
   "One screen", stop.
 
-**Other formats, when asked for**
+**The one other format, when asked for**
 
 - `format: "slides"`: a `.slides.html` reveal deck, one `<section>` per slide, 960 by 540.
-- `format: "component"`: `<body class="board">` with `../lib/board.css`, every component a direct
-  child of `<body>` with inline `left`, `top`, `width` on an 8px grid. The person can drag these
-  boxes. Size it in `<meta name="board">` and `stage.fit` it, because it clips otherwise.
 
-**Component rules (only for `format: "component"`)**
+**Placed blocks: the rules**
 
 - **Direct Children & IDs:** Every movable widget must be a direct child of `<body>`, styled with
   inline coordinates (`left`, `top`, `width` on an 8px grid), and assigned a semantic, stable
-  `data-id` (e.g., `data-id="auth-flow"`).
+  `data-id` (e.g., `data-id="auth-flow"`). A block with no coordinates of its own sits at the
+  origin, which is what the document block relies on.
 - **Editable Word Runs:** Any continuous run of text and phrasing marks (`<b>`, `<a>`, `<span>`)
   forms a single double-click editable field. Place strings that should be edited independently into
   separate leaf elements. Never put editable copy in CSS, scripts, or attributes.

@@ -187,7 +187,7 @@ say(
 );
 say("nothing else in the file moved", nowComponent.replace(/"w":\d+,"h":\d+/, '"w":0,"h":0') === wasComponent.replace(/"w":\d+,"h":\d+/, '"w":0,"h":0'), "the rest of the bytes are identical");
 
-// --- a flow document: the width is storable, the height is its content ----------------
+// --- a board written as a document: both numbers are writable, and the height is a floor ---
 
 const flow = await boardPath("notes.html");
 const flowPath = "boards/notes.html";
@@ -197,7 +197,7 @@ const flowMeta = metaOf(wasFlow);
 await select(flowPath);
 const flowHandle = await handleAt(flowPath);
 say(
-	"a flow document gets the same handle — one box, on the corner, not a bar of another shape",
+	"a board written as a document gets the same handle — one box, on the corner, not a bar of another shape",
 	flowHandle !== null &&
 		both !== null &&
 		flowHandle.square &&
@@ -206,16 +206,23 @@ say(
 		flowHandle.cursor === both.cursor &&
 		Math.abs(flowHandle.dx) <= 1 &&
 		Math.abs(flowHandle.dy) <= 1,
-	`${JSON.stringify(flowHandle)} vs the component board's ${JSON.stringify(both)}`,
+	`${JSON.stringify(flowHandle)} vs the other board's ${JSON.stringify(both)}`,
 );
 
 await dragHandle(flowPath, 120, 60);
 await changed(flow, wasFlow, { timeout: 8000 }).catch(() => {});
 const nowFlow = read(flow);
 const flowAfter = metaOf(nowFlow);
+/*
+ * Both numbers, on every board. The height used to be dropped here because this board was a
+ * *flow* document and its height was the browser's alone. It is one format now: what a drag
+ * writes is a floor, and the content raises the board above it whenever it needs more room — so
+ * dragging the bottom edge is how you keep space under the last block, and it can never cut a
+ * paragraph off.
+ */
 say(
-	"…so its width is written and its height is left alone",
-	flowAfter !== null && flowAfter.w > flowMeta.w && flowAfter.h === flowMeta.h,
+	"…so both numbers are written, and the height it gains is a floor under the content",
+	flowAfter !== null && flowAfter.w > flowMeta.w && flowAfter.h > 0,
 	`${JSON.stringify(flowMeta)} → ${JSON.stringify(flowAfter)}`,
 );
 

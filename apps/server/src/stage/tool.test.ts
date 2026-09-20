@@ -36,7 +36,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	/** The workspace the fake session is in, so `me.setWorkspace` → `me.get` is one round trip. */
 	let room: string | undefined;
 	/** What a browser would have reported, if one were looking. */
-	const extents = new Map<string, { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
+	const extents = new Map<string, { rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
 	const worked: string[] = [];
 	/** Every `stage.move`, with the stage it was written on. */
 	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
@@ -400,7 +400,7 @@ test("attach is most-recently-touched first, and re-attaching moves the board to
 test("resize writes the meta and the deck agrees immediately", async () => {
 	const { tool, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const before = deck.board("boards/plan.html");
-	assert.equal(before?.w, 1600, "the last-resort width, since this board's file says nothing");
+	assert.equal(before?.w, 1000, "the default width, since this board's file says nothing");
 
 	const result = await tool.run(`return await stage.resize("boards/plan.html", { w: 1600, h: 1100 })`);
 	assert.match(result.text, /"w": 1600/);
@@ -423,7 +423,7 @@ test("fit says to put the board on the canvas rather than guessing a height", as
 test("fit takes the height from the content and leaves the width alone", async () => {
 	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const board = deck.board("boards/plan.html");
-	assert.equal(board?.w, 1600, "a board that says nothing about itself gets the ceiling");
+	assert.equal(board?.w, 1000, "a board that says nothing about itself gets the default");
 	extents.set("boards/plan.html", { rev: board!.rev, w: 700, h: 1400 });
 
 	await tool.run(`return await stage.fit("boards/plan.html")`);
@@ -432,38 +432,40 @@ test("fit takes the height from the content and leaves the width alone", async (
 	/*
 	 * The change this test exists for. `fit` used to take the width too, in two passes, which made
 	 * it the one call that could reflow a document to a number it measured for a moment — and on a
-	 * flow board, whose `.doc` is `width: 100%` of the frame, the width it read back was the frame's
-	 * own, so every fit grew the board by the margin.
+	 * board written as a document, whose block is `width: 100%` of the frame, the width it read
+	 * back was the frame's own, so every fit grew the board by the margin.
 	 */
-	assert.equal(fitted?.w, 1600, "and the width is exactly what the file said");
+	assert.equal(fitted?.w, 1000, "and the width is exactly what the board had");
 	cleanup();
 });
 
 /*
- * The margin is a component board's, and a page that took it scrolled.
+ * The margin is room under the last placed box, and a page that took it scrolled.
  *
- * A flow board's height is not stored: the browser measures it and the deck takes that number.
- * The `<meta>` tag is read by `board.js`, which makes it the body's height — so a fit that wrote
- * the measurement plus 48 left every page 48px taller than the rectangle the canvas gave it, and
- * a page brings its own CSS, so there was no `overflow: hidden` to hide the difference. What the
- * reader got was a scrollbar on a board.
+ * The `<meta>` tag is what `board.js` makes the body's height, so a fit that wrote the
+ * measurement plus 48 left a page 48px taller than the document inside it: a strip of nothing
+ * along the bottom, and on a board that brings its own CSS there was no `overflow: hidden` to
+ * hide it. What the reader got was a scrollbar on a board.
+ *
+ * It used to be settled by the format. It is settled by the reading now: the frame reports the
+ * document's own height beside the blocks' extent, and when the document is the taller of the
+ * two it has already accounted for its own room.
  */
-test("a flow board is fitted to its content exactly, with no margin to scroll", async () => {
+test("a board that ends in its own padding is fitted exactly, with no margin to scroll", async () => {
 	const { tool, deck, extents, write, read, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
-	write("boards/page.html", `<!doctype html><title>page</title><meta name="board" content='{"w":1000}' /><body class="board flow"></body>`);
+	write("boards/page.html", `<!doctype html><title>page</title><meta name="board" content='{"w":1000}' /><body class="board"><div class="doc" data-id="doc"></div></body>`);
 	const page = deck.board("boards/page.html");
-	assert.equal(page?.format, "flow");
-	extents.set("boards/page.html", { rev: page!.rev, w: 956, h: 604 });
+	assert.equal(page?.format, "board");
+	extents.set("boards/page.html", { rev: page!.rev, w: 956, h: 604, page: 604 });
 
 	await tool.run(`return await stage.fit("boards/page.html")`);
-	// The file, not the record: a flow board's height in the deck is the browser's to report,
-	// and the tag is what `board.js` makes the body's height. Those two are the pair that has
-	// to agree, and 604 + a margin is the document that scrolled.
+	// The file, not the record: the tag is what `board.js` makes the body's height, and those
+	// two are the pair that has to agree. 604 + a margin is the document that scrolled.
 	assert.match(read("boards/page.html"), /"h":604/, "the measurement, and nothing added to it");
-	// The component board next door still gets its margin: there the height is stored, and the
-	// margin is the room a writer would have left below the last box.
+	// A board that ends in a placed box still gets its margin: there the last thing on the board
+	// is a box, and the margin is the room a writer would have left under it.
 	const plan = deck.board("boards/plan.html");
-	extents.set("boards/plan.html", { rev: plan!.rev, w: 700, h: 1400 });
+	extents.set("boards/plan.html", { rev: plan!.rev, w: 700, h: 1400, page: 900 });
 	await tool.run(`return await stage.fit("boards/plan.html")`);
 	assert.equal(deck.board("boards/plan.html")?.h, 1448);
 	cleanup();
@@ -498,7 +500,7 @@ test("fit still grows the height past a board its content has outgrown", async (
 	extents.set("boards/plan.html", { rev: board!.rev, w: 1300, h: 600 });
 
 	await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
-	assert.equal(deck.board("boards/plan.html")?.w, 1600, "the width is not what grew");
+	assert.equal(deck.board("boards/plan.html")?.w, 1000, "the width is not what grew");
 	assert.equal(deck.board("boards/plan.html")?.h, 600);
 	cleanup();
 });
@@ -514,7 +516,7 @@ test("a fit of a wide board leaves it wide and says nothing about width", async 
 	extents.set("boards/plan.html", { rev: board!.rev, w: 1900, h: 600 });
 
 	const result = await tool.run(`return await stage.fit("boards/plan.html", { margin: 0 })`);
-	assert.equal(deck.board("boards/plan.html")?.w, 1600, "the width the file has, not the content's");
+	assert.equal(deck.board("boards/plan.html")?.w, 1000, "the width the board has, not the content's");
 	assert.equal(deck.board("boards/plan.html")?.h, 600);
 	assert.equal(/came out \d+ wide/.test(result.text), false, result.text);
 	cleanup();
@@ -550,9 +552,9 @@ test("an unknown format is refused by name rather than quietly becoming a board"
 
 	assert.equal(result.isError, true);
 	// The words a caller reaches for — `reveal`, `markdown`, `deck` — are not formats, and a
-	// silent fallback to component would write positioned boxes for a talk.
+	// silent fallback to a board would write a page for a talk.
 	assert.match(result.text, /Unknown format reveal/);
-	assert.match(result.text, /component, flow, slides/);
+	assert.match(result.text, /board, slides/);
 	cleanup();
 });
 

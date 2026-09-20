@@ -133,13 +133,11 @@ const MEASURE = `(() => {
 		if (r.width > 0 && r.height > 0 && r.bottom > h) h = r.bottom;
 	}
 	if (h === 0) return 0;
-	if (document.body.classList.contains("flow")) {
-		const held = document.body.style.height;
-		document.body.style.height = "auto";
-		const page = document.body.scrollHeight;
-		document.body.style.height = held;
-		if (page > h) h = page;
-	}
+	const held = document.body.style.height;
+	document.body.style.height = "auto";
+	const page = document.body.scrollHeight;
+	document.body.style.height = held;
+	if (page > h) h = page;
 	return Math.ceil(h);
 })()`;
 
@@ -318,11 +316,15 @@ export class ThumbService {
 			// says so is drawn as it stands: a late picture beats none.
 			await page.waitForFunction("window.__boardReady === true", undefined, { timeout: READY_MS }).catch(() => {});
 			let clip = thumbClip(job.board);
-			if (job.board.format === "flow") {
+			if (job.board.format !== "slides") {
 				const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
-				if (measured > 0) {
-					clip = thumbClip({ w: job.board.w, h: measured });
-					this.host.measured?.(job.board.path, job.board.rev, measured);
+				// Never below what the board says it is: a stated height is a floor everywhere
+				// else (`deck/loader.ts`), and a picture cropped under it would be a different
+				// board from the one on the canvas.
+				const h = Math.max(measured, job.board.h);
+				if (measured > 0 && h !== job.board.h) {
+					clip = thumbClip({ w: job.board.w, h });
+					this.host.measured?.(job.board.path, job.board.rev, h);
 				}
 			}
 			const shot = await page.screenshot({

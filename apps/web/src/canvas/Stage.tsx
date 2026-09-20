@@ -132,7 +132,7 @@ export function Stage(props: {
 	/** So the server can answer `stage.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
 	/** How much room a board's content took, measured in its frame once it had mounted. */
-	onExtent?: (path: string, extent: { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
+	onExtent?: (path: string, extent: { rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
 	editor: EditorHost;
 	/** A tool picked by its key, which the palette's tooltips have always claimed. */
 	onTool?: (tool: Tool) => void;
@@ -1095,14 +1095,15 @@ export function Stage(props: {
 			/*
 			 * ⌥ is the file, on every board.
 			 *
-			 * And a plain double-click on a *field* board — a placed one, or a flow document this app
-			 * did not write — is nobody's: the run of words under the pointer is the in-frame field
-			 * editor's, and the document around it has no editor. This used to open a second editor
-			 * that wrote ops off a GrapesJS model; that editor drew the board as a stack of blocks
-			 * and refused most of the writes it did make, so the answer is `false` and the honest way
-			 * to edit one of these as a document is ⌥ and the text.
+			 * And a plain double-click on a board this app wrote is nobody's: the run of words under
+			 * the pointer belongs to the in-frame field editor, and the document around it has no
+			 * editor. This used to open a second editor that wrote ops off a GrapesJS model; that
+			 * editor drew the board as a stack of blocks and refused most of the writes it did make,
+			 * so the answer is `false` and the honest way to edit one of these as a document is ⌥ and
+			 * the text. A board with a `shell` is the exception, because there is no in-frame editor
+			 * on a markdown file or a page from somewhere else: the source *is* the board.
 			 */
-			if (!alt && (board.format === "component" || (board.format === "flow" && !board.shell))) return false;
+			if (!alt && !board.shell) return false;
 			props.onEditSource(path);
 			return true;
 		},

@@ -11,11 +11,12 @@ export type WebTarget = string | { ref: string } | { name: string; nth?: number 
 export interface Stage {
 	/**
 	 * Write a blank board and return its path. The title is the finding, as a sentence.
-	 * `format`: "flow" (default) is an ordinary page you design, its height measured;
-	 * "component" is absolutely positioned boxes on `board.css`, for a board the person
-	 * will drag around; "slides" is a reveal deck of `<section>`s in a `.slides.html`.
+	 * `format`: "board" (default) is one HTML page you design, whose root-level blocks are
+	 * placed where they say and whose height is measured; "slides" is a reveal deck of
+	 * `<section>`s in a `.slides.html`. ("component" and "flow" named the two board formats
+	 * that are now one, and both still mean "board".)
 	 */
-	newBoard(o: { title: string; format?: "component" | "flow" | "slides"; w?: number; h?: number }): Promise<string>;
+	newBoard(o: { title: string; format?: "board" | "slides"; w?: number; h?: number }): Promise<string>;
 	/** Put exactly these boards on the canvas and move the camera to them. `highlight` outlines one `data-id`. */
 	show(path: string | string[], o?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }): Promise<{ shown: string[] }>;
 	/**

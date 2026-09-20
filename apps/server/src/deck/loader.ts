@@ -2,34 +2,21 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
-import { readBoardMeta, readFlowMeta } from "./meta.ts";
+import { readMeta } from "./meta.ts";
 import { defaultWidth, formatOf, isBoardFile, liveKindOf, shellFor, slideHeight } from "./kinds.ts";
 import { resolveInDeck, resolveRoots, type ResolvedRoots } from "./roots.ts";
 import { syncRuntimeLib } from "./lib-sync.ts";
 import { declaredRoots, normalizeBoardPath, parseDeckFile, serializeDeckFile, type DeckFile } from "./schema.ts";
-import { DEFAULT_BOARD_W } from "../boards/templates.ts";
 
 /**
- * Defaults for a board that says nothing about its own size.
- *
- * The ceiling rather than a typical width, and deliberately so: this is the last resort for
- * a file with no `<meta name="board">` at all, and the two ways to be wrong are not equal.
- * A record too *narrow* clips the board in silence, which is the failure nobody sees; a
- * record too wide is a board with empty grid down one side, which anybody can see and
- * `stage.fit` corrects in one call. Shapes that know their own width are in
- * `boards/templates.ts`, and every one of them is well under this.
- */
-const DEFAULT_W = DEFAULT_BOARD_W;
-const DEFAULT_H = 800;
-/**
- * A flow board's height until a frame measures it, and a *foreign* one's for good.
+ * A board's height until a frame measures it, and a *foreign* one's for good.
  *
  * The short one, because a board that grows into its content on load looks like it is arriving where
  * one that shrinks looks broken. The long one, because a sandboxed document from somewhere else
  * cannot measure itself at all, so its placeholder has to be a usable page rather than a box that
  * grows.
  */
-const FLOW_H = 240;
+const START_H = 240;
 const FOREIGN_H = 600;
 /** Space between auto-placed boards, and how many go in a row before wrapping. */
 const GUTTER = 160;
@@ -68,6 +55,16 @@ export class Deck {
 	 * told about it.
 	 */
 	private signatures = new Map<string, string>();
+	/**
+	 * The height each board's file states, or 0 for a board that states none.
+	 *
+	 * **A stated height is a floor, not a ceiling.** It is what a drag or a `stage.fit` wrote, and the
+	 * browser's measurement raises the board above it whenever the content needs more room — so a board
+	 * can be given space under its last box and can still never clip. Kept here rather than on the
+	 * `Board` because nothing outside this file has a use for it: what everything else wants is `h`,
+	 * which is already the answer.
+	 */
+	private floors = new Map<string, number>();
 	private resolved: ResolvedRoots;
 	readonly warnings: string[] = [];
 
@@ -273,6 +270,7 @@ export class Deck {
 			if (seen.has(path)) continue;
 			this.boardsByPath.delete(path);
 			this.signatures.delete(path);
+			this.floors.delete(path);
 			removed.push(path);
 		}
 
@@ -288,6 +286,7 @@ export class Deck {
 			return undefined;
 		}
 		const previous = this.boardsByPath.get(path);
+		const floorBefore = this.floors.get(path);
 		const board = this.describe(path);
 		if (previous) {
 			board.x = previous.x;
@@ -297,12 +296,16 @@ export class Deck {
 			board.namedAt = previous.namedAt;
 			board.seenAt = previous.seenAt;
 			/*
-			 * A flow board's height is its content's, and only a frame knows it: the file cannot state one,
-			 * so the reading the last look produced is the best answer until the next look. Without this,
-			 * editing a flow board shrank it to the placeholder for a beat — and a board that jumps is the
-			 * thing `refresh` exists to avoid.
+			 * A board's height is its content's, and only a frame knows it: the reading the last look
+			 * produced is the best answer until the next look. Without this, editing a board shrank it to
+			 * the height in its file for a beat — and a board that jumps is the thing `refresh` exists to
+			 * avoid.
+			 *
+			 * Unless the file's own number moved, which is a drag or a `stage.fit` writing a new floor.
+			 * That one is deliberate and has to land now, or a fit that tightens a board would appear to do
+			 * nothing until something else reloaded it.
 			 */
-			if (board.format === "flow") board.h = previous.h;
+			if (board.format !== "slides" && floorBefore === this.floors.get(path)) board.h = Math.max(previous.h, board.h);
 		} else {
 			autoPlace([board], this.boards);
 		}
@@ -336,17 +339,22 @@ export class Deck {
 		const existed = existsSync(absolute);
 		if (existed) rmSync(absolute);
 		this.boardsByPath.delete(path);
+		this.floors.delete(path);
 		return existed;
 	}
 
 	/**
 	 * Keep a height a frame measured, for this session.
 	 *
-	 * The one number a board cannot state itself: a flow document's height is what its content came to,
-	 * and only the browser knows it. Written nowhere — a height is a reading, and one recorded beside
-	 * the board would be a second answer to "how tall is this" that goes stale the moment the content
-	 * changes, which is exactly the shadowing this file used to do to a width. Kept on the board, so
-	 * `deck.state` carries it while the process is up, and re-measured on the next load.
+	 * The one number a board cannot state for itself: how tall its content came to, which only the
+	 * browser knows. Written nowhere — a height is a reading, and one recorded beside the board would
+	 * be a second answer to "how tall is this" that goes stale the moment the content changes, which is
+	 * exactly the shadowing this file used to do to a width. Kept on the board, so `deck.state` carries
+	 * it while the process is up, and re-measured on the next load.
+	 *
+	 * **Never below the floor the file states.** That number is what somebody dragged or what a fit
+	 * wrote, and a measurement that undercut it would take away the room under the last box a beat after
+	 * it was asked for. Above it the measurement always wins, which is what makes clipping impossible.
 	 *
 	 * Returns the board only when the number actually moved, which is what stops a measurement that
 	 * agrees with the board from broadcasting a `deck.state` and reloading the frame that produced it,
@@ -354,9 +362,12 @@ export class Deck {
 	 */
 	setHeight(boardPath: string, h: number): Board | undefined {
 		const board = this.board(boardPath);
-		if (!board || board.format !== "flow") return undefined;
-		const height = Number.isFinite(h) && h > 0 ? Math.round(h) : undefined;
-		if (height === undefined || height === board.h) return undefined;
+		// A deck's height is its aspect's, not its content's.
+		if (!board || board.format === "slides") return undefined;
+		const measured = Number.isFinite(h) && h > 0 ? Math.round(h) : undefined;
+		if (measured === undefined) return undefined;
+		const height = Math.max(measured, this.floors.get(board.path) ?? 0);
+		if (height === board.h) return undefined;
 		board.h = height;
 		return board;
 	}
@@ -364,44 +375,43 @@ export class Deck {
 	private describe(path: string): Board {
 		const absolute = join(this.path, path);
 		const source = readFileSync(absolute, "utf8");
-		const format = formatOf(path, source);
+		const format = formatOf(path);
 		// A stub that draws itself from `postMessage`, if this is one.
 		const live = liveKindOf(source);
 		// Whether the file is a document already, or content that has to be wrapped in one.
 		const shell = shellFor(path, source);
-		const meta = format === "component" ? readBoardMeta(source) : readFlowMeta(path, source);
+		const meta = readMeta(path, source);
 		// Recorded here rather than in `resync` so that every path that reads a board —
 		// the first load, a watcher event, a `resync` — leaves the same mark behind.
 		this.signatures.set(path, signatureOf(absolute));
 		/*
 		 * Where the size comes from: **the board's own file**, and nowhere else.
 		 *
-		 * A component board says both numbers in `<meta name="board">`; a flow document says its width
-		 * in the same tag (or in front-matter, if it is markdown) and its height *is its content*, so
-		 * what it declares is a placeholder; a slide deck says its width and derives its height from the
-		 * aspect. And `deck.json` no longer keeps a copy: preferring one meant a resize that wrote
-		 * the file — which is what every resize does — could appear to do nothing, and a flow board's
-		 * width was unchangeable for as long as the record disagreed with the file.
+		 * A board says its width in `<meta name="board">` (or in front-matter, if it is markdown) and
+		 * may say a height there too; a slide deck says its width and derives its height from the
+		 * aspect. And `deck.json` no longer keeps a copy: preferring one meant a resize that wrote the
+		 * file — which is what every resize does — could appear to do nothing, and a board's width was
+		 * unchangeable for as long as the record disagreed with the file.
 		 */
-		const width = meta.w ?? (format === "component" ? DEFAULT_W : defaultWidth(format));
-		const height =
-			format === "component"
-				? meta.h ?? DEFAULT_H
-				: format === "slides"
-					? slideHeight(width, meta.aspect)
-					: /*
-						 * A flow document's height is its content's, and the browser replaces whatever is here with
-						 * the truth as soon as it loads — so a height in the file is a *starting* answer, and what a
-						 * resize wrote belongs there for the next load to start from.
-						 *
-						 * A *sandboxed* flow board — a document from somewhere else — never gets that measurement, so
-						 * for it this is the answer, not a start. Hence the two placeholders: a usable page for a
-						 * document nobody can measure, and the short one for ours, because a board that grows into its
-						 * content on load looks like it is arriving where one that shrinks looks broken. Keyed on the
-						 * shell rather than the extension: a flow board this app wrote is HTML too, and measures
-						 * itself like any other.
-						 */
-						meta.h ?? (shell === "foreign" ? FOREIGN_H : FLOW_H);
+		const width = meta.w ?? defaultWidth(format);
+		/*
+		 * **A stated height is a floor.** It is the room somebody dragged out or the number `stage.fit`
+		 * wrote, and the browser's measurement raises the board above it the moment the content needs
+		 * more — so a board keeps the space it was given and still cannot clip. A file that states none
+		 * is the ordinary case and is exactly as tall as what is on it.
+		 *
+		 * Two formats used to answer this, and the honest reading of the difference is that one of them
+		 * always stated a height and the other never did. It is one line now, and which line a board
+		 * takes is the file's to say rather than the format's.
+		 *
+		 * A *sandboxed* board — a document from somewhere else — never gets a measurement at all, so for
+		 * it the placeholder is the answer rather than a start. Hence the two: a usable page for a
+		 * document nobody can measure, and the short one for ours, because a board that grows into its
+		 * content on load looks like it is arriving where one that shrinks looks broken.
+		 */
+		const floor = format === "slides" ? 0 : meta.h ?? 0;
+		this.floors.set(path, floor);
+		const height = format === "slides" ? slideHeight(width, meta.aspect) : floor || (shell === "foreign" ? FOREIGN_H : START_H);
 		return {
 			path,
 			// `.slides.html` before `.html`, or a deck with no title of its own is called

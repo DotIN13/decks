@@ -12,7 +12,7 @@ const identity = (workspace?: string, name?: string): Identity => ({
 const board = (path: string, modifiedAt: number, lastWrittenBy?: string): Board => ({
 	path,
 	title: path.replace("boards/", ""),
-	format: "component",
+	format: "board",
 	x: 0,
 	y: 0,
 	w: 100,

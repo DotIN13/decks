@@ -8,7 +8,7 @@ import {
 	extensionFor,
 	MIRROR_SIZE,
 	renderBlank,
-	renderFormat,
+	renderSlides,
 	renderMirror,
 	renderWebBoard,
 	slugFor,
@@ -69,9 +69,9 @@ export class BoardService {
 	readonly revisions: Revisions;
 	private readonly authors: Authors;
 	private readonly seenAt: Seen;
-	private readonly extents = new Map<string, { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
+	private readonly extents = new Map<string, { rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
 	/** `stage.fit` calls waiting for the frame to load and report. */
-	private readonly extentWaiters = new Set<{ path: string; rev: number; resolve: (extent: { w: number; h: number } | undefined) => void }>();
+	private readonly extentWaiters = new Set<{ path: string; rev: number; resolve: (extent: { w: number; h: number; page?: number } | undefined) => void }>();
 
 	constructor(
 		private deck: Deck,
@@ -167,19 +167,25 @@ export class BoardService {
 	 * showing the same board agree, and a stale reading is filtered where it is read
 	 * rather than hoarded here.
 	 */
-	noteExtent(path: string, extent: { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void {
+	noteExtent(path: string, extent: { rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void {
 		this.extents.set(path, extent);
 		for (const waiter of [...this.extentWaiters]) {
 			if (waiter.path !== path || waiter.rev !== extent.rev) continue;
 			this.extentWaiters.delete(waiter);
-			waiter.resolve({ w: extent.w, h: extent.h });
+			waiter.resolve({ w: extent.w, h: extent.h, ...(extent.page === undefined ? {} : { page: extent.page }) });
 		}
 	}
 
-	/** The measurement for this board *at this revision*, or nothing. */
-	extent(path: string, rev: number): { w: number; h: number } | undefined {
+	/**
+	 * The measurement for this board *at this revision*, or nothing.
+	 *
+	 * `h` is the room the content needs — the furthest edge of the root-level blocks, or the
+	 * document's own height, whichever is greater — and `page` is that second number alone, so a
+	 * caller can tell a board that ends in a placed box from one that ends in its own padding.
+	 */
+	extent(path: string, rev: number): { w: number; h: number; page?: number } | undefined {
 		const extent = this.extents.get(path);
-		return extent && extent.rev === rev ? { w: extent.w, h: extent.h } : undefined;
+		return extent && extent.rev === rev ? { w: extent.w, h: extent.h, ...(extent.page === undefined ? {} : { page: extent.page }) } : undefined;
 	}
 
 	/** How many words the browser counted on this board at this revision, and its smallest type. */
@@ -206,7 +212,7 @@ export class BoardService {
 	 * `undefined` rather than a rejection: "nobody is looking at that board" is an answer,
 	 * and the caller (`stage.fit`) turns it into a sentence that says what to do about it.
 	 */
-	awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number } | undefined> {
+	awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number; page?: number } | undefined> {
 		const ready = this.extent(path, rev);
 		if (ready) return Promise.resolve(ready);
 		return new Promise((resolve) => {
@@ -278,12 +284,12 @@ export class BoardService {
 		 * The extension comes from the format and from nowhere else.
 		 *
 		 * `deck/kinds.ts` reads a board's format back out of its name, so these two cannot be
-		 * allowed to disagree: a file asked for as slides and written as `.md` would simply
-		 * *be* a flow board, correctly, with nothing anywhere to say why. The board itself is
+		 * allowed to disagree: a file asked for as slides and written as `.html` would simply
+		 * *be* a board, correctly, with nothing anywhere to say why. The board itself is
 		 * always blank when it is created — there are no templates any more; the examples a
 		 * board can be modelled on live in `examples/` beside the deck, refreshed on restart.
 		 */
-		const format = options.format ?? "component";
+		const format = options.format ?? "board";
 		const extension = extensionFor(format);
 		const base = slugFor(options.title);
 		let path = `boards/${base}${extension}`;
@@ -293,7 +299,7 @@ export class BoardService {
 		}
 
 		const file = this.deck.fileOf(path);
-		const html = format === "component" ? renderBlank(options.title, options.size) : renderFormat(format, options.title, options.size);
+		const html = format === "slides" ? renderSlides(options.title, options.size) : renderBlank(options.title, options.size);
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, html);
 		this.revisions.record(path, html);
@@ -443,28 +449,27 @@ export class BoardService {
 		const file = this.deck.fileOf(path);
 
 		/*
-		 * A flow or slides board is edited as its own source.
+		 * A board edited as its own source: the file's bytes, written whole.
 		 *
 		 * Handled before `applyPatches` rather than inside it, because that function is
-		 * parse5 over an HTML document and this is a markdown file: there is nothing to
+		 * parse5 over an HTML document and this may be a markdown file: there is nothing to
 		 * parse, address or splice. The write is the whole of the edit.
 		 *
-		 * A `source` op against a component board is refused rather than obeyed. Writing a
-		 * textarea's contents over a board of positioned components would work exactly once
-		 * and destroy the document — and the refusal is the sort a person can act on,
-		 * because it says which editor the board actually has.
+		 * It used to be refused for a board of placed boxes, on the grounds that replacing
+		 * such a document from a textarea would work once and destroy it. That was the
+		 * format talking: a board is a file, the source editor is opened deliberately (with
+		 * ⌥, `canvas/Stage.tsx`), and every write here is recorded as a revision that undo
+		 * can walk back. What is still refused is a source op *batched* with others, which
+		 * could only mean two writers disagreeing about the same bytes.
 		 */
 		const source = patches.find((patch) => patch.op === "source");
 		if (source) {
-			if (patches.length > 1 || board.format === "component") {
+			if (patches.length > 1) {
 				reply({
 					type: "board.patched",
 					path,
 					rev: board.rev,
-					refused:
-						board.format === "component"
-							? "That board is made of components; drag and retype them instead of replacing the file."
-							: "A source edit replaces the whole file, so it cannot be batched with other changes.",
+					refused: "A source edit replaces the whole file, so it cannot be batched with other changes.",
 				});
 				return;
 			}

@@ -4,7 +4,7 @@ import type { AgentKind, AgentMode, AgentState, Camera, Identity, Schedule, Sche
 import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
 import { roster } from "../agents/workspaces.ts";
-import { BOARD_FORMATS, boardWidth, isBoardFormat } from "../boards/templates.ts";
+import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService, WebTarget } from "./service.ts";
 
@@ -371,16 +371,15 @@ export function createStageTool(deps: {
 			/*
 			 * What the board *is as a file*, which is all a new board is allowed to choose.
 			 *
-			 * `flow` is the default: an ordinary page the agent designs, on the theme tokens
-			 * alone, whose height is measured. It was `component` until boards were tried in
-			 * variants against a clean deck: the positioned vocabulary cost an agent twice the
-			 * tool calls and money for the same one-screen board, and read no better. `component`
-			 * is still written when asked for, and is what a person's double-click creates;
-			 * `slides` is a reveal deck. The extension is derived from this and never named —
-			 * see `boards/templates.ts`.
+			 * `board` is the default and is nearly always the answer: one HTML document, whose
+			 * root-level blocks are placed where they say and flow where they do not, and whose
+			 * height is measured. `slides` is a reveal deck, which is a different thing to read
+			 * rather than a different way to write one. The two words that used to name the two
+			 * board formats, `component` and `flow`, both mean `board` now. The extension is
+			 * derived from this and never named — see `boards/templates.ts`.
 			 */
-			const format = options.format ?? "flow";
-			if (!isBoardFormat(format)) throw new Error(`Unknown format ${format}; use one of ${BOARD_FORMATS.join(", ")}`);
+			const format = asBoardFormat(options.format ?? "board");
+			if (!format) throw new Error(`Unknown format ${options.format}; use one of ${BOARD_FORMATS.join(", ")}`);
 			/*
 			 * There are no templates any more — every board starts blank — but the arguments
 			 * are still accepted rather than refused. This signature is in the `stage.d.ts`

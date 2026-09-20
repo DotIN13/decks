@@ -114,15 +114,14 @@ export function readingOf(doc: Document): { words: number; minFont?: number; ove
 }
 
 /**
- * A flow board's height is its **document's**, which is taller than the boxes in it.
+ * The **document's** own height, which can be taller than the blocks in it.
  *
- * A component board is a canvas of boxes, and the reading above is exactly right for it:
- * the body has no padding, and the room around the work is in each box's own coordinates.
- * A *page* — a flow board that brings its own design — is a document, and two pieces of it
- * are below every `[data-id]` there is: the body's own bottom padding, where a page keeps
- * its margins, and a bottom margin that collapsed out of the last block and now sits under
- * it. Neither is in any component's box. Left out, the canvas gives the board a rectangle
- * shorter than the document it is showing, and the page scrolls inside it.
+ * A board of placed boxes keeps the room around its work inside each box's own coordinates,
+ * and for one of those this agrees with the reading above. A board written as a document
+ * has two pieces below every `[data-id]` there is: the body's own bottom padding, where a
+ * page keeps its margins, and a bottom margin that collapsed out of the last block and now
+ * sits under it. Neither is in any block's box. Left out, the canvas gives the board a
+ * rectangle shorter than the document it is showing, and the page scrolls inside it.
  *
  * `scrollHeight` answers this, with one catch that is the reason for the two lines around
  * it: `board.js` gives the body the height in the board's `<meta>` tag, so asking a body
@@ -144,7 +143,7 @@ export function documentHeight(doc: Document): number | undefined {
 	return Number.isFinite(measured) && measured > 0 ? measured : undefined;
 }
 
-export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined {
+export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined {
 	const doc = frame?.contentDocument;
 	const view = frame?.contentWindow as (Window & { __boardReady?: boolean }) | null | undefined;
 	if (!doc || !view?.__boardReady) return undefined;
@@ -157,6 +156,20 @@ export function measureFrame(frame: HTMLIFrameElement | undefined): { w: number;
 	}
 	const extent = contentExtent(boxes);
 	if (!extent) return undefined;
-	const page = doc.body?.classList.contains("flow") ? documentHeight(doc) : undefined;
-	return { w: extent.w, h: Math.max(extent.h, Math.ceil(page ?? 0)), ...readingOf(doc) };
+	/*
+	 * Both readings, on every board.
+	 *
+	 * This used to ask the body whether it said `flow` and measure the document only then. That
+	 * was the format deciding, and the format is gone: a board is blocks, and the two ways the
+	 * content can reach past the last block — a document's own bottom padding, a margin that
+	 * collapsed out of the last block — are worth a `scrollHeight` whatever the board is made of.
+	 * On a board of placed boxes the two numbers come out the same, so nothing changes for one.
+	 *
+	 * `page` travels beside the height rather than being folded into it, because `stage.fit` needs
+	 * to tell the two apart: a board that ends in a placed box is fitted with room under it, and a
+	 * document that ends in its own padding already has its room.
+	 */
+	const page = documentHeight(doc);
+	const h = Math.max(extent.h, Math.ceil(page ?? 0));
+	return { w: extent.w, h, ...(page === undefined ? {} : { page: Math.ceil(page) }), ...readingOf(doc) };
 }

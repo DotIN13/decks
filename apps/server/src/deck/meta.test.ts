@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readBoardMeta, readFlowMeta, withBoardSize } from "./meta.ts";
+import { readBoardMeta, readMeta, withBoardSize } from "./meta.ts";
 
 test("a board's title, size and poster come off the head", () => {
 	const meta = readBoardMeta(`<!doctype html><html><head>
@@ -97,7 +97,7 @@ test("a size is a positive whole number of pixels", () => {
  * this, every HTML deck was 16:9 and a 4:3 one could not be written.
  */
 test("an HTML deck declares its aspect in the tag every board already has", () => {
-	const meta = readFlowMeta(
+	const meta = readMeta(
 		"boards/talk.slides.html",
 		`<!doctype html><html><head><title>The talk</title>
 		<meta name="board" content='{"aspect":"4:3","w":1200}' />
@@ -109,12 +109,12 @@ test("an HTML deck declares its aspect in the tag every board already has", () =
 });
 
 test("a markdown deck still declares it in front-matter, and neither reads the other's", () => {
-	const md = readFlowMeta("boards/talk.slides.md", "---\ntitle: Talk\naspect: 4:3\n---\n\n# One\n");
+	const md = readMeta("boards/talk.slides.md", "---\ntitle: Talk\naspect: 4:3\n---\n\n# One\n");
 	assert.equal(md.aspect, "4:3");
 	assert.equal(md.title, "Talk");
 
 	// A markdown file with a `<meta>` tag in it is a markdown file with a tag in it.
-	const stray = readFlowMeta("boards/notes.md", `<meta name="board" content='{"aspect":"4:3"}' />\n\n# Notes\n`);
+	const stray = readMeta("boards/notes.md", `<meta name="board" content='{"aspect":"4:3"}' />\n\n# Notes\n`);
 	assert.equal(stray.aspect, undefined);
 	assert.equal(stray.title, "Notes");
 });
@@ -122,7 +122,7 @@ test("a markdown deck still declares it in front-matter, and neither reads the o
 test("front-matter outranks the tag on an HTML file, because it is the more deliberate one", () => {
 	// Not a shape anybody writes on purpose; asserted so the precedence is decided rather
 	// than emergent, and so a future reader knows which line to change.
-	const meta = readFlowMeta(
+	const meta = readMeta(
 		"boards/odd.slides.html",
 		`---\naspect: 1:1\n---\n<meta name="board" content='{"aspect":"4:3"}' />\n<section>One</section>\n`,
 	);
@@ -130,7 +130,7 @@ test("front-matter outranks the tag on an HTML file, because it is the more deli
 });
 
 test("an HTML document with no tag keeps saying nothing about its size", () => {
-	const meta = readFlowMeta("boards/report.html", "<html><head><title>Report</title></head><body><h1>Report</h1></body></html>");
+	const meta = readMeta("boards/report.html", "<html><head><title>Report</title></head><body><h1>Report</h1></body></html>");
 	assert.equal(meta.w, undefined);
 	assert.equal(meta.aspect, undefined);
 	assert.equal(meta.title, "Report");
@@ -145,8 +145,8 @@ test("an HTML document with no tag keeps saying nothing about its size", () => {
  */
 test("a markdown board's width goes to its front-matter, not into a tag", () => {
 	const out = withBoardSize("boards/notes.md", `---\ntitle: Notes\n---\n\n# Notes\n\nBody.\n`, { w: 900 });
-	assert.equal(readFlowMeta("boards/notes.md", out).w, 900);
-	assert.equal(readFlowMeta("boards/notes.md", out).title, "Notes");
+	assert.equal(readMeta("boards/notes.md", out).w, 900);
+	assert.equal(readMeta("boards/notes.md", out).title, "Notes");
 	assert.equal(out.split("\n")[0], "---");
 	assert.ok(out.includes("\nw: 900\n"), out.slice(0, 40));
 	assert.ok(out.includes("# Notes") && out.includes("Body."), "and the document is untouched");
@@ -155,14 +155,14 @@ test("a markdown board's width goes to its front-matter, not into a tag", () => 
 
 test("a width already in the front-matter is replaced, not added twice", () => {
 	const out = withBoardSize("boards/notes.md", `---\nw: 700\ntitle: T\n---\n\n# T\n`, { w: 880 });
-	assert.equal(readFlowMeta("boards/notes.md", out).w, 880);
+	assert.equal(readMeta("boards/notes.md", out).w, 880);
 	assert.equal(out.match(/^w:/gm)?.length, 1);
 });
 
 test("a markdown board with no front-matter gets one, and keeps its heading for a title", () => {
 	const out = withBoardSize("boards/notes.md", `# A heading\n\nBody.\n`, { w: 760 });
-	assert.equal(readFlowMeta("boards/notes.md", out).w, 760);
-	assert.equal(readFlowMeta("boards/notes.md", out).title, "A heading");
+	assert.equal(readMeta("boards/notes.md", out).w, 760);
+	assert.equal(readMeta("boards/notes.md", out).title, "A heading");
 });
 
 test("a height on its own writes nothing to a markdown board", () => {

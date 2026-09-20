@@ -265,13 +265,13 @@ test("boards are found in subdirectories, and non-boards are not", () => {
 		deck.boards.map((b) => b.path),
 		["boards/a.html", "boards/nested/b.htm", "boards/notes.md", "boards/talk.slides.md"],
 	);
-	// And each one knows what it is, which is what everything downstream keys off.
+	// And each one knows what it is. Three of the four are boards, whatever they are written
+	// in: the one distinction left is the deck, which is paged rather than read.
 	assert.deepEqual(
 		deck.boards.map((b) => b.format),
-		["component", "component", "flow", "slides"],
+		["board", "board", "board", "slides"],
 	);
-	// The title comes from the content for a flow board: a rail full of filenames is a
-	// rail with nothing in it.
+	// The title comes from the content: a rail full of filenames is a rail with nothing in it.
 	assert.equal(deck.boards.find((b) => b.path === "boards/notes.md")?.title, "Notes");
 	rmSync(root, { recursive: true, force: true });
 });
@@ -340,5 +340,77 @@ test("the fallback layout measures itself against the canvas, not every board th
 	const state = deck.state(places, undefined, ["boards/a.html", "boards/b.html"]);
 	const b = state.boards.find((one) => one.path === "boards/b.html");
 	assert.ok(b && b.y < 10_000, `the unplaced board landed at ${b?.y}, beside the canvas rather than below the deck`);
+	rmSync(root, { recursive: true, force: true });
+});
+
+/*
+ * The height rule, which is where the two board formats actually differed.
+ *
+ * One of them always stated a height and kept it; the other never stated one and was measured.
+ * There is one rule now and the file chooses which half of it applies: **a stated height is a
+ * floor**. The browser's measurement raises the board above it whenever the content needs more
+ * room, which is what makes a board that clips impossible, and never lowers it below the number
+ * somebody dragged out or a fit wrote, which is what keeps room under the last block.
+ */
+test("a stated height is a floor the content raises, and never a ceiling", () => {
+	const root = emptyDeck();
+	writeFileSync(join(root, "boards", "a.html"), board("A", 900, 400));
+	const deck = Deck.open(root);
+	assert.equal(deck.board("boards/a.html")?.h, 400, "the file's number, before anybody has looked");
+
+	// Taller than the file says: the board grows, because the alternative is a cut paragraph.
+	assert.equal(deck.setHeight("boards/a.html", 690)?.h, 690);
+	assert.equal(deck.board("boards/a.html")?.h, 690);
+
+	// Shorter: the board comes back down to what the content needs, and stops at the floor —
+	// the room somebody asked for is still there, and nothing below it was ever promised.
+	assert.equal(deck.setHeight("boards/a.html", 300)?.h, 400);
+	assert.equal(deck.setHeight("boards/a.html", 380), undefined, "already at the floor, so nothing is broadcast");
+	assert.equal(deck.board("boards/a.html")?.h, 400);
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("a board that states no height is exactly its content's", () => {
+	const root = emptyDeck();
+	writeFileSync(join(root, "boards", "a.html"), board("A"));
+	const deck = Deck.open(root);
+	const start = deck.board("boards/a.html")?.h ?? 0;
+	assert.ok(start > 0, "a placeholder to draw before the first measurement");
+
+	assert.equal(deck.setHeight("boards/a.html", 604)?.h, 604);
+	// And down again, which a floor would have refused: there is none to refuse it.
+	assert.equal(deck.setHeight("boards/a.html", 420)?.h, 420);
+	rmSync(root, { recursive: true, force: true });
+});
+
+test("a deck's height is its aspect's, and a measurement does not touch it", () => {
+	const root = emptyDeck();
+	writeFileSync(join(root, "boards", "talk.slides.html"), slideDeck("Talk"));
+	const deck = Deck.open(root);
+	const before = deck.board("boards/talk.slides.html")?.h;
+	assert.equal(deck.setHeight("boards/talk.slides.html", 2000), undefined);
+	assert.equal(deck.board("boards/talk.slides.html")?.h, before);
+	rmSync(root, { recursive: true, force: true });
+});
+
+/*
+ * Editing a board must not make it jump, and fitting one must not leave it stale. Those pull in
+ * opposite directions, and the file's own number is what tells them apart: an edit that leaves it
+ * alone keeps the height last measured, and a write that changes it is a new floor to take now.
+ */
+test("an edit keeps the measured height, and a new floor in the file replaces it", () => {
+	const root = emptyDeck();
+	const file = join(root, "boards", "a.html");
+	writeFileSync(file, board("A", 900, 400));
+	const deck = Deck.open(root);
+	deck.setHeight("boards/a.html", 690);
+
+	// An ordinary edit: same floor, so the reading from the last look stands.
+	writeFileSync(file, board("A", 900, 400).replace("<body", "<body data-x=1"));
+	assert.equal(deck.refresh("boards/a.html")?.h, 690, "no jump to the number in the file");
+
+	// A fit or a drag: the file's number moved, so it is the board's now, down as well as up.
+	writeFileSync(file, withBoardSize("boards/a.html", readFileSync(file, "utf8"), { h: 500 }));
+	assert.equal(deck.refresh("boards/a.html")?.h, 500, "the new floor lands at once");
 	rmSync(root, { recursive: true, force: true });
 });

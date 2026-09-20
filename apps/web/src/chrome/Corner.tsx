@@ -1,7 +1,6 @@
 import type { AgentChat, AgentKind, AgentUsage, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
-import FileText from "lucide-solid/icons/file-text";
 import Maximize from "lucide-solid/icons/maximize";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Eraser from "lucide-solid/icons/eraser";
@@ -41,9 +40,8 @@ import { ContextRing } from "./ContextRing.tsx";
  * format is declared — `deck/kinds.ts` reads a board's format back out of its filename — so
  * seeing it here is seeing the mechanism rather than a decoration.
  */
-const FORMATS: Array<{ format: "component" | "flow" | "slides"; label: string; extension: string; note: string; icon: LucideIcon }> = [
-	{ format: "component", label: "Board", extension: ".html", note: "Positioned boxes you drag and retype: what a board is here", icon: FilePlus },
-	{ format: "flow", label: "Document", extension: ".html", note: "A document that reflows, as tall as its content", icon: FileText },
+const FORMATS: Array<{ format: "board" | "slides"; label: string; extension: string; note: string; icon: LucideIcon }> = [
+	{ format: "board", label: "Board", extension: ".html", note: "One document: blocks that say where they go are placed, the rest flow", icon: FilePlus },
 	{ format: "slides", label: "Slides", extension: ".slides.html", note: "A reveal deck: one <section> per slide, paged with the arrow keys", icon: Presentation },
 ];
 
@@ -92,7 +90,7 @@ export function Corner(props: {
 	 * either of the last two was to write the file by hand, because this button sent
 	 * `board.create` with nothing on it and the server defaulted to component.
 	 */
-	onNewBoard: (format?: "component" | "flow" | "slides") => void;
+	onNewBoard: (format?: "board" | "slides") => void;
 	/**
 	 * Take every board off the canvas.
 	 *

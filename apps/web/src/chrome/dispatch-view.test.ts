@@ -20,7 +20,7 @@ const NOW = 1_700_000_000_000;
 const HOUR = 60 * 60 * 1000;
 
 function board(path: string, over: Partial<Board> = {}): Board {
-	return { path, title: fileName(path), format: "component", x: 0, y: 0, w: 800, h: 600, rev: 1, inContext: [], ...over };
+	return { path, title: fileName(path), format: "board", x: 0, y: 0, w: 800, h: 600, rev: 1, inContext: [], ...over };
 }
 
 let n = 0;

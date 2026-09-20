@@ -216,7 +216,7 @@ test("a flow document is measured in the page, pictured to that height, and the 
 	const told: Array<[string, number, number]> = [];
 	const thumbs = new ThumbService({ origin: () => "http://127.0.0.1:1", dir, measured: (path, rev, h) => told.push([path, rev, h]) }, async () => chrome.browser);
 	// The record still carries the 240px placeholder; the page says 1234.
-	const flow = { ...board("boards/notes.html", 3, 720, 240), format: "flow" } as Board;
+	const flow = { ...board("boards/notes.html", 3, 720, 240), format: "board" } as Board;
 	const asked = thumbs.get(flow, "light");
 	await tick();
 	await chrome.release();

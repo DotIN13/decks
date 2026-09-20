@@ -12,7 +12,10 @@ Status: **all six milestones built and verified** — deck and stage, one agent,
 
 ## 1. Product definition
 
-A **board** is a local HTML file of absolutely-positioned components. It is where a
+A **board** is a local HTML file whose root-level blocks are absolutely positioned. A block that
+states where it goes is placed there; one that does not sits at the origin and holds a document that
+reads top to bottom. That covers what used to be two formats, `component` and `flow`, and they are
+one: a board is a file, and how it lays itself out is CSS rather than a kind. It is where a
 plan gets drafted, and where the agent reports that work is done. Both sides draw on
 it: the agent by editing the file with its ordinary tools, the user by direct
 manipulation. Because a board is a file it is also an artifact — it passes between
@@ -115,7 +118,9 @@ tools to keep in sync with a schema.
 
 **Where a board *sits*, and how big it *is*, belong to the board and its conversation.** What a
 board contains lives in the board file, and so does its size: one `<meta name="board">` tag for HTML,
-front-matter for markdown, a height the browser measures for anything that reflows. Where it sits
+front-matter for markdown. The width is the writer's; the height is the content's, measured by the
+browser that is showing it, and a height stated in the file is a **floor** the measurement raises
+rather than a ceiling it has to respect. That is what makes a board that clips impossible. Where it sits
 lives in the record of the agent whose canvas it is — `AgentRecord.positions`, under
 `.decks/agents/<id>/`, beside what that conversation is holding and showing (`§6.2`). So two
 conversations can look at one deck from two arrangements, the way they already keep two cameras, and

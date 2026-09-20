@@ -91,9 +91,10 @@ export function BoardFrame(props: {
 	 * at the size being asked for, with the document still at its old one inside it — and the
 	 * write happens once, at the end, which is also what makes one gesture one revision.
 	 *
-	 * Only the dimensions the format can hold arrive here. A component board sends both; a flow
-	 * document and a slide deck send the width, because a flow board's height is its content
-	 * and a deck's follows from its aspect (`wire/boards.ts` decides that, not this file).
+	 * Only the dimensions the file can hold arrive here. A board sends both — a height is a floor
+	 * in its `<meta>` tag, which the content raises when it needs to — and a slide deck sends the
+	 * width alone, because its height follows from its aspect (`wire/boards.ts` decides that, not
+	 * this file).
 	 */
 	onResize?: (size: { w: number; h: number }) => void;
 	onOpen: () => void;
@@ -104,7 +105,7 @@ export function BoardFrame(props: {
 	 * out, and the server is where the question gets asked (`stage.fit`, and `clipped` on
 	 * `stage.boards()`). Reported once per load, with the revision it was measured at.
 	 */
-	onExtent?: (extent: { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
+	onExtent?: (extent: { rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
 	/** Only for a deck: take it fullscreen. */
 	onPresent?: () => void;
 	/**
@@ -842,9 +843,10 @@ export function BoardFrame(props: {
 	 * its content needs, and the values in this deck are 1008 and 1354 rather than multiples of
 	 * anything, so a grid here would fight the numbers it is supposed to be producing.
 	 *
-	 * Only the width for a flow document or a slide deck, and the drag refuses to pretend
-	 * otherwise: the handle is drawn as a horizontal bar for those, and a height that cannot be
-	 * stored is not previewed as if it could.
+	 * Only the width for a slide deck, and the drag refuses to pretend otherwise: the handle is
+	 * drawn as a horizontal bar for one, and a height that follows from the aspect is not
+	 * previewed as if it could be dragged. Every other board takes both — a height dragged out is
+	 * a floor written into the file, and the content raises the board above it if it needs to.
 	 */
 	const startSizing = (event: PointerEvent) => {
 		if (!props.onResize) return;
@@ -859,7 +861,7 @@ export function BoardFrame(props: {
 		const from = { x: event.clientX, y: event.clientY };
 		const origin = { w: props.board.w, h: props.board.h };
 		const zoom = props.camera.zoom;
-		const both = props.board.format === "component";
+		const both = props.board.format !== "slides";
 		let moved = false;
 
 		const move = (moveEvent: PointerEvent) => {
@@ -892,15 +894,17 @@ export function BoardFrame(props: {
 
 	/*
 	 * The drag's number is let go of when the board *is* that size, which is when the write has
-	 * landed and the frame has reloaded at it. A flow document's height is the browser's to
-	 * report and arrives a beat later, so this watches the width there — the height it was
-	 * holding is the one it had, and the report replaces it.
+	 * landed and the frame has reloaded at it. A deck's height follows from its aspect and is
+	 * never the dragged one, so there this watches the width alone.
+	 *
+	 * A height the content then raises above the dragged one is not waited for: the file has the
+	 * number that was asked for, and what the board *shows* is that number or more.
 	 */
 	createEffect(() => {
 		const held = sizing();
 		if (!held) return;
-		const both = props.board.format === "component";
-		if (props.board.w === held.w && (!both || props.board.h === held.h)) setSizing(null);
+		const both = props.board.format !== "slides";
+		if (props.board.w === held.w && (!both || props.board.h >= held.h)) setSizing(null);
 	});
 
 	return (
@@ -973,17 +977,17 @@ export function BoardFrame(props: {
 					so — a button in the title bar is where somebody looks for "how do I show
 					this to a room".
 
-					Every format now, not only a deck: a document is readable fullscreen and a
-					component board is usable there, which is the point (`canvas/Present.tsx`).
-					The word changes with the format because "present" is what you do with a
-					deck and "fullscreen" is what you do with a page.
+					Every board now, not only a deck: a document is readable fullscreen and a board
+					of boxes is usable there, which is the point (`canvas/Present.tsx`). The word
+					changes with the format because "present" is what you do with a deck and
+					"fullscreen" is what you do with a board.
 
 					**Only a deck gets the word.** The bar is counter-scaled, so at the zoom where
 					a board is a tile its buttons take the whole of it — and "Fullscreen" is 64px
 					of the 160px a 760px board has down there, which puts an invisible button
 					where the *title* is. A double-click meant to fly to the board then presses
 					it. A deck's bar is 960px wide and the word is the design's own, so this is
-					about the two formats whose bars are narrow rather than about words.
+					about the boards whose bars are narrow rather than about words.
 
 					Not on a live board. A mirror draws itself from what the app posts into it,
 					so a second frame of it says nothing the first one does not, and its bar is

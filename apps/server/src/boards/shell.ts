@@ -29,15 +29,15 @@ import type { BoardFormat } from "./templates.ts";
 export interface ShellSpec {
 	/** Deck-relative path of the real file, e.g. `boards/notes.md`. */
 	path: string;
-	format: Exclude<BoardFormat, "component">;
+	format: BoardFormat;
 	/**
 	 * Which kind of content is being wrapped — `deck/kinds.ts` decides, and it is the one
 	 * thing this file cannot work out for itself.
 	 *
-	 * It used to be inferred from the extension: an `.html` flow board was assumed to be a
-	 * page from somewhere else and sandboxed. That was true while a flow board was always
-	 * markdown and is not now — every board this app writes is a single HTML file, and one of
-	 * those is a document in its own right rather than something to wrap.
+	 * It used to be inferred from the extension: an `.html` document board was assumed to be
+	 * a page from somewhere else and sandboxed. That was true while a document board was
+	 * always markdown and is not now — every board this app writes is a single HTML file, and
+	 * one of those is a document in its own right rather than something to wrap.
 	 */
 	shell: "content" | "foreign";
 	title: string;

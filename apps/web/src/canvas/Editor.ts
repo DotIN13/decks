@@ -86,16 +86,6 @@ export interface EditorHost {
 	/** Whether editing is on at all — below a certain zoom the frame is inert. */
 	enabled(): boolean;
 	/**
-	 * Whether this board is a *document*, so that retyping runs is the whole of the job.
-	 *
-	 * A flow board's content reflows: there is no grid for a component to sit on, no box to
-	 * resize, and nowhere to place a new one — its DOM tree is the file's tree, and a run of
-	 * words is the thing that can be addressed. The **fields** half of this file is exactly
-	 * as meaningful there; the geometry half is not. So it is one flag rather than a second
-	 * editor, and the four places below are where the geometry half begins.
-	 */
-	fieldsOnly(path: string): boolean;
-	/**
 	 * Bring a box on this board into the part of the screen a person can see.
 	 *
 	 * For the on-screen keyboard, which is the only thing that has ever needed it: a
@@ -107,6 +97,45 @@ export interface EditorHost {
 }
 
 export const snap = (value: number) => Math.round(value / GRID) * GRID;
+
+/**
+ * Whether a block is **placed**: it says where it goes, and the browser has taken it out of
+ * the flow. Those are the two halves of being something a person can drag and resize.
+ *
+ * The question used to be asked of the *board* — a flag called `fieldsOnly`, set for a whole
+ * format — and that was the two formats talking: a board of boxes could be dragged, a
+ * document could only be retyped, and one file could not be both. A board is one format now,
+ * so the question is asked of the block.
+ *
+ * **It says where it goes**: a `left` or a `top` in its own `style` attribute, which is what
+ * every placed box in every deck carries and what a drag writes back. A block with none is a
+ * document rather than a box — `.doc` is the case that matters, the full-bleed block a board
+ * written as a page keeps its prose in — and moving one by 8px would mean nothing.
+ *
+ * **And the browser agrees**: `position: absolute`, which `lib/board.css` gives every
+ * root-level block. Without this half, a drag on a block inside a card would write
+ * coordinates that the layout ignores.
+ */
+export const isPlaced = (element: Element | null | undefined): boolean => {
+	if (!element || element.ownerDocument.defaultView?.getComputedStyle(element).position !== "absolute") return false;
+	const style = element.getAttribute("style") ?? "";
+	return /(^|[;\s])(left|top)\s*:/.test(style);
+};
+
+/**
+ * Whether this document places its root-level blocks at all — can a new box be dropped on it?
+ *
+ * Read off the document rather than the file: board.css takes every root-level block out of
+ * the flow, so a board that brought it can hold a box wherever the pointer is. A board that
+ * lays itself out — a page that brings its own design, or a markdown file drawn into a shell
+ * — cannot, and there the honest answer is no: a box with a `left` and a `top` dropped into a
+ * document that flows would simply appear at the end of it.
+ */
+const placesBlocks = (doc: Document): boolean => {
+	const blocks = [...doc.querySelectorAll<HTMLElement>("body > [data-id]")];
+	const view = doc.defaultView;
+	return !!view && blocks.some((element) => view.getComputedStyle(element).position === "absolute");
+};
 
 const INLINE = new Set<string>(INLINE_TAGS);
 
@@ -282,9 +311,9 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		const selection = host.selected();
 		const element = selection?.path === path ? (doc.querySelector(`[data-id="${cssEscape(selection.id)}"]`) as HTMLElement | null) : null;
 		for (const marked of doc.querySelectorAll(".decks-editing")) marked.classList.remove("decks-editing");
-		// No resize handle on a document: there is no box to resize, and a handle that moved
-		// an element the CSS is laying out would fight the stylesheet rather than change it.
-		if (!element || !host.enabled() || host.fieldsOnly(path)) {
+		// No resize handle on a block the page is laying out: a handle that moved one would
+		// fight the stylesheet rather than change it.
+		if (!element || !host.enabled() || !isPlaced(element)) {
 			handle.style.display = "none";
 			return;
 		}
@@ -437,10 +466,11 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 
 		if (tool !== "select") {
 			event.preventDefault();
-			if (host.fieldsOnly(path)) {
-				// A placed component in a reflowing document is an absolutely positioned box in
-				// a page: the two layout systems would fight and the file would show it.
-				host.notice("This board is a document. Components go on a placed board, not a page.");
+			if (!placesBlocks(doc)) {
+				// A placed box dropped into a document that lays itself out would land at the end
+				// of it, wherever the pointer was: the two layout systems would fight and the file
+				// would show it.
+				host.notice("This board lays its own blocks out, so there is nowhere to place a box on it.");
 				host.resetTool();
 				return;
 			}
@@ -477,7 +507,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			 * what makes a drag across a board a pan rather than a rearrangement.
 			 */
 			if (!element || !onSelection || element.isContentEditable || editing) return;
-			if (host.fieldsOnly(path)) return;
+			if (!isPlaced(element)) return;
 			event.preventDefault();
 			gesture = { kind: "move", element, from: { x: event.clientX, y: event.clientY }, origin: rectOf(element) };
 			return;
@@ -497,8 +527,8 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * was picking the card up and dropping the caret wherever the drag ended.
 		 */
 		if (element.isContentEditable || editingOwns(event.target)) return;
-		// Selected, and not picked up: see `fieldsOnly`.
-		if (host.fieldsOnly(path)) return;
+		// Selected, and not picked up: a block the page lays out has nowhere to be dragged to.
+		if (!isPlaced(element)) return;
 		event.preventDefault();
 		gesture = { kind: "move", element, from: { x: event.clientX, y: event.clientY }, origin: rectOf(element) };
 	});

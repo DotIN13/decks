@@ -10,12 +10,12 @@ import { renderShell } from "./shell.ts";
  */
 
 test("the shell is a board the loader can read back", () => {
-	const html = renderShell({ path: "boards/notes.md", shell: "content", format: "flow", title: "Notes", w: 720, h: 400 });
+	const html = renderShell({ path: "boards/notes.md", shell: "content", format: "board", title: "Notes", w: 720, h: 400 });
 	const meta = readBoardMeta(html);
 	assert.equal(meta.title, "Notes");
 	assert.equal(meta.w, 720);
 	assert.equal(meta.h, 400);
-	assert.match(html, /<body class="board board-shell" data-format="flow">/);
+	assert.match(html, /<body class="board board-shell" data-format="board">/);
 	assert.match(html, /data-embed="notes\.md\?raw=1"/);
 });
 
@@ -26,7 +26,7 @@ test("the shell is a board the loader can read back", () => {
  * beyond an unstyled board.
  */
 test("a nested board reaches the same primitives as a top-level one", () => {
-	const nested = renderShell({ path: "boards/talks/2026/notes.md", shell: "content", format: "flow", title: "N", w: 720, h: 400 });
+	const nested = renderShell({ path: "boards/talks/2026/notes.md", shell: "content", format: "board", title: "N", w: 720, h: 400 });
 	assert.match(nested, /href="\/api\/lib\/board\.css"/);
 	assert.match(nested, /src="\/api\/lib\/board\.js"/);
 	// And the file is addressed relative to the board's own URL, exactly as an `<img src>`
@@ -51,7 +51,7 @@ test("a deck asks for the slide view, and carries its aspect", () => {
 test("a title cannot close the tag it is inside", () => {
 	const html = renderShell({
 		path: "boards/x.md",
-		shell: "content", format: "flow",
+		shell: "content", format: "board",
 		title: '</title><script>fetch("/api/deck")</script>',
 		w: 720,
 		h: 400,
@@ -61,7 +61,7 @@ test("a title cannot close the tag it is inside", () => {
 });
 
 test("a filename with a quote in it cannot escape the attribute", () => {
-	const html = renderShell({ path: 'boards/a" onload="alert(1).md', shell: "content", format: "flow", title: "x", w: 720, h: 400 });
+	const html = renderShell({ path: 'boards/a" onload="alert(1).md', shell: "content", format: "board", title: "x", w: 720, h: 400 });
 	assert.doesNotMatch(html, /onload="alert/);
 	assert.match(html, /&quot;/);
 });
@@ -72,14 +72,14 @@ test("a filename with a quote in it cannot escape the attribute", () => {
  * anywhere saying why. `?raw=1` is what stops that, which makes it worth its own test.
  */
 test("the file is asked for raw, or the shell would fetch itself", () => {
-	const flow = renderShell({ path: "boards/notes.md", shell: "content", format: "flow", title: "n", w: 720, h: 400 });
+	const flow = renderShell({ path: "boards/notes.md", shell: "content", format: "board", title: "n", w: 720, h: 400 });
 	assert.match(flow, /data-embed="notes\.md\?raw=1"/);
 	const deck = renderShell({ path: "boards/t.slides.md", shell: "content", format: "slides", title: "t", w: 960, h: 540 });
 	assert.match(deck, /data-slides="t\.slides\.md\?raw=1"/);
 });
 
 test("the one component carries a data-id, so the editor has something to land on", () => {
-	assert.match(renderShell({ path: "boards/n.md", shell: "content", format: "flow", title: "n", w: 720, h: 400 }), /data-id="body"/);
+	assert.match(renderShell({ path: "boards/n.md", shell: "content", format: "board", title: "n", w: 720, h: 400 }), /data-id="body"/);
 	assert.match(renderShell({ path: "boards/t.slides.md", shell: "content", format: "slides", title: "t", w: 960, h: 540 }), /data-id="deck"/);
 });
 

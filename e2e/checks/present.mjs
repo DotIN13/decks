@@ -23,9 +23,19 @@ const { browser, page, errors } = await open({ width: 1440, height: 900 });
 
 const formats = await page.evaluate(async () => {
 	const deck = await (await fetch("/api/deck")).json();
-	return deck.deck.boards.map((board) => ({ path: board.path, format: board.format, live: board.live ?? null }));
+	return deck.deck.boards.map((board) => ({ path: board.path, format: board.format, shell: board.shell ?? null, live: board.live ?? null }));
 });
-const pick = (format) => formats.find((board) => board.format === format)?.path;
+const pick = (format) => formats.find((board) => board.format === format && !board.live)?.path;
+/** A board the app wrote itself: no shell, so it is presented at its own rectangle. */
+const ours = (path) => formats.find((board) => board.format === "board" && !board.live && !board.shell && (!path || board.path === path))?.path;
+
+/** What the deck says a board measures, which is what presenting it has to match. */
+const sizeOf = (path) =>
+	page.evaluate(async (wanted) => {
+		const deck = await (await fetch("/api/deck")).json();
+		const board = deck.deck.boards.find((candidate) => candidate.path === wanted);
+		return { w: board?.w ?? 0, h: board?.h ?? 0 };
+	}, path);
 
 /** Press the board's own fullscreen button — the affordance, not a keyboard route. */
 const present = (path) =>
@@ -80,7 +90,7 @@ const labelOf = (board) => buttons.find((button) => button.path === board.path)?
 const formatsWithButtons = new Set(plain.map((board) => board.format));
 say(
 	"every board that can be shown has a fullscreen button, whatever its format",
-	plain.length > 0 && plain.every((board) => labelOf(board) !== null) && formatsWithButtons.size >= 3,
+	plain.length > 0 && plain.every((board) => labelOf(board) !== null) && formatsWithButtons.size === 2,
 	`${plain.length} boards, formats ${[...formatsWithButtons].join("/")}`,
 );
 say(
@@ -141,13 +151,13 @@ say(
 );
 
 const deckButton = buttons.find((button) => button.path === pick("slides"));
-const flowButton = buttons.find((button) => button.path === pick("flow"));
-const componentButton = buttons.find((button) => button.path === pick("component"));
+const documentButton = buttons.find((button) => button.path === ours("boards/notes.html"));
+const boxesButton = buttons.find((button) => button.path === ours("boards/plan.html"));
 say("…a deck's is named Present", deckButton?.label?.startsWith("Present") === true, String(deckButton?.label));
 say(
-	"…and a document's and a component board's are named Fullscreen, without the word on the bar",
-	flowButton?.label?.startsWith("Fullscreen") === true && componentButton?.label?.startsWith("Fullscreen") === true,
-	`${flowButton?.label} / ${componentButton?.label}`,
+	"…and a board's is named Fullscreen, however it is written, without the word on the bar",
+	documentButton?.label?.startsWith("Fullscreen") === true && boxesButton?.label?.startsWith("Fullscreen") === true,
+	`${documentButton?.label} / ${boxesButton?.label}`,
 );
 const words = await page.evaluate(() =>
 	[...document.querySelectorAll(".board-node .chrome .present-open")].map((button) => button.textContent?.trim() ?? ""),
@@ -216,35 +226,37 @@ const afterDeck = await overlay();
 say("…and the canvas keeps its own frames behind it", afterDeck === null, "canvas back");
 
 /*
- * 4. A flow document: the window, scrolling inside it, and the document's own keys.
+ * 4. A board written as a document: its own rectangle, like any other board.
+ *
+ * It used to fill the window, because it was a *flow* board and that was a format. There is one
+ * board format now, so the rule is one rule: a board is presented at the size it was written at,
+ * which is the size it is read at on the canvas. The frame takes the pointer and the keyboard,
+ * which is what a document needs and a slide does not.
  */
-await present(pick("flow"));
+await present(ours("boards/notes.html"));
 await settle(page, 700);
-const flowOverlay = await overlay();
+const documentOverlay = await overlay();
+const documentSize = await sizeOf(ours("boards/notes.html"));
 say(
-	"a document opens fullscreen filling the window",
-	flowOverlay?.format === "flow" && flowOverlay.frame.w === flowOverlay.window.w && flowOverlay.frame.h === flowOverlay.window.h,
-	`${JSON.stringify(flowOverlay?.frame)} in ${JSON.stringify(flowOverlay?.window)}`,
+	"a board written as a document opens at its own size, not the window's",
+	documentOverlay?.format === "board" && Math.abs(documentOverlay.frame.w - documentSize.w) <= 2,
+	`${JSON.stringify(documentOverlay?.frame)} for a board of ${documentSize.w}×${documentSize.h}`,
 );
-say("…and takes the pointer events, because it is a document", flowOverlay?.pointer !== "none", String(flowOverlay?.pointer));
-say("…with the keyboard inside it, so the arrows scroll rather than page", flowOverlay?.focused === "present-frame", String(flowOverlay?.focused));
+say("…and takes the pointer events, because it is a document", documentOverlay?.pointer !== "none", String(documentOverlay?.pointer));
+say("…with the keyboard inside it, so the arrows scroll rather than page", documentOverlay?.focused === "present-frame", String(documentOverlay?.focused));
 say("…and Escape still gets out, from inside the frame", (await leave()) === false, "overlay gone");
 
 /*
- * 5. A component board: its own rectangle, at 1:1, and its own buttons reachable.
+ * 5. A board of placed boxes: the same rectangle rule, at 1:1, and its own buttons reachable.
  */
-await present(pick("component"));
+await present(ours("boards/plan.html"));
 await settle(page, 700);
 const componentOverlay = await overlay();
-const declared = formats.find((board) => board.format === "component");
-const size = await page.evaluate(async (path) => {
-	const deck = await (await fetch("/api/deck")).json();
-	const board = deck.deck.boards.find((candidate) => candidate.path === path);
-	return { w: board?.w ?? 0, h: board?.h ?? 0 };
-}, declared.path);
+const declared = { path: ours("boards/plan.html") };
+const size = await sizeOf(declared.path);
 say(
-	"a component board opens at its own size, not the window's",
-	componentOverlay?.format === "component" && Math.abs(componentOverlay.frame.w - size.w) <= 2,
+	"a board of placed boxes opens at its own size too",
+	componentOverlay?.format === "board" && Math.abs(componentOverlay.frame.w - size.w) <= 2,
 	`${JSON.stringify(componentOverlay?.frame)} for a board of ${size.w}×${size.h}`,
 );
 say("…centred in a scrollable overlay, so a tall board can be scrolled", componentOverlay?.overflow === "auto", String(componentOverlay?.overflow));

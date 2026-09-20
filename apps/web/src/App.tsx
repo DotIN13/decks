@@ -715,15 +715,6 @@ export function App() {
 		 * pointer events, so text selects and copies, and a board that is a game is playable.
 		 */
 		enabled: () => zoomInteractive() && mode() === "edit",
-		/*
-		 * A flow board is a document: retyping runs is the whole of what can be edited on it
-		 * (`Editor.ts`). Read from the board list rather than remembered, because a board's
-		 * format is a property of the file and the file can change under a live frame.
-		 */
-		fieldsOnly: (path: string) => {
-			const board = state.boards.find((candidate) => candidate.path === path);
-			return board ? board.format === "flow" && !board.shell : false;
-		},
 		reveal: (path, box) => {
 			const board = state.boards.find((candidate) => candidate.path === path);
 			const stage = document.querySelector(".stage");
@@ -1498,7 +1489,7 @@ export function App() {
 						   board in the middle of this canvas's view and clear of what is there, which
 						   is near but not always on screen when the middle is taken. */
 						void files
-							.askForBoard((request) => send({ type: "board.create", ...(format && format !== "component" ? { format } : {}), request }))
+							.askForBoard((request) => send({ type: "board.create", ...(format ? { format } : {}), request }))
 							.then((path) => {
 								if (!path) return;
 								setSelected(path);

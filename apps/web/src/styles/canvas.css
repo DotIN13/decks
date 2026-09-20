@@ -63,10 +63,12 @@
 	}
 
 	/*
-	 * A page, filling the window. Its own height is its content's, so this is the one frame
-	 * whose inner document does the scrolling.
+	 * A wrapped file, filling the window: a markdown board or a page from somewhere else, whose
+	 * height nobody has measured. This is the one frame whose inner document does the scrolling.
+	 * Every other board is presented at the size it was written at, which is the size it is read
+	 * at on the canvas (`canvas/Present.tsx`).
 	 */
-	.present[data-format="flow"] .present-frame {
+	.present[data-shell]:not([data-format="slides"]) .present-frame {
 		width: 100%;
 		height: 100%;
 	}

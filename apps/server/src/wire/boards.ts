@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { ServerMessage } from "@decks/protocol";
-import { isBoardFormat } from "../boards/templates.ts";
+import { asBoardFormat } from "../boards/templates.ts";
 import { codeFor } from "../boards/eval-code.ts";
 import { boardActor } from "../stage/board-actor.ts";
 import { runEval, safeJson } from "../stage/eval.ts";
@@ -38,17 +38,15 @@ export const boards = {
 	/*
 	 * A board dragged to a new size, by the person holding the mouse.
 	 *
-	 * **The format decides where the number goes**, and that decision lives here rather than in
-	 * the browser because it is a fact about the file:
+	 * **The number goes into the board's own file**, through `boards.resize`, which records a
+	 * revision like every other write. Both dimensions: a width, and a height that is a *floor* —
+	 * the browser keeps measuring the content and raises the board above it whenever it needs more
+	 * room, so a drag adds space under the last box and can never take away a paragraph.
 	 *
-	 * - a **component** board's size is the one number in its own `<meta>` tag, so the drag is a
-	 *   write — through `boards.resize`, which records a revision like every other write;
-	 * - a **flow** document's width is in that tag and its height *is its content*, measured by
-	 *   the browser and reported back (`board.extent`), so only the width is written;
-	 * - a **slide** deck's height follows from its aspect, so only the width is taken — and it goes to
-	 *   the file like every other size: the `<meta>` tag of an HTML deck, front-matter of a markdown
-	 *   one. `deck.json` used to keep it, which made a deck's width the one number you could not read
-	 *   off the deck.
+	 * A **slide** deck is the exception: its height follows from its aspect, so only the width is
+	 * taken. It goes to the file like every other size — the `<meta>` tag of an HTML deck,
+	 * front-matter of a markdown one. `deck.json` used to keep it, which made a deck's width the one
+	 * number you could not read off the deck.
 	 *
 	 * Clamped, like everything else a browser sends: 320 wide is about the narrowest board this
 	 * app's own templates use, and the ceiling is well past the tallest board in the deck — a
@@ -72,12 +70,7 @@ export const boards = {
 				if (w !== undefined) wire.boards.resize(message.path, { w });
 				return;
 			}
-			/*
-			 * A flow document takes the width and keeps its own height. Sending both would fight the
-			 * measurement that is about to arrive: the frame reloads at the new width, reports the
-			 * height it found, and a stored height would win over it for exactly one revision.
-			 */
-			const wanted = board.format === "flow" ? { ...(w !== undefined ? { w } : {}) } : { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
+			const wanted = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
 			if (wanted.w === undefined && wanted.h === undefined) return;
 			// `writeBoard` inside broadcasts the new board, so this one needs no second message.
 			wire.boards.resize(message.path, wanted);
@@ -91,6 +84,7 @@ export const boards = {
 			rev: message.rev,
 			w: message.w,
 			h: message.h,
+			...(typeof message.page === "number" ? { page: message.page } : {}),
 			...(typeof message.words === "number" ? { words: message.words } : {}),
 			...(typeof message.minFont === "number" ? { minFont: message.minFont } : {}),
 			...(typeof message.overflowX === "number" ? { overflowX: message.overflowX } : {}),
@@ -98,12 +92,13 @@ export const boards = {
 			...(typeof message.overlaps === "number" ? { overlaps: message.overlaps } : {}),
 		});
 		/*
-		 * A flow board *is* its content's height.
+		 * A board is as tall as its content, whatever its file says.
 		 *
-		 * Markdown and plain documents have nowhere in the file to keep a height and
-		 * no reason to: the browser has just measured the only true answer, so the
-		 * board takes it. This is what makes "the board clips and nobody notices"
-		 * impossible for these formats — there is no stored height to be wrong.
+		 * The browser has just measured the only true answer, so the board takes it —
+		 * unless the file states a taller one, which `setHeight` treats as a floor. This
+		 * is what makes "the board clips and nobody notices" impossible: the measurement
+		 * can always raise the board, and the only thing it cannot do is take away room
+		 * somebody asked for.
 		 *
 		 * Three guards, and each one is a loop that was easy to write by accident:
 		 *
@@ -116,8 +111,8 @@ export const boards = {
 		 *   measurement of a document that has since been rewritten sets the height
 		 *   of one that no longer exists.
 		 */
-		const flowing = wire.deck.board(message.path);
-		if (flowing?.format === "flow" && flowing.rev === message.rev) {
+		const measured = wire.deck.board(message.path);
+		if (measured && measured.rev === message.rev) {
 			const resized = wire.deck.setHeight(message.path, message.h);
 			if (resized) wire.send({ type: "deck.state", deck: wire.stageState() });
 		}
@@ -165,10 +160,11 @@ export const boards = {
 	 * An unknown `kind` and an unknown `format` are the same bargain: the worst outcome of a
 	 * bad name should be an empty board rather than a refusal, and every board is blank
 	 * anyway — the `kind` left over from when there were templates is ignored, whatever it
-	 * says, and a format that is not one of the three becomes a component board.
+	 * says, and a format that is not one of the two becomes a board. `component` and `flow`
+	 * are still understood and both mean `board`: they named the two formats that are one.
 	 */
 	"board.create": (message, reply, wire) => {
-		const format = isBoardFormat(message.format) ? message.format : "component";
+		const format = asBoardFormat(message.format) ?? "board";
 		/*
 		 * A title, a size and a place when the browser has something to put on the board: a
 		 * file dropped on empty canvas, which gets a board of its own where it was dropped.
