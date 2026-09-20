@@ -1,4 +1,4 @@
-import type { AgentKind, Board, Camera, ThinkingLevel } from "@decks/protocol";
+import type { AgentKind, Board, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
 import Moon from "lucide-solid/icons/moon";
@@ -1580,6 +1580,15 @@ export function App() {
 					`data-inset="top"` where there were two.
 				*/}
 				<AgentPill
+					{...(stageCanvas() && state.canvas
+						? {
+								canvas: {
+									name: stageCanvas()!.name,
+									working: stageCanvas()!.agents.map((id) => state.identities[id]).filter((identity): identity is Identity => identity !== undefined),
+								},
+								onRenameCanvas: (name: string) => send({ type: "canvas.rename", id: stageCanvas()!.id, name }),
+							}
+						: {})}
 					mode={mode()}
 					onMode={(next) => {
 						// A press while editing means "this component", so the pen is put down first.

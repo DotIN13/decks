@@ -599,6 +599,15 @@ export function AgentPill(props: {
 	surface?: "dispatch" | "stage";
 	/** Back to the dashboard. Drawn only on a stage. */
 	onHome?: () => void;
+	/**
+	 * The canvas on screen, when one is open: its name, and who is working on it.
+	 *
+	 * A canvas is a room, so the pill says which room and who is in it — the faces of the
+	 * agents on it, in their own colours. The name is renamed in place, which is where a canvas
+	 * made as "Canvas 3" gets the name it should have had.
+	 */
+	canvas?: { name: string; working: Identity[] };
+	onRenameCanvas?: (name: string) => void;
 	/** How many tasks want a person: the badge on Home, and on the Boards tab. */
 	wantsYou?: number;
 	/** How many boards an agent named since the person last read them: the dot on the Boards tab. */
@@ -710,6 +719,10 @@ export function AgentPill(props: {
 				</button>
 				<span class="pill-sep" aria-hidden="true" />
 			</span>
+
+			<Show when={onStage() && props.canvas}>
+				{(canvas) => <CanvasSegment name={canvas().name} working={canvas().working} onRename={(name) => props.onRenameCanvas?.(name)} />}
+			</Show>
 
 			{/*
 			 * The active agent, with the same ring it would carry in the corner — which is also
@@ -1027,5 +1040,65 @@ export function AgentPill(props: {
 			</Show>
 			</Show>
 		</div>
+	);
+}
+
+/**
+ * The open canvas's name and who is working on it, as a segment of the pill.
+ *
+ * The name is a button that turns into a field: Enter or leaving it keeps the new name, Escape
+ * keeps the old one. The faces are the agents on this canvas, overlapped like a room's roster,
+ * and a tooltip names them — they are said, not offered, because who is here is a fact.
+ */
+function CanvasSegment(props: { name: string; working: Identity[]; onRename: (name: string) => void }) {
+	const [editing, setEditing] = createSignal(false);
+	let field: HTMLInputElement | undefined;
+	const finish = (keep: boolean) => {
+		const next = field?.value.trim() ?? "";
+		setEditing(false);
+		if (keep && next && next !== props.name) props.onRename(next);
+	};
+	return (
+		<span class="pill-canvas">
+			<Show
+				when={editing()}
+				fallback={
+					<button type="button" class="chipbtn pill-canvas-name" title="Rename this canvas" onClick={() => setEditing(true)}>
+						{props.name}
+					</button>
+				}
+			>
+				<input
+					ref={(element) => {
+						field = element;
+						queueMicrotask(() => element.select());
+					}}
+					class="pill-canvas-field"
+					value={props.name}
+					aria-label="Canvas name"
+					maxLength={40}
+					onKeyDown={(event) => {
+						if (event.key === "Enter") finish(true);
+						if (event.key === "Escape") {
+							event.stopPropagation();
+							finish(false);
+						}
+					}}
+					onBlur={() => finish(true)}
+				/>
+			</Show>
+			<Show when={props.working.length > 0}>
+				<span class="pill-canvas-faces" title={`Working here: ${props.working.map((identity) => identity.name).join(", ")}`}>
+					<For each={props.working.slice(0, 4)}>
+						{(identity) => (
+							<span class="pill-canvas-face" style={{ "--face": identity.color }}>
+								{identity.name.slice(0, 1)}
+							</span>
+						)}
+					</For>
+				</span>
+			</Show>
+			<span class="pill-sep" aria-hidden="true" />
+		</span>
 	);
 }
