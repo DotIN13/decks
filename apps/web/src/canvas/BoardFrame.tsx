@@ -1,4 +1,5 @@
 import type { BoardPatch } from "@decks/protocol";
+import { AgentCursor } from "./AgentCursor.tsx";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import BookOpen from "lucide-solid/icons/book-open";
 import FilePenLine from "lucide-solid/icons/file-pen-line";
@@ -1231,22 +1232,7 @@ export function BoardFrame(props: {
 
 			{/* An agent pointing at something, in the board's own coordinates and
 			    counter-scaled so the label stays readable however far out you are. */}
-			<Show when={props.cursor}>
-				{(cursor) => (
-					<div
-						class="agent-cursor"
-						style={{
-							left: `${cursor().x}px`,
-							top: `${cursor().y}px`,
-							"--zoom": zoom(),
-							"--cursor-color": cursor().color,
-						}}
-					>
-						<span class="dot" />
-						<span class="label">{cursor().label}</span>
-					</div>
-				)}
-			</Show>
+			<AgentCursor cursor={props.cursor} zoom={zoom()} />
 
 			{/*
 			 * The resize handle, on the selected board — **one handle, every kind of document**.
