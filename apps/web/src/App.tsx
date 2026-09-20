@@ -4,13 +4,14 @@ import Info from "lucide-solid/icons/info";
 import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import Sun from "lucide-solid/icons/sun";
-import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show} from "solid-js";
+import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack} from "solid-js";
 import type { EditorHost } from "./canvas/Editor.ts";
 import { Settings } from "./chat/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import type { Presenting } from "./state/ui.ts";
 import { createAlerts } from "./app/alerts.ts";
-import { camera, glide, moveCamera, setCamera } from "./state/camera.ts";
+import { camera, CLOSE_MS, glide, moveCamera, OPEN_MS, setCamera } from "./state/camera.ts";
+import { createCanvasMorph } from "./app/canvas-morph.ts";
 import { handleFrame, type FrameHooks } from "./app/frames.ts";
 import { createFileDrops } from "./app/files.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
@@ -162,10 +163,44 @@ export function App() {
 	 * row in the panel does, and the camera comes back from `agent-views.ts` as it always has.
 	 */
 	const [routeAgent, setRouteAgent] = createSignal<string | undefined>();
+	/*
+	 * Opening a canvas grows it out of the card that was pressed, and going Home shrinks it back
+	 * in (`app/canvas-morph.ts`). `morphing` tells the surface not to slide its layers while the
+	 * camera is doing the moving; `arriving` is the canvas whose boards the camera is waiting for.
+	 */
+	const morph = createCanvasMorph({ deckPath: () => state.deck?.path ?? "", stage: () => document.querySelector(".stage"), camera });
+	const [morphing, setMorphing] = createSignal(false);
+	let morphDone: ReturnType<typeof setTimeout> | undefined;
+	const morphFor = (ms: number) => {
+		setMorphing(true);
+		clearTimeout(morphDone);
+		morphDone = setTimeout(() => setMorphing(false), ms + 120);
+	};
+	let arriving: string | undefined;
+	/** The place last applied, so a delayed switch can tell whether it is still wanted. */
+	let currentPlace: Place | undefined;
+	/**
+	 * The canvas asked for has its boards: land on it — out of the card when a card was pressed,
+	 * else straight to where it was left or a fit. Once per arrival, not on every board change.
+	 */
+	const landCanvas = () => {
+		if (!arriving || arriving !== state.canvas) return;
+		const id = arriving;
+		arriving = undefined;
+		morph.arrived(id, stageBoards());
+	};
 	let setWantFocusedStage: (value: boolean) => void = () => {};
 	const applyPlace = (place: Place) => {
+		currentPlace = place;
 		if (place.surface === "dispatch") {
-			setSurface("dispatch");
+			const leaving = surface() === "stage" ? state.canvas : undefined;
+			if (leaving) {
+				morphFor(CLOSE_MS);
+				morph.leave(leaving, stageBoards(), () => {
+					// Only if nothing else moved in the meantime: a second press wins.
+					if (currentPlace?.surface === "dispatch") setSurface("dispatch");
+				});
+			} else setSurface("dispatch");
 			setDispatchTab(place.tab);
 			setDispatchPreview(place.board);
 			setRouteAgent(undefined);
@@ -182,7 +217,11 @@ export function App() {
 		if (place.canvas) {
 			setRouteAgent(undefined);
 			setWantFocusedStage(false);
+			// Keep where the canvas being left was looking, for the next time it is opened.
+			if (state.canvas && state.canvas !== place.canvas) morph.keep(state.canvas, camera());
+			arriving = place.canvas;
 			if (place.canvas !== state.canvas) send({ type: "canvas.focus", id: place.canvas });
+			else landCanvas();
 			return;
 		}
 		/*
@@ -697,6 +736,17 @@ export function App() {
 		const canvas = state.canvases.find((one) => one.id === state.canvas);
 		const playing = new Set(canvas ? canvas.boards : state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
 		return state.boards.filter((board) => playing.has(board.path));
+	});
+
+	/*
+	 * A canvas that was asked for has arrived — the server has said this browser is on it, and
+	 * its boards came with that — so the camera lands on it. Tracked on both, because the boards
+	 * are what decide where to land and the canvas is what says they are the right ones.
+	 */
+	createEffect(() => {
+		void state.canvas;
+		void stageBoards();
+		untrack(landCanvas);
 	});
 
 	/**
@@ -1227,7 +1277,7 @@ export function App() {
 				 * document lives in a different element under each renderer, and moving an iframe
 				 * reloads it anyway, so a clean remount is the honest version of the same cost.
 				 */}
-				<div class="surface" data-surface={surface()}>
+				<div class="surface" data-surface={surface()} data-morph={morphing() ? "true" : undefined}>
 					{/*
 					 * The dashboard in front by default, the stage behind it, and a press slides
 					 * one over the other. The layer behind is `data-hidden` and `inert`, the same
@@ -1241,7 +1291,11 @@ export function App() {
 							boards={state.boards}
 							identities={state.identities}
 							canvases={state.canvases}
-							onOpenCanvas={(canvas) => go({ surface: "stage", agent: "", canvas: canvas.id })}
+							onOpenCanvas={(canvas, card) => {
+								morph.open(canvas.id, card);
+								morphFor(OPEN_MS);
+								go({ surface: "stage", agent: "", canvas: canvas.id });
+							}}
 							onNewCanvas={() => {
 								/*
 								 * A name that is not in the way: the canvas is renamed from its own title

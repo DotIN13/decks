@@ -30,8 +30,8 @@ export interface DispatchViewProps {
 	identities: Record<string, Identity>;
 	/** Every canvas in the deck — the landing pane's cards. */
 	canvases: Canvas[];
-	/** Open a canvas: the press that leaves the dashboard. */
-	onOpenCanvas: (canvas: Canvas) => void;
+	/** Open a canvas: the press that leaves the dashboard, with the card it was pressed on. */
+	onOpenCanvas: (canvas: Canvas, card: DOMRect) => void;
 	/** Make one, and go to it. */
 	onNewCanvas: () => void;
 	chats: AgentChat[];

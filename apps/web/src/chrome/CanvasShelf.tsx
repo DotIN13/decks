@@ -20,8 +20,8 @@ export interface CanvasShelfProps {
 	canvases: Canvas[];
 	boards: Board[];
 	identities: Record<string, Identity>;
-	/** Board paths that changed since the canvas was last opened, for the marked pictures. */
-	onOpen: (canvas: Canvas) => void;
+	/** Open a canvas, with the card's rectangle so the canvas can grow out of it. */
+	onOpen: (canvas: Canvas, card: DOMRect) => void;
 	onCreate: () => void;
 	/** Boards on no canvas at all: still in the deck, and still changing. */
 	onUnfiled: () => void;
@@ -58,7 +58,13 @@ export function CanvasShelf(props: CanvasShelfProps) {
 						const news = () => canvas.changedAt > (canvas.openedAt ?? 0);
 						const working = () => canvas.agents.map((id) => props.identities[id]).filter((identity): identity is Identity => identity !== undefined);
 						return (
-							<button type="button" class="canvas-card" data-news={news() ? "true" : undefined} onClick={() => props.onOpen(canvas)}>
+							<button
+								type="button"
+								class="canvas-card"
+								data-canvas-id={canvas.id}
+								data-news={news() ? "true" : undefined}
+								onClick={(event) => props.onOpen(canvas, (event.currentTarget.querySelector(".canvas-strip") ?? event.currentTarget).getBoundingClientRect())}
+							>
 								<span class="canvas-card-name">
 									<Show when={news()}>
 										<span class="canvas-dot" aria-label="Something new here" />

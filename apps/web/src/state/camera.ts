@@ -60,12 +60,22 @@ export const reducedMotion = () => typeof matchMedia === "function" && matchMedi
  * is the journey, and a reader that caught one without the other would see the view jump to where
  * it was going and then glide from where it already was.
  */
-export function moveCamera(next: Camera, options?: { animate?: boolean }): void {
+export function moveCamera(next: Camera, options?: { animate?: boolean; ms?: number }): void {
 	const calm = reducedMotion();
 	batch(() => {
 		setCamera(next);
-		setGlide(options?.animate && !calm ? { token: ++glides, ms: GLIDE_MS } : undefined);
+		setGlide(options?.animate && !calm ? { token: ++glides, ms: options.ms ?? GLIDE_MS } : undefined);
 	});
 }
+
+/**
+ * How long opening a canvas from its card takes, and going back into the card.
+ *
+ * Shorter than `GLIDE_MS` because it is a press rather than a journey: the card is already a
+ * small picture of the canvas, so there is no distance to read, only a size to grow into. Back is
+ * a hair quicker again, because leaving is less interesting than arriving.
+ */
+export const OPEN_MS = 360;
+export const CLOSE_MS = 350;
 
 export { camera, glide, setCamera };
