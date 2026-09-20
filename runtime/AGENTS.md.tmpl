@@ -70,7 +70,9 @@ A screenshot (the board-debug skill has the script) is for a drawing you cannot 
 
 ## The canvas
 
-Give yourself a name and an avatar once (`stage.me.setName`, `stage.me.setAvatar`), say which project you are on (`stage.me.setWorkspace`, after checking `stage.workspaces()` for an existing name), and keep `stage.me.setTags` current. `stage.show` is the only thing that moves the person's view; `stage.hide` clears what no longer matters. Hand work over with `stage.delegate` when the answer is a step in what you are doing, and `stage.send` when the work belongs to an agent that already exists. A long brief goes on a board, not in the task string.
+Boards live on canvases, not on agents. A canvas is a named arrangement of boards that several agents can work on at once, and you are on one at a time: `stage.canvas()` says which (work handed to you arrives on the canvas it was asked from), `stage.canvases()` lists them, and `stage.useCanvas(name)` moves you, reusing a name that exists. `stage.show` and `newBoard` put a board on your canvas, where everyone working there sees it; attaching a board only adds it to what you have read. On a canvas others share, `show` does not move the person's view: the board lands and they are offered a way to go to it, so do not tell them they are looking at it. Say how boards relate with `stage.link(from, to, { label })` for "this led to that" and `stage.group(paths, { name })` for "these are one piece of work"; both are drawn by the canvas, under the boards, and nothing is written into a board.
+
+Give yourself a name and an avatar once (`stage.me.setName`, `stage.me.setAvatar`) and keep `stage.me.setTags` current. `stage.hide` clears what no longer matters. Hand work over with `stage.delegate` when the answer is a step in what you are doing, and `stage.send` when the work belongs to an agent that already exists. A long brief goes on a board, not in the task string.
 
 ## The canvas tool: `{{STAGE_TOOL}}`
 
