@@ -126,16 +126,22 @@ export function joinSpot(size: { w: number; h: number }, onCanvas: readonly Box[
  * Is the place a board already has near enough to keep when it joins the canvas?
  *
  * Yes when it is somewhere the person can see, and yes when it sits within a board's length of
- * the boards that are on the canvas — which is what makes hiding a board and playing it again
- * put it back in its own hole rather than at the end of the row. No when it is neither, which is
- * every board still carrying a place from the old deck-wide auto-layout: those are the boards
- * that used to arrive a million pixels away.
+ * the boards on the canvas — which is what makes hiding a board and playing it again put it back
+ * in its own hole rather than at the end of the row. No when it is neither: that is a board still
+ * carrying a place from the old deck-wide auto-layout, arriving a million pixels from anything.
+ *
+ * **An empty canvas keeps it too**, which is the case that has to be argued for rather than
+ * assumed. There is nothing there to be near and so nothing to be far from, and a place is
+ * somebody's decision — a drag, a drop, a deck laid out on purpose. Moving it here was worse than
+ * useless in both directions: clearing the canvas and playing one board back moved it, and every
+ * arrangement was one clear-and-replay from being rebuilt around wherever the camera happened to
+ * be. Nothing is lost by keeping it, because the camera arrives on a board you asked for.
  */
 export function keepsPlace(box: Box, onCanvas: readonly Box[], camera?: Camera): boolean {
+	const cluster = bounds(onCanvas);
+	if (!cluster) return true;
 	const view = viewBox(camera);
 	if (view && overlaps(box, view)) return true;
-	const cluster = bounds(onCanvas);
-	if (!cluster) return false;
 	const reach = GUTTER + Math.max(box.w, box.h);
 	return touching(box, cluster, reach);
 }

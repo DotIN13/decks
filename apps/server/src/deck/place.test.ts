@@ -35,7 +35,8 @@ test("a place is kept when it is visible or beside the canvas, and dropped when 
 	assert.equal(keepsPlace({ x: 0, y: 0, ...size }, onCanvas, camera), true, "where you are looking");
 	assert.equal(keepsPlace({ x: 1160, y: 0, ...size }, onCanvas, camera), true, "one board along from the canvas");
 	assert.equal(keepsPlace({ x: 0, y: 900_000, ...size }, onCanvas, camera), false, "the old deck-wide column");
-	assert.equal(keepsPlace({ x: 0, y: 900_000, ...size }, [], camera), false, "and with nothing on the canvas either");
+	// Nothing on the canvas is nothing to be far from, and a place is somebody's decision.
+	assert.equal(keepsPlace({ x: 0, y: 900_000, ...size }, [], camera), true, "the first board back on an empty canvas");
 });
 
 test("with every candidate taken, a board goes to the right of everything rather than on top", () => {

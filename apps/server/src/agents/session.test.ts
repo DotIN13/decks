@@ -804,3 +804,15 @@ test("restoring a canvas places nothing: the arrangement is the one the person l
 	assert.deepEqual(agent.positions()["boards/one.html"], { x: 0, y: 900_000 }, "no place was worked out");
 	cleanup();
 });
+
+test("clearing the canvas and playing a board back leaves it where it was", () => {
+	const { agent, cleanup } = agentOn(["one.html"], { camera: { x: 40_000, y: 40_000, zoom: 1, width: 1440, height: 900 } });
+	agent.setPosition("boards/one.html", 0, 0);
+	agent.setInPlay(["boards/one.html"], { place: true });
+	agent.setInPlay([], { place: true });
+	agent.setInPlay(["boards/one.html"], { place: true });
+	// The camera is 40,000 px away and the canvas was empty, and neither is a reason to move a
+	// board somebody put somewhere: what moves instead is the camera, once the board is on.
+	assert.deepEqual(agent.positions()["boards/one.html"], { x: 0, y: 0 });
+	cleanup();
+});
