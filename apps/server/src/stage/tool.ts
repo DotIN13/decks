@@ -1,6 +1,6 @@
 import { isoIn, isZone, nowWords, offsetLabel, partsIn, processZone } from "../clock.ts";
 import { existsSync, readFileSync } from "node:fs";
-import type { AgentKind, AgentMode, AgentState, Camera, Identity, Schedule, ScheduleSpec, TaskResult, TaskSpec, ThinkingLevel } from "@decks/protocol";
+import type { AgentKind, AgentMode, AgentState, Camera, Canvas, Identity, Schedule, ScheduleSpec, TaskResult, TaskSpec, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
 import { roster } from "../agents/workspaces.ts";
@@ -149,6 +149,22 @@ export interface StageAgentHooks {
 	setTags(tags: unknown): string[];
 	/** Replaces the agent's workspace and returns it as stored — see `agents/workspaces.ts`. */
 	setWorkspace(workspace: unknown): string | null;
+	/**
+	 * The canvas this agent works on, and the verbs that draw between its boards.
+	 *
+	 * Optional so a host with no canvases — a board running its own code — can leave it out;
+	 * the verbs then refuse with a sentence rather than doing something to a canvas nobody
+	 * meant. Every verb answers with the canvas as it now is, so an agent sees what it did.
+	 */
+	canvas?: {
+		current(): Canvas | undefined;
+		list(): Canvas[];
+		use(name: string): Canvas | undefined;
+		link(from: string, to: string, label?: string): Canvas | undefined;
+		unlink(from: string, to: string): Canvas | undefined;
+		group(paths: string[], name: string): Canvas | undefined;
+		ungroup(name: string): Canvas | undefined;
+	};
 	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
@@ -871,7 +887,52 @@ export function createStageTool(deps: {
 					context: other.context,
 				})),
 			),
+
+		/*
+		 * The canvas verbs. Each answers with the canvas as it now is, so an agent that drew an
+		 * arrow can see it, and each refuses in a sentence when there is nothing to draw on — a
+		 * board running its own code has no canvas of its own.
+		 */
+		canvas: async () => canvasHooks().current(),
+		canvases: async () => canvasHooks().list(),
+		useCanvas: async (name: string) => {
+			if (typeof name !== "string" || !name.trim()) throw new Error("useCanvas takes the canvas's name, for example stage.useCanvas(\"Political LLM\").");
+			return must(canvasHooks().use(name), "That canvas could not be joined.");
+		},
+		link: async (from: string, to: string, options?: { label?: string }) => {
+			const [a, b] = [boardPath(from), boardPath(to)];
+			if (a === b) throw new Error("An arrow needs two different boards.");
+			return must(canvasHooks().link(a, b, typeof options?.label === "string" ? options.label.slice(0, 60) : undefined), "The arrow was already there.");
+		},
+		unlink: async (from: string, to: string) => must(canvasHooks().unlink(boardPath(from), boardPath(to)), "There was no arrow between those two."),
+		group: async (paths: string[], options: { name: string }) => {
+			if (!Array.isArray(paths) || paths.length < 2) throw new Error("A group is two or more boards: stage.group([a, b], { name }).");
+			if (typeof options?.name !== "string" || !options.name.trim()) throw new Error("A group needs a name, which is what is written on its border.");
+			return must(canvasHooks().group(paths.map(boardPath), options.name), "That group could not be drawn.");
+		},
+		ungroup: async (name: string) => must(canvasHooks().ungroup(name), `There is no group called ${name}.`),
 	};
+
+	/** The canvas hooks, or a sentence saying there are none. */
+	function canvasHooks(): NonNullable<StageAgentHooks["canvas"]> {
+		if (!agent.canvas) throw new Error("There is no canvas here to draw on.");
+		return agent.canvas;
+	}
+
+	/** A board this deck has, by the path an agent uses; a sentence when it is not one. */
+	function boardPath(path: string): string {
+		const wanted = typeof path === "string" ? path.replace(/^\.?\//, "") : "";
+		if (!service.boards().some((board) => board.path === wanted)) {
+			throw new Error(`No such board: ${String(path)}. Use the path from stage.boards(), like "boards/plan.html".`);
+		}
+		return wanted;
+	}
+
+	function must(canvas: Canvas | undefined, otherwise: string): Canvas {
+		const now = canvas ?? canvasHooks().current();
+		if (!now) throw new Error(otherwise);
+		return now;
+	}
 
 	const snapshot = (): StageSnapshot => ({
 		// The arrangement this stage is looking at, so a resume or a rewind restores where the boards

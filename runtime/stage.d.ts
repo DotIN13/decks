@@ -8,6 +8,12 @@ export interface Board { path: string; title: string; x: number; y: number; w: n
 
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
 
+/**
+ * A canvas: the boards on it, the arrows and groups drawn between them, and who works there.
+ * Boards belong to canvases, not to agents. Two agents on one canvas see one arrangement.
+ */
+export interface Canvas { id: string; name: string; boards: string[]; links: Array<{ from: string; to: string; label?: string }>; groups: Array<{ name: string; boards: string[] }>; changedAt: number; agents: string[] }
+
 export interface Stage {
 	/**
 	 * Write a blank board and return its path. The title is the finding, as a sentence.
@@ -97,9 +103,21 @@ export interface Stage {
 		setAvatar(avatar: { emoji: string } | { svg: string }): Promise<void>;
 		/** What you are working on, as up to four short nouns. Replaces the list; `[]` when you stop. */
 		setTags(tags: string[]): Promise<string[]>;
-		/** The project you are on, one word. Check `workspaces()` first and reuse a name. */
+		/** Work on the canvas of this name, made if there is none. Same as `useCanvas`. */
 		setWorkspace(workspace: string | null): Promise<string | null>;
 	};
+	/** The canvas you work on, or `undefined` before you have shown anything. `show` and `newBoard` put boards on it. */
+	canvas(): Promise<Canvas | undefined>;
+	/** Every canvas in the deck. Check this before making one, and reuse a name. */
+	canvases(): Promise<Canvas[]>;
+	/** Work on another canvas, by name, made if there is none. What you have read stays with you. */
+	useCanvas(name: string): Promise<Canvas>;
+	/** An arrow from one board to another on your canvas: this led to that. Drawn under the boards; nothing is written into either file. */
+	link(from: string, to: string, o?: { label?: string }): Promise<Canvas>;
+	unlink(from: string, to: string): Promise<Canvas>;
+	/** A dashed border round two or more boards on your canvas: one piece of work. The same name replaces the group. */
+	group(paths: string[], o: { name: string }): Promise<Canvas>;
+	ungroup(name: string): Promise<Canvas>;
 	workspaces(): Promise<Array<{ name: string; agents: Array<{ id: string; name: string }>; boards: string[] }>>;
 	agents(): Promise<Array<{ id: string; name: string; me: boolean; state: string; kind: string; tags: string[]; workspace?: string; queued: number }>>;
 	/** Make a subagent, hand it boards, and wait for its report. */

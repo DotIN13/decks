@@ -667,6 +667,12 @@ export function App() {
 	 * like boards disappearing. An empty canvas beside a full rail says what is true, and
 	 * says it before anything has happened rather than after.
 	 */
+	/**
+	 * The canvas the stage is drawing: the one this browser opened, else the one the focused chat
+	 * works on. Its arrows and groups are drawn under the boards.
+	 */
+	const stageCanvas = createMemo(() => state.canvases.find((one) => one.id === state.canvas) ?? state.canvases.find((one) => !!state.focused && one.agents.includes(state.focused)));
+
 	const stageBoards = createMemo(() => {
 		/*
 		 * What is on the canvas, from the canvas — and from the focused chat when this browser
@@ -1288,6 +1294,8 @@ export function App() {
 						mode={mode()}
 						marks={marks()}
 						boards={stageBoards()}
+						links={stageCanvas()?.links ?? []}
+						groups={stageCanvas()?.groups ?? []}
 						camera={camera()}
 						glide={glide()}
 						setCamera={setCameraAndReport}

@@ -250,6 +250,8 @@ export class App {
 				 */
 				arranged: () => this.send({ type: "deck.state", deck: this.stageState() }),
 				canvases: this.canvases,
+				canvasList: () => this.canvasList(),
+				publishCanvases: () => this.publishCanvases(),
 				recordRevision: (path) => this.boards.recordRevision(path),
 				wrote: (path, who) => this.boards.wrote(path, who),
 				boardPathOf: (file) => this.boards.boardPathOf(file),

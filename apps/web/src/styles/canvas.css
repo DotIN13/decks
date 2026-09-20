@@ -442,3 +442,54 @@
 		font-size: 10.5px;
 	}
 }
+
+/*
+ * The arrows and groups a canvas has (`canvas/CanvasWires.tsx`).
+ *
+ * An SVG of no size at the world's origin with its overflow showing, so a path at any world
+ * coordinate is drawn where it says. Every length is `N * --unit` — one screen pixel in world
+ * coordinates — so a line stays two pixels wide and a label 12px at any zoom. Under the boards
+ * and never in the way of a pointer: it shows what the canvas says, it is not a control.
+ */
+.canvas-wires {
+	--unit: calc(1px / var(--zoom, 1));
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 1px;
+	height: 1px;
+	overflow: visible;
+	pointer-events: none;
+}
+.canvas-wire path {
+	fill: none;
+	stroke: var(--color-accent);
+	stroke-width: calc(2 * var(--unit));
+	stroke-linejoin: round;
+}
+.canvas-wire .canvas-wire-head {
+	fill: var(--color-accent);
+	stroke: none;
+}
+.canvas-wire text {
+	fill: var(--color-accent);
+	font-size: calc(12 * var(--unit));
+	font-weight: 600;
+	paint-order: stroke;
+	stroke: var(--bg);
+	stroke-width: calc(4 * var(--unit));
+	transform: translateY(calc(-6 * var(--unit)));
+	text-anchor: middle;
+}
+.canvas-fence rect {
+	fill: none;
+	stroke: var(--muted);
+	stroke-width: calc(1.5 * var(--unit));
+	stroke-dasharray: calc(7 * var(--unit)) calc(6 * var(--unit));
+	opacity: 0.7;
+}
+.canvas-fence text {
+	fill: var(--muted);
+	font-size: calc(12 * var(--unit));
+	font-weight: 600;
+}

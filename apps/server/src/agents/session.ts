@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import type { AgentCapabilities, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
+import type { AgentCapabilities, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Canvas, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
@@ -223,6 +223,8 @@ export class DeckAgent {
 		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
 		this.save();
 		this.publishContext();
+		// Who is on which canvas is on every card, so joining one is news for the dashboard.
+		this.host.canvasesChanged?.();
 		return canvas.id;
 	}
 	/**
@@ -284,6 +286,10 @@ export class DeckAgent {
 			 * fixture has nobody else to tell.
 			 */
 			canvasChanged?(canvasId: string, exceptAgentId: string): void;
+			/** Every canvas as the browser sees it, for `stage.canvas()` and `stage.canvases()`. */
+			canvasList?(): Canvas[];
+			/** A canvas was made, joined, or drawn on: send the list again. */
+			canvasesChanged?(): void;
 			agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; tags: string[]; kind: AgentKind; holding: number }>;
 			spawn(parentId: string, spec: DelegateSpec): Promise<DelegateReport>;
 			/** Put work in another agent's queue, without waiting for it. */
@@ -600,6 +606,33 @@ export class DeckAgent {
 		this.parentId = undefined;
 	}
 
+	/**
+	 * The canvas verbs an agent gets: read where it is, move, and draw between boards.
+	 *
+	 * Drawing goes on the canvas it is working on, made on first use like a shown board is —
+	 * an agent that links two boards before showing either still has somewhere to put the line.
+	 */
+	private canvasHooks() {
+		const current = () => (this.canvas ? this.host.canvasList?.().find((canvas) => canvas.id === this.canvas) : undefined);
+		const drew = (changed: unknown) => {
+			if (!changed) return undefined;
+			this.host.canvasesChanged?.();
+			return current();
+		};
+		return {
+			current,
+			list: () => this.host.canvasList?.() ?? [],
+			use: (name: string) => {
+				this.useCanvas(name);
+				return current();
+			},
+			link: (from: string, to: string, label?: string) => drew(this.canvases.link(this.canvasId, from, to, label)),
+			unlink: (from: string, to: string) => drew(this.canvas ? this.canvases.unlink(this.canvas, from, to) : undefined),
+			group: (paths: string[], name: string) => drew(this.canvases.group(this.canvasId, name, paths)),
+			ungroup: (name: string) => drew(this.canvas ? this.canvases.ungroup(this.canvas, name) : undefined),
+		};
+	}
+
 	/** Put a remembered canvas back: what the agent held, showed and called itself. */
 	private apply(snapshot: StageSnapshot | undefined): void {
 		if (!snapshot) return;
@@ -648,6 +681,7 @@ export class DeckAgent {
 			rename: (name: string) => this.rename(name),
 			setTags: (tags: unknown) => this.setTags(tags),
 			setWorkspace: (workspace: unknown) => this.setWorkspace(workspace),
+			canvas: this.canvasHooks(),
 			setAvatar: (url: string) => this.setAvatar(url),
 			agents: () => this.host.agents(),
 			camera: () => this.host.camera(this.id),

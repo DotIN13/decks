@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, Schedule, ScheduleSpec, ServerMessage, TaskResult, TaskSpec } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, Canvas, Schedule, ScheduleSpec, ServerMessage, TaskResult, TaskSpec } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { dispatcherBrief } from "../tasks/brief.ts";
 import { nowWords, processZone } from "../clock.ts";
@@ -53,6 +53,10 @@ export class Registry {
 			arranged?(): void;
 			/** The deck's canvases: what holds the boards (`canvas/store.ts`). */
 			canvases: CanvasStore;
+			/** Every canvas as the browser sees it, with who is on each. */
+			canvasList?(): Canvas[];
+			/** Send the canvas list to every browser. */
+			publishCanvases?(): void;
 			recordRevision(path: string): string | undefined;
 			/** An agent said it wrote this board — the byline the gallery shows. Optional so a bare test host can omit it. */
 			wrote?(path: string, who: string): void;
@@ -230,6 +234,8 @@ export class Registry {
 				 * boards, so each of their browsers is told, and the arrangement goes out once.
 				 */
 				canvasChanged: (canvasId: string, except: string) => this.canvasChanged(canvasId, except),
+				canvasList: () => this.host.canvasList?.() ?? [],
+				canvasesChanged: () => this.host.publishCanvases?.(),
 				agents: () => this.summaries(),
 				spawn: (parentId, spec) => this.spawn(parentId, spec),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
