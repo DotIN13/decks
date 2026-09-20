@@ -12,6 +12,7 @@ import { StageBridge } from "./stage/bridge.ts";
 import { TaskService } from "./tasks/service.ts";
 import { TaskStore } from "./tasks/store.ts";
 import { SettingsStore } from "./settings.ts";
+import { CanvasStore } from "./canvas/store.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./web/bridge.ts";
@@ -59,6 +60,13 @@ export class App {
 	readonly tasks: TaskService;
 	/** The deck's own settings. Built first: it sets the clock everything after it reads. */
 	readonly settings: SettingsStore;
+	/**
+	 * The deck's canvases: what holds the boards, their places and the arrows between them.
+	 *
+	 * One per deck, shared by every agent on it, which is the whole point — two agents working
+	 * on one thing are on one canvas and see one arrangement.
+	 */
+	readonly canvases: CanvasStore;
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */
@@ -104,6 +112,7 @@ export class App {
 		deck: Deck,
 	) {
 		this.deck = deck;
+		this.canvases = new CanvasStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text }));
 		this.evalTrust = new EvalTrust(config.dataDir);
 		this.boards = new BoardService(deck, {
 			send: (message) => this.send(message),
@@ -114,7 +123,11 @@ export class App {
 			 */
 			state: () => this.stageState(),
 			edited: (path, summary) => this.agents.userEdited(path, summary),
-			removed: (path) => this.agents.boardRemoved(path),
+			removed: (path) => {
+				// A board that left the deck leaves every canvas, with its place and its arrows.
+				this.canvases.boardRemoved(path);
+				this.agents.boardRemoved(path);
+			},
 		});
 		this.stage = new StageService(deck, {
 			/*
@@ -235,6 +248,7 @@ export class App {
 				 * arrive in.
 				 */
 				arranged: () => this.send({ type: "deck.state", deck: this.stageState() }),
+				canvases: this.canvases,
 				recordRevision: (path) => this.boards.recordRevision(path),
 				wrote: (path, who) => this.boards.wrote(path, who),
 				boardPathOf: (file) => this.boards.boardPathOf(file),
@@ -695,6 +709,8 @@ export class App {
 		App.refreshExamples(this.deck);
 		this.stage.setDeck(this.deck);
 		this.boards.setDeck(this.deck);
+		// A different deck is a different set of canvases, read from its own folder.
+		this.canvases.setDeck(this.deck.path);
 		// The new deck's clock first: its schedules are read against it.
 		this.settings.setDeck(this.deck.path);
 		// Tasks and schedules belong to the deck they name, so a switch is a fresh read —

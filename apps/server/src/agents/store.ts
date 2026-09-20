@@ -71,17 +71,14 @@ export interface AgentRecord {
 	/** The deck's dispatcher, kept across restarts so the deck never grows a second one. */
 	role?: "dispatcher";
 	context: string[];
-	inPlay: string[];
 	/**
-	 * Where this conversation has put its boards.
+	 * The canvas this chat is working on, by id (`canvas/store.ts`).
 	 *
-	 * **Per stage, not per deck.** A board's place belongs to the arrangement you are looking at, so
-	 * the same board can sit differently in this chat and the next. Absent means "this stage has not
-	 * placed it", which falls through to `Deck.arrange` — the same `autoPlace` rule the deck always
-	 * applied, over this stage's boards. No `w`/`h`: a board's size is its file's `<meta>`, or its own
-	 * measured extent, and a copy here would go stale.
+	 * What is on that canvas, where each board sits and the arrows between them are the
+	 * canvas's own record, shared with every other chat on it. Before canvases this was three
+	 * fields here — `inPlay`, `positions` and a `workspace` word — one private copy per chat.
 	 */
-	positions?: Record<string, { x: number; y: number }>;
+	canvas?: string;
 	createdAt: number;
 	/** The model (and thinking level) the chat was last on, so a dormant row can still say what it will use. */
 	model?: AgentModel;
@@ -118,13 +115,16 @@ export interface AgentRecord {
 	/** What *you* said it was doing, from the customise popup. Never written by the agent. */
 	userTags?: string[];
 	/**
-	 * The workspace it is in, from `stage.me.setWorkspace` or from you.
+	 * The three fields a record written before canvases carried, read once and never written.
 	 *
-	 * On the record for the reason tags are: the whole point of a workspace is finding the agent
-	 * you are *not* talking to, and a dormant chat has no session to ask. Read back by
-	 * `validate()` — the seam a field falls through if it is only ever written.
+	 * `canvas/migrate.ts` turns them into canvases on the first open — the workspace word into
+	 * a canvas of that name, the boards and their places onto it — and after that write the
+	 * record names a canvas instead. Kept as their own names so nothing can mistake them for
+	 * state this build maintains.
 	 */
-	workspace?: string;
+	legacyInPlay?: string[];
+	legacyPositions?: Record<string, { x: number; y: number }>;
+	legacyWorkspace?: string;
 	/**
 	 * A summary of the transcript, not a copy of it. A row shows a preview of the last
 	 * thing said, and the only other place that line lives is `chat.json` — so without this
@@ -475,8 +475,15 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(typeof source.parentId === "string" ? { parentId: source.parentId } : {}),
 		...(source.role === "dispatcher" ? { role: "dispatcher" as const } : {}),
 		context: strings(source.context),
-		inPlay: strings(source.inPlay),
-		...(positions ? { positions } : {}),
+		...(typeof source.canvas === "string" && source.canvas ? { canvas: source.canvas } : {}),
+		/*
+		 * What a record written before canvases had: what was up, where it sat, and the word the
+		 * agent typed about itself. Read back only so `canvas/migrate.ts` can turn them into a
+		 * canvas on the first open, and never written again.
+		 */
+		...(strings(source.inPlay).length > 0 ? { legacyInPlay: strings(source.inPlay) } : {}),
+		...(positions ? { legacyPositions: positions } : {}),
+		...(typeof source.workspace === "string" && source.workspace ? { legacyWorkspace: source.workspace } : {}),
 		createdAt: created,
 		...(model ? { model } : {}),
 		...(usage ? { usage } : {}),
@@ -493,12 +500,6 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(typeof source.account === "string" && source.account ? { account: source.account } : {}),
 		...(tags.length > 0 ? { tags } : {}),
 		...(userTags.length > 0 ? { userTags } : {}),
-		/*
-		 * Taken as it is, like the account, and for the reason the two lists above are not
-		 * *re-cleaned*: it was cleaned on the way in, and a second pass here is how a change of
-		 * cap silently rewrites stored history.
-		 */
-		...(typeof source.workspace === "string" && source.workspace ? { workspace: source.workspace } : {}),
 		...(lastLine ? { lastLine } : {}),
 		lastAt: finite(source.lastAt, created),
 	};

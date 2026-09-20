@@ -12,6 +12,7 @@ import { Deck } from "./deck/loader.ts";
 import { realPathOf } from "./deck/roots.ts";
 import type { StageService } from "./stage/service.ts";
 import type { Hub, View } from "./ws.ts";
+import { CanvasStore } from "./canvas/store.ts";
 
 /*
  * Two devices on one deck, each on its own conversation.
@@ -38,7 +39,7 @@ function seeded(deckPath: string, name: string, place: { x: number; y: number })
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
+		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
 	);
 	agent.rename(name);
 	agent.translator.user("here");

@@ -10,6 +10,7 @@ import { Registry } from "./registry.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
+import { CanvasStore } from "../canvas/store.ts";
 
 /**
  * That the chat list survives the process (DESIGN §6.2).
@@ -54,7 +55,7 @@ function agentOn(deck: Deck, color = "#3b5cf6"): DeckAgent {
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color, kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
+		{ color, kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
 	);
 }
 
@@ -63,6 +64,7 @@ function registryOn(deck: Deck): { registry: Registry; sent: ServerMessage[] } {
 	const registry = new Registry(deck, (message) => sent.push(message), {} as StageService, {
 		port: 4329,
 		defaultKind: "pi",
+		canvases: new CanvasStore(deck.path),
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		recordRevision: () => undefined,
 		boardPathOf: () => undefined,
@@ -359,7 +361,6 @@ test("a restored chat is opened on the model the conversation was last held in",
 			name: "Ada",
 			color: "#3b5cf6",
 			context: [],
-			inPlay: [],
 			createdAt: 1,
 			lastAt: 2,
 			model: { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "high" },
@@ -543,6 +544,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 					kind: options.kind ?? childKind,
 					snapshots: new AgentStateStore(),
 					store: new AgentStore(deck),
+					canvases: new CanvasStore(deck.path),
 				},
 			);
 			child = agent;
@@ -553,6 +555,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 	const registry = new SpyRegistry(deck, (message) => sent.push(message), {} as StageService, {
 		port: 4329,
 		defaultKind: "pi",
+		canvases: new CanvasStore(deck.path),
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		recordRevision: () => undefined,
 		boardPathOf: () => undefined,
@@ -576,7 +579,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
+		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
 	);
 	parent.translator.user("delegate something");
 	(registry as unknown as { agents: DeckAgent[] }).agents.push(parent);
@@ -723,7 +726,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 					recordRevision: () => undefined,
 					boardPathOf: () => undefined,
 				},
-				{ name: options.name ?? "Agent", color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
+				{ name: options.name ?? "Agent", color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
 			);
 			(this as unknown as { agents: DeckAgent[] }).agents.push(agent);
 			(this as unknown as { focusedId?: string }).focusedId ??= agent.id;
@@ -733,6 +736,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 	})(deck, (message) => sent.push(message), {} as StageService, {
 		port: 4329,
 		defaultKind: "pi",
+		canvases: new CanvasStore(deck.path),
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		recordRevision: () => undefined,
 		boardPathOf: () => undefined,
@@ -841,7 +845,7 @@ test("a turn's boards are the ones the agent named, not the ones that moved mean
 			wrote: (path: string, who: string) => void wrote.push([path, who]),
 			boardPathOf: () => undefined,
 		},
-		{ color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
+		{ color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
 	);
 	const result = await agent.run("do it");
 	assert.deepEqual(result.boards, ["boards/plan.html"]);

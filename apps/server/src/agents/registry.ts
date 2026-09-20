@@ -5,12 +5,14 @@ import { dispatcherBrief } from "../tasks/brief.ts";
 import { nowWords, processZone } from "../clock.ts";
 import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
+import type { CanvasStore } from "../canvas/store.ts";
+import { planCanvases } from "../canvas/migrate.ts";
 import type { CreateSpec, DelegateReport, DelegateSpec, SendSpec } from "../stage/tool.ts";
 import type { TaskFinish } from "../tasks/service.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
-import { AgentStore } from "./store.ts";
+import { AgentStore, type AgentRecord } from "./store.ts";
 
 /**
  * Which agents exist, and which one the browser is looking at.
@@ -49,6 +51,8 @@ export class Registry {
 			camera(agentId: string): Camera;
 			/** Say that a board was placed, so the deck state goes out before the canvas changes. */
 			arranged?(): void;
+			/** The deck's canvases: what holds the boards (`canvas/store.ts`). */
+			canvases: CanvasStore;
 			recordRevision(path: string): string | undefined;
 			/** An agent said it wrote this board — the byline the gallery shows. Optional so a bare test host can omit it. */
 			wrote?(path: string, who: string): void;
@@ -165,6 +169,14 @@ export class Registry {
 			/** The deck's dispatcher. Made by `ensureDispatcher`, never by a person. */
 			role?: "dispatcher";
 			/**
+			 * The canvas to work on, by id: a delegating parent's, or the one a task arrived with.
+			 *
+			 * A child works where its parent was working, for the reason it inherits the account —
+			 * a fan-out that puts its boards on a canvas nobody is looking at is work you have to
+			 * go and find.
+			 */
+			canvas?: string;
+			/**
 			 * The workspace to open in — a delegating parent's, or a chat's own record.
 			 *
 			 * A child is created in its parent's workspace rather than in none, for the reason it
@@ -177,15 +189,14 @@ export class Registry {
 			restored?: {
 				id: string;
 				context: string[];
-				inPlay: string[];
 				/**
-				 * Where this conversation had put its boards — the arrangement it was looking at.
+				 * The canvas this conversation was working on, by id.
 				 *
-				 * A stage's own, and the reason this is on the restored record at all: a dragged board
-				 * surviving a restart is the behaviour the per-stage change exists to keep, and the
-				 * position map is the only place it lives.
+				 * Where its boards sit and which are up live on the canvas now, so this one field
+				 * replaces the list and the map a chat used to carry — and it is what makes a
+				 * dragged board stay where it was put, for everyone on that canvas.
 				 */
-				positions?: Record<string, { x: number; y: number }>;
+				canvas?: string;
 				avatar?: string;
 				createdAt: number;
 				/**
@@ -202,7 +213,6 @@ export class Registry {
 				account?: string;
 				tags?: string[];
 				userTags?: string[];
-				workspace?: string;
 			};
 		} = {},
 	): DeckAgent {
@@ -215,6 +225,17 @@ export class Registry {
 				camera: (agentId: string) => this.host.camera(agentId),
 				// A board that was given a place: the browsers need the arrangement, not just the canvas.
 				arranged: () => this.host.arranged?.(),
+				/*
+				 * One agent changed a shared canvas. Everyone else on it is looking at the same
+				 * boards, so each of their browsers is told, and the arrangement goes out once.
+				 */
+				canvasChanged: (canvasId: string, except: string) => {
+					for (const other of this.agents) {
+						if (other.id === except || other.canvas !== canvasId) continue;
+						other.canvasMoved();
+					}
+					this.host.arranged?.();
+				},
 				agents: () => this.summaries(),
 				spawn: (parentId, spec) => this.spawn(parentId, spec),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
@@ -269,6 +290,8 @@ export class Registry {
 				kind: options.kind ?? this.host.defaultKind,
 				snapshots: this.snapshots,
 				store: this.store,
+				canvases: this.host.canvases,
+				...(options.canvas ? { canvas: options.canvas } : {}),
 			},
 		);
 		this.agents.push(agent);
@@ -293,7 +316,10 @@ export class Registry {
 	 * decide whether the deck still needs its first agent — a restored deck does not.
 	 */
 	restore(): number {
-		for (const { record } of this.store.list().reverse()) {
+		const records = this.store.list().map(({ record }) => record);
+		const canvases = this.migrate(records);
+		for (const record of [...records].reverse()) {
+			const canvas = record.canvas ?? canvases.get(record.id);
 			this.create({
 				name: record.name,
 				kind: record.kind,
@@ -303,12 +329,11 @@ export class Registry {
 				...(record.role ? { role: record.role } : {}),
 				restored: {
 					id: record.id,
+					...(canvas ? { canvas } : {}),
 					// The transcript is not read here. It is read when somebody opens the chat
 					// (`session.transcript`), which is the difference between a list that costs
 					// a directory read and one that costs every conversation ever had.
 					context: record.context,
-					inPlay: record.inPlay,
-					...(record.positions ? { positions: record.positions } : {}),
 					...(record.lastLine ? { lastLine: record.lastLine } : {}),
 					...(record.lastAt ? { lastAt: record.lastAt } : {}),
 					...(record.avatar ? { avatar: record.avatar } : {}),
@@ -326,7 +351,6 @@ export class Registry {
 					...(record.account ? { account: record.account } : {}),
 					...(record.tags ? { tags: record.tags } : {}),
 					...(record.userTags ? { userTags: record.userTags } : {}),
-					...(record.workspace ? { workspace: record.workspace } : {}),
 				},
 			});
 		}
@@ -339,6 +363,36 @@ export class Registry {
 		this.focusedId = this.agents.at(-1)?.id;
 		this.publish();
 		return this.agents.length;
+	}
+
+	/**
+	 * One-way, once: the chats that exist become the canvases they were describing.
+	 *
+	 * A record written before canvases carries what it had up, where it sat, and the word its
+	 * agent typed about itself. `canvas/migrate.ts` decides what canvases those make; this
+	 * writes them and answers with the chat id to canvas id map `restore` then hands each agent.
+	 * A record that already names a canvas is left alone, so this is a no-op on the second open.
+	 */
+	private migrate(records: readonly AgentRecord[]): Map<string, string> {
+		const assigned = new Map<string, string>();
+		const stale = records.filter((record) => !record.canvas && (record.legacyWorkspace || record.legacyInPlay?.length || record.legacyPositions));
+		if (stale.length === 0) return assigned;
+		const plans = planCanvases(
+			stale.map((record) => ({
+				id: record.id,
+				name: record.name,
+				...(record.legacyWorkspace ? { workspace: record.legacyWorkspace } : {}),
+				inPlay: record.legacyInPlay ?? [],
+				...(record.legacyPositions ? { positions: record.legacyPositions } : {}),
+				lastAt: record.lastAt,
+			})),
+		);
+		for (const plan of plans) {
+			const existing = this.host.canvases.byName(plan.name);
+			const canvas = existing ?? this.host.canvases.create({ name: plan.name, boards: plan.boards, places: plan.places });
+			for (const member of plan.members) assigned.set(member, canvas.id);
+		}
+		return assigned;
 	}
 
 	get(id: string | undefined): DeckAgent | undefined {
