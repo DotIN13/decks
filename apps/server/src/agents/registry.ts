@@ -38,6 +38,9 @@ export class Registry {
 	/** The chat list on disk, so it survives a restart (§6.2). */
 	private store: AgentStore;
 
+	/** A task the dispatcher is deciding, and the canvas it was asked for on. Read once, at the send. */
+	private readonly taskCanvases = new Map<string, string>();
+
 	constructor(
 		private deck: Deck,
 		private readonly emit: (message: ServerMessage) => void,
@@ -256,7 +259,9 @@ export class Registry {
 				},
 				task: (spec: TaskSpec): TaskResult => {
 					if (!this.host.tasks) throw new Error("This deck has no dashboard.");
-					return this.host.tasks.create(spec, agent.id);
+					// Work an agent asks for is for the canvas it is on, unless it said otherwise.
+					const canvas = spec.canvas ?? agent.canvas;
+					return this.host.tasks.create({ ...spec, ...(canvas ? { canvas } : {}) }, agent.id);
 				},
 				/*
 				 * A schedule from a deciding dispatcher is that task's answer: the person asked
@@ -683,6 +688,14 @@ export class Registry {
 		});
 		if (placing) {
 			from.decidedSend = true;
+			/*
+			 * A task asked for on a canvas is done on that canvas: the agent it went to moves
+			 * there, so the boards it makes land in front of the person who asked, and the card
+			 * for that canvas says it is working there.
+			 */
+			const canvas = this.host.canvases.get(this.taskCanvases.get(placing));
+			if (canvas) to.useCanvas(canvas.name);
+			this.taskCanvases.delete(placing);
 			this.host.tasks?.assigned({ taskId: placing, agentId: to.id, agentName: to.chat().name, why: firstLineOf(spec.task) });
 		}
 		this.publish();
@@ -728,8 +741,10 @@ export class Registry {
 	 * goes into its queue as a `decide` item and runs the moment it is up; when the turn
 	 * ends the runtime is stopped and the conversation kept (`DeckAgent.sleep`).
 	 */
-	decide(task: { id: string; text: string; boards: string[]; workspace?: string; promptPath?: string; schedule?: string }): { dispatcherId: string } {
+	decide(task: { id: string; text: string; boards: string[]; workspace?: string; canvas?: string; promptPath?: string; schedule?: string }): { dispatcherId: string } {
 		const template = this.ensureDispatcher();
+		const canvasName = this.host.canvases.get(task.canvas)?.name;
+		if (task.canvas && canvasName) this.taskCanvases.set(task.id, task.canvas);
 		const model = template.currentModel();
 		const mode = template.chat().mode;
 		const account = template.accountId();
@@ -746,7 +761,7 @@ export class Registry {
 		dispatcher.enqueue({
 			from: "deck",
 			fromName: "The dashboard",
-			task: dispatcherBrief({ ...task, now: nowWords(Date.now(), processZone()) }),
+			task: dispatcherBrief({ ...task, ...(canvasName ? { canvasName } : {}), now: nowWords(Date.now(), processZone()) }),
 			boards: [],
 			at: Date.now(),
 			decide: task.id,
@@ -761,8 +776,11 @@ export class Registry {
 	 * the sender it names is the dashboard, so a queue notice reads "The dashboard
 	 * queued work for you" and a drain keeps it that way.
 	 */
-	deliver(target: string, spec: SendSpec & { taskId: string; fromName: string }): { queued: true; position: number } {
+	deliver(target: string, spec: SendSpec & { taskId: string; fromName: string; canvas?: string }): { queued: true; position: number } {
 		const to = this.resolve(target);
+		// The work is for a canvas: the agent moves there first, so what it shows lands in front of the person who asked.
+		const canvas = this.host.canvases.get(spec.canvas);
+		if (canvas) to.useCanvas(canvas.name);
 		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
 		const position = to.enqueue({
 			from: "deck",

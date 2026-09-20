@@ -1,4 +1,4 @@
-import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type Canvas, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type Schedule, type Task, type WebStatus } from "@decks/protocol";
+import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type Camera, type Canvas, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type Schedule, type Task, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
 import { trackZoneWith } from "../lib/time.ts";
 import { emptyAgent, type AgentRecord } from "./agent.ts";
@@ -101,6 +101,11 @@ function createDeck() {
 		canvases: Canvas[];
 		/** The canvas this browser is looking at. The server keeps the same answer per socket. */
 		canvas?: string;
+		/**
+		 * The last board an agent put up on the canvas on screen without moving the view, and
+		 * the view that frames it. Drawn as a chip with a Go button; `at` lets it expire.
+		 */
+		arrival?: { agentId: string; path: string; camera: Camera; at: number };
 		/** The deck's own settings, kept by the server, and the zone its machine is on. */
 		settings: DeckSettings;
 		machineZone: string;

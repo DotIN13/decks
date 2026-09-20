@@ -493,3 +493,68 @@
 	font-size: calc(12 * var(--unit));
 	font-weight: 600;
 }
+
+/*
+ * "Sable put up The result · Go" (`canvas/ArrivalChip.tsx`): the one way an agent reaches your
+ * view on a shared canvas. Under the notice strip, in the agent's colour, and the only part of
+ * that column that takes a pointer, because it is the only part with something to press.
+ */
+.arrival-chip {
+	position: absolute;
+	top: 58px;
+	left: 50%;
+	z-index: 30;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 5px 6px 5px 11px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: var(--panel);
+	box-shadow: 0 6px 20px rgb(0 0 0 / 12%);
+	font-size: 12px;
+	transform: translateX(-50%);
+	animation: arrival-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.arrival-dot {
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	background: var(--agent);
+}
+.arrival-text b {
+	font-weight: 600;
+}
+.arrival-go {
+	height: 24px;
+	padding: 0 11px;
+	border: 0;
+	border-radius: 999px;
+	background: var(--fg);
+	color: var(--bg);
+	cursor: pointer;
+	font: inherit;
+	font-weight: 600;
+}
+.arrival-close {
+	width: 22px;
+	height: 22px;
+	border: 0;
+	border-radius: 50%;
+	background: none;
+	color: var(--muted);
+	cursor: pointer;
+	font-size: 14px;
+	line-height: 1;
+}
+@keyframes arrival-in {
+	from {
+		opacity: 0;
+		transform: translate(-50%, -6px);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.arrival-chip {
+		animation: none;
+	}
+}

@@ -360,6 +360,9 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							annotate: (agentId, path, next) =>
 								setMarks((was) => [...was.filter((mark) => mark.agentId !== agentId || mark.path !== path), ...next]),
 							toast: (text) => notice("info", text),
+							// On a canvas the camera is the person's: see the note on `inRoom`.
+							inRoom: () => state.canvas !== undefined,
+							arrived: (arrival) => setState("arrival", { ...arrival, at: Date.now() }),
 						});
 					} catch (error) {
 						value = { error: error instanceof Error ? error.message : String(error) };

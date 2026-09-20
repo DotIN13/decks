@@ -79,3 +79,12 @@ test("the brief says what time it is where the person is, when it is told", () =
 	assert.match(text, /unless you pass `timezone`/);
 	assert.doesNotMatch(dispatcherBrief({ id: "t7", text: "x", boards: [] }), /It is now/);
 });
+
+test("a task asked for on a canvas says which, and that whoever takes it works there", () => {
+	const text = dispatcherBrief({ id: "t2", text: "Redraw the cost chart", boards: [], canvasName: "Political LLM" });
+	assert.match(text, /on the \*\*Political LLM\*\* canvas/);
+	assert.match(text, /Prefer an agent already working there/);
+	assert.match(text, /will work on that canvas/);
+	const plain = dispatcherBrief({ id: "t3", text: "Redraw the cost chart", boards: [] });
+	assert.doesNotMatch(plain, /canvas\*\*/, "no canvas, no sentence about one");
+});

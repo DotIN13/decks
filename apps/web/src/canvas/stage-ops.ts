@@ -42,6 +42,15 @@ export interface StageOpsHost {
 	/** Replace one agent's annotations on one board. An empty list clears them. */
 	annotate(agentId: string, path: string, marks: Mark[]): void;
 	toast(text: string): void;
+	/**
+	 * Whether the person is looking at a canvas several agents may share.
+	 *
+	 * Optional so a host that has no canvases keeps today's rule. When it answers yes, an agent
+	 * putting a board up does not move the camera — it lands, and `arrived` offers the way there.
+	 */
+	inRoom?(): boolean;
+	/** A board an agent put up on the canvas on screen, and the view that frames it, for the Go chip. */
+	arrived?(arrival: { agentId: string; path: string; camera: Camera }): void;
 }
 
 /**
@@ -89,6 +98,17 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			const wanted = fit(fitAll ? boards.map(boxOf) : [boxOf(boards[0]!)], host.viewport());
 			const waiting = defer(call, host, wanted, boards[0]!.path);
 			if (waiting) return { shown: boards.map((board) => board.path), ...waiting };
+			/*
+			 * On a shared canvas, the camera is the person's. Several agents can be working there,
+			 * and one that flew the view every time it put a board up would take it away from the
+			 * person mid-sentence — so the board lands where it was placed and a chip says who put
+			 * it there, with a button to go and look. The agent is told, so it does not report
+			 * that the person is looking at something they are not.
+			 */
+			if (call.agentId && host.inRoom?.()) {
+				host.arrived?.({ agentId: call.agentId, path: boards[0]!.path, camera: wanted });
+				return { shown: boards.map((board) => board.path), waiting: "the person is on a canvas others share, so the board is up but the view did not move; they were offered a way to go to it" };
+			}
 
 			host.setCamera(wanted, { animate: args.animate === true });
 			host.select(boards[0]!.path);

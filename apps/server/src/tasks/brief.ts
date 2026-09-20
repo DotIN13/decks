@@ -14,6 +14,8 @@ export interface DispatchBriefTask {
 	text: string;
 	boards: string[];
 	workspace?: string;
+	/** The name of the canvas the work is for, when it was asked from one. */
+	canvasName?: string;
 	/** Where the message is saved as a file (`.decks/tasks/<id>.md`), when it is. */
 	promptPath?: string;
 	/** The name of the cron job that started this task, when one did rather than a person. */
@@ -42,6 +44,14 @@ export function dispatcherBrief(task: DispatchBriefTask): string {
 			: task.workspace
 				? `The person asked for it in the **${task.workspace}** workspace.`
 				: undefined,
+		/*
+		 * The canvas it was asked from. Whoever takes the work is moved onto it before they
+		 * start, so their boards land where the person is looking — which makes an agent that
+		 * is already there the better choice, because it has read what is on it.
+		 */
+		task.canvasName
+			? `It was asked for on the **${task.canvasName}** canvas. Prefer an agent already working there (the \`workspace\` field of \`stage.agents()\`); whoever you send it to will work on that canvas.`
+			: undefined,
 		task.boards.length > 0 ? `It names these boards: ${task.boards.map((path) => `\`${path}\``).join(", ")}.` : undefined,
 	]
 		.filter(Boolean)

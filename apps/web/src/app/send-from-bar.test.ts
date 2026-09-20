@@ -98,3 +98,21 @@ test("stripMention removes the token and tidies the whitespace around it", () =>
 	assert.equal(stripMention("no mention here", "Ada"), "no mention here");
 	assert.equal(stripMention("@Ada and @Ada again", "Ada"), "and @Ada again");
 });
+
+const room: BarContext = { surface: "stage", agents, focused: { id: "s1", name: "Sable" }, canvas: { id: "cv1", name: "Political LLM" } };
+
+test("on a canvas, a line that names nobody goes to the dispatcher for that canvas", () => {
+	assert.deepEqual(destination("redraw the chart", room), { kind: "task", canvas: { id: "cv1", name: "Political LLM" } });
+	assert.equal(destinationLabel(destination("redraw the chart", room)), "to dispatcher, on Political LLM");
+});
+
+test("on a canvas, @Name reaches that agent and brings it to the canvas", () => {
+	const dest = destination("@Ada redraw the chart", room);
+	assert.equal(dest.kind, "prompt");
+	assert.deepEqual(dest.kind === "prompt" ? dest.canvas : undefined, { id: "cv1", name: "Political LLM" });
+	assert.match(destinationLabel(dest), /on Political LLM$/);
+});
+
+test("the dashboard's bar is not in a room, whatever canvas was open last", () => {
+	assert.deepEqual(destination("hello", { ...room, surface: "dispatch" }), { kind: "task" });
+});

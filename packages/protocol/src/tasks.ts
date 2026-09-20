@@ -35,6 +35,8 @@ export interface Task {
 	text: string;
 	/** The workspace it was asked for, if any — the first filter the rule applies. */
 	workspace?: string;
+	/** The canvas it is for, by id. Whoever takes it works there. */
+	canvas?: string;
 	/** Boards handed to the assigned agent with the task, for the brief. */
 	boards: string[];
 	/**
@@ -70,6 +72,11 @@ export interface Task {
 export interface TaskSpec {
 	text: string;
 	workspace?: string;
+	/**
+	 * The canvas the work is for, by id: where it was asked from, and where the agent that
+	 * takes it puts its boards. The dispatcher prefers an agent already working there.
+	 */
+	canvas?: string;
 	boards?: string[];
 	/**
 	 * An agent named by a person. Wins over the rule: somebody who said who should do

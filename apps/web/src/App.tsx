@@ -50,6 +50,7 @@ import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
+import { ArrivalChip } from "./canvas/ArrivalChip.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel } from "./chrome/LeftPanel.tsx";
 import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
@@ -345,9 +346,11 @@ export function App() {
 	const barContext = () => {
 		const focusedId = state.focused;
 		const nameOf = (id: string) => state.identities[id]?.name ?? state.chats.find((chat) => chat.id === id)?.name ?? id;
+		const open = state.canvases.find((canvas) => canvas.id === state.canvas);
 		return {
 			surface: surface(),
 			...(focusedId ? { focused: { id: focusedId, name: nameOf(focusedId) } } : {}),
+			...(open ? { canvas: { id: open.id, name: open.name } } : {}),
 			agents: visibleChats().map((chat) => ({ id: chat.id, name: nameOf(chat.id) })),
 		};
 	};
@@ -365,13 +368,22 @@ export function App() {
 		const text = withComments(typed, notes);
 		switch (dest.kind) {
 			case "task":
-				send({ type: "task.create", task: { text: dest.named ? withComments(stripMention(typed, DISPATCHER_NAME), notes) : text }, requestedBy: "you" });
+				send({
+					type: "task.create",
+					task: { text: dest.named ? withComments(stripMention(typed, DISPATCHER_NAME), notes) : text, ...(dest.canvas ? { canvas: dest.canvas.id } : {}) },
+					requestedBy: "you",
+				});
 				// From a stage nothing on screen changes, so it is said: the task is on the dashboard.
-				if (surface() === "stage") notice("info", "Handed to the dispatcher. It is on the dashboard's Tasks tab.");
+				if (surface() === "stage") notice("info", dest.canvas ? `Handed to the dispatcher, for ${dest.canvas.name}. Whoever takes it works here.` : "Handed to the dispatcher. It is on the dashboard's Tasks tab.");
 				return;
 			case "prompt": {
 				const line = dest.named ? withComments(stripMention(typed, dest.name), notes) : text;
 				if (dest.id === state.focused) clearMarks(dest.id);
+				/*
+				 * Named in a room: the agent is brought to this canvas before it hears the line, so
+				 * what it puts up lands here. The order on the wire is the order it happens in.
+				 */
+				if (dest.canvas) send({ type: "canvas.use", agentId: dest.id, canvasId: dest.canvas.id });
 				send({ type: "agent.prompt", id: dest.id, text: line });
 				return;
 			}
@@ -1979,6 +1991,20 @@ export function App() {
 				    shown a turn. */}
 
 				<NoticeStrip />
+				<Show when={surface() === "stage"}>
+					<ArrivalChip
+						arrival={state.arrival}
+						identities={state.identities}
+						boards={state.boards}
+						onGo={(target, path) => {
+							// A press is about the journey, so it arrives rather than jumps.
+							moveCamera(target, { animate: true });
+							setSelected(path);
+							setState("arrival", undefined);
+						}}
+						onDismiss={() => setState("arrival", undefined)}
+					/>
+				</Show>
 
 			</div>
 		</div>

@@ -28,7 +28,7 @@ export interface TaskRegistry {
 	 * Ask the dispatcher agent to place a task. It answers through `assignedByDispatcher`
 	 * (its `send` during the turn) and `decided` (the turn's end), not through a return.
 	 */
-	decide(task: { id: string; text: string; boards: string[]; workspace?: string; promptPath?: string; schedule?: string }): { dispatcherId: string };
+	decide(task: { id: string; text: string; boards: string[]; workspace?: string; canvas?: string; promptPath?: string; schedule?: string }): { dispatcherId: string };
 	/** Every agent, with the fields the rule ranks on. */
 	roster(): TaskRosterEntry[];
 	/**
@@ -48,6 +48,8 @@ export interface DeliverSpec {
 	taskId: string;
 	/** What the queue's arrival notice names as the sender. */
 	fromName: string;
+	/** The canvas the work is for, by id; the agent moves there before it starts. */
+	canvas?: string;
 }
 
 /** A task the assignee finished — what the drain reports back through the same seam. */
@@ -168,6 +170,7 @@ export class TaskService {
 			id: randomUUID(),
 			text,
 			...(spec.workspace ? { workspace: spec.workspace } : {}),
+			...(spec.canvas ? { canvas: spec.canvas } : {}),
 			boards: spec.boards ?? [],
 			dispatch: { at: now, outcome: "none", why: "" },
 			state: "open",
@@ -207,6 +210,7 @@ export class TaskService {
 				text: task.text,
 				boards: task.boards,
 				...(task.workspace ? { workspace: task.workspace } : {}),
+				...(task.canvas ? { canvas: task.canvas } : {}),
 				...(promptPath ? { promptPath } : {}),
 				...(schedule ? { schedule } : {}),
 			});
@@ -470,6 +474,7 @@ export class TaskService {
 				boards: task.boards.length > 0 ? task.boards : undefined,
 				taskId: task.id,
 				fromName: "The dashboard",
+				...(task.canvas ? { canvas: task.canvas } : {}),
 			});
 			task.state = "assigned";
 		} catch (error) {
