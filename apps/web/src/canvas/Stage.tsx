@@ -196,6 +196,16 @@ export function Stage(props: {
 	let glideToken = 0;
 	let glideRaf: number | undefined;
 	let lastGlideToken = -1;
+	/**
+	 * A glide the app has asked for and this file has not started yet.
+	 *
+	 * The camera signal and the glide request arrive in the same batch, and the boards are
+	 * rendered from that batch **before** the effect below gets to start the loop — so for one
+	 * pass "the camera has moved" is true and "the camera is moving" is not yet, and a board
+	 * that the new camera brings into view would begin parsing its document exactly then, at
+	 * the top of the flight. This closes that window: the request itself counts as movement.
+	 */
+	const glidePending = () => props.glide !== undefined && props.glide.token !== lastGlideToken;
 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
 	/**
 	 * A pan *gesture* is in flight — a finger down, a drag on bare canvas, space and a drag.
@@ -1205,6 +1215,7 @@ export function Stage(props: {
 		boards: () => props.boards,
 		isVisible,
 		view,
+		moving: () => moving() || gliding() || glidePending(),
 		lastMoved: () => lastMoved,
 		screenCentre: (board) => toScreen(props.camera, view(), { x: board.x + board.w / 2, y: board.y + board.h / 2 }),
 		mayStart: () => props.boardsMayStart,

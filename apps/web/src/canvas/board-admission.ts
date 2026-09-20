@@ -50,6 +50,13 @@ export interface AdmissionHost {
 	/** How large the stage is; zero before the first measurement. */
 	view: () => { width: number; height: number };
 	/**
+	 * Whether the camera is moving right now — a pan, a pinch or a glide.
+	 *
+	 * A reactive read, unlike `lastMoved`: a board held back during a movement has to be let
+	 * in when it ends, and this is what re-runs the question.
+	 */
+	moving: () => boolean;
+	/**
 	 * When the camera last moved, as `performance.now()`.
 	 *
 	 * A getter rather than a value, because the gestures write it synchronously in their own
@@ -76,6 +83,8 @@ export interface Admission {
 
 export function createAdmission(host: AdmissionHost): Admission {
 	const lastSeen = new Map<string, number>();
+	/** Boards with a document **right now**, so a movement never takes one away or starts one. */
+	const live = new Set<string>();
 	const [sweep, setSweep] = createSignal(0);
 	let sweeper: ReturnType<typeof setTimeout> | undefined;
 
@@ -96,6 +105,24 @@ export function createAdmission(host: AdmissionHost): Admission {
 		const now = performance.now();
 		if (host.isVisible(board)) {
 			lastSeen.set(board.path, now);
+			/*
+			 * **A document is never *started* in the middle of a movement**, which is the other
+			 * half of the rule above it: one is never let go in the middle of one either.
+			 *
+			 * A camera fly sweeps the visible margin across the deck, and every board it passes
+			 * used to begin parsing right then — `board.css`, `board.js`, the markdown, the
+			 * maths — on the same main thread the flight is drawn on. Measured on a 420ms fly
+			 * over 16 boards: nine documents started mid-flight, and the frames they landed in
+			 * were 78, 80, 66, 41 and 37ms long, so the move was drawn eleven times instead of
+			 * twenty-five. Held back, they start when the camera stops, which is 160ms after it
+			 * does and is the moment a person starts reading rather than moving.
+			 *
+			 * `live` is what it has *now*, not what it has ever had: a board on screen keeps its
+			 * document through the movement, and one whose document was let go while it was away
+			 * is a new start again, because reloading it costs exactly what the first load did.
+			 */
+			if (!live.has(board.path) && host.moving()) return false;
+			live.add(board.path);
 			return true;
 		}
 		const seen = lastSeen.get(board.path);
@@ -111,6 +138,7 @@ export function createAdmission(host: AdmissionHost): Admission {
 			sweepLater(Math.max(KEEP_MS - gone, QUIET_MS - still) + 50);
 			return true;
 		}
+		live.delete(board.path);
 		return false;
 	};
 

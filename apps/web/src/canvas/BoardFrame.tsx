@@ -282,7 +282,22 @@ export function BoardFrame(props: {
 		const url = boardUrl({ path: props.board.path, rev });
 		return props.nonce ? `${url}&r=${props.nonce}` : url;
 	};
-	const zoom = createMemo(() => props.camera.zoom);
+	/**
+	 * The camera's scale, as the board's *chrome* uses it: held still while the camera moves.
+	 *
+	 * Everything counter-scaled here — the title bar, its buttons, the resize handle, an
+	 * agent's marks and cursor — is sized in `--unit`, which is `1px / var(--zoom)`. So a new
+	 * zoom is not a repaint, it is a **layout** of every one of those boxes, and during a
+	 * camera fly that is sixteen bars laid out on every frame. Measured on one 420ms fly over
+	 * sixteen boards: the move was drawn 21 times with the bars as they were and 25 times with
+	 * them taken away entirely, and style and layout came to 187ms of the flight.
+	 *
+	 * So the chrome rides with the world while the camera is moving — for those few hundred
+	 * milliseconds a bar scales like the board it sits on — and takes its true size again the
+	 * moment the camera rests, which is when anyone looks at it. The memo returns its previous
+	 * value rather than reading the camera, so nothing downstream even re-runs.
+	 */
+	const zoom = createMemo((previous?: number) => (props.moving && previous !== undefined ? previous : props.camera.zoom));
 	const inert = createMemo(() => zoom() < INTERACT_ZOOM);
 
 	/*
