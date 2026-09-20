@@ -16,12 +16,12 @@ import { WORKSPACE_NONE, workspaceDigests } from "./workspace-panel.ts";
  * which still exist and still change, and go last.
  */
 
-/** The three panes, in the order the tab strip draws them. */
-export type DispatchTab = "boards" | "tasks" | "cron";
-export const DISPATCH_TABS: DispatchTab[] = ["boards", "tasks", "cron"];
+/** The four panes, in the order the tab strip draws them. */
+export type DispatchTab = "canvases" | "boards" | "tasks" | "cron";
+export const DISPATCH_TABS: DispatchTab[] = ["canvases", "boards", "tasks", "cron"];
 
 /** What each tab is called on its button. */
-export const DISPATCH_TAB_LABEL: Record<DispatchTab, string> = { boards: "Boards", tasks: "Tasks", cron: "Cron" };
+export const DISPATCH_TAB_LABEL: Record<DispatchTab, string> = { canvases: "Canvases", boards: "Boards", tasks: "Tasks", cron: "Cron" };
 
 /**
  * The five words the UI has for a task's seven states.

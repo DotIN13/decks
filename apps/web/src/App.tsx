@@ -173,6 +173,26 @@ export function App() {
 		}
 		setSurface("stage");
 		setDispatchPreview(undefined);
+		/*
+		 * A canvas is the thing the boards are on, so opening one is a frame of its own: the
+		 * server answers this socket with that canvas's boards and clears its changed mark.
+		 * The conversation is left alone — you can read a canvas while talking to anybody.
+		 */
+		if (place.canvas) {
+			setRouteAgent(undefined);
+			setWantFocusedStage(false);
+			if (place.canvas !== state.canvas) send({ type: "canvas.focus", id: place.canvas });
+			return;
+		}
+		/*
+		 * Going to a conversation's own stage: stop following a canvas, so what is drawn is
+		 * that chat's again. The server is told rather than left to guess, because it keeps
+		 * the answer per socket.
+		 */
+		if (state.canvas) {
+			setState("canvas", undefined);
+			send({ type: "canvas.focus", id: "" });
+		}
 		if (place.agent === "") {
 			// `#/stage`: whoever the server says is focused. Named once that is known, below.
 			setRouteAgent(undefined);
@@ -648,7 +668,16 @@ export function App() {
 	 * says it before anything has happened rather than after.
 	 */
 	const stageBoards = createMemo(() => {
-		const playing = new Set(state.focused ? state.agents[state.focused]?.inPlay ?? [] : []);
+		/*
+		 * What is on the canvas, from the canvas — and from the focused chat when this browser
+		 * has not opened one.
+		 *
+		 * The canvas is what holds the boards, so a window that has opened one draws its list
+		 * whoever it is talking to, and two agents working there draw the same thing. Without
+		 * a canvas this is what it always was: the focused conversation's own set.
+		 */
+		const canvas = state.canvases.find((one) => one.id === state.canvas);
+		const playing = new Set(canvas ? canvas.boards : state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
 		return state.boards.filter((board) => playing.has(board.path));
 	});
 
@@ -1193,6 +1222,19 @@ export function App() {
 							onTab={(tab) => go({ surface: "dispatch", tab })}
 							boards={state.boards}
 							identities={state.identities}
+							canvases={state.canvases}
+							onOpenCanvas={(canvas) => go({ surface: "stage", agent: "", canvas: canvas.id })}
+							onNewCanvas={() => {
+								/*
+								 * A name that is not in the way: the canvas is renamed from its own title
+								 * bar once there is something on it, and asking for a name before there
+								 * is anything to name it after is a dialog nobody wants.
+								 */
+								const taken = new Set(state.canvases.map((canvas) => canvas.name));
+								let n = state.canvases.length + 1;
+								while (taken.has(`Canvas ${n}`)) n += 1;
+								send({ type: "canvas.create", name: `Canvas ${n}` });
+							}}
 							chats={visibleChats()}
 							contexts={state.contexts}
 							tasks={state.tasks}

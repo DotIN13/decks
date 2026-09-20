@@ -145,3 +145,65 @@ export function keepsPlace(box: Box, onCanvas: readonly Box[], camera?: Camera):
 	const reach = GUTTER + Math.max(box.w, box.h);
 	return touching(box, cluster, reach);
 }
+
+/**
+ * The places a set of boards joining a canvas should take, and only the ones that need one.
+ *
+ * The three cases in order: a board with no place gets one in the middle of the view and clear
+ * of what is there; a board whose place is visible, or near the boards already on the canvas,
+ * keeps it; a board whose place is neither is placed again. What is returned is the new spots,
+ * so the caller writes them wherever places live — a canvas, for everything since canvases.
+ *
+ * Pure, and shared by the two things that put boards on a canvas: an agent showing one, and a
+ * person adding one to a canvas they are looking at with nobody's conversation behind it.
+ */
+export function joinPlaces(options: {
+	wanted: readonly string[];
+	playing: readonly string[];
+	places: Readonly<Record<string, { x: number; y: number }>>;
+	size: (path: string) => { w: number; h: number } | undefined;
+	camera?: Camera;
+}): Record<string, { x: number; y: number }> {
+	const { wanted, playing, places, size, camera } = options;
+	const joining = wanted.filter((path) => !playing.includes(path) && size(path) !== undefined);
+	const spots: Record<string, { x: number; y: number }> = {};
+	if (joining.length === 0) return spots;
+	const boxOf = (path: string): Box | undefined => {
+		const dimensions = size(path);
+		const at = places[path];
+		return dimensions && at ? { x: at.x, y: at.y, ...dimensions } : undefined;
+	};
+	const onCanvas = wanted
+		.filter((path) => playing.includes(path))
+		.map(boxOf)
+		.filter((box): box is Box => box !== undefined);
+	/*
+	 * What a newcomer has to keep clear of: the boards on the canvas, and any board that is merely
+	 * *near* — placed, hidden, and close enough that playing it again would put it back where it
+	 * is. Everything else is filtered out by the same test, which keeps this cheap on a canvas that
+	 * still carries a place for hundreds of boards.
+	 */
+	const occupied = [...onCanvas];
+	for (const path of Object.keys(places)) {
+		if (wanted.includes(path)) continue;
+		const box = boxOf(path);
+		if (box && keepsPlace(box, onCanvas, camera)) occupied.push(box);
+	}
+	for (const path of joining) {
+		const dimensions = size(path);
+		if (!dimensions) continue;
+		const held = places[path];
+		if (held && keepsPlace({ ...held, ...dimensions }, onCanvas, camera)) {
+			onCanvas.push({ ...held, ...dimensions });
+			occupied.push({ ...held, ...dimensions });
+			continue;
+		}
+		const spot = joinSpot(dimensions, occupied, camera);
+		spots[path] = spot;
+		// Both lists: the newcomer is part of the canvas the next one is measured against, and
+		// part of what it has to miss.
+		onCanvas.push({ ...spot, ...dimensions });
+		occupied.push({ ...spot, ...dimensions });
+	}
+	return spots;
+}

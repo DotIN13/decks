@@ -10,6 +10,17 @@ import type { WirePart } from "./context.ts";
  */
 export const canvas = {
 	"canvas.focus": (message, reply, wire) => {
+		/*
+		 * An empty id is "stop looking at a canvas": the browser has gone back to a chat's own
+		 * stage, and from here on it is sent that conversation's boards again. Said rather than
+		 * inferred, because the server cannot tell a browser that moved from one that went quiet.
+		 */
+		if (message.id === "") {
+			if (wire.viewing) wire.viewing.canvas = undefined;
+			reply({ type: "deck.state", deck: wire.stageState() });
+			reply({ type: "canvases", canvases: wire.canvasList(), focused: "" });
+			return;
+		}
 		const found = wire.canvases.get(message.id);
 		if (!found) {
 			reply({ type: "notice", level: "warn", text: "That canvas is gone." });

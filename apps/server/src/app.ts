@@ -13,6 +13,7 @@ import { TaskService } from "./tasks/service.ts";
 import { TaskStore } from "./tasks/store.ts";
 import { SettingsStore } from "./settings.ts";
 import { CanvasStore } from "./canvas/store.ts";
+import { canvasStage, type StageTarget } from "./canvas/stage.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./web/bridge.ts";
@@ -757,7 +758,14 @@ export class App {
 	 * `board.changed` must not start a runtime as a side effect of being sent. No stage means the
 	 * deck's own auto-layout, which is what a deck with nobody looking at it has anyway.
 	 */
-	stageState(agent: DeckAgent | undefined = this.agents.looking()): DeckState {
+	stageState(asked?: DeckAgent): DeckState {
+		/*
+		 * A frame from a browser that has opened a canvas is answered with that canvas. Asked
+		 * about a particular agent — a per-view render, a board the agent placed — the answer is
+		 * that agent's canvas, as before.
+		 */
+		if (!asked && this.viewing?.canvas && this.canvases.get(this.viewing.canvas)) return this.canvasState(this.viewing.canvas);
+		const agent = asked ?? this.agents.looking();
 		if (!agent) return this.deck.state();
 		const seeded: Array<{ path: string; x: number; y: number }> = [];
 		/*
@@ -787,6 +795,27 @@ export class App {
 		const state = this.deck.state(this.canvases.places(canvas.id), (path, at) => seeded.push({ path, ...at }), this.canvases.boards(canvas.id));
 		for (const { path, x, y } of seeded) this.canvases.place(canvas.id, path, x, y);
 		return state;
+	}
+
+	/**
+	 * What a board frame acts on: the canvas this browser opened, else the chat it is in.
+	 *
+	 * The canvas when there is one, because that is what the person is looking at and adding
+	 * to — whoever they happen to be talking to. The agent otherwise, which is exactly what
+	 * every board frame did before canvases.
+	 */
+	target(): StageTarget {
+		const id = this.viewing?.canvas;
+		if (id && this.canvases.get(id)) {
+			return canvasStage({
+				canvases: this.canvases,
+				deck: this.deck,
+				id,
+				camera: () => this.cameras.get(this.viewing?.focused ?? "") ?? this.lastCamera,
+				changed: () => this.agents.canvasChanged(id),
+			});
+		}
+		return this.agents.focused();
 	}
 
 	/** Every canvas as the browser needs it, with the agents working on each. */

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { AgentCapabilities, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import { type Box, joinSpot, keepsPlace } from "../deck/place.ts";
+import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, type CreateSpec, type DelegateReport, type DelegateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
@@ -756,52 +756,21 @@ export class DeckAgent {
 	 * board rather than on every send.
 	 */
 	private placeJoining(wanted: string[]): void {
-		const joining = wanted.filter((path) => !this.playing.includes(path) && this.deck.board(path));
-		if (joining.length === 0) return;
-		const boxOf = (path: string): Box | undefined => {
-			const board = this.deck.board(path);
-			const at = this.places[path];
-			return board && at ? { x: at.x, y: at.y, w: board.w, h: board.h } : undefined;
-		};
-		const onCanvas = wanted
-			.filter((path) => this.playing.includes(path))
-			.map(boxOf)
-			.filter((box): box is Box => box !== undefined);
-		const camera = this.host.camera(this.id);
-		/*
-		 * What a newcomer has to keep clear of: the boards on the canvas, and any board that is
-		 * merely *near* — placed, hidden, and close enough that playing it again would put it back
-		 * where it is. Landing on one of those is a collision nobody sees until the board is played.
-		 * Everything else is filtered out by the same test, which is what keeps this cheap on a deck
-		 * whose stages still carry a place for all 900 boards.
-		 */
-		const occupied = [...onCanvas];
-		for (const [path, at] of Object.entries(this.places)) {
-			if (wanted.includes(path)) continue;
-			const box = boxOf(path);
-			if (box && keepsPlace(box, onCanvas, camera)) occupied.push(box);
-		}
-		let placed = false;
-		for (const path of joining) {
-			const board = this.deck.board(path);
-			if (!board) continue;
-			const size = { w: board.w, h: board.h };
-			const held = this.places[path];
-			if (held && keepsPlace({ ...held, ...size }, onCanvas, camera)) {
-				onCanvas.push({ ...held, ...size });
-				occupied.push({ ...held, ...size });
-				continue;
-			}
-			const spot = joinSpot(size, occupied, camera);
-			this.canvases.place(this.canvasId, path, spot.x, spot.y);
-			// Both lists: the newcomer is part of the canvas the next one is measured against, and
-			// part of what it has to miss.
-			onCanvas.push({ ...spot, ...size });
-			occupied.push({ ...spot, ...size });
-			placed = true;
-		}
-		if (!placed) return;
-		this.host.canvasChanged?.(this.canvasId, this.id);
+		const spots = joinPlaces({
+			wanted,
+			playing: this.playing,
+			places: this.places,
+			size: (path) => {
+				const board = this.deck.board(path);
+				return board ? { w: board.w, h: board.h } : undefined;
+			},
+			camera: this.host.camera(this.id),
+		});
+		const entries = Object.entries(spots);
+		if (entries.length === 0) return;
+		const canvasId = this.canvasId;
+		for (const [path, spot] of entries) this.canvases.place(canvasId, path, spot.x, spot.y);
+		this.host.canvasChanged?.(canvasId, this.id);
 		/*
 		 * The browser draws a board where the deck state says it is, so a place worked out here
 		 * has to be sent before the canvas is told the board is on it — which is the order these

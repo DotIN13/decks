@@ -229,13 +229,7 @@ export class Registry {
 				 * One agent changed a shared canvas. Everyone else on it is looking at the same
 				 * boards, so each of their browsers is told, and the arrangement goes out once.
 				 */
-				canvasChanged: (canvasId: string, except: string) => {
-					for (const other of this.agents) {
-						if (other.id === except || other.canvas !== canvasId) continue;
-						other.canvasMoved();
-					}
-					this.host.arranged?.();
-				},
+				canvasChanged: (canvasId: string, except: string) => this.canvasChanged(canvasId, except),
 				agents: () => this.summaries(),
 				spawn: (parentId, spec) => this.spawn(parentId, spec),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
@@ -393,6 +387,20 @@ export class Registry {
 			for (const member of plan.members) assigned.set(member, canvas.id);
 		}
 		return assigned;
+	}
+
+	/**
+	 * A shared canvas changed: every agent on it is told, and the arrangement goes out once.
+	 *
+	 * `except` is whoever made the change, which has already said so itself. A person changing
+	 * a canvas from the browser has no agent to except, and every agent there hears.
+	 */
+	canvasChanged(canvasId: string, except = ""): void {
+		for (const other of this.agents) {
+			if (other.id === except || other.canvas !== canvasId) continue;
+			other.canvasMoved();
+		}
+		this.host.arranged?.();
 	}
 
 	get(id: string | undefined): DeckAgent | undefined {

@@ -142,19 +142,19 @@ test("samePlace compares by value and treats a missing board as no board", () =>
 	assert.equal(samePlace({ surface: "stage", agent: "a" }, { surface: "dispatch", tab: "boards" }), false);
 });
 
-test("landing prefers the hash, then the remembered tab, then boards", () => {
+test("landing prefers the hash, then the remembered tab, then the shelf of canvases", () => {
 	const storage = fakeStorage({ [TAB_KEY]: "cron" });
 	assert.deepEqual(landing("#/agent/a", storage), { surface: "stage", agent: "a" });
 	assert.deepEqual(landing("", storage), { surface: "dispatch", tab: "cron" });
 	assert.deepEqual(landing("#/junk", storage), { surface: "dispatch", tab: "cron" });
-	assert.deepEqual(landing("", fakeStorage({ [TAB_KEY]: "elsewhere" })), { surface: "dispatch", tab: "boards" });
-	assert.deepEqual(landing("", fakeStorage()), { surface: "dispatch", tab: "boards" });
+	assert.deepEqual(landing("", fakeStorage({ [TAB_KEY]: "elsewhere" })), { surface: "dispatch", tab: "canvases" });
+	assert.deepEqual(landing("", fakeStorage()), { surface: "dispatch", tab: "canvases" });
 	const broken = {
 		getItem: () => {
 			throw new Error("refused");
 		},
 	};
-	assert.deepEqual(landing("", broken), { surface: "dispatch", tab: "boards" });
+	assert.deepEqual(landing("", broken), { surface: "dispatch", tab: "canvases" });
 });
 
 test("installRoute reads the landing place once and writes it with replaceState when the hash was empty", () => {
@@ -211,10 +211,18 @@ test("popstate reports the parsed place, falling back to the landing place", () 
 test("installRoute survives having no window at all", () => {
 	const seen: Place[] = [];
 	const route = installRoute({ onPlace: (p) => seen.push(p), storage: fakeStorage() });
-	assert.deepEqual(seen, [{ surface: "dispatch", tab: "boards" }]);
+	assert.deepEqual(seen, [{ surface: "dispatch", tab: "canvases" }]);
 	route.go({ surface: "stage", agent: "a" });
 	assert.deepEqual(seen.at(-1), { surface: "stage", agent: "a" });
 	route.dispose();
+});
+
+test("a canvas has an address of its own, and it round-trips", () => {
+	assert.deepEqual(parsePlace("#/canvas/cv_7f2a"), { surface: "stage", agent: "", canvas: "cv_7f2a" });
+	assert.equal(formatPlace({ surface: "stage", agent: "", canvas: "cv_7f2a" }), "#/canvas/cv_7f2a");
+	// Two canvases are two places, so Back between them works.
+	assert.equal(samePlace({ surface: "stage", agent: "", canvas: "a" }, { surface: "stage", agent: "", canvas: "b" }), false);
+	assert.equal(samePlace({ surface: "stage", agent: "", canvas: "a" }, { surface: "stage", agent: "", canvas: "a" }), true);
 });
 
 test("#/stage is the focused agent's stage, with no id yet, and formats back the same", () => {

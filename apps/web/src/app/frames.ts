@@ -429,6 +429,17 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				 * The shared Chrome. The code rides only on the greeting's copy, so a later
 				 * status keeps the code the greeting brought rather than dropping it.
 				 */
+				case "canvases":
+					/*
+					 * Every canvas, whole. `reconcile` for the same reason the task list uses it:
+					 * a card whose changed mark flips is the thing the reader is watching, and a
+					 * fresh array would rebuild every card and lose the pulse.
+					 */
+					setState("canvases", reconcile(message.canvases, { key: "id", merge: false }));
+					// `""` is the server saying this browser is on no canvas — back on a chat's own
+					// stage — which is a different answer from "I did not mention it".
+					if (message.focused !== undefined) setState("canvas", message.focused === "" ? undefined : message.focused);
+					return;
 				case "tasks":
 					// The dashboard's whole second half in one frame. `reconcile` like the
 					// agents list: a task row changing state must update in place, not be

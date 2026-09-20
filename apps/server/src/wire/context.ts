@@ -9,6 +9,7 @@ import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../web/bridge.ts";
 import type { View } from "../ws.ts";
 import type { CanvasStore } from "../canvas/store.ts";
+import type { StageTarget } from "../canvas/stage.ts";
 
 /** How a frame answers the socket it came from — and only that socket. */
 export type Reply = (message: ServerMessage) => void;
@@ -107,6 +108,8 @@ export interface WireContext {
 	canvasState(canvasId: string): DeckState;
 	/** Every canvas as the browser needs it, with the agents working on each. */
 	canvasList(): Canvas[];
+	/** What a board frame acts on: the canvas this browser opened, else the focused chat. */
+	target(): StageTarget;
 	/** Say what canvases exist, to everyone, after one is made, renamed, joined or removed. */
 	publishCanvases(): void;
 

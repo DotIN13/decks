@@ -12,14 +12,23 @@
  * it remembers, so a stale bookmark is never a blank screen.
  */
 
-export type DispatchTab = "boards" | "tasks" | "cron";
+export type DispatchTab = "canvases" | "boards" | "tasks" | "cron";
 
-export type Place = { surface: "dispatch"; tab: DispatchTab; board?: string } | { surface: "stage"; agent: string };
+export type Place =
+	| { surface: "dispatch"; tab: DispatchTab; board?: string }
+	/**
+	 * A canvas, or one agent's stage.
+	 *
+	 * `#/canvas/<id>` is the address of a canvas, which is the thing boards live on and the
+	 * thing two agents can share. `#/agent/<id>` still opens a conversation, and the canvas it
+	 * is working on comes with it — so a link to an agent keeps working and lands on its work.
+	 */
+	| { surface: "stage"; agent: string; canvas?: string };
 
 /** Where the last dispatch tab is remembered, so an empty hash lands somewhere familiar. */
 export const TAB_KEY = "decks.dispatch.tab";
 
-const TABS: readonly DispatchTab[] = ["boards", "tasks", "cron"];
+const TABS: readonly DispatchTab[] = ["canvases", "boards", "tasks", "cron"];
 const AGENT_ID = /^[A-Za-z0-9_-]+$/;
 
 function isTab(value: string | null | undefined): value is DispatchTab {
@@ -61,6 +70,9 @@ export function parsePlace(hash: string): Place | undefined {
 	if (parts.length === 2 && parts[0] === "agent" && parts[1] !== undefined && AGENT_ID.test(parts[1])) {
 		return { surface: "stage", agent: parts[1] };
 	}
+	if (parts.length === 2 && parts[0] === "canvas" && parts[1] !== undefined && AGENT_ID.test(parts[1])) {
+		return { surface: "stage", agent: "", canvas: parts[1] };
+	}
 	// The stage of whoever is focused, for a link written before the roster is known. The
 	// app replaces it with `#/agent/<id>` once the server has said who that is.
 	if (parts.length === 1 && parts[0] === "stage") return { surface: "stage", agent: "" };
@@ -69,7 +81,10 @@ export function parsePlace(hash: string): Place | undefined {
 
 /** The inverse of `parsePlace`, always with the leading `#`. */
 export function formatPlace(place: Place): string {
-	if (place.surface === "stage") return place.agent === "" ? "#/stage" : `#/agent/${place.agent}`;
+	if (place.surface === "stage") {
+		if (place.canvas) return `#/canvas/${place.canvas}`;
+		return place.agent === "" ? "#/stage" : `#/agent/${place.agent}`;
+	}
 	const board = place.board === undefined || place.board === "" ? "" : `?board=${encodeURIComponent(place.board)}`;
 	return `#/${place.tab}${board}`;
 }
@@ -77,7 +92,7 @@ export function formatPlace(place: Place): string {
 export function samePlace(a: Place | undefined, b: Place | undefined): boolean {
 	if (a === undefined || b === undefined) return a === b;
 	if (a.surface === "stage" || b.surface === "stage") {
-		return a.surface === "stage" && b.surface === "stage" && a.agent === b.agent;
+		return a.surface === "stage" && b.surface === "stage" && a.agent === b.agent && (a.canvas ?? "") === (b.canvas ?? "");
 	}
 	return a.tab === b.tab && (a.board ?? undefined) === (b.board ?? undefined);
 }
@@ -91,9 +106,9 @@ function storedTab(storage: Pick<Storage, "getItem"> | undefined): DispatchTab |
 	}
 }
 
-/** The place the hash names, else dispatch on the remembered tab, else the boards tab. */
+/** The place the hash names, else dispatch on the remembered tab, else the shelf of canvases. */
 export function landing(hash: string, storage?: Pick<Storage, "getItem">): Place {
-	return parsePlace(hash) ?? { surface: "dispatch", tab: storedTab(storage) ?? "boards" };
+	return parsePlace(hash) ?? { surface: "dispatch", tab: storedTab(storage) ?? "canvases" };
 }
 
 /**

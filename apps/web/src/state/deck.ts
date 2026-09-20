@@ -1,4 +1,4 @@
-import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type Schedule, type Task, type WebStatus } from "@decks/protocol";
+import { AGENT_KINDS, type AgentChat, type AgentKind, type Board, type Canvas, type ClaudeAccount, type DeckSettings, type DeckState, type Identity, type RuntimeInfo, type Schedule, type Task, type WebStatus } from "@decks/protocol";
 import { createStore } from "solid-js/store";
 import { trackZoneWith } from "../lib/time.ts";
 import { emptyAgent, type AgentRecord } from "./agent.ts";
@@ -91,6 +91,16 @@ function createDeck() {
 		 */
 		tasks: Task[];
 		schedules: Schedule[];
+		/**
+		 * Every canvas in the deck, from the `canvases` frame.
+		 *
+		 * A canvas is what holds the boards, so this is what the dashboard's cards are drawn
+		 * from and what the stage reads its arrows and groups out of. A handful of rows, sent
+		 * whole, unlike the boards.
+		 */
+		canvases: Canvas[];
+		/** The canvas this browser is looking at. The server keeps the same answer per socket. */
+		canvas?: string;
 		/** The deck's own settings, kept by the server, and the zone its machine is on. */
 		settings: DeckSettings;
 		machineZone: string;
@@ -114,6 +124,7 @@ function createDeck() {
 		accounts: [] as ClaudeAccount[],
 		tasks: [] as Task[],
 		schedules: [] as Schedule[],
+		canvases: [] as Canvas[],
 		settings: {} as DeckSettings,
 		machineZone: "",
 		activeAccount: "default",
@@ -156,6 +167,12 @@ export const runtimes = (): RuntimeInfo[] =>
 export const ensureAgent = (id: string): void => {
 	if (!state.agents[id]) setState("agents", id, emptyAgent());
 };
+
+/** The canvas this browser is looking at, if the server has said and it still exists. */
+export const focusedCanvas = (): Canvas | undefined => state.canvases.find((canvas) => canvas.id === state.canvas);
+
+/** Whether a canvas has something on it nobody has looked at: the dashboard's mark. */
+export const isNews = (canvas: Canvas): boolean => canvas.changedAt > (canvas.openedAt ?? 0);
 
 /** What to call an agent in a sentence, without the sentence being about an id. */
 export const nameOf = (id: string | undefined): string => (id ? (state.identities[id]?.name ?? "An agent") : "An agent");

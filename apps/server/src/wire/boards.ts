@@ -26,7 +26,7 @@ export const boards = {
 		 * is written down is this conversation's arrangement. The board sent back is the one *this stage*
 		 * sees, which is the same object when the caller is the stage that moved it.
 		 */
-		const agent = wire.agents.focused();
+		const agent = wire.target();
 		agent.setPosition(message.path, message.x, message.y);
 		const board = wire.stageState().boards.find((one) => one.path === message.path);
 		if (!board) return;
@@ -133,7 +133,7 @@ export const boards = {
 	 * the view.
 	 */
 	"board.play": (message, _reply, wire) => {
-		const agent = wire.agents.focused();
+		const agent = wire.target();
 		// A board picked out of the rail is a board joining the canvas, so it is placed beside what
 		// is on it unless the place it already has is somewhere you can see (`deck/place.ts`).
 		agent.setInPlay([...agent.inPlay, message.path], { place: true });
@@ -145,7 +145,7 @@ export const boards = {
 	},
 
 	"board.hide": (message, _reply, wire) => {
-		const agent = wire.agents.focused();
+		const agent = wire.target();
 		agent.setInPlay(agent.inPlay.filter((path) => path !== message.path));
 	},
 
@@ -177,7 +177,7 @@ export const boards = {
 		const h = bounded(message.size?.h, 240, 4000);
 		const size = w !== undefined || h !== undefined ? { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) } : undefined;
 		const path = wire.boards.newBoard({ title, format, ...(size ? { size } : {}) });
-		const agent = wire.agents.focused();
+		const agent = wire.target();
 		/*
 		 * The place first, then the canvas. A drop and a double-click name the point themselves, and
 		 * a place that is already there is a place `setInPlay` keeps — so this order is what stops
@@ -214,7 +214,7 @@ export const boards = {
 			return;
 		}
 		const path = wire.boards.newMirror({ agentId: of.id, name: of.name });
-		const agent = wire.agents.focused();
+		const agent = wire.target();
 		agent.setInPlay([...agent.inPlay, path], { place: true });
 		// After the board is placed, so the browser that asked can fly to where it actually landed.
 		if (typeof message.request === "string") reply({ type: "board.created", request: message.request, path });

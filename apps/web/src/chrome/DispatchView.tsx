@@ -13,10 +13,11 @@
  * which tab, which preview, and every action are the caller's, so the same view can be
  * driven from the bar, a URL, or a test.
  */
-import type { AgentChat, Board, Identity, Schedule, Task } from "@decks/protocol";
+import type { AgentChat, Board, Canvas, Identity, Schedule, Task } from "@decks/protocol";
 import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 import { CronList } from "./CronList.tsx";
 import { DISPATCH_TAB_LABEL, DISPATCH_TABS, type DispatchTab, galleryGroups } from "./dispatch-view.ts";
+import { CanvasShelf } from "./CanvasShelf.tsx";
 import { Gallery } from "./Gallery.tsx";
 import { Preview } from "./Preview.tsx";
 import { TaskBand } from "./TaskBand.tsx";
@@ -27,6 +28,12 @@ export interface DispatchViewProps {
 	onTab: (tab: DispatchTab) => void;
 	boards: Board[];
 	identities: Record<string, Identity>;
+	/** Every canvas in the deck — the landing pane's cards. */
+	canvases: Canvas[];
+	/** Open a canvas: the press that leaves the dashboard. */
+	onOpenCanvas: (canvas: Canvas) => void;
+	/** Make one, and go to it. */
+	onNewCanvas: () => void;
 	chats: AgentChat[];
 	/** Agent id → the boards it holds — what decides a board's workspace. */
 	contexts: Record<string, string[]>;
@@ -107,6 +114,18 @@ export function DispatchView(props: DispatchViewProps) {
 		<section class="dispatch" aria-label="Dispatch" data-preview={props.preview ? "true" : undefined}>
 			{/* The panes, in a column of their own so the preview can stand beside them. */}
 			<div class="dispatch-side">
+			<Show when={props.tab === "canvases"}>
+				<div class="dispatch-pane dispatch-scroll" role="tabpanel" data-id="canvases">
+					<CanvasShelf
+						canvases={props.canvases}
+						boards={props.boards}
+						identities={props.identities}
+						onOpen={props.onOpenCanvas}
+						onCreate={props.onNewCanvas}
+						onUnfiled={() => props.onTab("boards")}
+					/>
+				</div>
+			</Show>
 			<Show when={props.tab === "boards"}>
 				<div class="dispatch-pane dispatch-pane-boards" role="tabpanel" data-id="boards">
 					<TaskBand tasks={props.tasks} chats={props.chats} onTab={props.onTab} onOpenAgent={props.onOpenAgent} />

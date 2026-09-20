@@ -131,7 +131,7 @@ function createUi() {
 	const [surface, setSurface] = createSignal<"dispatch" | "stage">("dispatch");
 
 	/** The dashboard's tab. Also from the hash; the last one is kept for an empty hash. */
-	const [dispatchTab, setDispatchTab] = createSignal<"boards" | "tasks" | "cron">("boards");
+	const [dispatchTab, setDispatchTab] = createSignal<"canvases" | "boards" | "tasks" | "cron">("canvases");
 
 	/** A board opened as a preview over the gallery, by path. Nothing when none is. */
 	const [preview, setPreview] = createSignal<string | undefined>();
