@@ -120,7 +120,7 @@ test("a default width is the format's own, or the screen when the screen is smal
 	assert.equal(boardWidth(undefined, 1920), 880);
 	assert.equal(boardWidth(undefined, 3840), 880, "and a very wide screen changes nothing");
 	// The other two formats keep their own measures.
-	assert.equal(boardWidth(undefined, 1920, "flow"), 720);
+	assert.equal(boardWidth(undefined, 1920, "flow"), 1000);
 	assert.equal(boardWidth(undefined, 1920, "slides"), 960);
 	// A screen narrower than the default wins, which is the whole point of asking.
 	assert.equal(boardWidth(undefined, 390, "slides"), 390);
@@ -199,9 +199,10 @@ test("a new deck is reveal's own format, and this view's rules can read it", () 
 test("a new document is one HTML file, and a document in its own right", () => {
 	const html = renderFormat("flow", "Notes on the refresh", { w: 820 });
 	assert.match(html, /<body class="board flow">/, "`board` for the primitives, `flow` for the reflow");
-	assert.match(html, /lib\/board\.css/);
+	assert.match(html, /lib\/theme\.css/, "tokens only: the design is the writer's own");
+	assert.ok(!html.includes("lib/board.css"), "and not the component vocabulary");
 	assert.match(html, /lib\/board\.js/);
-	assert.match(html, /class="doc" data-id="body"/, "one component, so a double-click has something to land on");
+	assert.match(html, /<main data-id="main">/, "a block with an id, so a comment has something to land on");
 	assert.ok(!html.includes("{{"), "no placeholders left");
 
 	const meta = readBoardMeta(html);

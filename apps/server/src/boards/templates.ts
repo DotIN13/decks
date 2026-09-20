@@ -196,27 +196,31 @@ export function renderFormat(format: Exclude<BoardFormat, "component">, title: s
 	<head>
 		<meta charset="utf-8" />
 		<title>${escapeHtml(title)}</title>
-		<!--
-			No height: a flow board's is measured, never stored. The browser reports what its
-			content came to and the deck follows, so this board cannot clip.
-		-->
+		<!-- No height: a page's height is measured, never stored, so it cannot clip. -->
 		<meta name="board" content='{"w":${w},"bg":"plain"}' />
-		<link rel="stylesheet" href="../lib/board.css" />
+		<!-- Colour and type tokens only (light and dark). The design is yours, in the style below. -->
+		<link rel="stylesheet" href="../lib/theme.css" />
+		<style>
+			/* board.js sets the body to the board's width, so padding has to count inside it. */
+			*, *::before, *::after { box-sizing: border-box; }
+			body { margin: 0; padding: 40px 48px; font: 17px/1.5 var(--b-font); color: var(--b-fg); background: var(--b-bg); }
+			h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.2; letter-spacing: -0.01em; }
+		</style>
 		${importMapTag()}
 	</head>
 	<body class="board flow">
-		<div class="doc" data-id="body" style="left: 0; top: 0; width: 100%">
+		<header data-id="title">
 			<h1>${escapeHtml(title)}</h1>
-		</div>
+		</header>
+		<main data-id="main"></main>
 		<script src="../lib/board.js"></script>
 	</body>
 </html>
 `;
 }
 
-/** 960 for a deck, because that is the logical width a slide is laid out at; 720 for prose. */
 function defaultFormatWidth(format: Exclude<BoardFormat, "component">): number {
-	return format === "slides" ? 960 : 720;
+	return format === "slides" ? 960 : 1000;
 }
 
 /**

@@ -19,7 +19,14 @@ import { fileURLToPath } from "node:url";
  * as a convention spread across comments. `installed()` is what a test asserts against, so a
  * partial checkout fails loudly instead of at the first agent turn.
  */
-const HERE = dirname(fileURLToPath(import.meta.url));
+/**
+ * `DECKS_RUNTIME_DIR` points the whole module at another copy of `runtime/`. It exists so the
+ * words an agent is given (the context template, the tool's description, the guidelines, the
+ * skills) can be tried in variants against a throwaway data directory without editing the
+ * checkout a running server reads.
+ */
+const SELF = dirname(fileURLToPath(import.meta.url));
+const HERE = process.env.DECKS_RUNTIME_DIR ? resolve(process.env.DECKS_RUNTIME_DIR) : SELF;
 
 /** The asset root: `runtime/` in the repository, and in whatever layout ships it. */
 export function runtimeDir(): string {
@@ -28,7 +35,7 @@ export function runtimeDir(): string {
 
 /** Where Decks itself is installed — the directory `node_modules` sits in. */
 export function installDir(): string {
-	return resolve(HERE, "..");
+	return resolve(SELF, "..");
 }
 
 /** The skills an agent is taught with (`board-authoring`, `board-debug`). */
@@ -69,6 +76,11 @@ export function toolDescription(): string {
 	return resolve(HERE, "tool-description.txt");
 }
 
+/** The guidelines appended to every agent's context, one per line. Optional: the built-in list stands without it. */
+export function guidelinesFile(): string {
+	return resolve(HERE, "guidelines.txt");
+}
+
 /** The base context file, with `{{DECK_NAME}}` and the rest substituted in. */
 export function agentsTemplate(): string {
 	return resolve(HERE, "AGENTS.md.tmpl");
@@ -98,6 +110,7 @@ export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean 
 	{ path: "AGENTS.md.tmpl", what: "the deck context, with the board list filled in" },
 	{ path: "stage.d.ts", what: "the canvas API, injected verbatim" },
 	{ path: "tool-description.txt", what: "the canvas tool's words, for every runtime" },
+	{ path: "guidelines.txt", what: "the guidelines appended to every agent's context, one per line" },
 	{ path: "opencode", what: "opencode's config directory: its tool and Decks' skills", dir: true },
 	{ path: "antigravity/mcp-server.mjs", what: "antigravity's one-tool MCP server" },
 ];

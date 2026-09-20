@@ -87,7 +87,16 @@ export const boards = {
 	},
 
 	"board.extent": (message, _reply, wire) => {
-		wire.boards.noteExtent(message.path, { rev: message.rev, w: message.w, h: message.h });
+		wire.boards.noteExtent(message.path, {
+			rev: message.rev,
+			w: message.w,
+			h: message.h,
+			...(typeof message.words === "number" ? { words: message.words } : {}),
+			...(typeof message.minFont === "number" ? { minFont: message.minFont } : {}),
+			...(typeof message.overflowX === "number" ? { overflowX: message.overflowX } : {}),
+			...(typeof message.cut === "number" ? { cut: message.cut } : {}),
+			...(typeof message.overlaps === "number" ? { overlaps: message.overlaps } : {}),
+		});
 		/*
 		 * A flow board *is* its content's height.
 		 *

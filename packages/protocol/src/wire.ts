@@ -41,7 +41,7 @@ export type ClientMessage =
 	 * carries the `rev` it was taken at, because a measurement of a document that has
 	 * since been rewritten is not a measurement of anything.
 	 */
-	| { type: "board.extent"; path: string; rev: number; w: number; h: number }
+	| { type: "board.extent"; path: string; rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }
 	| { type: "board.undo"; path: string }
 	/**
 	 * A component on a board was pressed, and the board carries code for it.

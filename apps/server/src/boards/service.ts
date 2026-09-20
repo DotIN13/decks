@@ -69,7 +69,7 @@ export class BoardService {
 	readonly revisions: Revisions;
 	private readonly authors: Authors;
 	private readonly seenAt: Seen;
-	private readonly extents = new Map<string, { rev: number; w: number; h: number }>();
+	private readonly extents = new Map<string, { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
 	/** `stage.fit` calls waiting for the frame to load and report. */
 	private readonly extentWaiters = new Set<{ path: string; rev: number; resolve: (extent: { w: number; h: number } | undefined) => void }>();
 
@@ -167,7 +167,7 @@ export class BoardService {
 	 * showing the same board agree, and a stale reading is filtered where it is read
 	 * rather than hoarded here.
 	 */
-	noteExtent(path: string, extent: { rev: number; w: number; h: number }): void {
+	noteExtent(path: string, extent: { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }): void {
 		this.extents.set(path, extent);
 		for (const waiter of [...this.extentWaiters]) {
 			if (waiter.path !== path || waiter.rev !== extent.rev) continue;
@@ -180,6 +180,12 @@ export class BoardService {
 	extent(path: string, rev: number): { w: number; h: number } | undefined {
 		const extent = this.extents.get(path);
 		return extent && extent.rev === rev ? { w: extent.w, h: extent.h } : undefined;
+	}
+
+	/** How many words the browser counted on this board at this revision, and its smallest type. */
+	reading(path: string, rev: number): { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } {
+		const extent = this.extents.get(path);
+		return extent && extent.rev === rev ? { ...(extent.words === undefined ? {} : { words: extent.words }), ...(extent.minFont === undefined ? {} : { minFont: extent.minFont }), ...(extent.overflowX === undefined ? {} : { overflowX: extent.overflowX }), ...(extent.cut === undefined ? {} : { cut: extent.cut }), ...(extent.overlaps === undefined ? {} : { overlaps: extent.overlaps }) } : {};
 	}
 
 	/** Nobody is looking at that board any more, or it is gone. */

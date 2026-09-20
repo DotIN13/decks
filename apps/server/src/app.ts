@@ -145,6 +145,11 @@ export class App {
 			writeBoard: (path, html) => this.boards.writeBoard(path, html),
 			extent: (path, rev) => this.boards.extent(path, rev),
 			awaitExtent: (path, rev, ms) => this.boards.awaitExtent(path, rev, ms),
+			reading: (path, rev) => this.boards.reading(path, rev),
+			views: async (path) => {
+				const board = this.deck.board(path);
+				return board ? this.thumbs.views(board) : undefined;
+			},
 			call: (call) => this.callStage(call),
 			connected: () => (this.hub?.connections ?? 0) > 0,
 			broadcast: (message) => this.send(message),
@@ -182,10 +187,24 @@ export class App {
 		this.thumbs = new ThumbService({
 			origin: () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`,
 			dir: join(deck.path, ".decks", "thumbs"),
-			// The same guards as `board.extent` on the wire: a flow board, at the revision measured.
+			/*
+			 * The same guards as `board.extent` on the wire — a flow board, at the revision
+			 * measured — and one more: **a reader's browser outranks this one.**
+			 *
+			 * This measurement is taken in the server's own Chromium, with the server's fonts. A
+			 * reader's browser has theirs, and the same document comes to a different height in
+			 * the two: 1,149 px here against 1,221 px there on a board of tables, which is three
+			 * lines of wrapping. Both readings are honest and only one can be the board's. It has
+			 * to be the reader's, or the board is cut for the person actually looking at it.
+			 *
+			 * So this fills in a height nobody has reported yet — a board on the dashboard that
+			 * has never been opened, which is the reason the callback exists — and never overrules
+			 * a frame's.
+			 */
 			measured: (path, rev, h) => {
 				const board = this.deck.board(path);
 				if (board?.format !== "flow" || board.rev !== rev) return;
+				if (this.boards.extent(path, rev)) return;
 				if (this.deck.setHeight(path, h)) this.send({ type: "deck.state", deck: this.stageState() });
 			},
 		});

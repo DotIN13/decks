@@ -118,12 +118,27 @@ export function thumbClip(board: Pick<Board, "w" | "h">): { width: number; heigh
 	return { width, height, scale: THUMB_WIDTH / width };
 }
 
-/** In the page: how far down the board's components reach, the way `canvas/extent.ts` measures it. */
+/**
+ * In the page: how far down the board reaches, the way `canvas/extent.ts` measures it.
+ *
+ * The components, and for a flow board the whole document — a page keeps its margins on the
+ * body, and a margin can collapse out of the last block, so both sit below every `[data-id]`
+ * there is. The two measurements have to agree or the picture and the board are different
+ * heights; the reasoning is in `extent.ts`, and this is its twin.
+ */
 const MEASURE = `(() => {
 	let h = 0;
 	for (const el of document.querySelectorAll("body > [data-id]")) {
 		const r = el.getBoundingClientRect();
 		if (r.width > 0 && r.height > 0 && r.bottom > h) h = r.bottom;
+	}
+	if (h === 0) return 0;
+	if (document.body.classList.contains("flow")) {
+		const held = document.body.style.height;
+		document.body.style.height = "auto";
+		const page = document.body.scrollHeight;
+		document.body.style.height = held;
+		if (page > h) h = page;
 	}
 	return Math.ceil(h);
 })()`;
@@ -338,6 +353,47 @@ export class ThumbService {
 		}
 	}
 
+	/**
+	 * Press every control on a board and say which views break it.
+	 *
+	 * A board that keeps its depth behind tabs and rows has views its writer never looked at:
+	 * `fit` measures the board as it rests, and a screenshot is of the resting view too. The
+	 * first board checked this way had a tab whose text was squeezed into a 24px column and ran
+	 * to 3,460px, and nothing had said so. This loads the board in the same headless browser
+	 * the pictures use, presses each control in turn, and measures after each press: the height,
+	 * anything wider than the board, and any script error. Nothing is returned for a view that
+	 * is fine, and nothing at all when there is no Chromium, because this is advice.
+	 */
+	async views(board: Board): Promise<BoardViews | undefined> {
+		if (this.broken) return undefined;
+		clearTimeout(this.idle);
+		let browser: Browser;
+		try {
+			this.browser ??= this.launch();
+			browser = await this.browser;
+		} catch {
+			this.browser = undefined;
+			return undefined;
+		}
+		this.running += 1;
+		const context = await browser.newContext({ viewport: { width: Math.max(320, Math.round(board.w)), height: 800 }, reducedMotion: "reduce" });
+		try {
+			const page = await context.newPage();
+			const errors: string[] = [];
+			page.on("pageerror", (error) => errors.push(error.message.split("\n")[0] ?? ""));
+			await page.goto(`${this.host.origin()}/api/board/${board.path.split("/").map(encodeURIComponent).join("/")}`, { waitUntil: "load", timeout: READY_MS });
+			await page.waitForFunction("window.__boardReady === true", undefined, { timeout: READY_MS }).catch(() => {});
+			const pressed = (await page.evaluate(PRESS_EVERY_CONTROL)) as { controls: number; opening: number; views: BoardViews["views"] };
+			return { controls: pressed.controls, opening: pressed.opening, views: pressed.views, errors: errors.slice(0, 3) };
+		} catch {
+			return undefined;
+		} finally {
+			await context.close().catch(() => {});
+			this.running -= 1;
+			if (this.running === 0 && this.queue.length === 0) this.rest();
+		}
+	}
+
 	private rest(): void {
 		clearTimeout(this.idle);
 		this.idle = setTimeout(() => void this.close(), IDLE_MS);
@@ -359,6 +415,41 @@ export class ThumbService {
 		void this.close();
 	}
 }
+
+/** What pressing a board's controls found: how many there are, and the views that go wrong. */
+export interface BoardViews {
+	controls: number;
+	/** How tall the board is in the view it opens on, which is the view its height was measured in. */
+	opening: number;
+	/** One entry per press that left the board too tall or too wide; `label` is the control's own words. */
+	views: Array<{ label: string; h: number; overflowX: number }>;
+	errors: string[];
+}
+
+/**
+ * Runs in the page. Every visible control, twelve at most, pressed in document order; after
+ * each press the far bottom of the body's children and the horizontal spill are read.
+ *
+ * A view is reported when it spills sideways, when it runs past one screen (0.8 of the board's
+ * width), **or when it is taller than the board it is on**. That last one is the case this
+ * check was missing: a board's height is measured in the view it opens on, so a tab 125px
+ * taller than its board has its last lines cut and no number anywhere was over a limit —
+ * 667px on a 542px board passed a test written against the width.
+ */
+const PRESS_EVERY_CONTROL = `(async () => {
+	const controls = [...document.querySelectorAll("button, summary, [role=tab], [data-tab], select")].filter((el) => el.getBoundingClientRect().width > 0);
+	const bottom = () => { let b = 0; for (const el of document.querySelectorAll("body > *")) { const r = el.getBoundingClientRect(); if (r.width && r.height) b = Math.max(b, r.bottom + scrollY); } return Math.round(b); };
+	const opening = bottom();
+	const limit = Math.min(document.documentElement.clientWidth * 0.8, opening + 2);
+	const views = [];
+	for (const el of controls.slice(0, 12)) {
+		try { el.click(); } catch {}
+		await new Promise((r) => setTimeout(r, 80));
+		const h = bottom(), overflowX = Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth);
+		if (h > limit || overflowX > 2) views.push({ label: (el.innerText || el.getAttribute("aria-label") || el.tagName).trim().slice(0, 40), h, overflowX });
+	}
+	return { controls: controls.length, opening, views };
+})()`;
 
 async function launchChromium(): Promise<Browser> {
 	const playwright: Playwright = await import("playwright");

@@ -1,10 +1,10 @@
 import { isoIn, isZone, nowWords, offsetLabel, partsIn, processZone } from "../clock.ts";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import type { AgentKind, AgentMode, AgentState, Camera, Identity, Schedule, ScheduleSpec, TaskResult, TaskSpec, ThinkingLevel } from "@decks/protocol";
-import { toolDescription as toolDescriptionPath } from "@decks/runtime";
+import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
 import { roster } from "../agents/workspaces.ts";
-import { BOARD_FORMATS, boardWidth, isBoardFormat, WIDE_BOARD_W } from "../boards/templates.ts";
+import { BOARD_FORMATS, boardWidth, isBoardFormat } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService, WebTarget } from "./service.ts";
 
@@ -271,46 +271,22 @@ function toolDescription(): string {
 	return description;
 }
 
-const GUIDELINES = [
-	"Answer on a board: stage.newBoard for the shell, write/edit for the content, stage.show to put it in front of the user.",
-	"Pick the format for the thing: component boxes by default, format: 'flow' for a document that reflows and measures its own height, format: 'slides' for a reveal deck of <section> elements. All three are single HTML files. A board of prose does not want to be positioned boxes.",
-	"Width: the smallest that holds the content. Nothing is capped, but keep a board under about 1200 and inside the viewport — wider is read scaled down, and a long line is one the eye loses its place in. On a small screen make that session's boards small rather than merely narrower, and split a very wide or very tall board in two.",
-	"Reading order: DOM order is visual order, top to bottom. Two components sharing a row go left-first in the file.",
-	/*
-	 * The ones about *what a board says* rather than where its boxes are.
-	 *
-	 * They were one line — "aim for the smallest board that explains the thing" — which is a
-	 * preference, and a preference loses to the pull of writing everything down. These are
-	 * imperative and they name the move to make: be brief, label the axis, head the box with
-	 * what it is. Deliberately no counts: a word budget gets gamed into four short
-	 * paragraphs, and a components limit gets met by making one card longer.
-	 */
-	"Lead with the finding. The first thing on a board is what you concluded, in a sentence somebody could repeat — not the background, not the method, not what you were asked.",
-	"Be concise. Short sentences, no preamble, nothing said twice.",
-	"Give a board sections, and head the sections from this set: Summary, Overview, Problem, Research question, Method, Result, Todos, Next. Reading the section headings alone should tell somebody what is on the board — that is what makes a board scannable rather than a wall of cards.",
-	"Inside a section, a component's heading is a short plain phrase — two or three words saying what the box is — not a chatty sentence and not the finding itself. The finding goes in the body, where it can be read.",
-	"Write the shortest thing that is still true. Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a structure, a number to an adjective. A third paragraph in one card is a table you have not drawn yet.",
-	"A card is a claim with its evidence, not a section of an essay: a heading that says what it is, then the fewest words that back it. If a card needs a scrollbar in your head, it is two cards or a table.",
-	"A diagram or a table must stand on its own: every axis labelled with its unit, every series and column named in words. Never letter- or number-coded — no arms called A/B/C/D, no metrics called M1/M2/M3, no bare decimals with nothing saying what they measure. Somebody who has not read the chat should be able to say what every row and every axis is.",
-	"Write in plain language, always, unless you were asked for something else. Technical terms are welcome — precision is the point — and it is the sentence around them that should be plain. No metaphors, no clever framing, no long sentence doing two jobs.",
-	"Reporting research, that means both: what was done, what came out and what it means, in words a reader outside the project would follow — then the numbers, the method and the names.",
-	"The board carries the answer; the chat reply names it and may recap or add to it. What is never acceptable is the substance in chat with a stub on the board, or a board that only makes sense after reading the chat.",
-	"When work is finished, report on a board — method, result, what is left — rather than describing it in the chat column.",
-	"Keep the canvas to what matters now: stage.show narrows it, stage.hide takes a board off it without dropping it from your context.",
-	"Board files are edited in place — Write, Edit, cat > file. Never a temp-file-and-rename (sed -i, an atomic save): it replaces the file the canvas is watching.",
-	"After writing a board, stage.fit it rather than guessing whether it clips. A board does not scroll, so content past its edge is simply not drawn.",
-	"Nothing watches which files you edit: a board is yours, on the dashboard and under a task you were handed, once you stage.fit it, stage.show it on its own, or stage.report it. Edited a board without showing it? stage.report(path).",
-	/*
-	 * The one guideline that is about the *chat list* rather than the canvas.
-	 *
-	 * It is here as well as in `stage.d.ts` because the two are read differently: the d.ts is
-	 * reference, consulted when reaching for a call, and these are instructions read once at
-	 * the top. An API documented only in reference material is an API nobody remembers exists
-	 * — which for tags means a row that is permanently empty, and the feature not existing.
-	 */
-	"Say what you are working on: stage.me.setTags(['panel-css', 'measuring']) when you start on something, and setTags([]) when you stop. It is how the user sees what each agent is up to without opening every conversation. Short nouns, not sentences.",
-	"Say which project you are on, once, when you start: stage.me.setWorkspace('political-llm'). It replaces a tag rather than adding to one: it is a location, not a list, so declaring the same word as the others is how a group forms. Check stage.workspaces() first and reuse a name that is already there rather than inventing a second spelling of it — the call returns the slug it stored, so what you set is what the others must say. Leave one project before you join another; the last word wins and it is the same field.",
+/** What an agent is told when `runtime/guidelines.txt` is missing: the one rule the rest hang from. */
+const BUILT_IN_GUIDELINES = [
+	"Answer on a board: stage.newBoard for the page, write/edit for the content, stage.show then stage.fit to put it in front of the person. A board is one screen, read in about ten seconds.",
 ];
+
+/**
+ * The guidelines an agent is given: `runtime/guidelines.txt` when there is one, a line each,
+ * and the list above when there is not. A file for the reason the description is one: the
+ * words can then be changed, and tried in variants, without touching this module.
+ */
+function guidelines(): string[] {
+	const file = guidelinesFile();
+	if (!existsSync(file)) return BUILT_IN_GUIDELINES;
+	return readFileSync(file, "utf8").split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
+}
+const GUIDELINES = guidelines();
 
 export function createStageTool(deps: {
 	stage: StageService;
@@ -395,13 +371,15 @@ export function createStageTool(deps: {
 			/*
 			 * What the board *is as a file*, which is all a new board is allowed to choose.
 			 *
-			 * `component` is every board this app wrote before formats existed and stays the
-			 * default, so an agent that says nothing gets what it has always got. The other
-			 * two are documents rather than boxes: `flow` is a document that reflows, `slides`
-			 * is a reveal deck. The extension is derived from this and never named — see
-			 * `boards/templates.ts`.
+			 * `flow` is the default: an ordinary page the agent designs, on the theme tokens
+			 * alone, whose height is measured. It was `component` until boards were tried in
+			 * variants against a clean deck: the positioned vocabulary cost an agent twice the
+			 * tool calls and money for the same one-screen board, and read no better. `component`
+			 * is still written when asked for, and is what a person's double-click creates;
+			 * `slides` is a reveal deck. The extension is derived from this and never named —
+			 * see `boards/templates.ts`.
 			 */
-			const format = options.format ?? "component";
+			const format = options.format ?? "flow";
 			if (!isBoardFormat(format)) throw new Error(`Unknown format ${format}; use one of ${BOARD_FORMATS.join(", ")}`);
 			/*
 			 * There are no templates any more — every board starts blank — but the arguments
@@ -446,7 +424,7 @@ export function createStageTool(deps: {
 			 */
 			if (view) notes.push(`viewport ${view.width}×${view.height} px`);
 			notes.push(
-				`board width ${width} — keep a board under ${WIDE_BOARD_W} and inside the viewport where you can; nothing stops you going wider, but a wide board is read scaled down. Reading order is top to bottom in DOM order.`,
+				`board width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. stage.fit will say which of these a board is over.`,
 			);
 			return path;
 		},
@@ -506,8 +484,32 @@ export function createStageTool(deps: {
 		 * second way on a flow board, where the width it read back was the frame's own.
 		 */
 		fit: async (path: string, options?: { margin?: number }) => {
-			const { board, content } = await service.fit(path, options);
+			const { board, content, reading, views } = await service.fit(path, options);
 			agent.worked?.(board.path);
+			/*
+			 * What the browser read, said as sentences, so the check costs no screenshot.
+			 *
+			 * An agent told "one screen, about 120 words, nothing under 14px" used to find out
+			 * whether it had managed it by driving Playwright and reading a picture, which was
+			 * a third of what a board cost. The frame that measures the height can count the
+			 * words and find the smallest type in the same pass, so `fit` says them. Only what
+			 * is over is mentioned: a board inside all three gets the numbers and no advice.
+			 */
+			const screen = Math.round(board.w * 0.72);
+			const over: string[] = [];
+			if (content.h > screen) over.push(`${content.h} px tall, which is more than one screen (about ${screen} px at this width)`);
+			if (reading.words !== undefined && reading.words > 170) over.push(`${reading.words} words, where about 120 is what gets read`);
+			if (reading.minFont !== undefined && reading.minFont < 14) over.push(`its smallest text is ${reading.minFont}px, and under 14px is not readable once the board is fitted to a window`);
+			if (reading.overflowX !== undefined) over.push(`${reading.overflowX} px wider than the board, so its right edge is cut off: something (a table, a row, a long word) does not fit the width`);
+			if (reading.cut !== undefined) over.push(`${reading.cut} box${reading.cut === 1 ? "" : "es"} on it cut off their own content: a fixed-height panel is too short for what is in it, and a board cannot scroll`);
+			if (reading.overlaps !== undefined) over.push(`${reading.overlaps} pair${reading.overlaps === 1 ? "" : "s"} of labels in a drawing overlap each other: move them apart or shorten them, then look at it with a screenshot`);
+			for (const view of views?.views ?? [])
+					over.push(
+						`after pressing "${view.label}" it is ${view.h} px tall${view.overflowX ? ` and ${view.overflowX} px too wide` : ""}, where it opens at ${views?.opening} px: a board's height is measured in the view it opens on, so a taller view has its last lines cut. Give the panel a min-height, or move that view to its own board`,
+					);
+			for (const error of views?.errors ?? []) over.push(`a script on it throws: ${error}`);
+			if (over.length) notes.push(`This board is ${over.join("; ")}. Cut it, enlarge the type, or move the second idea to its own board. A document the person asked for in full (a message, a list, code) is exempt from the height and the word count.`);
+			else if (reading.words !== undefined) notes.push(`One screen: ${content.h} px tall, ${reading.words} words${reading.minFont === undefined ? "" : `, smallest text ${reading.minFont}px`}${views ? `, ${views.controls} control${views.controls === 1 ? "" : "s"} pressed and every view fits` : ""}. Nothing to fix.`);
 			return { path: board.path, w: board.w, h: board.h, content };
 		},
 

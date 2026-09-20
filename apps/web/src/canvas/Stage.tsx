@@ -132,7 +132,7 @@ export function Stage(props: {
 	/** So the server can answer `stage.camera()` with what the user can see. */
 	onViewport?: (viewport: Viewport) => void;
 	/** How much room a board's content took, measured in its frame once it had mounted. */
-	onExtent?: (path: string, extent: { rev: number; w: number; h: number }) => void;
+	onExtent?: (path: string, extent: { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }) => void;
 	editor: EditorHost;
 	/** A tool picked by its key, which the palette's tooltips have always claimed. */
 	onTool?: (tool: Tool) => void;

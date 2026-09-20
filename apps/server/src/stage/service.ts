@@ -32,6 +32,10 @@ export interface StageHost {
 	extent(path: string, rev: number): { w: number; h: number } | undefined;
 	/** Wait for a measurement of this revision — every frame takes one when it loads. */
 	awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number } | undefined>;
+	/** Words counted and the smallest type on the board at this revision, when a browser reported them. */
+	/** Press every control on the board in a headless page and report the views that break it. Advice: absent when it cannot run. */
+	views?(path: string): Promise<{ controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } | undefined>;
+	reading?(path: string, rev: number): { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number };
 	/** Send to the focused browser, and resolve when it answers. */
 	call(call: Omit<StageCall, "id">): Promise<unknown>;
 	/** Is anyone looking? */
@@ -215,14 +219,14 @@ export class StageService {
 	 *
 	 * The height is the one number a board cannot state for itself: it is what the content came to
 	 * once it was laid out, and only the browser knows it. So this reads what the frame measured and
-	 * writes that, plus the margin a board's own components start at.
+	 * writes that, plus — on a component board — the margin its boxes start at.
 	 *
 	 * It used to take the width too, in two passes: set the width, wait for the reflow, measure the
 	 * height that produced. That made `fit` the one call that could silently reflow a board — and on
 	 * a **flow** document, whose `.doc` is `width: 100%` of the frame, the "content width" it read
 	 * back was the frame's own width, so every fit added the margin and grew the board by 48px.
 	 */
-	async fit(path: string, options?: { margin?: number }): Promise<{ board: Board; content: { w: number; h: number } }> {
+	async fit(path: string, options?: { margin?: number }): Promise<{ board: Board; content: { w: number; h: number }; reading: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }; views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } }> {
 		// The record first: an agent calls this straight after writing the content, and
 		// the revision we wait for a measurement of has to be the one now on disk.
 		this.deck.refresh(path);
@@ -232,8 +236,21 @@ export class StageService {
 		const margin = Math.max(0, Math.min(400, Math.round(options?.margin ?? FIT_MARGIN)));
 
 		const measured = await this.measure(path, board.rev);
-		const h = measured.h + margin;
-		return { board: h === board.h ? board : this.resize(path, { h }), content: measured };
+		/*
+		 * The margin is a component board's, and only a component board's.
+		 *
+		 * There, the height is a stored number and the margin is the room a writer would have
+		 * left below the last box. A **flow** board's height is not stored: the browser measures
+		 * it and the deck takes that number (`wire/boards.ts`, `board.extent`). The `<meta>` tag
+		 * is read by `board.js`, which makes it the body's height — so a margin here is a document
+		 * 48px taller than the rectangle the canvas gives it, which is a page that scrolls inside
+		 * its own board. The two numbers have to be the same number.
+		 */
+		const h = board.format === "flow" ? measured.h : measured.h + margin;
+		const reading = this.host.reading?.(path, board.rev) ?? {};
+		// Six seconds at most: the check is advice, and a fit that hangs on it is worse than one without it.
+		const views = await Promise.race([this.host.views?.(path) ?? Promise.resolve(undefined), new Promise<undefined>((done) => setTimeout(() => done(undefined), 6000))]).catch(() => undefined);
+		return { board: h === board.h ? board : this.resize(path, { h }), content: measured, reading, ...(views ? { views } : {}) };
 	}
 
 	/**

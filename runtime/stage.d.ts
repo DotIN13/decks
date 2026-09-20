@@ -1,863 +1,115 @@
 /**
- * The stage API, available inside `{{STAGE_TOOL}}` as `stage`.
- *
- * This file is injected into your context verbatim, so it is the whole contract:
- * if something is not here, it does not exist. Your code runs as the body of an
- * async function, so you can `await` and `return` — whatever you return comes back
- * to you as JSON, and anything you `console.log` comes back with it.
- *
- *     await stage.show("boards/plan.html", { highlight: "risk" });
- *     const boards = await stage.boards();
- *     return boards.filter((b) => b.inContext.length === 0).map((b) => b.path);
- *
- * Board *content* is files: read and edit it with your ordinary tools. This is for the
- * things a file cannot express — what is on the canvas, what is in your context, and who
- * you are.
- *
- * Three tiers, and they are worth keeping straight:
- *
- * - the **deck** is every board file (`boards()`)
- * - your **context** is what you are holding (`attach` / `detach` / `context`) — the rail
- *   beside the canvas lists it, and the user can take a board off the canvas but cannot
- *   take one out of your context
- * - what is **in play** is the subset on the canvas (`show` / `hide` / `inPlay`)
+ * The stage API, available inside `{{STAGE_TOOL}}` as `stage`. Your code is the body of an
+ * async function: `await` and `return` work, and what you return comes back as JSON, with
+ * anything you `console.log`. This is the whole API: if something is not here, it does not
+ * exist. Board content is files: write it with your ordinary tools.
  */
+export interface Board { path: string; title: string; x: number; y: number; w: number; h: number; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string }
 
-export interface Board {
-	/** Deck-relative, e.g. "boards/plan.html". */
-	path: string;
-	title: string;
-	/** Where it sits on the canvas. The user may have dragged it. */
-	x: number;
-	y: number;
-	w: number;
-	h: number;
-	/**
-	 * How much room the content actually takes, as the canvas last measured it.
-	 *
-	 * Only present for a board somebody is looking at, and only while the measurement
-	 * matches the file — a reading of a version you have since rewritten is left off
-	 * rather than reported, because a number gets believed.
-	 */
-	content?: { w: number; h: number };
-	/** Content past the edge of the board: written, rendered, and invisible. */
-	clipped?: boolean;
-	/** Ids of agents holding this board in context. */
-	inContext: string[];
-	/**
-	 * Who wrote it last: an agent id, or "you" for the user.
-	 *
-	 * Said, not detected: an agent becomes a board's writer by calling `newBoard`, `fit`, a
-	 * one-board `show`, or `report` on it. A file written and never named has no writer.
-	 */
-	lastWrittenBy?: string;
-}
-
-export interface Root {
-	path: string;
-	writable: boolean;
-	exists: boolean;
-}
-
-export interface Camera {
-	/** The world point under the centre of the user's viewport. */
-	x: number;
-	y: number;
-	/** 1 is life size; 0.25 is zoomed out to four boards across. */
-	zoom: number;
-}
-
-export interface Identity {
-	name: string;
-	avatar?: string;
-	color: string;
-	/** What you last said you were doing, as stored — see `me.setTags`. */
-	tags?: string[];
-	/** The workspace you are in, as a slug — `"political-llm"`. See `me.setWorkspace`. */
-	workspace?: string;
-}
-
-export interface AgentSummary {
-	id: string;
-	name: string;
-	/** Whether this is you. */
-	me: boolean;
-	state: "idle" | "thinking" | "streaming" | "tool" | "waiting";
-	/**
-	 * The runtime this agent is. Fixed at creation, and not interchangeable: a Claude agent
-	 * can rewind, an opencode one cannot, an antigravity one has no thinking scale in the
-	 * picker and applies a mode change only at its next start. It is the same word the chat
-	 * list shows the user.
-	 */
-	kind: "pi" | "claude" | "opencode" | "antigravity";
-	/**
-	 * The boards this agent is holding, **newest first** and capped at twenty.
-	 *
-	 * `held` is most-recently-touched-first, so this slice is the answer to "what is it
-	 * working on" — attaching a board already held moves it to the front. The cap is a
-	 * screen of it, not a truncation: `holding` is the true total, so a reader can tell
-	 * a slice from everything before deciding whether to ask for more.
-	 */
-	context: string[];
-	/** How many boards it really holds — `context` is capped, this is not. */
-	holding: number;
-	/** What it says it is working on. Empty if it has not said. */
-	tags: string[];
-	/**
-	 * The workspace it is in, or `undefined` for an agent in none.
-	 *
-	 * The panel clusters by this, and it is here rather than only in `workspaces()` so that
-	 * "who else is on this project" is answered by the call an agent already makes to see who
-	 * exists — the same argument `tags` makes, one level up.
-	 */
-	workspace?: string;
-	/** How many handed-over items are waiting for it — see `send`. */
-	queued: number;
-}
-
-/**
- * One workspace: a slug, its members, and the boards they hold.
- *
- * There is no group object behind this and nothing to create — a workspace exists exactly as
- * long as somebody says its name, which is what makes it something an agent can form on its
- * own. See `agents/workspaces.ts` for the aggregation.
- */
-export interface Workspace {
-	/** The slug every member shares. */
-	name: string;
-	/** Members, in the order `agents()` reports them. */
-	agents: Array<{ id: string; name: string; state: "idle" | "thinking" | "streaming" | "tool" | "waiting"; tags: string[] }>;
-	/**
-	 * Every board at least one member holds, **the ones most of them hold first**.
-	 *
-	 * A board two members are working from is the workspace's; a board one of them has open is
-	 * that agent's. The first entry is therefore the plan of record, which is what makes joining
-	 * a workspace useful rather than merely tidy.
-	 */
-	boards: string[];
-}
-
-/** One item waiting in an agent's queue. */
-export interface QueuedWork {
-	/** The agent that sent it, and the name it was going by. */
-	from: string;
-	fromName: string;
-	task: string;
-	boards: string[];
-	at: number;
-}
-
-/** The shared Chrome's state, as the status board draws it. */
-export interface WebStatus {
-	/** A pairing code exists. */
-	paired: boolean;
-	/** The extension is connected and a tab is attached. */
-	connected: boolean;
-	/** The tab you drive — the first shared one. */
-	tab?: { title: string; url: string };
-	tabs: Array<{ title: string; url: string }>;
-	/** The last twelve things done through `web.*`, oldest first. */
-	actions: Array<{ at: number; text: string; ok: boolean }>;
-	/** A submit waiting for the user's Allow. */
-	pending?: { id: string; text: string };
-	/** Why the last connection ended, if it has. */
-	closed?: string;
-}
-
-/**
- * How you name something in the shared tab.
- *
- * **A name is the default** — the label, the placeholder, the words on the button — because
- * it is what a person would say and what a transcript can be read back from. The other two
- * forms exist because real forms defeat names:
- *
- * - `{ ref: "e42" }` — an id from `read()`'s snapshot, where every element carries one. The
- *   only way to reach a field with **no label at all**, and the way to be certain which of
- *   several you mean. References belong to the page they were read from: after the tab
- *   navigates, read again.
- * - `{ name: "Degree", nth: 2 }` — one of several things with the same name, **counting from
- *   1**. Cheap, but positions move when the page gains a row; a reference does not.
- */
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
 
-export interface ShowOptions {
-	/** "board" fits the one board (default); "all" fits everything named. */
-	fit?: "board" | "all";
-	/** A `data-id` on the board to outline, so the user's eye lands on it. */
-	highlight?: string;
-	/**
-	 * Arrive at the framed view rather than jumping to it: 420ms, easing out.
-	 *
-	 * Off by default, and deliberately. An op says where to look, and something that reads the
-	 * camera a frame after calling this should see where it was told to look — the two gestures
-	 * that move the camera *for* the user (a link on a board, a row in the panel) glide without
-	 * being asked, because those are a person's hands and the journey is the point.
-	 */
-	animate?: boolean;
-}
-
 export interface Stage {
-	// --- looking at the deck ------------------------------------------------------
-
-	/** Every board in the deck, with where it sits and who is holding it. */
-	boards(): Promise<Board[]>;
-
-	/** A board's source, without spending a `read` turn on it. */
-	read(path: string): Promise<string>;
-
-	/** Directories outside the deck that embeds may reach (from deck.json). */
-	roots(): Promise<Root[]>;
-
 	/**
-	 * A path you found on disk -> the URL a board should embed.
-	 * Throws if the file is outside the deck and every declared root.
+	 * Write a blank board and return its path. The title is the finding, as a sentence.
+	 * `format`: "flow" (default) is an ordinary page you design, its height measured;
+	 * "component" is absolutely positioned boxes on `board.css`, for a board the person
+	 * will drag around; "slides" is a reveal deck of `<section>`s in a `.slides.html`.
 	 */
-	resolve(file: string): Promise<string>;
-
-	/** The URL to open in Playwright when you want to look at a board. */
-	url(path: string): Promise<string>;
-
+	newBoard(o: { title: string; format?: "component" | "flow" | "slides"; w?: number; h?: number }): Promise<string>;
+	/** Put exactly these boards on the canvas and move the camera to them. `highlight` outlines one `data-id`. */
+	show(path: string | string[], o?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }): Promise<{ shown: string[] }>;
 	/**
-	 * How much room the canvas has, in CSS pixels — the size a board is looked at in.
-	 *
-	 * The window minus the chrome standing beside it, not divided by the zoom: it is the
-	 * space a board has on screen, so `1440x900` means a board that wide is read at life
-	 * size and a board twice that is read at half.
-	 *
-	 * `undefined` when nobody is looking, or before the browser's first reading. There is
-	 * deliberately no default — a made-up number looks exactly like a measured one at the
-	 * point you would use it.
+	 * Set a board's height from its measured content; the board must be shown first. The result
+	 * also says, in a sentence, what the browser found: the height, the word count, the smallest
+	 * type, content wider than the board, boxes that cut off their own content, and any view
+	 * that breaks when a control is pressed. Use it instead of a screenshot.
 	 */
-	viewport(): Promise<{ width: number; height: number } | undefined>;
-
-	// --- starting a board ----------------------------------------------------------
-
-	/**
-	 * Write the shell of a new board and return its path, ready to fill in.
-	 *
-	 * This exists so that answering on a board costs about as little as answering in
-	 * chat: doctype, meta, stylesheet, script and a titled heading, written for you.
-	 * **Every board starts blank** — a heading and nothing else, on purpose. There are
-	 * no templates to choose between; the shape of a board is the writer's decision,
-	 * and what a finished board can look like is in the examples (`examples/` in the
-	 * deck, refreshed by the app on every restart), to borrow from rather than to be
-	 * created from. Edit the returned path to put the content in.
-	 *
-	 * The board is attached and put on the canvas. The camera does not move — call `show`
-	 * when you want the user looking at it.
-	 *
-	 *     const path = await stage.newBoard({ title: "Why the second tab fails" });
-	 *     // then edit(path): replace the placeholder with the finding, in a sentence
-	 *     // somebody could repeat — "The second tab reuses the first one's socket" — and
-	 *     // stop there. Not the background, not the method, not what you were asked.
-	 *
-	 * **`format` is the only choice a new board makes**, and it is what the board *is as a
-	 * file*. **All three are single HTML files**; only the body says which:
-	 *
-	 * - `component` (default) — `<body class="board">`, absolutely-positioned boxes with
-	 *   `data-id`s. The only format the drag-and-retype editor can work on.
-	 * - `flow` — `<body class="board flow">`, a document that reflows, with the content in
-	 *   one full-bleed `.doc` component. Ordinary HTML inside it: headings, paragraphs,
-	 *   tables, an `<svg>`, `[data-md]` for a markdown block. Its height is **measured**
-	 *   rather than stored, so it cannot clip, and a double-click edits the file as source
-	 *   rather than as boxes.
-	 * - `slides` — a `.slides.html` deck in **reveal's own format**: one `<section>` per
-	 *   slide inside `.reveal > .slides`. Nested sections become consecutive slides. Speaker
-	 *   notes are `<aside class="notes">`. Every slide is laid out at 960×540 and scaled, so
-	 *   nothing reflows when it is presented — and a `<script>` in it does not run, so a deck
-	 *   cannot bring its own runtime.
-	 *
-	 * The **file extension is derived** from the format and is not yours to name: a board's
-	 * format is read back out of its filename, so the two must not be able to disagree.
-	 *
-	 *     const deck = await stage.newBoard({ title: "The plan, out loud", format: "slides" });
-	 *     // -> "boards/the-plan-out-loud.slides.html", one blank slide in it
-	 *
-	 *     const doc = await stage.newBoard({ title: "Notes on the refresh", format: "flow" });
-	 *     // -> "boards/notes-on-the-refresh.html", one empty .doc component to write into
-	 *
-	 * **The result tells you the viewport and the width it chose** — `viewport 1440x900 px`,
-	 * then the width with the advice beside it — because that is the moment both are worth
-	 * knowing. `stage.viewport()` asks any other time.
-	 *
-	 * **Width.** The smallest width that holds the content. **Nothing is capped** — a width
-	 * you pass is used, whatever it is — so this is advice rather than a rule: keep a board
-	 * under about 1200 and inside the viewport, because a board wider than the room the
-	 * canvas has is read scaled down and a long line is one the eye loses its place in. On a
-	 * phone-sized viewport, make that session's boards *small* rather than merely narrower.
-	 * Very wide or very tall is two boards.
-	 *
-	 * With no `w`, a board is sized to its format and to the screen: 880 for a component
-	 * board — the measure prose actually wants — 720 for a `flow` document and 960 for a
-	 * deck, each capped by the viewport when there is one to measure.
-	 *
-	 * **Reading order.** DOM order is visual order, top to bottom. One column or two; where
-	 * two components share a row, write the left one first. The reader has the picture and
-	 * you have the file, and the two have to be the same document.
-	 *
-	 * **Lead with the finding, and be concise.** The first thing on a board is what you
-	 * concluded, said so it could be repeated; after that, short sentences, no preamble and
-	 * nothing said twice.
-	 *
-	 * **Give a board sections, and head them from this set** — Summary, Overview, Problem,
-	 * Research question, Method, Result, Todos, Next. Reading the section headings alone
-	 * should tell somebody what is on the board; that is what makes one scannable rather
-	 * than a wall of cards. Inside a section, a component's heading is a short plain phrase
-	 * saying what the box is — two or three words — never a chatty sentence and never the
-	 * finding itself, which belongs in the body where it can be read.
-	 *
-	 * Prefer a table to a paragraph about a comparison, a diagram to a paragraph about a
-	 * structure, and a number to an adjective — a third paragraph in one card is a table you
-	 * have not drawn yet. **And a diagram or a table has to stand on its own**: every axis
-	 * labelled with its unit, every column named in words, and nothing coded — no arms called
-	 * A/B/C/D, no metrics called M1/M2/M3, no bare decimals.
-	 *
-	 * **Write in plain language, always, unless you were asked for something else.** Technical
-	 * terms are welcome — precision is the point — and it is the sentence around them that
-	 * should be plain enough for a colleague outside the project. No metaphors, no clever
-	 * framing, no long sentence doing two jobs. Reporting research that means both: what was
-	 * done, what came out and what it means, then the numbers, the method and the names.
-	 *
-	 * Once the height is near twice the width, it is two boards.
-	 */
-	newBoard(options: {
-		title: string;
-		format?: "component" | "flow" | "slides";
-		w?: number;
-		h?: number;
-	}): Promise<string>;
-
-	/**
-	 * A **mirror**: a board that is a live view of a conversation.
-	 *
-	 *     await stage.mirror();                          // this conversation
-	 *     await stage.mirror({ of: "Vale", w: 560, h: 900 });
-	 *     // -> { path: "boards/mirrors/vale.html", of: "Vale", agent: "7f3a…" }
-	 *
-	 * Unlike every other board, its file never changes: it is a stub, and the turns arrive
-	 * in the browser from a transcript the app is already holding. So it costs no writes, it
-	 * cannot go stale, and **mirroring an agent you are not talking to is free** — which is
-	 * the point of `of`. Three mirrors side by side is what everyone is doing, without
-	 * opening three conversations.
-	 *
-	 * It scrolls, inside its own rectangle, and hands the scroll back to the canvas at the
-	 * ends. It is pinned to the newest turn until you scroll away from it, and says how many
-	 * arrived while you were reading further up. Below half zoom a board takes no pointer
-	 * events at all, so a mirror seen small is a glance and a mirror zoomed into is a
-	 * transcript.
-	 *
-	 * A **view, not a document**: you cannot retype a turn in it or drag one out. If you
-	 * want part of a conversation as material on the canvas, write it onto a board yourself.
-	 *
-	 * Attached and put on the canvas, camera unmoved, exactly as `newBoard` is. Asking twice
-	 * for the same agent hands back the board you already have rather than a second window.
-	 */
-	mirror(options?: { of?: string; w?: number; h?: number }): Promise<{ path: string; of: string; agent: string }>;
-
-	/**
-	 * **The user's own Chrome**, shared with the deck through the Decks browser extension.
-	 *
-	 * The extension attaches to one tab the user picks and dials this server; from then on
-	 * these calls drive that tab — logged in as the user, on the user's own screen. Nothing is
-	 * streamed back: there is no picture of the tab, because the user is looking at it. **`read`
-	 * is how you see the page**: its address, its title, and the accessibility tree, which
-	 * names every field with its label and value and every button with its name, and puts a
-	 * `[ref=e42]` on each. Use those names in `fill` and `click`. **`screenshot` is how you
-	 * look**: the picture comes back attached to the call, for what a tree cannot say.
-	 *
-	 *     const page = await stage.web.read();            // { url, title, snapshot }
-	 *     await stage.web.screenshot();                    // the picture, attached to the result
-	 *     await stage.web.fill("Email", "ada@example.org");
-	 *     await stage.web.select("Country", "Iceland");
-	 *     await stage.web.click("Next");
-	 *     await stage.web.submit("Create account");        // waits for the user's Allow
-	 *
-	 * **When a name will not do, use the reference beside it in the snapshot.** A real form
-	 * has fields with no label, several fields with the same label, and controls it hides and
-	 * paints over — so `fill`, `select` and `click` also take `{ ref: "e42" }`, or
-	 * `{ name: "Degree", nth: 2 }` to take the second of several (see `WebTarget`).
-	 *
-	 *     // - textbox [ref=e57]        ← the question is loose text beside it, so it has no name
-	 *     await stage.web.fill({ ref: "e57" }, "The purpose of this study is…");
-	 *
-	 * **A name that matches more than one thing is refused**, with both ways out in the
-	 * sentence — it never picks one for you. A reference is read from one page: after the tab
-	 * navigates, read again rather than reusing it.
-	 *
-	 * **Every call throws a sentence when no tab is shared** — pairing has not happened, the
-	 * laptop is asleep, the tab was closed — and that sentence is the thing to relay to the
-	 * user. Setting up is theirs to do, once: `pairing()` gives the code to paste into the
-	 * extension, and the status board (`board()`) shows the address and the code until a tab
-	 * arrives, then which tab, connected or not, and what you did.
-	 *
-	 * **`submit` asks the user first.** It puts the question on the status board and waits up
-	 * to two minutes for Allow or Deny; a `{ allowed: false }` result is a refusal, not an
-	 * error. Pass `{ ask: false }` only when the user has said they do not want to be asked
-	 * for this site. Passwords and codes are the user's to type, in the tab itself: do not ask
-	 * for them and do not fill them.
-	 */
-	web: {
-		/** Connected or not, which tab, the last actions, a pending question. */
-		status(): Promise<WebStatus>;
-		/** The pairing code and what to tell the user to do with it. */
-		pairing(): Promise<{ code: string; path: string; note: string }>;
-		/** A fresh code. The extension has to be paired again. */
-		repair(): Promise<{ code: string }>;
-		/** Make or find the status board, attach it, and put it on the canvas. Returns its path. */
-		board(): Promise<string>;
-		/** Navigate the shared tab. */
-		open(url: string): Promise<{ url: string; title: string }>;
-		/** The page as text. `truncated` when the tree was cut at 60,000 characters. */
-		read(): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
-		/**
-		 * A picture of the tab. **Attached to this call's result**, so you see it in the same
-		 * turn; also saved at `file` for a second look. The viewport by default, the whole page
-		 * with `full: true`. Chrome only paints a tab it is showing: if this times out, ask the
-		 * user to bring the shared tab to the front. `read` is still the cheaper way to learn
-		 * names and values; this is for what a tree cannot say — a thumbnail, a chart, a layout.
-		 */
-		screenshot(options?: { full?: boolean }): Promise<{ file: string; width: number; height: number }>;
-		/** Type into a field — by its label, or by a `{ ref }`. Replaces what was there. */
-		fill(field: WebTarget, text: string): Promise<{ field: string }>;
-		/** Choose an option in a dropdown, by the option's label or value. */
-		select(field: WebTarget, option: string): Promise<{ field: string; option: string }>;
-		/** Click a button, link, checkbox, radio, tab or piece of text — by its name, or by a `{ ref }`. */
-		click(what: WebTarget): Promise<{ clicked: string }>;
-		/** A key, by its name: "Enter", "Tab", "Escape", "ArrowDown". */
-		press(key: string): Promise<{ pressed: string }>;
-		/** Press the named button, or Enter, after the user allows it on the status board. */
-		submit(what?: WebTarget, options?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
-		/** Detach from the shared tab. The user can share again from the extension. */
-		stop(): Promise<void>;
-	};
-
-	/**
-	 * Set a board's size. Either dimension on its own is fine.
-	 *
-	 *     await stage.resize("boards/plan.html", { h: 1800 });
-	 *
-	 * A board's size is one number in its own `<meta name="board">`, and editing that tag
-	 * by hand works — but it is JSON inside an HTML attribute, and the write has to leave
-	 * every other byte alone. This does it, and refreshes the deck's record as part of the
-	 * write, so a resize is never a change the canvas has to be told about twice.
-	 */
+	fit(path: string, o?: { margin?: number }): Promise<{ path: string; w: number; h: number }>;
+	/** Set a size outright. */
 	resize(path: string, size: { w?: number; h?: number }): Promise<{ path: string; w: number; h: number }>;
-
-	/**
-	 * Size a board to its content — **the height, and only the height**.
-	 *
-	 *     await stage.fit("boards/plan.html");            // -> { path, w, h, content }
-	 *     await stage.fit("boards/plan.html", { margin: 80 });
-	 *
-	 * The height is the one number a board cannot state for itself: it is what the content came to
-	 * once it was laid out, and only the browser knows it. This reads the measurement the frame
-	 * reported and writes that, plus a margin (`margin`, 48 by default).
-	 *
-	 * **The width is left alone.** It is the author's, written in the board's own `<meta>`, and a
-	 * board pinned to a measured width reflows its text every time the measurement changes. Use
-	 * `stage.resize` when you mean to change a width.
-	 *
-	 * The measurement is taken in the frame showing the board, because that is the only
-	 * place a board is laid out. So **the board has to be on the canvas**: a board nobody
-	 * is showing has never been measured, and this says so rather than guessing. Write the
-	 * content, `show` it, then `fit` — which is the loop that replaces screenshotting a
-	 * board to find out whether it clips.
-	 */
-	fit(path: string, options?: { margin?: number }): Promise<{ path: string; w: number; h: number; content?: { w: number; h: number } }>;
-
-	/**
-	 * Say which boards carry your work. **This is how the deck knows who wrote what.**
-	 *
-	 *     await stage.report("boards/plan.html");
-	 *     await stage.report(["boards/plan.html", "boards/risks.html"]);
-	 *
-	 * Nothing watches which files you edit. You become a board's writer, and the board is listed
-	 * under a task you were handed, when you name it: `newBoard`, `fit` and a `show` of one board
-	 * all do, so the usual write, show, fit loop needs nothing more. `report` is for the rest: a
-	 * board you edited and left where it was, or several at once. It moves nothing.
-	 */
+	/** Name boards you edited without showing them, so they are listed as yours. */
 	report(path: string | string[]): Promise<{ reported: string[] }>;
-
-	// --- your context -------------------------------------------------------------
-
-	/**
-	 * Hold a board in context, and put it on the canvas. Returns the boards now held.
-	 *
-	 * Attaching does not put the source in your context — call `read` for that. It tells
-	 * the environment which boards you are working on: the rail lists them, a subagent
-	 * inherits them, and they appear on the canvas, because a board you are holding that
-	 * the user cannot see is a board they have no way of knowing about.
-	 */
-	attach(path: string | string[]): Promise<Board[]>;
-
-	/** Stop holding a board. It leaves the canvas with it. */
-	detach(path: string | string[]): Promise<Board[]>;
-
-	/** The boards you are holding. */
-	context(): Promise<Board[]>;
-
-	/** The boards on the canvas: what the user can see of your context. */
-	inPlay(): Promise<Board[]>;
-
-	// --- what the user sees -------------------------------------------------------
-
-	/**
-	 * Set what is on the canvas, and fit the camera to it.
-	 *
-	 * This is the narrowing gesture and the only thing that moves the camera: the canvas
-	 * becomes exactly what you name. Anything not already held is attached, because a
-	 * board you show is a board you are working on. To put everything back:
-	 * `await stage.show((await stage.context()).map((b) => b.path))`.
-	 *
-	 * **The camera is per conversation.** If the user is reading another chat, the canvas
-	 * does not move — your view is remembered and arrives, framed as you asked, the moment
-	 * they open yours. The result says which happened: `{ shown }` when it moved,
-	 * `{ shown, deferred }` when it is waiting. Either way the boards are in play, so this
-	 * is worth doing whether or not anyone is watching.
-	 */
-	show(path: string | string[], options?: ShowOptions): Promise<{ shown: string[]; deferred?: string }>;
-
-	/**
-	 * Take boards off the canvas, keeping them in your context.
-	 *
-	 * For when something has served its purpose and would only be clutter — the canvas is
-	 * closer to a slide than a desk.
-	 */
+	/** Take boards off the canvas, keeping them in your context. */
 	hide(path: string | string[]): Promise<void>;
-
-	/**
-	 * Move a board on the canvas.
-	 *
-	 * The move is written to **this conversation's** arrangement, so it is a real rearrangement for you
-	 * and does not move the board for anybody else — the same board can sit differently in two chats.
-	 */
+	/** Every board in the deck; `clipped` means content is past the edge. */
+	boards(): Promise<Board[]>;
+	/** A board's source. */
+	read(path: string): Promise<string>;
+	/** The room the canvas has, in CSS pixels. */
+	viewport(): Promise<{ width: number; height: number } | undefined>;
+	attach(path: string | string[]): Promise<Board[]>;
+	detach(path: string | string[]): Promise<Board[]>;
+	context(): Promise<Board[]>;
 	move(path: string, at: { x: number; y: number }): Promise<Board>;
-
-	/**
-	 * Where **your** canvas is looking — not where the user is, unless they are reading you.
-	 * Setting it follows the same rule as `show`: applied if you are on screen, remembered
-	 * against your chat if you are not.
-	 *
-	 * `animate: true` glides there rather than jumping — see `ShowOptions.animate`, and note that
-	 * it is a *request*: a reduced-motion setting on the reader's machine makes it instant, and
-	 * the call still answers normally, because a preference is not a failure.
-	 */
-	camera(): Promise<Camera>;
-	camera(at: Camera, options?: { animate?: boolean }): Promise<void>;
-
+	/** Bubbles with arrows pointing at `data-id`s you changed. Nothing is written to the board. `null` clears. */
+	annotate(path: string, marks: Array<{ to: string | { x: number; y: number }; label: string; tone?: "accent" | "ok" | "warn" | "danger" }> | null): Promise<unknown>;
+	toast(text: string): Promise<void>;
+	/** The URL of a board, for a Playwright screenshot. */
+	url(path: string): Promise<string>;
+	/** A file on disk -> the URL a board should embed. */
+	resolve(file: string): Promise<string>;
+	/** The boards on the canvas: what the person can see of your context. */
+	inPlay(): Promise<Board[]>;
+	/** Directories outside the deck that embeds may reach (from deck.json). */
+	roots(): Promise<Array<{ path: string; writable: boolean; exists: boolean }>>;
+	/** Where your canvas is looking, or move it. `zoom` 1 is life size. */
+	camera(): Promise<{ x: number; y: number; zoom: number }>;
+	camera(at: { x: number; y: number; zoom: number }, o?: { animate?: boolean }): Promise<void>;
 	/** Reload a board's frame, if you changed something the watcher cannot see. */
 	reload(path: string): Promise<void>;
-
-	/**
-	 * Put a labelled dot on a board, at board coordinates, in your colour — or
-	 * `null` to take it away. For pointing at something while you talk about it.
-	 */
+	/** A labelled dot on a board, at board coordinates; `null` removes it. */
 	cursor(path: string, at: { x: number; y: number } | null): Promise<void>;
-
+	/** A board that is a live view of a conversation: yours, or `of` another agent's. */
+	mirror(o?: { of?: string; w?: number; h?: number }): Promise<{ path: string; of: string; agent: string }>;
+	/** What is waiting in an agent's queue: yours, or another's. */
+	queue(agentId?: string): Promise<Array<{ from: string; fromName: string; task: string; boards: string[]; at: number }>>;
 	/**
-	 * Point at what you just changed: a bubble with a small arrow, on the canvas.
-	 *
-	 *     await stage.annotate("boards/plan.html", [
-	 *       { to: "goal", label: "rewrote this" },
-	 *       { to: "risk-auth", label: "and added this", tone: "ok" },
-	 *     ]);
-	 *     await stage.annotate("boards/plan.html", null);   // clear yours
-	 *
-	 * **Nothing is written to the board.** These live on the canvas and vanish, like
-	 * `cursor` — a board that has been annotated is byte-identical to one that has not, so
-	 * there is nothing to tidy up afterwards.
-	 *
-	 * `to` is a component's `data-id`, which is the point: the arrow is anchored to the
-	 * *thing*, so a component that moves takes its arrow with it. A `{ x, y }` is a board
-	 * coordinate, for pointing at somewhere rather than something.
-	 *
-	 * Use it when you have changed a board and want the reader's eye to land on where —
-	 * which `show({ highlight })` cannot do, because it frames exactly one component and
-	 * moves the camera to do it. Four at most, `tone` is `accent` | `ok` | `warn` | `danger`,
-	 * and labels are cut at 80 characters. Yours are cleared when you are next prompted.
-	 *
-	 * Returns how many were drawn: anything pointing at a `data-id` the board does not have
-	 * is dropped, so `{ annotated: 2, of: 3 }` means one of them missed.
+	 * The person's own Chrome, shared through the Decks extension: one tab, logged in as
+	 * them. `read` is how you see the page (address, title, and an accessibility tree that
+	 * names every field and button and gives each a `[ref=e42]`); `screenshot` is for what a
+	 * tree cannot say. Name a target by its label, or `{ ref: "e42" }`, or
+	 * `{ name: "Degree", nth: 2 }`; a name matching two things is refused. References die
+	 * when the tab navigates: read again. Every call throws a sentence when no tab is
+	 * shared; relay it. `submit` asks the person first and may return `allowed: false`.
+	 * Never ask for or fill passwords and codes.
 	 */
-	annotate(path: string, marks: Array<{ to: string | { x: number; y: number }; label: string; tone?: "accent" | "ok" | "warn" | "danger" }> | null): Promise<unknown>;
-
-	/** A short message in the corner of the canvas. Sparingly. */
-	toast(text: string): Promise<void>;
-
-	// --- who you are --------------------------------------------------------------
-
-	me: {
-		/** Your name in the chat list. Pick one and keep it. */
-		setName(name: string): Promise<void>;
-		/**
-		 * Your avatar. An emoji is one line; an SVG lets you draw your own face,
-		 * which is the intended use — keep it square, simple, and legible at 18px.
-		 */
-		setAvatar(avatar: { emoji: string } | { svg: string }): Promise<void>;
-		/**
-		 * What you are working on, in a few words. **Set these when you start on something and
-		 * clear them when you stop**, so the person watching can see what each agent is up to
-		 * without opening five conversations.
-		 *
-		 *     await stage.me.setTags(["panel-css", "measuring"]);
-		 *     // when the work moves on
-		 *     await stage.me.setTags(["panel-css", "writing-up"]);
-		 *     // finished
-		 *     await stage.me.setTags([]);
-		 *
-		 * **It replaces, it does not add.** So the list always says what is true now — which is
-		 * the only thing it is asked. Four at most, and each is slugged: lowercased, spaces to
-		 * hyphens, cut at 24 characters on a word boundary. It returns them **as stored**, so
-		 * `["Reading panel.css and measuring"]` comes back `["reading-panel-css-and"]` — read
-		 * the result if you care what it became.
-		 *
-		 * Short nouns beat sentences: `panel-css`, `e2e`, `thumbnails`. The name of the thing
-		 * you are working on, not a description of the work.
-		 */
-		setTags(tags: string[]): Promise<string[]>;
-		/**
-		 * Which project you are on. **One word, and it replaces what was there.**
-		 *
-		 *     await stage.me.setWorkspace("political-llm");
-		 *     await stage.me.setWorkspace(null);        // no project in particular
-		 *
-		 * Two agents are in the same workspace when they say the same word — there is no group to
-		 * create and nobody to ask. That is the whole of the feature: the panel clusters agents by
-		 * this, and the person looking at a list of fourteen of them can see which are on what.
-		 *
-		 * **Check `workspaces()` before you invent a name.** A second spelling of a project that
-		 * already exists is a second group, which is the failure this is most likely to have. The
-		 * call returns the slug it stored — slugged, lowercased, cut at 24 characters on a word
-		 * boundary — so `("Political LLM (round 20)")` comes back `"political-llm"`:
-		 *
-		 *     const mine = await stage.me.setWorkspace("Political LLM");  // "political-llm"
-		 *
-		 * It is a *location*, not a list: unlike `setTags` there is exactly one, so joining one
-		 * project is leaving another. `null`, or `""`, means you are in none. Set it once when you
-		 * start rather than at the top of every turn — a repeated write is a no-op on the wire, but
-		 * it is how you would overwrite a workspace the user moved you into deliberately.
-		 */
-		setWorkspace(workspace: string | null): Promise<string | null>;
-		get(): Promise<Identity>;
+	web: {
+		status(): Promise<{ paired: boolean; connected: boolean; tab?: { title: string; url: string }; pending?: { id: string; text: string }; closed?: string }>;
+		pairing(): Promise<{ code: string; path: string; note: string }>;
+		repair(): Promise<{ code: string }>;
+		board(): Promise<string>;
+		open(url: string): Promise<{ url: string; title: string }>;
+		read(): Promise<{ url: string; title: string; snapshot: string; truncated?: boolean }>;
+		screenshot(o?: { full?: boolean }): Promise<{ file: string; width: number; height: number }>;
+		fill(field: WebTarget, text: string): Promise<{ field: string }>;
+		select(field: WebTarget, option: string): Promise<{ field: string; option: string }>;
+		click(what: WebTarget): Promise<{ clicked: string }>;
+		press(key: string): Promise<{ pressed: string }>;
+		submit(what?: WebTarget, o?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
+		stop(): Promise<void>;
 	};
-
-	/**
-	 * The workspaces in use, biggest first, with their members and the boards they hold.
-	 *
-	 * This is how you find the project you are joining: what it is called, who else is already
-	 * there, and — the useful half — **what they are working from**. `boards` is every board at
-	 * least one member holds, the ones most of them hold first, so the first entry is the plan of
-	 * record and a new agent does not have to be told where it is.
-	 *
-	 * Agents in no workspace are not in this list at all; they are the ones `agents()` reports
-	 * with no `workspace`. A workspace disappears when its last member leaves it, because there
-	 * was never anything to delete.
-	 */
-	workspaces(): Promise<Workspace[]>;
-
-	/** The other agents on this deck, and what they are holding. */
-	agents(): Promise<AgentSummary[]>;
-
-	/**
-	 * Hand work to a subagent and wait for its report.
-	 *
-	 * The child is a fresh session on this same deck: its own context, its own row in
-	 * the chat list, the same canvas. It is *given the source* of the boards you hand
-	 * it — not a summary — so it starts from the same plan you are working to, and it
-	 * reports by changing those boards.
-	 *
-	 * Omit `boards` and it inherits the ones you are holding. Four at a time.
-	 *
-	 *     const done = await stage.delegate({
-	 *       name: "layout",
-	 *       task: "Rework the risks board so nothing overlaps at 1400x900.",
-	 *       boards: ["boards/risks.html"],
-	 *     });
-	 *     return done.report;
-	 */
-	delegate(spec: {
-		name?: string;
-		task: string;
-		boards?: string[];
-		/** "provider/model", if it should not use the default. */
-		model?: string;
-		/**
-		 * The runtime the child is: fixed at creation, exactly as the `+` button fixes it.
-		 * Omit it and the child gets the server's default. The one field that can never
-		 * change afterwards.
-		 */
-		kind?: "pi" | "claude" | "opencode" | "antigravity";
-		/**
-		 * The thinking level, on its own scale from the model. Whatever you ask, the child is
-		 * still created — a request a runtime cannot hold is a notice in your transcript, not
-		 * an error. Every runtime takes these; only the set offered per model varies.
-		 */
-		thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-		/**
-		 * How much the child asks before acting, from its runtime's own set.
-		 *
-		 * A request a runtime cannot hold is not an error: the child does the work on its
-		 * default mode and your transcript says so. pi has no modes at all, opencode offers
-		 * three of the four (not `plan`), antigravity two (`acceptEdits` and `plan`), Claude
-		 * all four.
-		 */
-		mode?: "manual" | "acceptEdits" | "plan" | "auto";
-	}): Promise<{ agent: string; name: string; report: string; boards: string[] }>;
-
-	/**
-	 * Hand work to an agent that **already exists**, and carry on without waiting.
-	 *
-	 * The counterpart to `delegate`, and the difference is who the work belongs to.
-	 * `delegate` creates an agent and blocks until it reports: right when the result is a
-	 * step in what *you* are doing. `send` puts an item in somebody else's queue and returns
-	 * at once: right when the work is *theirs* — they are holding that part of the deck,
-	 * they asked, or you have nothing to do with the answer.
-	 *
-	 *     await stage.send("Ada", {
-	 *       task: "The panel numbers on boards/rows.html are stale — remeasure and update them.",
-	 *       boards: ["boards/rows.html"],
-	 *     });
-	 *     // -> { queued: true, position: 1 }
-	 *
-	 * `to` is an id or a name from `stage.agents()`. The receiver starts it once it has been
-	 * **idle for a quiet period**, so it never cuts into a turn in progress, and it is handed
-	 * the board *source* at that moment — not at this one, so a board that changes while the
-	 * item waits is read as it then is. It arrives as a notice in their transcript
-	 * immediately, so nothing runs unannounced.
-	 *
-	 * Eight items per agent. Nothing is created, so it does not count against the subagent
-	 * limit, and sending to yourself is allowed — it is how you leave yourself a follow-up.
-	 */
-	send(to: string, work: {
-		task: string;
-		boards?: string[];
-		/**
-		 * Tell you when the work is done: the receiver's report lands in your transcript as
-		 * a notice when the item runs. Never a queued task — a task runs a turn of your own,
-		 * and two agents answering each other's reports is a conversation that never ends.
-		 * Off by default, because most sends are work you have nothing more to do with, and
-		 * a reply you did not ask for is an interruption.
-		 */
-		reply?: boolean;
-	}): Promise<{ queued: true; position: number }>;
-
-	/**
-	 * Make a new agent with no task, and return at once — for a `send` to follow.
-	 *
-	 *     const made = await stage.create({ name: "Survey", workspace: "political-llm", tags: ["survey-design"] });
-	 *     await stage.send(made.agent, { task: "…", reply: false });
-	 *
-	 * The gap between the other two: `delegate` makes an agent and **waits** for it, `send`
-	 * needs one that already exists. This makes one, idle, as a peer — not your child, so
-	 * nobody waits for it and it does not count against the subagent limit — and hands back
-	 * its id. Use it when nobody on the deck covers the topic. Check `stage.agents()` first:
-	 * a second agent on a topic one already holds is a second conversation to keep track of.
-	 *
-	 * It opens in your workspace, on your runtime, and on your model and account unless told
-	 * otherwise. Name a `kind` and it is that runtime instead, on that runtime's default model.
-	 * `model` is `provider/model`, as the picker lists them; a model the runtime cannot open
-	 * is a notice in your transcript and the agent stays on the default. `tags` are set as
-	 * its own, so the panel says what it is for.
-	 */
-	create(spec: {
-		name: string;
-		workspace?: string;
-		tags?: string[];
-		kind?: "pi" | "claude" | "opencode" | "antigravity";
-		model?: string;
-		thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
-		mode?: "manual" | "acceptEdits" | "plan" | "auto";
-	}): Promise<{ agent: string; name: string }>;
-
-	/** What is waiting for an agent: yours, or another's if you name it. */
-	queue(agentId?: string): Promise<QueuedWork[]>;
-
-	/**
-	 * The time where the person is.
-	 *
-	 *     await stage.now();
-	 *     // -> { iso: "2026-09-18T12:19:40-07:00", timezone: "America/Los_Angeles", offset: "UTC−7",
-	 *     //      weekday: "Friday", words: "Friday 18 September 2026, 12:19 (America/Los_Angeles, UTC−7)", epoch: 1789759180000 }
-	 *
-	 * The person sets their timezone once, in Settings, and everything they say about time is
-	 * in it: "this afternoon", "by Friday", "since yesterday". Your shell's `date` agrees with
-	 * this. Use it rather than the date your session started on, which a long conversation
-	 * outlives. `epoch` is the same instant as every timestamp the stage API returns.
-	 */
-	now(): Promise<{ iso: string; timezone: string; offset: string; weekday: string; words: string; epoch: number }>;
-
-	/**
-	 * Make a schedule: a task the deck makes on its own, at a time of day, on the days named.
-	 *
-	 *     await stage.schedule({
-	 *       name: "Morning papers",
-	 *       at: "09:00",                 // HH:MM, in the person's timezone
-	 *       days: [1, 2, 3, 4, 5],       // 0 is Sunday, 6 is Saturday
-	 *       workspace: "political-llm",  // the workspace it writes into
-	 *       task: "Write one board for each notable paper posted since yesterday.",
-	 *     });
-	 *
-	 * **Never convert a time yourself.** `at` and `days` are read in the person's own timezone
-	 * (`stage.now()` names it), which is what "every weekday at nine" means. When they name
-	 * another place, pass it and leave the hour as they said it:
-	 *
-	 *     await stage.schedule({ ..., at: "09:00", timezone: "Europe/London" });  // nine in London
-	 *
-	 * `timezone` is an IANA name. The schedule keeps it, so it stays nine in London through
-	 * both of London's clock changes, whatever the person's own zone does.
-	 *     // -> the schedule, with its id and `nextRunAt`
-	 *
-	 * Each firing becomes a task on the dashboard and goes through the dispatcher like any
-	 * other; the Cron tab lists the schedules. `task` is the work, written as an instruction
-	 * to the agent that will run it, and `boards` optionally names boards to hand over with
-	 * it. A time that is not HH:MM, a day outside 0 to 6, or a job with no text is refused
-	 * with a sentence.
-	 */
-	schedule(spec: {
-		name: string;
-		at: string;
-		days: number[];
-		/** An IANA zone for `at` and `days`. Leave it out for the person's own. */
-		timezone?: string;
-		workspace: string;
-		task: string;
-		boards?: string[];
-	}): Promise<{ id: string; name: string; at: string; days: number[]; timezone?: string; workspace: string; task: string; boards: string[]; nextRunAt: number }>;
-
-	/**
-	 * Make a dashboard task, and let the deck decide which agent takes it.
-	 *
-	 * The counterpart to `send` for work with no obvious owner: instead of naming an
-	 * agent, the text is handed to the dashboard's dispatcher rule, which picks by
-	 * workspace, then by who is idle and least loaded, and puts it in that agent's
-	 * queue. (A person may still name one with `agentId`, and their word wins.) The
-	 * task lives on the dashboard's workspace tab, where it can be cancelled, retried
-	 * and watched to done.
-	 *
-	 *     await stage.task({ text: "Remeasure the panel numbers across all boards.", workspace: "political-llm" });
-	 *     // -> { id: "…", state: "assigned" | "blocked", agentId?, agentName?, why }
-	 *
-	 * `blocked` is not an error: it is the rule's honest answer that nobody should do
-	 * it, with the reason in `why`, and a person can retry it from the panel. The
-	 * receiver runs it as a queued item, exactly as a `send` would.
-	 */
-	task(spec: {
-		text: string;
-		/** The workspace to stay inside, if any — the first filter the rule applies. */
-		workspace?: string;
-		/** Boards handed to the assigned agent with the task, for the brief. */
-		boards?: string[];
-		/** An agent named by a person; wins over the rule. */
-		agentId?: string;
-	}): Promise<{
-		id: string;
-		/** assigned — in a queue; blocked — nobody fit, see `why`; open — not yet decided. */
-		state: "open" | "assigned" | "blocked" | "running" | "done" | "failed" | "cancelled";
-		agentId?: string;
-		agentName?: string;
-		/** Where it went, or why nowhere. */
-		why: string;
-	}>;
+	now(): Promise<{ iso: string; timezone: string; words: string; epoch: number }>;
+	me: {
+		get(): Promise<{ name: string; avatar?: string; color: string; tags?: string[]; workspace?: string }>;
+		/** Pick a name and an avatar once, early. */
+		setName(name: string): Promise<void>;
+		setAvatar(avatar: { emoji: string } | { svg: string }): Promise<void>;
+		/** What you are working on, as up to four short nouns. Replaces the list; `[]` when you stop. */
+		setTags(tags: string[]): Promise<string[]>;
+		/** The project you are on, one word. Check `workspaces()` first and reuse a name. */
+		setWorkspace(workspace: string | null): Promise<string | null>;
+	};
+	workspaces(): Promise<Array<{ name: string; agents: Array<{ id: string; name: string }>; boards: string[] }>>;
+	agents(): Promise<Array<{ id: string; name: string; me: boolean; state: string; kind: string; tags: string[]; workspace?: string; queued: number }>>;
+	/** Make a subagent, hand it boards, and wait for its report. */
+	delegate(spec: { name?: string; task: string; boards?: string[]; model?: string; kind?: "pi" | "claude" | "opencode" | "antigravity"; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto" }): Promise<{ agent: string; name: string; report: string; boards: string[] }>;
+	/** Queue work for an agent that already exists, and carry on. `reply: true` brings its report back to you. */
+	send(to: string, work: { task: string; boards?: string[]; reply?: boolean }): Promise<{ queued: true; position: number }>;
+	/** Make a new idle agent, for a `send` to follow. */
+	create(spec: { name: string; workspace?: string; tags?: string[]; kind?: "pi" | "claude" | "opencode" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto" }): Promise<{ agent: string; name: string }>;
+	/** A dashboard task; the deck picks who does it. */
+	task(spec: { text: string; workspace?: string; boards?: string[]; agentId?: string }): Promise<{ id: string; state: string; why: string }>;
+	/** A repeating task. `at` is HH:MM in the person's timezone; never convert it yourself. */
+	schedule(spec: { name: string; at: string; days: number[]; timezone?: string; workspace: string; task: string; boards?: string[] }): Promise<{ id: string; nextRunAt: number }>;
 }
-
 declare const stage: Stage;

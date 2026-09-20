@@ -18,7 +18,7 @@ import type { ScheduleSpec } from "@decks/protocol";
  * Neither is reachable from a browser check — the e2e suite needs a model to make an agent
  * call a tool at all — and both are the part a model actually reads.
  */
-function toolOn(camera: Camera) {
+function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }) {
 	const root = mkdtempSync(join(tmpdir(), "decks-tool-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	writeFileSync(join(root, "boards", "plan.html"), `<!doctype html><title>plan</title><body class="board"></body>`);
@@ -36,14 +36,14 @@ function toolOn(camera: Camera) {
 	/** The workspace the fake session is in, so `me.setWorkspace` → `me.get` is one round trip. */
 	let room: string | undefined;
 	/** What a browser would have reported, if one were looking. */
-	const extents = new Map<string, { rev: number; w: number; h: number }>();
+	const extents = new Map<string, { rev: number; w: number; h: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
 	const worked: string[] = [];
 	const service = new StageService(deck, {
 		newMirror: () => "boards/mirrors/x.html",
 		newBoard: (options) => {
 			// The extension is the server's business and comes from the format — the stub
 			// mirrors the real table so a test can assert *which file* a format asked for.
-			const extension = options.format === "slides" ? ".slides.html" : options.format === "flow" ? ".md" : ".html";
+			const extension = options.format === "slides" ? ".slides.html" : ".html";
 			const path = `boards/${options.title.toLowerCase().replace(/\W+/g, "-")}${extension}`;
 			// The size it was asked for goes into the file, because the file is the only
 			// place a size lives — a stub that dropped it would make every width assertion
@@ -68,6 +68,11 @@ function toolOn(camera: Camera) {
 		 * their own width. So this answers whatever revision is asked for.
 		 */
 		awaitExtent: async (path) => extents.get(path),
+		reading: (path) => {
+			const { words, minFont, overflowX } = extents.get(path) ?? {};
+			return { ...(words === undefined ? {} : { words }), ...(minFont === undefined ? {} : { minFont }), ...(overflowX === undefined ? {} : { overflowX }) };
+		},
+		...(views ? { views: async () => views } : {}),
 		call: async () => ({ ok: true }),
 		connected: () => true,
 		place: () => undefined, broadcast: () => {},
@@ -124,6 +129,11 @@ function toolOn(camera: Camera) {
 		service,
 		/** What was actually written to disk, which is the only place a board's size lives. */
 		read: (path: string) => readFileSync(join(root, path), "utf8"),
+		/** For a test that needs a board of a format the stub's `newBoard` does not write. */
+		write: (path: string, html: string) => {
+			writeFileSync(join(root, path), html);
+			deck.refresh(path);
+		},
 		cleanup: () => rmSync(root, { recursive: true, force: true }),
 	};
 }
@@ -146,7 +156,7 @@ test("with no reading from a browser, it says nothing rather than making a numbe
 	assert.equal(/viewport \d+/.test(result.text), false, "no measurement, because nobody took one");
 	// The *advice* is still said, because it still applies: a board nobody is looking at is
 	// still a board somebody will read.
-	assert.match(result.text, /keep a board under 1200/);
+	assert.match(result.text, /One screen/);
 	assert.equal((await tool.run(`return (await stage.viewport()) ?? "none"`)).text, `"none"`);
 	cleanup();
 });
@@ -166,20 +176,20 @@ test("a default width is the format's own, or the screen when the screen is smal
 
 	const wide = toolOn({ x: 0, y: 0, zoom: 1, width: 1920, height: 1080 });
 	const onWide = await wide.tool.run(`return await stage.newBoard({ title: "Wide" })`);
-	assert.equal(widthOf(wide.read("boards/wide.html")), 880, "the format's own width, on a screen with room to spare");
-	assert.match(onWide.text, /board width 880/);
+	assert.equal(widthOf(wide.read("boards/wide.html")), 1000, "the format's own width, on a screen with room to spare");
+	assert.match(onWide.text, /board width 1000/);
 	wide.cleanup();
 
 	const phone = toolOn({ x: 0, y: 0, zoom: 1, width: 390, height: 844 });
 	const onPhone = await phone.tool.run(`return await stage.newBoard({ title: "Phone" })`);
 	assert.equal(widthOf(phone.read("boards/phone.html")), 390, "the screen, when the screen is smaller");
-	assert.match(onPhone.text, /board width 390 — keep a board under 1200/);
+	assert.match(onPhone.text, /board width 390\. One screen/);
 	phone.cleanup();
 
 	// A huge screen is not an invitation: the format's own width is still the answer.
 	const huge = toolOn({ x: 0, y: 0, zoom: 1, width: 3840, height: 2160 });
 	await huge.tool.run(`return await stage.newBoard({ title: "Huge" })`);
-	assert.equal(widthOf(huge.read("boards/huge.html")), 880);
+	assert.equal(widthOf(huge.read("boards/huge.html")), 1000);
 	huge.cleanup();
 
 	/*
@@ -421,6 +431,59 @@ test("fit takes the height from the content and leaves the width alone", async (
 	cleanup();
 });
 
+/*
+ * The margin is a component board's, and a page that took it scrolled.
+ *
+ * A flow board's height is not stored: the browser measures it and the deck takes that number.
+ * The `<meta>` tag is read by `board.js`, which makes it the body's height — so a fit that wrote
+ * the measurement plus 48 left every page 48px taller than the rectangle the canvas gave it, and
+ * a page brings its own CSS, so there was no `overflow: hidden` to hide the difference. What the
+ * reader got was a scrollbar on a board.
+ */
+test("a flow board is fitted to its content exactly, with no margin to scroll", async () => {
+	const { tool, deck, extents, write, read, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
+	write("boards/page.html", `<!doctype html><title>page</title><meta name="board" content='{"w":1000}' /><body class="board flow"></body>`);
+	const page = deck.board("boards/page.html");
+	assert.equal(page?.format, "flow");
+	extents.set("boards/page.html", { rev: page!.rev, w: 956, h: 604 });
+
+	await tool.run(`return await stage.fit("boards/page.html")`);
+	// The file, not the record: a flow board's height in the deck is the browser's to report,
+	// and the tag is what `board.js` makes the body's height. Those two are the pair that has
+	// to agree, and 604 + a margin is the document that scrolled.
+	assert.match(read("boards/page.html"), /"h":604/, "the measurement, and nothing added to it");
+	// The component board next door still gets its margin: there the height is stored, and the
+	// margin is the room a writer would have left below the last box.
+	const plan = deck.board("boards/plan.html");
+	extents.set("boards/plan.html", { rev: plan!.rev, w: 700, h: 1400 });
+	await tool.run(`return await stage.fit("boards/plan.html")`);
+	assert.equal(deck.board("boards/plan.html")?.h, 1448);
+	cleanup();
+});
+
+/*
+ * A view taller than the board is cut, and the check was measuring it against the width.
+ *
+ * A board's height is measured in the view it opens on, so a tab 125px taller than the board
+ * loses its last lines. The old limit was 0.8 of the board's *width*, which on a 1000px board
+ * is 800px: a 667px view on a 542px board passed, and the reader saw it cut.
+ */
+test("fit says when a view is taller than the board, not only when it is long", async () => {
+	const { tool, extents, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 }, {
+		controls: 3,
+		opening: 542,
+		views: [{ label: "Where it lives", h: 667, overflowX: 0 }],
+		errors: [],
+	});
+	const board = deck.board("boards/plan.html");
+	extents.set("boards/plan.html", { rev: board!.rev, w: 956, h: 542, words: 120 });
+
+	const result = await tool.run(`return await stage.fit("boards/plan.html")`);
+	assert.match(result.text, /after pressing "Where it lives" it is 667 px tall, where it opens at 542 px/);
+	assert.match(result.text, /min-height/, "and it says what to do about it");
+	cleanup();
+});
+
 test("fit still grows the height past a board its content has outgrown", async () => {
 	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 });
 	const board = deck.board("boards/plan.html");
@@ -462,12 +525,12 @@ test("a format reaches the service, and decides the file", async () => {
 	assert.ok(read("boards/the-plan-out-loud.slides.html"), "and the file is the one the format names");
 
 	const doc = await tool.run(`return await stage.newBoard({ title: "Notes", format: "flow" })`);
-	assert.match(doc.text.split("\n")[0] ?? "", /boards\/notes\.md/);
-	// And the width it was sized at is the *format's* default, not the blank shape's 1000.
-	assert.match(doc.text, /board width 720/);
+	assert.match(doc.text.split("\n")[0] ?? "", /boards\/notes\.html/);
+	// And the width it was sized at is the *format's* default: a page is 1000.
+	assert.match(doc.text, /board width 1000/);
 	assert.match(deck.text, /board width 960/, "a deck opens 1:1 with a slide's own layout");
 
-	// Nothing said is a component board, which is what every board was before formats.
+	// Nothing said is a page (`flow`), which is what an agent is taught to write.
 	const board = await tool.run(`return await stage.newBoard({ title: "Ordinary" })`);
 	assert.match(board.text.split("\n")[0] ?? "", /boards\/ordinary\.html/);
 	cleanup();
@@ -637,5 +700,29 @@ test("stage.me.setWorkspace hands the value to the session, and reports what cam
 	// Leaving it is an absence, and an absence has nothing to print — the tool's own sentence
 	// for a run that returned nothing, rather than the word `undefined` dressed up as JSON.
 	assert.equal((await tool.run(`return (await stage.me.get()).workspace`)).text, "(done)");
+	cleanup();
+});
+
+/*
+ * `fit` says what the browser read, so an agent can tell whether a board is one screen
+ * without taking a picture of it. Only what is over is named; a board inside every limit
+ * gets its numbers and is told there is nothing to fix.
+ */
+test("fit reports the height, the words, the smallest type and any spill, and names only what is over", async () => {
+	const { tool, deck, extents, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1440, height: 900 });
+	await tool.run(`await stage.newBoard({ title: "Plan", w: 1000 })`);
+	const board = deck.refresh("boards/plan.html");
+
+	extents.set("boards/plan.html", { rev: board!.rev, w: 1000, h: 600, words: 130, minFont: 15 });
+	const fine = await tool.run(`return await stage.fit("boards/plan.html")`);
+	assert.match(fine.text, /One screen: 600 px tall, 130 words, smallest text 15px\. Nothing to fix\./);
+
+	const again = deck.refresh("boards/plan.html");
+	extents.set("boards/plan.html", { rev: again!.rev, w: 1000, h: 1900, words: 640, minFont: 11, overflowX: 96 });
+	const over = await tool.run(`return await stage.fit("boards/plan.html")`);
+	assert.match(over.text, /1900 px tall, which is more than one screen/);
+	assert.match(over.text, /640 words/);
+	assert.match(over.text, /smallest text is 11px/);
+	assert.match(over.text, /96 px wider than the board/);
 	cleanup();
 });

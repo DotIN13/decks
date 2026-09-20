@@ -1,26 +1,53 @@
 ---
 name: board-authoring
-description: How to write a board — its format and lifecycle, the rules for components and in-place editing, visuals, diagrams and embeds, and the design-system tokens to style with. Read before answering on a board or building one with anything beyond cards and text.
+description: How to write a board. The default is a one-screen page you design yourself on the theme tokens; this also covers the positioned "component" format and its board.css vocabulary, diagrams, embeds and links. Read before building anything beyond a title, a visual and a few words.
 ---
 
 # Board authoring
 
-**Board Formats & Lifecycle**
+**One screen**
 
-- **Single HTML File:** Boards are standalone documents declaring their format via the `<body>`
-  class: `class="board"` (absolute positioned boxes), `class="board flow"` (single reflowing document
-  via `.doc`), or `class="reveal"` (slides named `*.slides.html`).
-- **Creation & Sizing:** Initialize via `stage.newBoard({ title, format })`. Every new board is
-  blank — a heading and nothing else — because a served shape decided too much of the board
-  before the writer had a sentence. Keep
-  boards under ~1200px wide (matching viewport) to avoid downscaling. Use `stage.fit(path)`
-  post-render to take the content's height; the width is left as it is, and
-  `stage.resize(path, { w, h })` sets a size directly.
-- **Layout Order:** Match DOM order strictly to visual reading order (top-to-bottom, left-to-right).
-  Standardize section headings using `<h3 class="text">` with approved tags: *Summary, Overview,
-  Problem, Research question, Method, Result, Todos, Next*.
+- A board is read in about ten seconds. One idea, the title is the finding as a sentence, one main
+  visual (diagram, chart, table, or two to four large numbers), about 120 words, five blocks at most.
+- No section headings (Summary, Method, Next), no background, no recap. About 1000 by 700 or smaller.
+  What does not fit is cut; a real second idea is a second board, linked with `<a href="other.html">`.
+- Body text 17px or larger, nothing under 14px, the title on one or two full-width lines.
+- Say each thing once. The title carries the finding and its number, so the body does not restate them: it shows what stands behind them. If the title already has the headline number, the large figures under it are other numbers. A caption never repeats a label, and a detail view never repeats the row that opened it. Write for a smart reader from outside the project. The first time a term of art, an abbreviation or an internal name appears (a KV cache, a t value, a file or variable name, an arm of an experiment), either replace it with plain words or say in a few words what it is. A statistic says how to read it, for example "t 2.3, where above 2 is unlikely to be chance". Before you finish, reread the board as someone who has never seen this project or paper: every name that came from its files (an arm, a scheme, a clause, a metric, a model's nickname, a statistic) is either replaced by what it does or explained once. The cheapest way costs no space: give the term a dotted underline and put its meaning in a hover or tap note, `<abbr title="what it means, in plain words">term</abbr>` with `abbr { text-decoration: underline dotted; cursor: help }`. A chart labels both axes with their units and says in its own title what to see in it; small multiples each carry their scale.
+- Plain words, no em dashes. Every axis, column and number says what it measures, with its unit.
 
-**Component Rules & In-Place Editing**
+**Depth behind a click**
+
+- Depth goes behind a click, not below the fold.
+  At rest the board shows the finding and its one visual.
+  What a reader may want next (the numbers behind a bar, the method, the runner-up, a definition, the second paper) is one click or hover away on the same screen: tabs, a row that opens its detail in a fixed panel, a toggle between two views, a value on hover, a filter on a table. Swap content in place rather than appending it, so an opened board is still one screen, and give each hidden view about the same word budget as the resting one. Controls are real <button> or <details> elements, look pressable, work offline, and the board makes sense before anything is pressed. Never hide the finding itself. If the person asked for several parts (say the claim, the method, the result and why it matters), none is dropped: the finding is what shows at rest and each other part is a view one click away. A <details> or a panel that opens must open into space the board already reserves, or over the content, so opening it does not make the board taller than one screen.
+- A pattern that works: a table whose rows are buttons, and one detail panel of fixed height beside
+  or under it that shows the chosen row. Another: two or three tabs over one chart area.
+- When the person asks for something to use as it stands (a message to send, a section of a protocol, a full list, code), the board holds that thing in full and nothing else. The one-screen rule limits what you add, not what they asked for.
+
+**The default format: a page you design**
+
+- `stage.newBoard({ title })` writes `<body class="board flow">` with `../lib/theme.css`, a `<style>`
+  block, a `<header data-id="title">` and an empty `<main data-id="main">`. Its height is measured,
+  so it cannot clip. Write your own CSS; lay out with flexbox or grid in normal flow.
+- `theme.css` is tokens only, light and dark: `--b-fg --b-muted --b-faint --b-bg --b-bg-deep
+  --b-bg-layer --b-border --b-border-strong --b-accent --b-accent-soft --b-ok --b-warn --b-danger
+  --b-radius --b-font --b-mono`. Never hardcode a colour the tokens cover.
+- Every top-level block of `<body>` gets a stable, meaningful `data-id`. `board.js` stays last.
+- Patterns that work: a highlighted row in a comparison table; before and after side by side; a
+  sequence diagram with three lifelines; a row of large numbers with a one-line label each; one
+  chart with a labelled axis and the winning series in the accent colour.
+- Then `stage.show(path)` and `stage.fit(path)`. `fit` reports the height, the word count, the
+  smallest type and any content wider than the board. Fix what it says is over; when it says
+  "One screen", stop.
+
+**Other formats, when asked for**
+
+- `format: "slides"`: a `.slides.html` reveal deck, one `<section>` per slide, 960 by 540.
+- `format: "component"`: `<body class="board">` with `../lib/board.css`, every component a direct
+  child of `<body>` with inline `left`, `top`, `width` on an 8px grid. The person can drag these
+  boxes. Size it in `<meta name="board">` and `stage.fit` it, because it clips otherwise.
+
+**Component rules (only for `format: "component"`)**
 
 - **Direct Children & IDs:** Every movable widget must be a direct child of `<body>`, styled with
   inline coordinates (`left`, `top`, `width` on an 8px grid), and assigned a semantic, stable
