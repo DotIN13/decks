@@ -155,7 +155,9 @@ export class DeckAgent {
 	 * being attached or shown, and taken out of play without leaving the context.
 	 */
 	private get playing(): string[] {
-		return this.canvases.boards(this.canvasId);
+		// The non-creating read: an agent nobody has given work to has no canvas, and asking
+		// what is on its canvas must not make one. Showing a board does (`canvasId`).
+		return this.canvas ? this.canvases.boards(this.canvas) : [];
 	}
 
 	/**
@@ -176,7 +178,7 @@ export class DeckAgent {
 	 * through `setPosition`, because what comes back here is a copy.
 	 */
 	private get places(): Record<string, { x: number; y: number }> {
-		return this.canvases.places(this.canvasId);
+		return this.canvas ? this.canvases.places(this.canvas) : {};
 	}
 
 	/** The canvas this conversation is working on, once it has needed one. */

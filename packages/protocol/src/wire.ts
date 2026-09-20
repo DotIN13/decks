@@ -20,6 +20,7 @@ import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
 import type { Schedule, ScheduleSpec, Task, TaskSpec } from "./tasks.ts";
 import type { WebStatus } from "./web.ts";
+import type { Canvas } from "./canvas.ts";
 export type ClientMessage =
 	| { type: "deck.open"; path: string }
 	| { type: "board.move"; path: string; x: number; y: number }
@@ -128,6 +129,24 @@ export type ClientMessage =
 	 * looking" — which is what it always claimed to mean.
 	 */
 	| { type: "camera.set"; camera: Camera; agentId?: string }
+	/**
+	 * Look at a canvas.
+	 *
+	 * Per browser, like the chat it is looking at: two windows on one deck can be on two
+	 * canvases. The answer is that canvas's `deck.state`, and opening it clears its changed
+	 * mark — which is the one write a look makes.
+	 */
+	| { type: "canvas.focus"; id: string }
+	| { type: "canvas.create"; name: string }
+	| { type: "canvas.rename"; id: string; name: string }
+	| { type: "canvas.remove"; id: string }
+	/** Put an agent to work on a canvas. What it has read stays with it; what it shows goes there. */
+	| { type: "canvas.use"; agentId: string; canvasId: string }
+	/** An arrow between two boards, drawn on the canvas rather than inside a board. */
+	| { type: "canvas.link"; id: string; from: string; to: string; label?: string }
+	| { type: "canvas.unlink"; id: string; from: string; to: string }
+	| { type: "canvas.group"; id: string; name: string; boards: string[] }
+	| { type: "canvas.ungroup"; id: string; name: string }
 	| { type: "agent.create"; parentId?: string; kind?: AgentKind }
 	| { type: "agent.focus"; id: string }
 	/**
@@ -247,6 +266,13 @@ export type ClientMessage =
 
 export type ServerMessage =
 	| { type: "deck.state"; deck: DeckState }
+	/**
+	 * Every canvas in the deck, and the one this browser is looking at.
+	 *
+	 * Sent whole rather than as a delta: a deck has a handful of canvases where it has
+	 * hundreds of boards, and the dashboard reads all of them to draw its cards.
+	 */
+	| { type: "canvases"; canvases: Canvas[]; focused?: string }
 	/**
 	 * What this install can run, and what to call it — sent on connect, and whenever a
 	 * client asks.

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { examplesDir, runtimeLib } from "@decks/runtime";
-import type { AgentKind, Board, Camera, ClientMessage, DeckState, ServerMessage, StageCall } from "@decks/protocol";
+import type { AgentKind, Board, Camera, Canvas, ClientMessage, DeckState, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { BoardService } from "./boards/service.ts";
 import { EvalTrust } from "./boards/eval-trust.ts";
@@ -627,6 +627,9 @@ export class App {
 		// A new browser starts on the conversation last opened anywhere, and moves on its own after.
 		if (view) view.focused = this.agents.looking()?.id;
 		reply({ type: "deck.state", deck: this.stageState() });
+		// And what canvases there are: the dashboard's cards, and the list the composer's
+		// `@` and the canvas switcher read.
+		reply({ type: "canvases", canvases: this.canvasList(), ...(view?.canvas ? { focused: view.canvas } : {}) });
 		/*
 		 * And what this install can run.
 		 *
@@ -770,6 +773,49 @@ export class App {
 	}
 
 	/**
+	 * The deck as one canvas sees it: its boards, in the places that canvas has put them.
+	 *
+	 * The same two halves as `stageState` — the arrangement, and writing down any place that had
+	 * to be worked out — with the canvas as the owner instead of a chat. A canvas that is gone
+	 * is the deck's own layout rather than an error: a stale tab asking for one should draw
+	 * something.
+	 */
+	canvasState(canvasId: string): DeckState {
+		const canvas = this.canvases.get(canvasId);
+		if (!canvas) return this.deck.state();
+		const seeded: Array<{ path: string; x: number; y: number }> = [];
+		const state = this.deck.state(this.canvases.places(canvas.id), (path, at) => seeded.push({ path, ...at }), this.canvases.boards(canvas.id));
+		for (const { path, x, y } of seeded) this.canvases.place(canvas.id, path, x, y);
+		return state;
+	}
+
+	/** Every canvas as the browser needs it, with the agents working on each. */
+	canvasList(): Canvas[] {
+		const working = new Map<string, string[]>();
+		for (const agent of this.agents.all()) {
+			const id = agent.canvas;
+			if (!id) continue;
+			const on = working.get(id);
+			if (on) on.push(agent.id);
+			else working.set(id, [agent.id]);
+		}
+		return this.canvases.list().map((canvas) => ({
+			id: canvas.id,
+			name: canvas.name,
+			boards: [...canvas.boards],
+			links: canvas.links.map((link) => ({ ...link })),
+			groups: canvas.groups.map((group) => ({ name: group.name, boards: [...group.boards] })),
+			changedAt: canvas.changedAt,
+			...(canvas.openedAt === undefined ? {} : { openedAt: canvas.openedAt }),
+			agents: working.get(canvas.id) ?? [],
+		}));
+	}
+
+	publishCanvases(): void {
+		this.send({ type: "canvases", canvases: this.canvasList() });
+	}
+
+	/**
 	 * One board as the focused stage sees it — the same resolution `stageState` does, for the one caller
 	 * that has the board already. A broadcast that carried the loader's copy instead would put the board
 	 * at the origin for everybody, because the loader's boards have no place of their own any more.
@@ -786,6 +832,14 @@ export class App {
 		if (message.type === "board.changed") {
 			if (message.removed) this.thumbs.forget(message.path);
 			else if (message.board) this.thumbs.changed(message.board);
+			/*
+			 * And the canvases holding it are news until somebody opens them. The mark is about
+			 * the board's *contents*, so it is set here — where every write to a board passes,
+			 * whoever made it — and not where boards are moved.
+			 */
+			const marked = this.canvases.holding(message.path);
+			for (const canvas of marked) this.canvases.changed(canvas.id);
+			if (marked.length > 0) queueMicrotask(() => this.publishCanvases());
 		}
 		this.hub?.each((view) => this.forView(message, view));
 	}
@@ -799,6 +853,19 @@ export class App {
 	 * A browser whose conversation was closed is moved to the registry's, which is the nearest row.
 	 */
 	private forView(message: ServerMessage, view: View): ServerMessage {
+		/*
+		 * A browser that has opened a canvas is sent that canvas's boards, whatever chat it is
+		 * on. This is the whole of the decoupling on the wire: the canvas decides the boards,
+		 * the chat decides the conversation, and one browser can change either on its own.
+		 */
+		if (view.canvas && this.canvases.get(view.canvas)) {
+			if (message.type === "deck.state") return { ...message, deck: this.canvasState(view.canvas) };
+			if (message.type === "canvases") return { ...message, focused: view.canvas };
+			if (message.type === "board.changed" && message.board) {
+				const placed = this.canvasState(view.canvas).boards.find((one) => one.path === message.path);
+				if (placed) return { ...message, board: { ...message.board, x: placed.x, y: placed.y } };
+			}
+		}
 		const shared = this.agents.looking();
 		if (view === this.viewing) return message;
 		const own = this.agents.get(view.focused);

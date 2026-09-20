@@ -1,4 +1,4 @@
-import type { AgentKind, Camera, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
+import type { AgentKind, Camera, Canvas, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
 import type { Registry } from "../agents/registry.ts";
 import type { BoardService } from "../boards/service.ts";
 import type { EvalTrust } from "../boards/eval-trust.ts";
@@ -8,6 +8,7 @@ import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../web/bridge.ts";
 import type { View } from "../ws.ts";
+import type { CanvasStore } from "../canvas/store.ts";
 
 /** How a frame answers the socket it came from — and only that socket. */
 export type Reply = (message: ServerMessage) => void;
@@ -94,6 +95,20 @@ export interface WireContext {
 	 * that is re-placed on every send chases whatever was moved last (see `Deck.arrange`).
 	 */
 	stageState(): DeckState;
+
+	/** The deck's canvases: what holds the boards (`canvas/store.ts`). */
+	readonly canvases: CanvasStore;
+	/**
+	 * The deck as one canvas sees it: its boards, in the places it has put them.
+	 *
+	 * The same seeding `stageState` does, written back onto the canvas rather than onto a
+	 * chat — a board with no place of its own is placed once, beside the boards already there.
+	 */
+	canvasState(canvasId: string): DeckState;
+	/** Every canvas as the browser needs it, with the agents working on each. */
+	canvasList(): Canvas[];
+	/** Say what canvases exist, to everyone, after one is made, renamed, joined or removed. */
+	publishCanvases(): void;
 
 	/** The camera a browser last reported, and the per-agent readings beside it. */
 	lastCamera: Camera;
