@@ -346,9 +346,16 @@ export function createStageTool(deps: {
 		throw new Error(sentence);
 	};
 
+	/**
+	 * The boards as **this agent** sees them: its own canvas, which is the one `stage.move` writes
+	 * to. Every read in this file goes through here, so a verb cannot quietly answer for somebody
+	 * else's arrangement.
+	 */
+	const here = () => service.boards(agent.id);
+
 	const stage: Stage = {
 		// --- reads ---------------------------------------------------------------
-		boards: async () => service.boards(),
+		boards: async () => here(),
 		resolve: async (file: string) => service.resolve(file),
 		url: async (path: string) => service.url(path, port),
 		/**
@@ -491,7 +498,7 @@ export function createStageTool(deps: {
 		report: async (path: string | string[]) => {
 			const paths = asList(path);
 			for (const one of paths) {
-				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
+				if (!here().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
 			}
 			for (const one of paths) agent.worked?.(one);
 			return { reported: paths };
@@ -501,7 +508,7 @@ export function createStageTool(deps: {
 		attach: async (path: string | string[]) => {
 			const wanted = asList(path);
 			for (const one of wanted) {
-				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
+				if (!here().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
 			}
 			// Most-recently-touched first: the boards just attached lead the list — the last one
 			// named is the most recent — and boards already held that are not re-attached keep
@@ -514,17 +521,17 @@ export function createStageTool(deps: {
 			// A board taken up is a board put on the canvas: attaching something the user
 			// then cannot see would make the rail the only evidence it happened.
 			agent.setInPlay([...agent.inPlay(), ...wanted]);
-			return service.boards().filter((board) => next.includes(board.path));
+			return here().filter((board) => next.includes(board.path));
 		},
 		detach: async (path: string | string[]) => {
 			const dropping = new Set(asList(path));
 			const next = agent.context().filter((held) => !dropping.has(held));
 			agent.setContext(next);
-			return service.boards().filter((board) => next.includes(board.path));
+			return here().filter((board) => next.includes(board.path));
 		},
 		inPlay: async () => {
 			const playing = agent.inPlay();
-			return service.boards().filter((board) => playing.includes(board.path));
+			return here().filter((board) => playing.includes(board.path));
 		},
 
 		// --- the canvas ------------------------------------------------------------
@@ -544,7 +551,7 @@ export function createStageTool(deps: {
 		show: async (path: string | string[], options?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }) => {
 			const paths = asList(path);
 			for (const one of paths) {
-				if (!service.boards().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
+				if (!here().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
 			}
 			agent.setInPlay(paths);
 			// One board named is the focusing gesture: "look at what I made". Several is arranging
@@ -838,7 +845,7 @@ export function createStageTool(deps: {
 	/** A board this deck has, by the path an agent uses; a sentence when it is not one. */
 	function boardPath(path: string): string {
 		const wanted = typeof path === "string" ? path.replace(/^\.?\//, "") : "";
-		if (!service.boards().some((board) => board.path === wanted)) {
+		if (!here().some((board) => board.path === wanted)) {
 			throw new Error(`No such board: ${String(path)}. Use the path from stage.boards(), like "boards/plan.html".`);
 		}
 		return wanted;

@@ -151,8 +151,16 @@ export class App {
 
 			},
 
-			// `stage.boards()` reads the arrangement the conversation is looking at, not the loader's list.
-			boards: () => this.stageState().boards,
+			/*
+			 * `stage.boards()` reads the arrangement **of the agent that asked** — the same canvas
+			 * `stage.move` writes to. Served from the conversation on screen instead, an agent
+			 * working while the person read another chat moved a board and read back the place it
+			 * had before, with the move itself correct on disk.
+			 *
+			 * No id is a board running its own code, which acts for the conversation in front of
+			 * the person (`stage/board-actor.ts`), so that case keeps the old answer.
+			 */
+			boards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
 
 			newBoard: ({ format, ...rest }) => this.boards.newBoard({ ...rest, ...(isBoardFormat(format) ? { format } : {}) }),
 			newMirror: (options) => this.boards.newMirror(options),

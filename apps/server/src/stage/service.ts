@@ -53,12 +53,19 @@ export interface StageHost {
 	 */
 	place(agentId: string, path: string, x: number, y: number): Board | undefined;
 	/**
-	 * Every board as this stage sees it — the arrangement, not the loader's zeroes.
+	 * Every board as one stage sees it — the arrangement, not the loader's zeroes.
 	 *
-	 * Optional, like `StageAgentHooks.positions`, so a host that does not arrange omits it and a test
-	 * can build one without a stage behind it. `StageService.boards` falls back to the deck's own list.
+	 * **Answered for the agent that asked.** A move is written on the caller's own canvas
+	 * (`place`), so a read served from whichever conversation the browser happens to be looking
+	 * at would tell an agent that its own move did not happen — which is what it did, until an
+	 * agent moved four boards while the person was reading another chat and `stage.boards()`
+	 * gave back all four places from before.
+	 *
+	 * Optional, like `StageAgentHooks.positions`, so a host that does not arrange omits it and a
+	 * test can build one without a stage behind it. `StageService.boards` falls back to the deck's
+	 * own list; no id means the conversation on screen, which is what a board's own code gets.
 	 */
-	boards?(): Board[];
+	boards?(agentId?: string): Board[];
 
 }
 
@@ -118,7 +125,7 @@ export class StageService {
 
 	// --- reads --------------------------------------------------------------------
 
-	boards(): Board[] {
+	boards(agentId?: string): Board[] {
 		const holders = this.host.agents();
 		/*
 		 * The host's arrangement when there is one, and the deck's own list when there is not.
@@ -127,7 +134,7 @@ export class StageService {
 		 * became per stage — so returning `deck.boards` here for a real app would tell every agent that
 		 * every board is at the origin, which is worse than saying nothing.
 		 */
-		return (this.host.boards?.() ?? this.deck.boards).map((board) => {
+		return (this.host.boards?.(agentId) ?? this.deck.boards).map((board) => {
 			// A measurement of an older revision is left off rather than reported: it is a
 			// number, and a number gets believed.
 			const content = this.host.extent(board.path, board.rev);
