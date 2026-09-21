@@ -47,6 +47,8 @@ export const canvas = {
 		const wanted = message.name.trim();
 		const name = !wanted || wire.canvases.nameTaken(wanted) ? wire.canvases.newName() : wanted;
 		const made = wire.canvases.create({ name, ...(message.workspace ? { workspace: message.workspace } : {}) });
+		// Made by the person, so it is not news to them: the mark is for what changed while they were elsewhere.
+		wire.canvases.opened(made.id, made.changedAt);
 		wire.publishCanvases();
 		reply({ type: "deck.state", deck: wire.canvasState(made.id) });
 		reply({ type: "canvases", canvases: wire.canvasList(), focused: made.id });

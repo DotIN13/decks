@@ -218,6 +218,11 @@ say("…and the app stays on the dashboard, where the new heading appears", awai
 await settle(page, 600);
 const heading = await page.evaluate(() => [...document.querySelectorAll(".canvas-shelf .canvas-ws h2")].map((h) => h.textContent));
 say("…the shelf now heads it by the slug the server made", heading.includes("zeta-check"), JSON.stringify(heading));
+const fresh = await page.evaluate(() => {
+	const card = document.querySelector('.canvas-ws[data-workspace="zeta-check"] .canvas-card');
+	return { dot: card?.querySelector(".canvas-dot") !== null, meta: card?.querySelector(".canvas-meta")?.textContent };
+});
+say("…and the canvas you just made is not marked as changed since you looked", fresh.dot === false && fresh.meta?.includes("nothing new"), JSON.stringify(fresh));
 await page.locator('.pill button[aria-label$="the boards panel"]').first().click().catch(() => {});
 await page.evaluate(() => { location.hash = "#/boards"; });
 await settle(page, 600);
