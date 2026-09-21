@@ -966,6 +966,11 @@
 		cursor: pointer;
 		font: inherit;
 		font-size: 12px;
+		/* The filter chips' own easing (`.chipbtn`), so the two kinds of button in one bar move alike. */
+		transition:
+			background-color 120ms ease,
+			border-color 120ms ease,
+			color 120ms ease;
 	}
 	.canvas-new > svg {
 		color: var(--muted);
