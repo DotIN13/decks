@@ -95,14 +95,13 @@ await page.waitForSelector(".popover", { timeout: 5000 });
 await page.locator(".popover .canvas-menu-remove").click();
 await settle(page, 200);
 const asked = await page.evaluate(() => ({
-	q: document.querySelector(".popover .canvas-menu-q")?.textContent,
-	sub: document.querySelector(".popover .canvas-menu-sub")?.textContent,
-	buttons: [...document.querySelectorAll(".popover .canvas-btn")].map((b) => b.textContent?.trim()),
+	verbs: [...document.querySelectorAll(".popover [data-row] .lb")].map((lb) => lb.textContent?.trim()),
+	buttons: [...document.querySelectorAll(".popover .canvas-menu-ask .canvas-btn")].map((b) => b.textContent?.trim()),
 }));
-say("Remove asks once, in place, and says the boards stay", (await sent("canvas.remove")).length === 0 && asked.q === "Remove Canvas camera?" && asked.sub === "There is nothing on it." && JSON.stringify(asked.buttons) === JSON.stringify(["Cancel", "Remove"]), JSON.stringify(asked));
-await page.locator(".popover .canvas-btn", { hasText: "Cancel" }).click();
+say("Remove asks once, in its own row, with the other verbs still there", (await sent("canvas.remove")).length === 0 && JSON.stringify(asked.verbs) === JSON.stringify(["Rename", "Move to…"]) && JSON.stringify(asked.buttons) === JSON.stringify(["Cancel", "Remove"]), JSON.stringify(asked));
+await page.locator(".popover .canvas-menu-ask .canvas-btn", { hasText: "Cancel" }).click();
 await settle(page, 200);
-say("…Cancel goes back to the verbs, with the menu still open", (await page.locator(".popover .canvas-menu-remove").count()) === 1);
+say("…Cancel puts the row back, with the menu still open", (await page.locator(".popover .canvas-menu-remove").count()) === 1 && (await page.locator(".popover .canvas-menu-ask").count()) === 0);
 await page.locator(".popover .canvas-menu-remove").click();
 await settle(page, 200);
 await page.locator(".popover .canvas-menu-yes").click();

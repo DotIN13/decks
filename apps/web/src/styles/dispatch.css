@@ -1208,28 +1208,22 @@
 		border-top: 1px solid var(--line);
 		border-radius: 0 0 7px 7px;
 	}
-	/* The question Remove turns the menu into. */
-	.canvas-menu-confirm {
-		padding: 4px 6px 2px;
+	/* The question Remove turns its own row into: the icon stays, the word becomes two buttons. */
+	.canvas-menu-ask {
+		display: grid;
+		align-items: center;
+		gap: 5px;
+		grid-template-columns: 16px 1fr 1fr;
+		padding: 3px 6px;
 	}
-	.canvas-menu-q {
-		margin: 0 0 2px;
-		font-size: 12.5px;
-		font-weight: 600;
-	}
-	.canvas-menu-sub {
-		margin: 0 0 10px;
-		color: var(--muted);
-		font-size: 11.5px;
-	}
-	.canvas-menu-acts {
-		display: flex;
-		justify-content: flex-end;
-		gap: 6px;
+	.canvas-menu-ask > .ic {
+		display: grid;
+		color: var(--color-danger);
+		place-items: center;
 	}
 	.canvas-btn {
-		height: 28px;
-		padding: 0 12px;
+		height: 26px;
+		padding: 0 8px;
 		border: 1px solid var(--line-strong);
 		border-radius: var(--control-radius, 7px);
 		background: var(--panel);
