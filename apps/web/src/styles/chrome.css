@@ -593,6 +593,13 @@
 		outline-offset: -1px;
 	}
 
+	/* Armed: asked once, held visible in danger red until the second press or the menu closes. */
+	:is(.popover, .rowlist) .row-act > .close[data-armed="true"] {
+		opacity: 1;
+		background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+		color: var(--color-danger);
+	}
+
 	/*
 	 * A button at the end of its travel: still there, plainly not pressable.
 	 *

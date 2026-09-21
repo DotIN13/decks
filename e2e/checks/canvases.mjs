@@ -190,6 +190,8 @@ await settle(page, 800);
 let made = await sent("canvas.create");
 say("+ on a heading makes a canvas in that workspace, named after it while that name is free", made.length === 1 && made[0].workspace === "political-llm" && made[0].name === "political-llm", JSON.stringify(made));
 say("…and the app went to it", await page.evaluate(() => location.hash.startsWith("#/canvas/")), await page.evaluate(() => location.hash));
+/* A real stage, for the switcher at the end: the pill draws its canvas segment only on a canvas the server focused. */
+const realStage = await page.evaluate(() => location.hash);
 
 await home();
 await feed({ type: "canvases", canvases });
@@ -226,6 +228,22 @@ await page.locator('.pill button[aria-label$="the boards panel"]').first().click
 await page.evaluate(() => { location.hash = "#/boards"; });
 await settle(page, 600);
 say("the Boards tab's bar carries the same New workspace button", (await page.locator(".dispatch-pane-boards .dispatch-gallery-bar .canvas-new").count()) === 1);
+
+// --- the pill's canvas switcher: a bin on every row, asked twice --------------------------
+await page.evaluate((hash) => { location.hash = hash; }, realStage);
+await settle(page, 1200);
+await clearSent();
+await page.locator('.pill button[aria-label^="Canvases — currently"]').click();
+await page.waitForSelector(".popover .row-act", { timeout: 5000 });
+const pillRow = page.locator(".popover .row-act", { hasText: "Zeta Check" });
+await pillRow.hover();
+await pillRow.locator(".close").click({ force: true });
+await settle(page, 200);
+say("the switcher's rows carry a bin that asks once", (await sent("canvas.remove")).length === 0 && (await pillRow.locator(".close").getAttribute("data-armed")) === "true");
+await pillRow.locator(".close").click({ force: true });
+await settle(page, 300);
+removed = await sent("canvas.remove");
+say("…and removes on the second press, the canvas of the row it is on", removed.length === 1 && typeof removed[0].id === "string" && removed[0].id !== realStage.slice("#/canvas/".length).split("?")[0], JSON.stringify(removed));
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

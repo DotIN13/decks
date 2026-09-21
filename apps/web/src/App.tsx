@@ -1763,6 +1763,7 @@ export function App() {
 					canvases={state.canvases}
 					onOpenCanvas={(id) => openCanvas(id)}
 					onNewCanvas={() => newCanvas(state.focused ?? "")}
+					onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
 					onRenameAgent={(id, name) => send({ type: "agent.rename", id, name })}
 					mode={mode()}
 					onMode={(next) => {

@@ -16,6 +16,7 @@ import FileText from "lucide-solid/icons/file-text";
 import Pencil from "lucide-solid/icons/pencil";
 import Brush from "lucide-solid/icons/brush";
 import Hand from "lucide-solid/icons/hand";
+import Trash2 from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { AgentMark } from "./agent-marks.tsx";
@@ -648,6 +649,8 @@ export function AgentPill(props: {
 	canvases?: Canvas[];
 	onOpenCanvas?: (id: string) => void;
 	onNewCanvas?: () => void;
+	/** Remove a canvas from the deck, from the switcher's rows. Boards stay. */
+	onRemoveCanvas?: (id: string) => void;
 	/** How many tasks want a person: the badge on Home, and on the Boards tab. */
 	wantsYou?: number;
 	/** How many boards an agent named since the person last read them: the dot on the Boards tab. */
@@ -769,6 +772,7 @@ export function AgentPill(props: {
 						onRename={(name) => props.onRenameCanvas?.(name)}
 						{...(props.onOpenCanvas ? { onOpen: props.onOpenCanvas } : {})}
 						{...(props.onNewCanvas ? { onNew: props.onNewCanvas } : {})}
+						{...(props.onRemoveCanvas ? { onRemove: props.onRemoveCanvas } : {})}
 					/>
 				)}
 			</Show>
@@ -1187,7 +1191,29 @@ function CanvasSegment(props: {
 	onRename: (name: string) => void;
 	onOpen?: (id: string) => void;
 	onNew?: () => void;
+	onRemove?: (id: string) => void;
 }) {
+	/*
+	 * A bin on every row, asked twice, as the panel's canvas rows ask: the first press arms
+	 * it and the second removes. One armed at a time — arming another disarms the first —
+	 * and closing the menu forgets it.
+	 */
+	const [armed, setArmed] = createSignal<string | undefined>();
+	let waiting: ReturnType<typeof setTimeout> | undefined;
+	const disarm = () => {
+		clearTimeout(waiting);
+		setArmed(undefined);
+	};
+	const pressBin = (id: string) => {
+		if (armed() !== id) {
+			clearTimeout(waiting);
+			setArmed(id);
+			waiting = setTimeout(disarm, 4000);
+			return;
+		}
+		disarm();
+		props.onRemove?.(id);
+	};
 	return (
 		<span class="pill-canvas">
 			<EditableName
@@ -1210,6 +1236,7 @@ function CanvasSegment(props: {
 					placement="bottom-start"
 					label="Canvases"
 					class="w-[248px]"
+					onOpenChange={disarm}
 					trigger={(api) => (
 						<button
 							type="button"
@@ -1228,8 +1255,10 @@ function CanvasSegment(props: {
 				>
 					<For each={props.canvases}>
 						{(canvas) => (
+							<div class="row-act">
 							<button
 								type="button"
+								class="min-w-0 flex-1"
 								role="menuitem"
 								data-row
 								data-flat="true"
@@ -1246,6 +1275,22 @@ function CanvasSegment(props: {
 									<span class="pill-canvas-news" aria-label="Something new here" />
 								</Show>
 							</button>
+							<Show when={props.onRemove}>
+								<button
+									type="button"
+									class="close"
+									data-armed={armed() === canvas.id ? "true" : undefined}
+									title={armed() === canvas.id ? `Press again to remove ${canvas.name} — its boards stay` : `Remove ${canvas.name}`}
+									aria-label={armed() === canvas.id ? `Remove ${canvas.name} — press again to confirm` : `Remove ${canvas.name}`}
+									onClick={(event) => {
+										event.stopPropagation();
+										pressBin(canvas.id);
+									}}
+								>
+									<Icon of={Trash2} size={12} />
+								</button>
+							</Show>
+							</div>
 						)}
 					</For>
 					<Show when={props.onNew}>
