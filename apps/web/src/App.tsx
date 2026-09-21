@@ -239,21 +239,23 @@ export function App() {
 		 * open of that canvas landed at one percent with the boards in the corner.
 		 */
 		if (wasOnStage && state.canvas && state.canvas !== place.canvas) morph.keep(state.canvas, camera());
-		if (place.canvas !== state.canvas) {
-			arriving = { id: place.canvas, at: Date.now() };
-			send({ type: "canvas.focus", id: place.canvas });
-		} else {
-			/*
-			 * The same room: the camera is not touched.
-			 *
-			 * `landCanvas` moves the view to where this canvas was left, which is right on
-			 * arrival and wrong on every other visit to this line — switching agent is a place
-			 * change now (`?agent=`), and an agent switch that re-landed the canvas would
-			 * overrule the per-agent camera `focusAgent` has just restored. It is a no-op
-			 * unless a canvas we asked for is still waiting for its boards.
-			 */
-			landCanvas();
-		}
+		/*
+		 * Whether this is an *arrival*, which is what decides if the camera lands.
+		 *
+		 * Two ways in: the canvas changed, or the stage did — coming back from the dashboard
+		 * is an arrival even when it is the same room, because going Home flew the camera
+		 * into that room's card (`morph.leave`) and left it there. Without this the second
+		 * opening of a canvas showed its boards shrunk into the corner the card had been in,
+		 * which is the camera nobody moved rather than the camera going wrong.
+		 *
+		 * And *not* an arrival when only `?agent=` changed. A canvas is not re-landed because
+		 * you addressed somebody else: the boards did not move, and a camera that jumped on
+		 * every switch would be the room moving under the conversation.
+		 */
+		const room = place.canvas !== state.canvas;
+		if (room || !wasOnStage) arriving = { id: place.canvas, at: Date.now() };
+		if (room) send({ type: "canvas.focus", id: place.canvas });
+		else landCanvas();
 		/*
 		 * The room is the place; the agent is who the composer addresses in it. Told to the
 		 * server only when it is somebody else, so opening a canvas with the same agent on

@@ -12,7 +12,7 @@
  * - thrown hard at the right edge it is put away behind a tab, and the tab brings it back;
  * - Escape on a stage with nothing selected goes Home.
  */
-import { open, ready, say, settle, socket, stageCanvasId, WEB } from "../harness.mjs";
+import { open, ready, say, settle, socket, stageCanvasId, still, WEB } from "../harness.mjs";
 
 // `boards: false`: the harness opens on the stage for the rest of the suite; this check is
 // about the landing, so it goes to the front door itself.
@@ -156,11 +156,36 @@ say("the bar's word is the dispatcher's on the dashboard", (await page.locator("
 say("no board document was torn down by the switch", (await documents()) === before, `${before} -> ${await documents()}`);
 
 await page.goBack();
-await settle(page, 600);
+await settle(page, 900);
+await still(page);
 say("Back after Home is the stage again", (await hash()) === stageHash && (await surface()) === "stage", `${await hash()}`);
 await page.keyboard.press("Escape");
 await settle(page, 600);
 say("Escape on a stage with nothing selected goes Home", (await surface()) === "dispatch", `${await hash()}`);
+
+/*
+ * Opened from its card, left, and opened from its card again.
+ *
+ * Going Home from a canvas flies the camera *into* that canvas's card on the shelf, so the
+ * second opening has to fly it back out. It did not: the same room was not treated as an
+ * arrival, so the camera stayed shrunk into the corner the card had been in and the boards
+ * came back as a stamp in the top left. The two views are compared, because "it opened" and
+ * "it opened where it was" are different claims.
+ */
+const view = () => page.evaluate(() => document.querySelector(".world")?.getAttribute("style")?.replace(/\s+/g, " ") ?? "");
+await page.locator('.pill [role="tab"]', { hasText: "Canvases" }).click();
+await settle(page, 500);
+await page.locator("[data-canvas-id]").first().click();
+await settle(page, 900);
+await still(page);
+await ready(page);
+const firstOpen = await view();
+await page.click('[aria-label="Home: back to the dashboard"]');
+await settle(page, 900);
+await page.locator("[data-canvas-id]").first().click();
+await settle(page, 900);
+await still(page);
+say("a canvas opened from its card twice looks the same both times", (await view()) === firstOpen, `${firstOpen} -> ${await view()}`);
 
 // The composer, dragged off its home, and still there after a reload.
 const box = await page.locator(".dockbox").boundingBox();
