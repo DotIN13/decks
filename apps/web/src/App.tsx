@@ -360,7 +360,7 @@ export function App() {
 	 * Named after the workspace when it is the first canvas in it — the room a project opens
 	 * with is the project's — and "Canvas n" otherwise, out of the way of every name in use.
 	 */
-	const newCanvas = (open?: string, workspace?: string) => {
+	const newCanvas = (open?: string, workspace?: string, o?: { stay?: boolean }) => {
 		// By slug, as the server tells names apart: "Political LLM" and `political-llm` are one name.
 		const key = (name: string) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 		const taken = new Set(state.canvases.map((canvas) => key(canvas.name)));
@@ -371,8 +371,10 @@ export function App() {
 			while (taken.has(`canvas-${n}`)) n += 1;
 			name = `Canvas ${n}`;
 		}
-		// Always opened, so the name can be typed where it will be read; with whoever you were talking to.
-		openingWith = open ?? state.focused ?? "";
+		// Opened, so the name can be typed where it will be read, with whoever you were talking to —
+		// unless the caller says to stay: a new workspace is made from the dashboard, and its first
+		// canvas appearing under a new heading is the whole point of making it there.
+		openingWith = o?.stay ? undefined : (open ?? state.focused ?? "");
 		send({ type: "canvas.create", name, ...(workspace ? { workspace } : {}) });
 	};
 	/** A stage, from anywhere. Switching agent while already on one replaces the entry, so five presses are one Back. */
@@ -1519,7 +1521,7 @@ export function App() {
 							onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
 							workspaces={workspaceNames(state.canvases, state.identities)}
 							/* Named as typed and filed under the server's slug of it, which is what the heading will say. */
-							onNewWorkspace={(name) => newCanvas(undefined, name)}
+							onNewWorkspace={(name) => newCanvas(undefined, name, { stay: true })}
 							chats={visibleChats()}
 							contexts={state.contexts}
 							tasks={state.tasks}
