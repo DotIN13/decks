@@ -154,9 +154,16 @@
 		max-width: 180px;
 		overflow: hidden;
 		padding: 0 9px;
+		/* No outline: it is the name of the room, read a hundred times and pressed once. The
+		   fill on hover is what says it can be pressed; the border is transparent rather than
+		   gone so the chip keeps its height. */
+		border-color: transparent;
 		color: var(--fg);
 		font-weight: 600;
 		text-overflow: ellipsis;
+	}
+	.pill-name:hover {
+		border-color: transparent;
 	}
 	/*
 	 * The agent's name is a chip like the canvas's, and 12px like the line it is in: it sits
