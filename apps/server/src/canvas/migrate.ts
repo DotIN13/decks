@@ -27,6 +27,9 @@ export interface ChatToMigrate {
 	lastAt?: number;
 }
 
+/** A board's size, for deciding whether a set of places is an arrangement. */
+export type SizeOf = (path: string) => { w: number; h: number } | undefined;
+
 export interface CanvasPlan {
 	name: string;
 	/**
@@ -54,7 +57,7 @@ export interface CanvasPlan {
  * arranged boards it has since hidden. That is not a loss worth thirty empty cards: those
  * places are almost all the old auto-layout's, and the boards are still in the deck.
  */
-export function planCanvases(chats: readonly ChatToMigrate[]): CanvasPlan[] {
+export function planCanvases(chats: readonly ChatToMigrate[], size?: SizeOf): CanvasPlan[] {
 	const groups = new Map<string, ChatToMigrate[]>();
 	for (const chat of chats) {
 		const key = chat.workspace ? `w:${chat.workspace}` : `c:${chat.id}`;
@@ -86,9 +89,52 @@ export function planCanvases(chats: readonly ChatToMigrate[]): CanvasPlan[] {
 			shared: key.startsWith("w:"),
 			name: key.startsWith("w:") ? key.slice(2) : (ordered[0]?.name ?? "Canvas"),
 			boards,
-			places,
+			places: arranged(places, size) ? places : {},
 			members: members.map((chat) => chat.id),
 		});
 	}
 	return plans;
+}
+
+/** What a board is assumed to be when the deck cannot say: the shell's own size. */
+const ASSUMED = { w: 880, h: 400 };
+
+/**
+ * How much of its own bounding box a canvas's boards have to cover to count as arranged.
+ *
+ * On the live deck this separates by a factor of thirty-eight. Every canvas somebody
+ * actually laid out fills 91% or more of the rectangle around it. Three do not:
+ * `cross-interviewer` puts three boards down 563,460 px of empty canvas, `decks` four down
+ * 192,468 and `political-llm` five down 153,236 — 0%, 0.1% and 2.4%.
+ */
+const ARRANGED = 0.1;
+
+/**
+ * Whether these places are somebody's arrangement or the leftovers of the old auto-layout.
+ *
+ * Before canvases, every chat was given a place for nearly every board in the deck — rows of
+ * three down a single column, which on nine hundred boards is a million pixels tall. A chat
+ * holding four of them kept four places out of that column, so the four boards it had up sat
+ * tens of thousands of pixels apart with nothing in between. Migrating that faithfully is a
+ * canvas that opens at one percent with its boards in the corner, and there is nothing in it
+ * to preserve: nobody chose those spots.
+ *
+ * Measured by area rather than by span, because a big canvas is legitimately big: two hundred
+ * boards in tidy rows reach a hundred thousand pixels down and still fill half of it. What
+ * marks the auto-layout's leavings is the *emptiness*, not the size.
+ *
+ * Under two boards there is no spread to speak of, and a single remembered place is worth
+ * keeping.
+ */
+function arranged(places: Record<string, { x: number; y: number }>, size?: SizeOf): boolean {
+	const boxes = Object.entries(places).map(([path, at]) => ({ ...at, ...(size?.(path) ?? ASSUMED) }));
+	if (boxes.length < 2) return true;
+	const left = Math.min(...boxes.map((box) => box.x));
+	const top = Math.min(...boxes.map((box) => box.y));
+	const right = Math.max(...boxes.map((box) => box.x + box.w));
+	const bottom = Math.max(...boxes.map((box) => box.y + box.h));
+	const hull = (right - left) * (bottom - top);
+	if (hull <= 0) return true;
+	const covered = boxes.reduce((sum, box) => sum + box.w * box.h, 0);
+	return covered / hull >= ARRANGED;
 }

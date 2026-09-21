@@ -394,6 +394,8 @@ export class Registry {
 				...(record.legacyPositions ? { positions: record.legacyPositions } : {}),
 				lastAt: record.lastAt,
 			})),
+			// Sizes, so the plan can tell an arrangement from the old auto-layout's leavings.
+			(path) => this.deck.board(path),
 		);
 		for (const plan of plans) {
 			/*

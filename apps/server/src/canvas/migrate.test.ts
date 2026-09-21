@@ -85,3 +85,32 @@ test("two chats of the same size break the tie on the one used most recently", (
 	]);
 	assert.deepEqual(plans[0]?.places["boards/one.html"], { x: 2, y: 2 });
 });
+
+/*
+ * The old deck-wide auto-layout, as it actually sat on the live deck.
+ *
+ * `cross-interviewer` held three boards and had places for them 280,000 px apart, because
+ * those places were three rows out of a column containing every board in the deck. Kept,
+ * the canvas opens at one percent with its boards in the corner; there is nothing in it
+ * worth keeping, because nobody chose it.
+ */
+test("places that are the auto-layout's leavings are dropped, and an arrangement is not", () => {
+	const size = () => ({ w: 1000, h: 700 });
+	const spread = planCanvases(
+		[{ id: "a", name: "Wren", inPlay: ["one.html", "two.html", "three.html"], positions: { "one.html": { x: 0, y: 0 }, "two.html": { x: 0, y: 281_000 }, "three.html": { x: 0, y: 563_000 } } }],
+		size,
+	);
+	assert.deepEqual(spread[0]?.places, {}, "three boards down half a million pixels is not an arrangement");
+	assert.deepEqual(spread[0]?.boards, ["one.html", "two.html", "three.html"], "and the boards stay on the canvas");
+
+	const laid = planCanvases(
+		[{ id: "b", name: "Iris", inPlay: ["one.html", "two.html", "three.html"], positions: { "one.html": { x: 0, y: 0 }, "two.html": { x: 1_160, y: 0 }, "three.html": { x: 2_320, y: 0 } } }],
+		size,
+	);
+	assert.deepEqual(Object.keys(laid[0]?.places ?? {}).sort(), ["one.html", "three.html", "two.html"], "three boards in a row is");
+});
+
+test("one remembered place is kept, because there is no spread to judge", () => {
+	const plans = planCanvases([{ id: "a", name: "Wren", inPlay: ["one.html"], positions: { "one.html": { x: 9_000, y: 400_000 } } }], () => ({ w: 1000, h: 700 }));
+	assert.deepEqual(plans[0]?.places, { "one.html": { x: 9_000, y: 400_000 } });
+});
