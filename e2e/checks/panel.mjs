@@ -15,6 +15,24 @@
 import { open, say, settle, zoom, ZOOM_IN_PAGE } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 900 });
+/* What the browser sends back, for the one press here that has to reach the server: the × on a row. */
+await page.addInitScript(() => {
+	if (window.top !== window.self) return;
+	const Real = window.WebSocket;
+	window.__sent = [];
+	window.WebSocket = class extends Real {
+		constructor(...args) {
+			super(...args);
+			const send = this.send.bind(this);
+			this.send = (data) => {
+				window.__sent.push(String(data));
+				return send(data);
+			};
+		}
+	};
+});
+await page.reload({ waitUntil: "load" });
+await settle(page, 2000);
 try {
 	const inset = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--inset-left").trim());
 	const mounted = () => page.locator("[data-inset='left']").count();
@@ -165,7 +183,37 @@ try {
 		swap === null || (swap.before.dot === "1" && swap.before.bin === "0" && swap.after.dot === "0" && swap.after.bin === "1"),
 		JSON.stringify(swap),
 	);
-	say("…and nothing under the cursor moves", swap === null || swap.before.name === swap.after.name, JSON.stringify(swap));
+	/* A row on the canvas carries a hide as well, right beside the bin, and that column
+	   comes out of the name when the row is approached: the dot's swap for the bin is still in
+	   place, and the name ends clear of the × by the row's own gap. */
+	const beside = await (async () => {
+		const row = page.locator(".board-act:has(.dot)").first();
+		if ((await row.count()) === 0) return null;
+		await row.hover();
+		await page.waitForTimeout(220);
+		const laid = await row.evaluate((el) => {
+			const x = el.querySelector(".board-hide")?.getBoundingClientRect();
+			const bin = el.querySelector(".board-del").getBoundingClientRect();
+			const name = el.querySelector(".nm").getBoundingClientRect();
+			return x ? { shows: getComputedStyle(el.querySelector(".board-hide")).opacity === "1", gap: Math.round(bin.left - x.right), level: Math.round(x.top) === Math.round(bin.top), clear: Math.round(x.left - name.right) } : { missing: true };
+		});
+		return laid;
+	})();
+	say("a row on the canvas has a hide right beside its bin, level with it", beside === null || (beside.shows && beside.gap === 2 && beside.level), JSON.stringify(beside));
+	say("…and the name ends clear of it", beside === null || beside.clear >= 6, JSON.stringify(beside));
+	say("…which is the only thing the approach costs the name", swap === null || swap.after.name < swap.before.name, JSON.stringify(swap));
+	const hid = await (async () => {
+		const row = page.locator(".board-act:has(.board-hide)").first();
+		if ((await row.count()) === 0) return null;
+		await page.evaluate(() => { window.__sent = []; });
+		await row.hover();
+		await row.locator(".board-hide").click();
+		await page.waitForTimeout(250);
+		const sent = await page.evaluate(() => window.__sent.map((raw) => JSON.parse(raw)).filter((message) => message.type === "board.hide"));
+		await page.mouse.move(700, 500);
+		return sent;
+	})();
+	say("…and one press takes the board off the canvas, no arming", hid === null || (hid.length === 1 && typeof hid[0].path === "string"), JSON.stringify(hid));
 
 	/*
 	 * And the name clears the bin on the rows that have no dot to reserve its column for.

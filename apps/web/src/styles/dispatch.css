@@ -260,7 +260,9 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 2px 0 4px;
+		/* 4px above, not 2: the pane scrolls from the bar's top edge, and the search field's focus
+		   ring is 3px wide — at 2px the ring's top line was cut off. */
+		padding: 4px 0;
 	}
 	.dispatch-filters {
 		display: flex;
@@ -966,10 +968,23 @@
 		cursor: pointer;
 		font: inherit;
 		font-size: 12px;
+		/* The filter chips' own easing (`.chipbtn`), so the two kinds of button in one bar move alike. */
+		transition:
+			background-color 120ms ease,
+			border-color 120ms ease,
+			color 120ms ease;
 	}
-	.canvas-new:hover {
-		border-color: var(--color-accent);
-		color: var(--color-accent);
+	.canvas-new > svg {
+		color: var(--muted);
+	}
+	/* Pressed or hovered, it fills a shade rather than turning blue: it is a plain button, not a link. */
+	.canvas-new:hover,
+	.canvas-new[aria-expanded="true"] {
+		background: var(--line);
+	}
+	.canvas-new:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
 	}
 	.canvas-cards {
 		display: grid;
@@ -1149,12 +1164,30 @@
 	.canvas-menu [data-row] > .lb {
 		font-weight: 400;
 	}
+	/*
+	 * One line each, so the icon sits on the label's centre rather than its first line.
+	 *
+	 * The shared row starts its icon at the top with a pixel of padding, which is right for
+	 * a row with a note under its label and 1.5px high for one without.
+	 */
+	.canvas-menu [data-row] {
+		row-gap: 0;
+		align-items: center;
+	}
+	.canvas-menu [data-row] > .ic {
+		display: grid;
+		height: 18px;
+		grid-row: auto;
+		padding-top: 0;
+		place-items: center;
+	}
 	.canvas-menu-chev {
 		margin-left: auto;
 		color: var(--faint);
 	}
-	.canvas-menu-remove,
-	.canvas-menu-remove > .ic {
+	/* Red, on both the word and the icon: the shared row colours its label and icon itself, so
+	   this has to outrank `:is(.popover, .rowlist) [data-row] > .lb`. */
+	.popover.canvas-menu .canvas-menu-remove > :is(.lb, .ic) {
 		color: var(--color-danger);
 	}
 	/* The way back from the list: a heading you can press, in the note's voice. */
@@ -1182,28 +1215,22 @@
 		border-top: 1px solid var(--line);
 		border-radius: 0 0 7px 7px;
 	}
-	/* The question Remove turns the menu into. */
-	.canvas-menu-confirm {
-		padding: 4px 6px 2px;
+	/* The question Remove turns its own row into: the icon stays, the word becomes two buttons. */
+	.canvas-menu-ask {
+		display: grid;
+		align-items: center;
+		gap: 5px;
+		grid-template-columns: 16px 1fr 1fr;
+		padding: 3px 6px;
 	}
-	.canvas-menu-q {
-		margin: 0 0 2px;
-		font-size: 12.5px;
-		font-weight: 600;
-	}
-	.canvas-menu-sub {
-		margin: 0 0 10px;
-		color: var(--muted);
-		font-size: 11.5px;
-	}
-	.canvas-menu-acts {
-		display: flex;
-		justify-content: flex-end;
-		gap: 6px;
+	.canvas-menu-ask > .ic {
+		display: grid;
+		color: var(--color-danger);
+		place-items: center;
 	}
 	.canvas-btn {
-		height: 28px;
-		padding: 0 12px;
+		height: 26px;
+		padding: 0 8px;
 		border: 1px solid var(--line-strong);
 		border-radius: var(--control-radius, 7px);
 		background: var(--panel);

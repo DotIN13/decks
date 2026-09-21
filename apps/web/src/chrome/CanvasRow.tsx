@@ -1,5 +1,4 @@
 import type { Canvas } from "@decks/protocol";
-import Frame from "lucide-solid/icons/frame";
 import Trash2 from "lucide-solid/icons/trash-2";
 import { createSignal, onCleanup, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
@@ -81,7 +80,8 @@ export function CanvasRow(props: {
 					press();
 				}}
 			>
-				<Icon of={Frame} size={13} class="flex-none text-faint" />
+				{/* The same little box a board row carries, empty: a canvas has no picture, but it is the same kind of row. */}
+				<span class="board-thumb" aria-hidden="true" />
 				<span class="nm">{props.canvas.name}</span>
 				<Show when={news()}>
 					{/* The boards row's own mark, in its own 20px slot: the × covers it on hover, and the heading's + sits over it. */}

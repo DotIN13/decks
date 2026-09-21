@@ -95,14 +95,13 @@ await page.waitForSelector(".popover", { timeout: 5000 });
 await page.locator(".popover .canvas-menu-remove").click();
 await settle(page, 200);
 const asked = await page.evaluate(() => ({
-	q: document.querySelector(".popover .canvas-menu-q")?.textContent,
-	sub: document.querySelector(".popover .canvas-menu-sub")?.textContent,
-	buttons: [...document.querySelectorAll(".popover .canvas-btn")].map((b) => b.textContent?.trim()),
+	verbs: [...document.querySelectorAll(".popover [data-row] .lb")].map((lb) => lb.textContent?.trim()),
+	buttons: [...document.querySelectorAll(".popover .canvas-menu-ask .canvas-btn")].map((b) => b.textContent?.trim()),
 }));
-say("Remove asks once, in place, and says the boards stay", (await sent("canvas.remove")).length === 0 && asked.q === "Remove Canvas camera?" && asked.sub === "There is nothing on it." && JSON.stringify(asked.buttons) === JSON.stringify(["Cancel", "Remove"]), JSON.stringify(asked));
-await page.locator(".popover .canvas-btn", { hasText: "Cancel" }).click();
+say("Remove asks once, in its own row, with the other verbs still there", (await sent("canvas.remove")).length === 0 && JSON.stringify(asked.verbs) === JSON.stringify(["Rename", "Move to…"]) && JSON.stringify(asked.buttons) === JSON.stringify(["Cancel", "Remove"]), JSON.stringify(asked));
+await page.locator(".popover .canvas-menu-ask .canvas-btn", { hasText: "Cancel" }).click();
 await settle(page, 200);
-say("…Cancel goes back to the verbs, with the menu still open", (await page.locator(".popover .canvas-menu-remove").count()) === 1);
+say("…Cancel puts the row back, with the menu still open", (await page.locator(".popover .canvas-menu-remove").count()) === 1 && (await page.locator(".popover .canvas-menu-ask").count()) === 0);
 await page.locator(".popover .canvas-menu-remove").click();
 await settle(page, 200);
 await page.locator(".popover .canvas-menu-yes").click();
@@ -191,6 +190,8 @@ await settle(page, 800);
 let made = await sent("canvas.create");
 say("+ on a heading makes a canvas in that workspace, named after it while that name is free", made.length === 1 && made[0].workspace === "political-llm" && made[0].name === "political-llm", JSON.stringify(made));
 say("…and the app went to it", await page.evaluate(() => location.hash.startsWith("#/canvas/")), await page.evaluate(() => location.hash));
+/* A real stage, for the switcher at the end: the pill draws its canvas segment only on a canvas the server focused. */
+const realStage = await page.evaluate(() => location.hash);
 
 await home();
 await feed({ type: "canvases", canvases });
@@ -214,15 +215,35 @@ await page.keyboard.press("Enter");
 await settle(page, 800);
 made = await sent("canvas.create");
 say("New workspace makes its first canvas, named as typed and filed under the name", made.length === 1 && made[0].workspace === "Zeta Check" && made[0].name === "Zeta Check", JSON.stringify(made));
-say("…and the app went to it", await page.evaluate(() => location.hash.startsWith("#/canvas/")), await page.evaluate(() => location.hash));
+say("…and the app stays on the dashboard, where the new heading appears", await page.evaluate(() => location.hash.startsWith("#/canvases")), await page.evaluate(() => location.hash));
 await settle(page, 600);
-await home();
 const heading = await page.evaluate(() => [...document.querySelectorAll(".canvas-shelf .canvas-ws h2")].map((h) => h.textContent));
 say("…the shelf now heads it by the slug the server made", heading.includes("zeta-check"), JSON.stringify(heading));
+const fresh = await page.evaluate(() => {
+	const card = document.querySelector('.canvas-ws[data-workspace="zeta-check"] .canvas-card');
+	return { dot: card?.querySelector(".canvas-dot") !== null, meta: card?.querySelector(".canvas-meta")?.textContent };
+});
+say("…and the canvas you just made is not marked as changed since you looked", fresh.dot === false && fresh.meta?.includes("nothing new"), JSON.stringify(fresh));
 await page.locator('.pill button[aria-label$="the boards panel"]').first().click().catch(() => {});
 await page.evaluate(() => { location.hash = "#/boards"; });
 await settle(page, 600);
 say("the Boards tab's bar carries the same New workspace button", (await page.locator(".dispatch-pane-boards .dispatch-gallery-bar .canvas-new").count()) === 1);
+
+// --- the pill's canvas switcher: a bin on every row, asked twice --------------------------
+await page.evaluate((hash) => { location.hash = hash; }, realStage);
+await settle(page, 1200);
+await clearSent();
+await page.locator('.pill button[aria-label^="Canvases — currently"]').click();
+await page.waitForSelector(".popover .row-act", { timeout: 5000 });
+const pillRow = page.locator(".popover .row-act", { hasText: "Zeta Check" });
+await pillRow.hover();
+await pillRow.locator(".close").click({ force: true });
+await settle(page, 200);
+say("the switcher's rows carry a bin that asks once", (await sent("canvas.remove")).length === 0 && (await pillRow.locator(".close").getAttribute("data-armed")) === "true");
+await pillRow.locator(".close").click({ force: true });
+await settle(page, 300);
+removed = await sent("canvas.remove");
+say("…and removes on the second press, the canvas of the row it is on", removed.length === 1 && typeof removed[0].id === "string" && removed[0].id !== realStage.slice("#/canvas/".length).split("?")[0], JSON.stringify(removed));
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

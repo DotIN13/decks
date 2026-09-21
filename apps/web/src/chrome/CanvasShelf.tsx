@@ -267,14 +267,14 @@ export function CanvasShelf(props: CanvasShelfProps) {
  * *Rename* hands back to the card, which opens its own name. *Move to…* is a disclosure
  * (`aria-expanded`, so the press does not close the menu) onto the list of workspaces, the
  * current one checked, *No workspace* last and *New workspace…* under a rule — the same list
- * the agent window's picker shows. *Remove* asks once, in place: the menu becomes the
- * question, with Cancel and Remove as two buttons, rather than a row that changed its own
- * words and had to be pressed twice. Boards stay in the deck either way, and the question
- * says so, because that is the one thing a person about to press Remove wants to know.
+ * the agent window's picker shows. *Remove* asks once, in its own row: the row becomes
+ * Cancel and Remove, with the other verbs still where they were, rather than a row that
+ * changed its own words and had to be pressed twice. Boards stay in the deck either way.
  */
 function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: () => void; onMove: (workspace: string | null) => void; onRemove: () => void }) {
-	const [view, setView] = createSignal<"menu" | "move" | "new" | "confirm">("menu");
+	const [view, setView] = createSignal<"menu" | "move" | "new">("menu");
 	const [wanted, setWanted] = createSignal("");
+	const [asking, setAsking] = createSignal(false);
 	let dismiss: (() => void) | undefined;
 	const pick = (workspace: string | null) => {
 		if ((props.canvas.workspace ?? null) !== workspace) props.onMove(workspace);
@@ -286,19 +286,15 @@ function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: () 
 		props.onMove(name);
 		dismiss?.();
 	};
-	const boards = () => {
-		const n = props.canvas.boards.length;
-		if (n === 0) return "There is nothing on it.";
-		return n === 1 ? "Its board stays in the deck." : `Its ${n} boards stay in the deck.`;
-	};
 	return (
 		<Popover
 			placement="bottom-end"
-			class="canvas-menu w-[224px]"
+			class="canvas-menu w-[188px]"
 			label={`${props.canvas.name}: rename, move or remove`}
 			onOpenChange={() => {
 				setView("menu");
 				setWanted("");
+				setAsking(false);
 			}}
 			trigger={(api) => {
 				dismiss = () => {
@@ -340,12 +336,37 @@ function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: () 
 							<Icon of={ChevronRight} size={12} class="canvas-menu-chev" />
 						</span>
 					</button>
-					<button type="button" data-row role="menuitem" data-keep-open class="canvas-menu-remove" onClick={() => setView("confirm")}>
-						<span class="ic">
-							<Icon of={Trash2} size={13} />
-						</span>
-						<span class="lb">Remove</span>
-					</button>
+					<Show
+						when={asking()}
+						fallback={
+							<button type="button" data-row role="menuitem" data-keep-open class="canvas-menu-remove" onClick={() => setAsking(true)}>
+								<span class="ic">
+									<Icon of={Trash2} size={13} />
+								</span>
+								<span class="lb">Remove</span>
+							</button>
+						}
+					>
+						{/* The row becomes the question, in its own place: the other verbs stay where they were. */}
+						<div class="canvas-menu-ask" role="group" aria-label={`Remove ${props.canvas.name}?`}>
+							<span class="ic">
+								<Icon of={Trash2} size={13} />
+							</span>
+							<button type="button" class="canvas-btn" onClick={() => setAsking(false)}>
+								Cancel
+							</button>
+							<button
+								type="button"
+								class="canvas-btn canvas-btn-danger canvas-menu-yes"
+								onClick={() => {
+									props.onRemove();
+									dismiss?.();
+								}}
+							>
+								Remove
+							</button>
+						</div>
+					</Show>
 				</Match>
 				<Match when={view() === "move"}>
 					<div class="canvas-menu-list" role="group" aria-label="Move to workspace">
@@ -373,27 +394,6 @@ function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: () 
 				</Match>
 				<Match when={view() === "new"}>
 					<WorkspaceField value={wanted()} onInput={setWanted} onCreate={create} autofocus />
-				</Match>
-				<Match when={view() === "confirm"}>
-					<div class="canvas-menu-confirm" role="alertdialog" aria-label={`Remove ${props.canvas.name}?`}>
-						<p class="canvas-menu-q">Remove {props.canvas.name}?</p>
-						<p class="canvas-menu-sub">{boards()}</p>
-						<div class="canvas-menu-acts">
-							<button type="button" class="canvas-btn" onClick={() => setView("menu")}>
-								Cancel
-							</button>
-							<button
-								type="button"
-								class="canvas-btn canvas-btn-danger canvas-menu-yes"
-								onClick={() => {
-									props.onRemove();
-									dismiss?.();
-								}}
-							>
-								Remove
-							</button>
-						</div>
-					</div>
 				</Match>
 			</Switch>
 		</Popover>
