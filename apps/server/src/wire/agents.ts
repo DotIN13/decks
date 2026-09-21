@@ -28,6 +28,8 @@ export const agents = {
 		const room = wire.viewing?.canvas;
 		const agent = wire.agents.create({
 			... (message.parentId ? { parentId: message.parentId } : {}),
+			// From under a workspace heading: the agent is in that project, and stands in its first room.
+			...(message.workspace ? { workspace: message.workspace } : {}),
 			... (message.kind ? { kind: message.kind } : {}),
 			... (room && wire.canvases.get(room) ? { canvas: room } : {}),
 		});

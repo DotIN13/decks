@@ -149,7 +149,8 @@ export type ClientMessage =
 	| { type: "canvas.unlink"; id: string; from: string; to: string }
 	| { type: "canvas.group"; id: string; name: string; boards: string[] }
 	| { type: "canvas.ungroup"; id: string; name: string }
-	| { type: "agent.create"; parentId?: string; kind?: AgentKind }
+	/** A new agent — in a workspace, when made from under its heading. */
+	| { type: "agent.create"; parentId?: string; kind?: AgentKind; workspace?: string }
 	| { type: "agent.focus"; id: string }
 	/**
 	 * Take an agent off the list.

@@ -1968,6 +1968,7 @@ export function App() {
 					/* The room's project, on a stage: the workspace of the canvas you are looking at leads both lists. */
 					hereWorkspace={surface() === "stage" ? stageCanvas()?.workspace : undefined}
 					onFocusAgent={visitAgent}
+					onNewAgent={(workspace) => send({ type: "agent.create", ...(workspace ? { workspace } : {}) })}
 					/* The Canvases tab: the rooms, under their projects, and a way between them. */
 					canvases={state.canvases}
 					currentCanvas={surface() === "stage" ? state.canvas : undefined}

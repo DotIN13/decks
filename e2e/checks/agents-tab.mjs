@@ -262,7 +262,7 @@ const panel = await page.evaluate(() => ({
  * each sorted for itself.
  */
 say("three sections, most urgent first", JSON.stringify(panel.sections) === JSON.stringify(["wants:1", "working:2", "quiet:2"]), JSON.stringify(panel.sections));
-say("…named in sentence case", JSON.stringify(panel.labels) === JSON.stringify(["Wants you1", "Working2", "Quiet2"]), JSON.stringify(panel.labels));
+say("…named in sentence case, with no count on the heading", JSON.stringify(panel.labels) === JSON.stringify(["Wants you", "Working", "Quiet"]), JSON.stringify(panel.labels));
 /*
  * A finished turn stays in Quiet with the green ring rather than being promoted: "come and
  * read this" is not the same demand as "answer this now".
@@ -294,7 +294,7 @@ say("an agent with nothing to say gets a shorter row", basil.h < ada.h - 20, `Ba
  * word is boxed, so the sentence had two other things saying it.
  */
 say("…and dormant beats idle, in one word", basil.dormant === "true" && basil.state?.includes("Dormant"), JSON.stringify([basil.dormant, basil.state]));
-/* The foot counts, and stops: the three headings above it each carry their own count. */
+/* The foot counts, and it is the only count: the headings carry a + instead. */
 say("the foot counts what the sections hold", panel.foot === "5 agents", panel.foot);
 /* Pictures or rows is a question about thumbnails; an agent has no second rendering. */
 say("the density toggle belongs to Boards", panel.density === "none", panel.density);
@@ -475,7 +475,7 @@ const filed = await page.evaluate(() => {
 		kind: section.dataset.kind,
 		label: section.querySelector(".panel-meta > span")?.textContent,
 		note: section.querySelector(".panel-meta .note")?.textContent ?? null,
-		count: section.querySelector(".panel-meta .n")?.textContent,
+		plus: section.querySelector(".panel-meta button")?.getAttribute("aria-label") ?? null,
 		rows: [...section.querySelectorAll(".agent-row")].map((row) => row.querySelector(".lb")?.textContent),
 	}));
 });
@@ -500,7 +500,7 @@ say(
 	filed[0]?.note === null && filed[1]?.note === "2 working" && filed[2]?.note === "1 wants you",
 	JSON.stringify(filed.map((one) => one.note)),
 );
-say("…and nothing is lost in the count", filed.reduce((sum, one) => sum + Number(one.count), 0) === 5, JSON.stringify(filed.map((one) => one.count)));
+say("…and each heading carries a + that makes an agent in that project, instead of a count", JSON.stringify(filed.map((one) => one.plus)) === JSON.stringify(["New agent in irb-84069", "New agent in political-llm", "New agent in no workspace"]), JSON.stringify(filed.map((one) => one.plus)));
 
 /*
  * **A message moves a row, and nothing else does.** Basil is dormant and Iris has been waiting

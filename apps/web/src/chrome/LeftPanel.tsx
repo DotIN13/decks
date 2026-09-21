@@ -172,6 +172,8 @@ export function LeftPanel(props: {
 	 */
 	hereWorkspace?: string;
 	onFocusAgent?: (id: string) => void;
+	/** Make an agent in a workspace (`undefined` for none) — the `+` on a heading of the workspace cut. */
+	onNewAgent?: (workspace: string | undefined) => void;
 
 	// --- the Canvases tab -------------------------------------------------------------
 	/** Every canvas in the deck, for the first tab: the rooms, under their workspaces. */
@@ -776,7 +778,23 @@ export function LeftPanel(props: {
 											the heading's right-hand column, inboard of the count, so the two are read together.
 										*/}
 										<Show when={section.note}>{(note) => <span class="note">{note()}</span>}</Show>
-										<span class="n tabular-nums">{section.rows.length}</span>
+										{/*
+											No count: the rows are right under it, and what the slot is for is the
+											same `+` the Canvases tab's headings carry — an agent made from under a
+											project's heading is in that project. Only where the heading *is* a
+											project; the attention cut's headings are not places to make one in.
+										*/}
+										<Show when={props.onNewAgent && (section.kind === "workspace" || section.kind === "unfiled")}>
+											<button
+												type="button"
+												class="iconbtn size-5 flex-none rounded-sm pointer-coarse:size-8"
+												aria-label={section.kind === "workspace" ? `New agent in ${section.label}` : "New agent in no workspace"}
+												title={section.kind === "workspace" ? `New agent in ${section.label}` : "New agent, in no workspace"}
+												onClick={() => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined)}
+											>
+												<Icon of={Plus} size={12} />
+											</button>
+										</Show>
 									</div>
 									{/*
 										`.rowlist` is the row vocabulary — the grid, the corner, the hover, the

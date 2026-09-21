@@ -552,6 +552,17 @@ export class DeckAgent {
 		if (workspace) {
 			this.workspaceChosen = workspace;
 			this.identity = { ...this.identity, workspace };
+			/*
+			 * A new agent made in a project stands in the project's first room, the same room
+			 * `setWorkspace` moves an agent into — unless it was made in a room already
+			 * (`options.canvas`, the one the person is looking at). A restored chat keeps
+			 * whatever room its record names.
+			 */
+			if (!options.restored && !this.canvasChosen) {
+				const room = this.canvases.inWorkspace(workspace)[0] ?? this.canvases.create({ name: this.canvases.freeName(workspace), workspace });
+				this.canvasChosen = room.id;
+				this.joinCanvas(room.id);
+			}
 		}
 		this.parentId = options.parentId;
 		this.resumeRef = options.resumeRef;
