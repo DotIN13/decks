@@ -607,6 +607,15 @@ export function createStageTool(deps: {
 			if (patch?.name !== undefined) {
 				const clean = String(patch.name).trim().slice(0, 40);
 				if (!clean) throw new Error("A name cannot be empty");
+				/*
+				 * One name, one agent. A name is an address — the bar reads `@Sable` and the
+				 * deck has to know which Sable — so a second agent taking one is refused rather
+				 * than quietly numbered: the model picked a word, and it is the one who should
+				 * pick the next one.
+				 */
+				const mine = agent.identity().name.trim().toLowerCase();
+				const taken = clean.toLowerCase() !== mine && agent.agents().some((other) => other.id !== agent.id && other.name.trim().toLowerCase() === clean.toLowerCase());
+				if (taken) throw new Error(`Another agent is already called ${clean}. Pick a different name.`);
 				agent.rename(clean);
 			}
 			if (patch?.avatar !== undefined) {

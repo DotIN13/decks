@@ -177,7 +177,8 @@ await page.evaluate(() => {
 			lost,
 			focusKept: document.activeElement === before.focused && document.contains(before.focused),
 			scrollKept: list.scrollTop === before.scroll,
-			popover: Boolean(document.querySelector(".popover")),
+			// A popover, or the edit window the pen opens — either is a surface somebody has open.
+			popover: Boolean(document.querySelector('.popover, [role="dialog"]')),
 			pulse: { before: before.pulseAt, after: running === before.pulse ? running?.currentTime : null },
 			state: Object.fromEntries([...still.keys()].map((name) => [name, state(name)])),
 			notesBefore: before.notes,
@@ -245,15 +246,17 @@ const woke = await change("Kestrel: woken by a prompt", { type: "agent.row", id:
 const dormant = await page.evaluate(() => window.__rowFor("Kestrel")?.dataset.dormant ?? "none");
 say("a row with no dormant mark on it wakes the chat", dormant === "none" && woke.kept === woke.rows, `${dormant}, ${woke.kept} of ${woke.rows} kept`);
 
-// --- a popup somebody has open -----------------------------------------------------------
+// --- a window somebody has open ------------------------------------------------------------
 
+/* The pen opens the edit window now, in a portal of its own: the row it belongs to is the
+   component that draws it, so a list redraw that re-created that row would take it with it. */
 await page.evaluate(() => window.__rowFor("Sable")?.querySelector(".agent-tagbtn")?.click());
-await page.waitForSelector(".popover", { timeout: 4000 });
+await page.waitForSelector('[role="dialog"]', { timeout: 4000 });
 await settle(page, 300);
 
 const popup = await change("Rook: tool → thinking", { type: "agent.state", id: "k7", state: "thinking" });
 
-say("a popup stays open while the list is redrawn", popup.popover, "the popover went with its row");
+say("an open window survives the list being redrawn", popup.popover, "the window went with its row");
 say("…with nothing added or removed behind it", popup.churn.added === 0 && popup.churn.removed === 0, JSON.stringify(popup.churn));
 
 await page.keyboard.press("Escape");

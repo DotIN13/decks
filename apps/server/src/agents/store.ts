@@ -79,6 +79,15 @@ export interface AgentRecord {
 	 * fields here — `inPlay`, `positions` and a `workspace` word — one private copy per chat.
 	 */
 	canvas?: string;
+	/**
+	 * Every canvas this chat has worked on, by id, oldest first, including `canvas` above.
+	 *
+	 * An agent belongs to a room by having worked in it, and it does not leave when it starts
+	 * work somewhere else: the panel's "on this canvas" section and a canvas card's faces are
+	 * this list read backwards. `canvas` stays the *current* one — where the next board it
+	 * shows will land — which is the one thing a single field could never say twice.
+	 */
+	canvases?: string[];
 	createdAt: number;
 	/** The model (and thinking level) the chat was last on, so a dormant row can still say what it will use. */
 	model?: AgentModel;
@@ -476,6 +485,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(source.role === "dispatcher" ? { role: "dispatcher" as const } : {}),
 		context: strings(source.context),
 		...(typeof source.canvas === "string" && source.canvas ? { canvas: source.canvas } : {}),
+		...(strings(source.canvases).length > 0 ? { canvases: strings(source.canvases) } : {}),
 		/*
 		 * What a record written before canvases had: what was up, where it sat, and the word the
 		 * agent typed about itself. Read back only so `canvas/migrate.ts` can turn them into a

@@ -553,30 +553,36 @@
 		color: var(--fg);
 	}
 
-	/* Your tags, in the popup: a chip with a × in it. */
-	.tagpop {
+	/*
+	 * The edit window's fields: a column inside each group, under its heading.
+	 *
+	 * `.set-row` is the other shape a settings group has — one line, the control on the
+	 * right — and it is not this one: a field with a rule written under it is two lines, and
+	 * three of them side by side in a 440px window would be a form nobody reads.
+	 */
+	.agent-edit-pad {
 		display: flex;
 		flex-direction: column;
 		gap: 7px;
-		padding: 2px;
+		padding: 0 12px 11px;
 	}
 
 	/*
-	 * The popup's own two type sizes.
+	 * The window's own note size.
 	 *
 	 * `.nt` is scoped to `:is(.popover, .rowlist) [data-row] > .nt` — it is the note under a
 	 * *row*, and there is no row in here — so it fell back to body size and the hint read
-	 * larger than the tags it was explaining. Stated rather than reached for: this is not a
+	 * larger than the field it was explaining. Stated rather than reached for: this is not a
 	 * row, and pretending otherwise to borrow one declaration is how a vocabulary stops
 	 * meaning anything.
 	 */
-	.tagpop .nt {
+	.agent-edit-pad .nt {
 		color: var(--faint);
 		font-size: 10.5px;
 		line-height: 1.4;
 	}
 
-	.tagpop .tag {
+	.agent-edit-pad .tag {
 		display: inline-flex;
 		align-items: center;
 		gap: 3px;

@@ -7,6 +7,7 @@ import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
 import type { CanvasStore } from "../canvas/store.ts";
 import { planCanvases } from "../canvas/migrate.ts";
+import { numberedName } from "../names.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { CreateSpec, SendSpec } from "../stage/tool.ts";
 import type { TaskFinish } from "../tasks/service.ts";
@@ -293,6 +294,16 @@ export class Registry {
 				// The whole chat row is what carries the menu, so a longer list is one
 				// republish of the list the browser already keys on.
 				commandsChanged: () => this.publish(),
+				/*
+				 * `Agent 1`, `Agent 2`, and nothing else on the deck has that number.
+				 *
+				 * Every unnamed chat used to be called `Agent`: six of them on this machine, and
+				 * a name is how an agent is addressed — `@Agent` from the bar could mean any of
+				 * them. The number is the whole of the fix, and it stops mattering the moment the
+				 * agent gives itself a name (`stage.me({ name })`), which is the first thing most
+				 * of them do.
+				 */
+				name: options.name ?? numberedName("Agent", (name) => this.nameTaken(name)),
 				color: options.color ?? COLORS[this.agents.length % COLORS.length]!,
 				kind: options.kind ?? this.host.defaultKind,
 				snapshots: this.snapshots,
@@ -337,6 +348,7 @@ export class Registry {
 				restored: {
 					id: record.id,
 					...(canvas ? { canvas } : {}),
+					...(record.canvases?.length ? { canvases: record.canvases } : {}),
 					// The transcript is not read here. It is read when somebody opens the chat
 					// (`session.transcript`), which is the difference between a list that costs
 					// a directory read and one that costs every conversation ever had.
@@ -432,11 +444,35 @@ export class Registry {
 			other.canvasMoved();
 		}
 		this.host.arranged?.();
+		/*
+		 * And the canvases themselves, because **what is on a canvas is part of the canvas**.
+		 *
+		 * A browser draws its stage from the canvas's own board list now, not from the focused
+		 * agent's in-play set, so a board shown or hidden on a shared canvas reached every
+		 * agent and no window: `deck.state` says where the boards *are*, and this is what says
+		 * which of them are up.
+		 */
+		this.host.publishCanvases?.();
 	}
 
 	get(id: string | undefined): DeckAgent | undefined {
 		if (!id) return undefined;
 		return this.agents.find((agent) => agent.id === id);
+	}
+
+	/**
+	 * Whether another chat already answers to this name.
+	 *
+	 * Case-insensitive, because that is how the bar reads an `@name` (`app/send-from-bar.ts`)
+	 * — `@sable` and `@Sable` are one address, so they are one name here. The dispatcher is
+	 * included: `@Dispatcher` is a reserved word, and an agent called Dispatcher would take
+	 * a line meant for the dashboard.
+	 */
+	nameTaken(name: string, exceptId?: string): boolean {
+		const wanted = name.trim().toLowerCase();
+		if (!wanted) return false;
+		if (wanted === "dispatcher") return true;
+		return this.agents.some((agent) => agent.id !== exceptId && agent.chat().name.trim().toLowerCase() === wanted);
 	}
 
 	/** The agent the browser is looking at, created on demand so a deck is never agentless. */

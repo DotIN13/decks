@@ -829,15 +829,21 @@ export class App {
 		return this.agents.focused();
 	}
 
-	/** Every canvas as the browser needs it, with the agents working on each. */
+	/**
+	 * Every canvas as the browser needs it, with the agents on each.
+	 *
+	 * On, not working-on-now: an agent belongs to every canvas it has worked in
+	 * (`session.canvasIds`), so one agent shows up in several rooms and a room keeps the
+	 * faces of everybody who has done something there.
+	 */
 	canvasList(): Canvas[] {
 		const working = new Map<string, string[]>();
 		for (const agent of this.agents.all()) {
-			const id = agent.canvas;
-			if (!id) continue;
-			const on = working.get(id);
-			if (on) on.push(agent.id);
-			else working.set(id, [agent.id]);
+			for (const id of agent.canvasIds) {
+				const on = working.get(id);
+				if (on) on.push(agent.id);
+				else working.set(id, [agent.id]);
+			}
 		}
 		return this.canvases.list().map((canvas) => ({
 			id: canvas.id,

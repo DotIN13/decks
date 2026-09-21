@@ -7,9 +7,15 @@
  * history, and we only ever describe places to it.
  *
  * Two surfaces. `#/boards`, `#/tasks` and `#/cron` are the dispatch surface on one of its
- * tabs, optionally with a board picked out (`#/boards?board=<path>`). `#/agent/<id>` is one
- * agent's stage. Anything else parses to nothing and the app lands on the last dispatch tab
- * it remembers, so a stale bookmark is never a blank screen.
+ * tabs, optionally with a board picked out (`#/boards?board=<path>`). `#/canvas/<id>` is a
+ * canvas, optionally with the agent you are talking to on it (`?agent=<id>`). Anything else
+ * parses to nothing and the app lands on the last dispatch tab it remembers, so a stale
+ * bookmark is never a blank screen.
+ *
+ * **There is no agent address.** An agent is on every canvas it has worked on, so no single
+ * room could answer to its name; who you are typing to is a setting on the canvas you are
+ * looking at, which is why it is a query value and not a path. `#/agent/<id>`, which used to
+ * be one, now parses to nothing and lands on the shelf.
  */
 
 export type DispatchTab = "canvases" | "boards" | "tasks" | "cron";
@@ -17,13 +23,12 @@ export type DispatchTab = "canvases" | "boards" | "tasks" | "cron";
 export type Place =
 	| { surface: "dispatch"; tab: DispatchTab; board?: string }
 	/**
-	 * A canvas, or one agent's stage.
+	 * A canvas, and who you are talking to on it.
 	 *
-	 * `#/canvas/<id>` is the address of a canvas, which is the thing boards live on and the
-	 * thing two agents can share. `#/agent/<id>` still opens a conversation, and the canvas it
-	 * is working on comes with it — so a link to an agent keeps working and lands on its work.
+	 * The canvas is the place: it is what holds the boards and what two agents can share.
+	 * `agent` is who the composer addresses there, absent while the room has nobody in it.
 	 */
-	| { surface: "stage"; agent: string; canvas?: string };
+	| { surface: "stage"; canvas: string; agent?: string };
 
 /** Where the last dispatch tab is remembered, so an empty hash lands somewhere familiar. */
 export const TAB_KEY = "decks.dispatch.tab";
@@ -36,16 +41,16 @@ function isTab(value: string | null | undefined): value is DispatchTab {
 }
 
 /**
- * The `board` query value, decoded by hand. `URLSearchParams` would turn a `+` in a board
- * path into a space, and `encodeURIComponent` never writes a `+`, so the two would not
- * round-trip.
+ * A query value, decoded by hand. `URLSearchParams` would turn a `+` in a board path into a
+ * space, and `encodeURIComponent` never writes a `+`, so the two would not round-trip.
  */
-function boardFromQuery(query: string): string | undefined {
+function fromQuery(query: string, key: string): string | undefined {
+	const head = `${key}=`;
 	for (const pair of query.split("&")) {
-		if (!pair.startsWith("board=")) continue;
+		if (!pair.startsWith(head)) continue;
 		try {
-			const board = decodeURIComponent(pair.slice("board=".length));
-			return board === "" ? undefined : board;
+			const value = decodeURIComponent(pair.slice(head.length));
+			return value === "" ? undefined : value;
 		} catch {
 			return undefined;
 		}
@@ -64,26 +69,20 @@ export function parsePlace(hash: string): Place | undefined {
 	if (rest.length > 1 && rest.endsWith("/")) rest = rest.slice(0, -1);
 	const parts = rest.slice(1).split("/");
 	if (parts.length === 1 && isTab(parts[0])) {
-		const board = boardFromQuery(query);
+		const board = fromQuery(query, "board");
 		return board === undefined ? { surface: "dispatch", tab: parts[0] } : { surface: "dispatch", tab: parts[0], board };
 	}
-	if (parts.length === 2 && parts[0] === "agent" && parts[1] !== undefined && AGENT_ID.test(parts[1])) {
-		return { surface: "stage", agent: parts[1] };
-	}
 	if (parts.length === 2 && parts[0] === "canvas" && parts[1] !== undefined && AGENT_ID.test(parts[1])) {
-		return { surface: "stage", agent: "", canvas: parts[1] };
+		const agent = fromQuery(query, "agent");
+		return agent !== undefined && AGENT_ID.test(agent) ? { surface: "stage", canvas: parts[1], agent } : { surface: "stage", canvas: parts[1] };
 	}
-	// The stage of whoever is focused, for a link written before the roster is known. The
-	// app replaces it with `#/agent/<id>` once the server has said who that is.
-	if (parts.length === 1 && parts[0] === "stage") return { surface: "stage", agent: "" };
 	return undefined;
 }
 
 /** The inverse of `parsePlace`, always with the leading `#`. */
 export function formatPlace(place: Place): string {
 	if (place.surface === "stage") {
-		if (place.canvas) return `#/canvas/${place.canvas}`;
-		return place.agent === "" ? "#/stage" : `#/agent/${place.agent}`;
+		return place.agent ? `#/canvas/${place.canvas}?agent=${place.agent}` : `#/canvas/${place.canvas}`;
 	}
 	const board = place.board === undefined || place.board === "" ? "" : `?board=${encodeURIComponent(place.board)}`;
 	return `#/${place.tab}${board}`;
@@ -92,7 +91,7 @@ export function formatPlace(place: Place): string {
 export function samePlace(a: Place | undefined, b: Place | undefined): boolean {
 	if (a === undefined || b === undefined) return a === b;
 	if (a.surface === "stage" || b.surface === "stage") {
-		return a.surface === "stage" && b.surface === "stage" && a.agent === b.agent && (a.canvas ?? "") === (b.canvas ?? "");
+		return a.surface === "stage" && b.surface === "stage" && (a.agent ?? "") === (b.agent ?? "") && a.canvas === b.canvas;
 	}
 	return a.tab === b.tab && (a.board ?? undefined) === (b.board ?? undefined);
 }

@@ -193,22 +193,39 @@ export class DeckAgent {
 
 	/** The canvas this conversation is working on, once it has needed one. */
 	private canvasChosen: string | undefined;
+	/**
+	 * Every canvas it has worked on, oldest first. Membership, where `canvasChosen` is *now*.
+	 *
+	 * An agent does not leave a room by going to another one: it is on the shelf of both, in
+	 * the panel's "on this canvas" section of both, and addressable from either. Kept in the
+	 * order it joined so a card's faces are stable, and read back through the store so a
+	 * canvas that has been deleted drops out without anything having to prune it.
+	 */
+	private canvasesUsed: string[] = [];
+
+	/** Remember it joined, without changing which one is current. */
+	private joinCanvas(id: string): void {
+		if (this.canvasesUsed.includes(id)) return;
+		this.canvasesUsed.push(id);
+	}
 
 	/**
 	 * The canvas this agent works on, made on first use.
 	 *
 	 * An agent with nothing up is on no canvas, which is the honest state for a chat nobody
 	 * has given work to: it shows on the dashboard as available rather than as an empty card.
-	 * The moment it shows a board it needs one, and a canvas named after the chat is the
-	 * least surprising place for that board to land — its own, even when another chat has the
-	 * same name, because six chats called "Agent" are six pieces of work. Joining a canvas by
-	 * name is `useCanvas`, which is what `stage.me.setWorkspace` does.
+	 * The moment it shows a board it needs one, and what it gets is a canvas of its own with
+	 * a name nothing else has (`names.ts`): `Canvas 1`, `Canvas 2`. It used to be named after the
+	 * chat, which read as a claim that the room belongs to that agent — and it does not, since
+	 * anyone can be addressed there and an agent is in every room it has worked in. Both the
+	 * canvas and the chat are renamed the moment there is something to name them after.
 	 */
 	get canvasId(): string {
 		const chosen = this.canvases.get(this.canvasChosen);
 		if (chosen) return chosen.id;
-		const made = this.canvases.create({ name: this.canvases.freeName(this.identity.name || "Canvas") });
+		const made = this.canvases.create({ name: this.canvases.newName() });
 		this.canvasChosen = made.id;
+		this.joinCanvas(made.id);
 		this.save();
 		return made.id;
 	}
@@ -216,6 +233,18 @@ export class DeckAgent {
 	/** The canvas it is on, if it is on one. Reading this must not make one. */
 	get canvas(): string | undefined {
 		return this.canvases.get(this.canvasChosen)?.id;
+	}
+
+	/**
+	 * Every canvas it is on: the ones it has worked in, and the one it is on now.
+	 *
+	 * Filtered through the store rather than pruned on deletion, so removing a canvas is one
+	 * file going away and not a sweep through every agent that ever stood on it.
+	 */
+	get canvasIds(): string[] {
+		const ids = this.canvasesUsed.filter((id) => this.canvases.get(id));
+		const now = this.canvas;
+		return now && !ids.includes(now) ? [...ids, now] : ids;
 	}
 
 	/**
@@ -227,6 +256,7 @@ export class DeckAgent {
 	useCanvas(name: string | null | undefined): string | undefined {
 		if (!name) return this.canvas;
 		const canvas = this.canvases.ensure(name);
+		this.joinCanvas(canvas.id);
 		if (canvas.id === this.canvasChosen) return canvas.id;
 		this.canvasChosen = canvas.id;
 		this.identity = { ...this.identity, workspace: canvas.name };
@@ -409,6 +439,8 @@ export class DeckAgent {
 				context: string[];
 				/** The canvas it was working on, by id — see `canvas/store.ts`. */
 				canvas?: string;
+				/** Every canvas it had worked on, by id: membership, where `canvas` is the current one. */
+				canvases?: string[];
 				avatar?: string;
 				createdAt: number;
 				/**
@@ -435,7 +467,10 @@ export class DeckAgent {
 		this.id = options.restored?.id ?? randomUUID();
 		this.store = options.store;
 		this.canvases = options.canvases;
-		if (options.canvas) this.canvasChosen = options.canvas;
+		if (options.canvas) {
+			this.canvasChosen = options.canvas;
+			this.joinCanvas(options.canvas);
+		}
 		this.restored = options.restored !== undefined;
 		this.role = options.role;
 		/*
@@ -571,6 +606,8 @@ export class DeckAgent {
 			 * `canvas/migrate.ts` is what gave a chat written before canvases one to name.
 			 */
 			this.canvasChosen = options.restored.canvas;
+			this.canvasesUsed = [...(options.restored.canvases ?? [])];
+			if (this.canvasChosen) this.joinCanvas(this.canvasChosen);
 			const canvas = options.canvases.get(this.canvasChosen);
 			// The panel groups by this, and a restored chat has to draw its group before it has
 			// said anything. The canvas is the fact; this is the label read off it.
@@ -1002,6 +1039,7 @@ export class DeckAgent {
 			...(this.parentId ? { parentId: this.parentId } : {}),
 			context: [...this.held],
 			...(this.canvasChosen ? { canvas: this.canvasChosen } : {}),
+			...(this.canvasIds.length > 0 ? { canvases: this.canvasIds } : {}),
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),

@@ -380,28 +380,46 @@ await settle(page, 400);
 say("switching tabs clears the query", (await page.locator(".panel-shell .field input").inputValue()) === "", await page.locator(".panel-shell .field input").inputValue());
 say("…and the placeholder follows the tab", /boards$/.test((await page.locator(".panel-shell .field input").getAttribute("placeholder")) ?? ""), await page.locator(".panel-shell .field input").getAttribute("placeholder"));
 
-// --- the customise popup ------------------------------------------------------------
+// --- the edit window ------------------------------------------------------------------
 
+/*
+ * The pen opens a window, not a popover: three fields with a rule written under each, in
+ * the shape Settings and Usage already have. It was a 228px card holding two of them, and
+ * the third — the name — could not be in there at all, because a refused name has to be
+ * able to say why.
+ */
 await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 400);
 await page.locator(".agent-row").first().hover();
 await settle(page, 250);
 await page.locator(".agent-row .agent-tagbtn").first().click();
-await page.waitForSelector(".tagpop", { timeout: 4000 });
+await page.waitForSelector('[role="dialog"]', { timeout: 4000 });
 await settle(page, 400);
 
 const pop = await page.evaluate(() => ({
-	/* The popup exists to be typed into; one that opens with the cursor elsewhere costs a
-	   click to use — and worse, the first Enter re-pressed the trigger and closed it. */
-	focused: document.activeElement?.tagName,
-	field: Math.round(document.querySelector(".tagpop .field")?.getBoundingClientRect().height ?? 0),
-	chips: [...document.querySelectorAll(".tagpop .tag")].map((tag) => tag.textContent?.replace(/\s+/g, "")),
+	/* It exists to be typed into, and the name is what most visits are for — a window that
+	   opens with the cursor elsewhere costs a click to use. */
+	focused: document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.tagName,
+	fields: [...document.querySelectorAll('[role="dialog"] .field')].map((field) => Math.round(field.getBoundingClientRect().height)),
+	groups: [...document.querySelectorAll('[role="dialog"] .set-title')].map((title) => title.textContent),
+	theirs: [...document.querySelectorAll('[role="dialog"] .tag:not([data-mine])')].map((tag) => tag.textContent?.replace(/\s+/g, "")),
+	mine: [...document.querySelectorAll('[role="dialog"] .tag[data-mine]')].map((tag) => tag.textContent?.replace(/\s+/g, "")),
 }));
-say("the popup takes the cursor", pop.focused === "INPUT", pop.focused);
-say("…with a field that did not collapse", pop.field === 32, `${pop.field}px`);
-say("…showing only your own tags", JSON.stringify(pop.chips) === JSON.stringify(["mine"]), JSON.stringify(pop.chips));
+say("the window takes the cursor, in the name", pop.focused === "Agent name", String(pop.focused));
+say("…and holds the three things about an agent you can change", JSON.stringify(pop.groups) === JSON.stringify(["Name", "Workspace", "Tags"]), JSON.stringify(pop.groups));
+say("…with fields that did not collapse", pop.fields.length === 3 && pop.fields.every((height) => height === 32), JSON.stringify(pop.fields));
+/* Two lists that never write to each other: what it says it is doing, and what you say. */
+say("…the agent's own tags shown beside yours", JSON.stringify(pop.theirs) === JSON.stringify(["e2e", "flaky-editing"]), JSON.stringify(pop.theirs));
+say("…and only yours carry a way to remove them", JSON.stringify(pop.mine) === JSON.stringify(["mine"]), JSON.stringify(pop.mine));
 
-await page.keyboard.type("Panel CSS, later");
+// The name: typed and committed with Enter, which is the one field that can be refused.
+await page.keyboard.type("Iris the second");
+await page.keyboard.press("Enter");
+await settle(page, 400);
+const renamed = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.rename")).map((frame) => JSON.parse(frame)).at(-1));
+say("renaming sends the new name, for the agent whose row it is", renamed?.name === "Iris the second" && renamed?.id === "a3", JSON.stringify(renamed));
+
+await page.locator('[role="dialog"] input[placeholder="Add a tag…"]').fill("Panel CSS, later");
 await page.keyboard.press("Enter");
 await settle(page, 400);
 const sent = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.tags")).map((frame) => JSON.parse(frame)));
@@ -412,12 +430,16 @@ const sent = await page.evaluate(() => window.__sent.filter((frame) => frame.inc
  */
 say("adding sends your tags, splitting on commas alone", JSON.stringify(sent.at(-1)?.tags) === JSON.stringify(["mine", "Panel CSS", "later"]), JSON.stringify(sent.at(-1)));
 say("…for the agent whose row it is", sent.at(-1)?.id === "a3", sent.at(-1)?.id);
-say("…and the popup stays open, so a second tag is one keystroke away", await page.evaluate(() => Boolean(document.querySelector(".tagpop"))));
+say("…and the window stays open, so a second tag is one keystroke away", await page.evaluate(() => Boolean(document.querySelector('[role="dialog"]'))));
 
-await page.locator(".tagpop .tag-x").first().click();
+await page.locator('[role="dialog"] .tag-x').first().click();
 await settle(page, 400);
 const after = await page.evaluate(() => JSON.parse(window.__sent.filter((frame) => frame.includes("agent.tags")).at(-1)));
 say("removing one sends the rest", JSON.stringify(after.tags) === JSON.stringify([]), JSON.stringify(after.tags));
+
+await page.keyboard.press("Escape");
+await settle(page, 300);
+say("Escape closes it", (await page.locator('[role="dialog"]').count()) === 0);
 
 
 // --- the workspace axis ---------------------------------------------------------------

@@ -281,3 +281,43 @@ test("search finds a project by name, in either grouping", () => {
 		"the same two agents in the attention axis, where the workspace is only on the row",
 	);
 });
+
+/*
+ * The room comes first.
+ *
+ * A canvas is the unit of work, so the panel's first question on a stage is who is in the
+ * room — and an agent is on every canvas it has worked in, which is why this lifts rows out
+ * of the cut below instead of being a third axis.
+ */
+test("the agents on the canvas are a section of their own, above either cut", () => {
+	for (const group of ["workspace", "attention"] as const) {
+		const sections = agentSections({ chats, identities, unread, focused: "ada", group, onCanvas: ["ada", "pi"] });
+		assert.equal(sections[0]?.label, "On this canvas");
+		assert.deepEqual(
+			sections[0]?.rows.map((row) => row.id),
+			["ada", "pi"],
+			"newest first, as every other section is",
+		);
+		const below = sections.slice(1).flatMap((section) => section.rows.map((row) => row.id));
+		assert.deepEqual(below.sort(), ["basil", "iris", "wren"], `${group}: the room's agents are not listed twice`);
+		assert.equal(agentTally(sections).total, chats.length, `${group}: every agent is listed exactly once`);
+	}
+});
+
+test("an empty room draws no heading, and the list is what it always was", () => {
+	const before = agentSections({ chats, identities, unread, focused: "ada", group: "workspace" });
+	const after = agentSections({ chats, identities, unread, focused: "ada", group: "workspace", onCanvas: [] });
+	assert.deepEqual(
+		after.map((section) => section.label),
+		before.map((section) => section.label),
+	);
+});
+
+test("a search runs over the room as well as the deck", () => {
+	const sections = agentSections({ chats, identities, unread, focused: "ada", onCanvas: ["ada", "pi"], query: "panel-css" });
+	assert.deepEqual(
+		sections.map((section) => [section.label, section.rows.map((row) => row.id)]),
+		[["On this canvas", ["ada"]]],
+		"Ada matches and is in the room; Pi is in the room and does not match",
+	);
+});

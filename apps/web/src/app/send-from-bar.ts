@@ -9,9 +9,16 @@
  * text; then the surface, which is the dispatcher on the dispatch surface and the focused
  * agent on a stage. A stage with nobody focused has nowhere to send to, and says so.
  *
- * **On a canvas the bar is a room's.** Several agents may be working there, so a line that
- * names nobody goes to the dispatcher *for that canvas*, which hands it to an agent already
- * on it; `@Sable` reaches Sable wherever it was, and brings it to this canvas for the job.
+ * **On a canvas the bar is a room's, addressed to somebody in it.** Who that is comes from
+ * the pill and the panel (`?agent=` in the hash), so a line that names nobody goes to the
+ * agent you chose, and works *here*: the room rides along, and the server puts that agent on
+ * this canvas before it hears the line. `@Sable` reaches Sable wherever it was, on the same
+ * terms. A room with nobody chosen falls back to the dispatcher for that canvas, which hands
+ * the line to an agent already on it.
+ *
+ * It used to be the other way round — every unnamed line on a canvas became a dispatcher task
+ * — and that was right while a canvas had no addressee. Now that choosing one is a click in
+ * two places, a bar that ignored the choice would make the choice mean nothing.
  *
  * `@Dispatcher` is a name like any other, and works from any bar: on an agent's stage it
  * turns the line into a task for the dispatcher to place, which is otherwise a trip Home.
@@ -80,8 +87,8 @@ export function destination(text: string, context: BarContext): Destination {
 		if (mention.name.toLowerCase() === DISPATCHER_NAME.toLowerCase()) return { kind: "task", named: true, ...room };
 	}
 	if (context.surface === "dispatch") return { kind: "task" };
+	if (context.focused) return { kind: "prompt", id: context.focused.id, name: context.focused.name, named: false, ...room };
 	if (context.canvas) return { kind: "task", ...room };
-	if (context.focused) return { kind: "prompt", id: context.focused.id, name: context.focused.name, named: false };
 	return { kind: "nowhere" };
 }
 

@@ -5,14 +5,14 @@
  *
  * - the app opens on the dashboard, with the hash written, and no conversation opened;
  * - a board previewed from the gallery zooms, by a gesture made over its own frame;
- * - a row in the panel opens that agent's stage, and Home comes back to the same tab;
+ * - a row in the panel opens that agent's canvas, and Home comes back to the same tab;
  * - Back after a row press is Home; a reload lands where the hash says;
  * - a half-typed line survives the switch, and the count of board documents does not move;
  * - the composer, dragged off its home, is where it was dropped after a reload;
  * - thrown hard at the right edge it is put away behind a tab, and the tab brings it back;
  * - Escape on a stage with nothing selected goes Home.
  */
-import { open, ready, say, settle, socket, WEB } from "../harness.mjs";
+import { open, ready, say, settle, socket, stageCanvasId, WEB } from "../harness.mjs";
 
 // `boards: false`: the harness opens on the stage for the rest of the suite; this check is
 // about the landing, so it goes to the front door itself.
@@ -31,6 +31,14 @@ for (let i = 0; i < 30 && !agentId; i++) {
 	if (!agentId) await settle(page, 200);
 }
 if (!agentId) throw new Error("the fixture deck has no agent to open a stage for");
+/*
+ * The room that row opens into, and the whole of the address.
+ *
+ * There is no `#/agent/<id>` any more: an agent is on every canvas it has worked in, so the
+ * place is the canvas and the agent is who the composer is addressing on it.
+ */
+const canvasId = await stageCanvasId();
+const stageHash = `#/canvas/${canvasId}?agent=${agentId}`;
 
 const hash = () => page.evaluate(() => location.hash);
 const surface = () => page.getAttribute(".surface", "data-surface");
@@ -126,7 +134,7 @@ await page.locator('.panel-shell .agent-row[data-current="true"] button[data-age
 await settle(page, 700);
 await ready(page);
 const before = await documents();
-say("a row in the panel opens that agent's stage", (await hash()) === `#/agent/${agentId}` && (await surface()) === "stage", `${await hash()} ${await surface()}`);
+say("a row in the panel opens that agent's canvas", (await hash()) === stageHash && (await surface()) === "stage", `${await hash()} ${await surface()}`);
 say("Home grows into the pill on a stage", (await page.locator('.pill-home[data-on="true"]').count()) === 1);
 say("the bar's word is the agent's on a stage", /^to /.test((await page.locator(".dock-to").textContent()) ?? "") && !/dispatcher/.test((await page.locator(".dock-to").textContent()) ?? ""), await page.locator(".dock-to").textContent());
 say("…and a stage's bar does not: its agent's runtime was fixed when it was made", (await page.locator(".dock .runtime-chip").count()) === 0);
@@ -134,7 +142,8 @@ say("…and a stage's bar does not: its agent's runtime was fixed when it was ma
    bar's own word, which is the send's decision run without sending. */
 await page.fill(".dockfield", "@Dispatcher find someone for this");
 await settle(page, 200);
-say("@Dispatcher on a stage addresses the dispatcher", (await page.locator(".dock-to").textContent()) === "to dispatcher", await page.locator(".dock-to").textContent());
+/* "to dispatcher, on <canvas>": a stage is always a room now, and the room rides along. */
+say("@Dispatcher on a stage addresses the dispatcher", /^to dispatcher/.test((await page.locator(".dock-to").textContent()) ?? ""), await page.locator(".dock-to").textContent());
 await page.fill(".dockfield", "");
 await settle(page, 200);
 say("…and without it the bar is the agent's again", /^to /.test((await page.locator(".dock-to").textContent()) ?? "") && !/dispatcher/.test((await page.locator(".dock-to").textContent()) ?? ""));
@@ -148,7 +157,7 @@ say("no board document was torn down by the switch", (await documents()) === bef
 
 await page.goBack();
 await settle(page, 600);
-say("Back after Home is the stage again", (await hash()) === `#/agent/${agentId}` && (await surface()) === "stage", `${await hash()}`);
+say("Back after Home is the stage again", (await hash()) === stageHash && (await surface()) === "stage", `${await hash()}`);
 await page.keyboard.press("Escape");
 await settle(page, 600);
 say("Escape on a stage with nothing selected goes Home", (await surface()) === "dispatch", `${await hash()}`);

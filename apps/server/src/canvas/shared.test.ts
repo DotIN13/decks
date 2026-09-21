@@ -114,7 +114,9 @@ test("an agent nobody has given work to is on no canvas until it shows something
 	assert.deepEqual(canvases.list(), []);
 	one.setInPlay(["boards/plan.html"], { place: true });
 	assert.equal(canvases.list().length, 1, "showing a board makes the canvas it lands on");
-	assert.equal(canvases.list()[0]?.name, "Sable", "named after the chat, which is where its work was");
+	// `Canvas 1`, and not the chat's name — the room is not the agent's, and both are renamed
+	// as soon as there is something to name them after.
+	assert.equal(canvases.list()[0]?.name, "Canvas 1");
 	cleanup();
 });
 
@@ -126,7 +128,46 @@ test("two chats with the same name each get a canvas of their own when they firs
 	one.setInPlay(["boards/plan.html"], { place: true });
 	two.setInPlay(["boards/notes.html"], { place: true });
 	assert.notEqual(one.canvas, two.canvas);
-	assert.deepEqual(canvases.list().map((canvas) => canvas.name).sort(), ["Agent", "Agent 2"]);
+	const names = canvases.list().map((canvas) => canvas.name);
+	assert.equal(names.length, 2);
+	assert.equal(new Set(names).size, 2, `two canvases, two names: ${names.join(", ")}`);
+	assert.deepEqual([...names].sort(), ["Canvas 1", "Canvas 2"], names.join(", "));
 	assert.deepEqual(one.inPlay, ["boards/plan.html"], "neither sees the other's board");
+	cleanup();
+});
+
+/*
+ * Membership, which is what the pill's "here" section and a canvas card's faces are drawn
+ * from. An agent joins a room by working in it and does not leave it by going next door:
+ * there is no agent address any more, so "which canvas is Sable on" has to be allowed more
+ * than one answer.
+ */
+test("an agent is on every canvas it has worked on, and the current one is the last it joined", () => {
+	const { deck, cleanup } = deckOn();
+	const { one } = pair(deck);
+	assert.deepEqual(one.canvasIds, [], "nothing worked on, no rooms");
+	one.useCanvas("political-llm");
+	one.setInPlay(["boards/plan.html"], { place: true });
+	one.useCanvas("decks");
+	one.setInPlay(["boards/notes.html"], { place: true });
+
+	assert.equal(one.canvasIds.length, 2, "both rooms");
+	assert.equal(one.canvas, one.canvasIds[1], "the current one is where the next board lands");
+	assert.deepEqual(one.inPlay, ["boards/notes.html"], "and only that one's boards are its in-play set");
+	cleanup();
+});
+
+test("a canvas that is deleted drops out of the rooms an agent is in", () => {
+	const { deck, cleanup } = deckOn();
+	const { one, canvases } = pair(deck);
+	one.useCanvas("first");
+	const first = one.canvas as string;
+	one.useCanvas("second");
+	assert.deepEqual(one.canvasIds.length, 2);
+	canvases.remove(first);
+	assert.deepEqual(
+		one.canvasIds.map((id) => canvases.get(id)?.name),
+		["second"],
+	);
 	cleanup();
 });

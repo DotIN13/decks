@@ -16,9 +16,20 @@ export const agents = {
 		 * this the picker for a fresh conversation showed nothing selected until
 		 * something else happened to republish the list.
 		 */
+		/*
+		 * Made **in the room the person is in**, when they are in one.
+		 *
+		 * A canvas is where work happens, so an agent made while looking at one belongs to
+		 * it: its first board lands where the person who asked for it is looking, rather
+		 * than on a canvas of its own named after the chat that nobody has open. Made from
+		 * the dashboard there is no room, and the old rule stands — the canvas is made when
+		 * it first shows something.
+		 */
+		const room = wire.viewing?.canvas;
 		const agent = wire.agents.create({
 			... (message.parentId ? { parentId: message.parentId } : {}),
 			... (message.kind ? { kind: message.kind } : {}),
+			... (room && wire.canvases.get(room) ? { canvas: room } : {}),
 		});
 		/*
 		 * Asked for by a person, so it is what they want to talk to. A subagent is
@@ -26,6 +37,8 @@ export const agents = {
 		 * the focus — its parent is mid-turn and still has something to say.
 		 */
 		wire.agents.focus(agent.id);
+		// Who is in the room changed, and the pill and the panel draw that.
+		if (room) wire.publishCanvases();
 		void wire.publishAccounts();
 	},
 
@@ -57,6 +70,26 @@ export const agents = {
 	 */
 	"agent.tags": (message, _reply, wire) => {
 		wire.agents.get(message.id)?.setUserTags(message.tags);
+	},
+
+	/*
+	 * A rename from a person, which is the same act as `stage.me({ name })` from the agent.
+	 *
+	 * Refused when the name is taken, and said out loud: a name is an address — the bar reads
+	 * `@Sable` and the deck has to know which Sable — so two agents cannot share one. The
+	 * agent's own rename throws the same refusal at the model (`stage/tool.ts`).
+	 */
+	"agent.rename": (message, reply, wire) => {
+		const agent = wire.agents.get(message.id);
+		const name = message.name.trim().slice(0, 40);
+		if (!agent || !name) return;
+		if (wire.agents.nameTaken(name, agent.id)) {
+			reply({ type: "notice", level: "warn", text: `Another agent is already called ${name}.` });
+			// The field is holding a name the deck refused; this is what puts the old one back.
+			reply({ type: "agent.identity", id: agent.id, identity: agent.chat().identity });
+			return;
+		}
+		agent.rename(name);
 	},
 
 	/*

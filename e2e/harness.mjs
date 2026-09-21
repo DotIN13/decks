@@ -147,11 +147,15 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 		}
 	}, scheme);
 	/*
-	 * `#/stage`: the focused agent's stage. The app opens on the dispatch dashboard by
-	 * default, and every check in this suite was written against a canvas on screen; the
-	 * hash asks for that without knowing the agent's id, which the greeting supplies.
+	 * `#/canvas/<id>`: the room the fixture's boards are in.
+	 *
+	 * The app opens on the dispatch dashboard by default, and every check in this suite was
+	 * written against a canvas on screen. There is no `#/stage` and no agent address any
+	 * more — an agent is on every canvas it has worked in, so neither could name one place —
+	 * so the id is asked of the server first. `resetStage` has already played the fixture's
+	 * boards onto the focused agent's canvas, which is the one wanted here.
 	 */
-	await page.goto(`${WEB}/#/stage`, { waitUntil: "load" });
+	await page.goto(`${WEB}/#/canvas/${await stageCanvasId()}`, { waitUntil: "load" });
 	/*
 	 * Answer permission questions, because a check cannot.
 	 *
@@ -348,7 +352,7 @@ export async function ask(page, text, { timeout = 600000 } = {}) {
 }
 
 /** Talk to the server the way the client does. */
-export async function socket() {
+export async function socket({ canvas } = {}) {
 	const ws = new WebSocket(`${API.replace("http", "ws")}/ws`);
 	const received = [];
 	await new Promise((resolve, reject) => {
@@ -356,12 +360,51 @@ export async function socket() {
 		ws.onerror = reject;
 	});
 	ws.onmessage = (event) => received.push(JSON.parse(String(event.data)));
-	return {
+	const link = {
 		received,
 		send: (message) => ws.send(JSON.stringify(message)),
 		last: (type) => received.filter((m) => m.type === type).at(-1),
 		close: () => ws.close(),
 	};
+	/*
+	 * `canvas: true` puts this socket in the same room as the page.
+	 *
+	 * What a board frame acts on is **the canvas that socket is looking at**, and a socket
+	 * that has not opened one falls back to whoever the server has focused — which is global,
+	 * so another check running beside this one can move it. A play or a hide then landed on a
+	 * canvas nobody in this check was looking at, and the assertion failed as if hiding were
+	 * broken. Checks that drive boards over the wire ask for the page's room by name.
+	 */
+	if (canvas) {
+		link.send({ type: "canvas.focus", id: canvas === true ? await stageCanvasId() : canvas });
+		await new Promise((resolve) => setTimeout(resolve, 200));
+	}
+	return link;
+}
+
+/**
+ * The canvas a check should open: the focused agent's, else whichever one exists.
+ *
+ * Read off the greeting rather than guessed, because the id is a uuid the fixture cannot
+ * know. Waits, because the first check of a run reaches a server that is still starting its
+ * first agent — the same race `resetStage` documents below, arriving here through a hash
+ * that would otherwise be `#/canvas/undefined`.
+ */
+export async function stageCanvasId({ timeout = 25000 } = {}) {
+	const link = await socket();
+	const deadline = Date.now() + timeout;
+	try {
+		while (Date.now() < deadline) {
+			const canvases = link.last("canvases")?.canvases ?? [];
+			const focused = link.last("agents")?.focused;
+			const mine = canvases.find((canvas) => focused && canvas.agents.includes(focused)) ?? canvases[0];
+			if (mine) return mine.id;
+			await new Promise((resolve) => setTimeout(resolve, 200));
+		}
+	} finally {
+		link.close();
+	}
+	throw new Error("stageCanvasId: the deck has no canvas to open");
 }
 
 /**
@@ -471,7 +514,9 @@ export async function openPanel(page, tab = "context") {
  */
 export async function openAgents(page) {
 	if (await page.locator(".popover").count()) return;
-	await page.locator('.pill button[aria-label^="Switch agent"], .pill button[aria-haspopup="menu"]').first().click();
+	/* The agent's own chevron, by name. `[aria-haspopup="menu"]` used to be enough and is not:
+	   the canvas segment beside it opens a menu too, and it comes first in the pill. */
+	await page.locator('.pill button[aria-label^="Agents"], .pill button[aria-label^="Switch agent"]').first().click();
 	await page.waitForSelector(".popover", { timeout: 6000 });
 }
 

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { slug } from "../agents/slug.ts";
+import { numberedName } from "../names.ts";
 
 /**
  * Canvases: the thing that holds the boards.
@@ -141,13 +142,30 @@ export class CanvasStore {
 	/**
 	 * A name no canvas has yet: `name`, else `name 2`, `name 3`…
 	 *
-	 * For a canvas that belongs to one chat. Six chats called "Agent" are six arrangements, and
-	 * matching by name would fold them onto one canvas and lose five of them.
+	 * For a canvas that is being given a *particular* name — the migration's, out of a
+	 * workspace word several chats said. A canvas nobody has named gets `newName` instead,
+	 * which is a name rather than a count.
 	 */
 	freeName(name: string): string {
 		const base = name.trim().slice(0, MAX_CANVAS_NAME - 4) || "Canvas";
 		if (!this.byName(base)) return base;
 		for (let n = 2; ; n += 1) if (!this.byName(`${base} ${n}`)) return `${base} ${n}`;
+	}
+
+	/** What a canvas is called before anybody names it: `Canvas 1`, `Canvas 2`, the first one free. */
+	newName(base = "Canvas"): string {
+		return numberedName(base.slice(0, MAX_CANVAS_NAME - 6), (name) => Boolean(this.byName(name)));
+	}
+
+	/**
+	 * Whether another canvas already answers to this name.
+	 *
+	 * By slug, because that is how `byName` matches — `Political LLM` and `political-llm`
+	 * are one name to an agent joining by it, so they have to be one name to a rename too.
+	 */
+	nameTaken(name: string, exceptId?: string): boolean {
+		const found = this.byName(name);
+		return Boolean(found && found.id !== exceptId);
 	}
 
 	/** The canvas with this name, made if there is not one. */
@@ -159,7 +177,7 @@ export class CanvasStore {
 		this.load();
 		const record: CanvasRecord = {
 			id: options.id ?? `cv_${randomUUID().slice(0, 8)}`,
-			name: options.name.trim().slice(0, MAX_CANVAS_NAME) || "Canvas",
+			name: options.name.trim().slice(0, MAX_CANVAS_NAME) || this.newName(),
 			boards: [...(options.boards ?? [])],
 			places: { ...(options.places ?? {}) },
 			links: [],

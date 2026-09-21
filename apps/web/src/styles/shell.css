@@ -137,10 +137,12 @@
 		box-shadow: none;
 	}
 
-	/* ---- the open canvas: its name and who is in it ------------------------------ */
+	/* ---- the two names in the line: the canvas's and the agent's ------------------ */
 	/*
-	 * A canvas is a room, so the pill says which one and who is working there. The name is a
-	 * chip that turns into a field; the faces overlap like a roster, in each agent's colour.
+	 * Both are renamed in place — a chip that turns into a field (`EditableName`) — so they
+	 * share the chip and the field rather than each having a pair. The canvas used to carry
+	 * the faces of everybody on it as well; they are gone, because the agent you are
+	 * addressing is drawn in the same line and appeared twice.
 	 */
 	.pill-canvas {
 		display: inline-flex;
@@ -148,7 +150,7 @@
 		gap: var(--pill-gap, 4px);
 		white-space: nowrap;
 	}
-	.pill-canvas-name {
+	.pill-name {
 		max-width: 180px;
 		overflow: hidden;
 		padding: 0 9px;
@@ -156,7 +158,17 @@
 		font-weight: 600;
 		text-overflow: ellipsis;
 	}
-	.pill-canvas-field {
+	/*
+	 * The agent's name is a chip like the canvas's, and 12px like the line it is in: it sits
+	 * next to a 28px avatar rather than between two dividers, so the canvas chip's padding
+	 * would push the chevron away from the face it belongs to.
+	 */
+	.pill-agent-name {
+		max-width: 160px;
+		padding: 0 4px;
+		font-size: 12px;
+	}
+	.pill-name-field {
 		width: 160px;
 		height: 26px;
 		padding: 0 8px;
@@ -167,28 +179,21 @@
 		font: inherit;
 		font-weight: 600;
 	}
-	.pill-canvas-faces {
-		display: inline-flex;
-		padding-left: 4px;
-	}
-	.pill-canvas-face {
-		display: grid;
-		width: 20px;
-		height: 20px;
-		margin-left: -5px;
-		place-items: center;
-		border: 2px solid var(--layer, var(--panel));
+	/*
+	 * A canvas with something new on it, in the switcher: the dashboard card's mark, at the
+	 * size a menu row can spare. A dot rather than a count, because the question this
+	 * answers is "is there anything", and the shelf is where "how much" is asked.
+	 */
+	.pill-canvas-news {
+		width: 7px;
+		height: 7px;
+		flex: none;
+		margin-left: auto;
 		border-radius: 50%;
-		background: var(--face, var(--color-accent));
-		color: #fff;
-		font-size: 10.5px;
-		font-weight: 600;
+		background: var(--color-accent);
 	}
 	@media (max-width: 640px) {
-		.pill-canvas-faces {
-			display: none;
-		}
-		.pill-canvas-name {
+		.pill-name {
 			max-width: 110px;
 		}
 	}

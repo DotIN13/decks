@@ -1,5 +1,5 @@
 import { PALETTE, type ComponentKind } from "@decks/board-kit";
-import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
+import type { AgentChat, AgentKind, Canvas, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ArrowLeft from "lucide-solid/icons/arrow-left";
@@ -22,7 +22,7 @@ import { AgentMark } from "./agent-marks.tsx";
 import type { CanvasMode, Tool } from "../canvas/Editor.ts";
 import { Icon } from "../ui/icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
-import { runtimes } from "../state/deck.ts";
+import { isNews, runtimes } from "../state/deck.ts";
 import { canHover } from "../lib/media.ts";
 import { agentList, agentStatus, closeWords, dropdownFaces, rowWords, workspaceRuns } from "./agent-order.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
@@ -226,6 +226,14 @@ export function AgentMenu(props: {
 	onNew: (kind?: AgentKind) => void;
 	/** Take a chat off the list. The transcript is a file on disk and stays there. */
 	onClose: (id: string) => void;
+	/**
+	 * Who is on the canvas on screen, by id. The menu's first section.
+	 *
+	 * An agent is on every canvas it has worked in, so this is not a filter of the list but a
+	 * cut through it: the same agent is *here* in one room and *anywhere* in the next. Empty,
+	 * or absent on the dashboard, and the menu is one list grouped by workspace as before.
+	 */
+	here?: string[];
 	/** The control that opens it, given `Popover`'s api so it can draw itself pressed. */
 	trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;
 	placement?: Placement;
@@ -340,7 +348,25 @@ export function AgentMenu(props: {
 	 * rows it is not drawing. See `workspaceRuns`: the rows keep the order they were ranked in,
 	 * and the headings appear only once there is more than one group to tell apart.
 	 */
-	const runs = () => workspaceRuns(listed().shown, props.identities);
+	const runs = (): Array<{ label: string | undefined; chats: AgentChat[] }> => {
+		const shown = listed().shown;
+		const here = new Set(props.here ?? []);
+		/*
+		 * In a room: **here, then anywhere** — the two questions this menu is opened with, in
+		 * the order they are asked. Picking from either only changes who the composer
+		 * addresses; an agent from `Anywhere` joins this canvas by working on it, which is
+		 * the server's own rule (`session.canvasIds`) and not something the menu has to do.
+		 *
+		 * Off a canvas the old cut stands: one list, in workspace runs.
+		 */
+		const inside = here.size > 0 ? shown.filter((chat) => here.has(chat.id)) : [];
+		/* Nobody from this room in the list — an empty canvas, or a list cut down by a search
+		   that matched nothing here — so there is no *here* to draw, and `Anywhere` alone would
+		   be a heading that told the reader nothing. */
+		if (inside.length === 0) return workspaceRuns(shown, props.identities);
+		const outside = shown.filter((chat) => !here.has(chat.id));
+		return [{ label: "Here", chats: inside }, ...(outside.length > 0 ? [{ label: "Anywhere", chats: outside }] : [])];
+	};
 
 	return (
 		<Popover
@@ -600,14 +626,28 @@ export function AgentPill(props: {
 	/** Back to the dashboard. Drawn only on a stage. */
 	onHome?: () => void;
 	/**
-	 * The canvas on screen, when one is open: its name, and who is working on it.
+	 * The canvas on screen, when one is open: its name, and who is on it.
 	 *
-	 * A canvas is a room, so the pill says which room and who is in it — the faces of the
-	 * agents on it, in their own colours. The name is renamed in place, which is where a canvas
-	 * made as "Canvas 3" gets the name it should have had.
+	 * The faces the name used to carry are gone. They were a second roster in a line that
+	 * already has one — the agent you are addressing is drawn beside them, so the active
+	 * agent appeared twice — and who is in the room is the panel's "On this canvas" section,
+	 * where there is room to say what each of them is doing. `agents` stays, because the
+	 * agents menu cuts itself into *here* and *anywhere* by it.
 	 */
-	canvas?: { name: string; working: Identity[] };
+	canvas?: { id: string; name: string; agents: string[] };
 	onRenameCanvas?: (name: string) => void;
+	/** Rename the agent you are talking to, from its own name in the line. Absent and the name is a label. */
+	onRenameAgent?: (id: string, name: string) => void;
+	/**
+	 * Every canvas in the deck, for the switcher in the pill's canvas segment.
+	 *
+	 * The canvas is the place, so moving between rooms belongs beside the name of the room
+	 * you are in rather than on the dashboard alone: Home is for leaving, this is for going
+	 * next door. Absent and the name is a label with no chevron.
+	 */
+	canvases?: Canvas[];
+	onOpenCanvas?: (id: string) => void;
+	onNewCanvas?: () => void;
 	/** How many tasks want a person: the badge on Home, and on the Boards tab. */
 	wantsYou?: number;
 	/** How many boards an agent named since the person last read them: the dot on the Boards tab. */
@@ -721,7 +761,16 @@ export function AgentPill(props: {
 			</span>
 
 			<Show when={onStage() && props.canvas}>
-				{(canvas) => <CanvasSegment name={canvas().name} working={canvas().working} onRename={(name) => props.onRenameCanvas?.(name)} />}
+				{(canvas) => (
+					<CanvasSegment
+						id={canvas().id}
+						name={canvas().name}
+						canvases={props.canvases ?? []}
+						onRename={(name) => props.onRenameCanvas?.(name)}
+						{...(props.onOpenCanvas ? { onOpen: props.onOpenCanvas } : {})}
+						{...(props.onNewCanvas ? { onNew: props.onNewCanvas } : {})}
+					/>
+				)}
 			</Show>
 
 			{/*
@@ -773,7 +822,20 @@ export function AgentPill(props: {
 							the larger of the two, which would hold the buttons back 128px for
 							a string that is not one of them.
 						*/}
-						<span class="max-w-[160px] truncate text-[12px] font-semibold max-[768px]:hidden">{name()}</span>
+						{/*
+							Renamed in place, like the canvas beside it: a press on the name is a
+							field, Escape keeps the old one. An agent names itself as its first act
+							(`stage.me({ name })`), and this is the same act from your side — which
+							is why `Agent 3` can be the thing it is *called* rather than a label you
+							have to ask an agent to change on your behalf.
+						*/}
+						<EditableName
+							name={name() ?? ""}
+							label="Agent name"
+							title={`Rename ${name()}`}
+							class="pill-name pill-agent-name max-[768px]:hidden"
+							onRename={(next) => props.onRenameAgent?.(chat().id, next)}
+						/>
 					</span>
 				)}
 			</Show>
@@ -783,6 +845,7 @@ export function AgentPill(props: {
 				identities={props.identities}
 				focused={props.focused}
 				unread={props.unread}
+				here={props.canvas?.agents ?? []}
 				onFocus={props.onFocus}
 				onNew={props.onNew}
 				onClose={props.onClose}
@@ -1044,13 +1107,27 @@ export function AgentPill(props: {
 }
 
 /**
- * The open canvas's name and who is working on it, as a segment of the pill.
+ * A name you rename in place: a button that becomes a field.
  *
- * The name is a button that turns into a field: Enter or leaving it keeps the new name, Escape
- * keeps the old one. The faces are the agents on this canvas, overlapped like a room's roster,
- * and a tooltip names them — they are said, not offered, because who is here is a fact.
+ * Two names in this pill work this way — the canvas's and the agent's — and the rules are
+ * the same for both: Enter or leaving the field keeps what was typed, Escape keeps the old
+ * name, and an empty field is not a name. One component, because a second copy of six lines
+ * is where the two come to behave differently.
+ *
+ * The field is not a `contenteditable` or a permanently-live input: a name that is always
+ * editable is a name you rename by mistake while reaching for the chevron beside it.
  */
-function CanvasSegment(props: { name: string; working: Identity[]; onRename: (name: string) => void }) {
+function EditableName(props: {
+	name: string;
+	/** What the field is called, for a screen reader. */
+	label: string;
+	/** The tooltip on the button, which is where the verb is said. */
+	title: string;
+	/** The button's classes, so the two callers can look like what they sit in. */
+	class: string;
+	max?: number;
+	onRename: (name: string) => void;
+}) {
 	const [editing, setEditing] = createSignal(false);
 	let field: HTMLInputElement | undefined;
 	const finish = (keep: boolean) => {
@@ -1059,44 +1136,126 @@ function CanvasSegment(props: { name: string; working: Identity[]; onRename: (na
 		if (keep && next && next !== props.name) props.onRename(next);
 	};
 	return (
+		<Show
+			when={editing()}
+			fallback={
+				<button type="button" class={props.class} title={props.title} onClick={() => setEditing(true)}>
+					{props.name}
+				</button>
+			}
+		>
+			<input
+				ref={(element) => {
+					field = element;
+					queueMicrotask(() => element.select());
+				}}
+				class="pill-name-field"
+				value={props.name}
+				aria-label={props.label}
+				maxLength={props.max ?? 40}
+				onKeyDown={(event) => {
+					if (event.key === "Enter") finish(true);
+					if (event.key === "Escape") {
+						event.stopPropagation();
+						finish(false);
+					}
+				}}
+				onBlur={() => finish(true)}
+			/>
+		</Show>
+	);
+}
+
+/**
+ * The open canvas: its name, and the way to the next room.
+ *
+ * The name is a button that turns into a field: Enter or leaving it keeps the new name, Escape
+ * keeps the old one. It used to carry the faces of everybody on the canvas as well, and they
+ * are gone: the agent you are talking to is drawn two controls along, so its face was in the
+ * line twice, and who else is in the room is a question the panel answers properly.
+ *
+ * The chevron is the switcher. **Clicking the name renames, clicking the chevron
+ * moves** — two verbs on one segment, which is the same division the agent beside it makes
+ * (the face is who you are with, the chevron is who else there is), so nothing new has to be
+ * learnt to tell them apart.
+ */
+function CanvasSegment(props: {
+	id: string;
+	name: string;
+	/** Every canvas in the deck; the switcher's list. */
+	canvases: Canvas[];
+	onRename: (name: string) => void;
+	onOpen?: (id: string) => void;
+	onNew?: () => void;
+}) {
+	return (
 		<span class="pill-canvas">
-			<Show
-				when={editing()}
-				fallback={
-					<button type="button" class="chipbtn pill-canvas-name" title="Rename this canvas" onClick={() => setEditing(true)}>
-						{props.name}
-					</button>
-				}
-			>
-				<input
-					ref={(element) => {
-						field = element;
-						queueMicrotask(() => element.select());
-					}}
-					class="pill-canvas-field"
-					value={props.name}
-					aria-label="Canvas name"
-					maxLength={40}
-					onKeyDown={(event) => {
-						if (event.key === "Enter") finish(true);
-						if (event.key === "Escape") {
-							event.stopPropagation();
-							finish(false);
-						}
-					}}
-					onBlur={() => finish(true)}
-				/>
-			</Show>
-			<Show when={props.working.length > 0}>
-				<span class="pill-canvas-faces" title={`Working here: ${props.working.map((identity) => identity.name).join(", ")}`}>
-					<For each={props.working.slice(0, 4)}>
-						{(identity) => (
-							<span class="pill-canvas-face" style={{ "--face": identity.color }}>
-								{identity.name.slice(0, 1)}
-							</span>
+			<EditableName
+				name={props.name}
+				label="Canvas name"
+				title="Rename this canvas"
+				class="chipbtn pill-name"
+				onRename={props.onRename}
+			/>
+			{/*
+				The rooms, from the room you are in.
+				
+				Ordered as the server sends them, which is by name: a shelf you can predict beats
+				one that reshuffles itself as agents work. The dot is the canvas's own changed mark
+				(`isNews`) — something was put up there since you last looked — and it is the one
+				reason to leave a room you had not thought of leaving.
+			*/}
+			<Show when={props.onOpen ?? props.onNew}>
+				<Popover
+					placement="bottom-start"
+					label="Canvases"
+					class="w-[248px]"
+					trigger={(api) => (
+						<button
+							type="button"
+							class="iconbtn"
+							ref={api.ref}
+							aria-haspopup="menu"
+							aria-expanded={api.open}
+							data-on={api.open ? "soft" : undefined}
+							title="Open another canvas"
+							aria-label={`Canvases — currently ${props.name}`}
+							onClick={api.toggle}
+						>
+							<Icon of={ChevronDown} size={12} />
+						</button>
+					)}
+				>
+					<For each={props.canvases}>
+						{(canvas) => (
+							<button
+								type="button"
+								role="menuitem"
+								data-row
+								data-flat="true"
+								/* Washed, not ticked, exactly as the agent rows are: the row describes the
+								   room you are already in rather than a setting you have chosen. */
+								data-current={canvas.id === props.id ? "true" : undefined}
+								onClick={() => props.onOpen?.(canvas.id)}
+							>
+								<span class="lb nm block truncate">{canvas.name}</span>
+								<Show when={canvas.id === props.id}>
+									<span class="meta flex-none text-[10px]">you are here</span>
+								</Show>
+								<Show when={canvas.id !== props.id && isNews(canvas)}>
+									<span class="pill-canvas-news" aria-label="Something new here" />
+								</Show>
+							</button>
 						)}
 					</For>
-				</span>
+					<Show when={props.onNew}>
+						<div class="rule" />
+						<button type="button" role="menuitem" data-row data-flat="true" onClick={() => props.onNew?.()}>
+							<Icon of={Plus} size={13} class="flex-none text-muted" />
+							<span class="lb flex-1 whitespace-nowrap">New canvas</span>
+						</button>
+					</Show>
+				</Popover>
 			</Show>
 			<span class="pill-sep" aria-hidden="true" />
 		</span>

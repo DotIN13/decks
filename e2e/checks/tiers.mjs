@@ -5,7 +5,7 @@
  * socket — no model needed. The agent-side half (`attach`/`show` from `stage_eval`) is
  * checked in stage-api.mjs, which does need one.
  */
-import { deckState, emptyCanvas, newAgent, open, openAllBoards, openPanel, say, settle, socket } from "../harness.mjs";
+import { deckState, newAgent, open, openAllBoards, openPanel, say, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const paths = deck.boards.map((board) => board.path).sort();
@@ -39,42 +39,56 @@ const mine = () =>
 const listed = () => page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .nm")].map((n) => n.textContent).sort());
 
 /*
- * A fresh agent holds nothing, so it puts nothing on the canvas. The canvas used to fall
- * back to every board, which claimed the agent was working from all of them and made its
- * first act — narrowing to one — look like boards disappearing.
+ * The canvas is the room's, and the panel says the same thing about it.
  *
- * The panel used to fall back the same way, on the argument that it was the only place to
- * find a board so it had to list every one. It does not have to: the deck is the last
- * section of its list, always there under whatever the agent is holding. So both surfaces
- * say what is true rather than one of them saying two things depending on state nobody is
- * looking at — the canvas is what the agent put in play, and the panel's first two headings
- * are what it holds.
+ * `inPlay` used to be one agent's, so the two surfaces could be made to disagree by
+ * switching agent; both read the canvas now. The deck is the last section of the list,
+ * always there under whatever is up, so the panel is never a list of nothing.
  */
-await newAgent(page);
-await settle(page, 1200);
-await emptyCanvas(page);
-say("an agent holding nothing puts nothing on the canvas", (await onCanvas()).length === 0, (await onCanvas()).join(" ") || "(empty)");
-
 await openPanel(page);
-say("…and the panel lists nothing under its own two headings", (await mine()).length === 0, (await mine()).join(" ") || "(empty)");
-say(
-	"…while still showing the deck, so the panel is never a list of nothing",
-	(await listed()).join() === names.join(),
-	(await listed()).join(" "),
-);
+say("the canvas shows the room's boards", (await onCanvas()).join() === paths.join(), (await onCanvas()).join(" "));
+say("…and the panel's own headings say the same", (await mine()).join() === names.join(), (await mine()).join(" "));
 
 await openAllBoards(page);
 say("every board is reachable from here, which is where you find one", (await listed()).join() === names.join(), (await listed()).join(" "));
 await page.mouse.move(800, 500);
 
-// Holding two boards narrows the canvas to them.
+/*
+ * A new agent joins the room it was made in.
+ *
+ * It used to make a canvas of its own, named after the chat, and the boards on screen went
+ * away — which is what "the canvas is one agent's in-play set" looked like from the front.
+ * An agent made while looking at a canvas is put on it (`wire/agents.ts`), so the room is
+ * unchanged and the only thing that moved is who the bar is talking to.
+ */
+const roomBefore = await onCanvas();
+await newAgent(page);
+await settle(page, 1200);
+say("a new agent joins the room rather than emptying it", (await onCanvas()).join() === roomBefore.join(), (await onCanvas()).join(" ") || "(empty)");
+/*
+ * And it is called something nothing else is called.
+ *
+ * Every unnamed chat used to be `Agent`, which is an address two of them shared: `@Agent`
+ * from the bar could mean either. The roster is read off a fresh socket, because the
+ * greeting carries it and this is a fact about the server rather than about the pill.
+ */
+const roster = await socket();
+await settle(page, 600);
+const chats = (roster.last("agents")?.chats ?? []).filter((chat) => chat.role !== "dispatcher");
+roster.close();
+const chatNames = chats.map((chat) => chat.name);
+say("…with a number of its own: Agent 1, Agent 2", chatNames.every((name) => /^Agent \d+$/.test(name)), JSON.stringify(chatNames));
+say("…and no two chats share one", new Set(chatNames.map((name) => name.toLowerCase())).size === chatNames.length, JSON.stringify(chatNames));
+await openPanel(page);
+say("…and the room's boards are still what the panel lists", (await mine()).join() === names.join(), (await mine()).join(" "));
+
+// Two more plays land on the canvas the browser is looking at, whoever sent them.
 const two = paths.slice(0, 2);
-const link = await socket();
+const link = await socket({ canvas: true });
 for (const path of two) link.send({ type: "board.play", path });
-await page.waitForFunction((wanted) => document.querySelectorAll(".board-node").length === wanted, two.length, { timeout: 8000 });
-say("the canvas narrows to what the agent holds", (await onCanvas()).join() === two.join(), (await onCanvas()).join(" "));
+await settle(page, 800);
+say("a board played again is not a second copy of it", (await onCanvas()).join() === paths.join(), (await onCanvas()).join(" "));
 await openPanel(page, "context");
-say("the panel's own two headings list the same two", (await mine()).join() === two.map(base).sort().join(), (await mine()).join(" "));
 
 // The hide button on a board takes it off the canvas, and the rail keeps it.
 //
@@ -86,11 +100,19 @@ await page.locator(`.board-node[data-path="${first}"] .chrome`).hover();
 await page.locator(`.board-node[data-path="${first}"] .chrome .hide`).click();
 await page.waitForFunction((wanted) => !document.querySelector(`.board-node[data-path="${wanted}"]`), first, { timeout: 8000 });
 say("the hide button takes a board off the canvas", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
-say("…without dropping it from the agent's context", (await mine()).length === 2, (await mine()).join(" "));
+/*
+ * And it is still in the panel, under a different heading.
+ *
+ * Which heading depends on who holds it: a board an agent has read falls to `Held, not
+ * shown`, and one that was only ever *up* — which is what a board played onto the room is —
+ * falls back to `In the deck`. Both are the list; the tier it lands in is the point of
+ * having three.
+ */
+say("…without dropping it from the list", (await listed()).includes(base(first)), (await listed()).join(" "));
 
-// Clicking a thumbnail in the context panel puts it back.
+// Clicking its row in the panel puts it back on the canvas.
 await openPanel(page, "context");
-await page.locator(`.panel-section:not([data-kind="deck"]) .board-row:has(.nm:text-is("${base(first)}"))`).first().click();
+await page.locator(`.panel-list .board-row:has(.nm:text-is("${base(first)}"))`).first().click();
 await page.waitForFunction((wanted) => Boolean(document.querySelector(`.board-node[data-path="${wanted}"]`)), first, { timeout: 8000 });
 await page.mouse.move(800, 500);
 say("clicking a rail item plays it", (await onCanvas()).includes(first), (await onCanvas()).join(" "));

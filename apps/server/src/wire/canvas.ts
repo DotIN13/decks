@@ -37,14 +37,29 @@ export const canvas = {
 	},
 
 	"canvas.create": (message, reply, wire) => {
-		const made = wire.canvases.create({ name: message.name });
+		/*
+		 * One name, one canvas: a canvas is joined by name (`stage.canvas("…")`), so a second
+		 * one wearing the same name would take work meant for the first. A name already in
+		 * use is replaced by a fresh default rather than refused — nobody chose this one, the
+		 * app generated it, and a dialog about a name the person never typed is worse than a
+		 * different number.
+		 */
+		const wanted = message.name.trim();
+		const name = !wanted || wire.canvases.nameTaken(wanted) ? wire.canvases.newName() : wanted;
+		const made = wire.canvases.create({ name });
 		wire.publishCanvases();
 		reply({ type: "deck.state", deck: wire.canvasState(made.id) });
 		reply({ type: "canvases", canvases: wire.canvasList(), focused: made.id });
 		if (wire.viewing) wire.viewing.canvas = made.id;
 	},
 
-	"canvas.rename": (message, _reply, wire) => {
+	"canvas.rename": (message, reply, wire) => {
+		// Refused rather than numbered: this name was typed, so the person is the one to change it.
+		if (wire.canvases.nameTaken(message.name, message.id)) {
+			reply({ type: "notice", level: "warn", text: `Another canvas is already called ${message.name.trim()}.` });
+			reply({ type: "canvases", canvases: wire.canvasList() });
+			return;
+		}
 		if (wire.canvases.rename(message.id, message.name)) wire.publishCanvases();
 	},
 

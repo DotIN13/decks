@@ -40,12 +40,19 @@ say("the fixture has boards to be placed among", paths.length >= 2, JSON.stringi
 // --- a board picked out of the rail, from the far end of the old column ----------------
 
 const stray = paths.at(-1);
-const link = await socket();
+const link = await socket({ canvas: true });
 /* Off the canvas and half a million pixels down: the place the deck-wide layout used to give a
    board that nobody had put anywhere. */
 link.send({ type: "board.hide", path: stray });
 link.send({ type: "board.move", path: stray, x: 0, y: 520_000 });
-await settle(page, 700);
+/*
+ * Waited for rather than slept through. A hide travels socket → canvas → every browser, and
+ * a fixed 700ms was enough until the canvas list started travelling with it: under a full
+ * run this check failed on its second assertion about once in twenty, which reads as the
+ * hide being broken rather than as the wait being short.
+ */
+await page.waitForFunction((path) => !document.querySelector(`.board-node[data-path="${path}"]`), stray, { timeout: 8000 });
+await settle(page, 300);
 
 const staying = await onScreen();
 say("…and one of them is off the canvas, with a place far from the rest", !staying.some((board) => board.path === stray), stray);

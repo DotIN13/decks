@@ -292,10 +292,12 @@
 		/* Level with the two toolbars, in the band between them: a 28px chip centred on their
 		   40px, and the page begins 18px under it. */
 		top: 18px;
-		/* Centred on the canvas column, not the layer: the sidebar is a full-height column
-		   now and the top-left pill starts beside it, so the layer's own middle can sit
-		   under the pill while editing. The dock makes the same subtraction. */
-		left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
+		/* Centred in the clear span of the top band, between the two clusters (`--band-left`
+		   and `--band-right`, measured in `camera/insets.ts`). Centring it on the canvas
+		   column put it *under* the top-left pill: the pill is a float, so nothing is
+		   subtracted for it, and it reaches the middle of a 1440px window once it carries a
+		   canvas switcher. The fallback is the old rule, for a window with no clusters in it. */
+		left: calc((var(--band-left, var(--inset-left, 0px)) + var(--band-right, calc(100% - var(--inset-right, 0px)))) / 2);
 		transform: translateX(-50%);
 		z-index: 5;
 		display: flex;

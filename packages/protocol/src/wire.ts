@@ -164,6 +164,14 @@ export type ClientMessage =
 	 */
 	| { type: "agent.tags"; id: string; tags: string[] }
 	/**
+	 * Rename an agent, from its own name in the pill or from the edit modal.
+	 *
+	 * The same field `stage.me({ name })` writes: an agent names itself and you may rename
+	 * it, and there is one name either way. Refused with a notice when another agent already
+	 * answers to it, because a name is how the bar addresses one.
+	 */
+	| { type: "agent.rename"; id: string; name: string }
+	/**
 	 * The workspace an agent is in, from the row's customise popup. `null` leaves it.
 	 *
 	 * The same field `stage.me.setWorkspace` writes, and deliberately not a second one: a

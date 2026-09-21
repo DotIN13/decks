@@ -77,7 +77,26 @@ const markedBefore = await page.evaluate(() => {
 	}
 	return marked;
 });
-await page.locator(`.board-node[data-path="${NOTES}"] .chrome .focus-open`).click();
+/*
+ * The board's own bar, clear of the top-left pill before it is pressed.
+ *
+ * A float over the canvas intercepts presses, and the pill has grown a canvas switcher: where
+ * the camera happens to leave a board is not what this check is about, so the canvas is panned
+ * until the button is its own. Two turns of the wheel is plenty; the loop is so a change in the
+ * pill's height cannot quietly make this a coin toss again.
+ */
+const openButton = page.locator(`.board-node[data-path="${NOTES}"] .chrome .focus-open`);
+for (let tries = 0; tries < 4; tries += 1) {
+	const pill = await page.locator('.float.pill[data-inset="top"]').first().boundingBox();
+	const button = await openButton.boundingBox();
+	if (!pill || !button) break;
+	const clear = button.y > pill.y + pill.height + 6 || button.x > pill.x + pill.width + 6;
+	if (clear) break;
+	await page.mouse.move(900, 600);
+	await page.mouse.wheel(0, -160);
+	await settle(page, 250);
+}
+await openButton.click();
 await settle(page, 700);
 
 const state = () =>
@@ -277,6 +296,22 @@ await page.keyboard.press("d");
 await settle(page, 700);
 const backIn = await page.evaluate(() => Boolean(document.querySelector(".focus")));
 say("the view can also be entered by its key", backIn, String(backIn));
+/*
+ * The exit chip stands clear of both top clusters.
+ *
+ * It used to be centred on the canvas column, which put it under the top-left pill as soon
+ * as the pill carried a canvas switcher — the press landed on the text tool. It centres in
+ * the gap between the clusters now (`--band-left`/`--band-right`), and this is that, in
+ * numbers, because it is the kind of thing a stylesheet change can undo silently.
+ */
+const band = await page.evaluate(() => {
+	const rect = (el) => (el ? { left: Math.round(el.getBoundingClientRect().left), right: Math.round(el.getBoundingClientRect().right) } : undefined);
+	return {
+		pill: rect(document.querySelector('.float.pill[data-inset="top"]')),
+		exit: rect(document.querySelector(".focus-exit")),
+	};
+});
+say("the exit chip stands clear of the top-left pill", Boolean(band.exit && band.pill && band.exit.left > band.pill.right), JSON.stringify(band));
 await page.locator(".focus-exit").click();
 await settle(page, 700);
 const byButton = await state();

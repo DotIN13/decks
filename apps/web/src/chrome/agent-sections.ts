@@ -27,7 +27,7 @@ import { agentStatus, type AgentStatus } from "./agent-order.ts";
  * unanswerable in the place it is asked.
  */
 
-export type AgentSectionKind = "wants" | "working" | "quiet" | "workspace" | "unfiled";
+export type AgentSectionKind = "canvas" | "wants" | "working" | "quiet" | "workspace" | "unfiled";
 
 /**
  * How the list is cut up.
@@ -45,6 +45,16 @@ export type AgentSectionKind = "wants" | "working" | "quiet" | "workspace" | "un
  * `byRecency` — so the axis changes the headings and not the ranking.
  */
 export type AgentGroup = "workspace" | "attention";
+
+/**
+ * The heading over the agents in the room you are looking at, above either cut.
+ *
+ * A canvas is the unit of work, so the first question the panel is opened with on a stage is
+ * *who is in here* — and it is not a third axis: the agents on this canvas are lifted out and
+ * everybody else is cut up exactly as the chosen axis says. An agent is on every canvas it has
+ * worked in, so a row leaving this section is not a row leaving the list.
+ */
+const ON_CANVAS = "On this canvas";
 
 export interface AgentRow {
 	/**
@@ -106,6 +116,13 @@ export interface AgentListInput {
 	query?: string;
 	/** Which axis to cut the list by. Absent is attention — see `AgentGroup`. */
 	group?: AgentGroup;
+	/**
+	 * The agents on the canvas on screen, by id: the section that goes on top.
+	 *
+	 * Absent, or empty, and the list is what it always was. On the dashboard there is no room
+	 * to be in, so nothing passes it there.
+	 */
+	onCanvas?: string[];
 }
 
 const SECTIONS: { kind: AgentSectionKind; label: string; holds: AgentStatus[] }[] = [
@@ -161,10 +178,23 @@ export function agentSections(input: AgentListInput): AgentSection[] {
 		};
 	});
 
-	const matching = rows.filter((row) => agentMatches(row, needle));
-	if (input.group === "workspace") return workspaceSections(matching);
+	const all = rows.filter((row) => agentMatches(row, needle));
+	/*
+	 * The room first, and the rest of the deck under it.
+	 *
+	 * The two halves are cut by *membership*, before the axis is applied, so "on this canvas"
+	 * is a section under either heading scheme and the search still runs over both. A canvas
+	 * with nobody on it draws no section rather than an empty one, exactly as a status
+	 * section does.
+	 */
+	const here = new Set(input.onCanvas ?? []);
+	const inside = here.size > 0 ? all.filter((row) => here.has(row.id)) : [];
+	const matching = here.size > 0 ? all.filter((row) => !here.has(row.id)) : all;
+	const room: AgentSection[] = inside.length > 0 ? [section("canvas", "canvas", ON_CANVAS, inside)] : [];
 
-	const out: AgentSection[] = [];
+	if (input.group === "workspace") return [...room, ...workspaceSections(matching)];
+
+	const out: AgentSection[] = [...room];
 	for (const section of SECTIONS) {
 		const mine = matching.filter((row) => section.holds.includes(row.status)).sort(byRecency);
 		if (mine.length > 0) out.push({ id: section.kind, kind: section.kind, label: section.label, rows: mine });

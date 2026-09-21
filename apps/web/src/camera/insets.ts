@@ -75,9 +75,23 @@ export function watchInsets(root: HTMLElement = document.body): void {
 	let sizes = new ResizeObserver(() => soon(false));
 	const tracked = new Set<Element>();
 
+	/*
+	 * The clear span of the top band: to the right of the left cluster, and to the left of
+	 * the right one.
+	 *
+	 * The two top clusters are floats, so they are not insets — nothing is subtracted for
+	 * them — but anything else that wants to sit *between* them has to know where they end.
+	 * The focus view's exit chip is the case: centred on the canvas column it sat under the
+	 * pill the moment the pill grew a canvas switcher, and a press aimed at it landed on the
+	 * text tool. Measured, like everything else here, rather than stated beside a stylesheet.
+	 */
+	let band = { left: 0, right: 0 };
+
 	const measure = () => {
 		const view = { width: window.innerWidth, height: window.innerHeight };
 		const next: Insets = { ...ZERO };
+		let bandLeft = 0;
+		let bandRight = view.width;
 		for (const el of tracked) {
 			const edge = (el as HTMLElement).dataset.inset as keyof Insets | undefined;
 			if (!edge) continue;
@@ -112,9 +126,23 @@ export function watchInsets(root: HTMLElement = document.body): void {
 			if (edge === "right") next.right = Math.max(next.right, view.width - box.offsetLeft);
 			if (edge === "top") next.top = Math.max(next.top, box.offsetTop + height);
 			if (edge === "bottom") next.bottom = Math.max(next.bottom, view.height - box.offsetTop);
+			/*
+			 * And where the top band is taken. Which side a cluster belongs to is decided by
+			 * its own middle: the pill grows rightwards from the sidebar and the corner grows
+			 * leftwards from the window's edge, so nothing has to name them.
+			 */
+			if (edge === "top") {
+				const middle = box.offsetLeft + width / 2;
+				if (middle < view.width / 2) bandLeft = Math.max(bandLeft, box.offsetLeft + width);
+				else bandRight = Math.min(bandRight, box.offsetLeft);
+			}
 		}
+		bandLeft = Math.max(bandLeft, next.left);
+		bandRight = Math.max(bandLeft, Math.min(bandRight, view.width - next.right));
 		const now = insets();
-		if (now.left === next.left && now.right === next.right && now.top === next.top && now.bottom === next.bottom) return;
+		const sameBand = band.left === bandLeft && band.right === bandRight;
+		if (sameBand && now.left === next.left && now.right === next.right && now.top === next.top && now.bottom === next.bottom) return;
+		band = { left: bandLeft, right: bandRight };
 		setInsets(next);
 		/*
 		 * Published as custom properties as well as a signal, so that the parts of the
@@ -131,6 +159,9 @@ export function watchInsets(root: HTMLElement = document.body): void {
 		root.setProperty("--inset-right", `${next.right}px`);
 		root.setProperty("--inset-top", `${next.top}px`);
 		root.setProperty("--inset-bottom", `${next.bottom}px`);
+		/* A gutter inside each cluster, so what centres here never touches one. */
+		root.setProperty("--band-left", `${bandLeft + 12}px`);
+		root.setProperty("--band-right", `${Math.max(bandLeft + 12, bandRight - 12)}px`);
 	};
 
 	const sync = () => {

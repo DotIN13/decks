@@ -2,9 +2,10 @@ import type { Identity } from "@decks/protocol";
 import PictureInPicture2 from "lucide-solid/icons/picture-in-picture-2";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
-import { createEffect, createSignal, createUniqueId, For, onMount, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
+import { Portal } from "solid-js/web";
+import { AgentEdit } from "./AgentEdit.tsx";
 import { Icon } from "../ui/icons.tsx";
-import { Popover } from "../ui/Popover.tsx";
 import { AgentFace } from "./AgentPill.tsx";
 import { closeWords, since, statusWords } from "./agent-order.ts";
 import { canHover } from "../lib/media.ts";
@@ -59,6 +60,14 @@ export function AgentRow(props: {
 	 */
 	onWorkspace?: (workspace: string | null) => void;
 	/**
+	 * Rename this agent — the same field `stage.me({ name })` writes.
+	 *
+	 * Yours as well as the agent's, because a chat called `Agent 3` is a chat you should be
+	 * able to name without asking it to name itself. Absent means the window's name field is
+	 * a label.
+	 */
+	onRename?: (name: string) => void;
+	/**
 	 * Every workspace in use, for the popup's suggestions.
 	 *
 	 * The one thing that stops this feature's likeliest failure — a second spelling of a
@@ -69,6 +78,8 @@ export function AgentRow(props: {
 }) {
 	const chat = () => props.row.chat;
 	const name = () => props.identity?.name ?? chat().name;
+	/** Whether this row's edit window is open. One per row, and only the open one is drawn. */
+	const [editing, setEditing] = createSignal(false);
 	/** Off the row, where `agent-sections.ts` put it — one source for one fact, like the tags. */
 	const workspace = () => props.row.workspace;
 	/** The tooltip if this agent can be closed, and `undefined` if it cannot. */
@@ -184,22 +195,54 @@ export function AgentRow(props: {
 			</button>
 
 			{/*
-				Your own tags, behind a `+`.
-
+				Edit this agent: the pen, and a window rather than a popover.
+				
 				Inside `.row-act` and *not* a `[data-row]`, for the reason the × is not one: this
 				list is roved by the arrow keys, and a second stop per row would double every
 				journey through it. It is reachable by Tab from the row instead.
+
+				The window is in a `Portal` because the panel is a scrolling column with its own
+				`overflow`, and a modal drawn inside one is a modal clipped to a 264px strip.
 			*/}
 			<Show when={props.onTags}>
 				{(onTags) => (
-					<Customise
-						name={name()}
-						tags={props.row.userTags}
-						workspace={workspace()}
-						workspaces={props.workspaces ?? []}
-						onTags={onTags()}
-						{...(props.onWorkspace ? { onWorkspace: props.onWorkspace } : {})}
-					/>
+					<>
+						<button
+							class="agent-tagbtn"
+							type="button"
+							data-on={editing() || undefined}
+							title={`Edit ${name()}`}
+							aria-label={`Edit ${name()}: name, workspace and tags`}
+							onClick={(event) => {
+								event.stopPropagation();
+								setEditing(true);
+							}}
+						>
+							{/*
+								A pen, at the × beside it: 13px, the same stroke, the same 20px slot.
+								It was a `+`, which said *add one more* — right for a row of chips you
+								are appending to, wrong for the only control on a row that opens a
+								thing you edit.
+							*/}
+							<Icon of={SquarePen} size={13} />
+						</button>
+						<Show when={editing()}>
+							<Portal>
+								<AgentEdit
+									agentId={chat().id}
+									name={name()}
+									tags={props.row.tags}
+									userTags={props.row.userTags}
+									{...(workspace() ? { workspace: workspace() } : {})}
+									workspaces={props.workspaces ?? []}
+									onRename={(next) => props.onRename?.(next)}
+									onTags={onTags()}
+									onWorkspace={(next) => props.onWorkspace?.(next)}
+									onClose={() => setEditing(false)}
+								/>
+							</Portal>
+						</Show>
+					</>
 				)}
 			</Show>
 
@@ -256,241 +299,3 @@ export function AgentRow(props: {
 	);
 }
 
-/**
- * Your tags on an agent, in a popup.
- *
- * A separate list from the agent's, which is the point rather than an implementation detail:
- * `stage.me.setTags` **replaces**, so one shared list would mean the agent's next call
- * silently deleted what you typed. They are stored in `Identity.userTags`, drawn outlined
- * where the agent's are filled, and the agent cannot read them — `stage.agents()` reports
- * `tags` and not `userTags`, because what you think of an agent is not something it should
- * be steering on.
- *
- * **No Save.** Every change is sent, as everything else in this app is; a popup with a Save
- * button is a popup you can leave in a state that looks applied and is not.
- */
-function Customise(props: {
-	name: string;
-	tags: string[];
-	/** The workspace this agent is in, or undefined. */
-	workspace?: string;
-	/** Every workspace in use — the suggestions under the field. */
-	workspaces: string[];
-	onTags: (tags: string[]) => void;
-	/** Absent means the workspace cannot be set from here. */
-	onWorkspace?: (workspace: string | null) => void;
-}) {
-	const [draft, setDraft] = createSignal("");
-	const [room, setRoom] = createSignal(props.workspace ?? "");
-	const listId = createUniqueId();
-	let entry: HTMLInputElement | undefined;
-	let roomField: HTMLInputElement | undefined;
-
-	/*
-	 * The field follows the agent's workspace rather than owning it.
-	 *
-	 * Both writers land on one value — the agent declares one with `stage.me.setWorkspace`, and
-	 * the row announces it — so a field that only held what you last typed would disagree with
-	 * the chip on the row it was opened from.
-	 */
-	createEffect(() => setRoom(props.workspace ?? ""));
-
-	/*
-	 * Take the cursor when the popup opens — not when this component mounts.
-	 *
-	 * Three things were tried and the first two were wrong for the same reason. `autofocus`
-	 * is an attribute the browser only acts on for nodes present at page load. `onMount`
-	 * looked right and fired at the wrong moment: this component mounts with the **row**,
-	 * and `Popover` renders its children only while open, so the input did not exist yet and
-	 * the ref was undefined.
-	 *
-	 * So it hangs off `onOpenChange`, one frame later because the card is measured and placed
-	 * after it mounts. Until this worked, focus stayed on the trigger: the first keystroke
-	 * went to a button and the first Enter re-pressed it, closing the popup somebody had just
-	 * opened in order to type into it.
-	 */
-	const focusEntry = () => requestAnimationFrame(() => entry?.focus());
-
-	/**
-	 * The workspace, committed on Enter or on leaving the field.
-	 *
-	 * Not on every keystroke: a slug is a *word* the other agents have to say, and writing
-	 * `polit`, then `politi`, then `political-llm` as three workspaces would leave two of them
-	 * behind — a workspace disappears when its last member leaves it, but a half-typed one that
-	 * the browser republished would be a section in somebody else's panel for as long as it took
-	 * to type the rest. Enter is the boundary, and it is the same key the tag field above uses.
-	 */
-	const commitRoom = () => {
-		if (!props.onWorkspace) return;
-		const wanted = room().trim();
-		const now = props.workspace ?? "";
-		if (wanted === now) return;
-		props.onWorkspace(wanted || null);
-	};
-
-	/*
-	 * Split on **commas only**, not on whitespace.
-	 *
-	 * Splitting on both looked more generous and was wrong: a tag may contain spaces, which
-	 * the server turns into hyphens — so `Panel CSS` is one tag called `panel-css`, and
-	 * whitespace-splitting turned it into two called `panel` and `css`. A comma is the only
-	 * separator somebody types deliberately.
-	 *
-	 * Nothing else is validated here. The server slugs, dedupes and caps whatever arrives
-	 * (`agents/tags.ts`), and two places deciding what a tag may be is how they come to
-	 * disagree — what comes back on the next `agent.identity` is the truth.
-	 */
-	const add = () => {
-		const wanted = draft()
-			.split(",")
-			.map((part) => part.trim())
-			.filter(Boolean);
-		if (wanted.length === 0) return;
-		setDraft("");
-		props.onTags([...props.tags, ...wanted]);
-	};
-
-	return (
-		<Popover
-			placement="bottom-end"
-			class="w-[228px]"
-			label={`Your tags for ${props.name}`}
-			onOpenChange={(open) => open && focusEntry()}
-			trigger={(api) => (
-				<button
-					class="agent-tagbtn"
-					type="button"
-					ref={api.ref}
-					data-on={api.open || undefined}
-					title={`Your own tags for ${props.name}`}
-					aria-label={`Your own tags for ${props.name}`}
-					onClick={(event) => {
-						event.stopPropagation();
-						api.toggle();
-					}}
-				>
-					{/*
-						A pen, at the × beside it: 13px, the same stroke, the same 20px slot.
-						
-						It was a `+`, which said *add one more* — right for a row of chips you are
-						appending to, wrong for the only control on a row that opens a thing you edit.
-						And at 12px it sat a pixel light next to a 13px ×, which is the sort of
-						difference nobody names and everybody sees.
-					*/}
-					<Icon of={SquarePen} size={13} />
-				</button>
-			)}
-		>
-			<div class="tagpop">
-				{/*
-					The workspace, above the tags, because it is the one field here that is not yours
-					alone: the agent sets it through `stage.me.setWorkspace` and either of you can move it.
-				*/}
-				<Show when={props.onWorkspace}>
-					{(move) => (
-						<>
-							<div class="label">Workspace</div>
-							<label class="field h-8 flex-none gap-1.5 rounded-md">
-								<input
-									ref={roomField}
-									type="text"
-									spellcheck={false}
-									class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
-									placeholder="No workspace"
-									list={listId}
-									value={room()}
-									onInput={(event) => setRoom(event.currentTarget.value)}
-									onBlur={commitRoom}
-									onKeyDown={(event) => {
-										if (event.key === "Enter") event.preventDefault();
-										// As in the tag field below: `Popover` reads Enter off the document, and a
-										// keystroke that means "save this" should not also press the roved row.
-										if (event.key === "Enter") {
-											event.stopPropagation();
-											commitRoom();
-										}
-									}}
-								/>
-							</label>
-							<datalist id={listId}>
-								<For each={props.workspaces}>{(name) => <option value={name} />}</For>
-							</datalist>
-							<p class="nt m-0">Slugged and cut at 24 characters. ⏎ to move it; empty leaves the workspace.</p>
-						</>
-					)}
-				</Show>
-
-				<div class="label">Your tags for {props.name}</div>
-
-				<Show
-					when={props.tags.length > 0}
-					fallback={<p class="nt m-0">None yet. These are yours, and the agent cannot see or overwrite them.</p>}
-				>
-					<div class="tags">
-						<For each={props.tags}>
-							{(tag) => (
-								<span class="tag" data-mine="true">
-									{tag}
-									<button
-										type="button"
-										class="tag-x"
-										title={`Remove ${tag}`}
-										aria-label={`Remove ${tag}`}
-										onClick={() => props.onTags(props.tags.filter((other) => other !== tag))}
-									>
-										<Icon of={X} size={9} />
-									</button>
-								</span>
-							)}
-						</For>
-					</div>
-				</Show>
-
-				{/*
-					Focused on mount, not with `autofocus`.
-					
-					The attribute only acts on a node present at page load; this one is created when
-					the popover opens, so it did nothing and the first keystroke went to the
-					document. The popup exists to be typed into — one that opens with the cursor
-					elsewhere costs a click to use.
-				*/}
-				{/*
-					`flex-none` is load-bearing here, exactly as it is in the panel's header.
-
-					`.field` carries `flex: 1` for the inspector's row of four, where it grows
-					sideways. `.tagpop` is a flex *column*, so that grow is vertical and a
-					`flex-basis: 0` beats a stated height — the field measured its input's
-					min-content and came out 18px instead of 32.
-				*/}
-				<label class="field h-8 flex-none gap-1.5 rounded-md">
-					<input
-						ref={entry}
-						type="text"
-						spellcheck={false}
-						class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
-						placeholder="Add a tag…"
-						value={draft()}
-						onInput={(event) => setDraft(event.currentTarget.value)}
-						onKeyDown={(event) => {
-							if (event.key === "Enter") {
-								event.preventDefault();
-								/* `Popover` reads Enter off the document and presses the roved row with it.
-								   There is no row in here to press, but a keystroke that means "add this
-								   tag" should not also be travelling to a menu's key handler. */
-								event.stopPropagation();
-								add();
-							}
-							// Backspace on an empty field takes the last one off, which is what every
-							// tag field does and what a hand reaches for without being told.
-							if (event.key === "Backspace" && !draft() && props.tags.length > 0) {
-								event.preventDefault();
-								props.onTags(props.tags.slice(0, -1));
-							}
-						}}
-					/>
-				</label>
-				<p class="nt m-0">Four at most, lowercased and hyphenated. ⏎ to add.</p>
-			</div>
-		</Popover>
-	);
-}

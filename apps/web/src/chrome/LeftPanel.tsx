@@ -158,6 +158,14 @@ export function LeftPanel(props: {
 	chats?: AgentChat[];
 	identities?: Record<string, Identity>;
 	unread?: Record<string, number>;
+	/**
+	 * Who is on the canvas on screen, by id: the section the Agents tab opens with.
+	 *
+	 * The canvas is the unit of work, so the room comes before the deck — and because an
+	 * agent is on every canvas it has worked in, this lifts rows out of the cut below rather
+	 * than being an axis of its own. Absent on the dashboard, where there is no room to be in.
+	 */
+	onCanvasAgents?: string[];
 	onFocusAgent?: (id: string) => void;
 	onCloseAgent?: (id: string) => void;
 	/** Put a live view of that agent's conversation on the canvas (`canvas/live-chat.ts`). */
@@ -166,6 +174,8 @@ export function LeftPanel(props: {
 	onAgentTags?: (id: string, tags: string[]) => void;
 	/** Move an agent into a workspace, or out of one with `null`. */
 	onAgentWorkspace?: (id: string, workspace: string | null) => void;
+	/** Rename an agent, from the edit window its row opens. */
+	onAgentRename?: (id: string, name: string) => void;
 	/**
 	 * Which axis the agents list is cut by — see `AgentGroup`. Uncontrolled when absent, and
 	 * **workspace** is what it opens on.
@@ -277,6 +287,7 @@ export function LeftPanel(props: {
 		focused: props.focused,
 		query: query(),
 		group: group(),
+		onCanvas: props.onCanvasAgents ?? [],
 	});
 
 	/**
@@ -715,6 +726,7 @@ export function LeftPanel(props: {
 												{...(props.onAgentTags ? { onTags: (tags: string[]) => props.onAgentTags?.(row.chat.id, tags) } : {})}
 												workspaces={workspaceNames()}
 												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
+												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
 												{...(props.onMirrorAgent ? { onMirror: () => props.onMirrorAgent?.(row.chat.id) } : {})}
 											/>
 										)}
