@@ -108,7 +108,17 @@ export function DispatchTabs(props: DispatchTabsProps) {
 export function DispatchView(props: DispatchViewProps) {
 	/** The task a gallery card's "from a task" chip asked to see; the Tasks tab scrolls to it and marks it. */
 	const [spotTask, setSpotTask] = createSignal<string | undefined>();
-	const groups = createMemo(() => galleryGroups(props.boards, props.identities, props.contexts, props.tasks));
+	/*
+	 * Grouped only for the tab that draws it.
+	 *
+	 * This is the most expensive thing on the dashboard — every board in the deck put under
+	 * the workspace that holds it, with a card built for each — and the Gallery below is its
+	 * only reader. A Solid memo recomputes when its sources change whether or not anybody
+	 * reads it, so without this gate the deck's nine hundred boards were regrouped on every
+	 * frame the server sent: while the dashboard sat on Canvases, and while it was behind the
+	 * stage and not on screen at all.
+	 */
+	const groups = createMemo(() => (props.tab === "boards" ? galleryGroups(props.boards, props.identities, props.contexts, props.tasks) : []));
 
 	return (
 		<section class="dispatch" aria-label="Dispatch" data-preview={props.preview ? "true" : undefined}>

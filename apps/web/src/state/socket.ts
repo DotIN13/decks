@@ -1,4 +1,5 @@
 import type { ClientMessage, ServerMessage } from "@decks/protocol";
+import { batch } from "solid-js";
 
 /**
  * The one connection to the server, and the frames that go down it.
@@ -51,9 +52,45 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 	const listeners = new Set<(message: ServerMessage) => void>();
 	/** Frames sent while the socket was down, delivered when it is up. */
 	const queue: ClientMessage[] = [];
+	/** Frames that have arrived and are waiting to be applied together (`wave` below). */
+	const arrived: ServerMessage[] = [];
 	let socket: WebSocket | undefined;
 	let attempt = 0;
 	let timer: number | undefined;
+	let painting: number | undefined;
+	let soon: number | undefined;
+
+	/**
+	 * Every frame that has arrived since the last paint, applied as one change.
+	 *
+	 * A frame is one `setState`, and a `setState` runs the whole reactive graph over it: on
+	 * this deck that is the dashboard's grouping over nine hundred boards. One frame at a
+	 * time, that cost is paid per frame — and the greeting is not one frame. It is the deck,
+	 * the canvases, the chat list and then **seven frames for every conversation on the deck**
+	 * (`session.greet`): 240 of them on a deck of 34 chats, sent by the server in 120ms and
+	 * applied by the browser over 44 *seconds*, with the main thread blocked throughout. That
+	 * is what "the boards and the canvases appear one by one" was: not a slow server, and not
+	 * pictures, but the same grouping recomputed 240 times while the page could not paint.
+	 *
+	 * So frames are collected and handed to the listeners inside one `batch`, once per paint.
+	 * Nothing is dropped and nothing is reordered; the greeting lands as two or three waves
+	 * instead of 240, and a wave that arrives while the page is busy is bigger, which is the
+	 * behaviour you want.
+	 *
+	 * The timer beside the animation frame is for a tab in the background, which paints
+	 * nothing: without it, a hidden window would hold a "finished" frame until it was looked
+	 * at, and the banner and the tab badge are exactly what a hidden window is for.
+	 */
+	const wave = () => {
+		if (painting !== undefined) cancelAnimationFrame(painting);
+		if (soon !== undefined) clearTimeout(soon);
+		painting = undefined;
+		soon = undefined;
+		const frames = arrived.splice(0);
+		batch(() => {
+			for (const message of frames) for (const listener of listeners) listener(message);
+		});
+	};
 
 	const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 
@@ -73,7 +110,10 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 			} catch {
 				return;
 			}
-			for (const listener of listeners) listener(message);
+			arrived.push(message);
+			if (painting !== undefined || soon !== undefined) return;
+			painting = requestAnimationFrame(wave);
+			soon = window.setTimeout(wave, 50);
 		};
 
 		socket.onclose = () => {
@@ -102,6 +142,8 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 			return socket?.readyState === WebSocket.OPEN;
 		},
 		[Symbol.dispose]: () => {
+			if (painting !== undefined) cancelAnimationFrame(painting);
+			if (soon !== undefined) clearTimeout(soon);
 			if (timer) clearTimeout(timer);
 			socket?.close();
 		},

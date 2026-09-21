@@ -68,6 +68,10 @@ export function workspaceDigests(
 ): WorkspaceDigest[] {
 	const groups = new Map<string, WorkspaceBoard[]>();
 	const agents = new Map<string, string[]>();
+	// By path once, rather than a scan of the deck per board held: the two loops below ask
+	// for a board as many times as the deck's agents hold one between them, and on a deck of
+	// nine hundred boards and thirty chats that scan was the dashboard's largest cost.
+	const byPath = new Map(boards.map((board) => [board.path, board]));
 	// The roster order is identity order, which is the order the panel already shows.
 	// Every agent is a member first — even one holding nothing — so a section exists
 	// for a project whose agents are all between tasks. An agent in none is the
@@ -82,7 +86,7 @@ export function workspaceDigests(
 		const bucket = identity?.workspace ?? WORKSPACE_NONE();
 		if (identity) agents.set(bucket, [...(agents.get(bucket) ?? []), identity.name]);
 		for (const path of held) {
-			const board = boards.find((one) => one.path === path);
+			const board = byPath.get(path);
 			if (!board) continue; // a board that was deleted is not a section's work
 			const list = groups.get(bucket) ?? [];
 			if (!list.some((one) => one.path === path)) {
