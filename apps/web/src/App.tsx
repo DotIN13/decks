@@ -437,6 +437,35 @@ export function App() {
 		newCanvas(id, workspace);
 	};
 	const addressAgent = visitAgent;
+	/*
+	 * The view follows the agent you are talking to when it moves itself.
+	 *
+	 * An agent moves with `stage.useCanvas` or `stage.newCanvas`, and pressing it goes to where
+	 * it is — so the room you are in should be where it went, not where it was. Without this the
+	 * person stayed behind, and their next line brought the agent back (`canvas.use` before a
+	 * prompt), which undid the move it had just made. Only a move by the same agent counts:
+	 * switching agent is `visitAgent`'s business, and a move into the room you are already in
+	 * is no move at all. A canvas made in the same breath can reach the list a frame after the
+	 * move does, so the follow waits for it rather than landing on a room that is not there yet.
+	 */
+	let followed: { agent: string; canvas?: string } | undefined;
+	createEffect(() => {
+		const agent = state.focused;
+		const canvas = agent ? state.agents[agent]?.canvas : undefined;
+		const listed = !!canvas && state.canvases.some((one) => one.id === canvas);
+		untrack(() => {
+			if (!agent) {
+				followed = undefined;
+				return;
+			}
+			if (canvas && !listed) return;
+			const last = followed;
+			followed = { agent, ...(canvas ? { canvas } : {}) };
+			if (!canvas || !last || last.agent !== agent || last.canvas === canvas) return;
+			if (surface() !== "stage" || state.canvas === canvas) return;
+			go({ surface: "stage", canvas, agent });
+		});
+	});
 	/** Open a canvas, keeping whoever you are talking to: the room changes, the conversation does not. */
 	const openCanvas = (id: string, options?: { replace?: boolean }) =>
 		go({ surface: "stage", canvas: id, ...(state.focused ? { agent: state.focused } : {}) }, options);

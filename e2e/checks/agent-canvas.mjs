@@ -102,5 +102,13 @@ const held = await page.evaluate(() =>
 const heldText = await page.evaluate(() => document.querySelector('.panel-section[data-kind="held"]')?.textContent ?? "");
 say("the canvas's taken-off board is under Held, not shown", heldText.includes("Held, not shown") && /notes/i.test(heldText), `${heldText.slice(0, 120)} ${JSON.stringify(held)}`);
 
+// --- the agent you are with moves itself, and you go with it ---------------------------
+/* What `stage.useCanvas("Neutral image")` is heard as. Before this the view stayed put, and the
+   next line typed here brought the agent back to this room, undoing its move. */
+await feed({ type: "context.changed", agentId: "a1", boards: [], inPlay: [], canvas: "cv_neutral" });
+await settle(page, 700);
+at = await hash();
+say("when the agent you are with moves canvas, the view follows it", at.includes("cv_neutral") && at.includes("a1"), at);
+
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();
