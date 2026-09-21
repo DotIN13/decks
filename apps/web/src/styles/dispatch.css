@@ -967,9 +967,17 @@
 		font: inherit;
 		font-size: 12px;
 	}
-	.canvas-new:hover {
-		border-color: var(--color-accent);
-		color: var(--color-accent);
+	.canvas-new > svg {
+		color: var(--muted);
+	}
+	/* Pressed or hovered, it fills a shade rather than turning blue: it is a plain button, not a link. */
+	.canvas-new:hover,
+	.canvas-new[aria-expanded="true"] {
+		background: var(--line);
+	}
+	.canvas-new:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
 	}
 	.canvas-cards {
 		display: grid;
