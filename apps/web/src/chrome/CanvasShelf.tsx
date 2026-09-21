@@ -294,7 +294,7 @@ function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: () 
 	return (
 		<Popover
 			placement="bottom-end"
-			class="canvas-menu w-[224px]"
+			class="canvas-menu w-[188px]"
 			label={`${props.canvas.name}: rename, move or remove`}
 			onOpenChange={() => {
 				setView("menu");
