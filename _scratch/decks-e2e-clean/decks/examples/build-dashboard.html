@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Build duration and queue delay across sixteen releases</title>
+		<meta name="board" content='{"w":1100,"h":872,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
+			<h1>Build duration and queue delay across sixteen releases</h1>
+		</div>
+
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 112px; width: 1004px">
+			<p><b>Median wall time is 13 minutes, up from 6 in June.</b> The builds themselves grew 40%; the rest is queue wait behind a single CI runner that started queueing every Friday.</p>
+		</div>
+
+		<div class="kpi" data-id="kpi-wall" style="left: 48px; top: 208px; width: 228px">
+			<span class="value" id="v-wall">0</span>
+			<span class="label">Median wall time, minutes</span>
+		</div>
+		<div class="kpi" data-id="kpi-queue" style="left: 308px; top: 208px; width: 228px">
+			<span class="value" id="v-queue">0</span>
+			<span class="label">Queue wait, minutes</span>
+		</div>
+		<div class="kpi" data-id="kpi-red" style="left: 568px; top: 208px; width: 228px">
+			<span class="value" id="v-red">0</span>
+			<span class="label">Red builds, last 15</span>
+		</div>
+		<div class="kpi" data-id="kpi-deploys" style="left: 828px; top: 208px; width: 224px">
+			<span class="value" id="v-deploys">0</span>
+			<span class="label">Deploys per day, last week</span>
+		</div>
+
+		<section class="card" data-id="chart" style="left: 48px; top: 328px; width: 640px">
+			<h3>Build duration by release, minutes</h3>
+			<div style="position: relative; height: 320px"><canvas id="chart"></canvas></div>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">Wall time is the full run from push to ready; queue wait is time spent behind other jobs.</p>
+		</section>
+
+		<section class="card" data-id="releases" style="left: 720px; top: 328px; width: 332px">
+			<h3>The last five releases</h3>
+			<table class="table">
+				<thead><tr><th>Release</th><th>Wall, min</th><th>Result</th></tr></thead>
+				<tbody>
+					<tr><td>R-1</td><td>16.4</td><td><span class="chip" style="color: var(--b-ok)">green</span></td></tr>
+					<tr><td>R-2</td><td>18.9</td><td><span class="chip" style="color: var(--b-danger)">red</span></td></tr>
+					<tr><td>R-3</td><td>12.1</td><td><span class="chip" style="color: var(--b-ok)">green</span></td></tr>
+					<tr><td>R-4</td><td>11.6</td><td><span class="chip" style="color: var(--b-ok)">green</span></td></tr>
+					<tr><td>R-5</td><td>9.8</td><td><span class="chip" style="color: var(--b-ok)">green</span></td></tr>
+				</tbody>
+			</table>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 8px">The red build is the one that sat behind a Friday queue for 40 minutes.</p>
+		</section>
+
+		<div class="callout" data-id="next" data-tone="warn" style="left: 48px; top: 752px; width: 1004px">
+			<p><b>What to do.</b> Add a second CI runner before the next Friday deploy, and put the integration suite behind a cache: two jobs now compile the same frontend twice, back to back.</p>
+		</div>
+
+		<script type="module">
+			// The four numbers count up on load, staggered, so a static-looking row of figures
+			// reads as something that just happened. gsap owns the motion; the values come from
+			// the same table the line chart draws, so the board cannot disagree with itself.
+			const { gsap } = await import("gsap");
+			const counters = [
+				{ id: "#v-wall", to: 13, label: "" },
+				{ id: "#v-queue", to: 4.9, label: "" },
+				{ id: "#v-red", to: 3, label: "" },
+				{ id: "#v-deploys", to: 2.1, label: "" },
+			];
+			gsap.from("#kpi-wall, #kpi-queue, #kpi-red, #kpi-deploys", { opacity: 0, y: 12, duration: 0.4, stagger: 0.08, ease: "power2.out" });
+			for (const counter of counters) {
+				const el = document.querySelector(counter.id);
+				if (!el) continue;
+				const obj = { v: 0 };
+				gsap.to(obj, { v: counter.to, duration: 1.1, delay: 0.3, ease: "power1.out", onUpdate: () => { el.textContent = counter.to % 1 === 0 ? String(Math.round(obj.v)) : obj.v.toFixed(1); } });
+			}
+
+			const host = document.querySelector("#chart");
+			if (host) {
+				// The bare "chart.js" import registers nothing, so the pieces this chart uses are
+				// named and registered before the chart is built. The line scale, the point and
+				// line elements, and the tooltip are the whole of what a line chart needs.
+				// The bare "chart.js" import registers nothing, so the pieces this chart uses are
+				// named and registered before the chart is built. The line scale, the point and
+				// line elements, and the tooltip are the whole of what a line chart needs.
+				const charts = await import("chart.js");
+				const { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend } = charts;
+				Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
+				const releases = ["R-16", "R-15", "R-14", "R-13", "R-12", "R-11", "R-10", "R-9", "R-8", "R-7", "R-6", "R-5", "R-4", "R-3", "R-2", "R-1"];
+				const wall = [6.2, 6.0, 6.4, 6.8, 7.1, 7.4, 7.8, 8.2, 8.5, 9.1, 9.6, 10.4, 11.6, 12.1, 18.9, 16.4];
+				const queue = [0.8, 0.9, 0.9, 1.2, 1.1, 1.4, 1.6, 1.5, 1.9, 2.2, 2.1, 2.8, 3.1, 3.4, 6.8, 4.9];
+				/*
+				 * A canvas cannot resolve `var(--b-accent)`, so the theme's colours are read off the
+				 * document and handed over as real values: the chart then draws in the same palette
+				 * as everything around it, in light and in dark.
+				 */
+				const css = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
+				const ink = css("--b-fg");
+				const muted = css("--b-muted");
+				const accent = css("--b-accent");
+				const warn = css("--b-warn");
+				const border = css("--b-border");
+				const layer = css("--b-bg-layer");
+				const strong = css("--b-border-strong");
+				const labelStyle = { color: muted, font: { size: 12 } };
+
+				new Chart(host, {
+					type: "line",
+					data: {
+						labels: releases,
+						datasets: [
+							{ label: "Wall time, minutes", data: wall, borderColor: accent, backgroundColor: accent, tension: 0.3, pointRadius: 2, borderWidth: 2 },
+							{ label: "Queue wait, minutes", data: queue, borderColor: warn, backgroundColor: warn, tension: 0.3, pointRadius: 2, borderWidth: 2 },
+						],
+					},
+					options: {
+						responsive: true,
+						maintainAspectRatio: false,
+						interaction: { mode: "index", intersect: false },
+						plugins: {
+							legend: { labels: { ...labelStyle, boxWidth: 10 } },
+							tooltip: { backgroundColor: layer, borderColor: strong, borderWidth: 1, titleColor: ink, bodyColor: ink },
+						},
+						scales: {
+							x: { title: { display: true, text: "release, most recent first", ...labelStyle }, ticks: { color: muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { color: border } },
+							y: { title: { display: true, text: "minutes", ...labelStyle }, ticks: { color: muted }, grid: { color: border }, beginAtZero: true },
+						},
+					},
+				});
+			}
+		</script>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

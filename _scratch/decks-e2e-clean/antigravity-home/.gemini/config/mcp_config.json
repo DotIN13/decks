@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "decks": {
+      "command": "/usr/bin/node",
+      "args": [
+        "/home/decks/projects/decks/runtime/antigravity/mcp-server.mjs"
+      ]
+    }
+  }
+}

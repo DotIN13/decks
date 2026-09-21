@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Path is the address; data-id is only an anchor</title>
+		<meta name="board" content='{"w":1008,"h":955,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<section class="card" data-id="rule" style="left: 40px; top: 40px; width: 920px">
+			<h3>Yes — and the rule is: a path from the nearest named ancestor, or from the body</h3>
+			<p>
+				<b>The address is <code>id</code> + <code>path</code>, and <code>id</code> may be
+				<code>""</code></b> — which means the body. Nothing in the editor needs an element to be named:
+				it needs an element to be <i>reachable</i>, and the body always is. A flow document with no ids
+				at all is fully editable, block by block, by path.
+			</p>
+			<table class="table">
+				<tr>
+					<th>Board</th>
+					<th>What anchors the address</th>
+					<th>What the path walks</th>
+				</tr>
+				<tr>
+					<td>A component board</td>
+					<td>The card's own <code>data-id</code> — so the address is stable while anything around it
+						moves.</td>
+					<td>Inside the card: its heading, its paragraph, a table cell.</td>
+				</tr>
+				<tr>
+					<td>A flow document</td>
+					<td><b>Nothing but the root</b> — <code>id: ""</code>. Its blocks are not named and do not
+						need to be.</td>
+					<td>From the body down: the fourth block's second child, and so on.</td>
+				</tr>
+				<tr>
+					<td>Slides</td>
+					<td>The root again — a deck's <code>&lt;section&gt;</code>s are the file's own markup.</td>
+					<td>From the body. <b>And this is where “handle on the element” earns its place:</b> the script
+						may present the slides in another order, so DOM order and file order differ — but the handle
+						travels with the element, so a press still lands on the right node, and the path is counted
+						in the tree, which is the file's order. Counting DOM siblings would address the wrong
+						slide.</td>
+				</tr>
+				<tr>
+					<td>Markdown</td>
+					<td>—</td>
+					<td>No tree at all: the whole file is one <code>source</code> edit, as it is today.</td>
+				</tr>
+			</table>
+			<p>
+				<b>The one server change this needs is three lines</b>, and they are already written on the branch
+				we archived:
+				<code>if (id === "") return find(document, (element) =&gt; element.nodeName === "body")</code>, plus
+				its refusal wording (<i>“this board has no &lt;body&gt; to edit”</i>). On main today an address is
+				<code>data-id</code> only, which is why the component ops have to find the body themselves. Port
+				it <b>with</b> the tree editor, not after it.
+			</p>
+		</section>
+
+		<section class="card" data-id="name" style="left: 40px; top: 560px; width: 920px">
+			<h3>Why keep data-id where it exists: a path is a position, an id is a name</h3>
+			<table class="table">
+				<tr>
+					<th></th>
+					<th></th>
+				</tr>
+				<tr>
+					<td><b>Insert a paragraph above a block</b></td>
+					<td>Every path below it shifts by one. The same edit leaves <code>#goal</code> — and every path
+						walked from it — exactly where it was. That is the whole reason a named component is
+						addressed by its name.</td>
+				</tr>
+				<tr>
+					<td><b><code>data-id</code> is also how an agent refers to a thing</b></td>
+					<td>“Edit <code>#risk</code>” survives a reflow; “edit the fifth child of the body” does not, and
+						reads as a coordinate rather than as a thing. The ops' summaries speak in names for that
+						reason, and a rename is an op of its own.</td>
+				</tr>
+				<tr>
+					<td><b>But the editor must not depend on one</b></td>
+					<td>Its address is a path from the nearest named ancestor <i>or from the body</i> — the same
+						rule in both cases. Which is why <b>the tree editor needs nothing from <code>data-id</code>
+						except the anchors that happen to be there</b>, and why a flow document does not need to
+						gain a single id to become editable.</td>
+				</tr>
+				<tr>
+					<td><b>Either way, <code>before</code> is the guard</b></td>
+					<td>A name survives a move and not a rewrite; a path survives nothing but is checked. Both are
+						only safe to send because the server compares the words at the address before it writes —
+						and refuses, so the client re-reads, and the user retypes on what is actually there.</td>
+				</tr>
+			</table>
+		</section>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

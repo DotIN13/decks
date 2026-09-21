@@ -1985,7 +1985,7 @@ export function App() {
 						models={runtimeFor(barChat()?.kind)?.models ?? []}
 						commands={barChat()?.commands ?? runtimeFor(barChat()?.kind)?.commands ?? []}
 						runtime={barChat()?.kind}
-						modes={runtimeFor(barChat()?.kind)?.capabilities.modes ?? []}
+						modes={runtimeFor(barChat()?.kind)?.capabilities?.modes ?? []}
 						mode={barChat()?.mode}
 						onMode={(mode) => send({ type: "agent.setMode", id: barAgent() ?? "", mode })}
 						{...(surface() === "dispatch" ? { onRuntime: (kind: AgentKind) => send({ type: "dispatcher.setKind", kind }) } : {})}

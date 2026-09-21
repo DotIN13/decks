@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>A JSX comment is text under every board</title>
+		<meta name="board" content='{"w":1008,"h":1107,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<section class="card" data-id="summary" style="left: 40px; top: 40px; width: 920px">
+			<h3>Summary</h3>
+			<p><b>Ninety words of a source comment were drawn on the canvas, under all eight boards.</b> In
+			the <i>children</i> position of JSX, a block comment is not a comment — it is a text child. It is
+			also valid JSX, so nothing in the toolchain objected: the type checker was happy, esbuild strips
+			it, and Solid's compiler — which is what runs here — emitted it as a string and rendered it. The
+			comment is in braces now, and <code>geometry.mjs</code> asserts that nothing drawn on the canvas
+			came out of a source comment, because the DOM is the only place this is catchable.</p>
+		</section>
+
+		<section class="card" data-id="measured" style="left: 40px; top: 260px; width: 452px">
+			<h3>Measured</h3>
+			<table class="table">
+				<tr><th>Moment</th><th>Text nodes carrying source delimiters</th></tr>
+				<tr><td>before, on the canvas</td><td>8 — one inside each <code>.board-node</code>, which is what “under every board” means</td></tr>
+				<tr><td>after, on the canvas</td><td>2 — both inside <code>&lt;style&gt;</code> elements, where a comment is a comment</td></tr>
+			</table>
+			<p>The probe walks every element's <b>own</b> child nodes, not its descendants' — a leaked comment
+			is a text node, and the board's title is a text node too, so the distinction is the measurement.</p>
+		</section>
+
+		<section class="card" data-id="why" style="left: 508px; top: 260px; width: 452px">
+			<h3>Why nothing caught it</h3>
+			<table class="table">
+				<tr><th>Tool</th><th>What it said</th></tr>
+				<tr><td>type checker</td><td>fine — it is legal JSX</td></tr>
+				<tr><td>esbuild</td><td>strips it, so a scan built on esbuild finds nothing</td></tr>
+				<tr><td>Solid's compiler</td><td>emits it as a string and renders it</td></tr>
+			</table>
+			<p>My first detector was an esbuild scan, and it reported “no comment is rendered as content”
+			while the text was on screen. The compiler that runs in the app is the only one whose answer
+			counts — and the running DOM is its answer.</p>
+		</section>
+
+		<section class="card" data-id="elsewhere" style="left: 40px; top: 596px; width: 920px">
+			<h3>The other sixteen</h3>
+			<p>Sixteen other comments in the app end on the line right before an element, which is what the
+			leak looked like. All sixteen are in <b>expression or attribute</b> position — the block sits
+			after <code>return (</code> and before the root element, or inside a <code>fallback={…}</code> —
+			where the comment is dropped as a comment. The distinction is not the shape of the comment but
+			where it sits: <b>inside an element's children</b> is the only position that makes it text.</p>
+			<p>Which is also why the fix cannot be “careful”: the next person to add a comment there has no
+			signal at all. The braces are load-bearing, and the comment now says so on itself.</p>
+		</section>
+
+		<section class="card" data-id="assert" style="left: 40px; top: 924px; width: 920px">
+			<h3>The assertion</h3>
+			<p><code>geometry.mjs</code>: no element on the canvas may hold a text node containing a source
+			comment's delimiters, <code>&lt;style&gt;</code> and <code>&lt;script&gt;</code> excepted — since
+			those two <i>are</i> source, and a comment in them is doing its job. 19 assertions, none failing.
+			It is a general claim about the canvas rather than about boards, so it catches the next one of
+			these wherever it is written.</p>
+		</section>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

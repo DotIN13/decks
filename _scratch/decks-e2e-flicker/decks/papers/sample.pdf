@@ -1,0 +1,66 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 396 >>
+stream
+BT /F1 22 Tf 72 720 Td (Decks - a sample paper) Tj ET
+BT /F1 12 Tf 72 670 Td () Tj ET
+BT /F1 12 Tf 72 650 Td (This page exists so the example deck can embed a real PDF.) Tj ET
+BT /F1 12 Tf 72 630 Td () Tj ET
+BT /F1 12 Tf 72 610 Td (Boards render PDFs with pdf.js, at the width of the component,) Tj ET
+BT /F1 12 Tf 72 590 Td (so a paper can sit on the canvas beside the plan that cites it.) Tj ET
+endstream
+endobj
+3 0 obj
+<< /Length 354 >>
+stream
+BT /F1 22 Tf 72 720 Td (2. Why a canvas) Tj ET
+BT /F1 12 Tf 72 670 Td () Tj ET
+BT /F1 12 Tf 72 650 Td (A transcript is a poor place to keep a plan: it scrolls away.) Tj ET
+BT /F1 12 Tf 72 630 Td (A board does not scroll away. It has a position, a size, and a) Tj ET
+BT /F1 12 Tf 72 610 Td (file on disk that both the agent and the reader can edit.) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Length 249 >>
+stream
+BT /F1 22 Tf 72 720 Td (3. Page ranges) Tj ET
+BT /F1 12 Tf 72 670 Td () Tj ET
+BT /F1 12 Tf 72 650 Td (This is page three. The sources board embeds pages 1-2 only,) Tj ET
+BT /F1 12 Tf 72 630 Td (which is how a citation shows the part it means.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+6 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 3 0 R >>
+endobj
+7 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 4 0 R >>
+endobj
+8 0 obj
+<< /Type /Pages /Kids [5 0 R 6 0 R 7 0 R] /Count 3 >>
+endobj
+9 0 obj
+<< /Type /Catalog /Pages 8 0 R >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000000526 00000 n 
+0000000931 00000 n 
+0000001231 00000 n 
+0000001357 00000 n 
+0000001483 00000 n 
+0000001609 00000 n 
+0000001678 00000 n 
+trailer
+<< /Size 10 /Root 9 0 R >>
+startxref
+1727
+%%EOF

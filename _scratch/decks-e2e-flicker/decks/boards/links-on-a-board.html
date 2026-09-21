@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Links on a board — a board link opens a board, everything else opens a tab</title>
+		<meta name="board" content='{"w":1000,"h":1837,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<h3 class="text" data-id="title" style="left: 48px; top: 40px; width: 904px; font-size: 26px; font-weight: 700">Links on a board</h3>
+
+		<h3 class="text" data-id="summary-head" style="left: 48px; top: 88px; width: 700px">Summary</h3>
+
+		<section class="card" data-id="finding" style="left: 48px; top: 136px; width: 904px">
+			<p>
+				<b>A link on a board no longer navigates the board.</b> A link to another board in the
+				deck opens <b>that board on the canvas, beside the one that carried it</b>; every other
+				link opens in <b>a tab of its own</b>, so the board being read is still the board in
+				the frame. Until now both replaced the board with whatever the link pointed at, at an
+				address the reader could not get back from.
+			</p>
+		</section>
+
+		<h3 class="text" data-id="result-head" style="left: 48px; top: 280px; width: 700px">Result</h3>
+
+		<section class="card" data-id="cases" style="left: 48px; top: 328px; width: 904px">
+			<table class="table">
+				<thead>
+					<tr><th>What the link points at</th><th>What a click does</th></tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>a board in this deck — <code>href="risks.html"</code></td>
+						<td>that board goes on the canvas, 32px to the right of the board that linked to it, and both are framed</td>
+					</tr>
+					<tr>
+						<td>somewhere else — <code>href="https://…"</code></td>
+						<td>a tab of its own; the board does not move</td>
+					</tr>
+					<tr>
+						<td>a file in the deck that is not a board — <code>href="../assets/sketch.svg"</code></td>
+						<td>a tab of its own; the board does not move</td>
+					</tr>
+					<tr>
+						<td>a board file this deck does not hold — <code>href="not-written-yet.html"</code></td>
+						<td>a notice saying there is no board there; nothing opens</td>
+					</tr>
+					<tr>
+						<td>a jump inside the board — <code>href="#top"</code></td>
+						<td>the board scrolls, as it always did</td>
+					</tr>
+				</tbody>
+			</table>
+		</section>
+
+		<h3 class="text" data-id="method-head" style="left: 48px; top: 656px; width: 700px">Method</h3>
+
+		<section class="card" data-id="method" style="left: 48px; top: 704px; width: 904px">
+			<p><b>Five files, and a link only crosses two of them.</b></p>
+			<table class="table">
+				<tbody>
+					<tr><td><code>runtime/lib/board.js</code></td><td>the click: decides what the link is, and for anything that is not a board puts <code>target="_blank"</code> on the anchor so the browser opens the tab itself</td></tr>
+					<tr><td><code>apps/web/src/canvas/board-links.ts</code></td><td>the app's half of the one message a board link sends: same-origin, from this frame, and one path inside the deck</td></tr>
+					<tr><td><code>apps/web/src/App.tsx</code></td><td><code>openLinkedBoard</code>: plays the board, places it beside the link's own board, frames both, or says there is no board there</td></tr>
+					<tr><td><code>apps/web/src/canvas/BoardFrame.tsx</code>, <code>Present.tsx</code></td><td>the two frames a board is drawn in, so a link works when the board is presented too</td></tr>
+					<tr><td><code>runtime/AGENTS.md.tmpl</code>, <code>runtime/skills/board-authoring/SKILL.md</code></td><td>the guidance: cite by link, and when a board needs more room, write the next board and link to it</td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<section class="card" data-id="decide" style="left: 48px; top: 1048px; width: 904px">
+			<p>
+				<b>The decision is made in the board, not in the app, and that was measured.</b> A tab
+				can only be opened from the click itself: a <code>window.open</code> in the app's
+				message handler — the obvious design, where the app is the only thing that knows the
+				deck — opened an empty window and never navigated it. So the frame classifies by the
+				board-file glob (<code>.html</code>, <code>.md</code>) and opens its own tabs, and only
+				a board link travels. The cost is one extension list with two readers, the same bargain
+				<code>familyOf</code> already makes with <code>embedFamily</code>.
+			</p>
+		</section>
+
+		<section class="card" data-id="verified" style="left: 48px; top: 1232px; width: 904px">
+			<p>
+				<b>Checked twice.</b> In a real browser, <code>e2e/checks/board-links.mjs</code> — <b>13
+				assertions</b>, green — drives the fixture board at 88% zoom and checks all five rows
+				above, the presented board's own frame, and that the frame's address never changes. The
+				zoom is not padding: a board below half zoom takes no pointer events at all, which is
+				what made the first version of this check assert about clicks that never landed. And in
+				the unit suite, <code>board-links.test.ts</code> pins the two guards: a message from
+				another window, and a path out of the deck.
+			</p>
+			<p>
+				<b>326</b> web tests and <b>947</b> across the repo, all green;
+				<code>tsc --noEmit</code> clean on every package. The whole browser suite — <b>22 checks,
+				496 assertions</b> — is green on the merged tree, including the 12 assertions of the
+				code-highlighting check that landed first, and the four other checks that read the
+				fixture board this touched.
+			</p>
+		</section>
+
+		<h3 class="text" data-id="next-head" style="left: 48px; top: 1480px; width: 700px">Next</h3>
+
+		<section class="card" data-id="next" style="left: 48px; top: 1528px; width: 904px">
+			<p>
+				<b>Merged.</b> Vela landed it on <code>main</code> as <code>641c8c4</code> and
+				<code>75d3bf7</code>, on top of the code-highlighting merge — which had to go first,
+				because it was staged in the same four files (<code>runtime/lib/board.js</code>,
+				<code>runtime/AGENTS.md.tmpl</code>,
+				<code>runtime/skills/board-authoring/SKILL.md</code>, <code>e2e/run.mjs</code>). Mine is
+				a new section in each, so eleven of the twelve files rebased clean. One did not:
+				<code>SKILL.md</code>, because the two bullets land next to each other in the same list,
+				and both were kept — the code bullet above the links bullet. Nothing of theirs was
+				dropped, and nothing of mine either.
+			</p>
+			<p>
+				<b>One step left: the app.</b> <code>~/app</code> is pulled and rebuilt. A deck's
+				<code>lib/</code> is refreshed when the deck is opened, so the click behaviour arrives
+				with the next restart of Decks, not before it.
+			</p>
+			<p>
+				Nothing is left undone. What this does not do: it does not create a board a link
+				names and the deck does not have — that is the notice — and a link inside an
+				<code>[data-embed]</code>'s own sandboxed frame is that page's business, not the
+				board's.
+			</p>
+		</section>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

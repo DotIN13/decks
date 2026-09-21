@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>How it works — one frame, one tree, one range</title>
+		<meta name="board" content='{"w":1008,"h":813,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<section class="card" data-id="loop" style="left: 40px; top: 40px; width: 920px">
+			<h3>The loop</h3>
+			<svg viewBox="0 0 880 330" style="width: 100%; height: auto" role="img"
+				aria-label="A press on a handled element becomes a node in the client tree, then a path and an op; the server re-parses the file, resolves the path to a byte range and splices it; the file changes, and the frame already shows the edit or is re-read after a refusal">
+				<defs>
+					<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+						<path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+					</marker>
+				</defs>
+				<g fill="none" stroke="currentColor" stroke-width="1.5">
+					<rect x="14" y="26" width="250" height="96" rx="8" />
+					<rect x="320" y="26" width="230" height="124" rx="8" />
+					<rect x="606" y="26" width="260" height="96" rx="8" />
+					<rect x="606" y="214" width="260" height="96" rx="8" />
+					<line x1="268" y1="74" x2="314" y2="74" marker-end="url(#ar)" />
+					<line x1="554" y1="74" x2="600" y2="74" marker-end="url(#ar)" />
+					<line x1="736" y1="126" x2="736" y2="210" marker-end="url(#ar)" />
+					<path d="M 606 262 H 139 V 126" stroke-dasharray="6 5" marker-end="url(#ar)" />
+				</g>
+				<g font-size="13" font-weight="600" fill="currentColor">
+					<text x="34" y="52">the frame</text>
+					<text x="336" y="52">the tree</text>
+					<text x="624" y="52">the server</text>
+					<text x="624" y="240">the file's bytes</text>
+				</g>
+				<g font-size="11" fill="currentColor" opacity="0.9">
+					<text x="34" y="74">the board, rendered — in both modes</text>
+					<text x="34" y="91">our tree serialised with handles,</text>
+					<text x="34" y="108">parsed by the browser, scripts run</text>
+					<text x="336" y="74">every element the parse produced</text>
+					<text x="336" y="91">a handle only where it has bytes</text>
+					<text x="336" y="108">and is not inside a leaf — so a card,</text>
+					<text x="336" y="125">a paragraph and a cell are, marks are not</text>
+					<text x="624" y="74">re-parse, for offsets only</text>
+					<text x="624" y="91">resolve the path, check before</text>
+					<text x="624" y="108">take the smallest range</text>
+					<text x="624" y="262">one range spliced</text>
+					<text x="624" y="279">every other byte verbatim</text>
+					<text x="624" y="296">the paths still resolve</text>
+					<text x="291" y="66" text-anchor="middle" opacity="0.9">a press</text>
+					<text x="577" y="66" text-anchor="middle" opacity="0.9">an op</text>
+					<text x="748" y="172" opacity="0.9">a byte range</text>
+					<text x="158" y="214">the frame already shows the edit,</text>
+					<text x="158" y="231">because that is where it was made;</text>
+					<text x="158" y="248">a refused write re-reads the board</text>
+				</g>
+			</svg>
+			<p>
+				Nothing is ever serialised from a tree into the file: the server's tree is only asked <b>where the
+				bytes are</b>. And a node with no handle <b>cannot be pressed at all</b> — which is why what a
+				script drew, and a <code>&lt;b&gt;</code> inside a paragraph, never need a rule saying they are not
+				targets. They are not in the tree.
+			</p>
+		</section>
+
+		<section class="card" data-id="gate" style="left: 40px; top: 460px; width: 920px">
+			<h3>One frame, two modes — the mode changes interaction and nothing else</h3>
+			<table class="table">
+				<tr>
+					<th>Same board, same rendering</th>
+					<th>Browse</th>
+					<th>Edit</th>
+				</tr>
+				<tr>
+					<td>A press inside it</td>
+					<td>selects the board</td>
+					<td><b>selects the node</b> under the pointer</td>
+				</tr>
+				<tr>
+					<td>A drag</td>
+					<td>moves the board</td>
+					<td><b>moves the node</b>, snapped, if it has <code>left</code>/<code>top</code></td>
+				</tr>
+				<tr>
+					<td>A second click on a run of words</td>
+					<td>—</td>
+					<td>a caret in it</td>
+				</tr>
+				<tr>
+					<td>Inside a drawn panel</td>
+					<td>—</td>
+					<td>its <b>source</b> is offered; what the script drew has no handle</td>
+				</tr>
+				<tr>
+					<td>Escape</td>
+					<td>the canvas's use</td>
+					<td>leaves the mode</td>
+				</tr>
+			</table>
+			<p>
+				Toggling does not reload: scroll, a live box, a running animation all survive. And <b>there is no
+				save step</b> — a drag commits when the pointer is released, a retype when the caret leaves — so
+				the mode cannot lose work.
+			</p>
+		</section>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

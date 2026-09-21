@@ -163,6 +163,10 @@ export const runtimes = (): RuntimeInfo[] =>
  * to arrive on every chat row, which is the same catalogue thirty-four times on a deck of
  * thirty-four chats. Undefined before the first `runtimes` frame, which every reader here
  * already has a fallback for.
+ *
+ * Read each of the three with `?.` even though the type says they are there. A server that
+ * has not been restarted since a deploy answers with the older shape, and for the minute
+ * that lasts a composer with no mode control beats one that throws.
  */
 export const runtimeFor = (kind: AgentKind | undefined): RuntimeInfo | undefined =>
 	kind ? runtimes().find((runtime) => runtime.kind === kind) : undefined;

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Live probe — a board with no content of its own</title>
+		<meta name="board" content='{"w":420,"h":320,"bg":"plain"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<!--
+		The fixture's live board: a stub that draws itself from `postMessage`, asking the app
+		to feed it a conversation. It is here so that the suite has one board of the kind that
+		cannot be filled with a window — no fullscreen, and nothing to open in a tab — and so
+		that `liveKindOf` in `deck/kinds.ts` has a board to be right about.
+	-->
+	<body class="board">
+		<div
+			class="live"
+			data-id="mirror"
+			data-live="chat"
+			data-agent="no-such-agent"
+			style="left: 0; top: 0; width: 420px; height: 320px"
+		></div>
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

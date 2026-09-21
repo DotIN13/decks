@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>What the survey round found</title>
+		<meta name="board" content='{"w":760,"bg":"plain"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<!--
+		The fixture's flow board: a document, not a canvas. Its height is measured rather than
+		declared, it has no components to drag, and it is what the e2e checks use for the flow
+		half of every format decision — fullscreen filling a window, the editor's field half
+		running without its geometry half.
+	-->
+	<body class="board flow">
+		<div class="doc" data-id="body">
+			<h1>What the survey round found</h1>
+			<p>
+				Two hundred and forty people answered the first round. The headline is
+				illness: it is the only topic where the two arms separate, and the separation holds
+				when the round is split by age or by region.
+			</p>
+			<h2>Where the arms separate</h2>
+			<p>
+				Illness moves eleven points between the two arms. Prices move four, and the
+				remaining five topics move less than that — which is inside the noise this sample
+				can resolve, so they are reported as flat rather than as small effects.
+			</p>
+			<table>
+				<tr><th>Topic</th><th>Arm A</th><th>Arm B</th><th>Difference</th></tr>
+				<tr><td><p>Illness</p></td><td><p>61%</p></td><td><p>50%</p></td><td><p>+11</p></td></tr>
+				<tr><td><p>Prices</p></td><td><p>44%</p></td><td><p>48%</p></td><td><p>−4</p></td></tr>
+				<tr><td><p>Housing</p></td><td><p>39%</p></td><td><p>41%</p></td><td><p>−2</p></td></tr>
+			</table>
+			<blockquote>
+				The one row worth reading twice is illness, and the reason is not that it moved
+				furthest — it is the only one that moved further than the sample can explain.
+			</blockquote>
+			<p>Filed under <code>data/round-1</code>, with the questionnaire and the raw exports beside it.</p>
+		</div>
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

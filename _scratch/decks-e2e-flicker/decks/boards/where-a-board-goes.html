@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Where a board goes</title>
+		<meta name="board" content='{"w":1100,"h":1576,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<h3 class="text" data-id="title" style="left: 48px; top: 48px; width: 700px">Where a board goes</h3>
+
+		<section class="card" data-id="summary" style="left: 48px; top: 88px; width: 1004px">
+			<p><b>A board an agent creates, or pulls onto the stage, lands to the right of what is on the canvas</b> — top-aligned with it, rather than below the deck. A position the agent gives is used as it stands. <b>Superseded in one respect:</b> this was written when “placed” meant a position in <code>deck.json</code>, which is one arrangement for everybody — see <a href="./the-canvas-belongs-to-the-conversation.html">the canvas belongs to the conversation</a> for the correction and the rule as it shipped.</p>
+		</section>
+
+		<h3 class="text" data-id="problem" style="left: 48px; top: 212px; width: 600px">Problem</h3>
+
+		<section class="card" data-id="dangling" style="left: 48px; top: 260px; width: 1004px">
+			<p>The default was <i>rows of three, below everything</i>, anchored at the left edge of the whole arrangement. On a deck that has grown into regions that is nowhere in particular: this deck has <b>510 boards</b> spread over <b>750,000 pixels</b> vertically, so a board written in the middle of a conversation appeared at the far end of whichever column happened to be lowest, and the person who asked for it had to go and find it.</p>
+		</section>
+
+		<section class="card" data-id="picture" style="left: 48px; top: 424px; width: 1004px">
+			<svg viewBox="0 0 1004 330" role="img" aria-label="Before: a new board placed below the whole arrangement, far from the boards in play. After: the same new board placed immediately to the right of the arrangement, level with its top.">
+				<!-- Before. The arranged region is the pair of grey boxes; the new board is the outlined one,
+				     and the dotted line is the distance the old rule put between them. -->
+				<text x="48" y="24" fill="#5c5c5c" font-size="13" font-weight="600">Before — below everything</text>
+				<rect x="48" y="48" width="120" height="70" rx="6" fill="#e8e8e8" stroke="#c9c9c9" />
+				<text x="108" y="88" fill="#5c5c5c" font-size="12" text-anchor="middle">arranged</text>
+				<rect x="184" y="48" width="120" height="70" rx="6" fill="#e8e8e8" stroke="#c9c9c9" />
+				<text x="244" y="88" fill="#5c5c5c" font-size="12" text-anchor="middle">arranged</text>
+				<rect x="48" y="134" width="120" height="70" rx="6" fill="#e8e8e8" stroke="#c9c9c9" />
+				<text x="108" y="174" fill="#5c5c5c" font-size="12" text-anchor="middle">arranged</text>
+
+				<line x1="108" y1="204" x2="108" y2="252" stroke="#c9c9c9" stroke-width="1.5" stroke-dasharray="4 4" />
+				<text x="120" y="232" fill="#8a8a8a" font-size="11">the whole deck, downward</text>
+				<rect x="48" y="256" width="120" height="70" rx="6" fill="#eef2ff" stroke="#3b5cf6" stroke-width="1.5" />
+				<text x="108" y="296" fill="#3b5cf6" font-size="12" font-weight="600" text-anchor="middle">new board</text>
+
+				<line x1="470" y1="40" x2="470" y2="330" stroke="#e0e0e0" stroke-width="1" />
+
+				<!-- After. Same region, and the new board sits at its right edge and its top. -->
+				<text x="520" y="24" fill="#5c5c5c" font-size="13" font-weight="600">After — beside what is on the canvas</text>
+				<rect x="520" y="48" width="120" height="70" rx="6" fill="#e8e8e8" stroke="#c9c9c9" />
+				<text x="580" y="88" fill="#5c5c5c" font-size="12" text-anchor="middle">arranged</text>
+				<rect x="656" y="48" width="120" height="70" rx="6" fill="#e8e8e8" stroke="#c9c9c9" />
+				<text x="716" y="88" fill="#5c5c5c" font-size="12" text-anchor="middle">arranged</text>
+				<rect x="520" y="134" width="120" height="70" rx="6" fill="#e8e8e8" stroke="#c9c9c9" />
+				<text x="580" y="174" fill="#5c5c5c" font-size="12" text-anchor="middle">arranged</text>
+
+				<rect x="832" y="48" width="120" height="70" rx="6" fill="#eef2ff" stroke="#3b5cf6" stroke-width="1.5" />
+				<text x="892" y="88" fill="#3b5cf6" font-size="12" font-weight="600" text-anchor="middle">new board</text>
+
+				<line x1="792" y1="83" x2="826" y2="83" stroke="#3b5cf6" stroke-width="1.5" />
+				<path d="M826 83 l-6 -4 v8 z" fill="#3b5cf6" />
+				<text x="809" y="70" fill="#3b5cf6" font-size="11" text-anchor="middle">160px</text>
+				<line x1="520" y1="48" x2="952" y2="48" stroke="#3b5cf6" stroke-width="1" stroke-dasharray="3 3" opacity="0.5" />
+				<text x="944" y="52" fill="#8a8a8a" font-size="11" text-anchor="end">tops aligned</text>
+			</svg>
+		</section>
+
+		<h3 class="text" data-id="method" style="left: 48px; top: 800px; width: 600px">Method</h3>
+
+		<section class="card" data-id="rule" style="left: 48px; top: 848px; width: 490px">
+			<h3>The three rules</h3>
+			<ul>
+				<li><b>The reference is what is on the canvas</b> — the boards in play, not the whole deck. A deck's arrangement is every region at once, which is to say no place in particular.</li>
+				<li><b>A board <i>this stage</i> has placed is never moved.</b> The stage's own record holds the positions it decided — not <code>deck.json</code>, which is the deck's arrangement and everybody's default. That correction is what made this rule simpler rather than more complicated, and it is why the call is safe on every <code>show</code>.</li>
+				<li><b>Nothing lands on top of anything.</b> A spot that collides is walked downwards until it is clear, because a board put beside the ones in play can still land on a board nobody is looking at.</li>
+			</ul>
+		</section>
+
+		<section class="card" data-id="where" style="left: 562px; top: 848px; width: 490px">
+			<h3>Where it lives</h3>
+			<p><code>deck/layout.ts</code> is the arithmetic, pure and 7 tests of its own. Two callers: <code>Deck.autoPlace</code> for a deck being opened — where nothing is in play yet, so the arranged boards are the reference, and a deck with nothing arranged lays out from the origin exactly as before — and <code>StageService.place</code>, which writes the position down and broadcasts it.</p>
+			<p><code>newBoard</code>, <code>attach</code>, <code>show</code> and <code>mirror</code> all call it. Placement happens <i>before</i> the camera is told to fit, and both travel the same socket in order, so the browser frames where the board now is rather than where it was.</p>
+		</section>
+
+		<section class="card" data-id="at" style="left: 48px; top: 1184px; width: 1004px">
+			<h3>A position the agent names</h3>
+			<p><code>stage.newBoard({ …, at: { x, y } })</code> is used as it stands — a caller that has thought about where something goes is not improved on. It is in <code>stage.d.ts</code>, so it is part of the contract agents read. Otherwise the default applies, and <code>stage.move</code> still works afterwards for anything else.</p>
+		</section>
+
+		<h3 class="text" data-id="result" style="left: 48px; top: 1320px; width: 500px">Result</h3>
+
+		<section class="card" data-id="numbers" style="left: 48px; top: 1368px; width: 1004px">
+			<table class="table">
+				<thead>
+					<tr><th>Check</th><th>Result</th></tr>
+				</thead>
+				<tbody>
+					<tr><td>Unit tests</td><td>21 across the rule, the two stages that must not move each other, the record round trip, and the wiring in the tool</td></tr>
+					<tr><td>Boards that move because of this</td><td>none — every board in this deck is already arranged</td></tr>
+					<tr><td>Shipped with</td><td>the per-stage model it needed — <a href="./the-canvas-belongs-to-the-conversation.html">the canvas belongs to the conversation</a></td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

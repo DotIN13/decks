@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>How the changed mark is wired</title>
+		<meta name="board" content='{"w":1000,"h":1464,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 904px">
+			<h1>How the changed mark is wired</h1>
+		</div>
+
+		<h3 class="text" data-id="h-summary" style="left: 48px; top: 136px; width: 904px; font-size: 18px; font-weight: 620">Summary</h3>
+
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 176px; width: 904px">
+			<p><b>The server already knows who named a board, and it is the one that has to start saying when.</b> The browser decides the other half, because only the browser knows what is on screen. The rule itself is on <a href="news-means-an-agent-named-the-board-while-you-we.html">the rule board</a>, and the drawing is on <a href="the-changed-mark-redrawn.html">the look</a>.</p>
+		</div>
+
+		<h3 class="text" data-id="h-method" style="left: 48px; top: 304px; width: 904px; font-size: 18px; font-weight: 620">Method</h3>
+
+		<section class="card" data-id="flow" style="left: 48px; top: 344px; width: 904px">
+			<h3>Where each half is decided</h3>
+			<svg viewBox="0 0 864 208" width="100%" role="img" aria-label="An agent naming a board is stamped by the server, broadcast to every browser, and turned into a mark, or not, by the browser that knows what is on screen.">
+				<defs>
+					<marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+						<path d="M0 0 L8 4 L0 8 z" fill="var(--b-border-strong)" />
+					</marker>
+				</defs>
+				<g font-family="var(--b-font)" font-size="12">
+					<rect x="0" y="8" width="196" height="64" rx="8" fill="var(--b-bg-layer)" stroke="var(--b-border-strong)" />
+					<text x="12" y="30" fill="var(--b-fg)" font-weight="600">Agent names a board</text>
+					<text x="12" y="48" fill="var(--b-muted)">fit, show, report, new</text>
+					<text x="12" y="64" fill="var(--b-muted)">stage tool: workedOn(path)</text>
+
+					<line x1="200" y1="40" x2="228" y2="40" stroke="var(--b-border-strong)" marker-end="url(#ar)" />
+
+					<rect x="232" y="8" width="196" height="64" rx="8" fill="var(--b-bg-layer)" stroke="var(--b-border-strong)" />
+					<text x="244" y="30" fill="var(--b-fg)" font-weight="600">The server stamps it</text>
+					<text x="244" y="48" fill="var(--b-muted)">wrote(path, who)</text>
+					<text x="244" y="64" fill="var(--b-muted)">.decks/authors.json: who, at</text>
+
+					<line x1="432" y1="40" x2="460" y2="40" stroke="var(--b-border-strong)" marker-end="url(#ar)" />
+
+					<rect x="464" y="8" width="196" height="64" rx="8" fill="var(--b-bg-layer)" stroke="var(--b-border-strong)" />
+					<text x="476" y="30" fill="var(--b-fg)" font-weight="600">Every browser hears it</text>
+					<text x="476" y="48" fill="var(--b-muted)">board.changed</text>
+					<text x="476" y="64" fill="var(--b-muted)">namedAt, lastWrittenBy</text>
+
+					<line x1="664" y1="40" x2="692" y2="40" stroke="var(--b-border-strong)" marker-end="url(#ar)" />
+
+					<rect x="696" y="8" width="168" height="64" rx="8" fill="var(--b-bg-layer)" stroke="var(--b-accent)" />
+					<text x="708" y="30" fill="var(--b-fg)" font-weight="600">The browser decides</text>
+					<text x="708" y="48" fill="var(--b-muted)">was that the agent</text>
+					<text x="708" y="64" fill="var(--b-muted)">on screen?</text>
+
+					<line x1="780" y1="76" x2="780" y2="104" stroke="var(--b-border-strong)" />
+					<line x1="470" y1="104" x2="780" y2="104" stroke="var(--b-border-strong)" />
+					<line x1="470" y1="104" x2="470" y2="124" stroke="var(--b-border-strong)" marker-end="url(#ar)" />
+					<line x1="780" y1="104" x2="780" y2="124" stroke="var(--b-border-strong)" marker-end="url(#ar)" />
+
+					<rect x="380" y="128" width="180" height="56" rx="8" fill="var(--b-bg-deep)" stroke="var(--b-border)" />
+					<text x="392" y="152" fill="var(--b-fg)" font-weight="600">Yes: send board.seen</text>
+					<text x="392" y="170" fill="var(--b-muted)">no mark, on any device</text>
+
+					<rect x="690" y="128" width="180" height="56" rx="8" fill="var(--b-accent-soft)" stroke="var(--b-accent)" />
+					<text x="702" y="152" fill="var(--b-fg)" font-weight="600">No: mark the card</text>
+					<text x="702" y="170" fill="var(--b-muted)">until you read it</text>
+				</g>
+			</svg>
+		</section>
+
+		<section class="card" data-id="build" style="left: 48px; top: 672px; width: 904px">
+			<h3>Where the change goes</h3>
+			<table class="table">
+				<thead>
+					<tr><th style="width: 320px">Where</th><th>What changes</th></tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><code>packages/protocol/src/deck.ts</code></td>
+						<td><code>namedAt?: number</code> beside <code>modifiedAt</code> and <code>seenAt</code></td>
+					</tr>
+					<tr>
+						<td><code>apps/server/src/boards/authors.ts</code></td>
+						<td>
+							The note keeps <code>{ who, at }</code>, with a <code>say()</code> that is idempotent for one act. A bare
+							string in a file written before this still parses, as a writer with no time
+						</td>
+					</tr>
+					<tr>
+						<td><code>apps/server/src/boards/service.ts</code></td>
+						<td>
+							<code>wrote()</code> stamps the time and broadcasts it. The canvas editor's patch now goes through
+							<code>wrote(path, "you")</code> rather than setting the byline itself, so the person's own act is
+							timed like an agent's
+						</td>
+					</tr>
+					<tr>
+						<td><code>apps/server/src/deck/loader.ts</code></td>
+						<td>
+							The act time rides across a re-read, the way the byline already did: the loader re-describes
+							the file and knows no authors, so a re-read used to drop both
+						</td>
+					</tr>
+					<tr>
+						<td><code>apps/web/src/chrome/dispatch-view.ts</code></td>
+						<td>
+							<code>isNews</code> reads the act and falls back to the file, <code>agoLabel</code> names the age for a
+							chip, and a shelf sorts by the newest act rather than the newest file
+						</td>
+					</tr>
+					<tr>
+						<td><code>apps/web/src/app/watching.ts</code> <span class="chip">new</span></td>
+						<td>
+							The <i>you were watching</i> half, as its own module rather than inline in the frame handler,
+							so the rule can be tested without a model. <code>frames.ts</code> calls it on
+							<code>board.changed</code> and sends <code>board.seen</code>
+						</td>
+					</tr>
+					<tr>
+						<td><code>Gallery.tsx</code>, <code>DispatchView.tsx</code>, <code>AgentPill.tsx</code>, <code>App.tsx</code>, <code>dispatch.css</code></td>
+						<td>The four carriers, the accent count on a shelf, and the dot on the Boards tab</td>
+					</tr>
+					<tr>
+						<td>Tests</td>
+						<td>
+							Seven cases in <code>dispatch-view.test.ts</code>, four in <code>watching.test.ts</code>, two in
+							<code>authors.test.ts</code>, <code>wrote.test.ts</code> rewritten for the act time, and a new
+							<code>e2e/checks/news.mjs</code> whose 16 assertions read the mark out of the DOM
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</section>
+
+		<h3 class="text" data-id="h-next" style="left: 48px; top: 1280px; width: 904px; font-size: 18px; font-weight: 620">Next</h3>
+
+		<div class="callout" data-id="cost" data-tone="ok" style="left: 48px; top: 1320px; width: 904px">
+			<p><b>Built, in one commit.</b> About half a day, and most of it the look. Two things came out differently from the design, and both are on <a href="news-means-an-agent-named-the-board-while-you-we.html">the rule board</a>: the <i>you were watching</i> test is the agent alone, and a byline kept from before acts were timed is no longer news. <a href="the-changed-mark-redrawn.html">The look</a> shows the result on the same shelf it was designed against.</p>
+		</div>
+	</body>
+</html>

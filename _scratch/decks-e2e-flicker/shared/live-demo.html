@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>A page that opts in</title>
+		<style>
+			body { margin: 0; padding: 14px; background: #fffdf8; color: #161616;
+				font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+			h1 { margin: 0 0 2px; font-size: 15px; }
+			p { margin: 0 0 10px; color: #808080; font-size: 11.5px; }
+			button { padding: 9px 14px 11px; border: 0; border-radius: 12px; background: #3b5cf6;
+				box-shadow: 0 3px 0 #263fa9; color: #fff; font: 600 12.5px inherit; cursor: pointer; }
+			button:active { transform: translateY(3px); box-shadow: 0 0 0 #263fa9; }
+			#box { height: 56px; margin-top: 10px; overflow: auto; padding: 8px 10px;
+				border: 1px solid #eee; border-radius: 10px; font-size: 11.5px; }
+			#box div { padding: 3px 0; }
+		</style>
+	</head>
+	<body>
+		<h1>A page that opts in</h1>
+		<p>No veil, no click: it takes the pointer and hands back the scrolls it cannot use.</p>
+		<button id="go">clicked 0 times</button>
+		<div id="box">
+			<div>this box has its own scroll</div>
+			<div>so a wheel over it stays here</div>
+			<div>until it reaches the end</div>
+			<div>and then the canvas takes over</div>
+			<div>which is the rule one level up</div>
+			<div>as well</div>
+		</div>
+
+		<script>
+			let n = 0;
+			const go = document.getElementById("go");
+			go.addEventListener("click", () => {
+				n += 1;
+				go.textContent = `clicked ${n} time${n === 1 ? "" : "s"}`;
+			});
+		</script>
+
+		<!--
+			`lib/embed-guest.js`, inlined and trimmed to the two gestures this fixture is
+			asked about. It lives outside the deck (it is reached through a root in
+			deck.json) so it cannot load the deck's copy — and inlining it earns its keep
+			anyway: it shows the protocol is a page's own twenty lines, not a dependency
+			on our file.
+		-->
+		<script>
+			(() => {
+				if (window.parent === window) return;
+				const post = (m) => { try { window.parent.postMessage(m, "*"); } catch {} };
+				post({ t: "decks:embed-ready" });
+				window.addEventListener("load", () => post({ t: "decks:embed-ready" }));
+
+				const style = document.createElement("style");
+				style.dataset.decksUi = "true";
+				style.textContent = "* { touch-action: none; }";
+				document.head.appendChild(style);
+
+				const canScroll = (el, dx, dy) => {
+					const s = getComputedStyle(el);
+					const vertical = /auto|scroll/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1;
+					if (vertical && Math.abs(dy) >= Math.abs(dx)) {
+						const room = dy > 0 ? el.scrollHeight - el.clientHeight - el.scrollTop : el.scrollTop;
+						if (room > 1) return true;
+					}
+					return false;
+				};
+				const scrollableUnder = (target, dx, dy) => {
+					let node = target instanceof Element ? target : null;
+					while (node) {
+						if (canScroll(node, dx, dy)) return node;
+						node = node.parentElement;
+					}
+					return undefined;
+				};
+
+				window.addEventListener(
+					"wheel",
+					(event) => {
+						const zooming = event.ctrlKey || event.metaKey;
+						if (!zooming && scrollableUnder(event.target, event.deltaX, event.deltaY)) return;
+						event.preventDefault();
+						post({ t: "decks:wheel", dx: event.deltaX, dy: event.deltaY, x: event.clientX, y: event.clientY, zooming });
+					},
+					{ passive: false },
+				);
+
+				const fingers = new Map();
+				let mode = "undecided";
+				let scrolling;
+				// A test hook, and the thing worth watching: a gesture that is not released
+				// leaves a finger down, and the next one looks like a pinch to the stage.
+				let decided = "none";
+				let down = null;
+				window.__gesture = () => ({ fingers: fingers.size, mode, decided, down });
+
+				const onMove = (event) => {
+					if (event.pointerType !== "touch") return;
+					const was = fingers.get(event.pointerId);
+					if (!was) return;
+					const dx = event.clientX - was.x;
+					const dy = event.clientY - was.y;
+					was.x = event.clientX;
+					was.y = event.clientY;
+
+					if (fingers.size > 1) {
+						mode = "camera";
+						scrolling = undefined;
+					} else if (mode === "undecided" && (Math.abs(dx) >= 2 || Math.abs(dy) >= 2)) {
+						const box = scrollableUnder(was.on, -dx, -dy);
+						mode = box ? "scroll" : "camera";
+						decided = mode + ":" + (box ? box.id || box.tagName : "-") + ":" + Math.round(dy);
+						scrolling = box;
+					}
+
+					if (mode === "scroll" && scrolling) {
+						scrolling.scrollLeft -= dx;
+						scrolling.scrollTop -= dy;
+						return;
+					}
+					post({ t: "decks:touch", phase: "move", id: event.pointerId, x: event.clientX, y: event.clientY });
+				};
+				const onUp = (event) => {
+					if (event.pointerType !== "touch") return;
+					if (!fingers.delete(event.pointerId)) return;
+					post({ t: "decks:touch", phase: "up", id: event.pointerId, x: event.clientX, y: event.clientY });
+					if (fingers.size > 0) return;
+					mode = "undecided";
+					scrolling = undefined;
+					document.removeEventListener("pointermove", onMove, true);
+					document.removeEventListener("pointerup", onUp, true);
+					document.removeEventListener("pointercancel", onUp, true);
+				};
+				document.addEventListener("pointerdown", (event) => {
+					if (event.pointerType !== "touch") return;
+					if (fingers.size === 0) {
+						mode = "undecided";
+						scrolling = undefined;
+						document.addEventListener("pointermove", onMove, true);
+						document.addEventListener("pointerup", onUp, true);
+						document.addEventListener("pointercancel", onUp, true);
+					}
+					fingers.set(event.pointerId, { x: event.clientX, y: event.clientY, on: event.target });
+					down = { on: event.target.id || event.target.tagName, x: Math.round(event.clientX), y: Math.round(event.clientY) };
+					post({ t: "decks:touch", phase: "down", id: event.pointerId, x: event.clientX, y: event.clientY });
+					try {
+						document.documentElement.setPointerCapture(event.pointerId);
+					} catch {}
+				});
+			})();
+		</script>
+	</body>
+</html>

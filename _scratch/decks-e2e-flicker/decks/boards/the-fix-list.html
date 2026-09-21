@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>The fix list</title>
+		<meta name="board" content='{"w":1120,"h":916,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<style>
+			.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+			.n { font-variant-numeric: tabular-nums; color: var(--color-faint); }
+		</style>
+	</head>
+	<body class="board">
+		<h1 class="text" data-id="title" style="left: 40px; top: 36px; width: 800px; font-size: 26px; font-weight: 650">
+			What I’m going to fix
+		</h1>
+
+		<div class="callout" data-tone="info" data-id="core" style="left: 40px; top: 92px; width: 1040px">
+			<h3>One new function, and everything else falls out of it</h3>
+			<p><span class="mono">resolve_options(kind, sub, model_options) → (options, source)</span> — precedence decided once: <b>configured &gt; model &gt; scale</b>, and never a silent Yes/No. Both loops call it instead of each having their own rule.</p>
+		</div>
+
+		<h3 class="text" data-id="head" style="left: 40px; top: 232px; width: 600px; font-size: 17px; font-weight: 620">The changes</h3>
+
+		<table class="table" data-id="changes" style="left: 40px; top: 272px; width: 1040px">
+			<thead>
+				<tr><th style="width: 34px">#</th><th style="width: 520px">Change</th><th>Where</th></tr>
+			</thead>
+			<tbody>
+				<tr><td class="n">1</td><td>Add the shared resolver; call it from both option sites, replacing the two conflicting rules</td><td class="mono">agentic.py:288, 355 · interview.py:144</td></tr>
+				<tr><td class="n">2</td><td>Say “I discarded your list” on <b>every</b> branch, not just the configured one — plus, for a likert, “this uses an agree/disagree scale, phrase the stem as a statement”</td><td class="mono">agentic.py:371</td></tr>
+				<tr><td class="n">3</td><td>Give the three likert rows real anchors, in the seed and in the live DB</td><td class="mono">seed.py:39, 49 · data/app.db (ids 5, 9, 14)</td></tr>
+				<tr><td class="n">4</td><td>Let the admin edit likert anchors — show the textarea, and stop the save zeroing the field</td><td class="mono">AdminPage.tsx:104, 153</td></tr>
+				<tr><td class="n">5</td><td>Correct <span class="mono">kind</span> against <span class="mono">sub.answer_type</span> on the sparkme path too — wire up the constant that is sitting there unused</td><td class="mono">interview.py:42, 144</td></tr>
+				<tr><td class="n">6</td><td>Give <span class="mono">ask_likert</span> an <span class="mono">options</span> param and <span class="mono">ask_rating</span> a <span class="mono">min</span>/<span class="mono">max</span>, so surface B can carry what the resolver now accepts</td><td class="mono">llm.py:249-254</td></tr>
+				<tr><td class="n">7</td><td>Rephrase the scripted fallback stem, which today reads “How much do you agree with ‘how optimistic you are…’?”</td><td class="mono">interview.py:168</td></tr>
+				<tr><td class="n">8</td><td>Update the tests that pin the current behaviour, and add one per fixed case</td><td class="mono">tests/test_llm.py · test_agentic.py</td></tr>
+			</tbody>
+		</table>
+
+		<div class="callout" data-tone="warn" data-id="not" style="left: 40px; top: 728px; width: 1040px">
+			<h3>Not doing — it needs your call</h3>
+			<p>Per-subtopic rating bounds. Making a 0–10 item expressible means a new column on <span class="mono">Subtopic</span> and a migration, and it changes what the rating column means across an instrument you may already have data in. Say the word and it becomes #9.</p>
+		</div>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

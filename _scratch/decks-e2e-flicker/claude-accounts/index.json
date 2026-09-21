@@ -1,0 +1,11 @@
+{
+  "accounts": [
+    {
+      "id": "default",
+      "email": "tzhang3@uchicago.edu",
+      "orgName": "University of Chicago Enterprise",
+      "plan": "enterprise",
+      "addedAt": 0
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Revenue share by price and quality in a subscription market</title>
+		<meta name="board" content='{"w":1100,"h":1128,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
+			<h1>Revenue share by price and quality in a subscription market</h1>
+		</div>
+
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 112px; width: 1004px">
+			<p><b>By price against quality, the field splits into a packed middle and a bare value lane.</b> Northwind sells a third of the market at the top of the quality scale; the only entrant under 70 dollars with a strong score holds 3% and is growing fastest.</p>
+		</div>
+
+		<section class="card" data-id="map" style="left: 48px; top: 200px; width: 1004px">
+			<h3>The category, by price and quality, sized by revenue share</h3>
+			<div id="map" style="position: relative; height: 430px"></div>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 6px">Hover a brand for its numbers; click to pin it. Bubble area is share of category revenue. The axes split the field at 100 dollars and quality 75.</p>
+		</section>
+
+		<section class="card" data-id="table" style="left: 48px; top: 752px; width: 660px">
+			<h3>The field, by revenue share</h3>
+			<table class="table">
+				<thead><tr><th>Brand</th><th>Price, dollars per month</th><th>Quality score</th><th>Share, percent</th></tr></thead>
+				<tbody>
+					<tr><td><b>Northwind (you)</b></td><td>118</td><td>92</td><td>31</td></tr>
+					<tr><td>Harbor</td><td>74</td><td>58</td><td>19</td></tr>
+					<tr><td>Meridian</td><td>88</td><td>66</td><td>16</td></tr>
+					<tr><td>Bluebottle</td><td>98</td><td>78</td><td>14</td></tr>
+					<tr><td>Stoa</td><td>132</td><td>70</td><td>9</td></tr>
+					<tr><td>Atlas</td><td>142</td><td>96</td><td>8</td></tr>
+					<tr><td>Fern</td><td>62</td><td>86</td><td>3</td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<div class="callout" data-id="next" data-tone="ok" style="left: 740px; top: 752px; width: 312px">
+			<p><b>The opening.</b> Nothing sits between Harbor and the premium corner at an honest price. Fern is the only proof the lane works: it doubles every six months on a 45 dollar ticket.</p>
+		</div>
+
+		<script type="module">
+			const host = document.querySelector("#map");
+			if (host) {
+				const d3 = await import("d3");
+
+				const brands = [
+					{ name: "Northwind", price: 118, quality: 92, share: 31, us: true },
+					{ name: "Harbor", price: 74, quality: 58, share: 19, us: false },
+					{ name: "Meridian", price: 88, quality: 66, share: 16, us: false },
+					{ name: "Bluebottle", price: 98, quality: 78, share: 14, us: false },
+					{ name: "Stoa", price: 132, quality: 70, share: 9, us: false },
+					{ name: "Atlas", price: 142, quality: 96, share: 8, us: false },
+					{ name: "Fern", price: 62, quality: 86, share: 3, us: false },
+				];
+
+				const width = host.clientWidth || 960;
+				const height = 430;
+				const margin = { top: 16, right: 20, bottom: 48, left: 56 };
+				const innerW = width - margin.left - margin.right;
+				const innerH = height - margin.top - margin.bottom;
+
+				const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height).style("display", "block");
+				const plot = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+				const x = d3.scaleLinear().domain([50, 160]).range([0, innerW]);
+				const y = d3.scaleLinear().domain([45, 100]).range([innerH, 0]);
+				const radius = d3.scaleSqrt().domain([0, 32]).range([6, 40]);
+
+				// The four quadrants, with the axes that split them: names, not codes, so the
+				// map is readable without the legend doing the work.
+				// The four quadrants, named in the corners they describe. Short names only: the brands
+				// are on the bubbles and in the table, and a corner label with them in it lands on a
+				// bubble.
+				[
+					{ x: innerW - 8, y: 16, anchor: "end", text: "premium value" },
+					{ x: 8, y: 16, anchor: "start", text: "value lane" },
+					{ x: innerW - 8, y: innerH - 8, anchor: "end", text: "overpriced" },
+					{ x: 8, y: innerH - 8, anchor: "start", text: "cut price" },
+				].forEach((label) => {
+					plot.append("text").attr("x", label.x).attr("y", label.y).attr("text-anchor", label.anchor)
+						.style("font-size", "10px").style("fill", "var(--b-faint)").style("letter-spacing", "0.06em")
+						.text(label.text);
+				});
+				const vline = plot.append("line").attr("x1", x(100)).attr("x2", x(100)).attr("y1", 0).attr("y2", innerH).attr("stroke", "var(--b-border)").attr("stroke-dasharray", "3 4");
+				const hline = plot.append("line").attr("x1", 0).attr("x2", innerW).attr("y1", y(75)).attr("y2", y(75)).attr("stroke", "var(--b-border)").attr("stroke-dasharray", "3 4");
+
+				// The axes each direction counts in, with their units, and the tick values.
+				plot.append("g").call(d3.axisLeft(y).ticks(5).tickSize(-innerW))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "11px"))
+					.call((axis) => axis.selectAll("line").style("stroke", "var(--b-border)"))
+					.call((axis) => axis.select(".domain").style("stroke", "none"));
+				plot.append("g").attr("transform", `translate(0,${innerH})`).call(d3.axisBottom(x).ticks(6).tickSize(-innerH))
+					.style("color", "var(--b-muted)")
+					.call((axis) => axis.selectAll("text").style("font-size", "11px").attr("dy", "1.6em"))
+					.call((axis) => axis.selectAll("line").style("stroke", "var(--b-border)"))
+					.call((axis) => axis.select(".domain").style("stroke", "none"));
+				plot.append("text").attr("x", 0).attr("y", -8).style("font-size", "11px").style("fill", "var(--b-muted)").text("quality score, 0 to 100");
+				plot.append("text").attr("x", innerW / 2).attr("y", innerH + 40).attr("text-anchor", "middle").style("font-size", "11px").style("fill", "var(--b-muted)").text("monthly price, dollars");
+
+				const tooltip = d3.select(host).append("div").style("position", "absolute").style("left", "0").style("top", "0")
+					.style("pointer-events", "none").style("opacity", "0").style("z-index", "5")
+					.style("background", "var(--b-bg-layer)").style("border", "1px solid var(--b-border-strong)").style("border-radius", "6px")
+					.style("padding", "8px 10px").style("font-size", "12px").style("box-shadow", "var(--b-shadow)");
+
+				const circle = plot.selectAll("circle").data(brands).join("circle")
+					.attr("cx", (d) => x(d.price)).attr("cy", (d) => y(d.quality)).attr("r", (d) => radius(d.share))
+					.style("fill", (d) => (d.us ? "var(--b-accent)" : "var(--b-muted)"))
+					.style("fill-opacity", (d) => (d.us ? 0.95 : 0.42))
+					.style("stroke", (d) => (d.us ? "var(--b-accent)" : "none")).style("stroke-width", 2)
+					.style("cursor", "pointer")
+					.on("mouseenter", (event, d) => {
+						d3.select(event.currentTarget).style("fill-opacity", 1).style("fill", d.us ? "var(--b-accent)" : "var(--b-fg)");
+						tooltip.style("opacity", "1").html(`<b>${d.name}</b>${d.us ? " (you)" : ""}<br>${d.price} dollars per month<br>quality ${d.quality}<br>${d.share}% of category revenue`).style("left", `${event.offsetX + 16}px`).style("top", `${event.offsetY - 40}px`);
+					}).on("mousemove", (event) => tooltip.style("left", `${event.offsetX + 16}px`).style("top", `${event.offsetY - 40}px`))
+					.on("mouseleave", (event, d) => {
+						d3.select(event.currentTarget).style("fill-opacity", d.us ? 0.95 : 0.42).style("fill", d.us ? "var(--b-accent)" : "var(--b-muted)");
+						tooltip.style("opacity", "0");
+					})
+					.on("click", (event, d) => {
+						// A click pins the brand: a ring at its edge, and one pin at a time, so
+						// pinned and unpinned brands are told apart at a glance.
+						plot.selectAll("circle.pin").remove();
+						plot.append("circle").attr("class", "pin")
+							.attr("cx", x(d.price)).attr("cy", y(d.quality)).attr("r", radius(d.share) + 4)
+							.style("fill", "none").style("stroke", "var(--b-accent)").style("stroke-width", 2);
+					});
+
+				// The bubble size legend, bottom right inside the plot, with the numbers on the
+				// circles.
+				const legend = plot.append("g").attr("transform", `translate(${innerW - 132},${innerH - 96})`);
+				for (const share of [5, 15, 30]) {
+					const r = radius(share);
+					legend.append("circle").attr("cx", 18).attr("cy", 40 - r).attr("r", r).style("fill", "none").style("stroke", "var(--b-border-strong)");
+					legend.append("text").attr("x", 42).attr("y", 40 - 2 * r + 4 - 2).style("font-size", "10px").style("fill", "var(--b-muted)").text(`${share}%`);
+				}
+				legend.append("text").attr("x", 18).attr("y", 52).attr("text-anchor", "middle").style("font-size", "10px").style("fill", "var(--b-faint)").text("revenue share");
+			}
+		</script>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

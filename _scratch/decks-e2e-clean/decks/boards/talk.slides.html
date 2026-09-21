@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Three slides about the fixture</title>
+		<meta name="board" content='{"w":960,"aspect":"16:9"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<!--
+		The fixture's deck: reveal's own format, three sections, no scripts. Every e2e check
+		that needs a board which is *not* a component board has one now — before this, the
+		whole suite only ever saw component boards, which is how a slides-only gate on
+		fullscreen could sit in the app unnoticed.
+	-->
+	<body class="reveal">
+		<div class="slides">
+			<section>
+				<h1 style="margin: 0 0 6px">The fixture, in three slides</h1>
+				<p>What the e2e checks page through, lay out at 960×540, and present.</p>
+			</section>
+			<section>
+				<h2>One</h2>
+				<p>Arrows page this. Space pages this. A clicker sends PageDown, which pages this.</p>
+			</section>
+			<section>
+				<h2>Two</h2>
+				<p>The last slide, so that a check can tell "next" from "wrapped around".</p>
+				<aside class="notes">A speaker note, which the board takes out of the slide.</aside>
+			</section>
+		</div>
+		<!--
+			No script tag, deliberately: the shell loads `board.js`, which sees the `.deck`
+			component and lazy-loads `slides.js` itself. A `<script src="…/slides.js">` here
+			would be a classic script with ES `export` in it — a syntax error, and a page error
+			the "no page errors" assertion would fail on.
+		-->
+	</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>data-node — what gets a handle, and what does not</title>
+		<meta name="board" content='{"w":1008,"h":951,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+	</head>
+	<body class="board">
+		<section class="card" data-id="answer" style="left: 40px; top: 40px; width: 920px">
+			<h3>No — and the handle is not an id in the file</h3>
+			<p>
+				A handle goes on <b>every node that has bytes of its own and is not inside a leaf</b>: every
+				container, and every leaf. It is how a <i>press</i> finds a node, and nothing else —
+				<b>the file never contains one, and never learns it exists.</b> The address of an edit is still
+				<code>data-id</code> plus the path counted in the tree.
+			</p>
+			<table class="table">
+				<tr>
+					<th>Node</th>
+					<th>Handle</th>
+					<th>Why</th>
+					<th>In the deck</th>
+				</tr>
+				<tr>
+					<td>A <b>container</b> — <code>&lt;section class="card"&gt;</code>, a document's body, a list</td>
+					<td><b>Yes</b></td>
+					<td>It can be moved, deleted, reordered, resized — every verb a container has.</td>
+					<td>15,009</td>
+				</tr>
+				<tr>
+					<td>A <b>leaf</b> — a <code>&lt;h3&gt;</code>, a <code>&lt;p&gt;</code>, a table cell</td>
+					<td><b>Yes</b></td>
+					<td>It is one run of words: a caret goes in it, and its whole content is what an edit
+						replaces.</td>
+					<td>41,648</td>
+				</tr>
+				<tr>
+					<td>A mark <b>inside</b> a leaf — <code>&lt;b&gt;</code>, <code>&lt;a&gt;</code>,
+						<code>&lt;code&gt;</code></td>
+					<td>No</td>
+					<td>By policy: <b>a run of words is one leaf, marks and all.</b> Half a sentence is not a thing
+						to select, and the caret walks through a link rather than stopping at it. Giving these
+						handles would invite a verb the model does not have.</td>
+					<td>32,318</td>
+				</tr>
+				<tr>
+					<td>A text node</td>
+					<td>No</td>
+					<td>Nothing to carry an attribute, and nothing to address: a run of text is its element's
+						content, which is the leaf above.</td>
+					<td>—</td>
+				</tr>
+				<tr>
+					<td>An element the parser <b>implied</b> — a <code>&lt;tbody&gt;</code> no byte corresponds
+						to</td>
+					<td>No</td>
+					<td>No bytes, so no range to splice. A step in a path, never a target.</td>
+					<td>338</td>
+				</tr>
+				<tr>
+					<td>What a <b>script</b> drew inside a panel</td>
+					<td>No</td>
+					<td>It is not in the tree at all — and so, mechanically, not selectable. The panel itself is,
+						and it is edited as its source.</td>
+					<td>—</td>
+				</tr>
+			</table>
+			<p>
+				Counted over this deck: <b>540 boards, 89,313 elements</b> — 56,657 handles, 338 without bytes,
+				32,318 marks inside runs.
+			</p>
+		</section>
+
+		<section class="card" data-id="how" style="left: 40px; top: 520px; width: 920px">
+			<h3>Five steps, and two properties</h3>
+			<table class="table">
+				<tr>
+					<th>Step</th>
+					<th></th>
+				</tr>
+				<tr>
+					<td><b>1 — assign</b></td>
+					<td>During the walk, in document order: <code>data-node="n412"</code>. A counter, so the same
+						board gives the same handles twice running.</td>
+				</tr>
+				<tr>
+					<td><b>2 — serialise</b></td>
+					<td>The tree goes back out as a document <i>with</i> the handles in the markup, and is written
+						into the iframe.</td>
+				</tr>
+				<tr>
+					<td><b>3 — the browser parses it</b></td>
+					<td>They are ordinary attributes, so they survive — and this is the parse that runs the board's
+						scripts and applies its stylesheets.</td>
+				</tr>
+				<tr>
+					<td><b>4 — collect</b></td>
+					<td><code>[data-node]</code> → element → node. That map is the only thing that pairs a DOM
+						element with a tree node; the node's own address is <code>data-id</code> plus a path.</td>
+				</tr>
+				<tr>
+					<td><b>5 — a press</b></td>
+					<td><code>event.target.closest("[data-node]")</code> → the node → the path, counted <b>in the
+						tree</b> → the server splices the range it found in its own parse.</td>
+				</tr>
+			</table>
+			<p>
+				<b>Never written back:</b> the handle exists in the editor's frame and nowhere else. <b>No layout
+				effect:</b> it is an attribute, and no board's stylesheet knows the name — mine is
+				<code>data-node</code> for that reason.
+			</p>
+		</section>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>
