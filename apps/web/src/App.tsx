@@ -192,8 +192,10 @@ export function App() {
 	let setWantFocusedStage: (value: boolean) => void = () => {};
 	const applyPlace = (place: Place) => {
 		currentPlace = place;
+		// Read before anything sets it: whether we are leaving a canvas we were looking at.
+		const wasOnStage = surface() === "stage";
 		if (place.surface === "dispatch") {
-			const leaving = surface() === "stage" ? state.canvas : undefined;
+			const leaving = wasOnStage ? state.canvas : undefined;
 			if (leaving) {
 				morphFor(CLOSE_MS);
 				morph.leave(leaving, stageBoards(), () => {
@@ -217,8 +219,14 @@ export function App() {
 		if (place.canvas) {
 			setRouteAgent(undefined);
 			setWantFocusedStage(false);
-			// Keep where the canvas being left was looking, for the next time it is opened.
-			if (state.canvas && state.canvas !== place.canvas) morph.keep(state.canvas, camera());
+			/*
+			 * Keep where the canvas being left was looking, for the next time it is opened — but
+			 * only when we were looking at it. Coming back through the dashboard, the camera has
+			 * already flown into the card by now, and `morph.leave` parked the real view on the
+			 * way out; parking again here wrote the shrunken card camera over it, and the next
+			 * open of that canvas landed at one percent with the boards in the corner.
+			 */
+			if (wasOnStage && state.canvas && state.canvas !== place.canvas) morph.keep(state.canvas, camera());
 			arriving = place.canvas;
 			if (place.canvas !== state.canvas) send({ type: "canvas.focus", id: place.canvas });
 			else landCanvas();
