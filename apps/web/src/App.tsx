@@ -186,9 +186,8 @@ export function App() {
 	 */
 	const landCanvas = () => {
 		if (!arriving || arriving !== state.canvas) return;
-		const id = arriving;
-		arriving = undefined;
-		morph.arrived(id, stageBoards());
+		// Only done asking once it has somewhere to land: a canvas arrives before its boards do.
+		if (morph.arrived(arriving, stageBoards())) arriving = undefined;
 	};
 	let setWantFocusedStage: (value: boolean) => void = () => {};
 	const applyPlace = (place: Place) => {

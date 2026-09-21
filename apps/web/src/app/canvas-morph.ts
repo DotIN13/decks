@@ -28,8 +28,15 @@ interface Storage {
 export interface CanvasMorph {
 	/** A card was pressed: remember where, and grow out of it once the canvas's boards are here. */
 	open(canvasId: string, card: DOMRect): void;
-	/** The canvas this browser is on and its boards have arrived: run a pending open, if any. */
-	arrived(canvasId: string, boards: readonly Board[]): void;
+	/**
+	 * The canvas this browser is on: land on it, growing out of a pressed card when there was one.
+	 *
+	 * Answers **whether it landed**. The boards of a canvas arrive a beat after the canvas itself
+	 * does, and a browser that opened one by its address has nothing to fit until they do — so a
+	 * caller that is told `false` keeps asking rather than leaving the camera wherever it was,
+	 * which on a deck of 900 boards is a fit of all of them at 2%.
+	 */
+	arrived(canvasId: string, boards: readonly Board[]): boolean;
 	/**
 	 * Leaving a canvas for the dashboard: shrink into its card, then call `done`.
 	 *
@@ -78,11 +85,16 @@ export function createCanvasMorph(options: { deckPath: () => string; stage: () =
 		},
 
 		arrived(canvasId, boards) {
-			const opening = pending;
-			if (!opening || opening.canvasId !== canvasId) return;
-			pending = undefined;
 			const to = destination(canvasId, boards);
-			if (!to) return;
+			// Nothing to land on yet: the canvas is here and its boards are not.
+			if (!to) return false;
+			const opening = pending?.canvasId === canvasId ? pending : undefined;
+			pending = undefined;
+			if (!opening) {
+				// Opened by its address rather than by pressing a card: no card to grow out of.
+				moveCamera(to);
+				return true;
+			}
 			const rect = stageRect();
 			const box = boundsOf(boards.map(boxOf));
 			/*
@@ -91,9 +103,10 @@ export function createCanvasMorph(options: { deckPath: () => string; stage: () =
 			 */
 			if (!rect || !box || reducedMotion() || Date.now() - opening.at > 1500) {
 				moveCamera(to);
-				return;
+				return true;
 			}
 			run(cameraInto(box, opening.card, rect), to, box, OPEN_MS);
+			return true;
 		},
 
 		leave(canvasId, boards, done) {
