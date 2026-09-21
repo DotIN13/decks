@@ -32,11 +32,7 @@ export function CronList(props: CronListProps) {
 	const n = () => props.schedules.length;
 	return (
 		<>
-			<div class="dispatch-note">
-				<span class="flex-1" />
-				<span class="dispatch-hint">Ask in the bar: "every weekday at nine, digest for alpha". The dispatcher makes the schedule.</span>
-			</div>
-			<Show when={n() > 0} fallback={<p class="dispatch-empty">Nothing scheduled. Say what and when in the bar, and the job starts here.</p>}>
+			<Show when={n() > 0} fallback={<p class="dispatch-empty">No cron jobs. Ask Dispatcher to schedule one.</p>}>
 				<div class="dispatch-sec">
 					<b>Scheduled</b>
 					<span class="dispatch-n">{n()}</span>
