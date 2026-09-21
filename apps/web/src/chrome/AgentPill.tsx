@@ -2,6 +2,7 @@ import { PALETTE, type ComponentKind } from "@decks/board-kit";
 import type { AgentChat, AgentKind, Canvas, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
+import ArrowLeft from "lucide-solid/icons/arrow-left";
 import House from "lucide-solid/icons/house";
 import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import PanelLeft from "lucide-solid/icons/panel-left";
@@ -734,7 +735,7 @@ export function AgentPill(props: {
 					tabindex={onStage() ? 0 : -1}
 					onClick={() => props.onHome?.()}
 				>
-					<Icon of={House} size={13} />
+					<Icon of={ArrowLeft} size={13} />
 					<span>Home</span>
 					<Show when={(props.wantsYou ?? 0) > 0}>
 						<span class="pill-home-n">{props.wantsYou}</span>
