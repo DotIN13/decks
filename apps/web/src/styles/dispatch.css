@@ -1,5 +1,5 @@
 /*
- * The dashboard's own shapes: the strip, the band, the shelves and cards, the task rows,
+ * The dashboard's own shapes: the strip, the shelves and cards, the task rows,
  * the preview.
  *
  * Same split as `panel.css`: a shape spelled in more than one place is here, layout is a
@@ -216,22 +216,7 @@
 		color: var(--faint);
 	}
 
-	/* --- the in-flight band --------------------------------------------------------------- */
-	.dispatch-band {
-		flex: none;
-		margin: 0 12px 8px;
-		padding: 8px 10px 6px;
-		border: 1px solid var(--line);
-		border-radius: 8px;
-		background: var(--layer, var(--bg-deep));
-	}
-	.dispatch-band-head {
-		display: flex;
-		align-items: baseline;
-		gap: 6px;
-		padding-bottom: 4px;
-		font-size: 11.5px;
-	}
+	/* --- the task and cron rows ------------------------------------------------------------ */
 	.dispatch-rows {
 		display: flex;
 		flex-direction: column;

@@ -20,7 +20,6 @@ import { DISPATCH_TAB_LABEL, DISPATCH_TABS, type DispatchTab, galleryGroups } fr
 import { CanvasShelf } from "./CanvasShelf.tsx";
 import { Gallery } from "./Gallery.tsx";
 import { Preview } from "./Preview.tsx";
-import { TaskBand } from "./TaskBand.tsx";
 import { TaskList } from "./TaskList.tsx";
 
 export interface DispatchViewProps {
@@ -149,7 +148,6 @@ export function DispatchView(props: DispatchViewProps) {
 			</Show>
 			<Show when={props.tab === "boards"}>
 				<div class="dispatch-pane dispatch-pane-boards" role="tabpanel" data-id="boards">
-					<TaskBand tasks={props.tasks} chats={props.chats} onTab={props.onTab} onOpenAgent={props.onOpenAgent} />
 					<div class="dispatch-scroll">
 						<Gallery
 							groups={groups()}

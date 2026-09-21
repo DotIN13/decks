@@ -72,16 +72,6 @@ const FLIGHT_RANK: Partial<Record<TaskState, number>> = {
 	open: 3,
 };
 
-/** Every task that is not finished, in the band's order. */
-export function inFlight(tasks: Task[]): Task[] {
-	return tasks
-		.filter((task) => FLIGHT_RANK[task.state] !== undefined)
-		.sort((a, b) => {
-			const rank = (FLIGHT_RANK[a.state] ?? 9) - (FLIGHT_RANK[b.state] ?? 9);
-			return rank !== 0 ? rank : b.updatedAt - a.updatedAt;
-		});
-}
-
 /** How many tasks are waiting on a person — the number on the Boards tab. */
 export function wantsYou(tasks: Task[]): number {
 	return tasks.filter((task) => task.state === "blocked" || task.state === "failed").length;

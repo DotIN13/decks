@@ -8,7 +8,6 @@ import {
 	filterCards,
 	galleryGroups,
 	holderNames,
-	inFlight,
 	isNews,
 	schedulePaused,
 	stateWord,
@@ -60,19 +59,6 @@ test("whyRefused prefers the rule's reason, falls back to the dispatch, and is s
 	assert.equal(whyRefused(task("blocked", { reason: "nobody in beta" })), "nobody in beta");
 	assert.equal(whyRefused(task("failed")), "the only agent in the workspace");
 	assert.equal(whyRefused(task("running", { reason: "stale" })), undefined);
-});
-
-test("inFlight drops the finished, puts refused first, then running, assigned, open; newest first within", () => {
-	const olderOpen = task("open", { updatedAt: NOW - 5000 });
-	const newerOpen = task("open", { updatedAt: NOW - 1000 });
-	const running = task("running");
-	const failed = task("failed");
-	const done = task("done");
-	const cancelled = task("cancelled");
-	const assigned = task("assigned");
-	const blocked = task("blocked", { updatedAt: NOW });
-	const order = inFlight([olderOpen, done, newerOpen, running, failed, cancelled, assigned, blocked]).map((one) => one.id);
-	assert.deepEqual(order, [blocked.id, failed.id, running.id, assigned.id, newerOpen.id, olderOpen.id]);
 });
 
 test("wantsYou counts blocked and failed only", () => {
