@@ -140,6 +140,8 @@ export function LeftPanel(props: {
 	 * destructive control there would be one on the thumbnails as well.
 	 */
 	onDelete?: (board: Board) => void;
+	/** Take a board off the canvas, keeping the file. */
+	onHide?: (board: Board) => void;
 	/** What is typed, for a caller that wants to keep it — `⌘K` opening on a query, say. */
 	onSearch?: (query: string) => void;
 	/**
@@ -889,6 +891,7 @@ export function LeftPanel(props: {
 														dim={row.dim}
 														onCanvas={row.onCanvas}
 														{...(props.onDelete ? { onDelete: () => props.onDelete?.(row.board) } : {})}
+														{...(props.onHide ? { onHide: () => props.onHide?.(row.board) } : {})}
 														onPick={() => props.onPick(row.board)}
 													/>
 												)}

@@ -2012,6 +2012,7 @@ export function App() {
 					 * follow from that, where they already did.
 					 */
 					onDelete={(board) => send({ type: "board.delete", path: board.path })}
+					onHide={(board) => send({ type: "board.hide", path: board.path })}
 				/>
 
 

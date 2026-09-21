@@ -882,6 +882,56 @@
 	}
 
 	/*
+	 * The hide (an eye, struck through), close beside the bin, on rows that are on the canvas.
+	 *
+	 * The same 20px box and the same reveal as the bin, so the two read as one pair of things you
+	 * can do to the row. A row that carries it needs a wider column taken out of its name when
+	 * approached — `--bin-room` grows by the ×'s box and gap — and, unlike a bare bin, this
+	 * cannot be swapped into the dot's place, so the name on a dotted row does give up 26px here.
+	 */
+	.board-act:has(> .board-hide) {
+		--bin-room: 48px;
+	}
+	/* The dot's column is where the hide now stands, so the dot leaves the flow while the row is approached. */
+	.board-act:has(> .board-hide):is(:hover, :focus-within) > .board-row > .dot {
+		width: 0;
+		margin: 0;
+		visibility: hidden;
+	}
+	.board-hide {
+		position: absolute;
+		top: 50%;
+		right: 28px;
+		display: grid;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		border: 0;
+		border-radius: 6px;
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+		opacity: 0;
+		place-items: center;
+		transform: translateY(-50%);
+		transition: opacity 120ms ease-out;
+	}
+	.board-act:is(:hover, :focus-within) > .board-hide {
+		opacity: 1;
+	}
+	.board-hide:hover {
+		background: color-mix(in srgb, var(--fg) 12%, transparent);
+		color: var(--fg);
+	}
+	.board-hide:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
+	}
+	.board-act:has(> .board-hide):is(:hover, :focus-within) > .board-row {
+		padding-right: var(--bin-room);
+	}
+
+	/*
 	 * And the name gets out of its way.
 	 *
 	 * A row with a dot on it needs nothing here: the dot is in flow in that column, so its name
@@ -948,6 +998,15 @@
 
 		.board-del {
 			right: 2px;
+			width: 28px;
+			height: 28px;
+			opacity: 1;
+		}
+		.board-act:has(> .board-hide) {
+			--bin-room: 60px;
+		}
+		.board-hide {
+			right: 30px;
 			width: 28px;
 			height: 28px;
 			opacity: 1;

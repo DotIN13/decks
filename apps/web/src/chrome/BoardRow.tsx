@@ -1,5 +1,6 @@
 import type { Board } from "@decks/protocol";
 import Trash2 from "lucide-solid/icons/trash-2";
+import EyeOff from "lucide-solid/icons/eye-off";
 import { createSignal, onCleanup, Show } from "solid-js";
 import { RailItem } from "./BoardRail.tsx";
 import { BoardPicture } from "./BoardPicture.tsx";
@@ -51,6 +52,8 @@ export function BoardRow(props: {
 	 * once the person has said it twice.
 	 */
 	onDelete?: () => void;
+	/** Take the board off the canvas, keeping the file. Drawn only on a row that is on it. */
+	onHide?: () => void;
 	onPick: () => void;
 }) {
 	/*
@@ -133,6 +136,26 @@ export function BoardRow(props: {
 					<span class="dot" aria-hidden="true" />
 				</Show>
 			</button>
+
+			{/*
+				A hide, beside the bin, on a row that is on the canvas: it takes the board off the
+				canvas and nothing else, so one press does it — there is no file to lose, and the
+				Boards tab is where it comes back from.
+			*/}
+			<Show when={props.onHide && props.onCanvas}>
+				<button
+					class="board-hide"
+					type="button"
+					title={`Take ${name()} off the canvas`}
+					aria-label={`Hide ${name()}`}
+					onClick={(event) => {
+						event.stopPropagation();
+						props.onHide?.();
+					}}
+				>
+					<Icon of={EyeOff} size={12} />
+				</button>
+			</Show>
 
 			<Show when={props.onDelete}>
 				<button
