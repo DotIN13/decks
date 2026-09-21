@@ -18,10 +18,10 @@ function chat(id: string, state: AgentState, lastAt?: number): AgentChat {
 		name: id,
 		state,
 		unread: 0,
-		contextCount: 0,
 		kind: "claude",
-		capabilities: { modes: [] },
-		commands: [],
+		identity: { name: id, color: "#000" },
+		boards: [],
+		inPlay: [],
 		lastAt,
 	};
 }

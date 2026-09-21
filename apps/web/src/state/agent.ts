@@ -1,4 +1,4 @@
-import type { AgentModel, AgentState, AgentUsage, ChatItem, ExtensionUiPrompt, ModelOption } from "@decks/protocol";
+import type { AgentModel, AgentState, AgentUsage, ChatItem, ExtensionUiPrompt } from "@decks/protocol";
 
 /**
  * Everything the browser keeps about one agent, in one record.
@@ -39,8 +39,6 @@ export interface AgentRecord {
 	transcript: ChatItem[];
 	/** Whether the server holds anything older than the oldest row here. */
 	moreHistory: boolean;
-	/** The models this agent's runtime offers — one list per agent, not per app. */
-	models: ModelOption[];
 	/** The model and thinking level it is on. */
 	model?: AgentModel;
 	/** Its context and cost meter. */
@@ -78,7 +76,7 @@ export interface AgentScratch {
 	lastState?: AgentState;
 }
 
-export const emptyAgent = (): AgentRecord => ({ transcript: [], moreHistory: false, models: [], inPlay: [] });
+export const emptyAgent = (): AgentRecord => ({ transcript: [], moreHistory: false, inPlay: [] });
 
 const emptyScratch = (): AgentScratch => ({ historyHeld: false, historyAsked: false });
 

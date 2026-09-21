@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { examplesDir, runtimeLib } from "@decks/runtime";
-import type { AgentKind, Board, Camera, Canvas, ClientMessage, DeckState, ServerMessage, StageCall } from "@decks/protocol";
+import type { AgentKind, Board, Camera, Canvas, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { BoardService } from "./boards/service.ts";
 import { EvalTrust } from "./boards/eval-trust.ts";
@@ -260,6 +260,7 @@ export class App {
 				canvases: this.canvases,
 				canvasList: () => this.canvasList(),
 				publishCanvases: () => this.publishCanvases(),
+				publishRuntimes: () => this.send({ type: "runtimes", list: this.runtimes() }),
 				recordRevision: (path) => this.boards.recordRevision(path),
 				wrote: (path, who) => this.boards.wrote(path, who),
 				boardPathOf: (file) => this.boards.boardPathOf(file),
@@ -650,7 +651,7 @@ export class App {
 		 * this, the `+` menu offered all four everywhere, and the first prompt was where you
 		 * found out that the binary was not installed.
 		 */
-		reply({ type: "runtimes", list: runtimeList() });
+		reply({ type: "runtimes", list: this.runtimes() });
 		for (const warning of this.deck.warnings) reply({ type: "notice", level: "warn", text: warning });
 		// The whole truth on connect, so a reconnect is a refresh: the deck, the
 		// agents, and each one's transcript.
@@ -698,7 +699,7 @@ export class App {
 	 * every browser hears the setting and the chat list.
 	 */
 	setDispatcherKind(kind: AgentKind): { error: string } | undefined {
-		const runtime = runtimeList().find((candidate) => candidate.kind === kind);
+		const runtime = this.runtimes().find((candidate) => candidate.kind === kind);
 		if (!runtime) return { error: `"${kind}" is not a runtime this server has.` };
 		if (!runtime.available) return { error: runtime.reason ?? `${runtime.label} is not installed on this machine.` };
 		this.settings.setDispatcherKind(kind);
@@ -852,6 +853,15 @@ export class App {
 
 	publishCanvases(): void {
 		this.send({ type: "canvases", canvases: this.canvasList() });
+	}
+
+	/**
+	 * Every runtime, with everything about it that is not about a conversation: whether it
+	 * can start here, its modes, its slash commands, and the models it last offered on this
+	 * deck. The last three used to be copied onto every chat row.
+	 */
+	runtimes(): RuntimeInfo[] {
+		return runtimeList((kind) => this.agents.knownModels(kind));
 	}
 
 	/**

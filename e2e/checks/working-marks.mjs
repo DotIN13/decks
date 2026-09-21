@@ -47,9 +47,9 @@ const chat = (id, name, kind, state) => ({
 	lastAt: Date.now() - 4_000,
 	lastLine: "Reading the file",
 	unread: 0,
-	contextCount: 1,
-	capabilities: { modes: [] },
-	commands: [],
+	identity: { name, color: "#3b5cf6" },
+	boards: ["boards/plan.html"],
+	inPlay: [],
 });
 
 const KINDS = ["pi", "claude", "opencode", "antigravity"];

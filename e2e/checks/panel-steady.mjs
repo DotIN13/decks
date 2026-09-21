@@ -63,9 +63,9 @@ const chat = (id, name, kind, state, lastLine, ago, extra = {}) => ({
 	...(lastLine ? { lastLine } : {}),
 	lastAt: Date.now() - ago,
 	unread: 0,
-	contextCount: 2,
-	capabilities: { modes: [] },
-	commands: [],
+	identity: { name, color: "#3b5cf6" },
+	boards: ["boards/plan.html", "boards/risks.html"],
+	inPlay: [],
 	...extra,
 });
 
@@ -226,6 +226,24 @@ say("…and the list still scrolled where it was", inside.scrollKept, "the scrol
  * a jump on a face that was already pulsing, which is what the flicker looked like.
  */
 say("the working face keeps the pulse it had running", inside.pulse.before !== null && inside.pulse.after !== null && inside.pulse.after > inside.pulse.before, JSON.stringify(inside.pulse));
+
+// --- the row message, which is what a prompt and a finished turn send now ------------------
+
+/*
+ * A prompt used to republish the whole chat list to say that one row's preview line had
+ * changed. `agent.row` says it about the one chat, and it has to reach the DOM without
+ * costing what a list costs — and it has to be read as a *complete* statement of the four
+ * fields it carries, or a chat that has just woken stays marked dormant for ever.
+ */
+const said = await change("Mira: a fresher line", { type: "agent.row", id: "q1", lastLine: "Finished, 14 boards measured", lastAt: Date.now() });
+say("a row message adds no node and removes none", said.churn.added === 0 && said.churn.removed === 0, JSON.stringify(said.churn));
+say("…every row is the element it was", said.kept === said.rows, `${said.kept} of ${said.rows} kept${said.lost.length ? ` (lost ${said.lost.join(", ")})` : ""}`);
+const line = await page.evaluate(() => window.__rowFor("Mira")?.querySelector(".agent-said")?.textContent);
+say("…and the line it carried is on the row", line === "Finished, 14 boards measured", String(line));
+
+const woke = await change("Kestrel: woken by a prompt", { type: "agent.row", id: "q4", lastLine: "Right, starting", lastAt: Date.now() });
+const dormant = await page.evaluate(() => window.__rowFor("Kestrel")?.dataset.dormant ?? "none");
+say("a row with no dormant mark on it wakes the chat", dormant === "none" && woke.kept === woke.rows, `${dormant}, ${woke.kept} of ${woke.rows} kept`);
 
 // --- a popup somebody has open -----------------------------------------------------------
 

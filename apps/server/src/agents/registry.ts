@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, Canvas, Schedule, ScheduleSpec, ServerMessage, TaskResult, TaskSpec } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, Canvas, ModelOption, Schedule, ScheduleSpec, ServerMessage, TaskResult, TaskSpec } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { dispatcherBrief } from "../tasks/brief.ts";
 import { nowWords, processZone } from "../clock.ts";
@@ -7,6 +7,7 @@ import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
 import type { CanvasStore } from "../canvas/store.ts";
 import { planCanvases } from "../canvas/migrate.ts";
+import { runtimeOf } from "../runtimes/registry.ts";
 import type { CreateSpec, SendSpec } from "../stage/tool.ts";
 import type { TaskFinish } from "../tasks/service.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
@@ -59,6 +60,8 @@ export class Registry {
 			canvasList?(): Canvas[];
 			/** Send the canvas list to every browser. */
 			publishCanvases?(): void;
+			/** Send the runtime list again: one of them reported a model catalogue. */
+			publishRuntimes?(): void;
 			recordRevision(path: string): string | undefined;
 			/** An agent said it wrote this board — the byline the gallery shows. Optional so a bare test host can omit it. */
 			wrote?(path: string, who: string): void;
@@ -238,6 +241,7 @@ export class Registry {
 				canvasChanged: (canvasId: string, except: string) => this.canvasChanged(canvasId, except),
 				canvasList: () => this.host.canvasList?.() ?? [],
 				canvasesChanged: () => this.host.publishCanvases?.(),
+				runtimesChanged: () => this.host.publishRuntimes?.(),
 				agents: () => this.summaries(),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
 				create: (fromId, spec) => this.createFor(fromId, spec),
@@ -509,13 +513,23 @@ export class Registry {
 		// The focus moves to whatever is nearest, or to a new agent on the next request —
 		// `focused()` creates on demand, so a deck is never agentless.
 		if (this.focusedId === id) {
-			const next = this.agents[index] ?? this.agents[index - 1];
-			this.focusedId = next?.id;
-			if (next) next.greet((message) => this.emit(message));
+			// `publish` below carries the whole of whatever the focus lands on: a row is the
+			// conversation now, so there is nothing left to greet it with.
+			this.focusedId = (this.agents[index] ?? this.agents[index - 1])?.id;
 		}
 		this.emit({ type: "agent.removed", id });
 		this.publish();
 		return { removed: true };
+	}
+
+	/**
+	 * What a runtime last offered on this deck, for the runtime list the browser is sent.
+	 *
+	 * Kept beside the agent records rather than in any of them (`store.ts`), because it is a
+	 * fact about the runtime: one catalogue for every chat on it.
+	 */
+	knownModels(kind: AgentKind): ModelOption[] {
+		return this.store.knownModels(kind);
 	}
 
 	all(): readonly DeckAgent[] {
@@ -568,7 +582,7 @@ export class Registry {
 			await made.setThinking(spec.thinking);
 		}
 		if (spec.mode) {
-			if (made.chat().capabilities.modes.includes(spec.mode)) {
+			if (runtimeOf(made.chat().kind).capabilities.modes.includes(spec.mode)) {
 				await made.start();
 				await made.setMode(spec.mode);
 			} else {

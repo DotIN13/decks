@@ -1,4 +1,4 @@
-import { AGENT_KINDS, type AgentKind, type RuntimeInfo } from "@decks/protocol";
+import { AGENT_KINDS, type AgentKind, type ModelOption, type RuntimeInfo } from "@decks/protocol";
 import { antigravity } from "./antigravity/index.ts";
 import type { AgentRuntime } from "./contract.ts";
 import { claude } from "./claude/index.ts";
@@ -38,10 +38,16 @@ export function runtimeOf(kind: AgentKind): AgentRuntime {
  * where you learned which ones were installed. The answer is a `PATH` lookup, so it is cheap
  * enough to send on connect and to recompute whenever somebody asks.
  */
-export function runtimeList(): RuntimeInfo[] {
+export function runtimeList(models: (kind: AgentKind) => ModelOption[] = () => []): RuntimeInfo[] {
 	return AGENT_KINDS.map((kind) => {
 		const runtime = RUNTIMES[kind];
 		const answer = runtime.availability();
-		return { kind, label: runtime.label, ...answer };
+		/*
+		 * And the three facts that used to ride on every chat row instead. Modes and slash
+		 * commands are the runtime's own constants; the catalogue is what this deck last saw
+		 * it offer, which the caller reads out of the agent store — a runtime that has never
+		 * run here has none, and this file has nowhere to keep one.
+		 */
+		return { kind, label: runtime.label, ...answer, capabilities: runtime.capabilities, commands: runtime.commands, models: models(kind) };
 	});
 }

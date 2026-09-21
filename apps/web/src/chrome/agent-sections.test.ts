@@ -15,10 +15,10 @@ const chat = (id: string, name: string, state: AgentState, lastAt: number, extra
 	state,
 	lastAt,
 	unread: 0,
-	contextCount: 0,
 	kind: "claude",
-	capabilities: { modes: [] },
-	commands: [],
+	identity: { name, color: "#000" },
+	boards: [],
+	inPlay: [],
 	...extra,
 });
 

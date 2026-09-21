@@ -7,6 +7,7 @@ import type { AgentChat, AgentKind, AgentMode, ServerMessage, ThinkingLevel } fr
 import { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import { Registry } from "./registry.ts";
+import { runtimeOf } from "../runtimes/registry.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
@@ -91,7 +92,7 @@ test("a chat that was spoken to comes back after a restart", () => {
 	assert.equal(back.name, "Kestrel");
 	assert.equal(back.kind, "pi");
 	assert.equal(back.dormant, true, "readable, but nothing is running behind it");
-	assert.equal(back.contextCount, 1);
+	assert.deepEqual(back.boards, ["boards/plan.html"], "with the boards it was holding on the row itself");
 	assert.deepEqual([...(registry.get(id)?.inPlay ?? [])], ["boards/plan.html"], "the canvas comes back too");
 	cleanup();
 });
@@ -168,10 +169,11 @@ test("a dormant row still reports what its runtime can do", () => {
 	const { registry } = registryOn(deck);
 	registry.restore();
 
-	// Capabilities are a property of the runtime, not of a live session, so the mode control
-	// can be drawn correctly before anything is started. pi has no modes; the assertion is
-	// that the answer comes from the *kind* rather than from an absent backend.
-	assert.deepEqual(rowFor(registry, id)?.capabilities, { modes: [] });
+	// Capabilities are a property of the runtime, not of a live session, so they are not on
+	// the row at all: the browser reads them off the runtime the row names. What the row has
+	// to get right is the runtime.
+	assert.equal(rowFor(registry, id)?.kind, "pi");
+	assert.deepEqual(runtimeOf("pi").capabilities, { modes: [] }, "and pi has no modes to draw a control for");
 	cleanup();
 });
 
@@ -370,10 +372,7 @@ test("a restored chat is opened on the model the conversation was last held in",
 	const { registry, sent } = registryOn(deck);
 	assert.equal(registry.restore(), 1);
 
-	const greeted: ServerMessage[] = [];
-	registry.get("held")?.greet((message) => greeted.push(message));
-	const model = greeted.find((message): message is Extract<ServerMessage, { type: "agent.model" }> => message.type === "agent.model");
-	assert.deepEqual(model?.model, { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "high" }, "the row says what it will use");
+	assert.deepEqual(rowFor(registry, "held")?.model, { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "high" }, "the row says what it will use");
 
 	// And the record it writes back keeps it, so the next restart says the same thing
 	// rather than losing it one boot later.

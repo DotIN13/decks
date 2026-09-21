@@ -9,7 +9,6 @@ import type {
 	AgentState,
 	ClaudeAccount,
 	Identity,
-	ModelOption,
 	RuntimeInfo,
 	ThinkingLevel,
 } from "./chat.ts";
@@ -277,8 +276,12 @@ export type ServerMessage =
 	 * What this install can run, and what to call it — sent on connect, and whenever a
 	 * client asks.
 	 *
-	 * A property of the machine, not of the deck, and it travels beside `deck.state` rather
-	 * than inside it because the deck is a directory and this is what is installed.
+	 * Mostly a property of the machine rather than of the deck, and it travels beside
+	 * `deck.state` rather than inside it because the deck is a directory and this is what is
+	 * installed. It also carries the three things that are true of a runtime and not of a
+	 * conversation — its modes, its slash commands, and the models it last offered here — so
+	 * they are sent once instead of once per chat. Sent again when a runtime that has just
+	 * started reports a different catalogue.
 	 */
 	| { type: "runtimes"; list: RuntimeInfo[] }
 	| { type: "board.changed"; path: string; rev: number; board?: Board; removed?: boolean }
@@ -291,6 +294,22 @@ export type ServerMessage =
 			defaultKind: AgentKind;
 	  }
 	| { type: "agent.state"; id: string; state: AgentState }
+	/**
+	 * The parts of one chat's row that no other message carries.
+	 *
+	 * A row is the whole of what a browser knows about a chat, and almost every field on it
+	 * already has a message of its own: the name and colour in `agent.identity`, what it is
+	 * doing in `agent.state`, the boards in `context.changed`, the model, the account, the
+	 * reading. Four did not — what it last said, when, whether it is still asleep, and what it
+	 * asks before acting — and the only thing that carried them was the whole list. So a prompt
+	 * and the end of a turn sent every chat on the deck to say that one of them had spoken:
+	 * 59 KB, twice a turn, on a deck of thirty-four.
+	 *
+	 * Complete rather than partial: these four fields are stated as they now are, and an absent
+	 * one means absent. That is what keeps it from becoming a second, disagreeing account of a
+	 * row — the failure this protocol has already had once.
+	 */
+	| { type: "agent.row"; id: string; lastLine?: string; lastAt?: number; dormant?: true; mode?: AgentMode }
 	/** An agent is off the list; anything the browser kept for it can go. */
 	| { type: "agent.removed"; id: string }
 	| { type: "agent.identity"; id: string; identity: Identity }
@@ -307,7 +326,6 @@ export type ServerMessage =
 	 * browser made carry no flag: it already has the panel open.
 	 */
 	| { type: "agent.report"; id: string; report?: UsageReport; error?: string; show?: true }
-	| { type: "models"; agentId: string; models: ModelOption[] }
 	| { type: "timeline.preview"; agentId: string; entryId: string | null; boards: Record<string, string> }
 	/**
 	 * The conversation as the browser should open it: the tail, and whether there is more.

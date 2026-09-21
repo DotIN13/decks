@@ -153,7 +153,19 @@ trackZoneWith(() => void state.settings.timezone);
  * real labels and the real answer.
  */
 export const runtimes = (): RuntimeInfo[] =>
-	state.runtimes.length > 0 ? state.runtimes : AGENT_KINDS.map((kind) => ({ kind, label: kind, available: true }));
+	state.runtimes.length > 0 ? state.runtimes : AGENT_KINDS.map((kind) => ({ kind, label: kind, available: true, capabilities: { modes: [] }, commands: [], models: [] }));
+
+/**
+ * One runtime, by the kind a chat says it is on.
+ *
+ * Three things a chat needs to draw its composer are the runtime's and not its own: the
+ * modes it offers, the `/` commands it answers and the models it can be moved to. They used
+ * to arrive on every chat row, which is the same catalogue thirty-four times on a deck of
+ * thirty-four chats. Undefined before the first `runtimes` frame, which every reader here
+ * already has a fallback for.
+ */
+export const runtimeFor = (kind: AgentKind | undefined): RuntimeInfo | undefined =>
+	kind ? runtimes().find((runtime) => runtime.kind === kind) : undefined;
 
 /**
  * The record for an agent, created if this is the first thing said about it.

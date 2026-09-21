@@ -98,7 +98,7 @@ function agentOn(
 	return { agent, store, sent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-	test("a dormant chat greets the model it was restored with", () => {
+	test("a dormant chat's row names the model it was restored with", () => {
 		const { agent, cleanup } = agentOn([], {
 			restored: {
 				id: "restored-1",
@@ -109,11 +109,7 @@ function agentOn(
 				model: { provider: "claude", model: "claude-sonnet-4", thinking: "low" },
 			},
 		});
-		const sent: ServerMessage[] = [];
-		agent.greet((message) => sent.push(message));
-		const model = sent.find((message): message is Extract<ServerMessage, { type: "agent.model" }> => message.type === "agent.model");
-		assert.ok(model, "greet should report a model for a dormant chat");
-		assert.deepEqual(model.model, { provider: "claude", model: "claude-sonnet-4", thinking: "low" });
+		assert.deepEqual(agent.chat().model, { provider: "claude", model: "claude-sonnet-4", thinking: "low" });
 		cleanup();
 	});
 
@@ -126,7 +122,7 @@ function agentOn(
 	 * section had no row marked, and the ring was not drawn at all. None of the three needs a
 	 * runtime to answer: two are on the record and the third is what the runtime last offered.
 	 */
-	test("a dormant chat greets the account it spends, the reading it left, and a model list", () => {
+	test("a dormant chat's row carries the account it spends, the reading it left, and its model", () => {
 		const { switcher } = switcherOf(["acct-one", "acct-two"]);
 		const { agent, cleanup } = agentOn([], {
 			accounts: switcher,
@@ -141,26 +137,59 @@ function agentOn(
 				usage: { contextTokens: 12_000, contextWindow: 200_000, cost: 0.3 },
 			},
 		});
-		const sent: ServerMessage[] = [];
-		agent.greet((message) => sent.push(message));
+		const row = agent.chat();
+		assert.equal(row.account, "acct-two", "so the picker can mark the row this conversation spends");
+		assert.deepEqual(row.usage, { contextTokens: 12_000, contextWindow: 200_000, cost: 0.3 });
+		// The catalogue is not on the row: it belongs to the runtime, and one copy of it goes
+		// to the browser in the runtime list however many chats are on that runtime.
+		assert.equal(row.commands, undefined, "and neither is a command list, until a session is running");
+		cleanup();
+	});
 
-		const account = sent.find((message): message is Extract<ServerMessage, { type: "agent.account" }> => message.type === "agent.account");
-		assert.equal(account?.account, "acct-two", "so the picker can mark the row this conversation spends");
-		const usage = sent.find((message): message is Extract<ServerMessage, { type: "agent.usage" }> => message.type === "agent.usage");
-		assert.deepEqual(usage?.usage, { contextTokens: 12_000, contextWindow: 200_000, cost: 0.3 });
-		const models = sent.find((message): message is Extract<ServerMessage, { type: "models" }> => message.type === "models");
-		assert.deepEqual(models?.models.map((option) => option.model), ["gpt-5"], "the list this runtime last offered on this deck");
+	/*
+	 * What a prompt and the end of a turn send.
+	 *
+	 * Both were the whole chat list — every row on the deck, to report that one of them had
+	 * spoken. This is that news about the one chat, and it has to be complete: these four
+	 * fields are the only ones no other message carries, so a browser that merges them
+	 * instead of assigning them would leave a woken chat asleep for ever.
+	 */
+	test("saying the row carries what only the row carries, and no list", () => {
+		const { agent, sent, cleanup } = agentOn([], {
+			restored: {
+				id: "restored-row",
+				items: [{ kind: "user", id: "m1", text: "hello", at: 1 }],
+				context: [],
+				inPlay: [],
+				createdAt: 1,
+				lastLine: "Reading the file",
+				lastAt: 1_700,
+			},
+		});
+		agent.sayRow();
+		const row = sent.find((message): message is Extract<ServerMessage, { type: "agent.row" }> => message.type === "agent.row");
+		assert.ok(row, "a prompt says the row moved");
+		assert.equal(row.lastLine, "Reading the file");
+		assert.equal(row.lastAt, 1_700);
+		assert.equal(row.dormant, true, "and that it has not been woken yet");
+		assert.equal(sent.some((message) => message.type === "agents"), false, "and it is not the chat list");
+		cleanup();
+	});
+
+	test("a row's preview line is cut to what the list can draw", () => {
+		const { agent, sent, cleanup } = agentOn([]);
+		agent.translator.user("x".repeat(4_000));
+		agent.sayRow();
+		const row = sent.filter((message): message is Extract<ServerMessage, { type: "agent.row" }> => message.type === "agent.row").at(-1);
+		assert.equal(row?.lastLine?.length, 240, "the row draws one clipped line, and the hover card three");
 		cleanup();
 	});
 
 	test("a chat with no reading says nothing rather than saying zero", () => {
 		const { agent, cleanup } = agentOn([]);
-		const sent: ServerMessage[] = [];
-		agent.greet((message) => sent.push(message));
-
 		// A ring at zero claims an empty context, which is a different and usually false
 		// claim from "not known yet" — so the absence has to reach the browser as an absence.
-		assert.equal(sent.some((message) => message.type === "agent.usage"), false);
+		assert.equal(agent.chat().usage, undefined);
 		cleanup();
 	});
 
@@ -238,11 +267,7 @@ function agentOn(
 				createdAt: 1,
 			},
 		});
-		const sent: ServerMessage[] = [];
-		agent.greet((message) => sent.push(message));
-		const model = sent.find((message): message is Extract<ServerMessage, { type: "agent.model" }> => message.type === "agent.model");
-		assert.ok(model, "greet should report the model recovered from the session file");
-		assert.deepEqual(model.model, { provider: "opencode-go", model: "deepseek-v4-flash", thinking: "high" });
+		assert.deepEqual(agent.chat().model, { provider: "opencode-go", model: "deepseek-v4-flash", thinking: "high" }, "the row says what the session file last recorded");
 		cleanup();
 		rmSync(root, { recursive: true, force: true });
 	});
@@ -329,11 +354,12 @@ test("setInPlay and setContext agree on what the newest board is", () => {
 	cleanup();
 });
 
-test("the chat row counts what is held, not what is shown", () => {
+test("the chat row carries what is held and what is shown, and they are not the same list", () => {
 	const { agent, cleanup } = agentOn(["a.html", "b.html"]);
 	agent.setContext(["boards/a.html", "boards/b.html"]);
 	agent.setInPlay(["boards/a.html"]);
-	assert.equal(agent.chat().contextCount, 2);
+	assert.deepEqual(agent.chat().boards, ["boards/a.html", "boards/b.html"]);
+	assert.deepEqual(agent.chat().inPlay, ["boards/a.html"]);
 	cleanup();
 });
 

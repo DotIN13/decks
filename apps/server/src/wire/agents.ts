@@ -72,11 +72,18 @@ export const agents = {
 
 	"agent.prompt": (message, _reply, wire) => {
 		const agent = wire.agents.get(message.id) ?? wire.agents.focused();
-		// Deliberately not awaited: a prompt runs for minutes and the socket has
-		// other frames to handle meanwhile. Everything it produces arrives as
-		// events, and `publish()` refreshes the chat list once it settles.
-		void agent.prompt(message.text).then(() => wire.agents.publish());
-		wire.agents.publish();
+		/*
+		 * Deliberately not awaited: a prompt runs for minutes and the socket has other frames
+		 * to handle meanwhile. Everything it produces arrives as events of its own.
+		 *
+		 * The row, not the list. This was `publish()` — the whole chat list, to report that one
+		 * row now shows what you just typed. `sayRow` is the same news about the one chat it
+		 * happened to; the end of the turn says it again from the session itself, which is
+		 * where work an agent gave itself ends too. A prompt that *makes* an agent still
+		 * publishes, from `create`, because then the list really is different.
+		 */
+		void agent.prompt(message.text);
+		agent.sayRow();
 	},
 
 	"agent.abort": (message, _reply, wire) => {

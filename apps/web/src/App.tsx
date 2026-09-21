@@ -23,7 +23,7 @@ import { frameRevs, patchBoard } from "./state/patches.ts";
 import {clearMarks, component, marks, mode, selected, setComponent, setMode, setSelected, setTool, tool} from "./state/selection.ts";
 import { on, send, start } from "./state/socket.ts";
 import { Icon } from "./ui/icons.tsx";
-import {clearDialog, clearPreview, dialog, preview, setState, state} from "./state/deck.ts";
+import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
 import { notice } from "./state/notices.ts";
 import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport, surface, setSurface, dispatchTab, setDispatchTab, dispatchPreview, setDispatchPreview} from "./state/ui.ts";
 import { installRoute, type Place } from "./app/route.ts";
@@ -1982,10 +1982,10 @@ export function App() {
 						onUsage={() => openUsage(barAgent())}
 						busy={busy()}
 						model={barAgent() ? state.agents[barAgent()!]?.model : undefined}
-						models={barAgent() ? state.agents[barAgent()!]?.models ?? [] : []}
-						commands={barChat()?.commands ?? []}
+						models={runtimeFor(barChat()?.kind)?.models ?? []}
+						commands={barChat()?.commands ?? runtimeFor(barChat()?.kind)?.commands ?? []}
 						runtime={barChat()?.kind}
-						modes={barChat()?.capabilities?.modes ?? []}
+						modes={runtimeFor(barChat()?.kind)?.capabilities.modes ?? []}
 						mode={barChat()?.mode}
 						onMode={(mode) => send({ type: "agent.setMode", id: barAgent() ?? "", mode })}
 						{...(surface() === "dispatch" ? { onRuntime: (kind: AgentKind) => send({ type: "dispatcher.setKind", kind }) } : {})}

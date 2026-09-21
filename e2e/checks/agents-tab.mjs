@@ -41,6 +41,22 @@ await page.reload({ waitUntil: "load" });
 await settle(page, 2000);
 
 const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
+
+/*
+ * What each agent says about itself, kept here because the row carries it.
+ *
+ * A chat list is the whole of what a browser knows about a chat — identity included — so a
+ * second `agents` frame states every identity again. Declaring a workspace below writes it
+ * here as well, or the next list would take it back off, which is exactly what the server
+ * would do if an agent's own record had lost it.
+ */
+const says = {};
+const identityOf = (id, name) => ({ name, color: "#3b5cf6", ...(says[id] ?? {}) });
+/** Say something about an agent: the frame the app hears, and the row it will hear next. */
+const declare = async (id, name, extra) => {
+	says[id] = { ...(says[id] ?? {}), ...extra };
+	await feed({ type: "agent.identity", id, identity: identityOf(id, name) });
+};
 const chat = (id, name, kind, state, lastLine, ago, extra = {}) => ({
 	id,
 	name,
@@ -49,9 +65,9 @@ const chat = (id, name, kind, state, lastLine, ago, extra = {}) => ({
 	...(lastLine ? { lastLine } : {}),
 	lastAt: Date.now() - ago,
 	unread: 0,
-	contextCount: 2,
-	capabilities: { modes: [] },
-	commands: [],
+	identity: identityOf(id, name),
+	boards: ["boards/plan.html", "boards/risks.html"],
+	inPlay: [],
 	...extra,
 });
 
@@ -77,7 +93,7 @@ for (const [id, name, tags, userTags] of [
 	["a3", "Iris", ["e2e", "flaky-editing"], ["mine"]],
 	["a4", "Wren", ["thumbnails"], []],
 ]) {
-	await feed({ type: "agent.identity", id, identity: { name, color: "#3b5cf6", tags, ...(userTags.length ? { userTags } : {}) } });
+	await declare(id, name, { tags, ...(userTags.length ? { userTags } : {}) });
 }
 await feed({ type: "chat.item", agentId: "a4", item: { id: "w1", kind: "assistant", text: "Done — 12 boards measured", at: Date.now() - 900_000 } });
 await settle(page, 800);
@@ -418,7 +434,7 @@ for (const [id, name, tags, workspace] of [
 	["a3", "Iris", ["e2e", "flaky-editing"], undefined],
 	["a5", "Basil", [], undefined],
 ]) {
-	await feed({ type: "agent.identity", id, identity: { name, color: "#3b5cf6", tags, ...(workspace ? { workspace } : {}) } });
+	await declare(id, name, { tags, ...(workspace ? { workspace } : {}) });
 }
 await settle(page, 500);
 

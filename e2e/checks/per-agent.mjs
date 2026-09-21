@@ -44,9 +44,9 @@ const chat = (id, name) => ({
 	state: "idle",
 	lastAt: Date.now(),
 	unread: 0,
-	contextCount: 1,
-	capabilities: { modes: [] },
-	commands: [],
+	identity: { name, color: "#3b5cf6" },
+	boards: ["boards/plan.html"],
+	inPlay: [],
 });
 await feed({ type: "agents", defaultKind: "pi", focused: "A", chats: [chat("A", "Ada"), chat("B", "Bo")] });
 /* Deliberately different corners of the deck: `plan` at 0,0 and `deep` at 0,2440. */

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import type { AgentCapabilities, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Canvas, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, SlashCommand, ThinkingLevel, UsageReport } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Canvas, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
@@ -40,6 +40,16 @@ function quietMs(): number {
  * that the sender should have done the work or spawned somebody to.
  */
 const QUEUE_LIMIT = 8;
+
+/**
+ * How much of the last thing said a row carries.
+ *
+ * The row draws one line of it, clipped, and the hover card three. It was the whole message:
+ * 41 KB of a 76 KB chat list on a deck of thirty-four chats, sent again every time the list
+ * is published — which is on every prompt. Two hundred and forty characters is longer than
+ * anything either of those two places can show.
+ */
+const PREVIEW_CHARS = 240;
 
 /** The first line of a task, for a notice that has to fit on one. */
 function firstLine(task: string): string {
@@ -290,6 +300,13 @@ export class DeckAgent {
 			canvasList?(): Canvas[];
 			/** A canvas was made, joined, or drawn on: send the list again. */
 			canvasesChanged?(): void;
+			/**
+			 * This agent's runtime answered with a model catalogue: send the runtime list again.
+			 *
+			 * The catalogue belongs to the runtime rather than to this conversation, so it is
+			 * published there and not from here. Optional on the same terms as the two above.
+			 */
+			runtimesChanged?(): void;
 			agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; tags: string[]; kind: AgentKind; holding: number }>;
 			/** Put work in another agent's queue, without waiting for it. */
 			send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
@@ -509,6 +526,13 @@ export class DeckAgent {
 				}
 				// Rows leave trimmed: no arguments, and only a preview of a long output (`wire.ts`).
 				this.emit(message.type === "chat.item" ? { ...message, item: forBrowser(message.item) } : message);
+				/*
+				 * A turn that has just ended has left a new last line, so the row is said here
+				 * rather than wherever the turn was asked for. Work an agent gave itself ends
+				 * the same way work a person typed does, and this is the one place both pass
+				 * through.
+				 */
+				if (message.type === "agent.state" && message.state === "idle") this.sayRow();
 			},
 			deck.path,
 			() => this.save(),
@@ -1092,6 +1116,12 @@ export class DeckAgent {
 				this.lastModel = backend.model();
 				this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
 				this.emit({ type: "agent.model", id: this.id, model: backend.model() });
+				/*
+				 * And the row: a chat that was dormant is not any more, and what it asks before
+				 * acting is whatever the runtime that just opened says it is. Those two change
+				 * here and nowhere else, so this is where they are said.
+				 */
+				this.sayRow();
 				void this.publishModels();
 				// A restored chat now carries a live model; put it on the record so the
 				// next boot can greet it from the store instead of from the runtime.
@@ -1114,9 +1144,11 @@ export class DeckAgent {
 		if (!this.backend) return;
 		try {
 			this.modelOptions = await this.backend.models();
-			// Remembered per runtime, so the *next* chat has a picker before it has a session.
+			// Remembered per runtime, so the *next* chat has a picker before it has a session,
+			// and published as the runtime's — one list for every chat on it, rather than the
+			// same catalogue once per conversation.
 			this.store.rememberModels(this.kind, this.modelOptions);
-			this.emit({ type: "models", agentId: this.id, models: this.modelOptions });
+			this.host.runtimesChanged?.();
 		} catch (error) {
 			this.translator.notice("warn", `Could not list models: ${(error as Error).message}`);
 		}
@@ -1701,9 +1733,23 @@ export class DeckAgent {
 		return this.backend?.mode?.() ?? this.currentMode;
 	}
 
-	/** One row in the chat list. Unread is the browser's business, not ours. */
+	/**
+	 * One row in the chat list: everything a browser knows about this conversation.
+	 *
+	 * It carries what the greeting used to send after it, one message per fact per chat —
+	 * the identity, the boards, the model, the account, the reading. Each of those is still
+	 * broadcast on its own when it changes; this is the same facts, gathered, so that
+	 * arriving is one change to the browser's state instead of seven per chat.
+	 *
+	 * What is **not** here is what belongs to the runtime rather than to this conversation:
+	 * its modes, its dormant slash commands and its model catalogue all travel once, in
+	 * `runtimes`. The one exception is a started session that has discovered commands of its
+	 * own, which is the only way two chats on one runtime differ.
+	 *
+	 * Unread is the browser's business, not ours.
+	 */
 	chat(): AgentChat {
-		const last = this.translator.lastLine() ?? this.storedLast;
+		const model = this.backend?.model() ?? this.lastModel;
 		return {
 			id: this.id,
 			name: this.identity.name,
@@ -1711,36 +1757,66 @@ export class DeckAgent {
 			...(this.parentId ? { parentId: this.parentId } : {}),
 			...(this.role ? { role: this.role } : {}),
 			state: this.state,
-			...(last ? { lastLine: last.text, lastAt: last.at } : {}),
+			...this.rowFacts(),
 			unread: 0,
-			contextCount: this.held.length,
 			kind: this.kind,
-			capabilities: this.backend?.capabilities ?? capabilitiesOf(this.kind),
-			commands: this.backend?.commands() ?? commandsOf(this.kind),
+			...(this.backend ? { commands: this.backend.commands() } : {}),
+			identity: this.identity,
+			boards: [...this.held],
+			inPlay: [...this.playing],
+			...(model ? { model } : {}),
+			/*
+			 * What it will spend, and what it has spent. Both were once missing from the
+			 * greeting, and both are only ever *emitted* from a running backend — so on a chat
+			 * nobody had prompted since the deck opened, the model picker's Subscription
+			 * section had no row marked and the context ring was not drawn at all. Neither
+			 * needs a runtime to answer: the account is on the record and the reading is the
+			 * conversation's own.
+			 */
+			...(this.account ? { account: this.account } : {}),
+			...(this.usage ? { usage: this.usage } : {}),
+		};
+	}
+
+	/**
+	 * The four fields of a row that only the row carries, as they are now.
+	 *
+	 * Written once and read twice: by `chat()` above, and by `sayRow()` below, which is how
+	 * they reach a browser between one chat list and the next. Two copies of this would be
+	 * two answers to "what did it last say", and the point of the message is that there is
+	 * one. `mode` is here rather than beside the model because nothing else announces it —
+	 * a runtime reports what it asks before acting when it starts, and that is a row change.
+	 */
+	private rowFacts(): Pick<AgentChat, "lastLine" | "lastAt" | "mode" | "dormant"> {
+		const last = this.translator.lastLine() ?? this.storedLast;
+		return {
+			...(last ? { lastLine: last.text.slice(0, PREVIEW_CHARS), lastAt: last.at } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
 			// Restored and untouched: readable, but nothing is running until it is prompted.
 			...(this.restored && !this.starting ? { dormant: true as const } : {}),
 		};
 	}
 
+	/**
+	 * Say that this row moved, without sending every other row with it.
+	 *
+	 * A prompt and the end of a turn used to publish the whole chat list — every chat on the
+	 * deck, to report that one of them had spoken. This is the same news in about a hundred
+	 * bytes. Everything else a turn moves already says so on its own: the state, the model,
+	 * the cost, the boards.
+	 */
+	sayRow(): void {
+		this.emit({ type: "agent.row", id: this.id, ...this.rowFacts() });
+	}
+
+	/**
+	 * What a new browser needs that the row cannot carry.
+	 *
+	 * One thing: a question this agent asked before that browser existed. It is not a fact
+	 * about the conversation but an open call waiting on an answer, and an agent whose
+	 * question is never redrawn waits forever.
+	 */
 	greet(reply: (message: ServerMessage) => void): void {
-		reply({ type: "agent.identity", id: this.id, identity: this.identity });
-		reply({ type: "agent.state", id: this.id, state: this.state });
-		reply({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
-		if (this.backend) reply({ type: "agent.model", id: this.id, model: this.backend.model() });
-		else if (this.lastModel) reply({ type: "agent.model", id: this.id, model: this.lastModel });
-		if (this.modelOptions.length > 0) reply({ type: "models", agentId: this.id, models: this.modelOptions });
-		/*
-		 * What it will spend, and what it has spent. Both were missing from the greeting, and
-		 * both are only ever *emitted* from a running backend — so on a chat nobody had
-		 * prompted since the deck opened, the model picker's Subscription section had no row
-		 * marked and the context ring was not drawn at all. Neither needs a runtime to answer:
-		 * the account is on the record and the reading is the conversation's own.
-		 */
-		if (this.account) reply({ type: "agent.account", id: this.id, account: this.account });
-		if (this.usage) reply({ type: "agent.usage", id: this.id, usage: this.usage });
-		// A question asked before this browser existed still needs answering, or the agent
-		// that asked it waits forever.
 		for (const prompt of this.bridge.outstanding()) reply({ type: "extension.ui.prompt", agentId: this.id, prompt });
 	}
 
@@ -1805,28 +1881,6 @@ export class DeckAgent {
  * fifth would have been a fourth place to forget. Every entry is the same shape — a
  * context in, a started backend out — which is the whole of what `AgentBackend` asks.
  */
-/**
- * The runtime behind an agent: its class, its capabilities and its dormant commands.
- *
- * Three tables lived here, all keyed by kind, all listing the same four names — and this
- * file imported every runtime to fill them, which is the opposite of what `backend.ts` says
- * the layering is. They are one descriptor per runtime now (`runtimes/`), and this file
- * asks the registry rather than naming anybody.
- */
-function capabilitiesOf(kind: AgentKind): AgentCapabilities {
-	return runtimeOf(kind).capabilities;
-}
-
-/**
- * The `/` commands a dormant chat offers without waking its runtime.
- *
- * Mirrors what each backend's `commands()` answers when it is running — a dormant
- * chat has no backend to ask, and the menu should not change when one is resumed.
- */
-function commandsOf(kind: AgentKind): SlashCommand[] {
-	return runtimeOf(kind).commands;
-}
-
 /**
  * The model a pi session was last on, read from its file.
  *

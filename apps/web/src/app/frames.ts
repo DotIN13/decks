@@ -1,4 +1,4 @@
-import type { BoardPatch, Camera, ServerMessage } from "@decks/protocol";
+import type { AgentState, BoardPatch, Camera, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
 import { PAGE, prepend } from "../chat/history-page.ts";
 import { receiveToolResult } from "../chat/tool-results.ts";
@@ -35,6 +35,45 @@ export interface FrameHooks {
 	landed(): void;
 	setAtTurn(at: { id: string; at: number } | undefined): void;
 	raise(kind: "done" | "ask" | "problem", banner: { title: string; body?: string; tag?: string; agent?: string }): void;
+}
+
+/**
+ * Whether a value from the wire differs from the one already held.
+ *
+ * Serialised rather than compared field by field, because the four things this is asked
+ * about are small and shaped differently — an identity with two lists in it, a list of
+ * board paths, a model, a reading of three numbers. Reading a store proxy through
+ * `JSON.stringify` walks it, which is the point: it is the *contents* that decide whether
+ * anything downstream needs to run again.
+ */
+function changed(held: unknown, arrived: unknown): boolean {
+	return JSON.stringify(held ?? null) !== JSON.stringify(arrived ?? null);
+}
+
+/**
+ * What an agent's state means, whichever message carried it.
+ *
+ * The moment a face turns green (`chrome/agent-order.ts`), said out loud — and keyed on the
+ * *transition* rather than the value, so a reconnection, which replays the state of every
+ * agent on the deck, does not ring five times. Two messages carry a state now: the row in the
+ * chat list and the `agent.state` that follows a change, and both have to mean the same thing
+ * or a chat that finished while the socket was down rings twice or not at all.
+ */
+function heardState(id: string, state_: AgentState, hooks: FrameHooks): void {
+	const mine = scratch.of(id);
+	const was = mine.lastState;
+	mine.lastState = state_;
+	if (finished(was, state_)) {
+		hooks.raise("done", {
+			title: `${nameOf(id)} finished`,
+			// The deck's name, so a banner from one of three windows says which one.
+			body: state.deck?.name,
+			tag: `done:${id}`,
+			agent: id,
+		});
+	} else if (startedAsking(was, state_)) {
+		hooks.raise("ask", { title: `${nameOf(id)} is waiting for you`, tag: `ask:${id}`, agent: id });
+	}
 }
 
 /**
@@ -155,6 +194,34 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 						hooks.setAtTurn(undefined);
 					}
 					setState({ chats: message.chats, focused, defaultKind: message.defaultKind });
+					/*
+					 * And the rest of each row, into the places the app reads them from.
+					 *
+					 * These arrived as seven messages per chat until the row carried them: the
+					 * identity, the boards, the model, the account, the reading. The unpacking
+					 * is here rather than at each reader because everything above this line
+					 * already keys by agent id, and a row is a fact about one agent however it
+					 * travelled. The state handler is the same one a live `agent.state` uses, so
+					 * a chat that finished while the socket was down still rings on reconnect.
+					 *
+					 * **Only what changed is written.** The list is published for a dozen
+					 * reasons that have nothing to do with these fields — a prompt sent, a turn
+					 * finished, a chat focused — and a write of an equal value is still a write:
+					 * it would invalidate every agent's boards on every prompt, and the
+					 * dashboard groups the deck by exactly that. A separate message only ever
+					 * arrived when something had actually moved, and this has to mean the same.
+					 */
+					for (const chat of message.chats) {
+						ensureAgent(chat.id);
+						if (chat.identity && changed(state.identities[chat.id], chat.identity)) setState("identities", chat.id, chat.identity);
+						if (changed(state.contexts[chat.id], chat.boards)) setState("contexts", chat.id, chat.boards ?? []);
+						const held = state.agents[chat.id];
+						if (changed(held?.inPlay, chat.inPlay)) setState("agents", chat.id, "inPlay", chat.inPlay ?? []);
+						if (changed(held?.model, chat.model)) setState("agents", chat.id, "model", chat.model);
+						if (changed(held?.usage, chat.usage)) setState("agents", chat.id, "usage", chat.usage);
+						if (held?.spending !== chat.account) setState("agents", chat.id, "spending", chat.account);
+						heardState(chat.id, chat.state, hooks);
+					}
 					ensureHistory(focused);
 					// No chat to wait for: the deck is all there is to open.
 					if (!focused) releaseBoards();
@@ -190,29 +257,35 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					return;
 
 				case "agent.state": {
-					const mine = scratch.of(message.id);
-					const was = mine.lastState;
-					mine.lastState = message.state;
 					setState("chats", (chats) => chats.map((chat) => (chat.id === message.id ? { ...chat, state: message.state } : chat)));
-					/*
-					 * The moment a face turns green (`chrome/agent-order.ts`), said out loud.
-					 *
-					 * Keyed on the *transition* rather than the value, so a reconnection — which
-					 * replays the state of every agent on the deck — does not ring five times.
-					 */
-					if (finished(was, message.state)) {
-						hooks.raise("done", {
-							title: `${nameOf(message.id)} finished`,
-							// The deck's name, so a banner from one of three windows says which one.
-							body: state.deck?.name,
-							tag: `done:${message.id}`,
-							agent: message.id,
-						});
-					} else if (startedAsking(was, message.state)) {
-						hooks.raise("ask", { title: `${nameOf(message.id)} is waiting for you`, tag: `ask:${message.id}`, agent: message.id });
-					}
+					heardState(message.id, message.state, hooks);
 					return;
 				}
+
+				/*
+				 * The four fields of a row that no other message carries, restated in full.
+				 *
+				 * Assigned rather than merged, because the message is a complete statement of
+				 * those four: a chat that was dormant and is now running says so by not saying
+				 * `dormant`, and a merge would leave it asleep for ever. Everything else on the
+				 * row is left exactly as it was — this is not a row, it is the part of one that
+				 * moves when a turn starts and ends.
+				 */
+				case "agent.row":
+					setState("chats", (chats) =>
+						chats.map((chat) => {
+							if (chat.id !== message.id) return chat;
+							const { lastLine: _line, lastAt: _at, mode: _mode, dormant: _dormant, ...rest } = chat;
+							return {
+								...rest,
+								...(message.lastLine === undefined ? {} : { lastLine: message.lastLine }),
+								...(message.lastAt === undefined ? {} : { lastAt: message.lastAt }),
+								...(message.mode ? { mode: message.mode } : {}),
+								...(message.dormant ? { dormant: true as const } : {}),
+							};
+						}),
+					);
+					return;
 
 				case "agent.model":
 					ensureAgent(message.id);
@@ -237,14 +310,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setUsageReport({ loading: false, ...(message.report ? { report: message.report } : {}), ...(message.error ? { error: message.error } : {}) });
 					return;
 				}
-
-				case "models":
-					// One list per agent: the runtime each agent runs on answers its own, and
-					// a global list would show the last agent to start on everyone — a row
-					// for Claude listing the models of a pi agent that started after it.
-					ensureAgent(message.agentId);
-					setState("agents", message.agentId, "models", message.models);
-					return;
 
 				case "chat.history":
 					ensureAgent(message.agentId);

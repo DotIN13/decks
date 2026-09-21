@@ -1,4 +1,6 @@
 /** An agent as the chat list draws it: its runtime, its identity, and what it can do. */
+import type { AgentUsage } from "./usage.ts";
+
 export type AgentState = "idle" | "thinking" | "streaming" | "tool" | "waiting";
 
 /**
@@ -30,6 +32,12 @@ export const AGENT_KINDS: readonly AgentKind[] = ["claude", "pi", "opencode", "a
  * them in a menu, and not whether the machine could run them. So the `+` menu said "New
  * claude agent" and offered Antigravity on a machine with no `agy` on it, and the first
  * prompt was where you found out. Both facts are the server's, and this is how they travel.
+ *
+ * **Everything true of the runtime rather than of a conversation belongs here.** The three
+ * below used to ride on every chat row, which meant a deck of thirty-four chats greeted a
+ * browser with thirty-four copies of a model catalogue and of a slash-command list: 96 KB of
+ * a 444 KB greeting, carrying eight KB of distinct facts. A chat says which runtime it is on
+ * and the browser looks the rest up here.
  */
 export interface RuntimeInfo {
 	kind: AgentKind;
@@ -39,6 +47,22 @@ export interface RuntimeInfo {
 	available: boolean;
 	/** Why not, in a sentence for the person who has to fix it. Absent when available. */
 	reason?: string;
+	/** What its agents can do, where runtimes differ. Declared by the runtime, never per session. */
+	capabilities: AgentCapabilities;
+	/**
+	 * What `/` completes to on a chat of this runtime.
+	 *
+	 * The list a dormant chat offers. A *running* session can discover more — a project's
+	 * own commands, a skill the CLI found — and says so on its own row (`AgentChat.commands`).
+	 */
+	commands: SlashCommand[];
+	/**
+	 * The models it last offered on this deck. Empty until it has run here once.
+	 *
+	 * Remembered per runtime rather than asked of a backend (`agents/store.ts`), which is what
+	 * lets a restored deck draw a model picker with nothing running.
+	 */
+	models: ModelOption[];
 }
 
 /**
@@ -91,7 +115,22 @@ export interface SlashCommand {
 	aliases?: string[];
 }
 
-/** One row in the chat list: an agent, as a messaging app would draw it. */
+/**
+ * One row in the chat list: an agent, as a messaging app would draw it — and everything
+ * else a browser knows about that agent.
+ *
+ * **The row is the whole chat, not a summary of it.** The greeting used to send this list
+ * and then seven more messages per chat — its identity, its state, the boards it holds, its
+ * model, its catalogue, its account, its reading — which on a deck of thirty-four chats is
+ * 233 messages behind one. Every one of them was a separate change to the browser's state,
+ * and a change is a redraw: the page was blocked for seventeen seconds applying a greeting
+ * the server had finished sending in 120 milliseconds. The facts are per chat and had to
+ * travel; the envelopes did not.
+ *
+ * Each of these is still broadcast on its own when it *changes* (`agent.identity`,
+ * `context.changed`, `agent.model`…). That is what makes a reconnect an ordinary refresh
+ * rather than a second code path: the list is the same facts, all at once.
+ */
 export interface AgentChat {
 	id: string;
 	/** The agent named itself, through `stage.me.setName`. */
@@ -111,13 +150,36 @@ export interface AgentChat {
 	lastLine?: string;
 	lastAt?: number;
 	unread: number;
-	contextCount: number;
 	kind: AgentKind;
-	capabilities: AgentCapabilities;
-	/** What `/` completes to in the composer, supplied by the backend. */
-	commands: SlashCommand[];
+	/**
+	 * What `/` completes to, when this session offers more than its runtime does.
+	 *
+	 * Absent on a dormant chat, and on a running one that found nothing extra: the list to
+	 * draw is then `RuntimeInfo.commands` for its `kind`. Present when a started session has
+	 * discovered its own — a project's commands, a skill the CLI found — which is the only
+	 * case where two chats on one runtime have different menus.
+	 */
+	commands?: SlashCommand[];
 	/** Absent when the runtime has no modes. */
 	mode?: AgentMode;
+	/**
+	 * What the agent says about itself: its colour, its tags, the workspace it works in.
+	 *
+	 * `name` and `avatar` above are the same two fields again, because they are what the row
+	 * draws and every reader of a row asks for them by that name. The rest of an identity is
+	 * read by the canvas, the cursors and the panel's grouping.
+	 */
+	identity: Identity;
+	/** The boards it holds — its reading. */
+	boards: string[];
+	/** The boards it has put on the canvas, a subset of the above. */
+	inPlay: string[];
+	/** The model and thinking level it is on, live from a running runtime or as last recorded. */
+	model?: AgentModel;
+	/** The Claude subscription it spends, when it is on one of its own. */
+	account?: string;
+	/** Its context and cost meter, as of its last turn. */
+	usage?: AgentUsage;
 	/**
 	 * Restored from a previous run and not yet resumed.
 	 *

@@ -141,7 +141,7 @@ await feed({
 	type: "agents",
 	defaultKind: "pi",
 	focused: "A",
-	chats: [{ id: "A", name: "Ada", kind: "claude", state: "streaming", lastAt: Date.now(), unread: 0, contextCount: 0, capabilities: { modes: [] }, commands: [] }],
+	chats: [{ id: "A", name: "Ada", kind: "claude", state: "streaming", lastAt: Date.now(), unread: 0, identity: { name: "Ada", color: "#3b5cf6" }, boards: [], inPlay: [] }],
 });
 await feed({ type: "chat.item", agentId: "A", item: { id: "u1", kind: "user", text: "Say something", at: Date.now() - 4000 } });
 await feed({ type: "chat.item", agentId: "A", item: { id: "a1", kind: "assistant", text: "", at: Date.now(), streaming: true } });
