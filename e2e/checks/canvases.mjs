@@ -110,8 +110,18 @@ const panelHeadings = await page.evaluate(() => [...document.querySelectorAll('.
 say("the tab has the same headings in the same order", JSON.stringify(panelHeadings) === JSON.stringify(["cross-interviewer", "decks", "political-llm", "No workspace"]), JSON.stringify(panelHeadings));
 const rows = await page.evaluate(() => [...document.querySelectorAll('.panel-list[data-tab="canvases"] .canvas-row .nm')].map((n) => n.textContent));
 say("…every canvas once, newest first inside a heading", JSON.stringify(rows) === JSON.stringify(["Cross-interviewer", "Canvas camera", "Decks", "Bench surfaces", "Neutral image", "Tech Week", "Scratch"]), JSON.stringify(rows));
-const faces = await page.evaluate(() => document.querySelectorAll('.canvas-row[data-canvas-row="cv_p1"] .canvas-row-face').length);
-say("…a row wears the faces of who is working there", faces === 1, `${faces} face`);
+const marks = await page.evaluate(() => ({ dots: document.querySelectorAll(".canvas-row > .dot").length, extras: document.querySelectorAll(".canvas-row .canvas-row-faces, .canvas-row .canvas-row-n").length }));
+say("…a row is a board row: a name and the dot for a change, nothing else", marks.dots === 0 && marks.extras === 0, JSON.stringify(marks));
+await feed({ type: "canvases", canvases: canvases.map((one) => (one.id === "cv_p1" ? { ...one, changedAt: Date.now() + 1 } : one)) });
+await settle(page, 300);
+const dot = await page.evaluate(() => {
+	const row = document.querySelector('.canvas-row[data-canvas-row="cv_p1"]');
+	const dot = row?.querySelector(".dot")?.getBoundingClientRect();
+	const bin = row?.parentElement?.querySelector(".board-del")?.getBoundingClientRect();
+	const plus = row?.closest(".panel-section")?.querySelector(".panel-meta button")?.getBoundingClientRect();
+	return dot && bin && plus ? { dot: Math.round(dot.right), bin: Math.round(bin.right), plus: Math.round(plus.right) } : null;
+});
+say("…and a change since you looked is the dot, in the column the × and the + share", dot !== null && dot.dot === dot.bin && dot.dot === dot.plus, JSON.stringify(dot));
 const foot = await page.locator(".panel-foot .truncate").textContent();
 say("…and the foot counts them", foot?.trim() === "7 canvases", String(foot));
 if (SHOTS) await page.screenshot({ path: `${SHOTS}/tab.png`, clip: { x: 0, y: 0, width: 264, height: 620 } });

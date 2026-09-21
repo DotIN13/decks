@@ -1054,29 +1054,6 @@
 		}
 	}
 
-	/* The Canvases tab's rows: a board row with faces and a count on it. */
-	.canvas-row > .canvas-row-faces {
-		display: flex;
-		flex: none;
-		align-items: center;
-	}
-	.canvas-row-face {
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
-		background: var(--face, var(--color-accent));
-		box-shadow: 0 0 0 1.5px var(--panel);
-	}
-	.canvas-row-face + .canvas-row-face {
-		margin-left: -4px;
-	}
-	.canvas-row > .canvas-row-n {
-		flex: none;
-		min-width: 14px;
-		color: var(--faint);
-		font-size: 10.5px;
-		text-align: right;
-	}
 	.panel-meta > .here {
 		flex: none;
 		margin-left: 4px;

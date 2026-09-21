@@ -744,7 +744,6 @@ export function LeftPanel(props: {
 											<CanvasRow
 												canvas={canvas}
 												current={canvas.id === props.currentCanvas}
-												identities={props.identities ?? {}}
 												onOpen={() => props.onOpenCanvas?.(canvas.id)}
 												{...(props.onRemoveCanvas ? { onRemove: () => props.onRemoveCanvas?.(canvas.id) } : {})}
 											/>

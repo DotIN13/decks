@@ -1,7 +1,7 @@
-import type { Canvas, Identity } from "@decks/protocol";
+import type { Canvas } from "@decks/protocol";
 import Frame from "lucide-solid/icons/frame";
 import Trash2 from "lucide-solid/icons/trash-2";
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createSignal, onCleanup, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 
 /**
@@ -9,9 +9,9 @@ import { Icon } from "../ui/icons.tsx";
  *
  * The same object as a board's row — `.board-row` inside `.board-act`, the current wash, the
  * arming — because the list above and below it is made of those, and a third row style in
- * one panel is how two lists come to nearly match. What is on it beyond the name: a dot for
- * a change you have not looked at (the same mark the shelf's card wears), the faces of who is
- * working there, and how many boards it holds.
+ * one panel is how two lists come to nearly match. What is on it beyond the name is the
+ * boards row's own dot, here for a change you have not looked at — the mark the shelf's card
+ * wears — in the 20px slot the × and the heading's + share, so the three line up.
  *
  * Pressing it opens the canvas and keeps the conversation: the room changes, the agent does
  * not. The × removes the *arrangement* only — the boards stay in the deck — which is why it
@@ -25,7 +25,6 @@ export function CanvasRow(props: {
 	canvas: Canvas;
 	/** The canvas on screen: washed, not ticked. */
 	current?: boolean;
-	identities?: Record<string, Identity>;
 	onOpen: () => void;
 	/** Remove the canvas. Absent means the row has no × on it. */
 	onRemove?: () => void;
@@ -50,8 +49,6 @@ export function CanvasRow(props: {
 	onCleanup(() => clearTimeout(timer));
 
 	const news = () => props.canvas.changedAt > (props.canvas.openedAt ?? 0);
-	const faces = () => props.canvas.agents.map((id) => props.identities?.[id]).filter((identity): identity is Identity => identity !== undefined);
-	const count = () => props.canvas.boards.length;
 
 	return (
 		<div
@@ -87,16 +84,9 @@ export function CanvasRow(props: {
 				<Icon of={Frame} size={13} class="flex-none text-faint" />
 				<span class="nm">{props.canvas.name}</span>
 				<Show when={news()}>
-					<span class="dot" aria-label="Changed since you looked" />
+					{/* The boards row's own mark, in its own 20px slot: the × covers it on hover, and the heading's + sits over it. */}
+					<span class="dot" title="Changed since you looked" aria-label="Changed since you looked" />
 				</Show>
-				<Show when={faces().length > 0}>
-					<span class="canvas-row-faces" aria-label={`Working here: ${faces().map((identity) => identity.name).join(", ")}`}>
-						<For each={faces().slice(0, 4)}>{(identity) => <span class="canvas-row-face" style={{ "--face": identity.color }} title={identity.name} />}</For>
-					</span>
-				</Show>
-				<span class="canvas-row-n tabular-nums" aria-label={`${count()} board${count() === 1 ? "" : "s"}`}>
-					{count()}
-				</span>
 			</button>
 			<Show when={props.onRemove}>
 				<button
