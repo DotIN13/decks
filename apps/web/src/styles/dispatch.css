@@ -1155,9 +1155,14 @@
 	 * The shared row starts its icon at the top with a pixel of padding, which is right for
 	 * a row with a note under its label and 1.5px high for one without.
 	 */
+	.canvas-menu [data-row] {
+		row-gap: 0;
+		align-items: center;
+	}
 	.canvas-menu [data-row] > .ic {
 		display: grid;
 		height: 18px;
+		grid-row: auto;
 		padding-top: 0;
 		place-items: center;
 	}
@@ -1165,8 +1170,9 @@
 		margin-left: auto;
 		color: var(--faint);
 	}
-	.canvas-menu-remove,
-	.canvas-menu-remove > .ic {
+	/* Red, on both the word and the icon: the shared row colours its label and icon itself, so
+	   this has to outrank `:is(.popover, .rowlist) [data-row] > .lb`. */
+	.popover.canvas-menu .canvas-menu-remove > :is(.lb, .ic) {
 		color: var(--color-danger);
 	}
 	/* The way back from the list: a heading you can press, in the note's voice. */
