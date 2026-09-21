@@ -31,7 +31,6 @@ function seeded(deckPath: string, name: string, place: { x: number; y: number })
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
 			agents: () => [],
-			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
 			report: () => {},

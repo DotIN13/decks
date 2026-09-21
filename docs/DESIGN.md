@@ -1379,7 +1379,7 @@ All six milestones, each verified against the real app rather than only unit-tes
 | M2 | One agent: Pi adapter, transcript, composer, extension-UI bridge, both skills. |
 | M3 | `stage_eval`: stage service, eval, identity, state rebuilt from the branch. |
 | M4 | The user draws: editor, palette, inspector, patches, revisions, undo, the agent is told. |
-| M5 | Many chats: registry, chat list, `stage.delegate` with board handoff. |
+| M5 | Many chats: registry, chat list, `stage.send` with board handoff (`stage.delegate` until the verb cut). |
 | M6 | Time machine: rewind / fork / restore on each message, preview from revisions. |
 
 Since then the canvas also works under a finger — pinch and two-finger pan pooled across
@@ -1442,5 +1442,7 @@ section.
 - A rewind truncates our transcript by matching the rewound message's text, which is
   what `navigateTree` hands back. Two identical messages in one conversation would cut
   at the first.
-- `stage.delegate` waits for the child. A detached mode (`detach: true` in the plan) is
-  not built, so a long child blocks the parent's turn.
+- `stage.delegate` is gone. It waited for the child, and a stage run is abandoned after 20
+  seconds (`stage/eval.ts`) while a turn is minutes, so the report never came back: in 434
+  runs on the live deck it was never called once. `stage.send` is the only handover, and
+  `reply: true` is how an answer arrives — in the sender's transcript, on its next turn.

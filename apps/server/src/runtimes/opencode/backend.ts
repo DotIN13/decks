@@ -199,7 +199,7 @@ export class OpencodeBackend implements AgentBackend {
 	private briefingFile(): string {
 		const { deck, tool } = this.context;
 		const path = resolve(deck.path, ".decks-agent.md");
-		const text = [deckContext(deck, tool.name), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
+		const text = [deckContext(deck, tool.name, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
 		try {
 			/*
 			 * Only when it has changed, which is not an optimisation.

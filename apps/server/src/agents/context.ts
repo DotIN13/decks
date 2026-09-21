@@ -35,7 +35,29 @@ export function timeLine(): string {
 	return `**The person's timezone is ${zone}.** Times and dates they mention ("this afternoon", "by Friday", "every weekday at nine") are in it. \`date\` in your shell prints it, and \`await stage.now()\` returns the time there. Timestamps from the stage API are epoch milliseconds.`;
 }
 
-export function deckContext(deck: Deck, toolName: string): string {
+/**
+ * The shared browser's verbs, taken out of the API unless there is a tab to drive.
+ *
+ * Thirteen verbs one agent has ever used, carried in every other agent's prompt: about 240
+ * tokens of type text plus the paragraph that explains it, every turn, for a thing most
+ * agents cannot do because nothing is paired. So the block is included when a browser is
+ * shared and replaced by one line when it is not — the line names the verb that says how to
+ * pair, which is the only thing an agent can usefully do about it.
+ */
+export function apiFor(api: string, options: { web: boolean }): string {
+	if (options.web) return api;
+	const start = api.indexOf("\n\tweb: {");
+	if (start < 0) return api;
+	const end = api.indexOf("\n\t};", start);
+	if (end < 0) return api;
+	return (
+		api.slice(0, start) +
+		"\n\t/** The person's own Chrome, when they are sharing a tab. Nothing is shared now; `stage.web.status()` says so and how to pair. */\n\tweb: { status(): Promise<{ paired: boolean; connected: boolean }>; pairing(): Promise<{ code: string; path: string; note: string }> };" +
+		api.slice(end + "\n\t};".length)
+	);
+}
+
+export function deckContext(deck: Deck, toolName: string, options: { web?: boolean } = {}): string {
 	const template = agentsTemplate();
 	if (!existsSync(template)) {
 		// A missing template is a broken install, not a reason to refuse to run: the
@@ -65,7 +87,7 @@ export function deckContext(deck: Deck, toolName: string): string {
 	const api = existsSync(stageApi) ? readFileSync(stageApi, "utf8") : "";
 
 	return readFileSync(template, "utf8")
-		.replaceAll("{{STAGE_API}}", api ? ["```ts", api.trim(), "```"].join("\n") : "_The stage API is not available in this install._")
+		.replaceAll("{{STAGE_API}}", api ? ["```ts", apiFor(api, { web: options.web === true }).trim(), "```"].join("\n") : "_The stage API is not available in this install._")
 		.replaceAll("{{DECK_NAME}}", deck.name)
 		.replaceAll("{{DECK_PATH}}", deck.path)
 		.replaceAll("{{BOARDS}}", boardList)

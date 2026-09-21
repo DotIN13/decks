@@ -92,7 +92,7 @@ export class PiBackend implements AgentBackend {
 			 * truth about a deck the agent can simply look at.
 			 */
 			agentsFilesOverride: (base) => ({
-				agentsFiles: [...base.agentsFiles, { path: `${deck.path} (deck)`, content: deckContext(deck, tool.name) }],
+				agentsFiles: [...base.agentsFiles, { path: `${deck.path} (deck)`, content: deckContext(deck, tool.name, { web: tool.webShared() }) }],
 			}),
 		});
 		await loader.reload();

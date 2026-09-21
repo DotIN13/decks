@@ -5,7 +5,7 @@ import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
-import { createStageTool, type CreateSpec, type DelegateReport, type DelegateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
+import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
 import type { TaskResult, TaskSpec } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
@@ -291,7 +291,6 @@ export class DeckAgent {
 			/** A canvas was made, joined, or drawn on: send the list again. */
 			canvasesChanged?(): void;
 			agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; tags: string[]; kind: AgentKind; holding: number }>;
-			spawn(parentId: string, spec: DelegateSpec): Promise<DelegateReport>;
 			/** Put work in another agent's queue, without waiting for it. */
 			send(fromId: string, target: string, spec: SendSpec): { queued: true; position: number };
 			/** Make an agent, idle, for a send to follow. Optional: a host without a registry has none. */
@@ -685,7 +684,6 @@ export class DeckAgent {
 			setAvatar: (url: string) => this.setAvatar(url),
 			agents: () => this.host.agents(),
 			camera: () => this.host.camera(this.id),
-			spawn: (spec: DelegateSpec) => this.host.spawn(this.id, spec),
 			send: (target: string, spec: SendSpec) => this.host.send(this.id, target, spec),
 			create: (spec: CreateSpec) => {
 				if (!this.host.create) throw new Error("This deck cannot make agents.");

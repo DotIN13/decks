@@ -7,7 +7,7 @@ import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
 import type { CanvasStore } from "../canvas/store.ts";
 import { planCanvases } from "../canvas/migrate.ts";
-import type { CreateSpec, DelegateReport, DelegateSpec, SendSpec } from "../stage/tool.ts";
+import type { CreateSpec, SendSpec } from "../stage/tool.ts";
 import type { TaskFinish } from "../tasks/service.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
@@ -28,7 +28,6 @@ const COLORS = ["#3b5cf6", "#2eaf5a", "#e7af36", "#623be2", "#d92e3c", "#0f9ba8"
  * Not a resource limit — it is a legibility limit. Six agents editing the same deck
  * at once produce a canvas nobody can follow and a bill nobody expected.
  */
-const MAX_CHILDREN = 4;
 
 export class Registry {
 	private readonly agents: DeckAgent[] = [];
@@ -240,7 +239,6 @@ export class Registry {
 				canvasList: () => this.host.canvasList?.() ?? [],
 				canvasesChanged: () => this.host.publishCanvases?.(),
 				agents: () => this.summaries(),
-				spawn: (parentId, spec) => this.spawn(parentId, spec),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
 				create: (fromId, spec) => this.createFor(fromId, spec),
 			report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
@@ -529,88 +527,6 @@ export class Registry {
 	}
 
 	/**
-	 * Hand work to a new agent and wait for its report (§6.2).
-	 *
-	 * In-process rather than a subprocess, unlike Pi's own subagent example: the child
-	 * shares this deck's stage, so its boards land on the same canvas and its
-	 * transcript is a row in the same chat list. What it does not share is context —
-	 * it is a fresh session with its own file.
-	 */
-	async spawn(parentId: string, spec: DelegateSpec): Promise<DelegateReport> {
-		const parent = this.get(parentId);
-		if (!parent) throw new Error("The delegating agent is gone");
-
-		const running = this.agents.filter((agent) => agent.parentId === parentId && agent.running).length;
-		if (running >= MAX_CHILDREN) {
-			throw new Error(`You already have ${running} subagents running; wait for one to finish.`);
-		}
-
-		// The runtime is chosen at creation, exactly as the `+` button does: a live session
-		// cannot change the process it is talking to, so `kind` is fixed here for the child's
-		// life. Ask for one and the child is that runtime; ask for nothing and it is the
-		// server's default, as before — every call written so far keeps working.
-		const child = this.create({
-			parentId,
-			...(spec.name ? { name: spec.name } : {}),
-			...(spec.kind ? { kind: spec.kind } : {}),
-			/*
-			 * And the parent's subscription.
-			 *
-			 * A subagent is the parent's work continuing, so it should not quietly spend a
-			 * different account than the agent that asked for it — which is what the install
-			 * default would have given it. Only meaningful for a Claude child; the other
-			 * runtimes have no Claude account to spend and ignore it.
-			 */
-			...(parent.accountId() ? { account: parent.accountId() as string } : {}),
-			/*
-			 * And the parent's workspace, on the same argument and one level more useful.
-			 *
-			 * A delegation is a group growing: the child is doing part of the project the parent
-			 * named, so a fan-out of six that each landed in no workspace would be six agents to
-			 * find by hand — which is the problem workspaces exist for.
-			 */
-			...(parent.workspace ? { workspace: parent.workspace } : {}),
-		});
-		if (spec.model?.includes("/")) {
-			const [provider, ...rest] = spec.model.split("/");
-			try {
-				// The third argument is the thinking level, and it used to be dropped here —
-				// `setModel(provider, model)` stopped two arguments short of what every backend
-				// takes, so a subagent asked for a model silently lost whatever level it would
-				// otherwise have had. A delegation that asks for both gets both.
-				await child.setModel(provider!, rest.join("/"), spec.thinking);
-			} catch (error) {
-				parent.translator.notice("warn", `Subagent stays on the default model: ${(error as Error).message}`);
-			}
-		} else if (spec.thinking) {
-			// Thinking asked for on its own, on the default model. `setThinking` starts the
-			// runtime itself now, so the explicit `start` is gone rather than duplicated.
-			await child.setThinking(spec.thinking);
-		}
-
-		if (spec.mode) {
-			const modes = child.chat().capabilities.modes;
-			if (modes.includes(spec.mode)) {
-				await child.start();
-				await child.setMode(spec.mode);
-			} else {
-				// Asking for a posture a runtime cannot hold is not an error: the work is worth
-				// doing on the nearest thing it has, and the parent is told it did not get what
-				// it asked for — the same deal `spawn` already makes for a refused model. pi has
-				// no modes at all, opencode offers three of the four, antigravity two.
-				parent.translator.notice("warn", `Subagent stays in its default mode: ${child.chat().kind} cannot do "${spec.mode}".`);
-			}
-		}
-
-		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
-		if (handed.length > 0) child.setContext(handed);
-
-		const result = await child.run(brief(spec.task, handed, this.deck));
-		this.publish();
-		return { agent: child.id, name: child.chat().name, report: result.report, boards: result.boards };
-	}
-
-	/**
 	 * Make an agent with no task, for a `send` to follow — `stage.create`.
 	 *
 	 * A peer rather than a child: it has no parent to report to and is not counted against
@@ -666,9 +582,9 @@ export class Registry {
 	/**
 	 * Put work in an existing agent's queue and return — the handover that does not block.
 	 *
-	 * Where `spawn` makes an agent and waits for it, this hands a task to somebody who is
-	 * already here and is done. Nothing is created, so it does not count against
-	 * `MAX_CHILDREN`, and the sender's next line runs immediately.
+	 * The only handover there is. Waiting for an agent was `spawn`, and it could not work: a
+	 * stage run is abandoned after twenty seconds and a turn is minutes, so the report never
+	 * came back. This hands the work over and returns; `reply` is how the answer arrives.
 	 *
 	 * The target may be given as an id or as a name, because a model reading
 	 * `stage.agents()` has both in front of it and will reach for whichever reads better. A

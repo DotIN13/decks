@@ -78,7 +78,6 @@ function agentOn(
 			port: 4329,
 			camera: () => camera ?? { x: 0, y: 0, zoom: 1, width: 1440, height: 900 },
 			agents: () => [],
-			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
 			report: () => {},
@@ -423,7 +422,6 @@ function probeOn(): { agent: Probe; sent: ServerMessage[]; reportCalls: Array<{ 
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
 			agents: () => [],
-			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: (fromId, target) => {
 				sentTos.push(target);
 				return { queued: true as const, position: 1 };

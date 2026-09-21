@@ -10,7 +10,7 @@ import type { Board, Identity } from "@decks/protocol";
  * without a network call, because both inputs are already on the wire.
  *
  * **A board belongs to the workspace whose agents hold it**, the same rule
- * `stage.workspaces()` uses, so the panel's two lists never disagree about who is in
+ * `stage.canvases()` answers with, so the panel's two lists never disagree about who is in
  * which project. A board held by agents of two workspaces appears under both — it is
  * the truth twice, and mirroring it is cheaper than hiding it.
  *

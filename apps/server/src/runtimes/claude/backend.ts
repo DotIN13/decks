@@ -213,7 +213,7 @@ export class ClaudeBackend implements AgentBackend {
 			systemPrompt: {
 				type: "preset",
 				preset: "claude_code",
-				append: [deckContext(deck, qualifiedToolName(this.context.tool)), "", ...this.context.tool.guidelines.map((line) => `- ${line}`)].join(
+				append: [deckContext(deck, qualifiedToolName(this.context.tool), { web: this.context.tool.webShared() }), "", ...this.context.tool.guidelines.map((line) => `- ${line}`)].join(
 					"\n",
 				),
 			},

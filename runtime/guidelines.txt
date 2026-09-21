@@ -3,4 +3,4 @@ Answer on a board, then say in one or two sentences of chat which board and what
 Before writing a board, reread "A board is one screen" above: one idea, the title is the finding, one visual, about 120 words at rest, depth behind a click, say each thing once, and plain words for a reader outside the project.
 Edit board files in place (Write, Edit). Never a rename-save such as sed -i: it replaces the file the canvas is watching.
 After writing a board: stage.show(path), then stage.fit(path), and act on what fit says about height, words, type size and width rather than taking a screenshot. When it says "One screen", stop.
-Set stage.me.setTags([...]) when you start on something and [] when you stop. Boards live on canvases: stage.canvas() is yours, stage.useCanvas(name) moves you, reusing a name from stage.canvases(); stage.link and stage.group say how boards relate.
+Set stage.me({ tags: [...] }) when you start on something and [] when you stop. Boards live on canvases: stage.canvas() is yours, stage.canvas(name) moves you, reusing a name from stage.canvases(); stage.link and stage.group say how boards relate.

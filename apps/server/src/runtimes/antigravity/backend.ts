@@ -230,7 +230,7 @@ export class AntigravityBackend implements AgentBackend {
 	 */
 	private briefing(): string {
 		const { deck, tool } = this.context;
-		return [deckContext(deck, tool.name), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
+		return [deckContext(deck, tool.name, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
 	}
 
 	async abort(): Promise<void> {

@@ -23,9 +23,8 @@ import type { QueuedWork, SendSpec, StageAgentHooks } from "./tool.ts";
  * acting for the conversation in front of it, which is also what makes the delegation
  * legible: the board's changes appear in the chat the user is reading.
  *
- * `spawn` is the one verb that refuses. A board's run is abandoned by `runEval` at 20
- * seconds and the child would run on regardless, so a board that wants an agent to do
- * something says `stage.send`, which queues the work and does not wait.
+ * A board hands work over with `stage.send`, which queues it and returns: a board's run is
+ * abandoned by `runEval` at 20 seconds, so nothing here can wait for an answer either.
  */
 export interface BoardConversation {
 	/** The focused conversation's id, which is what the canvas verbs are keyed by. */
@@ -94,9 +93,6 @@ export function boardActor(options: { path: string; conversation: BoardConversat
 		setWorkspace: () => null,
 		agents: () => conversation.agents(),
 		camera: () => conversation.camera(),
-		spawn: () => {
-			throw new Error("A board cannot create an agent. Use stage.send to hand the work to one that exists.");
-		},
 		// The sender is the conversation, because a queue's reply has to find somebody to
 		// land in and a board has no inbox of its own.
 		send: (target, spec) => conversation.send(conversation.id, target, spec),

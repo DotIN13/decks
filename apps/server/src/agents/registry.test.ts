@@ -45,7 +45,6 @@ function agentOn(deck: Deck, color = "#3b5cf6"): DeckAgent {
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
 			agents: () => [],
-			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
 			report: () => {},
@@ -481,13 +480,12 @@ test("summaries reports the twenty newest boards, the true total, and the runtim
 });
 
 /*
- * `Registry.spawn` honouring what a delegation asked for (§6.2).
+ * `Registry.createFor` honouring what a `send({ name, … })` asked for.
  *
- * Spawn creates the child through `Registry.create`, which would start a real runtime — the
- * thing these tests exist to avoid. So `create` is overridden to hand spawn a `SpyChild`
- * whose `setModel`/`setMode`/`setThinking`/`run` record rather than reach a backend, and
- * a parent built directly (the way the registry test harness builds every agent) is put on
- * the list under its real id so `spawn` can find it and write its notices to it.
+ * It makes the agent through `Registry.create`, which would start a real runtime — the thing
+ * these tests exist to avoid. So `create` is overridden to hand back a `SpyChild` whose
+ * `setModel`/`setMode`/`setThinking` record rather than reach a backend, and a parent built
+ * directly is put on the list under its real id so its notices have somewhere to land.
  */
 class SpyChild extends DeckAgent {
 		tagsSet: string[] = [];
@@ -529,8 +527,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 					port: 4329,
 					camera: () => ({ x: 0, y: 0, zoom: 1 }),
 					agents: () => [],
-					spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
-					send: () => ({ queued: true as const, position: 1 }),
+							send: () => ({ queued: true as const, position: 1 }),
 					queue: () => [],
 					report: () => {},
 					brief: (task: string) => task,
@@ -571,7 +568,6 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
 			agents: () => [],
-			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
 			report: () => {},
@@ -586,12 +582,12 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 	return { registry, parentId: parent.id, child: () => child, created: () => createdWith, sent };
 }
 
-test("spawn passes the asked-for kind to create, and the child is that runtime", async () => {
+test("create passes the asked-for kind, and the new agent is that runtime", async () => {
 	const { deck, cleanup } = deckOn();
 	const { registry, parentId, child } = spawnHarness(deck, "pi");
 
-	await registry.spawn(parentId, { task: "survey the deck", kind: "claude", boards: ["boards/plan.html"] });
-	assert.equal(child()?.kind, "claude", "the child was created on the runtime asked for, not the default");
+	await registry.createFor(parentId, { name: "Survey", kind: "claude" });
+	assert.equal(child()?.kind, "claude", "made on the runtime asked for, not the default");
 	cleanup();
 });
 
@@ -629,29 +625,22 @@ test("create passes a named model and thinking level to the new agent's backend"
 	cleanup();
 });
 
-test("spawn passes the thinking level as setModel's third argument", async () => {
-	const { deck, cleanup } = deckOn();
-	const { registry, parentId, child } = spawnHarness(deck, "claude");
-
-	await registry.spawn(parentId, { task: "x", model: "pi/deepseek-v4", thinking: "high" });
-	assert.deepEqual(child()?.models, [["pi", "deepseek-v4", "high"]], "the level reaches the backend, which is where it used to be dropped");
-	cleanup();
-});
-
 test("thinking asked for without a model is applied to the default", async () => {
 	const { deck, cleanup } = deckOn();
 	const { registry, parentId, child } = spawnHarness(deck, "pi");
 
-	await registry.spawn(parentId, { task: "x", thinking: "max" });
+	await registry.createFor(parentId, { name: "Maps", thinking: "max" });
 	assert.deepEqual(child()?.thinkings, ["max"]);
 	cleanup();
 });
 
-test("a mode the runtime offers reaches the child's setMode", async () => {
+test("a mode the runtime offers reaches the new agent's setMode", async () => {
 	const { deck, cleanup } = deckOn();
 	const { registry, parentId, child } = spawnHarness(deck, "claude");
 
-	await registry.spawn(parentId, { task: "x", mode: "plan" });
+	// The runtime is named, because a mode belongs to the runtime that offers it: the creator
+	// here is a pi agent, and pi has no modes at all.
+	await registry.createFor(parentId, { name: "Maps", kind: "claude", mode: "plan" });
 	assert.deepEqual(child()?.modes, ["plan"]);
 	cleanup();
 });
@@ -660,12 +649,12 @@ test("a mode a runtime does not offer is a notice, not an error — pi has no mo
 	const { deck, cleanup } = deckOn();
 	const { registry, parentId, child, sent } = spawnHarness(deck, "pi");
 
-	const report = await registry.spawn(parentId, { task: "x", mode: "plan" });
-	assert.equal(report.report, "done", "the child still did the work, on the mode it has");
+	const made = await registry.createFor(parentId, { name: "Maps", mode: "plan" });
+	assert.equal(typeof made.agent, "string", "the agent was still made, on the mode it has");
 	assert.deepEqual(child()?.modes, [], "no mode was set");
 	const notice = sent.filter((message) => message.type === "chat.item").at(-1);
 	assert.ok(notice && notice.type === "chat.item" && notice.item.kind === "notice");
-	assert.match(notice.item.text, /Subagent stays in its default mode: pi cannot do "plan"/);
+	assert.match(notice.item.text, /stays in its default mode: pi cannot do "plan"/);
 	cleanup();
 });
 
@@ -716,8 +705,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 					port: 4329,
 					camera: () => ({ x: 0, y: 0, zoom: 1 }),
 					agents: () => [],
-					spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
-					send: (fromId, target, spec) => this.send(fromId, target, spec),
+							send: (fromId, target, spec) => this.send(fromId, target, spec),
 					queue: (agentId) => this.get(agentId)?.queue() ?? [],
 					// The real wiring under test: the receiver's `report` call becomes a
 					// notice in whoever is named — a transcript item, not a queued task.
@@ -836,7 +824,6 @@ test("a turn's boards are the ones the agent named, not the ones that moved mean
 			port: 4329,
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
 			agents: () => [],
-			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
 			report: () => {},

@@ -72,7 +72,6 @@ function toolOn(options: { canvas?: boolean } = {}) {
 			...(options.canvas === false ? {} : { canvas: hooks }),
 			agents: () => [],
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
-			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true, position: 1 }),
 			queue: () => [],
 			recordRevision: () => undefined,
@@ -84,7 +83,7 @@ function toolOn(options: { canvas?: boolean } = {}) {
 
 test("an arrow lands on the agent's canvas, and the verb answers with the canvas", async () => {
 	const { tool } = toolOn();
-	const result = await tool.run(`return (await stage.link("boards/plan.html", "boards/result.html", { label: "ran" })).links`);
+	const result = await tool.run(`return (await stage.link("boards/plan.html", "boards/result.html", "ran")).links`);
 	assert.equal(result.isError, false, result.text);
 	assert.deepEqual(JSON.parse(result.text), [{ from: "boards/plan.html", to: "boards/result.html", label: "ran" }]);
 });
@@ -108,11 +107,11 @@ test("a path that is not a board is refused with the shape of one that is", asyn
 	assert.match(result.text, /boards\/plan\.html/);
 });
 
-test("useCanvas joins by name, and canvas() says where you are", async () => {
+test("canvas(name) joins by name, and canvas() says where you are", async () => {
 	const { tool } = toolOn();
 	const before = await tool.run(`return (await stage.canvas()) ?? "none"`);
 	assert.equal(before.text, `"none"`, "an agent that has drawn nothing is on no canvas");
-	await tool.run(`return await stage.useCanvas("Political LLM")`);
+	await tool.run(`return await stage.canvas("Political LLM")`);
 	const after = await tool.run(`return (await stage.canvas()).name`);
 	assert.equal(after.text, `"Political LLM"`);
 	const all = await tool.run(`return (await stage.canvases()).map((canvas) => canvas.name)`);
@@ -124,4 +123,33 @@ test("with no canvas to draw on, every verb refuses in a sentence", async () => 
 	const result = await tool.run(`return await stage.link("boards/plan.html", "boards/result.html")`);
 	assert.equal(result.isError, true);
 	assert.match(result.text, /no canvas here/);
+});
+
+test("the opposites fold into the verbs: a null label unlinks, an empty list ungroups", async () => {
+	const { tool } = toolOn();
+	await tool.run(`await stage.link("boards/plan.html", "boards/result.html", "ran"); await stage.group(["boards/plan.html", "boards/result.html"], { name: "the pilot" });`);
+	const gone = await tool.run(`
+		await stage.link("boards/plan.html", "boards/result.html", null);
+		const canvas = await stage.group([], { name: "the pilot" });
+		return { links: canvas.links.length, groups: canvas.groups.length };
+	`);
+	assert.deepEqual(JSON.parse(gone.text), { links: 0, groups: 0 });
+	const missing = await tool.run(`return await stage.group([], { name: "nothing" })`);
+	assert.match(missing.text, /no group called nothing/);
+});
+
+test("a verb that is gone refuses with the call that replaces it", async () => {
+	const { tool } = toolOn();
+	for (const [code, expected] of [
+		[`return await stage.useCanvas("x")`, /stage\.canvas\(name\)/],
+		[`return await stage.unlink("boards/plan.html", "boards/result.html")`, /stage\.link\(a, b, null\)/],
+		[`return await stage.ungroup("the pilot")`, /stage\.group\(\[\], \{ name \}\)/],
+		[`return await stage.workspaces()`, /stage\.canvases\(\)/],
+		[`return await stage.me.setTags(["x"])`, /stage\.me\(\{ tags \}\)/],
+		[`return await stage.delegate({ task: "x" })`, /abandoned after 20 seconds[\s\S]*stage\.send/],
+	] as const) {
+		const result = await tool.run(code);
+		assert.equal(result.isError, true, code);
+		assert.match(result.text, expected, code);
+	}
 });

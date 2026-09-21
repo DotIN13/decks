@@ -121,7 +121,6 @@ function builtStageTool() {
 				setWorkspace: () => null,
 				agents: () => [],
 				camera: () => ({ x: 0, y: 0, zoom: 1 }),
-				spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 				send: () => ({ queued: true, position: 1 }),
 				queue: () => [],
 				recordRevision: () => undefined,

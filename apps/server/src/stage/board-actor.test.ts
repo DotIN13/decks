@@ -86,11 +86,15 @@ test("a write is recorded through the board service", () => {
 	assert.deepEqual(calls, ["recordRevision:boards/plan.html"]);
 });
 
-test("a board cannot create an agent, and the refusal names what to do instead", () => {
-	const { api } = conversation();
+test("a board hands work over with send, and has no way to make an agent", () => {
+	const { api, calls } = conversation();
 	const actor = boardActor({ path: "boards/plan.html", conversation: api });
 
-	assert.throws(() => actor.spawn({ task: "do it" }), /stage\.send/);
+	// `create` is the hook a `send({ name })` needs, and a board does not have one: making an
+	// agent is not something a snippet on a board should be able to do.
+	assert.equal(actor.create, undefined);
+	actor.send("Sable", { task: "redraw the chart" });
+	assert.ok(calls.some((call) => JSON.stringify(call).includes("Sable")), "the send reached the conversation");
 });
 
 test("a board has no row of its own to tag or to place in a workspace", () => {

@@ -22,35 +22,6 @@ import type { StageService, WebTarget } from "./service.ts";
  */
 
 /** What a parent asks for when it hands work over (§6.2). */
-export interface DelegateSpec {
-	name?: string;
-	task: string;
-	/** Boards handed over: the child is given their source, not a description. */
-	boards?: string[];
-	/** "provider/model", if the child should run on something other than the default. */
-	model?: string;
-	/**
-	 * The runtime the child is: fixed at creation, exactly as the `+` button fixes it.
-	 *
-	 * Omit it and the child gets the server's default. It is the one field that can never
-	 * change afterwards, so asking for it here is the only way to get it.
-	 */
-	kind?: AgentKind;
-	/**
-	 * The thinking level, on its own scale from the model — the same reason the composer
-	 * draws it as a separate control below the model list.
-	 */
-	thinking?: ThinkingLevel;
-	/**
-	 * How much the child asks before acting, from its runtime's own set.
-	 *
-	 * The runtimes do not all offer all four — pi has none at all, antigravity two — and
-	 * asking for one a runtime does not have is not an error: the child does the work on
-	 * its default mode and the parent is told it did not get what it asked for.
-	 */
-	mode?: AgentMode;
-}
-
 /**
  * What one agent hands to another that already exists (the queue, not a spawn).
  *
@@ -125,14 +96,6 @@ export interface QueuedWork {
 	decide?: string;
 }
 
-export interface DelegateReport {
-	agent: string;
-	name: string;
-	report: string;
-	/** Boards the child created or changed. */
-	boards: string[];
-}
-
 export interface StageAgentHooks {
 	id: string;
 	identity(): Identity;
@@ -168,8 +131,6 @@ export interface StageAgentHooks {
 	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
-	/** Hand work to a new agent and wait for it. */
-	spawn(spec: DelegateSpec): Promise<DelegateReport>;
 	/** Queue work for an agent that already exists, and return without waiting. */
 	send(target: string, spec: SendSpec): { queued: true; position: number };
 	/** Make an agent and return at once; optional so a host with no registry can omit it. */
@@ -259,6 +220,13 @@ export interface StageTool {
 	 * never goes through `run`.
 	 */
 	readonly stage: Stage;
+	/**
+	 * Whether the person is sharing a tab right now.
+	 *
+	 * The backends ask before they write the deck context, because the browser's thirteen
+	 * verbs are only described to an agent that can use them (`agents/context.ts`).
+	 */
+	webShared(): boolean;
 	run(code: string): Promise<StageToolResult>;
 	snapshot(): StageSnapshot;
 }
@@ -303,6 +271,28 @@ function guidelines(): string[] {
 	return readFileSync(file, "utf8").split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
 }
 const GUIDELINES = guidelines();
+
+/**
+ * Verbs this build removed, and the sentence each one answers with for a release.
+ *
+ * Four runtimes' transcripts contain these names, and a resumed conversation will call them.
+ * Each sentence names the call that does the same job, so the next line a model writes is the
+ * right one — a refusal it can act on beats a `TypeError` it cannot.
+ */
+const GONE: Record<string, string> = {
+	mirror: "stage.mirror is gone. A mirror board is made from the Agents tab; nothing in the API makes one.",
+	toast: "stage.toast is gone. Say it in your turn: what you write reaches the person.",
+	read: "stage.read is gone. A board is a file — read it with your own file tools.",
+	roots: "stage.roots is gone. stage.resolve(file) answers, and says which roots it may reach when it cannot.",
+	context: "stage.context() is gone. stage.boards() marks what each agent holds, in inContext.",
+	workspaces: "stage.workspaces() is gone. stage.canvases() is the same list, with who is working on each.",
+	useCanvas: 'stage.useCanvas(name) is now stage.canvas(name); stage.canvas() with nothing says where you are.',
+	unlink: "stage.unlink(a, b) is now stage.link(a, b, null).",
+	ungroup: 'stage.ungroup(name) is now stage.group([], { name }).',
+	task: 'stage.task({ text }) is now stage.send("dispatcher", { task: text }).',
+	delegate: "stage.delegate is gone: a stage run is abandoned after 20 seconds, so it could never return a subagent's report. Use stage.send({ name, kind }, { task, reply: true }) — the agent is made, the work is queued, and its report reaches you on your next turn.",
+	create: 'stage.create({ name }) is now the first argument of send: stage.send({ name, kind }, { task }).',
+};
 
 export function createStageTool(deps: {
 	stage: StageService;
@@ -359,8 +349,6 @@ export function createStageTool(deps: {
 	const stage: Stage = {
 		// --- reads ---------------------------------------------------------------
 		boards: async () => service.boards(),
-		read: async (path: string) => service.read(path),
-		roots: async () => service.roots(),
 		resolve: async (file: string) => service.resolve(file),
 		url: async (path: string) => service.url(path, port),
 		/**
@@ -442,41 +430,6 @@ export function createStageTool(deps: {
 				`board width ${width}. One screen: about ${Math.round(width * 0.7)} px tall, about 120 words, body text 17px or larger and nothing under 14px. stage.fit will say which of these a board is over.`,
 			);
 			return path;
-		},
-
-		/**
-		 * A mirror: a live view of a conversation, on the canvas.
-		 *
-		 * The board it writes never changes — its turns arrive in the browser, from a
-		 * transcript the app is already holding for every agent. So mirroring somebody
-		 * you are not talking to costs a `postMessage`, which is the point of it: three
-		 * mirrors side by side is what everyone is doing, without opening three chats.
-		 *
-		 * Attached and put on the canvas, camera unmoved, exactly as `newBoard` is. Asking
-		 * twice for the same agent hands back the board you already have.
-		 */
-		mirror: async (options?: { of?: string; w?: number; h?: number }) => {
-			const wanted = options?.of?.trim();
-			const others = agent.agents();
-			const found = wanted
-				? (others.find((other) => other.id === wanted) ??
-					others.find((other) => other.name.toLowerCase() === wanted.toLowerCase()))
-				: others.find((other) => other.id === agent.id);
-			if (!found) {
-				throw new Error(
-					wanted
-						? `No agent called ${wanted}. Use an id or a name from stage.agents().`
-						: "This conversation is not in the agent list yet, so there is nothing to mirror.",
-				);
-			}
-			const path = service.mirror({
-				agentId: found.id,
-				name: found.name,
-				size: { ...(options?.w ? { w: options.w } : {}), ...(options?.h ? { h: options.h } : {}) },
-			});
-			agent.setContext([path, ...agent.context().filter((held) => held !== path)]);
-			agent.setInPlay([...agent.inPlay().filter((shown) => shown !== path), path]);
-			return { path, of: found.name, agent: found.id };
 		},
 
 		/**
@@ -569,10 +522,6 @@ export function createStageTool(deps: {
 			agent.setContext(next);
 			return service.boards().filter((board) => next.includes(board.path));
 		},
-		context: async () => {
-			const held = agent.context();
-			return service.boards().filter((board) => held.includes(board.path));
-		},
 		inPlay: async () => {
 			const playing = agent.inPlay();
 			return service.boards().filter((board) => playing.includes(board.path));
@@ -621,7 +570,6 @@ export function createStageTool(deps: {
 		reload: async (path: string) => service.reload(agent.id, path),
 		cursor: async (path: string, at: { x: number; y: number } | null) =>
 			service.cursor(agent.id, path, at, agent.identity().name, agent.identity().color),
-		toast: async (text: string) => service.toast(agent.id, text),
 
 		// --- identity -------------------------------------------------------------
 		/**
@@ -634,119 +582,91 @@ export function createStageTool(deps: {
 		 */
 		annotate: async (path: string, marks: unknown) => service.annotate(agent.id, path, marks),
 
-		me: {
-			setName: async (name: string) => {
-				const clean = name.trim().slice(0, 40);
+		/**
+		 * Who you are, and what you are doing: read it with nothing, change it with a patch.
+		 *
+		 * One verb where there were five, because they were one act with five names — and the
+		 * patch is what a model can hold in its head: `stage.me({ name: "Sable", tags: ["panel"] })`.
+		 * What comes back is the identity **as stored**, which is not always what was passed:
+		 * tags are slugged, deduped and capped at four, so `["Reading panel.css and measuring"]`
+		 * comes back as `["reading-panel-css-and"]`. Returning it is the only way a model finds
+		 * that out, and the alternative — silently storing something other than what it thinks it
+		 * set — is how an agent ends up setting the same tags forever.
+		 *
+		 * Which canvas you work on is `stage.canvas(name)`, not a field here: it is a fact about
+		 * the deck's boards rather than about you.
+		 */
+		me: async (patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[] }) => {
+			if (patch?.name !== undefined) {
+				const clean = String(patch.name).trim().slice(0, 40);
 				if (!clean) throw new Error("A name cannot be empty");
 				agent.rename(clean);
-			},
-			/**
-			 * What this agent is doing, in its own words. Replaces the list.
-			 *
-			 * Returns the tags **as stored**, which is not always what was passed: they are
-			 * slugged, deduped and capped at four, so `["Reading panel.css and measuring"]`
-			 * comes back as `["reading-panel-css-and"]`. Returning them is the only way a model
-			 * finds that out, and the alternative — silently storing something different from
-			 * what it thinks it set — is how an agent ends up re-setting the same tags forever.
-			 */
-			setTags: async (tags: string[]) => agent.setTags(tags),
-			/**
-			 * The workspace this agent is in. Replaces — one value, not a list.
-			 *
-			 * Returns it **as stored**: slugged, lowercased and cut at 24 characters, so
-			 * `stage.me.setWorkspace("Political LLM (round 20)")` comes back as `political-llm`.
-			 * Returning it is the only way a model finds that out, and it is also how two agents
-			 * that named "the same" project differently end up in one group rather than two.
-			 * `null` or an empty string leaves the workspace.
-			 */
-			setWorkspace: async (workspace: string | null) => agent.setWorkspace(workspace),
-			setAvatar: async (avatar: { emoji: string } | { svg: string }) => {
+			}
+			if (patch?.avatar !== undefined) {
+				const avatar = patch.avatar;
 				if ("emoji" in avatar) {
-					// An emoji becomes a data URL rather than a special case in the
-					// browser: one code path for "the agent has a picture".
-					const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><text x="32" y="44" font-size="44" text-anchor="middle">${escapeXml(avatar.emoji.slice(0, 4))}</text></svg>`;
+					// An emoji becomes a data URL rather than a special case in the browser: one
+					// code path for "the agent has a picture".
+					const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><text x="32" y="44" font-size="44" text-anchor="middle">${escapeXml(String(avatar.emoji).slice(0, 4))}</text></svg>`;
 					agent.setAvatar(service.writeAvatar(agent.id, svg));
-					return;
+				} else {
+					if (!/^\s*<svg[\s>]/i.test(avatar.svg)) throw new Error("An SVG avatar must start with <svg>");
+					agent.setAvatar(service.writeAvatar(agent.id, avatar.svg));
 				}
-				if (!/^\s*<svg[\s>]/i.test(avatar.svg)) throw new Error("An SVG avatar must start with <svg>");
-				agent.setAvatar(service.writeAvatar(agent.id, avatar.svg));
-			},
-			get: async () => agent.identity(),
+			}
+			if (patch?.tags !== undefined) agent.setTags(patch.tags);
+			return agent.identity();
 		},
 
 		/**
-		 * Hand work to a subagent, with the boards it needs (§6.2).
+		 * Hand work to somebody else, and carry on.
 		 *
-		 * The child gets the *source* of each board rather than a summary, and the
-		 * instruction that those boards are the plan of record. That is the whole
-		 * point of boards being files: alignment is a paste, not a briefing.
+		 * One verb for the three that were: a **name or id** sends to an agent that exists; a
+		 * **shape** — `{ name, kind }` — makes the agent and sends to it; and the word
+		 * `"dispatcher"` makes a dashboard task, which the deck places for you. It always
+		 * returns at once, because it has to: a stage run is abandoned after twenty seconds and
+		 * a turn is minutes, so there is no honest way to wait for an answer inside a call.
+		 * `reply: true` is how the answer reaches you — their report lands in your transcript
+		 * and you read it on your next turn.
+		 *
+		 * The receiver starts when it has been quiet for a while, so nothing interrupts a turn in
+		 * progress, and it is handed the board *source* when it runs rather than when you sent it,
+		 * so a board that changes in between is read as it is.
 		 */
-		delegate: async (spec: DelegateSpec) => {
-			if (!spec?.task?.trim()) throw new Error("A delegated task needs a description");
-			return agent.spawn({
-				...spec,
-				// The parent's own context is the default handover: if it did not say
-				// which boards, it means the ones it is working on.
-				boards: spec.boards ?? agent.context(),
-			});
-		},
-
-		/**
-		 * Hand work to an agent that already exists, and carry on.
-		 *
-		 * The difference from `delegate` is the whole point: `delegate` makes a new agent and
-		 * blocks until it reports, which is right when the work is a step in what you are
-		 * doing. `send` puts an item in somebody else's queue and returns — right when the
-		 * work is *theirs*, when they are the one holding that part of the deck, or when you
-		 * have nothing to do with the answer.
-		 *
-		 * The receiver runs it once it has been quiet for a while, so it never interrupts a
-		 * turn in progress, and it is handed the board *source* when it runs — not when you
-		 * sent it, so a board that changes in between is read as it is.
-		 */
-		send: async (target: string, spec: SendSpec) => {
-			if (!target?.trim()) throw new Error("Say which agent: an id or a name from stage.agents()");
+		send: async (target: string | CreateSpec, spec: SendSpec) => {
 			if (!spec?.task?.trim()) throw new Error("Sent work needs a description");
-			return agent.send(target.trim(), {
+			const work = {
 				task: spec.task,
 				...(spec.boards ? { boards: spec.boards } : {}),
 				...(spec.reply ? { reply: true } : {}),
-			});
-		},
-		/**
-		 * Make an agent and return at once, so the next line can `send` to it.
-		 *
-		 * For work nobody on the deck covers: a dispatcher that finds no agent on the topic
-		 * makes one here rather than blocking on a `delegate`, and hands the work over the
-		 * way it would to anyone else.
-		 */
-		create: async (spec: CreateSpec) => {
-			if (!spec?.name?.trim()) throw new Error("A new agent needs a name");
-			if (!agent.create) throw new Error("This deck cannot make agents.");
-			return agent.create({ ...spec, name: spec.name.trim() });
+			};
+			/*
+			 * A shape rather than a name: the agent is made first, on your runtime, account and
+			 * canvas unless it says otherwise, and the work goes into its queue. This is what
+			 * `create` and `delegate` were, minus the wait that could not be kept.
+			 */
+			if (target && typeof target === "object") {
+				if (!agent.create) throw new Error("This deck cannot make agents.");
+				const name = String(target.name ?? "").trim();
+				if (!name) throw new Error('A new agent needs a name: stage.send({ name: "Rune" }, { task });');
+				const made = await agent.create({ ...target, name });
+				return { ...agent.send(made.agent, work), agent: made.agent, name: made.name };
+			}
+			const to = String(target ?? "").trim();
+			if (!to) throw new Error('Say who: a name or id from stage.agents(), { name } to make one, or "dispatcher" to let the deck place it.');
+			/*
+			 * The dispatcher is not an agent you queue work into — it is the rule that decides
+			 * who should have it — so this word makes a dashboard task instead. It is the one
+			 * name `send` reads rather than resolves, which is what `task` used to be.
+			 */
+			if (to.toLowerCase() === "dispatcher") {
+				if (!agent.task) throw new Error("This deck has no dashboard.");
+				return agent.task({ text: spec.task.trim(), ...(spec.boards ? { boards: spec.boards } : {}) });
+			}
+			return agent.send(to, work);
 		},
 		/** What is waiting for an agent: yours, or another's if you name it. */
 		queue: async (agentId?: string) => agent.queue(agentId),
-
-		/**
-		 * Make a dashboard task and let the deck decide who takes it.
-		 *
-		 * The counterpart to `send` for work that has no obvious owner: instead of
-		 * naming an agent, the text is handed to the dashboard's dispatcher rule, which
-		 * picks by workspace, then by who is idle and least loaded, and puts it in that
-		 * agent's queue. What the caller gets back says where it went and why — or that
-		 * nobody could take it, which is a blocked task a person can retry on the panel.
-		 */
-		task: async (spec: TaskSpec) => {
-			if (!spec?.text?.trim()) throw new Error("A task needs a description");
-			if (!agent.task) throw new Error("This deck has no dashboard.");
-			return agent.task({
-				text: spec.text.trim(),
-				...(spec.workspace ? { workspace: spec.workspace } : {}),
-				...(spec.boards ? { boards: spec.boards } : {}),
-				...(spec.agentId ? { agentId: spec.agentId } : {}),
-			});
-		},
 
 		/**
 		 * The time where the person is: the deck's timezone (Settings, Time), which the
@@ -864,53 +784,49 @@ export function createStageTool(deps: {
 				queued: other.queued ?? 0,
 			})),
 
-		/**
-		 * The workspaces in use, biggest first — who is on which project, and what they hold.
-		 *
-		 * The field on `agents()` answers "which workspace is this one in"; this answers "which
-		 * workspaces are there", which is the question an agent has before it joins one, and
-		 * cannot be got by grouping the agents yourself if you do not already know the names.
-		 *
-		 * `boards` is the union of the members' held boards, **the ones most of them hold first** —
-		 * so a new agent joining a project finds what the project is working from in one call, and
-		 * the first entry is what everybody there has open. See `agents/workspaces.ts`: it is one
-		 * pure function over the summaries this agent can already ask for.
-		 */
-		workspaces: async () =>
-			roster(
-				agent.agents().map((other) => ({
-					id: other.id,
-					name: other.name,
-					state: other.state,
-					tags: other.tags,
-					workspace: other.workspace,
-					context: other.context,
-				})),
-			),
-
 		/*
 		 * The canvas verbs. Each answers with the canvas as it now is, so an agent that drew an
 		 * arrow can see it, and each refuses in a sentence when there is nothing to draw on — a
 		 * board running its own code has no canvas of its own.
 		 */
-		canvas: async () => canvasHooks().current(),
-		canvases: async () => canvasHooks().list(),
-		useCanvas: async (name: string) => {
-			if (typeof name !== "string" || !name.trim()) throw new Error("useCanvas takes the canvas's name, for example stage.useCanvas(\"Political LLM\").");
-			return must(canvasHooks().use(name), "That canvas could not be joined.");
+		/**
+		 * The canvas you work on: read it with nothing, join one by name.
+		 *
+		 * Joining makes the canvas if there is not one, and moves nothing with you — what you
+		 * have read is yours and stays; what you show from now on goes there. `stage.canvases()`
+		 * is the list, with who is working on each, so a name can be reused rather than doubled.
+		 */
+		canvas: async (name?: string) => {
+			if (name === undefined) return canvasHooks().current();
+			if (typeof name !== "string" || !name.trim()) throw new Error('stage.canvas("Political LLM") joins a canvas; stage.canvas() says which one you are on.');
+			return must(canvasHooks().use(name.trim()), "That canvas could not be joined.");
 		},
-		link: async (from: string, to: string, options?: { label?: string }) => {
+		canvases: async () => canvasHooks().list(),
+		/**
+		 * An arrow from one board to another on your canvas: this led to that.
+		 *
+		 * A label of `null` takes the arrow away, which is why there is no `unlink`: removing a
+		 * line is the same act with nothing to write on it.
+		 */
+		link: async (from: string, to: string, label?: string | null) => {
 			const [a, b] = [boardPath(from), boardPath(to)];
 			if (a === b) throw new Error("An arrow needs two different boards.");
-			return must(canvasHooks().link(a, b, typeof options?.label === "string" ? options.label.slice(0, 60) : undefined), "The arrow was already there.");
+			if (label === null) return changed(canvasHooks().unlink(a, b), "There was no arrow between those two.");
+			return must(canvasHooks().link(a, b, typeof label === "string" ? label.slice(0, 60) : undefined), "The arrow was already there.");
 		},
-		unlink: async (from: string, to: string) => must(canvasHooks().unlink(boardPath(from), boardPath(to)), "There was no arrow between those two."),
+		/**
+		 * A dashed border round two or more boards: one piece of work.
+		 *
+		 * An empty list takes the group away, on the same argument as `link(a, b, null)`: the
+		 * group with nothing in it is no group.
+		 */
 		group: async (paths: string[], options: { name: string }) => {
-			if (!Array.isArray(paths) || paths.length < 2) throw new Error("A group is two or more boards: stage.group([a, b], { name }).");
 			if (typeof options?.name !== "string" || !options.name.trim()) throw new Error("A group needs a name, which is what is written on its border.");
-			return must(canvasHooks().group(paths.map(boardPath), options.name), "That group could not be drawn.");
+			const name = options.name.trim();
+			if (Array.isArray(paths) && paths.length === 0) return changed(canvasHooks().ungroup(name), `There is no group called ${name}.`);
+			if (!Array.isArray(paths) || paths.length < 2) throw new Error("A group is two or more boards: stage.group([a, b], { name }), or [] to take one away.");
+			return must(canvasHooks().group(paths.map(boardPath), name), "That group could not be drawn.");
 		},
-		ungroup: async (name: string) => must(canvasHooks().ungroup(name), `There is no group called ${name}.`),
 	};
 
 	/** The canvas hooks, or a sentence saying there are none. */
@@ -926,6 +842,12 @@ export function createStageTool(deps: {
 			throw new Error(`No such board: ${String(path)}. Use the path from stage.boards(), like "boards/plan.html".`);
 		}
 		return wanted;
+	}
+
+	/** For a removal: nothing to remove is worth saying, where drawing the same arrow twice is not. */
+	function changed(canvas: Canvas | undefined, otherwise: string): Canvas {
+		if (!canvas) throw new Error(otherwise);
+		return canvas;
 	}
 
 	function must(canvas: Canvas | undefined, otherwise: string): Canvas {
@@ -944,6 +866,30 @@ export function createStageTool(deps: {
 		identity: agent.identity(),
 	});
 
+	/*
+	 * The names that are gone, and what to say instead.
+	 *
+	 * A verb that stops existing becomes "stage.mirror is not a function", which is a turn
+	 * thrown away and a model with no idea what to do next. So each removed name stays
+	 * callable for one release and refuses with the call that replaces it. They are added
+	 * after the object rather than declared in `Stage`, because the whole point is that they
+	 * are not part of the API any more — nothing in the type, nothing in the prompt.
+	 */
+	Object.assign(stage, Object.fromEntries(Object.entries(GONE).map(([name, sentence]) => [name, async () => { throw new Error(sentence); }])));
+	/*
+	 * `me` was five verbs and is one, and it is the busiest thing that moved — 129 calls to
+	 * `me.setTags` alone on this deck. A call to the old shape has to say so rather than read
+	 * as a missing property, so the function carries the five names and each throws its own
+	 * sentence.
+	 */
+	Object.assign(stage.me, {
+		get: async () => { throw new Error("stage.me.get() is now stage.me()."); },
+		setName: async () => { throw new Error('stage.me.setName(name) is now stage.me({ name }).'); },
+		setAvatar: async () => { throw new Error("stage.me.setAvatar(avatar) is now stage.me({ avatar })."); },
+		setTags: async () => { throw new Error("stage.me.setTags(tags) is now stage.me({ tags })."); },
+		setWorkspace: async () => { throw new Error('stage.me.setWorkspace(name) is now stage.canvas(name): the canvas is what holds the boards.'); },
+	});
+
 	return {
 		name: STAGE_TOOL_NAME,
 		label: "Stage",
@@ -953,6 +899,7 @@ export function createStageTool(deps: {
 		parameterDescription: "TypeScript, run as an async function body with `stage` in scope. Return a value to see it.",
 		stage,
 		snapshot,
+		webShared: () => service.web?.status().paired === true,
 
 		async run(code: string): Promise<StageToolResult> {
 			notes = [];

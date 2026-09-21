@@ -27,6 +27,8 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	const sends: Array<{ target: string; spec: SendSpec }> = [];
 	const created: CreateSpec[] = [];
 	const scheduled: ScheduleSpec[] = [];
+	/** Dashboard tasks the tool asked for — what `send("dispatcher", …)` turns into. */
+	const tasks: Array<{ text: string; boards?: string[] }> = [];
 	const others = [
 		{ id: "a1", name: "Ada", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html"], holding: 1, tags: ["panel-css"], workspace: "political-llm", queued: 3 },
 		{ id: "a2", name: "Rune", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html", "boards/notes.html"], holding: 2, tags: [], workspace: "political-llm", queued: 0 },
@@ -106,7 +108,6 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			},
 			agents: () => others,
 			camera: () => camera,
-			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: (target, spec) => {
 				sends.push({ target, spec });
 				return { queued: true, position: sends.length };
@@ -120,6 +121,10 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 				return { id: "s-1", ...spec, task: spec.task, boards: spec.boards ?? [], createdAt: 1, nextRunAt: 2, missed: 0, enabled: true };
 			},
 			queue: () => waiting,
+			task: (spec) => {
+				tasks.push({ text: spec.text, ...(spec.boards ? { boards: spec.boards } : {}) });
+				return { id: `t-${tasks.length}`, state: "open", why: "the stub placed it" };
+			},
 			recordRevision: () => undefined,
 			worked: (path) => void worked.push(path),
 			boardPathOf: () => undefined,
@@ -131,6 +136,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		moved,
 		sends,
 		created,
+		tasks,
 		scheduled,
 		deck,
 		extents,
@@ -229,7 +235,7 @@ test("the note is per run: a call that did not start a board carries no viewport
 test("send needs an address and a task, and passes both on", async () => {
 	const { tool, sends, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 
-	assert.match((await tool.run(`return await stage.send("", { task: "x" })`)).text, /Say which agent/);
+	assert.match((await tool.run(`return await stage.send("", { task: "x" })`)).text, /Say who/);
 	assert.match((await tool.run(`return await stage.send("Kit", { task: "  " })`)).text, /needs a description/);
 	assert.equal(sends.length, 0, "and neither reached the registry");
 
@@ -276,7 +282,7 @@ test("a board is the agent's once it is named: newBoard, fit, a one-board show a
 	deck.refresh("boards/two.html");
 
 	// Arranging the canvas, reading and attaching are not authorship.
-	const arranged = await tool.run(`await stage.show(["boards/one.html", "boards/two.html"]); await stage.attach("boards/one.html"); await stage.read("boards/one.html"); await stage.hide("boards/two.html");`);
+	const arranged = await tool.run(`await stage.show(["boards/one.html", "boards/two.html"]); await stage.attach("boards/one.html"); await stage.boards(); await stage.hide("boards/two.html");`);
 	assert.equal(arranged.isError, false, arranged.text);
 	assert.deepEqual(worked, []);
 
@@ -298,16 +304,27 @@ test("a board is the agent's once it is named: newBoard, fit, a one-board show a
 	cleanup();
 });
 
-test("create needs a name, trims it, and hands the rest to the registry", async () => {
-	const { tool, created, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+test("send with a shape makes the agent and queues the work for it", async () => {
+	const { tool, created, sends, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 
-	assert.match((await tool.run(`return await stage.create({ name: "  " })`)).text, /needs a name/);
-	assert.equal(created.length, 0);
+	assert.match((await tool.run(`return await stage.send({ name: "  " }, { task: "x" })`)).text, /needs a name/);
+	assert.equal(created.length, 0, "and nothing was made");
 
-	const made = await tool.run(`return await stage.create({ name: " Survey ", workspace: "political-llm", tags: ["survey-design"] })`);
-	assert.equal(made.isError, false);
+	const made = await tool.run(`return await stage.send({ name: " Survey ", tags: ["survey-design"] }, { task: "Draft the questions" })`);
+	assert.equal(made.isError, false, made.text);
 	assert.match(made.text, /"agent": "new-1"/);
-	assert.deepEqual(created, [{ name: "Survey", workspace: "political-llm", tags: ["survey-design"] }]);
+	assert.deepEqual(created, [{ name: "Survey", tags: ["survey-design"] }]);
+	assert.deepEqual(sends, [{ target: "new-1", spec: { task: "Draft the questions" } }], "the work went to the agent it just made");
+	cleanup();
+});
+
+test('send("dispatcher") makes a dashboard task rather than queueing work into the dispatcher', async () => {
+	const { tool, tasks, sends, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+
+	const placed = await tool.run(`return await stage.send("Dispatcher", { task: " Remeasure the panel ", boards: ["boards/plan.html"] })`);
+	assert.equal(placed.isError, false, placed.text);
+	assert.deepEqual(tasks, [{ text: "Remeasure the panel", boards: ["boards/plan.html"] }]);
+	assert.equal(sends.length, 0, "nothing was queued: the deck places it");
 	cleanup();
 });
 
@@ -375,7 +392,6 @@ test("attach is most-recently-touched first, and re-attaching moves the board to
 			setWorkspace: () => null,
 			agents: () => [],
 			camera: () => ({ x: 0, y: 0, zoom: 1 }),
-			spawn: async () => ({ agent: "", name: "", report: "", boards: [] }),
 			send: () => ({ queued: true, position: 1 }),
 			queue: () => [],
 			recordRevision: () => undefined,
@@ -679,37 +695,22 @@ test("the description is the file, and nothing carries its own copy", async () =
 	}
 });
 
-test("stage.workspaces() is who is on what, and what they are working from", async () => {
-	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-	const rooms = JSON.parse((await tool.run(`return await stage.workspaces()`)).text) as Array<Record<string, unknown>>;
 
-	// One workspace, because only Ada and Rune have one — and the agent asking is `a1`.
-	assert.equal(rooms.length, 1);
-	assert.equal(rooms[0]?.name, "political-llm");
-	assert.deepEqual((rooms[0]?.agents as Array<{ name: string }>).map((one) => one.name), ["Ada", "Rune"]);
-	/*
-	 * The boards, most members first: `plan` is held by both and `notes` by one. That order is
-	 * the whole point of asking about a group rather than about an agent — the first entry is
-	 * the board everybody there is working from, so an agent joining does not have to be told.
-	 */
-	assert.deepEqual(rooms[0]?.boards, ["boards/plan.html", "boards/notes.html"]);
-	cleanup();
-});
-
-test("stage.me.setWorkspace hands the value to the session, and reports what came back", async () => {
+test("stage.me reads with nothing and writes with a patch, and says what was stored", async () => {
 	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	/*
-	 * The tool does not clean it. `session.setWorkspace` is the one place that slugs a
-	 * workspace, so that one an agent declares and one you type are the same word — and the
-	 * *return* is the point of the call: it is how a model finds out that the sentence it sent
-	 * became `political-llm`, and therefore how two agents land in one group rather than two.
+	 * The tool does not clean the tags: `session.setTags` is the one place that slugs them, and
+	 * the *return* is the point of the call — it is how a model finds out that the sentence it
+	 * sent became `panel-css`, rather than setting the same tags forever.
 	 */
-	assert.equal((await tool.run(`return await stage.me.setWorkspace("political-llm")`)).text, `"political-llm"`);
-	assert.equal((await tool.run(`return (await stage.me.get()).workspace`)).text, `"political-llm"`, "and it is on the identity");
-	assert.equal((await tool.run(`return await stage.me.setWorkspace(null)`)).text, "null", "`null` leaves the workspace");
-	// Leaving it is an absence, and an absence has nothing to print — the tool's own sentence
-	// for a run that returned nothing, rather than the word `undefined` dressed up as JSON.
-	assert.equal((await tool.run(`return (await stage.me.get()).workspace`)).text, "(done)");
+	const set = await tool.run(`return await stage.me({ name: "Ada", tags: ["panel-css"] })`);
+	assert.equal(set.isError, false, set.text);
+	assert.match(set.text, /"name": "Ada"/);
+	assert.equal((await tool.run(`return (await stage.me()).name`)).text, `"Ada"`, "and reading it back says the same");
+	// The five verbs it replaced each say what to write instead, for a conversation resumed
+	// against this build with the old names in its transcript.
+	assert.match((await tool.run(`return await stage.me.setName("Kit")`)).text, /stage\.me\(\{ name \}\)/);
+	assert.match((await tool.run(`return await stage.me.setWorkspace("political-llm")`)).text, /stage\.canvas\(name\)/);
 	cleanup();
 });
 
