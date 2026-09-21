@@ -272,6 +272,10 @@
 		max-width: 280px;
 		border-radius: var(--control-radius, 8px);
 	}
+	/* New workspace, at the far end of either tab's bar: the same outlined button as New canvas. */
+	.dispatch-gallery-bar > .canvas-new {
+		margin-left: auto;
+	}
 	.dispatch-search > input::-webkit-search-cancel-button {
 		-webkit-appearance: none;
 		appearance: none;

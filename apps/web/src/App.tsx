@@ -1518,6 +1518,8 @@ export function App() {
 							onMoveCanvas={(id, workspace) => send({ type: "canvas.workspace", id, workspace })}
 							onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
 							workspaces={workspaceNames(state.canvases, state.identities)}
+							/* Named as typed and filed under the server's slug of it, which is what the heading will say. */
+							onNewWorkspace={(name) => newCanvas(undefined, name)}
 							chats={visibleChats()}
 							contexts={state.contexts}
 							tasks={state.tasks}

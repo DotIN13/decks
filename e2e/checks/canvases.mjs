@@ -96,6 +96,16 @@ await settle(page, 300);
 let removed = await sent("canvas.remove");
 say("…and removes on the second press", removed.length === 1 && removed[0].id === "cv_d2", JSON.stringify(removed));
 
+// --- the shelf's bar: a search, and New workspace ----------------------------------------
+await page.locator(".canvas-shelf-bar input").fill("neutral");
+await settle(page, 300);
+const narrowed = await page.evaluate(() => [...document.querySelectorAll(".canvas-shelf .canvas-ws h2")].map((h) => h.textContent));
+say("the shelf's search narrows the headings to the canvases that match", JSON.stringify(narrowed) === JSON.stringify(["political-llm"]), JSON.stringify(narrowed));
+await page.locator(".canvas-shelf-bar input").fill("");
+await settle(page, 200);
+const bars = await page.evaluate(() => ({ shelf: document.querySelectorAll(".canvas-shelf-bar .canvas-new").length, search: document.querySelectorAll(".canvas-shelf-bar .dispatch-search").length }));
+say("…and the bar carries a New workspace button beside it", bars.shelf === 1 && bars.search === 1, JSON.stringify(bars));
+
 // --- the panel's Canvases tab -----------------------------------------------------------
 if (!(await page.evaluate(() => document.querySelector(".panel-shell")?.dataset.open === "true"))) {
 	await page.locator('.pill button[aria-label$="the boards panel"]').first().click();
@@ -161,6 +171,25 @@ await settle(page, 800);
 made = await sent("canvas.create");
 say("New canvas on the shelf's heading makes one in that workspace too, numbered when a canvas already wears the project's name", made.length === 1 && made[0].workspace === "decks" && made[0].name === "Canvas 1", JSON.stringify(made));
 say("…and the app went to that one as well", await page.evaluate(() => location.hash.startsWith("#/canvas/")), await page.evaluate(() => location.hash));
+
+await home();
+await clearSent();
+await page.locator(".canvas-shelf-bar .canvas-new").click();
+await page.waitForSelector(".popover input", { timeout: 5000 });
+await page.locator(".popover input").fill("Zeta Check");
+await page.keyboard.press("Enter");
+await settle(page, 800);
+made = await sent("canvas.create");
+say("New workspace makes its first canvas, named as typed and filed under the name", made.length === 1 && made[0].workspace === "Zeta Check" && made[0].name === "Zeta Check", JSON.stringify(made));
+say("…and the app went to it", await page.evaluate(() => location.hash.startsWith("#/canvas/")), await page.evaluate(() => location.hash));
+await settle(page, 600);
+await home();
+const heading = await page.evaluate(() => [...document.querySelectorAll(".canvas-shelf .canvas-ws h2")].map((h) => h.textContent));
+say("…the shelf now heads it by the slug the server made", heading.includes("zeta-check"), JSON.stringify(heading));
+await page.locator('.pill button[aria-label$="the boards panel"]').first().click().catch(() => {});
+await page.evaluate(() => { location.hash = "#/boards"; });
+await settle(page, 600);
+say("the Boards tab's bar carries the same New workspace button", (await page.locator(".dispatch-pane-boards .dispatch-gallery-bar .canvas-new").count()) === 1);
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

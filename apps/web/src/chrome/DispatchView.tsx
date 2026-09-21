@@ -40,6 +40,8 @@ export interface DispatchViewProps {
 	onRemoveCanvas: (id: string) => void;
 	/** Every workspace in use, for the cards' move menu. */
 	workspaces: string[];
+	/** A new workspace, from either tab's bar: its first canvas, filed under it and named after it. */
+	onNewWorkspace: (name: string) => void;
 	chats: AgentChat[];
 	/** Agent id → the boards it holds — what decides a board's workspace. */
 	contexts: Record<string, string[]>;
@@ -142,6 +144,7 @@ export function DispatchView(props: DispatchViewProps) {
 						onRename={props.onRenameCanvas}
 						onMove={props.onMoveCanvas}
 						onRemove={props.onRemoveCanvas}
+						onNewWorkspace={props.onNewWorkspace}
 						onUnfiled={() => props.onTab("boards")}
 					/>
 				</div>
@@ -157,6 +160,7 @@ export function DispatchView(props: DispatchViewProps) {
 								setSpotTask(id);
 								props.onTab("tasks");
 							}}
+							onNewWorkspace={props.onNewWorkspace}
 						/>
 					</div>
 				</div>

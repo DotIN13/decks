@@ -7,6 +7,7 @@ import { Popover } from "../ui/Popover.tsx";
 import { Icon } from "../ui/icons.tsx";
 import { BoardPicture } from "./BoardPicture.tsx";
 import { canvasSections, NO_WORKSPACE, type CanvasSection } from "./canvas-sections.ts";
+import { NewWorkspace } from "./NewWorkspace.tsx";
 import { relativeTime } from "./workspace-panel.ts";
 
 /**
@@ -41,6 +42,8 @@ export interface CanvasShelfProps {
 	onMove: (id: string, workspace: string | null) => void;
 	/** Remove the arrangement. The boards stay. */
 	onRemove: (id: string) => void;
+	/** A new workspace: its first canvas, filed under it and named after it. */
+	onNewWorkspace: (name: string) => void;
 	/** Boards on no canvas at all: still in the deck, and still changing. */
 	onUnfiled: () => void;
 }
@@ -52,7 +55,9 @@ export function CanvasShelf(props: CanvasShelfProps) {
 	const byPath = createMemo(() => new Map(props.boards.map((board) => [board.path, board])));
 	const filed = createMemo(() => new Set(props.canvases.flatMap((canvas) => canvas.boards)));
 	const unfiled = createMemo(() => props.boards.filter((board) => !filed().has(board.path)));
-	const sections = createMemo(() => canvasSections({ canvases: props.canvases }));
+	const [query, setQuery] = createSignal("");
+	const sections = createMemo(() => canvasSections({ canvases: props.canvases, query: query() }));
+	const narrowed = () => query().trim() !== "";
 	/** Who is in a workspace, by what the agents themselves say — the heading's count. */
 	const agentsIn = (workspace: string | undefined) => Object.values(props.identities).filter((identity) => (identity.workspace ?? "") === (workspace ?? "")).length;
 
@@ -72,6 +77,13 @@ export function CanvasShelf(props: CanvasShelfProps) {
 
 	return (
 		<div class="canvas-shelf">
+			{/* The Boards tab's bar, with its search: the same object, so the two tabs read as one dashboard. */}
+			<div class="dispatch-gallery-bar canvas-shelf-bar">
+				<label class="field dispatch-search">
+					<input type="search" spellcheck={false} placeholder="Search canvases or workspaces" value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
+				</label>
+				<NewWorkspace class="canvas-shelf-new-ws" onCreate={props.onNewWorkspace} />
+			</div>
 			<For each={sections()}>
 				{(section) => (
 					<section class="canvas-ws" data-workspace={section.workspace ?? ""} aria-label={section.label}>
@@ -151,7 +163,7 @@ export function CanvasShelf(props: CanvasShelfProps) {
 					</section>
 				)}
 			</For>
-			<Show when={unfiled().length > 0}>
+			<Show when={unfiled().length > 0 && !narrowed()}>
 				<section class="canvas-ws" aria-label="Boards on no canvas">
 					<div class="canvas-cards">
 						<button type="button" class="canvas-card canvas-card-unfiled" onClick={() => props.onUnfiled()}>
@@ -176,14 +188,23 @@ export function CanvasShelf(props: CanvasShelfProps) {
 				</section>
 			</Show>
 			<Show when={sections().length === 0}>
-				<div class="canvas-shelf-head">
-					<h2>Canvases</h2>
-					<button type="button" class="canvas-new" onClick={() => props.onCreate(undefined)}>
-						<Icon of={Plus} size={12} />
-						New canvas
-					</button>
-				</div>
-				<p class="canvas-none">No canvases yet. Make one, or ask an agent for a board and it will make the first.</p>
+				<Show
+					when={narrowed()}
+					fallback={
+						<>
+							<div class="canvas-shelf-head">
+								<h2>Canvases</h2>
+								<button type="button" class="canvas-new" onClick={() => props.onCreate(undefined)}>
+									<Icon of={Plus} size={12} />
+									New canvas
+								</button>
+							</div>
+							<p class="canvas-none">No canvases yet. Make one, or ask an agent for a board and it will make the first.</p>
+						</>
+					}
+				>
+					<p class="canvas-none">No canvas matches “{query().trim()}”.</p>
+				</Show>
 			</Show>
 		</div>
 	);

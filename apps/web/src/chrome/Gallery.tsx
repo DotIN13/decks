@@ -12,6 +12,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { BoardPicture } from "./BoardPicture.tsx";
 import { fileName, filterCards, type GalleryCard, type GalleryFilter, type GalleryGroup } from "./dispatch-view.ts";
+import { NewWorkspace } from "./NewWorkspace.tsx";
 
 export interface GalleryProps {
 	groups: GalleryGroup[];
@@ -20,6 +21,8 @@ export interface GalleryProps {
 	onOpenAgent: (id: string) => void;
 	/** The "from a task" chip: show that task on the Tasks tab. */
 	onOpenTask: (id: string) => void;
+	/** A new workspace: its first canvas, filed under it and named after it. */
+	onNewWorkspace: (name: string) => void;
 }
 
 const FILTERS: { id: GalleryFilter; label: string }[] = [
@@ -85,6 +88,7 @@ export function Gallery(props: GalleryProps) {
 						onInput={(event) => setQuery(event.currentTarget.value)}
 					/>
 				</label>
+				<NewWorkspace class="dispatch-gallery-new-ws" onCreate={props.onNewWorkspace} />
 			</div>
 			<Show when={props.groups.length > 0} fallback={<p class="dispatch-empty">No boards yet.</p>}>
 				<For each={props.groups}>
