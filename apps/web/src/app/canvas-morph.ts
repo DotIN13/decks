@@ -148,7 +148,8 @@ export function flyAlong(from: Camera, to: Camera, box: WorldBox, view: { width:
 	moveCamera(from);
 	const step = (now: number) => {
 		const t = Math.min(1, (now - start) / ms);
-		const eased = 1 - Math.pow(1 - t, 3);
+		// In and out: it neither snaps off the card nor stops dead on the canvas.
+		const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 		moveCamera(morphFrame(from, to, eased, box, view));
 		if (t < 1) flight = requestAnimationFrame(step);
 		else done?.();

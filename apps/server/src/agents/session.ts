@@ -193,6 +193,8 @@ export class DeckAgent {
 
 	/** The canvas this conversation is working on, once it has needed one. */
 	private canvasChosen: string | undefined;
+	/** The workspace it works in — its own fact, set by it or by you, kept on the record. */
+	private workspaceChosen: string | undefined;
 	/**
 	 * Every canvas it has worked on, oldest first. Membership, where `canvasChosen` is *now*.
 	 *
@@ -255,17 +257,37 @@ export class DeckAgent {
 	 */
 	useCanvas(name: string | null | undefined): string | undefined {
 		if (!name) return this.canvas;
-		const canvas = this.canvases.ensure(name);
+		// Its own project's canvas of that name first, and a new one is made in its project.
+		const canvas = this.canvases.ensure(name, this.workspaceChosen);
+		return this.standOn(canvas.id);
+	}
+
+	/**
+	 * Stand on a canvas: join it and make it the one shown to from now on.
+	 *
+	 * An agent with no workspace that steps onto a filed canvas adopts the canvas's — it has
+	 * said nothing about where it works, and the room it chose has. One with a workspace keeps
+	 * it: an agent works in a project and visits its rooms, and visiting is not moving house.
+	 */
+	private standOn(id: string): string | undefined {
+		const canvas = this.canvases.get(id);
+		if (!canvas) return this.canvas;
 		this.joinCanvas(canvas.id);
 		if (canvas.id === this.canvasChosen) return canvas.id;
 		this.canvasChosen = canvas.id;
-		this.identity = { ...this.identity, workspace: canvas.name };
-		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
+		if (!this.workspaceChosen && canvas.workspace) this.declareWorkspace(canvas.workspace);
 		this.save();
 		this.publishContext();
 		// Who is on which canvas is on every card, so joining one is news for the dashboard.
 		this.host.canvasesChanged?.();
 		return canvas.id;
+	}
+
+	/** Record the workspace and say so, without moving: `setWorkspace` and `standOn` both write through here. */
+	private declareWorkspace(workspace: string): void {
+		this.workspaceChosen = workspace;
+		this.identity = { ...this.identity, workspace };
+		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
 	}
 	/**
 	 * Things to tell the agent before its next turn.
@@ -527,7 +549,10 @@ export class DeckAgent {
 		 * asked for it. Both are already cleaned, so neither is cleaned again here.
 		 */
 		const workspace = options.restored?.workspace ?? options.workspace;
-		if (workspace) this.identity = { ...this.identity, workspace };
+		if (workspace) {
+			this.workspaceChosen = workspace;
+			this.identity = { ...this.identity, workspace };
+		}
 		this.parentId = options.parentId;
 		this.resumeRef = options.resumeRef;
 		this.kind = options.kind;
@@ -609,9 +634,12 @@ export class DeckAgent {
 			this.canvasesUsed = [...(options.restored.canvases ?? [])];
 			if (this.canvasChosen) this.joinCanvas(this.canvasChosen);
 			const canvas = options.canvases.get(this.canvasChosen);
-			// The panel groups by this, and a restored chat has to draw its group before it has
-			// said anything. The canvas is the fact; this is the label read off it.
-			if (canvas) this.identity = { ...this.identity, workspace: canvas.name };
+			// A chat that never said where it works, standing on a filed canvas, is in that
+			// project: the same adoption `standOn` makes, so a restart and a join agree.
+			if (canvas?.workspace && !this.workspaceChosen) {
+				this.workspaceChosen = canvas.workspace;
+				this.identity = { ...this.identity, workspace: canvas.workspace };
+			}
 		}
 
 		this.bridge = new ExtensionUiBridge({
@@ -1040,6 +1068,7 @@ export class DeckAgent {
 			context: [...this.held],
 			...(this.canvasChosen ? { canvas: this.canvasChosen } : {}),
 			...(this.canvasIds.length > 0 ? { canvases: this.canvasIds } : {}),
+			...(this.workspaceChosen ? { workspace: this.workspaceChosen } : {}),
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
@@ -1732,21 +1761,30 @@ export class DeckAgent {
 	setWorkspace(raw: unknown): string | null {
 		const workspace = cleanWorkspace(raw);
 		/*
-		 * A workspace was a word an agent typed about itself, and it is a canvas now.
-		 *
-		 * The verb stays because it is in every agent's instructions and in four runtimes'
-		 * transcripts; what it does is join the canvas of that name, making it if there is not
-		 * one. Saying nothing leaves the canvas alone rather than clearing it: "I am not going
-		 * to say" is not the same as "take my work away".
+		 * Saying nothing leaves it alone rather than clearing it: "I am not going to say" is not
+		 * the same as "take my work away".
 		 */
-		if (!workspace) return this.canvases.get(this.canvasChosen)?.name ?? null;
-		this.useCanvas(workspace);
-		return this.canvases.get(this.canvasChosen)?.name ?? workspace;
+		if (!workspace) return this.workspaceChosen ?? null;
+		if (workspace === this.workspaceChosen) return workspace;
+		this.declareWorkspace(workspace);
+		/*
+		 * Moving house moves the agent into a room of the new project: the first canvas in it
+		 * (newest change first, the order every list shows), or one made and named after the
+		 * project when it has none. A canvas it is already on that is in the project stays.
+		 */
+		const here = this.canvases.get(this.canvasChosen);
+		if (here?.workspace !== workspace) {
+			const room = this.canvases.inWorkspace(workspace)[0] ?? this.canvases.create({ name: this.canvases.freeName(workspace), workspace });
+			this.standOn(room.id);
+		}
+		this.save();
+		this.publishContext();
+		return workspace;
 	}
 
-	/** The name of the canvas it is on, which is what the panel groups by. */
+	/** The workspace it works in, as a slug: what every list groups by, and what a task is routed on. */
 	get workspace(): string | undefined {
-		return this.canvases.get(this.canvasChosen)?.name;
+		return this.workspaceChosen;
 	}
 
 	get tags(): string[] {

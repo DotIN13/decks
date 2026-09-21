@@ -848,6 +848,7 @@ export class App {
 		return this.canvases.list().map((canvas) => ({
 			id: canvas.id,
 			name: canvas.name,
+			...(canvas.workspace ? { workspace: canvas.workspace } : {}),
 			boards: [...canvas.boards],
 			links: canvas.links.map((link) => ({ ...link })),
 			groups: canvas.groups.map((group) => ({ name: group.name, boards: [...group.boards] })),

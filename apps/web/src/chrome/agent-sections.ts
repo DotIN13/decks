@@ -27,7 +27,7 @@ import { agentStatus, type AgentStatus } from "./agent-order.ts";
  * unanswerable in the place it is asked.
  */
 
-export type AgentSectionKind = "canvas" | "wants" | "working" | "quiet" | "workspace" | "unfiled";
+export type AgentSectionKind = "wants" | "working" | "quiet" | "workspace" | "unfiled";
 
 /**
  * How the list is cut up.
@@ -47,14 +47,16 @@ export type AgentSectionKind = "canvas" | "wants" | "working" | "quiet" | "works
 export type AgentGroup = "workspace" | "attention";
 
 /**
- * The heading over the agents in the room you are looking at, above either cut.
+ * The heading that leads the workspace cut is the room's.
  *
- * A canvas is the unit of work, so the first question the panel is opened with on a stage is
- * *who is in here* — and it is not a third axis: the agents on this canvas are lifted out and
- * everybody else is cut up exactly as the chosen axis says. An agent is on every canvas it has
- * worked in, so a row leaving this section is not a row leaving the list.
+ * A canvas belongs to a workspace, so on a stage the first question the panel is opened with
+ * is "who else is on this project" — and the section for the workspace of the canvas on
+ * screen goes first, marked `here`, with the rest A to Z after it. It is the one heading
+ * whose place depends on where you stand, which is why it is marked: a heading in first place
+ * that says nothing reads as an alphabet mistake. There is no section for the canvas itself
+ * any more; an agent works in a project and visits its rooms, so the room's roster is the
+ * project's.
  */
-const ON_CANVAS = "On this canvas";
 
 export interface AgentRow {
 	/**
@@ -97,6 +99,8 @@ export interface AgentSection {
 	/** The whole label, sentence case, without the count. Never uppercase. */
 	label: string;
 	rows: AgentRow[];
+	/** Whether this is the workspace of the canvas on screen — the section that leads the workspace cut. */
+	here?: boolean;
 	/**
 	 * Something true about the *group*, in the heading's right-hand column.
 	 *
@@ -117,12 +121,11 @@ export interface AgentListInput {
 	/** Which axis to cut the list by. Absent is attention — see `AgentGroup`. */
 	group?: AgentGroup;
 	/**
-	 * The agents on the canvas on screen, by id: the section that goes on top.
-	 *
-	 * Absent, or empty, and the list is what it always was. On the dashboard there is no room
-	 * to be in, so nothing passes it there.
+	 * The workspace of the canvas on screen, whose section leads the workspace cut. Absent
+	 * when there is no room to be in (the dashboard), and when the room is in no workspace:
+	 * `No workspace` jumping to the top would read as a mistake, so the alphabet stands.
 	 */
-	onCanvas?: string[];
+	here?: string;
 }
 
 const SECTIONS: { kind: AgentSectionKind; label: string; holds: AgentStatus[] }[] = [
@@ -179,24 +182,10 @@ export function agentSections(input: AgentListInput): AgentSection[] {
 	});
 
 	const all = rows.filter((row) => agentMatches(row, needle));
-	/*
-	 * The room first, and the rest of the deck under it.
-	 *
-	 * The two halves are cut by *membership*, before the axis is applied, so "on this canvas"
-	 * is a section under either heading scheme and the search still runs over both. A canvas
-	 * with nobody on it draws no section rather than an empty one, exactly as a status
-	 * section does.
-	 */
-	const here = new Set(input.onCanvas ?? []);
-	const inside = here.size > 0 ? all.filter((row) => here.has(row.id)) : [];
-	const matching = here.size > 0 ? all.filter((row) => !here.has(row.id)) : all;
-	const room: AgentSection[] = inside.length > 0 ? [section("canvas", "canvas", ON_CANVAS, inside)] : [];
-
-	if (input.group === "workspace") return [...room, ...workspaceSections(matching)];
-
-	const out: AgentSection[] = [...room];
+	if (input.group === "workspace") return workspaceSections(all, input.here);
+	const out: AgentSection[] = [];
 	for (const section of SECTIONS) {
-		const mine = matching.filter((row) => section.holds.includes(row.status)).sort(byRecency);
+		const mine = all.filter((row) => section.holds.includes(row.status)).sort(byRecency);
 		if (mine.length > 0) out.push({ id: section.kind, kind: section.kind, label: section.label, rows: mine });
 	}
 	return out;
@@ -240,7 +229,7 @@ const byRecency = (a: AgentRow, b: AgentRow) => (b.chat.lastAt ?? 0) - (a.chat.l
  * attention axis — see `byRecency`. The `note` is what puts urgency back into the heading: a
  * group with somebody waiting in it says so, without the rows having to be read.
  */
-function workspaceSections(rows: AgentRow[]): AgentSection[] {
+function workspaceSections(rows: AgentRow[], here?: string): AgentSection[] {
 	const groups = new Map<string, AgentRow[]>();
 	for (const row of rows) {
 		const name = row.workspace ?? "";
@@ -248,17 +237,17 @@ function workspaceSections(rows: AgentRow[]): AgentSection[] {
 		if (group) group.push(row);
 		else groups.set(name, [row]);
 	}
-
 	const named = [...groups.keys()]
 		.filter((name) => name)
 		.sort((left, right) => left.localeCompare(right))
 		.map((name) => section("workspace", `ws:${name}`, name, groups.get(name) ?? []));
-
 	const loose = groups.get("");
-	return loose ? [...named, section("unfiled", "ws:", "No workspace", loose)] : named;
+	const all = loose ? [...named, section("unfiled", "ws:", "No workspace", loose)] : named;
+	// The room's project first, and said so.
+	const room = here ? all.find((one) => one.id === `ws:${here}`) : undefined;
+	return room ? [{ ...room, here: true }, ...all.filter((one) => one !== room)] : all;
 }
 
-/** One section, with its rows ranked and its heading given the one thing about the group. */
 function section(kind: AgentSectionKind, id: string, label: string, rows: AgentRow[]): AgentSection {
 	const ranked = [...rows].sort(byRecency);
 	const note = sectionNote(ranked);

@@ -158,6 +158,11 @@ const CHECKS = [
 	 * one is about what the DOM does when the same row's state changes underneath it.
 	 */
 	{ file: "panel-steady.mjs", needsAgent: false },
+	/*
+	 * Canvases under workspaces, on the shelf and in the panel's Canvases tab: the headings,
+	 * the order inside them, New canvas on a heading, and the card's menu. Fed frames, no agent.
+	 */
+	{ file: "canvases.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },

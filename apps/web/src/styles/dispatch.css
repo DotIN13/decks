@@ -953,10 +953,13 @@
 		color: var(--muted);
 	}
 	.canvas-new {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		height: 26px;
-		padding: 0 10px;
+		padding: 0 10px 0 8px;
 		border: 1px solid var(--line-strong);
-		border-radius: 999px;
+		border-radius: var(--control-radius, 7px);
 		background: var(--panel);
 		color: var(--fg);
 		cursor: pointer;
@@ -1077,6 +1080,85 @@
 		margin: 0;
 		color: var(--faint);
 		font-size: 12px;
+	}
+
+	/* One workspace's section of the shelf: a heading with its own New canvas, then its cards. */
+	.canvas-ws + .canvas-ws {
+		margin-top: 8px;
+	}
+	.canvas-ws-sub {
+		margin-right: auto;
+		color: var(--faint);
+		font-size: 11.5px;
+	}
+	.canvas-shelf-head h2 {
+		flex: none;
+	}
+	.canvas-slot {
+		position: relative;
+		display: flex;
+	}
+	.canvas-slot > .canvas-card {
+		flex: 1;
+		min-width: 0;
+	}
+	/* The card's menu, in its corner: drawn only when the card is under the pointer or the menu is open. */
+	.canvas-more {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		display: grid;
+		width: var(--control-sm, 22px);
+		height: var(--control-sm, 22px);
+		place-items: center;
+		border: 0;
+		border-radius: var(--control-radius, 7px);
+		background: var(--panel);
+		color: var(--faint);
+		cursor: pointer;
+		opacity: 0;
+		transition:
+			opacity 120ms ease,
+			background-color 120ms ease,
+			color 120ms ease;
+	}
+	.canvas-slot:is(:hover, :focus-within) > .canvas-more,
+	.canvas-more[aria-expanded="true"] {
+		opacity: 1;
+	}
+	.canvas-more:hover,
+	.canvas-more[aria-expanded="true"] {
+		background: var(--line);
+		color: var(--fg);
+	}
+	.canvas-more:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -1px;
+	}
+	@media (pointer: coarse) {
+		.canvas-more {
+			opacity: 1;
+		}
+	}
+	.canvas-menu-name {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 2px 6px 8px;
+	}
+	.canvas-menu-name > .nt {
+		font-size: 10.5px;
+		color: var(--faint);
+	}
+	.canvas-menu-move {
+		padding-left: 8px;
+		border-left: 2px solid var(--line);
+	}
+	.canvas-menu-remove {
+		color: var(--color-danger);
+	}
+	.canvas-menu-remove[data-armed="true"] {
+		font-weight: 600;
 	}
 
 	@media (prefers-reduced-motion: reduce) {

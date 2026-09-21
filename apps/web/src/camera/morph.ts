@@ -75,7 +75,14 @@ export function morphFrame(from: Camera, to: Camera, s: number, box: WorldBox, v
 	});
 	const a = onScreen(from);
 	const b = onScreen(to);
-	const zoom = from.zoom * Math.pow(to.zoom / from.zoom, s);
+	/*
+	 * The zoom moves in equal steps, not equal ratios. Easing the zoom by ratio while the
+	 * box's middle moved in a straight line sent every *other* point on the screen along an
+	 * arc — the card's corners swung out and back on the way to the canvas's. With the shift
+	 * and the scale on one linear clock, every point goes straight from where it sat on the
+	 * card to where it lands, and the ease in `flyAlong` is what keeps the start from lurching.
+	 */
+	const zoom = from.zoom + (to.zoom - from.zoom) * s;
 	const at = { x: a.x + (b.x - a.x) * s, y: a.y + (b.y - a.y) * s };
 	return { zoom, x: middle.x - (at.x - view.width / 2) / zoom, y: middle.y - (at.y - view.height / 2) / zoom };
 }

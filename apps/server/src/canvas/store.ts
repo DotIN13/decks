@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { slug } from "../agents/slug.ts";
+import { cleanWorkspace } from "../agents/workspaces.ts";
 import { numberedName } from "../names.ts";
 
 /**
@@ -43,6 +44,14 @@ export interface CanvasGroup {
 }
 
 export interface CanvasRecord {
+	/**
+	 * The workspace it is in, as the agent's slug (`agents/workspaces.ts`), or absent for none.
+	 *
+	 * A label on the record and nothing more: no board moves when it changes, and a canvas
+	 * with none is as whole as one with. It is what every list cuts by, and what `byName`
+	 * prefers when two projects each have a canvas called "Plan".
+	 */
+	workspace?: string;
 	/** Stable for the canvas's life. The file name is not: it follows the name. */
 	id: string;
 	name: string;
@@ -132,20 +141,31 @@ export class CanvasStore {
 	}
 
 	/** The canvas with this name, matched as a slug so "Political LLM" finds `political-llm`. */
-	byName(name: string): CanvasRecord | undefined {
+	/**
+	 * The canvas with this name — in this workspace first, when one is given.
+	 *
+	 * Names are one per deck (`nameTaken`), so the preference only matters for the day two
+	 * projects both make a "Plan": the agent asking from inside one of them gets its own.
+	 */
+	byName(name: string, workspace?: string | null): CanvasRecord | undefined {
 		this.load();
 		const wanted = slug(name, MAX_CANVAS_NAME);
 		if (!wanted) return undefined;
-		return [...this.canvases.values()].find((canvas) => slug(canvas.name, MAX_CANVAS_NAME) === wanted);
+		const named = [...this.canvases.values()].filter((canvas) => slug(canvas.name, MAX_CANVAS_NAME) === wanted);
+		if (workspace) {
+			const inside = named.find((canvas) => canvas.workspace === workspace);
+			if (inside) return inside;
+		}
+		return named[0];
 	}
 
-	/**
-	 * A name no canvas has yet: `name`, else `name 2`, `name 3`…
-	 *
-	 * For a canvas that is being given a *particular* name — the migration's, out of a
-	 * workspace word several chats said. A canvas nobody has named gets `newName` instead,
-	 * which is a name rather than a count.
-	 */
+	/** The canvases in a workspace (`""` or `undefined` for none), newest change first: the first is what an agent's row opens. */
+	inWorkspace(workspace: string | undefined): CanvasRecord[] {
+		return this.list()
+			.filter((canvas) => (canvas.workspace ?? "") === (workspace ?? ""))
+			.sort((a, b) => b.changedAt - a.changedAt);
+	}
+
 	freeName(name: string): string {
 		const base = name.trim().slice(0, MAX_CANVAS_NAME - 4) || "Canvas";
 		if (!this.byName(base)) return base;
@@ -169,15 +189,18 @@ export class CanvasStore {
 	}
 
 	/** The canvas with this name, made if there is not one. */
-	ensure(name: string): CanvasRecord {
-		return this.byName(name) ?? this.create({ name });
+	/** The canvas with this name, made if there is not one — in the workspace, when a new one is made. */
+	ensure(name: string, workspace?: string | null): CanvasRecord {
+		return this.byName(name, workspace) ?? this.create({ name, ...(workspace ? { workspace } : {}) });
 	}
 
-	create(options: { name: string; id?: string; boards?: string[]; places?: Record<string, { x: number; y: number }> }): CanvasRecord {
+	create(options: { name: string; id?: string; workspace?: string | null; boards?: string[]; places?: Record<string, { x: number; y: number }> }): CanvasRecord {
 		this.load();
+		const workspace = cleanWorkspace(options.workspace);
 		const record: CanvasRecord = {
 			id: options.id ?? `cv_${randomUUID().slice(0, 8)}`,
 			name: options.name.trim().slice(0, MAX_CANVAS_NAME) || this.newName(),
+			...(workspace ? { workspace } : {}),
 			boards: [...(options.boards ?? [])],
 			places: { ...(options.places ?? {}) },
 			links: [],
@@ -194,6 +217,23 @@ export class CanvasStore {
 		const clean = name.trim().slice(0, MAX_CANVAS_NAME);
 		if (!record || !clean || clean === record.name) return undefined;
 		record.name = clean;
+		this.save(record);
+		return record;
+	}
+
+	/**
+	 * Move a canvas into a workspace, or out of one with `null`.
+	 *
+	 * Cleaned like the agent's word, so "Political LLM" typed on a card and `political-llm`
+	 * declared by an agent are one workspace. Nothing on the canvas moves.
+	 */
+	setWorkspace(id: string, workspace: string | null): CanvasRecord | undefined {
+		const record = this.get(id);
+		if (!record) return undefined;
+		const clean = cleanWorkspace(workspace);
+		if ((record.workspace ?? null) === clean) return undefined;
+		if (clean) record.workspace = clean;
+		else delete record.workspace;
 		this.save(record);
 		return record;
 	}
@@ -369,6 +409,7 @@ function validate(raw: unknown, fileName: string): CanvasRecord {
 	const source = raw as Record<string, unknown>;
 	const id = typeof source.id === "string" && source.id ? source.id : `cv_${slug(fileName.replace(/\.json$/, ""), MAX_CANVAS_NAME)}`;
 	const name = typeof source.name === "string" && source.name.trim() ? source.name.trim().slice(0, MAX_CANVAS_NAME) : fileName.replace(/\.json$/, "");
+	const workspace = cleanWorkspace(source.workspace);
 	const boards = strings(source.boards);
 	const places: Record<string, { x: number; y: number }> = {};
 	if (source.places && typeof source.places === "object" && !Array.isArray(source.places)) {
@@ -402,6 +443,7 @@ function validate(raw: unknown, fileName: string): CanvasRecord {
 	return {
 		id,
 		name,
+		...(workspace ? { workspace } : {}),
 		boards,
 		places,
 		links,

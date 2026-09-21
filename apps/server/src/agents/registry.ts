@@ -370,6 +370,7 @@ export class Registry {
 					...(record.account ? { account: record.account } : {}),
 					...(record.tags ? { tags: record.tags } : {}),
 					...(record.userTags ? { userTags: record.userTags } : {}),
+					...(record.workspace ? { workspace: record.workspace } : {}),
 				},
 			});
 		}
@@ -379,6 +380,7 @@ export class Registry {
 		 * `create` sets `focusedId ??=`, and the list is restored oldest-first so the colour
 		 * fallback lands in the original order — which together would focus the *oldest* chat.
 		 */
+		this.fileCanvases();
 		this.focusedId = this.agents.at(-1)?.id;
 		this.publish();
 		return this.agents.length;
@@ -392,6 +394,35 @@ export class Registry {
 	 * writes them and answers with the chat id to canvas id map `restore` then hands each agent.
 	 * A record that already names a canvas is left alone, so this is a no-op on the second open.
 	 */
+	/**
+	 * A canvas nobody has filed takes the workspace of the agents standing on it.
+	 *
+	 * Once, on open, and only for canvases with no workspace of their own: a canvas made
+	 * before canvases had workspaces sits under "No workspace" otherwise, while every agent on
+	 * it says which project it is. When they disagree the most common word wins; a canvas
+	 * nobody with a workspace stands on is left as it is, for the person to file from its
+	 * card. Nothing on a canvas moves.
+	 */
+	private fileCanvases(): void {
+		const votes = new Map<string, Map<string, number>>();
+		for (const agent of this.agents) {
+			const workspace = agent.workspace;
+			if (!workspace) continue;
+			for (const id of agent.canvasIds) {
+				const tally = votes.get(id) ?? new Map<string, number>();
+				tally.set(workspace, (tally.get(workspace) ?? 0) + 1);
+				votes.set(id, tally);
+			}
+		}
+		for (const canvas of this.host.canvases.list()) {
+			if (canvas.workspace) continue;
+			const tally = votes.get(canvas.id);
+			if (!tally) continue;
+			const best = [...tally.entries()].sort(([left, a], [right, b]) => b - a || left.localeCompare(right))[0]?.[0];
+			if (best) this.host.canvases.setWorkspace(canvas.id, best);
+		}
+	}
+
 	private migrate(records: readonly AgentRecord[]): Map<string, string> {
 		const assigned = new Map<string, string>();
 		// Not the dispatchers: they hand work out and never put a board up, so they are on no canvas.
@@ -415,7 +446,7 @@ export class Registry {
 			 * made is it. A chat's own name is not: two chats called "Agent" get two canvases.
 			 */
 			const existing = plan.shared ? this.host.canvases.byName(plan.name) : undefined;
-			const canvas = existing ?? this.host.canvases.create({ name: plan.shared ? plan.name : this.host.canvases.freeName(plan.name), boards: plan.boards, places: plan.places });
+			const canvas = existing ?? this.host.canvases.create({ name: plan.shared ? plan.name : this.host.canvases.freeName(plan.name), ...(plan.shared ? { workspace: plan.name } : {}), boards: plan.boards, places: plan.places });
 			for (const member of plan.members) assigned.set(member, canvas.id);
 		}
 		/*

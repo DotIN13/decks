@@ -79,10 +79,10 @@ try {
 	 * the canvas you were already looking at, which is what the app opens on.
 	 */
 	const tabs = await page.getByRole("tab").allInnerTexts();
-	say("two tabs, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Agents", "Boards"]), JSON.stringify(tabs));
+	say("three tabs, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Canvases", "Agents", "Boards"]), JSON.stringify(tabs));
 	// Scoped to the panel: the dispatch dashboard behind the stage has a tab strip of its own.
 	const selected = await page.evaluate(() => [...document.querySelectorAll('.panel-shell [role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent));
-	say("…agents first, and the panel opens on Boards", JSON.stringify(selected) === JSON.stringify(["Boards"]), JSON.stringify(selected));
+	say("…canvases first, and the panel opens on Boards", JSON.stringify(selected) === JSON.stringify(["Boards"]), JSON.stringify(selected));
 
 	/*
 	 * The header is 32px, both controls, which is `--control-md` — the height a labelled chip

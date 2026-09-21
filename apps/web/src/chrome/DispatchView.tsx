@@ -32,8 +32,15 @@ export interface DispatchViewProps {
 	canvases: Canvas[];
 	/** Open a canvas: the press that leaves the dashboard, with the card it was pressed on. */
 	onOpenCanvas: (canvas: Canvas, card: DOMRect) => void;
-	/** Make one, and go to it. */
-	onNewCanvas: () => void;
+	/** Make one in a workspace (`undefined` for none), and go to it. */
+	onNewCanvas: (workspace: string | undefined) => void;
+	onRenameCanvas: (id: string, name: string) => void;
+	/** File a canvas under a workspace, or under none with `null`. */
+	onMoveCanvas: (id: string, workspace: string | null) => void;
+	/** Remove the arrangement; the boards stay in the deck. */
+	onRemoveCanvas: (id: string) => void;
+	/** Every workspace in use, for the cards' move menu. */
+	workspaces: string[];
 	chats: AgentChat[];
 	/** Agent id → the boards it holds — what decides a board's workspace. */
 	contexts: Record<string, string[]>;
@@ -130,8 +137,12 @@ export function DispatchView(props: DispatchViewProps) {
 						canvases={props.canvases}
 						boards={props.boards}
 						identities={props.identities}
+						workspaces={props.workspaces}
 						onOpen={props.onOpenCanvas}
 						onCreate={props.onNewCanvas}
+						onRename={props.onRenameCanvas}
+						onMove={props.onMoveCanvas}
+						onRemove={props.onRemoveCanvas}
 						onUnfiled={() => props.onTab("boards")}
 					/>
 				</div>

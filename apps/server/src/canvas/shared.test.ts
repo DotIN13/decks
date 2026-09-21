@@ -171,3 +171,50 @@ test("a canvas that is deleted drops out of the rooms an agent is in", () => {
 	);
 	cleanup();
 });
+
+/*
+ * A workspace is the agent's own, and a canvas belongs to one.
+ *
+ * The cases that would show as a wrong heading: an agent moving into a project and not
+ * landing in its room, a join adopting a project the agent never named, and a project's
+ * first room being made twice.
+ */
+test("declaring a workspace moves the agent into the project's first canvas, made and named after it when there is none", () => {
+	const { deck, cleanup } = deckOn();
+	const { one, canvases } = pair(deck);
+	assert.equal(one.setWorkspace("Political LLM"), "political-llm", "slugged, and the slug is what comes back");
+	assert.equal(one.workspace, "political-llm");
+	const room = canvases.get(one.canvas);
+	assert.equal(room?.workspace, "political-llm", "the room is filed under the project");
+	assert.equal(room?.name, "political-llm", "the first room of a project is named after it");
+	// A second agent moving in lands in the same room, not a second one.
+	const { two } = pair(deck);
+	two.setWorkspace("political-llm");
+	assert.equal(two.canvas, one.canvas, "the project's first canvas, not a new one");
+	cleanup();
+});
+
+test("a canvas an agent joins by name is made in its workspace, and visiting a room does not move house", () => {
+	const { deck, cleanup } = deckOn();
+	const { one, two, canvases } = pair(deck);
+	one.setWorkspace("decks");
+	one.useCanvas("Camera");
+	assert.equal(canvases.get(one.canvas)?.workspace, "decks", "made in the agent's own project");
+	assert.equal(one.workspace, "decks");
+	// Two, in another project, visits the same room and stays in its own project.
+	two.setWorkspace("political-llm");
+	two.useCanvas("Camera");
+	assert.equal(two.canvas, one.canvas, "one room by that name in the deck");
+	assert.equal(two.workspace, "political-llm", "visiting is not moving house");
+	cleanup();
+});
+
+test("an agent in no workspace adopts the project of the room it steps into", () => {
+	const { deck, cleanup } = deckOn();
+	const { one, two } = pair(deck);
+	one.setWorkspace("decks");
+	one.useCanvas("Camera");
+	two.useCanvas("Camera");
+	assert.equal(two.workspace, "decks");
+	cleanup();
+});

@@ -43,6 +43,7 @@ import { markComment, unmarkComments } from "./canvas/comment-select.ts";
 import { addComment, commenting, removeComment, setCommenting, takeComments, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "./state/ink.ts";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
+import { firstCanvasIn, workspaceNames } from "./chrome/canvas-sections.ts";
 import { Stage } from "./canvas/Stage.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
@@ -353,22 +354,26 @@ export function App() {
 	 * nobody named", which is what the pill's own `+` means.
 	 */
 	let openingWith: string | undefined;
-	/** A new canvas, named out of the way, and opened when `open` says who to talk to there. */
-	const newCanvas = (open?: string) => {
-		/*
-		 * `Canvas 1`, `Canvas 2`: the kind, and the lowest number no canvas is using.
-		 *
-		 * A name that is not in the way — the canvas is renamed from its own title bar once
-		 * there is something on it, and asking for a name before there is anything to name it
-		 * after is a dialog nobody wants. Counted here as well as on the server (`names.ts`)
-		 * because the number should match the shelf the person is looking at; the server
-		 * counts again if this one is taken by the time it arrives (`wire/canvas.ts`).
-		 */
-		const taken = new Set(state.canvases.map((canvas) => canvas.name.trim().toLowerCase()));
-		let n = 1;
-		while (taken.has(`canvas ${n}`)) n += 1;
-		openingWith = open;
-		send({ type: "canvas.create", name: `Canvas ${n}` });
+	/**
+	 * A new canvas, opened when `open` says who to talk to there, in `workspace` when one is given.
+	 *
+	 * Named after the workspace when it is the first canvas in it — the room a project opens
+	 * with is the project's — and "Canvas n" otherwise, out of the way of every name in use.
+	 */
+	const newCanvas = (open?: string, workspace?: string) => {
+		// By slug, as the server tells names apart: "Political LLM" and `political-llm` are one name.
+		const key = (name: string) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+		const taken = new Set(state.canvases.map((canvas) => key(canvas.name)));
+		let name: string;
+		if (workspace && !taken.has(key(workspace))) name = workspace;
+		else {
+			let n = 1;
+			while (taken.has(`canvas-${n}`)) n += 1;
+			name = `Canvas ${n}`;
+		}
+		// Always opened, so the name can be typed where it will be read; with whoever you were talking to.
+		openingWith = open ?? state.focused ?? "";
+		send({ type: "canvas.create", name, ...(workspace ? { workspace } : {}) });
 	};
 	/** A stage, from anywhere. Switching agent while already on one replaces the entry, so five presses are one Back. */
 	const openStage = (id: string) => {
@@ -394,6 +399,34 @@ export function App() {
 			return;
 		}
 		openStage(id);
+	};
+	/**
+	 * An agent's row: go to the first canvas in its workspace, and talk to it there.
+	 *
+	 * The canvas is the room and the workspace is the project, so pressing an agent opens the
+	 * project's first room (newest change first, the order every list shows) with that agent
+	 * as the conversation. Already standing in one of the project's rooms, you stay in it — a
+	 * press that moved you out of the room you chose would be a press people stop making. A
+	 * project with no room yet gets one, named after it; an agent in no workspace is addressed
+	 * where you are, as before.
+	 */
+	const visitAgent = (id: string) => {
+		const workspace = state.identities[id]?.workspace;
+		if (!workspace) {
+			addressAgent(id);
+			return;
+		}
+		const here = surface() === "stage" ? state.canvases.find((canvas) => canvas.id === state.canvas) : undefined;
+		if (here && here.workspace === workspace) {
+			addressAgent(id);
+			return;
+		}
+		const room = firstCanvasIn(state.canvases, workspace);
+		if (room) {
+			go({ surface: "stage", canvas: room.id, agent: id }, { replace: surface() === "stage" });
+			return;
+		}
+		newCanvas(id, workspace);
 	};
 	/** Open a canvas, keeping whoever you are talking to: the room changes, the conversation does not. */
 	const openCanvas = (id: string, options?: { replace?: boolean }) =>
@@ -1476,7 +1509,11 @@ export function App() {
 								morphFor(OPEN_MS);
 								openCanvas(canvas.id);
 							}}
-							onNewCanvas={() => newCanvas()}
+							onNewCanvas={(workspace) => newCanvas(undefined, workspace)}
+							onRenameCanvas={(id, name) => send({ type: "canvas.rename", id, name })}
+							onMoveCanvas={(id, workspace) => send({ type: "canvas.workspace", id, workspace })}
+							onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
+							workspaces={workspaceNames(state.canvases, state.identities)}
 							chats={visibleChats()}
 							contexts={state.contexts}
 							tasks={state.tasks}
@@ -1928,9 +1965,15 @@ export function App() {
 					chats={visibleChats()}
 					identities={state.identities}
 					unread={unread}
-					/* The room's own roster, on a stage: who is on the canvas you are looking at. */
-					onCanvasAgents={surface() === "stage" ? (stageCanvas()?.agents ?? []) : []}
-					onFocusAgent={addressAgent}
+					/* The room's project, on a stage: the workspace of the canvas you are looking at leads both lists. */
+					hereWorkspace={surface() === "stage" ? stageCanvas()?.workspace : undefined}
+					onFocusAgent={visitAgent}
+					/* The Canvases tab: the rooms, under their projects, and a way between them. */
+					canvases={state.canvases}
+					currentCanvas={surface() === "stage" ? state.canvas : undefined}
+					onOpenCanvas={(id) => openCanvas(id)}
+					onNewCanvas={(workspace) => newCanvas(undefined, workspace)}
+					onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
 					onCloseAgent={closeAgent}
 					onMirrorAgent={(id) =>
 						void files.askForBoard((request) => send({ type: "agent.mirror", agentId: id, request })).then((path) => path && frameWhenPlaced(path))

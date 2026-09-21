@@ -142,3 +142,36 @@ test("a free name counts up past the ones taken", () => {
 	store.create({ name: "Agent 2" });
 	assert.equal(store.freeName("agent"), "agent 3", "matched however it is spelled");
 });
+
+test("a canvas keeps its workspace on the file, cleaned like an agent's, and can be moved or unfiled", () => {
+	const path = deck();
+	const store = new CanvasStore(path);
+	const canvas = store.create({ name: "Plan", workspace: "Political LLM" });
+	assert.equal(canvas.workspace, "political-llm", "the same slug an agent would get");
+	const written = JSON.parse(readFileSync(join(path, ".decks", "canvases", "plan.json"), "utf8")) as Record<string, unknown>;
+	assert.equal(written.workspace, "political-llm");
+	assert.equal(new CanvasStore(path).get(canvas.id)?.workspace, "political-llm", "read back off the file");
+	assert.ok(store.setWorkspace(canvas.id, "decks"));
+	assert.equal(store.get(canvas.id)?.workspace, "decks");
+	assert.equal(store.setWorkspace(canvas.id, "decks"), undefined, "no change is no write");
+	assert.ok(store.setWorkspace(canvas.id, null));
+	assert.equal(store.get(canvas.id)?.workspace, undefined, "unfiled again");
+	assert.equal("workspace" in (JSON.parse(readFileSync(join(path, ".decks", "canvases", "plan.json"), "utf8")) as object), false);
+});
+
+test("a name is found in the asker's workspace first, and a workspace's first canvas is its newest change", () => {
+	const path = deck();
+	const store = new CanvasStore(path);
+	const a = store.create({ name: "Notes", workspace: "decks" });
+	const b = store.create({ name: "Plan", workspace: "decks" });
+	store.changed(a.id, 100);
+	store.changed(b.id, 200);
+	assert.equal(store.byName("plan", "decks")?.id, b.id);
+	assert.equal(store.byName("plan")?.id, b.id, "and anywhere, when the asker has no workspace");
+	assert.equal(store.byName("plan", "elsewhere")?.id, b.id, "a name in another project still answers: one name per deck");
+	assert.deepEqual(store.inWorkspace("decks").map((canvas) => canvas.id), [b.id, a.id]);
+	assert.deepEqual(store.inWorkspace(undefined), [], "none is a workspace too, and it is empty here");
+	assert.equal(store.ensure("Plan", "decks").id, b.id, "found, not made");
+	const made = store.ensure("Brief", "political-llm");
+	assert.equal(made.workspace, "political-llm", "made in the workspace asked from");
+});

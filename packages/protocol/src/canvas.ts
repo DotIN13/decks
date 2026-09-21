@@ -10,6 +10,14 @@
 export interface Canvas {
 	id: string;
 	name: string;
+	/**
+	 * The workspace it belongs to, as a slug: `"political-llm"`. Absent for none.
+	 *
+	 * The same word an agent declares about itself (`Identity.workspace`), cleaned the same
+	 * way, so an agent and a canvas in one project say one thing. Every list of canvases is
+	 * cut by it, and an agent's row opens the first canvas in its own.
+	 */
+	workspace?: string;
 	/** Every board on it, in the order they joined. */
 	boards: string[];
 	/** Arrows drawn between boards on this canvas. */

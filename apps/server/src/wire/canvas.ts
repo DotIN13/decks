@@ -46,11 +46,16 @@ export const canvas = {
 		 */
 		const wanted = message.name.trim();
 		const name = !wanted || wire.canvases.nameTaken(wanted) ? wire.canvases.newName() : wanted;
-		const made = wire.canvases.create({ name });
+		const made = wire.canvases.create({ name, ...(message.workspace ? { workspace: message.workspace } : {}) });
 		wire.publishCanvases();
 		reply({ type: "deck.state", deck: wire.canvasState(made.id) });
 		reply({ type: "canvases", canvases: wire.canvasList(), focused: made.id });
 		if (wire.viewing) wire.viewing.canvas = made.id;
+	},
+
+	/** File a canvas under a workspace, or under none. The boards stay where they are. */
+	"canvas.workspace": (message, _reply, wire) => {
+		if (wire.canvases.setWorkspace(message.id, message.workspace)) wire.publishCanvases();
 	},
 
 	"canvas.rename": (message, reply, wire) => {

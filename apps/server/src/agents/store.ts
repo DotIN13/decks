@@ -88,6 +88,8 @@ export interface AgentRecord {
 	 * shows will land — which is the one thing a single field could never say twice.
 	 */
 	canvases?: string[];
+	/** The workspace the agent works in, as a slug (`workspaces.ts`). Its own fact, kept across restarts. */
+	workspace?: string;
 	createdAt: number;
 	/** The model (and thinking level) the chat was last on, so a dormant row can still say what it will use. */
 	model?: AgentModel;
@@ -493,7 +495,13 @@ function validate(raw: unknown, id: string): AgentRecord {
 		 */
 		...(strings(source.inPlay).length > 0 ? { legacyInPlay: strings(source.inPlay) } : {}),
 		...(positions ? { legacyPositions: positions } : {}),
-		...(typeof source.workspace === "string" && source.workspace ? { legacyWorkspace: source.workspace } : {}),
+		/*
+		 * A workspace is the agent's own again, kept on the record. A chat written before
+		 * canvases existed has one and no canvas, and `registry.migrate` reads it as the old
+		 * per-chat room as well: `legacyWorkspace` is that reading, and only for those.
+		 */
+		...(typeof source.workspace === "string" && source.workspace ? { workspace: source.workspace } : {}),
+		...(typeof source.workspace === "string" && source.workspace && !(typeof source.canvas === "string" && source.canvas) ? { legacyWorkspace: source.workspace } : {}),
 		createdAt: created,
 		...(model ? { model } : {}),
 		...(usage ? { usage } : {}),

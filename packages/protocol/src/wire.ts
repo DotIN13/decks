@@ -136,8 +136,11 @@ export type ClientMessage =
 	 * mark — which is the one write a look makes.
 	 */
 	| { type: "canvas.focus"; id: string }
-	| { type: "canvas.create"; name: string }
+	/** A new canvas, in a workspace or in none. */
+	| { type: "canvas.create"; name: string; workspace?: string | null }
 	| { type: "canvas.rename"; id: string; name: string }
+	/** Move a canvas into a workspace, or out of one with `null`. Nothing on it moves. */
+	| { type: "canvas.workspace"; id: string; workspace: string | null }
 	| { type: "canvas.remove"; id: string }
 	/** Put an agent to work on a canvas. What it has read stays with it; what it shows goes there. */
 	| { type: "canvas.use"; agentId: string; canvasId: string }

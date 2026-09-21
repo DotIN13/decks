@@ -1,6 +1,7 @@
-import type { Board } from "@decks/protocol";
+import type { Board, Canvas } from "@decks/protocol";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Rows3 from "lucide-solid/icons/rows-3";
+import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
@@ -11,6 +12,8 @@ import { panelSections, panelTally } from "./panel-groups.ts";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentRow } from "./AgentRow.tsx";
+import { CanvasRow } from "./CanvasRow.tsx";
+import { canvasSections } from "./canvas-sections.ts";
 import { agentFoot, agentSections, agentTally, type AgentGroup, type AgentSection } from "./agent-sections.ts";
 
 /**
@@ -85,7 +88,11 @@ export type Density = "list" | "grid";
  * Two genuinely different collections, which is what makes a strip defensible here — see the
  * note on the `chats` prop.
  */
-export type PanelTab = "boards" | "agents";
+export type PanelTab = "canvases" | "agents" | "boards";
+
+/** The strip's order: the rooms, who is in them, what is on them. The panel still opens on Boards. */
+const PANEL_TABS: PanelTab[] = ["canvases", "agents", "boards"];
+const PANEL_TAB_LABEL: Record<PanelTab, string> = { canvases: "Canvases", agents: "Agents", boards: "Boards" };
 
 /** Below this the panel cannot stand beside the canvas, so it goes over it. */
 const SHEET = 1100;
@@ -159,14 +166,24 @@ export function LeftPanel(props: {
 	identities?: Record<string, Identity>;
 	unread?: Record<string, number>;
 	/**
-	 * Who is on the canvas on screen, by id: the section the Agents tab opens with.
-	 *
-	 * The canvas is the unit of work, so the room comes before the deck — and because an
-	 * agent is on every canvas it has worked in, this lifts rows out of the cut below rather
-	 * than being an axis of its own. Absent on the dashboard, where there is no room to be in.
+	 * The workspace of the canvas on screen, absent on the dashboard and when that canvas is in
+	 * none. Its section leads the Agents tab's workspace cut, marked as the room's; the
+	 * Canvases tab reads the same fact off `currentCanvas`.
 	 */
-	onCanvasAgents?: string[];
+	hereWorkspace?: string;
 	onFocusAgent?: (id: string) => void;
+
+	// --- the Canvases tab -------------------------------------------------------------
+	/** Every canvas in the deck, for the first tab: the rooms, under their workspaces. */
+	canvases?: Canvas[];
+	/** The canvas on screen, by id: its row is washed. */
+	currentCanvas?: string;
+	/** Go to a canvas. The conversation stays whoever it was. */
+	onOpenCanvas?: (id: string) => void;
+	/** Make a canvas in a workspace (`undefined` for none) and go to it — the `+` on a heading. */
+	onNewCanvas?: (workspace: string | undefined) => void;
+	/** Remove the arrangement; the boards stay. Absent means no row has a × on it. */
+	onRemoveCanvas?: (id: string) => void;
 	onCloseAgent?: (id: string) => void;
 	/** Put a live view of that agent's conversation on the canvas (`canvas/live-chat.ts`). */
 	onMirrorAgent?: (id: string) => void;
@@ -287,7 +304,7 @@ export function LeftPanel(props: {
 		focused: props.focused,
 		query: query(),
 		group: group(),
-		onCanvas: props.onCanvasAgents ?? [],
+		...(props.hereWorkspace ? { here: props.hereWorkspace } : {}),
 	});
 
 	/**
@@ -315,6 +332,13 @@ export function LeftPanel(props: {
 	 * store for it to write into. It runs in the same task as the update that caused it, before
 	 * anything is painted, so the list is never a frame behind what the socket said.
 	 */
+	const canvasList = createMemo(() => canvasSections({ canvases: props.canvases ?? [], ...(props.currentCanvas ? { current: props.currentCanvas } : {}), query: query() }));
+	const canvasCount = () => (props.canvases ?? []).length;
+	const canvasFoot = () => {
+		const shown = canvasList().reduce((sum, section) => sum + section.rows.length, 0);
+		if (query().trim()) return `${shown} of ${canvasCount()} match`;
+		return canvasCount() === 0 ? "No canvases yet" : `${canvasCount()} canvas${canvasCount() === 1 ? "" : "es"}`;
+	};
 	const [agentList, setAgentList] = createStore<AgentSection[]>(agentSections(agentInput()));
 	createEffect(() => setAgentList(reconcile(agentSections(agentInput()))));
 
@@ -383,7 +407,7 @@ export function LeftPanel(props: {
 	const LOAD_MORE_AT = 400;
 	const [rowBudget, setRowBudget] = createSignal(FIRST_ROWS);
 	/** The sections of the list that is showing — boards, or agents. */
-	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentList : sections());
+	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentList : tab() === "canvases" ? canvasList() : sections());
 	const visibleRows = () => groups().reduce((sum, section) => sum + section.rows.length, 0);
 	/** How many of the section at `index`'s rows fit in what the sections above it left. */
 	const allowance = (index: number): number => {
@@ -564,7 +588,7 @@ export function LeftPanel(props: {
 								The panel still opens on Boards, because that is the canvas you were
 								already looking at.
 							*/}
-							<For each={["agents", "boards"] as PanelTab[]}>
+							<For each={PANEL_TABS}>
 								{(name) => (
 									<button
 										type="button"
@@ -585,12 +609,13 @@ export function LeftPanel(props: {
 											   `agents` then `boards` — so the other one is named here rather
 											   than derived, and these two lines are what a third tab would
 											   have to change. */
-											const next: PanelTab = name === "agents" ? "boards" : "agents";
+											const step = event.key === "ArrowRight" ? 1 : -1;
+											const next = PANEL_TABS[(PANEL_TABS.indexOf(name) + step + PANEL_TABS.length) % PANEL_TABS.length] ?? name;
 											goTab(next);
 											document.getElementById(`${ids}-tab-${next}`)?.focus();
 										}}
 									>
-										{name === "boards" ? "Boards" : "Agents"}
+										{PANEL_TAB_LABEL[name]}
 									</button>
 								)}
 							</For>
@@ -622,7 +647,9 @@ export function LeftPanel(props: {
 							   on panel-css” is the question tags exist to answer, and this is the surface
 							   with room to show the answer. */
 							placeholder={
-								tab() === "agents"
+								tab() === "canvases"
+									? `Search ${canvasCount()} canvas${canvasCount() === 1 ? "" : "es"} or workspaces`
+								: tab() === "agents"
 									? `Search ${allAgents().total} agent${allAgents().total === 1 ? "" : "s"}, tags or workspaces`
 									: `Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`
 							}
@@ -689,12 +716,58 @@ export function LeftPanel(props: {
 					onKeyDown={rove}
 					onScroll={growIfNearEnd}
 				>
+					<Show when={tab() === "canvases"}>
+						<For each={canvasList()}>
+							{(section, index) => (
+								<div class="panel-section" data-kind={section.here ? "here" : section.workspace ? "workspace" : "unfiled"}>
+									<div class="panel-meta meta">
+										<span class="truncate">{section.label}</span>
+										{/* The one heading whose place depends on where you stand, and it says so. */}
+										<Show when={section.here}>
+											<span class="here">· this canvas</span>
+										</Show>
+										<span class="flex-1" />
+										<Show when={props.onNewCanvas}>
+											<button
+												type="button"
+												class="iconbtn size-5 flex-none rounded-sm pointer-coarse:size-8"
+												aria-label={section.workspace ? `New canvas in ${section.workspace}` : "New canvas in no workspace"}
+												title={section.workspace ? `New canvas in ${section.workspace}` : "New canvas, in no workspace"}
+												onClick={() => props.onNewCanvas?.(section.workspace)}
+											>
+												<Icon of={Plus} size={12} />
+											</button>
+										</Show>
+									</div>
+									<For each={section.rows.slice(0, allowance(index()))}>
+										{(canvas) => (
+											<CanvasRow
+												canvas={canvas}
+												current={canvas.id === props.currentCanvas}
+												identities={props.identities ?? {}}
+												onOpen={() => props.onOpenCanvas?.(canvas.id)}
+												{...(props.onRemoveCanvas ? { onRemove: () => props.onRemoveCanvas?.(canvas.id) } : {})}
+											/>
+										)}
+									</For>
+								</div>
+							)}
+						</For>
+						<Show when={canvasList().length === 0}>
+							<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
+								{canvasCount() === 0 ? "No canvases yet. Press + on the dashboard, or ask an agent for a board." : `No canvas matches “${query().trim()}”.`}
+							</p>
+						</Show>
+					</Show>
 					<Show when={tab() === "agents"}>
 						<For each={agentList}>
 							{(section, index) => (
 								<div class="panel-section" data-kind={section.kind}>
 									<div class="panel-meta meta">
 										<span class="truncate">{section.label}</span>
+										<Show when={section.here}>
+											<span class="here">· this canvas</span>
+										</Show>
 										<span class="flex-1" />
 										{/*
 											What the *group* is doing, where the group is a workspace.
@@ -842,7 +915,9 @@ export function LeftPanel(props: {
 						the sections say it too, but they scroll and this does not.
 					*/}
 					<span class="truncate">
-						{tab() === "agents"
+						{tab() === "canvases"
+							? canvasFoot()
+							: tab() === "agents"
 							? agentFoot(allAgents(), query().trim() ? agentTally(agentList).total : undefined)
 							: tally().shown === props.boards.length
 								? `${props.boards.length} board${props.boards.length === 1 ? "" : "s"}${tally().held > 0 ? ` · ${tally().held} held` : ""}`
@@ -859,7 +934,7 @@ export function LeftPanel(props: {
 						disabled, for the reason this file gives elsewhere: a control that cannot be pressed
 						asks to be explained, and its absence here explains itself.
 					*/}
-					<div class="seg" data-seg="density" style={tab() === "agents" ? { display: "none" } : undefined}>
+					<div class="seg" data-seg="density" style={tab() !== "boards" ? { display: "none" } : undefined}>
 						<button
 							type="button"
 							class="grid place-items-center px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
@@ -881,7 +956,7 @@ export function LeftPanel(props: {
 							<Icon of={LayoutGrid} size={12} />
 						</button>
 					</div>
-					<div class="seg" data-seg="agents" style={tab() === "boards" ? { display: "none" } : undefined}>
+					<div class="seg" data-seg="agents" style={tab() !== "agents" ? { display: "none" } : undefined}>
 						<button
 							type="button"
 							class="px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
