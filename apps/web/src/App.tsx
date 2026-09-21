@@ -401,14 +401,17 @@ export function App() {
 		openStage(id);
 	};
 	/**
-	 * An agent's row: go to the first canvas in its workspace, and talk to it there.
+	 * An agent's row: go to its project, and talk to it there.
 	 *
-	 * The canvas is the room and the workspace is the project, so pressing an agent opens the
-	 * project's first room (newest change first, the order every list shows) with that agent
-	 * as the conversation. Already standing in one of the project's rooms, you stay in it — a
-	 * press that moved you out of the room you chose would be a press people stop making. A
-	 * project with no room yet gets one, named after it; an agent in no workspace is addressed
-	 * where you are, as before.
+	 * The canvas is the room and the workspace is the project, so pressing an agent opens a
+	 * room of the project with that agent as the conversation. Which room, in order: the one
+	 * you are already standing in, when it is the project's — a press that moved you out of
+	 * the room you chose would be a press people stop making; then the room the agent is
+	 * standing in, when that is the project's — its work is there, and "the first canvas in
+	 * the workspace" would otherwise be whichever room changed last, a target that moves
+	 * under the reader; then the project's first room (newest change first, the order every
+	 * list shows); and a project with no room yet gets one, named after it. An agent in no
+	 * workspace is addressed where you are, as before.
 	 */
 	const visitAgent = (id: string) => {
 		const workspace = state.identities[id]?.workspace;
@@ -421,7 +424,8 @@ export function App() {
 			addressAgent(id);
 			return;
 		}
-		const room = firstCanvasIn(state.canvases, workspace);
+		const theirs = state.canvases.filter((canvas) => canvas.workspace === workspace && canvas.agents.includes(id)).sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0))[0];
+		const room = theirs ?? firstCanvasIn(state.canvases, workspace);
 		if (room) {
 			go({ surface: "stage", canvas: room.id, agent: id }, { replace: surface() === "stage" });
 			return;
