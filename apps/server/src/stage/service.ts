@@ -65,7 +65,7 @@ export interface StageHost {
 	 * test can build one without a stage behind it. `StageService.boards` falls back to the deck's
 	 * own list; no id means the conversation on screen, which is what a board's own code gets.
 	 */
-	boards?(agentId?: string): Board[];
+	boards?(agentId?: string, canvasId?: string): Board[];
 
 }
 
@@ -125,7 +125,8 @@ export class StageService {
 
 	// --- reads --------------------------------------------------------------------
 
-	boards(agentId?: string): Board[] {
+	/** Every board, placed as `canvasId` has them when one is named, else as the asking agent's canvas does. */
+	boards(agentId?: string, canvasId?: string): Board[] {
 		const holders = this.host.agents();
 		/*
 		 * The host's arrangement when there is one, and the deck's own list when there is not.
@@ -134,7 +135,7 @@ export class StageService {
 		 * became per stage — so returning `deck.boards` here for a real app would tell every agent that
 		 * every board is at the origin, which is worse than saying nothing.
 		 */
-		return (this.host.boards?.(agentId) ?? this.deck.boards).map((board) => {
+		return (this.host.boards?.(agentId, canvasId) ?? this.deck.boards).map((board) => {
 			// A measurement of an older revision is left off rather than reported: it is a
 			// number, and a number gets believed.
 			const content = this.host.extent(board.path, board.rev);

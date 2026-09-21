@@ -17,7 +17,6 @@ function conversation(over: Partial<BoardConversation> = {}) {
 	const api: BoardConversation = {
 		id: "agent-1",
 		context: () => ["boards/plan.html"],
-		setContext: (paths) => void calls.push(`setContext:${paths.join(",")}`),
 		inPlay: () => ["boards/plan.html"],
 		setInPlay: (paths) => void calls.push(`setInPlay:${paths.join(",")}`),
 		positions: () => ({ "boards/plan.html": { x: 10, y: 20 } }),
@@ -63,10 +62,9 @@ test("what is about the conversation is delegated to it", () => {
 	assert.deepEqual(actor.positions?.(), { "boards/plan.html": { x: 10, y: 20 } });
 	assert.deepEqual(actor.camera(), { x: 1, y: 2, zoom: 1 });
 
-	actor.setContext(["boards/a.html"]);
 	actor.setInPlay(["boards/b.html"]);
 	actor.setPosition?.("boards/a.html", 3, 4);
-	assert.deepEqual(calls, ["setContext:boards/a.html", "setInPlay:boards/b.html", "setPosition:boards/a.html:3,4"]);
+	assert.deepEqual(calls, ["setInPlay:boards/b.html", "setPosition:boards/a.html:3,4"]);
 });
 
 test("work handed over is sent by the conversation, because a board has no inbox", () => {

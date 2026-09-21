@@ -8,7 +8,7 @@ test("the brief carries the work, where to look, and the one call to make", () =
 	assert.match(text, /\*\*decks\*\* workspace/);
 	assert.match(text, /`boards\/plan.html`/);
 	assert.match(text, /await stage\.agents\(\)/);
-	assert.match(text, /stage\.workspaces\(\)/);
+	assert.match(text, /stage\.canvases\(\)/);
 	assert.match(text, /stage\.queue\(agentId\)/);
 	assert.match(text, /stage\.d\.ts/);
 	assert.match(text, /stage\.send\("<agent name or id>", \{ task: .*reply: false \}\)/);
@@ -19,7 +19,7 @@ test("the brief carries the work, where to look, and the one call to make", () =
 	assert.match(text, /The one thing you may write is the prompt file/);
 	assert.doesNotMatch(text, /do not write anything/);
 	// Nobody on the topic: make an agent and send to it, on a cost-effective model.
-	assert.match(text, /make one with `await stage\.create\(\)`/);
+	assert.match(text, /make one by sending to a shape, `await stage\.send\(\{ name, kind \}, \{ task \}\)`/);
 	// No model is named in the text: the dashboard's own choice is the default.
 	assert.match(text, /Leave `model` out, so it opens on the model chosen in the dashboard's bar/);
 	assert.doesNotMatch(text, /DeepSeek|Opus/);

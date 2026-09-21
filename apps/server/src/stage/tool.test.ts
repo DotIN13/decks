@@ -96,7 +96,6 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			id: "a1",
 			identity: () => ({ name: "Ada", color: "#000", ...(room ? { workspace: room } : {}) }),
 			context: () => [],
-			setContext: () => {},
 			inPlay: () => [],
 			setInPlay: () => {},
 			rename: () => {},
@@ -281,8 +280,8 @@ test("a board is the agent's once it is named: newBoard, fit, a one-board show a
 	deck.refresh("boards/one.html");
 	deck.refresh("boards/two.html");
 
-	// Arranging the canvas, reading and attaching are not authorship.
-	const arranged = await tool.run(`await stage.show(["boards/one.html", "boards/two.html"]); await stage.attach("boards/one.html"); await stage.boards(); await stage.hide("boards/two.html");`);
+	// Arranging the canvas and reading are not authorship.
+	const arranged = await tool.run(`await stage.show(["boards/one.html", "boards/two.html"]); await stage.boards(); await stage.hide("boards/two.html");`);
 	assert.equal(arranged.isError, false, arranged.text);
 	assert.deepEqual(worked, []);
 
@@ -346,65 +345,6 @@ test("stage.agents() carries what each one is working on, and what is waiting fo
 	assert.equal(seen[0]?.workspace, "political-llm");
 	assert.equal(seen[2]?.workspace, undefined, "an agent in none says so by saying nothing");
 	cleanup();
-});
-
-test("attach is most-recently-touched first, and re-attaching moves the board to the front", async () => {
-	const root = mkdtempSync(join(tmpdir(), "decks-attach-"));
-	mkdirSync(join(root, "boards"), { recursive: true });
-	for (const name of ["a.html", "b.html", "c.html"]) {
-		writeFileSync(join(root, "boards", name), `<!doctype html><title>${name}</title><body class="board"></body>`);
-	}
-	const deck = Deck.open(root);
-	const service = new StageService(deck, {
-		newMirror: () => "boards/mirrors/x.html",
-		newBoard: () => "",
-		writeBoard: () => {
-			throw new Error("not used here");
-		},
-		extent: () => undefined,
-		awaitExtent: async () => undefined,
-		call: async () => ({ ok: true }),
-		connected: () => true,
-		place: () => undefined, broadcast: () => {},
-		camera: () => ({ x: 0, y: 0, zoom: 1 }),
-		agents: () => [],
-	});
-
-	// A hook that really holds the list, so the ordering `attach` builds can be read off it.
-	let held: string[] = [];
-	const set: string[][] = [];
-	const tool = createStageTool({
-		stage: service,
-		port: 4329,
-		agent: {
-			id: "a1",
-			identity: () => ({ name: "Ada", color: "#000" }),
-			context: () => held,
-			setContext: (paths) => {
-				held = paths;
-				set.push([...paths]);
-			},
-			inPlay: () => [],
-			setInPlay: () => {},
-			rename: () => {},
-			setAvatar: () => {},
-			setTags: (tags) => tags as string[],
-			setWorkspace: () => null,
-			agents: () => [],
-			camera: () => ({ x: 0, y: 0, zoom: 1 }),
-			send: () => ({ queued: true, position: 1 }),
-			queue: () => [],
-			recordRevision: () => undefined,
-			boardPathOf: () => undefined,
-		},
-	});
-
-	await tool.run(`await stage.attach(["boards/a.html", "boards/b.html", "boards/c.html"])`);
-	assert.deepEqual(set.at(-1), ["boards/c.html", "boards/b.html", "boards/a.html"], "the last attached leads the list");
-
-	await tool.run(`await stage.attach(["boards/a.html"])`);
-	assert.deepEqual(set.at(-1), ["boards/a.html", "boards/c.html", "boards/b.html"], "re-attaching a board moves it to the front");
-	rmSync(root, { recursive: true, force: true });
 });
 
 /*
@@ -746,4 +686,74 @@ test("a move is written on the canvas of the agent that asked, not on whichever 
 	// tidying its own canvas moved the board on somebody else's and left its own where it was.
 	assert.deepEqual(moved, [{ agentId: "a1", path: "boards/plan.html", x: 40, y: 80 }]);
 	cleanup();
+});
+
+/*
+ * A canvas is added to, never cleared. `show` used to make the canvas exactly what it named,
+ * which was one call away from emptying a room others were working in; a new topic is a new
+ * canvas now, and `hide` says so when it is asked to empty one.
+ */
+test("show adds to the canvas, and hide takes off only what it names and never the last board", async () => {
+	const root = mkdtempSync(join(tmpdir(), "decks-additive-"));
+	mkdirSync(join(root, "boards"), { recursive: true });
+	for (const name of ["a.html", "b.html", "c.html"]) {
+		writeFileSync(join(root, "boards", name), `<!doctype html><title>${name}</title><body class="board"></body>`);
+	}
+	const deck = Deck.open(root);
+	const service = new StageService(deck, {
+		newMirror: () => "boards/mirrors/x.html",
+		newBoard: () => "",
+		writeBoard: () => {
+			throw new Error("not used here");
+		},
+		extent: () => undefined,
+		awaitExtent: async () => undefined,
+		call: async () => ({ ok: true }),
+		connected: () => true,
+		place: () => undefined, broadcast: () => {},
+		camera: () => ({ x: 0, y: 0, zoom: 1 }),
+		agents: () => [],
+	});
+	let up: string[] = [];
+	let held: string[] = [];
+	const tool = createStageTool({
+		stage: service,
+		port: 4329,
+		agent: {
+			id: "a1",
+			identity: () => ({ name: "Ada", color: "#000" }),
+			context: () => held,
+			inPlay: () => up,
+			setInPlay: (paths) => {
+				up = [...paths];
+			},
+			rename: () => {},
+			setAvatar: () => {},
+			setTags: (tags) => tags as string[],
+			setWorkspace: () => null,
+			agents: () => [],
+			camera: () => ({ x: 0, y: 0, zoom: 1 }),
+			send: () => ({ queued: true, position: 1 }),
+			queue: () => [],
+			recordRevision: () => undefined,
+			boardPathOf: () => undefined,
+		},
+	});
+
+	await tool.run(`await stage.show(["boards/a.html", "boards/b.html"])`);
+	await tool.run(`await stage.show("boards/c.html")`);
+	assert.deepEqual(up, ["boards/a.html", "boards/b.html", "boards/c.html"], "a second show adds beside the first");
+
+	await tool.run(`await stage.show("boards/a.html")`);
+	assert.deepEqual(up, ["boards/a.html", "boards/b.html", "boards/c.html"], "showing a board that is up changes nothing");
+
+	await tool.run(`await stage.hide("boards/b.html")`);
+	assert.deepEqual(up, ["boards/a.html", "boards/c.html"], "an out-of-date board comes off by name");
+
+	const emptied = await tool.run(`await stage.hide(["boards/a.html", "boards/c.html"])`);
+	assert.equal(emptied.isError, true);
+	assert.match(emptied.text, /would empty the canvas/);
+	assert.match(emptied.text, /stage\.canvas\(/, "the refusal names the way to start a new topic");
+	assert.deepEqual(up, ["boards/a.html", "boards/c.html"], "nothing came off");
+	rmSync(root, { recursive: true, force: true });
 });

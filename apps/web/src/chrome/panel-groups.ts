@@ -12,9 +12,11 @@ import type { Board } from "@decks/protocol";
  *
  * The three sections, in the order they are drawn:
  *
- * 1. **On the canvas** — held *and* in play. The accent dot, and the only rows at full
+ * 1. **On the canvas** — what the canvas has up. The accent dot, and the only rows at full
  *    strength, because this list is the canvas written down.
- * 2. **Held, not shown** — the agent is working from it without asking you to look at it.
+ * 2. **Held, not shown** — boards the canvas has taken off and keeps a place for
+ *    (`Canvas.kept`). Boards belong to canvases, not agents, so this is the room's shelf and
+ *    the same for everybody in it; showing one puts it back where it was.
  *    Dimmed: `[data-off-canvas]` in the old rail did this with 45% opacity on a picture,
  *    which made a list look switched off; on a text row it is the muted colour.
  * 3. **In the deck** — everything else there is. Neither dimmed nor marked: browsing the
@@ -32,7 +34,7 @@ import type { Board } from "@decks/protocol";
  * else — with one search field over all of it and the counts beside the headings saying the
  * rest.
  *
- * A board an agent holds appears **once**, in its own section and not again under the deck.
+ * A board the canvas holds appears **once**, in its own section and not again under the deck.
  * A list that shows a thing twice is a list you cannot count.
  */
 
@@ -60,22 +62,9 @@ export interface PanelSection {
 export interface PanelInput {
 	/** Every board there is. The third section is this, minus the two above it. */
 	boards: Board[];
-	/**
-	 * The agent whose canvas and shelf the first two sections are.
-	 *
-	 * Without one there is nothing to put in them and the list is simply the deck, which is
-	 * the honest picture of a fresh session rather than an empty panel.
-	 */
-	focused?: string;
-	/**
-	 * Agent id → the paths it holds, in attach order.
-	 *
-	 * Still the whole record rather than one agent's list, because `focused` is what picks
-	 * out of it and it can be absent — and a caller that has to do the lookup itself is a
-	 * caller that has to decide what "no agent" means.
-	 */
-	holdings: Record<string, string[]>;
-	/** The focused agent's in-play set: what is actually drawn on the canvas. */
+	/** Boards the canvas took off and keeps a place for, newest first: the second section. */
+	kept?: string[];
+	/** What is up on the canvas: the first section. */
 	inPlay?: string[];
 	/** What is typed in the search field. Filters the rows; the sections stay in order. */
 	query?: string;
@@ -120,26 +109,10 @@ const fold = (query?: string) => (query ?? "").trim().toLowerCase();
 export function panelSections(input: PanelInput): PanelSection[] {
 	const needle = fold(input.query);
 	const known = new Map(input.boards.map((board) => [board.path, board]));
-	const focused = input.focused;
-	const holdings = input.holdings ?? {};
-
-	/*
-	 * The focused agent's holdings, in attach order, dropping anything the deck no longer
-	 * has. A context can name a board that has since been deleted, and a row for a board
-	 * that is not there is a row that cannot be picked.
-	 */
-	const held = (focused ? holdings[focused] ?? [] : []).filter((path) => known.has(path));
-	const heldSet = new Set(held);
-	const playing = new Set((input.inPlay ?? []).filter((path) => known.has(path)));
-
-	/*
-	 * In play but not held should be impossible — playing a board attaches it — but if it
-	 * ever happens the board is *on the canvas*, and a list of what is on the canvas that
-	 * omits something on the canvas is the one error this panel must not make. So the
-	 * canvas section is held-and-playing in attach order, then anything else in play.
-	 */
-	const canvasPaths = [...held.filter((path) => playing.has(path)), ...[...playing].filter((path) => !heldSet.has(path))];
-	const quietPaths = held.filter((path) => !playing.has(path));
+	/* Both lists drop anything the deck no longer has: a row for a board that is not there is a row that cannot be picked. */
+	const canvasPaths = (input.inPlay ?? []).filter((path, index, all) => known.has(path) && all.indexOf(path) === index);
+	const up = new Set(canvasPaths);
+	const quietPaths = (input.kept ?? []).filter((path) => known.has(path) && !up.has(path));
 	/* What the first two sections have claimed, so the third is "the rest" rather than "the
 	   deck all over again". */
 	const claimed = new Set([...canvasPaths, ...quietPaths]);
@@ -160,8 +133,8 @@ export function panelSections(input: PanelInput): PanelSection[] {
 	if (quiet.length > 0) sections.push({ kind: "held", label: "Held, not shown", rows: quiet });
 
 	/*
-	 * The rest of the deck, in the *deck's* order rather than an agent's attach order: this
-	 * section is not about the agent, and `boards` arrives sorted by path.
+	 * The rest of the deck, in the *deck's* order: this section is not about the canvas, and
+	 * `boards` arrives sorted by path.
 	 */
 	const rest = input.boards.filter((board) => !claimed.has(board.path) && matches(board, needle));
 	if (rest.length > 0) {

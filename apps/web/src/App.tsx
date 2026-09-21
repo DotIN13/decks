@@ -330,6 +330,16 @@ export function App() {
 	/** The canvas somebody looked at most recently, which is where a stage with nothing else to go on lands. */
 	const lastOpenedCanvas = () => [...state.canvases].sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0))[0];
 	/**
+	 * The canvas an agent is working on now, when it is one that still exists.
+	 *
+	 * The server says so on the chat row and on every `context.changed`, and the agent moves
+	 * itself with `stage.canvas(name)`, so this follows the agent rather than the reader.
+	 */
+	const workingOn = (id: string) => {
+		const canvas = state.agents[id]?.canvas;
+		return canvas && state.canvases.some((one) => one.id === canvas) ? canvas : undefined;
+	};
+	/**
 	 * Which room to open for an agent.
 	 *
 	 * An agent is on every canvas it has worked in, so this is a preference rather than a
@@ -339,6 +349,8 @@ export function App() {
 	 */
 	const canvasFor = (agentId?: string): string | undefined => {
 		if (agentId) {
+			const now = workingOn(agentId);
+			if (now) return now;
 			const here = state.canvases.find((canvas) => canvas.id === state.canvas && canvas.agents.includes(agentId));
 			if (here) return here.id;
 			const theirs = state.canvases.filter((canvas) => canvas.agents.includes(agentId)).sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0))[0];
@@ -386,52 +398,43 @@ export function App() {
 		go({ surface: "stage", canvas, agent: id }, { replace: surface() === "stage" });
 	};
 	/**
-	 * Talk to an agent: address it here, or open its room from the dashboard.
+	 * Go to an agent: to the canvas it is working on, and talk to it there.
 	 *
-	 * **In a room, switching agent does not move you.** An agent is on every canvas it has
-	 * worked in, so "go to its stage" no longer names one place — and the room you are in is
-	 * the one you chose. From the dashboard, where there is no room yet, the same press opens
-	 * one: the canvas you share with it, else the one it worked in last.
-	 */
-	const addressAgent = (id: string) => {
-		if (surface() === "stage" && state.canvas) {
-			go({ surface: "stage", canvas: state.canvas, agent: id }, { replace: true });
-			return;
-		}
-		openStage(id);
-	};
-	/**
-	 * An agent's row: go to its project, and talk to it there.
+	 * **Agents are the way in, and an agent's room is where its work is.** Its row in the
+	 * Agents tab, its face in the toolbar and in the corner all land here, from a stage or from
+	 * the dashboard, and all three go to the canvas the agent is on now: the one it chose with
+	 * `stage.canvas`, or the one it was handed work on. Pressing the agent you are already with,
+	 * in the room it is in, moves nothing.
 	 *
-	 * The canvas is the room and the workspace is the project, so pressing an agent opens a
-	 * room of the project with that agent as the conversation. Which room, in order: the one
-	 * you are already standing in, when it is the project's — a press that moved you out of
-	 * the room you chose would be a press people stop making; then the room the agent is
-	 * standing in, when that is the project's — its work is there, and "the first canvas in
-	 * the workspace" would otherwise be whichever room changed last, a target that moves
-	 * under the reader; then the project's first room (newest change first, the order every
-	 * list shows); and a project with no room yet gets one, named after it. An agent in no
-	 * workspace is addressed where you are, as before.
+	 * An agent that has shown nothing yet is on no canvas, and is addressed without moving you
+	 * when you are in a room, or — from the dashboard, or when it declared a workspace — in the
+	 * first room of its project, which is where its first board will land.
 	 */
 	const visitAgent = (id: string) => {
+		const replace = surface() === "stage";
+		const canvas = workingOn(id);
+		if (canvas) {
+			go({ surface: "stage", canvas, agent: id }, { replace });
+			return;
+		}
 		const workspace = state.identities[id]?.workspace;
+		const here = surface() === "stage" ? state.canvases.find((one) => one.id === state.canvas) : undefined;
+		if (here && (!workspace || here.workspace === workspace)) {
+			go({ surface: "stage", canvas: here.id, agent: id }, { replace: true });
+			return;
+		}
 		if (!workspace) {
-			addressAgent(id);
+			openStage(id);
 			return;
 		}
-		const here = surface() === "stage" ? state.canvases.find((canvas) => canvas.id === state.canvas) : undefined;
-		if (here && here.workspace === workspace) {
-			addressAgent(id);
-			return;
-		}
-		const theirs = state.canvases.filter((canvas) => canvas.workspace === workspace && canvas.agents.includes(id)).sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0))[0];
-		const room = theirs ?? firstCanvasIn(state.canvases, workspace);
+		const room = firstCanvasIn(state.canvases, workspace);
 		if (room) {
-			go({ surface: "stage", canvas: room.id, agent: id }, { replace: surface() === "stage" });
+			go({ surface: "stage", canvas: room.id, agent: id }, { replace });
 			return;
 		}
 		newCanvas(id, workspace);
 	};
+	const addressAgent = visitAgent;
 	/** Open a canvas, keeping whoever you are talking to: the room changes, the conversation does not. */
 	const openCanvas = (id: string, options?: { replace?: boolean }) =>
 		go({ surface: "stage", canvas: id, ...(state.focused ? { agent: state.focused } : {}) }, options);
@@ -1957,7 +1960,8 @@ export function App() {
 					 * canvas stopped being one agent's in-play set.
 					 */
 					inPlay={stageBoards().map((board) => board.path)}
-					holdings={state.contexts}
+					/* What the room took off and keeps: boards belong to the canvas, not to whoever you are talking to. */
+					kept={stageCanvas()?.kept ?? []}
 					focused={state.focused}
 					open={boardsOpen()}
 					onOpenChange={showBoards}

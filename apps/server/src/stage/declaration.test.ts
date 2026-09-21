@@ -112,7 +112,6 @@ function builtStageTool() {
 				id: "a1",
 				identity: () => ({ name: "Ada", color: "#000" }),
 				context: () => [],
-				setContext: () => {},
 				inPlay: () => [],
 				setInPlay: () => {},
 				rename: () => {},

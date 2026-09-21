@@ -334,7 +334,6 @@ async function runBoardEval(
 	const conversation = {
 		id: focused.id,
 		context: () => [...focused.context],
-		setContext: (paths: string[]) => focused.setContext(paths),
 		inPlay: () => [...focused.inPlay],
 		setInPlay: (paths: string[]) => focused.setInPlay(paths, { place: true }),
 		positions: () => focused.positions(),

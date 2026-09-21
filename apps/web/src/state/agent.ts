@@ -58,6 +58,8 @@ export interface AgentRecord {
 	 * it itself. Moving that means changing a signature, which is its own change.
 	 */
 	inPlay: string[];
+	/** The canvas it is working on now, by id: where pressing its row or its face goes. */
+	canvas?: string;
 }
 
 /** The part that is never drawn, and therefore must not be reactive. */

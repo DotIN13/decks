@@ -217,6 +217,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 						if (changed(state.contexts[chat.id], chat.boards)) setState("contexts", chat.id, chat.boards ?? []);
 						const held = state.agents[chat.id];
 						if (changed(held?.inPlay, chat.inPlay)) setState("agents", chat.id, "inPlay", chat.inPlay ?? []);
+						if (held?.canvas !== chat.canvas) setState("agents", chat.id, "canvas", chat.canvas);
 						if (changed(held?.model, chat.model)) setState("agents", chat.id, "model", chat.model);
 						if (changed(held?.usage, chat.usage)) setState("agents", chat.id, "usage", chat.usage);
 						if (held?.spending !== chat.account) setState("agents", chat.id, "spending", chat.account);
@@ -385,6 +386,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("contexts", message.agentId, message.boards);
 					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "inPlay", message.inPlay);
+					if (state.agents[message.agentId]?.canvas !== message.canvas) setState("agents", message.agentId, "canvas", message.canvas);
 					return;
 
 				case "stage.call": {

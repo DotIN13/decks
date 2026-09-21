@@ -20,6 +20,12 @@ export interface Canvas {
 	workspace?: string;
 	/** Every board on it, in the order they joined. */
 	boards: string[];
+	/**
+	 * Boards it has held and taken off, newest first: it keeps their places, and the panel lists
+	 * them as held, not shown. `boards` and these together are what the canvas holds, and what
+	 * every agent working on it has as its context.
+	 */
+	kept: string[];
 	/** Arrows drawn between boards on this canvas. */
 	links: CanvasLink[];
 	/** Boards fenced together, because they are one piece of work. */

@@ -14,6 +14,7 @@ const canvas = (id: string, name: string, changedAt: number, workspace?: string)
 	name,
 	...(workspace ? { workspace } : {}),
 	boards: [],
+	kept: [],
 	links: [],
 	groups: [],
 	changedAt,

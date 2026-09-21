@@ -35,19 +35,19 @@ const inPanel = () =>
 await newAgent(page);
 await settle(page, 1200);
 await page.mouse.move(800, 500);
-// A fresh agent holds nothing, so its canvas is empty until it attaches something.
+// A fresh agent holds nothing, so its canvas is empty until it shows something.
 await emptyCanvas(page);
 
-await ask(page, `With one stage_eval call, attach ${two[0]} and ${two[1]}, then return stage.inPlay().`);
+await ask(page, `With one stage_eval call, show ${two[0]} and ${two[1]}, then return the boards on your canvas.`);
 // The panel has to be up for its rows to exist at all — it is a panel now, not a rail that
 // was always mounted.
 await openPanel(page, "context");
 await settle(page, 400);
-say("attaching narrows the canvas to what is held", (await onCanvas()).join() === two.slice().sort().join(), (await onCanvas()).join(" "));
+say("showing puts exactly those two up", (await onCanvas()).join() === two.slice().sort().join(), (await onCanvas()).join(" "));
 say("the panel lists the same two", (await inPanel()).join() === two.map(base).sort().join(), (await inPanel()).join(" "));
 
-await ask(page, `With one stage_eval call, show only ${two[0]}.`);
-say("show narrows the canvas further", (await onCanvas()).join() === two[0], (await onCanvas()).join(" "));
+await ask(page, `With one stage_eval call, hide ${two[1]}.`);
+say("hide takes one off, leaving the other", (await onCanvas()).join() === two[0], (await onCanvas()).join(" "));
 say("…and the panel still lists both", (await inPanel()).length === 2, (await inPanel()).join(" "));
 
 say("no page errors", errors.length === 0, errors.join(" | "));

@@ -469,7 +469,7 @@ test("summaries reports the twenty newest boards, the true total, and the runtim
 	registry.restore();
 	const held = registry.get(id)!;
 	const paths = Array.from({ length: 25 }, (_, index) => `boards/b${index}.html`);
-	held.setContext(paths);
+	held.setInPlay(paths);
 
 	const summary = registry.summaries().find((row) => row.id === id)!;
 	assert.equal(summary.holding, 25, "the true total is not truncated");

@@ -268,6 +268,16 @@ export class CanvasStore {
 	 * Places are left alone: a board taken off keeps the spot it had, which is what makes
 	 * showing it again put it back where it was.
 	 */
+	/**
+	 * Boards this canvas has held and taken off: it still has a place for them, and showing one
+	 * again puts it back there. Newest place first. With `boards`, this is what the canvas holds.
+	 */
+	kept(id: string): string[] {
+		const record = this.get(id);
+		if (!record) return [];
+		return Object.keys(record.places).filter((path) => !record.boards.includes(path)).reverse();
+	}
+
 	setBoards(id: string, paths: string[]): CanvasRecord | undefined {
 		const record = this.get(id);
 		if (!record) return undefined;

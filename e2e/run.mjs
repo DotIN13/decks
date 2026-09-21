@@ -163,6 +163,11 @@ const CHECKS = [
 	 * the order inside them, New canvas on a heading, and the card's menu. Fed frames, no agent.
 	 */
 	{ file: "canvases.mjs", needsAgent: false },
+	/*
+	 * Agents are the way in: a row in the Agents tab and a face in the corner go to the canvas
+	 * the agent is working on, and follow it when it moves itself. Fed frames, no agent.
+	 */
+	{ file: "agent-canvas.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },

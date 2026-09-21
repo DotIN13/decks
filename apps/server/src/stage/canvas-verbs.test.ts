@@ -27,14 +27,14 @@ function toolOn(options: { canvas?: boolean } = {}) {
 	const canvases = new CanvasStore(root);
 	let on: string | undefined;
 	const list = (): Canvas[] =>
-		canvases.list().map((canvas) => ({ ...canvas, agents: canvas.id === on ? ["a1"] : [] }));
+		canvases.list().map(({ places: _places, ...canvas }) => ({ ...canvas, kept: canvases.kept(canvas.id), agents: canvas.id === on ? ["a1"] : [] }));
 	const current = () => list().find((canvas) => canvas.id === on);
 	const here = () => (on ??= canvases.ensure("Ada").id);
 	const hooks: StageAgentHooks["canvas"] = {
 		current,
 		list,
-		use: (name) => {
-			on = canvases.ensure(name).id;
+		use: (name, workspace) => {
+			on = canvases.ensure(name, workspace).id;
 			return current();
 		},
 		link: (from, to, label) => (canvases.link(here(), from, to, label) ? current() : undefined),
@@ -62,7 +62,6 @@ function toolOn(options: { canvas?: boolean } = {}) {
 			id: "a1",
 			identity: () => ({ name: "Ada", color: "#000" }),
 			context: () => [],
-			setContext: () => {},
 			inPlay: () => [],
 			setInPlay: () => {},
 			rename: () => {},
@@ -107,15 +106,26 @@ test("a path that is not a board is refused with the shape of one that is", asyn
 	assert.match(result.text, /boards\/plan\.html/);
 });
 
-test("canvas(name) joins by name, and canvas() says where you are", async () => {
+test("useCanvas moves to a canvas that exists, newCanvas makes one, and canvas() only reads", async () => {
 	const { tool } = toolOn();
 	const before = await tool.run(`return (await stage.canvas()) ?? "none"`);
 	assert.equal(before.text, `"none"`, "an agent that has drawn nothing is on no canvas");
-	await tool.run(`return await stage.canvas("Political LLM")`);
+
+	const typo = await tool.run(`return await stage.useCanvas("Political LLM")`);
+	assert.equal(typo.isError, true, "a name nobody has is not made by moving");
+	assert.match(typo.text, /stage\.newCanvas\("Political LLM"\)/);
+
+	await tool.run(`return await stage.newCanvas("Political LLM")`);
 	const after = await tool.run(`return (await stage.canvas()).name`);
-	assert.equal(after.text, `"Political LLM"`);
-	const all = await tool.run(`return (await stage.canvases()).map((canvas) => canvas.name)`);
-	assert.deepEqual(JSON.parse(all.text), ["Political LLM"]);
+	assert.equal(after.text, `"Political LLM"`, "making a canvas moves you to it");
+
+	const twice = await tool.run(`return await stage.newCanvas("political-llm")`);
+	assert.equal(twice.isError, true, "a name is used once per deck");
+	assert.match(twice.text, /stage\.useCanvas\("Political LLM"\)/);
+
+	const reading = await tool.run(`return await stage.canvas("Other")`);
+	assert.equal(reading.isError, true, "canvas() with a name used to move; now it says what does");
+	assert.match(reading.text, /stage\.useCanvas\("Other"\)[\s\S]*stage\.newCanvas\("Other"/);
 });
 
 test("with no canvas to draw on, every verb refuses in a sentence", async () => {
@@ -141,10 +151,12 @@ test("the opposites fold into the verbs: a null label unlinks, an empty list ung
 test("a verb that is gone refuses with the call that replaces it", async () => {
 	const { tool } = toolOn();
 	for (const [code, expected] of [
-		[`return await stage.useCanvas("x")`, /stage\.canvas\(name\)/],
+		[`return await stage.inPlay()`, /stage\.boards\(\)/],
+		[`return await stage.attach("boards/plan.html")`, /stage\.show\(path\)/],
+		[`return await stage.detach("boards/plan.html")`, /stage\.hide\(path\)/],
 		[`return await stage.unlink("boards/plan.html", "boards/result.html")`, /stage\.link\(a, b, null\)/],
 		[`return await stage.ungroup("the pilot")`, /stage\.group\(\[\], \{ name \}\)/],
-		[`return await stage.workspaces()`, /stage\.canvases\(\)/],
+		[`return await stage.workspaces()`, /stage\.canvases\(\{ workspace \}\)/],
 		[`return await stage.me.setTags(["x"])`, /stage\.me\(\{ tags \}\)/],
 		[`return await stage.delegate({ task: "x" })`, /abandoned after 20 seconds[\s\S]*stage\.send/],
 	] as const) {
@@ -152,4 +164,38 @@ test("a verb that is gone refuses with the call that replaces it", async () => {
 		assert.equal(result.isError, true, code);
 		assert.match(result.text, expected, code);
 	}
+});
+
+test("newCanvas files the canvas in the workspace named, and a bad workspace is refused", async () => {
+	const { tool } = toolOn();
+	const made = await tool.run(`return await stage.newCanvas("Bench surfaces", { workspace: "Political LLM" })`);
+	assert.equal(made.isError, false, made.text);
+	assert.equal(JSON.parse(made.text).workspace, "political-llm", "the workspace is cleaned like every other");
+	const bad = await tool.run(`return await stage.newCanvas("Notes", { workspace: 7 })`);
+	assert.equal(bad.isError, true);
+	assert.match(bad.text, /workspace is a project name/);
+});
+
+test("boards, canvases and agents return everything, and a filter narrows them", async () => {
+	const { tool, canvases } = toolOn();
+	await tool.run(`await stage.newCanvas("Bench", { workspace: "political-llm" })`);
+	canvases.setBoards(canvases.byName("Bench")!.id, ["boards/plan.html"]);
+	await tool.run(`await stage.newCanvas("Camera", { workspace: "decks" })`);
+	canvases.setBoards(canvases.byName("Camera")!.id, ["boards/judge.html", "boards/result.html"]);
+
+	const every = JSON.parse((await tool.run(`return (await stage.boards()).map((b) => b.path).sort()`)).text);
+	assert.deepEqual(every, ["boards/judge.html", "boards/plan.html", "boards/result.html"], "no filter is the whole deck");
+	const bench = JSON.parse((await tool.run(`return (await stage.boards({ filter: { canvas: "bench" } })).map((b) => [b.path, b.canvas])`)).text);
+	assert.deepEqual(bench, [["boards/plan.html", "Bench"]], "one room, by name, and each board says where it was found");
+	const decks = JSON.parse((await tool.run(`return (await stage.boards({ filter: { workspace: "decks" } })).map((b) => b.path).sort()`)).text);
+	assert.deepEqual(decks, ["boards/judge.html", "boards/result.html"]);
+
+	assert.deepEqual(JSON.parse((await tool.run(`return (await stage.canvases()).map((c) => c.name).sort()`)).text), ["Bench", "Camera"]);
+	assert.deepEqual(JSON.parse((await tool.run(`return (await stage.canvases({ filter: { workspace: "Political LLM" } })).map((c) => c.name)`)).text), ["Bench"]);
+
+	const agents = await tool.run(`return (await stage.agents({ filter: { canvas: "Camera" } })).length`);
+	assert.equal(agents.isError, false, agents.text);
+	const missing = await tool.run(`return await stage.boards({ filter: { canvas: "Nowhere" } })`);
+	assert.equal(missing.isError, true);
+	assert.match(missing.text, /No canvas "Nowhere"/);
 });

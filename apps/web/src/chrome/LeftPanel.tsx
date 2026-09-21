@@ -110,9 +110,9 @@ export function LeftPanel(props: {
 	current?: string;
 	/** The focused agent's in-play set: what is actually on the canvas. */
 	inPlay?: string[];
-	/** Agent id → the paths it holds, in attach order. `focused` picks this apart. */
-	holdings: Record<string, string[]>;
-	/** Whose canvas and shelf the first two sections are. */
+	/** Boards the canvas took off and keeps a place for: the Boards tab's "Held, not shown". */
+	kept?: string[];
+	/** The agent you are talking to, for the Agents tab. */
 	focused?: string;
 	/** Folded is gone. Owned by the pill's button, so the two can never disagree. */
 	open: boolean;
@@ -383,8 +383,7 @@ export function LeftPanel(props: {
 	const sections = createMemo(() =>
 		panelSections({
 			boards: props.boards,
-			focused: props.focused,
-			holdings: props.holdings,
+			kept: props.kept,
 			inPlay: props.inPlay,
 			query: query(),
 		}),

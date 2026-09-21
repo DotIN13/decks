@@ -370,7 +370,7 @@ export type ServerMessage =
 	 * the agent is working from, which the rail lists — and `inPlay` is the subset it has
 	 * put on the canvas for the user to look at now.
 	 */
-	| { type: "context.changed"; agentId: string; boards: string[]; inPlay: string[] }
+	| { type: "context.changed"; agentId: string; boards: string[]; inPlay: string[]; canvas?: string }
 	| { type: "stage.call"; call: StageCall }
 	/**
 	 * A question an agent is waiting on, and **which agent is waiting**.

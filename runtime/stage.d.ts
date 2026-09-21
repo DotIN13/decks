@@ -4,7 +4,7 @@
  * anything you `console.log`. This is the whole API: if something is not here, it does not
  * exist. Board content is files: write it with your ordinary tools.
  */
-export interface Board { path: string; title: string; x: number; y: number; w: number; h: number; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string }
+export interface Board { path: string; title: string; x: number; y: number; w: number; h: number; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string; canvas?: string }
 
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
 
@@ -12,7 +12,7 @@ export type WebTarget = string | { ref: string } | { name: string; nth?: number 
  * A canvas: the boards on it, the arrows and groups drawn between them, and who works there.
  * Boards belong to canvases, not to agents. Two agents on one canvas see one arrangement.
  */
-export interface Canvas { id: string; name: string; boards: string[]; links: Array<{ from: string; to: string; label?: string }>; groups: Array<{ name: string; boards: string[] }>; changedAt: number; agents: string[] }
+export interface Canvas { id: string; name: string; workspace?: string; boards: string[]; links: Array<{ from: string; to: string; label?: string }>; groups: Array<{ name: string; boards: string[] }>; changedAt: number; agents: string[] }
 
 export interface Stage {
 	/**
@@ -23,7 +23,7 @@ export interface Stage {
 	 * that are now one, and both still mean "board".)
 	 */
 	newBoard(o: { title: string; format?: "board" | "slides"; w?: number; h?: number }): Promise<string>;
-	/** Put exactly these boards on the canvas and move the camera to them. `highlight` outlines one `data-id`. */
+	/** Add these boards to your canvas, beside what is there, and move the camera to them. `highlight` outlines one `data-id`. */
 	show(path: string | string[], o?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }): Promise<{ shown: string[] }>;
 	/**
 	 * Set a board's height from its measured content; the board must be shown first. The result
@@ -36,14 +36,16 @@ export interface Stage {
 	resize(path: string, size: { w?: number; h?: number }): Promise<{ path: string; w: number; h: number }>;
 	/** Name boards you edited without showing them, so they are listed as yours. */
 	report(path: string | string[]): Promise<{ reported: string[] }>;
-	/** Take boards off the canvas, keeping them in your context. */
+	/** Take boards that are out of date off the canvas, keeping them in your context. Refused when it would empty the canvas: a new topic is a new canvas. */
 	hide(path: string | string[]): Promise<void>;
-	/** Every board in the deck; `clipped` means content is past the edge. */
-	boards(): Promise<Board[]>;
+	/**
+	 * Every board in the deck, or with `filter` the boards on one canvas (name or id) or on every
+	 * canvas of a workspace, each saying which `canvas` it was found on. `clipped` means content
+	 * is past the edge.
+	 */
+	boards(o?: { filter?: { canvas?: string; workspace?: string } }): Promise<Board[]>;
 	/** The room the canvas has, in CSS pixels. */
 	viewport(): Promise<{ width: number; height: number } | undefined>;
-	attach(path: string | string[]): Promise<Board[]>;
-	detach(path: string | string[]): Promise<Board[]>;
 	move(path: string, at: { x: number; y: number }): Promise<Board>;
 	/** Bubbles with arrows pointing at `data-id`s you changed. Nothing is written to the board. `null` clears. */
 	annotate(path: string, marks: Array<{ to: string | { x: number; y: number }; label: string; tone?: "accent" | "ok" | "warn" | "danger" }> | null): Promise<unknown>;
@@ -51,8 +53,6 @@ export interface Stage {
 	url(path: string): Promise<string>;
 	/** A file on disk -> the URL a board should embed. */
 	resolve(file: string): Promise<string>;
-	/** The boards on the canvas: what the person can see of your context. */
-	inPlay(): Promise<Board[]>;
 	/** Where your canvas is looking, or move it. `zoom` 1 is life size. */
 	camera(): Promise<{ x: number; y: number; zoom: number }>;
 	camera(at: { x: number; y: number; zoom: number }, o?: { animate?: boolean }): Promise<void>;
@@ -94,15 +94,26 @@ export interface Stage {
 	 * identity as stored — tags are slugged, deduped and capped at four. Your canvas is `canvas()`.
 	 */
 	me(patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[] }): Promise<{ name: string; avatar?: string; color: string; tags?: string[]; workspace?: string }>;
-	/** The canvas you work on. With a name, join that one (made if there is none); with nothing, read where you are. */
-	canvas(name?: string): Promise<Canvas | undefined>;
-	/** Every canvas in the deck, with who is working on each. Check it before making one, and reuse a name. */
-	canvases(): Promise<Canvas[]>;
+	/** The canvas you are working on, or undefined before you have shown anything. */
+	canvas(): Promise<Canvas | undefined>;
+	/**
+	 * Move to a canvas that exists, by name or id: what you show from then on goes there, and
+	 * pressing you in the app takes the person there.
+	 */
+	useCanvas(name: string): Promise<Canvas>;
+	/**
+	 * Make a canvas for a new topic and move to it: in your own workspace, or in `workspace`.
+	 * A name is used once per deck; a taken one is refused.
+	 */
+	newCanvas(name: string, o?: { workspace?: string }): Promise<Canvas>;
+	/** Every canvas, with who is working on each; `filter.workspace` narrows to one project. Check it before making one. */
+	canvases(o?: { filter?: { workspace?: string } }): Promise<Canvas[]>;
 	/** An arrow between two boards on your canvas: this led to that. A label of `null` takes it away. Drawn under the boards; nothing is written into either file. */
 	link(from: string, to: string, label?: string | null): Promise<Canvas>;
 	/** A dashed border round two or more boards: one piece of work. The same name replaces it; `[]` takes it away. */
 	group(paths: string[], o: { name: string }): Promise<Canvas>;
-	agents(): Promise<Array<{ id: string; name: string; me: boolean; state: string; kind: string; tags: string[]; workspace?: string; queued: number }>>;
+	/** Every agent; `filter.workspace` narrows to one project, `filter.canvas` to who has worked in that room. */
+	agents(o?: { filter?: { workspace?: string; canvas?: string } }): Promise<Array<{ id: string; name: string; me: boolean; state: string; kind: string; tags: string[]; workspace?: string; queued: number }>>;
 	/**
 	 * Hand work over, and carry on. Three targets: a name from `agents()`; `{ name, kind }`, which
 	 * makes the agent first; or `"dispatcher"`, which makes a dashboard task for the deck to place.

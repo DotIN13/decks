@@ -160,7 +160,9 @@ export class App {
 			 * No id is a board running its own code, which acts for the conversation in front of
 			 * the person (`stage/board-actor.ts`), so that case keeps the old answer.
 			 */
-			boards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
+			boards: (agentId?: string, canvasId?: string) =>
+				// A named canvas answers with its own places: `stage.boards({ canvas })` reads a room the agent is not in.
+				canvasId && this.canvases.get(canvasId) ? this.canvasState(canvasId).boards : this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
 
 			newBoard: ({ format, ...rest }) => this.boards.newBoard({ ...rest, ...(isBoardFormat(format) ? { format } : {}) }),
 			newMirror: (options) => this.boards.newMirror(options),
@@ -850,6 +852,7 @@ export class App {
 			name: canvas.name,
 			...(canvas.workspace ? { workspace: canvas.workspace } : {}),
 			boards: [...canvas.boards],
+			kept: this.canvases.kept(canvas.id).filter((path) => this.deck.board(path)),
 			links: canvas.links.map((link) => ({ ...link })),
 			groups: canvas.groups.map((group) => ({ name: group.name, boards: [...group.boards] })),
 			changedAt: canvas.changedAt,

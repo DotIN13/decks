@@ -87,13 +87,16 @@ test("a board dragged by one agent is in the same place for the other", () => {
 	cleanup();
 });
 
-test("what each agent has read stays its own", () => {
+test("agents on one canvas hold what the canvas holds, taken-off boards included", () => {
 	const { deck, cleanup } = deckOn();
 	const { one, two } = pair(deck);
 	one.useCanvas("work");
 	two.useCanvas("work");
-	one.setContext(["boards/plan.html", "boards/notes.html"]);
-	assert.deepEqual([...two.context], [], "reading is private; the canvas is shared");
+	one.setInPlay(["boards/plan.html", "boards/notes.html"], { place: true });
+	one.setInPlay(["boards/plan.html"]);
+	assert.deepEqual([...two.context], ["boards/plan.html", "boards/notes.html"], "one canvas, one context");
+	two.useCanvas("elsewhere");
+	assert.deepEqual([...two.context], [], "moving rooms is reading the new room's boards");
 	cleanup();
 });
 
@@ -216,5 +219,45 @@ test("an agent in no workspace adopts the project of the room it steps into", ()
 	one.useCanvas("Camera");
 	two.useCanvas("Camera");
 	assert.equal(two.workspace, "decks");
+	cleanup();
+});
+
+/*
+ * Where an agent is working now travels with it, because it is where pressing the agent goes:
+ * its row in the Agents tab and its face in the toolbar both land on this canvas. Moving with
+ * `stage.canvas(name)` is heard on the wire at once, not on the next list.
+ */
+test("the chat row and context.changed name the canvas an agent is working on now", () => {
+	const { deck, cleanup } = deckOn();
+	const canvases = new CanvasStore(deck.path);
+	const heard: Array<{ type: string; canvas?: string }> = [];
+	const agent = new DeckAgent(
+		deck,
+		(message) => heard.push(message as { type: string; canvas?: string }),
+		{} as StageService,
+		{
+			port: 4329,
+			camera: () => ({ x: 0, y: 0, zoom: 1 }),
+			agents: () => [],
+			send: () => ({ queued: true as const, position: 1 }),
+			queue: () => [],
+			report: () => {},
+			brief: (task: string) => task,
+			recordRevision: () => undefined,
+			boardPathOf: () => undefined,
+		},
+		{ name: "Sable", color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases },
+	);
+	assert.equal(agent.chat().canvas, undefined, "on no canvas until it has one");
+
+	agent.useCanvas("political-llm");
+	const first = agent.canvas as string;
+	assert.equal(agent.chat().canvas, first);
+	assert.equal(heard.filter((message) => message.type === "context.changed").at(-1)?.canvas, first, "the move is said at once");
+
+	agent.useCanvas("decks");
+	assert.notEqual(agent.canvas, first);
+	assert.equal(agent.chat().canvas, agent.canvas, "the row follows it to the next one");
+	assert.equal(heard.filter((message) => message.type === "context.changed").at(-1)?.canvas, agent.canvas);
 	cleanup();
 });

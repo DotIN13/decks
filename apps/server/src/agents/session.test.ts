@@ -272,91 +272,34 @@ function agentOn(
 		rmSync(root, { recursive: true, force: true });
 	});
 
-test("holding a board puts it on the canvas; the canvas is a subset of what is held", () => {
+test("the context is the canvas's: what is up, then what it took off and keeps a place for", () => {
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html", "c.html"]);
+	assert.equal(context(), "", "on no canvas, holding nothing");
 
-	agent.setContext(["boards/a.html", "boards/b.html"]);
+	agent.setInPlay(["boards/a.html", "boards/b.html"], { place: true });
 	assert.equal(context(), "boards/a.html boards/b.html");
-	// Setting the context alone does not put anything on the canvas — `attach` does that,
-	// and it is the caller that pairs them.
-	assert.equal(inPlay(), "");
 
-	agent.setInPlay(["boards/a.html"]);
-	assert.equal(inPlay(), "boards/a.html");
-	assert.equal(context(), "boards/a.html boards/b.html", "showing what is held changes nothing else");
-	cleanup();
-});
-
-test("showing a board the agent was not holding attaches it, newest first", () => {
-	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setContext(["boards/a.html"]);
-
+	// What `stage.hide` and the board's × both do: off the canvas, still held by it.
 	agent.setInPlay(["boards/b.html"]);
 	assert.equal(inPlay(), "boards/b.html");
-	// A board shown for the first time is the most recent touch, so it leads the held
-	// list rather than joining the end — `stage.agents()` answers newest-first.
-	assert.equal(context(), "boards/b.html boards/a.html");
-	cleanup();
-});
-
-test("dropping a board from the context takes it off the canvas", () => {
-	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["boards/a.html", "boards/b.html"]);
-	assert.equal(inPlay(), "boards/a.html boards/b.html");
-
-	agent.setContext(["boards/a.html"]);
-	assert.equal(context(), "boards/a.html");
-	assert.equal(inPlay(), "boards/a.html", "a board in play that is no longer held would be a third state");
-	cleanup();
-});
-
-test("taking a board off the canvas leaves it held", () => {
-	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setInPlay(["boards/a.html", "boards/b.html"]);
-
-	// What `stage.hide` and the board's × both do.
-	agent.setInPlay(agent.inPlay.filter((path) => path !== "boards/a.html"));
-	assert.equal(inPlay(), "boards/b.html");
-	assert.equal(context(), "boards/b.html boards/a.html");
+	assert.equal(context(), "boards/b.html boards/a.html", "a board taken off stays held, after the ones up");
 	cleanup();
 });
 
 test("both sets travel together, and neither repeats itself", () => {
 	const { agent, last, cleanup } = agentOn(["a.html", "b.html"]);
-	// Both fresh boards lead the held list, most recent last-named first.
 	agent.setInPlay(["boards/a.html", "boards/a.html", "boards/b.html"]);
 
 	const message = last();
 	assert.ok(message && message.type === "context.changed");
 	assert.deepEqual(message.inPlay, ["boards/a.html", "boards/b.html"], "deduplicated");
-	assert.deepEqual(message.boards, ["boards/b.html", "boards/a.html"], "newest first");
-	cleanup();
-});
-
-test("setContext keeps the recency order it is given, and never repeats itself", () => {
-	const { agent, context, cleanup } = agentOn(["a.html", "b.html"]);
-
-	// The touch sites build most-recently-touched-first; setContext is the one place the
-	// invariant is stored, so what the caller says the newest is, the readers see.
-	agent.setContext(["boards/b.html", "boards/b.html", "boards/a.html"]);
-	assert.equal(context(), "boards/b.html boards/a.html");
-	cleanup();
-});
-
-test("setInPlay and setContext agree on what the newest board is", () => {
-	const { agent, context, cleanup } = agentOn(["a.html", "b.html", "c.html"]);
-	// A first show fronts every board: the last named is the most recent touch.
-	agent.setInPlay(["boards/a.html", "boards/b.html", "boards/c.html"]);
-	assert.equal(context(), "boards/c.html boards/b.html boards/a.html");
-	// Re-showing one already held does not reorder — showing is not attaching.
-	agent.setInPlay(["boards/a.html"]);
-	assert.equal(context(), "boards/c.html boards/b.html boards/a.html");
+	assert.deepEqual(message.boards, ["boards/a.html", "boards/b.html"]);
 	cleanup();
 });
 
 test("the chat row carries what is held and what is shown, and they are not the same list", () => {
 	const { agent, cleanup } = agentOn(["a.html", "b.html"]);
-	agent.setContext(["boards/a.html", "boards/b.html"]);
+	agent.setInPlay(["boards/a.html", "boards/b.html"], { place: true });
 	agent.setInPlay(["boards/a.html"]);
 	assert.deepEqual(agent.chat().boards, ["boards/a.html", "boards/b.html"]);
 	assert.deepEqual(agent.chat().inPlay, ["boards/a.html"]);

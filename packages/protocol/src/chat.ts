@@ -174,6 +174,13 @@ export interface AgentChat {
 	boards: string[];
 	/** The boards it has put on the canvas, a subset of the above. */
 	inPlay: string[];
+	/**
+	 * The canvas it is working on now, by id. Absent until it has shown something.
+	 *
+	 * An agent is *on* every canvas it has worked in (`Canvas.agents`), but it works on one
+	 * at a time, and this is that one: the room pressing its row or its face takes you to.
+	 */
+	canvas?: string;
 	/** The model and thinking level it is on, live from a running runtime or as last recorded. */
 	model?: AgentModel;
 	/** The Claude subscription it spends, when it is on one of its own. */

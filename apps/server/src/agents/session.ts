@@ -156,7 +156,17 @@ export class DeckAgent {
 	 * board is a fresh touch, which is why `attach` moves it to the front rather than leaving
 	 * it where it sat.
 	 */
-	private held: string[] = [];
+	private get held(): string[] {
+		/*
+		 * What the canvas holds: the boards up on it, then the ones taken off that it keeps a
+		 * place for. Boards belong to canvases now, so an agent's context is its canvas's — two
+		 * agents in one room have one context, and an agent that moves rooms reads the new one.
+		 */
+		const canvas = this.canvas;
+		if (!canvas) return [];
+		const up = this.canvases.boards(canvas);
+		return [...up, ...this.canvases.kept(canvas).filter((path) => !up.includes(path) && this.deck.board(path))];
+	}
 	/**
 	 * The subset of those on the canvas.
 	 *
@@ -255,10 +265,10 @@ export class DeckAgent {
 	 * Nothing moves with the agent. What it has read is its own and stays; what it puts up
 	 * from now on goes to the canvas it has joined.
 	 */
-	useCanvas(name: string | null | undefined): string | undefined {
+	useCanvas(name: string | null | undefined, workspace?: string): string | undefined {
 		if (!name) return this.canvas;
-		// Its own project's canvas of that name first, and a new one is made in its project.
-		const canvas = this.canvases.ensure(name, this.workspaceChosen);
+		// The named project's canvas of that name first, else its own project's; a new one is made there.
+		const canvas = this.canvases.ensure(name, workspace ?? this.workspaceChosen);
 		return this.standOn(canvas.id);
 	}
 
@@ -635,7 +645,6 @@ export class DeckAgent {
 			if (options.restored.lastLine) {
 				this.storedLast = { text: options.restored.lastLine, at: options.restored.lastAt ?? this.createdAt };
 			}
-			this.held = [...options.restored.context];
 			/*
 			 * The canvas it was working on. What is up and where it sits are the canvas's now, so
 			 * nothing is put back here: the record names a canvas and the canvas has the rest.
@@ -721,8 +730,8 @@ export class DeckAgent {
 		return {
 			current,
 			list: () => this.host.canvasList?.() ?? [],
-			use: (name: string) => {
-				this.useCanvas(name);
+			use: (name: string, workspace?: string) => {
+				this.useCanvas(name, workspace);
 				return current();
 			},
 			link: (from: string, to: string, label?: string) => drew(this.canvases.link(this.canvasId, from, to, label)),
@@ -735,7 +744,6 @@ export class DeckAgent {
 	/** Put a remembered canvas back: what the agent held, showed and called itself. */
 	private apply(snapshot: StageSnapshot | undefined): void {
 		if (!snapshot) return;
-		if (Array.isArray(snapshot.context)) this.setContext(snapshot.context.filter((path) => typeof path === "string"));
 		if (Array.isArray(snapshot.inPlay)) this.setInPlay(snapshot.inPlay.filter((path) => typeof path === "string"));
 		if (snapshot.positions && typeof snapshot.positions === "object") {
 			// A rewind puts the arrangement back on the canvas, which is where it lives now, so
@@ -772,7 +780,6 @@ export class DeckAgent {
 			id: this.id,
 			identity: () => this.identity,
 			context: () => [...this.held],
-			setContext: (paths: string[]) => this.setContext(paths),
 			inPlay: () => [...this.playing],
 			setInPlay: (paths: string[]) => this.setInPlay(paths, { place: true }),
 			positions: () => ({ ...this.places }),
@@ -812,24 +819,6 @@ export class DeckAgent {
 		return this.playing;
 	}
 
-	/**
-	 * Set the context, keeping the canvas a subset of it.
-	 *
-	 * Detaching a board has to take it off the canvas too — a board in play that the agent
-	 * is no longer holding would be a third state nobody asked for.
-	 *
-	 * `held` is most-recently-touched first, and the callers build the argument that way —
-	 * the newest board leads. This keeps the order: it is the one place the invariant is
-	 * stored, so every reader (`stage.agents()`, the rail, the canvas, the record on disk)
-	 * sees the same list without each deciding what "newest" means for itself.
-	 */
-	setContext(paths: string[]): void {
-		this.held = paths.filter((path, index) => paths.indexOf(path) === index);
-		this.playing = this.playing.filter((path) => this.held.includes(path));
-		this.publishContext();
-	}
-
-	/** Set what is on the canvas. Anything shown is held, so showing can attach. */
 	/** Where this stage has put its boards: what the client draws, and what a switch has to send. */
 	positions(): Record<string, { x: number; y: number }> {
 		return { ...this.places };
@@ -859,11 +848,6 @@ export class DeckAgent {
 	setInPlay(paths: string[], options: { place?: boolean } = {}): void {
 		const wanted = paths.filter((path, index) => paths.indexOf(path) === index);
 		if (options.place) this.placeJoining(wanted);
-		// A board shown for the first time is the most recent touch, so it leads the held
-		// list rather than joining the end. This is one of the two places a board first
-		// enters `held` — the other is `stage.attach`, which fronts them itself — and both
-		// must agree on what "newest" means or the recency order silently splits in two.
-		for (const path of wanted) if (!this.held.includes(path)) this.held.unshift(path);
 		this.playing = wanted;
 		this.publishContext();
 	}
@@ -922,8 +906,7 @@ export class DeckAgent {
 	 * shows the whole deck" fallback does not fire. It reads as the deck being gone.
 	 */
 	forget(path: string): boolean {
-		if (!this.held.includes(path) && !this.playing.includes(path)) return false;
-		this.held = this.held.filter((held) => held !== path);
+		if (!this.playing.includes(path)) return false;
 		this.playing = this.playing.filter((playing) => playing !== path);
 		this.publishContext();
 		return true;
@@ -937,11 +920,11 @@ export class DeckAgent {
 	 * changed, and it has already written itself.
 	 */
 	canvasMoved(): void {
-		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
+		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing], ...(this.canvas ? { canvas: this.canvas } : {}) });
 	}
 
 	private publishContext(): void {
-		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
+		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing], ...(this.canvas ? { canvas: this.canvas } : {}) });
 		// The boards are part of the record, and this is not a transcript change, so the
 		// translator's hook does not cover it.
 		this.save();
@@ -1851,6 +1834,7 @@ export class DeckAgent {
 			identity: this.identity,
 			boards: [...this.held],
 			inPlay: [...this.playing],
+			...(this.canvas ? { canvas: this.canvas } : {}),
 			...(model ? { model } : {}),
 			/*
 			 * What it will spend, and what it has spent. Both were once missing from the

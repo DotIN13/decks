@@ -30,7 +30,6 @@ export interface BoardConversation {
 	/** The focused conversation's id, which is what the canvas verbs are keyed by. */
 	id: string;
 	context(): string[];
-	setContext(paths: string[]): void;
 	inPlay(): string[];
 	setInPlay(paths: string[]): void;
 	positions?(): Record<string, { x: number; y: number }>;
@@ -70,7 +69,6 @@ export function boardActor(options: { path: string; conversation: BoardConversat
 		id: conversation.id,
 		identity: () => identity,
 		context: () => conversation.context(),
-		setContext: (paths) => conversation.setContext(paths),
 		inPlay: () => conversation.inPlay(),
 		setInPlay: (paths) => conversation.setInPlay(paths),
 		...(conversation.positions ? { positions: () => conversation.positions!() } : {}),
