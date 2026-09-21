@@ -560,29 +560,90 @@
 	 * right — and it is not this one: a field with a rule written under it is two lines, and
 	 * three of them side by side in a 440px window would be a form nobody reads.
 	 */
-	.agent-edit-pad {
+	/*
+	 * The edit window's body: three rows, the fact on the left and its control on the right,
+	 * the settings modal's own row without the hairline between them — three rows do not need
+	 * dividing, and the lines read as three separate forms.
+	 */
+	.agent-edit {
 		display: flex;
 		flex-direction: column;
-		gap: 7px;
-		padding: 0 12px 11px;
+		padding: 6px 0 10px;
 	}
-
-	/*
-	 * The window's own note size.
-	 *
-	 * `.nt` is scoped to `:is(.popover, .rowlist) [data-row] > .nt` — it is the note under a
-	 * *row*, and there is no row in here — so it fell back to body size and the hint read
-	 * larger than the field it was explaining. Stated rather than reached for: this is not a
-	 * row, and pretending otherwise to borrow one declaration is how a vocabulary stops
-	 * meaning anything.
-	 */
-	.agent-edit-pad .nt {
-		color: var(--faint);
-		font-size: 10.5px;
+	.agent-edit-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-height: 44px;
+		padding: 6px 14px;
+	}
+	.agent-edit-row.agent-edit-tags {
+		align-items: flex-start;
+		padding-top: 8px;
+	}
+	.agent-edit-row.agent-edit-tags > .agent-edit-k {
+		line-height: 32px;
+	}
+	.agent-edit-k {
+		width: 78px;
+		flex: none;
+		color: var(--muted);
+		font-size: 12px;
+	}
+	.agent-edit-v {
+		display: flex;
+		min-width: 0;
+		flex: 1;
+		flex-direction: column;
+		gap: 7px;
+	}
+	.agent-edit-v > .field {
+		width: 100%;
+		box-sizing: border-box;
+	}
+	.agent-edit-v > .field[data-invalid] {
+		border-color: var(--color-danger);
+	}
+	/* Said only when it bites: under the field, in the field's own red. */
+	.agent-edit-err {
+		margin: -2px 0 0;
+		color: var(--color-danger);
+		font-size: 11px;
 		line-height: 1.4;
 	}
-
-	.agent-edit-pad .tag {
+	/* The picker wears the field's shape, so the three rows line up as three fields. */
+	.agent-edit-pick {
+		display: flex;
+		width: 100%;
+		height: 32px;
+		flex: none; /* `.field` says `flex: 1`, which in this column is a basis of 0 and a height of one line */
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		box-sizing: border-box;
+		padding: 0 8px 0 10px;
+		color: var(--fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 12px;
+		text-align: left;
+	}
+	.agent-edit-pick > svg {
+		color: var(--muted);
+	}
+	.agent-edit-pick[aria-expanded="true"] {
+		background: var(--line);
+	}
+	.agent-edit-pick-v {
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+	}
+	.agent-edit-pick-v[data-none] {
+		color: var(--faint);
+		font-family: inherit;
+		font-size: 12px;
+	}
+	.agent-edit .tag {
 		display: inline-flex;
 		align-items: center;
 		gap: 3px;

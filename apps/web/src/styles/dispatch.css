@@ -1145,25 +1145,142 @@
 			opacity: 1;
 		}
 	}
-	.canvas-menu-name {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		padding: 2px 6px 8px;
+	/* The menu's rows are all the same weight: a verb is a verb, chevron or not. */
+	.canvas-menu [data-row] > .lb {
+		font-weight: 400;
 	}
-	.canvas-menu-name > .nt {
-		font-size: 10.5px;
+	.canvas-menu-chev {
+		margin-left: auto;
 		color: var(--faint);
 	}
-	.canvas-menu-move {
-		padding-left: 8px;
-		border-left: 2px solid var(--line);
-	}
-	.canvas-menu-remove {
+	.canvas-menu-remove,
+	.canvas-menu-remove > .ic {
 		color: var(--color-danger);
 	}
-	.canvas-menu-remove[data-armed="true"] {
+	/* The way back from the list: a heading you can press, in the note's voice. */
+	.canvas-menu-back {
+		display: flex;
+		width: 100%;
+		align-items: center;
+		gap: 3px;
+		padding: 4px 6px 6px 3px;
+		border: 0;
+		background: transparent;
+		color: var(--muted);
+		font: inherit;
+		font-size: 11.5px;
+		cursor: pointer;
+		text-align: left;
+	}
+	.canvas-menu-back:hover {
+		color: var(--fg);
+	}
+	/* *New workspace…* under a rule, at the foot of both lists. */
+	.canvas-menu-new {
+		margin-top: 4px;
+		padding-top: 10px;
+		border-top: 1px solid var(--line);
+		border-radius: 0 0 7px 7px;
+	}
+	/* The question Remove turns the menu into. */
+	.canvas-menu-confirm {
+		padding: 4px 6px 2px;
+	}
+	.canvas-menu-q {
+		margin: 0 0 2px;
+		font-size: 12.5px;
 		font-weight: 600;
+	}
+	.canvas-menu-sub {
+		margin: 0 0 10px;
+		color: var(--muted);
+		font-size: 11.5px;
+	}
+	.canvas-menu-acts {
+		display: flex;
+		justify-content: flex-end;
+		gap: 6px;
+	}
+	.canvas-btn {
+		height: 28px;
+		padding: 0 12px;
+		border: 1px solid var(--line-strong);
+		border-radius: var(--control-radius, 7px);
+		background: var(--panel);
+		color: var(--fg);
+		font: inherit;
+		font-size: 12px;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.canvas-btn:hover {
+		background: var(--line);
+	}
+	.canvas-btn-danger {
+		border-color: var(--color-danger);
+		background: var(--color-danger);
+		color: #fff;
+	}
+	.canvas-btn-danger:hover {
+		background: color-mix(in srgb, var(--color-danger) 85%, black);
+	}
+	/* The name, opened on the card: a field over the card's own name line. */
+	.canvas-rename {
+		position: absolute;
+		z-index: 2;
+		top: 9px;
+		left: 10px;
+		right: 36px;
+		box-sizing: border-box;
+		height: 22px;
+		padding: 0 4px;
+		border: 0;
+		border-radius: 5px;
+		outline: 2px solid var(--color-accent);
+		background: var(--panel);
+		color: var(--fg);
+		font: inherit;
+		font-size: 14px;
+		font-weight: 600;
+		line-height: 22px;
+	}
+	.canvas-slot[data-renaming] > .canvas-card > .canvas-card-name {
+		visibility: hidden;
+	}
+	/* The shared name field: what a new workspace is typed into, wherever it is typed. */
+	.ws-new {
+		padding: 3px 3px 2px;
+	}
+	.ws-new-line {
+		display: flex;
+		gap: 5px;
+	}
+	.ws-new-create {
+		height: 32px;
+		flex: none;
+		padding: 0 11px;
+		border: 1px solid var(--fg);
+		border-radius: var(--control-radius, 7px);
+		background: var(--fg);
+		color: var(--bg);
+		font: inherit;
+		font-size: 12px;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.ws-new-create:disabled {
+		cursor: default;
+		opacity: 0.45;
+	}
+	.ws-new-slug {
+		margin: 7px 3px 2px;
+		color: var(--muted);
+		font-size: 11px;
+	}
+	.ws-new-slug > code {
+		color: var(--fg);
+		font-family: var(--font-mono);
+		font-size: 11px;
 	}
 
 	@media (prefers-reduced-motion: reduce) {

@@ -345,6 +345,13 @@ export function LeftPanel(props: {
 	createEffect(() => setAgentList(reconcile(agentSections(agentInput()))));
 
 	/** Every agent, unfiltered — what the foot counts and the placeholder says. */
+	/* Every name on the deck but the agent's own: what the edit window checks a new name against
+	   before the server does, so the refusal is a red line under the field rather than a notice. */
+	const nameTaken = (name: string, self: string) => {
+		const wanted = name.trim().toLowerCase();
+		return (props.chats ?? []).some((chat) => chat.id !== self && (props.identities?.[chat.id]?.name ?? chat.name).trim().toLowerCase() === wanted);
+	};
+
 	const allAgents = createMemo(() => agentTally(agentSections({ chats: props.chats ?? [], identities: props.identities ?? {}, unread: props.unread ?? {}, focused: props.focused })));
 
 	let list: HTMLDivElement | undefined;
@@ -817,6 +824,7 @@ export function LeftPanel(props: {
 												workspaces={workspaceNames()}
 												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
 												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
+												taken={(name) => nameTaken(name, row.chat.id)}
 												{...(props.onMirrorAgent ? { onMirror: () => props.onMirrorAgent?.(row.chat.id) } : {})}
 											/>
 										)}

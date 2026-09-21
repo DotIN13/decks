@@ -1,70 +1,77 @@
+import Check from "lucide-solid/icons/check";
+import ChevronDown from "lucide-solid/icons/chevron-down";
 import X from "lucide-solid/icons/x";
-import { createEffect, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
+import { Popover } from "../ui/Popover.tsx";
 import { Icon } from "../ui/icons.tsx";
+import { NO_WORKSPACE } from "./canvas-sections.ts";
+import { WorkspaceField } from "./NewWorkspace.tsx";
+
+/** The server keeps four of your tags at most (`agents/tags.ts`); past that the field goes away. */
+const MAX_TAGS = 4;
 
 /**
- * Everything about one agent that a person may change, in one window.
+ * Everything about one agent that a person may change, in one window: three rows.
  *
  * ### What this replaced
  *
- * A 228px popover hanging off a pen in the row's action column, holding a workspace field
- * and a tag field. It was the right two fields in the wrong container: a popover is for a
- * choice you make and dismiss, and this is a small form — three fields, each with a rule
- * about what it accepts, and one of them (the name) could not be in there at all because
- * there was no room to say why a name was refused. It also could not be opened from
- * anywhere else, so the name in the pill and the name in the panel were edited by two
- * different gestures in two different places.
+ * Three groups in the settings modal's shape, each a heading, a sentence saying what the
+ * group was for, a field, and a rule written under it — 89 words on screen before anything
+ * was pressed, for three facts. It read as a form to be studied rather than a thing to be
+ * changed. What stands here instead is the settings modal's *row*: the fact on the left, the
+ * one control that changes it on the right, and no hairline between rows because three rows
+ * do not need dividing.
  *
- * So it is the app's modal instead, the shape `Settings` and `Usage` already are:
- * `.picker-backdrop` over everything, a `.set-head` naming the subject, groups on a
- * recessed ground. Nothing new to learn, and room for each field to say its own rule.
+ * ### A rule is said only when it bites
  *
- * ### The three fields are three different kinds of fact
+ * - **The name** is how the bar addresses the agent (`@Sable`), so the deck refuses a name
+ *   another agent already answers to. Rather than a sentence saying so, the field turns red
+ *   with *Another agent is already called Sable* the moment the typed name is somebody
+ *   else's, and Enter does nothing until it is not. The server is still the judge — a name it
+ *   refuses comes back as a notice and an `agent.identity` that puts the old one back — but
+ *   the window knows every name on the deck, so it can say so first.
+ * - **The workspace** is picked from a list rather than typed: every workspace in use, *No
+ *   workspace*, and *New workspace…*, which is the one place a name is typed. A second
+ *   spelling of a project cannot happen, so the slug rule need not be written here either.
+ * - **The tags** are yours alone (`Identity.userTags`), and the agent's own stay on its row in
+ *   the panel, where they already were. Chips, and a field under them; the field goes away
+ *   at the fourth tag, which is the cap, shown rather than stated.
  *
- * - **The name** is the agent's own, and yours to change: it is how the bar addresses it
- *   (`@Sable`), so the deck refuses a name another agent already answers to. The refusal
- *   comes back as a notice and an `agent.identity` that puts the old name back in the field.
- * - **The workspace** is a location, one value, and either of you may write it — the agent
- *   through `stage.canvas(name)` and you through here.
- * - **The tags** are two lists that never write to each other: what the agent says it is
- *   doing, which is read-only here, and what *you* say about it, which is what this edits.
- *
- * Committed on Enter or on leaving a field, and never on a keystroke: a workspace is a word
- * other agents have to say, and `polit`, `politi`, `political-llm` typed into a live field
- * would be three workspaces, two of them abandoned.
+ * Committed on Enter or on leaving a field, and never on a keystroke, as before: a name is
+ * a word the bar has to match, and a half-typed one sent on every key would rename the
+ * agent five times on the way to *Sable*.
  */
 export function AgentEdit(props: {
 	agentId: string;
 	/** The agent's name as the deck has it; the field follows this, so a refusal puts it back. */
 	name: string;
-	/** What the agent says it is doing. Read-only: it is the agent's sentence, not yours. */
-	tags: string[];
 	/** What you say about it. This is what the tag field edits. */
 	userTags: string[];
 	workspace?: string;
-	/** Every workspace in use, as suggestions — the one thing that stops a second spelling. */
+	/** Every workspace in use, which is the list the picker offers. */
 	workspaces: string[];
+	/** Whether another agent already answers to this name. Without it, only the server refuses. */
+	taken?: (name: string) => boolean;
+	/** The agent's face, for the window's header, so the window is visibly about one agent. */
+	face?: JSX.Element;
 	onRename: (name: string) => void;
 	onTags: (tags: string[]) => void;
 	onWorkspace: (workspace: string | null) => void;
 	onClose: () => void;
 }) {
 	const [name, setName] = createSignal(props.name);
-	const [room, setRoom] = createSignal(props.workspace ?? "");
 	const [draft, setDraft] = createSignal("");
-	const listId = createUniqueId();
 	let nameField: HTMLInputElement | undefined;
 
-	/*
-	 * The fields follow the agent rather than owning it.
-	 *
-	 * Both of these have two writers — the agent names itself and declares its workspace,
-	 * you do the same from here — so a field that only held what you last typed would sit
-	 * there disagreeing with the row it was opened from. It is also how a refused rename
-	 * puts the old name back: the server replies with the identity it kept.
-	 */
+	/* The field follows the agent rather than owning it: the agent names itself too, and a
+	   refused rename comes back as the identity the server kept. */
 	createEffect(() => setName(props.name));
-	createEffect(() => setRoom(props.workspace ?? ""));
+
+	const taken = () => {
+		const wanted = name().trim();
+		if (wanted === "" || wanted.toLowerCase() === props.name.toLowerCase()) return false;
+		return props.taken?.(wanted) ?? false;
+	};
 
 	onMount(() => {
 		/*
@@ -78,12 +85,12 @@ export function AgentEdit(props: {
 		 * is the alternative: while this is open it takes Escape *first*, closes, and stops
 		 * the event — so the stage behind it neither goes Home nor drops its selection.
 		 *
-		 * On `window` rather than the card, for the reason `Settings` gives: a handler on a
-		 * div only fires while focus is inside it, and nothing here holds focus once a chip's
-		 * × has been pressed.
+		 * While the workspace list is open, Escape is the list's: it closes itself, and a
+		 * second press closes the window.
 		 */
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key !== "Escape" || event.defaultPrevented) return;
+			if (document.querySelector(".popover.agent-edit-list")) return;
 			event.preventDefault();
 			event.stopPropagation();
 			props.onClose();
@@ -96,17 +103,12 @@ export function AgentEdit(props: {
 
 	const commitName = () => {
 		const wanted = name().trim();
+		if (taken()) return;
 		if (!wanted || wanted === props.name) {
 			setName(props.name);
 			return;
 		}
 		props.onRename(wanted);
-	};
-
-	const commitRoom = () => {
-		const wanted = room().trim();
-		if (wanted === (props.workspace ?? "")) return;
-		props.onWorkspace(wanted || null);
 	};
 
 	/*
@@ -140,11 +142,12 @@ export function AgentEdit(props: {
 			}}
 		>
 			<div
-				class="panel-float static flex max-h-[86%] w-[min(440px,calc(100vw-24px))] flex-col overflow-hidden p-0"
+				class="panel-float static flex max-h-[86%] w-[min(400px,calc(100vw-24px))] flex-col overflow-hidden p-0"
 				role="dialog"
 				aria-label={`Edit ${props.name}`}
 			>
 				<header class="set-head">
+					{props.face}
 					<span class="set-head-title">{props.name}</span>
 					<span class="flex-1" />
 					<button class="iconbtn [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
@@ -152,18 +155,16 @@ export function AgentEdit(props: {
 					</button>
 				</header>
 
-				<div class="set-body">
-					<section class="set-group">
-						<header>
-							<span class="set-title">Name</span>
-							<span class="set-note">how you address it from the bar</span>
-						</header>
-						<div class="agent-edit-pad">
-							<label class="field h-8 flex-none gap-1.5 rounded-md">
+				<div class="agent-edit">
+					<div class="agent-edit-row">
+						<span class="agent-edit-k">Name</span>
+						<div class="agent-edit-v">
+							<label class="field h-8 flex-none gap-1.5 rounded-md" data-invalid={taken() ? "true" : undefined}>
 								<input
 									ref={nameField}
 									type="text"
 									aria-label="Agent name"
+									aria-invalid={taken()}
 									spellcheck={false}
 									class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
 									maxLength={40}
@@ -177,58 +178,25 @@ export function AgentEdit(props: {
 									}}
 								/>
 							</label>
-							<p class="nt m-0">⏎ to rename. Two agents cannot share a name; the deck says so and keeps the old one.</p>
-						</div>
-					</section>
-
-					<section class="set-group">
-						<header>
-							<span class="set-title">Workspace</span>
-							<span class="set-note">the project it is on, which the panel groups by</span>
-						</header>
-						<div class="agent-edit-pad">
-							<label class="field h-8 flex-none gap-1.5 rounded-md">
-								<input
-									type="text"
-									aria-label="Workspace"
-									spellcheck={false}
-									class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
-									placeholder="No workspace"
-									list={listId}
-									value={room()}
-									onInput={(event) => setRoom(event.currentTarget.value)}
-									onBlur={commitRoom}
-									onKeyDown={(event) => {
-										if (event.key !== "Enter") return;
-										event.preventDefault();
-										commitRoom();
-									}}
-								/>
-							</label>
-							<datalist id={listId}>
-								<For each={props.workspaces}>{(workspace) => <option value={workspace} />}</For>
-							</datalist>
-							<p class="nt m-0">Slugged and cut at 24 characters. ⏎ to move it; empty leaves the workspace.</p>
-						</div>
-					</section>
-
-					<section class="set-group">
-						<header>
-							<span class="set-title">Tags</span>
-							<span class="set-note">yours to write; the agent's are shown, not edited</span>
-						</header>
-						<div class="agent-edit-pad">
-							<Show when={props.tags.length > 0}>
-								<div class="tags">
-									<For each={props.tags}>{(tag) => <span class="tag">{tag}</span>}</For>
-								</div>
-								<p class="nt m-0">What it says it is doing. It rewrites these itself, so they are not yours to keep.</p>
+							<Show when={taken()}>
+								<p class="agent-edit-err" role="alert">
+									Another agent is already called {name().trim()}.
+								</p>
 							</Show>
+						</div>
+					</div>
 
-							<Show
-								when={props.userTags.length > 0}
-								fallback={<p class="nt m-0">None of yours yet. These are yours alone: the agent cannot see or overwrite them.</p>}
-							>
+					<div class="agent-edit-row">
+						<span class="agent-edit-k">Workspace</span>
+						<div class="agent-edit-v">
+							<WorkspacePick {...(props.workspace ? { value: props.workspace } : {})} workspaces={props.workspaces} onPick={props.onWorkspace} />
+						</div>
+					</div>
+
+					<div class="agent-edit-row agent-edit-tags">
+						<span class="agent-edit-k">Tags</span>
+						<div class="agent-edit-v">
+							<Show when={props.userTags.length > 0}>
 								<div class="tags">
 									<For each={props.userTags}>
 										{(tag) => (
@@ -248,34 +216,114 @@ export function AgentEdit(props: {
 									</For>
 								</div>
 							</Show>
-
-							<label class="field h-8 flex-none gap-1.5 rounded-md">
-								<input
-									type="text"
-									spellcheck={false}
-									class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
-									placeholder="Add a tag…"
-									value={draft()}
-									onInput={(event) => setDraft(event.currentTarget.value)}
-									onKeyDown={(event) => {
-										if (event.key === "Enter") {
-											event.preventDefault();
-											add();
-										}
-										// Backspace on an empty field takes the last one off, which is what
-										// every tag field does and what a hand reaches for unprompted.
-										if (event.key === "Backspace" && !draft() && props.userTags.length > 0) {
-											event.preventDefault();
-											props.onTags(props.userTags.slice(0, -1));
-										}
-									}}
-								/>
-							</label>
-							<p class="nt m-0">Four at most, lowercased and hyphenated. ⏎ to add.</p>
+							<Show when={props.userTags.length < MAX_TAGS}>
+								<label class="field h-8 flex-none gap-1.5 rounded-md">
+									<input
+										type="text"
+										spellcheck={false}
+										class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
+										placeholder="Add a tag"
+										aria-label="Add a tag"
+										value={draft()}
+										onInput={(event) => setDraft(event.currentTarget.value)}
+										onKeyDown={(event) => {
+											if (event.key === "Enter") {
+												event.preventDefault();
+												add();
+											}
+											// Backspace on an empty field takes the last one off, which is what
+											// every tag field does and what a hand reaches for unprompted.
+											if (event.key === "Backspace" && !draft() && props.userTags.length > 0) {
+												event.preventDefault();
+												props.onTags(props.userTags.slice(0, -1));
+											}
+										}}
+									/>
+								</label>
+							</Show>
 						</div>
-					</section>
+					</div>
 				</div>
 			</div>
 		</div>
+	);
+}
+
+/**
+ * The workspace, as a list to pick from: a field-shaped button showing the current one, and
+ * under it every workspace in use, *No workspace*, and *New workspace…*, which turns the
+ * list into the shared name field. The same list the canvas menu's *Move to* shows, so the
+ * two places a thing is filed under a project look alike.
+ */
+function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (workspace: string | null) => void }) {
+	const [making, setMaking] = createSignal(false);
+	const [wanted, setWanted] = createSignal("");
+	let dismiss: (() => void) | undefined;
+	const create = () => {
+		const name = wanted().trim();
+		if (!name) return;
+		props.onPick(name);
+		dismiss?.();
+	};
+	return (
+		<Popover
+			placement="bottom-start"
+			class="agent-edit-list w-[266px]"
+			label="Workspace"
+			onOpenChange={() => {
+				setMaking(false);
+				setWanted("");
+			}}
+			trigger={(api) => {
+				dismiss = () => {
+					if (api.open) api.toggle();
+				};
+				return (
+					<button
+						ref={api.ref}
+						type="button"
+						class="field agent-edit-pick rounded-md"
+						aria-haspopup="listbox"
+						aria-expanded={api.open}
+						aria-label="Workspace"
+						onClick={api.toggle}
+					>
+						<span class="agent-edit-pick-v" data-none={props.value ? undefined : "true"}>
+							{props.value ?? NO_WORKSPACE}
+						</span>
+						<Icon of={ChevronDown} size={13} />
+					</button>
+				);
+			}}
+		>
+			<Show when={!making()} fallback={<WorkspaceField value={wanted()} onInput={setWanted} onCreate={create} autofocus />}>
+				<For each={[...props.workspaces, ""]}>
+					{(workspace) => {
+						const current = () => (props.value ?? "") === workspace;
+						return (
+							<button
+								type="button"
+								data-row
+								data-flat="true"
+								data-current={current()}
+								role="option"
+								aria-selected={current()}
+								onClick={() => {
+									if (!current()) props.onPick(workspace || null);
+								}}
+							>
+								<span class="lb flex-1">{workspace || NO_WORKSPACE}</span>
+								<Show when={current()}>
+									<Icon of={Check} size={11} class="text-accent" />
+								</Show>
+							</button>
+						);
+					}}
+				</For>
+				<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="canvas-menu-new" onClick={() => setMaking(true)}>
+					<span class="lb flex-1">New workspace…</span>
+				</button>
+			</Show>
+		</Popover>
 	);
 }

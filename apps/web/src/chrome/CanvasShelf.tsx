@@ -1,13 +1,18 @@
 import type { Board, Canvas, Identity } from "@decks/protocol";
+import ArrowRightLeft from "lucide-solid/icons/arrow-right-left";
 import Check from "lucide-solid/icons/check";
+import ChevronLeft from "lucide-solid/icons/chevron-left";
+import ChevronRight from "lucide-solid/icons/chevron-right";
 import Ellipsis from "lucide-solid/icons/ellipsis";
+import Pencil from "lucide-solid/icons/pencil";
 import Plus from "lucide-solid/icons/plus";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import Trash2 from "lucide-solid/icons/trash-2";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { Popover } from "../ui/Popover.tsx";
 import { Icon } from "../ui/icons.tsx";
 import { BoardPicture } from "./BoardPicture.tsx";
 import { canvasSections, NO_WORKSPACE, type CanvasSection } from "./canvas-sections.ts";
-import { NewWorkspace } from "./NewWorkspace.tsx";
+import { NewWorkspace, WorkspaceField } from "./NewWorkspace.tsx";
 import { relativeTime } from "./workspace-panel.ts";
 
 /**
@@ -100,8 +105,32 @@ export function CanvasShelf(props: CanvasShelfProps) {
 								{(canvas) => {
 									const news = () => canvas.changedAt > (canvas.openedAt ?? 0);
 									const working = () => canvas.agents.map((id) => props.identities[id]).filter((identity): identity is Identity => identity !== undefined);
+									/*
+									 * Renamed on the card, not in the menu: the menu's *Rename* opens the name
+									 * where it lives, selected, and Enter keeps it while Escape puts it back. The
+									 * field sits over the card's name rather than inside it, because the card is
+									 * a button and a field inside a button is a press that opens the canvas.
+									 */
+									const [renaming, setRenaming] = createSignal(false);
+									let renameField: HTMLInputElement | undefined;
+									let renamed = false;
+									const startRename = () => {
+										renamed = false;
+										setRenaming(true);
+										requestAnimationFrame(() => {
+											renameField?.focus();
+											renameField?.select();
+										});
+									};
+									const endRename = (keep: boolean) => {
+										if (renamed) return;
+										renamed = true;
+										const wanted = renameField?.value.trim() ?? "";
+										if (keep && wanted && wanted !== canvas.name) props.onRename(canvas.id, wanted);
+										setRenaming(false);
+									};
 									return (
-										<div class="canvas-slot">
+										<div class="canvas-slot" data-renaming={renaming() ? "true" : undefined}>
 											<button
 												type="button"
 												class="canvas-card"
@@ -148,10 +177,32 @@ export function CanvasShelf(props: CanvasShelfProps) {
 													{relativeTime(canvas.changedAt)}
 												</span>
 											</button>
+											<Show when={renaming()}>
+												<input
+													ref={renameField}
+													type="text"
+													class="canvas-rename"
+													aria-label={`Rename ${canvas.name}`}
+													value={canvas.name}
+													spellcheck={false}
+													onClick={(event) => event.stopPropagation()}
+													onKeyDown={(event) => {
+														if (event.key === "Enter") {
+															event.preventDefault();
+															endRename(true);
+														} else if (event.key === "Escape") {
+															event.preventDefault();
+															event.stopPropagation();
+															endRename(false);
+														}
+													}}
+													onBlur={() => endRename(true)}
+												/>
+											</Show>
 											<CanvasMenu
 												canvas={canvas}
 												workspaces={props.workspaces}
-												onRename={(name) => props.onRename(canvas.id, name)}
+												onRename={startRename}
 												onMove={(workspace) => props.onMove(canvas.id, workspace)}
 												onRemove={() => props.onRemove(canvas.id)}
 											/>
@@ -211,34 +262,43 @@ export function CanvasShelf(props: CanvasShelfProps) {
 }
 
 /**
- * The card's menu: rename, move, remove.
+ * The card's menu: three verbs, and nothing to fill in.
  *
- * A `Popover` off a `···` in the card's corner, drawn as a sibling of the card and not inside
- * it, because the card is a button and a button inside a button is not a thing. Rename is a
- * field in the menu rather than a dialog: the name is one word and the card is right there.
- * Remove asks twice, the way a board's delete does — it drops the arrangement only, so it
- * does not deserve a dialog, and it is not undoable, so it does not deserve one press.
+ * *Rename* hands back to the card, which opens its own name. *Move to…* is a disclosure
+ * (`aria-expanded`, so the press does not close the menu) onto the list of workspaces, the
+ * current one checked, *No workspace* last and *New workspace…* under a rule — the same list
+ * the agent window's picker shows. *Remove* asks once, in place: the menu becomes the
+ * question, with Cancel and Remove as two buttons, rather than a row that changed its own
+ * words and had to be pressed twice. Boards stay in the deck either way, and the question
+ * says so, because that is the one thing a person about to press Remove wants to know.
  */
-function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: (name: string) => void; onMove: (workspace: string | null) => void; onRemove: () => void }) {
-	const [name, setName] = createSignal(props.canvas.name);
-	const [moving, setMoving] = createSignal(false);
-	const [armed, setArmed] = createSignal(false);
+function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: () => void; onMove: (workspace: string | null) => void; onRemove: () => void }) {
+	const [view, setView] = createSignal<"menu" | "move" | "new" | "confirm">("menu");
+	const [wanted, setWanted] = createSignal("");
 	let dismiss: (() => void) | undefined;
-	const commit = () => {
-		const wanted = name().trim();
-		if (wanted && wanted !== props.canvas.name) props.onRename(wanted);
+	const pick = (workspace: string | null) => {
+		if ((props.canvas.workspace ?? null) !== workspace) props.onMove(workspace);
+		dismiss?.();
+	};
+	const create = () => {
+		const name = wanted().trim();
+		if (!name) return;
+		props.onMove(name);
+		dismiss?.();
+	};
+	const boards = () => {
+		const n = props.canvas.boards.length;
+		if (n === 0) return "There is nothing on it.";
+		return n === 1 ? "Its board stays in the deck." : `Its ${n} boards stay in the deck.`;
 	};
 	return (
 		<Popover
 			placement="bottom-end"
-			class="canvas-menu w-[220px]"
+			class="canvas-menu w-[224px]"
 			label={`${props.canvas.name}: rename, move or remove`}
-			onOpenChange={(open) => {
-				dismiss = undefined;
-				setName(props.canvas.name);
-				setMoving(false);
-				setArmed(false);
-				if (!open) commit();
+			onOpenChange={() => {
+				setView("menu");
+				setWanted("");
 			}}
 			trigger={(api) => {
 				dismiss = () => {
@@ -263,80 +323,79 @@ function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: (na
 				);
 			}}
 		>
-			<label class="canvas-menu-name">
-				<span class="nt">Name</span>
-				<input
-					class="field"
-					type="text"
-					value={name()}
-					spellcheck={false}
-					onInput={(event) => setName(event.currentTarget.value)}
-					onKeyDown={(event) => {
-						if (event.key !== "Enter") return;
-						event.preventDefault();
-						commit();
-						dismiss?.();
-					}}
-				/>
-			</label>
-			{/* The move row is a disclosure within the menu (`aria-expanded`), so the press that opens it
-			    does not close the menu; the remove row keeps it open for the same reason, to be pressed twice. */}
-			<Show
-				when={moving()}
-				fallback={
-					<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} onClick={() => setMoving(true)}>
-						<span class="lb flex-1">Move to workspace…</span>
-						<span class="nt">{props.canvas.workspace ?? "none"}</span>
+			<Switch>
+				<Match when={view() === "menu"}>
+					<button type="button" data-row role="menuitem" class="canvas-menu-rename" onClick={() => props.onRename()}>
+						<span class="ic">
+							<Icon of={Pencil} size={13} />
+						</span>
+						<span class="lb">Rename</span>
 					</button>
-				}
-			>
-				<div class="canvas-menu-move" role="group" aria-label="Move to workspace">
-					<For each={[...props.workspaces, ""]}>
-						{(workspace) => {
-							const current = () => (props.canvas.workspace ?? "") === workspace;
-							return (
-								<button
-									type="button"
-									data-row
-									data-flat="true"
-									data-current={current()}
-									role="menuitemradio"
-									aria-checked={current()}
-									onClick={() => {
-										if (!current()) props.onMove(workspace || null);
-										dismiss?.();
-									}}
-								>
-									<span class="lb flex-1">{workspace || NO_WORKSPACE}</span>
-									<Show when={current()}>
-										<Icon of={Check} size={11} class="text-accent" />
-									</Show>
-								</button>
-							);
-						}}
-					</For>
-				</div>
-			</Show>
-			<button
-				type="button"
-				data-row
-				data-flat="true"
-				role="menuitem"
-				class="canvas-menu-remove"
-				data-keep-open
-				data-armed={armed() ? "true" : undefined}
-				onClick={() => {
-					if (!armed()) {
-						setArmed(true);
-						return;
-					}
-					props.onRemove();
-					dismiss?.();
-				}}
-			>
-				<span class="lb flex-1">{armed() ? "Press again to remove" : "Remove"}</span>
-				<span class="nt">{armed() ? "boards stay" : ""}</span>
-			</button>
+					<button type="button" data-row role="menuitem" aria-expanded={false} class="canvas-menu-move" onClick={() => setView("move")}>
+						<span class="ic">
+							<Icon of={ArrowRightLeft} size={13} />
+						</span>
+						<span class="lb">
+							Move to…
+							<Icon of={ChevronRight} size={12} class="canvas-menu-chev" />
+						</span>
+					</button>
+					<button type="button" data-row role="menuitem" data-keep-open class="canvas-menu-remove" onClick={() => setView("confirm")}>
+						<span class="ic">
+							<Icon of={Trash2} size={13} />
+						</span>
+						<span class="lb">Remove</span>
+					</button>
+				</Match>
+				<Match when={view() === "move"}>
+					<div class="canvas-menu-list" role="group" aria-label="Move to workspace">
+						<button type="button" class="canvas-menu-back" onClick={() => setView("menu")}>
+							<Icon of={ChevronLeft} size={12} />
+							Move to
+						</button>
+						<For each={[...props.workspaces, ""]}>
+							{(workspace) => {
+								const current = () => (props.canvas.workspace ?? "") === workspace;
+								return (
+									<button type="button" data-row data-flat="true" data-current={current()} role="menuitemradio" aria-checked={current()} onClick={() => pick(workspace || null)}>
+										<span class="lb flex-1">{workspace || NO_WORKSPACE}</span>
+										<Show when={current()}>
+											<Icon of={Check} size={11} class="text-accent" />
+										</Show>
+									</button>
+								);
+							}}
+						</For>
+						<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="canvas-menu-new" onClick={() => setView("new")}>
+							<span class="lb flex-1">New workspace…</span>
+						</button>
+					</div>
+				</Match>
+				<Match when={view() === "new"}>
+					<WorkspaceField value={wanted()} onInput={setWanted} onCreate={create} autofocus />
+				</Match>
+				<Match when={view() === "confirm"}>
+					<div class="canvas-menu-confirm" role="alertdialog" aria-label={`Remove ${props.canvas.name}?`}>
+						<p class="canvas-menu-q">Remove {props.canvas.name}?</p>
+						<p class="canvas-menu-sub">{boards()}</p>
+						<div class="canvas-menu-acts">
+							<button type="button" class="canvas-btn" onClick={() => setView("menu")}>
+								Cancel
+							</button>
+							<button
+								type="button"
+								class="canvas-btn canvas-btn-danger canvas-menu-yes"
+								onClick={() => {
+									props.onRemove();
+									dismiss?.();
+								}}
+							>
+								Remove
+							</button>
+						</div>
+					</div>
+				</Match>
+			</Switch>
 		</Popover>
 	);
 }

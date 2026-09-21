@@ -75,6 +75,8 @@ export function AgentRow(props: {
 	 * left to memory. Read off the identities the panel already holds; no extra fetch.
 	 */
 	workspaces?: string[];
+	/** Whether another agent already answers to a name, for the window's red line. */
+	taken?: (name: string) => boolean;
 }) {
 	const chat = () => props.row.chat;
 	const name = () => props.identity?.name ?? chat().name;
@@ -231,8 +233,9 @@ export function AgentRow(props: {
 								<AgentEdit
 									agentId={chat().id}
 									name={name()}
-									tags={props.row.tags}
 									userTags={props.row.userTags}
+									face={<AgentFace chat={chat()} identity={props.identity} size={22} ring={1.5} />}
+									{...(props.taken ? { taken: props.taken } : {})}
 									{...(workspace() ? { workspace: workspace() } : {})}
 									workspaces={props.workspaces ?? []}
 									onRename={(next) => props.onRename?.(next)}

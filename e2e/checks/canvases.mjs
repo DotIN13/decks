@@ -75,11 +75,15 @@ const slot = page.locator('.canvas-slot:has(.canvas-card[data-canvas-id="cv_d2"]
 await slot.locator(".canvas-more").click({ force: true });
 await page.waitForSelector(".popover", { timeout: 5000 });
 if (SHOTS) await page.screenshot({ path: `${SHOTS}/menu.png`, clip: { x: 264, y: 0, width: 1136, height: 620 } });
-await page.locator(".popover [data-row]", { hasText: "Move to workspace" }).click();
+/* Three verbs, no field. Rename hands back to the card; Move to… is a disclosure onto the
+   list; Remove turns the menu into a question with two buttons. */
+const verbs = await page.evaluate(() => [...document.querySelectorAll(".popover [data-row] .lb")].map((lb) => lb.textContent?.trim()));
+say("the card's menu is three verbs", JSON.stringify(verbs) === JSON.stringify(["Rename", "Move to…", "Remove"]), JSON.stringify(verbs));
+await page.locator(".popover .canvas-menu-move").click();
 await settle(page, 200);
-const offered = await page.evaluate(() => [...document.querySelectorAll(".popover .canvas-menu-move [data-row] .lb")].map((lb) => lb.textContent?.trim()));
-say("the card's menu offers every workspace in use, and none", JSON.stringify(offered) === JSON.stringify(["cross-interviewer", "decks", "political-llm", "No workspace"]), JSON.stringify(offered));
-await page.locator(".popover .canvas-menu-move [data-row]", { hasText: "political-llm" }).click();
+const offered = await page.evaluate(() => [...document.querySelectorAll(".popover .canvas-menu-list [data-row] .lb")].map((lb) => lb.textContent?.trim()));
+say("Move to… offers every workspace in use, none, and a new one", JSON.stringify(offered) === JSON.stringify(["cross-interviewer", "decks", "political-llm", "No workspace", "New workspace…"]), JSON.stringify(offered));
+await page.locator(".popover .canvas-menu-list [data-row]", { hasText: "political-llm" }).click();
 await settle(page, 300);
 let moved = await sent("canvas.workspace");
 say("…and moving sends the canvas to that workspace", moved.length === 1 && moved[0].id === "cv_d2" && moved[0].workspace === "political-llm", JSON.stringify(moved));
@@ -90,11 +94,37 @@ await slot.locator(".canvas-more").click({ force: true });
 await page.waitForSelector(".popover", { timeout: 5000 });
 await page.locator(".popover .canvas-menu-remove").click();
 await settle(page, 200);
-say("Remove asks once", (await sent("canvas.remove")).length === 0 && (await page.locator(".popover .canvas-menu-remove").textContent())?.includes("again"));
+const asked = await page.evaluate(() => ({
+	q: document.querySelector(".popover .canvas-menu-q")?.textContent,
+	sub: document.querySelector(".popover .canvas-menu-sub")?.textContent,
+	buttons: [...document.querySelectorAll(".popover .canvas-btn")].map((b) => b.textContent?.trim()),
+}));
+say("Remove asks once, in place, and says the boards stay", (await sent("canvas.remove")).length === 0 && asked.q === "Remove Canvas camera?" && asked.sub === "There is nothing on it." && JSON.stringify(asked.buttons) === JSON.stringify(["Cancel", "Remove"]), JSON.stringify(asked));
+await page.locator(".popover .canvas-btn", { hasText: "Cancel" }).click();
+await settle(page, 200);
+say("…Cancel goes back to the verbs, with the menu still open", (await page.locator(".popover .canvas-menu-remove").count()) === 1);
 await page.locator(".popover .canvas-menu-remove").click();
+await settle(page, 200);
+await page.locator(".popover .canvas-menu-yes").click();
 await settle(page, 300);
 let removed = await sent("canvas.remove");
-say("…and removes on the second press", removed.length === 1 && removed[0].id === "cv_d2", JSON.stringify(removed));
+say("…and Remove removes", removed.length === 1 && removed[0].id === "cv_d2", JSON.stringify(removed));
+
+await clearSent();
+await slot.locator(".canvas-more").click({ force: true });
+await page.waitForSelector(".popover", { timeout: 5000 });
+await page.locator(".popover .canvas-menu-rename").click();
+await settle(page, 300);
+const opened = await page.evaluate(() => {
+	const field = document.querySelector(".canvas-rename");
+	return { menu: document.querySelectorAll(".popover").length, focused: document.activeElement === field, value: field?.value, selected: field ? field.selectionEnd - field.selectionStart : -1 };
+});
+say("Rename closes the menu and opens the name on the card, selected", opened.menu === 0 && opened.focused && opened.value === "Canvas camera" && opened.selected === 13, JSON.stringify(opened));
+await page.keyboard.type("Decks canvas");
+await page.keyboard.press("Enter");
+await settle(page, 300);
+const renamed = await sent("canvas.rename");
+say("…and Enter sends the new name", renamed.length === 1 && renamed[0].id === "cv_d2" && renamed[0].name === "Decks canvas" && (await page.locator(".canvas-rename").count()) === 0, JSON.stringify(renamed));
 
 // --- the shelf's bar: a search, and New workspace ----------------------------------------
 await page.locator(".canvas-shelf-bar input").fill("neutral");
@@ -177,6 +207,9 @@ await clearSent();
 await page.locator(".canvas-shelf-bar .canvas-new").click();
 await page.waitForSelector(".popover input", { timeout: 5000 });
 await page.locator(".popover input").fill("Zeta Check");
+await settle(page, 150);
+const preview = await page.evaluate(() => document.querySelector(".popover .ws-new-slug")?.textContent?.replace(/\s+/g, " ").trim());
+say("the field shows what the name becomes, because it differs from what was typed", preview === "Named zeta-check", String(preview));
 await page.keyboard.press("Enter");
 await settle(page, 800);
 made = await sent("canvas.create");

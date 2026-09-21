@@ -383,10 +383,9 @@ say("…and the placeholder follows the tab", /boards$/.test((await page.locator
 // --- the edit window ------------------------------------------------------------------
 
 /*
- * The pen opens a window, not a popover: three fields with a rule written under each, in
- * the shape Settings and Usage already have. It was a 228px card holding two of them, and
- * the third — the name — could not be in there at all, because a refused name has to be
- * able to say why.
+ * The pen opens a window of three rows — the fact on the left, its control on the right —
+ * and nothing written under any of them. A rule shows only when it bites: a taken name is a
+ * red line under the field, and the tag field goes away at the cap.
  */
 await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 400);
@@ -401,25 +400,56 @@ const pop = await page.evaluate(() => ({
 	   opens with the cursor elsewhere costs a click to use. */
 	focused: document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.tagName,
 	fields: [...document.querySelectorAll('[role="dialog"] .field')].map((field) => Math.round(field.getBoundingClientRect().height)),
-	groups: [...document.querySelectorAll('[role="dialog"] .set-title')].map((title) => title.textContent),
-	theirs: [...document.querySelectorAll('[role="dialog"] .tag:not([data-mine])')].map((tag) => tag.textContent?.replace(/\s+/g, "")),
+	rows: [...document.querySelectorAll('[role="dialog"] .agent-edit-k')].map((k) => k.textContent),
+	notes: [...document.querySelectorAll('[role="dialog"] p')].length,
+	picker: document.querySelector('[role="dialog"] .agent-edit-pick')?.textContent?.trim(),
+	theirs: [...document.querySelectorAll('[role="dialog"] .tag:not([data-mine])')].length,
 	mine: [...document.querySelectorAll('[role="dialog"] .tag[data-mine]')].map((tag) => tag.textContent?.replace(/\s+/g, "")),
 }));
 say("the window takes the cursor, in the name", pop.focused === "Agent name", String(pop.focused));
-say("…and holds the three things about an agent you can change", JSON.stringify(pop.groups) === JSON.stringify(["Name", "Workspace", "Tags"]), JSON.stringify(pop.groups));
+say("…and holds the three things about an agent you can change, as rows", JSON.stringify(pop.rows) === JSON.stringify(["Name", "Workspace", "Tags"]), JSON.stringify(pop.rows));
+say("…with nothing written under them", pop.notes === 0, `${pop.notes} notes`);
 say("…with fields that did not collapse", pop.fields.length === 3 && pop.fields.every((height) => height === 32), JSON.stringify(pop.fields));
-/* Two lists that never write to each other: what it says it is doing, and what you say. */
-say("…the agent's own tags shown beside yours", JSON.stringify(pop.theirs) === JSON.stringify(["e2e", "flaky-editing"]), JSON.stringify(pop.theirs));
-say("…and only yours carry a way to remove them", JSON.stringify(pop.mine) === JSON.stringify(["mine"]), JSON.stringify(pop.mine));
+say("…the workspace as a picker, saying it is on none", pop.picker === "No workspace", String(pop.picker));
+/* Yours alone: the agent's own tags stay on its row, and only yours carry a way to remove them. */
+say("…only your tags, each with a way to remove it", pop.theirs === 0 && JSON.stringify(pop.mine) === JSON.stringify(["mine"]), JSON.stringify(pop.mine));
+
+// A name another agent already answers to: said in red, under the field, and not sent.
+await page.keyboard.type("Ada");
+await page.keyboard.press("Enter");
+await settle(page, 300);
+const refused = await page.evaluate(() => ({
+	line: document.querySelector('[role="dialog"] .agent-edit-err')?.textContent?.trim(),
+	sent: window.__sent.filter((frame) => frame.includes("agent.rename")).length,
+}));
+say("a taken name says so under the field and is not sent", refused.line === "Another agent is already called Ada." && refused.sent === 0, JSON.stringify(refused));
 
 // The name: typed and committed with Enter, which is the one field that can be refused.
-await page.keyboard.type("Iris the second");
+await page.locator('[role="dialog"] input[aria-label="Agent name"]').fill("Iris the second");
 await page.keyboard.press("Enter");
 await settle(page, 400);
 const renamed = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.rename")).map((frame) => JSON.parse(frame)).at(-1));
 say("renaming sends the new name, for the agent whose row it is", renamed?.name === "Iris the second" && renamed?.id === "a3", JSON.stringify(renamed));
 
-await page.locator('[role="dialog"] input[placeholder="Add a tag…"]').fill("Panel CSS, later");
+// The workspace: picked from the list, never typed.
+await page.locator('[role="dialog"] .agent-edit-pick').click();
+await page.waitForSelector(".popover.agent-edit-list", { timeout: 4000 });
+const listed = await page.evaluate(() => [...document.querySelectorAll(".popover.agent-edit-list [data-row] .lb")].map((lb) => lb.textContent?.trim()));
+/* No agent has declared a workspace yet, so the list is none and a new one — and the new one
+   is the one place a workspace is typed. */
+say("the picker lists every workspace in use, none, and a new one", JSON.stringify(listed) === JSON.stringify(["No workspace", "New workspace…"]), JSON.stringify(listed));
+await page.locator(".popover.agent-edit-list [data-row]", { hasText: "New workspace…" }).click();
+await page.waitForSelector(".popover.agent-edit-list input", { timeout: 4000 });
+await page.locator(".popover.agent-edit-list input").fill("political-llm");
+await page.keyboard.press("Enter");
+await settle(page, 300);
+const picked = await page.evaluate(() => ({
+	...window.__sent.filter((frame) => frame.includes("agent.workspace")).map((frame) => JSON.parse(frame)).at(-1),
+	listOpen: Boolean(document.querySelector(".popover.agent-edit-list")),
+}));
+say("naming a new one sends the workspace, for the agent whose row it is, and the list closes", picked.workspace === "political-llm" && picked.id === "a3" && !picked.listOpen, JSON.stringify(picked));
+
+await page.locator('[role="dialog"] input[placeholder="Add a tag"]').fill("Panel CSS, later");
 await page.keyboard.press("Enter");
 await settle(page, 400);
 const sent = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.tags")).map((frame) => JSON.parse(frame)));
