@@ -260,7 +260,9 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 2px 0 4px;
+		/* 4px above, not 2: the pane scrolls from the bar's top edge, and the search field's focus
+		   ring is 3px wide — at 2px the ring's top line was cut off. */
+		padding: 4px 0;
 	}
 	.dispatch-filters {
 		display: flex;
