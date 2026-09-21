@@ -234,7 +234,18 @@ rmSync(join(data, "decks", ".pi"), { recursive: true, force: true });
  */
 rmSync(join(data, "claude-accounts"), { recursive: true, force: true });
 
-const server = spawn("npm", ["run", "dev"], {
+/*
+ * `e2e:serve`, not `dev`: the same two processes with the server's `--watch` taken off.
+ *
+ * A suite's server must not reload under the suite. `npm run dev` runs the server with
+ * `node --watch`, so saving a source file part-way through a run restarts it — every open
+ * socket drops, and whichever check happened to be starting waits thirty seconds for a
+ * board to mount and fails with nothing run. It reads as that check being broken: on
+ * 21 September 2026 it was `mirror.mjs`, which passes on its own in thirteen seconds, and
+ * before that `working-marks.mjs` and `panel-steady.mjs` the same way. Vite still watches
+ * the browser half, which reloads a module rather than dropping the connection.
+ */
+const server = spawn("npm", ["run", "e2e:serve"], {
 	cwd: root,
 	/*
 	 * Its own process group, which is what makes `stop()` able to reach the whole tree.

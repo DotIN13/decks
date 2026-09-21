@@ -33,6 +33,8 @@
     "dev": "concurrently --raw --kill-others-on-fail \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "DECKS_DATA_DIR=\"${DECKS_DATA_DIR:-$PWD/data}\" npm run dev --workspace @decks/server",
     "dev:web": "npm run dev --workspace @decks/web",
+    "e2e:serve": "concurrently --raw --kill-others-on-fail \"npm:e2e:serve:server\" \"npm:dev:web\"",
+    "e2e:serve:server": "DECKS_DATA_DIR=\"${DECKS_DATA_DIR:-$PWD/data}\" npm run start --workspace @decks/server",
     "build": "npm run build --workspace @decks/server && npm run build --workspace @decks/web",
     "start": "DECKS_DATA_DIR=\"${DECKS_DATA_DIR:-$PWD/data}\" npm run start --workspace @decks/server",
     "typecheck": "npm run typecheck --workspaces --if-present",
