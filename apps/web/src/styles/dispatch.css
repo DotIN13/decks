@@ -921,25 +921,37 @@
 	 * One card per canvas, where the gallery has one per board. The card is a button and
 	 * nothing inside it is: who is working there is a fact about the canvas, not a menu.
 	 */
+	/*
+	 * The Boards tab's rhythm, measure for measure: the bar, then sections each ruled off
+	 * above with 8px of air under the rule and the heading on one 16px line, the cards under
+	 * it and 10px of air after them before the next rule. No gaps between sections — the
+	 * rule is the gap.
+	 */
 	.canvas-shelf {
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
-		padding-top: 10px;
 	}
 	.canvas-shelf-head {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 8px;
+		padding: 8px 2px;
 	}
+	/* The button is taller than the heading's line; it overhangs rather than opening the row up. */
+	.canvas-shelf-head > .canvas-new {
+		margin: -4px 0;
+	}
+	/* 8px between the bar and the first rule, as the gallery leaves. */
+	.canvas-shelf-bar {
+		margin-bottom: 8px;
+	}
+	/* The Boards tab's shelf name, letter for letter: sentence case, 12.5px, 600. One heading style for the dashboard. */
 	.canvas-shelf-head h2 {
 		margin: 0;
-		font-size: 13px;
+		font-size: 12.5px;
 		font-weight: 600;
-		letter-spacing: 0.02em;
-		text-transform: uppercase;
-		color: var(--muted);
+		color: var(--fg);
 	}
 	.canvas-new {
 		display: inline-flex;
@@ -961,7 +973,8 @@
 	}
 	.canvas-cards {
 		display: grid;
-		gap: 12px;
+		gap: 10px;
+		padding-bottom: 10px;
 		grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
 	}
 	.canvas-card {
@@ -995,6 +1008,7 @@
 		gap: 7px;
 		font-size: 14px;
 		font-weight: 600;
+		line-height: 18px;
 	}
 	.canvas-dot {
 		width: 8px;
@@ -1051,12 +1065,14 @@
 		overflow: hidden;
 		color: var(--muted);
 		font-size: 11.5px;
+		line-height: 16px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	.canvas-meta {
 		color: var(--faint);
 		font-size: 11.5px;
+		line-height: 16px;
 	}
 	.canvas-card[data-news="true"] .canvas-meta b {
 		color: var(--color-accent);
@@ -1073,7 +1089,6 @@
 
 	/* One workspace's section of the shelf: a heading with its own New canvas, then its cards — ruled off above, as the Boards tab's shelves are. */
 	.canvas-ws {
-		padding-top: 6px;
 		border-top: 1px solid var(--line);
 	}
 	.canvas-ws-sub {
