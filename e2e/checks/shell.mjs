@@ -36,8 +36,12 @@ const hash = () => page.evaluate(() => location.hash);
 const surface = () => page.getAttribute(".surface", "data-surface");
 const documents = () => page.evaluate(() => document.querySelectorAll(".surface-layer[data-layer='stage'] iframe").length);
 
-say("the app opens on the dashboard, and writes the hash", (await hash()) === "#/boards" && (await surface()) === "dispatch", `${await hash()} ${await surface()}`);
-say("the dashboard's tabs are drawn in the top-left pill", (await page.locator('.pill [role="tab"]').count()) === 3);
+say("the app opens on the dashboard's shelf of canvases, and writes the hash", (await hash()) === "#/canvases" && (await surface()) === "dispatch", `${await hash()} ${await surface()}`);
+say("the dashboard's tabs are drawn in the top-left pill", (await page.locator('.pill [role="tab"]').count()) === 4);
+/* The gallery of every board is a tab of its own now, one press from the canvases. */
+await page.locator('.pill [role="tab"]', { hasText: "Boards" }).click();
+await settle(page, 600);
+say("…and the Boards tab is the gallery", (await hash()) === "#/boards", await hash());
 
 /*
  * Every card has a picture the server took (`boards/thumbs.ts`), of a board this browser

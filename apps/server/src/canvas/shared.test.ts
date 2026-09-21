@@ -118,3 +118,16 @@ test("an agent nobody has given work to is on no canvas until it shows something
 	assert.equal(canvases.list()[0]?.name, "Sable", "named after the chat, which is where its work was");
 	cleanup();
 });
+
+test("two chats with the same name each get a canvas of their own when they first show a board", () => {
+	const { deck, cleanup } = deckOn();
+	const { one, two, canvases } = pair(deck);
+	one.rename("Agent");
+	two.rename("Agent");
+	one.setInPlay(["boards/plan.html"], { place: true });
+	two.setInPlay(["boards/notes.html"], { place: true });
+	assert.notEqual(one.canvas, two.canvas);
+	assert.deepEqual(canvases.list().map((canvas) => canvas.name).sort(), ["Agent", "Agent 2"]);
+	assert.deepEqual(one.inPlay, ["boards/plan.html"], "neither sees the other's board");
+	cleanup();
+});

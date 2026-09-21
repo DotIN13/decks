@@ -29,6 +29,11 @@ export interface ChatToMigrate {
 
 export interface CanvasPlan {
 	name: string;
+	/**
+	 * Whether the name is a workspace word several chats said, which makes it the canvas they
+	 * share, rather than a chat's own name, which two chats can happen to have.
+	 */
+	shared: boolean;
 	/** On the canvas, the fullest member's boards first and the others' after. */
 	boards: string[];
 	places: Record<string, { x: number; y: number }>;
@@ -45,14 +50,15 @@ export interface CanvasPlan {
  * fuller canvas is the better guess at the arrangement a person laid out. Ties break on the
  * chat that was used most recently, so the answer does not change between runs.
  *
- * A chat with nothing on its canvas and no word is on no canvas at all. That is not a loss:
- * nothing was arranged, and an empty canvas per dormant chat is thirty empty cards.
+ * A chat with nothing on its canvas and no word is on no canvas at all — even if it once
+ * arranged boards it has since hidden. That is not a loss worth thirty empty cards: those
+ * places are almost all the old auto-layout's, and the boards are still in the deck.
  */
 export function planCanvases(chats: readonly ChatToMigrate[]): CanvasPlan[] {
 	const groups = new Map<string, ChatToMigrate[]>();
 	for (const chat of chats) {
 		const key = chat.workspace ? `w:${chat.workspace}` : `c:${chat.id}`;
-		if (!chat.workspace && chat.inPlay.length === 0 && !hasPlaces(chat)) continue;
+		if (!chat.workspace && chat.inPlay.length === 0) continue;
 		const group = groups.get(key);
 		if (group) group.push(chat);
 		else groups.set(key, [chat]);
@@ -66,9 +72,18 @@ export function planCanvases(chats: readonly ChatToMigrate[]): CanvasPlan[] {
 		const places: Record<string, { x: number; y: number }> = {};
 		for (const chat of ordered) {
 			for (const path of chat.inPlay) if (!boards.includes(path)) boards.push(path);
-			for (const [path, at] of Object.entries(chat.positions ?? {})) if (!(path in places)) places[path] = at;
+		}
+		/*
+		 * Places only for the boards that are up. A chat's `positions` held a place for nearly
+		 * every board in the deck — the old deck-wide auto-layout wrote one for each, 600 to 900
+		 * per chat on the live deck — and carrying them would make a canvas file of 50 KB that is
+		 * rewritten on every drag, to remember places nobody chose.
+		 */
+		for (const chat of ordered) {
+			for (const [path, at] of Object.entries(chat.positions ?? {})) if (boards.includes(path) && !(path in places)) places[path] = at;
 		}
 		plans.push({
+			shared: key.startsWith("w:"),
 			name: key.startsWith("w:") ? key.slice(2) : (ordered[0]?.name ?? "Canvas"),
 			boards,
 			places,
@@ -76,8 +91,4 @@ export function planCanvases(chats: readonly ChatToMigrate[]): CanvasPlan[] {
 		});
 	}
 	return plans;
-}
-
-function hasPlaces(chat: ChatToMigrate): boolean {
-	return Object.keys(chat.positions ?? {}).length > 0;
 }

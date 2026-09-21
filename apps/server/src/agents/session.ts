@@ -190,14 +190,14 @@ export class DeckAgent {
 	 * An agent with nothing up is on no canvas, which is the honest state for a chat nobody
 	 * has given work to: it shows on the dashboard as available rather than as an empty card.
 	 * The moment it shows a board it needs one, and a canvas named after the chat is the
-	 * least surprising place for that board to land. A canvas of that name already existing
-	 * is taken as the same canvas, which is what makes `stage.me.setWorkspace("political-llm")`
-	 * still mean "work with the others over there".
+	 * least surprising place for that board to land — its own, even when another chat has the
+	 * same name, because six chats called "Agent" are six pieces of work. Joining a canvas by
+	 * name is `useCanvas`, which is what `stage.me.setWorkspace` does.
 	 */
 	get canvasId(): string {
 		const chosen = this.canvases.get(this.canvasChosen);
 		if (chosen) return chosen.id;
-		const made = this.canvases.ensure(this.identity.name || "Canvas");
+		const made = this.canvases.create({ name: this.canvases.freeName(this.identity.name || "Canvas") });
 		this.canvasChosen = made.id;
 		this.save();
 		return made.id;

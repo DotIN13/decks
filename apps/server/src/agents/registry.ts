@@ -380,7 +380,8 @@ export class Registry {
 	 */
 	private migrate(records: readonly AgentRecord[]): Map<string, string> {
 		const assigned = new Map<string, string>();
-		const stale = records.filter((record) => !record.canvas && (record.legacyWorkspace || record.legacyInPlay?.length || record.legacyPositions));
+		// Not the dispatchers: they hand work out and never put a board up, so they are on no canvas.
+		const stale = records.filter((record) => record.role !== "dispatcher" && !record.canvas && (record.legacyWorkspace || record.legacyInPlay?.length));
 		if (stale.length === 0) return assigned;
 		const plans = planCanvases(
 			stale.map((record) => ({
@@ -393,9 +394,24 @@ export class Registry {
 			})),
 		);
 		for (const plan of plans) {
-			const existing = this.host.canvases.byName(plan.name);
-			const canvas = existing ?? this.host.canvases.create({ name: plan.name, boards: plan.boards, places: plan.places });
+			/*
+			 * A workspace word several chats said is one canvas, and a canvas of that name already
+			 * made is it. A chat's own name is not: two chats called "Agent" get two canvases.
+			 */
+			const existing = plan.shared ? this.host.canvases.byName(plan.name) : undefined;
+			const canvas = existing ?? this.host.canvases.create({ name: plan.shared ? plan.name : this.host.canvases.freeName(plan.name), boards: plan.boards, places: plan.places });
 			for (const member of plan.members) assigned.set(member, canvas.id);
+		}
+		/*
+		 * Written now, not at the chat's next save. A restored chat is dormant and may never be
+		 * saved again, and a record still without a canvas would be migrated again on the next
+		 * open — making "Agent 7" out of a chat that already has "Agent". The three old fields go
+		 * in the same write, which is what makes this happen once.
+		 */
+		for (const record of stale) {
+			const canvas = assigned.get(record.id);
+			const { legacyInPlay: _inPlay, legacyPositions: _positions, legacyWorkspace: _workspace, ...rest } = record;
+			this.store.writeRecord({ ...rest, ...(canvas ? { canvas } : {}) });
 		}
 		return assigned;
 	}

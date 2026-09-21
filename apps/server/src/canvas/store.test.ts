@@ -132,3 +132,13 @@ test("canvases survive being read back", () => {
 	assert.deepEqual(again.places(canvas.id), { "boards/a.html": { x: 12, y: 34 } });
 	assert.deepEqual(again.get(canvas.id)?.links, [{ from: "boards/a.html", to: "boards/b.html", label: "ran" }]);
 });
+
+test("a free name counts up past the ones taken", () => {
+	const path = deck();
+	const store = new CanvasStore(path);
+	assert.equal(store.freeName("Agent"), "Agent");
+	store.create({ name: "Agent" });
+	assert.equal(store.freeName("Agent"), "Agent 2");
+	store.create({ name: "Agent 2" });
+	assert.equal(store.freeName("agent"), "agent 3", "matched however it is spelled");
+});

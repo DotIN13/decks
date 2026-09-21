@@ -56,12 +56,26 @@ test("a chat with nothing arranged and no word is on no canvas", () => {
 	assert.deepEqual(planCanvases([chat({ id: "idle", name: "Ada" })]), []);
 });
 
-test("a chat that arranged boards it has since hidden still gets its canvas", () => {
-	// `positions` outlives `inPlay`: the arrangement is real even with nothing up.
-	const plans = planCanvases([chat({ id: "s2", name: "Rune", positions: { "boards/one.html": { x: 10, y: 20 } } })]);
-	assert.equal(plans.length, 1);
-	assert.deepEqual(plans[0]?.boards, []);
-	assert.deepEqual(plans[0]?.places, { "boards/one.html": { x: 10, y: 20 } });
+test("a chat that only has places for hidden boards gets no canvas", () => {
+	// On the live deck those places are the old deck-wide auto-layout's, 600 to 900 per chat.
+	assert.deepEqual(planCanvases([chat({ id: "s2", name: "Rune", positions: { "boards/one.html": { x: 10, y: 20 } } })]), []);
+});
+
+test("only the places of boards on the canvas are carried", () => {
+	const plans = planCanvases([
+		chat({ id: "s3", name: "Wren", inPlay: ["boards/one.html"], positions: { "boards/one.html": { x: 1, y: 2 }, "boards/old.html": { x: 9000, y: 9000 } } }),
+	]);
+	assert.deepEqual(plans[0]?.places, { "boards/one.html": { x: 1, y: 2 } });
+});
+
+test("a workspace canvas is shared; a chat's own is not, so two chats with one name stay apart", () => {
+	const plans = planCanvases([
+		chat({ id: "a", name: "Agent", inPlay: ["boards/one.html"] }),
+		chat({ id: "b", name: "Agent", inPlay: ["boards/two.html"] }),
+		chat({ id: "c", name: "Rune", workspace: "decks", inPlay: ["boards/three.html"] }),
+	]);
+	assert.equal(plans.length, 3, "two Agents are two canvases");
+	assert.deepEqual(plans.map((plan) => plan.shared).sort(), [false, false, true]);
 });
 
 test("two chats of the same size break the tie on the one used most recently", () => {

@@ -138,6 +138,18 @@ export class CanvasStore {
 		return [...this.canvases.values()].find((canvas) => slug(canvas.name, MAX_CANVAS_NAME) === wanted);
 	}
 
+	/**
+	 * A name no canvas has yet: `name`, else `name 2`, `name 3`…
+	 *
+	 * For a canvas that belongs to one chat. Six chats called "Agent" are six arrangements, and
+	 * matching by name would fold them onto one canvas and lose five of them.
+	 */
+	freeName(name: string): string {
+		const base = name.trim().slice(0, MAX_CANVAS_NAME - 4) || "Canvas";
+		if (!this.byName(base)) return base;
+		for (let n = 2; ; n += 1) if (!this.byName(`${base} ${n}`)) return `${base} ${n}`;
+	}
+
 	/** The canvas with this name, made if there is not one. */
 	ensure(name: string): CanvasRecord {
 		return this.byName(name) ?? this.create({ name });
