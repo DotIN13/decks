@@ -1071,9 +1071,10 @@
 		font-size: 12px;
 	}
 
-	/* One workspace's section of the shelf: a heading with its own New canvas, then its cards. */
-	.canvas-ws + .canvas-ws {
-		margin-top: 8px;
+	/* One workspace's section of the shelf: a heading with its own New canvas, then its cards — ruled off above, as the Boards tab's shelves are. */
+	.canvas-ws {
+		padding-top: 6px;
+		border-top: 1px solid var(--line);
 	}
 	.canvas-ws-sub {
 		margin-right: auto;
