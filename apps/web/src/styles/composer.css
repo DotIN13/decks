@@ -1,0 +1,141 @@
+/*
+ * The composer: what you type into, and what sits under it.
+ *
+ * The textarea, the select-like chips beside it (the model, the thinking level), the send
+ * button and its busy state, the usage line, the mention mark, and `.dockbox` — the box a
+ * file is dragged onto. `chat/composer/` is one component tree and this is its material.
+ *
+ * These rules were in `index.css`. The rules and the notes above them are as they were.
+ */
+@layer components {
+	.composer textarea:focus {
+	outline: none;
+}
+	/*
+ * The pickers are chips, not form fields.
+ *
+ * Three bordered boxes with the platform's own chevrons were the least Decks-like thing on
+ * screen: they read as a settings form bolted under the input, next to a palette whose
+ * controls have no borders at all. A wash of `--line` is enough to say "this is a control"
+ * — the same thing the title bar's open button says — and it puts the emphasis back on the
+ * words you are typing, which is what the dock is for.
+ */
+.composer select {
+	max-width: 200px;
+	min-height: var(--control-sm);
+	padding: 3px 6px;
+	border: 0;
+	border-radius: var(--control-radius);
+	background: var(--line);
+	color: var(--muted);
+	cursor: pointer;
+	font: inherit;
+	font-size: 11px;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
+}
+	.composer select:hover {
+	background: var(--line-strong);
+	color: var(--fg);
+}
+	.composer select:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 1px;
+}
+	/*
+ * A circle, now that it is one icon rather than the word "send" or the word "stop".
+ * Square and centred so the two never change the bar's height between turns.
+ */
+/*
+ * Round, where every other control here is a soft square. The one deliberate exception:
+ * everything else in this bar toggles or picks, and this one *commits* — the shape says so
+ * before the icon does, and it is the only filled control in the dock.
+ */
+.composer .send {
+	display: grid;
+	width: var(--control);
+	height: var(--control);
+	padding: 0;
+	border-radius: 999px;
+	place-items: center;
+}
+	.composer .send[data-busy="true"] {
+	border-color: transparent;
+	background: var(--color-danger);
+	color: #fff;
+}
+	.composer .send:not([data-busy="true"]) {
+	border-color: transparent;
+	background: var(--color-accent);
+	color: #fff;
+}
+	.composer .usage {
+	color: var(--faint);
+	font-family: var(--font-mono);
+	font-size: 10px;
+}
+	/* It is a button now (a click opens the usage modal) but should still read as a
+   meter, not a control: no box, just the figures, and a hover that says it is
+   tappable. */
+.composer button.usage {
+	padding: 1px 3px;
+	border: 0;
+	background: none;
+	border-radius: var(--control-radius);
+	font-family: var(--font-mono);
+	font-size: 10px;
+}
+	.composer button.usage:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+
+	/* The same rules, under the same query. */
+	@media (pointer: coarse) {
+	.set-row .chipbtn {
+		--control-md: 34px;
+	}
+	.composer .send {
+		width: 44px;
+		height: 44px;
+		border-radius: 12px;
+	}
+	.composer select {
+		min-height: 36px;
+		font-size: 13px;
+	}
+}
+
+	/* The same rules, under the same query. */
+	@media (max-width: 760px) {
+	/*
+	 * One line, always: the model, the thinking level and (where present) the mode
+	 * share the row beside the send button, each truncating its own label rather than
+	 * wrapping the bar onto a second row. Three wrapped rows made the dock up to three
+	 * times as tall — and the panels measure themselves against the dock, so they sat
+	 * higher on the screen than the bar they were meant to sit above. A truncated
+	 * label on a phone is a fine trade: the picker is full-screen when opened; it is
+	 * the bar that has to fit.
+	 */
+	.composer .controls {
+		flex-wrap: nowrap;
+	}
+	.composer select {
+		min-width: 0;
+		max-width: none;
+		flex: 1 1 0;
+	}
+	/* The context meter is the first thing to give way: the least-used control in the
+	   bar and the one with the most words. The cost it reports is still in the column
+	   on hover (desktop), so nothing is lost but the bar's own width. */
+	.composer .usage {
+		display: none;
+	}
+}
+	/* A file dragged over the input bar: it will be copied into the deck and mentioned (`Composer`). */
+.dockbox[data-dropping="true"] {
+	outline: 2px dashed var(--accent, #3b82f6);
+	outline-offset: 2px;
+}
+}
