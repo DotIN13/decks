@@ -53,19 +53,91 @@ const LIVE = {
 	},
 };
 
-test("the codenamed buckets do not become limits", () => {
-	// `nimbus_quill` and `seven_day_cowork` are there and are not windows anybody has:
-	// `limits[]` is the general form and is what gets read.
+test("an empty codenamed bucket does not become a limit", () => {
+	// `nimbus_quill` and this fixture's `seven_day_cowork` have no reset and nothing used:
+	// windows the account is not on and cannot move, which is a row answered with noise.
 	assert.deepEqual(
 		toUsageReport(LIVE, null).limits?.map((limit) => limit.key),
-		["session"],
+		["five_hour"],
 	);
 });
 
-test("an inactive bucket is left out", () => {
-	// The account *has* a Cowork week; it is not on one. The CLI's own panel does not draw
-	// those, and a row at 0% that can never move is a question answered with nothing.
-	assert.equal(toUsageReport(LIVE, null).limits?.some((limit) => limit.key.includes("Cowork")), false);
+test("the named windows survive a `limits[]` that is shorter than they are", () => {
+	/*
+	 * The bug this pins, measured on a live account: `limits[]` listed the five-hour window
+	 * and one inactive bucket, while the block beside it carried three more windows with
+	 * reset dates. Preferring the array drew one row where the CLI's own panel drew three.
+	 */
+	const report = toUsageReport(
+		{
+			rate_limits_available: true,
+			rate_limits: {
+				five_hour: { utilization: 15, resets_at: "2026-09-22T08:20:01+00:00" },
+				seven_day: { utilization: 61, resets_at: "2026-09-25T00:00:00+00:00" },
+				seven_day_oauth_apps: { utilization: 0, resets_at: "2026-09-25T00:00:00+00:00" },
+				limits: [{ kind: "session", group: "session", percent: 15, resets_at: "2026-09-22T08:20:01+00:00", scope: null, is_active: true }],
+			},
+		},
+		null,
+	);
+	assert.deepEqual(
+		report.limits?.map((limit) => [limit.key, limit.percent]),
+		[
+			["seven_day", 61],
+			["five_hour", 15],
+			["seven_day_oauth_apps", 0],
+		],
+	);
+});
+
+test("a per-model week is one row, whichever half of the payload states it", () => {
+	/*
+	 * A Fable week arrives three ways — as a named bucket, in `model_scoped[]`, and as a
+	 * scoped row in `limits[]` — and they are the same window. `KIND_KEY` is what collapses
+	 * them: the server's own display name wins, and nothing is listed twice.
+	 */
+	const report = toUsageReport(
+		{
+			rate_limits_available: true,
+			rate_limits: {
+				five_hour: { utilization: 15, resets_at: null },
+				seven_day_fable: { utilization: 33, resets_at: "2026-09-25T00:00:00+00:00" },
+				model_scoped: [{ display_name: "Fable", utilization: 33, resets_at: "2026-09-25T00:00:00+00:00" }],
+				limits: [{ kind: "weekly_scoped", group: "weekly", percent: 33, resets_at: "2026-09-25T00:00:00+00:00", scope: { model: "Fable" }, is_active: true }],
+			},
+		},
+		null,
+	);
+	assert.deepEqual(
+		report.limits?.map((limit) => [limit.key, limit.label, limit.percent]),
+		[
+			["seven_day_fable", "7-day (Fable)", 33],
+			["five_hour", "5-hour window", 15],
+		],
+	);
+});
+
+test("a window the account is not on is drawn and marked, not dropped", () => {
+	// It used to be left out entirely, which meant the panel could not say what windows the
+	// plan carries. It is reported with `active: false`, and the panel dims it.
+	const report = toUsageReport(
+		{
+			rate_limits_available: true,
+			rate_limits: {
+				five_hour: { utilization: 15, resets_at: null },
+				seven_day_cowork: { utilization: 0, resets_at: "2026-09-25T00:00:00+00:00" },
+				limits: [{ kind: "weekly_scoped", group: "weekly", percent: 0, resets_at: null, scope: { model: null, surface: { display_name: "Cowork" } }, is_active: false }],
+			},
+		},
+		null,
+	);
+	assert.deepEqual(
+		report.limits?.map((limit) => [limit.key, limit.label, limit.active]),
+		[
+			["five_hour", "5-hour window", true],
+			["seven_day_cowork", "7-day (Cowork)", false],
+		],
+	);
 });
 
 test("a scoped window is named by its scope", () => {
@@ -84,8 +156,8 @@ test("a scoped window is named by its scope", () => {
 	assert.deepEqual(
 		report.limits?.map((limit) => [limit.key, limit.label]),
 		[
-			["weekly_scoped:opus", "7-day window (opus)"],
-			["weekly_scoped:Cowork", "7-day window (Cowork)"],
+			["seven_day_opus", "7-day (Opus)"],
+			["seven_day_cowork", "7-day (Cowork)"],
 		],
 	);
 });

@@ -2087,6 +2087,7 @@ export function App() {
 						report={usageReport().report}
 						error={usageReport().error}
 						loading={usageReport().loading}
+						at={usageReport().at}
 						onRefresh={() => readUsage(state.focused)}
 						onClose={() => setUsagePanel(undefined)}
 					/>

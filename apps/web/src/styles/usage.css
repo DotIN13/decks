@@ -58,6 +58,18 @@
 		overflow-wrap: anywhere;
 	}
 
+	/*
+	 * Figures from the last reading, while the fresh one is in flight.
+	 *
+	 * Muted, not `--color-danger` like `.usage-stale` above it: nothing has gone wrong, the
+	 * numbers are just a minute old and about to be replaced in place.
+	 */
+	.usage-modal .usage-reading {
+		margin: 0 0 10px;
+		color: var(--faint);
+		font-size: 11.5px;
+	}
+
 	/* Turning while it reads. Reduced motion keeps the disabled state, which is the part
 	   that carries the information. */
 	.usage-modal .usage-spin svg {
@@ -90,6 +102,17 @@
 	.usage-modal .usage-limit {
 		display: grid;
 		gap: 3px;
+	}
+
+	/*
+	 * A window the plan carries and the account is not on.
+	 *
+	 * Drawn, because "what limits does this account have" is a fair question, and dimmed,
+	 * because it is not the limit anybody is about to hit. Its bar is uncoloured by the
+	 * component, so a dormant window at 90% cannot read as an amber warning.
+	 */
+	.usage-modal .usage-limit.dormant {
+		opacity: 0.55;
 	}
 
 	.usage-modal .usage-limit-head {

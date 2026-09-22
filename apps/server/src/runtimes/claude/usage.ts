@@ -45,6 +45,22 @@ const KIND_LABEL: Record<string, string> = {
 	monthly: "30-day window",
 };
 
+/**
+ * A `limits[]` kind, as the key the block of named windows uses for the same window.
+ *
+ * This is what lets the two halves of the payload be read together rather than one of them
+ * chosen: the array calls the five-hour window `session` and the week `weekly`, while the
+ * block beside it calls them `five_hour` and `seven_day`. One window, two names, and a panel
+ * reading both without this would report every limit twice.
+ */
+const KIND_KEY: Record<string, string> = {
+	session: "five_hour",
+	five_hour: "five_hour",
+	weekly: "seven_day",
+	weekly_scoped: "seven_day",
+	monthly: "monthly",
+};
+
 export function toUsageReport(raw: unknown, account: string | null): UsageReport {
 	const root = record(raw) ?? {};
 	const limits = record(root.rate_limits);
@@ -61,69 +77,157 @@ export function toUsageReport(raw: unknown, account: string | null): UsageReport
 }
 
 /**
- * Every window the account has, fullest first.
+ * Every window the account has, read from **both** places the payload states them.
  *
- * Fullest first because the reason anyone opens this is to find out which limit they are
- * about to hit, and reading order should not depend on which bucket the server happened to
- * list first.
+ * Either one alone loses windows. The block of named buckets (`five_hour`, `seven_day`,
+ * `seven_day_opus`, `model_scoped[]`, and a changing set of codenames) is the complete list,
+ * but it labels nothing beyond the five names that are documented. The undocumented
+ * `limits[]` array is the only place a window carries a display name, a scope, and whether
+ * the account is on it — and it is *shorter*: on a live account it listed two entries where
+ * the block beside it had four windows with reset dates. Preferring the array, which is what
+ * this file used to do, drew one row where the CLI's own panel draws three.
+ *
+ * So the block supplies the windows, the array names them and says which are in force, and
+ * `KIND_KEY` is what keeps one window from being drawn twice under two names.
  */
 function readLimits(limits: Record<string, unknown>): PlanLimit[] {
-	const rows = Array.isArray(limits.limits) ? fromLimitsArray(limits.limits) : fromNamedWindows(limits);
+	const rows = new Map<string, PlanLimit>();
+	readNamedWindows(rows, limits);
+	readModelScoped(rows, limits);
+	readLimitsArray(rows, limits);
+
+	const out = [...rows.values()];
 
 	// Credits are not a window — no reset, and it is money rather than a share — but it is
 	// the other thing that stops a turn, so it belongs in the list.
 	const extra = record(limits.extra_usage);
 	if (extra?.is_enabled === true) {
-		rows.push({ key: "extra_usage", label: "Extra usage credits", percent: percent(extra.utilization), resetsAt: null });
+		out.push({ key: "extra_usage", label: "Extra usage credits", percent: percent(extra.utilization), resetsAt: null, active: true });
 	}
 
-	return rows.sort((a, b) => (b.percent ?? -1) - (a.percent ?? -1));
+	/*
+	 * In force first, then fullest first. Fullest because the reason anyone opens this is to
+	 * find out which limit they are about to hit, and reading order should not depend on
+	 * which bucket the server happened to list first; in force first because a window the
+	 * account is not currently subject to cannot be the answer to that question, however
+	 * full it reads.
+	 */
+	return out.sort((a, b) => Number(b.active) - Number(a.active) || (b.percent ?? -1) - (a.percent ?? -1));
 }
 
 /**
- * The general form, when the CLI sends it.
+ * The named block: the documented five, and whatever else is in there this month.
  *
- * Undocumented, so it is read defensively — but it is the only shape that carries `scope`,
- * which is what tells a per-model week apart from a per-surface one. `is_active: false` is a
- * bucket the account has but is not on; the CLI's own panel does not draw those and neither
- * does this.
+ * Every key is read rather than a list of known ones, because the documented names are a
+ * subset of what arrives — one live account also carried `seven_day_cowork`,
+ * `seven_day_omelette`, `nimbus_quill` and eleven more. A codename that is only a
+ * placeholder says so by having nothing in it: no reset, and nothing used. Those are
+ * dropped, because a row at 0% that can never move is a question answered with noise. One
+ * with a reset date is a real window and is kept, under a name made from its key until
+ * `limits[]` gives it a better one.
  */
-function fromLimitsArray(rows: unknown[]): PlanLimit[] {
-	const out: PlanLimit[] = [];
-	for (const entry of rows) {
-		const row = record(entry);
-		if (!row || row.is_active === false) continue;
-
-		const kind = text(row.kind) ?? text(row.group) ?? "limit";
-		const scope = record(row.scope);
-		const suffix = text(scope?.model) ?? text(record(scope?.surface)?.display_name);
-
-		const base = KIND_LABEL[kind] ?? kind.replace(/_/g, " ");
-		out.push({
-			key: suffix ? `${kind}:${suffix}` : kind,
-			label: suffix ? `${base} (${suffix})` : base,
-			percent: percent(row.percent ?? row.utilization),
-			resetsAt: text(row.resets_at),
-		});
+function readNamedWindows(rows: Map<string, PlanLimit>, limits: Record<string, unknown>): void {
+	for (const [key, value] of Object.entries(limits)) {
+		if (key === "limits" || key === "model_scoped" || key === "extra_usage") continue;
+		const window = record(value);
+		if (!window || !("utilization" in window)) continue;
+		const share = percent(window.utilization);
+		const resetsAt = text(window.resets_at);
+		if (!WINDOW_LABEL[key] && !resetsAt && !share) continue;
+		merge(rows, key, { label: WINDOW_LABEL[key] ?? windowLabel(key), percent: share, resetsAt, active: true });
 	}
-	return out;
 }
 
-/** The documented windows, for a CLI that does not send `limits[]`. */
-function fromNamedWindows(limits: Record<string, unknown>): PlanLimit[] {
-	const out: PlanLimit[] = [];
-	for (const [key, label] of Object.entries(WINDOW_LABEL)) {
-		const window = record(limits[key]);
-		if (!window) continue;
-		out.push({ key, label, percent: percent(window.utilization), resetsAt: text(window.resets_at) });
-	}
+/** The per-model weeks — where a Fable or an Opus week arrives when the CLI sends one. */
+function readModelScoped(rows: Map<string, PlanLimit>, limits: Record<string, unknown>): void {
 	for (const entry of Array.isArray(limits.model_scoped) ? limits.model_scoped : []) {
 		const row = record(entry);
 		if (!row) continue;
 		const name = text(row.display_name) ?? "model";
-		out.push({ key: `model_scoped:${name}`, label: `7-day (${name})`, percent: percent(row.utilization), resetsAt: text(row.resets_at) });
+		merge(rows, `seven_day_${slug(name)}`, { label: `7-day (${name})`, percent: percent(row.utilization), resetsAt: text(row.resets_at), active: true });
 	}
-	return out;
+}
+
+/**
+ * The general form, when the CLI sends it: display names, scopes, and what is in force.
+ *
+ * Read last so its label wins — it is the server's own word for the bucket, where everything
+ * above is this file reading a key. `is_active: false` is a window the account has and is
+ * not on: it used to be dropped here, and is now kept and marked, because a plan that
+ * carries a week for a model you have not used yet should still say the week is there. The
+ * exception is a row with nothing in it at all — not in force, no reset, nothing used —
+ * which is a placeholder rather than a limit, and only when the named block did not already
+ * report that window.
+ */
+function readLimitsArray(rows: Map<string, PlanLimit>, limits: Record<string, unknown>): void {
+	for (const entry of Array.isArray(limits.limits) ? limits.limits : []) {
+		const row = record(entry);
+		if (!row) continue;
+
+		const kind = text(row.kind) ?? text(row.group) ?? "limit";
+		const scope = record(row.scope);
+		const suffix = text(scope?.model) ?? text(record(scope?.surface)?.display_name);
+		const key = canonicalKey(kind, suffix);
+
+		const share = percent(row.percent ?? row.utilization);
+		const resetsAt = text(row.resets_at);
+		const active = row.is_active !== false;
+		if (!active && !resetsAt && !share && !rows.has(key)) continue;
+
+		merge(rows, key, { label: scopedLabel(kind, suffix), percent: share, resetsAt, active });
+	}
+}
+
+/**
+ * One window, stated by two sources.
+ *
+ * The later source wins where it has something to say and never loses what the earlier one
+ * had: the array knows the name and the activity, the block usually knows the share and the
+ * reset. Not in force beats in force, because only the array states it at all.
+ */
+function merge(rows: Map<string, PlanLimit>, key: string, next: Omit<PlanLimit, "key">): void {
+	const was = rows.get(key);
+	rows.set(key, {
+		key,
+		label: next.label,
+		percent: next.percent ?? was?.percent ?? null,
+		resetsAt: next.resetsAt ?? was?.resetsAt ?? null,
+		active: next.active && (was?.active ?? true),
+	});
+}
+
+/** A key from the named block, as words: `seven_day_cowork` is the 7-day window for Cowork. */
+function windowLabel(key: string): string {
+	const week = /^seven_day_(.+)$/.exec(key);
+	if (week?.[1]) return `7-day (${titled(week[1])})`;
+	const hours = /^five_hour_(.+)$/.exec(key);
+	if (hours?.[1]) return `5-hour (${titled(hours[1])})`;
+	return titled(key);
+}
+
+/** A `limits[]` row, as words: its kind, narrowed by whatever its scope names. */
+function scopedLabel(kind: string, suffix: string | null): string {
+	const base = KIND_LABEL[kind] ?? titled(kind);
+	return suffix ? `${base.replace(/ window$/, "")} (${titled(suffix)})` : base;
+}
+
+/** The one key both sources agree on for one window. */
+function canonicalKey(kind: string, suffix: string | null): string {
+	const base = KIND_KEY[kind] ?? kind;
+	return suffix ? `${base}_${slug(suffix)}` : base;
+}
+
+function slug(name: string): string {
+	return name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "_")
+		.replace(/^_+|_+$/g, "");
+}
+
+/** Words from a key, capitalised once — a name that arrived capitalised is left as it is. */
+function titled(raw: string): string {
+	const words = raw.replace(/_/g, " ");
+	return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
 
 function readSession(session: Record<string, unknown> | null): SessionSpend {

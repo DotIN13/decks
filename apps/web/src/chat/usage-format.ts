@@ -90,6 +90,21 @@ export function resetsAt(iso: string | null, now: number): string | null {
 	return formatDateTime(at, { hour: "numeric", minute: "2-digit", ...(sameDay ? {} : { month: "short", day: "numeric" }) });
 }
 
+/**
+ * How long ago a figure was read, from a fixed `now` so it can be tested.
+ *
+ * The coarsest useful answer: what this is next to is a reading being taken again, and the
+ * only question it answers is whether what is on screen is a minute old or an hour old.
+ */
+export function ago(at: number, now: number): string {
+	const minutes = Math.floor(Math.max(0, now - at) / 60_000);
+	if (minutes < 1) return "a moment ago";
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	return `${Math.round(hours / 24)}d ago`;
+}
+
 /** What the runtime's behaviour keys mean in words. */
 const BEHAVIOR_LABEL: Record<string, string> = {
 	cache_miss: "Cache misses",

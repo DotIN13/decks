@@ -22,9 +22,10 @@ export interface AgentUsage {
  * worse than no figures.
  *
  * **A narrowing, deliberately.** The Claude CLI answers a control request whose payload is
- * already wider than its own typings — codenamed buckets that are all null, an undocumented
- * `limits[]` — so the server reads whatever is there and publishes these fields. A bucket
- * appearing or being renamed upstream changes one mapping function rather than the panel.
+ * already wider than its own typings — codenamed buckets, a block of named windows and an
+ * undocumented `limits[]` array that states some of the same windows under other names — so
+ * the server reads all of it, merges it and publishes these fields. A bucket appearing or
+ * being renamed upstream changes one mapping function rather than the panel.
  */
 export interface UsageReport {
 	/** Which runtime answered, because what it can answer depends on that. */
@@ -67,6 +68,15 @@ export interface PlanLimit {
 	percent: number | null;
 	/** ISO 8601. Null for a window with no scheduled reset. */
 	resetsAt: string | null;
+	/**
+	 * Whether the account is subject to this window right now.
+	 *
+	 * A plan carries windows it is not currently on — a week for a model or a surface that
+	 * has not been used yet. Those used to be dropped, which meant the panel could not
+	 * answer "what limits does this account have"; they are drawn quietly instead, so a
+	 * window in force and a window merely available are both said and cannot be confused.
+	 */
+	active: boolean;
 }
 
 /** Tokens, the four ways they are counted and priced. */

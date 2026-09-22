@@ -167,11 +167,26 @@ function createUi() {
 	 * `⋯` has one row for the reading and it opens this directly. The third way is `/cost`,
 	 * which arrives from the server with `show` — see the `agent.report` case in `App.tsx`.
 	 *
-	 * The reading itself is *not* kept per agent across openings: it is read fresh every
-	 * time, because two of its three parts are running totals and the third is a countdown.
+	 * The reading is always asked for again on opening, because two of its three parts are
+	 * running totals and the third is a countdown. What it is *not* any more is withheld
+	 * until that answer arrives: the last reading for this agent is drawn at once, stamped
+	 * with when it was taken, and replaced in place when the fresh one lands. A read is
+	 * about two seconds of round trip to the CLI, and two seconds of "Reading…" over
+	 * figures that were true a minute ago is a slow panel rather than an honest one.
 	 */
 	const [usagePanel, setUsagePanel] = createSignal<string | undefined>(undefined);
-	const [usageReport, setUsageReport] = createSignal<{ report?: UsageReport; error?: string; loading: boolean }>({ loading: false });
+	const [usageReport, setUsageReport] = createSignal<{ report?: UsageReport; error?: string; loading: boolean; /** When the report on screen was read. */ at?: number }>({
+		loading: false,
+	});
+
+	/**
+	 * The last reading per agent, so reopening the panel is not two seconds of nothing.
+	 *
+	 * Not reactive and not in the store: it is read once when the panel opens, and a
+	 * component that re-ran when a *different* agent's figures came back would be redrawing
+	 * over a reading nobody asked to change.
+	 */
+	const seenReports = new Map<string, { report: UsageReport; at: number }>();
 
 	/** Re-read the figures for an agent without opening or moving the panel. */
 	const readUsage = (id: string | undefined) => {
@@ -180,12 +195,28 @@ function createUi() {
 		send({ type: "agent.report", id });
 	};
 
-	/** Open the panel on an agent, and ask for its figures. */
+	/** Open the panel on an agent, on whatever was last read, and ask for its figures. */
 	const openUsage = (id: string | undefined) => {
 		if (!id) return;
 		setUsagePanel(id);
-		setUsageReport({ loading: true });
+		const kept = seenReports.get(id);
+		setUsageReport({ loading: true, ...(kept ? { report: kept.report, at: kept.at } : {}) });
 		send({ type: "agent.report", id });
+	};
+
+	/**
+	 * A reading came back: kept for this agent, and drawn if its panel is still open.
+	 *
+	 * A failure keeps the figures rather than clearing them — which is what the panel's own
+	 * "could not read usage" line has always claimed happens, and did not: the answer used
+	 * to be written straight over the state, so an error emptied the panel it was apologising
+	 * in.
+	 */
+	const tookReport = (id: string, answer: { report?: UsageReport; error?: string }) => {
+		if (answer.report) seenReports.set(id, { report: answer.report, at: Date.now() });
+		if (usagePanel() !== id) return;
+		const kept = seenReports.get(id);
+		setUsageReport({ loading: false, ...(kept ? { report: kept.report, at: kept.at } : {}), ...(answer.error ? { error: answer.error } : {}) });
 	};
 
 	/**
@@ -281,6 +312,7 @@ function createUi() {
 		setUsagePanel,
 		usageReport,
 		setUsageReport,
+		tookReport,
 		readUsage,
 		openUsage,
 		unread,
@@ -340,6 +372,7 @@ export const {
 	setUsagePanel,
 	usageReport,
 	setUsageReport,
+	tookReport,
 	readUsage,
 	openUsage,
 	unread,

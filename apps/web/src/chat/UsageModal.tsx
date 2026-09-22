@@ -4,7 +4,7 @@ import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 import { contextLevel, contextPercent, usageLevel } from "../lib/context-usage.ts";
-import { behaviorLabel, duration, exact, modelLabel, money, planLabel, resetsAt, resetsIn, tokens } from "./usage-format.ts";
+import { ago, behaviorLabel, duration, exact, modelLabel, money, planLabel, resetsAt, resetsIn, tokens } from "./usage-format.ts";
 
 /** How often the countdowns move. A window resets in hours; this is plenty. */
 const TICK = 30_000;
@@ -44,9 +44,11 @@ const TICK = 30_000;
  * 3. **What has been using it** — the runtime's own scan of this machine's transcripts,
  *    when it collects one.
  *
- * Read fresh on every opening and never cached between them: two of the three are running
- * totals and the third is a countdown, so figures from an hour ago labelled as usage are
- * worse than no figures.
+ * Read again on every opening: two of the three are running totals and the third is a
+ * countdown, so figures from an hour ago labelled as usage are worse than no figures. What
+ * it does *not* do is wait in silence for that read — the reading takes about two seconds
+ * through the CLI, so the last one for this agent is drawn at once and says how old it is
+ * while the fresh one is on its way (`state/ui.ts`).
  */
 export function UsageModal(props: {
 	/** The cheap reading the browser already has, so the context is drawn immediately. */
@@ -54,6 +56,8 @@ export function UsageModal(props: {
 	report: UsageReport | undefined;
 	error: string | undefined;
 	loading: boolean;
+	/** When the report on screen was read, so a reading being retaken can say how old it is. */
+	at: number | undefined;
 	onRefresh: () => void;
 	onClose: () => void;
 }) {
@@ -132,6 +136,14 @@ export function UsageModal(props: {
 						the failure is said out loud above them.
 					*/}
 					<Show when={props.error}>{(message) => <p class="usage-stale">Could not read usage: {message()}</p>}</Show>
+
+					{/*
+						Figures from the last reading, while this one is in flight.
+						
+						Said rather than spun, because the spinner is in the header and a bar that is
+						two seconds out of date looks exactly like a bar that is current.
+					*/}
+					<Show when={props.loading && props.report && props.at}>{(at) => <p class="usage-reading">Reading again — figures from {ago(at(), now())}.</p>}</Show>
 
 					{/* --- this conversation ------------------------------------------------- */}
 
@@ -336,22 +348,40 @@ function Facts(props: { spend: SessionSpend }) {
 	);
 }
 
-/** One plan window: how full, how long until it turns over. */
+/** One plan window: how full, how long until it turns over, and whether it is in force. */
 function Limit(props: { limit: PlanLimit; now: number }) {
 	const until = () => resetsIn(props.limit.resetsAt, props.now);
+	/**
+	 * The line under the bar: the countdown, or why there is not one.
+	 *
+	 * A window the account is not currently subject to is drawn and marked rather than left
+	 * out, because "which limits does this account have" is a question the panel should be
+	 * able to answer — but it is not the one you are about to hit, so it says so and its bar
+	 * is uncoloured.
+	 */
+	const foot = () => {
+		const left = until();
+		if (!props.limit.active) return left ? `not in force · turns over in ${left}` : "not in force";
+		if (!left) return null;
+		return left === "now" ? "resetting now" : `resets in ${left}`;
+	};
+
 	return (
-		<li class="usage-limit">
+		<li class="usage-limit" classList={{ dormant: !props.limit.active }}>
 			<div class="usage-limit-head">
 				<span class="usage-limit-label">{props.limit.label}</span>
 				<span class="usage-limit-value">{props.limit.percent === null ? "—" : `${Math.round(props.limit.percent)}%`}</span>
 			</div>
-			<Meter percent={props.limit.percent} />
-			<Show when={until()}>
-				{(left) => (
+			<Meter percent={props.limit.percent} flat={!props.limit.active} />
+			<Show when={foot()}>
+				{(line) => (
 					/* The countdown is the answer; the wall-clock time is for deciding whether to
 					   wait, so it is one hover away. */
-					<span class="usage-limit-reset" title={resetsAt(props.limit.resetsAt, props.now) ?? undefined}>
-						{left() === "now" ? "resetting now" : `resets in ${left()}`}
+					<span
+						class="usage-limit-reset"
+						title={props.limit.active ? (resetsAt(props.limit.resetsAt, props.now) ?? undefined) : "A window this plan carries and this account is not on right now"}
+					>
+						{line()}
 					</span>
 				)}
 			</Show>

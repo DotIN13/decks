@@ -872,15 +872,13 @@ export class ClaudeBackend implements AgentBackend {
 	 * reading with nobody attached until the report says whose it is.
 	 */
 	async report(): Promise<UsageReport> {
-		await this.refreshUsage();
 		/*
 		 * Whose subscription this is, asked of the CLI rather than read off the row.
 		 *
 		 * The stored label is what the account was called when it was added, and it goes
 		 * stale the moment somebody runs `claude auth login` in a terminal — which had the
 		 * panel captioned with an account the machine was no longer signed in as. One short
-		 * subprocess, on a panel that is already waiting for `planUsage`, and the stored
-		 * label is still there as the answer when the CLI is slow.
+		 * subprocess, and the stored label is still there as the answer when the CLI is slow.
 		 */
 		const accounts = this.context.accounts;
 		/*
@@ -890,8 +888,30 @@ export class ClaudeBackend implements AgentBackend {
 		 * no panel.
 		 */
 		const mine = this.context.account?.id();
-		const identity = accounts ? await claudeIdentity(accounts.keychainDir(mine ?? accounts.active()?.id ?? "") || undefined) : {};
-		return toUsageReport(await this.planUsage(), identity.email ?? (mine ? accounts?.describe(mine)?.email : accounts?.active()?.email) ?? null);
+
+		/*
+		 * One plan read, and everything else beside it.
+		 *
+		 * Measured against a live account: `get_usage` is a 2.0 s round trip through the CLI,
+		 * `auth status` a 0.36 s subprocess, `getContextUsage` 0.35 s — and **two**
+		 * `get_usage` calls are 4.0 s, because the CLI answers control requests one at a
+		 * time. This method used to make two of them (`refreshUsage` asks for the session's
+		 * cost, and the mapping below asks for the windows) with the subprocess between, in a
+		 * chain: 4.9 s of a panel saying "Reading…" for a question it had already asked.
+		 *
+		 * So the read is started once here and *handed* to `refreshUsage`, rather than
+		 * refreshed independently — passing the promise and not the value, because a
+		 * `getContextUsage` that queues behind it finishes after the read has settled, and a
+		 * value asked for then is a second round trip. Measured at 2.3 s, which is the one
+		 * read plus the context reading queued behind it.
+		 */
+		const plan = this.planUsage();
+		const [usage, identity] = await Promise.all([
+			plan,
+			accounts ? claudeIdentity(accounts.keychainDir(mine ?? accounts.active()?.id ?? "") || undefined) : Promise.resolve({} as Awaited<ReturnType<typeof claudeIdentity>>),
+			this.refreshUsage(plan),
+		]);
+		return toUsageReport(usage, identity.email ?? (mine ? accounts?.describe(mine)?.email : accounts?.active()?.email) ?? null);
 	}
 
 	/**
@@ -1096,14 +1116,23 @@ export class ClaudeBackend implements AgentBackend {
 		}
 	}
 
-	/** Read after each turn, because Decks' `usage()` is synchronous and this is not. */
-	private async refreshUsage(): Promise<void> {
+	/**
+	 * Read after each turn, because Decks' `usage()` is synchronous and this is not.
+	 *
+	 * The plan read is a *promise* and has a default, so a caller with one already in the air
+	 * hands it over (`report`) and a caller without one starts it here — started before the
+	 * context reading is awaited either way, so the two go together rather than one after the
+	 * other. Handing over the value instead of the promise would not work: the context read
+	 * queues behind the plan read in the CLI, so by the time it answers the plan read has
+	 * settled and asking again is a second two-second round trip.
+	 */
+	private async refreshUsage(plan: Promise<SDKControlGetUsageResponse | undefined> = this.planUsage()): Promise<void> {
 		try {
-			const usage = await this.session.getContextUsage();
+			const context = await this.session.getContextUsage();
 			this.lastUsage = {
-				contextTokens: usage.totalTokens,
-				contextWindow: usage.maxTokens,
-				cost: (await this.spend()) ?? this.lastUsage?.cost ?? 0,
+				contextTokens: context.totalTokens,
+				contextWindow: context.maxTokens,
+				cost: sessionCost(await plan) ?? this.lastUsage?.cost ?? 0,
 			};
 		} catch {
 			/* a query that has ended has no usage, which is not an error worth raising */
@@ -1111,33 +1140,26 @@ export class ClaudeBackend implements AgentBackend {
 	}
 
 	/**
-	 * What the session has cost, from the call behind the CLI's own `/usage`.
+	 * The whole of what `/usage` knows, or nothing at all.
 	 *
-	 * Reported as zero until now, on the grounds that the call is experimental — which
-	 * left the meter saying "3% ctx" beside a pi agent saying "3% ctx · $0.0018", and a
-	 * cost of zero is not more honest than no figure, it is a wrong one.
-	 *
-	 * Held at arm's length, because the SDK's own name for it is an instruction:
-	 * `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`. Probed for rather than
-	 * called, so an SDK that drops or renames it degrades to the previous figure instead of
-	 * throwing inside a turn — the same reason `report` treats the plan windows as a
-	 * bonus rather than a field.
+	 * Single-flight: a read already in the air is handed to the next caller rather than
+	 * joined by a second one. Opening the panel asks this question twice over — once for the
+	 * windows and once for the session's cost — and each ask is a two-second round trip to
+	 * the CLI. Nothing is cached *past* the answer: the promise is forgotten when it settles,
+	 * so a refresh press is always a fresh read.
 	 */
-	private async spend(): Promise<number | undefined> {
-		const usage = await this.planUsage();
-		const cost = usage?.session?.total_cost_usd;
-		return typeof cost === "number" && Number.isFinite(cost) ? cost : undefined;
-	}
+	private planRead?: Promise<SDKControlGetUsageResponse | undefined>;
 
-	/** The whole of what `/usage` knows, or nothing at all. */
-	private async planUsage(): Promise<SDKControlGetUsageResponse | undefined> {
+	private planUsage(): Promise<SDKControlGetUsageResponse | undefined> {
+		if (this.planRead) return this.planRead;
 		const read = (this.session as Partial<Query>).usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET;
-		if (typeof read !== "function") return undefined;
-		try {
-			return await read.call(this.session);
-		} catch {
-			return undefined;
-		}
+		if (typeof read !== "function") return Promise.resolve(undefined);
+		const pending = read.call(this.session).catch(() => undefined);
+		this.planRead = pending;
+		void pending.finally(() => {
+			if (this.planRead === pending) this.planRead = undefined;
+		});
+		return pending;
 	}
 
 	// --- modes -------------------------------------------------------------------------
@@ -1333,6 +1355,22 @@ function stageServerName(): string {
  * `off` and `minimal` have no effort counterpart — the CLI's lowest is `low` — so they map
  * to nothing rather than to a level that would spend more than was asked for.
  */
+/**
+ * What the session has cost, out of the payload behind the CLI's own `/usage`.
+ *
+ * Reported as zero for a while, on the grounds that the call is experimental — which left
+ * the meter saying "3% ctx" beside a pi agent saying "3% ctx · $0.0018", and a cost of zero
+ * is not more honest than no figure, it is a wrong one.
+ *
+ * `undefined` rather than zero when the payload has no figure, so the caller keeps the one
+ * it had: the whole payload is held at arm's length, because the SDK's own name for the call
+ * is an instruction — `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`.
+ */
+function sessionCost(usage: SDKControlGetUsageResponse | undefined): number | undefined {
+	const cost = usage?.session?.total_cost_usd;
+	return typeof cost === "number" && Number.isFinite(cost) ? cost : undefined;
+}
+
 /** The CLI's own auth subcommand, to be run outside any session. */
 function runClaudeCommand(
 	args: string[],

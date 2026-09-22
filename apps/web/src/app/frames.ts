@@ -18,7 +18,7 @@ import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
-import { releaseBoards, setDraft, setUnread, setUsagePanel, setUsageReport, usagePanel, surface } from "../state/ui.ts";
+import { releaseBoards, setDraft, setUnread, setUsagePanel, surface, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
 
 /** What the frame handler needs from the component it used to live in. */
@@ -305,10 +305,10 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				 */
 				case "agent.report": {
 					if (message.show) setUsagePanel(message.id);
-					// A reading for an agent whose panel is not open is a reading for a panel that
-					// was closed while it was in flight.
-					if (usagePanel() !== message.id) return;
-					setUsageReport({ loading: false, ...(message.report ? { report: message.report } : {}), ...(message.error ? { error: message.error } : {}) });
+					// Kept for this agent whether or not its panel is still open — a panel closed
+					// while a reading was in flight is exactly the case the next opening wants it
+					// for, so `tookReport` files it and draws it only if it is still being read.
+					tookReport(message.id, { ...(message.report ? { report: message.report } : {}), ...(message.error ? { error: message.error } : {}) });
 					return;
 				}
 

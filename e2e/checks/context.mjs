@@ -167,6 +167,79 @@ const agent = {
 	say("…with the same reading in it, drawn without waiting for the server", modal.percent === "74%" && /148,000 of 200,000/.test(modal.tokens ?? ""), JSON.stringify([modal.percent, modal.tokens]));
 	say("…inside a 393px screen", modal.inside && modal.width <= 393 - 24, `${modal.width}px`);
 
+	/*
+	 * Every window the account has, and not only the one it is closest to filling.
+	 *
+	 * The payload states the same windows twice — a block of named buckets and an
+	 * undocumented `limits[]` array that is shorter and uses other names — and reading only
+	 * the array drew one row on a live account whose CLI panel showed three. The report is
+	 * fed here because a real one is a two-second round trip to a signed-in CLI.
+	 */
+	await feed({
+		type: "agent.report",
+		id: "A",
+		report: {
+			kind: "claude",
+			subscription: "max",
+			account: "ada@example.com",
+			limits: [
+				{ key: "five_hour", label: "5-hour window", percent: 15, resetsAt: new Date(Date.now() + 3 * 3600_000).toISOString(), active: true },
+				{ key: "seven_day", label: "7-day window", percent: 61, resetsAt: new Date(Date.now() + 2 * 86_400_000).toISOString(), active: true },
+				{ key: "seven_day_fable", label: "7-day (Fable)", percent: 33, resetsAt: new Date(Date.now() + 2 * 86_400_000).toISOString(), active: true },
+				{ key: "seven_day_cowork", label: "7-day (Cowork)", percent: 0, resetsAt: null, active: false },
+			],
+			session: { costUsd: 1.25, tokens: { input: 1290, output: 840, cacheRead: 400_000, cacheWrite: 20_000 }, models: [], durationMs: null, apiDurationMs: null, linesAdded: null, linesRemoved: null },
+			behaviors: null,
+		},
+	});
+	await settle(page, 400);
+	const windows = await page.evaluate(() => ({
+		rows: [...document.querySelectorAll('[data-group="limits"] .usage-limit')].map((row) => ({
+			label: row.querySelector(".usage-limit-label")?.textContent,
+			value: row.querySelector(".usage-limit-value")?.textContent,
+			foot: row.querySelector(".usage-limit-reset")?.textContent,
+			dim: row.classList.contains("dormant"),
+		})),
+		whose: document.querySelector('[data-group="limits"] .set-note')?.textContent,
+	}));
+	say("the plan section draws every window the account has", windows.rows.length === 4, JSON.stringify(windows.rows.map((row) => row.label)));
+	/* In the order the report gives them, which is the server's — fullest first, in force
+	   first, and unit-tested in `usage.test.ts`. What matters here is that a per-model week
+	   is drawn at all: reading only `limits[]` is what used to lose it. */
+	say(
+		"…including the per-model week, with its own share",
+		windows.rows.some((row) => row.label === "7-day (Fable)" && row.value === "33%"),
+		JSON.stringify(windows.rows),
+	);
+	say(
+		"…and a window the account is not on is dimmed and says so",
+		windows.rows.at(-1)?.dim === true && /not in force/.test(windows.rows.at(-1)?.foot ?? ""),
+		JSON.stringify(windows.rows.at(-1)),
+	);
+	say("…under the account whose windows they are", /ada@example.com/.test(windows.whose ?? ""), windows.whose ?? "");
+
+	/*
+	 * Reopening it draws the last reading at once rather than "Reading…".
+	 *
+	 * And the read it starts on the way in *fails* here, because the agent in this check is
+	 * fed to the browser and the server has never heard of it — which is the second half of
+	 * the assertion and the older bug: the answer used to be written straight over the
+	 * state, so a failed read emptied the panel it was apologising in.
+	 */
+	await page.locator(".usage-modal [aria-label='Close']").click();
+	await settle(page, 300);
+	await page.locator('.pill button[aria-label^="More"]').click();
+	await settle(page, 300);
+	await page.locator(".popover [data-row]").filter({ hasText: /context usage/i }).click();
+	await settle(page, 600);
+	const again = await page.evaluate(() => ({
+		rows: document.querySelectorAll('[data-group="limits"] .usage-limit').length,
+		empty: document.querySelectorAll('[data-group="limits"] .usage-empty').length,
+		stale: document.querySelector(".usage-modal .usage-stale")?.textContent,
+	}));
+	say("reopening it shows the last reading instead of waiting", again.rows === 4 && again.empty === 0, JSON.stringify(again));
+	say("…and a read that fails says so over the figures, which stay", again.rows === 4 && /Could not read usage/.test(again.stale ?? ""), JSON.stringify(again));
+
 	await page.locator(".usage-modal [aria-label='Close']").click();
 	await settle(page, 400);
 	say("and it closes", (await page.evaluate(() => document.querySelectorAll(".usage-modal").length)) === 0);
