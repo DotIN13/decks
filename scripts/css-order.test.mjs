@@ -15,6 +15,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { flatten, fingerprint, ties, changedTies, describe, signature, record, outsideLayer } from "./css-order.mjs";
 
+/* The base selector, which the rename report is read in: `.row-label` out of `@media (…) ▸ .row-label`. */
+const baseOf = (rule) => rule.sel.split(" ▸ ").pop();
+
 /** A cascade out of an in-memory map of path → text, keyed the way the resolver looks them up. */
 const cascade = (files, entry = "entry.css") => flatten((path) => files[path] ?? null, entry);
 const hashOf = (files, entry) => fingerprint(cascade(files, entry));
@@ -185,7 +188,7 @@ test("the baseline's own rule list can be diffed against the sheets", () => {
 test("a rule list stored and read back is the same cascade", () => {
 	const files = { "entry.css": `@import "./a.css";`, "a.css": `@layer components { .x { color: red } }` };
 	const entries = cascade(files);
-	assert.deepEqual(describe(entries.map(record), entries), { added: [], removed: [], moved: [], edited: [], relayered: [], ties: [] });
+	assert.deepEqual(describe(entries.map(record), entries), { added: [], removed: [], moved: [], edited: [], relayered: [], renamed: [], ties: [] });
 });
 
 test("component rules outside the layer are counted, and token blocks are not", () => {
@@ -222,4 +225,24 @@ test("a rule that enters a layer is not an edit", () => {
 	assert.equal(changes.added.length, 0);
 	assert.equal(changes.removed.length, 0);
 	assert.equal(changes.relayered[0].to.sel, "@layer components ▸ .a");
+});
+
+test("a rule renamed where it stands is a rename, not a drop and an addition", () => {
+	const before = { "entry.css": `.lb { color: red; font-size: 11px }\n.other { color: blue }` };
+	const after = { "entry.css": `.row-label { color: red; font-size: 11px }\n.other { color: blue }` };
+	const changes = describe(cascade(before), cascade(after));
+	assert.deepEqual(changes.renamed.map((r) => [baseOf(r.from), baseOf(r.to)]), [[".lb", ".row-label"]]);
+	assert.equal(changes.added.length, 0);
+	assert.equal(changes.removed.length, 0);
+	assert.equal(changes.edited.length, 0);
+	assert.equal(changes.moved.length, 0);
+});
+
+test("a rename and an edit to the same rule are not confused", () => {
+	const before = { "entry.css": `.lb { color: red }` };
+	const after = { "entry.css": `.row-label { color: green }` };
+	const changes = describe(cascade(before), cascade(after));
+	assert.equal(changes.renamed.length, 0);
+	assert.equal(changes.added.length, 1);
+	assert.equal(changes.removed.length, 1);
 });

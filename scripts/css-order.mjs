@@ -307,6 +307,13 @@ const baseOf = (rule) => rule.sel.split(" ▸ ").pop();
 const identityOf = (rule) => `${baseOf(rule)}|${declsOf(rule).join(";")}`;
 
 /**
+ * What a rule says *and* the at-rule it sits in, which is a rule's shape rather than its name.
+ *
+ * Two rules with the same shape and different selectors are the same rule renamed.
+ */
+const shapeOf = (rule) => `${rule.sel.split(" ▸ ").slice(0, -1).join(" ▸ ")}|${declsOf(rule).join(";")}`;
+
+/**
  * A rule as something to compare across commits: its file, its selector, and its signature.
  *
  * `sig` is the identity — two records with the same signature are the same rule, wherever they
@@ -464,13 +471,14 @@ export function describe(before, after) {
 	const heldAfter = new Set(kept.map(([, j]) => j));
 
 	/*
-	 * What the alignment could not keep is one of three things: the same rule somewhere else
-	 * (its signature is on both sides), the same selector with different declarations (a rule
-	 * edited where it stands), or a rule that arrived or left.
+	 * What the alignment could not keep is one of four things: the same rule somewhere else
+	 * (its signature is on both sides), the same rule under a new name, the same selector with
+	 * different declarations (edited where it stands), or a rule that arrived or left.
 	 */
 	const orphans = new Map();
 	const bySelector = new Map();
 	const byIdentity = new Map();
+	const byShape = new Map();
 	const queue = (map, key, i) => {
 		if (!map.has(key)) map.set(key, []);
 		map.get(key).push(i);
@@ -480,11 +488,13 @@ export function describe(before, after) {
 		queue(orphans, was[i].sig, i);
 		queue(bySelector, was[i].sel, i);
 		queue(byIdentity, identityOf(was[i]), i);
+		queue(byShape, shapeOf(was[i]), i);
 	}
 	const added = [];
 	const moved = [];
 	const edited = [];
 	const relayered = [];
+	const renamed = [];
 	const take = (map, key, i) => {
 		const list = map.get(key);
 		if (list) {
@@ -500,6 +510,7 @@ export function describe(before, after) {
 			moved.push({ from: was[i], to: now[j], was: i, now: j });
 			take(bySelector, was[i].sel, i);
 			take(byIdentity, identityOf(was[i]), i);
+			take(byShape, shapeOf(was[i]), i);
 			continue;
 		}
 		/* Same selector, same declarations, a different at-rule chain: it entered or left a layer. */
@@ -509,6 +520,7 @@ export function describe(before, after) {
 			relayered.push({ from: was[i], to: now[j], was: i, now: j });
 			take(orphans, was[i].sig, i);
 			take(bySelector, was[i].sel, i);
+			take(byShape, shapeOf(was[i]), i);
 			continue;
 		}
 		const here = bySelector.get(now[j].sel);
@@ -516,6 +528,21 @@ export function describe(before, after) {
 			const i = here.shift();
 			edited.push({ from: was[i], to: now[j], was: i, now: j });
 			take(orphans, was[i].sig, i);
+			take(byIdentity, identityOf(was[i]), i);
+			take(byShape, shapeOf(was[i]), i);
+			continue;
+		}
+		/*
+		 * The same declarations, in the same at-rule, under a different selector: a rename.
+		 * Without this a rename reads as a rule dropped and another added, which is exactly
+		 * the noise a pass that renames 25 classes would make.
+		 */
+		const shape = byShape.get(shapeOf(now[j]));
+		if (shape?.length) {
+			const i = shape.shift();
+			renamed.push({ from: was[i], to: now[j], was: i, now: j });
+			take(orphans, was[i].sig, i);
+			take(bySelector, was[i].sel, i);
 			take(byIdentity, identityOf(was[i]), i);
 			continue;
 		}
@@ -527,7 +554,8 @@ export function describe(before, after) {
 	edited.sort((x, y) => x.now - y.now);
 	removed.sort((x, y) => x.at - y.at);
 	relayered.sort((x, y) => x.now - y.now);
-	return { added, removed, moved, edited, relayered, ties: changedTies(before, after) };
+	renamed.sort((x, y) => x.now - y.now);
+	return { added, removed, moved, edited, relayered, renamed, ties: changedTies(before, after) };
 }
 
 /* ------------------------------------------------------------------------- the command */
@@ -586,8 +614,12 @@ function report(before, after, { json }) {
 	}
 	const lines = [];
 	lines.push(
-		`cascade order changed: ${changes.moved.length} moved, ${changes.edited.length} edited in place, ${changes.relayered.length} entered or left a layer, ${changes.added.length} added, ${changes.removed.length} removed, ${changes.ties.length} ties decided differently`,
+		`cascade order changed: ${changes.moved.length} moved, ${changes.edited.length} edited in place, ${changes.relayered.length} entered or left a layer, ${changes.renamed.length} renamed, ${changes.added.length} added, ${changes.removed.length} removed, ${changes.ties.length} ties decided differently`,
 	);
+	for (const pair of changes.renamed.slice(0, 10)) {
+		lines.push(`  name ${short(baseOf(pair.from))} → ${short(baseOf(pair.to))}  ${spot(pair.to, pair.now)}  (same declarations, same place)`);
+	}
+	if (changes.renamed.length > 10) lines.push(`  … and ${changes.renamed.length - 10} more renamed`);
 	for (const pair of changes.relayered.slice(0, 6)) {
 		const into = pair.to.sel.includes("@layer") && !pair.from.sel.includes("@layer") ? "into a layer" : "out of a layer";
 		lines.push(`  layer ${short(pair.to.sel)}  ${spot(pair.from, pair.was)} → ${spot(pair.to, pair.now)}  (${into}, declarations unchanged)`);
