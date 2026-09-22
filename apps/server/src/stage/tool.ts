@@ -1,6 +1,6 @@
 import { isoIn, isZone, nowWords, offsetLabel, partsIn, processZone } from "../clock.ts";
 import { existsSync, readFileSync } from "node:fs";
-import type { AgentKind, AgentMode, AgentState, Camera, Canvas, Identity, Schedule, ScheduleSpec, TaskResult, TaskSpec, ThinkingLevel } from "@decks/protocol";
+import type { ActKind, AgentKind, AgentMode, AgentState, Camera, Canvas, Identity, Schedule, ScheduleSpec, TaskResult, TaskSpec, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
 import { slug } from "../agents/slug.ts";
@@ -164,6 +164,8 @@ export interface StageAgentHooks {
 	 * with no deck record (a board actor) can leave it out.
 	 */
 	worked?(path: string): void;
+	/** The agent acted on a board with a stage verb: the canvas draws its cursor there (`agents/acts.ts`). */
+	acted?(what: ActKind, path: string): void;
 	/** Deck-relative path for an absolute one, or undefined if it is not a board. */
 	boardPathOf(file: string): string | undefined;
 }
@@ -461,6 +463,7 @@ export function createStageTool(deps: {
 			});
 			agent.setInPlay([...agent.inPlay(), path]);
 			agent.worked?.(path);
+			agent.acted?.("new", path);
 			/*
 			 * The size of the thing you are about to fill, and the advice that goes with it.
 			 *
@@ -488,6 +491,7 @@ export function createStageTool(deps: {
 		resize: async (path: string, size: { w?: number; h?: number }) => {
 			if (!size || (size.w === undefined && size.h === undefined)) throw new Error("A resize needs a width, a height, or both");
 			const board = service.resize(path, size);
+			agent.acted?.("resize", board.path);
 			return { path: board.path, w: board.w, h: board.h };
 		},
 
@@ -501,6 +505,7 @@ export function createStageTool(deps: {
 		fit: async (path: string, options?: { margin?: number }) => {
 			const { board, content, reading, views } = await service.fit(path, options);
 			agent.worked?.(board.path);
+			agent.acted?.("resize", board.path);
 			/*
 			 * What the browser read, said as sentences, so the check costs no screenshot.
 			 *
@@ -571,6 +576,7 @@ export function createStageTool(deps: {
 			// the canvas, and is nobody's byline.
 			const [only] = paths;
 			if (only !== undefined && paths.length === 1) agent.worked?.(only);
+			for (const one of paths) agent.acted?.("show", one);
 			return service.show(agent.id, paths, options ?? {});
 		},
 		/**
@@ -590,8 +596,13 @@ export function createStageTool(deps: {
 				);
 			}
 			agent.setInPlay(left);
+			for (const one of dropping) if (up.includes(one)) agent.acted?.("hide", one);
 		},
-		move: async (path: string, at: { x: number; y: number }) => service.move(agent.id, path, at),
+		move: async (path: string, at: { x: number; y: number }) => {
+			const board = service.move(agent.id, path, at);
+			agent.acted?.("move", board.path);
+			return board;
+		},
 		camera: (async (at?: Camera, options?: { animate?: boolean }) => {
 			if (!at) return agent.camera();
 			await service.setCamera(agent.id, at, options ?? {});

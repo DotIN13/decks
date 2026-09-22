@@ -1734,6 +1734,7 @@ export function App() {
 						onHide={(path) => send({ type: "board.hide", path })}
 						nonces={state.nonces}
 						cursor={state.cursor}
+						acts={state.acts}
 						onViewport={() => reportCameraSoon(camera())}
 						onExtent={(path, extent) => send({ type: "board.extent", path, ...extent })}
 						editor={editor}

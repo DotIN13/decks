@@ -7,6 +7,7 @@ import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
 import type { CanvasStore } from "../canvas/store.ts";
 import { planCanvases } from "../canvas/migrate.ts";
+import type { Act } from "./acts.ts";
 import { numberedName } from "../names.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { CreateSpec, SendSpec } from "../stage/tool.ts";
@@ -66,6 +67,8 @@ export class Registry {
 			recordRevision(path: string): string | undefined;
 			/** An agent said it wrote this board — the byline the gallery shows. Optional so a bare test host can omit it. */
 			wrote?(path: string, who: string): void;
+			/** An agent is acting on a board: the canvas draws its cursor and marks (`agents/acts.ts`). Optional like `wrote`. */
+			act?(agentId: string, act: Act): void;
 			boardPathOf(file: string): string | undefined;
 			/** The Claude subscriptions this install can use, for the backends that can. */
 			accounts?: ClaudeAccountSwitcher;
@@ -284,6 +287,7 @@ export class Registry {
 				brief: (task, boards) => brief(task, boards, this.deck),
 				recordRevision: (path) => this.host.recordRevision(path),
 				wrote: (path, who) => this.host.wrote?.(path, who),
+				act: (agentId, act) => this.host.act?.(agentId, act),
 				boardPathOf: (file) => this.host.boardPathOf(file),
 			},
 			{

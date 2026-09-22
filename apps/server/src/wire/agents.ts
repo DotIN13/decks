@@ -60,6 +60,7 @@ export const agents = {
 
 	"agent.remove": (message, reply, wire) => {
 		const outcome = wire.agents.remove(message.id);
+		if (outcome.removed) wire.acts.forget(message.id);
 		if (!outcome.removed && outcome.reason) reply({ type: "notice", level: "warn", text: outcome.reason });
 	},
 

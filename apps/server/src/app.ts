@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { examplesDir, runtimeLib } from "@decks/runtime";
 import type { AgentKind, Board, Camera, Canvas, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
+import { Acts } from "./agents/acts.ts";
 import { BoardService } from "./boards/service.ts";
 import { EvalTrust } from "./boards/eval-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
@@ -55,6 +56,8 @@ export class App {
 	deck: Deck;
 	readonly agents: Registry;
 	readonly stage: StageService;
+	/** What each agent is doing to which board, said to the browsers as it happens (`agents/acts.ts`). */
+	readonly acts: Acts;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
 	readonly boards: BoardService;
 	/** Tasks and schedules: the dashboard's store, rule and scheduler (`tasks/service.ts`). */
@@ -243,12 +246,25 @@ export class App {
 			},
 			(message) => this.send(message),
 		);
+		this.acts = new Acts({
+			emit: (message) => this.send(message),
+			identity: (agentId) => this.agents.get(agentId)?.who(),
+			boardPathOf: (file) => this.boards.boardPathOf(file),
+			read: (path) => {
+				try {
+					return this.stage.read(path);
+				} catch {
+					return undefined;
+				}
+			},
+		});
 		this.agents = new Registry(
 			deck,
 			(message) => this.send(message),
 			this.stage,
 			{
 				port: config.port,
+				act: (agentId, act) => this.acts.act(agentId, act),
 				defaultKind: config.backend,
 				dispatcherKind: () => this.settings.get().dispatcherKind,
 				camera: (agentId) => this.cameras.get(agentId) ?? this.lastCamera,
@@ -533,6 +549,8 @@ export class App {
 				if (board) {
 					try {
 						this.boards.recordRevision(change.path);
+						// Whoever was holding this board with a write or edit tool is done, and the diff says what changed.
+						this.acts.landed(change.path, this.stage.read(change.path));
 					} catch {
 						/* the file went away between the event and the read */
 					}

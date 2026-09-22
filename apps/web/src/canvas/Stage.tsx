@@ -3,6 +3,7 @@ import { CanvasWires } from "./CanvasWires.tsx";
 import X from "lucide-solid/icons/x";
 import { Icon } from "../ui/icons.tsx";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
+import type { AgentAct } from "./acts.ts";
 import { between, boxOf, easeOutCubic, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
@@ -128,6 +129,8 @@ export function Stage(props: {
 	/** Per-board reload counters, from `stage.reload`. */
 	nonces?: Record<string, number>;
 	cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
+	/** What each agent is doing to which board; each frame takes the acts on its board (`canvas/acts.ts`). */
+	acts?: Record<string, AgentAct | undefined>;
 	/** The arrows and dashed groups the canvas on screen has, drawn under its boards. */
 	links?: import("@decks/protocol").CanvasLink[];
 	groups?: import("@decks/protocol").CanvasGroup[];
@@ -1334,6 +1337,7 @@ export function Stage(props: {
 							nonce={props.nonces?.[board.path]}
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
 							marks={(props.marks ?? []).filter((mark) => mark.path === board.path)}
+							acts={actsByPath().get(board.path)}
 							editor={props.editor}
 							gestures={gestures}
 							drops={props.drops(board.path)}
@@ -1355,6 +1359,21 @@ export function Stage(props: {
 							{...(props.onFocusBoard ? { focused: props.focus === board.path, onFocus: () => props.onFocusBoard?.(board.path) } : {})}
 						/>
 );
+
+	/*
+	 * The acts on each board, grouped once per change rather than filtered per frame: a
+	 * handful of agents at most, and every frame would otherwise walk the same record.
+	 */
+	const actsByPath = createMemo(() => {
+		const map = new Map<string, AgentAct[]>();
+		for (const act of Object.values(props.acts ?? {})) {
+			if (!act) continue;
+			const list = map.get(act.path);
+			if (list) list.push(act);
+			else map.set(act.path, [act]);
+		}
+		return map;
+	});
 
 	return (
 		<div

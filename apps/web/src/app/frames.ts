@@ -5,6 +5,7 @@ import { receiveToolResult } from "../chat/tool-results.ts";
 import { viewToPark } from "../camera/agent-view.ts";
 import { agentViews } from "../camera/agent-views.ts";
 import { runStageCall } from "../canvas/stage-ops.ts";
+import { DONE_LINGER_MS } from "../canvas/acts.ts";
 import { scratch } from "../state/agent.ts";
 import { moveCamera } from "../state/camera.ts";
 import { reportCamera } from "./camera-report.ts";
@@ -247,6 +248,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 */
 					scratch.forget(message.id);
 					setState("agents", message.id, undefined);
+					setState("acts", message.id, undefined);
 					setState("identities", message.id, undefined as never);
 					setState("contexts", message.id, undefined as never);
 					setUnread(message.id, 0);
@@ -255,6 +257,20 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 
 				case "agent.identity":
 					setState("identities", message.id, message.identity);
+					return;
+
+				/*
+				 * An agent acting on a board: kept as the latest act per agent, which is what the
+				 * frame draws a cursor and marks from. A finished act stays for a moment so the
+				 * landing can be seen, then goes — unless a newer act has replaced it by then.
+				 */
+				case "agent.act":
+					setState("acts", message.agentId, message);
+					if (message.phase === "done") {
+						setTimeout(() => {
+							if (state.acts[message.agentId]?.at === message.at) setState("acts", message.agentId, undefined);
+						}, DONE_LINGER_MS);
+					}
 					return;
 
 				case "agent.state": {

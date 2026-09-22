@@ -43,3 +43,11 @@ export interface StageCall {
 }
 
 export type StageResult = { id: string; value?: unknown; error?: string };
+
+/**
+ * What an agent is doing to a board, for the cursor and the editing marks the canvas draws.
+ *
+ * `edit` is a write or edit tool naming the board's file; the rest are stage verbs. Said by
+ * the server from what it already sees, so an agent never has to point at its own work.
+ */
+export type ActKind = "edit" | "new" | "resize" | "move" | "show" | "hide";

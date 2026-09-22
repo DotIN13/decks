@@ -1840,6 +1840,80 @@ svg.lucide {
 }
 
 /*
+ * An agent at work on a board (`canvas/acts.ts`): the block it holds, and the block it wrote.
+ *
+ * Both are in board coordinates, so they wrap the block at any zoom; the line and the name are
+ * counter-scaled so they are one size on the screen. The hold breathes, because a still outline
+ * says nothing is happening; the landing is one sweep across the new content and a fill that
+ * fades, then nothing — the changed mark on the title bar is what stays.
+ */
+.act-hold,
+.act-land {
+	position: absolute;
+	z-index: 5;
+	border-radius: 6px;
+	pointer-events: none;
+	--act: var(--color-accent);
+	--line-w: calc(1.5px / var(--zoom, 1));
+}
+.act-hold {
+	box-shadow:
+		0 0 0 var(--line-w) var(--act),
+		0 0 0 calc(var(--line-w) * 4) color-mix(in srgb, var(--act) 18%, transparent);
+	animation: act-breathe 2.2s ease-in-out infinite;
+}
+.act-hold > .who {
+	position: absolute;
+	right: 0;
+	bottom: 100%;
+	padding: 1px 7px;
+	border-radius: 5px 5px 0 0;
+	background: var(--act);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+	transform: scale(calc(1 / var(--zoom, 1)));
+	transform-origin: 100% 100%;
+}
+.act-land {
+	overflow: hidden;
+	animation: act-settle 900ms ease-out both;
+}
+.act-land::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--act) 35%, transparent) 50%, transparent 100%);
+	background-size: 60% 100%;
+	background-repeat: no-repeat;
+	animation: act-sweep 420ms ease-out both;
+}
+@keyframes act-breathe {
+	50% {
+		box-shadow:
+			0 0 0 var(--line-w) var(--act),
+			0 0 0 calc(var(--line-w) * 7) color-mix(in srgb, var(--act) 10%, transparent);
+	}
+}
+@keyframes act-settle {
+	from {
+		background: color-mix(in srgb, var(--act) 26%, transparent);
+	}
+	to {
+		background: transparent;
+	}
+}
+@keyframes act-sweep {
+	from {
+		background-position: -60% 0;
+	}
+	to {
+		background-position: 160% 0;
+	}
+}
+
+/*
  * An agent's cursor (`canvas/AgentCursor.tsx`): it drifts, it breathes, and it puts its name
  * away. The drift is a transition on `left`/`top`, which are board coordinates, so it follows
  * the board at any zoom; the counter-scale keeps the dot and the name one size on the screen.
@@ -1960,6 +2034,12 @@ svg.lucide {
 	}
 }
 @media (prefers-reduced-motion: reduce) {
+	/* The outline stays; what moves goes. */
+	.act-hold,
+	.act-land,
+	.act-land::before {
+		animation: none;
+	}
 	.agent-cursor,
 	.agent-cursor .label {
 		transition: none;

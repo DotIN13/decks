@@ -7,7 +7,7 @@ import ExternalLink from "lucide-solid/icons/external-link";
 import Maximize from "lucide-solid/icons/maximize-2";
 import X from "lucide-solid/icons/x";
 import { SourceEditor } from "./SourceEditor.tsx";
-import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Index, Match, onCleanup, Show, Switch } from "solid-js";
 import { unwrap } from "solid-js/store";
 import { Icon } from "../ui/icons.tsx";
 import { boardUrl, deckFileUrl } from "../lib/api.ts";
@@ -15,6 +15,7 @@ import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
 import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
+import { actRects, cursorFor, holding, landed, type AgentAct, type Rect } from "./acts.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { measureFrame } from "./extent.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
@@ -82,6 +83,8 @@ export function BoardFrame(props: {
 	cursor?: { x: number; y: number; label: string; color: string };
 	/** Agents pointing at components on this board. Transient; never written to the file. */
 	marks?: Mark[];
+	/** Agents at work on this board: a cursor each, and the blocks they hold or just wrote (`acts.ts`). */
+	acts?: AgentAct[];
 	onSelect: () => void;
 	onMove: (x: number, y: number) => void;
 	/**
@@ -420,8 +423,10 @@ export function BoardFrame(props: {
 	});
 
 	const [tick, setTick] = createSignal(0);
+	/** Who is acting on this board, as ids: a string is a stable key where an act object is not. */
+	const actingAgents = createMemo(() => (props.acts ?? []).map((act) => act.agentId), [], { equals: (a, b) => a.length === b.length && a.every((id, i) => id === b[i]) });
 	createEffect(() => {
-		if ((props.marks?.length ?? 0) === 0) return;
+		if ((props.marks?.length ?? 0) === 0 && (props.acts?.length ?? 0) === 0) return;
 		const timer = setInterval(() => setTick((n) => n + 1), 120);
 		onCleanup(() => clearInterval(timer));
 	});
@@ -1233,6 +1238,54 @@ export function BoardFrame(props: {
 			{/* An agent pointing at something, in the board's own coordinates and
 			    counter-scaled so the label stays readable however far out you are. */}
 			<AgentCursor cursor={props.cursor} zoom={zoom()} />
+
+			{/*
+				Agents at work on this board, said by the server rather than by them (`acts.ts`).
+
+				One row per agent, keyed on its id so the cursor is the same element from the
+				tool call to the landing and drifts between the two rather than re-mounting. The
+				block rectangles are read off the board's own document on `tick`, as the marks'
+				are, and compared by value so a poll that finds nothing moved redraws nothing.
+				The hold and the landing are keyed on the act's own clock, which is what restarts
+				their animations for a second act on the same block.
+			*/}
+			<For each={actingAgents()}>
+				{(agentId) => {
+					const act = () => props.acts?.find((one) => one.agentId === agentId);
+					const rects = createMemo(
+						() => {
+							void tick();
+							const current = act();
+							return current ? actRects(frameEl?.contentDocument ?? undefined, current) : [];
+						},
+						[],
+						{ equals: (a, b) => JSON.stringify(a) === JSON.stringify(b) },
+					);
+					const boxes = () => (rects().length > 0 ? rects() : [{ x: 0, y: 0, w: props.board.w, h: props.board.h }]);
+					const box = (rect: Rect, color: string) => ({ left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.w}px`, height: `${rect.h}px`, "--act": color, "--zoom": zoom() });
+					return (
+						<Show when={act()}>
+							{(current) => (
+								<>
+									<Show when={holding(current()) ? current().at : undefined} keyed>
+										<Index each={boxes()}>
+											{(rect) => (
+												<div class="act-hold" style={box(rect(), current().color)}>
+													<span class="who">{current().label}</span>
+												</div>
+											)}
+										</Index>
+									</Show>
+									<Show when={landed(current()) ? current().at : undefined} keyed>
+										<Index each={rects()}>{(rect) => <div class="act-land" style={box(rect(), current().color)} />}</Index>
+									</Show>
+									<AgentCursor cursor={{ ...cursorFor(current(), rects(), props.board), label: current().label, color: current().color }} zoom={zoom()} />
+								</>
+							)}
+						</Show>
+					);
+				}}
+			</For>
 
 			{/*
 			 * The resize handle, on the selected board — **one handle, every kind of document**.

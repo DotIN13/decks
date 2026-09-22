@@ -303,10 +303,17 @@ export class Translator {
 
 	// --- tools --------------------------------------------------------------------
 
+	/**
+	 * Every tool call, as it starts and ends, for whoever wants to know what the agent is
+	 * touching (`agents/acts.ts`). Set by the session; the translator itself only draws rows.
+	 */
+	onTool?: (event: { callId: string; name: string; args: unknown; phase: "start" | "end" }) => void;
+
 	toolStart(callId: string, name: string, title: string, args: unknown): void {
 		title = this.deckPath ? title.split(`${this.deckPath}/`).join("") : title;
 		this.push({ kind: "tool", id: `${this.agentId}:t:${callId}`, name, title, args, state: "running" });
 		this.setState("tool");
+		this.onTool?.({ callId, name, args, phase: "start" });
 	}
 
 	toolUpdate(callId: string, text: string): void {
@@ -316,6 +323,8 @@ export class Translator {
 	toolEnd(callId: string, text: string, isError: boolean, images: number): void {
 		this.patchTool(callId, { result: text, images, state: isError ? "error" : "done" });
 		this.onChange?.();
+		const item = this.itemOf(`${this.agentId}:t:${callId}`);
+		this.onTool?.({ callId, name: item?.kind === "tool" ? item.name : "", args: item?.kind === "tool" ? item.args : undefined, phase: "end" });
 	}
 
 	notice(level: "info" | "warn" | "error", text: string): void {

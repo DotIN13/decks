@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Canvas, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
+import type { ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Canvas, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
@@ -14,6 +14,7 @@ import type { ClaudeAccountSwitcher } from "./backend.ts";
 import type { AgentRecord, AgentStore } from "./store.ts";
 import type { StageBridge } from "../stage/bridge.ts";
 import { Translator } from "./translator.ts";
+import type { Act } from "./acts.ts";
 import { forBrowser, HISTORY_ITEMS } from "./wire.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace, sameWorkspace } from "./workspaces.ts";
@@ -384,6 +385,12 @@ export class DeckAgent {
 			/** What is waiting for one agent, for `stage.queue`. */
 			queue(agentId: string): QueuedWork[];
 			/**
+			 * This agent is acting on a board — a write or edit tool call, or a stage verb — so
+			 * the canvas can draw its cursor and marks there (`agents/acts.ts`). Optional: a unit
+			 * fixture has no canvas to draw on.
+			 */
+			act?(agentId: string, act: Act): void;
+			/**
 			 * A queued item belonging to a task was popped: the task is now running.
 			 *
 			 * Optional so a unit fixture that is not testing tasks can leave it out;
@@ -627,6 +634,7 @@ export class DeckAgent {
 			 */
 			(dropped) => this.store.archive(this.id, dropped),
 		);
+		this.translator.onTool = (event) => this.host.act?.(this.id, { kind: "tool", event });
 
 		/*
 		 * A restored chat is put back before anything can change it.
@@ -807,6 +815,7 @@ export class DeckAgent {
 			},
 			recordRevision: (path: string) => this.host.recordRevision(path),
 			worked: (path: string) => this.workedOn(path),
+			acted: (what: ActKind, path: string) => this.host.act?.(this.id, { kind: "verb", what, path }),
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
 		};
 	}
@@ -1818,6 +1827,11 @@ export class DeckAgent {
 	 *
 	 * Unread is the browser's business, not ours.
 	 */
+	/** The name and colour a cursor or a mark for this agent is drawn with (`agents/acts.ts`). */
+	who(): { name: string; color: string } {
+		return { name: this.identity.name, color: this.identity.color };
+	}
+
 	chat(): AgentChat {
 		const model = this.backend?.model() ?? this.lastModel;
 		return {

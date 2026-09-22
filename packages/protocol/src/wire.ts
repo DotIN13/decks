@@ -14,7 +14,7 @@ import type {
 } from "./chat.ts";
 import type { Board, DeckSettings, DeckState } from "./deck.ts";
 import type { ExtensionUiAnswer, ExtensionUiPrompt } from "./extension-ui.ts";
-import type { StageCall, StageResult, Camera } from "./stage.ts";
+import type { ActKind, StageCall, StageResult, Camera } from "./stage.ts";
 import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
 import type { Schedule, ScheduleSpec, Task, TaskSpec } from "./tasks.ts";
@@ -372,6 +372,14 @@ export type ServerMessage =
 	 */
 	| { type: "context.changed"; agentId: string; boards: string[]; inPlay: string[]; canvas?: string }
 	| { type: "stage.call"; call: StageCall }
+	/**
+	 * An agent acting on a board, said by the server rather than the agent: the cursor and the
+	 * editing marks are drawn from it (`canvas/acts.ts`). `start` is a write or edit tool call
+	 * naming the file, with the root block when the old text was found in it; `done` is the
+	 * file landing, with the blocks whose markup changed, or a stage verb. `at` is the act's
+	 * own clock, so two of them are two.
+	 */
+	| { type: "agent.act"; agentId: string; path: string; phase: "start" | "done"; what: ActKind; ids?: string[]; label: string; color: string; at: number }
 	/**
 	 * A question an agent is waiting on, and **which agent is waiting**.
 	 *

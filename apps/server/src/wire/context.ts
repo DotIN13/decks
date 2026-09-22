@@ -1,5 +1,6 @@
 import type { AgentKind, Camera, Canvas, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
 import type { Registry } from "../agents/registry.ts";
+import type { Acts } from "../agents/acts.ts";
 import type { BoardService } from "../boards/service.ts";
 import type { EvalTrust } from "../boards/eval-trust.ts";
 import type { StageService } from "../stage/service.ts";
@@ -70,6 +71,8 @@ export interface WireContext {
 	/** Writing, editing and deleting boards — `boards/service.ts`. */
 	readonly boards: BoardService;
 	readonly agents: Registry;
+	/** What each agent is doing to which board, for the cursors the canvas draws (`agents/acts.ts`). */
+	readonly acts: Acts;
 	readonly web: WebBridge;
 	readonly claudeAccounts: ClaudeAccounts;
 	/** Tasks and schedules — the dashboard's store (takes frames, not boards). */
