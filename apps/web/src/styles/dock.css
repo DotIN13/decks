@@ -623,16 +623,16 @@
 .dock {
 	position: absolute;
 	/*
-	 * Above the conversation, which is `z-index: 9`.
+	 * Above the conversation, which is `--z-conversation` (9).
 	 *
 	 * The column floats over the boards and stops 8px short of this bar, so the two only
 	 * meet when a card is mid-slide or the window is short — and when they met, the history
 	 * won, because this had no z-index at all and a positioned element without one paints at
 	 * 0. The bar you type into is not something a transcript may cover.
 	 *
-	 * 10 and not 11: the boards panel is 10 and comes later in the document, so on a phone —
-	 * where it is a full-height sheet — it still covers this, which is the arrangement the
-	 * sheet was drawn for.
+	 * `--z-chrome` (10) and not 11: the boards panel is on the same layer and comes later in
+	 * the document, so on a phone — where it is a full-height sheet — it still covers this,
+	 * which is the arrangement the sheet was drawn for.
 	 */
 	z-index: var(--z-chrome);
 	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
