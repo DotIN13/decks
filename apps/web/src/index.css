@@ -330,130 +330,6 @@ body {
 	touch-action: manipulation;
 }
 
-/* --- app chrome -------------------------------------------------------------- */
-
-/*
- * Lucide icons, wherever they land.
- *
- * Only `flex: none` is really ours — Tailwind's preflight already makes an `svg` a
- * block, which is what stops an icon reserving a descender under itself and sitting a
- * pixel low beside its label. What is left is the rule that an icon is never the thing
- * that gives way: every one of these sits in a flex row next to a label that can be a
- * long path, and a shrunk icon is a squashed icon. Size, colour and stroke are
- * deliberately absent — they come from the `Icon` wrapper in `ui/icons.tsx`, so the weight
- * is one decision in one place.
- */
-svg.lucide {
-	flex: none;
-}
-
-/*
- * A button whose whole label is an icon.
- *
- * Named rather than inferred, because the sizing is the point: a fixed square with the
- * icon gridded into the middle, instead of the `font-size` each of these used to carry
- * to talk a text glyph into looking centred.
- *
- * The new chrome spells this `.iconbtn` and states it once, in `styles/chrome.css`. What
- * is left here are the surfaces that have not been rebuilt — the cheat sheet and the
- * inspector's own two rows — and they should join it when they are.
- */
-.ops header button,
-.inspector .row.file button,
-.inspector .acts button {
-	display: grid;
-	width: var(--control);
-	height: var(--control);
-	padding: 0;
-	border: 0;
-	border-radius: var(--control-radius);
-	background: transparent;
-	color: var(--muted);
-	cursor: pointer;
-	place-items: center;
-	transition:
-		background 120ms ease,
-		color 120ms ease;
-}
-
-/*
- * The small one, for a control that shares a row with a list item's own content: a chat
- * row's `×`, and the panel header's `+`.
- *
- * `:not(.menu *)` because the `+` opens a menu that lives *inside* the header, and a
- * descendant selector cannot tell a control from a control's contents. Without it every menu
- * item was squeezed into the same 22px square — so the row's hover wash was a square behind
- * the runtime mark, with the name and the tick outside it and nothing to press but the icon.
- */
-.inspector header .close,
-.chats .rail-head button:not(.menu *) {
-
-	display: grid;
-	width: var(--control-sm);
-	height: var(--control-sm);
-	padding: 0;
-	border: 0;
-	border-radius: var(--control-radius);
-	background: none;
-	color: var(--faint);
-	cursor: pointer;
-	place-items: center;
-}
-
-/* One hover for all of them, which is the palette's: a wash, not a border and not a jump. */
-.ops header button:hover,
-.inspector .row.file button:hover,
-.inspector .acts button:hover,
-.inspector header .close:hover,
-.chats .rail-head button:not(.menu *):hover {
-
-	background: var(--line);
-	color: var(--fg);
-}
-
-/*
- * One area, full height. There is no title bar to reserve a row for.
- *
- * This was a two-row grid, and deleting the header without changing it put `.work` into
- * the 40px row the bar used to hold — so the canvas was 40px tall and the dock, anchored
- * to its bottom, hung off the top of the window. The chrome floats over the canvas now,
- * and floating means there is nothing to lay out around.
- *
- * The notch is handled where it is now relevant: each floating cluster pads itself by
- * `env(safe-area-inset-*)`, which is also what makes them right in landscape, where the
- * inset is on the side rather than the top.
- */
-.app {
-	position: relative;
-	height: 100%;
-}
-
-/*
- * A bare `.dot` lived here — 8px, green, red when `[data-off]` — for the connection light in
- * a title bar this app no longer has. Two elements wear the class now: the collaborator
- * cursor, which draws its own below, and the panel row's on-canvas mark, which draws a 6px
- * accent disc in a pseudo-element. The row's slot went 20px wide so a delete button could
- * stand in exactly its place, and this rule promptly painted that whole slot green.
- *
- * Deleted rather than narrowed: a global class name with a colour in it and no owner is a
- * booby trap for the next component that needs the word "dot".
- */
-
-/*
- * The canvas and everything floating over it, filling the window.
- *
- * `inset: 0` and not `height: 100%`, because every child of this is absolutely positioned
- * — the stage, all the floats, the dock — so as a block in normal flow it measured *zero*
- * high. Under the old two-row grid it was a grid item and got its height from `1fr`, which
- * hid the problem; deleting the title bar exposed it, and the symptom was the dock hanging
- * off the top of the window with the canvas invisible behind it.
- */
-.work {
-	position: absolute;
-	inset: 0;
-	overflow: hidden;
-}
-
 /*
  * The zoom, as the one number a counter-scaled box is written with.
  *
@@ -486,137 +362,6 @@ svg.lucide {
 	
 }
 
-/* --- floating panels -------------------------------------------------------- */
-
-.panel-float {
-	position: absolute;
-	border: 1px solid var(--line);
-	border-radius: 12px;
-	background: var(--panel);
-	box-shadow: var(--shadow);
-}
-
-/*
- * A text button, and the rule the palette and the title bar have been keeping all along:
- * **the container carries the border, the control does not.**
- *
- * These were 1px boxes on `--bg`, which put an outline around every answer in a card that
- * already has one, and made a dialog's buttons a different species from the tool row's. A
- * wash of `--line` is the same affordance with none of the ruling, and it leaves the accent
- * fill free to mean the one thing it should: this is the answer that acts.
- */
-/*
- * What is left of that list: the file picker's two header chips, at 11px rather than the
- * control scale. Everything else that used it — the question over the input bar, the accounts
- * modal — wears `.btn` from `styles/chrome.css` now, which is the same anatomy as `.iconbtn`
- * and `.chipbtn` and takes its height from `--control`. `.composer` was in the selector too,
- * and nothing has rendered that class since the rewrite.
- */
-.picker header button {
-	padding: 4px 10px;
-	border: 0;
-	border-radius: var(--control-radius);
-	background: var(--line);
-	color: var(--fg);
-	cursor: pointer;
-	font: inherit;
-	font-size: 12px;
-	transition:
-		background 120ms ease,
-		color 120ms ease;
-}
-
-.picker header button:hover {
-	background: var(--line-strong);
-}
-
-.picker header .add {
-	background: var(--color-accent);
-	color: #fff;
-}
-
-.picker header .add:hover {
-	background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
-}
-
-/* The picker's "from this device" while a copy is in flight. `.btn[disabled]` covers the
-   dialogs, which is where "the button is there and says it cannot go" was written. */
-.picker header button:disabled {
-	cursor: not-allowed;
-	opacity: 0.45;
-}
-
-/* --- the composer ----------------------------------------------------------- */
-
-/*
- * The dock: the last reply, a question if one is waiting, and the input bar.
- *
- * One bottom-centred stack rather than three separately-positioned things, so a question
- * appearing pushes the reply up instead of landing on top of it, and none of them has to
- * know the height of the others.
- */
-.dock {
-	position: absolute;
-	/*
-	 * Above the conversation, which is `z-index: 9`.
-	 *
-	 * The column floats over the boards and stops 8px short of this bar, so the two only
-	 * meet when a card is mid-slide or the window is short — and when they met, the history
-	 * won, because this had no z-index at all and a positioned element without one paints at
-	 * 0. The bar you type into is not something a transcript may cover.
-	 *
-	 * 10 and not 11: the boards panel is 10 and comes later in the document, so on a phone —
-	 * where it is a full-height sheet — it still covers this, which is the arrangement the
-	 * sheet was drawn for.
-	 */
-	z-index: 10;
-	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
-	/* Centred on the canvas column, not on the window — see the note below. */
-	left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
-	/* It slides when a panel opens. Fast enough not to be a wait, slow enough to read as
-	   the bar moving rather than jumping to a new place. */
-	transition: left 160ms ease;
-	display: flex;
-	/*
-	 * Centred on the canvas column: the window minus whatever the chrome is covering.
-	 *
-	 * It used to be centred on the *window* with twice-224px subtracted from its width —
-	 * a constant standing in for the board rail plus its margins. That was exact for one
-	 * arrangement and wrong for every other, and it is the mistake `camera/insets.ts` exists
-	 * to stop: a panel's width stated twice drifts the first time someone changes its
-	 * padding.
-	 *
-	 * Anchoring it to a panel's *state* used to be worse than the constant, because the
-	 * panel opened on cursor proximity and the bar would have slid sideways as you
-	 * reached for it. Proximity is gone — the panel has a button now — so a slide is a
-	 * response to something you pressed, which is legible, and 160ms is enough to read it
-	 * as movement.
-	 *
-	 * **Only the boards panel is in this sum**, because it is the only chrome that stands
-	 * *beside* the canvas. The conversation floats over the boards, so summoning it never
-	 * moves the bar. The inspector used to be subtracted too, on the argument that it
-	 * arrives on its own rather than being summoned — but it is a card in the top-right
-	 * corner now, and every click on a component slid this bar 160px sideways to report a
-	 * selection. A surface has to stand beside the canvas to move what is centred on it.
-	 *
-	 * The 64px is a gutter, and the clamp is a floor: under about 770px the subtraction
-	 * goes negative, and a dock 0 pixels across is not a degraded input bar but an
-	 * invisible one. Under 1100px the media query at the end of this file goes full-width
-	 * instead, which is where the floor stops mattering.
-	 */
-	width: min(720px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));
-	flex-direction: column;
-	align-items: stretch;
-	gap: 8px;
-	transform: translateX(-50%);
-	/* The stack is a frame around its children; only the children take clicks. */
-	pointer-events: none;
-}
-
-.dock > * {
-	pointer-events: auto;
-}
-
 /*
  * On a phone the bubbles are the sheet.
  *
@@ -645,97 +390,10 @@ svg.lucide {
 }
 
 @media (prefers-reduced-motion: reduce) {
-	/* The outline stays; what moves goes. The glow stays too, still. */
-	.act-hold,
-	.act-land,
-	.act-land::before,
-	.board-node > .news-glow::after {
-		animation: none;
-	}
 	
 	
 	
-}
-
-/* --- palette and picker ----------------------------------------------------- */
-
-/*
- * A horizontal strip at the top, clear of both panels.
- *
- * It used to sit at the left edge, which put it inside the reach that summons the
- * agent list — you could not move to the palette without calling up the panel that
- * then covered it.
- */
-/*
- * The tool group, which is no longer a float of its own — and no longer has any rules.
- *
- * It was `.panel-float.palette`, absolutely positioned at `top: 12px; left: 50%` with a
- * translate — the free-standing palette that sat under the title bar. The tools live inside
- * the top-left pill now, and `palette` survives only as the handle the canvas checks
- * address the group by.
- *
- * There was a second icon-button vocabulary here: `.palette button` at 30px with its own
- * hover and its own `[data-active="true"]` accent fill. Every one of those declarations was
- * wrong by the time it was read.
- *
- * - **30px, unlayered.** The five tools were 30px in a pill of 28px buttons, so the hover
- *   wash on a tool was two pixels bigger than the hover wash beside it. `@layer components`
- *   holds `.iconbtn`, and an unlayered rule beats a layered one however specific — which is
- *   also why nobody found this by reading `.iconbtn`.
- * - **`:hover` beating `[data-on]`.** For the same reason, hovering the *selected* tool
- *   replaced its accent fill with grey: the layered `[data-on="true"]` lost to this. A
- *   control saying "on" and then saying "not on" while your cursor is on it is the worst
- *   available answer.
- * - **`[data-active]` was a dead name.** The markup has said `data-on` since the tools moved
- *   into the pill, so the accent fill here had not applied to anything in months.
- *
- * The tools are `.iconbtn`, like every other icon button in the app. That is the whole rule.
- */
-
-/* --- the inspector ----------------------------------------------------------- */
-
-/*
- * The selection's properties (§6.5). Top right, not beside the palette: the notices
- * land under the palette, and the palette is a row of 30px targets that a column of
- * fields does not belong in.
- *
- * `right: 12px` is the edge every float on this side uses — the tool cluster directly above
- * it, and the conversation. It was 30px, to clear a timeline spine hard against that edge;
- * nothing has rendered `.turnbar` since the rewrite, and with the two panels now stacked
- * vertically, 18px of daylight between their right edges reads as a misalignment rather
- * than as clearance.
- *
- * Only the shell is here. Everything inside the panel is utilities in `Inspector.tsx`;
- * what stays is the corner, which is stated twice — here, and again as a bottom sheet on
- * a narrow screen — in `env()` and `--dock` terms a class attribute says badly.
- */
-.inspector {
-	/*
-	 * Under the corner cluster, not beside it.
-	 *
-	 * `top: 12px` put the panel's header on the same line as the tool pill, and at 320px
-	 * wide from `right: 30px` the two overlapped outright — the pill drew over the name of
-	 * the thing being edited. `--inset-top` is what the pill measures itself as (`data-inset`
-	 * on it, `camera/insets.ts` publishing the sum), so this follows it when the pill changes
-	 * height or folds, instead of restating a number that only holds for one arrangement.
-	 */
-	top: calc(var(--inset-top, 52px) + 8px);
-	right: 12px;
-	display: flex;
-	width: 236px;
-	flex-direction: column;
-	padding: 8px;
-	gap: 6px;
-	font-size: 12px;
-}
-
-.picker-backdrop {
-	position: absolute;
-	z-index: 20;
-	display: grid;
-	inset: 0;
-	background: rgb(0 0 0 / 30%);
-	place-items: center;
+	
 }
 
 /*
@@ -750,15 +408,6 @@ svg.lucide {
 	
 
 	
-}
-
-/* A row that is information rather than a choice: no hover wash, no pointer. */
-.row-act[data-row-static] {
-	cursor: default;
-}
-
-.row-act[data-row-static]:hover {
-	background: transparent;
 }
 
 /*
@@ -803,10 +452,7 @@ svg.lucide {
 }
 
 @media (pointer: coarse) {
-	/* A 40px bar cannot hold a 44px target. */
-	.app {
-		grid-template-rows: calc(52px + env(safe-area-inset-top)) 1fr;
-	}
+	
 
 	
 
@@ -832,12 +478,7 @@ svg.lucide {
  * with the canvas anyway, so there is nothing left for the dock to be beside.
  */
 @media (max-width: 1100px) {
-	.dock {
-		left: max(12px, env(safe-area-inset-left));
-		right: max(12px, env(safe-area-inset-right));
-		width: auto;
-		transform: none;
-	}
+	
 
 	/*
 	 * And the zoom controls go above it rather than into its bottom-right corner, which
@@ -866,31 +507,7 @@ svg.lucide {
 
 	
 
-	/*
-	 * The inspector becomes a bottom sheet, and this is the one place the desktop's
-	 * reasoning does not survive the screen getting smaller.
-	 *
-	 * Top right is right on a laptop: it is out of the way of the boards and clear of the
-	 * chat panel's reach (§6.5). Across the top of a phone it is *in the way of the tap
-	 * that opened it* — you tap a component, a panel appears over the place your finger
-	 * just was, and your next tap lands on a class switch you never meant to touch. That
-	 * is not a hypothetical; it is what the first version of this rule did, and it wrote a
-	 * revision each time. At the bottom the sheet is where the hand already is and the
-	 * component it describes stays visible above it.
-	 *
-	 * It takes the zoom controls' place while it is up rather than stacking above them.
-	 * Zooming has fingers to do it with, so the camera buttons are the thing that can be
-	 * missing for a moment; two floating panels in one corner is neither of them usable.
-	 */
-	.inspector {
-		top: auto;
-		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
-		right: max(8px, env(safe-area-inset-right));
-		left: max(8px, env(safe-area-inset-left));
-		width: auto;
-		max-height: 42vh;
-		overflow-y: auto;
-	}
+	
 
 }
 

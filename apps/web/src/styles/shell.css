@@ -586,4 +586,53 @@
 	.dispatch-card-pic {
 		height: 120px;
 	}
+	/*
+ * One area, full height. There is no title bar to reserve a row for.
+ *
+ * This was a two-row grid, and deleting the header without changing it put `.work` into
+ * the 40px row the bar used to hold — so the canvas was 40px tall and the dock, anchored
+ * to its bottom, hung off the top of the window. The chrome floats over the canvas now,
+ * and floating means there is nothing to lay out around.
+ *
+ * The notch is handled where it is now relevant: each floating cluster pads itself by
+ * `env(safe-area-inset-*)`, which is also what makes them right in landscape, where the
+ * inset is on the side rather than the top.
+ */
+.app {
+	position: relative;
+	height: 100%;
+}
+	/*
+ * A bare `.dot` lived here — 8px, green, red when `[data-off]` — for the connection light in
+ * a title bar this app no longer has. Two elements wear the class now: the collaborator
+ * cursor, which draws its own below, and the panel row's on-canvas mark, which draws a 6px
+ * accent disc in a pseudo-element. The row's slot went 20px wide so a delete button could
+ * stand in exactly its place, and this rule promptly painted that whole slot green.
+ *
+ * Deleted rather than narrowed: a global class name with a colour in it and no owner is a
+ * booby trap for the next component that needs the word "dot".
+ */
+
+/*
+ * The canvas and everything floating over it, filling the window.
+ *
+ * `inset: 0` and not `height: 100%`, because every child of this is absolutely positioned
+ * — the stage, all the floats, the dock — so as a block in normal flow it measured *zero*
+ * high. Under the old two-row grid it was a grid item and got its height from `1fr`, which
+ * hid the problem; deleting the title bar exposed it, and the symptom was the dock hanging
+ * off the top of the window with the canvas invisible behind it.
+ */
+.work {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+}
+
+	/* The same rules, under the same query. */
+	@media (pointer: coarse) {
+	/* A 40px bar cannot hold a 44px target. */
+	.app {
+		grid-template-rows: calc(52px + env(safe-area-inset-top)) 1fr;
+	}
+}
 }

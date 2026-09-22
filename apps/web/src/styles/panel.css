@@ -1155,4 +1155,113 @@
 		color: var(--color-accent);
 		white-space: nowrap;
 	}
+	/* --- floating panels -------------------------------------------------------- */
+
+.panel-float {
+	position: absolute;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--panel);
+	box-shadow: var(--shadow);
+}
+	/* --- palette and picker ----------------------------------------------------- */
+
+/*
+ * A horizontal strip at the top, clear of both panels.
+ *
+ * It used to sit at the left edge, which put it inside the reach that summons the
+ * agent list — you could not move to the palette without calling up the panel that
+ * then covered it.
+ */
+/*
+ * The tool group, which is no longer a float of its own — and no longer has any rules.
+ *
+ * It was `.panel-float.palette`, absolutely positioned at `top: 12px; left: 50%` with a
+ * translate — the free-standing palette that sat under the title bar. The tools live inside
+ * the top-left pill now, and `palette` survives only as the handle the canvas checks
+ * address the group by.
+ *
+ * There was a second icon-button vocabulary here: `.palette button` at 30px with its own
+ * hover and its own `[data-active="true"]` accent fill. Every one of those declarations was
+ * wrong by the time it was read.
+ *
+ * - **30px, unlayered.** The five tools were 30px in a pill of 28px buttons, so the hover
+ *   wash on a tool was two pixels bigger than the hover wash beside it. `@layer components`
+ *   holds `.iconbtn`, and an unlayered rule beats a layered one however specific — which is
+ *   also why nobody found this by reading `.iconbtn`.
+ * - **`:hover` beating `[data-on]`.** For the same reason, hovering the *selected* tool
+ *   replaced its accent fill with grey: the layered `[data-on="true"]` lost to this. A
+ *   control saying "on" and then saying "not on" while your cursor is on it is the worst
+ *   available answer.
+ * - **`[data-active]` was a dead name.** The markup has said `data-on` since the tools moved
+ *   into the pill, so the accent fill here had not applied to anything in months.
+ *
+ * The tools are `.iconbtn`, like every other icon button in the app. That is the whole rule.
+ */
+
+/* --- the inspector ----------------------------------------------------------- */
+
+/*
+ * The selection's properties (§6.5). Top right, not beside the palette: the notices
+ * land under the palette, and the palette is a row of 30px targets that a column of
+ * fields does not belong in.
+ *
+ * `right: 12px` is the edge every float on this side uses — the tool cluster directly above
+ * it, and the conversation. It was 30px, to clear a timeline spine hard against that edge;
+ * nothing has rendered `.turnbar` since the rewrite, and with the two panels now stacked
+ * vertically, 18px of daylight between their right edges reads as a misalignment rather
+ * than as clearance.
+ *
+ * Only the shell is here. Everything inside the panel is utilities in `Inspector.tsx`;
+ * what stays is the corner, which is stated twice — here, and again as a bottom sheet on
+ * a narrow screen — in `env()` and `--dock` terms a class attribute says badly.
+ */
+.inspector {
+	/*
+	 * Under the corner cluster, not beside it.
+	 *
+	 * `top: 12px` put the panel's header on the same line as the tool pill, and at 320px
+	 * wide from `right: 30px` the two overlapped outright — the pill drew over the name of
+	 * the thing being edited. `--inset-top` is what the pill measures itself as (`data-inset`
+	 * on it, `camera/insets.ts` publishing the sum), so this follows it when the pill changes
+	 * height or folds, instead of restating a number that only holds for one arrangement.
+	 */
+	top: calc(var(--inset-top, 52px) + 8px);
+	right: 12px;
+	display: flex;
+	width: 236px;
+	flex-direction: column;
+	padding: 8px;
+	gap: 6px;
+	font-size: 12px;
+}
+
+	/* The same rules, under the same query. */
+	@media (max-width: 760px) {
+	/*
+	 * The inspector becomes a bottom sheet, and this is the one place the desktop's
+	 * reasoning does not survive the screen getting smaller.
+	 *
+	 * Top right is right on a laptop: it is out of the way of the boards and clear of the
+	 * chat panel's reach (§6.5). Across the top of a phone it is *in the way of the tap
+	 * that opened it* — you tap a component, a panel appears over the place your finger
+	 * just was, and your next tap lands on a class switch you never meant to touch. That
+	 * is not a hypothetical; it is what the first version of this rule did, and it wrote a
+	 * revision each time. At the bottom the sheet is where the hand already is and the
+	 * component it describes stays visible above it.
+	 *
+	 * It takes the zoom controls' place while it is up rather than stacking above them.
+	 * Zooming has fingers to do it with, so the camera buttons are the thing that can be
+	 * missing for a moment; two floating panels in one corner is neither of them usable.
+	 */
+	.inspector {
+		top: auto;
+		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+		right: max(8px, env(safe-area-inset-right));
+		left: max(8px, env(safe-area-inset-left));
+		width: auto;
+		max-height: 42vh;
+		overflow-y: auto;
+	}
+}
 }

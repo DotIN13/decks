@@ -611,4 +611,83 @@
 	.sw[data-on="true"] > i {
 		margin-left: 11px;
 	}
+	/* --- the composer ----------------------------------------------------------- */
+
+/*
+ * The dock: the last reply, a question if one is waiting, and the input bar.
+ *
+ * One bottom-centred stack rather than three separately-positioned things, so a question
+ * appearing pushes the reply up instead of landing on top of it, and none of them has to
+ * know the height of the others.
+ */
+.dock {
+	position: absolute;
+	/*
+	 * Above the conversation, which is `z-index: 9`.
+	 *
+	 * The column floats over the boards and stops 8px short of this bar, so the two only
+	 * meet when a card is mid-slide or the window is short — and when they met, the history
+	 * won, because this had no z-index at all and a positioned element without one paints at
+	 * 0. The bar you type into is not something a transcript may cover.
+	 *
+	 * 10 and not 11: the boards panel is 10 and comes later in the document, so on a phone —
+	 * where it is a full-height sheet — it still covers this, which is the arrangement the
+	 * sheet was drawn for.
+	 */
+	z-index: 10;
+	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
+	/* Centred on the canvas column, not on the window — see the note below. */
+	left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
+	/* It slides when a panel opens. Fast enough not to be a wait, slow enough to read as
+	   the bar moving rather than jumping to a new place. */
+	transition: left 160ms ease;
+	display: flex;
+	/*
+	 * Centred on the canvas column: the window minus whatever the chrome is covering.
+	 *
+	 * It used to be centred on the *window* with twice-224px subtracted from its width —
+	 * a constant standing in for the board rail plus its margins. That was exact for one
+	 * arrangement and wrong for every other, and it is the mistake `camera/insets.ts` exists
+	 * to stop: a panel's width stated twice drifts the first time someone changes its
+	 * padding.
+	 *
+	 * Anchoring it to a panel's *state* used to be worse than the constant, because the
+	 * panel opened on cursor proximity and the bar would have slid sideways as you
+	 * reached for it. Proximity is gone — the panel has a button now — so a slide is a
+	 * response to something you pressed, which is legible, and 160ms is enough to read it
+	 * as movement.
+	 *
+	 * **Only the boards panel is in this sum**, because it is the only chrome that stands
+	 * *beside* the canvas. The conversation floats over the boards, so summoning it never
+	 * moves the bar. The inspector used to be subtracted too, on the argument that it
+	 * arrives on its own rather than being summoned — but it is a card in the top-right
+	 * corner now, and every click on a component slid this bar 160px sideways to report a
+	 * selection. A surface has to stand beside the canvas to move what is centred on it.
+	 *
+	 * The 64px is a gutter, and the clamp is a floor: under about 770px the subtraction
+	 * goes negative, and a dock 0 pixels across is not a degraded input bar but an
+	 * invisible one. Under 1100px the media query at the end of this file goes full-width
+	 * instead, which is where the floor stops mattering.
+	 */
+	width: min(720px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));
+	flex-direction: column;
+	align-items: stretch;
+	gap: 8px;
+	transform: translateX(-50%);
+	/* The stack is a frame around its children; only the children take clicks. */
+	pointer-events: none;
+}
+	.dock > * {
+	pointer-events: auto;
+}
+
+	/* The same rules, under the same query. */
+	@media (max-width: 1100px) {
+	.dock {
+		left: max(12px, env(safe-area-inset-left));
+		right: max(12px, env(safe-area-inset-right));
+		width: auto;
+		transform: none;
+	}
+}
 }

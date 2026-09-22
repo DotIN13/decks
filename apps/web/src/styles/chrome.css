@@ -1033,4 +1033,152 @@
 	.meta {
 		color: var(--faint);
 	}
+	/* --- app chrome -------------------------------------------------------------- */
+
+/*
+ * Lucide icons, wherever they land.
+ *
+ * Only `flex: none` is really ours — Tailwind's preflight already makes an `svg` a
+ * block, which is what stops an icon reserving a descender under itself and sitting a
+ * pixel low beside its label. What is left is the rule that an icon is never the thing
+ * that gives way: every one of these sits in a flex row next to a label that can be a
+ * long path, and a shrunk icon is a squashed icon. Size, colour and stroke are
+ * deliberately absent — they come from the `Icon` wrapper in `ui/icons.tsx`, so the weight
+ * is one decision in one place.
+ */
+svg.lucide {
+	flex: none;
+}
+	/*
+ * A button whose whole label is an icon.
+ *
+ * Named rather than inferred, because the sizing is the point: a fixed square with the
+ * icon gridded into the middle, instead of the `font-size` each of these used to carry
+ * to talk a text glyph into looking centred.
+ *
+ * The new chrome spells this `.iconbtn` and states it once, in `styles/chrome.css`. What
+ * is left here are the surfaces that have not been rebuilt — the cheat sheet and the
+ * inspector's own two rows — and they should join it when they are.
+ */
+.ops header button,
+.inspector .row.file button,
+.inspector .acts button {
+	display: grid;
+	width: var(--control);
+	height: var(--control);
+	padding: 0;
+	border: 0;
+	border-radius: var(--control-radius);
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	place-items: center;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
+}
+	/*
+ * The small one, for a control that shares a row with a list item's own content: a chat
+ * row's `×`, and the panel header's `+`.
+ *
+ * `:not(.menu *)` because the `+` opens a menu that lives *inside* the header, and a
+ * descendant selector cannot tell a control from a control's contents. Without it every menu
+ * item was squeezed into the same 22px square — so the row's hover wash was a square behind
+ * the runtime mark, with the name and the tick outside it and nothing to press but the icon.
+ */
+.inspector header .close,
+.chats .rail-head button:not(.menu *) {
+
+	display: grid;
+	width: var(--control-sm);
+	height: var(--control-sm);
+	padding: 0;
+	border: 0;
+	border-radius: var(--control-radius);
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	place-items: center;
+}
+	/* One hover for all of them, which is the palette's: a wash, not a border and not a jump. */
+.ops header button:hover,
+.inspector .row.file button:hover,
+.inspector .acts button:hover,
+.inspector header .close:hover,
+.chats .rail-head button:not(.menu *):hover {
+
+	background: var(--line);
+	color: var(--fg);
+}
+	/*
+ * A text button, and the rule the palette and the title bar have been keeping all along:
+ * **the container carries the border, the control does not.**
+ *
+ * These were 1px boxes on `--bg`, which put an outline around every answer in a card that
+ * already has one, and made a dialog's buttons a different species from the tool row's. A
+ * wash of `--line` is the same affordance with none of the ruling, and it leaves the accent
+ * fill free to mean the one thing it should: this is the answer that acts.
+ */
+/*
+ * What is left of that list: the file picker's two header chips, at 11px rather than the
+ * control scale. Everything else that used it — the question over the input bar, the accounts
+ * modal — wears `.btn` from `styles/chrome.css` now, which is the same anatomy as `.iconbtn`
+ * and `.chipbtn` and takes its height from `--control`. `.composer` was in the selector too,
+ * and nothing has rendered that class since the rewrite.
+ */
+.picker header button {
+	padding: 4px 10px;
+	border: 0;
+	border-radius: var(--control-radius);
+	background: var(--line);
+	color: var(--fg);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
+}
+	.picker header button:hover {
+	background: var(--line-strong);
+}
+	.picker header .add {
+	background: var(--color-accent);
+	color: #fff;
+}
+	.picker header .add:hover {
+	background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
+}
+	/* The picker's "from this device" while a copy is in flight. `.btn[disabled]` covers the
+   dialogs, which is where "the button is there and says it cannot go" was written. */
+.picker header button:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+}
+
+	/* The same rules, under the same query. */
+	@media (prefers-reduced-motion: reduce) {
+	/* The outline stays; what moves goes. The glow stays too, still. */
+	.act-hold,
+	.act-land,
+	.act-land::before,
+	.board-node > .news-glow::after {
+		animation: none;
+	}
+}
+	.picker-backdrop {
+	position: absolute;
+	z-index: 20;
+	display: grid;
+	inset: 0;
+	background: rgb(0 0 0 / 30%);
+	place-items: center;
+}
+	/* A row that is information rather than a choice: no hover wash, no pointer. */
+.row-act[data-row-static] {
+	cursor: default;
+}
+	.row-act[data-row-static]:hover {
+	background: transparent;
+}
 }
