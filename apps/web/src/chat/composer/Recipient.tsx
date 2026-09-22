@@ -24,6 +24,8 @@ export interface RecipientProps {
 	onDispatcher: () => void;
 	onNew: (kind?: AgentKind) => void;
 	onClose: (id: string) => void;
+	/** Open the Agents panel, for the agents the list has no room for. */
+	onMore?: () => void;
 }
 
 /**
@@ -76,6 +78,7 @@ export function Recipient(props: RecipientProps) {
 				onFocus={props.onPick}
 				onNew={props.onNew}
 				onClose={props.onClose}
+				{...(props.onMore ? { onMore: props.onMore } : {})}
 				placement="top-start"
 				label="Who gets the line"
 				foot={

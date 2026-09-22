@@ -55,7 +55,7 @@ import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
 import { ArrivalChip } from "./canvas/ArrivalChip.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
-import { LeftPanel } from "./chrome/LeftPanel.tsx";
+import { LeftPanel, type PanelTab } from "./chrome/LeftPanel.tsx";
 import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
 import { agentViews } from "./camera/agent-views.ts";
@@ -1310,6 +1310,12 @@ export function App() {
 		setBoardsOpen(open);
 		if (open && narrow()) closeHistory();
 	};
+	/** The Agents tab of the panel, asked for by the agent list's overflow row. */
+	const [panelAsk, setPanelAsk] = createSignal<{ tab: PanelTab; at: number } | undefined>();
+	const openAgentsPanel = () => {
+		showBoards(true);
+		setPanelAsk({ tab: "agents", at: Date.now() });
+	};
 
 
 	/**
@@ -1815,6 +1821,7 @@ export function App() {
 					onOpenCanvas={(id) => openCanvas(id)}
 					onNewCanvas={() => newCanvas(state.focused ?? "")}
 					onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
+					onMoreAgents={openAgentsPanel}
 					onRenameAgent={(id, name) => send({ type: "agent.rename", id, name })}
 					mode={mode()}
 					onMode={(next) => {
@@ -1858,6 +1865,7 @@ export function App() {
 					unread={unread}
 					onFocus={addressAgent}
 					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+					onMore={openAgentsPanel}
 					onClose={closeAgent}
 					surface={surface()}
 					zoom={camera().zoom}
@@ -2000,6 +2008,7 @@ export function App() {
 					would take the shortcut away in exactly the state it exists for.
 				*/}
 				<LeftPanel
+					{...(panelAsk() ? { ask: panelAsk()! } : {})}
 					boards={state.boards}
 					listMayGrow={boardsStarted() || surface() === "dispatch"}
 					current={selected()}
@@ -2251,6 +2260,7 @@ export function App() {
 							onDispatcher: () => setAddressed("dispatcher"),
 							onNew: (kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) }),
 							onClose: closeAgent,
+							onMore: openAgentsPanel,
 						}}
 						mentionables={[
 							...visibleChats().map((chat) => ({ name: agentName(chat.id), here: (stageCanvas()?.agents ?? []).includes(chat.id), chat })),

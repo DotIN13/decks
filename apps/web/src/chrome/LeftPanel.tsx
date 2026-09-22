@@ -98,6 +98,8 @@ const PANEL_TAB_LABEL: Record<PanelTab, string> = { canvases: "Canvases", agents
 const SHEET = 1100;
 
 export function LeftPanel(props: {
+	/** A tab asked for from outside — the agent menu's overflow row opens Agents. A new `at` is a new ask. */
+	ask?: { tab: PanelTab; at: number };
 	/** Every board there is. The list is all of them, in three sections. */
 	boards: Board[];
 	/**
@@ -218,6 +220,10 @@ export function LeftPanel(props: {
 	const [ownGroup, setOwnGroup] = createSignal<AgentGroup>("workspace");
 	const [query, setQuery] = createSignal("");
 	const [tab, setTab] = createSignal<PanelTab>("boards");
+	createEffect(() => {
+		const ask = props.ask;
+		if (ask) setTab(ask.tab);
+	});
 	const sheet = createSheet();
 
 	/*

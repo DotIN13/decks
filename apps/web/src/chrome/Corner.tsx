@@ -74,6 +74,8 @@ export function Corner(props: {
 	unread: Record<string, number>;
 	onFocus: (id: string) => void;
 	onNew: (kind?: AgentKind) => void;
+	/** Open the Agents panel, from the stack's overflow row. */
+	onMore?: () => void;
 	/** Passed through to the `+n` chip's dropdown, which is the pill's list. */
 	onClose: (id: string) => void;
 	/** The camera's scale, 1 being 100%. */
@@ -153,6 +155,7 @@ export function Corner(props: {
 				unread={props.unread}
 				onFocus={props.onFocus}
 				onNew={props.onNew}
+				{...(props.onMore ? { onMore: props.onMore } : {})}
 				onClose={props.onClose}
 			/>
 

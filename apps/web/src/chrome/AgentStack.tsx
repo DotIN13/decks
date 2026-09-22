@@ -37,6 +37,7 @@ export function AgentStack(props: {
 	onFocus: (id: string) => void;
 	/** The `+n` chip opens the pill's dropdown, and that list ends in "New agent". */
 	onNew: (kind?: AgentKind) => void;
+	onMore?: () => void;
 	/** …and every row in it has an ×, so the same list closes chats from either way in. */
 	onClose: (id: string) => void;
 }) {
@@ -187,6 +188,7 @@ export function AgentStack(props: {
 						onFocus={props.onFocus}
 						onNew={props.onNew}
 						onClose={props.onClose}
+						{...(props.onMore ? { onMore: props.onMore } : {})}
 						placement="bottom-end"
 						label="Agents"
 						trigger={(api) => (

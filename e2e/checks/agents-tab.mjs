@@ -604,5 +604,36 @@ say(
 say("…and it is the same three words as the panel's headings", JSON.stringify([...dropdown.groups].sort()) === JSON.stringify(["No workspace", "irb-84069", "political-llm"]), JSON.stringify(dropdown.groups));
 await page.keyboard.press("Escape");
 
+/*
+ * Past thirteen agents the dropdown stops listing and counts the rest. The count is a row,
+ * not a sentence: pressing it opens the panel on its Agents tab, which is where the rest are.
+ */
+await feed({
+	type: "agents",
+	chats: Array.from({ length: 16 }, (_, index) => chat(`m${index}`, `Many ${index}`, "claude", "idle", undefined, 60_000 * (index + 1))),
+});
+await settle(page, 500);
+await page.getByRole("tab", { name: "Boards" }).click();
+await settle(page, 300);
+await page.evaluate(() => {
+	const trigger = [...document.querySelectorAll(".float.pill button")].find((button) => /^Agents/.test(button.getAttribute("aria-label") ?? ""));
+	trigger?.click();
+});
+await page.waitForSelector(".popover .agent-menu-more", { timeout: 4000 });
+const overflow = await page.evaluate(() => ({
+	rows: document.querySelectorAll('.popover [data-agent="true"]').length,
+	more: document.querySelector(".popover .agent-menu-more .lb")?.textContent?.trim(),
+}));
+say("past the cap the dropdown lists thirteen and counts the rest, as a row", overflow.rows === 13 && overflow.more === "3 more agents", JSON.stringify(overflow));
+await page.locator(".popover .agent-menu-more").click();
+await settle(page, 500);
+const landed = await page.evaluate(() => ({
+	popover: document.querySelectorAll(".popover").length,
+	panel: document.querySelector(".panel-shell")?.dataset.open === "true",
+	tab: document.querySelector('.panel-shell [role="tab"][aria-selected="true"]')?.textContent?.trim(),
+	rows: document.querySelectorAll(".panel-shell .agent-row").length,
+}));
+say("…and pressing it opens the panel on its Agents tab, with every agent listed", landed.popover === 0 && landed.panel && landed.tab === "Agents" && landed.rows === 16, JSON.stringify(landed));
+
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();

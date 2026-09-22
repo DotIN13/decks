@@ -241,6 +241,8 @@ export function AgentMenu(props: {
 	label?: string;
 	/** Rows of the caller's own, under the rule and above New agent: the composer puts the dispatcher there. */
 	foot?: JSX.Element;
+	/** Open the Agents panel, for the agents this list has no room for. Without it, the count is only said. */
+	onMore?: () => void;
 }) {
 	/** Whether the runtime row has unfolded into its two choices. */
 	const [picking, setPicking] = createSignal(false);
@@ -519,9 +521,24 @@ export function AgentMenu(props: {
 			 * a count is not one to land on.
 			 */}
 			<Show when={listed().more > 0}>
-				<p class="m-0 px-2 py-1.5 text-[11px] leading-normal text-faint">
-					{listed().more} more {listed().more === 1 ? "agent" : "agents"} — open the Agents panel.
-				</p>
+				<Show
+					when={props.onMore}
+					fallback={
+						<p class="m-0 px-2 py-1.5 text-[11px] leading-normal text-faint">
+							{listed().more} more {listed().more === 1 ? "agent" : "agents"} — open the Agents panel.
+						</p>
+					}
+				>
+					{(more) => (
+						<button type="button" role="menuitem" data-row data-flat="true" class="agent-menu-more" onClick={() => more()()}>
+							<Icon of={PanelLeft} size={13} class="flex-none text-muted" />
+							<span class="lb flex-1 whitespace-nowrap">
+								{listed().more} more {listed().more === 1 ? "agent" : "agents"}
+							</span>
+							<span class="meta flex-none text-[10px]">Agents panel</span>
+						</button>
+					)}
+				</Show>
 			</Show>
 
 			<div class="rule" />
@@ -654,6 +671,8 @@ export function AgentPill(props: {
 	onNewCanvas?: () => void;
 	/** Remove a canvas from the deck, from the switcher's rows. Boards stay. */
 	onRemoveCanvas?: (id: string) => void;
+	/** Open the Agents panel, from the agent list's overflow row. */
+	onMoreAgents?: () => void;
 	/** How many tasks want a person: the badge on Home, and on the Boards tab. */
 	wantsYou?: number;
 	/** How many boards an agent named since the person last read them: the dot on the Boards tab. */
@@ -856,6 +875,7 @@ export function AgentPill(props: {
 				onFocus={props.onFocus}
 				onNew={props.onNew}
 				onClose={props.onClose}
+				{...(props.onMoreAgents ? { onMore: props.onMoreAgents } : {})}
 				label="Agents"
 				trigger={(api) => (
 					<button
