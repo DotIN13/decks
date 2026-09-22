@@ -1291,9 +1291,6 @@ function CanvasSegment(props: {
 								onClick={() => props.onOpen?.(canvas.id)}
 							>
 								<span class="lb nm block truncate">{canvas.name}</span>
-								<Show when={canvas.id === props.id}>
-									<span class="meta flex-none text-[10px]">you are here</span>
-								</Show>
 								<Show when={canvas.id !== props.id && isNews(canvas)}>
 									<span class="pill-canvas-news" aria-label="Something new here" />
 								</Show>
