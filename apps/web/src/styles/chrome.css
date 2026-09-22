@@ -65,7 +65,7 @@
 	 * a control that is merely *held*, and `data-on="yield"` is the third state the history
 	 * button needs: wanted, but not currently on the edge.
 	 */
-	.iconbtn {
+	.icon-button {
 		display: grid;
 		flex: none;
 		place-items: center;
@@ -82,12 +82,12 @@
 			color 120ms ease;
 	}
 
-	.iconbtn:hover {
+	.icon-button:hover {
 		background: var(--line);
 		color: var(--fg);
 	}
 
-	.iconbtn:focus-visible {
+	.icon-button:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 1px;
 	}
@@ -98,13 +98,13 @@
 	 * when chosen, and black only for the one thing that acts — leaves the accent for links,
 	 * focus and the agents' own colours, which is where it means something.
 	 */
-	.iconbtn[data-on="true"] {
+	.icon-button[data-on="true"] {
 		background: var(--raise);
 		color: var(--fg);
 		box-shadow: inset 0 0 0 1px var(--line-strong);
 	}
 
-	.iconbtn[data-on="soft"] {
+	.icon-button[data-on="soft"] {
 		background: var(--line);
 		color: var(--fg);
 	}
@@ -112,7 +112,7 @@
 	/*
 	 * Hovering a control that is already on.
 	 *
-	 * `.iconbtn:hover` is a wash of `--line` on a transparent button, and on a button that
+	 * `.icon-button:hover` is a wash of `--line` on a transparent button, and on a button that
 	 * is *on* that wash is already spent: on an accent fill it would be a contradiction —
 	 * grey where the state says accent — and on a soft one it is the colour already there,
 	 * so nothing moves at all. Both were true here, the first of them loudly, because the
@@ -123,7 +123,7 @@
 	 * the app already says elsewhere — `--line-strong` is the wash's next rung, and the
 	 * oklab mix is the one the picker's `+` uses.
 	 */
-	.iconbtn[data-on="true"]:hover {
+	.icon-button[data-on="true"]:hover {
 		background: var(--raise);
 		box-shadow: inset 0 0 0 1px var(--fg);
 	}
@@ -134,46 +134,46 @@
 	 * looks up to check from across the window, and a blue square is read from further away
 	 * than a white one. Asked for by name; everywhere else "chosen" stays the raised card.
 	 */
-	.pill .iconbtn[data-on="true"] {
+	.pill .icon-button[data-on="true"] {
 		background: var(--color-accent);
 		color: #fff;
 		box-shadow: none;
 	}
 
-	.pill .iconbtn[data-on="true"]:hover {
+	.pill .icon-button[data-on="true"]:hover {
 		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
 		box-shadow: none;
 	}
 
-	.pill .iconbtn[data-on="yield"] {
+	.pill .icon-button[data-on="yield"] {
 		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
 		color: var(--color-accent);
 		box-shadow: none;
 	}
 
-	.pill .iconbtn[data-on="yield"]:hover {
+	.pill .icon-button[data-on="yield"]:hover {
 		background: color-mix(in srgb, var(--color-accent) 22%, transparent);
 		box-shadow: none;
 	}
 
-	.iconbtn[data-on="soft"]:hover {
+	.icon-button[data-on="soft"]:hover {
 		background: var(--line-strong);
 	}
 
 	/* And the third state, for the same reason: the conversation button while the inspector
 	   has the edge is a tinted accent, and the grey wash over it read as *off*. */
-	.iconbtn[data-on="yield"]:hover {
+	.icon-button[data-on="yield"]:hover {
 		box-shadow: inset 0 0 0 1px var(--line-strong);
 	}
 
 	/* Wanted but yielded: the card, dimmed, with a dashed hairline — held, not off. */
-	.iconbtn[data-on="yield"] {
+	.icon-button[data-on="yield"] {
 		background: var(--raise);
 		color: var(--muted);
 		box-shadow: inset 0 0 0 1px var(--line);
 	}
 
-	.iconbtn[disabled] {
+	.icon-button[disabled] {
 		color: var(--faint);
 		cursor: default;
 		opacity: 0.5;
@@ -192,11 +192,11 @@
 	 * are looking at the menu is the more useful thing to say than the level you opened it to
 	 * read; `data-on` is set only while it is open, so the two never disagree for long.
 	 */
-	.iconbtn[data-level="warn"]:not([data-on]) {
+	.icon-button[data-level="warn"]:not([data-on]) {
 		color: var(--color-warn);
 	}
 
-	.iconbtn[data-level="high"]:not([data-on]) {
+	.icon-button[data-level="high"]:not([data-on]) {
 		color: var(--color-danger);
 	}
 
@@ -208,7 +208,7 @@
 	 * what replaced three native `<select>`s, whose platform chevrons were the least
 	 * Decks-like thing on screen.
 	 */
-	.chipbtn {
+	.chip-button {
 		display: flex;
 		flex: none;
 		align-items: center;
@@ -222,20 +222,20 @@
 		color: var(--muted);
 		cursor: pointer;
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		transition:
 			background-color 120ms ease,
 			border-color 120ms ease,
 			color 120ms ease;
 	}
 
-	.chipbtn:hover {
+	.chip-button:hover {
 		border-color: var(--line-strong);
 		background: var(--line);
 		color: var(--fg);
 	}
 
-	.chipbtn:focus-visible {
+	.chip-button:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 1px;
 	}
@@ -249,14 +249,14 @@
 	 * made the top-right cluster look shallower than the top-left one despite both being
 	 * 40px boxes.
 	 */
-	.pill .chipbtn {
+	.pill .chip-button {
 		height: var(--control);
 	}
 
 	/* Anything but the ordinary setting is a standing change, so it is tinted rather than
 	   merely labelled — you should be able to see that a session is in plan mode without
 	   reading the word. */
-	.chipbtn[data-on="true"] {
+	.chip-button[data-on="true"] {
 		border-color: var(--line-strong);
 		background: var(--raise);
 		color: var(--fg);
@@ -265,7 +265,7 @@
 
 	/* The permission mode chip in the composer keeps the accent tint when a mode other than
 	   the ordinary one is set: a standing change you should see without reading the word. */
-	.dockbox .chipbtn[data-on="true"] {
+	.composer-box .chip-button[data-on="true"] {
 		border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
 		/* Mixed over the raised card's white, not over the grey layer: a translucent tint on
 		   the layer came out dull, and a chip that is on should be the brightest thing in the
@@ -275,11 +275,11 @@
 	}
 
 	/* A second fact on the same chip — the thinking level beside the model. */
-	.chipbtn > .sub {
+	.chip-button > .chip-sub {
 		color: var(--faint);
 	}
 
-	.chipbtn > .chev {
+	.chip-button > .chevron {
 		flex: none;
 		opacity: 0.6;
 	}
@@ -307,15 +307,15 @@
 	.floatcard,
 	.popover {
 		position: fixed;
-		z-index: 40;
+		z-index: var(--z-menu);
 		box-sizing: border-box;
 		padding: 6px;
 		border: 1px solid var(--border-strong);
-		border-radius: 12px;
+		border-radius: var(--radius-panel, 12px);
 		background: var(--panel);
 		box-shadow: var(--shadow-menu);
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--type-ui);
 		/*
 		 * A ceiling, so no card can be taller than the window it is placed in.
 		 *
@@ -331,14 +331,14 @@
 	/*
 	 * A row you can pick. `data-row` is what the keyboard roves over.
 	 *
-	 * `.rowlist` as well as `.popover`, so a described choice in a *dialog* is the same object
+	 * `.row-list` as well as `.popover`, so a described choice in a *dialog* is the same object
 	 * as a described choice in a menu — same grid, same 7px corner, same hover wash, same
-	 * `.lb`/`.nt` pair. The question over the input bar used to draw its own: a full-width
+	 * `.row-label`/`.row-note` pair. The question over the input bar used to draw its own: a full-width
 	 * slab filled with `--line` at rest, which read as four disabled fields rather than as
 	 * four things to press, and was a second answer to a question this file had already
 	 * answered.
 	 */
-	:is(.popover, .rowlist) [data-row] {
+	:is(.popover, .row-list) [data-row] {
 		display: grid;
 		width: 100%;
 		align-items: start;
@@ -348,7 +348,7 @@
 		gap: 2px 9px;
 		grid-template-columns: 16px 1fr;
 		border: 0;
-		border-radius: 7px;
+		border-radius: var(--radius-item);
 		background: transparent;
 		color: inherit;
 		cursor: pointer;
@@ -356,13 +356,13 @@
 		text-align: left;
 	}
 
-	:is(.popover, .rowlist) [data-row]:hover,
-	:is(.popover, .rowlist) [data-row]:focus-visible {
+	:is(.popover, .row-list) [data-row]:hover,
+	:is(.popover, .row-list) [data-row]:focus-visible {
 		background: var(--line);
 		outline: none;
 	}
 
-	:is(.popover, .rowlist) [data-row][data-current="true"] {
+	:is(.popover, .row-list) [data-row][data-current="true"] {
 		background: var(--line);
 	}
 
@@ -373,12 +373,12 @@
 	 * cannot choose is a list you cannot reason about. No hover wash, because a wash on a row
 	 * that will not respond is the affordance lying.
 	 */
-	:is(.popover, .rowlist) [data-row][disabled] {
+	:is(.popover, .row-list) [data-row][disabled] {
 		cursor: default;
 		opacity: 0.55;
 	}
 
-	:is(.popover, .rowlist) [data-row][disabled]:hover {
+	:is(.popover, .row-list) [data-row][disabled]:hover {
 		background: transparent;
 	}
 
@@ -389,11 +389,11 @@
 	 * not — "Temporal" and "date-fns" are not things with pictures — and reserving the track
 	 * anyway indents a whole list by 25px against the question above it.
 	 */
-	:is(.popover, .rowlist) [data-row]:not(:has(> .ic)) {
+	:is(.popover, .row-list) [data-row]:not(:has(> .row-icon)) {
 		grid-template-columns: 1fr;
 	}
 
-	:is(.popover, .rowlist) [data-row] > .ic {
+	:is(.popover, .row-list) [data-row] > .row-icon {
 		grid-row: span 2;
 		padding-top: 1px;
 		color: var(--muted);
@@ -403,20 +403,20 @@
 	   group (`chat/Settings.tsx`). Added to the selector rather than given its own copy of these
 	   six declarations, because two type scales that are meant to match and are written twice do
 	   not stay matched. */
-	:is(.popover, .rowlist) [data-row] > .lb,
-	.set-k > .lb {
+	:is(.popover, .row-list) [data-row] > .row-label,
+	.set-k > .row-label {
 		display: flex;
 		align-items: center;
 		gap: 6px;
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--type-ui);
 		font-weight: 600;
 	}
 
 	/*
 	 * In a menu, a row with nothing under it is not a title.
 	 *
-	 * 600 is right for a row that *has* a `.nt` — a mode, a model, a described choice: the
+	 * 600 is right for a row that *has* a `.row-note` — a mode, a model, a described choice: the
 	 * label is a heading over its own sentence. It is wrong for a plain menu row, where it
 	 * makes a list of six places to go read as six headings, and the corner's `⋯` read
 	 * heavier than the zoom menu sitting a button away from it.
@@ -424,10 +424,10 @@
 	 * That disagreement had been patched seven times, one `font-normal` at a time — the
 	 * zoom stops, the two zoom steps, the tools menu, undo, and both "new agent" rows. Seven
 	 * opt-outs from a default is the default being wrong, so it is stated once here and the
-	 * utilities are gone. `.rowlist` keeps 600 throughout: the panel's boards, the settings
+	 * utilities are gone. `.row-list` keeps 600 throughout: the panel's boards, the settings
 	 * groups and the dialog's options are lists you read, not lists you pick from.
 	 */
-	.popover [data-row]:not(:has(> .nt)) > .lb {
+	.popover [data-row]:not(:has(> .row-note)) > .row-label {
 		font-weight: 400;
 	}
 
@@ -443,7 +443,7 @@
 	 * Immediately after the rule it excepts, because the two have the same specificity and
 	 * source order is what decides between them.
 	 */
-	.popover [data-row] > .lb.nm {
+	.popover [data-row] > .row-label.row-name {
 		font-weight: 600;
 	}
 
@@ -453,7 +453,7 @@
 	 * This is the reason a mode is a menu and not a segmented control: "edit freely" does
 	 * not say by itself that commands still ask, and the place to say so is here.
 	 */
-	:is(.popover, .rowlist) [data-row] > .nt,
+	:is(.popover, .row-list) [data-row] > .row-note,
 	/* The Time group's picker: a field, then the buttons that act on it, on one line. */
 	.set-zone {
 		display: flex;
@@ -464,9 +464,9 @@
 	.set-zone > .field {
 		width: 210px;
 	}
-	.set-k > .nt {
+	.set-k > .row-note {
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 		line-height: 1.4;
 	}
 
@@ -480,7 +480,7 @@
 	 * scrolled because its content now fitted, and the rule that says how tall a row is had
 	 * been quietly overruled by the box around it.
 	 */
-	:is(.popover, .rowlist) [data-row][data-flat="true"] {
+	:is(.popover, .row-list) [data-row][data-flat="true"] {
 		display: flex;
 		min-height: 30px;
 		flex: none;
@@ -505,11 +505,11 @@
 	 * underneath stops painting itself, and `:has` lets the box light up for the row's own
 	 * `data-current` without that state having to move off the row it describes.
 	 */
-	:is(.popover, .rowlist) .row-act {
+	:is(.popover, .row-list) .row-act {
 		display: flex;
 		align-items: center;
 		padding-right: 4px;
-		border-radius: 7px;
+		border-radius: var(--radius-item);
 		gap: 2px;
 	}
 
@@ -518,17 +518,17 @@
 	 * something that will not respond is the affordance lying. The account in use is the case:
 	 * its row is `disabled` and it is already tinted.
 	 */
-	:is(.popover, .rowlist) .row-act:is(:hover, :focus-within):not(:has(> [data-row][disabled])) {
+	:is(.popover, .row-list) .row-act:is(:hover, :focus-within):not(:has(> [data-row][disabled])) {
 		background: var(--line);
 	}
 
-	:is(.popover, .rowlist) .row-act:has(> [data-row][data-current="true"]) {
+	:is(.popover, .row-list) .row-act:has(> [data-row][data-current="true"]) {
 		background: var(--line);
 	}
 
-	:is(.popover, .rowlist) .row-act > [data-row]:hover,
-	:is(.popover, .rowlist) .row-act > [data-row]:focus-visible,
-	:is(.popover, .rowlist) .row-act > [data-row][data-current="true"] {
+	:is(.popover, .row-list) .row-act > [data-row]:hover,
+	:is(.popover, .row-list) .row-act > [data-row]:focus-visible,
+	:is(.popover, .row-list) .row-act > [data-row][data-current="true"] {
 		background: transparent;
 	}
 
@@ -558,7 +558,7 @@
 	 * On a touch screen neither of those is true — nothing is hovering, and nothing moves —
 	 * so there both are simply drawn, all the time.
 	 */
-	:is(.popover, .rowlist) .row-act > .close {
+	:is(.popover, .row-list) .row-act > .close {
 		display: grid;
 		width: var(--control-sm);
 		height: var(--control-sm);
@@ -579,22 +579,22 @@
 
 	/* `:focus-within` on the box, so roving onto the row with the keyboard is what reveals
 	   it — the row is where Delete is handled, and an invisible key is not a shortcut. */
-	:is(.popover, .rowlist) .row-act:is(:hover, :focus-within) > .close {
+	:is(.popover, .row-list) .row-act:is(:hover, :focus-within) > .close {
 		opacity: 1;
 	}
 
-	:is(.popover, .rowlist) .row-act > .close:hover {
+	:is(.popover, .row-list) .row-act > .close:hover {
 		background: color-mix(in srgb, var(--fg) 12%, transparent);
 		color: var(--fg);
 	}
 
-	:is(.popover, .rowlist) .row-act > .close:focus-visible {
+	:is(.popover, .row-list) .row-act > .close:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: -1px;
 	}
 
 	/* Armed: asked once, held visible in danger red until the second press or the menu closes. */
-	:is(.popover, .rowlist) .row-act > .close[data-armed="true"] {
+	:is(.popover, .row-list) .row-act > .close[data-armed="true"] {
 		opacity: 1;
 		background: color-mix(in srgb, var(--color-danger) 16%, transparent);
 		color: var(--color-danger);
@@ -607,7 +607,7 @@
 	 * between them, and the shape would change as a row moved — the list rearranging itself
 	 * around the thing you are dragging it with.
 	 */
-	:is(.popover, .rowlist) .row-act > .close[disabled] {
+	:is(.popover, .row-list) .row-act > .close[disabled] {
 		color: var(--faint);
 		cursor: default;
 	}
@@ -619,11 +619,11 @@
 	 * was first: that beat the `opacity: 0` above, so the two arrows that could *not* be
 	 * pressed were the only ones visible on an untouched list.
 	 */
-	:is(.popover, .rowlist) .row-act:is(:hover, :focus-within) > .close[disabled] {
+	:is(.popover, .row-list) .row-act:is(:hover, :focus-within) > .close[disabled] {
 		opacity: 0.35;
 	}
 
-	:is(.popover, .rowlist) .row-act > .close[disabled]:hover {
+	:is(.popover, .row-list) .row-act > .close[disabled]:hover {
 		background: none;
 		color: var(--faint);
 	}
@@ -637,11 +637,11 @@
 	 * here, and it moves because the alternative is a gutter that never stops being there.
 	 */
 	@media (hover: hover) {
-		:is(.popover, .rowlist) .row-act:has([data-yield]) > .close {
+		:is(.popover, .row-list) .row-act:has([data-yield]) > .close {
 			display: none;
 		}
 
-		:is(.popover, .rowlist) .row-act:has([data-yield]):is(:hover, :focus-within) > .close {
+		:is(.popover, .row-list) .row-act:has([data-yield]):is(:hover, :focus-within) > .close {
 			display: grid;
 		}
 
@@ -653,7 +653,7 @@
 		 * and put nothing in it: the status vanished to make room for a button that was never
 		 * coming. The panel's rows always have their tag button, so they always yield.
 		 */
-		:is(.popover, .rowlist) .row-act:has(> :is(.close, .agent-tagbtn)):is(:hover, :focus-within) [data-yield] {
+		:is(.popover, .row-list) .row-act:has(> :is(.close, .agent-tagbtn)):is(:hover, :focus-within) [data-yield] {
 			display: none;
 		}
 	}
@@ -667,7 +667,7 @@
 	 * justify hiding either.
 	 */
 	@media (hover: none) {
-		:is(.popover, .rowlist) .row-act > .close {
+		:is(.popover, .row-list) .row-act > .close {
 			opacity: 1;
 		}
 
@@ -679,7 +679,7 @@
 		 * ones whose words ran to the edge. Which is the ragged gutter this whole arrangement
 		 * exists to avoid, inverted.
 		 */
-		:is(.popover, .rowlist) .row-act:has([data-yield]):not(:has(> .close)) {
+		:is(.popover, .row-list) .row-act:has([data-yield]):not(:has(> .close)) {
 			padding-right: calc(var(--control-sm) + 6px);
 		}
 	}
@@ -689,13 +689,13 @@
 	 * one — so this is only the rhythm: the same 2px between rows that a popover has, because
 	 * two rows 6px apart read as two objects and these are one list.
 	 */
-	.rowlist {
+	.row-list {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 	}
 
-	:is(.popover, .rowlist) .rule {
+	:is(.popover, .row-list) .rule {
 		height: 1px;
 		margin: 6px 4px;
 		background: var(--line);
@@ -703,10 +703,10 @@
 
 	/* A label over a group of rows. Sentence case, never uppercase — see the note in
 	   `index.css` about what replaced the eyebrows. */
-	:is(.popover, .rowlist) .group {
+	:is(.popover, .row-list) .group {
 		padding: 5px 8px 3px;
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 		font-weight: 500;
 	}
 
@@ -719,7 +719,7 @@
 	 * rendered since the rewrite. So the three of them agreed by accident and could stop
 	 * agreeing without anybody touching them.
 	 *
-	 * The same anatomy as `.iconbtn` and `.chipbtn`, which is the point: `--control` for the
+	 * The same anatomy as `.icon-button` and `.chip-button`, which is the point: `--control` for the
 	 * height so a fingertip gets 44px from the one place that decides that, `--control-radius`
 	 * for the corner, and **the container carries the border, not the control** — a wash of
 	 * `--line` is the whole affordance, and it leaves the accent fill free to mean the one
@@ -739,7 +739,7 @@
 		color: var(--fg);
 		cursor: pointer;
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		white-space: nowrap;
 		transition:
 			background-color 120ms ease,
@@ -804,7 +804,7 @@
 		background: transparent;
 		color: var(--fg);
 		font: inherit;
-		font-size: 11px;
+		font-size: var(--type-note);
 		font-variant-numeric: tabular-nums;
 		transition:
 			background-color 120ms ease,
@@ -823,7 +823,7 @@
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
 	}
 
-	.field > .k {
+	.field > .kv-key {
 		flex: none;
 		color: var(--faint);
 	}
@@ -840,7 +840,7 @@
 	}
 
 	/* The label of a scrubbable field: dragging it changes the number. */
-	.field > .k[data-scrub="true"] {
+	.field > .kv-key[data-scrub="true"] {
 		cursor: ew-resize;
 		user-select: none;
 	}
@@ -848,7 +848,7 @@
 	/* A segmented control: pick one of a few, all visible. */
 	/* The hairline is an inset shadow, not a border: a border adds two pixels to a tray whose
 	   height is its buttons plus padding, and the panel's strip has to stay 32px. */
-	.seg {
+	.segmented {
 		display: flex;
 		flex: none;
 		padding: 2px;
@@ -858,7 +858,7 @@
 		box-shadow: inset 0 0 0 1px var(--line);
 	}
 
-	.seg > button {
+	.segmented > button {
 		flex: 1;
 		height: 20px;
 		border: 0;
@@ -867,18 +867,18 @@
 		color: var(--muted);
 		cursor: pointer;
 		font: inherit;
-		font-size: 10px;
+		font-size: var(--type-micro);
 		transition:
 			background-color 120ms ease,
 			color 120ms ease;
 	}
 
-	.seg > button:hover {
+	.segmented > button:hover {
 		background: var(--line);
 		color: var(--fg);
 	}
 
-	.seg > button[data-on="true"] {
+	.segmented > button[data-on="true"] {
 		background: var(--raise);
 		color: var(--fg);
 		font-weight: 600;
@@ -914,11 +914,11 @@
 	.kind {
 		flex: none;
 		padding: 1px 5px;
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: var(--fill);
 		color: var(--muted);
 		font-family: var(--font-mono);
-		font-size: 9.5px;
+		font-size: var(--type-tag);
 		line-height: 14px;
 		letter-spacing: 0.01em;
 	}
@@ -949,11 +949,11 @@
 		max-width: 100%;
 		overflow: hidden;
 		padding: 1px 6px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--fill);
 		color: var(--muted);
 		font-family: var(--font-mono);
-		font-size: 9.5px;
+		font-size: var(--type-tag);
 		line-height: 14px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -994,7 +994,7 @@
 	 * heading, and on every row of the panel when the grouping is Attention.
 	 */
 	.tag.ws {
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: transparent;
 		box-shadow: inset 0 0 0 1px var(--line-strong);
 		color: var(--muted);
@@ -1020,7 +1020,7 @@
 	 */
 	.label,
 	.meta {
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		font-weight: 500;
 		letter-spacing: 0;
 		text-transform: none;
@@ -1033,4 +1033,152 @@
 	.meta {
 		color: var(--faint);
 	}
+	/* --- app chrome -------------------------------------------------------------- */
+
+/*
+ * Lucide icons, wherever they land.
+ *
+ * Only `flex: none` is really ours — Tailwind's preflight already makes an `svg` a
+ * block, which is what stops an icon reserving a descender under itself and sitting a
+ * pixel low beside its label. What is left is the rule that an icon is never the thing
+ * that gives way: every one of these sits in a flex row next to a label that can be a
+ * long path, and a shrunk icon is a squashed icon. Size, colour and stroke are
+ * deliberately absent — they come from the `Icon` wrapper in `ui/icons.tsx`, so the weight
+ * is one decision in one place.
+ */
+svg.lucide {
+	flex: none;
+}
+	/*
+ * A button whose whole label is an icon.
+ *
+ * Named rather than inferred, because the sizing is the point: a fixed square with the
+ * icon gridded into the middle, instead of the `font-size` each of these used to carry
+ * to talk a text glyph into looking centred.
+ *
+ * The new chrome spells this `.icon-button` and states it once, in `styles/chrome.css`. What
+ * is left here are the surfaces that have not been rebuilt — the cheat sheet and the
+ * inspector's own two rows — and they should join it when they are.
+ */
+.ops-sheet header button,
+.inspector .row.file button,
+.inspector .acts button {
+	display: grid;
+	width: var(--control);
+	height: var(--control);
+	padding: 0;
+	border: 0;
+	border-radius: var(--control-radius);
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	place-items: center;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
+}
+	/*
+ * The small one, for a control that shares a row with a list item's own content: a chat
+ * row's `×`, and the panel header's `+`.
+ *
+ * `:not(.menu *)` because the `+` opens a menu that lives *inside* the header, and a
+ * descendant selector cannot tell a control from a control's contents. Without it every menu
+ * item was squeezed into the same 22px square — so the row's hover wash was a square behind
+ * the runtime mark, with the name and the tick outside it and nothing to press but the icon.
+ */
+.inspector header .close,
+.chats .rail-head button:not(.menu *) {
+
+	display: grid;
+	width: var(--control-sm);
+	height: var(--control-sm);
+	padding: 0;
+	border: 0;
+	border-radius: var(--control-radius);
+	background: none;
+	color: var(--faint);
+	cursor: pointer;
+	place-items: center;
+}
+	/* One hover for all of them, which is the palette's: a wash, not a border and not a jump. */
+.ops-sheet header button:hover,
+.inspector .row.file button:hover,
+.inspector .acts button:hover,
+.inspector header .close:hover,
+.chats .rail-head button:not(.menu *):hover {
+
+	background: var(--line);
+	color: var(--fg);
+}
+	/*
+ * A text button, and the rule the palette and the title bar have been keeping all along:
+ * **the container carries the border, the control does not.**
+ *
+ * These were 1px boxes on `--bg`, which put an outline around every answer in a card that
+ * already has one, and made a dialog's buttons a different species from the tool row's. A
+ * wash of `--line` is the same affordance with none of the ruling, and it leaves the accent
+ * fill free to mean the one thing it should: this is the answer that acts.
+ */
+/*
+ * What is left of that list: the file picker's two header chips, at 11px rather than the
+ * control scale. Everything else that used it — the question over the input bar, the accounts
+ * modal — wears `.btn` from `styles/chrome.css` now, which is the same anatomy as `.icon-button`
+ * and `.chip-button` and takes its height from `--control`. `.composer` was in the selector too,
+ * and nothing has rendered that class since the rewrite.
+ */
+.picker header button {
+	padding: 4px 10px;
+	border: 0;
+	border-radius: var(--control-radius);
+	background: var(--line);
+	color: var(--fg);
+	cursor: pointer;
+	font: inherit;
+	font-size: var(--type-ui);
+	transition:
+		background 120ms ease,
+		color 120ms ease;
+}
+	.picker header button:hover {
+	background: var(--line-strong);
+}
+	.picker header .add {
+	background: var(--color-accent);
+	color: #fff;
+}
+	.picker header .add:hover {
+	background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
+}
+	/* The picker's "from this device" while a copy is in flight. `.btn[disabled]` covers the
+   dialogs, which is where "the button is there and says it cannot go" was written. */
+.picker header button:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+}
+
+	/* The same rules, under the same query. */
+	@media (prefers-reduced-motion: reduce) {
+	/* The outline stays; what moves goes. The glow stays too, still. */
+	.act-hold,
+	.act-land,
+	.act-land::before,
+	.board-node > .news-glow::after {
+		animation: none;
+	}
+}
+	.picker-backdrop {
+	position: absolute;
+	z-index: var(--z-backdrop);
+	display: grid;
+	inset: 0;
+	background: rgb(0 0 0 / 30%);
+	place-items: center;
+}
+	/* A row that is information rather than a choice: no hover wash, no pointer. */
+.row-act[data-row-static] {
+	cursor: default;
+}
+	.row-act[data-row-static]:hover {
+	background: transparent;
+}
 }

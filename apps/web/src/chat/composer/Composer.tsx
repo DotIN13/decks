@@ -390,7 +390,7 @@ export function Composer(props: {
 		 * Deliberately *not* carrying the old `composer` class. Those rules dress a
 		 * bordered panel with three `<select>`s and a `.send` in it, and `.composer button`
 		 * in particular would put a wash and 4px/10px padding on every button in here,
-		 * beating `.iconbtn` on specificity. The narrow-width and coarse-pointer rules that
+		 * beating `.icon-button` on specificity. The narrow-width and coarse-pointer rules that
 		 * comment used to justify keeping it all target the elements this rewrite deletes.
 		 */
 		<section class="relative flex w-auto transform-none flex-col gap-1.5">
@@ -417,7 +417,7 @@ export function Composer(props: {
 			{/* 10 / 10 / 8: the bottom is short because the controls row has its own gap to
 			    the text above it, and 10 under a 26px button reads as a hole. */}
 			<div
-				class="dockbox float rounded-row px-2.5 pt-2.5 pb-2"
+				class="composer-box float rounded-row px-2.5 pt-2.5 pb-2"
 				data-dropping={dropping() ? "true" : undefined}
 				onDragOver={(event) => {
 					if (!props.onDropFiles || !carriesFiles(event.dataTransfer)) return;
@@ -542,9 +542,9 @@ export function Composer(props: {
 
 				{/* The controls row. `dockrow` is only the two control sizes the board fixes
 				    for this row (26px, 34 under a finger); the layout is here. */}
-				<div class="dockrow mt-2 flex items-center gap-1.5">
+				<div class="dock-row mt-2 flex items-center gap-1.5">
 					<Show when={props.onAttach}>
-						<button class="iconbtn" type="button" aria-label="Attach a file" title="Attach a file" onClick={() => props.onAttach?.()}>
+						<button class="icon-button" type="button" aria-label="Attach a file" title="Attach a file" onClick={() => props.onAttach?.()}>
 							<Icon of={Paperclip} size={15} />
 						</button>
 					</Show>
@@ -582,7 +582,7 @@ export function Composer(props: {
 						when={props.busy && !sendable()}
 						fallback={
 							<button
-								class="sendbtn"
+								class="send-button"
 								type="button"
 								disabled={!sendable()}
 								title={props.busy ? "Steer this turn" : "Send"}
@@ -594,7 +594,7 @@ export function Composer(props: {
 						}
 					>
 						<button
-							class="sendbtn"
+							class="send-button"
 							type="button"
 							data-stop="true"
 							title="Stop this turn"
@@ -629,7 +629,7 @@ export function Composer(props: {
 			 * Which also means the row is not *only* keycaps again — but the argument for
 			 * dropping it on a touchscreen is unchanged, because the dial goes to `⋯` there.
 			 */}
-			<div class="hintrow flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden">
+			<div class="hint-row flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden">
 				<Hints menuOpen={menuOpen() || atOpen()} mentions={Boolean(props.mentionables?.length)} />
 				<span class="flex-1" />
 				<ContextDial usage={props.usage} onUsage={props.onUsage} />

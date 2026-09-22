@@ -62,7 +62,7 @@ export function Dialog(props: {
 			<Switch>
 				<Match when={props.prompt.method === "confirm"}>
 					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
-					<div class="mt-[3px] text-[12px] whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
+					<div class="mt-[3px] text-ui whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
 					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button class="btn" type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
 							Allow
@@ -107,9 +107,9 @@ export function Dialog(props: {
 					<div class="font-semibold">{choose().title}</div>
 
 					{/*
-						`.rowlist` and `data-row`: the same object as a described choice in a menu —
+						`.row-list` and `data-row`: the same object as a described choice in a menu —
 						`styles/chrome.css` owns the grid, the 7px corner, the hover wash and the
-						`.lb`/`.nt` pair. These used to be full-width slabs filled with `--line` at
+						`.row-label`/`.row-note` pair. These used to be full-width slabs filled with `--line` at
 						rest, which read as four disabled fields rather than four things to press, and
 						was a second answer to a question that file had already answered.
 
@@ -117,7 +117,7 @@ export function Dialog(props: {
 						single choice the click is the answer, so a checkbox would be a control that
 						shows what you already did and then vanishes with the card.
 					*/}
-					<div class="rowlist mt-2">
+					<div class="row-list mt-2">
 						<For each={choose().options}>
 							{(option) => (
 								<button
@@ -128,13 +128,13 @@ export function Dialog(props: {
 									onClick={() => (choose().multiple ? toggle(option.label) : props.onAnswer({ value: option.label }))}
 								>
 									<Show when={choose().multiple}>
-										<span class="ic">
+										<span class="row-icon">
 											<Icon of={Check} size={14} class={ticked().includes(option.label) ? "" : "opacity-0"} />
 										</span>
 									</Show>
-									<span class="lb">{option.label}</span>
+									<span class="row-label">{option.label}</span>
 									<Show when={option.description}>
-										<span class="nt whitespace-normal">{option.description}</span>
+										<span class="row-note whitespace-normal">{option.description}</span>
 									</Show>
 								</button>
 							)}
@@ -239,13 +239,13 @@ export function Dialog(props: {
 				 */}
 				<Match when={props.prompt.method === "login"}>
 					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
-					<div class="mt-[3px] text-[12px] whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
+					<div class="mt-[3px] text-ui whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
 					{/* Breakable, so a 450-character OAuth URL can be read and copied in the dock. */}
 					{/* A wash rather than a bordered box on a bordered card, and the same corner as the
 					    field under it. Breakable, so a 450-character OAuth URL can be read and copied
 					    in the dock. */}
 					<a
-						class="mt-[7px] block rounded-control bg-line px-[9px] py-[7px] font-mono text-[11px] leading-normal break-all text-accent hover:bg-line-strong"
+						class="mt-[7px] block rounded-control bg-line px-[9px] py-[7px] font-mono text-note leading-normal break-all text-accent hover:bg-line-strong"
 						href={(props.prompt as { url: string }).url}
 						target="_blank"
 						rel="noreferrer"

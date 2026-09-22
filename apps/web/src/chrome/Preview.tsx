@@ -209,7 +209,7 @@ export function Preview(props: PreviewProps) {
 					{/* The controls at the left end, and in the header rather than a footer: the
 					    conversation floats over the panel's top-right corner at home and the
 					    composer over its foot, and a button under a float is a button nobody finds. */}
-					<button type="button" class="iconbtn" aria-label="Close preview" title="Close (Esc)" onClick={() => props.onClose()}>
+					<button type="button" class="icon-button" aria-label="Close preview" title="Close (Esc)" onClick={() => props.onClose()}>
 						<Icon of={X} size={14} />
 					</button>
 					<button type="button" class="dispatch-act" data-primary onClick={() => props.onOpenOnCanvas(props.path)}>
@@ -218,19 +218,19 @@ export function Preview(props: PreviewProps) {
 					{/* The same document in a tab of its own: for reading it at full size, or for
 					    keeping it open while the dashboard moves on. A link, so the browser's own
 					    middle-click and "copy link" work on it. */}
-					<a class="iconbtn" href={src()} target="_blank" rel="noopener" title="Open in a new tab" aria-label="Open in a new tab">
+					<a class="icon-button" href={src()} target="_blank" rel="noopener" title="Open in a new tab" aria-label="Open in a new tab">
 						<Icon of={ExternalLink} size={14} />
 					</a>
 					{/* For a mouse with no pinch and nobody's habit of ⌘-wheel. The middle one says
 					    where the zoom is and puts it back. */}
 					<span class="dispatch-preview-zoom" role="group" aria-label="Zoom">
-						<button type="button" class="iconbtn" aria-label="Zoom out" title="Zoom out (⌘−)" onClick={() => zoomStep("out")}>
+						<button type="button" class="icon-button" aria-label="Zoom out" title="Zoom out (⌘−)" onClick={() => zoomStep("out")}>
 							<Icon of={ZoomOut} size={14} />
 						</button>
 						<button type="button" class="dispatch-preview-percent" aria-label="Fit to width" title="Fit to width (⌘0)" onClick={() => zoomStep("fit")}>
 							{Math.round(scale() * 100)}%
 						</button>
-						<button type="button" class="iconbtn" aria-label="Zoom in" title="Zoom in (⌘+)" onClick={() => zoomStep("in")}>
+						<button type="button" class="icon-button" aria-label="Zoom in" title="Zoom in (⌘+)" onClick={() => zoomStep("in")}>
 							<Icon of={ZoomIn} size={14} />
 						</button>
 					</span>

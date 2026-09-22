@@ -38,8 +38,9 @@
     "build": "npm run build --workspace @decks/server && npm run build --workspace @decks/web",
     "start": "DECKS_DATA_DIR=\"${DECKS_DATA_DIR:-$PWD/data}\" npm run start --workspace @decks/server",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && node --test scripts/*.test.mjs",
     "vendor": "node scripts/vendor.mjs",
+    "css:order": "node scripts/css-order.mjs",
     "dev:example": "DECKS_DATA_DIR=\"$PWD/example\" npm run dev --workspace @decks/server",
     "test:e2e": "node e2e/run.mjs"
   },

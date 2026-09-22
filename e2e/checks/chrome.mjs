@@ -61,7 +61,7 @@ const sameShape = await page.evaluate(() => {
 			radius: style.borderRadius,
 			mono: name.fontFamily.includes("Mono"),
 			caps: name.textTransform,
-			chevronLast: row.lastElementChild?.classList.contains("twist") ?? false,
+			chevronLast: row.lastElementChild?.classList.contains("twisty") ?? false,
 		};
 	};
 	return { head: read(head), kid: read(kid) };
@@ -183,7 +183,7 @@ await page.locator(".stream .stream-mine .stream-rw").first().click();
 await page.waitForSelector(".popover", { timeout: 6000 });
 // By the row's label, not the row's whole text: a described row reads "Preview" and then
 // its sentence, and the sentence is not the thing being pressed.
-await page.locator(".popover [data-row]").filter({ has: page.locator(".lb", { hasText: /^Preview$/ }) }).first().click();
+await page.locator(".popover [data-row]").filter({ has: page.locator(".row-label", { hasText: /^Preview$/ }) }).first().click();
 await page.waitForFunction(() => document.querySelector(".stage")?.dataset.previewing === "true", null, { timeout: 8000 });
 const previewing = await page.evaluate(() => ({
 	stage: document.querySelector(".stage")?.dataset.previewing,

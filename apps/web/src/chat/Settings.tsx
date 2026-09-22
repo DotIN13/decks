@@ -121,7 +121,7 @@ export function Settings(props: {
 				<header class="set-head">
 					<span class="set-head-title">Settings</span>
 					<span class="flex-1" />
-					<button class="iconbtn [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+					<button class="icon-button [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
 						<Icon of={X} size={15} />
 					</button>
 				</header>
@@ -163,8 +163,8 @@ export function Settings(props: {
 
 						{/* `rowlist`, so each account is the same row as a described choice anywhere else in
 						    the app — `styles/chrome.css` owns the grid, the corner, the hover and the
-						    `.lb`/`.nt` type scale. */}
-						<div class="rowlist set-rows">
+						    `.row-label`/`.row-note` type scale. */}
+						<div class="row-list set-rows">
 							<For each={props.accounts}>
 								{(account) => (
 									<Row
@@ -255,11 +255,11 @@ function Row(props: {
 				button of its own inside it.
 			*/}
 			<div class="min-w-0 flex-1" data-row title={title()}>
-				<span class="lb w-full items-baseline">
+				<span class="row-label w-full items-baseline">
 					<span class="truncate">{name()}</span>
 					<Show when={props.account.plan}>{(plan) => <span class="meta flex-none">{plan()}</span>}</Show>
 				</span>
-				<span class="nt flex w-full items-baseline gap-1.5">
+				<span class="row-note flex w-full items-baseline gap-1.5">
 					{/* Before the organisation, and dimmer: what the row *is* comes before what the
 					    account belongs to, and neither should out-shout the email above them. */}
 					<Show when={whose()}>{(said) => <span class="flex-none text-faint">{said()}</span>}</Show>
@@ -354,13 +354,13 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 				<span class="set-title">Your Chrome</span>
 				<span class="set-note">{note()}</span>
 			</header>
-			<div class="rowlist set-rows">
+			<div class="row-list set-rows">
 				<div class="row-act" data-row-static>
 					<div class="min-w-0 flex-1" data-row>
-						<span class="lb w-full items-baseline">
+						<span class="row-label w-full items-baseline">
 							<span class="truncate">Decks address</span>
 						</span>
-						<span class="nt flex w-full items-baseline gap-1.5">
+						<span class="row-note flex w-full items-baseline gap-1.5">
 							<span class="truncate font-mono text-muted">{location.origin}</span>
 						</span>
 					</div>
@@ -370,10 +370,10 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 				</div>
 				<div class="row-act" data-row-static>
 					<div class="min-w-0 flex-1" data-row>
-						<span class="lb w-full items-baseline">
+						<span class="row-label w-full items-baseline">
 							<span class="truncate">Pairing code</span>
 						</span>
-						<span class="nt flex w-full items-baseline gap-1.5">
+						<span class="row-note flex w-full items-baseline gap-1.5">
 							<span class="truncate font-mono text-muted">{props.web?.code ?? "…"}</span>
 						</span>
 					</div>
@@ -388,11 +388,11 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 					{(tab) => (
 						<div class="row-act" data-row-static>
 							<div class="min-w-0 flex-1" data-row>
-								<span class="lb w-full items-baseline">
+								<span class="row-label w-full items-baseline">
 									<span class="truncate">{tab.title || "(untitled)"}</span>
 									<span class="state flex-none text-accent">shared</span>
 								</span>
-								<span class="nt flex w-full items-baseline gap-1.5">
+								<span class="row-note flex w-full items-baseline gap-1.5">
 									<span class="truncate font-mono text-muted">{tab.url}</span>
 								</span>
 							</div>
@@ -463,8 +463,8 @@ function TimeSettings() {
 			</header>
 			<div class="set-row">
 				<span class="set-k">
-					<span class="lb">{chosen() ? chosen() : `Not set: the server's own clock, ${state.machineZone || "unknown"}`}</span>
-					<span class="nt" data-zone-now>
+					<span class="row-label">{chosen() ? chosen() : `Not set: the server's own clock, ${state.machineZone || "unknown"}`}</span>
+					<span class="row-note" data-zone-now>
 						It is {clockTime(tick(), inForce() || undefined)} there now.
 						{!chosen() && state.machineZone !== mine ? ` This browser is on ${mine}.` : ""}
 					</span>
@@ -477,8 +477,8 @@ function TimeSettings() {
 			</div>
 			<div class="set-row">
 				<span class="set-k">
-					<span class="lb">Another timezone</span>
-					<span class="nt">An IANA name, such as Asia/Shanghai.</span>
+					<span class="row-label">Another timezone</span>
+					<span class="row-note">An IANA name, such as Asia/Shanghai.</span>
 				</span>
 				<span class="set-zone">
 					<input
@@ -525,10 +525,10 @@ function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: 
 			</header>
 			<div class="set-row">
 				<span class="set-k">
-					<span class="lb">Renderer</span>
-					<span class="nt" data-running={running()}>{note()}</span>
+					<span class="row-label">Renderer</span>
+					<span class="row-note" data-running={running()}>{note()}</span>
 				</span>
-				<span class="seg set-renderer" role="radiogroup" aria-label="Renderer">
+				<span class="segmented set-renderer" role="radiogroup" aria-label="Renderer">
 					<For each={RENDERERS}>
 						{(option) => (
 							<button

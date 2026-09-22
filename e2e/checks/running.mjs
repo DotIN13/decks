@@ -47,7 +47,7 @@ for (let i = 0; i < 300; i += 1) {
 			 */
 			dock: document.querySelectorAll('.statusline[data-working="true"]').length,
 			// One control, two meanings: `data-stop` is on it exactly while the agent is not idle.
-			busy: document.querySelector('.sendbtn[data-stop="true"]') !== null,
+			busy: document.querySelector('.send-button[data-stop="true"]') !== null,
 			row: Math.round(document.querySelector(".statusrow")?.getBoundingClientRect().height ?? -1),
 			sign: mark
 				? {
@@ -165,7 +165,7 @@ say(
 );
 
 const signAfterCommand = await page.evaluate(() => ({
-	stop: document.querySelector('.sendbtn[data-stop="true"]') !== null,
+	stop: document.querySelector('.send-button[data-stop="true"]') !== null,
 	working: document.querySelectorAll('.statusline[data-working="true"]').length,
 }));
 say(

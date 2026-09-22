@@ -46,17 +46,17 @@ export function ContextSummary(props: {
 						<i style={{ width: `${Math.min(value(), 100)}%` }} />
 					</div>
 
-					<div class="kv">
-						<span class="k">Used</span>
-						<span class="v">{figure(props.usage?.contextTokens ?? 0)}</span>
+					<div class="pair">
+						<span class="kv-key">Used</span>
+						<span class="kv-value">{figure(props.usage?.contextTokens ?? 0)}</span>
 					</div>
-					<div class="kv">
-						<span class="k">Window</span>
-						<span class="v">{figure(props.usage?.contextWindow ?? 0)}</span>
+					<div class="pair">
+						<span class="kv-key">Window</span>
+						<span class="kv-value">{figure(props.usage?.contextWindow ?? 0)}</span>
 					</div>
-					<div class="kv">
-						<span class="k">This session</span>
-						<span class="v">${(props.usage?.cost ?? 0).toFixed(3)}</span>
+					<div class="pair">
+						<span class="kv-key">This session</span>
+						<span class="kv-value">${(props.usage?.cost ?? 0).toFixed(3)}</span>
 					</div>
 
 					{/*
@@ -91,7 +91,7 @@ export function ContextSummary(props: {
 						onClick={() => props.onUsage()}
 					>
 						<Icon of={Gauge} size={14} class="shrink-0 text-muted" />
-						<span class="lb">Usage and limits</span>
+						<span class="row-label">Usage and limits</span>
 					</button>
 				</>
 			)}

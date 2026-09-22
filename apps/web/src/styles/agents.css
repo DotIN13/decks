@@ -40,7 +40,7 @@
 		width: var(--face, 24px);
 		height: var(--face, 24px);
 		flex: none;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		/* The fill is *who*; the ring is *what*. Both channels used to be spent on identity. */
 		background: var(--fill, var(--color-accent));
 		color: #fff;
@@ -62,7 +62,7 @@
 	.agent-face > img {
 		width: 100%;
 		height: 100%;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		object-fit: cover;
 	}
 
@@ -203,7 +203,7 @@
 		flex: none;
 		padding: 0;
 		border: 0;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: none;
 		cursor: pointer;
 		font: inherit;
@@ -225,7 +225,7 @@
 	.agent-facebtn:focus-visible::after {
 		position: absolute;
 		border: 2px solid var(--color-accent);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		content: "";
 		inset: calc(-3px - var(--ring, 2px) * 2);
 	}
@@ -312,12 +312,12 @@
 		flex: none;
 		padding: 0;
 		border: 1px solid var(--line);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--panel);
 		color: var(--muted);
 		cursor: pointer;
 		font: inherit;
-		font-size: 10px;
+		font-size: var(--type-micro);
 		font-weight: 600;
 		place-items: center;
 		transition:
@@ -341,7 +341,7 @@
 	 * The popover's own flat row (`[data-flat="true"]` in `chrome.css`) one notch taller: a
 	 * 20px face with a ring standing 3.5px off it needs 34px of row, and at 30 the rings of
 	 * two neighbouring agents touch. Everything else — the highlight, the keyboard roving,
-	 * the `.lb` name at 12px semibold — is the popover's, because an agent list that styled
+	 * the `.row-label` name at 12px semibold — is the popover's, because an agent list that styled
 	 * its own rows would be a second menu vocabulary.
 	 *
 	 * `[data-flat="true"]` is in the selector so the height *beats* `chrome.css`'s own 30px
@@ -363,7 +363,7 @@
 	 * do in the panel, and the gap moved to where a gap belongs: before the status, which is
 	 * flush right.
 	 */
-	.popover [data-row][data-flat="true"][data-agent] > .lb {
+	.popover [data-row][data-flat="true"][data-agent] > .row-label {
 		min-width: 0;
 		flex: 0 1 auto;
 	}
@@ -387,7 +387,7 @@
 		width: 7px;
 		height: 7px;
 		flex: none;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--status, var(--faint));
 	}
 

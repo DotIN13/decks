@@ -141,11 +141,11 @@ export function AgentHoverCard(props: {
 			>
 				<div class="flex items-center gap-[7px]">
 					<AgentFace chat={props.chat} identity={props.identity} unread={props.unread} size={20} ring={1.5} />
-					<span class="min-w-0 flex-1 truncate text-[12px] font-semibold">{name()}</span>
-					<span class="meta flex-none text-[10px] tabular-nums">{since(props.chat.lastAt)}</span>
+					<span class="min-w-0 flex-1 truncate text-ui font-semibold">{name()}</span>
+					<span class="meta flex-none text-micro tabular-nums">{since(props.chat.lastAt)}</span>
 				</div>
 
-				<div class="flex items-center gap-1.5 text-[11px] text-muted">
+				<div class="flex items-center gap-1.5 text-note text-muted">
 					<span class="agent-swatch" data-status={status()} aria-hidden="true" />
 					<span class="min-w-0 flex-1 truncate">{statusWords(status(), props.chat.state)}</span>
 					{/*
@@ -187,14 +187,14 @@ export function AgentHoverCard(props: {
 				 * a card that covers the boards it is telling you about.
 				 */}
 				<Show when={props.chat.lastLine}>
-					{(line) => <div class="line-clamp-3 text-[11px] leading-[1.45] text-faint">“{line()}”</div>}
+					{(line) => <div class="line-clamp-3 text-note leading-[1.45] text-faint">“{line()}”</div>}
 				</Show>
 
 				{/* Says what the click does, because the face is a *switch* and not a status
 				    light — which is the whole reason faces in a corner survive one agent at a
 				    time. Switching moves the canvas, the camera, the panel and the transcript
 				    together, so switching is the only kind of following there is. */}
-				<div class="flex items-center gap-1.5 border-t border-line pt-1.5 text-[10.5px] text-muted">
+				<div class="flex items-center gap-1.5 border-t border-line pt-1.5 text-hint text-muted">
 					<Icon of={ArrowRight} size={11} class="flex-none" />
 					Click to switch to {name()}
 				</div>

@@ -127,7 +127,7 @@ export function CommentPopup(props: {
 					}}
 				/>
 				<div class="comment-acts">
-					<button type="button" class="iconbtn [--control:24px]" title="Close (Escape)" aria-label="Close" onClick={props.onClose}>
+					<button type="button" class="icon-button [--control:24px]" title="Close (Escape)" aria-label="Close" onClick={props.onClose}>
 						<Icon of={X} size={14} />
 					</button>
 					<span class="flex-1" />

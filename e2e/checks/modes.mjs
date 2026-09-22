@@ -21,7 +21,7 @@ const state = () =>
 		ring: getComputedStyle(document.querySelector(".stage"), "::after").boxShadow,
 		/** There was an "Editing" pill in the bottom-left corner. There is not now. */
 		word: getComputedStyle(document.querySelector(".stage"), "::before").content,
-		tools: document.querySelectorAll(".float.pill .palette .iconbtn").length,
+		tools: document.querySelectorAll(".float.pill .palette .icon-button").length,
 		inspector: document.querySelectorAll(".inspector").length,
 		toggle: document.querySelector('[aria-label="Edit the boards"], [aria-label="Stop editing"]')?.getAttribute("aria-label") ?? null,
 	}));

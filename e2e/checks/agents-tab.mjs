@@ -111,7 +111,7 @@ const menu = await page.evaluate(() => ({
 		h: Math.round(row.getBoundingClientRect().height),
 		kind: row.querySelector(".kind")?.textContent,
 		dormant: row.querySelector(".kind")?.dataset.dormant ?? null,
-		name: row.querySelector(".lb")?.textContent,
+		name: row.querySelector(".row-label")?.textContent,
 	})),
 	tags: document.querySelectorAll(".popover .tag").length,
 }));
@@ -216,10 +216,10 @@ const panel = await page.evaluate(() => ({
 	sections: [...document.querySelectorAll(".panel-section")].map((section) => `${section.dataset.kind}:${section.querySelectorAll(".agent-row").length}`),
 	labels: [...document.querySelectorAll(".panel-meta")].map((meta) => meta.textContent?.replace(/\s+/g, " ").trim()),
 	rows: [...document.querySelectorAll(".agent-row")].map((agent) => ({
-		name: agent.querySelector(".lb")?.textContent,
+		name: agent.querySelector(".row-label")?.textContent,
 		h: Math.round(agent.getBoundingClientRect().height),
 		kind: agent.querySelector(".kind")?.textContent,
-		avatar: Math.round(agent.querySelector(".ic")?.getBoundingClientRect().width ?? 0),
+		avatar: Math.round(agent.querySelector(".row-icon")?.getBoundingClientRect().width ?? 0),
 		state: agent.querySelector(".agent-state")?.textContent?.trim(),
 		dormant: agent.dataset.dormant ?? null,
 		/*
@@ -232,9 +232,9 @@ const panel = await page.evaluate(() => ({
 		tags: [...agent.querySelectorAll(".tag")].map((tag) => `${tag.textContent}${tag.dataset.mine ? "*" : ""}`),
 		said: agent.querySelector(".agent-said")?.textContent?.trim(),
 		/* Side by side, not stacked: the row vocabulary collapses to one column unless the
-		   avatar is in an `.ic` slot, and that mistake put the name under the face. */
+		   avatar is in an `.row-icon` slot, and that mistake put the name under the face. */
 		sideBySide: (() => {
-			const ic = agent.querySelector(".ic")?.getBoundingClientRect();
+			const ic = agent.querySelector(".row-icon")?.getBoundingClientRect();
 			const body = agent.querySelector(".agent-body")?.getBoundingClientRect();
 			return Boolean(ic && body && body.left >= ic.right);
 		})(),
@@ -303,7 +303,7 @@ say("the field says what it searches", /agents, tags or workspaces/.test(panel.p
  */
 const geometry = () =>
 	page.evaluate(() => {
-		const row = [...document.querySelectorAll(".agent-row")].find((agent) => agent.querySelector(".lb")?.textContent === "Ada");
+		const row = [...document.querySelectorAll(".agent-row")].find((agent) => agent.querySelector(".row-label")?.textContent === "Ada");
 		if (!row) return null;
 		const at = row.getBoundingClientRect();
 		const line = row.querySelector(".agent-line");
@@ -348,13 +348,13 @@ await settle(page, 300);
 await page.locator(".panel-shell .field input").fill("panel-css");
 await settle(page, 400);
 const found = await page.evaluate(() => ({
-	rows: [...document.querySelectorAll(".agent-row .lb")].map((el) => el.textContent),
+	rows: [...document.querySelectorAll(".agent-row .row-label")].map((el) => el.textContent),
 }));
 say("searching a tag finds the agent on it", JSON.stringify(found.rows) === JSON.stringify(["Ada"]), JSON.stringify(found.rows));
 
 await page.locator(".panel-shell .field input").fill("mine");
 await settle(page, 400);
-say("…including by a tag you put on yourself", JSON.stringify(await page.evaluate(() => [...document.querySelectorAll(".agent-row .lb")].map((el) => el.textContent))) === JSON.stringify(["Iris"]));
+say("…including by a tag you put on yourself", JSON.stringify(await page.evaluate(() => [...document.querySelectorAll(".agent-row .row-label")].map((el) => el.textContent))) === JSON.stringify(["Iris"]));
 
 /*
  * The query clears on a tab switch: a filter left over from the other list has its cause off
@@ -420,7 +420,7 @@ say("renaming sends the new name, for the agent whose row it is", renamed?.name 
 // The workspace: picked from the list, never typed.
 await page.locator('[role="dialog"] .agent-edit-pick').click();
 await page.waitForSelector(".popover.agent-edit-list", { timeout: 4000 });
-const listed = await page.evaluate(() => [...document.querySelectorAll(".popover.agent-edit-list [data-row] .lb")].map((lb) => lb.textContent?.trim()));
+const listed = await page.evaluate(() => [...document.querySelectorAll(".popover.agent-edit-list [data-row] .row-label")].map((lb) => lb.textContent?.trim()));
 /* No agent has declared a workspace yet, so the list is none and a new one — and the new one
    is the one place a workspace is typed. */
 say("the picker lists every workspace in use, none, and a new one", JSON.stringify(listed) === JSON.stringify(["No workspace", "New workspace…"]), JSON.stringify(listed));
@@ -480,7 +480,7 @@ const attention = await page.evaluate(() => [...document.querySelectorAll(".pane
 say("the attention axis is still the one that was asked for", JSON.stringify(attention) === JSON.stringify(["wants", "working", "quiet"]), JSON.stringify(attention));
 /* The chip is drawn in both groupings: a fact about an agent is not a decoration of the
    section it happens to be under, and in this one the heading says nothing about a project. */
-const chipped = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => `${row.querySelector(".lb")?.textContent}:${row.querySelector(".tag.ws")?.textContent ?? "-"}`));
+const chipped = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => `${row.querySelector(".row-label")?.textContent}:${row.querySelector(".tag.ws")?.textContent ?? "-"}`));
 say("…and a workspace is on the row in the urgency grouping too", chipped.includes("Ada:political-llm") && chipped.includes("Basil:-"), JSON.stringify(chipped));
 
 await page.locator('.panel-view[data-view="attention"]').click();
@@ -492,7 +492,7 @@ const filed = await page.evaluate(() => {
 		label: section.querySelector(".panel-meta > span")?.textContent,
 		note: section.querySelector(".panel-meta .note")?.textContent ?? null,
 		plus: section.querySelector(".panel-meta button")?.getAttribute("aria-label") ?? null,
-		rows: [...section.querySelectorAll(".agent-row")].map((row) => row.querySelector(".lb")?.textContent),
+		rows: [...section.querySelectorAll(".agent-row")].map((row) => row.querySelector(".row-label")?.textContent),
 	}));
 });
 /*
@@ -543,7 +543,7 @@ const moved = await page.evaluate(() =>
 	[...document.querySelectorAll(".panel-section")].map((section) => ({
 		label: section.querySelector(".panel-meta > span")?.textContent,
 		note: section.querySelector(".panel-meta .note")?.textContent ?? null,
-		rows: [...section.querySelectorAll(".agent-row")].map((row) => row.querySelector(".lb")?.textContent),
+		rows: [...section.querySelectorAll(".agent-row")].map((row) => row.querySelector(".row-label")?.textContent),
 	})),
 );
 const loose = moved.find((one) => one.label === "No workspace");
@@ -553,7 +553,7 @@ say("…while the one waiting stays where it is, and the heading still says so",
 /* Searching by project works in either grouping — which is what makes it a way to *find* one. */
 await page.locator(".panel-shell input").first().fill("irb");
 await settle(page, 400);
-const byProject = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => row.querySelector(".lb")?.textContent));
+const byProject = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => row.querySelector(".row-label")?.textContent));
 say("searching a project name finds its agents", JSON.stringify(byProject) === JSON.stringify(["Wren"]), JSON.stringify(byProject));
 await page.locator(".panel-shell input").first().fill("");
 await settle(page, 300);
@@ -575,7 +575,7 @@ const dropdown = await page.evaluate(() => {
 	let group;
 	for (const child of card?.children ?? []) {
 		if (child.classList.contains("group")) group = child.textContent;
-		else for (const row of child.querySelectorAll('[data-agent="true"]')) filed.push(`${group}:${row.querySelector(".lb")?.textContent}`);
+		else for (const row of child.querySelectorAll('[data-agent="true"]')) filed.push(`${group}:${row.querySelector(".row-label")?.textContent}`);
 	}
 	return { groups: [...document.querySelectorAll(".popover .group")].map((one) => one.textContent), filed };
 });
@@ -603,7 +603,7 @@ await page.locator(".dock-to-chip").click();
 await page.waitForSelector(".popover .agent-menu-more", { timeout: 4000 });
 const overflow = await page.evaluate(() => ({
 	rows: document.querySelectorAll('.popover [data-agent="true"]').length,
-	more: document.querySelector(".popover .agent-menu-more .lb")?.textContent?.trim(),
+	more: document.querySelector(".popover .agent-menu-more .row-label")?.textContent?.trim(),
 }));
 say("past the cap the dropdown lists thirteen and counts the rest, as a row", overflow.rows === 13 && overflow.more === "3 more agents", JSON.stringify(overflow));
 await page.locator(".popover .agent-menu-more").click();

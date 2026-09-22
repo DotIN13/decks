@@ -2,7 +2,7 @@
  * The shapes the inspector spells more than once.
  *
  * Almost everything the panel needs was already shared vocabulary by the time this file
- * existed: `.field` and `.seg` and `.label` are in `styles/chrome.css`, `.float` is the
+ * existed: `.field` and `.segmented` and `.label` are in `styles/chrome.css`, `.float` is the
  * corner it floats in, and the shell's own geometry — which is stated twice, once top right
  * and once as a bottom sheet — is in `index.css` where `env()` and `--dock` can be said
  * properly. What is left here is the handful of rules that are *this* panel's and are used
@@ -47,7 +47,7 @@
 		height: 15px;
 		padding: 0;
 		border: 1px solid var(--line-strong);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		cursor: pointer;
 	}
 
@@ -93,7 +93,7 @@
 		.tone {
 			min-width: 38px;
 			min-height: 38px;
-			border-radius: 8px;
+			border-radius: var(--control-radius);
 		}
 	}
 
@@ -107,7 +107,7 @@
 	 * saying *which* number is moving. `data-scrubbing` is set by `scrub.ts` on the element
 	 * it captured the pointer with, so it cannot disagree with the drag.
 	 */
-	.field > .k[data-scrubbing="true"] {
+	.field > .kv-key[data-scrubbing="true"] {
 		color: var(--color-accent);
 	}
 

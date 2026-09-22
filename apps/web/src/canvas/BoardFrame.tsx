@@ -1278,7 +1278,7 @@ export function BoardFrame(props: {
 									style={{ left: `${point().x}px`, top: `${point().y}px`, "--zoom": zoom() }}
 								>
 									<span class="tip" aria-hidden="true" />
-									<span class="say">{mark.label}</span>
+									<span class="mark-say">{mark.label}</span>
 								</div>
 							)}
 						</Show>
@@ -1365,7 +1365,7 @@ export function BoardFrame(props: {
 			}
 			<Show when={props.onResize && props.selected}>
 				<div
-					class="sizer"
+					class="resize-handle"
 					/*
 					 * `--zoom` here, on this box alone, because that is what `--unit` is derived
 					 * from (`index.css`) and a handle on a canvas has to be a handle at every

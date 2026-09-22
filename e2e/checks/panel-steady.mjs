@@ -138,7 +138,7 @@ await page.evaluate(() => {
 		const named = (node) => (node.nodeType === 1 ? `${node.tagName.toLowerCase()}${node.className ? `.${String(node.className).split(" ")[0]}` : ""}` : `#text:${(node.textContent ?? "").trim().slice(0, 16)}`);
 		const notes = () => [...document.querySelectorAll(".panel-section")].map((section) => `${section.dataset.kind}:${section.querySelector(".note")?.textContent ?? ""}`);
 		window.__before = { label, rows: new Map(), focused: document.activeElement, scroll: list.scrollTop, churn: { added: 0, removed: 0 }, elements: { added: 0, removed: 0 }, moved: [], notes: notes() };
-		for (const row of document.querySelectorAll(".agent-row")) window.__before.rows.set(row.querySelector(".lb")?.textContent, row);
+		for (const row of document.querySelectorAll(".agent-row")) window.__before.rows.set(row.querySelector(".row-label")?.textContent, row);
 		window.__before.pulse = pulse();
 		window.__before.pulseAt = window.__before.pulse?.currentTime ?? null;
 		window.__observer?.disconnect();
@@ -159,7 +159,7 @@ await page.evaluate(() => {
 		const before = window.__before;
 		window.__observer.disconnect();
 		const still = new Map();
-		for (const row of document.querySelectorAll(".agent-row")) still.set(row.querySelector(".lb")?.textContent, row);
+		for (const row of document.querySelectorAll(".agent-row")) still.set(row.querySelector(".row-label")?.textContent, row);
 		const kept = [...before.rows].filter(([name, row]) => still.get(name) === row);
 		const lost = [...before.rows].filter(([name, row]) => still.get(name) !== row).map(([name, row]) => `${name}${row.isConnected ? "" : " (gone)"}`);
 		const state = (name) => {
@@ -207,7 +207,7 @@ const change = async (label, message) => {
  */
 await page.evaluate(() => {
 	const list = document.querySelector(".panel-list");
-	const rowFor = (name) => [...document.querySelectorAll(".agent-row")].find((row) => row.querySelector(".lb")?.textContent === name);
+	const rowFor = (name) => [...document.querySelectorAll(".agent-row")].find((row) => row.querySelector(".row-label")?.textContent === name);
 	window.__rowFor = rowFor;
 	list.scrollTop = 140;
 	rowFor("Ada")?.querySelector("[data-row]")?.focus();

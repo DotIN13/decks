@@ -587,11 +587,11 @@ export function LeftPanel(props: {
 				<div class="flex flex-none flex-col gap-2 pb-3">
 					<Show when={props.chats}>
 						{/*
-							The app's `.seg`, at `h-8` — 28px buttons inside 2px of padding is a 32px
+							The app's `.segmented`, at `h-8` — 28px buttons inside 2px of padding is a 32px
 							strip, matching the field below it. The removed Context/Deck strip was the
 							same object at `h-6`.
 						*/}
-						<div class="seg w-full" role="tablist" aria-label="Panel">
+						<div class="segmented w-full" role="tablist" aria-label="Panel">
 							{/*
 								**Agents first, then Boards.**
 
@@ -613,7 +613,7 @@ export function LeftPanel(props: {
 										   which is what keeps the panel three stops rather than five. */
 										tabindex={tab() === name ? 0 : -1}
 										data-on={tab() === name}
-										class="h-7 text-[11.5px] pointer-coarse:h-9"
+										class="h-7 text-label pointer-coarse:h-9"
 										onClick={() => goTab(name)}
 										onKeyDown={(event) => {
 											if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -656,7 +656,7 @@ export function LeftPanel(props: {
 							ref={field}
 							type="text"
 							spellcheck={false}
-							class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
+							class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
 							/* Says what it will match, which for agents includes the tags — “who else is
 							   on panel-css” is the question tags exist to answer, and this is the surface
 							   with room to show the answer. */
@@ -689,11 +689,11 @@ export function LeftPanel(props: {
 							}}
 						/>
 						<Show when={query()}>
-							{/* `.iconbtn` is 28px, and 44px on a coarse pointer, which would burst a
+							{/* `.icon-button` is 28px, and 44px on a coarse pointer, which would burst a
 							    24px field — so this one is sized by a utility instead. */}
 							<button
 								type="button"
-								class="iconbtn size-5 flex-none rounded-sm pointer-coarse:size-8"
+								class="icon-button size-5 flex-none rounded-sm pointer-coarse:size-8"
 								aria-label="Clear the search"
 								onClick={() => {
 									type("");
@@ -716,7 +716,7 @@ export function LeftPanel(props: {
 					<Show when={tab() !== "canvases"}>
 						<button
 							type="button"
-							class="iconbtn panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
+							class="icon-button panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
 							data-view={tab() === "boards" ? density() : group()}
 							aria-label={
 								tab() === "boards"
@@ -777,7 +777,7 @@ export function LeftPanel(props: {
 										<Show when={props.onNewCanvas}>
 											<button
 												type="button"
-												class="iconbtn size-5 flex-none rounded-sm pointer-coarse:size-8"
+												class="icon-button size-5 flex-none rounded-sm pointer-coarse:size-8"
 												aria-label={section.workspace ? `New canvas in ${section.workspace}` : "New canvas in no workspace"}
 												title={section.workspace ? `New canvas in ${section.workspace}` : "New canvas, in no workspace"}
 												onClick={() => props.onNewCanvas?.(section.workspace)}
@@ -800,7 +800,7 @@ export function LeftPanel(props: {
 							)}
 						</For>
 						<Show when={canvasList().length === 0}>
-							<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
+							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
 								{canvasCount() === 0 ? "No canvases yet. Press + on the dashboard, or ask an agent for a board." : `No canvas matches “${query().trim()}”.`}
 							</p>
 						</Show>
@@ -832,7 +832,7 @@ export function LeftPanel(props: {
 										<Show when={props.onNewAgent && (section.kind === "workspace" || section.kind === "unfiled")}>
 											<button
 												type="button"
-												class="iconbtn size-5 flex-none rounded-sm pointer-coarse:size-8"
+												class="icon-button size-5 flex-none rounded-sm pointer-coarse:size-8"
 												aria-label={section.kind === "workspace" ? `New agent in ${section.label}` : "New agent in no workspace"}
 												title={section.kind === "workspace" ? `New agent in ${section.label}` : "New agent, in no workspace"}
 												onClick={() => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined)}
@@ -842,15 +842,15 @@ export function LeftPanel(props: {
 										</Show>
 									</div>
 									{/*
-										`.rowlist` is the row vocabulary — the grid, the corner, the hover, the
-										current wash, `.row-act` and its ×, and the `.lb`/`.nt` type scale. The
+										`.row-list` is the row vocabulary — the grid, the corner, the hover, the
+										current wash, `.row-act` and its ×, and the `.row-label`/`.row-note` type scale. The
 										agent row wants all of that and two overrides (a 28px icon column and a
 										top-aligned action), which `.agent-list` in `panel.css` supplies.
 
 										Re-implementing it instead is how two lists in one panel come to nearly
 										match: the board rows above are the same object.
 									*/}
-									<div class="rowlist agent-list">
+									<div class="row-list agent-list">
 									<For each={section.rows.slice(0, allowance(index()))}>
 										{(row) => (
 											<AgentRow
@@ -875,7 +875,7 @@ export function LeftPanel(props: {
 						{/* The same shape of empty state the boards list has, and the same reasoning:
 						    a panel that is blank for a good reason still looks broken without it. */}
 						<Show when={agentList.length === 0}>
-							<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
+							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
 								{allAgents().total === 0 ? "No agents yet. Start one with `+`." : `No agent matches “${query().trim()}”.`}
 							</p>
 						</Show>
@@ -896,12 +896,12 @@ export function LeftPanel(props: {
 										32px bar above it. Sentence case at 11.5px/500 — `.meta` in
 										`styles/chrome.css` is that decision, made once.
 									*/}
-									{/* `.n` is the right-hand column the rows' dots and bins also stand in —
+									{/* `.count` is the right-hand column the rows' dots and bins also stand in —
 									    see `panel.css`. One column down the right edge, whatever is in it. */}
 									<div class="panel-meta meta">
 										<span class="truncate">{section.label}</span>
 										<span class="flex-1" />
-										<span class="n tabular-nums">{section.rows.length}</span>
+										<span class="count tabular-nums">{section.rows.length}</span>
 									</div>
 									{/*
 										The branch is outside the `For`, and it has to be.
@@ -960,7 +960,7 @@ export function LeftPanel(props: {
 						on into the deck below it.
 					*/}
 					<Show when={sections().length === 0}>
-						<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
+						<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
 							{props.boards.length === 0
 								? "This deck has no boards yet. Ask for one."
 								: `Nothing in the deck matches “${query().trim()}”.`}

@@ -80,7 +80,7 @@ export function ToolChip(props: { item: Extract<ChatItem, { kind: "tool" }> }) {
 					{/* Turned rather than swapped for a second glyph, which is this app's
 					    convention everywhere a row opens — picone swaps `chevron-down` for
 					    `chevron-up` and the two are the same picture at rest. */}
-					<Icon of={ChevronRight} class="twist" size={12} />
+					<Icon of={ChevronRight} class="twisty" size={12} />
 				</Show>
 			</button>
 			<Show when={open() && result()}>

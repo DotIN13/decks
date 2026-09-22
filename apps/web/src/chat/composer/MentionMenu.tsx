@@ -45,7 +45,7 @@ export function MentionMenu(props: {
 	return (
 		<div
 			ref={list}
-			class="rowlist mention-menu absolute bottom-[calc(100%+6px)] left-0 z-[12] max-h-[min(40vh,300px)] w-full overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
+			class="row-list mention-menu absolute bottom-[calc(100%+6px)] left-0 z-[12] max-h-[min(40vh,300px)] w-full overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
 			role="listbox"
 			aria-label="Who to name"
 		>
@@ -69,9 +69,9 @@ export function MentionMenu(props: {
 						<Show when={one.chat} fallback={<span class="mention-mark" aria-hidden="true">D</span>}>
 							{(chat) => <AgentFace chat={chat()} identity={props.identities[chat().id]} size={20} ring={1.5} />}
 						</Show>
-						<span class="lb nm block truncate">{one.name}</span>
+						<span class="row-label row-name block truncate">{one.name}</span>
 						<Show when={one.chat && !one.task}>{(_) => <span class="kind">{one.chat!.kind}</span>}</Show>
-						<span class="meta flex-none text-[10px]">{one.task ? "as a task" : one.here ? "here" : props.canvasName ? `joins ${props.canvasName}` : "elsewhere"}</span>
+						<span class="meta flex-none text-micro">{one.task ? "as a task" : one.here ? "here" : props.canvasName ? `joins ${props.canvasName}` : "elsewhere"}</span>
 					</button>
 				)}
 			</For>

@@ -80,7 +80,7 @@ const select = async (path) => {
 
 /** Drag the handle by screen pixels, and report what the node was drawn at half way through. */
 const dragHandle = async (path, dx, dy) => {
-	const handle = page.locator(`.board-node[data-path="${path}"] .sizer`);
+	const handle = page.locator(`.board-node[data-path="${path}"] .resize-handle`);
 	await handle.waitFor({ state: "visible", timeout: 6000 });
 	const box = await handle.boundingBox();
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -116,7 +116,7 @@ await select(componentPath);
 const handleAt = (wanted) =>
 	page.evaluate((path) => {
 		const node = document.querySelector(`.board-node[data-path="${path}"]`);
-		const sizer = node?.querySelector(".sizer");
+		const sizer = node?.querySelector(".resize-handle");
 		if (!node || !sizer) return null;
 		const n = node.getBoundingClientRect();
 		const s = sizer.getBoundingClientRect();

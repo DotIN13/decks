@@ -182,7 +182,7 @@ export function Corner(props: {
 					trigger={(api) => (
 						<button
 							type="button"
-							class="chipbtn tabular-nums"
+							class="chip-button tabular-nums"
 							ref={api.ref}
 							aria-haspopup="menu"
 							aria-expanded={api.open}
@@ -191,7 +191,7 @@ export function Corner(props: {
 							onClick={api.toggle}
 						>
 							{percent()}%
-							<Icon of={ChevronDown} size={10} class="chev" />
+							<Icon of={ChevronDown} size={10} class="chevron" />
 						</button>
 					)}
 				>
@@ -205,7 +205,7 @@ export function Corner(props: {
 								data-current={percent() === stop ? "true" : undefined}
 								onClick={() => props.onZoom(stop / 100)}
 							>
-								<span class="lb flex-1 tabular-nums">{stop}%</span>
+								<span class="row-label flex-1 tabular-nums">{stop}%</span>
 							</button>
 						)}
 					</For>
@@ -219,13 +219,13 @@ export function Corner(props: {
 					    has to survive the press. Every other row here closes it. */}
 					<button type="button" role="menuitem" data-row data-keep-open data-flat="true" onClick={() => props.onZoom(clamp(props.zoom * STEP))}>
 						<Icon of={ZoomIn} size={13} class="flex-none text-muted" />
-						<span class="lb flex-1">Zoom in</span>
-						<span class="meta flex-none text-[10px]">⌘=</span>
+						<span class="row-label flex-1">Zoom in</span>
+						<span class="meta flex-none text-micro">⌘=</span>
 					</button>
 					<button type="button" role="menuitem" data-row data-keep-open data-flat="true" onClick={() => props.onZoom(clamp(props.zoom / STEP))}>
 						<Icon of={ZoomOut} size={13} class="flex-none text-muted" />
-						<span class="lb flex-1">Zoom out</span>
-						<span class="meta flex-none text-[10px]">⌘-</span>
+						<span class="row-label flex-1">Zoom out</span>
+						<span class="meta flex-none text-micro">⌘-</span>
 					</button>
 				</Popover>
 			</span>
@@ -274,7 +274,7 @@ export function Corner(props: {
 					<button
 						ref={api.ref}
 						type="button"
-						class="iconbtn max-[640px]:hidden"
+						class="icon-button max-[640px]:hidden"
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-on={api.open ? "soft" : undefined}
@@ -295,18 +295,18 @@ export function Corner(props: {
 							title={choice.note}
 							onClick={() => props.onNewBoard(choice.format)}
 						>
-							<span class="ic">
+							<span class="row-icon">
 								<Icon of={choice.icon} size={15} />
 							</span>
-							<span class="lb">{choice.label}</span>
-							<span class="nt">{choice.extension}</span>
+							<span class="row-label">{choice.label}</span>
+							<span class="row-note">{choice.extension}</span>
 						</button>
 					)}
 				</For>
 			</Popover>
 			<button
 				type="button"
-				class="iconbtn max-[640px]:hidden"
+				class="icon-button max-[640px]:hidden"
 				disabled={props.onCanvas === 0}
 				title={
 					props.onCanvas === 0
@@ -323,7 +323,7 @@ export function Corner(props: {
 			    frame what is left. It used to sit beside the zoom readout. */}
 			<button
 				type="button"
-				class="iconbtn max-[640px]:hidden"
+				class="icon-button max-[640px]:hidden"
 				title="Fit the boards on the canvas (0)"
 				aria-label="Fit the boards on the canvas"
 				onClick={() => props.onFit()}
@@ -341,11 +341,11 @@ export function Corner(props: {
 			 * moment. Three rather than two because **yielded must not look like off**: a
 			 * button that goes dark when something borrows its surface is a button that has
 			 * silently forgotten what you asked it for. `state/edge.ts` owns the bit; the only
-			 * thing here is the translation into the attribute `.iconbtn` draws from.
+			 * thing here is the translation into the attribute `.icon-button` draws from.
 			 */}
 			<button
 				type="button"
-				class="iconbtn max-[360px]:hidden"
+				class="icon-button max-[360px]:hidden"
 				data-on={historyButton() === "on" ? "true" : historyButton() === "yield" ? "yield" : undefined}
 				aria-pressed={historyButton() !== "off"}
 				title={
@@ -371,7 +371,7 @@ export function Corner(props: {
 					<button
 						ref={api.ref}
 						type="button"
-						class="iconbtn"
+						class="icon-button"
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-on={api.open ? "soft" : undefined}
@@ -420,10 +420,10 @@ export function Corner(props: {
 						class="hidden pointer-coarse:flex"
 						onClick={props.onContext}
 					>
-						<span class="ic">
+						<span class="row-icon">
 							<ContextRing usage={props.usage} size={15} />
 						</span>
-						<span class="lb flex-1">Context usage</span>
+						<span class="row-label flex-1">Context usage</span>
 						<span class="meta flex-none tabular-nums">{Math.round(contextPercent(props.usage) ?? 0)}%</span>
 					</button>
 					<span class="rule hidden pointer-coarse:block" />
@@ -433,10 +433,10 @@ export function Corner(props: {
 				    three tabs and the panel toggle leave the corner room for one button, and the
 				    menu is the one that has to stay. */}
 				<button type="button" role="menuitem" data-row data-flat="true" class="hidden max-[360px]:flex" onClick={() => toggleHistory()}>
-					<span class="ic">
+					<span class="row-icon">
 						<Icon of={MessageSquare} size={15} />
 					</span>
-					<span class="lb flex-1">{historyButton() === "off" ? "Show the conversation" : "Hide the conversation"}</span>
+					<span class="row-label flex-1">{historyButton() === "off" ? "Show the conversation" : "Hide the conversation"}</span>
 				</button>
 				<span class="rule hidden max-[360px]:block" />
 
@@ -456,10 +456,10 @@ export function Corner(props: {
 					class="hidden max-[640px]:flex"
 					onClick={() => props.onFit()}
 				>
-					<span class="ic">
+					<span class="row-icon">
 						<Icon of={Maximize} size={15} />
 					</span>
-					<span class="lb">Fit the boards</span>
+					<span class="row-label">Fit the boards</span>
 				</button>
 				{/* The same three, as rows, because on a phone this menu *is* the toolbar. */}
 				<For each={FORMATS}>
@@ -471,11 +471,11 @@ export function Corner(props: {
 							class="hidden max-[640px]:flex"
 							onClick={() => props.onNewBoard(choice.format)}
 						>
-							<span class="ic">
+							<span class="row-icon">
 								<Icon of={choice.icon} size={15} />
 							</span>
-							<span class="lb">{choice.label}</span>
-							<span class="nt">{choice.extension}</span>
+							<span class="row-label">{choice.label}</span>
+							<span class="row-note">{choice.extension}</span>
 						</button>
 					)}
 				</For>
@@ -487,21 +487,21 @@ export function Corner(props: {
 					disabled={props.onCanvas === 0}
 					onClick={() => props.onClearStage()}
 				>
-					<span class="ic">
+					<span class="row-icon">
 						<Icon of={Eraser} size={15} />
 					</span>
-					<span class="lb">Clear the canvas</span>
+					<span class="row-label">Clear the canvas</span>
 				</button>
 				<span class="rule hidden max-[640px]:block" />
 
 				<For each={props.overflow}>
 					{(item) => (
 						<button type="button" data-row data-flat={item.note ? undefined : "true"} onClick={item.onPick}>
-							<span class="ic">
+							<span class="row-icon">
 								<Icon of={item.icon} size={15} />
 							</span>
-							<span class="lb">{item.label}</span>
-							<Show when={item.note}>{(note) => <span class="nt">{note()}</span>}</Show>
+							<span class="row-label">{item.label}</span>
+							<Show when={item.note}>{(note) => <span class="row-note">{note()}</span>}</Show>
 						</button>
 					)}
 				</For>

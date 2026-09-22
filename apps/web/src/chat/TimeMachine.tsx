@@ -128,11 +128,11 @@ export function TimeMachine(props: {
 					})
 				}
 			>
-				<span class="ic">
+				<span class="row-icon">
 					<Icon of={Eye} size={13} />
 				</span>
-				<span class="lb">{previewing() ? "Stop previewing" : "Preview"}</span>
-				<span class="nt">Show the canvas as it was at this message. Nothing is written, and Escape puts it back.</span>
+				<span class="row-label">{previewing() ? "Stop previewing" : "Preview"}</span>
+				<span class="row-note">Show the canvas as it was at this message. Nothing is written, and Escape puts it back.</span>
 			</button>
 
 			<button
@@ -145,11 +145,11 @@ export function TimeMachine(props: {
 					})
 				}
 			>
-				<span class="ic">
+				<span class="row-icon">
 					<Icon of={RotateCcw} size={13} />
 				</span>
-				<span class="lb">Rewind to here</span>
-				<span class="nt">Take back everything after it, and these words go back into the input bar.</span>
+				<span class="row-label">Rewind to here</span>
+				<span class="row-note">Take back everything after it, and these words go back into the input bar.</span>
 			</button>
 
 			<button
@@ -162,11 +162,11 @@ export function TimeMachine(props: {
 					})
 				}
 			>
-				<span class="ic">
+				<span class="row-icon">
 					<Icon of={GitBranch} size={13} />
 				</span>
-				<span class="lb">Fork from here</span>
-				<span class="nt">Keep this history and start a second agent from this point.</span>
+				<span class="row-label">Fork from here</span>
+				<span class="row-note">Keep this history and start a second agent from this point.</span>
 			</button>
 
 			{/*
@@ -188,11 +188,11 @@ export function TimeMachine(props: {
 				data-row
 				onClick={() => pick(() => props.onRestore(props.entryId))}
 			>
-				<span class="ic">
+				<span class="row-icon">
 					<Icon of={ArchiveRestore} size={13} />
 				</span>
-				<span class="lb">Restore</span>
-				<span class="nt">Write the boards back to how they were here. The conversation stays where it is.</span>
+				<span class="row-label">Restore</span>
+				<span class="row-note">Write the boards back to how they were here. The conversation stays where it is.</span>
 			</button>
 		</Popover>
 	);

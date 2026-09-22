@@ -179,8 +179,8 @@ const panel = await page.evaluate(() => {
 		name: group.dataset.group,
 		title: group.querySelector(".set-title")?.textContent,
 		rows: [...group.querySelectorAll(".set-row")].map((row) => ({
-			label: row.querySelector(".set-k > .lb")?.textContent,
-			note: row.querySelector(".set-k > .nt")?.textContent ?? null,
+			label: row.querySelector(".set-k > .row-label")?.textContent,
+			note: row.querySelector(".set-k > .row-note")?.textContent ?? null,
 			controls: [...row.children].filter((child) => !child.classList.contains("set-k")).map((child) => child.className.split(" ")[0]),
 		})),
 	}));
@@ -210,8 +210,8 @@ say("…without repeating the sentences", banners.rows.every((row) => row.note =
  * heading unnecessary: nothing in Sounds is a switch and nothing in Banners is a chip.
  */
 say("one control per row, everywhere", panel.groups.every((group) => group.rows.every((row) => row.controls.length === 1)), JSON.stringify(panel.groups.map((g) => g.rows.map((r) => r.controls))));
-say("…all of Banners' being switches", banners.rows.every((row) => row.controls[0] === "sw"), JSON.stringify(banners.rows.map((r) => r.controls[0])));
-say("…and Sounds' being cue chips, bar the volume", sounds.rows.slice(0, 3).every((row) => row.controls[0] === "chipbtn") && sounds.rows[3]?.controls[0] === "seg", JSON.stringify(sounds.rows.map((r) => r.controls[0])));
+say("…all of Banners' being switches", banners.rows.every((row) => row.controls[0] === "switch"), JSON.stringify(banners.rows.map((r) => r.controls[0])));
+say("…and Sounds' being cue chips, bar the volume", sounds.rows.slice(0, 3).every((row) => row.controls[0] === "chip-button") && sounds.rows[3]?.controls[0] === "segmented", JSON.stringify(sounds.rows.map((r) => r.controls[0])));
 say("the permission line lives inside the group it constrains", /banner/i.test(panel.strip ?? ""), panel.strip?.slice(0, 70));
 say("adding an account is the last row of its own group, not a window footer", /Add an account/.test(panel.add ?? "") && panel.footer === 0, `${panel.add} · ${panel.footer} footers`);
 
@@ -221,9 +221,9 @@ const wasPlayed = (await tab()).played;
 await page.locator(".set-row .set-cue").first().click();
 await page.waitForSelector(".set-sounds", { timeout: 4000 });
 const picker = await page.evaluate(() => ({
-	families: [...document.querySelectorAll(".set-sounds .grp")].map((el) => el.textContent),
+	families: [...document.querySelectorAll(".set-sounds .group-label")].map((el) => el.textContent),
 	numbers: document.querySelectorAll(".set-sounds .set-cues > [data-row]").length,
-	first: document.querySelector(".set-sounds [data-row] .lb")?.textContent,
+	first: document.querySelector(".set-sounds [data-row] .row-label")?.textContent,
 	current: document.querySelector(".set-sounds .set-cues > [data-row][data-current='true']")?.textContent,
 	scrolls: (() => {
 		const el = document.querySelector(".set-sounds");

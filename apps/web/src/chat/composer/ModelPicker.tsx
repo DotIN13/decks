@@ -120,7 +120,7 @@ export function ModelPicker(props: {
 						 * text: the browser drops whole glyphs to fit an ellipsis, so "edit freely"
 						 * came out "edit fre…" for want of a rounding error.
 						 */
-						class="chipbtn min-w-0 shrink-[100]"
+						class="chip-button min-w-0 shrink-[100]"
 						type="button"
 						disabled={props.disabled || props.models.length === 0}
 						aria-haspopup="menu"
@@ -153,9 +153,9 @@ export function ModelPicker(props: {
 						{/* The level only when there is one to show. "off" is a real answer and
 						    stays; a model with no scale at all has nothing to say here. */}
 						<Show when={levels().length > 0 ? props.model?.thinking : undefined}>
-							{(level) => <span class="sub max-[470px]:hidden">{level()}</span>}
+							{(level) => <span class="chip-sub max-[470px]:hidden">{level()}</span>}
 						</Show>
-						<Icon of={ChevronDown} size={10} class="chev" />
+						<Icon of={ChevronDown} size={10} class="chevron" />
 					</button>
 				);
 			}}
@@ -248,7 +248,7 @@ export function ModelPicker(props: {
 									pill is capped in `dock.css`, so a long provider name cannot go on eating
 									the row the names need.
 								*/}
-								<span class="pv" title={option.provider}>{option.provider}</span>
+								<span class="preview" title={option.provider}>{option.provider}</span>
 								<span class="min-w-0 flex-1 truncate">{option.label}</span>
 								<Show when={isCurrent(option)}>
 									<Icon of={Check} size={13} class="shrink-0 text-accent" />
@@ -272,11 +272,11 @@ export function ModelPicker(props: {
 				*/}
 				<div class="px-1.5 py-1">
 					<span class="meta">Thinking</span>
-					<div class="seg mt-1 w-full" data-scale="true">
+					<div class="segmented mt-1 w-full" data-scale="true">
 						<For each={levels()}>
 							{(level) => (
 								<button
-									/* `.seg`'s buttons carry no side padding of their own, being sized by
+									/* `.segmented`'s buttons carry no side padding of their own, being sized by
 									   the row they divide; seven words at 10px need it or the scale reads
 									   as one long run rather than as seven chips. */
 									class="px-1.5"
@@ -324,14 +324,14 @@ export function ModelPicker(props: {
 									disabled={!account.signedIn}
 									onClick={() => props.onAccount?.(account.id)}
 								>
-									<span class="ic">
+									<span class="row-icon">
 										<Show when={props.account === account.id}>
 											<Icon of={Check} size={13} />
 										</Show>
 									</span>
-									<span class="lb flex-1 truncate">{account.email ?? account.id}</span>
+									<span class="row-label flex-1 truncate">{account.email ?? account.id}</span>
 									<Show when={!account.signedIn}>
-										<span class="meta flex-none text-[10px]">signed out</span>
+										<span class="meta flex-none text-micro">signed out</span>
 									</Show>
 								</button>
 							)}

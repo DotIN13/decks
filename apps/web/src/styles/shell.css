@@ -120,12 +120,12 @@
 		height: 22px;
 		align-items: center;
 		justify-content: center;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: var(--fg);
 		color: var(--bg);
 	}
 	.panel-mark-name {
-		font-size: 13px;
+		font-size: var(--type-body);
 		font-weight: 600;
 	}
 
@@ -175,7 +175,7 @@
 		height: 26px;
 		padding: 0 8px;
 		border: 1px solid var(--color-accent);
-		border-radius: 8px;
+		border-radius: var(--control-radius);
 		background: var(--panel);
 		color: var(--fg);
 		font: inherit;
@@ -198,17 +198,17 @@
 	 * is the same 16px column the verbs under the rule put their icons in, so the names line
 	 * up with Rename and Move to… rather than sitting a dot's width to their left.
 	 */
-	.popover.canvas-menu .pill-canvas-row > .ic {
+	.popover.canvas-menu .pill-canvas-row > .row-icon {
 		display: grid;
 		flex: none;
 		width: 16px;
 		place-items: center;
 	}
-	.popover.canvas-menu .pill-canvas-row > .lb {
+	.popover.canvas-menu .pill-canvas-row > .row-label {
 		min-width: 0;
 		flex: 1;
 	}
-	.pill-name > .chev {
+	.pill-name > .chevron {
 		color: var(--muted);
 	}
 	@media (max-width: 640px) {
@@ -257,10 +257,10 @@
 		min-width: 15px;
 		height: 15px;
 		padding: 0 4px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--color-warn);
 		color: white;
-		font-size: 9.5px;
+		font-size: var(--type-tag);
 		line-height: 15px;
 		font-weight: 600;
 		text-align: center;
@@ -280,7 +280,7 @@
 		height: 22px;
 		align-items: center;
 		justify-content: center;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--fg);
 		color: var(--bg);
 	}
@@ -297,11 +297,11 @@
 		background: var(--line-strong);
 		opacity: 0.8;
 	}
-	.dockbox {
+	.composer-box {
 		position: relative;
 		cursor: grab;
 	}
-	.dock[data-dragging="true"] .dockbox {
+	.dock[data-dragging="true"] .composer-box {
 		cursor: grabbing;
 	}
 	.dock[data-dragging="true"] {
@@ -330,7 +330,7 @@
 		padding: 0;
 		border: 1px solid var(--border-strong);
 		border-right: 0;
-		border-radius: 12px 0 0 12px;
+		border-radius: var(--radius-panel, 12px) 0 0 12px;
 		background: var(--layer, var(--panel));
 		box-shadow: var(--shadow);
 		color: var(--muted);
@@ -361,7 +361,7 @@
 		gap: 6px;
 		margin: 0 0 5px 1px;
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 	.dock-to-chip {
 		display: inline-flex;
@@ -370,12 +370,12 @@
 		height: 22px;
 		padding: 0 5px 0 3px;
 		border: 1px solid var(--line);
-		border-radius: 7px;
+		border-radius: var(--radius-item);
 		background: var(--panel);
 		color: var(--fg);
 		cursor: pointer;
 		font: inherit;
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		font-weight: 600;
 		transition:
 			background-color 120ms ease,
@@ -412,7 +412,7 @@
 		border-radius: 50%;
 		background: var(--fg);
 		color: var(--bg);
-		font-size: 10px;
+		font-size: var(--type-micro);
 		font-weight: 700;
 	}
 
@@ -457,7 +457,7 @@
 	.stream[data-shown="true"] .stream-card,
 	.stream[data-shown="true"] .stream-bubble {
 		border: 1px solid var(--line);
-		border-radius: 8px;
+		border-radius: var(--control-radius);
 		background: var(--bg);
 		box-shadow: none;
 		color: var(--fg);
@@ -474,7 +474,7 @@
 		padding: 0 6px 0 12px;
 		margin: 0;
 		border-bottom: 1px solid var(--line);
-		font-size: 12px;
+		font-size: var(--type-ui);
 		pointer-events: auto;
 		cursor: grab;
 	}
@@ -486,7 +486,7 @@
 	}
 	.stream-head-state {
 		color: var(--muted);
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 	.stream-head-x {
 		margin-left: auto;
@@ -586,4 +586,53 @@
 	.dispatch-card-pic {
 		height: 120px;
 	}
+	/*
+ * One area, full height. There is no title bar to reserve a row for.
+ *
+ * This was a two-row grid, and deleting the header without changing it put `.work` into
+ * the 40px row the bar used to hold — so the canvas was 40px tall and the dock, anchored
+ * to its bottom, hung off the top of the window. The chrome floats over the canvas now,
+ * and floating means there is nothing to lay out around.
+ *
+ * The notch is handled where it is now relevant: each floating cluster pads itself by
+ * `env(safe-area-inset-*)`, which is also what makes them right in landscape, where the
+ * inset is on the side rather than the top.
+ */
+.app {
+	position: relative;
+	height: 100%;
+}
+	/*
+ * A bare `.dot` lived here — 8px, green, red when `[data-off]` — for the connection light in
+ * a title bar this app no longer has. Two elements wear the class now: the collaborator
+ * cursor, which draws its own below, and the panel row's on-canvas mark, which draws a 6px
+ * accent disc in a pseudo-element. The row's slot went 20px wide so a delete button could
+ * stand in exactly its place, and this rule promptly painted that whole slot green.
+ *
+ * Deleted rather than narrowed: a global class name with a colour in it and no owner is a
+ * booby trap for the next component that needs the word "dot".
+ */
+
+/*
+ * The canvas and everything floating over it, filling the window.
+ *
+ * `inset: 0` and not `height: 100%`, because every child of this is absolutely positioned
+ * — the stage, all the floats, the dock — so as a block in normal flow it measured *zero*
+ * high. Under the old two-row grid it was a grid item and got its height from `1fr`, which
+ * hid the problem; deleting the title bar exposed it, and the symptom was the dock hanging
+ * off the top of the window with the canvas invisible behind it.
+ */
+.work {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+}
+
+	/* The same rules, under the same query. */
+	@media (pointer: coarse) {
+	/* A 40px bar cannot hold a 44px target. */
+	.app {
+		grid-template-rows: calc(52px + env(safe-area-inset-top)) 1fr;
+	}
+}
 }

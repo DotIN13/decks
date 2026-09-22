@@ -7,9 +7,9 @@
  * lists and will appear in a third — while where the panel sits, how its header stacks and
  * what the header's gaps are are Tailwind utilities in `chrome/LeftPanel.tsx`.
  *
- * Nothing here re-states something `chrome.css` already says. The tabs are its `.seg`, the
+ * Nothing here re-states something `chrome.css` already says. The tabs are its `.segmented`, the
  * search field its `.field`, the section labels its `.meta`, the panel body its `.float`;
- * inventing `.panel-tabs` beside `.seg` is how two corners of the same window stop matching.
+ * inventing `.panel-tabs` beside `.segmented` is how two corners of the same window stop matching.
  *
  * ### The rhythm, and why the numbers are what they are
  *
@@ -189,7 +189,7 @@
 	 * its own rows stand on. Everything in the rail is centred in a 20px box and smaller than it — the
 	 * dot is 6px, the bin's icon 12px — so "the line" is always some ink inside the box, never the box.
 	 */
-	.panel-meta > .n {
+	.panel-meta > .count {
 		display: grid;
 		min-width: 20px;
 		padding-right: var(--count-inset, 4px);
@@ -199,7 +199,7 @@
 	}
 
 	/* The boards list's right-hand mark is the dot, whose circle ends seven pixels inside the box. */
-	.panel-list[data-tab="boards"] .panel-meta > .n {
+	.panel-list[data-tab="boards"] .panel-meta > .count {
 		--count-inset: 7px;
 	}
 
@@ -305,24 +305,24 @@
 	/*
 	 * Two overrides on the row vocabulary, and nothing else.
 	 *
-	 * `.rowlist` already gives the grid, the corner, the hover, the current wash, `.row-act`
+	 * `.row-list` already gives the grid, the corner, the hover, the current wash, `.row-act`
 	 * and the type scale — the board rows above are the same object, and re-implementing it
 	 * here is how two lists in one panel come to nearly match. What differs is only what has
 	 * to: the icon column is 28px rather than 16 because the avatar is worth seeing at that
 	 * size here, and the actions sit on the *first line* rather than centred in a row that
 	 * may be four lines tall.
 	 */
-	/* `.rowlist.agent-list`, not `.agent-list`: the vocabulary's own selector is
-	   `:is(.popover, .rowlist) [data-row]`, so matching its specificity would leave the
+	/* `.row-list.agent-list`, not `.agent-list`: the vocabulary's own selector is
+	   `:is(.popover, .row-list) [data-row]`, so matching its specificity would leave the
 	   winner to source order between two files. */
-	.rowlist.agent-list [data-row] {
+	.row-list.agent-list [data-row] {
 		padding: 7px 6px;
 		gap: 3px 9px;
 		grid-template-columns: 28px 1fr;
 	}
 
 	/* The avatar's slot: 28px and no top padding, where a 16px icon wanted one. */
-	.rowlist.agent-list [data-row] > .ic {
+	.row-list.agent-list [data-row] > .row-icon {
 		display: grid;
 		padding-top: 0;
 		place-items: center;
@@ -417,7 +417,7 @@
 	.agent-line > .ago {
 		margin-left: auto;
 		flex: none;
-		font-size: 10px;
+		font-size: var(--type-micro);
 		white-space: nowrap;
 	}
 
@@ -435,7 +435,7 @@
 		align-items: center;
 		gap: 5px;
 		color: var(--muted);
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 
 	/*
@@ -449,7 +449,7 @@
 	.agent-said {
 		overflow: hidden;
 		color: var(--faint);
-		font-size: 10.5px;
+		font-size: var(--type-hint);
 		line-height: 1.4;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -463,7 +463,7 @@
 	 * quiet signals in the place of one loud one, and the `title` on the row still says it
 	 * in words for anyone who asks.
 	 */
-	.agent-row[data-dormant] .lb {
+	.agent-row[data-dormant] .row-label {
 		color: var(--muted);
 		font-weight: 500;
 	}
@@ -489,7 +489,7 @@
 		flex: none;
 		place-items: center;
 		border: 0;
-		border-radius: 5px;
+		border-radius: var(--radius-thumb);
 		background: transparent;
 		color: var(--faint);
 		cursor: pointer;
@@ -563,7 +563,7 @@
 		width: 78px;
 		flex: none;
 		color: var(--muted);
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 	.agent-edit-v {
 		display: flex;
@@ -583,7 +583,7 @@
 	.agent-edit-err {
 		margin: -2px 0 0;
 		color: var(--color-danger);
-		font-size: 11px;
+		font-size: var(--type-note);
 		line-height: 1.4;
 	}
 	/* The picker wears the field's shape, so the three rows line up as three fields. */
@@ -600,7 +600,7 @@
 		color: var(--fg);
 		cursor: pointer;
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		text-align: left;
 	}
 	.agent-edit-pick > svg {
@@ -611,12 +611,12 @@
 	}
 	.agent-edit-pick-v {
 		font-family: var(--font-mono);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 	.agent-edit-pick-v[data-none] {
 		color: var(--faint);
 		font-family: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 	.agent-edit .tag {
 		display: inline-flex;
@@ -632,7 +632,7 @@
 		flex: none;
 		place-items: center;
 		border: 0;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: transparent;
 		color: inherit;
 		cursor: pointer;
@@ -712,7 +712,7 @@
 	 * column itself now, and it is the only line that needs to.
 	 */
 	@media (hover: none) {
-		.rowlist.agent-list .row-act:has([data-yield]):not(:has(> .close)) {
+		.row-list.agent-list .row-act:has([data-yield]):not(:has(> .close)) {
 			padding-right: 4px;
 		}
 	}
@@ -732,7 +732,7 @@
 		color: var(--fg);
 		cursor: pointer;
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		text-align: left;
 		transition:
 			background-color 120ms ease,
@@ -760,11 +760,11 @@
 
 	/* Held but not shown. The old rail said this with 45% opacity on a picture, which made a
 	   list look switched off; on a text row it is simply the fainter colour. */
-	.board-row[data-dim="true"] > .nm {
+	.board-row[data-dim="true"] > .row-name {
 		color: var(--faint);
 	}
 
-	.board-row > .nm {
+	.board-row > .row-name {
 		overflow: hidden;
 		min-width: 0;
 		flex: 1;
@@ -778,7 +778,7 @@
 	 * The same object a menu row is — a box holding the row and one small button, so that
 	 * pressing the button is not pressing the row, and so that a `<button>` is not nested
 	 * inside a `<button>`. It is spelled again here rather than reusing `.row-act` from
-	 * `chrome.css` because that one is scoped to `:is(.popover, .rowlist)`, whose `[data-row]`
+	 * `chrome.css` because that one is scoped to `:is(.popover, .row-list)`, whose `[data-row]`
 	 * is a 16px/1fr grid with 7px of padding: pulling this list into that scope would restyle
 	 * all seventy-eight board rows as menu rows.
 	 *
@@ -839,7 +839,7 @@
 		height: 20px;
 		padding: 0;
 		border: 0;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: none;
 		color: var(--faint);
 		cursor: pointer;
@@ -882,7 +882,7 @@
 		height: 20px;
 		padding: 0;
 		border: 0;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: none;
 		color: var(--faint);
 		cursor: pointer;
@@ -1022,7 +1022,7 @@
 	.board-row > .dot::before {
 		width: 6px;
 		height: 6px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--color-accent);
 		content: "";
 		transition: opacity 120ms ease;
@@ -1083,7 +1083,7 @@
 		flex-direction: column;
 		padding: 0;
 		border: 1px solid var(--line);
-		border-radius: 8px;
+		border-radius: var(--control-radius);
 		background: var(--bg);
 		color: var(--fg);
 		cursor: pointer;
@@ -1120,15 +1120,15 @@
 		object-position: 0 0;
 	}
 
-	.board-tile > .cap {
+	.board-tile > .tile-caption {
 		overflow: hidden;
 		padding: 4px 6px;
-		font-size: 10.5px;
+		font-size: var(--type-hint);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
-	.board-tile[data-dim="true"] > .cap {
+	.board-tile[data-dim="true"] > .tile-caption {
 		color: var(--faint);
 	}
 
@@ -1155,4 +1155,113 @@
 		color: var(--color-accent);
 		white-space: nowrap;
 	}
+	/* --- floating panels -------------------------------------------------------- */
+
+.panel-float {
+	position: absolute;
+	border: 1px solid var(--line);
+	border-radius: var(--radius-panel, 12px);
+	background: var(--panel);
+	box-shadow: var(--shadow);
+}
+	/* --- palette and picker ----------------------------------------------------- */
+
+/*
+ * A horizontal strip at the top, clear of both panels.
+ *
+ * It used to sit at the left edge, which put it inside the reach that summons the
+ * agent list — you could not move to the palette without calling up the panel that
+ * then covered it.
+ */
+/*
+ * The tool group, which is no longer a float of its own — and no longer has any rules.
+ *
+ * It was `.panel-float.palette`, absolutely positioned at `top: 12px; left: 50%` with a
+ * translate — the free-standing palette that sat under the title bar. The tools live inside
+ * the top-left pill now, and `palette` survives only as the handle the canvas checks
+ * address the group by.
+ *
+ * There was a second icon-button vocabulary here: `.palette button` at 30px with its own
+ * hover and its own `[data-active="true"]` accent fill. Every one of those declarations was
+ * wrong by the time it was read.
+ *
+ * - **30px, unlayered.** The five tools were 30px in a pill of 28px buttons, so the hover
+ *   wash on a tool was two pixels bigger than the hover wash beside it. `@layer components`
+ *   holds `.icon-button`, and an unlayered rule beats a layered one however specific — which is
+ *   also why nobody found this by reading `.icon-button`.
+ * - **`:hover` beating `[data-on]`.** For the same reason, hovering the *selected* tool
+ *   replaced its accent fill with grey: the layered `[data-on="true"]` lost to this. A
+ *   control saying "on" and then saying "not on" while your cursor is on it is the worst
+ *   available answer.
+ * - **`[data-active]` was a dead name.** The markup has said `data-on` since the tools moved
+ *   into the pill, so the accent fill here had not applied to anything in months.
+ *
+ * The tools are `.icon-button`, like every other icon button in the app. That is the whole rule.
+ */
+
+/* --- the inspector ----------------------------------------------------------- */
+
+/*
+ * The selection's properties (§6.5). Top right, not beside the palette: the notices
+ * land under the palette, and the palette is a row of 30px targets that a column of
+ * fields does not belong in.
+ *
+ * `right: 12px` is the edge every float on this side uses — the tool cluster directly above
+ * it, and the conversation. It was 30px, to clear a timeline spine hard against that edge;
+ * nothing has rendered `.turnbar` since the rewrite, and with the two panels now stacked
+ * vertically, 18px of daylight between their right edges reads as a misalignment rather
+ * than as clearance.
+ *
+ * Only the shell is here. Everything inside the panel is utilities in `Inspector.tsx`;
+ * what stays is the corner, which is stated twice — here, and again as a bottom sheet on
+ * a narrow screen — in `env()` and `--dock` terms a class attribute says badly.
+ */
+.inspector {
+	/*
+	 * Under the corner cluster, not beside it.
+	 *
+	 * `top: 12px` put the panel's header on the same line as the tool pill, and at 320px
+	 * wide from `right: 30px` the two overlapped outright — the pill drew over the name of
+	 * the thing being edited. `--inset-top` is what the pill measures itself as (`data-inset`
+	 * on it, `camera/insets.ts` publishing the sum), so this follows it when the pill changes
+	 * height or folds, instead of restating a number that only holds for one arrangement.
+	 */
+	top: calc(var(--inset-top, 52px) + 8px);
+	right: 12px;
+	display: flex;
+	width: 236px;
+	flex-direction: column;
+	padding: 8px;
+	gap: 6px;
+	font-size: var(--type-ui);
+}
+
+	/* The same rules, under the same query. */
+	@media (max-width: 760px) {
+	/*
+	 * The inspector becomes a bottom sheet, and this is the one place the desktop's
+	 * reasoning does not survive the screen getting smaller.
+	 *
+	 * Top right is right on a laptop: it is out of the way of the boards and clear of the
+	 * chat panel's reach (§6.5). Across the top of a phone it is *in the way of the tap
+	 * that opened it* — you tap a component, a panel appears over the place your finger
+	 * just was, and your next tap lands on a class switch you never meant to touch. That
+	 * is not a hypothetical; it is what the first version of this rule did, and it wrote a
+	 * revision each time. At the bottom the sheet is where the hand already is and the
+	 * component it describes stays visible above it.
+	 *
+	 * It takes the zoom controls' place while it is up rather than stacking above them.
+	 * Zooming has fingers to do it with, so the camera buttons are the thing that can be
+	 * missing for a moment; two floating panels in one corner is neither of them usable.
+	 */
+	.inspector {
+		top: auto;
+		bottom: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
+		right: max(8px, env(safe-area-inset-right));
+		left: max(8px, env(safe-area-inset-left));
+		width: auto;
+		max-height: 42vh;
+		overflow-y: auto;
+	}
+}
 }

@@ -150,7 +150,7 @@ export function AgentEdit(props: {
 					{props.face}
 					<span class="set-head-title">{props.name}</span>
 					<span class="flex-1" />
-					<button class="iconbtn [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+					<button class="icon-button [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
 						<Icon of={X} size={15} />
 					</button>
 				</header>
@@ -166,7 +166,7 @@ export function AgentEdit(props: {
 									aria-label="Agent name"
 									aria-invalid={taken()}
 									spellcheck={false}
-									class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
+									class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
 									maxLength={40}
 									value={name()}
 									onInput={(event) => setName(event.currentTarget.value)}
@@ -221,7 +221,7 @@ export function AgentEdit(props: {
 									<input
 										type="text"
 										spellcheck={false}
-										class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
+										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
 										placeholder="Add a tag"
 										aria-label="Add a tag"
 										value={draft()}
@@ -312,7 +312,7 @@ function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (w
 									if (!current()) props.onPick(workspace || null);
 								}}
 							>
-								<span class="lb flex-1">{workspace || NO_WORKSPACE}</span>
+								<span class="row-label flex-1">{workspace || NO_WORKSPACE}</span>
 								<Show when={current()}>
 									<Icon of={Check} size={11} class="text-accent" />
 								</Show>
@@ -321,7 +321,7 @@ function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (w
 					}}
 				</For>
 				<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="canvas-menu-new" onClick={() => setMaking(true)}>
-					<span class="lb flex-1">New workspace…</span>
+					<span class="row-label flex-1">New workspace…</span>
 				</button>
 			</Show>
 		</Popover>

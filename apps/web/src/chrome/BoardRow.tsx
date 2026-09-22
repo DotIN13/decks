@@ -130,7 +130,7 @@ export function BoardRow(props: {
 				}}
 			>
 				<BoardThumb board={props.board} />
-				<span class="nm">{name()}</span>
+				<span class="row-name">{name()}</span>
 				<Show when={props.onCanvas}>
 					{/* Decorative: "on the canvas" is already said by the section this row is in. */}
 					<span class="dot" aria-hidden="true" />

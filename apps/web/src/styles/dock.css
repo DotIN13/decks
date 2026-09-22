@@ -58,7 +58,7 @@
 	 * order, and a 12px corner arriving because of an import order is the kind of bug
 	 * nobody thinks to look for.
 	 */
-	.dockbox {
+	.composer-box {
 		transition:
 			border-color 120ms ease,
 			box-shadow 120ms ease;
@@ -77,7 +77,7 @@
 	 * the mode chip and the model chip are inside the box too, and lighting the whole box
 	 * up when somebody tabs to a picker says "you are typing" when they are not.
 	 */
-	.dockbox:has(.dockfield:focus) {
+	.composer-box:has(.dockfield:focus) {
 		border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
 		box-shadow:
 			0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent),
@@ -96,7 +96,7 @@
 		background: none;
 		color: var(--fg);
 		font: inherit;
-		font-size: 13px;
+		font-size: var(--type-body);
 		line-height: 1.45;
 		outline: none;
 		resize: none;
@@ -144,13 +144,13 @@
 	/*
 	 * The controls row, and the two sizes the board fixes for it.
 	 *
-	 * Set as custom properties rather than as widths, so `.iconbtn` and `.chipbtn` come
+	 * Set as custom properties rather than as widths, so `.icon-button` and `.chip-button` come
 	 * from `chrome.css` unmodified and there is still exactly one definition of what an
 	 * icon button is. 26px because these sit inside a card rather than in a toolbar — the
 	 * same reasoning `--control-md` was invented for, applied to the icon-only button next
 	 * to the labelled ones so that the three read as one row of three.
 	 */
-	.dockrow {
+	.dock-row {
 		--control: 26px;
 		--control-md: 26px;
 		--control-radius: 7px;
@@ -159,7 +159,7 @@
 	/*
 	 * A chip in this row gives ground; a chip in a pill does not.
 	 *
-	 * `.chipbtn` is `flex: none` (`chrome.css`), which is right where it was written: the
+	 * `.chip-button` is `flex: none` (`chrome.css`), which is right where it was written: the
 	 * corner's pill is `w-max`, so a chip that could shrink would be a chip shrinking for no
 	 * reason. This row is the other case — a fixed-width card with a model name in it, and a
 	 * model name is whatever the runtime calls it. `claude-opus-4-1-20250805-extended-thinking`
@@ -175,12 +175,12 @@
 	 * will not go below its min-content width unless it is told it may, and `truncate` has no
 	 * effect on a box that is never narrower than its text.
 	 */
-	.dockrow .chipbtn {
+	.dock-row .chip-button {
 		flex: 0 1 auto;
 		min-width: 0;
 	}
 
-	.dockrow .chipbtn > span {
+	.dock-row .chip-button > span {
 		min-width: 0;
 	}
 
@@ -193,7 +193,7 @@
 	 * it belongs to.
 	 */
 	@media (pointer: coarse) {
-		.dockrow {
+		.dock-row {
 			--control: 34px;
 			--control-md: 34px;
 		}
@@ -210,7 +210,7 @@
 	 * reflow when a turn starts or ends. Two buttons that swapped places would move the
 	 * thing you were about to press.
 	 */
-	.sendbtn {
+	.send-button {
 		display: grid;
 		flex: none;
 		place-items: center;
@@ -230,29 +230,29 @@
 			opacity 120ms ease;
 	}
 
-	.sendbtn:hover {
+	.send-button:hover {
 		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
 	}
 
 	@media (pointer: coarse) {
-		.sendbtn {
+		.send-button {
 			width: 40px;
 			height: 40px;
 		}
 	}
 
-	.sendbtn:focus-visible {
+	.send-button:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
 	}
 
 	/* Stop is danger-coloured; it is the one control here that undoes rather than does. */
-	.sendbtn[data-stop="true"] {
+	.send-button[data-stop="true"] {
 		background: var(--color-danger);
 	}
 
 	/* Nothing to send: outlined and faint, the same rest state as every chip beside it. */
-	.sendbtn[disabled] {
+	.send-button[disabled] {
 		background: transparent;
 		box-shadow: inset 0 0 0 1px var(--line);
 		color: var(--faint);
@@ -268,9 +268,9 @@
 	 * should disappear as the bar narrows, because half a hint is worse than no hint. The
 	 * ranks are variants in the markup, since only a utility can win against a utility.
 	 */
-	.hintrow {
+	.hint-row {
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 
 	.hint {
@@ -293,18 +293,18 @@
 		content: "·";
 	}
 
-	.hintrow kbd {
+	.hint-row kbd {
 		display: inline-grid;
 		box-sizing: border-box;
 		min-width: 16px;
 		height: 15px;
 		padding: 0 4px;
 		border: 1px solid var(--line-strong);
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: var(--panel);
 		color: var(--muted);
 		font: inherit;
-		font-size: 10px;
+		font-size: var(--type-micro);
 		place-items: center;
 	}
 
@@ -314,7 +314,7 @@
 	 * It was `.dial` — a 16px arc and a percentage at the end of the hint row, ambient and
 	 * only alarming over 70%. The reading now lives in the corner's `⋯` as a row of numbers
 	 * (`chat/composer/ContextSummary.tsx`) and the warning lives on the `⋯` button itself, which is
-	 * `.iconbtn[data-level]` in `chrome.css`. Nothing here draws a ring any more, so the
+	 * `.icon-button[data-level]` in `chrome.css`. Nothing here draws a ring any more, so the
 	 * fifty lines that did are deleted rather than kept warm.
 	 */
 
@@ -345,28 +345,28 @@
 	 */
 	/* Same chip, same ground as a tag and a runtime word — `--fill` in `index.css` says why
 	   the three of them stopped using the hairline colour. */
-	.popover .pv {
+	.popover .preview {
 		max-width: 72px;
 		flex: none;
 		padding: 1px 5px;
 		overflow: hidden;
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: var(--fill);
 		color: var(--faint);
-		font-size: 10px;
+		font-size: var(--type-micro);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
 	/*
-	 * The thinking scale, which is a `.seg` with one thing changed.
+	 * The thinking scale, which is a `.segmented` with one thing changed.
 	 *
-	 * `.seg`'s chosen tab is a raised panel-coloured chip, which reads perfectly among two
+	 * `.segmented`'s chosen tab is a raised panel-coloured chip, which reads perfectly among two
 	 * or three options and disappears among seven at 10px — the eye has to compare shadows
 	 * across the row to find it. Filled with the accent instead, so the current level is
 	 * findable in one glance, which is the only thing this row is ever asked.
 	 */
-	.seg[data-scale="true"] > button[data-on="true"] {
+	.segmented[data-scale="true"] > button[data-on="true"] {
 		background: var(--color-accent);
 		color: #fff;
 		box-shadow: none;
@@ -387,21 +387,21 @@
 	 * modal the rows rendered as "Used148,000" with no gap and the bar was invisible — the
 	 * component was in a container it had never been dressed for.
 	 */
-	:is(.popover, .usage-modal) .kv {
+	:is(.popover, .usage-modal) .pair {
 		display: flex;
 		align-items: center;
 		padding: 4px 8px;
 		gap: 8px;
 		color: var(--muted);
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 
-	:is(.popover, .usage-modal) .kv > .k {
+	:is(.popover, .usage-modal) .pair > .kv-key {
 		flex: 1;
 		color: var(--faint);
 	}
 
-	:is(.popover, .usage-modal) .kv > .v {
+	:is(.popover, .usage-modal) .pair > .kv-value {
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -416,14 +416,14 @@
 	/* The track under it: the ring unrolled, for a reading the arc can only approximate. */
 	:is(.popover, .usage-modal) .track {
 		height: 5px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--line);
 	}
 
 	:is(.popover, .usage-modal) .track > i {
 		display: block;
 		height: 5px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--color-accent);
 	}
 
@@ -456,12 +456,12 @@
 		padding: 0 8px;
 		gap: 8px;
 		border: 0;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: transparent;
 		color: var(--fg);
 		cursor: pointer;
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		text-align: left;
 	}
 
@@ -522,12 +522,12 @@
 		gap: 5px;
 		padding: 1px 4px;
 		border: 0;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: none;
 		color: var(--faint);
 		cursor: pointer;
 		font: inherit;
-		font-size: 11px;
+		font-size: var(--type-note);
 		font-variant-numeric: tabular-nums;
 		transition:
 			background-color 120ms ease,
@@ -573,13 +573,13 @@
 	/*
 	 * The switch, drawn rather than borrowed.
 	 *
-	 * It was written as `.popover .sw` for a menu row and then never used by one — dead CSS
+	 * It was written as `.popover .switch` for a menu row and then never used by one — dead CSS
 	 * describing a control the app did not have. The notifications grid is its first caller
 	 * (`alerts/AlertSettings.tsx`, three of them), so the `.popover` prefix came off rather than
 	 * a second one going on: a switch is a control, not a property of the menu it was
 	 * invented in.
 	 */
-	.sw {
+	.switch {
 		box-sizing: border-box;
 		/* It is a real `<button>` at its one call site, so the three declarations a browser
 		   would otherwise supply have to be undone here rather than at the markup. */
@@ -590,25 +590,104 @@
 		height: 15px;
 		flex: none;
 		padding: 2px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--line-strong);
 		transition: background-color 120ms ease;
 	}
 
-	.sw[data-on="true"] {
+	.switch[data-on="true"] {
 		background: var(--color-accent);
 	}
 
-	.sw > i {
+	.switch > i {
 		display: block;
 		width: 11px;
 		height: 11px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--panel);
 		transition: margin-left 120ms ease;
 	}
 
-	.sw[data-on="true"] > i {
+	.switch[data-on="true"] > i {
 		margin-left: 11px;
 	}
+	/* --- the composer ----------------------------------------------------------- */
+
+/*
+ * The dock: the last reply, a question if one is waiting, and the input bar.
+ *
+ * One bottom-centred stack rather than three separately-positioned things, so a question
+ * appearing pushes the reply up instead of landing on top of it, and none of them has to
+ * know the height of the others.
+ */
+.dock {
+	position: absolute;
+	/*
+	 * Above the conversation, which is `--z-conversation` (9).
+	 *
+	 * The column floats over the boards and stops 8px short of this bar, so the two only
+	 * meet when a card is mid-slide or the window is short — and when they met, the history
+	 * won, because this had no z-index at all and a positioned element without one paints at
+	 * 0. The bar you type into is not something a transcript may cover.
+	 *
+	 * `--z-chrome` (10) and not 11: the boards panel is on the same layer and comes later in
+	 * the document, so on a phone — where it is a full-height sheet — it still covers this,
+	 * which is the arrangement the sheet was drawn for.
+	 */
+	z-index: var(--z-chrome);
+	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
+	/* Centred on the canvas column, not on the window — see the note below. */
+	left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);
+	/* It slides when a panel opens. Fast enough not to be a wait, slow enough to read as
+	   the bar moving rather than jumping to a new place. */
+	transition: left 160ms ease;
+	display: flex;
+	/*
+	 * Centred on the canvas column: the window minus whatever the chrome is covering.
+	 *
+	 * It used to be centred on the *window* with twice-224px subtracted from its width —
+	 * a constant standing in for the board rail plus its margins. That was exact for one
+	 * arrangement and wrong for every other, and it is the mistake `camera/insets.ts` exists
+	 * to stop: a panel's width stated twice drifts the first time someone changes its
+	 * padding.
+	 *
+	 * Anchoring it to a panel's *state* used to be worse than the constant, because the
+	 * panel opened on cursor proximity and the bar would have slid sideways as you
+	 * reached for it. Proximity is gone — the panel has a button now — so a slide is a
+	 * response to something you pressed, which is legible, and 160ms is enough to read it
+	 * as movement.
+	 *
+	 * **Only the boards panel is in this sum**, because it is the only chrome that stands
+	 * *beside* the canvas. The conversation floats over the boards, so summoning it never
+	 * moves the bar. The inspector used to be subtracted too, on the argument that it
+	 * arrives on its own rather than being summoned — but it is a card in the top-right
+	 * corner now, and every click on a component slid this bar 160px sideways to report a
+	 * selection. A surface has to stand beside the canvas to move what is centred on it.
+	 *
+	 * The 64px is a gutter, and the clamp is a floor: under about 770px the subtraction
+	 * goes negative, and a dock 0 pixels across is not a degraded input bar but an
+	 * invisible one. Under 1100px the media query at the end of this file goes full-width
+	 * instead, which is where the floor stops mattering.
+	 */
+	width: min(720px, max(320px, calc(100% - var(--inset-left, 0px) - var(--inset-right, 0px) - 64px)));
+	flex-direction: column;
+	align-items: stretch;
+	gap: 8px;
+	transform: translateX(-50%);
+	/* The stack is a frame around its children; only the children take clicks. */
+	pointer-events: none;
+}
+	.dock > * {
+	pointer-events: auto;
+}
+
+	/* The same rules, under the same query. */
+	@media (max-width: 1100px) {
+	.dock {
+		left: max(12px, env(safe-area-inset-left));
+		right: max(12px, env(safe-area-inset-right));
+		width: auto;
+		transform: none;
+	}
+}
 }

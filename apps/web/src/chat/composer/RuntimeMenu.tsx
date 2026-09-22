@@ -37,7 +37,7 @@ export function RuntimeMenu(props: { kind: AgentKind | undefined; onKind: (kind:
 				return (
 					<button
 						ref={api.ref}
-						class="chipbtn runtime-chip min-w-0 shrink-0"
+						class="chip-button runtime-chip min-w-0 shrink-0"
 						type="button"
 						aria-haspopup="menu"
 						aria-expanded={api.open}
@@ -47,7 +47,7 @@ export function RuntimeMenu(props: { kind: AgentKind | undefined; onKind: (kind:
 					>
 						<Show when={props.kind}>{(kind) => <AgentMark class="flex-none" agent={kind()} size={13} />}</Show>
 						<span class="max-w-[96px] truncate max-[560px]:hidden">{current()?.label ?? props.kind ?? "Runtime"}</span>
-						<Icon of={ChevronDown} size={10} class="chev" />
+						<Icon of={ChevronDown} size={10} class="chevron" />
 					</button>
 				);
 			}}
@@ -69,14 +69,14 @@ export function RuntimeMenu(props: { kind: AgentKind | undefined; onKind: (kind:
 						}}
 					>
 						<AgentMark class="flex-none" agent={runtime.kind} size={13} />
-						<span class="lb flex-1">
+						<span class="row-label flex-1">
 							{runtime.label}
 							<Show when={runtime.kind === props.kind}>
 								<Icon of={Check} size={11} class="text-accent" />
 							</Show>
 						</span>
 						<Show when={!runtime.available}>
-							<span class="flex-none text-[11px] text-faint">not installed</span>
+							<span class="flex-none text-note text-faint">not installed</span>
 						</Show>
 					</button>
 				)}

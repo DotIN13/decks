@@ -179,9 +179,9 @@ function AgentChoices(props: { onPick: (kind: AgentKind) => void }) {
 					{/* `flex-none`: an `<svg>` in a flex row shrinks to nothing beside a
 					    `flex-1` label, and has. */}
 					<AgentMark class="flex-none" agent={runtime.kind} size={13} />
-					<span class="lb flex-1">New {runtime.label} agent</span>
+					<span class="row-label flex-1">New {runtime.label} agent</span>
 					<Show when={!runtime.available}>
-						<span class="flex-none text-[11px] text-faint">not installed</span>
+						<span class="flex-none text-note text-faint">not installed</span>
 					</Show>
 				</button>
 			)}
@@ -447,14 +447,14 @@ export function AgentMenu(props: {
 							>
 								<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} size={20} ring={1.5} />
 								{/*
-									`block`, because `.lb` is a flex row and `text-overflow` does not apply to
+									`block`, because `.row-label` is a flex row and `text-overflow` does not apply to
 									one — a long name would have overflowed the row rather than ellipsing.
 
 									`nm` keeps the name at 600 where the rest of this menu's labels are 400: a
 									row you pick an *agent* from is not a row you pick a command from. See
 									`chrome.css`, where both halves of that are stated together.
 								*/}
-								<span class="lb nm block truncate">{name()}</span>
+								<span class="row-label row-name block truncate">{name()}</span>
 								{/*
 									Which runtime, in the word the server uses. The chip the panel row and the
 									hover card also wear, so the three surfaces name a runtime identically —
@@ -469,7 +469,7 @@ export function AgentMenu(props: {
 									in `chrome.css`, which is also where the touch case lives, since there is
 									nothing to approach with on a phone and the slot simply stays open.
 								*/}
-								<span class="meta flex-none text-[10px] tabular-nums" data-yield>{rowWords(status(), chat.state, chat.lastAt)}</span>
+								<span class="meta flex-none text-micro tabular-nums" data-yield>{rowWords(status(), chat.state, chat.lastAt)}</span>
 							</button>
 
 							{/*
@@ -524,7 +524,7 @@ export function AgentMenu(props: {
 				<Show
 					when={props.onMore}
 					fallback={
-						<p class="m-0 px-2 py-1.5 text-[11px] leading-normal text-faint">
+						<p class="m-0 px-2 py-1.5 text-note leading-normal text-faint">
 							{listed().more} more {listed().more === 1 ? "agent" : "agents"} — open the Agents panel.
 						</p>
 					}
@@ -532,10 +532,10 @@ export function AgentMenu(props: {
 					{(more) => (
 						<button type="button" role="menuitem" data-row data-flat="true" class="agent-menu-more" onClick={() => more()()}>
 							<Icon of={PanelLeft} size={13} class="flex-none text-muted" />
-							<span class="lb flex-1 whitespace-nowrap">
+							<span class="row-label flex-1 whitespace-nowrap">
 								{listed().more} more {listed().more === 1 ? "agent" : "agents"}
 							</span>
-							<span class="meta flex-none text-[10px]">Agents panel</span>
+							<span class="meta flex-none text-micro">Agents panel</span>
 						</button>
 					)}
 				</Show>
@@ -572,7 +572,7 @@ export function AgentMenu(props: {
 				onClick={() => setPicking((was) => !was)}
 			>
 				<Icon of={Plus} size={13} class="flex-none text-muted" />
-				<span class="lb flex-1 whitespace-nowrap">New agent</span>
+				<span class="row-label flex-1 whitespace-nowrap">New agent</span>
 				<Icon of={ChevronDown} size={11} class="flex-none text-muted" />
 			</button>
 
@@ -715,7 +715,7 @@ export function AgentPill(props: {
 			 */}
 			<button
 				type="button"
-				class="iconbtn"
+				class="icon-button"
 				data-on={props.boardsOpen ? "soft" : undefined}
 				aria-pressed={props.boardsOpen}
 				title="Boards (⌘\)"
@@ -740,7 +740,7 @@ export function AgentPill(props: {
 			<span class="pill-home" data-on={onStage() ? "true" : undefined} aria-hidden={!onStage()}>
 				<button
 					type="button"
-					class="chipbtn pill-home-btn max-[480px]:hidden"
+					class="chip-button pill-home-btn max-[480px]:hidden"
 					title="Back to the dashboard (Esc)"
 					aria-label="Home: back to the dashboard"
 					tabindex={onStage() ? 0 : -1}
@@ -757,7 +757,7 @@ export function AgentPill(props: {
 				    meeting and overlapping. The badge rides on its corner. */}
 				<button
 					type="button"
-					class="iconbtn pill-home-icon hidden max-[480px]:grid"
+					class="icon-button pill-home-icon hidden max-[480px]:grid"
 					title="Back to the dashboard"
 					aria-label="Home: back to the dashboard"
 					tabindex={onStage() ? 0 : -1}
@@ -816,7 +816,7 @@ export function AgentPill(props: {
 			<Show when={onStage()}>
 			<button
 				type="button"
-				class="iconbtn"
+				class="icon-button"
 				/*
 				 * `soft` — the grey wash the panel toggle wears, not the accent fill.
 				 *
@@ -845,7 +845,7 @@ export function AgentPill(props: {
 			<Show when={props.mode === "browse"}>
 				<button
 					type="button"
-					class="iconbtn"
+					class="icon-button"
 					data-on={props.drawing ? "soft" : undefined}
 					aria-pressed={props.drawing}
 					title={props.drawing ? "Stop drawing" : "Draw on the boards"}
@@ -882,7 +882,7 @@ export function AgentPill(props: {
 					{(entry) => (
 						<button
 							type="button"
-							class="iconbtn"
+							class="icon-button"
 							data-on={props.tool === entry.tool ? "true" : undefined}
 							aria-pressed={props.tool === entry.tool}
 							title={`${entry.label} (${entry.key})`}
@@ -910,7 +910,7 @@ export function AgentPill(props: {
 					trigger={(api) => (
 						<button
 							type="button"
-							class="iconbtn"
+							class="icon-button"
 							ref={api.ref}
 							aria-haspopup="menu"
 							aria-expanded={api.open}
@@ -934,8 +934,8 @@ export function AgentPill(props: {
 								onClick={() => props.onTool(entry.tool)}
 							>
 								<Icon of={entry.icon} size={14} class="flex-none text-muted" />
-								<span class="lb flex-1">{entry.label}</span>
-								<span class="meta flex-none text-[10px]">{entry.key}</span>
+								<span class="row-label flex-1">{entry.label}</span>
+								<span class="meta flex-none text-micro">{entry.key}</span>
 							</button>
 						)}
 					</For>
@@ -954,8 +954,8 @@ export function AgentPill(props: {
 								<span class="rule hidden max-[640px]:block" />
 								<button type="button" role="menuitem" data-row data-flat="true" onClick={() => undo()()} class="hidden max-[640px]:flex">
 									<Icon of={Undo2} size={14} class="flex-none text-muted" />
-									<span class="lb flex-1">Undo the last edit</span>
-									<span class="meta flex-none text-[10px]">⌘Z</span>
+									<span class="row-label flex-1">Undo the last edit</span>
+									<span class="meta flex-none text-micro">⌘Z</span>
 								</button>
 							</>
 						)}
@@ -977,7 +977,7 @@ export function AgentPill(props: {
 						<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
 						<button
 							type="button"
-							class="iconbtn max-[640px]:hidden"
+							class="icon-button max-[640px]:hidden"
 							title="Undo the last edit to this board (⌘Z)"
 							aria-label="Undo the last edit to this board"
 							onClick={() => undo()()}
@@ -1065,7 +1065,7 @@ function CanvasSegment(props: {
 						return (
 							<button
 								type="button"
-								class="chipbtn pill-name"
+								class="chip-button pill-name"
 								ref={api.ref}
 								aria-haspopup="menu"
 								aria-expanded={api.open}
@@ -1075,7 +1075,7 @@ function CanvasSegment(props: {
 								onClick={api.toggle}
 							>
 								<span class="truncate">{props.name}</span>
-								<Icon of={ChevronDown} size={11} class="chev flex-none" />
+								<Icon of={ChevronDown} size={11} class="chevron flex-none" />
 							</button>
 						);
 					}}
@@ -1116,25 +1116,25 @@ function CanvasSegment(props: {
 												if (canvas.id !== props.id) props.onOpen?.(canvas.id);
 											}}
 										>
-											<span class="ic">
+											<span class="row-icon">
 												<Show when={canvas.id !== props.id && isNews(canvas)}>
 													<span class="pill-canvas-news" aria-label="Something new here" />
 												</Show>
 											</span>
-											<span class="lb nm block truncate">{canvas.name}</span>
+											<span class="row-label row-name block truncate">{canvas.name}</span>
 											{/* The room you are in is the washed row, and that is all it says: no word beside it. */}
 											<Show when={canvas.id !== props.id && canvas.boards.length > 0}>
-												<span class="meta flex-none text-[10px]">{`${canvas.boards.length} board${canvas.boards.length === 1 ? "" : "s"}`}</span>
+												<span class="meta flex-none text-micro">{`${canvas.boards.length} board${canvas.boards.length === 1 ? "" : "s"}`}</span>
 											</Show>
 										</button>
 									)}
 								</For>
 								<Show when={props.onNew}>
 									<button type="button" role="menuitem" data-row data-flat="true" class="pill-canvas-row" onClick={() => props.onNew?.()}>
-										<span class="ic">
+										<span class="row-icon">
 											<Icon of={Plus} size={13} />
 										</span>
-										<span class="lb">New canvas…</span>
+										<span class="row-label">New canvas…</span>
 									</button>
 								</Show>
 							</>

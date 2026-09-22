@@ -11,8 +11,8 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 
 /** Where you are, and where you would be if there were nothing here: the same quiet grey. */
-const WHERE = "overflow-hidden font-mono text-[11px] text-ellipsis whitespace-nowrap text-faint";
-const EMPTY = "p-2.5 text-[11px] text-faint";
+const WHERE = "overflow-hidden font-mono text-note text-ellipsis whitespace-nowrap text-faint";
+const EMPTY = "p-2.5 text-note text-faint";
 
 interface BrowseEntry {
 	name: string;
@@ -110,7 +110,7 @@ export function FilePicker(props: {
 					<Show when={listing()?.parent} fallback={<span class={WHERE}>roots</span>}>
 						{(parent) => (
 							<button
-								class="flex items-center gap-[3px] py-[3px] pr-[9px] pl-1.5 text-[11px] pointer-coarse:min-h-[38px]"
+								class="flex items-center gap-[3px] py-[3px] pr-[9px] pl-1.5 text-note pointer-coarse:min-h-[38px]"
 								type="button"
 								onClick={() => setAt(parent())}
 							>
@@ -140,7 +140,7 @@ export function FilePicker(props: {
 							}}
 						/>
 						<button
-							class="add ml-auto flex items-center gap-[3px] py-[3px] pr-[9px] pl-1.5 text-[11px] whitespace-nowrap disabled:cursor-default disabled:text-faint pointer-coarse:min-h-[38px]"
+							class="add ml-auto flex items-center gap-[3px] py-[3px] pr-[9px] pl-1.5 text-note whitespace-nowrap disabled:cursor-default disabled:text-faint pointer-coarse:min-h-[38px]"
 							type="button"
 							title="Copy a file or photo from this device into the deck"
 							disabled={adding()}
@@ -160,14 +160,14 @@ export function FilePicker(props: {
 						{(entry) => (
 							<button
 								type="button"
-								class="entry flex w-full cursor-pointer items-center gap-2 rounded-control border-0 bg-none px-2 py-[5px] text-left text-[12px] text-inherit hover:bg-line pointer-coarse:min-h-11"
+								class="entry flex w-full cursor-pointer items-center gap-2 rounded-control border-0 bg-none px-2 py-[5px] text-left text-ui text-inherit hover:bg-line pointer-coarse:min-h-11"
 								onClick={() => (entry.kind === "dir" ? setAt(entry.path) : props.onPick(entry.path))}
 							>
 								{/* The kind of thing a row is, in the same grey as the size on the other end. */}
 								<Icon of={iconFor(entry)} class="text-faint" size={16} />
 								<span class="flex-1">{entry.name}</span>
 								<Show when={entry.size !== undefined}>
-									<span class="text-[11px] text-faint">{Math.max(1, Math.round((entry.size ?? 0) / 1024))} KB</span>
+									<span class="text-note text-faint">{Math.max(1, Math.round((entry.size ?? 0) / 1024))} KB</span>
 								</Show>
 							</button>
 						)}

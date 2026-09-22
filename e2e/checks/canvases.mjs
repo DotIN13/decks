@@ -77,11 +77,11 @@ await page.waitForSelector(".popover", { timeout: 5000 });
 if (SHOTS) await page.screenshot({ path: `${SHOTS}/menu.png`, clip: { x: 264, y: 0, width: 1136, height: 620 } });
 /* Three verbs, no field. Rename hands back to the card; Move to… is a disclosure onto the
    list; Remove turns the menu into a question with two buttons. */
-const verbs = await page.evaluate(() => [...document.querySelectorAll(".popover [data-row] .lb")].map((lb) => lb.textContent?.trim()));
+const verbs = await page.evaluate(() => [...document.querySelectorAll(".popover [data-row] .row-label")].map((lb) => lb.textContent?.trim()));
 say("the card's menu is three verbs", JSON.stringify(verbs) === JSON.stringify(["Rename", "Move to…", "Remove"]), JSON.stringify(verbs));
 await page.locator(".popover .canvas-menu-move").click();
 await settle(page, 200);
-const offered = await page.evaluate(() => [...document.querySelectorAll(".popover .canvas-menu-list [data-row] .lb")].map((lb) => lb.textContent?.trim()));
+const offered = await page.evaluate(() => [...document.querySelectorAll(".popover .canvas-menu-list [data-row] .row-label")].map((lb) => lb.textContent?.trim()));
 say("Move to… offers every workspace in use, none, and a new one", JSON.stringify(offered) === JSON.stringify(["cross-interviewer", "decks", "political-llm", "No workspace", "New workspace…"]), JSON.stringify(offered));
 await page.locator(".popover .canvas-menu-list [data-row]", { hasText: "political-llm" }).click();
 await settle(page, 300);
@@ -95,7 +95,7 @@ await page.waitForSelector(".popover", { timeout: 5000 });
 await page.locator(".popover .canvas-menu-remove").click();
 await settle(page, 200);
 const asked = await page.evaluate(() => ({
-	verbs: [...document.querySelectorAll(".popover [data-row] .lb")].map((lb) => lb.textContent?.trim()),
+	verbs: [...document.querySelectorAll(".popover [data-row] .row-label")].map((lb) => lb.textContent?.trim()),
 	buttons: [...document.querySelectorAll(".popover .canvas-menu-ask .canvas-btn")].map((b) => b.textContent?.trim()),
 }));
 say("Remove asks once, in its own row, with the other verbs still there", (await sent("canvas.remove")).length === 0 && JSON.stringify(asked.verbs) === JSON.stringify(["Rename", "Move to…"]) && JSON.stringify(asked.buttons) === JSON.stringify(["Cancel", "Remove"]), JSON.stringify(asked));
@@ -147,7 +147,7 @@ await page.locator('.panel-shell [role="tab"]', { hasText: "Canvases" }).click()
 await settle(page, 400);
 const panelHeadings = await page.evaluate(() => [...document.querySelectorAll('.panel-list[data-tab="canvases"] .panel-meta > .truncate')].map((h) => h.textContent));
 say("the tab has the same headings in the same order", JSON.stringify(panelHeadings) === JSON.stringify(["cross-interviewer", "decks", "political-llm", "No workspace"]), JSON.stringify(panelHeadings));
-const rows = await page.evaluate(() => [...document.querySelectorAll('.panel-list[data-tab="canvases"] .canvas-row .nm')].map((n) => n.textContent));
+const rows = await page.evaluate(() => [...document.querySelectorAll('.panel-list[data-tab="canvases"] .canvas-row .row-name')].map((n) => n.textContent));
 say("…every canvas once, newest first inside a heading", JSON.stringify(rows) === JSON.stringify(["Cross-interviewer", "Canvas camera", "Decks", "Bench surfaces", "Neutral image", "Tech Week", "Scratch"]), JSON.stringify(rows));
 const marks = await page.evaluate(() => ({ dots: document.querySelectorAll(".canvas-row > .dot").length, extras: document.querySelectorAll(".canvas-row .canvas-row-faces, .canvas-row .canvas-row-n").length }));
 say("…a row is a board row: a name and the dot for a change, nothing else", marks.dots === 0 && marks.extras === 0, JSON.stringify(marks));
@@ -177,7 +177,7 @@ say("…and removes on the second press", removed.length === 1 && removed[0].id 
 
 await page.locator('.panel-shell .field input').fill("camera");
 await settle(page, 300);
-const found = await page.evaluate(() => [...document.querySelectorAll('.panel-list[data-tab="canvases"] .canvas-row .nm')].map((n) => n.textContent));
+const found = await page.evaluate(() => [...document.querySelectorAll('.panel-list[data-tab="canvases"] .canvas-row .row-name')].map((n) => n.textContent));
 say("the search narrows the tab and keeps the heading", JSON.stringify(found) === JSON.stringify(["Canvas camera"]), JSON.stringify(found));
 
 // --- making canvases, which really makes them and moves the app onto them ----------------
@@ -236,8 +236,8 @@ const realId = realStage.slice("#/canvas/".length).split("?")[0];
 await page.locator('.pill button[aria-label^="Canvases — currently"]').click();
 await page.waitForSelector(".popover.canvas-menu", { timeout: 5000 });
 const pillMenu = await page.evaluate(() => ({
-	rows: [...document.querySelectorAll(".popover .pill-canvas-row")].map((row) => `${row.querySelector(".lb")?.textContent?.trim()}${row.dataset.current === "true" ? "*" : ""}:${row.querySelector(".meta")?.textContent?.trim() ?? ""}`),
-	verbs: [...document.querySelectorAll(".popover [data-row]:not(.pill-canvas-row) .lb")].map((lb) => lb.textContent?.trim()),
+	rows: [...document.querySelectorAll(".popover .pill-canvas-row")].map((row) => `${row.querySelector(".row-label")?.textContent?.trim()}${row.dataset.current === "true" ? "*" : ""}:${row.querySelector(".meta")?.textContent?.trim() ?? ""}`),
+	verbs: [...document.querySelectorAll(".popover [data-row]:not(.pill-canvas-row) .row-label")].map((lb) => lb.textContent?.trim()),
 	bins: document.querySelectorAll(".popover .row-act .close").length,
 }));
 say("the name opens one menu: every canvas, the one you are in washed and saying nothing more, then New canvas", pillMenu.rows.some((row) => /\*:$/.test(row)) && pillMenu.rows.at(-1) === "New canvas…:", JSON.stringify(pillMenu.rows));

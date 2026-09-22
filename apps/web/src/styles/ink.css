@@ -40,9 +40,9 @@
 	}
 
 	/* The drawing tools: a second row under the top-left cluster. */
-	.inkbar {
+	.ink-bar {
 		position: absolute;
-		z-index: 30;
+		z-index: var(--z-float);
 		top: calc(var(--control, 28px) + 32px);
 		left: calc(var(--inset-left, 0px) + 12px);
 		max-width: calc(100% - var(--inset-left, 0px) - 24px);
@@ -50,7 +50,7 @@
 		overflow-x: auto;
 		scrollbar-width: none;
 	}
-	.inkbar .iconbtn:disabled {
+	.ink-bar .icon-button:disabled {
 		opacity: 0.35;
 		cursor: default;
 	}
@@ -84,7 +84,7 @@
 	.inkbar-width > span {
 		display: block;
 		width: 16px;
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: currentColor;
 	}
 }
@@ -94,12 +94,12 @@
 	   scaled document and the arithmetic (`CommentPopup.tsx`) ends in window pixels. */
 	.comment-popup {
 		position: fixed;
-		z-index: 60;
+		z-index: var(--z-popup);
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
 		padding: 4px;
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 	.comment-popup[data-open="true"] {
 		width: min(340px, calc(100vw - 16px));
@@ -112,9 +112,9 @@
 		gap: 6px;
 		height: 26px;
 		padding: 0 9px;
-		border-radius: 7px;
+		border-radius: var(--radius-item);
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--type-ui);
 		font-weight: 500;
 		white-space: nowrap;
 	}
@@ -159,10 +159,10 @@
 		min-height: 64px;
 		padding: 7px 9px;
 		border: 1px solid var(--line-strong);
-		border-radius: 8px;
+		border-radius: var(--control-radius);
 		background: var(--bg);
 		color: var(--fg);
-		font-size: 13px;
+		font-size: var(--type-body);
 		line-height: 1.45;
 		resize: vertical;
 	}
@@ -184,7 +184,7 @@
 	[data-slot="composer-input"] [data-component="mention-pill"] {
 		display: inline;
 		padding: 1px 4px;
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: color-mix(in srgb, #f2b200 22%, transparent);
 		color: var(--fg);
 		font-weight: 500;

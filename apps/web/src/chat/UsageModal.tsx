@@ -112,7 +112,7 @@ export function UsageModal(props: {
 					<span class="flex-1" />
 					{/* Free to press: the reading is a control request to the runtime, not a turn. */}
 					<button
-						class="iconbtn [--control:26px]"
+						class="icon-button [--control:26px]"
 						classList={{ "usage-spin": props.loading }}
 						type="button"
 						title="Read again"
@@ -122,7 +122,7 @@ export function UsageModal(props: {
 					>
 						<Icon of={RefreshCw} size={14} />
 					</button>
-					<button class="iconbtn [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+					<button class="icon-button [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
 						<Icon of={X} size={15} />
 					</button>
 				</header>
@@ -283,7 +283,7 @@ export function UsageModal(props: {
 								<span class="set-title">What's using it</span>
 								<span class="set-note">as the runtime scans this machine</span>
 								<span class="flex-1" />
-								<div class="seg">
+								<div class="segmented">
 									<For each={["day", "week"] as const}>
 										{(option) => (
 											<button type="button" data-on={span() === option} onClick={() => setSpan(option)}>

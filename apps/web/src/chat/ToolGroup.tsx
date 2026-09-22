@@ -89,7 +89,7 @@ function Group(props: { slot: Extract<ToolSlot, { kind: "group" }>; alone: boole
 					{count()} {word()}
 				</span>
 				<span class="title">{names()}</span>
-				<Icon of={ChevronRight} class="twist" size={12} />
+				<Icon of={ChevronRight} class="twisty" size={12} />
 			</button>
 			{/*
 			 * Opened, the calls are *nested* and otherwise unchanged: same row, same glyphs,
