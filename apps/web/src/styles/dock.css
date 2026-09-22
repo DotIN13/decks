@@ -300,7 +300,7 @@
 		height: 15px;
 		padding: 0 4px;
 		border: 1px solid var(--line-strong);
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: var(--panel);
 		color: var(--muted);
 		font: inherit;
@@ -350,7 +350,7 @@
 		flex: none;
 		padding: 1px 5px;
 		overflow: hidden;
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: var(--fill);
 		color: var(--faint);
 		font-size: var(--type-micro);
@@ -416,14 +416,14 @@
 	/* The track under it: the ring unrolled, for a reading the arc can only approximate. */
 	:is(.popover, .usage-modal) .track {
 		height: 5px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--line);
 	}
 
 	:is(.popover, .usage-modal) .track > i {
 		display: block;
 		height: 5px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--color-accent);
 	}
 
@@ -456,7 +456,7 @@
 		padding: 0 8px;
 		gap: 8px;
 		border: 0;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: transparent;
 		color: var(--fg);
 		cursor: pointer;
@@ -522,7 +522,7 @@
 		gap: 5px;
 		padding: 1px 4px;
 		border: 0;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: none;
 		color: var(--faint);
 		cursor: pointer;
@@ -590,7 +590,7 @@
 		height: 15px;
 		flex: none;
 		padding: 2px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--line-strong);
 		transition: background-color 120ms ease;
 	}
@@ -603,7 +603,7 @@
 		display: block;
 		width: 11px;
 		height: 11px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--panel);
 		transition: margin-left 120ms ease;
 	}

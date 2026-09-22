@@ -120,7 +120,7 @@
 		height: 22px;
 		align-items: center;
 		justify-content: center;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: var(--fg);
 		color: var(--bg);
 	}
@@ -175,7 +175,7 @@
 		height: 26px;
 		padding: 0 8px;
 		border: 1px solid var(--color-accent);
-		border-radius: 8px;
+		border-radius: var(--control-radius);
 		background: var(--panel);
 		color: var(--fg);
 		font: inherit;
@@ -257,7 +257,7 @@
 		min-width: 15px;
 		height: 15px;
 		padding: 0 4px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--color-warn);
 		color: white;
 		font-size: var(--type-tag);
@@ -280,7 +280,7 @@
 		height: 22px;
 		align-items: center;
 		justify-content: center;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--fg);
 		color: var(--bg);
 	}
@@ -330,7 +330,7 @@
 		padding: 0;
 		border: 1px solid var(--border-strong);
 		border-right: 0;
-		border-radius: 12px 0 0 12px;
+		border-radius: var(--radius-panel, 12px) 0 0 12px;
 		background: var(--layer, var(--panel));
 		box-shadow: var(--shadow);
 		color: var(--muted);
@@ -370,7 +370,7 @@
 		height: 22px;
 		padding: 0 5px 0 3px;
 		border: 1px solid var(--line);
-		border-radius: 7px;
+		border-radius: var(--radius-item);
 		background: var(--panel);
 		color: var(--fg);
 		cursor: pointer;
@@ -457,7 +457,7 @@
 	.stream[data-shown="true"] .stream-card,
 	.stream[data-shown="true"] .stream-bubble {
 		border: 1px solid var(--line);
-		border-radius: 8px;
+		border-radius: var(--control-radius);
 		background: var(--bg);
 		box-shadow: none;
 		color: var(--fg);

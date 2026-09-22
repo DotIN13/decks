@@ -108,7 +108,7 @@
 		max-height: 100%;
 		margin: 0 auto;
 		padding: 40px 32px;
-		border-radius: 10px;
+		border-radius: var(--radius-doc);
 		background: var(--panel);
 		color: var(--fg);
 	}
@@ -125,7 +125,7 @@
 		gap: 14px;
 		align-items: center;
 		padding: 14px 18px;
-		border-radius: 10px;
+		border-radius: var(--radius-doc);
 		background: var(--panel);
 		color: var(--fg);
 	}
@@ -149,7 +149,7 @@
 		gap: 8px;
 		align-items: center;
 		padding: 6px 8px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: rgb(255 255 255 / 10%);
 		backdrop-filter: blur(6px);
 		transition: opacity 200ms ease;
@@ -169,7 +169,7 @@
 		width: 30px;
 		height: 30px;
 		border: 0;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: rgb(255 255 255 / 12%);
 		color: #fff;
 		font-size: var(--type-title);
@@ -255,7 +255,7 @@
 		 * means the corner shows whatever the app is behind the page rather than a white wedge
 		 * under a board that may not be white.
 		 */
-		border-radius: 12px;
+		border-radius: var(--radius-panel, 12px);
 		background: transparent;
 		box-shadow: 0 1px 3px rgb(0 0 0 / 18%), 0 14px 40px rgb(0 0 0 / 16%);
 	}
@@ -332,7 +332,7 @@
 		margin-left: 2px;
 		border: 1px solid var(--line-strong);
 		border-bottom-width: 2px;
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: var(--layer, var(--bg));
 		color: var(--muted);
 		font: inherit;
@@ -510,7 +510,7 @@
 	gap: 8px;
 	padding: 5px 6px 5px 11px;
 	border: 1px solid var(--line);
-	border-radius: 999px;
+	border-radius: var(--radius-pill);
 	background: var(--panel);
 	box-shadow: 0 6px 20px rgb(0 0 0 / 12%);
 	font-size: var(--type-ui);
@@ -530,7 +530,7 @@
 	height: 24px;
 	padding: 0 11px;
 	border: 0;
-	border-radius: 999px;
+	border-radius: var(--radius-pill);
 	background: var(--fg);
 	color: var(--bg);
 	cursor: pointer;
@@ -927,7 +927,7 @@
  */
 .board-node > .shade {
 	position: absolute;
-	border-radius: 12px;
+	border-radius: var(--radius-panel, 12px);
 	box-shadow: var(--shadow);
 	inset: 0;
 	outline: 1px solid var(--line);
@@ -955,7 +955,7 @@
 .board-node > .news-glow {
 	position: absolute;
 	inset: 0;
-	border-radius: 12px;
+	border-radius: var(--radius-panel, 12px);
 	pointer-events: none;
 	opacity: 1;
 	transition: opacity var(--read-ms, 1500ms) ease-out;
@@ -964,7 +964,7 @@
 	content: "";
 	position: absolute;
 	inset: 0;
-	border-radius: 12px;
+	border-radius: var(--radius-panel, 12px);
 	box-shadow:
 		0 0 60px 10px color-mix(in srgb, var(--news, var(--color-accent)) 40%, transparent),
 		0 4px 18px rgb(0 0 0 / 19%);
@@ -988,7 +988,7 @@
 	.board-node > .surface {
 	position: relative;
 	overflow: hidden;
-	border-radius: 12px;
+	border-radius: var(--radius-panel, 12px);
 	background: var(--bg);
 }
 	.board-node > .surface > iframe {

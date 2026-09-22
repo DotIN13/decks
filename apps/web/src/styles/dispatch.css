@@ -107,7 +107,7 @@
 		padding: 0 4px;
 		margin-left: 6px;
 		place-items: center;
-		border-radius: 8px;
+		border-radius: var(--control-radius);
 		background: var(--color-warn);
 		color: #1a1200;
 		font-size: var(--type-micro);
@@ -168,7 +168,7 @@
 		align-items: center;
 		height: 18px;
 		padding: 0 7px;
-		border-radius: 8px;
+		border-radius: var(--control-radius);
 		background: var(--line);
 		color: var(--muted);
 		font-size: var(--type-hint);
@@ -331,7 +331,7 @@
 		gap: 6px;
 		padding: 10px 12px 8px;
 		border: 1px solid var(--line);
-		border-radius: 10px;
+		border-radius: var(--radius-doc);
 		background: var(--layer, var(--panel));
 	}
 	.dispatch-task[data-s="refused"] {
@@ -440,7 +440,7 @@
 		overflow: auto;
 		padding: 6px 8px;
 		border: 1px solid var(--line);
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: var(--bg);
 		color: var(--fg);
 		font-size: var(--type-ui);
@@ -464,7 +464,7 @@
 		gap: 6px;
 		padding: 3px 7px 3px 3px;
 		border: 1px solid var(--line);
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: var(--bg);
 		color: var(--fg);
 		cursor: pointer;
@@ -536,7 +536,7 @@
 		height: 26px;
 		place-items: center;
 		border: 1px solid var(--line);
-		border-radius: 7px;
+		border-radius: var(--radius-item);
 		background: var(--bg);
 		color: var(--muted);
 		cursor: pointer;
@@ -654,7 +654,7 @@
 		min-width: 44px;
 		padding: 2px 4px;
 		border: 0;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: none;
 		color: var(--muted);
 		font: inherit;
@@ -688,7 +688,7 @@
 		margin: 0 auto;
 		overflow: hidden;
 		border: 1px solid var(--line);
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: var(--panel);
 		box-shadow: var(--shadow-row);
 	}
@@ -815,7 +815,7 @@
 		gap: 8px;
 		padding: 11px 12px 12px;
 		border: 1px solid var(--line);
-		border-radius: 12px;
+		border-radius: var(--radius-panel, 12px);
 		background: var(--panel);
 		color: inherit;
 		cursor: pointer;
@@ -860,7 +860,7 @@
 		overflow: hidden;
 		height: 46px;
 		border: 1px solid var(--line);
-		border-radius: 5px;
+		border-radius: var(--radius-thumb);
 		background: var(--bg-deep, var(--panel));
 	}
 	.canvas-thumb img {
@@ -1087,7 +1087,7 @@
 		height: 22px;
 		padding: 0 4px;
 		border: 0;
-		border-radius: 5px;
+		border-radius: var(--radius-thumb);
 		outline: 2px solid var(--color-accent);
 		background: var(--panel);
 		color: var(--fg);

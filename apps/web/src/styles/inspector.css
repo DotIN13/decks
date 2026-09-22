@@ -47,7 +47,7 @@
 		height: 15px;
 		padding: 0;
 		border: 1px solid var(--line-strong);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		cursor: pointer;
 	}
 
@@ -93,7 +93,7 @@
 		.tone {
 			min-width: 38px;
 			min-height: 38px;
-			border-radius: 8px;
+			border-radius: var(--control-radius);
 		}
 	}
 

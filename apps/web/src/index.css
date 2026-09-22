@@ -160,6 +160,25 @@
 	 */
 	--row-radius: 14px;
 	/*
+	 * The rest of the corner scale, for the radii that are shared rather than one element's.
+	 *
+	 * Measured the same way as the type scale: 118 `border-radius` declarations used twelve
+	 * values, and eight of them are shared — a pill on every avatar and round button, a chip,
+	 * a row inside a menu, a tag, a thumbnail, a document being read. Those eight are here (or
+	 * were already: `--control-radius`, `--row-radius`), and the four that belong to one
+	 * element each — 3px, 2px, 13px, and 14px where it is not a row — stay literals.
+	 *
+	 * `--radius-panel` is the ninth and it lives in the `@theme` block instead, because
+	 * `rounded-panel` in a class attribute needs Tailwind to see it. It is 12px, and the
+	 * sheets read it with the fallback spelled out, as they always have.
+	 */
+	--radius-pill: 999px; /* a pill, an avatar, a dot: not a corner at all */
+	--radius-inline: 4px; /* a tag, a key, something inline and small */
+	--radius-thumb: 5px; /* a small picture */
+	--radius-chip: 6px; /* a chip, or a card inside a card */
+	--radius-item: 7px; /* a row inside a menu or a list */
+	--radius-doc: 10px; /* a document, or a preview of one, being read */
+	/*
 	 * The control scale, taken from the title bar and the tool palette.
 	 *
 	 * Those two are the app's reference for what a control looks like here: a fixed square

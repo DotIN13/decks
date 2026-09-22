@@ -57,7 +57,7 @@
 	width: var(--control);
 	height: var(--control);
 	padding: 0;
-	border-radius: 999px;
+	border-radius: var(--radius-pill);
 	place-items: center;
 }
 	.composer .send[data-busy="true"] {
@@ -99,7 +99,7 @@
 	.composer .send {
 		width: 44px;
 		height: 44px;
-		border-radius: 12px;
+		border-radius: var(--radius-panel, 12px);
 	}
 	.composer select {
 		min-height: 36px;

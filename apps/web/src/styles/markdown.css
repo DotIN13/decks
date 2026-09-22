@@ -193,7 +193,7 @@
 	/* Inline code, as against a fenced block: a tint, not a pane. */
 .md code {
 	padding: 1px 4px;
-	border-radius: 5px;
+	border-radius: var(--radius-thumb);
 	background: color-mix(in oklab, var(--fg) 9%, transparent);
 	font-family: var(--font-mono);
 	font-size: var(--type-ui);

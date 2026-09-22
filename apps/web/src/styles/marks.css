@@ -65,7 +65,7 @@
 	.board-mark > .say {
 	max-width: 220px;
 	padding: 4px 9px 5px;
-	border-radius: 7px;
+	border-radius: var(--radius-item);
 	background: var(--mark);
 	color: #fff;
 	font-size: var(--type-label);
@@ -100,7 +100,7 @@
 .act-land {
 	position: absolute;
 	z-index: var(--z-over-board);
-	border-radius: 6px;
+	border-radius: var(--radius-chip);
 	pointer-events: none;
 	--act: var(--color-accent);
 	--line-w: calc(1.5px / var(--zoom, 1));
@@ -116,7 +116,7 @@
 	right: 0;
 	bottom: 100%;
 	padding: 1px 7px;
-	border-radius: 5px 5px 0 0;
+	border-radius: var(--radius-thumb) 5px 0 0;
 	background: var(--act);
 	color: #fff;
 	font-size: var(--type-note);
@@ -192,7 +192,7 @@
 	width: 11px;
 	height: 11px;
 	border: 2px solid var(--bg);
-	border-radius: 999px;
+	border-radius: var(--radius-pill);
 	background: var(--cursor-color);
 	box-shadow: 0 1px 5px rgb(0 0 0 / 35%);
 	animation: cursor-bob 3.2s ease-in-out infinite;
@@ -200,7 +200,7 @@
 	.agent-cursor .halo {
 	position: absolute;
 	inset: -7px;
-	border-radius: 999px;
+	border-radius: var(--radius-pill);
 	background: var(--cursor-color);
 	opacity: 0.16;
 	animation: cursor-breathe 3.2s ease-in-out infinite;
@@ -213,13 +213,13 @@
 	height: 8px;
 	margin: -4px 0 0 -4px;
 	border: 2px solid var(--cursor-color);
-	border-radius: 999px;
+	border-radius: var(--radius-pill);
 	opacity: 0;
 	animation: cursor-ping 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 	.agent-cursor .label {
 	padding: 1px 7px;
-	border-radius: 999px;
+	border-radius: var(--radius-pill);
 	background: var(--cursor-color);
 	color: #fff;
 	font-size: var(--type-note);

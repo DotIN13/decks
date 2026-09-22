@@ -44,7 +44,7 @@
 	.set-group {
 	overflow: hidden;
 	border: 1px solid var(--line);
-	border-radius: 10px;
+	border-radius: var(--radius-doc);
 	background: var(--panel);
 }
 	.set-group + .set-group {
@@ -185,7 +185,7 @@
 	align-self: center;
 	padding: 3px 9px;
 	border: 1px solid var(--line);
-	border-radius: 6px;
+	border-radius: var(--radius-chip);
 	background: transparent;
 	color: var(--muted);
 	font-size: var(--type-note);

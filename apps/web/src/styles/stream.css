@@ -270,7 +270,7 @@
 		margin-top: 4px;
 		padding: 0;
 		border: 1px solid var(--line);
-		border-radius: 7px;
+		border-radius: var(--radius-item);
 		background: var(--panel);
 		box-shadow: var(--shadow-row);
 		color: var(--muted);
@@ -348,7 +348,7 @@
 		padding: 0 6px;
 		gap: 8px;
 		border: 0;
-		border-radius: 5px;
+		border-radius: var(--radius-thumb);
 		background: none;
 		color: inherit;
 		cursor: pointer;
@@ -400,7 +400,7 @@
 	.tool[data-state="done"] > .row > .state::before {
 		width: 5px;
 		height: 5px;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--line-strong);
 		content: "";
 	}
@@ -420,7 +420,7 @@
 		box-sizing: border-box;
 		border: 1.5px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
 		border-top-color: var(--color-accent);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		animation: tool-spin 0.67s linear infinite;
 		content: "";
 	}
@@ -607,7 +607,7 @@
 		overflow-x: auto;
 		margin: 0;
 		padding: 8px 10px;
-		border-radius: 6px;
+		border-radius: var(--radius-chip);
 		background: var(--bg-deep);
 		font-family: var(--font-mono);
 		font-size: var(--type-note);
@@ -686,7 +686,7 @@
 		align-self: center;
 		padding: 2px 9px;
 		border: 1px solid var(--line);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--panel);
 		box-shadow: var(--shadow-row);
 		color: var(--muted);
@@ -708,7 +708,7 @@
 		align-self: center;
 		padding: 3px 11px;
 		border: 1px solid var(--line);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--panel);
 		box-shadow: var(--shadow-row);
 		color: var(--muted);
@@ -788,7 +788,7 @@
 		padding: 0 11px 0 9px;
 		gap: 7px;
 		border: 1px solid var(--line);
-		border-radius: 14px;
+		border-radius: var(--row-radius);
 		background: var(--panel);
 		box-shadow: var(--shadow);
 		color: var(--muted);

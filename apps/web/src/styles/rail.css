@@ -85,7 +85,7 @@
 	flex-direction: column;
 	padding: 0;
 	border: 1px solid var(--line);
-	border-radius: 8px;
+	border-radius: var(--control-radius);
 	background: var(--bg);
 	cursor: pointer;
 	gap: 0;
@@ -124,7 +124,7 @@
 	overflow: hidden;
 	height: 92px;
 	border-bottom: 1px solid var(--line);
-	border-radius: 7px 7px 0 0;
+	border-radius: var(--radius-item) 7px 0 0;
 	background: var(--bg-deep);
 }
 	.rail-item .thumb > iframe,
@@ -389,7 +389,7 @@
 		flex: none;
 		border-right: 1px solid var(--line);
 		border-bottom: 0;
-		border-radius: 7px 0 0 7px;
+		border-radius: var(--radius-item) 0 0 7px;
 	}
 	.rail-item .label {
 		display: flex;

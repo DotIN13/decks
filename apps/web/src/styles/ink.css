@@ -84,7 +84,7 @@
 	.inkbar-width > span {
 		display: block;
 		width: 16px;
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: currentColor;
 	}
 }
@@ -112,7 +112,7 @@
 		gap: 6px;
 		height: 26px;
 		padding: 0 9px;
-		border-radius: 7px;
+		border-radius: var(--radius-item);
 		color: var(--fg);
 		font-size: var(--type-ui);
 		font-weight: 500;
@@ -159,7 +159,7 @@
 		min-height: 64px;
 		padding: 7px 9px;
 		border: 1px solid var(--line-strong);
-		border-radius: 8px;
+		border-radius: var(--control-radius);
 		background: var(--bg);
 		color: var(--fg);
 		font-size: var(--type-body);
@@ -184,7 +184,7 @@
 	[data-slot="composer-input"] [data-component="mention-pill"] {
 		display: inline;
 		padding: 1px 4px;
-		border-radius: 4px;
+		border-radius: var(--radius-inline);
 		background: color-mix(in srgb, #f2b200 22%, transparent);
 		color: var(--fg);
 		font-weight: 500;

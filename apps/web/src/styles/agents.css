@@ -40,7 +40,7 @@
 		width: var(--face, 24px);
 		height: var(--face, 24px);
 		flex: none;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		/* The fill is *who*; the ring is *what*. Both channels used to be spent on identity. */
 		background: var(--fill, var(--color-accent));
 		color: #fff;
@@ -62,7 +62,7 @@
 	.agent-face > img {
 		width: 100%;
 		height: 100%;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		object-fit: cover;
 	}
 
@@ -203,7 +203,7 @@
 		flex: none;
 		padding: 0;
 		border: 0;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: none;
 		cursor: pointer;
 		font: inherit;
@@ -225,7 +225,7 @@
 	.agent-facebtn:focus-visible::after {
 		position: absolute;
 		border: 2px solid var(--color-accent);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		content: "";
 		inset: calc(-3px - var(--ring, 2px) * 2);
 	}
@@ -312,7 +312,7 @@
 		flex: none;
 		padding: 0;
 		border: 1px solid var(--line);
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--panel);
 		color: var(--muted);
 		cursor: pointer;
@@ -387,7 +387,7 @@
 		width: 7px;
 		height: 7px;
 		flex: none;
-		border-radius: 999px;
+		border-radius: var(--radius-pill);
 		background: var(--status, var(--faint));
 	}
 
