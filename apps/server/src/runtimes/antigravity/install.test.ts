@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -20,6 +20,10 @@ function fakeUserGemini(): { real: string; home: string } {
 	mkdirSync(join(root, "user", ".gemini", "antigravity-cli"), { recursive: true });
 	mkdirSync(join(root, "user", ".gemini", "config", "projects"), { recursive: true });
 	writeFileSync(join(root, "user", ".gemini", "config", "config.json"), "{}", "utf8");
+	// …and the two pieces of `~/Library` that make its login keychain reachable.
+	mkdirSync(join(root, "user", "Library", "Keychains"), { recursive: true });
+	mkdirSync(join(root, "user", "Library", "Preferences"), { recursive: true });
+	writeFileSync(join(root, "user", "Library", "Preferences", "com.apple.security.plist"), "", "utf8");
 	return { real: join(root, "user", ".gemini"), home: join(root, "sandbox") };
 }
 
@@ -42,6 +46,27 @@ test("the sandbox links the user's auth and owns its mcp_config.json", () => {
 			mcpServers?: Record<string, { command?: string; args?: string[] }>;
 		};
 		assert.equal(mcp.mcpServers?.decks?.args?.[0], mcpServerPath());
+	} finally {
+		rmSync(home, { recursive: true, force: true });
+	}
+});
+
+/*
+ * The sign-in is not a file, so linking `.gemini` is not enough.
+ *
+ * `agy` authenticates through the login keychain, and `security` finds that keychain
+ * through the HOME it is handed. A sandbox without these two links has no default
+ * keychain, and every turn ends as "You are not logged into Antigravity".
+ */
+test("the sandbox can reach the login keychain", { skip: process.platform !== "darwin" }, () => {
+	const { real, home } = fakeUserGemini();
+	try {
+		prepareAntigravityHome(home, real);
+		const keychains = join(home, "Library", "Keychains");
+		assert.ok(lstatSync(keychains).isSymbolicLink(), "the keychains are reachable through a link");
+		assert.equal(realpathSync(keychains), realpathSync(join(real, "..", "Library", "Keychains")));
+		const searchList = join(home, "Library", "Preferences", "com.apple.security.plist");
+		assert.ok(lstatSync(searchList).isSymbolicLink(), "…and so is the search list that names them");
 	} finally {
 		rmSync(home, { recursive: true, force: true });
 	}
