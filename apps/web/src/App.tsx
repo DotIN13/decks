@@ -306,6 +306,19 @@ export function App() {
 		),
 	);
 	/*
+	 * The boards that are news, each in its writer's colour: what the canvas draws a glow round
+	 * until the board is read there (`canvas/glow.ts`). The same rule as the sidebar's mark, so a
+	 * board glows on the canvas exactly when it is marked in the list.
+	 */
+	const newsGlow = createMemo(() => {
+		const out: Record<string, string> = {};
+		for (const board of state.boards) {
+			if (!isNews(board)) continue;
+			out[board.path] = (board.lastWrittenBy && state.identities[board.lastWrittenBy]?.color) || "var(--color-accent)";
+		}
+		return out;
+	});
+	/*
 	 * Reading a board is what takes its "changed" mark off the dashboard: its preview there, or
 	 * the focus view on a stage. Said once per opening; the server ignores a board already read
 	 * since its last write, and the next write brings the mark back.
@@ -1735,6 +1748,8 @@ export function App() {
 						nonces={state.nonces}
 						cursor={state.cursor}
 						acts={state.acts}
+						news={newsGlow()}
+						onRead={(path) => send({ type: "board.seen", path })}
 						onViewport={() => reportCameraSoon(camera())}
 						onExtent={(path, extent) => send({ type: "board.extent", path, ...extent })}
 						editor={editor}

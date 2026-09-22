@@ -72,5 +72,14 @@ test("a board the person has read is stamped once, and a later write makes it ne
 	writeFileSync(join(root, "boards", "plan.html"), `<!doctype html><title>Plan, again</title><body class="board"></body>`);
 	const later = deck.refresh("boards/plan.html");
 	assert.equal(later?.seenAt, modified);
+
+	// Read, then named by an agent after the file moved (a fit after a write): news again, and a
+	// read stamps it even though the file itself is older than the last look.
+	service.seen("boards/plan.html", (later?.modifiedAt ?? 0) + 10);
+	const read = deck.board("boards/plan.html")?.seenAt ?? 0;
+	service.wrote("boards/plan.html", "agent-1", read + 500);
+	assert.equal(deck.board("boards/plan.html")?.namedAt, read + 500);
+	service.seen("boards/plan.html", read + 900);
+	assert.equal(deck.board("boards/plan.html")?.seenAt, read + 900, "the read is stamped against the naming act, not the file");
 	rmSync(root, { recursive: true, force: true });
 });

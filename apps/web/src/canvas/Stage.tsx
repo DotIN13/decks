@@ -131,6 +131,10 @@ export function Stage(props: {
 	cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
 	/** What each agent is doing to which board; each frame takes the acts on its board (`canvas/acts.ts`). */
 	acts?: Record<string, AgentAct | undefined>;
+	/** The boards that are news, by path, each with the colour its glow is drawn in (`canvas/glow.ts`). */
+	news?: Record<string, string>;
+	/** A board that was news was read on the canvas. */
+	onRead?: (path: string) => void;
 	/** The arrows and dashed groups the canvas on screen has, drawn under its boards. */
 	links?: import("@decks/protocol").CanvasLink[];
 	groups?: import("@decks/protocol").CanvasGroup[];
@@ -1338,6 +1342,8 @@ export function Stage(props: {
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
 							marks={(props.marks ?? []).filter((mark) => mark.path === board.path)}
 							acts={actsByPath().get(board.path)}
+							news={props.news?.[board.path]}
+							onRead={() => props.onRead?.(board.path)}
 							editor={props.editor}
 							gestures={gestures}
 							drops={props.drops(board.path)}

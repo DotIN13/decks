@@ -16,6 +16,7 @@ import { attachEditor, type EditorHost } from "./Editor.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
 import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
 import { actRects, cursorFor, holding, landed, type AgentAct, type Rect } from "./acts.ts";
+import { isRead, READ_MS, READ_ZOOM } from "./glow.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { measureFrame } from "./extent.ts";
 import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts";
@@ -85,6 +86,13 @@ export function BoardFrame(props: {
 	marks?: Mark[];
 	/** Agents at work on this board: a cursor each, and the blocks they hold or just wrote (`acts.ts`). */
 	acts?: AgentAct[];
+	/**
+	 * The board is news — an agent named it and the person has not read it — drawn as a glow in
+	 * this colour (the writer's) until it is read. Absent for a board that is not news.
+	 */
+	news?: string;
+	/** The board was read on the canvas: zoomed in on, mostly on screen, at rest (`glow.ts`). */
+	onRead?: () => void;
 	onSelect: () => void;
 	onMove: (x: number, y: number) => void;
 	/**
@@ -448,6 +456,8 @@ export function BoardFrame(props: {
 	 * bytes the live DOM already had.
 	 */
 	let frameEl: HTMLIFrameElement | undefined;
+	/** The node itself, for measuring how much of it is on the screen. */
+	let nodeEl: HTMLDivElement | undefined;
 	const applySrc = () => {
 		const next = frameSrc();
 		if (!frameEl || frameEl.getAttribute("src") === next) return;
@@ -913,9 +923,39 @@ export function BoardFrame(props: {
 		if (props.board.w === held.w && (!both || props.board.h >= held.h)) setSizing(null);
 	});
 
+	/*
+	 * Reading a board that is news takes its glow off, everywhere the person is signed in.
+	 *
+	 * Measured rather than derived: whether the board is mostly on the screen is a fact about
+	 * two rectangles, read once each time the camera comes to rest on a board that is news at a
+	 * readable zoom — which is rare, and nothing at all for a board that is not news. The rule
+	 * itself is `isRead` (`glow.ts`); a moment has to pass with it still true, so a camera that
+	 * stops on the way somewhere does not read every board it stopped on.
+	 */
+	const [reading, setReading] = createSignal(false);
+	createEffect(() => {
+		if (!props.news || !props.visible || props.moving || zoom() < READ_ZOOM) return;
+		const node = nodeEl;
+		if (!node) return;
+		const stage = node.closest(".stage")?.getBoundingClientRect();
+		const within = stage ? { x: stage.left, y: stage.top, w: stage.width, h: stage.height } : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+		const rect = node.getBoundingClientRect();
+		if (!isRead({ zoom: zoom(), moving: false, box: { x: rect.left, y: rect.top, w: rect.width, h: rect.height }, within })) return;
+		// Being read: the glow fades over the same moment, and goes when the read is stamped.
+		setReading(true);
+		const timer = setTimeout(() => props.onRead?.(), READ_MS);
+		onCleanup(() => {
+			clearTimeout(timer);
+			setReading(false);
+		});
+	});
+
 	return (
 		<div
 			class="board-node"
+			ref={(element) => {
+				nodeEl = element;
+			}}
 			data-dragging={dragging()}
 			data-selected={props.selected}
 			data-inert={inert()}
@@ -1110,7 +1150,7 @@ export function BoardFrame(props: {
 				on the surface itself makes Chrome repaint every board's document on every
 				step of a pan — see `.board-node > .shade` in `index.css`.
 			*/}
-			<div class="shade" aria-hidden="true" />
+			<div class="shade" aria-hidden="true" data-news={props.news ? "" : undefined} data-reading={props.news && reading() ? "" : undefined} style={props.news ? { "--news": props.news, "--read-ms": `${READ_MS}ms` } : undefined} />
 
 			{/*
 				When the frame is inert — zoomed out far enough that a board is a tile on a

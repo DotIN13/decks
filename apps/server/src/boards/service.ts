@@ -119,15 +119,21 @@ export class BoardService {
 	/**
 	 * The person looked at a board: its preview on the dashboard, or the focus view.
 	 *
-	 * Stamped with the later of now and the file's own time, so a clock that disagrees with the
-	 * disk cannot leave a board marked that has just been read. Nothing is sent when the board was
-	 * already read since its last write, which is every press after the first.
+	 * Stamped with the later of now and the board's own last time, so a clock that disagrees with
+	 * the disk cannot leave a board marked that has just been read. Nothing is sent when the board
+	 * was already read since it last changed, which is every press after the first.
+	 *
+	 * "Last changed" is the later of the file's time and the naming act (`wrote`), because that is
+	 * what `isNews` reads. An agent that writes a board and then fits it names it *after* the
+	 * file moved; a read that only looked at the file's time would refuse to stamp, and the board
+	 * would stay news for ever.
 	 */
 	seen(path: string, now = Date.now()): void {
 		const board = this.deck.board(path);
 		if (!board) return;
-		if ((board.seenAt ?? 0) >= (board.modifiedAt ?? 0)) return;
-		const at = Math.max(now, board.modifiedAt ?? 0);
+		const last = Math.max(board.modifiedAt ?? 0, board.namedAt ?? 0);
+		if ((board.seenAt ?? 0) >= last) return;
+		const at = Math.max(now, last);
 		this.seenAt.set(path, at);
 		board.seenAt = at;
 		const placed = this.hooks.state().boards.find((one) => one.path === path) ?? board;
