@@ -307,7 +307,7 @@
 	.floatcard,
 	.popover {
 		position: fixed;
-		z-index: 40;
+		z-index: var(--z-menu);
 		box-sizing: border-box;
 		padding: 6px;
 		border: 1px solid var(--border-strong);
@@ -1168,7 +1168,7 @@ svg.lucide {
 }
 	.picker-backdrop {
 	position: absolute;
-	z-index: 20;
+	z-index: var(--z-backdrop);
 	display: grid;
 	inset: 0;
 	background: rgb(0 0 0 / 30%);

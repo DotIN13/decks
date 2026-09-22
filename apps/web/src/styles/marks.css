@@ -24,7 +24,7 @@
  */
 .board-mark {
 	position: absolute;
-	z-index: 6;
+	z-index: var(--z-mark);
 	display: flex;
 	/*
 	 * `max-content`, and it is load-bearing.
@@ -99,7 +99,7 @@
 .act-hold,
 .act-land {
 	position: absolute;
-	z-index: 5;
+	z-index: var(--z-over-board);
 	border-radius: 6px;
 	pointer-events: none;
 	--act: var(--color-accent);

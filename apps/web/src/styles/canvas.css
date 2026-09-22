@@ -22,7 +22,7 @@
 @layer components {
 	.present {
 		position: fixed;
-		z-index: 200;
+		z-index: var(--z-present);
 		display: grid;
 		overflow: auto;
 		inset: 0;
@@ -299,7 +299,7 @@
 		   canvas switcher. The fallback is the old rule, for a window with no clusters in it. */
 		left: calc((var(--band-left, var(--inset-left, 0px)) + var(--band-right, calc(100% - var(--inset-right, 0px)))) / 2);
 		transform: translateX(-50%);
-		z-index: 5;
+		z-index: var(--z-over-board);
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -408,7 +408,7 @@
 @layer components {
 	.source-editor {
 		position: absolute;
-		z-index: 2;
+		z-index: var(--z-board-edit);
 		display: flex;
 		overflow: hidden;
 		flex-direction: column;
@@ -504,7 +504,7 @@
 	position: absolute;
 	top: 58px;
 	left: 50%;
-	z-index: 30;
+	z-index: var(--z-float);
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -870,7 +870,7 @@
 	position: absolute;
 	right: calc(-7 * var(--unit));
 	bottom: calc(-7 * var(--unit));
-	z-index: 6;
+	z-index: var(--z-mark);
 	width: calc(14 * var(--unit));
 	height: calc(14 * var(--unit));
 	border: calc(2 * var(--unit)) solid var(--bg, #fff);

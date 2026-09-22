@@ -634,7 +634,7 @@
 	 * where it is a full-height sheet — it still covers this, which is the arrangement the
 	 * sheet was drawn for.
 	 */
-	z-index: 10;
+	z-index: var(--z-chrome);
 	bottom: calc(12px + var(--keyboard) + env(safe-area-inset-bottom));
 	/* Centred on the canvas column, not on the window — see the note below. */
 	left: calc(var(--inset-left, 0px) + (100% - var(--inset-left, 0px) - var(--inset-right, 0px)) / 2);

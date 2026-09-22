@@ -60,7 +60,7 @@
 		 */
 		--gutter: 24px;
 		position: absolute;
-		z-index: 9;
+		z-index: var(--z-conversation);
 		top: calc(64px - var(--gutter));
 		right: calc(12px - var(--gutter));
 		bottom: calc(var(--dock, 88px) + 8px + var(--keyboard) + env(safe-area-inset-bottom));
@@ -1197,7 +1197,7 @@
 	top: 12px;
 	right: 4px;
 	bottom: calc(88px + var(--keyboard) + env(safe-area-inset-bottom));
-	z-index: 11;
+	z-index: var(--z-turnbar);
 	display: flex;
 	width: 14px;
 	flex-direction: column;

@@ -42,7 +42,7 @@
 	/* The drawing tools: a second row under the top-left cluster. */
 	.inkbar {
 		position: absolute;
-		z-index: 30;
+		z-index: var(--z-float);
 		top: calc(var(--control, 28px) + 32px);
 		left: calc(var(--inset-left, 0px) + 12px);
 		max-width: calc(100% - var(--inset-left, 0px) - 24px);
@@ -94,7 +94,7 @@
 	   scaled document and the arithmetic (`CommentPopup.tsx`) ends in window pixels. */
 	.comment-popup {
 		position: fixed;
-		z-index: 60;
+		z-index: var(--z-popup);
 		display: flex;
 		flex-direction: column;
 		gap: 8px;

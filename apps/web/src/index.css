@@ -234,6 +234,31 @@
 	/* One rung above white, like the board's `--b-bg-deep`: the floats sit a rung *below*
 	   it (`--layer`), so a float reads as a thing on the ground rather than a hole in it. */
 	--stage: var(--color-grey-100);
+	/*
+	 * The stack, in one place: who is above whom.
+	 *
+	 * The numbers *are* the order — read them down the list and that is what covers what —
+	 * and they live here because the question "why is this above that" is asked across files:
+	 * a notice floats over the work, a menu opens over the notice, and the comment popup opens
+	 * over the menu. Before this, the same answer was spread over seventeen declarations in
+	 * nine sheets as bare integers, and the only way to know whether 30 was above 40 was to
+	 * find both and read the CSS.
+	 *
+	 * **Not here, on purpose.** The fan inside `.agent-stack` (4 down to 1) is one component's
+	 * own order, and a panel's resize handle (1) is above its own panel and nothing else — both
+	 * are specific to one element, so both stay literals next to the thing they order.
+	 */
+	--z-board-edit: 2; /* a field opened on a board: the source editor, a rename */
+	--z-over-board: 5; /* just over the boards: the focus view's exit, an agent landing */
+	--z-mark: 6; /* a mark on a board, and the handle that resizes it */
+	--z-conversation: 9; /* the conversation column */
+	--z-chrome: 10; /* the rail and the dock: the chrome you work in */
+	--z-turnbar: 11; /* the turn bar, at the conversation's edge */
+	--z-backdrop: 20; /* a dialog's backdrop */
+	--z-float: 30; /* over the work and under a menu: a notice, the ink tools */
+	--z-menu: 40; /* menus and popovers */
+	--z-popup: 60; /* the comment popup, which opens over a menu */
+	--z-present: 200; /* the present view: a board filling the window */
 	color-scheme: light;
 }
 

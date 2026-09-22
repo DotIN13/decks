@@ -1079,7 +1079,7 @@
 	/* The name, opened on the card: a field over the card's own name line. */
 	.canvas-rename {
 		position: absolute;
-		z-index: 2;
+		z-index: var(--z-board-edit);
 		top: 9px;
 		left: 10px;
 		right: 36px;

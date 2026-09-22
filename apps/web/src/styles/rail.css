@@ -195,7 +195,7 @@
 	 */
 	max-height: calc(100% - 24px - var(--keyboard) - env(safe-area-inset-bottom));
 	left: max(12px, env(safe-area-inset-left));
-	z-index: 10;
+	z-index: var(--z-chrome);
 	display: flex;
 	width: 200px;
 	flex-direction: column;
