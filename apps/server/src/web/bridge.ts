@@ -59,6 +59,18 @@ export class WebBridge {
 	/** A browser agent has the tab right now, so `stage.web` is not the one driving it. */
 	private handedOver = false;
 	/**
+	 * The address of a tab that answered none of its thirty seconds, once one has.
+	 *
+	 * A tab can be readable and photographable and still run no script for this connection at
+	 * all: Playwright resolves the element it names and then waits out its whole timeout inside a
+	 * document that never answers, thirty seconds a verb. Measured on a OneTrust form in the
+	 * user's own Chrome, where a shell button and a question button failed the same way while
+	 * reads and screenshots kept working. Remembered, so the second verb that meets it says what
+	 * to do at once instead of paying those thirty seconds again. Cleared by a navigation, which
+	 * is the remedy.
+	 */
+	private stale: string | undefined;
+	/**
 	 * The address the last `read`'s references belong to.
 	 *
 	 * Every page numbers its own references from `e1`, so a reference held across a
@@ -146,6 +158,7 @@ export class WebBridge {
 			this.relay = undefined;
 			this.browser = undefined;
 			this.endpoint = undefined;
+			this.stale = undefined;
 			this.closed = reason;
 			this.settle(false);
 			this.changed(this.status());
@@ -153,6 +166,7 @@ export class WebBridge {
 		this.connecting = (async () => {
 			const endpoint = await relay.start();
 			this.endpoint = endpoint;
+			this.stale = undefined;
 			await relay.ready();
 			await this.attach(relay, endpoint);
 		})();
@@ -328,6 +342,8 @@ export class WebBridge {
 		const page = await this.page();
 		try {
 			await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+			// A navigation is what gives a tab the script it never had, so it is also the cure.
+			this.stale = undefined;
 			const result = { url: page.url(), title: await page.title() };
 			this.note(`opened ${result.title || result.url}`, true);
 			return result;
@@ -396,6 +412,7 @@ export class WebBridge {
 	/** Type into a field, named by its label, or by a reference from `read`. */
 	async fill(field: WebTarget, text: string): Promise<{ field: string }> {
 		const page = await this.page();
+		await this.live(page);
 		const label = labelOf(field);
 		try {
 			const target = await this.locate(page, field, (name) => [
@@ -412,13 +429,14 @@ export class WebBridge {
 			return { field: label };
 		} catch (error) {
 			this.note(`could not fill ${label}: ${(error as Error).message}`, false);
-			throw error;
+			throw this.staleOr(error, page);
 		}
 	}
 
 	/** Pick an option in a `<select>`, by its label or value. */
 	async select(field: WebTarget, option: string): Promise<{ field: string; option: string }> {
 		const page = await this.page();
+		await this.live(page);
 		const label = labelOf(field);
 		try {
 			const target = await this.locate(page, field, (name) => [page.getByLabel(name), page.getByRole("combobox", { name })]);
@@ -427,13 +445,14 @@ export class WebBridge {
 			return { field: label, option };
 		} catch (error) {
 			this.note(`could not choose ${option} for ${label}: ${(error as Error).message}`, false);
-			throw error;
+			throw this.staleOr(error, page);
 		}
 	}
 
 	/** Click a button, link, checkbox or piece of text, by its name or by a reference. */
 	async click(what: WebTarget): Promise<{ clicked: string }> {
 		const page = await this.page();
+		await this.live(page);
 		const label = labelOf(what);
 		try {
 			const target = await this.locate(page, what, (name) => [
@@ -452,7 +471,7 @@ export class WebBridge {
 			return { clicked: label };
 		} catch (error) {
 			this.note(`could not click ${label}: ${(error as Error).message}`, false);
-			throw error;
+			throw this.staleOr(error, page);
 		}
 	}
 
@@ -533,6 +552,7 @@ export class WebBridge {
 	/** Press a key in the page — "Enter", "Tab", "Escape". */
 	async press(key: string): Promise<{ pressed: string }> {
 		const page = await this.page();
+		await this.live(page);
 		await page.keyboard.press(key);
 		this.note(`pressed ${key}`, true);
 		return { pressed: key };
@@ -558,10 +578,50 @@ export class WebBridge {
 		}
 		if (what !== undefined) await this.click(what);
 		else {
+			await this.live(page);
 			await page.keyboard.press("Enter");
 			this.note("pressed Enter to submit", true);
 		}
 		return { submitted: named ?? "Enter", allowed: true };
+	}
+
+	/**
+	 * Meet a page the action verbs can run in, or say why not at once.
+	 *
+	 * Only ever asks when a previous verb already met a page that answered nothing, and leaves
+	 * the evaluation running when it does not answer — there is nothing to cancel it with — so a
+	 * page that is still mute costs two seconds instead of thirty. The person can also reload the
+	 * tab in front of them, and this notices: the page answers, the memory is dropped, and the
+	 * next verb works.
+	 */
+	private async live(page: Page): Promise<void> {
+		if (!this.stale) return;
+		const answered = await Promise.race([
+			page
+				.evaluate(() => 1)
+				.then(() => true)
+				.catch(() => false),
+			new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2_000)),
+		]);
+		if (answered) {
+			this.stale = undefined;
+			return;
+		}
+		throw new Error(unscriptableSaid(page.url()));
+	}
+
+	/**
+	 * The error to throw for a verb that has just failed, in the agent's language.
+	 *
+	 * Playwright's own report of this is thirty seconds of timeout with the element resolved and
+	 * nothing about why, which reads like a broken connection rather than a page that needs one
+	 * navigation. Everything else is passed through untouched.
+	 */
+	private staleOr(error: unknown, page: Page): Error {
+		const text = String((error as Error)?.message ?? "");
+		if (!/locator\.evaluate: Timeout \d+ms exceeded|locator\.(scrollIntoViewIfNeeded|click|fill|selectOption): Timeout \d+ms exceeded/.test(text)) return error as Error;
+		this.stale = page.url();
+		return new Error(unscriptableSaid(this.stale));
 	}
 
 	private askUser(text: string): Promise<boolean> {
@@ -583,6 +643,21 @@ function labelOf(target: WebTarget): string {
 	if (typeof target === "string") return target;
 	if ("ref" in target) return target.ref;
 	return target.nth === undefined ? target.name : `${target.name} (${target.nth})`;
+}
+
+/**
+ * Why a tab can be read and photographed but not clicked, and the one thing that fixes it.
+ *
+ * Nothing here claims a mechanism, because the observable is what an agent needs: every verb
+ * resolves the element it names and then runs no script in that page for thirty seconds, while
+ * the accessibility tree and screenshots answer normally, which is what makes the connection
+ * look healthy. A navigation of the same address ends it — measured on a live OneTrust page,
+ * where three clicks in a row timed out at thirty seconds each and four clicks after a
+ * navigation landed in about two seconds each — and `stage.web.open` of a tab's own address is
+ * that navigation.
+ */
+function unscriptableSaid(url: string): string {
+	return `The tab is on ${url} and nothing on it can be clicked or filled: the element resolved and then the page ran no script for thirty seconds, while reads and screenshots kept working. Navigate it once — stage.web.open("${url}") — and every verb works; nothing else will.`;
 }
 
 /** Why a click would or would not land, as the page itself sees it. */
