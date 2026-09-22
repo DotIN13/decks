@@ -121,7 +121,7 @@ export function Settings(props: {
 				<header class="set-head">
 					<span class="set-head-title">Settings</span>
 					<span class="flex-1" />
-					<button class="iconbtn [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+					<button class="icon-button [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
 						<Icon of={X} size={15} />
 					</button>
 				</header>
@@ -528,7 +528,7 @@ function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: 
 					<span class="row-label">Renderer</span>
 					<span class="row-note" data-running={running()}>{note()}</span>
 				</span>
-				<span class="seg set-renderer" role="radiogroup" aria-label="Renderer">
+				<span class="segmented set-renderer" role="radiogroup" aria-label="Renderer">
 					<For each={RENDERERS}>
 						{(option) => (
 							<button

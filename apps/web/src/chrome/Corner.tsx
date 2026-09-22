@@ -182,7 +182,7 @@ export function Corner(props: {
 					trigger={(api) => (
 						<button
 							type="button"
-							class="chipbtn tabular-nums"
+							class="chip-button tabular-nums"
 							ref={api.ref}
 							aria-haspopup="menu"
 							aria-expanded={api.open}
@@ -274,7 +274,7 @@ export function Corner(props: {
 					<button
 						ref={api.ref}
 						type="button"
-						class="iconbtn max-[640px]:hidden"
+						class="icon-button max-[640px]:hidden"
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-on={api.open ? "soft" : undefined}
@@ -306,7 +306,7 @@ export function Corner(props: {
 			</Popover>
 			<button
 				type="button"
-				class="iconbtn max-[640px]:hidden"
+				class="icon-button max-[640px]:hidden"
 				disabled={props.onCanvas === 0}
 				title={
 					props.onCanvas === 0
@@ -323,7 +323,7 @@ export function Corner(props: {
 			    frame what is left. It used to sit beside the zoom readout. */}
 			<button
 				type="button"
-				class="iconbtn max-[640px]:hidden"
+				class="icon-button max-[640px]:hidden"
 				title="Fit the boards on the canvas (0)"
 				aria-label="Fit the boards on the canvas"
 				onClick={() => props.onFit()}
@@ -341,11 +341,11 @@ export function Corner(props: {
 			 * moment. Three rather than two because **yielded must not look like off**: a
 			 * button that goes dark when something borrows its surface is a button that has
 			 * silently forgotten what you asked it for. `state/edge.ts` owns the bit; the only
-			 * thing here is the translation into the attribute `.iconbtn` draws from.
+			 * thing here is the translation into the attribute `.icon-button` draws from.
 			 */}
 			<button
 				type="button"
-				class="iconbtn max-[360px]:hidden"
+				class="icon-button max-[360px]:hidden"
 				data-on={historyButton() === "on" ? "true" : historyButton() === "yield" ? "yield" : undefined}
 				aria-pressed={historyButton() !== "off"}
 				title={
@@ -371,7 +371,7 @@ export function Corner(props: {
 					<button
 						ref={api.ref}
 						type="button"
-						class="iconbtn"
+						class="icon-button"
 						aria-haspopup="menu"
 						aria-expanded={api.open}
 						data-on={api.open ? "soft" : undefined}

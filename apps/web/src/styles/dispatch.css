@@ -4,8 +4,8 @@
  *
  * Same split as `panel.css`: a shape spelled in more than one place is here, layout is a
  * class attribute next to the markup. Nothing re-states `chrome.css` — the strip is its
- * `.seg`, the filter chips its `.chipbtn`, the search its `.field`, the preview panel
- * its `.float`, the close button its `.iconbtn`.
+ * `.segmented`, the filter chips its `.chip-button`, the search its `.field`, the preview panel
+ * its `.float`, the close button its `.icon-button`.
  *
  * Every selector is `.dispatch` or `.dispatch-*`, so the file can be dropped without a
  * trace. Inside `@layer components` like the rest, so a utility on the same element
@@ -785,7 +785,7 @@
 		cursor: pointer;
 		font: inherit;
 		font-size: var(--type-ui);
-		/* The filter chips' own easing (`.chipbtn`), so the two kinds of button in one bar move alike. */
+		/* The filter chips' own easing (`.chip-button`), so the two kinds of button in one bar move alike. */
 		transition:
 			background-color 120ms ease,
 			border-color 120ms ease,

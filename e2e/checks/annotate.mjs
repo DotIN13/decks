@@ -127,7 +127,7 @@ await page.keyboard.press("1");
 await settle(page, 900);
 await page.click('[aria-label="Draw on the boards"]');
 await page.waitForSelector(".inkbar");
-say("the brush brings the drawing tools", (await page.locator(".inkbar .iconbtn").count()) >= 8);
+say("the brush brings the drawing tools", (await page.locator(".inkbar .icon-button").count()) >= 8);
 
 const sheet = await page.locator(`${node} .ink-input`).boundingBox();
 const x0 = sheet.x + sheet.width * 0.35;

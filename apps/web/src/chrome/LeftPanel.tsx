@@ -587,11 +587,11 @@ export function LeftPanel(props: {
 				<div class="flex flex-none flex-col gap-2 pb-3">
 					<Show when={props.chats}>
 						{/*
-							The app's `.seg`, at `h-8` — 28px buttons inside 2px of padding is a 32px
+							The app's `.segmented`, at `h-8` — 28px buttons inside 2px of padding is a 32px
 							strip, matching the field below it. The removed Context/Deck strip was the
 							same object at `h-6`.
 						*/}
-						<div class="seg w-full" role="tablist" aria-label="Panel">
+						<div class="segmented w-full" role="tablist" aria-label="Panel">
 							{/*
 								**Agents first, then Boards.**
 
@@ -689,11 +689,11 @@ export function LeftPanel(props: {
 							}}
 						/>
 						<Show when={query()}>
-							{/* `.iconbtn` is 28px, and 44px on a coarse pointer, which would burst a
+							{/* `.icon-button` is 28px, and 44px on a coarse pointer, which would burst a
 							    24px field — so this one is sized by a utility instead. */}
 							<button
 								type="button"
-								class="iconbtn size-5 flex-none rounded-sm pointer-coarse:size-8"
+								class="icon-button size-5 flex-none rounded-sm pointer-coarse:size-8"
 								aria-label="Clear the search"
 								onClick={() => {
 									type("");
@@ -716,7 +716,7 @@ export function LeftPanel(props: {
 					<Show when={tab() !== "canvases"}>
 						<button
 							type="button"
-							class="iconbtn panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
+							class="icon-button panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
 							data-view={tab() === "boards" ? density() : group()}
 							aria-label={
 								tab() === "boards"
@@ -777,7 +777,7 @@ export function LeftPanel(props: {
 										<Show when={props.onNewCanvas}>
 											<button
 												type="button"
-												class="iconbtn size-5 flex-none rounded-sm pointer-coarse:size-8"
+												class="icon-button size-5 flex-none rounded-sm pointer-coarse:size-8"
 												aria-label={section.workspace ? `New canvas in ${section.workspace}` : "New canvas in no workspace"}
 												title={section.workspace ? `New canvas in ${section.workspace}` : "New canvas, in no workspace"}
 												onClick={() => props.onNewCanvas?.(section.workspace)}
@@ -832,7 +832,7 @@ export function LeftPanel(props: {
 										<Show when={props.onNewAgent && (section.kind === "workspace" || section.kind === "unfiled")}>
 											<button
 												type="button"
-												class="iconbtn size-5 flex-none rounded-sm pointer-coarse:size-8"
+												class="icon-button size-5 flex-none rounded-sm pointer-coarse:size-8"
 												aria-label={section.kind === "workspace" ? `New agent in ${section.label}` : "New agent in no workspace"}
 												title={section.kind === "workspace" ? `New agent in ${section.label}` : "New agent, in no workspace"}
 												onClick={() => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined)}

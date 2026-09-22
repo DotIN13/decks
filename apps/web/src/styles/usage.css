@@ -8,8 +8,8 @@
  * table of models and two attribution lists, none of which existed anywhere before.
  *
  * Nothing here restates a shape the app already has. In particular the day/week switch is
- * `chrome.css`'s `.seg` and the section headings are `.label`, because inventing a second
- * segmented control beside `.seg` is how two corners of one window stop matching.
+ * `chrome.css`'s `.segmented` and the section headings are `.label`, because inventing a second
+ * segmented control beside `.segmented` is how two corners of one window stop matching.
  */
 
 @layer components {
@@ -248,7 +248,7 @@
 
 	/*
 	 * The scan's own switch sits in a group heading rather than beside its content, which
-	 * takes two corrections: the heading is a baseline row, and `.seg`'s buttons are sized
+	 * takes two corrections: the heading is a baseline row, and `.segmented`'s buttons are sized
 	 * for a control strip where every label is one short word — "24 hours" wrapped to two
 	 * lines and made the heading 14px taller than every other one.
 	 */
@@ -256,7 +256,7 @@
 		align-items: center;
 	}
 
-	.usage-modal [data-group="behaviors"] .seg > button {
+	.usage-modal [data-group="behaviors"] .segmented > button {
 		padding-inline: 7px;
 		white-space: nowrap;
 	}

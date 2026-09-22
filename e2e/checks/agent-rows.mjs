@@ -114,7 +114,7 @@ await page.keyboard.press("Escape");
 await useModel(page);
 await page.locator(".dockfield").fill("Say the single word: uniform. Nothing else.");
 await page.locator(".dockfield").press("Enter");
-await page.waitForFunction(() => document.querySelector('.sendbtn[data-stop="true"]') !== null, null, { timeout: 20000 });
+await page.waitForFunction(() => document.querySelector('.send-button[data-stop="true"]') !== null, null, { timeout: 20000 });
 
 /*
  * Read with the menu open while the turn runs.
@@ -131,7 +131,7 @@ for (let i = 0; i < 200; i += 1) {
 		during = now;
 		break;
 	}
-	if (!(await page.evaluate(() => document.querySelector('.sendbtn[data-stop="true"]') !== null))) break;
+	if (!(await page.evaluate(() => document.querySelector('.send-button[data-stop="true"]') !== null))) break;
 	await settle(page, 100);
 }
 say("the row says it is working while it works", Boolean(during), JSON.stringify(during));

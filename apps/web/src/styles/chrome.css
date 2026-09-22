@@ -65,7 +65,7 @@
 	 * a control that is merely *held*, and `data-on="yield"` is the third state the history
 	 * button needs: wanted, but not currently on the edge.
 	 */
-	.iconbtn {
+	.icon-button {
 		display: grid;
 		flex: none;
 		place-items: center;
@@ -82,12 +82,12 @@
 			color 120ms ease;
 	}
 
-	.iconbtn:hover {
+	.icon-button:hover {
 		background: var(--line);
 		color: var(--fg);
 	}
 
-	.iconbtn:focus-visible {
+	.icon-button:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 1px;
 	}
@@ -98,13 +98,13 @@
 	 * when chosen, and black only for the one thing that acts — leaves the accent for links,
 	 * focus and the agents' own colours, which is where it means something.
 	 */
-	.iconbtn[data-on="true"] {
+	.icon-button[data-on="true"] {
 		background: var(--raise);
 		color: var(--fg);
 		box-shadow: inset 0 0 0 1px var(--line-strong);
 	}
 
-	.iconbtn[data-on="soft"] {
+	.icon-button[data-on="soft"] {
 		background: var(--line);
 		color: var(--fg);
 	}
@@ -112,7 +112,7 @@
 	/*
 	 * Hovering a control that is already on.
 	 *
-	 * `.iconbtn:hover` is a wash of `--line` on a transparent button, and on a button that
+	 * `.icon-button:hover` is a wash of `--line` on a transparent button, and on a button that
 	 * is *on* that wash is already spent: on an accent fill it would be a contradiction —
 	 * grey where the state says accent — and on a soft one it is the colour already there,
 	 * so nothing moves at all. Both were true here, the first of them loudly, because the
@@ -123,7 +123,7 @@
 	 * the app already says elsewhere — `--line-strong` is the wash's next rung, and the
 	 * oklab mix is the one the picker's `+` uses.
 	 */
-	.iconbtn[data-on="true"]:hover {
+	.icon-button[data-on="true"]:hover {
 		background: var(--raise);
 		box-shadow: inset 0 0 0 1px var(--fg);
 	}
@@ -134,46 +134,46 @@
 	 * looks up to check from across the window, and a blue square is read from further away
 	 * than a white one. Asked for by name; everywhere else "chosen" stays the raised card.
 	 */
-	.pill .iconbtn[data-on="true"] {
+	.pill .icon-button[data-on="true"] {
 		background: var(--color-accent);
 		color: #fff;
 		box-shadow: none;
 	}
 
-	.pill .iconbtn[data-on="true"]:hover {
+	.pill .icon-button[data-on="true"]:hover {
 		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
 		box-shadow: none;
 	}
 
-	.pill .iconbtn[data-on="yield"] {
+	.pill .icon-button[data-on="yield"] {
 		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
 		color: var(--color-accent);
 		box-shadow: none;
 	}
 
-	.pill .iconbtn[data-on="yield"]:hover {
+	.pill .icon-button[data-on="yield"]:hover {
 		background: color-mix(in srgb, var(--color-accent) 22%, transparent);
 		box-shadow: none;
 	}
 
-	.iconbtn[data-on="soft"]:hover {
+	.icon-button[data-on="soft"]:hover {
 		background: var(--line-strong);
 	}
 
 	/* And the third state, for the same reason: the conversation button while the inspector
 	   has the edge is a tinted accent, and the grey wash over it read as *off*. */
-	.iconbtn[data-on="yield"]:hover {
+	.icon-button[data-on="yield"]:hover {
 		box-shadow: inset 0 0 0 1px var(--line-strong);
 	}
 
 	/* Wanted but yielded: the card, dimmed, with a dashed hairline — held, not off. */
-	.iconbtn[data-on="yield"] {
+	.icon-button[data-on="yield"] {
 		background: var(--raise);
 		color: var(--muted);
 		box-shadow: inset 0 0 0 1px var(--line);
 	}
 
-	.iconbtn[disabled] {
+	.icon-button[disabled] {
 		color: var(--faint);
 		cursor: default;
 		opacity: 0.5;
@@ -192,11 +192,11 @@
 	 * are looking at the menu is the more useful thing to say than the level you opened it to
 	 * read; `data-on` is set only while it is open, so the two never disagree for long.
 	 */
-	.iconbtn[data-level="warn"]:not([data-on]) {
+	.icon-button[data-level="warn"]:not([data-on]) {
 		color: var(--color-warn);
 	}
 
-	.iconbtn[data-level="high"]:not([data-on]) {
+	.icon-button[data-level="high"]:not([data-on]) {
 		color: var(--color-danger);
 	}
 
@@ -208,7 +208,7 @@
 	 * what replaced three native `<select>`s, whose platform chevrons were the least
 	 * Decks-like thing on screen.
 	 */
-	.chipbtn {
+	.chip-button {
 		display: flex;
 		flex: none;
 		align-items: center;
@@ -229,13 +229,13 @@
 			color 120ms ease;
 	}
 
-	.chipbtn:hover {
+	.chip-button:hover {
 		border-color: var(--line-strong);
 		background: var(--line);
 		color: var(--fg);
 	}
 
-	.chipbtn:focus-visible {
+	.chip-button:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 1px;
 	}
@@ -249,14 +249,14 @@
 	 * made the top-right cluster look shallower than the top-left one despite both being
 	 * 40px boxes.
 	 */
-	.pill .chipbtn {
+	.pill .chip-button {
 		height: var(--control);
 	}
 
 	/* Anything but the ordinary setting is a standing change, so it is tinted rather than
 	   merely labelled — you should be able to see that a session is in plan mode without
 	   reading the word. */
-	.chipbtn[data-on="true"] {
+	.chip-button[data-on="true"] {
 		border-color: var(--line-strong);
 		background: var(--raise);
 		color: var(--fg);
@@ -265,7 +265,7 @@
 
 	/* The permission mode chip in the composer keeps the accent tint when a mode other than
 	   the ordinary one is set: a standing change you should see without reading the word. */
-	.dockbox .chipbtn[data-on="true"] {
+	.dockbox .chip-button[data-on="true"] {
 		border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
 		/* Mixed over the raised card's white, not over the grey layer: a translucent tint on
 		   the layer came out dull, and a chip that is on should be the brightest thing in the
@@ -275,11 +275,11 @@
 	}
 
 	/* A second fact on the same chip — the thinking level beside the model. */
-	.chipbtn > .sub {
+	.chip-button > .sub {
 		color: var(--faint);
 	}
 
-	.chipbtn > .chev {
+	.chip-button > .chev {
 		flex: none;
 		opacity: 0.6;
 	}
@@ -719,7 +719,7 @@
 	 * rendered since the rewrite. So the three of them agreed by accident and could stop
 	 * agreeing without anybody touching them.
 	 *
-	 * The same anatomy as `.iconbtn` and `.chipbtn`, which is the point: `--control` for the
+	 * The same anatomy as `.icon-button` and `.chip-button`, which is the point: `--control` for the
 	 * height so a fingertip gets 44px from the one place that decides that, `--control-radius`
 	 * for the corner, and **the container carries the border, not the control** — a wash of
 	 * `--line` is the whole affordance, and it leaves the accent fill free to mean the one
@@ -848,7 +848,7 @@
 	/* A segmented control: pick one of a few, all visible. */
 	/* The hairline is an inset shadow, not a border: a border adds two pixels to a tray whose
 	   height is its buttons plus padding, and the panel's strip has to stay 32px. */
-	.seg {
+	.segmented {
 		display: flex;
 		flex: none;
 		padding: 2px;
@@ -858,7 +858,7 @@
 		box-shadow: inset 0 0 0 1px var(--line);
 	}
 
-	.seg > button {
+	.segmented > button {
 		flex: 1;
 		height: 20px;
 		border: 0;
@@ -873,12 +873,12 @@
 			color 120ms ease;
 	}
 
-	.seg > button:hover {
+	.segmented > button:hover {
 		background: var(--line);
 		color: var(--fg);
 	}
 
-	.seg > button[data-on="true"] {
+	.segmented > button[data-on="true"] {
 		background: var(--raise);
 		color: var(--fg);
 		font-weight: 600;
@@ -1056,7 +1056,7 @@ svg.lucide {
  * icon gridded into the middle, instead of the `font-size` each of these used to carry
  * to talk a text glyph into looking centred.
  *
- * The new chrome spells this `.iconbtn` and states it once, in `styles/chrome.css`. What
+ * The new chrome spells this `.icon-button` and states it once, in `styles/chrome.css`. What
  * is left here are the surfaces that have not been rebuilt — the cheat sheet and the
  * inspector's own two rows — and they should join it when they are.
  */
@@ -1122,8 +1122,8 @@ svg.lucide {
 /*
  * What is left of that list: the file picker's two header chips, at 11px rather than the
  * control scale. Everything else that used it — the question over the input bar, the accounts
- * modal — wears `.btn` from `styles/chrome.css` now, which is the same anatomy as `.iconbtn`
- * and `.chipbtn` and takes its height from `--control`. `.composer` was in the selector too,
+ * modal — wears `.btn` from `styles/chrome.css` now, which is the same anatomy as `.icon-button`
+ * and `.chip-button` and takes its height from `--control`. `.composer` was in the selector too,
  * and nothing has rendered that class since the rewrite.
  */
 .picker header button {

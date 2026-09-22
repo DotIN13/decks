@@ -150,7 +150,7 @@ export function AgentEdit(props: {
 					{props.face}
 					<span class="set-head-title">{props.name}</span>
 					<span class="flex-1" />
-					<button class="iconbtn [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
+					<button class="icon-button [--control:26px]" type="button" title="Close" aria-label="Close" onClick={props.onClose}>
 						<Icon of={X} size={15} />
 					</button>
 				</header>

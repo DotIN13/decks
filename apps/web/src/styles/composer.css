@@ -93,7 +93,7 @@
 
 	/* The same rules, under the same query. */
 	@media (pointer: coarse) {
-	.set-row .chipbtn {
+	.set-row .chip-button {
 		--control-md: 34px;
 	}
 	.composer .send {

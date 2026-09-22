@@ -101,7 +101,7 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 						<span class="row-label">Volume</span>
 						<span class="row-note">All three together. “Off” keeps each choice above and silences them.</span>
 					</span>
-					<span class="seg set-vol">
+					<span class="segmented set-vol">
 						<For each={VOLUMES}>
 							{(stop) => (
 								<button type="button" data-on={props.prefs.volume === stop.value} onClick={() => setVolume(stop.value)}>
@@ -130,7 +130,7 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 								<span class="row-label">{ALERT_LABELS[kind].label}</span>
 							</span>
 							<button
-								class="sw"
+								class="switch"
 								type="button"
 								role="switch"
 								aria-checked={props.prefs.notify[kind]}
@@ -176,7 +176,7 @@ function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: Sound
 			 * arriving late is only a problem when it is announcing something.
 			 */
 			trigger={(api) => (
-				<button class="chipbtn set-cue" type="button" ref={api.ref} data-on={api.open || undefined} onClick={api.toggle}>
+				<button class="chip-button set-cue" type="button" ref={api.ref} data-on={api.open || undefined} onClick={api.toggle}>
 					<span class="truncate">{soundName(props.id)}</span>
 					<Icon of={ChevronDown} size={12} />
 				</button>

@@ -390,7 +390,7 @@ export function Composer(props: {
 		 * Deliberately *not* carrying the old `composer` class. Those rules dress a
 		 * bordered panel with three `<select>`s and a `.send` in it, and `.composer button`
 		 * in particular would put a wash and 4px/10px padding on every button in here,
-		 * beating `.iconbtn` on specificity. The narrow-width and coarse-pointer rules that
+		 * beating `.icon-button` on specificity. The narrow-width and coarse-pointer rules that
 		 * comment used to justify keeping it all target the elements this rewrite deletes.
 		 */
 		<section class="relative flex w-auto transform-none flex-col gap-1.5">
@@ -544,7 +544,7 @@ export function Composer(props: {
 				    for this row (26px, 34 under a finger); the layout is here. */}
 				<div class="dockrow mt-2 flex items-center gap-1.5">
 					<Show when={props.onAttach}>
-						<button class="iconbtn" type="button" aria-label="Attach a file" title="Attach a file" onClick={() => props.onAttach?.()}>
+						<button class="icon-button" type="button" aria-label="Attach a file" title="Attach a file" onClick={() => props.onAttach?.()}>
 							<Icon of={Paperclip} size={15} />
 						</button>
 					</Show>
@@ -582,7 +582,7 @@ export function Composer(props: {
 						when={props.busy && !sendable()}
 						fallback={
 							<button
-								class="sendbtn"
+								class="send-button"
 								type="button"
 								disabled={!sendable()}
 								title={props.busy ? "Steer this turn" : "Send"}
@@ -594,7 +594,7 @@ export function Composer(props: {
 						}
 					>
 						<button
-							class="sendbtn"
+							class="send-button"
 							type="button"
 							data-stop="true"
 							title="Stop this turn"

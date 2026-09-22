@@ -120,7 +120,7 @@ export function ModelPicker(props: {
 						 * text: the browser drops whole glyphs to fit an ellipsis, so "edit freely"
 						 * came out "edit fre…" for want of a rounding error.
 						 */
-						class="chipbtn min-w-0 shrink-[100]"
+						class="chip-button min-w-0 shrink-[100]"
 						type="button"
 						disabled={props.disabled || props.models.length === 0}
 						aria-haspopup="menu"
@@ -272,11 +272,11 @@ export function ModelPicker(props: {
 				*/}
 				<div class="px-1.5 py-1">
 					<span class="meta">Thinking</span>
-					<div class="seg mt-1 w-full" data-scale="true">
+					<div class="segmented mt-1 w-full" data-scale="true">
 						<For each={levels()}>
 							{(level) => (
 								<button
-									/* `.seg`'s buttons carry no side padding of their own, being sized by
+									/* `.segmented`'s buttons carry no side padding of their own, being sized by
 									   the row they divide; seven words at 10px need it or the scale reads
 									   as one long run rather than as seven chips. */
 									class="px-1.5"

@@ -769,7 +769,7 @@ export function App() {
 		const dock = dockEl;
 		const handle = dock?.querySelector<HTMLElement>(".dockbox");
 		if (!dock || !handle) return;
-		const float = mountFloat(dock, "composer", handle, "[data-slot='composer-input'], textarea, input, button, select, a, [role='menu'], [role='listbox'], .sendbtn", () => {
+		const float = mountFloat(dock, "composer", handle, "[data-slot='composer-input'], textarea, input, button, select, a, [role='menu'], [role='listbox'], .send-button", () => {
 			const box = workBox();
 			return { x: box.x + box.w / 2 - dock.offsetWidth / 2, y: box.h - dock.offsetHeight - 12 };
 		}, "bottom", { tab: STOW_TAB });

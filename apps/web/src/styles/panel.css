@@ -7,9 +7,9 @@
  * lists and will appear in a third — while where the panel sits, how its header stacks and
  * what the header's gaps are are Tailwind utilities in `chrome/LeftPanel.tsx`.
  *
- * Nothing here re-states something `chrome.css` already says. The tabs are its `.seg`, the
+ * Nothing here re-states something `chrome.css` already says. The tabs are its `.segmented`, the
  * search field its `.field`, the section labels its `.meta`, the panel body its `.float`;
- * inventing `.panel-tabs` beside `.seg` is how two corners of the same window stop matching.
+ * inventing `.panel-tabs` beside `.segmented` is how two corners of the same window stop matching.
  *
  * ### The rhythm, and why the numbers are what they are
  *
@@ -1187,8 +1187,8 @@
  *
  * - **30px, unlayered.** The five tools were 30px in a pill of 28px buttons, so the hover
  *   wash on a tool was two pixels bigger than the hover wash beside it. `@layer components`
- *   holds `.iconbtn`, and an unlayered rule beats a layered one however specific — which is
- *   also why nobody found this by reading `.iconbtn`.
+ *   holds `.icon-button`, and an unlayered rule beats a layered one however specific — which is
+ *   also why nobody found this by reading `.icon-button`.
  * - **`:hover` beating `[data-on]`.** For the same reason, hovering the *selected* tool
  *   replaced its accent fill with grey: the layered `[data-on="true"]` lost to this. A
  *   control saying "on" and then saying "not on" while your cursor is on it is the worst
@@ -1196,7 +1196,7 @@
  * - **`[data-active]` was a dead name.** The markup has said `data-on` since the tools moved
  *   into the pill, so the accent fill here had not applied to anything in months.
  *
- * The tools are `.iconbtn`, like every other icon button in the app. That is the whole rule.
+ * The tools are `.icon-button`, like every other icon button in the app. That is the whole rule.
  */
 
 /* --- the inspector ----------------------------------------------------------- */

@@ -144,7 +144,7 @@
 	/*
 	 * The controls row, and the two sizes the board fixes for it.
 	 *
-	 * Set as custom properties rather than as widths, so `.iconbtn` and `.chipbtn` come
+	 * Set as custom properties rather than as widths, so `.icon-button` and `.chip-button` come
 	 * from `chrome.css` unmodified and there is still exactly one definition of what an
 	 * icon button is. 26px because these sit inside a card rather than in a toolbar — the
 	 * same reasoning `--control-md` was invented for, applied to the icon-only button next
@@ -159,7 +159,7 @@
 	/*
 	 * A chip in this row gives ground; a chip in a pill does not.
 	 *
-	 * `.chipbtn` is `flex: none` (`chrome.css`), which is right where it was written: the
+	 * `.chip-button` is `flex: none` (`chrome.css`), which is right where it was written: the
 	 * corner's pill is `w-max`, so a chip that could shrink would be a chip shrinking for no
 	 * reason. This row is the other case — a fixed-width card with a model name in it, and a
 	 * model name is whatever the runtime calls it. `claude-opus-4-1-20250805-extended-thinking`
@@ -175,12 +175,12 @@
 	 * will not go below its min-content width unless it is told it may, and `truncate` has no
 	 * effect on a box that is never narrower than its text.
 	 */
-	.dockrow .chipbtn {
+	.dockrow .chip-button {
 		flex: 0 1 auto;
 		min-width: 0;
 	}
 
-	.dockrow .chipbtn > span {
+	.dockrow .chip-button > span {
 		min-width: 0;
 	}
 
@@ -210,7 +210,7 @@
 	 * reflow when a turn starts or ends. Two buttons that swapped places would move the
 	 * thing you were about to press.
 	 */
-	.sendbtn {
+	.send-button {
 		display: grid;
 		flex: none;
 		place-items: center;
@@ -230,29 +230,29 @@
 			opacity 120ms ease;
 	}
 
-	.sendbtn:hover {
+	.send-button:hover {
 		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
 	}
 
 	@media (pointer: coarse) {
-		.sendbtn {
+		.send-button {
 			width: 40px;
 			height: 40px;
 		}
 	}
 
-	.sendbtn:focus-visible {
+	.send-button:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
 	}
 
 	/* Stop is danger-coloured; it is the one control here that undoes rather than does. */
-	.sendbtn[data-stop="true"] {
+	.send-button[data-stop="true"] {
 		background: var(--color-danger);
 	}
 
 	/* Nothing to send: outlined and faint, the same rest state as every chip beside it. */
-	.sendbtn[disabled] {
+	.send-button[disabled] {
 		background: transparent;
 		box-shadow: inset 0 0 0 1px var(--line);
 		color: var(--faint);
@@ -314,7 +314,7 @@
 	 * It was `.dial` — a 16px arc and a percentage at the end of the hint row, ambient and
 	 * only alarming over 70%. The reading now lives in the corner's `⋯` as a row of numbers
 	 * (`chat/composer/ContextSummary.tsx`) and the warning lives on the `⋯` button itself, which is
-	 * `.iconbtn[data-level]` in `chrome.css`. Nothing here draws a ring any more, so the
+	 * `.icon-button[data-level]` in `chrome.css`. Nothing here draws a ring any more, so the
 	 * fifty lines that did are deleted rather than kept warm.
 	 */
 
@@ -359,14 +359,14 @@
 	}
 
 	/*
-	 * The thinking scale, which is a `.seg` with one thing changed.
+	 * The thinking scale, which is a `.segmented` with one thing changed.
 	 *
-	 * `.seg`'s chosen tab is a raised panel-coloured chip, which reads perfectly among two
+	 * `.segmented`'s chosen tab is a raised panel-coloured chip, which reads perfectly among two
 	 * or three options and disappears among seven at 10px — the eye has to compare shadows
 	 * across the row to find it. Filled with the accent instead, so the current level is
 	 * findable in one glance, which is the only thing this row is ever asked.
 	 */
-	.seg[data-scale="true"] > button[data-on="true"] {
+	.segmented[data-scale="true"] > button[data-on="true"] {
 		background: var(--color-accent);
 		color: #fff;
 		box-shadow: none;
@@ -573,13 +573,13 @@
 	/*
 	 * The switch, drawn rather than borrowed.
 	 *
-	 * It was written as `.popover .sw` for a menu row and then never used by one — dead CSS
+	 * It was written as `.popover .switch` for a menu row and then never used by one — dead CSS
 	 * describing a control the app did not have. The notifications grid is its first caller
 	 * (`alerts/AlertSettings.tsx`, three of them), so the `.popover` prefix came off rather than
 	 * a second one going on: a switch is a control, not a property of the menu it was
 	 * invented in.
 	 */
-	.sw {
+	.switch {
 		box-sizing: border-box;
 		/* It is a real `<button>` at its one call site, so the three declarations a browser
 		   would otherwise supply have to be undone here rather than at the markup. */
@@ -595,11 +595,11 @@
 		transition: background-color 120ms ease;
 	}
 
-	.sw[data-on="true"] {
+	.switch[data-on="true"] {
 		background: var(--color-accent);
 	}
 
-	.sw > i {
+	.switch > i {
 		display: block;
 		width: 11px;
 		height: 11px;
@@ -608,7 +608,7 @@
 		transition: margin-left 120ms ease;
 	}
 
-	.sw[data-on="true"] > i {
+	.switch[data-on="true"] > i {
 		margin-left: 11px;
 	}
 	/* --- the composer ----------------------------------------------------------- */

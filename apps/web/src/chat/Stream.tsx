@@ -448,7 +448,7 @@ export function Stream(props: {
 			<div class="stream-head" ref={head}>
 				<span class="stream-head-name">{props.name}</span>
 				<span class="stream-head-state">{props.state === "idle" ? "" : props.state}</span>
-				<button type="button" class="iconbtn stream-head-x" title="Hide the conversation" aria-label="Hide the conversation" onClick={() => closeHistory()}>
+				<button type="button" class="icon-button stream-head-x" title="Hide the conversation" aria-label="Hide the conversation" onClick={() => closeHistory()}>
 					<Icon of={X} size={13} />
 				</button>
 			</div>

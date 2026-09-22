@@ -50,7 +50,7 @@
 		overflow-x: auto;
 		scrollbar-width: none;
 	}
-	.inkbar .iconbtn:disabled {
+	.inkbar .icon-button:disabled {
 		opacity: 0.35;
 		cursor: default;
 	}

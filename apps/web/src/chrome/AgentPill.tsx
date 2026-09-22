@@ -715,7 +715,7 @@ export function AgentPill(props: {
 			 */}
 			<button
 				type="button"
-				class="iconbtn"
+				class="icon-button"
 				data-on={props.boardsOpen ? "soft" : undefined}
 				aria-pressed={props.boardsOpen}
 				title="Boards (⌘\)"
@@ -740,7 +740,7 @@ export function AgentPill(props: {
 			<span class="pill-home" data-on={onStage() ? "true" : undefined} aria-hidden={!onStage()}>
 				<button
 					type="button"
-					class="chipbtn pill-home-btn max-[480px]:hidden"
+					class="chip-button pill-home-btn max-[480px]:hidden"
 					title="Back to the dashboard (Esc)"
 					aria-label="Home: back to the dashboard"
 					tabindex={onStage() ? 0 : -1}
@@ -757,7 +757,7 @@ export function AgentPill(props: {
 				    meeting and overlapping. The badge rides on its corner. */}
 				<button
 					type="button"
-					class="iconbtn pill-home-icon hidden max-[480px]:grid"
+					class="icon-button pill-home-icon hidden max-[480px]:grid"
 					title="Back to the dashboard"
 					aria-label="Home: back to the dashboard"
 					tabindex={onStage() ? 0 : -1}
@@ -816,7 +816,7 @@ export function AgentPill(props: {
 			<Show when={onStage()}>
 			<button
 				type="button"
-				class="iconbtn"
+				class="icon-button"
 				/*
 				 * `soft` — the grey wash the panel toggle wears, not the accent fill.
 				 *
@@ -845,7 +845,7 @@ export function AgentPill(props: {
 			<Show when={props.mode === "browse"}>
 				<button
 					type="button"
-					class="iconbtn"
+					class="icon-button"
 					data-on={props.drawing ? "soft" : undefined}
 					aria-pressed={props.drawing}
 					title={props.drawing ? "Stop drawing" : "Draw on the boards"}
@@ -882,7 +882,7 @@ export function AgentPill(props: {
 					{(entry) => (
 						<button
 							type="button"
-							class="iconbtn"
+							class="icon-button"
 							data-on={props.tool === entry.tool ? "true" : undefined}
 							aria-pressed={props.tool === entry.tool}
 							title={`${entry.label} (${entry.key})`}
@@ -910,7 +910,7 @@ export function AgentPill(props: {
 					trigger={(api) => (
 						<button
 							type="button"
-							class="iconbtn"
+							class="icon-button"
 							ref={api.ref}
 							aria-haspopup="menu"
 							aria-expanded={api.open}
@@ -977,7 +977,7 @@ export function AgentPill(props: {
 						<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
 						<button
 							type="button"
-							class="iconbtn max-[640px]:hidden"
+							class="icon-button max-[640px]:hidden"
 							title="Undo the last edit to this board (⌘Z)"
 							aria-label="Undo the last edit to this board"
 							onClick={() => undo()()}
@@ -1065,7 +1065,7 @@ function CanvasSegment(props: {
 						return (
 							<button
 								type="button"
-								class="chipbtn pill-name"
+								class="chip-button pill-name"
 								ref={api.ref}
 								aria-haspopup="menu"
 								aria-expanded={api.open}

@@ -251,7 +251,7 @@
  * preference somebody has to set again after moving windows is a preference they stop
  * setting. The strip at the top of the group says why.
  */
-.sw[data-moot] {
+.switch[data-moot] {
 	opacity: 0.45;
 }
 
@@ -260,19 +260,19 @@
 	.set-row {
 		min-height: 48px;
 	}
-	.set-row > .sw {
+	.set-row > .switch {
 		width: 36px;
 		height: 21px;
 		padding: 3px;
 	}
-	.set-row > .sw > i {
+	.set-row > .switch > i {
 		width: 15px;
 		height: 15px;
 	}
-	.set-row > .sw[data-on="true"] > i {
+	.set-row > .switch[data-on="true"] > i {
 		margin-left: 15px;
 	}
-	.set-row .seg > button {
+	.set-row .segmented > button {
 		height: 30px;
 		font-size: var(--type-note);
 	}

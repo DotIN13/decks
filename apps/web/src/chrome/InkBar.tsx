@@ -83,7 +83,7 @@ export function InkBar(props: { onDone: () => void }) {
 				{(entry) => (
 					<button
 						type="button"
-						class="iconbtn"
+						class="icon-button"
 						data-on={inkTool() === entry.tool ? "true" : undefined}
 						aria-pressed={inkTool() === entry.tool}
 						title={entry.label}
@@ -122,7 +122,7 @@ export function InkBar(props: { onDone: () => void }) {
 						{(index) => (
 							<button
 								type="button"
-								class="iconbtn inkbar-width"
+								class="icon-button inkbar-width"
 								data-on={inkWidth() === index ? "soft" : undefined}
 								aria-pressed={inkWidth() === index}
 								title={`${widths()[index]} pixels wide`}
@@ -138,20 +138,20 @@ export function InkBar(props: { onDone: () => void }) {
 
 			<Show when={inkSelection()}>
 				<span class="pill-sep" aria-hidden="true" />
-				<button type="button" class="iconbtn" title="Delete the selected strokes (Delete)" aria-label="Delete the selected strokes" onClick={deleteInkSelection}>
+				<button type="button" class="icon-button" title="Delete the selected strokes (Delete)" aria-label="Delete the selected strokes" onClick={deleteInkSelection}>
 					<Icon of={Trash2} size={15} />
 				</button>
 			</Show>
 
 			<span class="pill-sep" aria-hidden="true" />
-			<button type="button" class="iconbtn" disabled={!canUndoInk()} title="Undo the last stroke (⌘Z)" aria-label="Undo the last stroke" onClick={undoInk}>
+			<button type="button" class="icon-button" disabled={!canUndoInk()} title="Undo the last stroke (⌘Z)" aria-label="Undo the last stroke" onClick={undoInk}>
 				<Icon of={Undo2} size={15} />
 			</button>
-			<button type="button" class="iconbtn" disabled={!canRedoInk()} title="Redo (⇧⌘Z)" aria-label="Redo" onClick={redoInk}>
+			<button type="button" class="icon-button" disabled={!canRedoInk()} title="Redo (⇧⌘Z)" aria-label="Redo" onClick={redoInk}>
 				<Icon of={Redo2} size={15} />
 			</button>
 			<span class="pill-sep" aria-hidden="true" />
-			<button type="button" class="iconbtn" title="Stop drawing (Escape)" aria-label="Stop drawing" onClick={props.onDone}>
+			<button type="button" class="icon-button" title="Stop drawing (Escape)" aria-label="Stop drawing" onClick={props.onDone}>
 				<Icon of={X} size={15} />
 			</button>
 		</div>

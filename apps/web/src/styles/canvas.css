@@ -857,7 +857,7 @@
  * its aspect — for those only the width is storable, so the handle is a wide, flat bar and the
  * `ew-resize` cursor says so before the drag starts.
  */
-.board-node > .sizer {
+.board-node > .resize-handle {
 	/*
 	 * Declared *here*, on the box that has `--zoom` written on it inline — the same shape the
 	 * bar uses (`--unit` is `calc(1px / var(--zoom, 1))` in the rule that also carries `.chrome`).
@@ -883,7 +883,7 @@
 
 	/* The same rules, under the same query. */
 	@media (pointer: coarse) {
-	.board-node > .sizer {
+	.board-node > .resize-handle {
 		width: calc(24 * var(--unit));
 		height: calc(24 * var(--unit));
 		right: calc(-12 * var(--unit));

@@ -121,7 +121,7 @@ export function ModeMenu(props: {
 						 * control pushed off the edge — and the label's own cap keeps its worst case
 						 * knowable whatever a runtime decides to call a mode.
 						 */
-						class="chipbtn min-w-0 shrink-0 max-[380px]:shrink"
+						class="chip-button min-w-0 shrink-0 max-[380px]:shrink"
 						type="button"
 						/* Anything but `ask first` is a standing change to how the session behaves,
 						   so it is tinted rather than merely labelled — you should be able to see

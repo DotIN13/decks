@@ -109,7 +109,7 @@ try {
 	 * back to 28 is exactly the kind of regression nobody files.
 	 */
 	const header = await page.evaluate(() => ({
-		strip: Math.round(document.querySelector(".panel-shell .seg")?.getBoundingClientRect().height ?? 0),
+		strip: Math.round(document.querySelector(".panel-shell .segmented")?.getBoundingClientRect().height ?? 0),
 		field: Math.round(document.querySelector(".panel-shell .field")?.getBoundingClientRect().height ?? 0),
 		label: Math.round(document.querySelector(".panel-meta")?.getBoundingClientRect().height ?? 0),
 	}));

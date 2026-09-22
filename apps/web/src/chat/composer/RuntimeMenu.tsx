@@ -37,7 +37,7 @@ export function RuntimeMenu(props: { kind: AgentKind | undefined; onKind: (kind:
 				return (
 					<button
 						ref={api.ref}
-						class="chipbtn runtime-chip min-w-0 shrink-0"
+						class="chip-button runtime-chip min-w-0 shrink-0"
 						type="button"
 						aria-haspopup="menu"
 						aria-expanded={api.open}

@@ -439,7 +439,7 @@ export function Inspector(props: {
 					{/*
 						A segmented control, and the palette is already one.
 
-						Four mutually exclusive choices with exactly one active is `.seg` in
+						Four mutually exclusive choices with exactly one active is `.segmented` in
 						`styles/chrome.css` — the same shape the dock's controls and the boards
 						panel's footer spell — so this asks for it by name instead of keeping a
 						private copy of a fourteen-utility string. It used to be four bordered pills:
@@ -448,11 +448,11 @@ export function Inspector(props: {
 						decode, and the words are what an agent would have written in the file anyway.
 					*/}
 					<Show when={shape().family === "box"}>
-						{/* `row` carries no styling of its own — `.seg` is the whole drawing — but it
+						{/* `row` carries no styling of its own — `.segmented` is the whole drawing — but it
 						    is how the panel's rows are addressed from outside, by the end-to-end
 						    checks among others, and the class is cheaper to keep than the hook is to
 						    move. */}
-						<div class="row seg boxes">
+						<div class="row segmented boxes">
 							<For each={BOX_CLASSES}>
 								{(box) => (
 									<button
