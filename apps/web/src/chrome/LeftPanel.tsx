@@ -842,7 +842,7 @@ export function LeftPanel(props: {
 										</Show>
 									</div>
 									{/*
-										`.rowlist` is the row vocabulary — the grid, the corner, the hover, the
+										`.row-list` is the row vocabulary — the grid, the corner, the hover, the
 										current wash, `.row-act` and its ×, and the `.row-label`/`.row-note` type scale. The
 										agent row wants all of that and two overrides (a 28px icon column and a
 										top-aligned action), which `.agent-list` in `panel.css` supplies.

@@ -107,7 +107,7 @@ export function Dialog(props: {
 					<div class="font-semibold">{choose().title}</div>
 
 					{/*
-						`.rowlist` and `data-row`: the same object as a described choice in a menu —
+						`.row-list` and `data-row`: the same object as a described choice in a menu —
 						`styles/chrome.css` owns the grid, the 7px corner, the hover wash and the
 						`.row-label`/`.row-note` pair. These used to be full-width slabs filled with `--line` at
 						rest, which read as four disabled fields rather than four things to press, and
