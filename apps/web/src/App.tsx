@@ -1820,6 +1820,8 @@ export function App() {
 					canvases={state.canvases}
 					onOpenCanvas={(id) => openCanvas(id)}
 					onNewCanvas={() => newCanvas(state.focused ?? "")}
+					workspaces={workspaceNames(state.canvases, state.identities)}
+					onMoveCanvas={(id, workspace) => send({ type: "canvas.workspace", id, workspace })}
 					onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
 					mode={mode()}
 					onMode={(next) => {

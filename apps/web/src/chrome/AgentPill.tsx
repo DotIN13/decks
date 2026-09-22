@@ -16,7 +16,6 @@ import FileText from "lucide-solid/icons/file-text";
 import Pencil from "lucide-solid/icons/pencil";
 import Brush from "lucide-solid/icons/brush";
 import Hand from "lucide-solid/icons/hand";
-import Trash2 from "lucide-solid/icons/trash-2";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { AgentMark } from "./agent-marks.tsx";
@@ -27,6 +26,7 @@ import { isNews, runtimes } from "../state/deck.ts";
 import { canHover } from "../lib/media.ts";
 import { agentList, agentStatus, closeWords, dropdownFaces, rowWords, workspaceRuns } from "./agent-order.ts";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
+import { CanvasVerbs } from "./CanvasShelf.tsx";
 import { DispatchTabs } from "./DispatchView.tsx";
 import type { DispatchTab } from "./dispatch-view.ts";
 
@@ -660,7 +660,11 @@ export function AgentPill(props: {
 	canvases?: Canvas[];
 	onOpenCanvas?: (id: string) => void;
 	onNewCanvas?: () => void;
-	/** Remove a canvas from the deck, from the switcher's rows. Boards stay. */
+	/** Every workspace in use, for the menu's Move to…; a typed name makes a new one. */
+	workspaces?: string[];
+	/** File this canvas under a workspace, or under none with `null`. */
+	onMoveCanvas?: (id: string, workspace: string | null) => void;
+	/** Remove this canvas from the deck, after the menu's own confirm. Boards stay. */
 	onRemoveCanvas?: (id: string) => void;
 	/** How many tasks want a person: the badge on Home, and on the Tasks tab. */
 	wantsYou?: number;
@@ -776,6 +780,8 @@ export function AgentPill(props: {
 						onRename={(name) => props.onRenameCanvas?.(name)}
 						{...(props.onOpenCanvas ? { onOpen: props.onOpenCanvas } : {})}
 						{...(props.onNewCanvas ? { onNew: props.onNewCanvas } : {})}
+						workspaces={props.workspaces ?? []}
+						{...(props.onMoveCanvas ? { onMove: props.onMoveCanvas } : {})}
 						{...(props.onRemoveCanvas ? { onRemove: props.onRemoveCanvas } : {})}
 					/>
 				)}
@@ -987,193 +993,153 @@ export function AgentPill(props: {
 	);
 }
 
-/**
- * A name you rename in place: a button that becomes a field.
- *
- * Two names in this pill work this way — the canvas's and the agent's — and the rules are
- * the same for both: Enter or leaving the field keeps what was typed, Escape keeps the old
- * name, and an empty field is not a name. One component, because a second copy of six lines
- * is where the two come to behave differently.
- *
- * The field is not a `contenteditable` or a permanently-live input: a name that is always
- * editable is a name you rename by mistake while reaching for the chevron beside it.
- */
-function EditableName(props: {
-	name: string;
-	/** What the field is called, for a screen reader. */
-	label: string;
-	/** The tooltip on the button, which is where the verb is said. */
-	title: string;
-	/** The button's classes, so the two callers can look like what they sit in. */
-	class: string;
-	max?: number;
-	onRename: (name: string) => void;
-}) {
-	const [editing, setEditing] = createSignal(false);
-	let field: HTMLInputElement | undefined;
-	const finish = (keep: boolean) => {
-		const next = field?.value.trim() ?? "";
-		setEditing(false);
-		if (keep && next && next !== props.name) props.onRename(next);
-	};
-	return (
-		<Show
-			when={editing()}
-			fallback={
-				<button type="button" class={props.class} title={props.title} onClick={() => setEditing(true)}>
-					{props.name}
-				</button>
-			}
-		>
-			<input
-				ref={(element) => {
-					field = element;
-					queueMicrotask(() => element.select());
-				}}
-				class="pill-name-field"
-				value={props.name}
-				aria-label={props.label}
-				maxLength={props.max ?? 40}
-				onKeyDown={(event) => {
-					if (event.key === "Enter") finish(true);
-					if (event.key === "Escape") {
-						event.stopPropagation();
-						finish(false);
-					}
-				}}
-				onBlur={() => finish(true)}
-			/>
-		</Show>
-	);
-}
 
 /**
- * The open canvas: its name, and the way to the next room.
+ * The open canvas: its name, and one menu under it.
  *
- * The name is a button that turns into a field: Enter or leaving it keeps the new name, Escape
- * keeps the old one. It used to carry the faces of everybody on the canvas as well, and they
- * are gone: the agent you are talking to is drawn two controls along, so its face was in the
- * line twice, and who else is in the room is a question the panel answers properly.
- *
- * The chevron is the switcher. **Clicking the name renames, clicking the chevron
- * moves** — two verbs on one segment, which is the same division the agent beside it makes
- * (the face is who you are with, the chevron is who else there is), so nothing new has to be
- * learnt to tell them apart.
+ * The name is the button. It used to be two — the name renamed in place, the chevron
+ * beside it opened the switcher with a bin on every row — and what a bin on somebody
+ * else's room was doing next to the name of yours was never a good answer. Now one press
+ * opens one list: the canvases (the one you are in washed, the others with what is on
+ * them), New canvas, and under a rule the three verbs on this canvas — Rename, Move to…,
+ * Remove — which are the card's own menu on the dashboard (`CanvasVerbs`), so the two
+ * places you can act on a canvas offer the same rows. Rename turns the name into a field
+ * where it stands; Remove asks in its own row.
  */
 function CanvasSegment(props: {
 	id: string;
 	name: string;
-	/** Every canvas in the deck; the switcher's list. */
+	/** Every canvas in the deck; the menu's list. */
 	canvases: Canvas[];
+	workspaces: string[];
 	onRename: (name: string) => void;
 	onOpen?: (id: string) => void;
 	onNew?: () => void;
+	onMove?: (id: string, workspace: string | null) => void;
 	onRemove?: (id: string) => void;
 }) {
-	/*
-	 * A bin on every row, asked twice, as the panel's canvas rows ask: the first press arms
-	 * it and the second removes. One armed at a time — arming another disarms the first —
-	 * and closing the menu forgets it.
-	 */
-	const [armed, setArmed] = createSignal<string | undefined>();
-	let waiting: ReturnType<typeof setTimeout> | undefined;
-	const disarm = () => {
-		clearTimeout(waiting);
-		setArmed(undefined);
+	const [open, setOpen] = createSignal(false);
+	const [renaming, setRenaming] = createSignal(false);
+	let dismiss: (() => void) | undefined;
+	let field: HTMLInputElement | undefined;
+	const finish = (keep: boolean) => {
+		const next = field?.value.trim() ?? "";
+		setRenaming(false);
+		if (keep && next && next !== props.name) props.onRename(next);
 	};
-	const pressBin = (id: string) => {
-		if (armed() !== id) {
-			clearTimeout(waiting);
-			setArmed(id);
-			waiting = setTimeout(disarm, 4000);
-			return;
-		}
-		disarm();
-		props.onRemove?.(id);
-	};
+	const current = () => props.canvases.find((canvas) => canvas.id === props.id) ?? { id: props.id, name: props.name };
 	return (
 		<span class="pill-canvas">
-			<EditableName
-				name={props.name}
-				label="Canvas name"
-				title="Rename this canvas"
-				class="chipbtn pill-name"
-				onRename={props.onRename}
-			/>
-			{/*
-				The rooms, from the room you are in.
-				
-				Ordered as the server sends them, which is by name: a shelf you can predict beats
-				one that reshuffles itself as agents work. The dot is the canvas's own changed mark
-				(`isNews`) — something was put up there since you last looked — and it is the one
-				reason to leave a room you had not thought of leaving.
-			*/}
-			<Show when={props.onOpen ?? props.onNew}>
+			<Show
+				when={!renaming()}
+				fallback={
+					<input
+						ref={(element) => {
+							field = element;
+							queueMicrotask(() => element.select());
+						}}
+						class="pill-name-field"
+						value={props.name}
+						aria-label="Canvas name"
+						maxLength={40}
+						onKeyDown={(event) => {
+							if (event.key === "Enter") finish(true);
+							if (event.key === "Escape") {
+								event.stopPropagation();
+								finish(false);
+							}
+						}}
+						onBlur={() => finish(true)}
+					/>
+				}
+			>
 				<Popover
 					placement="bottom-start"
 					label="Canvases"
-					class="w-[248px]"
-					onOpenChange={disarm}
-					trigger={(api) => (
-						<button
-							type="button"
-							class="iconbtn"
-							ref={api.ref}
-							aria-haspopup="menu"
-							aria-expanded={api.open}
-							data-on={api.open ? "soft" : undefined}
-							title="Open another canvas"
-							aria-label={`Canvases — currently ${props.name}`}
-							onClick={api.toggle}
-						>
-							<Icon of={ChevronDown} size={12} />
-						</button>
-					)}
-				>
-					<For each={props.canvases}>
-						{(canvas) => (
-							<div class="row-act">
+					class="canvas-menu w-[248px]"
+					onOpenChange={setOpen}
+					trigger={(api) => {
+						dismiss = () => {
+							if (api.open) api.toggle();
+						};
+						return (
 							<button
 								type="button"
-								class="min-w-0 flex-1"
-								role="menuitem"
-								data-row
-								data-flat="true"
-								/* Washed, not ticked, exactly as the agent rows are: the row describes the
-								   room you are already in rather than a setting you have chosen. */
-								data-current={canvas.id === props.id ? "true" : undefined}
-								onClick={() => props.onOpen?.(canvas.id)}
+								class="chipbtn pill-name"
+								ref={api.ref}
+								aria-haspopup="menu"
+								aria-expanded={api.open}
+								data-on={api.open ? "soft" : undefined}
+								title="This canvas, and the others"
+								aria-label={`Canvases — currently ${props.name}`}
+								onClick={api.toggle}
 							>
-								<span class="lb nm block truncate">{canvas.name}</span>
-								<Show when={canvas.id !== props.id && isNews(canvas)}>
-									<span class="pill-canvas-news" aria-label="Something new here" />
-								</Show>
+								<span class="truncate">{props.name}</span>
+								<Icon of={ChevronDown} size={11} class="chev flex-none" />
 							</button>
-							<Show when={props.onRemove}>
-								<button
-									type="button"
-									class="close"
-									data-armed={armed() === canvas.id ? "true" : undefined}
-									title={armed() === canvas.id ? `Press again to remove ${canvas.name} — its boards stay` : `Remove ${canvas.name}`}
-									aria-label={armed() === canvas.id ? `Remove ${canvas.name} — press again to confirm` : `Remove ${canvas.name}`}
-									onClick={(event) => {
-										event.stopPropagation();
-										pressBin(canvas.id);
-									}}
-								>
-									<Icon of={Trash2} size={12} />
-								</button>
-							</Show>
-							</div>
-						)}
-					</For>
-					<Show when={props.onNew}>
-						<div class="rule" />
-						<button type="button" role="menuitem" data-row data-flat="true" onClick={() => props.onNew?.()}>
-							<Icon of={Plus} size={13} class="flex-none text-muted" />
-							<span class="lb flex-1 whitespace-nowrap">New canvas</span>
-						</button>
-					</Show>
+						);
+					}}
+				>
+					<CanvasVerbs
+						canvas={current()}
+						workspaces={props.workspaces}
+						open={open()}
+						dismiss={() => dismiss?.()}
+						onRename={() => {
+							dismiss?.();
+							setRenaming(true);
+						}}
+						onMove={(workspace) => props.onMove?.(props.id, workspace)}
+						onRemove={() => props.onRemove?.(props.id)}
+						head={
+							<>
+								<div class="group">Canvases</div>
+								{/*
+									The rooms, from the room you are in, in the order the server sends them
+									(by name): a list you can predict beats one that reshuffles itself as agents
+									work. The dot is the canvas's own changed mark (`isNews`): something was put
+									up there since you last looked, and it is the one reason to leave a room you
+									had not thought of leaving.
+								*/}
+								<For each={props.canvases}>
+									{(canvas) => (
+										<button
+											type="button"
+											role="menuitem"
+											data-row
+											data-flat="true"
+											class="pill-canvas-row"
+											/* Washed, not ticked, as the agent rows are: the row describes the room you
+											   are already in rather than a setting you have chosen. */
+											data-current={canvas.id === props.id ? "true" : undefined}
+											onClick={() => {
+												if (canvas.id !== props.id) props.onOpen?.(canvas.id);
+											}}
+										>
+											<span class="ic">
+												<Show when={canvas.id !== props.id && isNews(canvas)}>
+													<span class="pill-canvas-news" aria-label="Something new here" />
+												</Show>
+											</span>
+											<span class="lb nm block truncate">{canvas.name}</span>
+											{/* The room you are in is the washed row, and that is all it says: no word beside it. */}
+											<Show when={canvas.id !== props.id && canvas.boards.length > 0}>
+												<span class="meta flex-none text-[10px]">{`${canvas.boards.length} board${canvas.boards.length === 1 ? "" : "s"}`}</span>
+											</Show>
+										</button>
+									)}
+								</For>
+								<Show when={props.onNew}>
+									<button type="button" role="menuitem" data-row data-flat="true" class="pill-canvas-row" onClick={() => props.onNew?.()}>
+										<span class="ic">
+											<Icon of={Plus} size={13} />
+										</span>
+										<span class="lb">New canvas…</span>
+									</button>
+								</Show>
+							</>
+						}
+					/>
 				</Popover>
 			</Show>
 			<span class="pill-sep" aria-hidden="true" />

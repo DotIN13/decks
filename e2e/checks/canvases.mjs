@@ -228,21 +228,34 @@ await page.evaluate(() => { location.hash = "#/boards"; });
 await settle(page, 600);
 say("the old gallery address lands on the canvases: there is no Boards tab on the dashboard", (await page.locator('.pill [role="tab"][aria-selected="true"]').textContent())?.trim() === "Canvases" && (await page.locator('.pill [role="tab"]').count()) === 3, await page.locator('.pill [role="tab"][aria-selected="true"]').textContent());
 
-// --- the pill's canvas switcher: a bin on every row, asked twice --------------------------
+// --- the pill's canvas menu: the rooms, then the verbs on this one ---------------------------
 await page.evaluate((hash) => { location.hash = hash; }, realStage);
 await settle(page, 1200);
 await clearSent();
+const realId = realStage.slice("#/canvas/".length).split("?")[0];
 await page.locator('.pill button[aria-label^="Canvases — currently"]').click();
-await page.waitForSelector(".popover .row-act", { timeout: 5000 });
-const pillRow = page.locator(".popover .row-act", { hasText: "Zeta Check" });
-await pillRow.hover();
-await pillRow.locator(".close").click({ force: true });
+await page.waitForSelector(".popover.canvas-menu", { timeout: 5000 });
+const pillMenu = await page.evaluate(() => ({
+	rows: [...document.querySelectorAll(".popover .pill-canvas-row")].map((row) => `${row.querySelector(".lb")?.textContent?.trim()}${row.dataset.current === "true" ? "*" : ""}:${row.querySelector(".meta")?.textContent?.trim() ?? ""}`),
+	verbs: [...document.querySelectorAll(".popover [data-row]:not(.pill-canvas-row) .lb")].map((lb) => lb.textContent?.trim()),
+	bins: document.querySelectorAll(".popover .row-act .close").length,
+}));
+say("the name opens one menu: every canvas, the one you are in washed and saying nothing more, then New canvas", pillMenu.rows.some((row) => /\*:$/.test(row)) && pillMenu.rows.at(-1) === "New canvas…:", JSON.stringify(pillMenu.rows));
+say("…and under a rule the card's own verbs, with no bin on any row", JSON.stringify(pillMenu.verbs) === JSON.stringify(["Rename", "Move to…", "Remove"]) && pillMenu.bins === 0, JSON.stringify(pillMenu));
+await page.locator(".popover .canvas-menu-remove").click();
 await settle(page, 200);
-say("the switcher's rows carry a bin that asks once", (await sent("canvas.remove")).length === 0 && (await pillRow.locator(".close").getAttribute("data-armed")) === "true");
-await pillRow.locator(".close").click({ force: true });
+say("Remove asks in its own row, and sends nothing yet", (await page.locator(".popover .canvas-menu-ask").count()) === 1 && (await sent("canvas.remove")).length === 0);
+await page.locator(".popover .canvas-menu-yes").click();
 await settle(page, 300);
 removed = await sent("canvas.remove");
-say("…and removes on the second press, the canvas of the row it is on", removed.length === 1 && typeof removed[0].id === "string" && removed[0].id !== realStage.slice("#/canvas/".length).split("?")[0], JSON.stringify(removed));
+say("…and the confirm removes the canvas you are in", removed.length === 1 && removed[0].id === realId, JSON.stringify(removed));
+await settle(page, 800);
+await page.locator('.pill button[aria-label^="Canvases — currently"]').click();
+await page.waitForSelector(".popover .canvas-menu-rename", { timeout: 5000 });
+await page.locator(".popover .canvas-menu-rename").click();
+await settle(page, 200);
+say("Rename turns the name in the pill into a field", (await page.locator(".pill .pill-name-field").count()) === 1 && (await page.locator(".popover").count()) === 0);
+await page.keyboard.press("Escape");
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

@@ -190,9 +190,26 @@
 		width: 7px;
 		height: 7px;
 		flex: none;
-		margin-left: auto;
 		border-radius: 50%;
 		background: var(--color-accent);
+	}
+	/*
+	 * A canvas row in the pill's menu: the mark's slot, the name, and what is on it. The slot
+	 * is the same 16px column the verbs under the rule put their icons in, so the names line
+	 * up with Rename and Move to… rather than sitting a dot's width to their left.
+	 */
+	.popover.canvas-menu .pill-canvas-row > .ic {
+		display: grid;
+		flex: none;
+		width: 16px;
+		place-items: center;
+	}
+	.popover.canvas-menu .pill-canvas-row > .lb {
+		min-width: 0;
+		flex: 1;
+	}
+	.pill-name > .chev {
+		color: var(--muted);
 	}
 	@media (max-width: 640px) {
 		.pill-name {

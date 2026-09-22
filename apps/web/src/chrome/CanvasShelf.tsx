@@ -7,7 +7,7 @@ import Ellipsis from "lucide-solid/icons/ellipsis";
 import Pencil from "lucide-solid/icons/pencil";
 import Plus from "lucide-solid/icons/plus";
 import Trash2 from "lucide-solid/icons/trash-2";
-import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, type JSX, Match, on, Show, Switch } from "solid-js";
 import { Popover } from "../ui/Popover.tsx";
 import { Icon } from "../ui/icons.tsx";
 import { BoardPicture } from "./BoardPicture.tsx";
@@ -271,31 +271,146 @@ export function CanvasShelf(props: CanvasShelfProps) {
  * Cancel and Remove, with the other verbs still where they were, rather than a row that
  * changed its own words and had to be pressed twice. Boards stay in the deck either way.
  */
-function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: () => void; onMove: (workspace: string | null) => void; onRemove: () => void }) {
+/**
+ * The verbs on a canvas, as a menu's contents: Rename, Move to…, Remove.
+ *
+ * One component for two menus. The card's `⋯` on the dashboard opens it alone; the pill's
+ * canvas name on a stage opens it under the list of canvases (`head`), so the room you are
+ * in and the rooms next door are one press, and what you can do to this one is the same
+ * three rows in both places. The state — which view, the confirm, the typed workspace —
+ * lives here and resets whenever the popover holding it opens.
+ */
+export function CanvasVerbs(props: {
+	canvas: Pick<Canvas, "id" | "name" | "workspace">;
+	workspaces: string[];
+	/** Whether the popover holding this is open: the views reset on every opening. */
+	open: boolean;
+	/** Close the popover, after a choice that leaves nothing more to ask. */
+	dismiss: () => void;
+	onRename: () => void;
+	onMove: (workspace: string | null) => void;
+	onRemove: () => void;
+	/** What sits above the verbs, ruled off: the pill's list of canvases. */
+	head?: JSX.Element;
+}) {
 	const [view, setView] = createSignal<"menu" | "move" | "new">("menu");
 	const [wanted, setWanted] = createSignal("");
 	const [asking, setAsking] = createSignal(false);
-	let dismiss: (() => void) | undefined;
+	createEffect(
+		on(
+			() => props.open,
+			(open) => {
+				if (!open) return;
+				setView("menu");
+				setWanted("");
+				setAsking(false);
+			},
+		),
+	);
 	const pick = (workspace: string | null) => {
 		if ((props.canvas.workspace ?? null) !== workspace) props.onMove(workspace);
-		dismiss?.();
+		props.dismiss();
 	};
 	const create = () => {
 		const name = wanted().trim();
 		if (!name) return;
 		props.onMove(name);
-		dismiss?.();
+		props.dismiss();
 	};
+	return (
+		<Switch>
+			<Match when={view() === "menu"}>
+				<Show when={props.head}>
+					{props.head}
+					<div class="rule" />
+				</Show>
+				<button type="button" data-row role="menuitem" class="canvas-menu-rename" onClick={() => props.onRename()}>
+					<span class="ic">
+						<Icon of={Pencil} size={13} />
+					</span>
+					<span class="lb">Rename</span>
+				</button>
+				<button type="button" data-row role="menuitem" aria-expanded={false} class="canvas-menu-move" onClick={() => setView("move")}>
+					<span class="ic">
+						<Icon of={ArrowRightLeft} size={13} />
+					</span>
+					<span class="lb">
+						Move to…
+						<Icon of={ChevronRight} size={12} class="canvas-menu-chev" />
+					</span>
+				</button>
+				<Show
+					when={asking()}
+					fallback={
+						<button type="button" data-row role="menuitem" data-keep-open class="canvas-menu-remove" onClick={() => setAsking(true)}>
+							<span class="ic">
+								<Icon of={Trash2} size={13} />
+							</span>
+							<span class="lb">Remove</span>
+						</button>
+					}
+				>
+					{/* The row becomes the question, in its own place: the other verbs stay where they were. */}
+					<div class="canvas-menu-ask" role="group" aria-label={`Remove ${props.canvas.name}?`}>
+						<span class="ic">
+							<Icon of={Trash2} size={13} />
+						</span>
+						<button type="button" class="canvas-btn" onClick={() => setAsking(false)}>
+							Cancel
+						</button>
+						<button
+							type="button"
+							class="canvas-btn canvas-btn-danger canvas-menu-yes"
+							onClick={() => {
+								props.onRemove();
+								props.dismiss();
+							}}
+						>
+							Remove
+						</button>
+					</div>
+				</Show>
+			</Match>
+			<Match when={view() === "move"}>
+				<div class="canvas-menu-list" role="group" aria-label="Move to workspace">
+					<button type="button" class="canvas-menu-back" onClick={() => setView("menu")}>
+						<Icon of={ChevronLeft} size={12} />
+						Move to
+					</button>
+					<For each={[...props.workspaces, ""]}>
+						{(workspace) => {
+							const current = () => (props.canvas.workspace ?? "") === workspace;
+							return (
+								<button type="button" data-row data-flat="true" data-current={current()} role="menuitemradio" aria-checked={current()} onClick={() => pick(workspace || null)}>
+									<span class="lb flex-1">{workspace || NO_WORKSPACE}</span>
+									<Show when={current()}>
+										<Icon of={Check} size={11} class="text-accent" />
+									</Show>
+								</button>
+							);
+						}}
+					</For>
+					<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="canvas-menu-new" onClick={() => setView("new")}>
+						<span class="lb flex-1">New workspace…</span>
+					</button>
+				</div>
+			</Match>
+			<Match when={view() === "new"}>
+				<WorkspaceField value={wanted()} onInput={setWanted} onCreate={create} autofocus />
+			</Match>
+		</Switch>
+	);
+}
+
+function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: () => void; onMove: (workspace: string | null) => void; onRemove: () => void }) {
+	const [open, setOpen] = createSignal(false);
+	let dismiss: (() => void) | undefined;
 	return (
 		<Popover
 			placement="bottom-end"
 			class="canvas-menu w-[188px]"
 			label={`${props.canvas.name}: rename, move or remove`}
-			onOpenChange={() => {
-				setView("menu");
-				setWanted("");
-				setAsking(false);
-			}}
+			onOpenChange={setOpen}
 			trigger={(api) => {
 				dismiss = () => {
 					if (api.open) api.toggle();
@@ -319,83 +434,7 @@ function CanvasMenu(props: { canvas: Canvas; workspaces: string[]; onRename: () 
 				);
 			}}
 		>
-			<Switch>
-				<Match when={view() === "menu"}>
-					<button type="button" data-row role="menuitem" class="canvas-menu-rename" onClick={() => props.onRename()}>
-						<span class="ic">
-							<Icon of={Pencil} size={13} />
-						</span>
-						<span class="lb">Rename</span>
-					</button>
-					<button type="button" data-row role="menuitem" aria-expanded={false} class="canvas-menu-move" onClick={() => setView("move")}>
-						<span class="ic">
-							<Icon of={ArrowRightLeft} size={13} />
-						</span>
-						<span class="lb">
-							Move to…
-							<Icon of={ChevronRight} size={12} class="canvas-menu-chev" />
-						</span>
-					</button>
-					<Show
-						when={asking()}
-						fallback={
-							<button type="button" data-row role="menuitem" data-keep-open class="canvas-menu-remove" onClick={() => setAsking(true)}>
-								<span class="ic">
-									<Icon of={Trash2} size={13} />
-								</span>
-								<span class="lb">Remove</span>
-							</button>
-						}
-					>
-						{/* The row becomes the question, in its own place: the other verbs stay where they were. */}
-						<div class="canvas-menu-ask" role="group" aria-label={`Remove ${props.canvas.name}?`}>
-							<span class="ic">
-								<Icon of={Trash2} size={13} />
-							</span>
-							<button type="button" class="canvas-btn" onClick={() => setAsking(false)}>
-								Cancel
-							</button>
-							<button
-								type="button"
-								class="canvas-btn canvas-btn-danger canvas-menu-yes"
-								onClick={() => {
-									props.onRemove();
-									dismiss?.();
-								}}
-							>
-								Remove
-							</button>
-						</div>
-					</Show>
-				</Match>
-				<Match when={view() === "move"}>
-					<div class="canvas-menu-list" role="group" aria-label="Move to workspace">
-						<button type="button" class="canvas-menu-back" onClick={() => setView("menu")}>
-							<Icon of={ChevronLeft} size={12} />
-							Move to
-						</button>
-						<For each={[...props.workspaces, ""]}>
-							{(workspace) => {
-								const current = () => (props.canvas.workspace ?? "") === workspace;
-								return (
-									<button type="button" data-row data-flat="true" data-current={current()} role="menuitemradio" aria-checked={current()} onClick={() => pick(workspace || null)}>
-										<span class="lb flex-1">{workspace || NO_WORKSPACE}</span>
-										<Show when={current()}>
-											<Icon of={Check} size={11} class="text-accent" />
-										</Show>
-									</button>
-								);
-							}}
-						</For>
-						<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="canvas-menu-new" onClick={() => setView("new")}>
-							<span class="lb flex-1">New workspace…</span>
-						</button>
-					</div>
-				</Match>
-				<Match when={view() === "new"}>
-					<WorkspaceField value={wanted()} onInput={setWanted} onCreate={create} autofocus />
-				</Match>
-			</Switch>
+			<CanvasVerbs canvas={props.canvas} workspaces={props.workspaces} open={open()} dismiss={() => dismiss?.()} onRename={props.onRename} onMove={props.onMove} onRemove={props.onRemove} />
 		</Popover>
 	);
 }
