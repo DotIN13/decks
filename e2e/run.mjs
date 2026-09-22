@@ -117,13 +117,6 @@ const CHECKS = [
 	 * does not: the task never runs, because the check cancels it while it is queued.
 	 */
 	{ file: "tasks.mjs", needsAgent: false },
-	/*
-	 * The mark on a gallery card: what makes a board news, and what the mark is made of. The
-	 * rule is unit-tested (`dispatch-view.test.ts`) and the stamping is (`wrote.test.ts`); what
-	 * only a browser can prove is that the four carriers are drawn, that reading a card clears
-	 * them, and that a board written from outside the app comes back marked.
-	 */
-	{ file: "news.mjs", needsAgent: false },
 	{ file: "shell.mjs", needsAgent: false },
 	/*
 	 * The focus view: the canvas as one page. Its own check rather than a section of

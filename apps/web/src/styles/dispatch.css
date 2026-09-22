@@ -306,16 +306,6 @@
 		background: var(--line);
 		color: var(--muted);
 	}
-	/* A dot on the Boards tab, not a number: the number that tab carries means waiting on you. */
-	.dispatch-tab-dot {
-		position: absolute;
-		top: 4px;
-		right: 3px;
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--color-accent);
-	}
 
 	/* --- cards: a task, or a schedule ------------------------------------------------------ */
 	.dispatch-tasks,

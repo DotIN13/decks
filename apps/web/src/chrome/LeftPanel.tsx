@@ -17,7 +17,6 @@ import { AgentRow } from "./AgentRow.tsx";
 import { CanvasRow } from "./CanvasRow.tsx";
 import { canvasSections } from "./canvas-sections.ts";
 import { agentSections, agentTally, type AgentGroup, type AgentSection } from "./agent-sections.ts";
-import { isNews } from "./dispatch-view.ts";
 
 /**
  * The left panel: one surface, **one list**, and a button that makes it go away.
@@ -347,8 +346,6 @@ export function LeftPanel(props: {
 	 */
 	const canvasList = createMemo(() => canvasSections({ canvases: props.canvases ?? [], ...(props.currentCanvas ? { current: props.currentCanvas } : {}), query: query() }));
 	const canvasCount = () => (props.canvases ?? []).length;
-	/** Boards an agent named since the person last read them: the dot on the Boards tab. */
-	const news = createMemo(() => props.boards.filter((board) => isNews(board)).length);
 	const [agentList, setAgentList] = createStore<AgentSection[]>(agentSections(agentInput()));
 	createEffect(() => setAgentList(reconcile(agentSections(agentInput()))));
 
@@ -632,9 +629,6 @@ export function LeftPanel(props: {
 										}}
 									>
 										{PANEL_TAB_LABEL[name]}
-										<Show when={name === "boards" && news() > 0}>
-											<span class="dispatch-tab-dot" aria-label={`${news()} boards changed`} />
-										</Show>
 									</button>
 								)}
 							</For>
