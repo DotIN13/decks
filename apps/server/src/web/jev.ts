@@ -280,10 +280,23 @@ export class JevService {
 		 */
 		const runtimeDir = mkdtempSync(join(tmpdir(), "decks-jev-"));
 		const passthrough = Object.fromEntries(Object.entries(keys).filter(([, value]) => typeof value === "string" && value)) as Record<string, string>;
+		/*
+		 * Which variable carries the endpoint is not cosmetic, and getting it wrong fails in a
+		 * way that reads like a missing browser. The vendored runner reads `BU_CDP_URL` as an
+		 * **http** DevTools endpoint and resolves it through `/json/version`; the gate's address
+		 * is a websocket, and urllib answers `unknown url type: ws` for one, so every supervised
+		 * run died thirty seconds in without a single step. `BU_CDP_WS` is the variable for a
+		 * websocket endpoint, and points at the gate exactly as the gate intends. The headless
+		 * browser keeps `BU_CDP_URL`, because a Chromium's own remote debugging port is http,
+		 * which is what that variable is for.
+		 */
+		const endpoint: Record<string, string> = {};
+		if (where === "chrome") endpoint.BU_CDP_WS = launched.cdpUrl;
+		else endpoint.BU_CDP_URL = launched.cdpUrl;
 		let child: JevRunnerProcess;
 		try {
 			const told = where === "chrome" ? { ...spec, url, goal: `${goal}\n\n${SUPERVISED}` } : { ...spec, url, goal };
-			child = await this.backend.runner(told, { ...passthrough, BU_CDP_URL: launched.cdpUrl, BU_NAME: "decks-jev", BH_RUNTIME_DIR: runtimeDir });
+			child = await this.backend.runner(told, { ...passthrough, ...endpoint, BU_NAME: "decks-jev", BH_RUNTIME_DIR: runtimeDir });
 		} catch (error) {
 			await this.end(run, "failed", `The runner could not start: ${(error as Error).message}`);
 			rmSync(runtimeDir, { recursive: true, force: true });

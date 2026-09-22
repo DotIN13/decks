@@ -152,10 +152,16 @@ test("a shared Chrome is what a run drives, and it drives it through the gate", 
 	 * The agent attaches to the gate, not to the Chrome: the address it is given is a loopback
 	 * port of this server's own, and the person's Chrome is only reachable from the other side
 	 * of it. A run pointed straight at the relay would be the ungated version of this.
+	 *
+	 * It goes in `BU_CDP_WS`, not `BU_CDP_URL`: the gate's address is a websocket, and the
+	 * runner reads `BU_CDP_URL` as an http endpoint it resolves through `/json/version`. Handed
+	 * a `ws://` address there it dies with `unknown url type: ws` before its first step, which
+	 * is what the first supervised run did.
 	 */
-	const gate = String(env()?.BU_CDP_URL);
+	const gate = String(env()?.BU_CDP_WS);
 	assert.match(gate, /^ws:\/\/127\.0\.0\.1:\d+\/cdp$/);
 	assert.notEqual(gate, "ws://127.0.0.1:9222/cdp");
+	assert.equal(env()?.BU_CDP_URL, undefined);
 	await service.stop();
 	assert.equal(service.state().status, "stopped");
 	// The gate closes with the run: the address the agent was given stops answering.
@@ -210,6 +216,8 @@ test("headless is a browser of the server's own even when a Chrome is shared", a
 	await service.run({ url: "https://x.test", goal: "g", browser: "headless" });
 	assert.equal(service.state().browser, "headless");
 	assert.equal(env()?.BU_CDP_URL, "http://127.0.0.1:1");
+	// The server's own browser is an http endpoint, so it keeps the variable for one.
+	assert.equal(env()?.BU_CDP_WS, undefined);
 	await service.stop();
 	assert.equal(closedBrowsers(), 1);
 });

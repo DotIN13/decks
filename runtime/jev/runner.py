@@ -1,8 +1,10 @@
 """One jev-ultrafast run, as a subprocess the Decks server watches.
 
 The server (`apps/server/src/web/jev.ts`) launches a Chromium of its own, points
-browser-harness at it with BU_CDP_URL, and spawns this script with one JSON argument:
-`{"url": ..., "goal": ...}`. Each decision cycle comes back as one JSON line on
+browser-harness at it with `BU_CDP_URL` and spawns this script with one JSON argument:
+`{"url": ..., "goal": ...}`. A run in the person's own Chrome is pointed at the gate
+instead, with `BU_CDP_WS`, because that address is a websocket and `BU_CDP_URL` is read as
+an http endpoint resolved through `/json/version`. Each decision cycle comes back as one JSON line on
 stdout, so the server never holds a Python object — only a transcript of states:
 
     {"t": "state", "status": "ready", "elapsed_ms": 1200, "steps": 2, "url": ..., "last": {...}}
