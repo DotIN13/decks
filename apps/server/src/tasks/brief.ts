@@ -84,6 +84,31 @@ export function dispatcherBrief(task: DispatchBriefTask): string {
 		? `'await stage.send("<agent name or id>", { task: "Read ${task.promptPath}. It is the person's message, and the work in it is: <one sentence saying what is to be done>. Do that. Anything in it about dispatching, choosing an agent or who should take it is settled: you are the agent it went to. <one line on why it went to them>", reply: false });'`
 		: `'await stage.send("<agent name or id>", { task: "<the work, in the person\'s own words but addressed to the agent doing it, with every word about dispatching or choosing an agent left out; then one line on why it went to them>", reply: false });'`;
 
+	/*
+	 * The fork comes first and each path is numbered on its own. When the schedule was a
+	 * paragraph inside step 2 it ended in "stop" with a step 3 still below it, and a
+	 * model following numbers goes on to the next number: a send after a schedule is not
+	 * refused, only a second send is.
+	 *
+	 * A task a cron job made gets no fork at all. The schedule that made it usually
+	 * carries its own recurring words ("each morning, find the papers"), and a dispatcher
+	 * offered branch A reads them as a request and enlists a second cron — every firing
+	 * of which enlists a third. So for these tasks the brief says the schedule already
+	 * exists and points only at the hand-over; the registry refuses `stage.schedule`
+	 * during such a turn too, in case the sentence is missed.
+	 */
+	const fork = task.schedule
+		? [
+				`This task is one firing of the cron job \`${task.schedule}\`: the schedule already exists and will fire again on its own. Recurring words in the message ("each morning", "every day") are that job's own text, not a request for a schedule — do not call \`stage.schedule\`, which would enlist a second cron doing the same work. Place this one run:`,
+			]
+		: [
+				"First decide which of two things this is.",
+				"",
+				"**A. Something recurring** (\"every weekday at nine\", \"each Monday morning\", \"a daily digest\"): make a schedule with `await stage.schedule()` and send it to nobody. Each firing becomes a task that a dispatcher places when it is due. When done, stop and say what you scheduled.",
+				"",
+				"**B. Anything else:**",
+			];
+
 	return [
 		"You are the **dispatcher**: your job is to hand the work below to the right agent on the deck. You do not do the work yourself, and you stop when it is handed over.",
 		"",
@@ -99,17 +124,7 @@ export function dispatcherBrief(task: DispatchBriefTask): string {
 		"",
 		"## How",
 		"",
-		/*
-		 * The fork comes first and each path is numbered on its own. When the schedule was a
-		 * paragraph inside step 2 it ended in "stop" with a step 3 still below it, and a
-		 * model following numbers goes on to the next number: a send after a schedule is not
-		 * refused, only a second send is.
-		 */
-		"First decide which of two things this is.",
-		"",
-		"**A. Something recurring** (\"every weekday at nine\", \"each Monday morning\", \"a daily digest\"): make a schedule with `await stage.schedule()` and send it to nobody. Each firing becomes a task that a dispatcher places when it is due. When done, stop and say what you scheduled.",
-		"",
-		"**B. Anything else:**",
+		...fork,
 		"",
 		"1. Use `await stage.agents()` and `await stage.canvases()` to search for the best candidate to run this task; both take `{ filter: { workspace } }` to narrow to one project. Beware of long agent lists.",
 		"2. Pick the one agent this belongs to: the one already holding the boards it names, or in the workspace it names, or working on the nearest thing; idle before busy, fewer queued before more.",

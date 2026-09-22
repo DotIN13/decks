@@ -278,6 +278,19 @@ export class TaskService {
 		this.persist();
 	}
 
+	/**
+	 * The name of the cron job that made this task, when a schedule did rather than a
+	 * person. The registry asks before letting a deciding dispatcher make a schedule:
+	 * a task a cron made answering itself with another cron is the one loop the
+	 * dashboard can build on its own. A source whose schedule is since deleted still
+	 * counts — the task still was not typed this morning.
+	 */
+	cronOf(taskId: string): string | undefined {
+		const task = this.find(taskId);
+		if (!task?.source) return undefined;
+		return this.schedules.find((entry) => entry.id === task.source?.scheduleId)?.name ?? "a cron job";
+	}
+
 	/** Take a task back, and out of its agent's queue. */
 	cancel(id: string): { cancelled: boolean; reason?: string } {
 		const task = this.find(id);

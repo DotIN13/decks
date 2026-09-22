@@ -43,6 +43,21 @@ test("a task a cron job started says so, by the job's name", () => {
 	assert.doesNotMatch(text, /The person asked for it/);
 });
 
+test("a task a cron job started is never offered a schedule: its recurring words are the cron's own text", () => {
+	// The schedule's task text usually says "each morning" — that is the cron talking,
+	// not a request for a new cron. Offering branch A here is how a cron re-enlists
+	// itself through the dispatcher, every firing.
+	const text = dispatcherBrief({ id: "t8", text: "Each morning, find the notable new AI papers and write one board per paper.", boards: [], workspace: "decks", schedule: "Morning AI papers" });
+	assert.doesNotMatch(text, /\*\*A\. Something recurring\*\*/);
+	assert.doesNotMatch(text, /\*\*B\. Anything else:\*\*/);
+	assert.doesNotMatch(text, /make a schedule with `await stage\.schedule\(\)`/);
+	assert.match(text, /one firing of the cron job `Morning AI papers`/);
+	assert.match(text, /do not call `stage\.schedule`/);
+	// The hand-over steps are still all there.
+	assert.match(text, /1\. Use `await stage\.agents\(\)`/);
+	assert.match(text, /3\. Hand over the work using `reply: false`/);
+});
+
 test("a task with no workspace or boards has no scope line", () => {
 	const text = dispatcherBrief({ id: "t2", text: "Anything", boards: [] });
 	assert.doesNotMatch(text, /workspace \*\*/);

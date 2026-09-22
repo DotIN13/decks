@@ -99,6 +99,8 @@ export class Registry {
 				schedule(spec: ScheduleSpec): Schedule | { error: string };
 				/** A deciding dispatcher made a schedule for its task instead of sending it: the task is done. */
 				scheduled(outcome: { taskId: string; schedule: Schedule }): void;
+				/** The name of the cron job that made this task, when a schedule did rather than a person. */
+				cronOf(taskId: string): string | undefined;
 			};
 		},
 	) {
@@ -280,6 +282,17 @@ export class Registry {
 				 */
 				schedule: (spec: ScheduleSpec) => {
 					if (!this.host.tasks) throw new Error("This deck has no dashboard.");
+					/*
+					 * A dispatcher deciding a task that a cron job made must not answer it with
+					 * another schedule: the task's recurring words are the cron's own text, and a
+					 * schedule made here would fire tomorrow, be dispatched, and enlist a third.
+					 * The brief already says so; refused here too, so a missed sentence cannot
+					 * loop the deck.
+					 */
+					if (agent.role === "dispatcher" && agent.deciding) {
+						const cron = this.host.tasks.cronOf(agent.deciding);
+						if (cron) return { error: `This task is one firing of the cron job "${cron}", which already exists. Hand the work to an agent with stage.send instead of scheduling it again.` };
+					}
 					const made = this.host.tasks.schedule(spec);
 					if (!("error" in made) && agent.role === "dispatcher" && agent.deciding && !agent.decidedSend) {
 						agent.decidedSend = true;

@@ -296,6 +296,7 @@ export class App {
 					decided: (outcome) => this.tasks.decided(outcome),
 					schedule: (spec) => this.tasks.createSchedule(spec),
 					scheduled: (outcome) => this.tasks.scheduled(outcome),
+					cronOf: (taskId) => this.tasks.cronOf(taskId),
 				},
 			},
 		);

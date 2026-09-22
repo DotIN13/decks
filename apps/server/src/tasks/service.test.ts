@@ -101,6 +101,22 @@ test("a deciding turn that makes a schedule finishes the task with the schedule 
 	cleanup();
 });
 
+test("cronOf names the schedule a task came from, and nothing for a typed one", () => {
+	const { service, cleanup } = harness([ada]);
+	const made = service.createSchedule({ name: "Morning AI papers", at: "08:00", days: [0, 1, 2, 3, 4, 5, 6], workspace: "decks", task: "Each morning, write the paper boards." });
+	assert.ok(!("error" in made));
+	const schedule = made as Schedule;
+	const fired = service.create({ text: schedule.task, workspace: "decks" }, { scheduleId: schedule.id });
+	assert.equal(service.cronOf(fired.id), "Morning AI papers");
+	// A person's own task has no cron, so a deciding dispatcher may still schedule it.
+	const typed = service.create({ text: "every weekday at nine, digest" });
+	assert.equal(service.cronOf(typed.id), undefined);
+	// The source outlives its schedule: a task a cron made still was not typed by a person.
+	const orphan = service.create({ text: "x", workspace: "decks" }, { scheduleId: "gone" });
+	assert.equal(service.cronOf(orphan.id), "a cron job");
+	cleanup();
+});
+
 test("a deciding turn that sends nothing blocks the task with what the dispatcher said", () => {
 	const { service, cleanup } = harness([ada]);
 	const result = service.create({ text: "x" });
