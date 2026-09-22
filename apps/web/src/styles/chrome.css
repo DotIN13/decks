@@ -859,6 +859,9 @@
 	}
 
 	.seg > button {
+		/* The box a mark on a tab (the panel's `.dispatch-tab-dot`) is placed in: without it
+		   the dot climbs to the nearest positioned ancestor, which is the sidebar's own corner. */
+		position: relative;
 		flex: 1;
 		height: 20px;
 		border: 0;
