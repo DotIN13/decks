@@ -58,9 +58,12 @@ const KINDS = ["pi", "claude", "opencode", "antigravity"];
 
 /*
  * The add-agent menu is the one surface that draws all four still marks at once: the panel's rows
- * draw faces, and a face is an avatar rather than a runtime.
+ * draw faces, and a face is an avatar rather than a runtime. It opens from the composer's chip,
+ * under New agent, since the pill's own + is gone.
  */
-await page.locator('[aria-label="Add an agent"]').click();
+await page.locator(".dock-to-chip").click();
+await page.waitForSelector(".popover [data-row]", { timeout: 4000 });
+await page.locator('.popover [aria-label="New agent: choose its runtime"]').click();
 await page.waitForSelector(".popover [data-row]", { timeout: 4000 });
 await settle(page, 300);
 

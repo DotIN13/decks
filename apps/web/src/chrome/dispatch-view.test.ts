@@ -5,8 +5,6 @@ import {
 	agoLabel,
 	daysLabel,
 	fileName,
-	filterCards,
-	galleryGroups,
 	holderNames,
 	isNews,
 	schedulePaused,
@@ -66,61 +64,6 @@ test("wantsYou counts blocked and failed only", () => {
 	assert.equal(wantsYou([]), 0);
 });
 
-test("galleryGroups shelves by holder, puts unheld boards last and folded, and marks what changed", () => {
-	const boards = [
-		board("boards/a-old.html", { modifiedAt: NOW - 48 * HOUR, lastWrittenBy: "a1" }),
-		board("boards/a-new.html", { modifiedAt: NOW - HOUR, lastWrittenBy: "a1", namedAt: NOW - HOUR }),
-		board("boards/b.html", { modifiedAt: NOW - 2 * HOUR }),
-		board("boards/nobody.html", { modifiedAt: NOW - 3 * HOUR }),
-	];
-	const contexts = { a1: ["boards/a-old.html", "boards/a-new.html"], b1: ["boards/b.html"] };
-	const wrote = task("done", { result: { at: NOW - HOUR, report: "drew it", boards: ["boards/a-new.html"] } });
-	const groups = galleryGroups(boards, identities, contexts, [wrote], NOW);
-	assert.deepEqual(
-		groups.map((group) => group.name),
-		["alpha", "beta", "No workspace"],
-	);
-	const alpha = groups[0]!;
-	assert.deepEqual(
-		alpha.cards.map((card) => card.board.path),
-		["boards/a-new.html", "boards/a-old.html"],
-	);
-	assert.equal(alpha.changed, 1);
-	assert.equal(alpha.collapsed, false);
-	assert.equal(alpha.cards[0]!.writtenBy, "Ada");
-	assert.equal(alpha.cards[0]!.fromTask?.id, wrote.id);
-	assert.equal(alpha.cards[1]!.writtenBy, "Ada");
-	assert.equal(alpha.cards[1]!.changed, false);
-	assert.equal(alpha.cards[1]!.fromTask, undefined);
-	const tail = groups[2]!;
-	assert.equal(tail.real, false);
-	assert.equal(tail.collapsed, true);
-	assert.deepEqual(tail.cards.map((card) => card.board.path), ["boards/nobody.html"]);
-	assert.deepEqual(tail.agents, ["Loose"]);
-});
-
-test("galleryGroups caps a shelf at nine and counts the rest, but counts changed before the cap", () => {
-	const boards = Array.from({ length: 12 }, (_, i) => board(`boards/p${i}.html`, { modifiedAt: NOW - i * HOUR }));
-	const contexts = { a1: boards.map((one) => one.path) };
-	const [alpha] = galleryGroups(boards, identities, contexts, [], NOW);
-	assert.equal(alpha!.cards.length, 9);
-	assert.equal(alpha!.more, 3);
-	assert.equal(alpha!.changed, 12);
-});
-
-test("filterCards narrows by chip, then by path or title", () => {
-	const cards = [
-		{ board: board("boards/plan.html", { title: "The plan" }), changed: true },
-		{ board: board("boards/notes.html", { title: "Notes" }), changed: false, fromTask: task("done") },
-	];
-	assert.equal(filterCards(cards, "all", "").length, 2);
-	assert.equal(filterCards(cards, "changed", "")[0]!.board.path, "boards/plan.html");
-	assert.equal(filterCards(cards, "from-tasks", "")[0]!.board.path, "boards/notes.html");
-	assert.equal(filterCards(cards, "all", "PLAN").length, 1);
-	assert.equal(filterCards(cards, "all", "the plan").length, 1);
-	assert.equal(filterCards(cards, "changed", "notes").length, 0);
-});
-
 test("fileName drops the folder and the extension", () => {
 	assert.equal(fileName("boards/plan.html"), "plan");
 	assert.equal(fileName("boards/deep/plan.slides.html"), "deep/plan.slides");
@@ -153,10 +96,6 @@ test("a board is news until the person reads it, and again once it is named afte
 	assert.equal(isNews({ ...written, seenAt: NOW - 10 * 60 * 1000 }, NOW), false, "read since");
 	assert.equal(isNews({ ...written, seenAt: NOW - 2 * HOUR }, NOW), true, "written after the last look");
 	assert.equal(isNews(board("boards/old.html", { modifiedAt: NOW - 48 * HOUR }), NOW), false, "a day old is not news either way");
-
-	const groups = galleryGroups([{ ...written, seenAt: NOW - 60_000 }], identities, { a1: ["boards/plan.html"] }, [], NOW);
-	assert.equal(groups[0]!.changed, 0);
-	assert.equal(groups[0]!.cards[0]!.changed, false);
 });
 
 /*
@@ -192,38 +131,10 @@ test("a file written with no byline at all is still news", () => {
 	assert.equal(isNews(board("boards/script.html", { modifiedAt: NOW - 60_000 }), NOW), true);
 });
 
-test("the card says how long ago, and only when it is news", () => {
-	const act = board("boards/plan.html", { modifiedAt: NOW - 3 * HOUR, lastWrittenBy: "a1", namedAt: NOW - 45 * 60 * 1000 });
-	const groups = galleryGroups([act], identities, { a1: ["boards/plan.html"] }, [], NOW);
-	assert.equal(groups[0]!.cards[0]!.changedAgo, "45m");
-	assert.equal(groups[0]!.cards[0]!.writtenBy, "Ada");
-	const read = galleryGroups([{ ...act, seenAt: NOW - 60_000 }], identities, { a1: ["boards/plan.html"] }, [], NOW);
-	assert.equal(read[0]!.cards[0]!.changed, false);
-	assert.equal(read[0]!.cards[0]!.changedAgo, undefined, "a card that is not news carries no age");
-});
-
-test("a shelf sorts by the newest act, so a reported board leads its own shelf", () => {
-	const written = board("boards/written.html", { modifiedAt: NOW - 4 * HOUR });
-	const reported = board("boards/reported.html", { modifiedAt: NOW - 6 * HOUR, lastWrittenBy: "a1", namedAt: NOW - 60_000 });
-	const groups = galleryGroups([written, reported], identities, { a1: ["boards/written.html", "boards/reported.html"] }, [], NOW);
-	assert.deepEqual(groups[0]!.cards.map((one) => one.board.path), ["boards/reported.html", "boards/written.html"]);
-});
-
 test("the age is a phrase a chip can hold", () => {
 	assert.equal(agoLabel(NOW - 30_000, NOW), "now");
 	assert.equal(agoLabel(NOW - 45 * 60 * 1000, NOW), "45m");
 	assert.equal(agoLabel(NOW - 5 * HOUR, NOW), "5h");
 	assert.equal(agoLabel(NOW - 26 * HOUR, NOW), "1d");
 	assert.equal(agoLabel(NOW + HOUR, NOW), "now", "a clock ahead of the person's is not a negative age");
-});
-
-test("a card carries the writer's id only when that agent is still on the deck", () => {
-	const boards = [
-		board("boards/mine.html", { modifiedAt: NOW - HOUR, lastWrittenBy: "a1" }),
-		board("boards/yours.html", { modifiedAt: NOW - HOUR, lastWrittenBy: "you" }),
-		board("boards/gone.html", { modifiedAt: NOW - HOUR, lastWrittenBy: "deleted-agent" }),
-	];
-	const cards = galleryGroups(boards, identities, { a1: boards.map((one) => one.path) }, [], NOW)[0]!.cards;
-	const by = Object.fromEntries(cards.map((card) => [card.board.path, card.writerId]));
-	assert.deepEqual(by, { "boards/mine.html": "a1", "boards/yours.html": undefined, "boards/gone.html": undefined });
 });

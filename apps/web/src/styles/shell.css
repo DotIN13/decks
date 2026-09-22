@@ -170,11 +170,6 @@
 	 * next to a 28px avatar rather than between two dividers, so the canvas chip's padding
 	 * would push the chevron away from the face it belongs to.
 	 */
-	.pill-agent-name {
-		max-width: 160px;
-		padding: 0 4px;
-		font-size: 12px;
-	}
 	.pill-name-field {
 		width: 160px;
 		height: 26px;

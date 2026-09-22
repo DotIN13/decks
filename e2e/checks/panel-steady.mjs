@@ -114,7 +114,7 @@ await settle(page, 400);
  * these agents has a project, so they are all in one heading and no state change can move
  * anything. The workspace case is measured lower down, on purpose.
  */
-await page.locator(".panel-foot .seg[data-seg='agents'] button", { hasText: /^Attention$/ }).click();
+await page.locator('.panel-view[data-view="workspace"]').click();
 await settle(page, 400);
 
 /*
@@ -309,7 +309,7 @@ for (const agent of agents) {
 	await feed({ type: "agent.identity", id: agent.id, identity: { name: agent.name, color: "#3b5cf6", tags: [], workspace: agent.id.startsWith("w") ? "irb-84069" : "political-llm" } });
 }
 await settle(page, 400);
-await page.locator('.panel-foot .seg[data-seg="agents"] button', { hasText: "Workspace" }).click();
+await page.locator('.panel-view[data-view="attention"]').click();
 await settle(page, 400);
 
 const filed = await change("Iris: waiting → working", { type: "agent.state", id: "w1", state: "streaming" });

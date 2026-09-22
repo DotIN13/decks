@@ -1,4 +1,6 @@
 import type { Board, Canvas } from "@decks/protocol";
+import Activity from "lucide-solid/icons/activity";
+import Folder from "lucide-solid/icons/folder";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Rows3 from "lucide-solid/icons/rows-3";
 import Plus from "lucide-solid/icons/plus";
@@ -14,7 +16,8 @@ import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentRow } from "./AgentRow.tsx";
 import { CanvasRow } from "./CanvasRow.tsx";
 import { canvasSections } from "./canvas-sections.ts";
-import { agentFoot, agentSections, agentTally, type AgentGroup, type AgentSection } from "./agent-sections.ts";
+import { agentSections, agentTally, type AgentGroup, type AgentSection } from "./agent-sections.ts";
+import { isNews } from "./dispatch-view.ts";
 
 /**
  * The left panel: one surface, **one list**, and a button that makes it go away.
@@ -344,11 +347,8 @@ export function LeftPanel(props: {
 	 */
 	const canvasList = createMemo(() => canvasSections({ canvases: props.canvases ?? [], ...(props.currentCanvas ? { current: props.currentCanvas } : {}), query: query() }));
 	const canvasCount = () => (props.canvases ?? []).length;
-	const canvasFoot = () => {
-		const shown = canvasList().reduce((sum, section) => sum + section.rows.length, 0);
-		if (query().trim()) return `${shown} of ${canvasCount()} match`;
-		return canvasCount() === 0 ? "No canvases yet" : `${canvasCount()} canvas${canvasCount() === 1 ? "" : "es"}`;
-	};
+	/** Boards an agent named since the person last read them: the dot on the Boards tab. */
+	const news = createMemo(() => props.boards.filter((board) => isNews(board)).length);
 	const [agentList, setAgentList] = createStore<AgentSection[]>(agentSections(agentInput()));
 	createEffect(() => setAgentList(reconcile(agentSections(agentInput()))));
 
@@ -632,6 +632,9 @@ export function LeftPanel(props: {
 										}}
 									>
 										{PANEL_TAB_LABEL[name]}
+										<Show when={name === "boards" && news() > 0}>
+											<span class="dispatch-tab-dot" aria-label={`${news()} boards changed`} />
+										</Show>
 									</button>
 								)}
 							</For>
@@ -646,7 +649,8 @@ export function LeftPanel(props: {
 						vertical, and a `flex-basis: 0` beats a stated height — so the field measured
 						its input's min-content and came out 19px instead of 32.
 					*/}
-					<label class="field h-8 flex-none gap-1.5 rounded-lg pointer-coarse:h-10 pointer-coarse:gap-2 pointer-coarse:px-2.5">
+					<div class="flex flex-none gap-1.5">
+					<label class="field h-8 min-w-0 flex-1 gap-1.5 rounded-lg pointer-coarse:h-10 pointer-coarse:gap-2 pointer-coarse:px-2.5">
 						<Icon of={Search} class="flex-none text-faint" size={13} />
 						{/*
 							16px on a touch keyboard, like the composer's field and for the same reason:
@@ -706,6 +710,39 @@ export function LeftPanel(props: {
 							</button>
 						</Show>
 					</label>
+					{/*
+						One control beside the search, and it is the foot's two, folded into one press.
+
+						Pictures or rows is a question about *thumbnails*, so it belongs to Boards; an
+						agent list has two ways of being cut up — by who needs you, or by which project
+						they are on — so on Agents the same square switches the grouping. The icon is
+						what a press will give you, and `data-view` is what is showing now, for a check.
+						Canvases have one rendering and one order, so there the square is not drawn.
+					*/}
+					<Show when={tab() !== "canvases"}>
+						<button
+							type="button"
+							class="iconbtn panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
+							data-view={tab() === "boards" ? density() : group()}
+							aria-label={
+								tab() === "boards"
+									? density() === "list"
+										? "Show boards as a grid"
+										: "Show boards as a list"
+									: group() === "workspace"
+										? "Group agents by what needs you"
+										: "Group agents by workspace"
+							}
+							title={tab() === "boards" ? (density() === "list" ? "Grid" : "List") : group() === "workspace" ? "Working, waiting, quiet" : "One section per workspace"}
+							onClick={() => {
+								if (tab() === "boards") goDensity(density() === "list" ? "grid" : "list");
+								else goGroup(group() === "workspace" ? "attention" : "workspace");
+							}}
+						>
+							<Icon of={tab() === "boards" ? (density() === "list" ? LayoutGrid : Rows3) : group() === "workspace" ? Activity : Folder} size={13} />
+						</button>
+					</Show>
+					</div>
 				</div>
 
 				<div
@@ -938,82 +975,6 @@ export function LeftPanel(props: {
 					</Show>
 				</div>
 
-				{/* The foot: what the list adds up to, and how it is drawn. 24px, 8px above it. */}
-				<div class="panel-foot meta">
-					{/*
-						What the list adds up to: its size, and how much of it is the agent's.
-
-						While a search is running it says how many of the deck matched, because that
-						is the number that changed. The held count rides along when there is one —
-						the sections say it too, but they scroll and this does not.
-					*/}
-					<span class="truncate">
-						{tab() === "canvases"
-							? canvasFoot()
-							: tab() === "agents"
-							? agentFoot(allAgents(), query().trim() ? agentTally(agentList).total : undefined)
-							: tally().shown === props.boards.length
-								? `${props.boards.length} board${props.boards.length === 1 ? "" : "s"}${tally().held > 0 ? ` · ${tally().held} held` : ""}`
-								: `${tally().shown} of ${props.boards.length} match`}
-					</span>
-					<span class="flex-1" />
-					{/*
-						The density toggle belongs to Boards, and the grouping to Agents.
-
-						Pictures or rows is a question about *thumbnails*; an agent has no second rendering.
-						What an agent list does have two of is ways of cutting it up — by who needs you, or
-						by which project they are on — so the foot's right-hand slot holds one control per
-						tab, and it is the same slot and the same `.seg` either way. Hidden rather than
-						disabled, for the reason this file gives elsewhere: a control that cannot be pressed
-						asks to be explained, and its absence here explains itself.
-					*/}
-					<div class="seg" data-seg="density" style={tab() !== "boards" ? { display: "none" } : undefined}>
-						<button
-							type="button"
-							class="grid place-items-center px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
-							data-on={density() === "list"}
-							aria-label="Show boards as a list"
-							aria-pressed={density() === "list"}
-							onClick={() => goDensity("list")}
-						>
-							<Icon of={Rows3} size={12} />
-						</button>
-						<button
-							type="button"
-							class="grid place-items-center px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
-							data-on={density() === "grid"}
-							aria-label="Show boards as a grid"
-							aria-pressed={density() === "grid"}
-							onClick={() => goDensity("grid")}
-						>
-							<Icon of={LayoutGrid} size={12} />
-						</button>
-					</div>
-					<div class="seg" data-seg="agents" style={tab() !== "agents" ? { display: "none" } : undefined}>
-						<button
-							type="button"
-							class="px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
-							data-on={group() === "attention"}
-							aria-label="Group agents by what needs you"
-							aria-pressed={group() === "attention"}
-							title="Working, waiting, quiet"
-							onClick={() => goGroup("attention")}
-						>
-							Attention
-						</button>
-						<button
-							type="button"
-							class="px-1.5 pointer-coarse:h-8 pointer-coarse:px-3"
-							data-on={group() === "workspace"}
-							aria-label="Group agents by workspace"
-							aria-pressed={group() === "workspace"}
-							title="One section per workspace"
-							onClick={() => goGroup("workspace")}
-						>
-							Workspace
-						</button>
-					</div>
-				</div>
 			</aside>
 		</>
 	);

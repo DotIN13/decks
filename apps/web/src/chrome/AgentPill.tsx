@@ -624,13 +624,6 @@ export function AgentPill(props: {
 	/** Whether the draw tool is on, and how to turn it on and off. Browse mode only. */
 	drawing: boolean;
 	onDrawing: (drawing: boolean) => void;
-	chats: AgentChat[];
-	identities: Record<string, Identity>;
-	focused: string | undefined;
-	unread: Record<string, number>;
-	onFocus: (id: string) => void;
-	onNew: (kind?: AgentKind) => void;
-	onClose: (id: string) => void;
 	/** Whether the boards panel is showing. A button, not a hover — folded means gone. */
 	boardsOpen: boolean;
 	onToggleBoards: () => void;
@@ -657,8 +650,6 @@ export function AgentPill(props: {
 	 */
 	canvas?: { id: string; name: string; agents: string[] };
 	onRenameCanvas?: (name: string) => void;
-	/** Rename the agent you are talking to, from its own name in the line. Absent and the name is a label. */
-	onRenameAgent?: (id: string, name: string) => void;
 	/**
 	 * Every canvas in the deck, for the switcher in the pill's canvas segment.
 	 *
@@ -671,12 +662,8 @@ export function AgentPill(props: {
 	onNewCanvas?: () => void;
 	/** Remove a canvas from the deck, from the switcher's rows. Boards stay. */
 	onRemoveCanvas?: (id: string) => void;
-	/** Open the Agents panel, from the agent list's overflow row. */
-	onMoreAgents?: () => void;
-	/** How many tasks want a person: the badge on Home, and on the Boards tab. */
+	/** How many tasks want a person: the badge on Home, and on the Tasks tab. */
 	wantsYou?: number;
-	/** How many boards an agent named since the person last read them: the dot on the Boards tab. */
-	news?: number;
 	/**
 	 * The dashboard's tabs, drawn in the pill where the agent and the + are on a stage.
 	 * On the dashboard the pill is the deck's, and the deck's three views are the thing to
@@ -686,11 +673,6 @@ export function AgentPill(props: {
 	onTab?: (tab: DispatchTab) => void;
 }) {
 	const onStage = () => props.surface !== "dispatch";
-	const active = () => props.chats.find((chat) => chat.id === props.focused);
-	const name = () => {
-		const chat = active();
-		return chat ? (props.identities[chat.id]?.name ?? chat.name) : undefined;
-	};
 	const current = () => TOOLS.find((entry) => entry.tool === props.tool) ?? TOOLS[0];
 
 	return (
@@ -800,142 +782,14 @@ export function AgentPill(props: {
 			</Show>
 
 			{/*
-			 * The active agent, with the same ring it would carry in the corner — which is also
-			 * why it has no face over there. A face in two corners is one too many.
-			 *
-			 * `flex-none` on the group and a `max-w` on the name, rather than `min-w-0` and
-			 * letting it shrink. The pill is absolutely positioned with no width, so its width
-			 * is shrink-to-fit — and an `overflow: hidden` child with `min-width: 0` inside one
-			 * contributes *nothing* to that calculation. The pill sized itself as if the name
-			 * were not there and laid the tools out on top of it: "Claude" came out as two
-			 * clipped letters under the select tool.
-			 *
-			 * So the name takes the room it needs and stops at 160px, which is about twenty
-			 * characters. Past that a name is not being read but recognised, and the dropdown
-			 * spells it out in full.
-			*/}
-			{/* On the dashboard: the three views, and nothing about agents. The sidebar has them. */}
+			 * No agent here. The face, the switcher and the + that used to follow the canvas are
+			 * gone: the corner's ringed face says who you follow, the composer's chip says who
+			 * gets the line and opens the same list, and the sidebar's Agents tab is the roster.
+			 * One thing in one bar.
+			 */}
+			{/* On the dashboard: the three views. The agents are the sidebar's and the composer's. */}
 			<Show when={!onStage()}>
-				<DispatchTabs tab={props.tab ?? "boards"} onTab={(tab) => props.onTab?.(tab)} badge={props.wantsYou} news={props.news} />
-			</Show>
-
-			<Show when={onStage()}>
-			{/* The face, the name and the chevron are one group: the agents menu opens from the
-			    chevron and lines up with the group (`data-popover-anchor`, read by `ui/Popover`). */}
-			<span class="flex items-center gap-1" data-popover-anchor>
-			<Show
-				when={active()}
-				fallback={<span class="label px-1">No agent</span>}
-			>
-				{(chat) => (
-					<span class="flex flex-none items-center gap-[7px] pl-0.5">
-						<AgentFace chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} />
-						{/*
-							The name goes on a phone; the face stays.
-
-							At 393px with 44px touch targets the pill came to 305px and ran 42px
-							into the corner cluster — two floats overlapping, which is the one
-							thing a floating chrome must not do. The name is the cheapest 67px
-							in it: the avatar still says whose window this is, its ring still
-							says what the agent is doing, and the dropdown spells the name out
-							the moment you reach for it.
-
-							**768, where everything else in this pill unfolds at 640** — and the
-							two numbers are the same sum done twice. Without the name the two
-							clusters come to 548px of content, so 640 leaves them 92px apart;
-							*with* one they come to as much as 708, because `max-w-[160px]` is
-							what a name is allowed to cost. A single breakpoint would have to be
-							the larger of the two, which would hold the buttons back 128px for
-							a string that is not one of them.
-						*/}
-						{/*
-							Renamed in place, like the canvas beside it: a press on the name is a
-							field, Escape keeps the old one. An agent names itself as its first act
-							(`stage.me({ name })`), and this is the same act from your side — which
-							is why `Agent 3` can be the thing it is *called* rather than a label you
-							have to ask an agent to change on your behalf.
-						*/}
-						<EditableName
-							name={name() ?? ""}
-							label="Agent name"
-							title={`Rename ${name()}`}
-							class="pill-name pill-agent-name max-[768px]:hidden"
-							onRename={(next) => props.onRenameAgent?.(chat().id, next)}
-						/>
-					</span>
-				)}
-			</Show>
-
-			<AgentMenu
-				chats={props.chats}
-				identities={props.identities}
-				focused={props.focused}
-				unread={props.unread}
-				here={props.canvas?.agents ?? []}
-				onFocus={props.onFocus}
-				onNew={props.onNew}
-				onClose={props.onClose}
-				{...(props.onMoreAgents ? { onMore: props.onMoreAgents } : {})}
-				label="Agents"
-				trigger={(api) => (
-					<button
-						type="button"
-						class="iconbtn max-[360px]:hidden"
-						ref={api.ref}
-						aria-haspopup="menu"
-						aria-expanded={api.open}
-						data-on={api.open ? "soft" : undefined}
-						title="Switch agent (⌘J)"
-						aria-label={name() ? `Agents — currently ${name()}` : "Agents"}
-						onClick={api.toggle}
-					>
-						<Icon of={ChevronDown} size={12} />
-					</button>
-				)}
-			/>
-			</span>
-
-			{/*
-				Add an agent, one press from the toolbar.
-
-				The list existed and was three presses deep: the chevron, then `New agent`, then the
-				runtime chip beside it — and the runtime is the one thing about a new agent that
-				**cannot be changed afterwards**, so it was the last thing the flow asked. This is
-				the same list (the same component, `AgentChoices`) one press from the toolbar, which
-				is where "add" lives in every app the person using this has already met.
-
-				Beside the selector it adds to, and not with the tools: adding an agent does not
-				change what a click on the canvas does. That is also what keeps two `+`-shaped
-				menus apart — the corner's is a new *board*.
-
-				Fold-away below 640px, where the pill is a 393px line with 44px targets and four
-				buttons already. Nothing is lost there: the chevron beside it opens the agents
-				menu, whose `New agent` pair is the same two presses it always was.
-			*/}
-			<Popover
-				placement="bottom-start"
-				label="Add an agent"
-				class="w-[248px]"
-				trigger={(api) => (
-					<button
-						type="button"
-						class="iconbtn max-[640px]:hidden"
-						ref={api.ref}
-						aria-haspopup="menu"
-						aria-expanded={api.open}
-						data-on={api.open ? "soft" : undefined}
-						title="Add an agent: pick its runtime"
-						aria-label="Add an agent"
-						onClick={api.toggle}
-					>
-						<Icon of={Plus} size={15} />
-					</button>
-				)}
-			>
-				<AgentChoices onPick={(kind) => props.onNew(kind)} />
-			</Popover>
-
-			<span class="pill-sep max-[360px]:hidden" aria-hidden="true" />
+				<DispatchTabs tab={props.tab ?? "canvases"} onTab={(tab) => props.onTab?.(tab)} badge={props.wantsYou} />
 			</Show>
 
 			{/*

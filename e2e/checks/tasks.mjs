@@ -18,7 +18,7 @@ import { open, say, settle, socket, WEB } from "../harness.mjs";
 
 // The harness opens on the stage; this check is about the dashboard, so it goes there.
 const { browser, page, errors } = await open({ width: 1500, height: 1000, boards: false });
-await page.goto(`${WEB}/#/boards`, { waitUntil: "load" });
+await page.goto(`${WEB}/#/canvases`, { waitUntil: "load" });
 await page.waitForSelector(".surface");
 await settle(page, 1200);
 const LINK = await socket();
@@ -37,12 +37,12 @@ for (let i = 0; i < 30 && !agentId; i++) {
 say("the deck has a dispatcher, and it is not in the agent panel", (LINK.last("agents")?.chats ?? []).some((chat) => chat.role === "dispatcher") && !((await page.locator(".panel-shell").textContent()) ?? "").includes("Dispatcher"));
 if (!agentId) throw new Error("the fixture deck has no agent to dispatch to");
 
-// A workspace for the agent, so the gallery has a real shelf and a schedule a place to write.
+// A workspace for the agent, so the shelf of canvases has a real heading and a schedule a place to write.
 LINK.send({ type: "agent.workspace", id: agentId, workspace: "political-llm" });
 await settle(page, 600);
 
 say("the app lands on the dashboard", (await page.getAttribute(".surface", "data-surface")) === "dispatch");
-say("the gallery has a shelf for the workspace", ((await page.locator(".dispatch").textContent()) ?? "").includes("political-llm"));
+say("the shelf has a heading for the workspace", ((await page.locator(".dispatch").textContent()) ?? "").includes("political-llm"));
 
 // --- a task, from the bar ------------------------------------------------------
 const TASK = "Remeasure the panel widths across every board";

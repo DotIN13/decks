@@ -251,11 +251,6 @@
 	}
 
 	/* --- the gallery ------------------------------------------------------------------------ */
-	.dispatch-gallery {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
 	.dispatch-gallery-bar {
 		display: flex;
 		align-items: center;
@@ -263,11 +258,6 @@
 		/* 4px above, not 2: the pane scrolls from the bar's top edge, and the search field's focus
 		   ring is 3px wide — at 2px the ring's top line was cut off. */
 		padding: 4px 0;
-	}
-	.dispatch-filters {
-		display: flex;
-		flex: none;
-		gap: 4px;
 	}
 	.dispatch-search {
 		height: var(--control-md, 26px);
@@ -281,164 +271,6 @@
 	.dispatch-search > input::-webkit-search-cancel-button {
 		-webkit-appearance: none;
 		appearance: none;
-	}
-
-	.dispatch-shelf {
-		border-top: 1px solid var(--line);
-	}
-	.dispatch-shelf-head {
-		display: flex;
-		width: 100%;
-		align-items: baseline;
-		gap: 8px;
-		padding: 8px 2px;
-		border: 0;
-		background: none;
-		color: inherit;
-		cursor: pointer;
-		font: inherit;
-		text-align: left;
-	}
-	.dispatch-shelf-head:hover .dispatch-shelf-name {
-		color: var(--color-accent);
-	}
-	.dispatch-shelf-name {
-		font-size: 12.5px;
-		font-weight: 600;
-	}
-	.dispatch-shelf-meta {
-		min-width: 0;
-		overflow: hidden;
-		color: var(--faint);
-		font-size: 11.5px;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.dispatch-shelf[data-folded="true"] .dispatch-shelf-name {
-		color: var(--muted);
-		font-weight: 500;
-	}
-	.dispatch-more {
-		margin: 0;
-		padding: 6px 2px 8px;
-		color: var(--faint);
-		font-size: 11.5px;
-	}
-
-	/*
-	 * As many columns as fit, none narrower than 240px, and a card never wider than 360:
-	 * a card is a picture of a board read at a glance, and three columns of a 2400px
-	 * window made each one a poster. On a wide window there are more of them, not bigger
-	 * ones. The cap is on the card rather than the track, because `auto-fill` counts
-	 * columns by a track's maximum: with `minmax(220px, 320px)` a 1180px grid got three
-	 * columns and 220px of nothing beside them.
-	 */
-	.dispatch-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-		gap: 10px;
-		padding-bottom: 10px;
-	}
-	.dispatch-card {
-		display: flex;
-		min-width: 0;
-		max-width: 360px;
-		flex-direction: column;
-		gap: 5px;
-	}
-	/* The picture and the name are the button; the chips under them are their own controls. */
-	.dispatch-card-open {
-		display: flex;
-		min-width: 0;
-		flex-direction: column;
-		gap: 5px;
-		padding: 0;
-		border: 0;
-		background: none;
-		color: inherit;
-		cursor: pointer;
-		font: inherit;
-		text-align: left;
-	}
-	.dispatch-card-open:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 2px;
-		border-radius: 8px;
-	}
-	.dispatch-card-pic {
-		position: relative;
-		display: block;
-		aspect-ratio: 4 / 3;
-		overflow: hidden;
-		border: 1px solid var(--line);
-		border-radius: 8px;
-		background: var(--panel);
-		transition: border-color 120ms ease, box-shadow 120ms ease;
-	}
-	.dispatch-card:hover .dispatch-card-pic {
-		border-color: var(--line-strong);
-		box-shadow: var(--shadow-row);
-	}
-	/*
-	 * The mark, in three parts, because on a shelf of thirty pale tiles a hairline is not a mark.
-	 * The spine sits inside the radius and reads as one shape with the frame; the frame and its
-	 * ring make the card gain a halo rather than a line. It stays on the accent colour rather than
-	 * the warn one: nothing is wrong with a board an agent has just finished.
-	 */
-	.dispatch-card[data-changed="true"] .dispatch-card-pic {
-		border-color: color-mix(in srgb, var(--color-accent) 55%, var(--line));
-		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent);
-	}
-	.dispatch-card[data-changed="true"] .dispatch-card-pic::before {
-		content: "";
-		position: absolute;
-		inset: 0 auto 0 0;
-		width: 3px;
-		background: var(--color-accent);
-		z-index: 2;
-	}
-	/* One pulse, and only for a mark that arrived under a reader's eyes (`Gallery.tsx`). */
-	@keyframes dispatch-news-arrives {
-		from {
-			opacity: 0;
-			transform: scaleY(0.25);
-		}
-	}
-	.dispatch-card[data-arrived="true"] .dispatch-card-pic::before {
-		transform-origin: center top;
-		animation: dispatch-news-arrives 900ms ease-out 1;
-	}
-	.dispatch-card-pic > img {
-		display: block;
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		object-position: top left;
-	}
-	.dispatch-card-tile {
-		display: grid;
-		height: 100%;
-		padding: 10px;
-		place-items: center;
-		color: var(--muted);
-		font-size: 11.5px;
-		line-height: 1.35;
-		text-align: center;
-		overflow-wrap: anywhere;
-	}
-	.dispatch-card-name {
-		overflow: hidden;
-		color: var(--fg);
-		font-family: var(--font-mono);
-		font-size: 11px;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.dispatch-card-chips {
-		display: flex;
-		min-width: 0;
-		flex-wrap: wrap;
-		gap: 4px;
 	}
 
 	/* --- the note over a list, and the groups ------------------------------------------- */
@@ -473,11 +305,6 @@
 	.dispatch-chip[data-s="plain"] {
 		background: var(--line);
 		color: var(--muted);
-	}
-	/* The count on a shelf says how many of its cards are news before a card is read. */
-	.dispatch-shelf-changed[data-any="true"] {
-		color: var(--color-accent);
-		font-weight: 600;
 	}
 	/* A dot on the Boards tab, not a number: the number that tab carries means waiting on you. */
 	.dispatch-tab-dot {

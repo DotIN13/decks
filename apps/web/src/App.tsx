@@ -526,7 +526,7 @@ export function App() {
 			const inField = !!target?.closest?.("input, textarea, select, [contenteditable]");
 			if ((event.metaKey || event.ctrlKey) && !event.altKey && ["1", "2", "3"].includes(event.key) && surface() === "dispatch" && !inField) {
 				event.preventDefault();
-				const tab = ({ "1": "boards", "2": "tasks", "3": "cron" } as const)[event.key as "1" | "2" | "3"];
+				const tab = ({ "1": "canvases", "2": "tasks", "3": "cron" } as const)[event.key as "1" | "2" | "3"];
 				go({ surface: "dispatch", tab });
 				return;
 			}
@@ -1821,8 +1821,6 @@ export function App() {
 					onOpenCanvas={(id) => openCanvas(id)}
 					onNewCanvas={() => newCanvas(state.focused ?? "")}
 					onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
-					onMoreAgents={openAgentsPanel}
-					onRenameAgent={(id, name) => send({ type: "agent.rename", id, name })}
 					mode={mode()}
 					onMode={(next) => {
 						// A press while editing means "this component", so the pen is put down first.
@@ -1831,17 +1829,9 @@ export function App() {
 					}}
 					drawing={drawing()}
 					onDrawing={setDrawing}
-					chats={visibleChats()}
-					identities={state.identities}
-					focused={state.focused}
-					unread={unread}
-					onFocus={addressAgent}
-					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
-					onClose={closeAgent}
 					surface={surface()}
 					onHome={goHome}
 					wantsYou={wantsYou(state.tasks)}
-					news={state.boards.filter((board) => isNews(board)).length}
 					tab={dispatchTab()}
 					onTab={(tab) => go({ surface: "dispatch", tab })}
 					boardsOpen={boardsOpen()}

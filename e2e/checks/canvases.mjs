@@ -161,8 +161,7 @@ const dot = await page.evaluate(() => {
 	return dot && bin && plus ? { dot: Math.round(dot.right), bin: Math.round(bin.right), plus: Math.round(plus.right) } : null;
 });
 say("…and a change since you looked is the dot, in the column the × and the + share", dot !== null && dot.dot === dot.bin && dot.dot === dot.plus, JSON.stringify(dot));
-const foot = await page.locator(".panel-foot .truncate").textContent();
-say("…and the foot counts them", foot?.trim() === "7 canvases", String(foot));
+say("…and there is no foot under the list, and no view button beside the search on this tab", (await page.locator(".panel-foot").count()) === 0 && (await page.locator(".panel-view").count()) === 0);
 if (SHOTS) await page.screenshot({ path: `${SHOTS}/tab.png`, clip: { x: 0, y: 0, width: 264, height: 620 } });
 
 await clearSent();
@@ -227,7 +226,7 @@ say("…and the canvas you just made is not marked as changed since you looked",
 await page.locator('.pill button[aria-label$="the boards panel"]').first().click().catch(() => {});
 await page.evaluate(() => { location.hash = "#/boards"; });
 await settle(page, 600);
-say("the Boards tab's bar carries the same New workspace button", (await page.locator(".dispatch-pane-boards .dispatch-gallery-bar .canvas-new").count()) === 1);
+say("the old gallery address lands on the canvases: there is no Boards tab on the dashboard", (await page.locator('.pill [role="tab"][aria-selected="true"]').textContent())?.trim() === "Canvases" && (await page.locator('.pill [role="tab"]').count()) === 3, await page.locator('.pill [role="tab"][aria-selected="true"]').textContent());
 
 // --- the pill's canvas switcher: a bin on every row, asked twice --------------------------
 await page.evaluate((hash) => { location.hash = hash; }, realStage);

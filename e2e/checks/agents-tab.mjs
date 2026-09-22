@@ -100,10 +100,8 @@ await settle(page, 800);
 
 // --- the dropdown: the runtime as a word, still one line ---------------------------
 
-await page.evaluate(() => {
-	const trigger = [...document.querySelectorAll(".float.pill button")].find((button) => /^Agents/.test(button.getAttribute("aria-label") ?? ""));
-	trigger?.click();
-});
+/* The list opens from the composer's chip now: the pill has no agent segment. */
+await page.locator(".dock-to-chip").click();
 await page.waitForSelector(".popover", { timeout: 4000 });
 await settle(page, 300);
 
@@ -198,11 +196,12 @@ await settle(page, 500);
  * by not having been told something.
  */
 const opened = await page.evaluate(() => ({
-	axis: [...document.querySelectorAll(".panel-foot .seg[data-seg='agents'] button")].map((button) => `${button.textContent?.trim()}${button.dataset.on === "true" ? "*" : ""}`),
+	/* The view square beside the search says which grouping is showing; a press gives the other. */
+	axis: document.querySelector(".panel-view")?.getAttribute("data-view"),
 	sections: [...document.querySelectorAll(".panel-section")].map((one) => `${one.dataset.kind}:${one.querySelectorAll(".agent-row").length}`),
 	label: document.querySelector(".panel-meta > span")?.textContent,
 }));
-say("the agents list opens cut by workspace", JSON.stringify(opened.axis) === JSON.stringify(["Attention", "Workspace*"]), JSON.stringify(opened.axis));
+say("the agents list opens cut by workspace", opened.axis === "workspace", JSON.stringify(opened.axis));
 say(
 	"…which is one heading here, since none of these five has a project",
 	JSON.stringify(opened.sections) === JSON.stringify(["unfiled:5"]) && opened.label === "No workspace",
@@ -210,7 +209,7 @@ say(
 );
 
 /* The other axis is one press away, and the rest of this section is about it. */
-await page.locator(".panel-foot .seg[data-seg='agents'] button", { hasText: /^Attention$/ }).click();
+await page.locator('.panel-view[data-view="workspace"]').click();
 await settle(page, 400);
 
 const panel = await page.evaluate(() => ({
@@ -240,19 +239,11 @@ const panel = await page.evaluate(() => ({
 			return Boolean(ic && body && body.left >= ic.right);
 		})(),
 	})),
-	/* The sentence alone: the foot's right-hand slot now holds the grouping control, and
-	   `innerText` of the box would read "5 agents Attention Workspace". */
-	foot: document.querySelector(".panel-foot > span")?.textContent?.trim(),
-	density: (() => {
-		const seg = document.querySelector(".panel-foot .seg[data-seg='density']");
-		return seg ? getComputedStyle(seg).display : "gone";
-	})(),
-	/* The foot's right-hand slot holds one control per tab — density for Boards, the grouping
-	   for Agents — so `data-seg` is how a check says which of the two it means. */
-	grouping: (() => {
-		const seg = document.querySelector(".panel-foot .seg[data-seg='agents']");
-		return seg ? [...seg.querySelectorAll("button")].map((b) => `${b.textContent?.trim()}${b.dataset.on === "true" ? "*" : ""}`) : [];
-	})(),
+	/* There is no foot: the count is in the headings, and the one control beside the search
+	   is the grouping on this tab, showing what is up and offering the other. */
+	foot: document.querySelector(".panel-foot")?.textContent?.trim(),
+	grouping: document.querySelector(".panel-view")?.getAttribute("data-view"),
+	groupingOffer: document.querySelector(".panel-view")?.getAttribute("aria-label"),
 	placeholder: document.querySelector(".panel-shell .field input")?.placeholder,
 }));
 
@@ -295,10 +286,9 @@ say("an agent with nothing to say gets a shorter row", basil.h < ada.h - 20, `Ba
  */
 say("…and dormant beats idle, in one word", basil.dormant === "true" && basil.state?.includes("Dormant"), JSON.stringify([basil.dormant, basil.state]));
 /* The foot counts, and it is the only count: the headings carry a + instead. */
-say("the foot counts what the sections hold", panel.foot === "5 agents", panel.foot);
+say("there is no foot under the list: the count lives in the headings", panel.foot === undefined, String(panel.foot));
 /* Pictures or rows is a question about thumbnails; an agent has no second rendering. */
-say("the density toggle belongs to Boards", panel.density === "none", panel.density);
-say("…and the grouping toggle belongs to Agents", JSON.stringify(panel.grouping) === JSON.stringify(["Attention*", "Workspace"]), JSON.stringify(panel.grouping));
+say("the square beside the search is the grouping on Agents: attention is up, and a press offers workspace", panel.grouping === "attention" && panel.groupingOffer === "Group agents by workspace", `${panel.grouping} / ${panel.groupingOffer}`);
 say("the field says what it searches", /agents, tags or workspaces/.test(panel.placeholder ?? ""), panel.placeholder);
 
 // --- approaching a row, and what is allowed to move ---------------------------------
@@ -359,12 +349,8 @@ await page.locator(".panel-shell .field input").fill("panel-css");
 await settle(page, 400);
 const found = await page.evaluate(() => ({
 	rows: [...document.querySelectorAll(".agent-row .lb")].map((el) => el.textContent),
-	/* The sentence alone: the foot's right-hand slot now holds the grouping control, and
-	   `innerText` of the box would read "5 agents Attention Workspace". */
-	foot: document.querySelector(".panel-foot > span")?.textContent?.trim(),
 }));
 say("searching a tag finds the agent on it", JSON.stringify(found.rows) === JSON.stringify(["Ada"]), JSON.stringify(found.rows));
-say("…and the foot says how many matched", found.foot === "1 of 5 match", found.foot);
 
 await page.locator(".panel-shell .field input").fill("mine");
 await settle(page, 400);
@@ -497,7 +483,7 @@ say("the attention axis is still the one that was asked for", JSON.stringify(att
 const chipped = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => `${row.querySelector(".lb")?.textContent}:${row.querySelector(".tag.ws")?.textContent ?? "-"}`));
 say("…and a workspace is on the row in the urgency grouping too", chipped.includes("Ada:political-llm") && chipped.includes("Basil:-"), JSON.stringify(chipped));
 
-await page.locator(".panel-foot .seg[data-seg='agents'] button", { hasText: /^Workspace$/ }).click();
+await page.locator('.panel-view[data-view="attention"]').click();
 await settle(page, 400);
 
 const filed = await page.evaluate(() => {
@@ -573,10 +559,8 @@ await page.locator(".panel-shell input").first().fill("");
 await settle(page, 300);
 
 /* And the dropdown, where two named workspaces are two runs to tell apart. */
-await page.evaluate(() => {
-	const trigger = [...document.querySelectorAll(".float.pill button")].find((button) => /^Agents/.test(button.getAttribute("aria-label") ?? ""));
-	trigger?.click();
-});
+/* The list opens from the composer's chip now: the pill has no agent segment. */
+await page.locator(".dock-to-chip").click();
 await page.waitForSelector(".popover", { timeout: 4000 });
 await settle(page, 300);
 const dropdown = await page.evaluate(() => {
@@ -615,10 +599,7 @@ await feed({
 await settle(page, 500);
 await page.getByRole("tab", { name: "Boards" }).click();
 await settle(page, 300);
-await page.evaluate(() => {
-	const trigger = [...document.querySelectorAll(".float.pill button")].find((button) => /^Agents/.test(button.getAttribute("aria-label") ?? ""));
-	trigger?.click();
-});
+await page.locator(".dock-to-chip").click();
 await page.waitForSelector(".popover .agent-menu-more", { timeout: 4000 });
 const overflow = await page.evaluate(() => ({
 	rows: document.querySelectorAll('.popover [data-agent="true"]').length,

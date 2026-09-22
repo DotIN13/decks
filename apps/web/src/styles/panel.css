@@ -273,38 +273,13 @@
 	}
 
 	/*
-	 * The foot, and the arithmetic that keeps its hairline clear of the control on it.
-	 *
-	 * It was 24px with a `border-top`, and `box-sizing: border-box` — so the content box was
-	 * 23px and the 24px density toggle inside it overflowed by one pixel and sat *on* the
-	 * line, which is what made the two read as colliding. 30px leaves the toggle 2px of air
-	 * above and below the rule: enough that the line belongs to the foot rather than to the
-	 * control.
+	 * The one control beside the search: list or grid on Boards, the grouping on Agents.
+	 * A bordered square the height of the field, so the header is one row of two shapes.
+	 * The foot it replaces was a 30px strip with the count and this control in it; the
+	 * count is in every section heading already.
 	 */
-	.panel-foot {
-		display: flex;
-		flex: none;
-		align-items: center;
-		box-sizing: border-box;
-		height: 30px;
-		margin-top: 8px;
-		padding: 0 4px;
-		gap: 4px;
-		border-top: 1px solid var(--line);
-	}
-
-	/*
-	 * Taller under a finger, because the two toggles in it are.
-	 *
-	 * The header grew to 36px tabs and a 40px field on a coarse pointer (`LeftPanel.tsx`),
-	 * and a 30px foot with 20px squares in it under that reads as a strip the panel forgot.
-	 * Nothing else in here is a target, so this is the whole of it: the row, and the buttons
-	 * are sized by utilities beside the markup that describes them.
-	 */
-	@media (pointer: coarse) {
-		.panel-foot {
-			height: 44px;
-		}
+	.panel-view {
+		border: 1px solid var(--line);
 	}
 
 	/*

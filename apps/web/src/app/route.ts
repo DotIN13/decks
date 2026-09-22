@@ -6,8 +6,9 @@
  * write to the hash followed by a read. That is why Back works: the browser owns the
  * history, and we only ever describe places to it.
  *
- * Two surfaces. `#/boards`, `#/tasks` and `#/cron` are the dispatch surface on one of its
- * tabs, optionally with a board picked out (`#/boards?board=<path>`). `#/canvas/<id>` is a
+ * Two surfaces. `#/canvases`, `#/tasks` and `#/cron` are the dispatch surface on one of its
+ * tabs, optionally with a board picked out (`#/canvases?board=<path>`). `#/boards` was the
+ * gallery tab, which is gone; it still parses, and lands on the canvases with its board. `#/canvas/<id>` is a
  * canvas, optionally with the agent you are talking to on it (`?agent=<id>`). Anything else
  * parses to nothing and the app lands on the last dispatch tab it remembers, so a stale
  * bookmark is never a blank screen.
@@ -18,7 +19,7 @@
  * be one, now parses to nothing and lands on the shelf.
  */
 
-export type DispatchTab = "canvases" | "boards" | "tasks" | "cron";
+export type DispatchTab = "canvases" | "tasks" | "cron";
 
 export type Place =
 	| { surface: "dispatch"; tab: DispatchTab; board?: string }
@@ -33,7 +34,7 @@ export type Place =
 /** Where the last dispatch tab is remembered, so an empty hash lands somewhere familiar. */
 export const TAB_KEY = "decks.dispatch.tab";
 
-const TABS: readonly DispatchTab[] = ["canvases", "boards", "tasks", "cron"];
+const TABS: readonly DispatchTab[] = ["canvases", "tasks", "cron"];
 const AGENT_ID = /^[A-Za-z0-9_-]+$/;
 
 function isTab(value: string | null | undefined): value is DispatchTab {
@@ -68,9 +69,11 @@ export function parsePlace(hash: string): Place | undefined {
 	// One trailing slash is tolerated; a hand-typed `#/boards/` should not miss.
 	if (rest.length > 1 && rest.endsWith("/")) rest = rest.slice(0, -1);
 	const parts = rest.slice(1).split("/");
-	if (parts.length === 1 && isTab(parts[0])) {
+	// The old gallery's address, kept so a bookmark or a remembered tab is never a blank screen.
+	const tab = parts[0] === "boards" ? "canvases" : parts[0];
+	if (parts.length === 1 && isTab(tab)) {
 		const board = fromQuery(query, "board");
-		return board === undefined ? { surface: "dispatch", tab: parts[0] } : { surface: "dispatch", tab: parts[0], board };
+		return board === undefined ? { surface: "dispatch", tab } : { surface: "dispatch", tab, board };
 	}
 	if (parts.length === 2 && parts[0] === "canvas" && parts[1] !== undefined && AGENT_ID.test(parts[1])) {
 		const agent = fromQuery(query, "agent");

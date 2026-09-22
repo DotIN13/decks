@@ -92,24 +92,29 @@ test("an agent has no address of its own any more", () => {
 });
 
 test("the three dispatch tabs, with or without the leading hash and a trailing slash", () => {
-	assert.deepEqual(parsePlace("#/boards"), { surface: "dispatch", tab: "boards" });
+	assert.deepEqual(parsePlace("#/canvases"), { surface: "dispatch", tab: "canvases" });
 	assert.deepEqual(parsePlace("#/tasks"), { surface: "dispatch", tab: "tasks" });
 	assert.deepEqual(parsePlace("#/cron"), { surface: "dispatch", tab: "cron" });
 	assert.deepEqual(parsePlace("/cron"), { surface: "dispatch", tab: "cron" });
-	assert.deepEqual(parsePlace("#/boards/"), { surface: "dispatch", tab: "boards" });
+	assert.deepEqual(parsePlace("#/canvases/"), { surface: "dispatch", tab: "canvases" });
+});
+
+test("the old gallery address lands on the canvases, with its board", () => {
+	assert.deepEqual(parsePlace("#/boards"), { surface: "dispatch", tab: "canvases" });
+	assert.deepEqual(parsePlace("#/boards?board=a"), { surface: "dispatch", tab: "canvases", board: "a" });
 });
 
 test("a board is URI-decoded, and a bad or empty one is dropped rather than failing the tab", () => {
-	assert.deepEqual(parsePlace("#/boards?board=risk%2Fmodel.html"), {
+	assert.deepEqual(parsePlace("#/canvases?board=risk%2Fmodel.html"), {
 		surface: "dispatch",
-		tab: "boards",
+		tab: "canvases",
 		board: "risk/model.html",
 	});
-	assert.deepEqual(parsePlace("#/boards?x=1&board=a%20b"), { surface: "dispatch", tab: "boards", board: "a b" });
-	assert.deepEqual(parsePlace("#/boards?board=a+b"), { surface: "dispatch", tab: "boards", board: "a+b" });
-	assert.deepEqual(parsePlace("#/boards?board="), { surface: "dispatch", tab: "boards" });
-	assert.deepEqual(parsePlace("#/boards?board=%E0%A4%A"), { surface: "dispatch", tab: "boards" });
-	assert.deepEqual(parsePlace("#/boards?other=1"), { surface: "dispatch", tab: "boards" });
+	assert.deepEqual(parsePlace("#/canvases?x=1&board=a%20b"), { surface: "dispatch", tab: "canvases", board: "a b" });
+	assert.deepEqual(parsePlace("#/canvases?board=a+b"), { surface: "dispatch", tab: "canvases", board: "a+b" });
+	assert.deepEqual(parsePlace("#/canvases?board="), { surface: "dispatch", tab: "canvases" });
+	assert.deepEqual(parsePlace("#/canvases?board=%E0%A4%A"), { surface: "dispatch", tab: "canvases" });
+	assert.deepEqual(parsePlace("#/canvases?other=1"), { surface: "dispatch", tab: "canvases" });
 });
 
 test("a canvas id is letters, digits, hyphens and underscores, and the agent on it is a query value", () => {
@@ -123,37 +128,37 @@ test("a canvas id is letters, digits, hyphens and underscores, and the agent on 
 
 test("format is the inverse of parse", () => {
 	const places: Place[] = [
-		{ surface: "dispatch", tab: "boards" },
+		{ surface: "dispatch", tab: "canvases" },
 		{ surface: "dispatch", tab: "tasks" },
 		{ surface: "dispatch", tab: "cron" },
-		{ surface: "dispatch", tab: "boards", board: "risk/model.html" },
-		{ surface: "dispatch", tab: "boards", board: "a+b c&d=e#f?g" },
+		{ surface: "dispatch", tab: "canvases", board: "risk/model.html" },
+		{ surface: "dispatch", tab: "canvases", board: "a+b c&d=e#f?g" },
 		{ surface: "stage", canvas: "cv1" },
 		{ surface: "stage", canvas: "cv1", agent: "sable-2" },
 	];
 	for (const place of places) assert.deepEqual(parsePlace(formatPlace(place)), place);
-	assert.equal(formatPlace({ surface: "dispatch", tab: "boards", board: "a b" }), "#/boards?board=a%20b");
-	assert.equal(formatPlace({ surface: "dispatch", tab: "boards", board: "" }), "#/boards");
+	assert.equal(formatPlace({ surface: "dispatch", tab: "canvases", board: "a b" }), "#/canvases?board=a%20b");
+	assert.equal(formatPlace({ surface: "dispatch", tab: "canvases", board: "" }), "#/canvases");
 	assert.equal(formatPlace({ surface: "stage", canvas: "cv1", agent: "x" }), "#/canvas/cv1?agent=x");
 });
 
 test("samePlace compares by value and treats a missing board as no board", () => {
 	assert.equal(samePlace(undefined, undefined), true);
-	assert.equal(samePlace(undefined, { surface: "dispatch", tab: "boards" }), false);
-	assert.equal(samePlace({ surface: "dispatch", tab: "boards" }, { surface: "dispatch", tab: "boards" }), true);
-	assert.equal(samePlace({ surface: "dispatch", tab: "boards" }, { surface: "dispatch", tab: "tasks" }), false);
+	assert.equal(samePlace(undefined, { surface: "dispatch", tab: "canvases" }), false);
+	assert.equal(samePlace({ surface: "dispatch", tab: "canvases" }, { surface: "dispatch", tab: "canvases" }), true);
+	assert.equal(samePlace({ surface: "dispatch", tab: "canvases" }, { surface: "dispatch", tab: "tasks" }), false);
 	assert.equal(
-		samePlace({ surface: "dispatch", tab: "boards", board: "a" }, { surface: "dispatch", tab: "boards" }),
+		samePlace({ surface: "dispatch", tab: "canvases", board: "a" }, { surface: "dispatch", tab: "canvases" }),
 		false,
 	);
 	assert.equal(
-		samePlace({ surface: "dispatch", tab: "boards", board: "a" }, { surface: "dispatch", tab: "boards", board: "a" }),
+		samePlace({ surface: "dispatch", tab: "canvases", board: "a" }, { surface: "dispatch", tab: "canvases", board: "a" }),
 		true,
 	);
 	assert.equal(samePlace({ surface: "stage", canvas: "c", agent: "a" }, { surface: "stage", canvas: "c", agent: "a" }), true);
 	assert.equal(samePlace({ surface: "stage", canvas: "c", agent: "a" }, { surface: "stage", canvas: "c", agent: "b" }), false);
 	assert.equal(samePlace({ surface: "stage", canvas: "c" }, { surface: "stage", canvas: "c", agent: "b" }), false);
-	assert.equal(samePlace({ surface: "stage", canvas: "c", agent: "a" }, { surface: "dispatch", tab: "boards" }), false);
+	assert.equal(samePlace({ surface: "stage", canvas: "c", agent: "a" }, { surface: "dispatch", tab: "canvases" }), false);
 });
 
 test("landing prefers the hash, then the remembered tab, then the shelf of canvases", () => {
@@ -199,16 +204,16 @@ test("go pushes a new hash, remembers a dispatch tab, and does not push a hash i
 	const route = installRoute({ onPlace: (p) => seen.push(p), storage, win });
 	route.go({ surface: "stage", canvas: "cv1", agent: "sable" });
 	assert.deepEqual(win.pushes, ["#/canvas/cv1?agent=sable"]);
-	assert.equal(storage.data[TAB_KEY], "boards");
+	assert.equal(storage.data[TAB_KEY], "canvases");
 	route.go({ surface: "dispatch", tab: "cron" });
 	assert.deepEqual(win.pushes, ["#/canvas/cv1?agent=sable", "#/cron"]);
 	assert.equal(storage.data[TAB_KEY], "cron");
 	route.go({ surface: "dispatch", tab: "cron" });
 	assert.deepEqual(win.pushes, ["#/canvas/cv1?agent=sable", "#/cron"]);
 	assert.equal(seen.length, 4);
-	route.go({ surface: "dispatch", tab: "boards", board: "a b" }, { replace: true });
-	assert.deepEqual(win.replaces, ["#/boards?board=a%20b"]);
-	assert.equal(win.location.hash, "#/boards?board=a%20b");
+	route.go({ surface: "dispatch", tab: "canvases", board: "a b" }, { replace: true });
+	assert.deepEqual(win.replaces, ["#/canvases?board=a%20b"]);
+	assert.equal(win.location.hash, "#/canvases?board=a%20b");
 });
 
 test("popstate reports the parsed place, falling back to the landing place", () => {
@@ -219,7 +224,7 @@ test("popstate reports the parsed place, falling back to the landing place", () 
 	win.back("#/canvas/cv1?agent=x");
 	assert.deepEqual(seen.at(-1), { surface: "stage", canvas: "cv1", agent: "x" });
 	win.back("#/garbage");
-	assert.deepEqual(seen.at(-1), { surface: "dispatch", tab: "boards" });
+	assert.deepEqual(seen.at(-1), { surface: "dispatch", tab: "canvases" });
 });
 
 test("installRoute survives having no window at all", () => {

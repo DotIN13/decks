@@ -4,7 +4,7 @@
  * What only a browser can prove:
  *
  * - the app opens on the dashboard, with the hash written, and no conversation opened;
- * - a board previewed from the gallery zooms, by a gesture made over its own frame;
+ * - a board previewed from the sidebar zooms, by a gesture made over its own frame;
  * - a row in the panel opens that agent's canvas, and Home comes back to the same tab;
  * - Back after a row press is Home; a reload lands where the hash says;
  * - a half-typed line survives the switch, and the count of board documents does not move;
@@ -45,23 +45,23 @@ const surface = () => page.getAttribute(".surface", "data-surface");
 const documents = () => page.evaluate(() => document.querySelectorAll(".surface-layer[data-layer='stage'] iframe").length);
 
 say("the app opens on the dashboard's shelf of canvases, and writes the hash", (await hash()) === "#/canvases" && (await surface()) === "dispatch", `${await hash()} ${await surface()}`);
-say("the dashboard's tabs are drawn in the top-left pill", (await page.locator('.pill [role="tab"]').count()) === 4);
-/* The gallery of every board is a tab of its own now, one press from the canvases. */
-await page.locator('.pill [role="tab"]', { hasText: "Boards" }).click();
-await settle(page, 600);
-say("…and the Boards tab is the gallery", (await hash()) === "#/boards", await hash());
+say("the dashboard's tabs are drawn in the top-left pill, and there are three: Canvases, Tasks, Cron", (await page.locator('.pill [role="tab"]').count()) === 3 && (await page.locator('.pill [role="tab"]').allTextContents()).join(",") === "Canvases,Tasks,Cron");
+/* The gallery of every board was a tab of its own; the sidebar's Boards tab is the one list now, on both surfaces. */
+say("…and the Boards tab is the sidebar's, not the dashboard's", (await page.locator('.panel-shell [role="tab"]', { hasText: "Boards" }).count()) === 1 && (await page.locator('.pill [role="tab"]', { hasText: "Boards" }).count()) === 0);
+await page.locator('.panel-shell [role="tab"]', { hasText: "Boards" }).click();
+await settle(page, 400);
 
 /*
- * Every card has a picture the server took (`boards/thumbs.ts`), of a board this browser
- * has never had open. It used to be a grey tile with the title on it until the board had
- * been on this browser's canvas. 640 real pixels wide, and asked for by revision so it can
+ * Every canvas card's strip has pictures the server took (`boards/thumbs.ts`), of boards this
+ * browser has never had open. It used to be a grey tile with the title on it until the board
+ * had been on this browser's canvas. 720 real pixels wide, and asked for by revision so it can
  * be cached for a year.
  */
 {
 	const ready = await page
 		.waitForFunction(
 			() => {
-				const pictures = [...document.querySelectorAll(".dispatch-card-pic .board-picture")];
+				const pictures = [...document.querySelectorAll(".canvas-thumb .board-picture")];
 				return pictures.length > 0 && pictures.every((one) => one.dataset.state === "ready");
 			},
 			undefined,
@@ -70,9 +70,9 @@ say("…and the Boards tab is the gallery", (await hash()) === "#/boards", await
 		.then(() => true)
 		.catch(() => false);
 	const pictures = await page.evaluate(() =>
-		[...document.querySelectorAll('.dispatch-card-pic img[data-thumb="ready"]')].map((one) => ({ w: one.naturalWidth, src: one.getAttribute("src") })),
+		[...document.querySelectorAll('.canvas-thumb img[data-thumb="ready"]')].map((one) => ({ w: one.naturalWidth, src: one.getAttribute("src") })),
 	);
-	say("every gallery card gets a picture taken by the server", ready && pictures.length > 0, JSON.stringify(pictures));
+	say("every canvas card's strip gets pictures taken by the server", ready && pictures.length > 0, JSON.stringify(pictures));
 	say("…720 pixels wide, asked for by revision and scheme", pictures.every((one) => one.w === 720 && /\/api\/thumb\/.+\?v=\d+&scheme=(light|dark)$/.test(one.src)), JSON.stringify(pictures));
 	const again = await page.evaluate(async (src) => {
 		const started = performance.now();
@@ -97,7 +97,8 @@ say("…and the Boards tab is the gallery", (await hash()) === "#/boards", await
  * separate document, so a ⌘-wheel over it reaches nothing in the app unless the preview
  * listens there too, which is how this was broken without anything failing.
  */
-await page.locator(".dispatch-card-open").first().click();
+/* The preview opens from the sidebar's Boards tab now: a row is a press on the dashboard. */
+await page.locator(".panel-shell .board-row").first().click();
 await page.waitForSelector(".dispatch-preview-frame");
 await settle(page, 1200);
 const drawn = () =>
@@ -189,7 +190,7 @@ await settle(page, 200);
 
 await page.click('[aria-label="Home: back to the dashboard"]');
 await settle(page, 700);
-say("Home comes back to the dashboard, on the tab it left", (await hash()) === "#/boards" && (await surface()) === "dispatch", `${await hash()}`);
+say("Home comes back to the dashboard, on the tab it left", (await hash()) === "#/canvases" && (await surface()) === "dispatch", `${await hash()}`);
 say("the draft survives the switch", (await page.locator(".dockfield").evaluate((el) => el.textContent)) === "half a line, typed before the switch");
 say("the bar's word is the dispatcher's on the dashboard", (await page.locator(".dock-to").getAttribute("data-dest")) === "to dispatcher", await page.locator(".dock-to").getAttribute("data-dest"));
 say("no board document was torn down by the switch", (await documents()) === before, `${before} -> ${await documents()}`);

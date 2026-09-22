@@ -16,9 +16,8 @@
 import type { AgentChat, Board, Canvas, Identity, Schedule, Task } from "@decks/protocol";
 import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 import { CronList } from "./CronList.tsx";
-import { DISPATCH_TAB_LABEL, DISPATCH_TABS, type DispatchTab, galleryGroups } from "./dispatch-view.ts";
+import { DISPATCH_TAB_LABEL, DISPATCH_TABS, type DispatchTab } from "./dispatch-view.ts";
 import { CanvasShelf } from "./CanvasShelf.tsx";
-import { Gallery } from "./Gallery.tsx";
 import { Preview } from "./Preview.tsx";
 import { TaskList } from "./TaskList.tsx";
 
@@ -40,8 +39,10 @@ export interface DispatchViewProps {
 	onRemoveCanvas: (id: string) => void;
 	/** Every workspace in use, for the cards' move menu. */
 	workspaces: string[];
-	/** A new workspace, from either tab's bar: its first canvas, filed under it and named after it. */
+	/** A new workspace, from the bar: its first canvas, filed under it and named after it. */
 	onNewWorkspace: (name: string) => void;
+	/** The Unfiled card was pressed: open the sidebar's Boards tab, which is where every board is listed now. */
+	onUnfiled?: () => void;
 	chats: AgentChat[];
 	/** Agent id → the boards it holds — what decides a board's workspace. */
 	contexts: Record<string, string[]>;
@@ -63,13 +64,8 @@ export interface DispatchViewProps {
 export interface DispatchTabsProps {
 	tab: DispatchTab;
 	onTab: (tab: DispatchTab) => void;
-	/** The number on the Boards tab; nothing is drawn for zero. */
+	/** The number on the Tasks tab, how many want a person; nothing is drawn for zero. */
 	badge?: number;
-	/**
-	 * How many boards are news. A dot rather than a number, because the number this tab already
-	 * carries means "waiting on you", and two meanings under one badge is one meaning too many.
-	 */
-	news?: number;
 }
 
 /** The strip alone, for a caller that wants to place it elsewhere than over the panes. */
@@ -98,10 +94,7 @@ export function DispatchTabs(props: DispatchTabsProps) {
 						}}
 					>
 						{DISPATCH_TAB_LABEL[name]}
-						<Show when={name === "boards" && (props.news ?? 0) > 0}>
-							<span class="dispatch-tab-dot" aria-label={`${props.news} boards changed`} />
-						</Show>
-						<Show when={name === "boards" && (props.badge ?? 0) > 0}>
+						<Show when={name === "tasks" && (props.badge ?? 0) > 0}>
 							<span class="dispatch-badge" aria-label={`${props.badge} waiting on you`}>
 								{props.badge}
 							</span>
@@ -116,18 +109,6 @@ export function DispatchTabs(props: DispatchTabsProps) {
 export function DispatchView(props: DispatchViewProps) {
 	/** The task a gallery card's "from a task" chip asked to see; the Tasks tab scrolls to it and marks it. */
 	const [spotTask, setSpotTask] = createSignal<string | undefined>();
-	/*
-	 * Grouped only for the tab that draws it.
-	 *
-	 * This is the most expensive thing on the dashboard — every board in the deck put under
-	 * the workspace that holds it, with a card built for each — and the Gallery below is its
-	 * only reader. A Solid memo recomputes when its sources change whether or not anybody
-	 * reads it, so without this gate the deck's nine hundred boards were regrouped on every
-	 * frame the server sent: while the dashboard sat on Canvases, and while it was behind the
-	 * stage and not on screen at all.
-	 */
-	const groups = createMemo(() => (props.tab === "boards" ? galleryGroups(props.boards, props.identities, props.contexts, props.tasks) : []));
-
 	return (
 		<section class="dispatch" aria-label="Dispatch" data-preview={props.preview ? "true" : undefined}>
 			{/* The panes, in a column of their own so the preview can stand beside them. */}
@@ -145,24 +126,8 @@ export function DispatchView(props: DispatchViewProps) {
 						onMove={props.onMoveCanvas}
 						onRemove={props.onRemoveCanvas}
 						onNewWorkspace={props.onNewWorkspace}
-						onUnfiled={() => props.onTab("boards")}
+						onUnfiled={() => props.onUnfiled?.()}
 					/>
-				</div>
-			</Show>
-			<Show when={props.tab === "boards"}>
-				<div class="dispatch-pane dispatch-pane-boards" role="tabpanel" data-id="boards">
-					<div class="dispatch-scroll">
-						<Gallery
-							groups={groups()}
-							onPreview={(path) => props.onPreview(path)}
-							onOpenAgent={props.onOpenAgent}
-							onOpenTask={(id) => {
-								setSpotTask(id);
-								props.onTab("tasks");
-							}}
-							onNewWorkspace={props.onNewWorkspace}
-						/>
-					</div>
 				</div>
 			</Show>
 			<Show when={props.tab === "tasks"}>
