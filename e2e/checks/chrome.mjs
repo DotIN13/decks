@@ -61,7 +61,7 @@ const sameShape = await page.evaluate(() => {
 			radius: style.borderRadius,
 			mono: name.fontFamily.includes("Mono"),
 			caps: name.textTransform,
-			chevronLast: row.lastElementChild?.classList.contains("twist") ?? false,
+			chevronLast: row.lastElementChild?.classList.contains("twisty") ?? false,
 		};
 	};
 	return { head: read(head), kid: read(kid) };
