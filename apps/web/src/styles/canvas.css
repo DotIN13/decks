@@ -443,7 +443,6 @@
 		font-family: var(--mono, monospace);
 		font-size: 10.5px;
 	}
-}
 
 /*
  * The arrows and groups a canvas has (`canvas/CanvasWires.tsx`).
@@ -559,4 +558,5 @@
 	.arrival-chip {
 		animation: none;
 	}
+}
 }

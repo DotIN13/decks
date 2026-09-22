@@ -3083,7 +3083,6 @@ svg.lucide {
 	}
 
 }
-}
 
 /*
  * Under a tool's output when only a preview of it arrived (`ToolChip`): the rest is on its
@@ -3099,4 +3098,5 @@ svg.lucide {
 .dockbox[data-dropping="true"] {
 	outline: 2px dashed var(--accent, #3b82f6);
 	outline-offset: 2px;
+}
 }

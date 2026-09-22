@@ -185,7 +185,7 @@ test("the baseline's own rule list can be diffed against the sheets", () => {
 test("a rule list stored and read back is the same cascade", () => {
 	const files = { "entry.css": `@import "./a.css";`, "a.css": `@layer components { .x { color: red } }` };
 	const entries = cascade(files);
-	assert.deepEqual(describe(entries.map(record), entries), { added: [], removed: [], moved: [], edited: [], ties: [] });
+	assert.deepEqual(describe(entries.map(record), entries), { added: [], removed: [], moved: [], edited: [], relayered: [], ties: [] });
 });
 
 test("component rules outside the layer are counted, and token blocks are not", () => {
@@ -196,4 +196,30 @@ test("component rules outside the layer are counted, and token blocks are not", 
 		outsideLayer(cascade(files)).map((r) => r.sel),
 		[".outside", "svg.lucide"],
 	);
+});
+
+test("a tie is read out of a baseline's own rule list too", () => {
+	/*
+	 * The baseline has signatures and no declarations, and `changedTies` used to reach for
+	 * `decls` — so a stale baseline crashed the check at the moment it had something to say.
+	 */
+	const before = { "entry.css": `.a { opacity: 0 }\n.a { opacity: 1 }` };
+	const after = { "entry.css": `.a { opacity: 1 }\n.a { opacity: 0 }` };
+	const stored = cascade(before).map((rule) => {
+		const { line, ...rest } = record(rule);
+		return rest;
+	});
+	const fired = changedTies(stored, cascade(after));
+	assert.deepEqual(fired.map((f) => [f.property, f.value.was, f.value.now]), [["opacity", "1", "0"]]);
+});
+
+test("a rule that enters a layer is not an edit", () => {
+	const before = { "entry.css": `.a { color: red }` };
+	const after = { "entry.css": `@layer components {\n\t.a { color: red }\n}` };
+	const changes = describe(cascade(before), cascade(after));
+	assert.equal(changes.relayered.length, 1);
+	assert.equal(changes.edited.length, 0);
+	assert.equal(changes.added.length, 0);
+	assert.equal(changes.removed.length, 0);
+	assert.equal(changes.relayered[0].to.sel, "@layer components ▸ .a");
 });

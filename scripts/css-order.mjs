@@ -297,6 +297,15 @@ function graphFiles(entry, read) {
 /** A rule with no file attached: what a tie is decided by. */
 export const signature = (rule) => `${rule.sel}{${rule.decls.join(";")}}`;
 
+/** A rule's identity, whether it came from a stylesheet (with declarations) or the baseline. */
+const sigOf = (rule) => rule.sig ?? signature(rule);
+
+/** The selector with its at-rule chain stripped: `.a` out of `@media (…) ▸ .a`. */
+const baseOf = (rule) => rule.sel.split(" ▸ ").pop();
+
+/** What a rule says, apart from where it sits: the pair that tells a relayer from an edit. */
+const identityOf = (rule) => `${baseOf(rule)}|${declsOf(rule).join(";")}`;
+
 /**
  * A rule as something to compare across commits: its file, its selector, and its signature.
  *
@@ -378,8 +387,8 @@ export function changedTies(before, after) {
 	for (const [key, from] of was) {
 		const to = now.get(key);
 		if (!to) continue;
-		const fromRules = from.map((i) => signature(before[i]));
-		const nowRules = to.map((i) => signature(after[i]));
+		const fromRules = from.map((i) => sigOf(before[i]));
+		const nowRules = to.map((i) => sigOf(after[i]));
 		/*
 		 * The rules among themselves, in order. Equal means the same rule still wins: the group
 		 * may have moved as a whole, and a group that moves together changes nothing. Indices are
@@ -461,29 +470,53 @@ export function describe(before, after) {
 	 */
 	const orphans = new Map();
 	const bySelector = new Map();
+	const byIdentity = new Map();
+	const queue = (map, key, i) => {
+		if (!map.has(key)) map.set(key, []);
+		map.get(key).push(i);
+	};
 	for (let i = 0; i < before.length; i++) {
 		if (heldBefore.has(i)) continue;
-		if (!orphans.has(was[i].sig)) orphans.set(was[i].sig, []);
-		orphans.get(was[i].sig).push(i);
-		if (!bySelector.has(was[i].sel)) bySelector.set(was[i].sel, []);
-		bySelector.get(was[i].sel).push(i);
+		queue(orphans, was[i].sig, i);
+		queue(bySelector, was[i].sel, i);
+		queue(byIdentity, identityOf(was[i]), i);
 	}
 	const added = [];
 	const moved = [];
 	const edited = [];
+	const relayered = [];
+	const take = (map, key, i) => {
+		const list = map.get(key);
+		if (list) {
+			const at = list.indexOf(i);
+			if (at >= 0) list.splice(at, 1);
+		}
+	};
 	for (let j = 0; j < after.length; j++) {
 		if (heldAfter.has(j)) continue;
 		const same = orphans.get(now[j].sig);
 		if (same?.length) {
 			const i = same.shift();
 			moved.push({ from: was[i], to: now[j], was: i, now: j });
+			take(bySelector, was[i].sel, i);
+			take(byIdentity, identityOf(was[i]), i);
+			continue;
+		}
+		/* Same selector, same declarations, a different at-rule chain: it entered or left a layer. */
+		const twin = byIdentity.get(identityOf(now[j]));
+		if (twin?.length) {
+			const i = twin.shift();
+			relayered.push({ from: was[i], to: now[j], was: i, now: j });
+			take(orphans, was[i].sig, i);
+			take(bySelector, was[i].sel, i);
 			continue;
 		}
 		const here = bySelector.get(now[j].sel);
 		if (here?.length) {
 			const i = here.shift();
-			orphans.get(was[i].sig)?.splice(orphans.get(was[i].sig).indexOf(i), 1);
 			edited.push({ from: was[i], to: now[j], was: i, now: j });
+			take(orphans, was[i].sig, i);
+			take(byIdentity, identityOf(was[i]), i);
 			continue;
 		}
 		added.push({ rule: now[j], at: j });
@@ -493,7 +526,8 @@ export function describe(before, after) {
 	moved.sort((x, y) => x.now - y.now);
 	edited.sort((x, y) => x.now - y.now);
 	removed.sort((x, y) => x.at - y.at);
-	return { added, removed, moved, edited, ties: changedTies(before, after) };
+	relayered.sort((x, y) => x.now - y.now);
+	return { added, removed, moved, edited, relayered, ties: changedTies(before, after) };
 }
 
 /* ------------------------------------------------------------------------- the command */
@@ -552,8 +586,13 @@ function report(before, after, { json }) {
 	}
 	const lines = [];
 	lines.push(
-		`cascade order changed: ${changes.moved.length} moved, ${changes.edited.length} edited in place, ${changes.added.length} added, ${changes.removed.length} removed, ${changes.ties.length} ties decided differently`,
+		`cascade order changed: ${changes.moved.length} moved, ${changes.edited.length} edited in place, ${changes.relayered.length} entered or left a layer, ${changes.added.length} added, ${changes.removed.length} removed, ${changes.ties.length} ties decided differently`,
 	);
+	for (const pair of changes.relayered.slice(0, 6)) {
+		const into = pair.to.sel.includes("@layer") && !pair.from.sel.includes("@layer") ? "into a layer" : "out of a layer";
+		lines.push(`  layer ${short(pair.to.sel)}  ${spot(pair.from, pair.was)} → ${spot(pair.to, pair.now)}  (${into}, declarations unchanged)`);
+	}
+	if (changes.relayered.length > 6) lines.push(`  … and ${changes.relayered.length - 6} more relayered`);
 	for (const tie of changes.ties) {
 		lines.push(`  TIE  ${short(tie.selector)} { ${tie.property} } — ${tie.rules} rules, the last one wins`);
 		lines.push(`       ${tie.property}:${tie.value.was}  at ${where(tie.was)}`);
