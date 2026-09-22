@@ -423,7 +423,6 @@ svg.lucide {
 	height: 100%;
 }
 
-
 /*
  * A bare `.dot` lived here — 8px, green, red when `[data-off]` — for the connection light in
  * a title bar this app no longer has. Two elements wear the class now: the collaborator
@@ -1224,8 +1223,6 @@ svg.lucide {
 	}
 }
 
-
-
 /*
  * A text button, and the rule the palette and the title bar have been keeping all along:
  * **the container carries the border, the control does not.**
@@ -1275,7 +1272,6 @@ svg.lucide {
 	cursor: not-allowed;
 	opacity: 0.45;
 }
-
 
 /* --- the composer ----------------------------------------------------------- */
 
@@ -1346,108 +1342,6 @@ svg.lucide {
 
 .dock > * {
 	pointer-events: auto;
-}
-
-/* What `/` completes to: a small menu floating above the input bar. */
-/* --- the conversation, floating over the boards ----------------------------
- *
- * The whole transcript, over the boards — and the only one there is. The 380px sheet that
- * used to slide in from the right edge is gone, and the bubbles that used to be a dim
- * summary of its newest turn took its job: scrollable, clickable, with the time machine on
- * each message.
- *
- * Nothing here has a background of its own — the rows are painted and the gaps between
- * them are the boards. What changed with the sheet's departure is that
- * the *column* is a pointer target now, not only its rows: it used to be
- * `pointer-events: none` so the gaps between bubbles passed clicks through, which is a
- * lovely property for a thing that appears on its own and a broken one for a thing you
- * have to scroll — the wheel over a gap went to the canvas, and the history under the
- * cursor did not move. Since it is opened and closed deliberately, from the one button in
- * the title bar, taking the pointer while it is up is the honest trade.
- */
-.chat-float {
-	position: absolute;
-	top: 12px;
-	right: 14px;
-	bottom: calc(var(--dock, 88px) + var(--row-gutter) + var(--keyboard) + env(safe-area-inset-bottom));
-	z-index: 9;
-	display: flex;
-	/*
-	 * The newest turn sits at the bottom, against the dock, and the history grows upwards.
-	 *
-	 * Anchoring the *column* rather than its rows means the scroller is only as tall as its
-	 * content until there is more of it than fits: a single reply is one bubble above the
-	 * input bar, not one bubble stranded at the top of a full-height panel.
-	 */
-	justify-content: flex-end;
-	/*
-	 * The gutter the rows' shadows live in, counted into the column's own width.
-	 *
-	 * A scroll container clips: `overflow-y: auto` forces `overflow-x` to compute to `auto`
-	 * too, so every row's shadow was sliced off in a straight vertical line down both edges
-	 * of the history — which is what made a column of floating rows read as a box with a
-	 * cut-out. The scroller carries this much padding instead, and the column is wider and
-	 * closer to the edge by the same amount, so the rows land where they always did.
-	 */
-	--row-gutter: 12px;
-	width: min(calc(360px + 2 * var(--row-gutter)), calc(100vw - 80px));
-	flex-direction: column;
-	opacity: 0;
-	pointer-events: none;
-	transition: opacity 160ms ease;
-}
-
-.chat-float[data-open="true"] {
-	opacity: 1;
-}
-
-/* Closed, it is not there at all: an invisible surface that ate the wheel would be a
-   canvas that had stopped working for no visible reason. */
-.chat-float:not([data-open="true"]) {
-	visibility: hidden;
-}
-
-.chat-float .fsroll {
-	display: flex;
-	overflow-y: auto;
-	/* Content-sized until there is more than fits, which is what the column above needs. */
-	flex: 0 1 auto;
-	flex-direction: column;
-	gap: 8px;
-	padding: var(--row-gutter);
-	overscroll-behavior: contain;
-	pointer-events: auto;
-}
-
-/*
- * The history overflows by design — that is what scrolling is for — and a flex column
- * shrinks its children to try to avoid it. Text-bearing bubbles resist through their
- * min-content height; a tool chip has `overflow: hidden` and nothing of its own to push
- * back with, so every one of them was squeezed to a line the moment the history filled
- * up.
- */
-.chat-float .fsroll > * {
-	flex: 0 0 auto;
-}
-
-/*
- * Every row is on the right, whoever said it.
- *
- * The two-sided arrangement is what a messaging app does, and it earns its keep there
- * because both sides are people. Here one side is *you* and the other is the agent
- * working on the boards behind the column — and left-aligned agent bubbles put the reply
- * on top of the canvas you are reading it against, with a ragged gutter down the middle
- * of the history. One column against the edge keeps the boards clear and gives every row
- * the same left margin to scan down.
- */
-.chat-float .fsroll > * {
-	align-self: flex-end;
-}
-
-.chat-float button {
-	font: inherit;
-	text-align: left;
-	cursor: pointer;
 }
 
 /* --- markdown inside a reply -------------------------------------------------
@@ -1697,12 +1591,7 @@ svg.lucide {
  * stays reachable while you read.
  */
 @media (max-width: 760px) {
-	.chat-float {
-		/* The gutter is inside these insets, so the rows still clear the screen edge by 8. */
-		right: max(0px, calc(env(safe-area-inset-right) - var(--row-gutter)));
-		left: max(0px, calc(env(safe-area-inset-left) - var(--row-gutter)));
-		width: auto;
-	}
+	
 
 	/*
 	 * Nothing here has to stand aside for the sheet.
@@ -1714,7 +1603,6 @@ svg.lucide {
 	 * removed outright (`No zoombar`, `App.tsx`). Completing it would be a no-op.
 	 */
 }
-
 
 .composer textarea:focus {
 	outline: none;
@@ -2794,7 +2682,6 @@ svg.lucide {
 	background: var(--color-danger);
 }
 
-
 /* --- a phone, and a hand ------------------------------------------------------ */
 
 /*
@@ -2890,7 +2777,6 @@ svg.lucide {
 		grid-template-rows: calc(52px + env(safe-area-inset-top)) 1fr;
 	}
 
-
 	.palette {
 		padding: 5px;
 	}
@@ -2899,9 +2785,6 @@ svg.lucide {
 		width: 44px;
 		height: 44px;
 	}
-
-
-
 
 	.composer .send {
 		width: 44px;
