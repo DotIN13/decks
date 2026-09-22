@@ -333,7 +333,7 @@
 	 *
 	 * `.rowlist` as well as `.popover`, so a described choice in a *dialog* is the same object
 	 * as a described choice in a menu — same grid, same 7px corner, same hover wash, same
-	 * `.lb`/`.nt` pair. The question over the input bar used to draw its own: a full-width
+	 * `.row-label`/`.row-note` pair. The question over the input bar used to draw its own: a full-width
 	 * slab filled with `--line` at rest, which read as four disabled fields rather than as
 	 * four things to press, and was a second answer to a question this file had already
 	 * answered.
@@ -389,11 +389,11 @@
 	 * not — "Temporal" and "date-fns" are not things with pictures — and reserving the track
 	 * anyway indents a whole list by 25px against the question above it.
 	 */
-	:is(.popover, .rowlist) [data-row]:not(:has(> .ic)) {
+	:is(.popover, .rowlist) [data-row]:not(:has(> .row-icon)) {
 		grid-template-columns: 1fr;
 	}
 
-	:is(.popover, .rowlist) [data-row] > .ic {
+	:is(.popover, .rowlist) [data-row] > .row-icon {
 		grid-row: span 2;
 		padding-top: 1px;
 		color: var(--muted);
@@ -403,8 +403,8 @@
 	   group (`chat/Settings.tsx`). Added to the selector rather than given its own copy of these
 	   six declarations, because two type scales that are meant to match and are written twice do
 	   not stay matched. */
-	:is(.popover, .rowlist) [data-row] > .lb,
-	.set-k > .lb {
+	:is(.popover, .rowlist) [data-row] > .row-label,
+	.set-k > .row-label {
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -416,7 +416,7 @@
 	/*
 	 * In a menu, a row with nothing under it is not a title.
 	 *
-	 * 600 is right for a row that *has* a `.nt` — a mode, a model, a described choice: the
+	 * 600 is right for a row that *has* a `.row-note` — a mode, a model, a described choice: the
 	 * label is a heading over its own sentence. It is wrong for a plain menu row, where it
 	 * makes a list of six places to go read as six headings, and the corner's `⋯` read
 	 * heavier than the zoom menu sitting a button away from it.
@@ -427,7 +427,7 @@
 	 * utilities are gone. `.rowlist` keeps 600 throughout: the panel's boards, the settings
 	 * groups and the dialog's options are lists you read, not lists you pick from.
 	 */
-	.popover [data-row]:not(:has(> .nt)) > .lb {
+	.popover [data-row]:not(:has(> .row-note)) > .row-label {
 		font-weight: 400;
 	}
 
@@ -443,7 +443,7 @@
 	 * Immediately after the rule it excepts, because the two have the same specificity and
 	 * source order is what decides between them.
 	 */
-	.popover [data-row] > .lb.nm {
+	.popover [data-row] > .row-label.row-name {
 		font-weight: 600;
 	}
 
@@ -453,7 +453,7 @@
 	 * This is the reason a mode is a menu and not a segmented control: "edit freely" does
 	 * not say by itself that commands still ask, and the place to say so is here.
 	 */
-	:is(.popover, .rowlist) [data-row] > .nt,
+	:is(.popover, .rowlist) [data-row] > .row-note,
 	/* The Time group's picker: a field, then the buttons that act on it, on one line. */
 	.set-zone {
 		display: flex;
@@ -464,7 +464,7 @@
 	.set-zone > .field {
 		width: 210px;
 	}
-	.set-k > .nt {
+	.set-k > .row-note {
 		color: var(--faint);
 		font-size: var(--type-note);
 		line-height: 1.4;

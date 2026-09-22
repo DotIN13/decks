@@ -109,7 +109,7 @@ export function Dialog(props: {
 					{/*
 						`.rowlist` and `data-row`: the same object as a described choice in a menu —
 						`styles/chrome.css` owns the grid, the 7px corner, the hover wash and the
-						`.lb`/`.nt` pair. These used to be full-width slabs filled with `--line` at
+						`.row-label`/`.row-note` pair. These used to be full-width slabs filled with `--line` at
 						rest, which read as four disabled fields rather than four things to press, and
 						was a second answer to a question that file had already answered.
 
@@ -128,13 +128,13 @@ export function Dialog(props: {
 									onClick={() => (choose().multiple ? toggle(option.label) : props.onAnswer({ value: option.label }))}
 								>
 									<Show when={choose().multiple}>
-										<span class="ic">
+										<span class="row-icon">
 											<Icon of={Check} size={14} class={ticked().includes(option.label) ? "" : "opacity-0"} />
 										</span>
 									</Show>
-									<span class="lb">{option.label}</span>
+									<span class="row-label">{option.label}</span>
 									<Show when={option.description}>
-										<span class="nt whitespace-normal">{option.description}</span>
+										<span class="row-note whitespace-normal">{option.description}</span>
 									</Show>
 								</button>
 							)}

@@ -312,7 +312,7 @@ function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (w
 									if (!current()) props.onPick(workspace || null);
 								}}
 							>
-								<span class="lb flex-1">{workspace || NO_WORKSPACE}</span>
+								<span class="row-label flex-1">{workspace || NO_WORKSPACE}</span>
 								<Show when={current()}>
 									<Icon of={Check} size={11} class="text-accent" />
 								</Show>
@@ -321,7 +321,7 @@ function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (w
 					}}
 				</For>
 				<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="canvas-menu-new" onClick={() => setMaking(true)}>
-					<span class="lb flex-1">New workspace…</span>
+					<span class="row-label flex-1">New workspace…</span>
 				</button>
 			</Show>
 		</Popover>

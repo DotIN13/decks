@@ -137,7 +137,7 @@ try {
 		kinds.every((kind, index) => index === 0 || order.indexOf(kind) > order.indexOf(kinds[index - 1])),
 		kinds.join(" → ") || "(none)",
 	);
-	const once = await page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .nm")].map((n) => n.textContent));
+	const once = await page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .row-name")].map((n) => n.textContent));
 	say("…and every board is under exactly one of them", once.length === new Set(once).size && once.length === rows, `${once.length} rows, ${new Set(once).size} distinct`);
 
 	/*
@@ -153,7 +153,7 @@ try {
 		const mid = (el) => { const b = el.getBoundingClientRect(); return Math.round((b.left + b.right) / 2); };
 		const row = document.querySelector(".board-act:has(.dot)") ?? document.querySelector(".board-act");
 		return {
-			count: mid(document.querySelector(".panel-meta .n")),
+			count: mid(document.querySelector(".panel-meta .count")),
 			dot: row.querySelector(".dot") ? mid(row.querySelector(".dot")) : null,
 			bin: mid(row.querySelector(".board-del")),
 		};
@@ -170,7 +170,7 @@ try {
 		const read = () => row.evaluate((el) => ({
 			dot: getComputedStyle(el.querySelector(".dot"), "::before").opacity,
 			bin: getComputedStyle(el.querySelector(".board-del")).opacity,
-			name: Math.round(el.querySelector(".nm").getBoundingClientRect().width),
+			name: Math.round(el.querySelector(".row-name").getBoundingClientRect().width),
 		}));
 		const before = await read();
 		await row.hover();
@@ -194,7 +194,7 @@ try {
 		const laid = await row.evaluate((el) => {
 			const x = el.querySelector(".board-hide")?.getBoundingClientRect();
 			const bin = el.querySelector(".board-del").getBoundingClientRect();
-			const name = el.querySelector(".nm").getBoundingClientRect();
+			const name = el.querySelector(".row-name").getBoundingClientRect();
 			return x ? { shows: getComputedStyle(el.querySelector(".board-hide")).opacity === "1", gap: Math.round(bin.left - x.right), level: Math.round(x.top) === Math.round(bin.top), clear: Math.round(x.left - name.right) } : { missing: true };
 		});
 		return laid;
@@ -231,7 +231,7 @@ try {
 	 */
 	const clear = async (locator) =>
 		locator.evaluate((el) => {
-			const name = el.querySelector(".nm").getBoundingClientRect();
+			const name = el.querySelector(".row-name").getBoundingClientRect();
 			const bin = el.querySelector(".board-del").getBoundingClientRect();
 			return { name: Math.round(name.width), clear: Math.round(bin.left - name.right), shows: getComputedStyle(el.querySelector(".board-del")).opacity === "1" };
 		});
@@ -277,7 +277,7 @@ try {
 		 * the dot keeps the assertion working on a fixture whose rows have no dots, and the two
 		 * cross-checks below it say that the ink is really where the dot and the stamp are.
 		 */
-		const n = document.querySelector(".panel-meta .n");
+		const n = document.querySelector(".panel-meta .count");
 		if (!n) return null;
 		const said = n.textContent;
 		const read = (text) => {
@@ -318,7 +318,7 @@ try {
 	await page.getByRole("tab", { name: "Agents" }).click();
 	await settle(page, 300);
 	const agentEnds = await page.evaluate(() => {
-		const n = document.querySelector(".panel-meta .n");
+		const n = document.querySelector(".panel-meta .count");
 		if (!n) return null;
 		const said = n.textContent;
 		const rights = ["4", "600", "6001"].map((text) => {
@@ -455,10 +455,10 @@ try {
 				return Math.round((b.left + b.right) / 2);
 			};
 			const row = document.querySelector(".board-act:has(.dot)") ?? document.querySelector(".board-act");
-			const name = row.querySelector(".nm").getBoundingClientRect();
+			const name = row.querySelector(".row-name").getBoundingClientRect();
 			const bin = row.querySelector(".board-del").getBoundingClientRect();
 			return {
-				count: mid(document.querySelector(".panel-meta .n")),
+				count: mid(document.querySelector(".panel-meta .count")),
 				bin: mid(row.querySelector(".board-del")),
 				dot: row.querySelector(".dot") ? mid(row.querySelector(".dot")) : null,
 				binShown: getComputedStyle(row.querySelector(".board-del")).opacity === "1",

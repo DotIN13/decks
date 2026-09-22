@@ -29,7 +29,7 @@ const { browser, page, errors } = await open();
 /**
  * Every agent row in the dropdown, as the list draws it.
  *
- * `.lb` is the name and `.meta` is the state — `rowWords` in `agent-order.ts` decides the
+ * `.row-label` is the name and `.meta` is the state — `rowWords` in `agent-order.ts` decides the
  * words, and `data-status` is the same fact as a machine-readable value, which is what the
  * ring on the face is drawn from. Both are read because they can disagree: the status is
  * derived and the words are written, and a row that says "idle" while its face is green is
@@ -38,13 +38,13 @@ const { browser, page, errors } = await open();
 const rows = () =>
 	page.evaluate(() =>
 		[...document.querySelectorAll('.popover [data-row][data-agent="true"]')].map((row) => ({
-			name: row.querySelector(".lb")?.textContent?.trim() ?? "",
+			name: row.querySelector(".row-label")?.textContent?.trim() ?? "",
 			words: row.querySelector(".meta")?.textContent?.trim() ?? "",
 			status: row.dataset.status ?? "",
 			current: row.dataset.current === "true",
-			/* A last line would be a `.nt`. There is deliberately none: a 264px row with a
+			/* A last line would be a `.row-note`. There is deliberately none: a 264px row with a
 			   truncated sentence in it is the chat list, which is what the hover card is for. */
-			lines: row.querySelectorAll(".nt").length,
+			lines: row.querySelectorAll(".row-note").length,
 			face: Boolean(row.querySelector(".agent-face")),
 		})),
 	);

@@ -32,11 +32,11 @@ const names = paths.map(base).sort();
  */
 const mine = () =>
 	page.evaluate(() =>
-		[...document.querySelectorAll('.panel-section:not([data-kind="deck"]) .board-row .nm')].map((n) => n.textContent).sort(),
+		[...document.querySelectorAll('.panel-section:not([data-kind="deck"]) .board-row .row-name')].map((n) => n.textContent).sort(),
 	);
 
 /** Every row in the list, all three sections of it. */
-const listed = () => page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .nm")].map((n) => n.textContent).sort());
+const listed = () => page.evaluate(() => [...document.querySelectorAll(".panel-list .board-row .row-name")].map((n) => n.textContent).sort());
 
 /*
  * The canvas is the room's, and the panel says the same thing about it.
@@ -112,7 +112,7 @@ say("…without dropping it from the list", (await listed()).includes(base(first
 
 // Clicking its row in the panel puts it back on the canvas.
 await openPanel(page, "context");
-await page.locator(`.panel-list .board-row:has(.nm:text-is("${base(first)}"))`).first().click();
+await page.locator(`.panel-list .board-row:has(.row-name:text-is("${base(first)}"))`).first().click();
 await page.waitForFunction((wanted) => Boolean(document.querySelector(`.board-node[data-path="${wanted}"]`)), first, { timeout: 8000 });
 await page.mouse.move(800, 500);
 say("clicking a rail item plays it", (await onCanvas()).includes(first), (await onCanvas()).join(" "));

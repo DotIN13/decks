@@ -341,7 +341,7 @@
 	 * The popover's own flat row (`[data-flat="true"]` in `chrome.css`) one notch taller: a
 	 * 20px face with a ring standing 3.5px off it needs 34px of row, and at 30 the rings of
 	 * two neighbouring agents touch. Everything else — the highlight, the keyboard roving,
-	 * the `.lb` name at 12px semibold — is the popover's, because an agent list that styled
+	 * the `.row-label` name at 12px semibold — is the popover's, because an agent list that styled
 	 * its own rows would be a second menu vocabulary.
 	 *
 	 * `[data-flat="true"]` is in the selector so the height *beats* `chrome.css`'s own 30px
@@ -363,7 +363,7 @@
 	 * do in the panel, and the gap moved to where a gap belongs: before the status, which is
 	 * flush right.
 	 */
-	.popover [data-row][data-flat="true"][data-agent] > .lb {
+	.popover [data-row][data-flat="true"][data-agent] > .row-label {
 		min-width: 0;
 		flex: 0 1 auto;
 	}

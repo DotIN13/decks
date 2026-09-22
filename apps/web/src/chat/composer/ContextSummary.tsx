@@ -91,7 +91,7 @@ export function ContextSummary(props: {
 						onClick={() => props.onUsage()}
 					>
 						<Icon of={Gauge} size={14} class="shrink-0 text-muted" />
-						<span class="lb">Usage and limits</span>
+						<span class="row-label">Usage and limits</span>
 					</button>
 				</>
 			)}

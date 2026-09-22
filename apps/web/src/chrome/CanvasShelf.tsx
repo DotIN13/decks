@@ -301,16 +301,16 @@ export function CanvasVerbs(props: {
 					<div class="rule" />
 				</Show>
 				<button type="button" data-row role="menuitem" class="canvas-menu-rename" onClick={() => props.onRename()}>
-					<span class="ic">
+					<span class="row-icon">
 						<Icon of={Pencil} size={13} />
 					</span>
-					<span class="lb">Rename</span>
+					<span class="row-label">Rename</span>
 				</button>
 				<button type="button" data-row role="menuitem" aria-expanded={false} class="canvas-menu-move" onClick={() => setView("move")}>
-					<span class="ic">
+					<span class="row-icon">
 						<Icon of={ArrowRightLeft} size={13} />
 					</span>
-					<span class="lb">
+					<span class="row-label">
 						Move to…
 						<Icon of={ChevronRight} size={12} class="canvas-menu-chev" />
 					</span>
@@ -319,16 +319,16 @@ export function CanvasVerbs(props: {
 					when={asking()}
 					fallback={
 						<button type="button" data-row role="menuitem" data-keep-open class="canvas-menu-remove" onClick={() => setAsking(true)}>
-							<span class="ic">
+							<span class="row-icon">
 								<Icon of={Trash2} size={13} />
 							</span>
-							<span class="lb">Remove</span>
+							<span class="row-label">Remove</span>
 						</button>
 					}
 				>
 					{/* The row becomes the question, in its own place: the other verbs stay where they were. */}
 					<div class="canvas-menu-ask" role="group" aria-label={`Remove ${props.canvas.name}?`}>
-						<span class="ic">
+						<span class="row-icon">
 							<Icon of={Trash2} size={13} />
 						</span>
 						<button type="button" class="canvas-btn" onClick={() => setAsking(false)}>
@@ -358,7 +358,7 @@ export function CanvasVerbs(props: {
 							const current = () => (props.canvas.workspace ?? "") === workspace;
 							return (
 								<button type="button" data-row data-flat="true" data-current={current()} role="menuitemradio" aria-checked={current()} onClick={() => pick(workspace || null)}>
-									<span class="lb flex-1">{workspace || NO_WORKSPACE}</span>
+									<span class="row-label flex-1">{workspace || NO_WORKSPACE}</span>
 									<Show when={current()}>
 										<Icon of={Check} size={11} class="text-accent" />
 									</Show>
@@ -367,7 +367,7 @@ export function CanvasVerbs(props: {
 						}}
 					</For>
 					<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="canvas-menu-new" onClick={() => setView("new")}>
-						<span class="lb flex-1">New workspace…</span>
+						<span class="row-label flex-1">New workspace…</span>
 					</button>
 				</div>
 			</Match>

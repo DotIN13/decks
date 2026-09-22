@@ -198,13 +198,13 @@
 	 * is the same 16px column the verbs under the rule put their icons in, so the names line
 	 * up with Rename and Move to… rather than sitting a dot's width to their left.
 	 */
-	.popover.canvas-menu .pill-canvas-row > .ic {
+	.popover.canvas-menu .pill-canvas-row > .row-icon {
 		display: grid;
 		flex: none;
 		width: 16px;
 		place-items: center;
 	}
-	.popover.canvas-menu .pill-canvas-row > .lb {
+	.popover.canvas-menu .pill-canvas-row > .row-label {
 		min-width: 0;
 		flex: 1;
 	}

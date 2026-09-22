@@ -843,7 +843,7 @@ export function LeftPanel(props: {
 									</div>
 									{/*
 										`.rowlist` is the row vocabulary — the grid, the corner, the hover, the
-										current wash, `.row-act` and its ×, and the `.lb`/`.nt` type scale. The
+										current wash, `.row-act` and its ×, and the `.row-label`/`.row-note` type scale. The
 										agent row wants all of that and two overrides (a 28px icon column and a
 										top-aligned action), which `.agent-list` in `panel.css` supplies.
 
@@ -896,12 +896,12 @@ export function LeftPanel(props: {
 										32px bar above it. Sentence case at 11.5px/500 — `.meta` in
 										`styles/chrome.css` is that decision, made once.
 									*/}
-									{/* `.n` is the right-hand column the rows' dots and bins also stand in —
+									{/* `.count` is the right-hand column the rows' dots and bins also stand in —
 									    see `panel.css`. One column down the right edge, whatever is in it. */}
 									<div class="panel-meta meta">
 										<span class="truncate">{section.label}</span>
 										<span class="flex-1" />
-										<span class="n tabular-nums">{section.rows.length}</span>
+										<span class="count tabular-nums">{section.rows.length}</span>
 									</div>
 									{/*
 										The branch is outside the `For`, and it has to be.

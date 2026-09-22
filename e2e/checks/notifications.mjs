@@ -179,8 +179,8 @@ const panel = await page.evaluate(() => {
 		name: group.dataset.group,
 		title: group.querySelector(".set-title")?.textContent,
 		rows: [...group.querySelectorAll(".set-row")].map((row) => ({
-			label: row.querySelector(".set-k > .lb")?.textContent,
-			note: row.querySelector(".set-k > .nt")?.textContent ?? null,
+			label: row.querySelector(".set-k > .row-label")?.textContent,
+			note: row.querySelector(".set-k > .row-note")?.textContent ?? null,
 			controls: [...row.children].filter((child) => !child.classList.contains("set-k")).map((child) => child.className.split(" ")[0]),
 		})),
 	}));
@@ -223,7 +223,7 @@ await page.waitForSelector(".set-sounds", { timeout: 4000 });
 const picker = await page.evaluate(() => ({
 	families: [...document.querySelectorAll(".set-sounds .grp")].map((el) => el.textContent),
 	numbers: document.querySelectorAll(".set-sounds .set-cues > [data-row]").length,
-	first: document.querySelector(".set-sounds [data-row] .lb")?.textContent,
+	first: document.querySelector(".set-sounds [data-row] .row-label")?.textContent,
 	current: document.querySelector(".set-sounds .set-cues > [data-row][data-current='true']")?.textContent,
 	scrolls: (() => {
 		const el = document.querySelector(".set-sounds");

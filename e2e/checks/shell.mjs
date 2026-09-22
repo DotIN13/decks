@@ -158,9 +158,9 @@ const wasAt = await hash();
 await page.locator(".dock-to-chip").click();
 await page.waitForSelector(".popover .dock-to-dispatcher", { timeout: 4000 });
 const chipMenu = await page.evaluate(() => ({
-	agents: [...document.querySelectorAll(".popover [data-row][data-agent]")].map((row) => row.querySelector(".lb")?.textContent?.trim()),
-	current: document.querySelector('.popover [data-row][data-agent][data-current="true"] .lb')?.textContent?.trim(),
-	dispatcher: document.querySelector(".popover .dock-to-dispatcher .lb")?.textContent?.trim(),
+	agents: [...document.querySelectorAll(".popover [data-row][data-agent]")].map((row) => row.querySelector(".row-label")?.textContent?.trim()),
+	current: document.querySelector('.popover [data-row][data-agent][data-current="true"] .row-label')?.textContent?.trim(),
+	dispatcher: document.querySelector(".popover .dock-to-dispatcher .row-label")?.textContent?.trim(),
 	fresh: [...document.querySelectorAll(".popover [data-row]")].some((row) => row.textContent?.includes("New agent")),
 }));
 say("the chip opens the agent list, with the dispatcher under the rule and New agent at the foot", chipMenu.agents.length >= 1 && chipMenu.dispatcher === "Dispatcher" && chipMenu.fresh, JSON.stringify(chipMenu));
@@ -179,7 +179,7 @@ say("…and the dispatcher row hands the line to the dispatcher", /^to dispatche
 await page.locator(".dockfield").click();
 await page.keyboard.type(`look at this @${other.slice(0, 2)}`);
 await page.waitForSelector(".mention-menu [data-row]", { timeout: 4000 });
-const completion = await page.evaluate(() => [...document.querySelectorAll(".mention-menu [data-row] .lb")].map((lb) => lb.textContent?.trim()));
+const completion = await page.evaluate(() => [...document.querySelectorAll(".mention-menu [data-row] .row-label")].map((lb) => lb.textContent?.trim()));
 say("@ and two letters open the completion, narrowed to the names that start so", completion.length >= 1 && completion.every((name) => name.toLowerCase().startsWith(other.slice(0, 2).toLowerCase())), JSON.stringify(completion));
 await page.keyboard.press("Enter");
 await settle(page, 300);

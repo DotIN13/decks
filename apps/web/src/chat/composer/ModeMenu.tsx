@@ -156,14 +156,14 @@ export function ModeMenu(props: {
 								dismiss?.();
 							}}
 						>
-							<Icon of={entry.icon} size={14} class="ic" />
-							<span class="lb">
+							<Icon of={entry.icon} size={14} class="row-icon" />
+							<span class="row-label">
 								{entry.label}
 								<Show when={entry.mode === props.mode}>
 									<Icon of={Check} size={11} class="text-accent" />
 								</Show>
 							</span>
-							<span class="nt">{entry.note}</span>
+							<span class="row-note">{entry.note}</span>
 						</button>
 					)}
 				</For>

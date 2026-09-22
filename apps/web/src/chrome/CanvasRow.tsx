@@ -82,7 +82,7 @@ export function CanvasRow(props: {
 			>
 				{/* The same little box a board row carries, empty: a canvas has no picture, but it is the same kind of row. */}
 				<span class="board-thumb" aria-hidden="true" />
-				<span class="nm">{props.canvas.name}</span>
+				<span class="row-name">{props.canvas.name}</span>
 				<Show when={news()}>
 					{/* The boards row's own mark, in its own 20px slot: the × covers it on hover, and the heading's + sits over it. */}
 					<span class="dot" title="Changed since you looked" aria-label="Changed since you looked" />

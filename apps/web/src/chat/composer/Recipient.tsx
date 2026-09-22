@@ -94,7 +94,7 @@ export function Recipient(props: RecipientProps) {
 								onClick={props.onDispatcher}
 							>
 								<AgentFace chat={dispatcher()} identity={props.identities[dispatcher().id]} size={20} ring={1.5} />
-								<span class="lb nm block truncate">Dispatcher</span>
+								<span class="row-label row-name block truncate">Dispatcher</span>
 							</button>
 						)}
 					</Show>

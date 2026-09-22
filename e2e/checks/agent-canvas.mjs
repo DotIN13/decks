@@ -97,7 +97,7 @@ await feed({
 await page.getByRole("tab", { name: "Boards" }).click();
 await settle(page, 500);
 const held = await page.evaluate(() =>
-	[...document.querySelectorAll('.panel-section[data-kind="held"] .lb, .panel-section[data-kind="held"] [data-path]')].map((row) => row.getAttribute("data-path") ?? row.textContent?.trim()),
+	[...document.querySelectorAll('.panel-section[data-kind="held"] .row-label, .panel-section[data-kind="held"] [data-path]')].map((row) => row.getAttribute("data-path") ?? row.textContent?.trim()),
 );
 const heldText = await page.evaluate(() => document.querySelector('.panel-section[data-kind="held"]')?.textContent ?? "");
 say("the canvas's taken-off board is under Held, not shown", heldText.includes("Held, not shown") && /notes/i.test(heldText), `${heldText.slice(0, 120)} ${JSON.stringify(held)}`);

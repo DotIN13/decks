@@ -189,7 +189,7 @@
 	 * its own rows stand on. Everything in the rail is centred in a 20px box and smaller than it — the
 	 * dot is 6px, the bin's icon 12px — so "the line" is always some ink inside the box, never the box.
 	 */
-	.panel-meta > .n {
+	.panel-meta > .count {
 		display: grid;
 		min-width: 20px;
 		padding-right: var(--count-inset, 4px);
@@ -199,7 +199,7 @@
 	}
 
 	/* The boards list's right-hand mark is the dot, whose circle ends seven pixels inside the box. */
-	.panel-list[data-tab="boards"] .panel-meta > .n {
+	.panel-list[data-tab="boards"] .panel-meta > .count {
 		--count-inset: 7px;
 	}
 
@@ -322,7 +322,7 @@
 	}
 
 	/* The avatar's slot: 28px and no top padding, where a 16px icon wanted one. */
-	.rowlist.agent-list [data-row] > .ic {
+	.rowlist.agent-list [data-row] > .row-icon {
 		display: grid;
 		padding-top: 0;
 		place-items: center;
@@ -463,7 +463,7 @@
 	 * quiet signals in the place of one loud one, and the `title` on the row still says it
 	 * in words for anyone who asks.
 	 */
-	.agent-row[data-dormant] .lb {
+	.agent-row[data-dormant] .row-label {
 		color: var(--muted);
 		font-weight: 500;
 	}
@@ -760,11 +760,11 @@
 
 	/* Held but not shown. The old rail said this with 45% opacity on a picture, which made a
 	   list look switched off; on a text row it is simply the fainter colour. */
-	.board-row[data-dim="true"] > .nm {
+	.board-row[data-dim="true"] > .row-name {
 		color: var(--faint);
 	}
 
-	.board-row > .nm {
+	.board-row > .row-name {
 		overflow: hidden;
 		min-width: 0;
 		flex: 1;

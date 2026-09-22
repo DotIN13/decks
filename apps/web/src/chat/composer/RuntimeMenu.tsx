@@ -69,7 +69,7 @@ export function RuntimeMenu(props: { kind: AgentKind | undefined; onKind: (kind:
 						}}
 					>
 						<AgentMark class="flex-none" agent={runtime.kind} size={13} />
-						<span class="lb flex-1">
+						<span class="row-label flex-1">
 							{runtime.label}
 							<Show when={runtime.kind === props.kind}>
 								<Icon of={Check} size={11} class="text-accent" />

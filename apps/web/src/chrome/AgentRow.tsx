@@ -131,11 +131,11 @@ export function AgentRow(props: {
 					28px, where the dropdown's is 20: this is the one place an agent's own drawing is
 					worth seeing at a size, and several on this deck have drawn one.
 
-					Wrapped in `.ic`, which is the row vocabulary's icon slot and not decoration —
-					`[data-row]:not(:has(> .ic))` collapses the grid to a single column, so without
+					Wrapped in `.row-icon`, which is the row vocabulary's icon slot and not decoration —
+					`[data-row]:not(:has(> .row-icon))` collapses the grid to a single column, so without
 					it the avatar and the name stacked instead of sitting side by side.
 				*/}
-				<span class="ic">
+				<span class="row-icon">
 					<AgentFace chat={chat()} identity={props.identity} unread={props.row.unread} size={28} ring={1.75} />
 				</span>
 
@@ -149,7 +149,7 @@ export function AgentRow(props: {
 						see `chrome.css`, where both halves of that live.
 					*/}
 					<span class="agent-line">
-						<span class="lb block truncate">{name()}</span>
+						<span class="row-label block truncate">{name()}</span>
 						<span class="kind" data-dormant={chat().dormant ? "true" : undefined}>{chat().kind}</span>
 						<span class="ago meta tabular-nums" data-yield>{since(chat().lastAt)}</span>
 					</span>

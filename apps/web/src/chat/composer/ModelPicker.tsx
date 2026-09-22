@@ -324,12 +324,12 @@ export function ModelPicker(props: {
 									disabled={!account.signedIn}
 									onClick={() => props.onAccount?.(account.id)}
 								>
-									<span class="ic">
+									<span class="row-icon">
 										<Show when={props.account === account.id}>
 											<Icon of={Check} size={13} />
 										</Show>
 									</span>
-									<span class="lb flex-1 truncate">{account.email ?? account.id}</span>
+									<span class="row-label flex-1 truncate">{account.email ?? account.id}</span>
 									<Show when={!account.signedIn}>
 										<span class="meta flex-none text-micro">signed out</span>
 									</Show>

@@ -179,7 +179,7 @@ function AgentChoices(props: { onPick: (kind: AgentKind) => void }) {
 					{/* `flex-none`: an `<svg>` in a flex row shrinks to nothing beside a
 					    `flex-1` label, and has. */}
 					<AgentMark class="flex-none" agent={runtime.kind} size={13} />
-					<span class="lb flex-1">New {runtime.label} agent</span>
+					<span class="row-label flex-1">New {runtime.label} agent</span>
 					<Show when={!runtime.available}>
 						<span class="flex-none text-note text-faint">not installed</span>
 					</Show>
@@ -447,14 +447,14 @@ export function AgentMenu(props: {
 							>
 								<AgentFace chat={chat} identity={props.identities[chat.id]} unread={props.unread[chat.id] ?? 0} size={20} ring={1.5} />
 								{/*
-									`block`, because `.lb` is a flex row and `text-overflow` does not apply to
+									`block`, because `.row-label` is a flex row and `text-overflow` does not apply to
 									one — a long name would have overflowed the row rather than ellipsing.
 
 									`nm` keeps the name at 600 where the rest of this menu's labels are 400: a
 									row you pick an *agent* from is not a row you pick a command from. See
 									`chrome.css`, where both halves of that are stated together.
 								*/}
-								<span class="lb nm block truncate">{name()}</span>
+								<span class="row-label row-name block truncate">{name()}</span>
 								{/*
 									Which runtime, in the word the server uses. The chip the panel row and the
 									hover card also wear, so the three surfaces name a runtime identically —
@@ -532,7 +532,7 @@ export function AgentMenu(props: {
 					{(more) => (
 						<button type="button" role="menuitem" data-row data-flat="true" class="agent-menu-more" onClick={() => more()()}>
 							<Icon of={PanelLeft} size={13} class="flex-none text-muted" />
-							<span class="lb flex-1 whitespace-nowrap">
+							<span class="row-label flex-1 whitespace-nowrap">
 								{listed().more} more {listed().more === 1 ? "agent" : "agents"}
 							</span>
 							<span class="meta flex-none text-micro">Agents panel</span>
@@ -572,7 +572,7 @@ export function AgentMenu(props: {
 				onClick={() => setPicking((was) => !was)}
 			>
 				<Icon of={Plus} size={13} class="flex-none text-muted" />
-				<span class="lb flex-1 whitespace-nowrap">New agent</span>
+				<span class="row-label flex-1 whitespace-nowrap">New agent</span>
 				<Icon of={ChevronDown} size={11} class="flex-none text-muted" />
 			</button>
 
@@ -934,7 +934,7 @@ export function AgentPill(props: {
 								onClick={() => props.onTool(entry.tool)}
 							>
 								<Icon of={entry.icon} size={14} class="flex-none text-muted" />
-								<span class="lb flex-1">{entry.label}</span>
+								<span class="row-label flex-1">{entry.label}</span>
 								<span class="meta flex-none text-micro">{entry.key}</span>
 							</button>
 						)}
@@ -954,7 +954,7 @@ export function AgentPill(props: {
 								<span class="rule hidden max-[640px]:block" />
 								<button type="button" role="menuitem" data-row data-flat="true" onClick={() => undo()()} class="hidden max-[640px]:flex">
 									<Icon of={Undo2} size={14} class="flex-none text-muted" />
-									<span class="lb flex-1">Undo the last edit</span>
+									<span class="row-label flex-1">Undo the last edit</span>
 									<span class="meta flex-none text-micro">⌘Z</span>
 								</button>
 							</>
@@ -1116,12 +1116,12 @@ function CanvasSegment(props: {
 												if (canvas.id !== props.id) props.onOpen?.(canvas.id);
 											}}
 										>
-											<span class="ic">
+											<span class="row-icon">
 												<Show when={canvas.id !== props.id && isNews(canvas)}>
 													<span class="pill-canvas-news" aria-label="Something new here" />
 												</Show>
 											</span>
-											<span class="lb nm block truncate">{canvas.name}</span>
+											<span class="row-label row-name block truncate">{canvas.name}</span>
 											{/* The room you are in is the washed row, and that is all it says: no word beside it. */}
 											<Show when={canvas.id !== props.id && canvas.boards.length > 0}>
 												<span class="meta flex-none text-micro">{`${canvas.boards.length} board${canvas.boards.length === 1 ? "" : "s"}`}</span>
@@ -1131,10 +1131,10 @@ function CanvasSegment(props: {
 								</For>
 								<Show when={props.onNew}>
 									<button type="button" role="menuitem" data-row data-flat="true" class="pill-canvas-row" onClick={() => props.onNew?.()}>
-										<span class="ic">
+										<span class="row-icon">
 											<Icon of={Plus} size={13} />
 										</span>
-										<span class="lb">New canvas…</span>
+										<span class="row-label">New canvas…</span>
 									</button>
 								</Show>
 							</>

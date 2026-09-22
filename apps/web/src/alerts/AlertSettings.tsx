@@ -88,8 +88,8 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 					{(kind) => (
 						<div class="set-row">
 							<span class="set-k">
-								<span class="lb">{ALERT_LABELS[kind].label}</span>
-								<span class="nt">{ALERT_LABELS[kind].note}</span>
+								<span class="row-label">{ALERT_LABELS[kind].label}</span>
+								<span class="row-note">{ALERT_LABELS[kind].note}</span>
 							</span>
 							<SoundPicker id={props.prefs.sound[kind]} label={ALERT_LABELS[kind].label} onPick={(next) => setSound(kind, next)} />
 						</div>
@@ -98,8 +98,8 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 
 				<div class="set-row">
 					<span class="set-k">
-						<span class="lb">Volume</span>
-						<span class="nt">All three together. “Off” keeps each choice above and silences them.</span>
+						<span class="row-label">Volume</span>
+						<span class="row-note">All three together. “Off” keeps each choice above and silences them.</span>
 					</span>
 					<span class="seg set-vol">
 						<For each={VOLUMES}>
@@ -127,7 +127,7 @@ export function AlertSettings(props: { prefs: AlertPrefs; onChange: (prefs: Aler
 							{/* The sentence is in Sounds and not repeated here: it describes the event, and
 							    the event is the same one. */}
 							<span class="set-k">
-								<span class="lb">{ALERT_LABELS[kind].label}</span>
+								<span class="row-label">{ALERT_LABELS[kind].label}</span>
 							</span>
 							<button
 								class="sw"
@@ -183,7 +183,7 @@ function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: Sound
 			)}
 		>
 			<button type="button" data-row data-flat="true" data-current={props.id === SILENT} onClick={() => props.onPick(SILENT)}>
-				<span class="lb">Silent</span>
+				<span class="row-label">Silent</span>
 			</button>
 			<For each={SOUND_FAMILIES}>
 				{(family) => (
