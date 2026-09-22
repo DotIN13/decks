@@ -27,7 +27,7 @@ export function WorkspaceField(props: { value: string; onInput: (value: string) 
 					<input
 						ref={field}
 						type="text"
-						class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
+						class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
 						placeholder="Name"
 						aria-label="Workspace name"
 						spellcheck={false}

@@ -613,7 +613,7 @@ export function LeftPanel(props: {
 										   which is what keeps the panel three stops rather than five. */
 										tabindex={tab() === name ? 0 : -1}
 										data-on={tab() === name}
-										class="h-7 text-[11.5px] pointer-coarse:h-9"
+										class="h-7 text-label pointer-coarse:h-9"
 										onClick={() => goTab(name)}
 										onKeyDown={(event) => {
 											if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -656,7 +656,7 @@ export function LeftPanel(props: {
 							ref={field}
 							type="text"
 							spellcheck={false}
-							class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
+							class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
 							/* Says what it will match, which for agents includes the tags — “who else is
 							   on panel-css” is the question tags exist to answer, and this is the surface
 							   with room to show the answer. */
@@ -800,7 +800,7 @@ export function LeftPanel(props: {
 							)}
 						</For>
 						<Show when={canvasList().length === 0}>
-							<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
+							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
 								{canvasCount() === 0 ? "No canvases yet. Press + on the dashboard, or ask an agent for a board." : `No canvas matches “${query().trim()}”.`}
 							</p>
 						</Show>
@@ -875,7 +875,7 @@ export function LeftPanel(props: {
 						{/* The same shape of empty state the boards list has, and the same reasoning:
 						    a panel that is blank for a good reason still looks broken without it. */}
 						<Show when={agentList.length === 0}>
-							<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
+							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
 								{allAgents().total === 0 ? "No agents yet. Start one with `+`." : `No agent matches “${query().trim()}”.`}
 							</p>
 						</Show>
@@ -960,7 +960,7 @@ export function LeftPanel(props: {
 						on into the deck below it.
 					*/}
 					<Show when={sections().length === 0}>
-						<p class="m-0 px-1 py-2 text-[12px] leading-normal text-faint">
+						<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
 							{props.boards.length === 0
 								? "This deck has no boards yet. Ask for one."
 								: `Nothing in the deck matches “${query().trim()}”.`}

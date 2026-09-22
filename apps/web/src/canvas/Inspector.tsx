@@ -31,7 +31,7 @@ import { scrubbable } from "./scrub.ts";
  * width of a row's label.
  */
 const ROW = "row flex items-center gap-1";
-const LABEL = "w-[34px] flex-none text-[11px] text-faint";
+const LABEL = "w-[34px] flex-none text-note text-faint";
 
 /**
  * Whether the panel is a bottom sheet rather than a float in the corner.
@@ -508,7 +508,7 @@ export function Inspector(props: {
 					<Show when={shape().family === "embed"}>
 						<div class={`${ROW} file`}>
 							<span class={LABEL}>file</span>
-							<span class="flex-1 overflow-hidden font-mono text-[11px] text-ellipsis whitespace-nowrap" title={source()}>
+							<span class="flex-1 overflow-hidden font-mono text-note text-ellipsis whitespace-nowrap" title={source()}>
 								{source().split("/").pop() || "nothing"}
 							</span>
 							<button

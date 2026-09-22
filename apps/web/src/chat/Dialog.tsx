@@ -62,7 +62,7 @@ export function Dialog(props: {
 			<Switch>
 				<Match when={props.prompt.method === "confirm"}>
 					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
-					<div class="mt-[3px] text-[12px] whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
+					<div class="mt-[3px] text-ui whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
 					<div class="mt-2 flex flex-wrap gap-1.5">
 						<button class="btn" type="button" data-primary="true" onClick={() => props.onAnswer({ confirmed: true })}>
 							Allow
@@ -239,13 +239,13 @@ export function Dialog(props: {
 				 */}
 				<Match when={props.prompt.method === "login"}>
 					<div class="font-semibold">{(props.prompt as { title: string }).title}</div>
-					<div class="mt-[3px] text-[12px] whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
+					<div class="mt-[3px] text-ui whitespace-pre-wrap text-muted">{(props.prompt as { message: string }).message}</div>
 					{/* Breakable, so a 450-character OAuth URL can be read and copied in the dock. */}
 					{/* A wash rather than a bordered box on a bordered card, and the same corner as the
 					    field under it. Breakable, so a 450-character OAuth URL can be read and copied
 					    in the dock. */}
 					<a
-						class="mt-[7px] block rounded-control bg-line px-[9px] py-[7px] font-mono text-[11px] leading-normal break-all text-accent hover:bg-line-strong"
+						class="mt-[7px] block rounded-control bg-line px-[9px] py-[7px] font-mono text-note leading-normal break-all text-accent hover:bg-line-strong"
 						href={(props.prompt as { url: string }).url}
 						target="_blank"
 						rel="noreferrer"

@@ -220,12 +220,12 @@ export function Corner(props: {
 					<button type="button" role="menuitem" data-row data-keep-open data-flat="true" onClick={() => props.onZoom(clamp(props.zoom * STEP))}>
 						<Icon of={ZoomIn} size={13} class="flex-none text-muted" />
 						<span class="lb flex-1">Zoom in</span>
-						<span class="meta flex-none text-[10px]">⌘=</span>
+						<span class="meta flex-none text-micro">⌘=</span>
 					</button>
 					<button type="button" role="menuitem" data-row data-keep-open data-flat="true" onClick={() => props.onZoom(clamp(props.zoom / STEP))}>
 						<Icon of={ZoomOut} size={13} class="flex-none text-muted" />
 						<span class="lb flex-1">Zoom out</span>
-						<span class="meta flex-none text-[10px]">⌘-</span>
+						<span class="meta flex-none text-micro">⌘-</span>
 					</button>
 				</Popover>
 			</span>

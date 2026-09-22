@@ -26,7 +26,7 @@ export function NoticeStrip() {
 			<For each={state.notices}>
 				{(item) => (
 					<div
-						class="notice rounded-[10px] border border-line bg-panel px-3 py-[7px] text-[12px] shadow-panel data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
+						class="notice rounded-[10px] border border-line bg-panel px-3 py-[7px] text-ui shadow-panel data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
 						data-level={item.level}
 					>
 						{item.text}

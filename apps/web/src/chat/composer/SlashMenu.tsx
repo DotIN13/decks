@@ -128,15 +128,15 @@ export function SlashMenu(props: {
 						onMouseDown={(event) => event.preventDefault()}
 						onClick={() => props.onPick(command)}
 					>
-						<span class="flex-none font-mono text-[12px] text-accent">
+						<span class="flex-none font-mono text-ui text-accent">
 							/{command.name}
 							{command.arg ? ` ${command.arg}` : ""}
 						</span>
 						<Show when={command.hint}>
-							<span class="min-w-0 flex-1 truncate text-[12px] text-muted">{command.hint}</span>
+							<span class="min-w-0 flex-1 truncate text-ui text-muted">{command.hint}</span>
 						</Show>
 						<Show when={badge(command, props.runtime)}>
-							{(label) => <span class="ml-auto flex-none text-[10px] tracking-wider text-faint uppercase">{label()}</span>}
+							{(label) => <span class="ml-auto flex-none text-micro tracking-wider text-faint uppercase">{label()}</span>}
 						</Show>
 					</button>
 				)}

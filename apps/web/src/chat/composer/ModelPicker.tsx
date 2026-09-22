@@ -331,7 +331,7 @@ export function ModelPicker(props: {
 									</span>
 									<span class="lb flex-1 truncate">{account.email ?? account.id}</span>
 									<Show when={!account.signedIn}>
-										<span class="meta flex-none text-[10px]">signed out</span>
+										<span class="meta flex-none text-micro">signed out</span>
 									</Show>
 								</button>
 							)}

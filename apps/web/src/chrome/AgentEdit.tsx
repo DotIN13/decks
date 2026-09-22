@@ -166,7 +166,7 @@ export function AgentEdit(props: {
 									aria-label="Agent name"
 									aria-invalid={taken()}
 									spellcheck={false}
-									class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
+									class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
 									maxLength={40}
 									value={name()}
 									onInput={(event) => setName(event.currentTarget.value)}
@@ -221,7 +221,7 @@ export function AgentEdit(props: {
 									<input
 										type="text"
 										spellcheck={false}
-										class="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none placeholder:text-faint"
+										class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint"
 										placeholder="Add a tag"
 										aria-label="Add a tag"
 										value={draft()}

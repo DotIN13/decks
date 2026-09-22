@@ -76,7 +76,7 @@ export function RuntimeMenu(props: { kind: AgentKind | undefined; onKind: (kind:
 							</Show>
 						</span>
 						<Show when={!runtime.available}>
-							<span class="flex-none text-[11px] text-faint">not installed</span>
+							<span class="flex-none text-note text-faint">not installed</span>
 						</Show>
 					</button>
 				)}

@@ -71,7 +71,7 @@ export function MentionMenu(props: {
 						</Show>
 						<span class="lb nm block truncate">{one.name}</span>
 						<Show when={one.chat && !one.task}>{(_) => <span class="kind">{one.chat!.kind}</span>}</Show>
-						<span class="meta flex-none text-[10px]">{one.task ? "as a task" : one.here ? "here" : props.canvasName ? `joins ${props.canvasName}` : "elsewhere"}</span>
+						<span class="meta flex-none text-micro">{one.task ? "as a task" : one.here ? "here" : props.canvasName ? `joins ${props.canvasName}` : "elsewhere"}</span>
 					</button>
 				)}
 			</For>

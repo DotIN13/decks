@@ -181,7 +181,7 @@ function AgentChoices(props: { onPick: (kind: AgentKind) => void }) {
 					<AgentMark class="flex-none" agent={runtime.kind} size={13} />
 					<span class="lb flex-1">New {runtime.label} agent</span>
 					<Show when={!runtime.available}>
-						<span class="flex-none text-[11px] text-faint">not installed</span>
+						<span class="flex-none text-note text-faint">not installed</span>
 					</Show>
 				</button>
 			)}
@@ -469,7 +469,7 @@ export function AgentMenu(props: {
 									in `chrome.css`, which is also where the touch case lives, since there is
 									nothing to approach with on a phone and the slot simply stays open.
 								*/}
-								<span class="meta flex-none text-[10px] tabular-nums" data-yield>{rowWords(status(), chat.state, chat.lastAt)}</span>
+								<span class="meta flex-none text-micro tabular-nums" data-yield>{rowWords(status(), chat.state, chat.lastAt)}</span>
 							</button>
 
 							{/*
@@ -524,7 +524,7 @@ export function AgentMenu(props: {
 				<Show
 					when={props.onMore}
 					fallback={
-						<p class="m-0 px-2 py-1.5 text-[11px] leading-normal text-faint">
+						<p class="m-0 px-2 py-1.5 text-note leading-normal text-faint">
 							{listed().more} more {listed().more === 1 ? "agent" : "agents"} — open the Agents panel.
 						</p>
 					}
@@ -535,7 +535,7 @@ export function AgentMenu(props: {
 							<span class="lb flex-1 whitespace-nowrap">
 								{listed().more} more {listed().more === 1 ? "agent" : "agents"}
 							</span>
-							<span class="meta flex-none text-[10px]">Agents panel</span>
+							<span class="meta flex-none text-micro">Agents panel</span>
 						</button>
 					)}
 				</Show>
@@ -935,7 +935,7 @@ export function AgentPill(props: {
 							>
 								<Icon of={entry.icon} size={14} class="flex-none text-muted" />
 								<span class="lb flex-1">{entry.label}</span>
-								<span class="meta flex-none text-[10px]">{entry.key}</span>
+								<span class="meta flex-none text-micro">{entry.key}</span>
 							</button>
 						)}
 					</For>
@@ -955,7 +955,7 @@ export function AgentPill(props: {
 								<button type="button" role="menuitem" data-row data-flat="true" onClick={() => undo()()} class="hidden max-[640px]:flex">
 									<Icon of={Undo2} size={14} class="flex-none text-muted" />
 									<span class="lb flex-1">Undo the last edit</span>
-									<span class="meta flex-none text-[10px]">⌘Z</span>
+									<span class="meta flex-none text-micro">⌘Z</span>
 								</button>
 							</>
 						)}
@@ -1124,7 +1124,7 @@ function CanvasSegment(props: {
 											<span class="lb nm block truncate">{canvas.name}</span>
 											{/* The room you are in is the washed row, and that is all it says: no word beside it. */}
 											<Show when={canvas.id !== props.id && canvas.boards.length > 0}>
-												<span class="meta flex-none text-[10px]">{`${canvas.boards.length} board${canvas.boards.length === 1 ? "" : "s"}`}</span>
+												<span class="meta flex-none text-micro">{`${canvas.boards.length} board${canvas.boards.length === 1 ? "" : "s"}`}</span>
 											</Show>
 										</button>
 									)}
