@@ -1,21 +1,29 @@
 @import "tailwindcss";
 /*
- * The app's own stylesheets, in cascade order.
+ * The app's stylesheets, in cascade order — and this file is the entry point: the ladder, the
+ * tokens, and the reset. Every region is a sheet of its own now, and this one holds no rule
+ * about a surface.
  *
- * Here rather than as `import "./styles/panel.css"` beside the component that uses it,
- * which is the tempting arrangement and the wrong one: both files declare rules inside
+ * The ladder is here rather than as `import "./styles/panel.css"` beside the component that
+ * uses it, which is the tempting arrangement and the wrong one: every file declares inside
  * `@layer components`, so which of them wins a tie is decided by source order — and a
  * JavaScript import makes that order depend on which module the bundler reached first.
  * Stated here it is a property of this file, which is where someone would look for it.
  *
- * `chrome.css` is the shared material and comes first, so an area file can override it.
+ * `chrome.css` is the shared material and comes first, so a region can override it. The last
+ * six were added when this file was split: they are the surfaces that never had a sheet (the
+ * rail, the settings window, the marks an agent leaves, markdown, the composer), and they sit
+ * at the end because that is where the rules they took used to be — the position this file's
+ * own rules had, after all twelve imports. That is also why the split moved as little as it
+ * could: a rule that changes sheets still changes its place, and the gate's report on each of
+ * those commits is what says so.
  *
- * **That order is hashed, so it is a fact rather than a convention.** `npm run css:order`
- * flattens these 13 sheets in the order below and hashes every rule with its at-rule chain and
- * its declarations, against the baseline in `styles/cascade-order.json`. Move a rule past
- * another one and the check fails naming both; move a rule into another sheet and it passes as
- * long as the flattened order is the same, which is what makes splitting this file verifiable.
- * Comments and whitespace are not part of it, so writing this paragraph changed nothing.
+ * **The order is hashed, so it is a fact rather than a convention.** `npm run css:order`
+ * flattens these 18 sheets in the order below and hashes every rule with its at-rule chain
+ * and its declarations, against the baseline in `styles/cascade-order.json`. Move a rule past
+ * another and the check fails naming both; move a rule into another sheet and it passes as
+ * long as the flattened order is the same. Comments and whitespace are not part of it, which
+ * is why the prose in this file could be rewritten and the hash did not move.
  */
 @import "./styles/chrome.css";
 @import "./styles/agents.css";
