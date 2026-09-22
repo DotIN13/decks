@@ -891,6 +891,16 @@
 		gap: 5px;
 		min-height: 20px;
 	}
+	/* The stack: each face after the first sits 6px over the one before, with a 2px ring in
+	   the card's own colour so the overlap reads as one face in front of another. */
+	.canvas-faces {
+		display: flex;
+		flex: none;
+		align-items: center;
+	}
+	.canvas-faces > .canvas-face + .canvas-face {
+		margin-left: -6px;
+	}
 	.canvas-face {
 		display: grid;
 		width: 20px;
@@ -899,6 +909,7 @@
 		place-items: center;
 		border-radius: 50%;
 		background: var(--face, var(--color-accent));
+		box-shadow: 0 0 0 2px var(--panel);
 		color: #fff;
 		font-size: 11px;
 		font-weight: 600;

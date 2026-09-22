@@ -157,13 +157,17 @@ export function CanvasShelf(props: CanvasShelfProps) {
 													</Show>
 												</span>
 												<span class="canvas-who">
-													<For each={working()}>
-														{(identity) => (
-															<span class="canvas-face" style={{ "--face": identity.color }} title={identity.name}>
-																{identity.name.slice(0, 1)}
-															</span>
-														)}
-													</For>
+													{/* The faces overlap, as the corner's do: a stack reads as "these people", a row of
+													    coins as three separate marks to read. */}
+													<span class="canvas-faces">
+														<For each={working()}>
+															{(identity) => (
+																<span class="canvas-face" style={{ "--face": identity.color }} title={identity.name}>
+																	{identity.name.slice(0, 1)}
+																</span>
+															)}
+														</For>
+													</span>
 													<span class="canvas-who-text">
 														{working().length === 0 ? "nobody here now" : working().map((identity) => identity.name).join(", ")}
 													</span>
