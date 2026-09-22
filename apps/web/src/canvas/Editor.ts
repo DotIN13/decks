@@ -294,10 +294,19 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	const componentAt = (target: EventTarget | null): HTMLElement | undefined => {
 		const element = target as HTMLElement | null;
 		if (!element || element.dataset?.decksUi) return undefined;
-		const owner = element.closest?.("[data-id]") as HTMLElement | null;
-		// Only direct children of the board are components; a heading inside a card
-		// belongs to the card.
-		return owner && owner.parentElement === doc.body ? owner : undefined;
+		/*
+		 * Only direct children of the board are components; a heading inside a card belongs
+		 * to the card. But the nearest `data-id` is often a *named block inside* one — the
+		 * authoring guidance has boards name their inner sections so a comment can point at
+		 * them — so climb the chain of named ancestors to the child of the body. Stopping at
+		 * the first name made every press inside such a block resolve to nothing, and the
+		 * whole pane read as not editable.
+		 */
+		let owner = element.closest?.("[data-id]") as HTMLElement | null;
+		while (owner && owner.parentElement !== doc.body) {
+			owner = owner.parentElement?.closest?.("[data-id]") as HTMLElement | null;
+		}
+		return owner ?? undefined;
 	};
 
 	const rectOf = (element: HTMLElement) => ({
