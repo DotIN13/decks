@@ -869,9 +869,10 @@ svg.lucide {
 /*
  * A board that is news (`canvas/glow.ts`): an agent named it and the person has not read it.
  *
- * A soft drop shadow in the writer's colour under the board — thrown down and long, over a
- * quiet dark one — breathing, until the board is read: zoomed in on and rested on, opened in
- * the focus view, or previewed on the dashboard. A box of its own beside the shade, never the
+ * A soft shadow in the writer's colour all round the board — even, not thrown down, so it
+ * reads as the board glowing rather than floating — over a quiet dark one for depth,
+ * breathing until the board is read: zoomed in on and rested on, opened in the focus view,
+ * or previewed on the dashboard. A box of its own beside the shade, never the
  * surface, for the reason the shadow is: paint outside the surface's box makes Chrome repaint
  * every document on a pan.
  *
@@ -895,7 +896,7 @@ svg.lucide {
 	inset: 0;
 	border-radius: 12px;
 	box-shadow:
-		0 18px 60px color-mix(in srgb, var(--news, var(--color-accent)) 40%, transparent),
+		0 0 60px 10px color-mix(in srgb, var(--news, var(--color-accent)) 40%, transparent),
 		0 4px 18px rgb(0 0 0 / 19%);
 	will-change: opacity;
 	animation: news-breathe 2.6s ease-in-out infinite;
