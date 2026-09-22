@@ -99,7 +99,7 @@
 		flex-direction: column;
 		gap: 8px;
 		padding: 4px;
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 	.comment-popup[data-open="true"] {
 		width: min(340px, calc(100vw - 16px));
@@ -114,7 +114,7 @@
 		padding: 0 9px;
 		border-radius: 7px;
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--type-ui);
 		font-weight: 500;
 		white-space: nowrap;
 	}
@@ -162,7 +162,7 @@
 		border-radius: 8px;
 		background: var(--bg);
 		color: var(--fg);
-		font-size: 13px;
+		font-size: var(--type-body);
 		line-height: 1.45;
 		resize: vertical;
 	}

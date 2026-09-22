@@ -24,7 +24,7 @@
 		flex-direction: row;
 		gap: 12px;
 		color: var(--fg);
-		font-size: 12.5px;
+		font-size: var(--type-copy);
 	}
 	/* The panes: the whole width alone, a column on the left when a preview is up. */
 	.dispatch-side {
@@ -67,7 +67,7 @@
 		background: transparent;
 		color: var(--muted);
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		line-height: 1;
 		justify-content: center;
 		cursor: pointer;
@@ -84,7 +84,7 @@
 	@media (max-width: 360px) {
 		.dispatch-tabs > button {
 			padding: 0 6px;
-			font-size: 11.5px;
+			font-size: var(--type-label);
 		}
 	}
 	.dispatch-tabs > button[data-on="true"] {
@@ -110,7 +110,7 @@
 		border-radius: 8px;
 		background: var(--color-warn);
 		color: #1a1200;
-		font-size: 10px;
+		font-size: var(--type-micro);
 		font-weight: 600;
 		font-variant-numeric: tabular-nums;
 		line-height: 1;
@@ -136,11 +136,11 @@
 		margin: 0;
 		padding: 8px 2px;
 		color: var(--faint);
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 	.dispatch-n {
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 		font-variant-numeric: tabular-nums;
 	}
 	.dispatch-link {
@@ -171,7 +171,7 @@
 		border-radius: 8px;
 		background: var(--line);
 		color: var(--muted);
-		font-size: 10.5px;
+		font-size: var(--type-hint);
 		font-weight: 500;
 		line-height: 1;
 		white-space: nowrap;
@@ -245,7 +245,7 @@
 		flex: 1 1 40%;
 		overflow: hidden;
 		color: var(--muted);
-		font-size: 12px;
+		font-size: var(--type-ui);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
@@ -283,7 +283,7 @@
 	}
 	.dispatch-hint {
 		color: var(--faint);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 	.dispatch-sec {
 		display: flex;
@@ -291,16 +291,16 @@
 		gap: 8px;
 		margin: 10px 0 6px;
 		color: var(--muted);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 	.dispatch-sec > b {
 		color: var(--fg);
-		font-size: 12.5px;
+		font-size: var(--type-copy);
 		font-weight: 600;
 	}
 	.dispatch-sec > .dispatch-link {
 		margin-left: auto;
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 	.dispatch-chip[data-s="plain"] {
 		background: var(--line);
@@ -318,7 +318,7 @@
 	.dispatch-cron-zone {
 		margin-left: 6px;
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 		font-weight: 500;
 		letter-spacing: 0.02em;
 	}
@@ -350,7 +350,7 @@
 	.dispatch-task-when {
 		margin-left: auto;
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
@@ -363,7 +363,7 @@
 		-webkit-line-clamp: 3;
 		color: var(--fg);
 		cursor: pointer;
-		font-size: 13px;
+		font-size: var(--type-body);
 		font-weight: 500;
 		line-height: 1.4;
 		overflow-wrap: anywhere;
@@ -383,7 +383,7 @@
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 2;
 		color: var(--muted);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		line-height: 1.4;
 		overflow-wrap: anywhere;
 	}
@@ -404,7 +404,7 @@
 	}
 	.dispatch-task-report {
 		min-width: 0;
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 	.dispatch-task-report > summary {
 		display: flex;
@@ -443,13 +443,13 @@
 		border-radius: 6px;
 		background: var(--bg);
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--type-ui);
 		line-height: 1.45;
 		overflow-wrap: anywhere;
 		scrollbar-width: thin;
 	}
 	.dispatch-task-report-body .md {
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 	.dispatch-task-wrote {
 		display: flex;
@@ -470,7 +470,7 @@
 		cursor: pointer;
 		font: inherit;
 		font-family: var(--font-mono);
-		font-size: 10.5px;
+		font-size: var(--type-hint);
 		transition: border-color 120ms ease, background-color 120ms ease;
 	}
 	.dispatch-pic:hover {
@@ -504,7 +504,7 @@
 		place-items: center;
 		color: var(--faint);
 		font-family: var(--font-sans, inherit);
-		font-size: 11px;
+		font-size: var(--type-note);
 		font-weight: 600;
 	}
 	.dispatch-pic-name {
@@ -525,7 +525,7 @@
 		min-width: 0;
 		overflow: hidden;
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
@@ -556,14 +556,14 @@
 	}
 	.dispatch-sched-time {
 		color: var(--fg);
-		font-size: 15px;
+		font-size: var(--type-title);
 		font-weight: 600;
 		letter-spacing: -0.01em;
 	}
 	.dispatch-sched-time > small {
 		margin-left: 6px;
 		color: var(--muted);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		font-weight: 400;
 	}
 	@media (pointer: coarse) {
@@ -583,7 +583,7 @@
 		color: var(--muted);
 		cursor: pointer;
 		font: inherit;
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 	}
 	.dispatch-act:hover {
@@ -640,7 +640,7 @@
 	.dispatch-preview-path {
 		overflow: hidden;
 		font-family: var(--font-mono);
-		font-size: 12px;
+		font-size: var(--type-ui);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
@@ -658,7 +658,7 @@
 		background: none;
 		color: var(--muted);
 		font: inherit;
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		font-variant-numeric: tabular-nums;
 		cursor: pointer;
 	}
@@ -670,7 +670,7 @@
 	.dispatch-preview-held {
 		flex: none;
 		color: var(--faint);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 	/* The room the board is drawn in: it scrolls when the board is taller than the panel. */
 	.dispatch-preview-scroll {
@@ -768,7 +768,7 @@
 	/* The Boards tab's shelf name, letter for letter: sentence case, 12.5px, 600. One heading style for the dashboard. */
 	.canvas-shelf-head h2 {
 		margin: 0;
-		font-size: 12.5px;
+		font-size: var(--type-copy);
 		font-weight: 600;
 		color: var(--fg);
 	}
@@ -784,7 +784,7 @@
 		color: var(--fg);
 		cursor: pointer;
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		/* The filter chips' own easing (`.chipbtn`), so the two kinds of button in one bar move alike. */
 		transition:
 			background-color 120ms ease,
@@ -838,7 +838,7 @@
 		display: flex;
 		align-items: center;
 		gap: 7px;
-		font-size: 14px;
+		font-size: var(--type-name);
 		font-weight: 600;
 		line-height: 18px;
 	}
@@ -873,7 +873,7 @@
 		grid-column: 1 / -1;
 		align-self: center;
 		color: var(--faint);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 	.canvas-who {
 		display: flex;
@@ -901,20 +901,20 @@
 		background: var(--face, var(--color-accent));
 		box-shadow: 0 0 0 2px var(--panel);
 		color: #fff;
-		font-size: 11px;
+		font-size: var(--type-note);
 		font-weight: 600;
 	}
 	.canvas-who-text {
 		overflow: hidden;
 		color: var(--muted);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		line-height: 16px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	.canvas-meta {
 		color: var(--faint);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		line-height: 16px;
 	}
 	.canvas-card[data-news="true"] .canvas-meta b {
@@ -924,7 +924,7 @@
 	.canvas-none {
 		margin: 0;
 		color: var(--faint);
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 
 	/* One workspace's section of the shelf: a heading with its own New canvas, then its cards — ruled off above, as the Boards tab's shelves are. */
@@ -934,7 +934,7 @@
 	.canvas-ws-sub {
 		margin-right: auto;
 		color: var(--faint);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 	.canvas-shelf-head h2 {
 		flex: none;
@@ -1026,7 +1026,7 @@
 		background: transparent;
 		color: var(--muted);
 		font: inherit;
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		cursor: pointer;
 		text-align: left;
 	}
@@ -1061,7 +1061,7 @@
 		background: var(--panel);
 		color: var(--fg);
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		font-weight: 600;
 		cursor: pointer;
 	}
@@ -1092,7 +1092,7 @@
 		background: var(--panel);
 		color: var(--fg);
 		font: inherit;
-		font-size: 14px;
+		font-size: var(--type-name);
 		font-weight: 600;
 		line-height: 22px;
 	}
@@ -1116,7 +1116,7 @@
 		background: var(--fg);
 		color: var(--bg);
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		font-weight: 600;
 		cursor: pointer;
 	}
@@ -1127,12 +1127,12 @@
 	.ws-new-slug {
 		margin: 7px 3px 2px;
 		color: var(--muted);
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 	.ws-new-slug > code {
 		color: var(--fg);
 		font-family: var(--font-mono);
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 
 	@media (prefers-reduced-motion: reduce) {

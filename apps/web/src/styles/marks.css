@@ -68,7 +68,7 @@
 	border-radius: 7px;
 	background: var(--mark);
 	color: #fff;
-	font-size: 11.5px;
+	font-size: var(--type-label);
 	font-weight: 500;
 	line-height: 1.35;
 	text-align: left;
@@ -119,7 +119,7 @@
 	border-radius: 5px 5px 0 0;
 	background: var(--act);
 	color: #fff;
-	font-size: 11px;
+	font-size: var(--type-note);
 	font-weight: 600;
 	white-space: nowrap;
 	transform: scale(calc(1 / var(--zoom, 1)));
@@ -222,7 +222,7 @@
 	border-radius: 999px;
 	background: var(--cursor-color);
 	color: #fff;
-	font-size: 11px;
+	font-size: var(--type-note);
 	font-weight: 600;
 	white-space: nowrap;
 	transform-origin: 0 50%;

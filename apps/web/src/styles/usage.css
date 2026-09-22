@@ -38,7 +38,7 @@
 	.usage-modal .usage-note {
 		margin: 0;
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -47,14 +47,14 @@
 		margin: 0;
 		padding: 6px 0;
 		color: var(--faint);
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 
 	/* A read that failed over figures that are still on screen. */
 	.usage-modal .usage-stale {
 		margin: 0 0 10px;
 		color: var(--color-danger);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		overflow-wrap: anywhere;
 	}
 
@@ -67,7 +67,7 @@
 	.usage-modal .usage-reading {
 		margin: 0 0 10px;
 		color: var(--faint);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 
 	/* Turning while it reads. Reduced motion keeps the disabled state, which is the part
@@ -119,7 +119,7 @@
 		display: flex;
 		align-items: baseline;
 		gap: 8px;
-		font-size: 12.5px;
+		font-size: var(--type-copy);
 	}
 
 	/* A window's name can be `7-day window (claude-opus-4-1)`, which will not always fit. */
@@ -141,7 +141,7 @@
 
 	.usage-modal .usage-limit-reset {
 		color: var(--faint);
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 
 	/* --- the conversation's figures ---------------------------------------------- */
@@ -160,20 +160,20 @@
 
 	.usage-modal .usage-facts dt {
 		color: var(--faint);
-		font-size: 10.5px;
+		font-size: var(--type-hint);
 	}
 
 	.usage-modal .usage-facts dd {
 		margin: 0;
 		color: var(--fg);
-		font-size: 14px;
+		font-size: var(--type-name);
 		font-variant-numeric: tabular-nums;
 	}
 
 	.usage-modal .usage-table {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 11.5px;
+		font-size: var(--type-label);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -222,7 +222,7 @@
 		display: flex;
 		align-items: baseline;
 		gap: 8px;
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 
 	/*
@@ -236,7 +236,7 @@
 		overflow: hidden;
 		color: var(--muted);
 		font-family: var(--font-mono);
-		font-size: 11px;
+		font-size: var(--type-note);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}

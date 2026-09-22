@@ -92,6 +92,19 @@
 	--shadow-row: var(--shadow-row);
 	--shadow-menu: var(--shadow-menu);
 
+	/* The type scale, as utilities: `text-ui`, `text-note`, `text-label` … — the names the
+	   sheets use, so a class attribute and a sheet cannot drift apart. */
+	--text-tag: var(--type-tag);
+	--text-micro: var(--type-micro);
+	--text-hint: var(--type-hint);
+	--text-note: var(--type-note);
+	--text-label: var(--type-label);
+	--text-ui: var(--type-ui);
+	--text-copy: var(--type-copy);
+	--text-body: var(--type-body);
+	--text-name: var(--type-name);
+	--text-title: var(--type-title);
+
 	--font-mono: var(--font-mono);
 }
 
@@ -235,6 +248,36 @@
 	   it (`--layer`), so a float reads as a thing on the ground rather than a hole in it. */
 	--stage: var(--color-grey-100);
 	/*
+	 * The type scale: ten sizes with names, because thirteen sizes without them is what the
+	 * app had.
+	 *
+	 * Measured before naming anything: 152 `font-size` declarations in the sheets and 136
+	 * `[Npx]` one-offs in markup, using thirteen distinct sizes between them. Ten of those
+	 * sizes are shared — five or more places each, across sheets that do not know about each
+	 * other — and they are the ones here, named for what they are for rather than for their
+	 * size, so a reader can tell whether the thing in front of them is a tag, a note, or a
+	 * label without holding a ruler to it.
+	 *
+	 * **Three sizes are not here, because they belong to one element each:** 16px is the
+	 * composer's input, 22px is the big number in the usage modal, and 20px is the Claude
+	 * frame's wordmark. A token for one element is a name nobody else may use.
+	 *
+	 * `@theme inline` hands the same ten to Tailwind as `text-tag`, `text-ui` and so on, so a
+	 * class attribute and a sheet spell the same size the same way — which is the other half
+	 * of the drift: the markup's `text-[11px]` and the sheets' `11px` were the same decision
+	 * written twice.
+	 */
+	--type-tag: 9.5px; /* a tag, or a count badge */
+	--type-micro: 10px; /* counts, kbd, segmented buttons, the usage line */
+	--type-hint: 10.5px; /* a hint under a field, a chip, a picture's label */
+	--type-note: 11px; /* a note, a secondary label, a field's own text */
+	--type-label: 11.5px; /* a label you read in order to act, and metadata */
+	--type-ui: 12px; /* a button, a chip, a placeholder: the working size */
+	--type-copy: 12.5px; /* the text of something being read: a document, a preview */
+	--type-body: 13px; /* the app's base, and the fields that match it */
+	--type-name: 14px; /* a name in a card, a heading */
+	--type-title: 15px; /* the largest text in a panel, a heading over a name */
+	/*
 	 * The stack, in one place: who is above whom.
 	 *
 	 * The numbers *are* the order — read them down the list and that is what covers what —
@@ -355,7 +398,7 @@ body {
 	background: var(--bg);
 	color: var(--fg);
 	font-family: var(--font-sans);
-	font-size: 13px;
+	font-size: var(--type-body);
 	-webkit-font-smoothing: antialiased;
 	/* Kills the 300ms wait for a second tap, and with it the double-tap zoom, on the
 	   chrome — where a double-tap means nothing and the delay is felt on every button.

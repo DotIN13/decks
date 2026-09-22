@@ -30,7 +30,7 @@
 	color: var(--muted);
 	cursor: pointer;
 	font: inherit;
-	font-size: 11px;
+	font-size: var(--type-note);
 	transition:
 		background 120ms ease,
 		color 120ms ease;
@@ -73,7 +73,7 @@
 	.composer .usage {
 	color: var(--faint);
 	font-family: var(--font-mono);
-	font-size: 10px;
+	font-size: var(--type-micro);
 }
 	/* It is a button now (a click opens the usage modal) but should still read as a
    meter, not a control: no box, just the figures, and a hover that says it is
@@ -84,7 +84,7 @@
 	background: none;
 	border-radius: var(--control-radius);
 	font-family: var(--font-mono);
-	font-size: 10px;
+	font-size: var(--type-micro);
 }
 	.composer button.usage:hover {
 	background: var(--line);
@@ -103,7 +103,7 @@
 	}
 	.composer select {
 		min-height: 36px;
-		font-size: 13px;
+		font-size: var(--type-body);
 	}
 }
 

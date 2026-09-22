@@ -45,10 +45,10 @@
 	line-height: 1.3;
 }
 	.md .md-h[data-level="1"] {
-	font-size: 15px;
+	font-size: var(--type-title);
 }
 	.md .md-h[data-level="2"] {
-	font-size: 14px;
+	font-size: var(--type-name);
 }
 	/* Three and deeper stop growing: below the body size a heading is just bold text, and in a
    column this narrow that is all the distinction that survives anyway. */
@@ -56,7 +56,7 @@
 .md .md-h[data-level="4"],
 .md .md-h[data-level="5"],
 .md .md-h[data-level="6"] {
-	font-size: 13px;
+	font-size: var(--type-body);
 }
 	/*
  * A list stays a list, which takes two explicit statements here.
@@ -105,7 +105,7 @@
 .md table {
 	width: max-content;
 	border-collapse: collapse;
-	font-size: 11.5px;
+	font-size: var(--type-label);
 	line-height: 1.45;
 }
 	/*
@@ -196,7 +196,7 @@
 	border-radius: 5px;
 	background: color-mix(in oklab, var(--fg) 9%, transparent);
 	font-family: var(--font-mono);
-	font-size: 12px;
+	font-size: var(--type-ui);
 	word-break: break-word;
 }
 	.md a {

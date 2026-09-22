@@ -31,7 +31,7 @@
 }
 	.set-head-title {
 	color: var(--fg);
-	font-size: 13px;
+	font-size: var(--type-body);
 	font-weight: 600;
 }
 	/* The recessed ground the groups stand on — the same relation a float has to the canvas. */
@@ -65,12 +65,12 @@
 }
 	.set-title {
 	color: var(--fg);
-	font-size: 12px;
+	font-size: var(--type-ui);
 	font-weight: 600;
 }
 	.set-note {
 	color: var(--faint);
-	font-size: 11px;
+	font-size: var(--type-note);
 }
 	/*
  * One row: what it is on the left, the one control that changes it on the right.
@@ -129,7 +129,7 @@
 	box-shadow: inset 0 1px 0 0 var(--line);
 	background: color-mix(in srgb, var(--color-warn) 10%, transparent);
 	color: var(--fg);
-	font-size: 11px;
+	font-size: var(--type-note);
 	line-height: 1.45;
 }
 	.set-strip[data-tone="ask"] {
@@ -142,7 +142,7 @@
 }
 	.set-strip code {
 	font-family: var(--font-mono);
-	font-size: 10px;
+	font-size: var(--type-micro);
 }
 	/* The account rows sit in the group's body, so the list's own padding comes off. */
 .set-rows {
@@ -167,7 +167,7 @@
 	color: var(--muted);
 	cursor: pointer;
 	font: inherit;
-	font-size: 12px;
+	font-size: var(--type-ui);
 	transition:
 		background-color 120ms ease,
 		color 120ms ease;
@@ -188,7 +188,7 @@
 	border-radius: 6px;
 	background: transparent;
 	color: var(--muted);
-	font-size: 11px;
+	font-size: var(--type-note);
 	font-weight: 600;
 	cursor: pointer;
 }
@@ -218,7 +218,7 @@
 	display: block;
 	padding: 8px 6px 4px;
 	color: var(--faint);
-	font-size: 10px;
+	font-size: var(--type-micro);
 }
 	.set-cues {
 	display: grid;
@@ -235,7 +235,7 @@
 	padding: 0;
 	color: var(--muted);
 	font-family: var(--font-mono);
-	font-size: 11px;
+	font-size: var(--type-note);
 	font-variant-numeric: tabular-nums;
 }
 	.popover.set-sounds .set-cues > [data-row][data-current="true"] {
@@ -274,7 +274,7 @@
 	}
 	.set-row .seg > button {
 		height: 30px;
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 	.popover.set-sounds .set-cues > [data-row] {
 		height: 34px;

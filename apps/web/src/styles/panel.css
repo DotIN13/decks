@@ -417,7 +417,7 @@
 	.agent-line > .ago {
 		margin-left: auto;
 		flex: none;
-		font-size: 10px;
+		font-size: var(--type-micro);
 		white-space: nowrap;
 	}
 
@@ -435,7 +435,7 @@
 		align-items: center;
 		gap: 5px;
 		color: var(--muted);
-		font-size: 11px;
+		font-size: var(--type-note);
 	}
 
 	/*
@@ -449,7 +449,7 @@
 	.agent-said {
 		overflow: hidden;
 		color: var(--faint);
-		font-size: 10.5px;
+		font-size: var(--type-hint);
 		line-height: 1.4;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -563,7 +563,7 @@
 		width: 78px;
 		flex: none;
 		color: var(--muted);
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 	.agent-edit-v {
 		display: flex;
@@ -583,7 +583,7 @@
 	.agent-edit-err {
 		margin: -2px 0 0;
 		color: var(--color-danger);
-		font-size: 11px;
+		font-size: var(--type-note);
 		line-height: 1.4;
 	}
 	/* The picker wears the field's shape, so the three rows line up as three fields. */
@@ -600,7 +600,7 @@
 		color: var(--fg);
 		cursor: pointer;
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		text-align: left;
 	}
 	.agent-edit-pick > svg {
@@ -611,12 +611,12 @@
 	}
 	.agent-edit-pick-v {
 		font-family: var(--font-mono);
-		font-size: 11.5px;
+		font-size: var(--type-label);
 	}
 	.agent-edit-pick-v[data-none] {
 		color: var(--faint);
 		font-family: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 	}
 	.agent-edit .tag {
 		display: inline-flex;
@@ -732,7 +732,7 @@
 		color: var(--fg);
 		cursor: pointer;
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--type-ui);
 		text-align: left;
 		transition:
 			background-color 120ms ease,
@@ -1123,7 +1123,7 @@
 	.board-tile > .cap {
 		overflow: hidden;
 		padding: 4px 6px;
-		font-size: 10.5px;
+		font-size: var(--type-hint);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
@@ -1233,7 +1233,7 @@
 	flex-direction: column;
 	padding: 8px;
 	gap: 6px;
-	font-size: 12px;
+	font-size: var(--type-ui);
 }
 
 	/* The same rules, under the same query. */
