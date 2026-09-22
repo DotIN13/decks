@@ -332,6 +332,11 @@ export function createStageTool(deps: {
 		if (!service.web) throw new Error("This server has no shared browser.");
 		return service.web;
 	};
+	/** The goal-driven browser agent, or the sentence that says this server has none. */
+	const needJev = () => {
+		if (!service.jev) throw new Error("This server has no jev browser agent.");
+		return service.jev;
+	};
 	/**
 	 * A target as the agent wrote it, checked here rather than in the bridge.
 	 *
@@ -816,6 +821,26 @@ export function createStageTool(deps: {
 				needWeb().submit(what === undefined ? undefined : needTarget(what, "submit needs the button's name, or a { ref } from stage.web.read()"), options),
 			/** Detach from the shared tab. */
 			stop: async () => needWeb().stop(),
+		},
+
+		/**
+		 * The goal-driven browser agent (jev-ultrafast), beside the shared Chrome.
+		 *
+		 * `web` is the person's own tab, driven one verb at a time and watched by them.
+		 * `web_jev` is a headless browser of the server's: one URL, one goal, and the agent
+		 * decides its own clicks until the goal is done or blocked. A run outlives a stage
+		 * call, so `run` returns at once and `state` is how the run is followed — on the
+		 * next turn, not in a loop inside this one.
+		 */
+		web_jev: {
+			/** Whether a run can start: the keys the server has, and the run going or just gone. */
+			status: async () => needJev().status(),
+			/** Start one run. One at a time; the answer says how to follow it. */
+			run: async (spec?: { url?: string; goal?: string }) => needJev().run({ url: String(spec?.url ?? ""), goal: String(spec?.goal ?? "") }),
+			/** The run going now, or the last one: every step the agent took. */
+			state: async () => needJev().state(),
+			/** End the run; the browser it drove closes with it. */
+			stop: async () => needJev().stop(),
 		},
 
 		/**

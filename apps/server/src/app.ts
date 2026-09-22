@@ -18,6 +18,7 @@ import { canvasStage, type StageTarget } from "./canvas/stage.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./web/bridge.ts";
+import { JevService } from "./web/jev.ts";
 import { ThumbService } from "./boards/thumbs.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
@@ -82,6 +83,8 @@ export class App {
 	readonly bridge = new StageBridge();
 	/** The user's own Chrome, shared through the Decks extension (`web/bridge.ts`). */
 	readonly web: WebBridge;
+	/** The goal-driven browser agent behind `stage.web_jev` (`web/jev.ts`). */
+	readonly jev: JevService;
 	readonly thumbs: ThumbService;
 	private hub: Hub | undefined;
 	/** The browser whose frame is being handled right now, if any — see `handle`. */
@@ -200,6 +203,8 @@ export class App {
 		 */
 		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.status", status }));
 		this.stage.web = Object.assign(this.web, { board: () => this.boards.newWebBoard() }) as typeof this.web & { board: () => string };
+		this.jev = new JevService();
+		this.stage.jev = this.jev;
 		/*
 		 * The dashboard: tasks and schedules, per deck like the agents they belong to.
 		 *
@@ -976,6 +981,7 @@ export class App {
 		clearInterval(this.resyncTimer);
 		this.resyncTimer = undefined;
 		this.web.dispose();
+		void this.jev.dispose();
 		this.thumbs.dispose();
 		this.agents.dispose();
 	}

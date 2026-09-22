@@ -88,6 +88,20 @@ export interface Stage {
 		submit(what?: WebTarget, o?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
 		stop(): Promise<void>;
 	};
+	/**
+	 * A goal-driven browser agent (jev-ultrafast), beside `web`: a headless browser of the
+	 * server's, never the person's Chrome. Give `run` one URL and one goal in plain words;
+	 * the agent picks its own clicks and typing until the goal is done or blocked. A run
+	 * outlives a stage call, so `run` returns at once — follow it with `state()` on your
+	 * next turn, one run at a time. `status()` says whether the server has the model keys
+	 * a run needs; relay its sentence when it says no.
+	 */
+	web_jev: {
+		status(): Promise<{ ready: boolean; missing: string[]; note: string; running?: { id: string; url: string; goal: string; startedAt: number; steps: number }; last?: { id: string; status: string; steps: number; elapsedMs: number; note?: string } }>;
+		run(o: { url: string; goal: string }): Promise<{ id: string; note: string }>;
+		state(): Promise<{ id: string; url: string; goal: string; status: "starting" | "running" | "done" | "blocked" | "failed" | "stopped"; elapsedMs: number; steps: Array<{ at: number; status: string; elapsedMs: number; steps: number; url?: string; last?: { action: string; operation: string; text: string | null } }>; note?: string; endedAt?: number }>;
+		stop(): Promise<void>;
+	};
 	now(): Promise<{ iso: string; timezone: string; words: string; epoch: number }>;
 	/**
 	 * Who you are and what you are doing: read with nothing, change with a patch. Answers with the

@@ -98,6 +98,35 @@ export interface WebHost {
 	board(): string;
 }
 
+/**
+ * What the stage tool needs of the goal-driven browser agent (`web/jev.ts`).
+ *
+ * The other half of `WebHost`: `web` is the person's own Chrome driven one verb at a
+ * time, `web_jev` is a headless browser of the server's that runs a whole goal. A run
+ * outlives a stage call, so the shape is a job — start, follow, stop.
+ */
+export interface JevHost {
+	status(): {
+		ready: boolean;
+		missing: string[];
+		note: string;
+		running?: { id: string; url: string; goal: string; startedAt: number; steps: number };
+		last?: { id: string; status: string; steps: number; elapsedMs: number; note?: string };
+	};
+	run(spec: { url: string; goal: string }): Promise<{ id: string; note: string }>;
+	state(): {
+		id: string;
+		url: string;
+		goal: string;
+		status: "starting" | "running" | "done" | "blocked" | "failed" | "stopped";
+		elapsedMs: number;
+		steps: Array<{ at: number; status: string; elapsedMs: number; steps: number; url?: string; last?: { action: string; operation: string; text: string | null } }>;
+		note?: string;
+		endedAt?: number;
+	};
+	stop(note?: string): Promise<void>;
+}
+
 /** The room `fit` leaves under the content — the margin a board's own components start at. */
 const FIT_MARGIN = 48;
 
@@ -113,6 +142,9 @@ export class StageService {
 	 * it. `undefined` in the tests that build a service on its own.
 	 */
 	web: WebHost | undefined;
+
+	/** The goal-driven browser agent, on the same terms as `web`: one per server, read only by the stage tool. */
+	jev: JevHost | undefined;
 
 	constructor(
 		private deck: Deck,
