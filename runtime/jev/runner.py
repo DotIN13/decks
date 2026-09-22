@@ -42,10 +42,11 @@ def line_of(snapshot):
                     "action": last["action"],
                     "operation": last["operation"],
                     "text": last["text"],
-                    # How long the decision took, and how long the text helper took, so a run's
-                    # wall time can be split into thinking and everything else.
+                    # How long the decision took, how long the text helper took, and what the two
+                    # together cost in tokens, so a run can be compared with a run of anything else.
                     "model_ms": last.get("latency_ms", 0),
                     "text_ms": last.get("text_latency_ms", 0),
+                    "tokens": last.get("usage", {}),
                 }
             }
             if last
