@@ -372,17 +372,9 @@
 		margin-right: auto;
 	}
 
-	/* An idle agent's *name* at half — the division of labour in one declaration: the corner
-	   is what is happening, this is what exists. The state text is already `--faint` and
-	   stays legible, because "idle · 3h" is the only content in the row that explains why the
-	   rest of it is dimmed.
-	   
-	   The **face** is never dimmed, here or in the corner. A mark drawn at half opacity on a
-	   panel reads as a rendering fault rather than a status, and the ring around it already
-	   carries the state in colour; there is no version of "faded" the eye takes as "idle". */
-	.popover [data-row][data-flat="true"][data-agent][data-status="idle"] > .lb {
-		opacity: 0.5;
-	}
+	/* Every name at full strength, idle or not. An idle agent's name used to sit at half
+	   opacity, and a grey name in a list of names reads as disabled, not as resting; the
+	   state text beside it ("idle · 3h") already says what the dimming was for. */
 
 	/*
 	 * The colour, restated as a shape, in the hover card.
