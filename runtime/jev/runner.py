@@ -35,7 +35,17 @@ def line_of(snapshot):
         "steps": len(snapshot["history"]),
         "url": snapshot["page"].get("url"),
         **(
-            {"last": {"action": last["action"], "operation": last["operation"], "text": last["text"]}}
+            {
+                "last": {
+                    "action": last["action"],
+                    "operation": last["operation"],
+                    "text": last["text"],
+                    # How long the decision took, and how long the text helper took, so a run's
+                    # wall time can be split into thinking and everything else.
+                    "model_ms": last.get("latency_ms", 0),
+                    "text_ms": last.get("text_latency_ms", 0),
+                }
+            }
             if last
             else {}
         ),
@@ -47,6 +57,13 @@ def main():
     spec = json.loads(sys.argv[1])
     snapshot = None
     try:
+        # A decision model other than TypeSafe's own, when one is named. Installed before the
+        # agent is imported, because the agent binds the model module's functions as it loads.
+        if os.environ.get("JEV_DECISION") == "chat":
+            from decision_chat import install
+
+            install()
+
         from jev_ultrafast import Agent
 
         with Agent(spec["url"], spec["goal"]) as agent:

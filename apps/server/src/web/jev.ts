@@ -150,12 +150,15 @@ export interface JevRunnerProcess {
 }
 
 /**
- * The one key without which no decision can be made.
- *
- * `TEXT_MODEL_API_KEY` is only needed to type, and a run in the shared Chrome never types a
- * word of its own: the words come from whoever is supervising it.
+ * The one key without which no decision can be made — and which key that is depends on who
+ * answers. TypeSafe's own model needs `TYPESAFE_API_KEY`; a chat model standing in for it needs
+ * its own, and a server running that way should not be told it is missing a key it will never
+ * use. `TEXT_MODEL_API_KEY` is only needed to type, and a run in the shared Chrome never types
+ * a word of its own: the words come from whoever is supervising it.
  */
-const REQUIRED = ["TYPESAFE_API_KEY"];
+function requiredKeys(): string[] {
+	return process.env.JEV_DECISION === "chat" ? ["JEV_DECISION_API_KEY"] : ["TYPESAFE_API_KEY"];
+}
 /** A run this long has stopped making progress; the library's own step budget usually ends it first. */
 const MAX_RUN_MS = 180_000;
 
@@ -174,7 +177,7 @@ export class JevService {
 
 	status(): JevStatus {
 		const keys = this.backend.keys();
-		const missing = REQUIRED.filter((name) => !keys[name]?.trim());
+		const missing = requiredKeys().filter((name) => !keys[name]?.trim());
 		const running = this.current && !this.current.endedAt ? this.current : undefined;
 		const last = this.current?.endedAt ? this.current : undefined;
 		const shared = this.sharedEndpoint !== undefined;
@@ -244,7 +247,7 @@ export class JevService {
 		if (!goal) throw new Error("run needs a goal, in a sentence or two");
 		if (this.current && !this.current.endedAt) throw new Error("A run is already going; stage.web_jev.stop() ends it, state() follows it.");
 		const keys = this.backend.keys();
-		const missing = REQUIRED.filter((name) => !keys[name]?.trim());
+		const missing = requiredKeys().filter((name) => !keys[name]?.trim());
 		if (missing.length > 0) throw new Error(`Set ${missing.join(" and ")} in the server's environment; without it no run can start.`);
 
 		/*
@@ -508,6 +511,14 @@ function realBackend(): JevBackend {
 			TEXT_MODEL_BASE_URL: process.env.TEXT_MODEL_BASE_URL,
 			TEXT_MODEL: process.env.TEXT_MODEL,
 			TEXT_MODEL_REASONING: process.env.TEXT_MODEL_REASONING,
+			// A decision model other than TypeSafe's own (`runtime/jev/decision_chat.py`).
+			// Passed through like the rest, because the runner is what decides to use it.
+			JEV_DECISION: process.env.JEV_DECISION,
+			JEV_DECISION_API_KEY: process.env.JEV_DECISION_API_KEY,
+			JEV_DECISION_BASE_URL: process.env.JEV_DECISION_BASE_URL,
+			JEV_DECISION_MODEL: process.env.JEV_DECISION_MODEL,
+			JEV_DECISION_SESSION: process.env.JEV_DECISION_SESSION,
+			JEV_DECISION_MAX_TOKENS: process.env.JEV_DECISION_MAX_TOKENS,
 		}),
 		browser: async () => {
 			const port = await freePort();
