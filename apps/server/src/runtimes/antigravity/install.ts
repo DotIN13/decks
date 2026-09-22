@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { antigravityServer, skillsDir } from "@decks/runtime";
 import { loadConfig } from "../../config.ts";
@@ -71,10 +71,11 @@ export interface PreparedHome {
  *
  * The layout is the measured one: `.gemini/antigravity-cli` and the config pieces are
  * symlinks to the user's real ones (auth, settings, projects stay the user's), Decks'
- * own `mcp_config.json` is a real file, and Decks' skills ride along under
- * `.gemini/config/skills` — the global skills root. The MCP server, therefore, is the one
- * thing in the sandbox that is not a link, which is the point: nothing Decks writes lands
- * in the user's `~/.gemini`.
+ * own `mcp_config.json` is a real file, Decks' skills ride along under
+ * `.gemini/config/skills` — the global skills root — and on macOS the two pieces of
+ * `~/Library` that make the login keychain reachable are lent as well (`linkKeychain`).
+ * The MCP server, therefore, is the one thing in the sandbox that is not a link, which is
+ * the point: nothing Decks writes lands in the user's `~/.gemini`.
  *
  * A path that is already there is left alone — re-linking would churn the user's inode
  * count for nothing — and a missing *real* piece (no `~/.gemini` at all) is reported
@@ -99,6 +100,7 @@ export function prepareAntigravityHome(homeDir = antigravityHomeDir(), realGemin
 	// Decks' skills as the CLI's global skills. Best effort: a deck without the skill dir
 	// still runs, it just does not carry its own documentation.
 	if (existsSync(skillsDir())) link(join(configDir, "skills"), skillsDir(), "dir");
+	linkKeychain(homeDir, dirname(realGemini));
 	const config = mcpConfig();
 	// Only when it has changed — a write per agent start would touch the sandbox for
 	// nothing and, worse, cycle the CLI's cache of it.
@@ -107,6 +109,35 @@ export function prepareAntigravityHome(homeDir = antigravityHomeDir(), realGemin
 	}
 	prepared = { homeDir, realGemini, ok: true };
 	return prepared;
+}
+
+/**
+ * Lend the sandbox the login keychain, which is where the CLI's sign-in now lives.
+ *
+ * `agy` authenticates through `keyringAuth`, and on macOS that is the login keychain
+ * rather than a file — so the symlinked `.gemini` carries everything except the one thing
+ * a turn cannot start without. Security finds a keychain through *the home directory the
+ * process is given*: the search list is `Library/Preferences/com.apple.security.plist`
+ * and the keychains themselves are in `Library/Keychains`. With neither of them under the
+ * sandbox HOME the CLI has no default keychain at all, loads no token, and every turn
+ * ends as "You are not logged into Antigravity" before a model is called.
+ *
+ * Both are the user's own and are linked read-only in practice: Decks writes nothing into
+ * either, and the CLI reaches this same keychain when the user runs `agy` in a terminal,
+ * so the sandbox grants it nothing it did not already have on this machine.
+ *
+ * Best effort and darwin-only. A Linux HOME has no `Library`, and a machine whose
+ * keychains are somewhere else still runs — it fails the way it did before this, which is
+ * the CLI's own message rather than a crash in here.
+ */
+function linkKeychain(homeDir: string, realHome: string): void {
+	if (process.platform !== "darwin") return;
+	const keychains = join(realHome, "Library", "Keychains");
+	if (!existsSync(keychains)) return;
+	mkdirSync(join(homeDir, "Library", "Preferences"), { recursive: true });
+	link(join(homeDir, "Library", "Keychains"), keychains, "dir");
+	const searchList = join(realHome, "Library", "Preferences", "com.apple.security.plist");
+	if (existsSync(searchList)) link(join(homeDir, "Library", "Preferences", "com.apple.security.plist"), searchList, "file");
 }
 
 /** `mcp_config.json`: the one tool, served by the machine's own Node. */
