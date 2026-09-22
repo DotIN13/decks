@@ -54,6 +54,8 @@ export class Registry {
 			/** The runtime chosen for the dashboard's dispatcher, if one has been (`settings.ts`). */
 			dispatcherKind?: () => AgentKind | undefined;
 			camera(agentId: string): Camera;
+			/** The reading, only when it is of this canvas — what a placement may anchor on. Optional so a bare fixture keeps the plain camera. */
+			cameraOn?(agentId: string, canvasId: string): Camera | undefined;
 			/** Say that a board was placed, so the deck state goes out before the canvas changes. */
 			arranged?(): void;
 			/** The deck's canvases: what holds the boards (`canvas/store.ts`). */
@@ -236,6 +238,7 @@ export class Registry {
 			{
 				port: this.host.port,
 				camera: (agentId: string) => this.host.camera(agentId),
+				cameraOn: (agentId: string, canvasId: string) => this.host.cameraOn?.(agentId, canvasId),
 				// A board that was given a place: the browsers need the arrangement, not just the canvas.
 				arranged: () => this.host.arranged?.(),
 				/*

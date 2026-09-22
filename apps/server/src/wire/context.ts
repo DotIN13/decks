@@ -1,4 +1,5 @@
 import type { AgentKind, Camera, Canvas, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
+import type { CameraReading } from "../deck/place.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { Acts } from "../agents/acts.ts";
 import type { BoardService } from "../boards/service.ts";
@@ -116,9 +117,9 @@ export interface WireContext {
 	/** Say what canvases exist, to everyone, after one is made, renamed, joined or removed. */
 	publishCanvases(): void;
 
-	/** The camera a browser last reported, and the per-agent readings beside it. */
-	lastCamera: Camera;
-	readonly cameras: Map<string, Camera>;
+	/** The camera a browser last reported, and the per-agent readings beside it, each tagged with the canvas it was of. */
+	lastCamera: CameraReading;
+	readonly cameras: Map<string, CameraReading>;
 	/** The canvas calls waiting on a browser, keyed by call id. */
 	readonly pendingStage: Map<string, PendingStage>;
 

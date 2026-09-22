@@ -1,6 +1,7 @@
 import type { Camera } from "@decks/protocol";
 import { canvasBox } from "../camera/insets.ts";
 import { camera, setCamera } from "../state/camera.ts";
+import { state } from "../state/deck.ts";
 import { send } from "../state/socket.ts";
 
 /**
@@ -31,11 +32,18 @@ let timer: number | undefined;
  * `agentId` names a *different* conversation's canvas: the camera is per conversation
  * (`camera/agent-view.ts`), and a parked view has to be reported for the agent it belongs
  * to rather than for whoever is on screen.
+ *
+ * The reading also says **which canvas it is of**, because the server places new boards at
+ * the middle of it and positions are per canvas: an untagged reading must never anchor a
+ * board (`deck/place.ts`, `cameraFor`). For the view on screen that is the stage's canvas;
+ * a parked view's caller says its own, and a reading that cannot say stays untagged, which
+ * the server reads as "anchor on the boards instead".
  */
-export function reportCamera(now: Camera, agentId?: string): void {
+export function reportCamera(now: Camera, agentId?: string, canvas?: string): void {
 	const box = canvasBox({ width: window.innerWidth, height: window.innerHeight });
 	const sized: Camera = { ...now, width: Math.round(box.width), height: Math.round(box.height) };
-	send({ type: "camera.set", camera: sized, ...(agentId ? { agentId } : {}) });
+	const of = canvas ?? (agentId ? undefined : state.canvas);
+	send({ type: "camera.set", camera: sized, ...(agentId ? { agentId } : {}), ...(of ? { canvas: of } : {}) });
 }
 
 /** The same, trailing a gesture by 250ms so a pan sends one frame and not a hundred. */

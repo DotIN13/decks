@@ -338,7 +338,7 @@ async function runBoardEval(
 		setInPlay: (paths: string[]) => focused.setInPlay(paths, { place: true }),
 		positions: () => focused.positions(),
 		setPosition: (board: string, x: number, y: number) => focused.setPosition(board, x, y),
-		camera: () => wire.cameras.get(focused.id) ?? wire.lastCamera,
+		camera: () => (wire.cameras.get(focused.id) ?? wire.lastCamera).at,
 		queue: () => focused.queue(),
 		agents: () => wire.agents.summaries(),
 		send: (fromId: string, target: string, spec: Parameters<Registry["send"]>[2]) => wire.agents.send(fromId, target, spec),

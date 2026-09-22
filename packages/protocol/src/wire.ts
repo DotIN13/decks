@@ -127,7 +127,12 @@ export type ClientMessage =
 	 * `stage.camera()` answers "where is my canvas looking" rather than "where is the user
 	 * looking" — which is what it always claimed to mean.
 	 */
-	| { type: "camera.set"; camera: Camera; agentId?: string }
+	/**
+	 * Where the person is looking. `agentId` names a parked conversation's view; `canvas` says
+	 * which canvas the reading is of, because positions are per canvas and a board must never
+	 * be placed by a camera that was looking at a different one (`deck/place.ts`, `cameraFor`).
+	 */
+	| { type: "camera.set"; camera: Camera; agentId?: string; canvas?: string }
 	/**
 	 * Look at a canvas.
 	 *

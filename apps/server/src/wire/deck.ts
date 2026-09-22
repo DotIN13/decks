@@ -14,9 +14,11 @@ export const deck = {
 
 	"camera.set": (message, _reply, wire) => {
 		// Recorded, not acted on: the camera is the browser's, and this is the reading an
-		// agent gets when it asks what the user can see.
-		wire.lastCamera = message.camera;
-		if (message.agentId) wire.cameras.set(message.agentId, message.camera);
+		// agent gets when it asks what the user can see. The canvas it is of rides along,
+		// so a placement can refuse a reading of somebody else's room (`deck/place.ts`).
+		const reading = { at: message.camera, ...(message.canvas ? { canvas: message.canvas } : {}) };
+		wire.lastCamera = reading;
+		if (message.agentId) wire.cameras.set(message.agentId, reading);
 	},
 
 	"stage.result": (message, _reply, wire) => {

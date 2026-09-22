@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { freeSpot, joinSpot, keepsPlace, viewBox } from "./place.ts";
+import { freeSpot, joinSpot, keepsPlace, viewBox, cameraFor } from "./place.ts";
 
 const overlap = (a: { x: number; y: number; w: number; h: number }, b: typeof a) =>
 	a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -67,4 +67,16 @@ test("a spot to the left is only taken when it is the nearest one", () => {
 	// Looking at its left-hand edge: the other side is.
 	const left = joinSpot({ w: 1000, h: 800 }, [there], { x: 0, y: 400, zoom: 1, width: 400, height: 300 });
 	assert.ok(left.x + 1000 <= there.x);
+});
+
+test("a reading anchors a placement only on the canvas it is of", () => {
+	const at = { x: 4000, y: 9000, zoom: 1, width: 1400, height: 900 };
+	assert.deepEqual(cameraFor({ at, canvas: "cv_here" }, "cv_here"), at);
+	// The bug this exists for: the last reading was of another canvas, and anchoring on it
+	// put a board joining this one inside that one's cluster.
+	assert.equal(cameraFor({ at, canvas: "cv_elsewhere" }, "cv_here"), undefined);
+	// A reading that does not say — an older browser, or the {0,0,1} a restart starts with —
+	// anchors nothing either: joinSpot then places against the boards already here.
+	assert.equal(cameraFor({ at }, "cv_here"), undefined);
+	assert.equal(cameraFor(undefined, "cv_here"), undefined);
 });

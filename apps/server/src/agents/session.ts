@@ -345,6 +345,15 @@ export class DeckAgent {
 			port: number;
 			camera(agentId: string): Camera;
 			/**
+			 * The reading, only when it is of this canvas: what `placeJoining` anchors on.
+			 *
+			 * Separate from `camera` because the two callers want different failures. An agent
+			 * asking `stage.camera()` wants the best reading there is; a placement anchoring a
+			 * board wants **no** reading rather than one of another canvas, because positions are
+			 * per canvas and the middle of somebody else's view is inside somebody else's cluster.
+			 */
+			cameraOn?(agentId: string, canvasId: string): Camera | undefined;
+			/**
 			 * A board was given a place: the arrangement changed, so the deck state has to go out.
 			 *
 			 * Optional because a unit fixture has no browsers to tell; absent means the place is
@@ -889,7 +898,13 @@ export class DeckAgent {
 				const board = this.deck.board(path);
 				return board ? { w: board.w, h: board.h } : undefined;
 			},
-			camera: this.host.camera(this.id),
+			/*
+			 * Only a reading of this canvas may anchor: the plain `camera` falls back to the last
+			 * reading from *any* canvas, and anchoring on that is how a board joining this canvas
+			 * landed inside another one's cluster. With no reading of this canvas, `joinSpot`
+			 * places against the boards already here, which is where a background room grows.
+			 */
+			camera: this.host.cameraOn ? this.host.cameraOn(this.id, this.canvasId) : this.host.camera(this.id),
 		});
 		const entries = Object.entries(spots);
 		if (entries.length === 0) return;

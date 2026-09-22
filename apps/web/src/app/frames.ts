@@ -433,8 +433,9 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 								// a switch.
 								agentViews(state.deck?.path ?? "").keep(agentId, viewToPark(camera, selected));
 								// So `stage.camera()` answers for that agent's canvas rather than falling
-								// back to wherever the last person to look at anything was.
-								reportCamera(camera, agentId);
+								// back to wherever the last person to look at anything was — tagged with
+								// that canvas, so the reading may anchor boards placed there and nowhere else.
+								reportCamera(camera, agentId, state.agents[agentId]?.canvas);
 							},
 							select: (path) => setSelected(path),
 							reload: (path) => setState("nonces", path, (current = 0) => current + 1),

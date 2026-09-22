@@ -27,6 +27,7 @@ import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncExamplesDir, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { watchDeck } from "./deck/watcher.ts";
+import { cameraFor, type CameraReading } from "./deck/place.ts";
 import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 
@@ -97,7 +98,7 @@ export class App {
 	 * an agent can ask what the user can see. It is a reading, not a source of
 	 * truth — nothing here ever moves it except at an agent's request.
 	 */
-	lastCamera: Camera = { x: 0, y: 0, zoom: 1 };
+	lastCamera: CameraReading = { at: { x: 0, y: 0, zoom: 1 } };
 	/**
 	 * And one per conversation, because the camera belongs to the conversation.
 	 *
@@ -105,7 +106,7 @@ export class App {
 	 * "where is my canvas looking" rather than "where is the user looking". An agent nobody
 	 * has looked at yet falls back to the last reading, which is the only honest guess.
 	 */
-	readonly cameras = new Map<string, Camera>();
+	readonly cameras = new Map<string, CameraReading>();
 	/** Stage calls waiting for the browser to carry them out. */
 	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
@@ -180,7 +181,7 @@ export class App {
 			call: (call) => this.callStage(call),
 			connected: () => (this.hub?.connections ?? 0) > 0,
 			broadcast: (message) => this.send(message),
-			camera: (agentId) => this.cameras.get(agentId) ?? this.lastCamera,
+			camera: (agentId) => (this.cameras.get(agentId) ?? this.lastCamera).at,
 			agents: () => this.agents.summaries(),
 		});
 		/*
@@ -267,7 +268,8 @@ export class App {
 				act: (agentId, act) => this.acts.act(agentId, act),
 				defaultKind: config.backend,
 				dispatcherKind: () => this.settings.get().dispatcherKind,
-				camera: (agentId) => this.cameras.get(agentId) ?? this.lastCamera,
+				camera: (agentId) => (this.cameras.get(agentId) ?? this.lastCamera).at,
+				cameraOn: (agentId, canvasId) => cameraFor(this.cameras.get(agentId) ?? this.lastCamera, canvasId),
 				/*
 				 * A board joining a canvas was given a place (`agents/session.ts`). The browsers draw a
 				 * board where the deck state says it is, so the state goes out here — before the
@@ -842,7 +844,8 @@ export class App {
 				canvases: this.canvases,
 				deck: this.deck,
 				id,
-				camera: () => this.cameras.get(this.viewing?.focused ?? "") ?? this.lastCamera,
+				// Of this canvas or nothing: the reading may be a parked view of another room.
+				camera: () => cameraFor(this.cameras.get(this.viewing?.focused ?? "") ?? this.lastCamera, id),
 				changed: () => this.agents.canvasChanged(id),
 			});
 		}
