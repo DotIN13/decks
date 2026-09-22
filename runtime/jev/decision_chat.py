@@ -51,23 +51,30 @@ Confidence is how sure you are, from 0 to 1."""
 
 def install():
     """
-    Point every model call the vendored code makes at the chat gateway.
+    Point the model calls the vendored code makes where this machine can reach them.
 
-    Two calls, and they need different things. The decision call goes to TypeSafe's own
-    endpoint, and is answered here instead. The text helper's call goes to whatever
-    `TEXT_MODEL_BASE_URL` names, and only needs the header the gateway routes on — without
-    it the gateway answers 400 and a run dies on its first keystroke.
+    Two things, and they are independent. The *decision* call goes to TypeSafe's own endpoint,
+    and is answered by a chat model instead — but only when `JEV_DECISION=chat`, because
+    otherwise it goes where it always went. The *text helper* call goes to whatever
+    `TEXT_MODEL_BASE_URL` names, and needs the header the gateway routes on: without it the
+    gateway answers 400 and a run dies on its first keystroke, whatever answers the decisions.
     """
     from jev_ultrafast import model
 
-    # The vendored code reads the key before it calls, so a missing one raises there and not
-    # in the call that would have ignored it. Nothing sends this value anywhere.
-    os.environ.setdefault("TYPESAFE_API_KEY", "chat-decision")
+    chat = os.environ.get("JEV_DECISION") == "chat"
+    gateway_urls = any("opencode.ai" in (os.environ.get(name) or "") for name in ("TEXT_MODEL_BASE_URL", "JEV_DECISION_BASE_URL"))
+    if not chat and not gateway_urls:
+        return
+
+    if chat:
+        # The vendored code reads the key before it calls, so a missing one raises there and
+        # not in the call that would have ignored it. Nothing sends this value anywhere.
+        os.environ.setdefault("TYPESAFE_API_KEY", "chat-decision")
 
     real = model.post_json
 
     def post_json(url, key, body):
-        if url.startswith("https://api.typesafe.ai/"):
+        if chat and url.startswith("https://api.typesafe.ai/"):
             return answer_with_chat(body)
         if "opencode.ai" in url:
             return gateway(url, key, body)
@@ -92,7 +99,14 @@ def headers(key):
 
 
 def gateway(url, key, body, tries=3):
-    """One call to the chat gateway, with the retries the vendored `post_json` has."""
+    """
+    One call to the chat gateway, with the retries the vendored `post_json` has.
+
+    The vendored text helper sets a DeepSeek-shaped `reasoning` field, and this gateway
+    answers 400 for it: `invalid request body: json: unknown field "reasoning"`. It is a
+    request to think less, not part of the question, so it is dropped rather than translated.
+    """
+    body = {name: value for name, value in body.items() if name not in {"reasoning", "thinking"}}
     for attempt in range(tries):
         response = CLIENT.post(url, json=body, headers=headers(key))
         if response.status_code in {429, 529, 503} and attempt < tries - 1:

@@ -57,12 +57,11 @@ def main():
     spec = json.loads(sys.argv[1])
     snapshot = None
     try:
-        # A decision model other than TypeSafe's own, when one is named. Installed before the
-        # agent is imported, because the agent binds the model module's functions as it loads.
-        if os.environ.get("JEV_DECISION") == "chat":
-            from decision_chat import install
+        # Where the model calls go, before the agent is imported: the agent binds the model
+        # module's functions as it loads. It does nothing unless this machine needs it.
+        from decision_chat import install
 
-            install()
+        install()
 
         from jev_ultrafast import Agent
 
