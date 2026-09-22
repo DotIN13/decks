@@ -496,52 +496,6 @@ svg.lucide {
 	box-shadow: var(--shadow);
 }
 
-.thinking {
-	align-self: flex-end;
-	max-width: 92%;
-	padding: 0 14px;
-	text-align: right;
-	color: var(--faint);
-	font-size: 12px;
-}
-
-.thinking > button {
-	padding: 0;
-	border: 0;
-	background: none;
-	color: var(--faint);
-	cursor: pointer;
-	font: inherit;
-	text-decoration: underline dotted;
-}
-
-.thinking > .body {
-	margin-top: 4px;
-	padding-left: 8px;
-	border-left: 2px solid var(--line);
-	white-space: pre-wrap;
-}
-
-/*
- * The tool row's styles are in `styles/stream.css`, not here.
- *
- * They were here, dressing the chat column this app used to have: a 14px radius, a hairline,
- * a `--bg` fill, a 7px dot that pulsed amber while a call ran. The column is gone and the
- * conversation that replaced it overrode nearly every line of it, which is two descriptions
- * of one component in two files and the reason the rows looked like boxes inside boxes. One
- * home now, next to the rest of the conversation, and it is picone-shaped: a spinner while a
- * call runs, a quiet dot when it is over, the name in mono, the chevron at the right end.
- *
- * `@keyframes pulse` stays — the tool row no longer uses it, but the float rows and the turn
- * bar still do.
- */
-
-@keyframes pulse {
-	50% {
-		opacity: 0.3;
-	}
-}
-
 /*
  * A text button, and the rule the palette and the title bar have been keeping all along:
  * **the container carries the border, the control does not.**
@@ -830,72 +784,6 @@ svg.lucide {
 	
 }
 
-/* --- the turn bar ------------------------------------------------------------ */
-
-/*
- * The spine: one block per turn, newest last, hard against the right edge.
- * It is how you get *back* to a turn — always there, always aimable — and the
- * conversation opens beside it rather than over it, so a block stays clickable while you
- * read.
- *
- * The stack grows from the **middle**, both ways. Pinned to the bottom it read as a stray
- * mark in the corner rather than a scrollbar of the conversation: three turns were three
- * specks above the dock, at the one height on that edge already crowded by the zoom
- * controls. Centred, the stack has a fixed midpoint and lengthens symmetrically as the
- * conversation does, which is legible at a glance and stays out of both corners. The order
- * is untouched — oldest at the top, newest at the bottom, the way the bubbles read.
- */
-.turnbar {
-	position: absolute;
-	top: 12px;
-	right: 4px;
-	bottom: calc(88px + var(--keyboard) + env(safe-area-inset-bottom));
-	z-index: 11;
-	display: flex;
-	width: 14px;
-	flex-direction: column;
-	justify-content: center;
-	padding: 3px 2px;
-	gap: 3px;
-}
-
-.turnbar .turn {
-	width: 10px;
-	height: 15px;
-	flex: 0 1 15px;
-	min-height: 3px;
-	padding: 0;
-	border: 0;
-	border-radius: 3px;
-	background: var(--line-strong);
-	cursor: pointer;
-	transition:
-		background 140ms ease,
-		width 140ms ease;
-}
-
-.turnbar .turn:hover {
-	width: 14px;
-	background: var(--muted);
-}
-
-.turnbar .turn[data-current="true"] {
-	background: var(--fg);
-}
-
-.turnbar .turn[data-unseen="true"] {
-	background: var(--color-accent);
-}
-
-.turnbar .turn[data-state="running"] {
-	background: var(--color-warn);
-	animation: pulse 1.2s ease-in-out infinite;
-}
-
-.turnbar .turn[data-state="error"] {
-	background: var(--color-danger);
-}
-
 /*
  * What is out, on the button that puts it there.
  *
@@ -932,15 +820,9 @@ svg.lucide {
 
 	
 
-	/* A 10px notch in a 14px column is not a target. */
-	.turnbar {
-		width: 24px;
-	}
+	
 
-	.turnbar .turn {
-		width: 18px;
-		min-height: 8px;
-	}
+	
 }
 
 /*
@@ -980,15 +862,7 @@ svg.lucide {
 
 	
 
-	/*
-	 * The timeline spine goes. It is a column of 10px notches on the right edge, which is
-	 * the hardest thing on screen to hit with a finger, and the same rewind, fork and
-	 * restore live on each message in the conversation — which is always shown on a
-	 * touchscreen (see `(hover: none)` above) rather than waiting for a hover.
-	 */
-	.turnbar {
-		display: none;
-	}
+	
 
 	
 
@@ -1018,16 +892,6 @@ svg.lucide {
 		overflow-y: auto;
 	}
 
-}
-
-/*
- * Under a tool's output when only a preview of it arrived (`ToolChip`): the rest is on its
- * way, or — if the call is no longer anywhere — this is all there is.
- */
-.tool > .more {
-	margin: 4px 0 0;
-	font-size: 11px;
-	color: var(--muted, #888);
 }
 
 }
