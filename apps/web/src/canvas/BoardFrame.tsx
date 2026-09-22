@@ -1150,7 +1150,18 @@ export function BoardFrame(props: {
 				on the surface itself makes Chrome repaint every board's document on every
 				step of a pan — see `.board-node > .shade` in `index.css`.
 			*/}
-			<div class="shade" aria-hidden="true" data-news={props.news ? "" : undefined} data-reading={props.news && reading() ? "" : undefined} style={props.news ? { "--news": props.news, "--read-ms": `${READ_MS}ms` } : undefined} />
+			<div class="shade" aria-hidden="true" />
+
+			{/*
+				The glow on a board that is news: a soft drop shadow in the writer's colour, on a
+				box of its own so its fade can never stutter. The breath is a keyframe animation
+				on the pseudo-element; the fade is a transition on this element's opacity, so it
+				starts from wherever the breath happens to be and reverses just as smoothly when
+				the reading is interrupted. One property each, and they multiply.
+			*/}
+			<Show when={props.news}>
+				<div class="news-glow" aria-hidden="true" data-reading={reading() ? "" : undefined} style={{ "--news": props.news, "--read-ms": `${READ_MS}ms` }} />
+			</Show>
 
 			{/*
 				When the frame is inert — zoomed out far enough that a board is a tile on a

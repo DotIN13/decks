@@ -869,50 +869,49 @@ svg.lucide {
 /*
  * A board that is news (`canvas/glow.ts`): an agent named it and the person has not read it.
  *
- * A soft ellipse in the writer's colour behind the board, breathing, until the board is read —
- * zoomed in on and rested on, opened in the focus view, or previewed on the dashboard. On the
- * shade rather than the surface for the reason the shadow is: paint outside the surface's box
- * makes Chrome repaint every document on a pan. Only opacity and transform move, on a
- * pseudo-element of its own, so the breath is the compositor's.
+ * A soft drop shadow in the writer's colour under the board — thrown down and long, over a
+ * quiet dark one — breathing, until the board is read: zoomed in on and rested on, opened in
+ * the focus view, or previewed on the dashboard. A box of its own beside the shade, never the
+ * surface, for the reason the shadow is: paint outside the surface's box makes Chrome repaint
+ * every document on a pan.
+ *
+ * Two properties on two boxes, and that split is what keeps the fade smooth. The breath is a
+ * keyframe animation on the pseudo-element's opacity; the fade while being read is a
+ * *transition* on the element's own opacity, which starts from wherever it is and reverses
+ * from wherever it got to — a keyframe fade here jumped to its first frame mid-breath, which
+ * read as a stutter. The two opacities multiply, so the glow keeps breathing as it goes.
  */
-.board-node > .shade[data-news] {
-	isolation: isolate;
+.board-node > .news-glow {
+	position: absolute;
+	inset: 0;
+	border-radius: 12px;
+	pointer-events: none;
+	opacity: 1;
+	transition: opacity var(--read-ms, 1500ms) ease-out;
 }
-.board-node > .shade[data-news]::after {
+.board-node > .news-glow::after {
 	content: "";
 	position: absolute;
-	z-index: -1;
-	/* Big enough that the ellipse shows past the board's edges: the middle is under the board. */
-	inset: -24% -16%;
-	border-radius: 50%;
-	background: radial-gradient(ellipse closest-side at center, color-mix(in srgb, var(--news, var(--color-accent)) 50%, transparent) 0%, color-mix(in srgb, var(--news, var(--color-accent)) 50%, transparent) 62%, color-mix(in srgb, var(--news, var(--color-accent)) 22%, transparent) 84%, transparent 100%);
-	opacity: 0.7;
-	will-change: opacity, transform;
-	animation: news-glow 2.6s ease-in-out infinite;
+	inset: 0;
+	border-radius: 12px;
+	box-shadow:
+		0 18px 60px color-mix(in srgb, var(--news, var(--color-accent)) 40%, transparent),
+		0 4px 18px rgb(0 0 0 / 19%);
+	will-change: opacity;
+	animation: news-breathe 2.6s ease-in-out infinite;
 }
-/* Being read — zoomed in on, mostly on screen, at rest: the glow fades over the read's own moment, and is gone when the read is stamped. */
-.board-node > .shade[data-news][data-reading]::after {
-	animation: news-fade var(--read-ms, 1500ms) ease-out forwards;
+/* Being read — zoomed in on, mostly on screen, at rest: the glow fades over the read's own
+   moment and is at nothing when the read is stamped and the box goes. */
+.board-node > .news-glow[data-reading] {
+	opacity: 0;
 }
-@keyframes news-glow {
+@keyframes news-breathe {
 	0%,
 	100% {
-		opacity: 0.55;
-		transform: scale(1);
+		opacity: 0.65;
 	}
 	50% {
 		opacity: 1;
-		transform: scale(1.05);
-	}
-}
-@keyframes news-fade {
-	from {
-		opacity: 0.8;
-		transform: scale(1.03);
-	}
-	to {
-		opacity: 0;
-		transform: scale(1);
 	}
 }
 
@@ -2088,12 +2087,8 @@ svg.lucide {
 	.act-hold,
 	.act-land,
 	.act-land::before,
-	.board-node > .shade[data-news]::after {
+	.board-node > .news-glow::after {
 		animation: none;
-	}
-	.board-node > .shade[data-news][data-reading]::after {
-		opacity: 0;
-		transition: opacity var(--read-ms, 1500ms) ease-out;
 	}
 	.agent-cursor,
 	.agent-cursor .label {
