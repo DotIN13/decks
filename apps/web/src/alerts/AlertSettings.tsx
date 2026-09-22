@@ -188,7 +188,7 @@ function SoundPicker(props: { id: SoundChoice; label: string; onPick: (id: Sound
 			<For each={SOUND_FAMILIES}>
 				{(family) => (
 					<>
-						<span class="grp">{family.label}</span>
+						<span class="group-label">{family.label}</span>
 						<div class="set-cues">
 							<For each={Array.from({ length: family.count }, (_, index) => `${family.id}-${String(index + 1).padStart(2, "0")}`)}>
 								{(id) => (

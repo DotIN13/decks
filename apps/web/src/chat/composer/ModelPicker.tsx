@@ -153,9 +153,9 @@ export function ModelPicker(props: {
 						{/* The level only when there is one to show. "off" is a real answer and
 						    stays; a model with no scale at all has nothing to say here. */}
 						<Show when={levels().length > 0 ? props.model?.thinking : undefined}>
-							{(level) => <span class="sub max-[470px]:hidden">{level()}</span>}
+							{(level) => <span class="chip-sub max-[470px]:hidden">{level()}</span>}
 						</Show>
-						<Icon of={ChevronDown} size={10} class="chev" />
+						<Icon of={ChevronDown} size={10} class="chevron" />
 					</button>
 				);
 			}}
@@ -248,7 +248,7 @@ export function ModelPicker(props: {
 									pill is capped in `dock.css`, so a long provider name cannot go on eating
 									the row the names need.
 								*/}
-								<span class="pv" title={option.provider}>{option.provider}</span>
+								<span class="preview" title={option.provider}>{option.provider}</span>
 								<span class="min-w-0 flex-1 truncate">{option.label}</span>
 								<Show when={isCurrent(option)}>
 									<Icon of={Check} size={13} class="shrink-0 text-accent" />

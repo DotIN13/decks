@@ -208,7 +208,7 @@
 		min-width: 0;
 		flex: 1;
 	}
-	.pill-name > .chev {
+	.pill-name > .chevron {
 		color: var(--muted);
 	}
 	@media (max-width: 640px) {

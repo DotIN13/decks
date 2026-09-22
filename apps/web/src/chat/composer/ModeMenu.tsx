@@ -138,7 +138,7 @@ export function ModeMenu(props: {
 						    name comes from the runtime, so the cap is what makes the width of this
 						    chip a thing the row can count on. */}
 						<span class="max-w-[132px] truncate">{current().label}</span>
-						<Icon of={ChevronDown} size={10} class="chev" />
+						<Icon of={ChevronDown} size={10} class="chevron" />
 					</button>
 					);
 				}}

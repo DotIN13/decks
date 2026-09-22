@@ -499,14 +499,14 @@
 
 	/* At the right end, where a disclosure belongs: a column of them is something the eye can
 	   run down. Turned rather than swapped for a second glyph — this app's convention. */
-	.tool > .row .twist {
+	.tool > .row .twisty {
 		flex: none;
 		color: var(--faint);
 		opacity: 0.5;
 		transition: transform 120ms ease;
 	}
 
-	.tool > .row[data-open="true"] .twist {
+	.tool > .row[data-open="true"] .twisty {
 		transform: rotate(90deg);
 	}
 

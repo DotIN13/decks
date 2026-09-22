@@ -85,7 +85,7 @@ const agent = {
 	const popover = await page.evaluate(() => ({
 		open: Boolean(document.querySelector(".popover .big")),
 		percent: document.querySelector(".popover .big")?.textContent,
-		used: [...document.querySelectorAll(".popover .kv")].map((row) => row.innerText.replace(/\s+/g, " ").trim()),
+		used: [...document.querySelectorAll(".popover .pair")].map((row) => row.innerText.replace(/\s+/g, " ").trim()),
 		modal: document.querySelectorAll(".usage-modal").length,
 	}));
 	say("pressing it opens the numbers as a popover", popover.open && popover.percent === "74%", JSON.stringify(popover.percent));

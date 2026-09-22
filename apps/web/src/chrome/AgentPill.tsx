@@ -1075,7 +1075,7 @@ function CanvasSegment(props: {
 								onClick={api.toggle}
 							>
 								<span class="truncate">{props.name}</span>
-								<Icon of={ChevronDown} size={11} class="chev flex-none" />
+								<Icon of={ChevronDown} size={11} class="chevron flex-none" />
 							</button>
 						);
 					}}

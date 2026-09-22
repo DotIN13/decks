@@ -191,7 +191,7 @@ export function Corner(props: {
 							onClick={api.toggle}
 						>
 							{percent()}%
-							<Icon of={ChevronDown} size={10} class="chev" />
+							<Icon of={ChevronDown} size={10} class="chevron" />
 						</button>
 					)}
 				>

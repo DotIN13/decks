@@ -221,7 +221,7 @@ const wasPlayed = (await tab()).played;
 await page.locator(".set-row .set-cue").first().click();
 await page.waitForSelector(".set-sounds", { timeout: 4000 });
 const picker = await page.evaluate(() => ({
-	families: [...document.querySelectorAll(".set-sounds .grp")].map((el) => el.textContent),
+	families: [...document.querySelectorAll(".set-sounds .group-label")].map((el) => el.textContent),
 	numbers: document.querySelectorAll(".set-sounds .set-cues > [data-row]").length,
 	first: document.querySelector(".set-sounds [data-row] .row-label")?.textContent,
 	current: document.querySelector(".set-sounds .set-cues > [data-row][data-current='true']")?.textContent,

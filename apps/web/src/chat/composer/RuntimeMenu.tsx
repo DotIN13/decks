@@ -47,7 +47,7 @@ export function RuntimeMenu(props: { kind: AgentKind | undefined; onKind: (kind:
 					>
 						<Show when={props.kind}>{(kind) => <AgentMark class="flex-none" agent={kind()} size={13} />}</Show>
 						<span class="max-w-[96px] truncate max-[560px]:hidden">{current()?.label ?? props.kind ?? "Runtime"}</span>
-						<Icon of={ChevronDown} size={10} class="chev" />
+						<Icon of={ChevronDown} size={10} class="chevron" />
 					</button>
 				);
 			}}

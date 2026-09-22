@@ -275,11 +275,11 @@
 	}
 
 	/* A second fact on the same chip — the thinking level beside the model. */
-	.chip-button > .sub {
+	.chip-button > .chip-sub {
 		color: var(--faint);
 	}
 
-	.chip-button > .chev {
+	.chip-button > .chevron {
 		flex: none;
 		opacity: 0.6;
 	}
@@ -823,7 +823,7 @@
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
 	}
 
-	.field > .k {
+	.field > .kv-key {
 		flex: none;
 		color: var(--faint);
 	}
@@ -840,7 +840,7 @@
 	}
 
 	/* The label of a scrubbable field: dragging it changes the number. */
-	.field > .k[data-scrub="true"] {
+	.field > .kv-key[data-scrub="true"] {
 		cursor: ew-resize;
 		user-select: none;
 	}

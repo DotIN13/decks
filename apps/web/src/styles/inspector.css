@@ -107,7 +107,7 @@
 	 * saying *which* number is moving. `data-scrubbing` is set by `scrub.ts` on the element
 	 * it captured the pointer with, so it cannot disagree with the drag.
 	 */
-	.field > .k[data-scrubbing="true"] {
+	.field > .kv-key[data-scrubbing="true"] {
 		color: var(--color-accent);
 	}
 

@@ -345,7 +345,7 @@
 	 */
 	/* Same chip, same ground as a tag and a runtime word — `--fill` in `index.css` says why
 	   the three of them stopped using the hairline colour. */
-	.popover .pv {
+	.popover .preview {
 		max-width: 72px;
 		flex: none;
 		padding: 1px 5px;
@@ -387,7 +387,7 @@
 	 * modal the rows rendered as "Used148,000" with no gap and the bar was invisible — the
 	 * component was in a container it had never been dressed for.
 	 */
-	:is(.popover, .usage-modal) .kv {
+	:is(.popover, .usage-modal) .pair {
 		display: flex;
 		align-items: center;
 		padding: 4px 8px;
@@ -396,12 +396,12 @@
 		font-size: var(--type-note);
 	}
 
-	:is(.popover, .usage-modal) .kv > .k {
+	:is(.popover, .usage-modal) .pair > .kv-key {
 		flex: 1;
 		color: var(--faint);
 	}
 
-	:is(.popover, .usage-modal) .kv > .v {
+	:is(.popover, .usage-modal) .pair > .kv-value {
 		font-variant-numeric: tabular-nums;
 	}
 

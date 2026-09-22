@@ -214,7 +214,7 @@
 	overflow-y: auto;
 	overscroll-behavior: contain;
 }
-	.popover.set-sounds .grp {
+	.popover.set-sounds .group-label {
 	display: block;
 	padding: 8px 6px 4px;
 	color: var(--faint);

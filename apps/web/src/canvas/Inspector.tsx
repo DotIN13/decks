@@ -303,7 +303,7 @@ export function Inspector(props: {
 					input, where a keyboard user already is.
 				*/}
 				<span
-					class="k"
+					class="kv-key"
 					data-scrub="true"
 					aria-hidden="true"
 					title={`${spec.name} — drag to change, ⇧ for ×10, ⌥ for finer`}

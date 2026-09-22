@@ -1120,7 +1120,7 @@
 		object-position: 0 0;
 	}
 
-	.board-tile > .cap {
+	.board-tile > .tile-caption {
 		overflow: hidden;
 		padding: 4px 6px;
 		font-size: var(--type-hint);
@@ -1128,7 +1128,7 @@
 		white-space: nowrap;
 	}
 
-	.board-tile[data-dim="true"] > .cap {
+	.board-tile[data-dim="true"] > .tile-caption {
 		color: var(--faint);
 	}
 
