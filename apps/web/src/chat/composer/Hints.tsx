@@ -53,7 +53,7 @@ export function Hints(props: {
 							}
 						>
 							<span class="hint max-[620px]:hidden">
-								<kbd>@</kbd> for boards
+								<kbd>@</kbd> for an agent
 							</span>
 						</Show>
 					</>

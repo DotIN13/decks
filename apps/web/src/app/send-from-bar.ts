@@ -36,6 +36,12 @@ export interface BarContext {
 	canvas?: { id: string; name: string };
 	agents: Array<{ id: string; name: string }>;
 	note?: { board: string; component: string };
+	/**
+	 * Who the composer's chip was set to, when it was: an agent by id, or the dispatcher. A
+	 * typed `@Name` still wins — it is in the words — and the chip is what stands when there
+	 * is none, before the focused agent does.
+	 */
+	addressed?: { id: string; name: string } | "dispatcher";
 }
 
 export type Destination =
@@ -86,6 +92,8 @@ export function destination(text: string, context: BarContext): Destination {
 		if (agent) return { kind: "prompt", id: agent.id, name: agent.name, named: true, ...room };
 		if (mention.name.toLowerCase() === DISPATCHER_NAME.toLowerCase()) return { kind: "task", named: true, ...room };
 	}
+	if (context.addressed === "dispatcher") return { kind: "task", ...room };
+	if (context.addressed) return { kind: "prompt", id: context.addressed.id, name: context.addressed.name, named: false, ...room };
 	if (context.surface === "dispatch") return { kind: "task" };
 	if (context.focused) return { kind: "prompt", id: context.focused.id, name: context.focused.name, named: false, ...room };
 	if (context.canvas) return { kind: "task", ...room };

@@ -239,6 +239,8 @@ export function AgentMenu(props: {
 	trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;
 	placement?: Placement;
 	label?: string;
+	/** Rows of the caller's own, under the rule and above New agent: the composer puts the dispatcher there. */
+	foot?: JSX.Element;
 }) {
 	/** Whether the runtime row has unfolded into its two choices. */
 	const [picking, setPicking] = createSignal(false);
@@ -523,6 +525,7 @@ export function AgentMenu(props: {
 			</Show>
 
 			<div class="rule" />
+			{props.foot}
 
 			{/*
 				New agent, as one control that unfolds.

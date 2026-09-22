@@ -15,6 +15,8 @@ import { parkedDrafts, reconcilePills } from "./parked.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { ContextDial } from "./ContextDial.tsx";
 import { filterCommands, SlashMenu } from "./SlashMenu.tsx";
+import { filterMentionables, MentionMenu, type Mentionable } from "./MentionMenu.tsx";
+import { Recipient, type RecipientProps } from "./Recipient.tsx";
 
 /**
  * The input bar, floating over the canvas.
@@ -101,6 +103,10 @@ export function Composer(props: {
 	 * bar carries no chips and nobody has to guess where Return sends a sentence.
 	 */
 	destination?: string;
+	/** Who gets the line, as a chip that can change it. Without it the word alone is drawn. */
+	recipient?: RecipientProps;
+	/** Everybody an `@` can name, for the completion under the caret. */
+	mentionables?: Mentionable[];
 	/** The text as it is typed, so the destination word can follow an @ name. */
 	onText?: (text: string) => void;
 	/**
@@ -279,9 +285,55 @@ export function Composer(props: {
 	};
 
 	/** Whether there is anything to send. Also what decides send against stop, below. */
+	/*
+	 * The `@` completion: the word at the caret, when it starts with an @ that begins a word.
+	 *
+	 * Reads the caret rather than the end of the text, so a name can be completed in the
+	 * middle of a line. Escape puts the query away without clearing the draft, which is what
+	 * Escape otherwise does here; typing on changes the query and brings the list back.
+	 */
+	const [caret, setCaret] = createSignal(0);
+	const [dismissed, setDismissed] = createSignal<string | null>(null);
+	const AT = /(^|\s)@([A-Za-z0-9_-]*)$/;
+	const atQuery = createMemo(() => {
+		const match = AT.exec(text().slice(0, caret()));
+		return match ? match[2]! : null;
+	});
+	const atMatches = createMemo(() => {
+		const query = atQuery();
+		if (query === null || !props.mentionables?.length || dismissed() === query) return [];
+		return filterMentionables(props.mentionables, query);
+	});
+	const atOpen = createMemo(() => atMatches().length > 0 && !menuOpen());
+	const [atIndex, setAtIndex] = createSignal(0);
+	createEffect(() => {
+		atMatches();
+		setAtIndex(0);
+	});
+	const pickMention = (one: Mentionable) => {
+		const query = atQuery() ?? "";
+		const whole = text();
+		const at = caret() - query.length - 1;
+		if (nodes().every((node) => node.type === "text") && at >= 0) {
+			const after = whole.slice(caret());
+			put(textDraft(`${whole.slice(0, at)}@${one.name}${after.startsWith(" ") ? "" : " "}${after}`));
+		} else {
+			// Pills in the draft: the field's own insert keeps them, at the cost of the typed fragment staying.
+			field?.insertText(`@${one.name}`);
+		}
+		setDismissed(null);
+		field?.focus();
+	};
 	const sendable = () => !draftIsEmpty(nodes());
 
 	const send = () => {
+		if (atOpen()) {
+			const chosen = atMatches()[atIndex()] ?? atMatches()[0];
+			if (chosen) {
+				pickMention(chosen);
+				return;
+			}
+		}
 		// Enter with a command menu open completes the highlighted row instead of sending
 		// the fragment — "/lo" Enter is "login", not an unknown command. A name typed out
 		// in full ranks itself first, so Enter on it completes to itself and the space
@@ -342,6 +394,16 @@ export function Composer(props: {
 		 * comment used to justify keeping it all target the elements this rewrite deletes.
 		 */
 		<section class="relative flex w-auto transform-none flex-col gap-1.5">
+			<Show when={atOpen()}>
+				<MentionMenu
+					matches={atMatches()}
+					identities={props.recipient?.identities ?? {}}
+					activeIndex={atIndex()}
+					{...(props.recipient?.canvasName ? { canvasName: props.recipient.canvasName } : {})}
+					onHover={setAtIndex}
+					onPick={pickMention}
+				/>
+			</Show>
 			<Show when={menuOpen()}>
 				<SlashMenu
 					commands={matches()}
@@ -380,8 +442,8 @@ export function Composer(props: {
 				{/* The grip. The bar is a float, and this is the one place a drag may start
 				    that is not the padding: the field and the buttons keep their own gestures. */}
 				<span class="dock-grip" aria-hidden="true" />
-				<Show when={props.destination}>
-					{(word) => <span class="dock-to">{word()}</span>}
+				<Show when={props.recipient} fallback={<Show when={props.destination}>{(word) => <span class="dock-to" data-dest={word()}>{word()}</span>}</Show>}>
+					{(recipient) => <Recipient {...recipient()} />}
 				</Show>
 				{/*
 					The field: text, and a pill for each comment going with it (`DraftField.tsx`).
@@ -406,7 +468,7 @@ export function Composer(props: {
 						const gone = (props.comments ?? []).filter((comment) => !here.has(comment.id)).map((comment) => comment.id);
 						if (gone.length > 0) props.onCommentsGone?.(gone);
 					}}
-					onCaret={() => {}}
+					onCaret={setCaret}
 					onComposing={(now) => {
 						composing = now;
 						if (!now) endedAt = Date.now();
@@ -415,6 +477,29 @@ export function Composer(props: {
 						// Every branch below is destructive — one moves a selection, one clears
 						// the draft, one sends it — so all of them ask the input method first.
 						if (imeOwns(event)) return;
+						if (atOpen()) {
+							const length = atMatches().length;
+							if (event.key === "ArrowDown") {
+								event.preventDefault();
+								setAtIndex((at) => (at + 1) % length);
+								return;
+							}
+							if (event.key === "ArrowUp") {
+								event.preventDefault();
+								setAtIndex((at) => (at - 1 + length) % length);
+								return;
+							}
+							if (event.key === "Tab") {
+								event.preventDefault();
+								pickMention(atMatches()[atIndex()] ?? atMatches()[0]!);
+								return;
+							}
+							if (event.key === "Escape") {
+								event.preventDefault();
+								setDismissed(atQuery());
+								return;
+							}
+						}
 						/*
 						 * While the menu is up it owns the arrows and Tab. Wrapping rather than
 						 * stopping at the ends: a fifty-row list is one ArrowUp away from its own
@@ -545,7 +630,7 @@ export function Composer(props: {
 			 * dropping it on a touchscreen is unchanged, because the dial goes to `⋯` there.
 			 */}
 			<div class="hintrow flex h-[18px] items-center gap-2 px-1.5 pointer-coarse:hidden">
-				<Hints menuOpen={menuOpen()} />
+				<Hints menuOpen={menuOpen() || atOpen()} mentions={Boolean(props.mentionables?.length)} />
 				<span class="flex-1" />
 				<ContextDial usage={props.usage} onUsage={props.onUsage} />
 			</div>

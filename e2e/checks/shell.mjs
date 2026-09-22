@@ -136,23 +136,62 @@ await ready(page);
 const before = await documents();
 say("a row in the panel opens that agent's canvas", (await hash()) === stageHash && (await surface()) === "stage", `${await hash()} ${await surface()}`);
 say("Home grows into the pill on a stage", (await page.locator('.pill-home[data-on="true"]').count()) === 1);
-say("the bar's word is the agent's on a stage", /^to /.test((await page.locator(".dock-to").textContent()) ?? "") && !/dispatcher/.test((await page.locator(".dock-to").textContent()) ?? ""), await page.locator(".dock-to").textContent());
+say("the bar's word is the agent's on a stage", /^to /.test((await page.locator(".dock-to").getAttribute("data-dest")) ?? "") && !/dispatcher/.test((await page.locator(".dock-to").getAttribute("data-dest")) ?? ""), await page.locator(".dock-to").getAttribute("data-dest"));
 say("…and a stage's bar does not: its agent's runtime was fixed when it was made", (await page.locator(".dock .runtime-chip").count()) === 0);
 /* @Dispatcher is a name from any bar: on a stage it turns the line into a task. Read off the
    bar's own word, which is the send's decision run without sending. */
 await page.fill(".dockfield", "@Dispatcher find someone for this");
 await settle(page, 200);
 /* "to dispatcher, on <canvas>": a stage is always a room now, and the room rides along. */
-say("@Dispatcher on a stage addresses the dispatcher", /^to dispatcher/.test((await page.locator(".dock-to").textContent()) ?? ""), await page.locator(".dock-to").textContent());
+say("@Dispatcher on a stage addresses the dispatcher", /^to dispatcher/.test((await page.locator(".dock-to").getAttribute("data-dest")) ?? ""), await page.locator(".dock-to").getAttribute("data-dest"));
 await page.fill(".dockfield", "");
 await settle(page, 200);
-say("…and without it the bar is the agent's again", /^to /.test((await page.locator(".dock-to").textContent()) ?? "") && !/dispatcher/.test((await page.locator(".dock-to").textContent()) ?? ""));
+say("…and without it the bar is the agent's again", /^to /.test((await page.locator(".dock-to").getAttribute("data-dest")) ?? "") && !/dispatcher/.test((await page.locator(".dock-to").getAttribute("data-dest")) ?? ""));
+
+/*
+ * The word is a chip now, and the chip is the control: it opens the pill's agent list with the
+ * dispatcher under the rule, and a pick changes where the next line goes without moving you.
+ * Typing `@` opens the same rows as a completion under the caret.
+ */
+const wasAt = await hash();
+await page.locator(".dock-to-chip").click();
+await page.waitForSelector(".popover .dock-to-dispatcher", { timeout: 4000 });
+const chipMenu = await page.evaluate(() => ({
+	agents: [...document.querySelectorAll(".popover [data-row][data-agent]")].map((row) => row.querySelector(".lb")?.textContent?.trim()),
+	current: document.querySelector('.popover [data-row][data-agent][data-current="true"] .lb')?.textContent?.trim(),
+	dispatcher: document.querySelector(".popover .dock-to-dispatcher .lb")?.textContent?.trim(),
+	fresh: [...document.querySelectorAll(".popover [data-row]")].some((row) => row.textContent?.includes("New agent")),
+}));
+say("the chip opens the agent list, with the dispatcher under the rule and New agent at the foot", chipMenu.agents.length >= 1 && chipMenu.dispatcher === "Dispatcher" && chipMenu.fresh, JSON.stringify(chipMenu));
+/* The fixture may hold one agent; then the pick is the same agent, and what is checked is that a pick addresses without moving. */
+const other = chipMenu.agents.find((name) => name !== chipMenu.current) ?? chipMenu.current;
+await page.locator(".popover [data-row][data-agent]", { hasText: other }).first().click();
+await settle(page, 300);
+const picked = await page.locator(".dock-to").getAttribute("data-dest");
+say("picking an agent addresses the next line to it", picked?.startsWith(`to ${other}`), String(picked));
+say("…without moving you: the chip brings the agent here, the pill would take you there", (await hash()) === wasAt, `${wasAt} -> ${await hash()}`);
+await page.locator(".dock-to-chip").click();
+await page.locator(".popover .dock-to-dispatcher").click();
+await settle(page, 300);
+say("…and the dispatcher row hands the line to the dispatcher", /^to dispatcher/.test((await page.locator(".dock-to").getAttribute("data-dest")) ?? ""), await page.locator(".dock-to").getAttribute("data-dest"));
+
+await page.locator(".dockfield").click();
+await page.keyboard.type(`look at this @${other.slice(0, 2)}`);
+await page.waitForSelector(".mention-menu [data-row]", { timeout: 4000 });
+const completion = await page.evaluate(() => [...document.querySelectorAll(".mention-menu [data-row] .lb")].map((lb) => lb.textContent?.trim()));
+say("@ and two letters open the completion, narrowed to the names that start so", completion.length >= 1 && completion.every((name) => name.toLowerCase().startsWith(other.slice(0, 2).toLowerCase())), JSON.stringify(completion));
+await page.keyboard.press("Enter");
+await settle(page, 300);
+const completed = await page.evaluate(() => ({ text: document.querySelector(".dockfield")?.textContent, menu: document.querySelectorAll(".mention-menu").length, dest: document.querySelector(".dock-to")?.getAttribute("data-dest") }));
+say("Enter completes the name into the line, and the chip follows the words", completed.text === `look at this @${other} ` && completed.menu === 0 && completed.dest?.startsWith(`to ${other}`), JSON.stringify(completed));
+await page.fill(".dockfield", "half a line, typed before the switch");
+await settle(page, 200);
 
 await page.click('[aria-label="Home: back to the dashboard"]');
 await settle(page, 700);
 say("Home comes back to the dashboard, on the tab it left", (await hash()) === "#/boards" && (await surface()) === "dispatch", `${await hash()}`);
 say("the draft survives the switch", (await page.locator(".dockfield").evaluate((el) => el.textContent)) === "half a line, typed before the switch");
-say("the bar's word is the dispatcher's on the dashboard", (await page.locator(".dock-to").textContent()) === "to dispatcher", await page.locator(".dock-to").textContent());
+say("the bar's word is the dispatcher's on the dashboard", (await page.locator(".dock-to").getAttribute("data-dest")) === "to dispatcher", await page.locator(".dock-to").getAttribute("data-dest"));
 say("no board document was torn down by the switch", (await documents()) === before, `${before} -> ${await documents()}`);
 
 await page.goBack();

@@ -338,18 +338,70 @@
 		opacity: 0;
 		pointer-events: none;
 	}
+	/*
+	 * Who gets the line: the word `To`, a chip with the agent's face and name, and, when the
+	 * agent is not on this canvas, what sending will do. The chip opens the pill's agent menu
+	 * (`chat/composer/Recipient.tsx` says how it differs from the pill's own chevron).
+	 */
 	.dock-to {
-		display: inline-block;
-		margin: 0 0 4px 2px;
-		padding: 0 6px;
-		border-radius: 5px;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: 0 0 5px 1px;
+		color: var(--faint);
+		font-size: 11px;
+	}
+	.dock-to-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		height: 22px;
+		padding: 0 5px 0 3px;
 		border: 1px solid var(--line);
-		font-size: 10px;
-		line-height: 1.7;
+		border-radius: 7px;
+		background: var(--panel);
+		color: var(--fg);
+		cursor: pointer;
+		font: inherit;
+		font-size: 11.5px;
 		font-weight: 600;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
+		transition:
+			background-color 120ms ease,
+			border-color 120ms ease;
+	}
+	.dock-to-chip:hover,
+	.dock-to-chip[aria-expanded="true"] {
+		border-color: var(--line-strong);
+		background: var(--line);
+	}
+	.dock-to-chip:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+	.dock-to-chip > svg {
 		color: var(--muted);
+	}
+	.dock-to-name {
+		max-width: 160px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.dock-to-joins {
+		color: var(--muted);
+	}
+	/* The dispatcher's mark in the completion, where there is no chat to draw a face from. */
+	.mention-mark {
+		display: grid;
+		width: 20px;
+		height: 20px;
+		flex: none;
+		place-items: center;
+		border-radius: 50%;
+		background: var(--fg);
+		color: var(--bg);
+		font-size: 10px;
+		font-weight: 700;
 	}
 
 	/* ---- the conversation as a float --------------------------------------------- */

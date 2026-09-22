@@ -578,15 +578,34 @@ export function App() {
 	const barChat = createMemo(() => state.chats.find((chat) => chat.id === barAgent()));
 	const streamAgent = () => (surface() === "dispatch" ? (logAgent() && state.chats.some((chat) => chat.id === logAgent()) ? logAgent() : dispatcherId()) : state.focused);
 	const streamChat = createMemo(() => state.chats.find((chat) => chat.id === streamAgent()));
+	const agentName = (id: string) => state.identities[id]?.name ?? state.chats.find((chat) => chat.id === id)?.name ?? id;
+	/*
+	 * Who the composer's chip was set to, on this stage: an agent, or the dispatcher.
+	 *
+	 * Kept apart from `state.focused` on purpose. Focusing an agent is *following* it now — the
+	 * pill's face takes you to the canvas it works on and keeps up as it moves — and the chip is
+	 * the other direction: the line carries this canvas with it, and the agent comes here. So a
+	 * pick in the chip changes only where the next line goes, and it lasts until the agent you
+	 * follow or the room changes, which is when the question is asked afresh.
+	 */
+	const [addressed, setAddressed] = createSignal<{ id: string } | "dispatcher" | undefined>();
+	createEffect(() => {
+		void state.focused;
+		void state.canvas;
+		setAddressed(undefined);
+	});
 	const barContext = () => {
 		const focusedId = state.focused;
-		const nameOf = (id: string) => state.identities[id]?.name ?? state.chats.find((chat) => chat.id === id)?.name ?? id;
+		const nameOf = agentName;
 		const open = state.canvases.find((canvas) => canvas.id === state.canvas);
+		const to = addressed();
+		const addressedAgent = to && to !== "dispatcher" && state.chats.some((chat) => chat.id === to.id) ? { id: to.id, name: nameOf(to.id) } : undefined;
 		return {
 			surface: surface(),
 			...(focusedId ? { focused: { id: focusedId, name: nameOf(focusedId) } } : {}),
 			...(open ? { canvas: { id: open.id, name: open.name } } : {}),
 			agents: visibleChats().map((chat) => ({ id: chat.id, name: nameOf(chat.id) })),
+			...(to === "dispatcher" ? { addressed: "dispatcher" as const } : addressedAgent ? { addressed: addressedAgent } : {}),
 		};
 	};
 	const sendFromBar = (typed: string, commentIds: string[] = []) => {
@@ -2217,6 +2236,26 @@ export function App() {
 						}}
 						onText={setBarText}
 						destination={destinationLabel(destination(barText(), barContext()))}
+						recipient={{
+							chats: visibleChats(),
+							identities: state.identities,
+							unread,
+							focused: state.focused,
+							here: surface() === "stage" ? [...(stageCanvas()?.agents ?? [])] : [],
+							dest: destination(barText(), barContext()),
+							label: destinationLabel(destination(barText(), barContext())),
+							...(dispatcherId() ? { dispatcher: state.chats.find((chat) => chat.id === dispatcherId()) } : {}),
+							...(surface() === "stage" && stageCanvas() ? { canvasName: stageCanvas()!.name } : {}),
+							// On a stage the chip addresses; on the dashboard, where there is no room to bring anyone to, an agent is the way in.
+							onPick: (id) => (surface() === "stage" ? setAddressed({ id }) : visitAgent(id)),
+							onDispatcher: () => setAddressed("dispatcher"),
+							onNew: (kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) }),
+							onClose: closeAgent,
+						}}
+						mentionables={[
+							...visibleChats().map((chat) => ({ name: agentName(chat.id), here: (stageCanvas()?.agents ?? []).includes(chat.id), chat })),
+							{ name: DISPATCHER_NAME, here: true, task: true, ...(dispatcherId() ? { chat: state.chats.find((chat) => chat.id === dispatcherId()) } : {}) },
+						]}
 						onAbort={() => send({ type: "agent.abort", id: state.focused ?? "" })}
 						/*
 						 * `thinking` comes back with the model now. Switching to a model that does
