@@ -41,8 +41,6 @@ export interface DispatchViewProps {
 	workspaces: string[];
 	/** A new workspace, from the bar: its first canvas, filed under it and named after it. */
 	onNewWorkspace: (name: string) => void;
-	/** The Unfiled card was pressed: open the sidebar's Boards tab, which is where every board is listed now. */
-	onUnfiled?: () => void;
 	chats: AgentChat[];
 	/** Agent id → the boards it holds — what decides a board's workspace. */
 	contexts: Record<string, string[]>;
@@ -126,7 +124,6 @@ export function DispatchView(props: DispatchViewProps) {
 						onMove={props.onMoveCanvas}
 						onRemove={props.onRemoveCanvas}
 						onNewWorkspace={props.onNewWorkspace}
-						onUnfiled={() => props.onUnfiled?.()}
 					/>
 				</div>
 			</Show>

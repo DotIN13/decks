@@ -921,9 +921,6 @@
 		color: var(--color-accent);
 		font-weight: 600;
 	}
-	.canvas-card-unfiled {
-		border-style: dashed;
-	}
 	.canvas-none {
 		margin: 0;
 		color: var(--faint);

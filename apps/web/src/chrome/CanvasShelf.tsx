@@ -49,8 +49,6 @@ export interface CanvasShelfProps {
 	onRemove: (id: string) => void;
 	/** A new workspace: its first canvas, filed under it and named after it. */
 	onNewWorkspace: (name: string) => void;
-	/** Boards on no canvas at all: still in the deck, and still changing. */
-	onUnfiled: () => void;
 }
 
 /** How many pictures a card shows. Four is what fits without the card becoming a gallery. */
@@ -58,8 +56,6 @@ const COVER = 4;
 
 export function CanvasShelf(props: CanvasShelfProps) {
 	const byPath = createMemo(() => new Map(props.boards.map((board) => [board.path, board])));
-	const filed = createMemo(() => new Set(props.canvases.flatMap((canvas) => canvas.boards)));
-	const unfiled = createMemo(() => props.boards.filter((board) => !filed().has(board.path)));
 	const [query, setQuery] = createSignal("");
 	const sections = createMemo(() => canvasSections({ canvases: props.canvases, query: query() }));
 	const narrowed = () => query().trim() !== "";
@@ -218,30 +214,6 @@ export function CanvasShelf(props: CanvasShelfProps) {
 					</section>
 				)}
 			</For>
-			<Show when={unfiled().length > 0 && !narrowed()}>
-				<section class="canvas-ws" aria-label="Boards on no canvas">
-					<div class="canvas-cards">
-						<button type="button" class="canvas-card canvas-card-unfiled" onClick={() => props.onUnfiled()}>
-							<span class="canvas-card-name">Unfiled</span>
-							<span class="canvas-strip">
-								<For each={unfiled().slice(0, COVER)}>
-									{(board) => (
-										<span class="canvas-thumb">
-											<BoardPicture board={board} alt="" />
-										</span>
-									)}
-								</For>
-							</span>
-							<span class="canvas-who">
-								<span class="canvas-who-text">on no canvas</span>
-							</span>
-							<span class="canvas-meta">
-								{unfiled().length} {unfiled().length === 1 ? "board" : "boards"} · in the deck, on nothing
-							</span>
-						</button>
-					</div>
-				</section>
-			</Show>
 			<Show when={sections().length === 0}>
 				<Show
 					when={narrowed()}
