@@ -47,6 +47,14 @@ jobs:
       # else — which is the reason it is `--workspaces` rather than a list of four.
       - run: npm run typecheck
 
+      # **The cascade gate, on its own line, and before the tests.** The app's 13 stylesheets
+      # are all inside `@layer components`, so which rule wins a tie is decided by the order
+      # they are flattened in — and `npm test` and `npm run test:e2e` both measure elements,
+      # not rules, so a rule dragged past another can turn a check green while changing the
+      # page. `scripts/css-order.mjs` hashes that order against the committed baseline; it is
+      # its own step so the log says "the order moved" instead of burying it in a test list.
+      - run: npm run css:order
+
       # **Before the unit tests, not after.** Three files in `apps/server` drive a real page —
       # `web/bridge.test.ts` over the extension's socket, and two in `app.test.ts` that measure a
       # frame and write the number back — so `npm test` needs a browser. This step used to come

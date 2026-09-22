@@ -1,0 +1,22 @@
+{
+	"note": "The app CSS's cascade order, flattened and hashed. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
+	"entry": "apps/web/src/index.css",
+	"hash": "9539750f0af1e35887b9252c6dd65080b58abc86d701e1a05ca46bceb1a99af5",
+	"rules": 976,
+	"ties": 3,
+	"files": {
+		"apps/web/src/index.css": 231,
+		"apps/web/src/styles/agents.css": 32,
+		"apps/web/src/styles/board-picture.css": 7,
+		"apps/web/src/styles/canvas.css": 47,
+		"apps/web/src/styles/chrome.css": 88,
+		"apps/web/src/styles/dispatch.css": 187,
+		"apps/web/src/styles/dock.css": 50,
+		"apps/web/src/styles/ink.css": 27,
+		"apps/web/src/styles/inspector.css": 11,
+		"apps/web/src/styles/panel.css": 115,
+		"apps/web/src/styles/shell.css": 66,
+		"apps/web/src/styles/stream.css": 86,
+		"apps/web/src/styles/usage.css": 29
+	}
+}

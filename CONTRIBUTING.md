@@ -29,9 +29,26 @@ to the canvas does not rearrange your own boards or fill your own revisions.
 
 ```bash
 npm run typecheck     # every workspace, including the extension and the browser checks
-npm test              # the unit tests, no model needed
+npm test              # the unit tests, no model needed, plus the cascade gate's own tests
 npm run test:e2e      # the browser checks, ~2 min, over a throwaway copy of example/
 ```
+
+**One more, and it is the one that catches what the others cannot.** The app's 13
+stylesheets all declare inside `@layer components`, so a rule of equal specificity is decided
+by position and by nothing else — and a comment moved, a file split or a rule dragged across
+another changes which one wins while the browser checks (which measure elements, not rules)
+still pass. `npm run css:order` flattens the `@import` graph in `apps/web/src/index.css`,
+hashes the rules in cascade order, and compares that to the committed baseline in
+`apps/web/src/styles/cascade-order.json`:
+
+```bash
+npm run css:order                # exit 1, naming every rule that moved and every tie it decided
+npm run css:order -- --update    # re-stamp after an intended change — and read the diff
+```
+
+It is deliberately blind to comments and whitespace, so moving a paragraph out of a
+stylesheet does not touch it; and it ignores which file a rule came from, so moving a rule to
+another sheet is free *as long as it lands in the same place in the cascade*.
 
 The browser checks need Chromium once: `npx playwright install chromium`. Three unit tests
 measure a real page, so they need it too.
