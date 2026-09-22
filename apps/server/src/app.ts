@@ -201,9 +201,27 @@ export class App {
 		 * property of this server, not of a deck. Every change is broadcast, so the status
 		 * board and the extension's popup say the same thing at the same time.
 		 */
-		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.status", status }));
+		this.web = new WebBridge(config.dataDir, (status) => {
+			this.send({ type: "web.status", status });
+			// A Chrome that connected or went away changes what `web_jev` will drive, so the
+			// address it was told about is replaced rather than kept.
+			this.jev.setShared(this.web.debuggerEndpoint());
+		});
 		this.stage.web = Object.assign(this.web, { board: () => this.boards.newWebBoard() }) as typeof this.web & { board: () => string };
-		this.jev = new JevService();
+		/*
+		 * The browser agent, pointed at the same Chrome `stage.web` drives.
+		 *
+		 * Two functions and an address, which is the whole of what the gate package needs from this
+		 * side: the question the person already answers for a submit, and the handover that lends
+		 * them the tab. The gate itself lives in `@decks/web-gate`, so nothing here decides what a
+		 * submit is, and the address a run attaches to is the bridge's own debugger endpoint rather
+		 * than a browser this server launches.
+		 */
+		this.jev = new JevService(undefined, {
+			person: (text) => this.web.ask(text),
+			borrow: () => this.web.handOver(),
+		});
+		this.jev.setShared(this.web.debuggerEndpoint());
 		this.stage.jev = this.jev;
 		/*
 		 * The dashboard: tasks and schedules, per deck like the agents they belong to.

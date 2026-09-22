@@ -102,28 +102,36 @@ export interface WebHost {
  * What the stage tool needs of the goal-driven browser agent (`web/jev.ts`).
  *
  * The other half of `WebHost`: `web` is the person's own Chrome driven one verb at a
- * time, `web_jev` is a headless browser of the server's that runs a whole goal. A run
- * outlives a stage call, so the shape is a job — start, follow, stop.
+ * time, `web_jev` is a whole goal run by an agent — in the person's own tab, where the two
+ * gates hold anything that sends or types, or in a browser of the server's own. A run
+ * outlives a stage call, so the shape is a job — start, follow, answer, stop.
  */
 export interface JevHost {
 	status(): {
 		ready: boolean;
 		missing: string[];
+		/** A Chrome is shared, so a run with no `browser` drives the person's own tab. */
+		shared: boolean;
 		note: string;
-		running?: { id: string; url: string; goal: string; startedAt: number; steps: number };
+		running?: { id: string; url: string; goal: string; startedAt: number; steps: number; browser: "chrome" | "headless"; waiting?: { id: string; kind: "allow" | "words"; action: string; tab?: string; field?: string; since: number } };
 		last?: { id: string; status: string; steps: number; elapsedMs: number; note?: string };
 	};
-	run(spec: { url: string; goal: string }): Promise<{ id: string; note: string }>;
+	run(spec: { url: string; goal: string; browser?: "chrome" | "headless" }): Promise<{ id: string; note: string }>;
 	state(): {
 		id: string;
 		url: string;
 		goal: string;
 		status: "starting" | "running" | "done" | "blocked" | "failed" | "stopped";
 		elapsedMs: number;
+		browser: "chrome" | "headless";
+		waiting?: { id: string; kind: "allow" | "words"; action: string; tab?: string; field?: string; since: number };
+		gate: Array<{ at: number; kind: string; text: string }>;
 		steps: Array<{ at: number; status: string; elapsedMs: number; steps: number; url?: string; last?: { action: string; operation: string; text: string | null } }>;
 		note?: string;
 		endedAt?: number;
 	};
+	/** Answer what a gate is holding: `allow` before something is sent, `text` for what gets typed. */
+	answer(input: { allow?: boolean; text?: string }): { answered: string };
 	stop(note?: string): Promise<void>;
 }
 

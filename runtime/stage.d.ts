@@ -96,10 +96,34 @@ export interface Stage {
 	 * next turn, one run at a time. `status()` says whether the server has the model keys
 	 * a run needs; relay its sentence when it says no.
 	 */
+	/**
+	 * A goal-driven browser agent (jev-ultrafast), beside the shared Chrome: one URL, one
+	 * goal, and the agent decides its own clicks until the goal is done or blocked.
+	 *
+	 * Left alone it drives the tab the person shared through the extension, because that is
+	 * the browser their logins are in — and two gates hold it there: nothing is sent without
+	 * an answer, and the words typed into a field are the supervising agent's, never its own.
+	 * `{ browser: "headless" }` is a Chromium of the server's own instead, for pages nobody is
+	 * logged into. A run outlives a stage call (a run is seconds to minutes; a stage run is
+	 * abandoned after twenty), so `run` returns at once, `state` follows the run, and `answer`
+	 * is how a held one carries on — on your next turn, never in a loop inside this one.
+	 */
 	web_jev: {
-		status(): Promise<{ ready: boolean; missing: string[]; note: string; running?: { id: string; url: string; goal: string; startedAt: number; steps: number }; last?: { id: string; status: string; steps: number; elapsedMs: number; note?: string } }>;
-		run(o: { url: string; goal: string }): Promise<{ id: string; note: string }>;
-		state(): Promise<{ id: string; url: string; goal: string; status: "starting" | "running" | "done" | "blocked" | "failed" | "stopped"; elapsedMs: number; steps: Array<{ at: number; status: string; elapsedMs: number; steps: number; url?: string; last?: { action: string; operation: string; text: string | null } }>; note?: string; endedAt?: number }>;
+		/** Whether a run can start, whether a Chrome is shared, and what the run going now is doing. */
+		status(): Promise<{ ready: boolean; missing: string[]; shared: boolean; note: string; running?: { id: string; url: string; goal: string; startedAt: number; steps: number; browser: "chrome" | "headless"; waiting?: { id: string; kind: "allow" | "words"; action: string; tab?: string; field?: string; since: number } }; last?: { id: string; status: string; steps: number; elapsedMs: number; note?: string } }>;
+		/**
+		 * Start one run. One at a time. Without `browser` it uses the shared Chrome when there is
+		 * one, and `headless` forces a browser of the server's own.
+		 */
+		run(o: { url: string; goal: string; browser?: "chrome" | "headless" }): Promise<{ id: string; note: string }>;
+		/** The run going now, or the last one: every step it took and every gate it met. */
+		state(): Promise<{ id: string; url: string; goal: string; status: "starting" | "running" | "done" | "blocked" | "failed" | "stopped"; elapsedMs: number; browser: "chrome" | "headless"; waiting?: { id: string; kind: "allow" | "words"; action: string; tab?: string; field?: string; since: number }; gate: Array<{ at: number; kind: string; text: string }>; steps: Array<{ at: number; status: string; elapsedMs: number; steps: number; url?: string; last?: { action: string; operation: string; text: string | null } }>; note?: string; endedAt?: number }>;
+		/**
+		 * Answer what a gate is holding. `{ allow: true }` lets a press that would send something
+		 * through; `{ text: "…" }` is what actually gets typed, because the browser agent's own
+		 * words never reach a field. `state()` says which of the two is being asked.
+		 */
+		answer(o: { allow?: boolean; text?: string }): Promise<{ answered: string }>;
 		stop(): Promise<void>;
 	};
 	now(): Promise<{ iso: string; timezone: string; words: string; epoch: number }>;

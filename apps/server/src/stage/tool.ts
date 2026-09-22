@@ -827,18 +827,33 @@ export function createStageTool(deps: {
 		 * The goal-driven browser agent (jev-ultrafast), beside the shared Chrome.
 		 *
 		 * `web` is the person's own tab, driven one verb at a time and watched by them.
-		 * `web_jev` is a headless browser of the server's: one URL, one goal, and the agent
-		 * decides its own clicks until the goal is done or blocked. A run outlives a stage
-		 * call, so `run` returns at once and `state` is how the run is followed — on the
-		 * next turn, not in a loop inside this one.
+		 * `web_jev` is a whole goal run by an agent: one URL, one goal, and the agent decides its
+		 * own clicks until the goal is done or blocked. Left alone it drives the tab the person
+		 * shared, because that is the browser the logins are in — and two gates stop it there, so
+		 * nothing is sent without an answer and the words typed into a field are yours, not its.
+		 * `{ browser: "headless" }` is a Chromium of the server's own instead, for pages nobody is
+		 * logged into. A run outlives a stage call, so `run` returns at once, `state` is how the
+		 * run is followed, and `answer` is how a held one carries on — on the next turn, never in
+		 * a loop inside this one.
 		 */
 		web_jev: {
-			/** Whether a run can start: the keys the server has, and the run going or just gone. */
+			/** Whether a run can start, whether a Chrome is shared, and what the run going now is doing. */
 			status: async () => needJev().status(),
 			/** Start one run. One at a time; the answer says how to follow it. */
-			run: async (spec?: { url?: string; goal?: string }) => needJev().run({ url: String(spec?.url ?? ""), goal: String(spec?.goal ?? "") }),
-			/** The run going now, or the last one: every step the agent took. */
+			run: async (spec?: { url?: string; goal?: string; browser?: string }) =>
+				needJev().run({
+					url: String(spec?.url ?? ""),
+					goal: String(spec?.goal ?? ""),
+					...(spec?.browser === "headless" || spec?.browser === "chrome" ? { browser: spec.browser } : {}),
+				}),
+			/** The run going now, or the last one: every step the agent took, and every gate it met. */
 			state: async () => needJev().state(),
+			/**
+			 * Answer what a gate is holding. `{ allow: true }` lets a press that would send something
+			 * through; `{ text: "…" }` is what actually gets typed, because the browser agent's own
+			 * words never reach a field. `state()` says which of the two is being asked.
+			 */
+			answer: async (input?: { allow?: boolean; text?: string }) => needJev().answer({ ...(typeof input?.allow === "boolean" ? { allow: input.allow } : {}), ...(typeof input?.text === "string" ? { text: input.text } : {}) }),
 			/** End the run; the browser it drove closes with it. */
 			stop: async () => needJev().stop(),
 		},

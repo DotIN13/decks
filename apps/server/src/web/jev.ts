@@ -29,10 +29,21 @@ import net from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { jevDir } from "@decks/runtime";
+import { WebGate, type GateEvent, type GateHooks, type GateQuestion } from "@decks/web-gate";
 
 export interface JevRunSpec {
 	url: string;
 	goal: string;
+	/**
+	 * Which browser the run drives.
+	 *
+	 * `chrome` is the tab the person shared with the deck, through the extension relay: the
+	 * logins are theirs and the two gates hold anything that sends or types. `headless` is a
+	 * Chromium this server launches, with nobody logged in and nothing to protect. Left out,
+	 * a shared Chrome is used when there is one, because that is the run that can reach the
+	 * page the goal is about.
+	 */
+	browser?: "chrome" | "headless";
 }
 
 /** One decision cycle, as the runner reported it. */
@@ -58,14 +69,61 @@ export interface JevRun {
 	/** Why it ended, when it did not end with `done`. */
 	note?: string;
 	endedAt?: number;
+	/** Where it is driving. */
+	browser: "chrome" | "headless";
+	/** What a gate is holding, while it holds it: nothing else in the run moves until this is answered. */
+	waiting?: { id: string; kind: "allow" | "words"; action: string; tab?: string; field?: string; since: number };
+	/** What the gates did, oldest first — the run's own record of what it was not allowed to do alone. */
+	gate: GateEvent[];
 }
+
+/** How many gate events a run keeps. Enough to read the run's shape; not a log. */
+const GATE_KEPT = 40;
+
+/**
+ * The person, when there is one to ask.
+ *
+ * A gate's question goes two ways at once: the status board, where the person can allow it,
+ * and `stage.web_jev.answer`, where the agent supervising the run can. Whichever answers
+ * first settles it, and the run carries on either way.
+ */
+export interface JevOptions {
+	/** Ask the person, through the status board. False when there is no board to ask on. */
+	person?: (text: string) => Promise<boolean>;
+	/**
+	 * Let go of the shared tab for the length of a run, and say how to take it back.
+	 *
+	 * A tab is driven by one CDP client at a time, so a browser agent running a goal in the
+	 * person's own Chrome borrows the connection rather than sharing it. What comes back is the
+	 * function that hands the tab to `stage.web` again.
+	 */
+	borrow?: () => Promise<() => Promise<void>>;
+}
+
+/** How long a held run waits for an answer before the gate refuses it. */
+const HELD_MS = 120_000;
+
+/**
+ * What the agent is told about the browser it is in, when that browser is somebody's own.
+ *
+ * This is a courtesy, not the enforcement: the gates are in the wire and hold whether or not
+ * the agent read this. What it buys is an agent that does not spend its steps fighting them —
+ * one that reports what it reached instead of retrying a press that was refused.
+ */
+const SUPERVISED = [
+	"This browser is supervised, and two things are not yours to do alone.",
+	"The words that go into a field come from the person watching, not from you: type as usual, and treat what a field contains as correct even if it is not what you asked for.",
+	"A press that would send, buy, post, confirm or delete is held for approval and may be refused. If an action comes back refused, do not try it again by another route: stop and report what you reached.",
+].join(" ");
 
 export interface JevStatus {
 	/** A run could start now: keys present and nothing already running. */
 	ready: boolean;
 	/** The environment variables a run needs and does not have. */
 	missing: string[];
-	running?: { id: string; url: string; goal: string; startedAt: number; steps: number };
+	/** A Chrome is shared, so a run without a `browser` drives the person's own tab. */
+	shared: boolean;
+	running?: { id: string; url: string; goal: string; startedAt: number; steps: number; browser: "chrome" | "headless"; waiting?: JevRun["waiting"] };
 	last?: { id: string; status: string; steps: number; elapsedMs: number; note?: string };
 	note: string;
 }
@@ -91,7 +149,12 @@ export interface JevRunnerProcess {
 	on(event: "close", listener: (code: number | null) => void): unknown;
 }
 
-/** The one key without which no decision can be made. `TEXT_MODEL_API_KEY` is only needed to type. */
+/**
+ * The one key without which no decision can be made.
+ *
+ * `TEXT_MODEL_API_KEY` is only needed to type, and a run in the shared Chrome never types a
+ * word of its own: the words come from whoever is supervising it.
+ */
 const REQUIRED = ["TYPESAFE_API_KEY"];
 /** A run this long has stopped making progress; the library's own step budget usually ends it first. */
 const MAX_RUN_MS = 180_000;
@@ -101,25 +164,72 @@ export class JevService {
 	private child: JevRunnerProcess | undefined;
 	private closeBrowser: (() => Promise<void>) | undefined;
 	private timer: ReturnType<typeof setTimeout> | undefined;
+	/** The gate holding the run, while it holds it. One at a time, like the run. */
+	private holding: { id: string; settle: (answer: boolean | string) => void; refuse: () => void; timer: ReturnType<typeof setTimeout> } | undefined;
 
-	constructor(private readonly backend: JevBackend = realBackend()) {}
+	constructor(
+		private readonly backend: JevBackend = realBackend(),
+		private readonly options: JevOptions = {},
+	) {}
 
 	status(): JevStatus {
 		const keys = this.backend.keys();
 		const missing = REQUIRED.filter((name) => !keys[name]?.trim());
 		const running = this.current && !this.current.endedAt ? this.current : undefined;
 		const last = this.current?.endedAt ? this.current : undefined;
+		const shared = this.sharedEndpoint !== undefined;
 		return {
 			ready: missing.length === 0 && !running,
 			missing,
-			...(running ? { running: { id: running.id, url: running.url, goal: running.goal, startedAt: running.startedAt, steps: running.steps.length } } : {}),
+			shared,
+			...(running ? { running: { id: running.id, url: running.url, goal: running.goal, startedAt: running.startedAt, steps: running.steps.length, browser: running.browser, ...(running.waiting ? { waiting: running.waiting } : {}) } } : {}),
 			...(last ? { last: { id: last.id, status: last.status, steps: last.steps.length, elapsedMs: last.elapsedMs, ...(last.note ? { note: last.note } : {}) } } : {}),
 			note: missing.length > 0
 				? `Set ${missing.join(" and ")} in the server's environment; without it no run can start.`
 				: running
-					? "A run is going; stage.web_jev.state() follows it, stage.web_jev.stop() ends it."
-					: "Ready. stage.web_jev.run({ url, goal }) starts a run; state() follows it.",
+					? running.waiting
+						? `A gate is holding the run: it wants to ${running.waiting.action}. Answer it with stage.web_jev.answer(${running.waiting.kind === "words" ? '{ text: "…" }' : "{ allow: true }"})${this.options.person ? ", or on the status board" : ""}.`
+						: "A run is going; stage.web_jev.state() follows it, stage.web_jev.stop() ends it."
+					: shared
+						? "Ready, in your own Chrome: stage.web_jev.run({ url, goal }) starts a run in the tab you shared, and stops before anything is sent or typed."
+						: "Ready, in a browser of the server's own: stage.web_jev.run({ url, goal }) starts a run. Share a tab to run it in your own Chrome instead.",
 		};
+	}
+
+	/**
+	 * Answer what a gate is holding.
+	 *
+	 * The two answers are different questions. `allow` is the yes or no before something is
+	 * sent; `text` is what actually goes into a field, because the words are the supervising
+	 * agent's and never the browser agent's own.
+	 */
+	answer(input: { allow?: boolean; text?: string }): { answered: string } {
+		const run = this.current;
+		const holding = this.holding;
+		const waiting = run?.waiting;
+		if (!run || !holding || !waiting) throw new Error("Nothing is waiting: stage.web_jev.state() shows the run and what it is doing.");
+		if (waiting.kind === "words") {
+			if (typeof input.text !== "string" || !input.text) throw new Error(`The run is waiting for text to type into ${waiting.field ?? "a field"}: stage.web_jev.answer({ text: "…" })`);
+			holding.settle(input.text);
+			return { answered: `${input.text.length} characters for ${waiting.field ?? "a field"}` };
+		}
+		if (typeof input.allow !== "boolean") throw new Error(`The run is waiting for a yes or no: it wants to ${waiting.action}. stage.web_jev.answer({ allow: true }) or { allow: false }.`);
+		holding.settle(input.allow);
+		return { answered: input.allow ? `allowed: ${waiting.action}` : `refused: ${waiting.action}` };
+	}
+
+	/** The endpoint of a Chrome somebody is logged into, as the bridge last reported it. */
+	private sharedEndpoint: string | undefined;
+
+	/**
+	 * Told when a Chrome connects or goes away.
+	 *
+	 * Pushed rather than pulled: `status()` is a synchronous read an agent makes on every turn,
+	 * and asking the bridge whether a browser is attached is not something it can do in the
+	 * middle of one.
+	 */
+	setShared(endpoint: string | undefined): void {
+		this.sharedEndpoint = endpoint;
 	}
 
 	/**
@@ -137,16 +247,29 @@ export class JevService {
 		const missing = REQUIRED.filter((name) => !keys[name]?.trim());
 		if (missing.length > 0) throw new Error(`Set ${missing.join(" and ")} in the server's environment; without it no run can start.`);
 
-		const run: JevRun = { id: randomUUID(), url, goal, startedAt: Date.now(), status: "starting", elapsedMs: 0, steps: [] };
+		/*
+		 * Which browser, decided here and nowhere else.
+		 *
+		 * A shared Chrome is the default because a goal is usually about a page behind a login,
+		 * and the gates are what make that safe: the run drives the person's own tab and stops at
+		 * the two things it may not do alone. `headless` is how an agent asks for the browser
+		 * nobody is logged into, and is the only way to run with no Chrome shared at all.
+		 */
+		const shared = spec.browser === "headless" ? undefined : this.sharedEndpoint;
+		const where: "chrome" | "headless" = shared ? "chrome" : "headless";
+		if (spec.browser === "chrome" && !shared)
+			throw new Error('No Chrome is shared with the deck, so there is nothing to drive. Share a tab from the Decks extension, or run with { browser: "headless" } in a browser of the server\'s own.');
+
+		const run: JevRun = { id: randomUUID(), url, goal, startedAt: Date.now(), status: "starting", elapsedMs: 0, steps: [], browser: where, gate: [] };
 		this.current = run;
-		let browser: { cdpUrl: string; close(): Promise<void> };
+		let launched: { cdpUrl: string; close(): Promise<void> };
 		try {
-			browser = await this.backend.browser();
+			launched = shared ? await this.gated(shared, run) : await this.backend.browser();
 		} catch (error) {
 			await this.end(run, "failed", `The browser could not launch: ${(error as Error).message}`);
 			throw new Error(`The browser could not launch: ${(error as Error).message}`);
 		}
-		this.closeBrowser = browser.close;
+		this.closeBrowser = launched.close;
 		/*
 		 * The harness daemon this run starts lives in a directory of the run's own, so two
 		 * runs can never find each other's daemon, and the runner's finally block knows
@@ -156,14 +279,15 @@ export class JevService {
 		const passthrough = Object.fromEntries(Object.entries(keys).filter(([, value]) => typeof value === "string" && value)) as Record<string, string>;
 		let child: JevRunnerProcess;
 		try {
-			child = await this.backend.runner(spec, { ...passthrough, BU_CDP_URL: browser.cdpUrl, BU_NAME: "decks-jev", BH_RUNTIME_DIR: runtimeDir });
+			const told = where === "chrome" ? { ...spec, url, goal: `${goal}\n\n${SUPERVISED}` } : { ...spec, url, goal };
+			child = await this.backend.runner(told, { ...passthrough, BU_CDP_URL: launched.cdpUrl, BU_NAME: "decks-jev", BH_RUNTIME_DIR: runtimeDir });
 		} catch (error) {
 			await this.end(run, "failed", `The runner could not start: ${(error as Error).message}`);
 			rmSync(runtimeDir, { recursive: true, force: true });
 			throw new Error(`The runner could not start: ${(error as Error).message}`);
 		}
 		this.child = child;
-		this.timer = setTimeout(() => void this.stop(`Stopped after ${Math.round(MAX_RUN_MS / 1000)} seconds.`), MAX_RUN_MS);
+		this.armTimer();
 
 		let buffer = "";
 		child.stdout.on("data", (chunk: Buffer) => {
@@ -186,7 +310,13 @@ export class JevService {
 			const tail = stderr.trim().split("\n").at(-1);
 			void this.end(run, "failed", code === 0 ? "The runner ended without a result." : `The runner exited ${code}${tail ? `: ${tail}` : "."}`);
 		});
-		return { id: run.id, note: "Started. stage.web_jev.state() follows it; each step is one decision the model made." };
+		return {
+			id: run.id,
+			note:
+				where === "chrome"
+					? "Started in the tab you shared. It stops at anything that sends or types: stage.web_jev.state() shows the run, and answer() is how a held one carries on."
+					: "Started. stage.web_jev.state() follows it; each step is one decision the model made.",
+		};
 	}
 
 	/** The run going now, or the last one: the whole transcript of steps. */
@@ -205,6 +335,103 @@ export class JevService {
 
 	async dispose(): Promise<void> {
 		await this.stop("The server is shutting down.");
+	}
+
+	// --- the two gates ---------------------------------------------------------------
+
+	/**
+	 * The shared Chrome, behind the gate.
+	 *
+	 * The agent attaches to this exactly as it would attach to a browser, which is the whole
+	 * point: the gate is a wire it cannot see past, not an instruction it could talk its way
+	 * out of. What comes out the other side is the person's own tab, logged in as them.
+	 */
+	private async gated(upstream: string, run: JevRun): Promise<{ cdpUrl: string; close(): Promise<void> }> {
+		const hooks: GateHooks = {
+			allow: (question) => this.askToSend(question),
+			words: (question) => this.askForWords(question),
+		};
+		/*
+		 * The tab is borrowed before the gate is built and given back when it closes, so the two
+		 * halves of the browser work are never attached at once: `stage.web` would be reading a
+		 * page a browser agent is halfway through changing.
+		 */
+		const release = await this.options.borrow?.();
+		let gate: WebGate;
+		try {
+			gate = await WebGate.start({ upstream, hooks, onEvent: (event) => this.gateEvent(run, event) });
+		} catch (error) {
+			await release?.();
+			throw error;
+		}
+		return {
+			cdpUrl: gate.cdpUrl,
+			close: async () => {
+				await gate.close();
+				await release?.();
+			},
+		};
+	}
+
+	/** What the gates did, kept on the run so `state()` says what the agent was not allowed to do alone. */
+	private gateEvent(run: JevRun, event: GateEvent): void {
+		run.gate.push(event);
+		while (run.gate.length > GATE_KEPT) run.gate.shift();
+		/*
+		 * A held run is not a run making no progress, so the ceiling that ends a stuck one is put
+		 * down while a question is out and picked up again when it is answered.
+		 */
+		if (event.kind === "held") this.disarmTimer();
+		else if (event.kind !== "closed") this.armTimer();
+	}
+
+	/** Before something is sent: the person on the status board, or the agent on its next turn. */
+	private askToSend(question: GateQuestion): Promise<boolean> {
+		return this.hold<boolean>(question, false, (settle) => {
+			const line = `A browser agent wants to ${question.action}${question.tab ? ` on ${question.tab}` : ""}. Allow?`;
+			void this.options.person?.(line).then((allowed) => settle(allowed));
+		});
+	}
+
+	/** Instead of the agent's own words: the text that actually goes into the field. */
+	private askForWords(question: GateQuestion): Promise<string> {
+		return this.hold<string>(question, "", () => {});
+	}
+
+	/**
+	 * One held command: recorded on the run, and settled by whoever answers first.
+	 *
+	 * A question nobody answers is refused rather than allowed, and the timer here is what
+	 * makes that true even when the caller never comes back.
+	 */
+	private hold<T extends boolean | string>(question: GateQuestion, refused: T, also: (settle: (answer: T) => void) => void): Promise<T> {
+		const run = this.current;
+		if (!run) return Promise.resolve(refused);
+		return new Promise<T>((resolve) => {
+			const settle = (answer: T) => {
+				if (this.holding?.id !== question.id) return;
+				clearTimeout(this.holding.timer);
+				this.holding = undefined;
+				if (run.waiting?.id === question.id) run.waiting = undefined;
+				resolve(answer);
+			};
+			const timer = setTimeout(() => settle(refused), HELD_MS);
+			timer.unref?.();
+			this.holding = { id: question.id, settle: settle as (answer: boolean | string) => void, refuse: () => settle(refused), timer };
+			run.waiting = { id: question.id, kind: question.kind, action: question.action, ...(question.tab ? { tab: question.tab } : {}), ...(question.field ? { field: question.field } : {}), since: Date.now() };
+			also(settle);
+		});
+	}
+
+	private armTimer(): void {
+		if (this.timer) clearTimeout(this.timer);
+		this.timer = setTimeout(() => void this.stop(`Stopped after ${Math.round(MAX_RUN_MS / 1000)} seconds.`), MAX_RUN_MS);
+		this.timer.unref?.();
+	}
+
+	private disarmTimer(): void {
+		if (this.timer) clearTimeout(this.timer);
+		this.timer = undefined;
 	}
 
 	private line(run: JevRun, raw: string): void {
@@ -241,6 +468,17 @@ export class JevService {
 		run.endedAt = Date.now();
 		if (this.timer) clearTimeout(this.timer);
 		this.timer = undefined;
+		/*
+		 * A question that outlived its run is refused, not left hanging: the gate would otherwise
+		 * sit on a socket nothing is reading.
+		 */
+		if (this.holding) {
+			clearTimeout(this.holding.timer);
+			const refuse = this.holding.refuse;
+			this.holding = undefined;
+			if (run.waiting) run.waiting = undefined;
+			refuse();
+		}
 		const close = this.closeBrowser;
 		this.closeBrowser = undefined;
 		try {

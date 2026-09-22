@@ -121,7 +121,21 @@ class BrowserModel {
 
 	async enableAutoAttach(): Promise<void> {
 		this.autoAttach = true;
+		const attached = new Set(this.sessions.keys());
 		await Promise.all([...this.known.keys()].map((tabId) => this.attachTab(tabId).catch(() => {})));
+		/*
+		 * A client that arrives after the tabs were attached still has to be told which targets are
+		 * already attached, or it sees a browser with no pages in it. `attachTab` announces a tab
+		 * once, when it creates the session, so a second client on the same relay — the deck's own
+		 * Playwright, taking the tab back from a browser agent that borrowed it — would otherwise
+		 * be handed nothing at all. Only the sessions that were already there are re-announced:
+		 * the ones just made were announced by `attachTab`, and saying it twice is not the same
+		 * thing as saying it again.
+		 */
+		for (const [tabId, session] of this.sessions) {
+			if (!attached.has(tabId)) continue;
+			this.emit({ method: "Target.attachedToTarget", params: { sessionId: session.sessionId, targetInfo: { ...session.targetInfo, attached: true }, waitingForDebugger: false } });
+		}
 	}
 
 	async createTarget(url: string | undefined): Promise<{ targetId: string | undefined }> {
@@ -325,6 +339,28 @@ export class Relay {
 	/** Resolves once the extension has announced its tabs (`extension.initialized`). */
 	ready(): Promise<void> {
 		return this.readiness.promise;
+	}
+
+	/**
+	 * Let go of the CDP client, and answer once the socket is really gone.
+	 *
+	 * The relay speaks to one client at a time — a tab driven by two of them is two agents
+	 * fighting over one page — so handing the tab to a second client means waiting for the
+	 * first one's socket to close, not merely asking it to. The wait is bounded because a
+	 * socket that has already gone will never raise its own close event again.
+	 */
+	releaseClient(): Promise<void> {
+		const client = this.client;
+		if (!client) return Promise.resolve();
+		return new Promise<void>((resolve) => {
+			const done = setTimeout(resolve, 1000);
+			done.unref?.();
+			client.once("close", () => {
+				clearTimeout(done);
+				resolve();
+			});
+			client.close(1000, "the tab is being handed over");
+		});
 	}
 
 	/** The tabs the debugger is attached to, with their current title and address. */

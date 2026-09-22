@@ -348,6 +348,56 @@ test("a reference from another page is a sentence, not a click on whatever now h
 	await assert.rejects(bridge.click({ ref: "nonsense" }), /is not a reference/);
 });
 
+test("a browser agent can borrow the tab, and the deck's own verbs say so while it is out", async () => {
+	const endpoint = bridge.debuggerEndpoint();
+	assert.ok(endpoint, "the relay's debugger endpoint is known while a Chrome is attached");
+	await bridge.open(FORM);
+	const release = await bridge.handOver();
+	// The tab is not the deck's while a browser agent has it, and the verb says why rather
+	// than reading a page that is moving under it.
+	await assert.rejects(bridge.read(), /A browser agent is driving the shared tab/);
+	assert.equal(bridge.status().connected, true, "the extension is still attached; the tab is borrowed, not gone");
+	/*
+	 * And it is really free: a second DevTools client attaches to the same address, which is
+	 * exactly what the relay refuses while the deck's own Playwright is holding it. This is the
+	 * thing that makes a run in the person's own Chrome possible at all, and it is done the way
+	 * the agent does it — a raw DevTools socket, not Playwright.
+	 */
+	const borrowed = new WebSocket(endpoint);
+	try {
+		await new Promise<void>((resolve, reject) => {
+			borrowed.once("open", () => resolve());
+			borrowed.once("error", reject);
+		});
+		const attached = new Promise<{ params: { sessionId?: string; targetInfo?: { url?: string } } }>((resolve) => {
+			borrowed.on("message", (data) => {
+				const message = JSON.parse(data.toString());
+				if (message.method === "Target.attachedToTarget") resolve(message);
+			});
+		});
+		borrowed.send(JSON.stringify({ id: 1, method: "Target.setAutoAttach", params: { autoAttach: true, waitForDebuggerOnStart: false, flatten: true } }));
+		const tab = await attached;
+		assert.ok(tab.params.sessionId, "the second client is told which tab is attached");
+		// And the session really drives the tab the person shared: asking it a question reads
+		// the page that is on their screen, not a blank one the relay invented.
+		const answered = new Promise<string>((resolve) => {
+			borrowed.on("message", (data) => {
+				const message = JSON.parse(data.toString());
+				if (message.id === 2) resolve(String(message.result?.result?.value));
+			});
+		});
+		borrowed.send(JSON.stringify({ id: 2, method: "Runtime.evaluate", params: { expression: "location.href", returnByValue: true }, sessionId: tab.params.sessionId }));
+		assert.match(await answered, /^data:text\/html/);
+	} finally {
+		borrowed.close();
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		await release();
+	}
+	const page = await bridge.page();
+	assert.equal(page.url(), (await value("location.href")) as string);
+	assert.equal(bridge.debuggerEndpoint(), endpoint, "and the address a run would attach to is unchanged");
+});
+
 test("stop lets go of the tab; the extension's socket closes and the status says why", async () => {
 	const closed = new Promise<string>((resolve) => extension.once("close", (_code, reason) => resolve(reason.toString())));
 	bridge.stop();

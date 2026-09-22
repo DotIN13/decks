@@ -1,7 +1,20 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { test } from "node:test";
+import { WebSocket } from "ws";
 import { JevService, type JevBackend } from "./jev.ts";
+
+/** A socket to an address, which rejects when nothing is listening on it. */
+function connect(url: string): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const socket = new WebSocket(url);
+		socket.once("open", () => {
+			socket.close();
+			resolve();
+		});
+		socket.once("error", (error: Error) => reject(error));
+	});
+}
 
 /**
  * The service against a fake backend: the runner is a Node one-liner printing the same
@@ -9,18 +22,33 @@ import { JevService, type JevBackend } from "./jev.ts";
  * steps, end and error to a result, stop to a SIGTERM, the browser closed with the run
  * — is tested without Python, Chromium, or a network.
  */
-function harness(options: { keys?: Record<string, string | undefined>; script?: string; failLaunch?: boolean } = {}) {
+function harness(
+	options: {
+		keys?: Record<string, string | undefined>;
+		script?: string;
+		failLaunch?: boolean;
+		/** The debugger endpoint of a Chrome somebody is logged into, when one is shared. */
+		shared?: string;
+		/** The person's answer to a gate's question, through the status board. */
+		person?: (text: string) => Promise<boolean>;
+	} = {},
+) {
 	let closed = 0;
+	let env: Record<string, string> | undefined;
 	const backend: JevBackend = {
 		keys: () => options.keys ?? { TYPESAFE_API_KEY: "k" },
 		browser: async () => {
 			if (options.failLaunch) throw new Error("no chromium here");
 			return { cdpUrl: "http://127.0.0.1:1", close: async () => void (closed += 1) };
 		},
-		runner: async () => spawn(process.execPath, ["-e", options.script ?? "process.exit(0)"], { stdio: ["ignore", "pipe", "pipe"] }),
+		runner: async (_spec, given) => {
+			env = given;
+			return spawn(process.execPath, ["-e", options.script ?? "process.exit(0)"], { stdio: ["ignore", "pipe", "pipe"] });
+		},
 	};
-	const service = new JevService(backend);
-	return { service, closedBrowsers: () => closed };
+	const service = new JevService(backend, { ...(options.person ? { person: options.person } : {}) });
+	service.setShared(options.shared);
+	return { service, closedBrowsers: () => closed, env: () => env };
 }
 
 const line = (payload: Record<string, unknown>) => `console.log(JSON.stringify(${JSON.stringify(payload)}));`;
@@ -110,4 +138,83 @@ test("a browser that cannot launch is the run's failure, not a hang", async () =
 test("state before any run is a sentence", () => {
 	const { service } = harness();
 	assert.throws(() => service.state(), /run\({ url, goal }\) starts one/);
+});
+
+test("a shared Chrome is what a run drives, and it drives it through the gate", async () => {
+	const { service, env } = harness({ script: "setInterval(() => {}, 1000)", shared: "ws://127.0.0.1:9222/cdp" });
+	assert.equal(service.status().shared, true);
+	const started = await service.run({ url: "https://x.test", goal: "find the invoice" });
+	assert.match(started.note, /the tab you shared/);
+	const run = service.state();
+	assert.equal(run.browser, "chrome");
+	assert.equal(service.status().running?.browser, "chrome");
+	/*
+	 * The agent attaches to the gate, not to the Chrome: the address it is given is a loopback
+	 * port of this server's own, and the person's Chrome is only reachable from the other side
+	 * of it. A run pointed straight at the relay would be the ungated version of this.
+	 */
+	const gate = String(env()?.BU_CDP_URL);
+	assert.match(gate, /^ws:\/\/127\.0\.0\.1:\d+\/cdp$/);
+	assert.notEqual(gate, "ws://127.0.0.1:9222/cdp");
+	await service.stop();
+	assert.equal(service.state().status, "stopped");
+	// The gate closes with the run: the address the agent was given stops answering.
+	await assert.rejects(connect(gate), /closed|refused|ECONNREFUSED|socket hang up/i);
+});
+
+test("the goal a supervised run is given says what it may not do alone", async () => {
+	const told: string[] = [];
+	const backend: JevBackend = {
+		keys: () => ({ TYPESAFE_API_KEY: "k" }),
+		browser: async () => ({ cdpUrl: "http://127.0.0.1:1", close: async () => {} }),
+		runner: async (spec) => {
+			told.push(spec.goal);
+			return spawn(process.execPath, ["-e", "process.exit(0)"], { stdio: ["ignore", "pipe", "pipe"] });
+		},
+	};
+	const service = new JevService(backend);
+	service.setShared("ws://127.0.0.1:9222/cdp");
+	await service.run({ url: "https://x.test", goal: "find the invoice" });
+	await ended(service);
+	assert.match(told[0] ?? "", /find the invoice/);
+	assert.match(told[0] ?? "", /supervised/);
+	assert.match(told[0] ?? "", /words that go into a field come from the person watching/);
+	assert.match(told[0] ?? "", /may be refused/);
+});
+
+test("a headless run is told none of that, because there is nobody to protect", async () => {
+	const told: string[] = [];
+	const backend: JevBackend = {
+		keys: () => ({ TYPESAFE_API_KEY: "k" }),
+		browser: async () => ({ cdpUrl: "http://127.0.0.1:1", close: async () => {} }),
+		runner: async (spec) => {
+			told.push(spec.goal);
+			return spawn(process.execPath, ["-e", "process.exit(0)"], { stdio: ["ignore", "pipe", "pipe"] });
+		},
+	};
+	const service = new JevService(backend);
+	service.setShared("ws://127.0.0.1:9222/cdp");
+	await service.run({ url: "https://x.test", goal: "find the invoice", browser: "headless" });
+	await ended(service);
+	assert.equal(told[0], "find the invoice");
+});
+
+test("asking for the shared Chrome when none is shared is a sentence, not a headless run", async () => {
+	const { service } = harness();
+	assert.equal(service.status().shared, false);
+	await assert.rejects(service.run({ url: "https://x.test", goal: "g", browser: "chrome" }), /No Chrome is shared/);
+});
+
+test("headless is a browser of the server's own even when a Chrome is shared", async () => {
+	const { service, env, closedBrowsers } = harness({ script: "setInterval(() => {}, 1000)", shared: "ws://127.0.0.1:9222/cdp" });
+	await service.run({ url: "https://x.test", goal: "g", browser: "headless" });
+	assert.equal(service.state().browser, "headless");
+	assert.equal(env()?.BU_CDP_URL, "http://127.0.0.1:1");
+	await service.stop();
+	assert.equal(closedBrowsers(), 1);
+});
+
+test("answering when nothing is waiting is a sentence, not a lost answer", async () => {
+	const { service } = harness();
+	assert.throws(() => service.answer({ allow: true }), /Nothing is waiting/);
 });
