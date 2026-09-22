@@ -17,6 +17,8 @@ import json
 import os
 import signal
 import sys
+import threading
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -92,12 +94,39 @@ def main():
     finally:
         # This run's harness daemon is its own (BH_RUNTIME_DIR is a per-run directory),
         # so stopping it here is what keeps runs from leaving one Python process each.
+        #
+        # The daemon is this process's child, and a child that exits stays a zombie until
+        # somebody waits for it. `stop_remote_daemon` decides the daemon has gone by
+        # `os.kill(pid, 0)`, which a zombie answers, so it waits its whole fifteen seconds for
+        # a process that has already stopped. Waiting for it here is what stops that: the
+        # moment it is reaped, `kill(pid, 0)` fails and the shutdown returns at once. When the
+        # daemon is not ours, `waitpid` says so immediately and this changes nothing.
+        try:
+            from browser_harness import _ipc
+
+            daemon = _ipc.identify(os.environ.get("BU_NAME", "default"), timeout=2.0)
+            if daemon:
+                threading.Thread(target=reap, args=(daemon,), daemon=True).start()
+        except Exception:
+            pass
         try:
             from browser_harness.admin import stop_remote_daemon
 
             stop_remote_daemon(os.environ.get("BU_NAME", "default"))
         except Exception:
             pass
+
+
+def reap(pid):
+    """Wait for a child that has stopped, so it stops answering `kill(pid, 0)`."""
+    while True:
+        try:
+            done, _ = os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            return
+        if done:
+            return
+        time.sleep(0.05)
 
 
 if __name__ == "__main__":
