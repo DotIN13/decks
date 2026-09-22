@@ -153,6 +153,46 @@ const openRun = async () =>
 		const doc = document.querySelector('.board-node[data-path="boards/notes.html"] iframe').contentDocument;
 		return [...doc.querySelectorAll("[contenteditable]")].filter((e) => e.getAttribute("contenteditable") !== "false").length;
 	});
+/*
+ * 5. A press inside a *named inner block* edits all the same.
+ *
+ * Report boards name their inner sections — a `data-id` on a div inside the doc — so a
+ * comment can point at one. The nearest name is not the component: the editor climbs to
+ * the child of the body. Before it climbed, every press inside such a block resolved to
+ * nothing, and the whole pane read as not editable — measured, on the deck's tabbed
+ * report boards.
+ */
+const nestedBefore = read(file);
+// The block is the last thing in the document, below the viewport at the zoom the check
+// chose — and a pan-zoom canvas is not a page Playwright can scroll, so pan the camera
+// down with the wheel until the paragraph is on screen. Panning, not zooming: a frame
+// click is only mapped straight at the zoom the earlier sections already vouched for.
+let aimed;
+for (let i = 0; i < 10; i++) {
+	aimed = await frame().locator('[data-id="method"] p').boundingBox();
+	if (aimed && aimed.y > 60 && aimed.y + aimed.height < 900) break;
+	await page.mouse.move(720, 500);
+	await page.mouse.wheel(0, 240);
+	await settle(page, 250);
+}
+say("the named block can be brought on screen", Boolean(aimed && aimed.y > 60 && aimed.y + aimed.height < 900), JSON.stringify(aimed));
+await frame().locator('[data-id="method"] p').dblclick();
+await settle(page, 400);
+say("a double-click inside a named inner block still opens its run", (await openRun()) === 1, `${await openRun()} open`);
+await page.keyboard.press("End");
+await page.keyboard.type(" Typed in the nested block.");
+await frame().locator(".doc h1").first().click();
+await settle(page, 900);
+const nestedAfter = read(file);
+const blockAt = nestedAfter.indexOf('data-id="method"');
+const typedAt = nestedAfter.indexOf("Typed in the nested block.");
+say(
+	"…and typing there splices bytes inside that block's own paragraph",
+	blockAt !== -1 && typedAt > blockAt && typedAt < nestedAfter.indexOf("</div>", blockAt),
+	`typed at ${typedAt}, the named block opens at ${blockAt} of ${nestedAfter.length}`,
+);
+say("…and the rest of the file is as it was", differ(nestedBefore, nestedAfter).tags.before === differ(nestedBefore, nestedAfter).tags.after, "no tag changed");
+
 const beforePressAway = read(file);
 await frame().locator(".doc p").first().dblclick();
 await settle(page, 600);
