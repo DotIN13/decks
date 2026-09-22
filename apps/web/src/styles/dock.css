@@ -58,7 +58,7 @@
 	 * order, and a 12px corner arriving because of an import order is the kind of bug
 	 * nobody thinks to look for.
 	 */
-	.dockbox {
+	.composer-box {
 		transition:
 			border-color 120ms ease,
 			box-shadow 120ms ease;
@@ -77,7 +77,7 @@
 	 * the mode chip and the model chip are inside the box too, and lighting the whole box
 	 * up when somebody tabs to a picker says "you are typing" when they are not.
 	 */
-	.dockbox:has(.dockfield:focus) {
+	.composer-box:has(.dockfield:focus) {
 		border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
 		box-shadow:
 			0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent),
@@ -150,7 +150,7 @@
 	 * same reasoning `--control-md` was invented for, applied to the icon-only button next
 	 * to the labelled ones so that the three read as one row of three.
 	 */
-	.dockrow {
+	.dock-row {
 		--control: 26px;
 		--control-md: 26px;
 		--control-radius: 7px;
@@ -175,12 +175,12 @@
 	 * will not go below its min-content width unless it is told it may, and `truncate` has no
 	 * effect on a box that is never narrower than its text.
 	 */
-	.dockrow .chip-button {
+	.dock-row .chip-button {
 		flex: 0 1 auto;
 		min-width: 0;
 	}
 
-	.dockrow .chip-button > span {
+	.dock-row .chip-button > span {
 		min-width: 0;
 	}
 
@@ -193,7 +193,7 @@
 	 * it belongs to.
 	 */
 	@media (pointer: coarse) {
-		.dockrow {
+		.dock-row {
 			--control: 34px;
 			--control-md: 34px;
 		}
@@ -268,7 +268,7 @@
 	 * should disappear as the bar narrows, because half a hint is worse than no hint. The
 	 * ranks are variants in the markup, since only a utility can win against a utility.
 	 */
-	.hintrow {
+	.hint-row {
 		color: var(--faint);
 		font-size: var(--type-note);
 	}
@@ -293,7 +293,7 @@
 		content: "·";
 	}
 
-	.hintrow kbd {
+	.hint-row kbd {
 		display: inline-grid;
 		box-sizing: border-box;
 		min-width: 16px;

@@ -62,7 +62,7 @@
 	border-right: 0;
 	border-left: 7px solid var(--mark);
 }
-	.board-mark > .say {
+	.board-mark > .mark-say {
 	max-width: 220px;
 	padding: 4px 9px 5px;
 	border-radius: var(--radius-item);

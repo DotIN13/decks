@@ -225,7 +225,7 @@
 	grid-template-columns: repeat(5, 1fr);
 	gap: 3px;
 }
-	/* Beats `:is(.popover, .rowlist) [data-row]`, which would make each number a full-width row. */
+	/* Beats `:is(.popover, .row-list) [data-row]`, which would make each number a full-width row. */
 .popover.set-sounds .set-cues > [data-row] {
 	display: flex;
 	min-height: 0;

@@ -1011,7 +1011,7 @@
 		color: var(--faint);
 	}
 	/* Red, on both the word and the icon: the shared row colours its label and icon itself, so
-	   this has to outrank `:is(.popover, .rowlist) [data-row] > .row-label`. */
+	   this has to outrank `:is(.popover, .row-list) [data-row] > .row-label`. */
 	.popover.canvas-menu .canvas-menu-remove > :is(.row-label, .row-icon) {
 		color: var(--color-danger);
 	}

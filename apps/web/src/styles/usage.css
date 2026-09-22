@@ -16,7 +16,7 @@
 	/*
 	 * The padded body of a group, for content that is prose and figures rather than rows.
 	 *
-	 * `.set-rows` is the other kind — a `.rowlist` flush to the group's edges — and this is
+	 * `.set-rows` is the other kind — a `.row-list` flush to the group's edges — and this is
 	 * its sibling: the hairline under the heading, drawn the same way, and room to breathe
 	 * for things that are not rows.
 	 */

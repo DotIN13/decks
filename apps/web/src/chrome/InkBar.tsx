@@ -78,7 +78,7 @@ export function InkBar(props: { onDone: () => void }) {
 	const paints = () => inkTool() === "pen" || inkTool() === "marker";
 
 	return (
-		<div class="inkbar float pill" role="toolbar" aria-label="Drawing tools">
+		<div class="ink-bar float pill" role="toolbar" aria-label="Drawing tools">
 			<For each={TOOLS}>
 				{(entry) => (
 					<button

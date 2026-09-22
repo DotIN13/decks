@@ -126,8 +126,8 @@ await page.locator(`${node} .chrome`).click();
 await page.keyboard.press("1");
 await settle(page, 900);
 await page.click('[aria-label="Draw on the boards"]');
-await page.waitForSelector(".inkbar");
-say("the brush brings the drawing tools", (await page.locator(".inkbar .icon-button").count()) >= 8);
+await page.waitForSelector(".ink-bar");
+say("the brush brings the drawing tools", (await page.locator(".ink-bar .icon-button").count()) >= 8);
 
 const sheet = await page.locator(`${node} .ink-input`).boundingBox();
 const x0 = sheet.x + sheet.width * 0.35;
@@ -147,8 +147,8 @@ say("…and in the board's own file, as one layer before the scripts", inFile() 
 say("…and nothing else in the file moved", read(file).replace(/[\t ]*<svg class="ink"[\s\S]*?<\/svg>\n/, "") === before);
 say("…and the board did not reload to show it", (await loads()) === probe);
 
-await page.click('.inkbar [aria-label^="Marker"]');
-await page.click('.inkbar [aria-label="Yellow"]');
+await page.click('.ink-bar [aria-label^="Marker"]');
+await page.click('.ink-bar [aria-label="Yellow"]');
 await page.mouse.move(x0, y0 + 70);
 await page.mouse.down();
 await page.mouse.move(x0 + 130, y0 + 72, { steps: 6 });
@@ -163,7 +163,7 @@ await page.keyboard.press("Control+Shift+z");
 await settle(page, 900);
 say("⇧⌘Z puts it back", (await inFrame()) === 2 && inFile() === 2, `${await inFrame()} ${inFile()}`);
 
-await page.click('.inkbar [aria-label^="Lasso"]');
+await page.click('.ink-bar [aria-label^="Lasso"]');
 await page.mouse.move(x0 - 20, y0 - 45);
 await page.mouse.down();
 for (const [dx, dy] of [[150, -45], [150, 45], [-20, 45], [-20, -45]]) await page.mouse.move(x0 + dx, y0 + dy, { steps: 5 });
@@ -182,7 +182,7 @@ await page.keyboard.press("Delete");
 await settle(page, 900);
 say("…and Delete removes it", (await inFrame()) === 1 && inFile() === 1);
 
-await page.click('.inkbar [aria-label^="Eraser"]');
+await page.click('.ink-bar [aria-label^="Eraser"]');
 await page.mouse.move(x0 + 50, y0 + 50);
 await page.mouse.down();
 await page.mouse.move(x0 + 50, y0 + 95, { steps: 6 });
@@ -201,7 +201,7 @@ const pointer = (type, kind, id, x, y, pressure) =>
 		},
 		[node, type, kind, id, x, y, pressure],
 	);
-await page.click('.inkbar [aria-label^="Pen"]');
+await page.click('.ink-bar [aria-label^="Pen"]');
 await pointer("pointerdown", "pen", 41, x0, y0, 0.15);
 for (let i = 1; i <= 10; i++) await pointer("pointermove", "pen", 41, x0 + i * 8, y0 + i * 2, 0.15 + i * 0.08);
 await pointer("pointerup", "pen", 41, x0 + 80, y0 + 20, 0);
@@ -221,7 +221,7 @@ await settle(page, 900);
 say("the board ends as it began", read(file) === before);
 await page.keyboard.press("Escape");
 await settle(page, 300);
-say("Escape puts the pen down", (await page.locator(".inkbar").count()) === 0 && (await page.locator(".ink-input").count()) === 0);
+say("Escape puts the pen down", (await page.locator(".ink-bar").count()) === 0 && (await page.locator(".ink-input").count()) === 0);
 
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();

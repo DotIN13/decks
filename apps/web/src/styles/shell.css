@@ -297,11 +297,11 @@
 		background: var(--line-strong);
 		opacity: 0.8;
 	}
-	.dockbox {
+	.composer-box {
 		position: relative;
 		cursor: grab;
 	}
-	.dock[data-dragging="true"] .dockbox {
+	.dock[data-dragging="true"] .composer-box {
 		cursor: grabbing;
 	}
 	.dock[data-dragging="true"] {

@@ -40,7 +40,7 @@
 	}
 
 	/* The drawing tools: a second row under the top-left cluster. */
-	.inkbar {
+	.ink-bar {
 		position: absolute;
 		z-index: var(--z-float);
 		top: calc(var(--control, 28px) + 32px);
@@ -50,7 +50,7 @@
 		overflow-x: auto;
 		scrollbar-width: none;
 	}
-	.inkbar .icon-button:disabled {
+	.ink-bar .icon-button:disabled {
 		opacity: 0.35;
 		cursor: default;
 	}

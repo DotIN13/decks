@@ -767,7 +767,7 @@ export function App() {
 		});
 	onMount(() => {
 		const dock = dockEl;
-		const handle = dock?.querySelector<HTMLElement>(".dockbox");
+		const handle = dock?.querySelector<HTMLElement>(".composer-box");
 		if (!dock || !handle) return;
 		const float = mountFloat(dock, "composer", handle, "[data-slot='composer-input'], textarea, input, button, select, a, [role='menu'], [role='listbox'], .send-button", () => {
 			const box = workBox();

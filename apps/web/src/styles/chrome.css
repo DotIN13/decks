@@ -265,7 +265,7 @@
 
 	/* The permission mode chip in the composer keeps the accent tint when a mode other than
 	   the ordinary one is set: a standing change you should see without reading the word. */
-	.dockbox .chip-button[data-on="true"] {
+	.composer-box .chip-button[data-on="true"] {
 		border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
 		/* Mixed over the raised card's white, not over the grey layer: a translucent tint on
 		   the layer came out dull, and a chip that is on should be the brightest thing in the
@@ -331,14 +331,14 @@
 	/*
 	 * A row you can pick. `data-row` is what the keyboard roves over.
 	 *
-	 * `.rowlist` as well as `.popover`, so a described choice in a *dialog* is the same object
+	 * `.row-list` as well as `.popover`, so a described choice in a *dialog* is the same object
 	 * as a described choice in a menu — same grid, same 7px corner, same hover wash, same
 	 * `.row-label`/`.row-note` pair. The question over the input bar used to draw its own: a full-width
 	 * slab filled with `--line` at rest, which read as four disabled fields rather than as
 	 * four things to press, and was a second answer to a question this file had already
 	 * answered.
 	 */
-	:is(.popover, .rowlist) [data-row] {
+	:is(.popover, .row-list) [data-row] {
 		display: grid;
 		width: 100%;
 		align-items: start;
@@ -356,13 +356,13 @@
 		text-align: left;
 	}
 
-	:is(.popover, .rowlist) [data-row]:hover,
-	:is(.popover, .rowlist) [data-row]:focus-visible {
+	:is(.popover, .row-list) [data-row]:hover,
+	:is(.popover, .row-list) [data-row]:focus-visible {
 		background: var(--line);
 		outline: none;
 	}
 
-	:is(.popover, .rowlist) [data-row][data-current="true"] {
+	:is(.popover, .row-list) [data-row][data-current="true"] {
 		background: var(--line);
 	}
 
@@ -373,12 +373,12 @@
 	 * cannot choose is a list you cannot reason about. No hover wash, because a wash on a row
 	 * that will not respond is the affordance lying.
 	 */
-	:is(.popover, .rowlist) [data-row][disabled] {
+	:is(.popover, .row-list) [data-row][disabled] {
 		cursor: default;
 		opacity: 0.55;
 	}
 
-	:is(.popover, .rowlist) [data-row][disabled]:hover {
+	:is(.popover, .row-list) [data-row][disabled]:hover {
 		background: transparent;
 	}
 
@@ -389,11 +389,11 @@
 	 * not — "Temporal" and "date-fns" are not things with pictures — and reserving the track
 	 * anyway indents a whole list by 25px against the question above it.
 	 */
-	:is(.popover, .rowlist) [data-row]:not(:has(> .row-icon)) {
+	:is(.popover, .row-list) [data-row]:not(:has(> .row-icon)) {
 		grid-template-columns: 1fr;
 	}
 
-	:is(.popover, .rowlist) [data-row] > .row-icon {
+	:is(.popover, .row-list) [data-row] > .row-icon {
 		grid-row: span 2;
 		padding-top: 1px;
 		color: var(--muted);
@@ -403,7 +403,7 @@
 	   group (`chat/Settings.tsx`). Added to the selector rather than given its own copy of these
 	   six declarations, because two type scales that are meant to match and are written twice do
 	   not stay matched. */
-	:is(.popover, .rowlist) [data-row] > .row-label,
+	:is(.popover, .row-list) [data-row] > .row-label,
 	.set-k > .row-label {
 		display: flex;
 		align-items: center;
@@ -424,7 +424,7 @@
 	 * That disagreement had been patched seven times, one `font-normal` at a time — the
 	 * zoom stops, the two zoom steps, the tools menu, undo, and both "new agent" rows. Seven
 	 * opt-outs from a default is the default being wrong, so it is stated once here and the
-	 * utilities are gone. `.rowlist` keeps 600 throughout: the panel's boards, the settings
+	 * utilities are gone. `.row-list` keeps 600 throughout: the panel's boards, the settings
 	 * groups and the dialog's options are lists you read, not lists you pick from.
 	 */
 	.popover [data-row]:not(:has(> .row-note)) > .row-label {
@@ -453,7 +453,7 @@
 	 * This is the reason a mode is a menu and not a segmented control: "edit freely" does
 	 * not say by itself that commands still ask, and the place to say so is here.
 	 */
-	:is(.popover, .rowlist) [data-row] > .row-note,
+	:is(.popover, .row-list) [data-row] > .row-note,
 	/* The Time group's picker: a field, then the buttons that act on it, on one line. */
 	.set-zone {
 		display: flex;
@@ -480,7 +480,7 @@
 	 * scrolled because its content now fitted, and the rule that says how tall a row is had
 	 * been quietly overruled by the box around it.
 	 */
-	:is(.popover, .rowlist) [data-row][data-flat="true"] {
+	:is(.popover, .row-list) [data-row][data-flat="true"] {
 		display: flex;
 		min-height: 30px;
 		flex: none;
@@ -505,7 +505,7 @@
 	 * underneath stops painting itself, and `:has` lets the box light up for the row's own
 	 * `data-current` without that state having to move off the row it describes.
 	 */
-	:is(.popover, .rowlist) .row-act {
+	:is(.popover, .row-list) .row-act {
 		display: flex;
 		align-items: center;
 		padding-right: 4px;
@@ -518,17 +518,17 @@
 	 * something that will not respond is the affordance lying. The account in use is the case:
 	 * its row is `disabled` and it is already tinted.
 	 */
-	:is(.popover, .rowlist) .row-act:is(:hover, :focus-within):not(:has(> [data-row][disabled])) {
+	:is(.popover, .row-list) .row-act:is(:hover, :focus-within):not(:has(> [data-row][disabled])) {
 		background: var(--line);
 	}
 
-	:is(.popover, .rowlist) .row-act:has(> [data-row][data-current="true"]) {
+	:is(.popover, .row-list) .row-act:has(> [data-row][data-current="true"]) {
 		background: var(--line);
 	}
 
-	:is(.popover, .rowlist) .row-act > [data-row]:hover,
-	:is(.popover, .rowlist) .row-act > [data-row]:focus-visible,
-	:is(.popover, .rowlist) .row-act > [data-row][data-current="true"] {
+	:is(.popover, .row-list) .row-act > [data-row]:hover,
+	:is(.popover, .row-list) .row-act > [data-row]:focus-visible,
+	:is(.popover, .row-list) .row-act > [data-row][data-current="true"] {
 		background: transparent;
 	}
 
@@ -558,7 +558,7 @@
 	 * On a touch screen neither of those is true — nothing is hovering, and nothing moves —
 	 * so there both are simply drawn, all the time.
 	 */
-	:is(.popover, .rowlist) .row-act > .close {
+	:is(.popover, .row-list) .row-act > .close {
 		display: grid;
 		width: var(--control-sm);
 		height: var(--control-sm);
@@ -579,22 +579,22 @@
 
 	/* `:focus-within` on the box, so roving onto the row with the keyboard is what reveals
 	   it — the row is where Delete is handled, and an invisible key is not a shortcut. */
-	:is(.popover, .rowlist) .row-act:is(:hover, :focus-within) > .close {
+	:is(.popover, .row-list) .row-act:is(:hover, :focus-within) > .close {
 		opacity: 1;
 	}
 
-	:is(.popover, .rowlist) .row-act > .close:hover {
+	:is(.popover, .row-list) .row-act > .close:hover {
 		background: color-mix(in srgb, var(--fg) 12%, transparent);
 		color: var(--fg);
 	}
 
-	:is(.popover, .rowlist) .row-act > .close:focus-visible {
+	:is(.popover, .row-list) .row-act > .close:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: -1px;
 	}
 
 	/* Armed: asked once, held visible in danger red until the second press or the menu closes. */
-	:is(.popover, .rowlist) .row-act > .close[data-armed="true"] {
+	:is(.popover, .row-list) .row-act > .close[data-armed="true"] {
 		opacity: 1;
 		background: color-mix(in srgb, var(--color-danger) 16%, transparent);
 		color: var(--color-danger);
@@ -607,7 +607,7 @@
 	 * between them, and the shape would change as a row moved — the list rearranging itself
 	 * around the thing you are dragging it with.
 	 */
-	:is(.popover, .rowlist) .row-act > .close[disabled] {
+	:is(.popover, .row-list) .row-act > .close[disabled] {
 		color: var(--faint);
 		cursor: default;
 	}
@@ -619,11 +619,11 @@
 	 * was first: that beat the `opacity: 0` above, so the two arrows that could *not* be
 	 * pressed were the only ones visible on an untouched list.
 	 */
-	:is(.popover, .rowlist) .row-act:is(:hover, :focus-within) > .close[disabled] {
+	:is(.popover, .row-list) .row-act:is(:hover, :focus-within) > .close[disabled] {
 		opacity: 0.35;
 	}
 
-	:is(.popover, .rowlist) .row-act > .close[disabled]:hover {
+	:is(.popover, .row-list) .row-act > .close[disabled]:hover {
 		background: none;
 		color: var(--faint);
 	}
@@ -637,11 +637,11 @@
 	 * here, and it moves because the alternative is a gutter that never stops being there.
 	 */
 	@media (hover: hover) {
-		:is(.popover, .rowlist) .row-act:has([data-yield]) > .close {
+		:is(.popover, .row-list) .row-act:has([data-yield]) > .close {
 			display: none;
 		}
 
-		:is(.popover, .rowlist) .row-act:has([data-yield]):is(:hover, :focus-within) > .close {
+		:is(.popover, .row-list) .row-act:has([data-yield]):is(:hover, :focus-within) > .close {
 			display: grid;
 		}
 
@@ -653,7 +653,7 @@
 		 * and put nothing in it: the status vanished to make room for a button that was never
 		 * coming. The panel's rows always have their tag button, so they always yield.
 		 */
-		:is(.popover, .rowlist) .row-act:has(> :is(.close, .agent-tagbtn)):is(:hover, :focus-within) [data-yield] {
+		:is(.popover, .row-list) .row-act:has(> :is(.close, .agent-tagbtn)):is(:hover, :focus-within) [data-yield] {
 			display: none;
 		}
 	}
@@ -667,7 +667,7 @@
 	 * justify hiding either.
 	 */
 	@media (hover: none) {
-		:is(.popover, .rowlist) .row-act > .close {
+		:is(.popover, .row-list) .row-act > .close {
 			opacity: 1;
 		}
 
@@ -679,7 +679,7 @@
 		 * ones whose words ran to the edge. Which is the ragged gutter this whole arrangement
 		 * exists to avoid, inverted.
 		 */
-		:is(.popover, .rowlist) .row-act:has([data-yield]):not(:has(> .close)) {
+		:is(.popover, .row-list) .row-act:has([data-yield]):not(:has(> .close)) {
 			padding-right: calc(var(--control-sm) + 6px);
 		}
 	}
@@ -689,13 +689,13 @@
 	 * one — so this is only the rhythm: the same 2px between rows that a popover has, because
 	 * two rows 6px apart read as two objects and these are one list.
 	 */
-	.rowlist {
+	.row-list {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 	}
 
-	:is(.popover, .rowlist) .rule {
+	:is(.popover, .row-list) .rule {
 		height: 1px;
 		margin: 6px 4px;
 		background: var(--line);
@@ -703,7 +703,7 @@
 
 	/* A label over a group of rows. Sentence case, never uppercase — see the note in
 	   `index.css` about what replaced the eyebrows. */
-	:is(.popover, .rowlist) .group {
+	:is(.popover, .row-list) .group {
 		padding: 5px 8px 3px;
 		color: var(--faint);
 		font-size: var(--type-note);
@@ -1060,7 +1060,7 @@ svg.lucide {
  * is left here are the surfaces that have not been rebuilt — the cheat sheet and the
  * inspector's own two rows — and they should join it when they are.
  */
-.ops header button,
+.ops-sheet header button,
 .inspector .row.file button,
 .inspector .acts button {
 	display: grid;
@@ -1101,7 +1101,7 @@ svg.lucide {
 	place-items: center;
 }
 	/* One hover for all of them, which is the palette's: a wash, not a border and not a jump. */
-.ops header button:hover,
+.ops-sheet header button:hover,
 .inspector .row.file button:hover,
 .inspector .acts button:hover,
 .inspector header .close:hover,

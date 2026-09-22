@@ -105,7 +105,7 @@ export function SlashMenu(props: {
 			completing and no wider.
 		*/
 		<div
-			class="rowlist absolute bottom-[calc(100%+6px)] left-0 z-[12] max-h-[min(40vh,300px)] w-full overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
+			class="row-list absolute bottom-[calc(100%+6px)] left-0 z-[12] max-h-[min(40vh,300px)] w-full overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
 			ref={list}
 			role="listbox"
 			aria-label="Commands"

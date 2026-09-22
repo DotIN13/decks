@@ -45,7 +45,7 @@ export function MentionMenu(props: {
 	return (
 		<div
 			ref={list}
-			class="rowlist mention-menu absolute bottom-[calc(100%+6px)] left-0 z-[12] max-h-[min(40vh,300px)] w-full overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
+			class="row-list mention-menu absolute bottom-[calc(100%+6px)] left-0 z-[12] max-h-[min(40vh,300px)] w-full overflow-y-auto rounded-panel border border-line bg-panel p-[5px] shadow-panel"
 			role="listbox"
 			aria-label="Who to name"
 		>

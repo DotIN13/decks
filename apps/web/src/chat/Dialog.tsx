@@ -117,7 +117,7 @@ export function Dialog(props: {
 						single choice the click is the answer, so a checkbox would be a control that
 						shows what you already did and then vanishes with the card.
 					*/}
-					<div class="rowlist mt-2">
+					<div class="row-list mt-2">
 						<For each={choose().options}>
 							{(option) => (
 								<button

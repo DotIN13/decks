@@ -1278,7 +1278,7 @@ export function BoardFrame(props: {
 									style={{ left: `${point().x}px`, top: `${point().y}px`, "--zoom": zoom() }}
 								>
 									<span class="tip" aria-hidden="true" />
-									<span class="say">{mark.label}</span>
+									<span class="mark-say">{mark.label}</span>
 								</div>
 							)}
 						</Show>

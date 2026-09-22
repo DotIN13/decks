@@ -164,7 +164,7 @@ export function Settings(props: {
 						{/* `rowlist`, so each account is the same row as a described choice anywhere else in
 						    the app — `styles/chrome.css` owns the grid, the corner, the hover and the
 						    `.row-label`/`.row-note` type scale. */}
-						<div class="rowlist set-rows">
+						<div class="row-list set-rows">
 							<For each={props.accounts}>
 								{(account) => (
 									<Row
@@ -354,7 +354,7 @@ function YourChrome(props: { web?: { status: WebStatus; code?: string }; onRepai
 				<span class="set-title">Your Chrome</span>
 				<span class="set-note">{note()}</span>
 			</header>
-			<div class="rowlist set-rows">
+			<div class="row-list set-rows">
 				<div class="row-act" data-row-static>
 					<div class="min-w-0 flex-1" data-row>
 						<span class="row-label w-full items-baseline">

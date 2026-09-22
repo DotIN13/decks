@@ -2,7 +2,7 @@
  * The composer: what you type into, and what sits under it.
  *
  * The textarea, the select-like chips beside it (the model, the thinking level), the send
- * button and its busy state, the usage line, the mention mark, and `.dockbox` — the box a
+ * button and its busy state, the usage line, the mention mark, and `.composer-box` — the box a
  * file is dragged onto. `chat/composer/` is one component tree and this is its material.
  *
  * These rules were in `index.css`. The rules and the notes above them are as they were.
@@ -134,7 +134,7 @@
 	}
 }
 	/* A file dragged over the input bar: it will be copied into the deck and mentioned (`Composer`). */
-.dockbox[data-dropping="true"] {
+.composer-box[data-dropping="true"] {
 	outline: 2px dashed var(--accent, #3b82f6);
 	outline-offset: 2px;
 }

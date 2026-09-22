@@ -169,7 +169,7 @@ export function CanvasOps(props: { onClose: () => void }) {
 				small text and there is nothing behind it worth reading through it.
 			*/}
 			<div
-				class="panel-float ops flex max-h-[78%] w-[min(560px,calc(100vw-24px))] static flex-col overflow-hidden bg-bg p-0"
+				class="panel-float ops-sheet flex max-h-[78%] w-[min(560px,calc(100vw-24px))] static flex-col overflow-hidden bg-bg p-0"
 				role="dialog"
 				aria-label="Shortcuts"
 			>

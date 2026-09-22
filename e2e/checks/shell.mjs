@@ -228,7 +228,7 @@ await still(page);
 say("a canvas opened from its card twice looks the same both times", (await view()) === firstOpen, `${firstOpen} -> ${await view()}`);
 
 // The composer, dragged off its home, and still there after a reload.
-const box = await page.locator(".dockbox").boundingBox();
+const box = await page.locator(".composer-box").boundingBox();
 await page.mouse.move(box.x + 16, box.y + 6);
 await page.mouse.down();
 await page.mouse.move(box.x - 300, box.y - 260, { steps: 12 });
@@ -271,7 +271,7 @@ await settle(page, 800);
 const away = await page.evaluate(() => {
 	const dock = document.querySelector(".dock");
 	const tab = dock?.querySelector(".dock-stowtab")?.getBoundingClientRect();
-	return { stowed: dock?.hasAttribute("data-stowed") ?? false, left: dock?.getBoundingClientRect().left ?? 0, tabRight: tab?.right ?? 0, inert: Boolean(dock?.querySelector(".dockbox")?.closest("[inert]")), width: window.innerWidth };
+	return { stowed: dock?.hasAttribute("data-stowed") ?? false, left: dock?.getBoundingClientRect().left ?? 0, tabRight: tab?.right ?? 0, inert: Boolean(dock?.querySelector(".composer-box")?.closest("[inert]")), width: window.innerWidth };
 });
 say("a hard throw at the right edge puts the composer away", away.stowed && away.left > away.width - 60, JSON.stringify(away));
 say("what is left on screen is its tab, against the edge, and the box is out of reach", Math.abs(away.tabRight - away.width) < 2 && away.inert, JSON.stringify(away));

@@ -850,7 +850,7 @@ export function LeftPanel(props: {
 										Re-implementing it instead is how two lists in one panel come to nearly
 										match: the board rows above are the same object.
 									*/}
-									<div class="rowlist agent-list">
+									<div class="row-list agent-list">
 									<For each={section.rows.slice(0, allowance(index()))}>
 										{(row) => (
 											<AgentRow

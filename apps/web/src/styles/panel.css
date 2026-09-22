@@ -305,24 +305,24 @@
 	/*
 	 * Two overrides on the row vocabulary, and nothing else.
 	 *
-	 * `.rowlist` already gives the grid, the corner, the hover, the current wash, `.row-act`
+	 * `.row-list` already gives the grid, the corner, the hover, the current wash, `.row-act`
 	 * and the type scale — the board rows above are the same object, and re-implementing it
 	 * here is how two lists in one panel come to nearly match. What differs is only what has
 	 * to: the icon column is 28px rather than 16 because the avatar is worth seeing at that
 	 * size here, and the actions sit on the *first line* rather than centred in a row that
 	 * may be four lines tall.
 	 */
-	/* `.rowlist.agent-list`, not `.agent-list`: the vocabulary's own selector is
-	   `:is(.popover, .rowlist) [data-row]`, so matching its specificity would leave the
+	/* `.row-list.agent-list`, not `.agent-list`: the vocabulary's own selector is
+	   `:is(.popover, .row-list) [data-row]`, so matching its specificity would leave the
 	   winner to source order between two files. */
-	.rowlist.agent-list [data-row] {
+	.row-list.agent-list [data-row] {
 		padding: 7px 6px;
 		gap: 3px 9px;
 		grid-template-columns: 28px 1fr;
 	}
 
 	/* The avatar's slot: 28px and no top padding, where a 16px icon wanted one. */
-	.rowlist.agent-list [data-row] > .row-icon {
+	.row-list.agent-list [data-row] > .row-icon {
 		display: grid;
 		padding-top: 0;
 		place-items: center;
@@ -712,7 +712,7 @@
 	 * column itself now, and it is the only line that needs to.
 	 */
 	@media (hover: none) {
-		.rowlist.agent-list .row-act:has([data-yield]):not(:has(> .close)) {
+		.row-list.agent-list .row-act:has([data-yield]):not(:has(> .close)) {
 			padding-right: 4px;
 		}
 	}
@@ -778,7 +778,7 @@
 	 * The same object a menu row is — a box holding the row and one small button, so that
 	 * pressing the button is not pressing the row, and so that a `<button>` is not nested
 	 * inside a `<button>`. It is spelled again here rather than reusing `.row-act` from
-	 * `chrome.css` because that one is scoped to `:is(.popover, .rowlist)`, whose `[data-row]`
+	 * `chrome.css` because that one is scoped to `:is(.popover, .row-list)`, whose `[data-row]`
 	 * is a 16px/1fr grid with 7px of padding: pulling this list into that scope would restyle
 	 * all seventy-eight board rows as menu rows.
 	 *

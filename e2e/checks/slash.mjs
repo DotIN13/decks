@@ -203,7 +203,7 @@ try {
 
 	await field.type("/");
 	await settle(page, 250);
-	const hints = await page.evaluate(() => [...document.querySelectorAll(".hintrow .hint")].map((el) => el.textContent.replace(/\s+/g, " ").trim()));
+	const hints = await page.evaluate(() => [...document.querySelectorAll(".hint-row .hint")].map((el) => el.textContent.replace(/\s+/g, " ").trim()));
 	say("the hint row says what the keyboard now does", hints.some((hint) => hint.includes("to choose")) && hints.some((hint) => hint.includes("complete")), JSON.stringify(hints));
 
 	say("no page errors", errors.length === 0, errors.join(" | "));

@@ -57,19 +57,19 @@ const agent = {
 	 * is load-bearing: it means "not known yet", which is a different claim from "empty" —
 	 * and a ring at zero makes the wrong one, which is the one somebody would act on.
 	 */
-	say("no dial before the agent has reported", (await page.evaluate(() => document.querySelectorAll(".hintrow .dial").length)) === 0);
+	say("no dial before the agent has reported", (await page.evaluate(() => document.querySelectorAll(".hint-row .dial").length)) === 0);
 
 	await feed({ type: "agent.usage", id: "A", usage: { contextTokens: 148_000, contextWindow: 200_000, cost: 1.234 } });
 	await settle(page, 500);
 
 	const dial = await page.evaluate(() => {
-		const element = document.querySelector(".hintrow .dial");
+		const element = document.querySelector(".hint-row .dial");
 		return element
 			? {
 					text: element.innerText.trim(),
 					level: element.querySelector(".ctx-ring")?.dataset.level,
 					visible: element.getBoundingClientRect().width > 0,
-					atEnd: Math.abs(element.getBoundingClientRect().right - document.querySelector(".hintrow").getBoundingClientRect().right) < 12,
+					atEnd: Math.abs(element.getBoundingClientRect().right - document.querySelector(".hint-row").getBoundingClientRect().right) < 12,
 				}
 			: null;
 	});
@@ -80,7 +80,7 @@ const agent = {
 	   gets truncated. The thresholds themselves are unit-tested in `context-usage.test.ts`. */
 	say("…and amber, because 74% is past the first threshold", dial?.level === "warn", dial?.level);
 
-	await page.locator(".hintrow .dial").click();
+	await page.locator(".hint-row .dial").click();
 	await settle(page, 400);
 	const popover = await page.evaluate(() => ({
 		open: Boolean(document.querySelector(".popover .big")),
@@ -125,7 +125,7 @@ const agent = {
 	 * dial goes with it. That is the whole reason the `⋯` row exists.
 	 */
 	const under = await page.evaluate(() => {
-		const element = document.querySelector(".hintrow");
+		const element = document.querySelector(".hint-row");
 		return element ? getComputedStyle(element).display : "absent";
 	});
 	say("no dial under the box on a phone", under === "none" || under === "absent", under);
