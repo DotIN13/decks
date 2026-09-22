@@ -297,6 +297,45 @@ function graphFiles(entry, read) {
 /** A rule with no file attached: what a tie is decided by. */
 export const signature = (rule) => `${rule.sel}{${rule.decls.join(";")}}`;
 
+/**
+ * A rule as something to compare across commits: its file, its selector, and its signature.
+ *
+ * `sig` is the identity — two records with the same signature are the same rule, wherever they
+ * are — and it is short enough to keep a thousand of them in the baseline. A rule read from a
+ * stylesheet carries its declarations and gets its signature computed here; one read back out
+ * of the baseline already has one.
+ */
+export const record = (rule) => ({
+	file: rule.file.replace(/^apps\/web\/src\//, ""),
+	sel: rule.sel,
+	sig: rule.decls ? signature(rule) : rule.sig,
+	/* Kept when the rule came from a stylesheet, so a report can name a line; never stored. */
+	...(rule.line === undefined ? {} : { line: rule.line }),
+});
+
+/**
+ * A rule's declarations, whether it was read from a stylesheet or back out of the baseline.
+ *
+ * The baseline stores each rule's whole signature and not a digest, which costs about a
+ * hundred kilobytes and buys two things: a diff of the baseline shows what a rule now says,
+ * and the tie alarm still works when the baseline is old.
+ */
+const declsOf = (rule) => {
+	if (rule.decls) return rule.decls;
+	const open = typeof rule.sig === "string" ? rule.sig.indexOf("{") : -1;
+	return open < 0 ? [] : rule.sig.slice(open + 1, -1).split(";").filter(Boolean);
+};
+
+/**
+ * The rules that are not in a layer, which in this app is a bug and not a style choice.
+ *
+ * Unlayered CSS beats every layer, so a component rule written outside `@layer components`
+ * cannot be overridden by a utility on the same element and nothing says why. The token blocks
+ * are outside deliberately (see the note in `index.css`) and are element or `:root` selectors,
+ * so the count is of rules that name a *class* — the ones a component reaches for.
+ */
+export const outsideLayer = (rules) => rules.filter((rule) => rule.decls?.length && /\./.test(rule.sel) && !rule.sel.includes("@layer"));
+
 export const fingerprint = (rules) => createHash("sha256").update(rules.map(signature).join("\n")).digest("hex");
 
 /**
@@ -310,7 +349,7 @@ export const fingerprint = (rules) => createHash("sha256").update(rules.map(sign
 export function ties(rules) {
 	const byPair = new Map();
 	rules.forEach((rule, index) => {
-		const props = new Set(rule.decls.map((d) => d.split(":")[0]));
+		const props = new Set(declsOf(rule).map((d) => d.split(":")[0]));
 		for (const prop of props) {
 			const key = `${rule.sel}|${prop}`;
 			if (!byPair.has(key)) byPair.set(key, []);
@@ -321,7 +360,7 @@ export function ties(rules) {
 }
 
 /** What a rule says about one property, or `""` when it does not set it. */
-const valueOf = (rule, property) => rule.decls.find((d) => d.startsWith(`${property}:`))?.slice(property.length + 1) ?? "";
+const valueOf = (rule, property) => declsOf(rule).find((d) => d.startsWith(`${property}:`))?.slice(property.length + 1) ?? "";
 
 /**
  * The rules whose winner moved, which is the whole reason to care about the order.
@@ -404,50 +443,74 @@ function align(a, b) {
 	return pairs;
 }
 
-/** What the check says: moves, arrivals, departures, and the ties the moves decided. */
+/** What the check says: moves, arrivals, departures, edits in place, and the ties the moves decided. */
 export function describe(before, after) {
-	const was = before.map(signature);
-	const now = after.map(signature);
-	const kept = align(was, now);
+	const was = before.map(record);
+	const now = after.map(record);
+	const kept = align(
+		was.map((r) => r.sig),
+		now.map((r) => r.sig),
+	);
 	const heldBefore = new Set(kept.map(([i]) => i));
 	const heldAfter = new Set(kept.map(([, j]) => j));
 
 	/*
-	 * What the alignment could not keep is either new, gone, or the same rule somewhere else.
-	 * A signature on both sides of the split is a move: it is the same rule, later or earlier.
+	 * What the alignment could not keep is one of three things: the same rule somewhere else
+	 * (its signature is on both sides), the same selector with different declarations (a rule
+	 * edited where it stands), or a rule that arrived or left.
 	 */
 	const orphans = new Map();
+	const bySelector = new Map();
 	for (let i = 0; i < before.length; i++) {
 		if (heldBefore.has(i)) continue;
-		const key = was[i];
-		if (!orphans.has(key)) orphans.set(key, []);
-		orphans.get(key).push(i);
+		if (!orphans.has(was[i].sig)) orphans.set(was[i].sig, []);
+		orphans.get(was[i].sig).push(i);
+		if (!bySelector.has(was[i].sel)) bySelector.set(was[i].sel, []);
+		bySelector.get(was[i].sel).push(i);
 	}
 	const added = [];
 	const moved = [];
+	const edited = [];
 	for (let j = 0; j < after.length; j++) {
 		if (heldAfter.has(j)) continue;
-		const queue = orphans.get(now[j]);
-		if (queue?.length) {
-			const i = queue.shift();
-			moved.push({ from: before[i], to: after[j], was: i, now: j });
-		} else added.push({ rule: after[j], at: j });
+		const same = orphans.get(now[j].sig);
+		if (same?.length) {
+			const i = same.shift();
+			moved.push({ from: was[i], to: now[j], was: i, now: j });
+			continue;
+		}
+		const here = bySelector.get(now[j].sel);
+		if (here?.length) {
+			const i = here.shift();
+			orphans.get(was[i].sig)?.splice(orphans.get(was[i].sig).indexOf(i), 1);
+			edited.push({ from: was[i], to: now[j], was: i, now: j });
+			continue;
+		}
+		added.push({ rule: now[j], at: j });
 	}
-	const removed = [...orphans.values()].flat().map((i) => ({ rule: before[i], at: i }));
+	const gone = new Set([...orphans.values()].flat());
+	const removed = [...gone].map((i) => ({ rule: was[i], at: i }));
 	moved.sort((x, y) => x.now - y.now);
+	edited.sort((x, y) => x.now - y.now);
 	removed.sort((x, y) => x.at - y.at);
-	return { added, removed, moved, ties: changedTies(before, after) };
+	return { added, removed, moved, edited, ties: changedTies(before, after) };
 }
 
 /* ------------------------------------------------------------------------- the command */
 
 const stamp = (rules) => ({
-	note: "The app CSS's cascade order, flattened and hashed. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
+	note: "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	entry: ENTRY,
 	hash: fingerprint(rules),
 	rules: rules.length,
 	sheets: new Set(rules.map((rule) => rule.file)).size,
 	ties: ties(rules).size,
+	/*
+	 * A ratchet, not a gate of its own: unlayered component rules beat every utility, so the
+	 * count is worth seeing. It cannot rise without the hash changing too, which is why the
+	 * number is printed at re-stamp time — that is the moment somebody is deciding.
+	 */
+	outsideLayer: outsideLayer(rules).length,
 	files: Object.fromEntries(
 		Object.entries(
 			rules.reduce((acc, rule) => {
@@ -456,9 +519,29 @@ const stamp = (rules) => ({
 			}, {}),
 		).sort(([a], [b]) => (a < b ? -1 : 1)),
 	),
+	/*
+	 * `[file, signature]`, one rule per line, in cascade order. The selector is the head of
+	 * the signature, so it is not stored twice — a thousand of these is the whole file, and
+	 * the point of keeping them is that a moved rule is a moved *line* in the diff.
+	 */
+	order: rules.map((rule) => [record(rule).file, signature(rule)]),
 });
 
-const where = (spot) => `${spot.file}:${spot.line}`;
+/**
+ * Written by hand rather than by `JSON.stringify`, for one line per rule.
+ *
+ * Stringified whole, every rule would be a five-line array of indentation, and a diff that
+ * moves one rule would be unreadable — which is the only reason the rules are in this file.
+ */
+function writeBaseline(path, baseline) {
+	const { order, ...rest } = baseline;
+	const head = JSON.stringify(rest, null, "\t").replace(/\n\}$/, "");
+	writeFileSync(path, `${head},\n\t"order": [\n${order.map(([file, sig]) => `\t\t${JSON.stringify([file, sig])}`).join(",\n")}\n\t]\n}\n`);
+}
+
+const where = (at) => `${at.file}:${at.line}`;
+/** A record's place: a line when it came from a stylesheet, its position when it came from the baseline. */
+const spot = (rec, index) => (rec.line === undefined ? `${rec.file}[${index}]` : `${rec.file}:${rec.line}`);
 const short = (s, n = 68) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 function report(before, after, { json }) {
@@ -469,7 +552,7 @@ function report(before, after, { json }) {
 	}
 	const lines = [];
 	lines.push(
-		`cascade order changed: ${changes.moved.length} moved, ${changes.added.length} added, ${changes.removed.length} removed, ${changes.ties.length} ties decided differently`,
+		`cascade order changed: ${changes.moved.length} moved, ${changes.edited.length} edited in place, ${changes.added.length} added, ${changes.removed.length} removed, ${changes.ties.length} ties decided differently`,
 	);
 	for (const tie of changes.ties) {
 		lines.push(`  TIE  ${short(tie.selector)} { ${tie.property} } — ${tie.rules} rules, the last one wins`);
@@ -477,12 +560,16 @@ function report(before, after, { json }) {
 		lines.push(`    →  ${tie.property}:${tie.value.now}  at ${where(tie.now)}`);
 	}
 	for (const move of changes.moved.slice(0, 20)) {
-		lines.push(`  move ${short(move.from.sel)}  ${where(move.from)} [${move.was}] → ${where(move.to)} [${move.now}]`);
+		lines.push(`  move ${short(move.from.sel)}  ${spot(move.from, move.was)} → ${spot(move.to, move.now)}`);
 	}
 	if (changes.moved.length > 20) lines.push(`  … and ${changes.moved.length - 20} more moves`);
-	for (const add of changes.added.slice(0, 10)) lines.push(`  add  ${short(add.rule.sel)}  ${where(add.rule)}`);
+	for (const edit of changes.edited.slice(0, 10)) {
+		lines.push(`  edit ${short(edit.to.sel)}  ${spot(edit.to, edit.now)}  (declarations changed, the order did not)`);
+	}
+	if (changes.edited.length > 10) lines.push(`  … and ${changes.edited.length - 10} more edited`);
+	for (const add of changes.added.slice(0, 10)) lines.push(`  add  ${short(add.rule.sel)}  ${spot(add.rule, add.at)}`);
 	if (changes.added.length > 10) lines.push(`  … and ${changes.added.length - 10} more added`);
-	for (const gone of changes.removed.slice(0, 10)) lines.push(`  drop ${short(gone.rule.sel)}  ${where(gone.rule)}`);
+	for (const gone of changes.removed.slice(0, 10)) lines.push(`  drop ${short(gone.rule.sel)}  ${spot(gone.rule, gone.at)}`);
 	if (changes.removed.length > 10) lines.push(`  … and ${changes.removed.length - 10} more dropped`);
 	lines.push(
 		changes.ties.length > 0
@@ -492,6 +579,15 @@ function report(before, after, { json }) {
 	lines.push("  npm run css:order -- --update");
 	console.log(lines.join("\n"));
 }
+
+/**
+ * The baseline's own rules, read back as records, so a stale baseline can still be diffed.
+ *
+ * An older baseline stored `[file, selector, signature]` and this accepts that too: the
+ * selector is the head of the signature either way.
+ */
+const fromBaseline = (baseline) =>
+	(baseline?.order ?? []).map(([file, sel, sig]) => (sig === undefined ? { file, sel: sel.slice(0, sel.indexOf("{")), sig: sel } : { file, sel, sig }));
 
 function main(argv) {
 	const flags = new Set(argv);
@@ -513,9 +609,17 @@ function main(argv) {
 	}
 
 	if (update) {
-		writeFileSync(baselinePath, `${JSON.stringify(stamp(current.entries), null, "\t")}\n`);
 		const next = stamp(current.entries);
-		console.log(`cascade re-stamped: ${next.rules} rules over ${next.sheets} sheets, ${next.ties} ties, ${next.hash.slice(0, 12)}…`);
+		writeBaseline(baselinePath, next);
+		const was = baseline?.outsideLayer;
+		console.log(
+			`cascade re-stamped: ${next.rules} rules over ${next.sheets} sheets, ${next.ties} ties, ${next.hash.slice(0, 12)}…` +
+				(was === undefined ? "" : `, and ${next.outsideLayer} component rules outside the layer (was ${was})`),
+		);
+		if (was !== undefined && next.outsideLayer > was) {
+			console.log("  those rules beat every utility, which is almost never what was meant:");
+			for (const rule of outsideLayer(current.entries).slice(0, 8)) console.log(`    ${rule.file}:${rule.line}  ${rule.sel}`);
+		}
 		return 0;
 	}
 
@@ -526,7 +630,9 @@ function main(argv) {
 			console.log("cascade order unchanged in the working tree, but HEAD does not match the committed baseline — re-stamp it.");
 			return 1;
 		}
+		const loose = outsideLayer(current.entries);
 		console.log(`cascade order unchanged: ${current.entries.length} rules over ${current.files.length} sheets, ${ties(current.entries).size} ties, sha256:${hash.slice(0, 12)}…`);
+		if (loose.length !== baseline.outsideLayer) console.log(`  (${loose.length} component rules outside the layer, and the baseline says ${baseline.outsideLayer})`);
 		return 0;
 	}
 	if (!baseline) {
@@ -535,8 +641,15 @@ function main(argv) {
 	}
 	console.log(`baseline says sha256:${baseline.hash.slice(0, 12)}… (${baseline.rules} rules, ${baseline.ties} ties) for ${baseline.entry}`);
 	console.log(`the sheets now say sha256:${hash.slice(0, 12)}… (${current.entries.length} rules, ${ties(current.entries).size} ties)`);
-	if (before) report(before.entries, current.entries, { json });
-	else console.log("(no git history to say what moved)");
+	/*
+	 * The baseline carries its own rules, so this diff never depends on git: when eighteen
+	 * commits land under a stale baseline, `HEAD` and the working tree are the same thing and
+	 * diffing against HEAD says "nothing moved" while the hash says otherwise. That happened.
+	 */
+	const stored = fromBaseline(baseline);
+	if (stored.length > 0) report(stored, current.entries, { json });
+	else if (before) report(before.entries, current.entries, { json });
+	else console.log("this baseline predates the rule list, so it cannot say what moved — re-stamp it.");
 	return 1;
 }
 

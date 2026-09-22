@@ -13,7 +13,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { flatten, fingerprint, ties, changedTies, describe, signature } from "./css-order.mjs";
+import { flatten, fingerprint, ties, changedTies, describe, signature, record, outsideLayer } from "./css-order.mjs";
 
 /** A cascade out of an in-memory map of path → text, keyed the way the resolver looks them up. */
 const cascade = (files, entry = "entry.css") => flatten((path) => files[path] ?? null, entry);
@@ -149,4 +149,51 @@ test("a rule inside a layer counts from the top of the file, not from the brace"
 	});
 	assert.deepEqual(rules.map((r) => r.line), [2, 5]);
 	assert.equal(rules[1].sel, "@layer components ▸ @media (pointer: coarse) ▸ .b");
+});
+
+test("a rule edited where it stands is one edit, not an addition and a departure", () => {
+	const before = { "entry.css": `.a { color: red }\n.b { color: blue }` };
+	const after = { "entry.css": `.a { color: green }\n.b { color: blue }` };
+	const changes = describe(cascade(before), cascade(after));
+	assert.deepEqual(changes.edited.map((e) => [e.from.sel, e.to.sel]), [[".a", ".a"]]);
+	assert.equal(changes.added.length, 0);
+	assert.equal(changes.removed.length, 0);
+	assert.equal(changes.moved.length, 0);
+});
+
+test("the baseline's own rule list can be diffed against the sheets", () => {
+	/*
+	 * The case that made this necessary: eighteen commits landed under a baseline stamped
+	 * before them, so `HEAD` and the working tree were the same file and the report said
+	 * "nothing moved" while the hash said otherwise. The baseline carries its rules for it.
+	 */
+	const before = { "entry.css": `@import "./one.css";\n@import "./two.css";`, "one.css": `.a { color: red }`, "two.css": `.b { color: blue }` };
+	const after = { "entry.css": `@import "./two.css";\n@import "./one.css";`, "one.css": `.a { color: red }`, "two.css": `.b { color: blue }` };
+	/* A baseline record is `[file, selector, signature]`: no line, because lines move. */
+	const stored = cascade(before).map((rule) => {
+		const { line, ...rest } = record(rule);
+		return rest;
+	});
+	const changes = describe(stored, cascade(after));
+	assert.equal(changes.moved.length, 1);
+	assert.equal(changes.moved[0].from.sel, ".a");
+	/* No line numbers in the baseline, so a record names its position instead. */
+	assert.equal(changes.moved[0].from.line, undefined);
+	assert.equal(changes.moved[0].to.line, 1);
+});
+
+test("a rule list stored and read back is the same cascade", () => {
+	const files = { "entry.css": `@import "./a.css";`, "a.css": `@layer components { .x { color: red } }` };
+	const entries = cascade(files);
+	assert.deepEqual(describe(entries.map(record), entries), { added: [], removed: [], moved: [], edited: [], ties: [] });
+});
+
+test("component rules outside the layer are counted, and token blocks are not", () => {
+	const files = {
+		"entry.css": `:root { --a: 1 }\n@theme { --b: 2 }\n@layer components {\n\t.in-layer { color: red }\n}\n.outside { color: blue }\nsvg.lucide { flex: none }`,
+	};
+	assert.deepEqual(
+		outsideLayer(cascade(files)).map((r) => r.sel),
+		[".outside", "svg.lucide"],
+	);
 });
