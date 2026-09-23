@@ -39,7 +39,7 @@ const browse = await state();
  */
 say("the canvas opens in browse mode", browse.mode === "browse", browse.mode);
 // The stage's tools are there in both modes: browse leaves the boards' pages alone, not the drawing.
-say("…with the stage's eight tools, because the drawing is edited in both modes", browse.tools === 8, String(browse.tools));
+say("…with the stage's seven tools, because the drawing is edited in both modes", browse.tools === 7, String(browse.tools));
 say("…no inspector, because it is a properties panel", browse.inspector === 0);
 say("…and nothing drawn to say editing is on", browse.ring === "none", `${browse.ring}`);
 say("the mode buttons are browse, edit and draw, in that order", browse.order === "Browse the boards / Edit the boards / Draw on the stage", browse.order);
@@ -92,7 +92,7 @@ say("a click while browsing selects no component", afterClick.editing === 0 && a
 await editMode(page);
 const editing = await state();
 say("the pencil turns editing on", editing.mode === "edit", editing.mode);
-say("…and the stage's eight tools stay", editing.tools === 8, String(editing.tools));
+say("…and the stage's seven tools stay", editing.tools === 7, String(editing.tools));
 /*
  * And no ring in either mode. There was one — an inset ring of the accent around the whole
  * stage, standing in for a confirmation dialog on the pencil, on the argument that a mode
@@ -122,7 +122,7 @@ say("…and the inspector arrives with it", nowClicked.inspector === 1);
 
 await editMode(page, false);
 const back = await state();
-say("and pressing it again puts everything back", back.mode === "browse" && back.tools === 8 && back.ring === "none", JSON.stringify(back));
+say("and pressing it again puts everything back", back.mode === "browse" && back.tools === 7 && back.ring === "none", JSON.stringify(back));
 say("…including dropping the selection's inspector", back.inspector === 0);
 
 // --- the column has no caret ------------------------------------------------------------

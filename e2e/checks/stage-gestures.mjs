@@ -126,7 +126,7 @@ const count = (selector) => page.evaluate((s) => document.querySelectorAll(s).le
 
 // --- browse mode: the tools, the hover, the marquee ----------------------------------------------
 say("the canvas is browsing", (await page.evaluate(() => document.querySelector(".stage").dataset.mode)) === "browse");
-say("…and the stage's tools are there", (await count(".pen-tools button[data-tool]")) === 8);
+say("…and the stage's seven tools are there, with no cursor among them: that is the browse button", (await count(".pen-tools button[data-tool]")) === 7 && (await count('.pen-tools [data-tool="select"]')) === 0);
 const a0 = await centre("g-a");
 await page.mouse.move(a0.x, a0.y);
 await settle(page, 300);

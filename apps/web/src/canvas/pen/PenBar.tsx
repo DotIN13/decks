@@ -6,7 +6,6 @@ import Circle from "lucide-solid/icons/circle";
 import Copy from "lucide-solid/icons/copy";
 import FrameIcon from "lucide-solid/icons/frame";
 import ImageDown from "lucide-solid/icons/image-down";
-import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
 import Redo2 from "lucide-solid/icons/redo-2";
 import SendToBack from "lucide-solid/icons/send-to-back";
@@ -34,8 +33,7 @@ import { Icon } from "../../ui/icons.tsx";
  * pen operation, the same one an agent would, and shows the value of the first selected item.
  */
 const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key: string; after?: boolean }> = [
-	{ tool: "select", icon: MousePointer2, label: "Select and move; shift adds, shift-drag draws a box round several", key: "V" },
-	{ tool: "rectangle", icon: Square, label: "Rectangle: drag to size it, or click for one", key: "R", after: true },
+	{ tool: "rectangle", icon: Square, label: "Rectangle: drag to size it, or click for one", key: "R" },
 	{ tool: "ellipse", icon: Circle, label: "Ellipse", key: "O" },
 	{ tool: "frame", icon: FrameIcon, label: "Frame: a box that holds what is drawn inside it", key: "F" },
 	{ tool: "note", icon: StickyNote, label: "Note", key: "N", after: true },
@@ -151,8 +149,10 @@ export function PenBar(props: {
 						title={`${entry.label} (${entry.key})`}
 						aria-label={entry.label}
 						onClick={() => {
-							setPenTool(entry.tool);
-							props.onArm(entry.tool);
+							// Pressing the armed tool again puts it down: selecting is what the canvas does with no tool in hand.
+							const next = penTool() === entry.tool ? "select" : entry.tool;
+							setPenTool(next);
+							props.onArm(next);
 						}}
 					>
 						<Icon of={entry.icon} size={15} />
