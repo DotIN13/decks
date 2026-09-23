@@ -14,7 +14,7 @@ import {
 	setInkSelection,
 	setPenSeen,
 } from "../state/ink.ts";
-import type { FrameGestureHost } from "./frame-gestures.ts";
+import type { FrameGestureHost } from "../board/frame-gestures.ts";
 
 /**
  * Where a board is drawn on: a sheet of glass over it, while the draw tool is on.

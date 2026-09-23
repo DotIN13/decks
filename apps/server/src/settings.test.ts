@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { processZone } from "./clock.ts";
+import { processZone } from "./lib/clock.ts";
 import { SettingsStore } from "./settings.ts";
 
 function deckDir(): string {

@@ -1,6 +1,6 @@
 /** The user's own Chrome, shared with the deck. */
 /**
- * What the deck knows about the browser the user shared with it (`server/web/bridge.ts`).
+ * What the deck knows about the browser the user shared with it (`server/browser/bridge.ts`).
  *
  * The extension in the user's Chrome dials the server and attaches to one tab; this is the
  * state of that connection, broadcast whenever it changes and drawn by the `data-live="web"`

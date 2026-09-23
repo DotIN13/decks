@@ -1,9 +1,9 @@
 import { deltaToBoard, type FrameAt, pointFromBoard } from "../camera/coords.ts";
 import { typingInto } from "./Editor.ts";
-import { type ZoomKey, zoomKey } from "./zoom-keys.ts";
-import { type SlideAction, slideKey } from "./slide-keys.ts";
+import { type ZoomKey, zoomKey } from "../canvas/zoom-keys.ts";
+import { type SlideAction, slideKey } from "../present/slide-keys.ts";
 import { noteCameraMove } from "./pan-signal.ts";
-import type { Finger, TouchStep } from "./touch.ts";
+import type { Finger, TouchStep } from "../canvas/touch.ts";
 
 /**
  * Canvas gestures that begin inside a board.

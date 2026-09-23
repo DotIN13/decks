@@ -288,7 +288,7 @@ export const MIRROR_SIZE = { w: 560, h: 900 };
  * The whole document of a live board.
  *
  * Four lines that never change, which is the point: a mirror's content is a conversation
- * the app is already holding, fed in over `postMessage` by `canvas/live-chat.ts` and drawn
+ * the app is already holding, fed in over `postMessage` by `board/live-chat.ts` and drawn
  * by `lib/live-chat.js`. Nothing here is written again as the conversation grows — no
  * watcher event, no revision churn, and a board file somebody can read and understand.
  *
@@ -329,7 +329,7 @@ export const WEB_BOARD_SIZE = { w: 560, h: 420 };
  * The status board for the user's shared Chrome.
  *
  * A stub, like a mirror: the component carries `data-live="web"` and draws itself from the
- * `web.status` the app is already holding (`canvas/live-chat.ts` feeds it, `lib/live-web.js`
+ * `web.status` the app is already holding (`board/live-chat.ts` feeds it, `lib/live-web.js`
  * draws it). There is deliberately no picture of the tab in it — the tab is on the user's own
  * screen — so the card says which tab is shared, whether it is connected, what the agent did,
  * and carries the Allow/Deny for a submit and the Stop button.

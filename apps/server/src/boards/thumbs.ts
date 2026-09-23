@@ -119,7 +119,7 @@ export function thumbClip(board: Pick<Board, "w" | "h">): { width: number; heigh
 }
 
 /**
- * In the page: how far down the board reaches, the way `canvas/extent.ts` measures it.
+ * In the page: how far down the board reaches, the way `board/extent.ts` measures it.
  *
  * The components, and for a flow board the whole document — a page keeps its margins on the
  * body, and a margin can collapse out of the last block, so both sit below every `[data-id]`

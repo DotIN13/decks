@@ -255,7 +255,7 @@ export const boards = {
 	 * Everything that makes this safe is a decision made here rather than in the board:
 	 *
 	 * - **The path is the app's**, stamped from the frame the message came from
-	 *   (`canvas/board-eval.ts`), so a board cannot ask for another board's trust.
+	 *   (`board/board-eval.ts`), so a board cannot ask for another board's trust.
 	 * - **The code is the file's**, read here (`boards/eval-code.ts`) rather than sent by the
 	 *   board, so what ran is always recoverable from the board on disk.
 	 * - **The trust list is the person's** (`boards/eval-trust.ts`), and the first ask is a

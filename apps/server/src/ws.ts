@@ -32,7 +32,7 @@ export class Hub {
 	 * `noServer`, and the upgrade is routed by hand.
 	 *
 	 * `/ws` is no longer the only websocket on this server: `/api/web/relay` is the user's
-	 * Chrome extension calling in (`web/bridge.ts`). Two `WebSocketServer`s on one HTTP
+	 * Chrome extension calling in (`browser/bridge.ts`). Two `WebSocketServer`s on one HTTP
 	 * server each abort any upgrade whose path is not theirs, so the second one broke the
 	 * first — the one upgrade listener in `index.ts` looks at the path and hands the socket
 	 * to whichever of the two it belongs to.

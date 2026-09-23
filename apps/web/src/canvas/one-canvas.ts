@@ -1,7 +1,7 @@
 import type { Board, Camera } from "@decks/protocol";
 import { createEffect, onCleanup } from "solid-js";
 import { toScreen } from "../camera/camera.ts";
-import { cssEscape } from "./inspect.ts";
+import { cssEscape } from "../board/inspect.ts";
 import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "./picture.ts";
 import type { RedrawQueue } from "./redraw-queue.ts";
 

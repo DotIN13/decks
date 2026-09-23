@@ -10,7 +10,7 @@ import { slug } from "./slug.ts";
  * in the same workspace when they say the same word, so a group needs no lifecycle, and an
  * agent joining one is a write it can make on its own.
  *
- * Pure, like `chrome/panel-groups.ts` and for the same reason: the two questions worth asking
+ * Pure, like `panel/panel-groups.ts` and for the same reason: the two questions worth asking
  * about this feature — "what may a workspace be called" and "who is in which one" — should be
  * answerable without starting a runtime and reading a panel.
  */

@@ -1,7 +1,7 @@
 /*
  * The board rail's items.
  *
- * A board in the list (`chrome/BoardRail.tsx`): the item, its thumbnail and its label; and
+ * A board in the list (`panel/BoardRail.tsx`): the item, its thumbnail and its label; and
  * the palette's sizes for a finger and a phone.
  *
  * These rules were in `index.css`, which held every region at once. The rules and the notes

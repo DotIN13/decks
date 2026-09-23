@@ -11,11 +11,11 @@ import { BoardRow, BoardTile } from "./BoardRow.tsx";
 import { panelSections } from "./panel-groups.ts";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
-import { AgentHoverCard } from "./AgentHoverCard.tsx";
-import { AgentRow } from "./AgentRow.tsx";
-import { NewAgentButton } from "./AgentPill.tsx";
+import { AgentHoverCard } from "../agents/AgentHoverCard.tsx";
+import { AgentRow } from "../agents/AgentRow.tsx";
+import { NewAgentButton } from "../agents/AgentPill.tsx";
 import type { AgentKind } from "@decks/protocol";
-import { agentSections, type AgentSection } from "./agent-sections.ts";
+import { agentSections, type AgentSection } from "../agents/agent-sections.ts";
 
 /**
  * The left panel: one surface, **one list**, and a button that makes it go away.
@@ -162,7 +162,7 @@ export function LeftPanel(props: {
 	onNewAgent?: (workspace: string | undefined, kind: AgentKind) => void;
 
 	onCloseAgent?: (id: string) => void;
-	/** Put a live view of that agent's conversation on the canvas (`canvas/live-chat.ts`). */
+	/** Put a live view of that agent's conversation on the canvas (`board/live-chat.ts`). */
 	onMirrorAgent?: (id: string) => void;
 	/** Replace *your* tags on an agent. Absent means no row can be customised. */
 	onAgentTags?: (id: string, tags: string[]) => void;

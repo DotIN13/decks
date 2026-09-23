@@ -10,7 +10,7 @@
  *
  * A board, fullscreen. An overlay rather than a moved frame: the canvas keeps its own frame,
  * camera and current state behind this, so leaving puts you back exactly where you were
- * (`canvas/Present.tsx`).
+ * (`present/Present.tsx`).
  *
  * Every format, and the frame is the one thing that differs. A deck is a fixed 960×540 slide
  * and gets the letterbox; a flow document is a page and gets the window, scrolling inside it;
@@ -66,7 +66,7 @@
 	 * A wrapped file, filling the window: a markdown board or a page from somewhere else, whose
 	 * height nobody has measured. This is the one frame whose inner document does the scrolling.
 	 * Every other board is presented at the size it was written at, which is the size it is read
-	 * at on the canvas (`canvas/Present.tsx`).
+	 * at on the canvas (`present/Present.tsx`).
 	 */
 	.present[data-shell]:not([data-format="slides"]) .present-frame {
 		width: 100%;
@@ -78,7 +78,7 @@
 	 *
 	 * The same overlay and the same frame as a board, for a file inside a box on one: a box
 	 * has no address of its own, so this is the app mounting the file the way the board drew
-	 * it (`canvas/PresentEmbed.tsx`). `data-family` is what the file *is*, read from the path
+	 * it (`present/PresentEmbed.tsx`). `data-family` is what the file *is*, read from the path
 	 * the board wrote, and it decides which of these rules applies.
 	 */
 	.present.embed-present[data-family="pdf"] .present-frame,
@@ -818,7 +818,7 @@
 	outline: 2px solid var(--color-accent);
 }
 	/*
- * A board that is news (`canvas/glow.ts`): an agent named it and the person has not read it.
+ * A board that is news (`board/glow.ts`): an agent named it and the person has not read it.
  *
  * A soft shadow in the writer's colour all round the board — even, not thrown down, so it
  * reads as the board glowing rather than floating — over a quiet dark one for depth,

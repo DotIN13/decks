@@ -744,7 +744,7 @@ needs the multi-splice path, for the copy's `data-id` and its `style`.
 `<svg>` was a connector by construction, and a hand-drawn diagram is whatever its author
 classed it. A top-level `<svg>` is therefore an `other` — a name, an order, a copy, a
 delete — and gets no drag, no resize and no retype, because every gesture in
-`canvas/Editor.ts` is `offsetLeft`/`offsetWidth` and an `SVGElement` has neither. The
+`board/Editor.ts` is `offsetLeft`/`offsetWidth` and an `SVGElement` has neither. The
 authoring skill answers that by putting the drawing inside a box component, which is
 draggable like anything else and scales the `viewBox` with it. A guard in the editor
 rather than a fix: making SVG geometry work would mean a second coordinate path through

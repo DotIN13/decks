@@ -41,7 +41,7 @@ export type TurnCard =
  * drifted: the panel drops a finished turn whose only content is thinking, the copy kept it,
  * so the same conversation had a row in the mirror that was not in the column. The fix for a
  * duplicated rule is not a better comment about keeping them in step; it is to stop having
- * two. The app posts these cards (`canvas/live-chat.ts`) and the board draws what it is given.
+ * two. The app posts these cards (`board/live-chat.ts`) and the board draws what it is given.
  *
  * Pure, and separate from `Turn.tsx`, because the folds are the part worth asserting and a
  * component is a poor place to assert anything.

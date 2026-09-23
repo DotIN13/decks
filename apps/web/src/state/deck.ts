@@ -87,7 +87,7 @@ function createDeck() {
 		 * Empty until the first frame arrives, which is why `runtimes` below has a fallback.
 		 */
 		runtimes: RuntimeInfo[];
-		/** The Claude subscriptions this install can use (`chat/Settings.tsx`). */
+		/** The Claude subscriptions this install can use (`settings/Settings.tsx`). */
 		accounts: ClaudeAccount[];
 		/** The deck's own settings, kept by the server, and the zone its machine is on. */
 		settings: DeckSettings;

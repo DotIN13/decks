@@ -13,7 +13,7 @@ import { embedFamily, embedUrl, pdfUrl } from "../lib/api.ts";
  *
  * - **The gesture has to belong to the app.** Selecting a box and pressing a button in the
  *   inspector is an app-side affordance, so a board's author does not have to remember to
- *   put one in the markup (`canvas/Inspector.tsx`).
+ *   put one in the markup (`board/Inspector.tsx`).
  * - **Foreign content cannot fullscreen itself.** A page from somewhere else sits in a
  *   sandboxed, opaque-origin frame, so `requestFullscreen` in there is refused — always —
  *   which `Present.tsx` already names as the reason it is an overlay first.
@@ -128,7 +128,7 @@ export function PresentEmbed(props: {
 		/*
 		 * And the way out that produces no keystroke at all: the browser leaving fullscreen by
 		 * itself. Chrome takes Escape for that and never dispatches it here, which is why the
-		 * overlay used to need a second press (`canvas/fullscreen.ts`).
+		 * overlay used to need a second press (`present/fullscreen.ts`).
 		 */
 		onCleanup(onFullscreenLeft(document, leave));
 		onCleanup(() => {

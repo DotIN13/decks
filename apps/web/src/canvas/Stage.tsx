@@ -6,14 +6,14 @@ import type { AgentAct } from "./acts.ts";
 import { between, boxOf, easeOutCubic, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
-import { BoardFrame, type BoardEditing } from "./BoardFrame.tsx";
-import type { EditorHost, Tool } from "./Editor.ts";
-import type { FileDropHost } from "./file-drop.ts";
-import type { FrameGestureHost } from "./frame-gestures.ts";
+import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
+import type { EditorHost, Tool } from "../board/Editor.ts";
+import type { FileDropHost } from "../board/file-drop.ts";
+import type { FrameGestureHost } from "../board/frame-gestures.ts";
 import { zoomKey } from "./zoom-keys.ts";
-import { deckMode, type DeckHandle, type SlideAction, slideKey } from "./slide-keys.ts";
-import { cssEscape } from "./inspect.ts";
-import type { LiveWebReply } from "./live-chat.ts";
+import { deckMode, type DeckHandle, type SlideAction, slideKey } from "../present/slide-keys.ts";
+import { cssEscape } from "../board/inspect.ts";
+import type { LiveWebReply } from "../board/live-chat.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { PALETTE } from "@decks/board-kit";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
@@ -104,7 +104,7 @@ export function Stage(props: {
 	focus?: string;
 	/** Toggle it. The stage owns the key; the app owns which board and when. */
 	onFocusToggle?: () => void;
-	/** The same, named by a board: the button in its own title bar (`canvas/BoardFrame.tsx`). */
+	/** The same, named by a board: the button in its own title bar (`board/BoardFrame.tsx`). */
 	onFocusBoard?: (path: string) => void;
 	/** Take a deck fullscreen: the app owns the overlay, the stage only asks for it. */
 	onPresent?: (path: string, at: number) => void;
@@ -130,7 +130,7 @@ export function Stage(props: {
 	cursor?: { path: string; x: number; y: number; label: string; color: string } | null;
 	/** What each agent is doing to which board; each frame takes the acts on its board (`canvas/acts.ts`). */
 	acts?: Record<string, AgentAct | undefined>;
-	/** The boards that are news, by path, each with the colour its glow is drawn in (`canvas/glow.ts`). */
+	/** The boards that are news, by path, each with the colour its glow is drawn in (`board/glow.ts`). */
 	news?: Record<string, string>;
 	/** A board that was news was read on the canvas. */
 	onRead?: (path: string) => void;
@@ -164,7 +164,7 @@ export function Stage(props: {
 	 * deck does not hold, which the app has already said in a notice.
 	 */
 	onOpenBoard?: (path: string, from: string) => boolean;
-	/** A component on a board carrying code was pressed (`canvas/board-eval.ts`). */
+	/** A component on a board carrying code was pressed (`board/board-eval.ts`). */
 	onBoardEval?: (path: string, id: string, value: unknown) => void;
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
@@ -431,7 +431,7 @@ export function Stage(props: {
 		 *
 		 * The gate was on both, which is why fullscreen existed only for slides: it was a
 		 * property of `Present.tsx`, which is an overlay and a second frame and knows nothing
-		 * about slides (`canvas/Present.tsx`). A document wants the window; a component board
+		 * about slides (`present/Present.tsx`). A document wants the window; a component board
 		 * wants its own rectangle at 1:1.
 		 */
 		if (action === "present") {

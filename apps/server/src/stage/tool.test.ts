@@ -489,7 +489,7 @@ test("a shape asked for is answered with a blank board, and the note says so", a
  * `stage.web`: the user's shared Chrome, through the one object the server holds for it.
  *
  * What is tested is the wording again — the sentence an agent gets on a server with no shared
- * browser, and that the calls reach the host — because the real thing (`web/bridge.test.ts`)
+ * browser, and that the calls reach the host — because the real thing (`browser/bridge.test.ts`)
  * runs against a Chromium and this is the tool's own contract with it.
  */
 test("stage.web says so when this server has no shared browser, and reaches the host when it has", async () => {

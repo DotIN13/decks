@@ -3,7 +3,7 @@ import type { WirePart } from "./context.ts";
 /**
  * The shared Chrome, from the status board.
  *
- * The user's own browser is attached by the extension (`web/bridge.ts`), and the board at
+ * The user's own browser is attached by the extension (`browser/bridge.ts`), and the board at
  * `boards/your-chrome.html` is its control panel: the answer to a submit the agent is
  * waiting on, a Stop, a fresh pairing code, and the card itself. Four frames, all of them
  * one call into the bridge and a republish of its status.

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { DeckSettings } from "@decks/protocol";
-import { isZone, processZone } from "./clock.ts";
+import { isZone, processZone } from "./lib/clock.ts";
 
 /**
  * What the person has set for the whole deck, kept by the server: today, their timezone.

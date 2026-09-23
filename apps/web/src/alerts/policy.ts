@@ -15,7 +15,7 @@ import { isSound, SILENT, type SoundChoice } from "./sound.ts";
  * opencode's notification context has three too — turn complete, permission asked, error —
  * and the parallel is not a coincidence, because a coding agent has exactly three moments
  * worth a noise. But this app already had names for its agent states long before it had
- * sounds (`chrome/agent-order.ts` derives `waiting` / `done` / `working` / `idle` and prints
+ * sounds (`agents/agent-order.ts` derives `waiting` / `done` / `working` / `idle` and prints
  * them in the hover card), so the kinds are named after those rather than after opencode's:
  *
  * - **`done`** — an agent stopped working. `agent-order` calls the unread version of this

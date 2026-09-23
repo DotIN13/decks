@@ -8,7 +8,7 @@
  * mention carrying the id it stands for, and text is *derived* from it.
  *
  * Decks has one kind of mention so far: a **comment** on words selected on a board
- * (`canvas/comments.ts`). A file is still spelled `@path` in plain text, as it was, because
+ * (`markup/comments.ts`). A file is still spelled `@path` in plain text, as it was, because
  * that spelling is what the agent reads and there is no identity to lose.
  */
 

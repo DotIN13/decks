@@ -1,5 +1,5 @@
 /*
- * A board as a picture (`chrome/BoardPicture.tsx`): a box the size of whatever holds it, the
+ * A board as a picture (`panel/BoardPicture.tsx`): a box the size of whatever holds it, the
  * picture filling it from the top left, and the picture that is still on its way laid over it
  * and clear, so nothing moves when it lands. New selectors only, which is what lets this be a
  * file of its own (see the note on `@import` order at the top of `index.css`).

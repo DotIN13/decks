@@ -106,7 +106,7 @@ const FIT_WAIT_MS = 5000;
 
 export class StageService {
 	/**
-	 * The user's shared Chrome, if the app has one (`web/bridge.ts`).
+	 * The user's shared Chrome, if the app has one (`browser/bridge.ts`).
 	 *
 	 * Held here rather than threaded through the registry and every session, because it is
 	 * one object per server, like the deck, and the stage tool is the only thing that reads

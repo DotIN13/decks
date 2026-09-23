@@ -400,7 +400,7 @@
 	}
 
 	/* `.set-k` is the same object outside a row: a name with a sentence under it, in a settings
-	   group (`chat/Settings.tsx`). Added to the selector rather than given its own copy of these
+	   group (`settings/Settings.tsx`). Added to the selector rather than given its own copy of these
 	   six declarations, because two type scales that are meant to match and are written twice do
 	   not stay matched. */
 	:is(.popover, .row-list) [data-row] > .row-label,

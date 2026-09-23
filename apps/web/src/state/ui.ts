@@ -119,7 +119,7 @@ function createUi() {
 	 */
 	const [boardsOpen, setBoardsOpen] = createSignal(panelOpensWith());
 
-	/** Settings: the Claude subscriptions this install can use (`chat/Settings.tsx`). */
+	/** Settings: the Claude subscriptions this install can use (`settings/Settings.tsx`). */
 	const [settings, setSettings] = createSignal(false);
 
 	/**
@@ -315,7 +315,7 @@ export type Ui = ReturnType<typeof createUi>;
  * Two kinds in one signal rather than two signals, because they are one state — only one
  * thing can be fullscreen, and whatever leaves is whichever is up. A board carries the slide
  * it was on; an embed carries what the box said, because the overlay has no board document
- * to read it from (`canvas/PresentEmbed.tsx`).
+ * to read it from (`present/PresentEmbed.tsx`).
  */
 export type Presenting =
 	| { kind: "board"; path: string; at: number }

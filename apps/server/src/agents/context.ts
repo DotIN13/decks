@@ -1,4 +1,4 @@
-import { processZone } from "../clock.ts";
+import { processZone } from "../lib/clock.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { agentsTemplate, stageDts } from "@decks/runtime";
 import type { Deck } from "../deck/loader.ts";

@@ -9,7 +9,7 @@
  * lets go of the bottom when a reader does.
  *
  * The delta rule itself — what to send a board that already holds some turns — is
- * `canvas/live-chat.test.ts`. This drives the button a person would press.
+ * `board/live-chat.test.ts`. This drives the button a person would press.
  */
 import { open, say, settle } from "../harness.mjs";
 
@@ -66,7 +66,7 @@ say("the file is a stub, not a transcript", source.length < 900 && source.includ
  * Cards pushed the way the app pushes them, so the rest of this is about the board's own
  * behaviour and not about whichever conversation the fixture happens to have.
  *
- * **The fixture is cards, not chat items**, because that is the wire (`canvas/live-chat.ts`).
+ * **The fixture is cards, not chat items**, because that is the wire (`board/live-chat.ts`).
  * The fold that turns a conversation into cards is the app's and is unit-tested
  * (`chat/turn-cards.test.ts`); what a browser is needed for is the board drawing them, so the
  * shapes are written out here rather than derived. `working` comes with the feed for the same

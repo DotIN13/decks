@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ModelOption, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import { nowWords, processZone } from "../clock.ts";
+import { nowWords, processZone } from "../lib/clock.ts";
 import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
 import type { Act } from "./acts.ts";
-import { numberedName } from "../names.ts";
+import { numberedName } from "./names.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { CreateSpec, SendSpec } from "../stage/tool.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";

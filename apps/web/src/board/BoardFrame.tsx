@@ -1,4 +1,4 @@
-import { AgentCursor } from "./AgentCursor.tsx";
+import { AgentCursor } from "../canvas/AgentCursor.tsx";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import BookOpen from "lucide-solid/icons/book-open";
 import ExternalLink from "lucide-solid/icons/external-link";
@@ -12,8 +12,8 @@ import { boardUrl, deckFileUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
-import { anchorPoint, bubbleSide, type Mark } from "./annotations.ts";
-import { actRects, cursorFor, holding, landed, type AgentAct, type Rect } from "./acts.ts";
+import { anchorPoint, bubbleSide, type Mark } from "../canvas/annotations.ts";
+import { actRects, cursorFor, holding, landed, type AgentAct, type Rect } from "../canvas/acts.ts";
 import { isRead, READ_MS, READ_ZOOM } from "./glow.ts";
 import { attachFrameDrop, type FileDropHost } from "./file-drop.ts";
 import { measureFrame } from "./extent.ts";
@@ -21,13 +21,13 @@ import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts"
 import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
 import { attachBoardOpen } from "./board-links.ts";
 import { attachBoardEval } from "./board-eval.ts";
-import { InkLayer } from "./InkLayer.tsx";
-import { readLayer, syncLayer } from "./ink-dom.ts";
-import { attachCommentSelect } from "./comment-select.ts";
+import { InkLayer } from "../markup/InkLayer.tsx";
+import { readLayer, syncLayer } from "../markup/ink-dom.ts";
+import { attachCommentSelect } from "../markup/comment-select.ts";
 import { adoptInk, drawing, inkOf } from "../state/ink.ts";
 import { paintFrame } from "../lib/theme.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
-import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "./picture.ts";
+import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "../canvas/picture.ts";
 
 /**
  * One board on the stage: a title above it, and the document itself in a frame.
@@ -170,7 +170,7 @@ export function BoardFrame(props: {
 	/** The user pressed Allow, Deny or Stop on that card. */
 	onWebReply?: (reply: LiveWebReply) => void;
 	/**
-	 * A link **on** this board that points at another board (`canvas/board-links.ts`).
+	 * A link **on** this board that points at another board (`board/board-links.ts`).
 	 *
 	 * `true` when the deck had that board and it is now on the canvas. A return value rather
 	 * than two callbacks because only the app knows the deck; `false` is a path this deck does
@@ -178,7 +178,7 @@ export function BoardFrame(props: {
 	 */
 	onOpenBoard?: (path: string, from: string) => boolean;
 	/**
-	 * A component on this board carrying code was pressed (`canvas/board-eval.ts`).
+	 * A component on this board carrying code was pressed (`board/board-eval.ts`).
 	 *
 	 * The board posted the name of the code block; the path is stamped here, from the board
 	 * this frame is showing, and the server reads the code out of that board's file.
@@ -563,7 +563,7 @@ export function BoardFrame(props: {
 		/*
 		 * A component carrying code, pressed. The board sends the block's name and this frame's
 		 * own path goes with it, which is what stops one board asking to run another's code
-		 * (`canvas/board-eval.ts`).
+		 * (`board/board-eval.ts`).
 		 */
 		detachEval = props.onBoardEval
 			? attachBoardEval(frame, (ask) => props.onBoardEval?.(props.board.path, ask.id, ask.value))
@@ -1022,7 +1022,7 @@ export function BoardFrame(props: {
 					this to a room".
 
 					Every board now, not only a deck: a document is readable fullscreen and a board
-					of boxes is usable there, which is the point (`canvas/Present.tsx`). The word
+					of boxes is usable there, which is the point (`present/Present.tsx`). The word
 					changes with the format because "present" is what you do with a deck and
 					"fullscreen" is what you do with a board.
 

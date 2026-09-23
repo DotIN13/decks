@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { loadComments, saveComments, type BoardComment } from "../canvas/comments.ts";
+import { loadComments, saveComments, type BoardComment } from "../markup/comments.ts";
 
 /**
  * Comments on boards: the one being written, and the ones waiting for the next message.

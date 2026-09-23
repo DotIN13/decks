@@ -1,6 +1,6 @@
 import type { AgentChat, Identity } from "@decks/protocol";
 import { createEffect, For } from "solid-js";
-import { AgentFace } from "../../chrome/AgentPill.tsx";
+import { AgentFace } from "../../agents/AgentPill.tsx";
 
 /** Somebody an `@` in the line can name: an agent. */
 export interface Mentionable {

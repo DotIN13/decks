@@ -15,7 +15,7 @@
  * phone, the browser's own chrome, another tab taking the screen.
  *
  * The overlay is still the presentation when the API is refused or absent: it is a fixed layer
- * *first*, and `requestFullscreen` is best-effort on top (`canvas/Present.tsx`). So this never
+ * *first*, and `requestFullscreen` is best-effort on top (`present/Present.tsx`). So this never
  * assumes the API engaged — with nothing in fullscreen, no `fullscreenchange` fires and Escape
  * reaches the page as usual.
  */

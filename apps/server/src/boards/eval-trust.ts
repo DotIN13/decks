@@ -10,7 +10,7 @@ import { join } from "node:path";
  * and a board is a file that may have been written by an agent that had just read a web
  * page. So the click is not the permission. This is.
  *
- * One list, on the install rather than on a deck, for the reason `web/bridge.ts` gives about
+ * One list, on the install rather than on a deck, for the reason `browser/bridge.ts` gives about
  * the pairing code: what a machine trusts should not have to be re-granted per deck. It is
  * a path list and nothing else — no capability is granted in degrees, because "some code"
  * is not a thing a server process can be given a little of.

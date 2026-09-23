@@ -1,4 +1,4 @@
-import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../clock.ts";
+import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";

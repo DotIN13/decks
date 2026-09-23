@@ -2,8 +2,8 @@ import { onCleanup, onMount } from "solid-js";
 import type { BoardPatch } from "@decks/protocol";
 import { toWorld } from "../camera/camera.ts";
 import { camera } from "../state/camera.ts";
-import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "../canvas/file-drop.ts";
-import type { EditorHost } from "../canvas/Editor.ts";
+import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "../board/file-drop.ts";
+import type { EditorHost } from "../board/Editor.ts";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
 import { selected } from "../state/selection.ts";
@@ -125,7 +125,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	/**
 	 * One file from the device, copied into the deck, answered as an embed path.
 	 *
-	 * The other end of the file picker (`canvas/FilePicker.tsx`), and the whole of "getting a
+	 * The other end of the file picker (`board/FilePicker.tsx`), and the whole of "getting a
 	 * photo off a phone onto a board": the upload route and the insert path were already there
 	 * for the desktop drag (§6.9), and a drag is the one gesture a touchscreen does not
 	 * have. So this is the same two steps in the other order — the bytes go into the deck

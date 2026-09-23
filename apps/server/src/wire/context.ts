@@ -7,7 +7,7 @@ import type { EvalTrust } from "../boards/eval-trust.ts";
 import type { StageService } from "../stage/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
-import type { WebBridge } from "../web/bridge.ts";
+import type { WebBridge } from "../browser/bridge.ts";
 import type { View } from "../ws.ts";
 import type { DeckAgent } from "../agents/session.ts";
 

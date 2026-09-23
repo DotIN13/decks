@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js";
 import type { Mark } from "../canvas/annotations.ts";
-import type { CanvasMode, Tool } from "../canvas/Editor.ts";
+import type { CanvasMode, Tool } from "../board/Editor.ts";
 
 /**
  * What is selected, what tool is in hand, and which mode the canvas is in.

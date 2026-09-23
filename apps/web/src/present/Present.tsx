@@ -2,8 +2,8 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import type { Board } from "@decks/protocol";
 import { type DeckHandle, slideKey } from "./slide-keys.ts";
 import { enterFullscreen, exitFullscreen, onFullscreenLeft } from "./fullscreen.ts";
-import { attachBoardOpen } from "./board-links.ts";
-import { attachBoardEval } from "./board-eval.ts";
+import { attachBoardOpen } from "../board/board-links.ts";
+import { attachBoardEval } from "../board/board-eval.ts";
 
 /**
  * A board, fullscreen.
@@ -58,7 +58,7 @@ export function Present(props: {
 	/** Where the deck ended up, so the canvas can follow rather than snapping back. */
 	onLeave?: (at: number) => void;
 	/**
-	 * A link **on** this board that points at another board (`canvas/board-links.ts`).
+	 * A link **on** this board that points at another board (`board/board-links.ts`).
 	 *
 	 * The overlay draws its own frame rather than a `BoardFrame`, so it has to wire the same
 	 * ask up from the board's document. `true` means the board is on the canvas and this exits
@@ -66,7 +66,7 @@ export function Present(props: {
 	 * it is a board nobody sees.
 	 */
 	onOpenBoard?: (path: string, from: string) => boolean;
-	/** A component on the presented board carrying code was pressed (`canvas/board-eval.ts`). */
+	/** A component on the presented board carrying code was pressed (`board/board-eval.ts`). */
 	onBoardEval?: (path: string, id: string, value: unknown) => void;
 }) {
 	let frameEl: HTMLIFrameElement | undefined;
@@ -126,7 +126,7 @@ export function Present(props: {
 		setAt(handle.current());
 	};
 
-	/** Once, whichever way out arrives first — see `canvas/fullscreen.ts` and each caller. */
+	/** Once, whichever way out arrives first — see `present/fullscreen.ts` and each caller. */
 	let left = false;
 	const leave = () => {
 		if (left) return;

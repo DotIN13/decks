@@ -2,7 +2,7 @@
  * The settings window, and the accounts list inside it.
  *
  * The window's head and body, its groups and rows, the cue picker's strip and switches, the
- * account row and its state (`chat/Settings.tsx`, `alerts/AlertSettings.tsx`). The file exists
+ * account row and its state (`settings/Settings.tsx`, `alerts/AlertSettings.tsx`). The file exists
  * because these are one surface: a window with rows, and every row is the same anatomy.
  *
  * These rules were in `index.css`. The rules and the notes above them are as they were.
@@ -10,7 +10,7 @@
 @layer components {
 	/*
  * The settings window: a title, a recessed body, and groups of rows.
- * `chat/Settings.tsx` and `alerts/AlertSettings.tsx`.
+ * `settings/Settings.tsx` and `alerts/AlertSettings.tsx`.
  *
  * This vocabulary replaced a three-column grid whose header row named the columns. The grid
  * measured correctly and read like a spreadsheet — and the header was the tell: a control
@@ -281,7 +281,7 @@
 	}
 }
 	/*
- * One Claude subscription in the settings panel (`chat/Settings.tsx`) — the one in use,
+ * One Claude subscription in the settings panel (`settings/Settings.tsx`) — the one in use,
  * tinted rather than washed, which is the same mark a focused chat row carries so "this is
  * the one" looks the same in both lists.
  *

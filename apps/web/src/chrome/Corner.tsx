@@ -13,8 +13,8 @@ import { For, Show } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 import { historyButton, toggleHistory } from "../state/edge.ts";
 import { Popover } from "../ui/Popover.tsx";
-import { AgentStack } from "./AgentStack.tsx";
-import { agentOrder } from "./agent-order.ts";
+import { AgentStack } from "../agents/AgentStack.tsx";
+import { agentOrder } from "../agents/agent-order.ts";
 import { contextLevel, contextPercent } from "../lib/context-usage.ts";
 import { ContextRing } from "./ContextRing.tsx";
 

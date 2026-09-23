@@ -50,7 +50,7 @@ export type ClientMessage =
 	 * A component on a board was pressed, and the board carries code for it.
 	 *
 	 * The browser stamps the board path from the frame the message came from
-	 * (`canvas/board-eval.ts`), so the path here is the app's word and not the board's. The
+	 * (`board/board-eval.ts`), so the path here is the app's word and not the board's. The
 	 * server reads the code out of the board's own file (`boards/eval-code.ts`), decides
 	 * whether this board is trusted (`boards/eval-trust.ts`) and runs it with the stage API
 	 * in the server process. `value` is whatever the pressed component was carrying.
@@ -64,7 +64,7 @@ export type ClientMessage =
 	 * Put a live view of one agent's conversation on the canvas.
 	 *
 	 * The board it makes never changes as the conversation grows — its turns arrive in the
-	 * browser, from a transcript this app already holds (`canvas/live-chat.ts`). Asking
+	 * browser, from a transcript this app already holds (`board/live-chat.ts`). Asking
 	 * twice for the same agent lands on the board that already exists.
 	 */
 	/** A live view of one conversation, as a board. `request` asks for a `board.created` naming it. */

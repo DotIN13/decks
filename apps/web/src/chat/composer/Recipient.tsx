@@ -1,6 +1,6 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
-import { AgentFace, AgentMenu, NewAgentButton } from "../../chrome/AgentPill.tsx";
+import { AgentFace, AgentMenu, NewAgentButton } from "../../agents/AgentPill.tsx";
 import { Icon } from "../../ui/icons.tsx";
 import type { Destination } from "../../app/send-from-bar.ts";
 

@@ -5,7 +5,7 @@
  * places spell the same way live in CSS; layout lives in a class attribute next to the
  * markup.** So the row, the thumbnail and the tile are here — a board row appears in two
  * lists and will appear in a third — while where the panel sits, how its header stacks and
- * what the header's gaps are are Tailwind utilities in `chrome/LeftPanel.tsx`.
+ * what the header's gaps are are Tailwind utilities in `panel/LeftPanel.tsx`.
  *
  * Nothing here re-states something `chrome.css` already says. The tabs are its `.segmented`, the
  * search field its `.field`, the section labels its `.meta`, the panel body its `.float`;

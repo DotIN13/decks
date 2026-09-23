@@ -13,12 +13,12 @@ import { StageBridge } from "./stage/bridge.ts";
 import { SettingsStore } from "./settings.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
-import { WebBridge } from "./web/bridge.ts";
+import { WebBridge } from "./browser/bridge.ts";
 import { ThumbService } from "./boards/thumbs.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
 import { claudeIdentity } from "./runtimes/claude/backend.ts";
-import { mapSeries } from "./series.ts";
+import { mapSeries } from "./lib/series.ts";
 import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncExamplesDir, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
@@ -64,7 +64,7 @@ export class App {
 	}
 	/** The canvas tool's other end, for the runtimes that are not in this process. */
 	readonly bridge = new StageBridge();
-	/** The user's own Chrome, shared through the Decks extension (`web/bridge.ts`). */
+	/** The user's own Chrome, shared through the Decks extension (`browser/bridge.ts`). */
 	readonly web: WebBridge;
 	readonly thumbs: ThumbService;
 	private hub: Hub | undefined;

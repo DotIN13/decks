@@ -71,7 +71,7 @@ export function trackVisualViewport(): () => void {
  * a two-finger pinch scaling the app.
  *
  * It does not touch the canvas. The board pinch is built on pointer and touch events
- * (`canvas/touch.ts`, `canvas/frame-gestures.ts`) and Safari fires both streams for the same
+ * (`canvas/touch.ts`, `board/frame-gestures.ts`) and Safari fires both streams for the same
  * fingers, so the gesture that zooms the boards is unaffected — which is the whole point of
  * this: one pinch, one thing zoomed, and it is the thing under your fingers.
  *

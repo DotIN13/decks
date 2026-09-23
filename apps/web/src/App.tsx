@@ -5,8 +5,8 @@ import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import Sun from "lucide-solid/icons/sun";
 import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show} from "solid-js";
-import type { EditorHost } from "./canvas/Editor.ts";
-import { Settings } from "./chat/Settings.tsx";
+import type { EditorHost } from "./board/Editor.ts";
+import { Settings } from "./settings/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import type { Presenting } from "./state/ui.ts";
 import { createAlerts } from "./app/alerts.ts";
@@ -28,30 +28,30 @@ import { notice } from "./state/notices.ts";
 import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
 import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
 import { makeFloat } from "./chrome/float.ts";
-import { isNews } from "./chrome/board-news.ts";
+import { isNews } from "./panel/board-news.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
-import { FilePicker } from "./canvas/FilePicker.tsx";
-import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
-import { Inspector } from "./canvas/Inspector.tsx";
-import { InkBar } from "./chrome/InkBar.tsx";
+import { FilePicker } from "./board/FilePicker.tsx";
+import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./board/inspect.ts";
+import { Inspector } from "./board/Inspector.tsx";
+import { InkBar } from "./markup/InkBar.tsx";
 import { pageKey } from "./chat/composer/parked.ts";
-import { CommentPopup } from "./canvas/CommentPopup.tsx";
-import { commentBlock, withComments } from "./canvas/comments.ts";
-import { markComment, unmarkComments } from "./canvas/comment-select.ts";
+import { CommentPopup } from "./markup/CommentPopup.tsx";
+import { commentBlock, withComments } from "./markup/comments.ts";
+import { markComment, unmarkComments } from "./markup/comment-select.ts";
 import { addComment, commenting, removeComment, setCommenting, takeComments, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "./state/ink.ts";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
 import { Stage } from "./canvas/Stage.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
-import { Present } from "./canvas/Present.tsx";
-import { PresentEmbed } from "./canvas/PresentEmbed.tsx";
+import { Present } from "./present/Present.tsx";
+import { PresentEmbed } from "./present/PresentEmbed.tsx";
 import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
-import { AgentPill } from "./chrome/AgentPill.tsx";
+import { AgentPill } from "./agents/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
-import { LeftPanel, type PanelTab } from "./chrome/LeftPanel.tsx";
+import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
 import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
 import { agentViews } from "./camera/agent-views.ts";
@@ -60,7 +60,7 @@ import { canvasBox, insets, watchInsets } from "./camera/insets.ts";
 import { canHover, NARROW } from "./lib/media.ts";
 import { installViewport, obscured } from "./app/viewport.ts";
 import { scheme, toggleScheme } from "./lib/theme.ts";
-import { UsageModal } from "./chat/UsageModal.tsx";
+import { UsageModal } from "./settings/UsageModal.tsx";
 import { workingWords } from "./chat/working-sign.ts";
 
 /**
@@ -152,7 +152,7 @@ export function App() {
 
 	/*
 	 * The boards that are news, each in its writer's colour: what the canvas draws a glow round
-	 * until the board is read there (`canvas/glow.ts`). The same rule as the sidebar's mark, so a
+	 * until the board is read there (`board/glow.ts`). The same rule as the sidebar's mark, so a
 	 * board glows on the canvas exactly when it is marked in the list.
 	 */
 	const newsGlow = createMemo(() => {
@@ -227,7 +227,7 @@ export function App() {
 	};
 
 	/*
-	 * A comment on selected words (`canvas/comments.ts`), ending one of the two ways the popup
+	 * A comment on selected words (`markup/comments.ts`), ending one of the two ways the popup
 	 * offers. Kept, it becomes a pill in the input bar, to go with this agent's next message,
 	 * and its words stay marked on the board. Sent, it is a message of its own, to the agent whose canvas this is,
 	 * and a busy agent takes it as steering exactly as it takes a typed line.
@@ -597,7 +597,7 @@ export function App() {
 	};
 
 	/**
-	 * The selected component as the inspector needs it (`canvas/inspect.ts`).
+	 * The selected component as the inspector needs it (`board/inspect.ts`).
 	 *
 	 * Read from the live document rather than kept in the store: the board is
 	 * same-origin (§4) and the DOM is already the truth about what is on screen, so a
@@ -733,7 +733,7 @@ export function App() {
 	 *
 	 * The overlay is told what the *box* said — the path, the page range — rather than being
 	 * handed the frame's document, because it mounts its own frame on the file's URL and has
-	 * nothing of the board's to read it from (`canvas/PresentEmbed.tsx`). The board is named
+	 * nothing of the board's to read it from (`present/PresentEmbed.tsx`). The board is named
 	 * too: an embed's path is relative to the board that wrote it, which is exactly what
 	 * `urlFor` in `lib/board.js` and `embedUrl` in `lib/api.ts` both need.
 	 */
@@ -1100,7 +1100,7 @@ export function App() {
 						 * fullscreens the selection when the selection *is* an embed, and the board
 						 * otherwise. Answered here rather than in `Stage` because the selection is
 						 * this component's — the stage knows the board, and the box is a shape
-						 * (`canvas/inspect.ts`) that the inspector is already reading.
+						 * (`board/inspect.ts`) that the inspector is already reading.
 						 */
 						onPresent={(path, at) => setPresenting(presentingFor(path, at))}
 						onEditSource={openSource}

@@ -81,7 +81,7 @@ export function ContextSummary(props: {
 					 *
 					 * It used to send a message that made the *runtime* format its figures into
 					 * strings and push them back as a card above the input bar. It opens a panel in
-					 * the browser now (`chat/UsageModal.tsx`), which is why the label can promise
+					 * the browser now (`settings/UsageModal.tsx`), which is why the label can promise
 					 * limits: there is somewhere for a meter and a countdown to go.
 					 */}
 					<button

@@ -61,7 +61,7 @@ export function Settings(props: {
 	onForget: (id: string) => void;
 	/**
 	 * The user's own Chrome, shared with the deck through the Decks extension
-	 * (`server/web/bridge.ts`). The code is what the extension is paired with; the address
+	 * (`server/browser/bridge.ts`). The code is what the extension is paired with; the address
 	 * is this page's own origin, because that is the address the browser reached Decks at.
 	 */
 	web?: { status: WebStatus; code?: string };

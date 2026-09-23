@@ -54,7 +54,7 @@ function changed(held: unknown, arrived: unknown): boolean {
 /**
  * What an agent's state means, whichever message carried it.
  *
- * The moment a face turns green (`chrome/agent-order.ts`), said out loud — and keyed on the
+ * The moment a face turns green (`agents/agent-order.ts`), said out loud — and keyed on the
  * *transition* rather than the value, so a reconnection, which replays the state of every
  * agent on the deck, does not ring five times. Two messages carry a state now: the row in the
  * chat list and the `agent.state` that follows a change, and both have to mean the same thing
