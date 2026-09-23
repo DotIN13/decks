@@ -1,6 +1,6 @@
 import { hitStroke, inkBounds, inkPaint, lassoPick, simplify, strokeShape, type InkStroke } from "@decks/board-kit";
 import type { Camera } from "@decks/protocol";
-import { createMemo, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, onCleanup, Show } from "solid-js";
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "../../state/ink.ts";
 import { inkItem } from "./ink.ts";
 import type { PenLayer, PenPreview } from "./layer.ts";
@@ -37,9 +37,36 @@ export function StageInk(props: {
 }) {
 	let live: SVGPathElement | undefined;
 	let loop: SVGPathElement | undefined;
+	let group: SVGGElement | undefined;
+
+	/*
+	 * A finished stroke stays on the glass until the stage has drawn it: it is sent to the server and
+	 * drawn from the answer, and taking it off at the lift left a frame or more with no stroke at all.
+	 * Each one waiting is a copy of the live path, marked with its id and taken off the moment that id
+	 * is among the strokes the stage drew — the same frame the drawing shows it — or after a few
+	 * seconds if the edit never came back.
+	 */
+	const waiting = new Map<string, { path: SVGPathElement; timer: ReturnType<typeof setTimeout> }>();
+	const settle = (id: string) => {
+		const held = waiting.get(id);
+		if (!held) return;
+		clearTimeout(held.timer);
+		held.path.remove();
+		waiting.delete(id);
+	};
+	const hold = (id: string) => {
+		if (!live || !group) return;
+		const path = live.cloneNode() as SVGPathElement;
+		group.insertBefore(path, live);
+		waiting.set(id, { path, timer: setTimeout(() => settle(id), 5000) });
+	};
+	createEffect(() => {
+		const drawn = new Set(props.strokes().map((stroke) => stroke.id));
+		for (const id of [...waiting.keys()]) if (drawn.has(id)) settle(id);
+	});
 
 	type Gesture =
-		| { kind: "draw"; pointer: number; points: number[]; stroke: Omit<InkStroke, "points" | "id"> }
+		| { kind: "draw"; pointer: number; points: number[]; stroke: Omit<InkStroke, "points" | "id">; id?: string }
 		| { kind: "erase"; pointer: number; gone: Set<string> }
 		| { kind: "lasso"; pointer: number; polygon: number[] }
 		| { kind: "move"; pointer: number; start: { x: number; y: number }; ids: string[]; dx: number; dy: number; moved: boolean };
@@ -194,6 +221,10 @@ export function StageInk(props: {
 		event.stopPropagation();
 		const done = gesture;
 		gesture = undefined;
+		if (done.kind === "draw" && event.type !== "pointercancel") {
+			done.id = props.newId();
+			hold(done.id);
+		}
 		clearLive();
 		if (event.type === "pointercancel") {
 			if (done.kind === "erase") props.layer.hide(undefined);
@@ -204,7 +235,7 @@ export function StageInk(props: {
 			case "draw": {
 				const points = simplify(done.points);
 				const colour = done.stroke.color === "ink" ? props.colourEdit() : undefined;
-				props.onEdit([...(colour ? [colour] : []), { op: "insert", node: inkItem({ ...done.stroke, points }, props.newId()) }]);
+				props.onEdit([...(colour ? [colour] : []), { op: "insert", node: inkItem({ ...done.stroke, points }, done.id ?? props.newId()) }]);
 				return;
 			}
 			case "erase":
@@ -231,6 +262,7 @@ export function StageInk(props: {
 	onCleanup(() => {
 		cancel();
 		setInkSelection(undefined);
+		for (const id of [...waiting.keys()]) settle(id);
 	});
 
 	return (
@@ -246,7 +278,7 @@ export function StageInk(props: {
 			// A long press with a pencil or a finger is not a request for the browser's menu.
 			onContextMenu={(event) => event.preventDefault()}
 		>
-			<g transform={transform()}>
+			<g ref={group} transform={transform()}>
 				<path ref={live} d="" stroke-linecap="round" stroke-linejoin="round" />
 				<path ref={loop} class="ink-loop" d="" />
 				<Show when={selection()}>

@@ -8,7 +8,7 @@ test("a stroke becomes a pen path in its own box, and reads back as the same str
 	assert.equal(node.type, "path");
 	assert.deepEqual([node.x, node.y, node.width, node.height], [96, 196, 48, 38]);
 	assert.deepEqual(node.viewBox, [0, 0, 48, 38]);
-	assert.deepEqual((node.metadata as { points: number[] }).points, [4, 4, 0.5, 44, 34, 0.15]);
+	assert.deepEqual((node.metadata as unknown as { points: number[] }).points, [4, 4, 0.5, 44, 34, 0.15]);
 	const doc: PenDocument = { version: "2.14", children: [{ ...node, x: 196 }] };
 	const stroke = strokeOf(layout(doc, doc.children, { theme: {} }).get("s1")!)!;
 	assert.deepEqual(stroke.points, [200, 200, 0.5, 240, 230, 0.15]);
