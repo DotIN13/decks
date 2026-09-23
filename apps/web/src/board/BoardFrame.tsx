@@ -224,7 +224,7 @@ export function BoardFrame(props: {
 	 * every drawable as changed; a draw then is work thrown away at the next step.
 	 */
 	moving: boolean;
-	/** The stage's side of a canvas renderer: the redraw queue, and the darkroom (`picture.ts`). */
+	/** The stage's side of the canvas renderer: the redraw queue (`picture.ts`). */
 	pictures: PictureHost;
 }) {
 	let detachEditor: (() => void) | undefined;
@@ -783,40 +783,6 @@ export function BoardFrame(props: {
 	});
 	onCleanup(() => props.pictures.queue.cancel(props.board.path));
 
-	// --- one canvas for the stage ---------------------------------------------------
-
-	/*
-	 * Under `one-canvas` the document does not live in this box at all: it is a child of the
-	 * stage's darkroom canvas, which is the only place the stage can draw it from. Made here
-	 * by hand rather than by JSX because it has to be appended to an element this component
-	 * does not own, and Solid tidies up the nodes *it* inserted where it inserted them. It is
-	 * inert — nothing inside a picture can be clicked, and a laid-out document that took
-	 * focus or pointer events at the stage's top-left would be a trap.
-	 */
-	createEffect(() => {
-		const darkroom = props.pictures.darkroom;
-		if (props.renderer !== "one-canvas" || !darkroom || !props.mounted) return;
-		const element = document.createElement("iframe");
-		element.dataset.path = props.board.path;
-		element.title = props.board.title;
-		element.width = String(props.board.w);
-		element.height = String(props.board.h);
-		element.referrerPolicy = "no-referrer";
-		element.setAttribute("drawable", "");
-		element.inert = true;
-		element.addEventListener("load", () => {
-			wire(element);
-			props.pictures.changed(props.board.path);
-		});
-		frameEl = element;
-		applySrc();
-		darkroom.appendChild(element);
-		onCleanup(() => {
-			unwire(element);
-			element.remove();
-		});
-	});
-
 	const startDrag = (event: PointerEvent) => {
 		if (event.button !== 0) return;
 		const touched = event.pointerType === "touch";
@@ -1263,12 +1229,6 @@ export function BoardFrame(props: {
 							<Show when={props.mounted}>{frameNode()}</Show>
 						</canvas>
 						<Show when={!props.mounted && !drawn()}>
-							<div class="placeholder">{props.board.path}</div>
-						</Show>
-					</Match>
-					<Match when={props.renderer === "one-canvas"}>
-						{/* The stage draws the board; this box is only the shadow, the bar and the marks. */}
-						<Show when={!props.mounted && !props.pictures.has(props.board.path)}>
 							<div class="placeholder">{props.board.path}</div>
 						</Show>
 					</Match>

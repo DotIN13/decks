@@ -21,7 +21,6 @@ import type { RendererChoice } from "../lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
-import { createOneCanvas } from "./one-canvas.ts";
 
 /**
  * The palette's keys: `select`, then whatever `@decks/board-kit` says the palette offers.
@@ -415,8 +414,7 @@ export function Stage(props: {
 	 * mid-turn.
 	 */
 	const deckIn = (path: string): DeckHandle | undefined => {
-		// By the frame's own path rather than its box: under the one-canvas renderer a
-		// document lives in the stage's darkroom, not in the board node.
+		// By the frame's own path rather than its box, which is the one lookup every renderer shares.
 		const node = element?.querySelector(`iframe[data-path="${cssEscape(path)}"]`) as HTMLIFrameElement | null;
 		return (node?.contentWindow as { __deck?: DeckHandle } | null)?.__deck;
 	};
@@ -501,7 +499,6 @@ export function Stage(props: {
 	const writeTransform = (cam: Camera) => {
 		const v = view();
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
-		oneCanvas.requestPicture();
 	};
 
 	/**
@@ -1246,33 +1243,14 @@ export function Stage(props: {
 	/**
 	 * Settle redraws for every board, a few per frame (`redraw-queue.ts`).
 	 *
-	 * Shared by both canvas renderers: under `canvas-per-board` each frame draws its own
-	 * canvas through it, under `one-canvas` the stage captures pictures through it. Either
-	 * way sixteen boards settling at once is four frames of work rather than one long one.
+	 * Under `canvas-per-board` each board draws its own canvas through it, so sixteen boards
+	 * settling at once is four frames of work rather than one long one.
 	 */
 	const redraws = createRedrawQueue({ perFrame: 4 });
 	onCleanup(() => redraws.clear());
 
-	/**
-	 * One canvas for the stage, and a darkroom behind it (`one-canvas.ts`).
-	 *
-	 * The queue is created here rather than there because both canvas renderers settle
-	 * through the same one: `canvas-per-board` draws each frame's own canvas through it
-	 * without any of the darkroom machinery.
-	 */
-	const oneCanvas = createOneCanvas({
-		boards: () => props.boards,
-		isVisible: (board) => isVisible(board),
-		view,
-		// The camera the gestures are moving, not the one committed a frame later.
-		camera: () => localCamera,
-		settledZoom: () => props.camera.zoom,
-		scaling,
-		moving,
-		renderer: () => props.renderer,
-		stage: () => element,
-		queue: redraws,
-	});
+	/** What each board frame is given for the canvas renderer (`canvas/picture.ts`). */
+	const pictures = { queue: redraws };
 
 
 	/*
@@ -1313,7 +1291,7 @@ export function Stage(props: {
 							renderer={alone ? "dom" : props.renderer}
 							scaling={scaling()}
 							moving={moving()}
-							pictures={oneCanvas.pictures}
+							pictures={pictures}
 							camera={props.camera}
 							mounted={alone || (admission.mayHaveDocument(board) && admission.isMounted(board))}
 							/*
@@ -1420,29 +1398,6 @@ export function Stage(props: {
 			 * editor's patch target and a deck's page handle all find the frame that is on screen,
 			 * and there is no second one for them to find instead.
 			 */}
-			{/* The one-canvas renderer's two canvases: the picture everyone sees, and the
-			    darkroom the documents live in (see `drawScene`). Under the world, so the
-			    bars, shadows and marks stay HTML on top of the pictures. */}
-			<Show when={props.renderer === "one-canvas"}>
-				{/* The darkroom first, so the picture is painted over it (`index.css`). */}
-				<canvas
-					class="darkroom"
-					attr:layoutsubtree=""
-					aria-hidden="true"
-					width={1}
-					height={1}
-					ref={(canvas) => {
-						oneCanvas.setDarkroom(canvas);
-					}}
-				/>
-				<canvas
-					class="stage-picture"
-					aria-hidden="true"
-					ref={(canvas) => {
-						oneCanvas.setPicture(canvas);
-					}}
-				/>
-			</Show>
 			<div class="world" data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
 				<For each={props.boards.filter((board) => board.path !== props.focus)} fallback={null}>
 					{(board) => boardNode(board)}

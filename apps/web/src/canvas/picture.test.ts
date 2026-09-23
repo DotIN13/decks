@@ -38,9 +38,8 @@ describe("drawScale", () => {
 	});
 
 	it("shrinks the frame when the picture is smaller than the canvas it is drawn in", () => {
-		// The one-canvas darkroom: it stands at the stage's size with two pixels per CSS
-		// pixel, the frame in it stands at the board's own 940 wide, and the picture wanted is
-		// the 470 pixels the board takes at a quarter zoom. 470 / (940 × 2).
+		// A canvas at two pixels per CSS pixel, the frame in it at the board's own 940 wide,
+		// and the picture wanted the 470 pixels the board takes at a quarter zoom. 470 / (940 × 2).
 		assert.deepEqual(drawScale({ w: 470, h: 447 }, { width: 940, height: 894 }, { x: 2, y: 2 }), { x: 0.25, y: 0.25 });
 	});
 
