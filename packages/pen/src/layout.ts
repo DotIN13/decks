@@ -303,11 +303,22 @@ export function layout(doc: PenDocument, nodes: readonly PenNode[], options: { t
 		placed.set(node.id, { node, box: { x: at.x, y: at.y, w: size.w, h: size.h }, parent, theme: t, order: order++ });
 		if (!Array.isArray(node.children) || node.children.length === 0) return;
 		if (node.type === "group") {
+			let x1 = Infinity;
+			let y1 = Infinity;
+			let x2 = -Infinity;
+			let y2 = -Infinity;
 			for (const child of node.children) {
 				if (!visible(doc, child, withTheme(t, child))) continue;
 				const childSize = sizeOf(child, t);
 				place(child, { x: at.x + (child.x ?? 0), y: at.y + (child.y ?? 0) }, childSize, node.id, t);
+				const box = placed.get(child.id)!.box;
+				x1 = Math.min(x1, box.x);
+				y1 = Math.min(y1, box.y);
+				x2 = Math.max(x2, box.x + box.w);
+				y2 = Math.max(y2, box.y + box.h);
 			}
+			// A group is the box round what is in it, wherever that starts, not a box from its own corner.
+			if (x1 !== Infinity) placed.get(node.id)!.box = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
 			return;
 		}
 		const { locals } = frameContent(node, t, size.w, size.h);

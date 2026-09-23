@@ -32,6 +32,8 @@ export interface PaintContext {
 	image(url: string): Image | undefined;
 	/** An icon's shapes, once fetched; undefined asks for it and draws nothing this time. */
 	icon(library: string, name: string, weight: number): IconShape | undefined;
+	/** Items left out, with everything inside them: the ones a drag is carrying on a picture of their own. */
+	skip?: ReadonlySet<string>;
 }
 
 const NOTE_COLORS: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe", context: "#bfdbfe" };
@@ -41,6 +43,7 @@ export function paintDocument(canvas: Canvas, nodes: readonly PenNode[], ctx: Pa
 }
 
 function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
+	if (ctx.skip?.has(node.id)) return;
 	const placed = ctx.placed.get(node.id);
 	if (!placed) return;
 	const { ck, doc } = ctx;

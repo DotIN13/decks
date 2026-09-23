@@ -65,8 +65,9 @@ export function PenBar(props: { doc: PenDocument | undefined; onEdit: (ops: unkn
 		});
 	});
 	const first = () => selected()[0];
-	const fillable = () => selected().filter((node) => !isArrow(node) && node.type !== "browser");
-	const lined = () => selected().filter((node) => !TEXTY.has(node.type) && node.type !== "browser");
+	// A group draws nothing of its own, so it has no colour or line to set; its children do.
+	const fillable = () => selected().filter((node) => !isArrow(node) && node.type !== "browser" && node.type !== "group");
+	const lined = () => selected().filter((node) => !TEXTY.has(node.type) && node.type !== "browser" && node.type !== "group");
 	const texty = () => selected().filter((node) => TEXTY.has(node.type));
 	const cornered = () => selected().filter((node) => node.type === "rectangle" || node.type === "frame");
 	/** "Colour" when everything picked is words, whose fill is the colour of the letters. */
@@ -242,7 +243,9 @@ export function PenBar(props: { doc: PenDocument | undefined; onEdit: (ops: unkn
 				</label>
 			</Show>
 
-			<span class="pill-sep" aria-hidden="true" />
+			<Show when={fillable().length + lined().length + texty().length + cornered().length > 0}>
+				<span class="pill-sep" aria-hidden="true" />
+			</Show>
 				<button type="button" class="icon-button" title="Bring to the front" aria-label="Bring to the front" onClick={() => order("front")}>
 					<Icon of={BringToFront} size={15} />
 				</button>

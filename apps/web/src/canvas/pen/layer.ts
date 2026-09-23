@@ -1,5 +1,5 @@
 import type { CanvasKit, Image, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, indexOf, isArrow, layout, reroute, walk, textStyleOf, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { baseTheme, expand, indexOf, isArrow, layout, pathBounds, reroute, walk, textStyleOf, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 
 /** A drag or a resize in progress: moved by `dx dy`, and sized `w h` when resizing. */
 export interface PenPreview {
@@ -67,22 +67,35 @@ export class PenLayer {
 	/** Items being dragged or resized, drawn changed by this much until the edit comes back from the server. */
 	private moving: ReadonlyMap<string, PenPreview> | undefined;
 
+	/** What each item looks like it covers, by id (`boundsOf`): what is outlined, hit and boxed in. */
+	bounds: ReadonlyMap<string, Frame> = new Map();
+
 	/**
 	 * The item under a stage point: the one drawn last, since that is the one on top.
 	 *
-	 * Boards are not drawn here and are not found; an item inside an instance is found as the
-	 * instance, because a copy is moved and deleted whole.
+	 * Tested against what an item draws (`bounds`), not the box it was given: a petal drawn in a
+	 * corner of a 600 by 700 box is hit on the petal. A press finds the outermost group round what
+	 * it hit, the way a design tool selects a group whole; `deep` finds the item itself, for a
+	 * double-click. Boards are not drawn here and are not found; an item inside an instance is
+	 * found as the instance, because a copy is moved and deleted whole.
 	 */
-	hitTest(point: { x: number; y: number }): PenHit | undefined {
+	hitTest(point: { x: number; y: number }, options?: { deep?: boolean }): PenHit | undefined {
 		let best: Placed | undefined;
 		for (const placed of this.placed.values()) {
-			const { node, box } = placed;
-			if (node.id.includes("/")) continue;
+			const { node } = placed;
+			if (node.id.includes("/") || node.type === "group") continue;
 			if (node.type === "browser" && node.metadata?.type === "decks.board") continue;
+			const box = this.bounds.get(node.id) ?? placed.box;
 			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
 			if (!best || placed.order > best.order) best = placed;
 		}
-		return best ? { id: best.node.id, node: best.node, box: { ...best.box } } : undefined;
+		if (!best) return undefined;
+		if (!options?.deep) {
+			for (let up = best.parent ? this.placed.get(best.parent) : undefined; up; up = up.parent ? this.placed.get(up.parent) : undefined) {
+				if (up.node.type === "group") best = up;
+			}
+		}
+		return { id: best.node.id, node: best.node, box: { ...(this.bounds.get(best.node.id) ?? best.box) } };
 	}
 
 	/**
@@ -92,8 +105,9 @@ export class PenLayer {
 	within(r: Frame): string[] {
 		const index = this.doc ? indexOf(this.doc) : new Map();
 		const inside = new Set<string>();
-		for (const { node, box } of this.placed.values()) {
+		for (const { node, box: given } of this.placed.values()) {
 			if (node.id.includes("/") || (node.type === "browser" && node.metadata?.type === "decks.board")) continue;
+			const box = this.bounds.get(node.id) ?? given;
 			if (box.x >= r.x && box.y >= r.y && box.x + box.w <= r.x + r.w && box.y + box.h <= r.y + r.h) inside.add(node.id);
 		}
 		return [...inside].filter((id) => {
@@ -102,11 +116,58 @@ export class PenLayer {
 		});
 	}
 
-	/** Draw items moved or resized by a gesture that has not been saved yet; nothing to stop. */
+	/**
+	 * Draw items moved or resized by a gesture that has not been saved yet; nothing to stop.
+	 *
+	 * A move is cheap on purpose: the first step records the drawing twice, once without the moving
+	 * items and once with only them, and every step after that replays the second picture shifted.
+	 * Laying out and recording the whole drawing on every mouse move is what made a drag of the
+	 * flower's hundred paths trail behind the pointer. A resize changes a shape, so it is redrawn.
+	 */
 	preview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
+		const slide = !!moving?.size && [...moving.values()].every((change) => change.w === undefined && change.h === undefined);
+		if (slide) {
+			const key = [...moving!.keys()].sort().join("|");
+			if (this.slide?.key !== key) this.dropSlide();
+			const first = moving!.values().next().value!;
+			this.slide = { key, ids: new Set(moving!.keys()), dx: first.dx, dy: first.dy, base: this.slide?.base, over: this.slide?.over };
+			this.schedule();
+			return;
+		}
+		this.dropSlide();
 		this.moving = moving;
 		this.dirty = true;
 		this.schedule();
+	}
+
+	/** The two pictures a move slides between, while one is in progress. */
+	private slide: { key: string; ids: Set<string>; dx: number; dy: number; base: Picture | undefined; over: Picture | undefined } | undefined;
+	/** What the last picture was painted from, so a slide can record from the same thing. */
+	private painted: { nodes: PenNode[]; doc: PenDocument; placed: Map<string, Placed> } | undefined;
+
+	private dropSlide(): void {
+		this.slide?.base?.delete();
+		this.slide?.over?.delete();
+		this.slide = undefined;
+	}
+
+	private recordSlide(): void {
+		const { ck, fonts, slide, painted } = this;
+		if (!ck || !fonts || !slide || !painted) return;
+		const ctx = { ck, fonts, doc: painted.doc, placed: painted.placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight) };
+		const record = (paint: (canvas: ReturnType<InstanceType<CanvasKit["PictureRecorder"]>["beginRecording"]>) => void) => {
+			const recorder = new ck.PictureRecorder();
+			paint(recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7)));
+			const picture = recorder.finishRecordingAsPicture();
+			recorder.delete();
+			return picture;
+		};
+		slide.base = record((canvas) => paintDocument(canvas, painted.nodes, { ...ctx, skip: slide.ids }));
+		const carried = [...slide.ids].flatMap((id) => {
+			const node = painted.placed.get(id)?.node;
+			return node ? [node] : [];
+		});
+		slide.over = record((canvas) => paintDocument(canvas, carried, ctx));
 	}
 
 	attach(element: HTMLCanvasElement): void {
@@ -119,6 +180,7 @@ export class PenLayer {
 		if (doc === this.doc && base === this.base) return;
 		// The server's answer has arrived, so whatever a drag was previewing is now the drawing itself.
 		this.moving = undefined;
+		this.dropSlide();
 		this.doc = doc;
 		this.base = base;
 		this.dirty = true;
@@ -158,6 +220,7 @@ export class PenLayer {
 
 	dispose(): void {
 		this.disposed = true;
+		this.dropSlide();
 		cancelAnimationFrame(this.frame);
 		this.picture?.delete();
 		this.picture = undefined;
@@ -204,6 +267,8 @@ export class PenLayer {
 		this.picture?.delete();
 		this.picture = undefined;
 		this.placed = new Map();
+		this.bounds = new Map();
+		this.dropSlide();
 		if (!doc || doc.children.length === 0) return;
 		const theme = baseTheme(doc, this.scheme);
 		/*
@@ -240,6 +305,8 @@ export class PenLayer {
 		});
 		const placed = layout(doc, nodes, { theme, measure: fonts.measure });
 		this.placed = placed;
+		this.bounds = boundsOf(placed);
+		this.painted = { nodes, doc, placed };
 		const recorder = new ck.PictureRecorder();
 		const canvas = recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7));
 		paintDocument(canvas, nodes, { ck, fonts, doc, placed, scheme: this.scheme, image: (url) => this.image(url), icon: (library, name, weight) => this.icons.get(library, name, weight) });
@@ -291,15 +358,61 @@ export class PenLayer {
 		}
 		const canvas = this.surface.getCanvas();
 		canvas.clear(ck.TRANSPARENT);
+		if (this.slide && !this.slide.base) this.recordSlide();
+		const slide = this.slide?.base && this.slide.over ? this.slide : undefined;
 		if (this.picture) {
 			canvas.save();
 			canvas.scale(dpr, dpr);
 			canvas.translate(this.view.width / 2, this.view.height / 2);
 			canvas.scale(this.camera.zoom, this.camera.zoom);
 			canvas.translate(-this.camera.x, -this.camera.y);
-			canvas.drawPicture(this.picture);
+			if (slide) {
+				canvas.drawPicture(slide.base!);
+				canvas.translate(slide.dx, slide.dy);
+				canvas.drawPicture(slide.over!);
+			} else canvas.drawPicture(this.picture);
 			canvas.restore();
 		}
 		this.surface.flush();
 	}
+}
+
+/**
+ * What each item looks like it covers, which is not always the box it was given.
+ *
+ * A path fills its box with its `viewBox`, so a petal drawn in one corner of a 600 by 700 viewBox
+ * has a 600 by 700 box; what it covers is its geometry, mapped into that box, and widened by half
+ * its stroke. A group covers what its children cover. Everything else covers its box.
+ */
+export function boundsOf(placed: ReadonlyMap<string, Placed>): Map<string, Frame> {
+	const out = new Map<string, Frame>();
+	const children = new Map<string, Placed[]>();
+	for (const item of placed.values()) if (item.parent) (children.get(item.parent) ?? children.set(item.parent, []).get(item.parent)!).push(item);
+	const visit = (item: Placed): Frame => {
+		const known = out.get(item.node.id);
+		if (known) return known;
+		const { node, box } = item;
+		let bounds: Frame = box;
+		if (node.type === "path" && typeof node.geometry === "string") {
+			const drawn = pathBounds(node.geometry);
+			const vb = node.viewBox;
+			if (drawn && vb && vb[2] > 0 && vb[3] > 0) {
+				const sx = box.w / vb[2];
+				const sy = box.h / vb[3];
+				const pad = (typeof node.strokeWidth === "number" && node.stroke !== undefined ? node.strokeWidth : 0) / 2;
+				bounds = { x: box.x + (drawn.x - vb[0]) * sx - pad, y: box.y + (drawn.y - vb[1]) * sy - pad, w: drawn.w * sx + pad * 2, h: drawn.h * sy + pad * 2 };
+			}
+		} else if (node.type === "group") {
+			const kids = (children.get(node.id) ?? []).map(visit);
+			if (kids.length) {
+				const x1 = Math.min(...kids.map((k) => k.x));
+				const y1 = Math.min(...kids.map((k) => k.y));
+				bounds = { x: x1, y: y1, w: Math.max(...kids.map((k) => k.x + k.w)) - x1, h: Math.max(...kids.map((k) => k.y + k.h)) - y1 };
+			}
+		}
+		out.set(node.id, bounds);
+		return bounds;
+	};
+	for (const item of placed.values()) visit(item);
+	return out;
 }

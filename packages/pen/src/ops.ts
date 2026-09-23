@@ -228,12 +228,23 @@ function placeBox(doc: PenDocument, id: string, box: Partial<Box>, options: Appl
 	const placed: Map<string, Placed> = layout(doc, expand(doc), options);
 	const parent = found.parent ? placed.get(found.parent.id) : undefined;
 	const origin = parent ? { x: parent.box.x, y: parent.box.y } : { x: 0, y: 0 };
+	/*
+	 * Where the item's box is now, so a move is a shift of its own x and y by the difference. That
+	 * is the same as "box corner minus parent corner" for every item whose box starts at its x, y,
+	 * and it is also right for a group, whose box starts wherever its children do.
+	 */
+	const now = placed.get(id)?.box;
 	const inFlow = !!found.parent && found.parent.type === "frame" && (found.parent.layout ?? "horizontal") !== "none" && node.layoutPosition !== "absolute";
 	const notes: string[] = [];
 	if (inFlow && (hasX || hasY)) notes.push(`${found.parent!.id} lays out its children, so it decides where ${id} goes; only the size was taken from the box`);
 	else {
-		if (hasX) node.x = round(box.x1! - origin.x);
-		if (hasY) node.y = round(box.y1! - origin.y);
+		const own = (value: unknown) => (typeof value === "number" ? value : 0);
+		if (hasX) node.x = round(now ? own(node.x) + box.x1! - now.x : box.x1! - origin.x);
+		if (hasY) node.y = round(now ? own(node.y) + box.y1! - now.y : box.y1! - origin.y);
+	}
+	if (node.type === "group" && (typeof box.x2 === "number" || typeof box.y2 === "number")) {
+		notes.push(`a group is as big as what is in it, so ${id} was moved but not resized; resize its children`);
+		return notes.join("; ");
 	}
 	const width = typeof box.x2 === "number" && hasX ? box.x2 - box.x1! : undefined;
 	const height = typeof box.y2 === "number" && hasY ? box.y2 - box.y1! : undefined;

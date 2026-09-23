@@ -215,3 +215,22 @@ test("the variables edit sets and removes document variables and theme axes", ()
 	const { doc: gone } = apply(next, [{ op: "variables", set: { card: null } }], light);
 	assert.deepEqual(gone.variables, {});
 });
+
+test("a group's box is the box round its children, and moving it by a box shifts it by the difference", () => {
+	const doc: PenDocument = {
+		version: "2.14",
+		children: [{ type: "group", id: "g", children: [
+			{ type: "rectangle", id: "a", x: 100, y: 50, width: 20, height: 10 },
+			{ type: "rectangle", id: "b", x: 150, y: 80, width: 30, height: 30 },
+		] }],
+	};
+	const theme = {};
+	assert.deepEqual(layout(doc, expand(doc), { theme }).get("g")!.box, { x: 100, y: 50, w: 80, h: 60 });
+	const { doc: moved, results } = apply(doc, [{ op: "update", id: "g", box: { x1: 110, y1: 40, x2: 999, y2: 999 } }], { theme });
+	const group = moved.children[0]!;
+	assert.equal(group.x, 10);
+	assert.equal(group.y, -10);
+	assert.equal(group.width, undefined);
+	assert.match(results[0]!.note ?? "", /moved but not resized/);
+	assert.deepEqual(layout(moved, expand(moved), { theme }).get("g")!.box, { x: 110, y: 40, w: 80, h: 60 });
+});

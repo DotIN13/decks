@@ -25,7 +25,7 @@ import { createOneCanvas } from "./one-canvas.ts";
 import { PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts";
 import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, arrowShape, ids as penIds, newId, type PenDocument, type PenNode } from "@decks/pen";
+import { ARROW, arrowShape, ids as penIds, indexOf, newId, type PenDocument, type PenNode } from "@decks/pen";
 
 /**
  * The palette's keys: `select`, then whatever `@decks/board-kit` says the palette offers.
@@ -591,7 +591,7 @@ export function Stage(props: {
 				out.push(resize);
 				continue;
 			}
-			const box = penLayer.placed.get(id)?.box;
+			const box = penLayer.bounds.get(id);
 			if (box) out.push({ id, x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h });
 		}
 		const marquee = penMarquee();
@@ -681,15 +681,19 @@ export function Stage(props: {
 		setPenTool(tool);
 	};
 
+	/** An item as the file has it, not as a preview has drawn it. */
+	const penNode = (id: string) => (props.pen ? indexOf(props.pen.doc).get(id)?.node : undefined);
+	const own = (value: unknown) => (typeof value === "number" ? value : 0);
+
 	/**
-	 * Move items by `dx dy` from where they are, or from `from` — the boxes a drag started with, since
-	 * the layout a drag's preview draws already has them moved.
+	 * Move items by `dx dy`: a shift of their own `x` and `y`. A shift rather than a new corner,
+	 * because a group's box starts where its children do, not at its own `x` and `y`.
 	 */
-	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, from?: ReadonlyMap<string, { x: number; y: number }>) => {
+	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number) => {
 		penEdit(
 			idsToMove.flatMap((id) => {
-				const box = from?.get(id) ?? penLayer.placed.get(id)?.box;
-				return box ? [{ op: "update", id, box: { x1: Math.round(box.x + dx), y1: Math.round(box.y + dy) } }] : [];
+				const node = penNode(id);
+				return node ? [{ op: "update", id, set: { x: Math.round(own(node.x) + dx), y: Math.round(own(node.y) + dy) } }] : [];
 			}),
 		);
 	};
@@ -698,12 +702,12 @@ export function Stage(props: {
 		const taken = props.pen ? penIds(props.pen.doc) : new Set<string>();
 		const made: string[] = [];
 		const ops = penSelection().flatMap((id) => {
-			const box = penLayer.placed.get(id)?.box;
-			if (!box) return [];
+			const node = penNode(id);
+			if (!node) return [];
 			const as = newId(taken);
 			taken.add(as);
 			made.push(as);
-			return [{ op: "copy", id, as, box: { x1: Math.round(box.x + 24), y1: Math.round(box.y + 24) } }];
+			return [{ op: "copy", id, as }, { op: "update", id: as, set: { x: own(node.x) + 24, y: own(node.y) + 24 } }];
 		});
 		penEdit(ops);
 		if (made.length) selectMade(made);
@@ -740,7 +744,9 @@ export function Stage(props: {
 			penCreate(event, tool, at);
 			return true;
 		}
-		const hit = penLayer.hitTest(at);
+		// The group under the point, unless a double-click already selected the thing inside it.
+		const inner = penLayer.hitTest(at, { deep: true });
+		const hit = inner && penSelection().includes(inner.id) ? inner : penLayer.hitTest(at);
 		if (hit) {
 			event.preventDefault();
 			props.onSelect(undefined);
@@ -751,10 +757,6 @@ export function Stage(props: {
 			}
 			const moving = selected.includes(hit.id) ? selected : [hit.id];
 			setPenSelection(moving);
-			const from = new Map(moving.flatMap((id) => {
-				const box = penLayer.placed.get(id)?.box;
-				return box ? [[id, { x: box.x, y: box.y }] as const] : [];
-			}));
 			let offset = { dx: 0, dy: 0 };
 			follow(
 				event,
@@ -764,7 +766,7 @@ export function Stage(props: {
 					penLayer.preview(new Map(moving.map((id) => [id, offset])));
 				},
 				(moved) => {
-					if (moved) penMoveBy(moving, offset.dx, offset.dy, from);
+					if (moved) penMoveBy(moving, offset.dx, offset.dy);
 				},
 			);
 			return true;
@@ -802,6 +804,17 @@ export function Stage(props: {
 		event.stopPropagation();
 		const { id } = box;
 		const start = { x: box.x, y: box.y, w: box.w, h: box.h };
+		/*
+		 * The handles are on what the item draws; the file sizes the box it was given. For most items
+		 * they are the same box. For a path drawn in a corner of its viewBox they are not, and the
+		 * given box is scaled by as much as the drawn one, about the same point.
+		 */
+		const given = penLayer.placed.get(id)?.box ?? start;
+		const givenFor = (drawn: { x: number; y: number; w: number; h: number }) => {
+			const sx = start.w > 0 ? drawn.w / start.w : 1;
+			const sy = start.h > 0 ? drawn.h / start.h : 1;
+			return { x: drawn.x - (start.x - given.x) * sx, y: drawn.y - (start.y - given.y) * sy, w: given.w * sx, h: given.h * sy };
+		};
 		let next = start;
 		follow(
 			event,
@@ -822,10 +835,14 @@ export function Stage(props: {
 				}
 				next = { x: Math.round(Math.min(x1, x2)), y: Math.round(Math.min(y1, y2)), w: Math.max(4, Math.round(Math.abs(x2 - x1))), h: Math.max(4, Math.round(Math.abs(y2 - y1))) };
 				setPenResize({ id, ...next });
-				penLayer.preview(new Map<string, PenPreview>([[id, { dx: next.x - start.x, dy: next.y - start.y, w: next.w, h: next.h }]]));
+				const box = givenFor(next);
+				penLayer.preview(new Map<string, PenPreview>([[id, { dx: box.x - given.x, dy: box.y - given.y, w: box.w, h: box.h }]]));
 			},
 			(moved) => {
-				if (moved) penEdit([{ op: "update", id, box: { x1: next.x, y1: next.y, x2: next.x + next.w, y2: next.y + next.h } }]);
+				if (!moved) return;
+				const box = givenFor(next);
+				const r = (n: number) => Math.round(n * 10) / 10;
+				penEdit([{ op: "update", id, box: { x1: r(box.x), y1: r(box.y), x2: r(box.x + box.w), y2: r(box.y + box.h) } }]);
 			},
 		);
 	};
@@ -1550,9 +1567,14 @@ export function Stage(props: {
 		if (props.mode === "edit" && props.onPenEdit && event.target === element) {
 			// The second press of a quick double-click on a tool's first item is not a request for a board.
 			if (performance.now() - penMadeAt < 500) return;
-			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)));
+			// A double-click reaches inside a group: words open for rewriting, anything else is selected on its own.
+			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)), { deep: true });
 			if (hit && TEXTY.has(hit.node.type)) {
 				openPenText(hit);
+				return;
+			}
+			if (hit && !penSelection().includes(hit.id)) {
+				setPenSelection([hit.id]);
 				return;
 			}
 		}
