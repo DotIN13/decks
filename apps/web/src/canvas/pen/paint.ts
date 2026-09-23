@@ -143,6 +143,11 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 		case "group":
 			for (const child of node.children ?? []) paintNode(canvas, child, ctx);
 			break;
+		case "browser":
+			// A deck board: the stage draws the board itself in this box, over the drawing.
+			if (node.metadata && node.metadata.type === "decks.board") break;
+			paintPlaceholder(canvas, ctx, node, placed);
+			break;
 		default:
 			paintPlaceholder(canvas, ctx, node, placed);
 	}

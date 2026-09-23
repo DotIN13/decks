@@ -98,7 +98,7 @@ export interface StageAgentHooks {
 	setTags(tags: unknown): string[];
 	/** Replaces the agent's workspace and returns it as stored — see `agents/workspaces.ts`. */
 	setWorkspace(workspace: unknown): string | null;
-	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number }>;
+	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number; stage?: string }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
 	/** Queue work for an agent that already exists, and return without waiting. */
@@ -127,6 +127,10 @@ export interface StageAgentHooks {
 	boardPathOf(file: string): string | undefined;
 	/** The folder this agent's stage drawing lives in, named on first use (`stage/pens.ts`). Optional for hosts with no drawing. */
 	stageName?(): string | undefined;
+	/** Work on another stage: its boards become this agent's (`agents/session.ts`). */
+	openStage?(name: string): void;
+	/** Make an empty stage from a title, open it, and return its name. */
+	newStage?(title: string): string;
 }
 
 /**
@@ -723,6 +727,32 @@ export function createStageTool(deps: {
 		 * agent that would rather edit the JSON with its own tools. The wording of the format is
 		 * pen.dev's, untranslated — the skill `pen-stage` teaches it.
 		 */
+		/** Every stage in the deck, who has it open, and how much is on it. */
+		stages: async () => {
+			const pens = needPens();
+			const mine = agent.stageName?.();
+			const everyone = agent.agents();
+			return pens.names().map((name) => ({
+				name,
+				open: everyone.filter((other) => (other.id === agent.id ? mine : other.stage) === name).map((other) => other.name),
+				boards: pens.boards(name).length,
+				...(name === mine ? { mine: true } : {}),
+			}));
+		},
+		/** Work on another stage: its boards are yours from now on, and the person sees it when talking to you. */
+		open: async (name: string) => {
+			if (typeof name !== "string" || !name.trim()) throw new Error('open names a stage, as in stage.open("deploy"); stage.stages() lists them.');
+			if (!agent.openStage) throw new Error("This agent cannot change stages.");
+			agent.openStage(name.trim());
+			return { stage: name.trim(), boards: agent.inPlay() };
+		},
+		/** A new, empty stage named from a title, opened at once. */
+		newStage: async (title: string) => {
+			if (typeof title !== "string" || !title.trim()) throw new Error('newStage takes a title, as in stage.newStage("Launch plan").');
+			if (!agent.newStage) throw new Error("This agent cannot make stages.");
+			return { stage: agent.newStage(title.trim()) };
+		},
+
 		pen: {
 			file: async () => `stages/${needStage()}/stage.pen`,
 			read: async () => {

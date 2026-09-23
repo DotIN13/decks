@@ -79,3 +79,27 @@ test("an arrow to a board is drawn on edit, and follows the board when it moves"
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("a stage's boards are browser items: synced in, read back in order, moved, resized and removed", () => {
+	const dir = deck();
+	const pens = new StagePens(dir, () => {});
+	try {
+		const name = pens.claim("s");
+		const a = { path: "boards/a.html", x: 0, y: 0, w: 1000, h: 700, title: "A" };
+		const b = { path: "boards/b.html", x: 1200, y: 0, w: 800, h: 600, title: "B" };
+		assert.equal(pens.syncBoards(name, [a, b]), true);
+		assert.equal(pens.syncBoards(name, [a, b]), false, "nothing changed, nothing written");
+		const item = pens.get(name).doc.children[0]!;
+		assert.deepEqual([item.type, item.id, item.url, item.width, item.metadata], ["browser", "a", "../../boards/a.html", 1000, { type: "decks.board", path: "boards/a.html" }]);
+		assert.deepEqual(pens.boards(name).map((one) => [one.path, one.x, one.y]), [["boards/a.html", 0, 0], ["boards/b.html", 1200, 0]]);
+		pens.syncBoards(name, [{ ...a, x: 50, h: 900 }]);
+		assert.deepEqual(pens.boards(name), [{ path: "boards/a.html", id: "a", x: 50, y: 0 }]);
+		assert.equal(pens.get(name).doc.children[0]!.height, 900);
+		// A board put inside a column by an edit is placed by the column, and read back there.
+		pens.edit(name, [{ op: "insert", node: { type: "frame", id: "col", layout: "vertical", gap: 40, x: 0, y: 2000, children: [] } }, { op: "move", id: "a", parent: "col" }]);
+		assert.deepEqual(pens.boards(name), [{ path: "boards/a.html", id: "a", x: 0, y: 2000 }]);
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

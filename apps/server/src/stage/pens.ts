@@ -1,7 +1,38 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
-import { apply, baseTheme, emptyDocument, parse, PenError, placements, read, reroute, serialize, type Frame, type Op, type OpResult, type PenDocument } from "@decks/pen";
+import { apply, baseTheme, emptyDocument, ids, parse, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
+import { fileUrl } from "../deck/roots.ts";
+
+/**
+ * A deck board on a stage: pen's own `browser` item, a live web page, pointed at the board's file
+ * and tagged in pen's extension field with the board's path, so the server knows which board it is
+ * without parsing a URL.
+ *
+ *     { "type": "browser", "id": "report", "name": "The finding", "url": "../../boards/report.html",
+ *       "x": 0, "y": 0, "width": 1000, "height": 700, "metadata": { "type": "decks.board", "path": "boards/report.html" } }
+ *
+ * pen.dev shows it as a web page; Decks draws the board itself in its place.
+ */
+export const BOARD_ITEM = "decks.board";
+
+/** The deck board an item stands for, by path, or undefined when it is not one. */
+export function boardOf(node: PenNode): string | undefined {
+	if (node.type !== "browser" || !node.metadata || node.metadata.type !== BOARD_ITEM) return undefined;
+	const path = node.metadata.path;
+	return typeof path === "string" && path ? path : undefined;
+}
+
+/** A board as a stage wants it: where it sits, and the size and title its file gives it. */
+export interface BoardSpot {
+	path: string;
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	title: string;
+}
 
 /**
  * Stages as `.pen` files: `stages/<name>/stage.pen` in the deck.
@@ -23,6 +54,8 @@ export interface PenEntry {
 	rev: number;
 	/** Why the file on disk is not what is shown, when it does not parse. */
 	error?: string;
+	/** The layout of `doc`, worked out the first time it is asked for. */
+	placed?: Map<string, Placed>;
 }
 
 const FILE = "stage.pen";
@@ -106,7 +139,8 @@ export class StagePens {
 		if (current.error) throw new PenError(`${current.error}. Fix the file, or replace it whole, before editing it.`);
 		const theme = baseTheme(current.doc, "light");
 		const { doc, results } = apply(current.doc, ops, { theme });
-		reroute(doc, placements(doc, { theme }), boards);
+		const placed = placements(doc, { theme });
+		reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards?.(path));
 		return { entry: this.write(name, doc), results };
 	}
 
@@ -118,7 +152,77 @@ export class StagePens {
 		const current = this.get(name);
 		if (current.error || !existsSync(this.fileOf(name))) return;
 		const doc = structuredClone(current.doc);
-		if (reroute(doc, placements(doc, { theme: baseTheme(doc, "light") }), boards)) this.write(name, doc);
+		const placed = placements(doc, { theme: baseTheme(doc, "light") });
+		if (reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards(path))) this.write(name, doc);
+	}
+
+	/** Where everything in a stage is, laid out once per version of the file. */
+	placedOf(name: string): Map<string, Placed> {
+		const entry = this.get(name);
+		entry.placed ??= placements(entry.doc, { theme: baseTheme(entry.doc, "light") });
+		return entry.placed;
+	}
+
+	/** The deck boards on a stage, in paint order, each where the layout puts it. */
+	boards(name: string): Array<{ path: string; id: string; x: number; y: number }> {
+		const placed = this.placedOf(name);
+		const out: Array<{ path: string; id: string; x: number; y: number }> = [];
+		for (const node of walk(this.get(name).doc.children)) {
+			const path = boardOf(node);
+			const box = path ? placed.get(node.id)?.box : undefined;
+			if (path && box && !out.some((one) => one.path === path)) out.push({ path, id: node.id, x: Math.round(box.x), y: Math.round(box.y) });
+		}
+		return out;
+	}
+
+	/**
+	 * Make the stage's boards these: add the ones missing, move and resize the ones that differ, and
+	 * take away the rest. Writes only when something changed, and returns whether it did.
+	 */
+	syncBoards(name: string, wanted: readonly BoardSpot[]): boolean {
+		const entry = this.get(name);
+		if (entry.error) return false;
+		const placed = this.placedOf(name);
+		const present = new Map<string, PenNode>();
+		for (const node of walk(entry.doc.children)) {
+			const path = boardOf(node);
+			if (path && !present.has(path)) present.set(path, node);
+		}
+		const taken = ids(entry.doc);
+		const ops: Op[] = [];
+		for (const spot of wanted) {
+			const node = present.get(spot.path);
+			if (!node) {
+				const base = slug(spot.path.replace(/^boards\//, "").replace(/\.[^.]+$/, ""), 40) || "board";
+				let id = base;
+				for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+				taken.add(id);
+				ops.push({
+					op: "insert",
+					node: { type: "browser", id, name: spot.title, url: `../../${spot.path}`, width: spot.w, height: spot.h, metadata: { type: BOARD_ITEM, path: spot.path } },
+					box: { x1: spot.x, y1: spot.y },
+				});
+				continue;
+			}
+			const set: Record<string, unknown> = {};
+			if (node.width !== spot.w) set.width = spot.w;
+			if (node.height !== spot.h) set.height = spot.h;
+			if (node.name !== spot.title) set.name = spot.title;
+			const box = placed.get(node.id)?.box;
+			const moved = !!box && (Math.round(box.x) !== spot.x || Math.round(box.y) !== spot.y);
+			if (Object.keys(set).length > 0 || moved) ops.push({ op: "update", id: node.id, set, ...(moved ? { box: { x1: spot.x, y1: spot.y } } : {}) });
+		}
+		const keep = new Set(wanted.map((spot) => spot.path));
+		for (const [path, node] of present) if (!keep.has(path)) ops.push({ op: "delete", id: node.id });
+		if (ops.length === 0) return false;
+		this.edit(name, ops);
+		return true;
+	}
+
+	/** The `stage.pen` frame for one agent looking at this stage. */
+	frame(agentId: string, name: string): ServerMessage {
+		const entry = this.get(name);
+		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc: entry.doc, base: `${fileUrl(join(this.dir, name))}/`, ...(entry.error ? { error: entry.error } : {}) };
 	}
 
 	/** Replace the document whole, from text that must parse. */
@@ -188,4 +292,10 @@ export class StagePens {
 		for (const timer of this.pending.values()) clearTimeout(timer);
 		this.pending.clear();
 	}
+}
+
+/** A board's box on this stage, found by path, for an arrow that ends on it. */
+function boardBox(doc: PenDocument, placed: ReadonlyMap<string, Placed>, path: string): Frame | undefined {
+	for (const node of walk(doc.children)) if (boardOf(node) === path) return placed.get(node.id)?.box;
+	return undefined;
 }

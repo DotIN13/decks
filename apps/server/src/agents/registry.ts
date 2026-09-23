@@ -88,7 +88,7 @@ export class Registry {
 	 * than needing a second shape for the same fact. `undefined` for an agent in none, which is
 	 * the absence the panel draws one section for.
 	 */
-	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number }> {
+	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number; stage: string | undefined }> {
 		return this.agents.map((agent) => {
 			const chat = agent.chat();
 			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand
@@ -109,6 +109,8 @@ export class Registry {
 				// who is in which, and `roster` for the aggregation.
 				workspace: agent.workspace,
 				queued: agent.queued,
+				// The stage it has open, so `stage.stages()` can say who is on each (`stage/pens.ts`).
+				stage: agent.stageName(),
 			};
 		});
 	}

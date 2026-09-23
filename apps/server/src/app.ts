@@ -27,7 +27,6 @@ import type { CameraReading } from "./deck/place.ts";
 import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
-import { fileUrl } from "./deck/roots.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -105,7 +104,11 @@ export class App {
 		this.deck = deck;
 		this.evalTrust = new EvalTrust(config.dataDir);
 		this.boards = new BoardService(deck, {
-			send: (message) => this.send(message),
+			send: (message) => {
+				this.send(message);
+				// A board's size is its file's; every stage showing it carries that size in its own file.
+				if (message.type === "board.changed" && !message.removed) for (const agent of this.agents?.all() ?? []) agent.boardResized(message.path);
+			},
 			/*
 			 * The arrangement, not the deck — `BoardService` broadcasts a board on every write, and the
 			 * loader's copy of one has no place of its own any more. It asks rather than is handed the
@@ -779,24 +782,22 @@ export class App {
 		}
 	}
 
-	/** A stage drawing changed: tell every browser, once per agent whose stage it is. */
-	private publishPen(name: string, entry: PenEntry): void {
+	/**
+	 * A stage drawing changed: every session on that stage takes its boards from it, and every
+	 * browser is sent it once per agent whose stage it is.
+	 */
+	private publishPen(name: string, _entry: PenEntry): void {
 		for (const agent of this.agents?.all() ?? []) {
 			if (agent.stageName() !== name) continue;
-			this.send(this.penFrame(agent.id, name, entry));
+			agent.penChanged();
+			this.send(this.pens.frame(agent.id, name));
 		}
 	}
 
 	/** The drawing for one agent's stage, for a browser opening its chat; nothing if it has never drawn. */
 	penMessage(agentId: string): ServerMessage | undefined {
-		const agent = this.agents.get(agentId);
-		const name = agent?.stageName();
-		if (!name) return undefined;
-		return this.penFrame(agentId, name, this.pens.get(name));
-	}
-
-	private penFrame(agentId: string, name: string, entry: PenEntry): ServerMessage {
-		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc: entry.doc, base: `${fileUrl(join(this.pens.dir, name))}/`, ...(entry.error ? { error: entry.error } : {}) };
+		const name = this.agents.get(agentId)?.stageName();
+		return name ? this.pens.frame(agentId, name) : undefined;
 	}
 
 	dispose(): void {

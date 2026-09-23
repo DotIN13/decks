@@ -91,6 +91,15 @@ export interface Stage {
 		stop(): Promise<void>;
 	};
 	/**
+	 * Stages are files, `stages/<name>/stage.pen`, and you work on one at a time: its boards are the
+	 * ones you show, hide and move, and the person sees it when talking to you. `stages` lists every
+	 * stage and who has it open; `open` moves you to one; `newStage` makes an empty one and opens it.
+	 * Two agents on one stage share its boards and its drawing.
+	 */
+	stages(): Promise<Array<{ name: string; open: string[]; boards: number; mine?: true }>>;
+	open(name: string): Promise<{ stage: string; boards: string[] }>;
+	newStage(title: string): Promise<{ stage: string }>;
+	/**
 	 * Your stage's drawing — notes, text, shapes, arrows and frames, drawn under the boards — kept as a
 	 * native pen.dev `.pen` file in pen's own types and fields; the pen-stage skill teaches them.
 	 * `read` gives every item as saved plus its `box` on the stage. `edit` applies edits together or
