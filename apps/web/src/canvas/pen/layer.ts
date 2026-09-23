@@ -123,29 +123,68 @@ export class PenLayer {
 	 * Every item wholly inside a stage rectangle, leaving out any whose parent is picked too:
 	 * what a marquee selects. Boards and the inside of an instance are not items to select.
 	 */
-	/**
-	 * The link under a stage point, in a markdown card: where a press there would go. The card's
-	 * layout is the one it was drawn with (`fonts.markdown` keeps it), so the boxes are exact.
-	 */
-	linkAt(point: { x: number; y: number }): string | undefined {
+	/** The markdown card on top at a stage point, its layout as drawn, and the point inside it. */
+	private cardAt(point: { x: number; y: number }) {
 		const fonts = this.fonts;
 		const doc = this.drawnDoc;
 		if (!fonts || !doc) return undefined;
-		let found: string | undefined;
+		let found: { id: string; layout: ReturnType<PenFonts["markdown"]>; x: number; y: number } | undefined;
 		let order = -1;
 		for (const placed of this.placed.values()) {
 			const { node, box } = placed;
 			if (!isMarkdown(node) || placed.order < order || this.hidden.has(node.id)) continue;
 			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
 			const content = String(resolve(doc, node.content, withTheme(placed.theme, node)) ?? "");
-			const card = fonts.markdown(content, textStyleOf(doc, node, placed.theme), { width: box.w - NOTE_PAD * 2, align: node.textAlign ?? "left" });
-			const x = point.x - box.x - NOTE_PAD;
-			const y = point.y - box.y - NOTE_PAD;
-			const link = card.links.find((l) => x >= l.x && x <= l.x + l.w && y >= l.y && y <= l.y + l.h);
+			const layout = fonts.markdown(content, textStyleOf(doc, node, placed.theme), { width: box.w - NOTE_PAD * 2, align: node.textAlign ?? "left" });
 			order = placed.order;
-			found = link?.href;
+			found = { id: node.id, layout, x: point.x - box.x - NOTE_PAD, y: point.y - box.y - NOTE_PAD };
 		}
 		return found;
+	}
+
+	/**
+	 * The link under a stage point, in a markdown card: where a press there would go. The card's
+	 * layout is the one it was drawn with (`fonts.markdown` keeps it), so the boxes are exact; a link
+	 * in a wide table is where the table's scroll has put it, and only while it is in view.
+	 */
+	linkAt(point: { x: number; y: number }): string | undefined {
+		const card = this.cardAt(point);
+		if (!card) return undefined;
+		const { layout, x, y } = card;
+		return layout.links.find((l) => {
+			let lx = l.x;
+			if (l.scroller !== undefined) {
+				const view = layout.scrollers[l.scroller];
+				if (!view || x < view.x || x > view.x + view.w) return false;
+				lx -= this.scrollOf(card.id, l.scroller);
+			}
+			return x >= lx && x <= lx + l.w && y >= l.y && y <= l.y + l.h;
+		})?.href;
+	}
+
+	/** How far each card's wide tables are scrolled, by `id:index`. The stage's to keep, not the file's. */
+	private readonly scrolls = new Map<string, number>();
+	private readonly scrollOf = (id: string, index: number): number => this.scrolls.get(`${id}:${index}`) ?? 0;
+
+	/**
+	 * Scroll the wide table under a stage point sideways by `dx` stage pixels. True when there was one
+	 * to scroll — even at its end, so a sideways gesture over a table never turns into a pan halfway.
+	 */
+	scrollBy(point: { x: number; y: number }, dx: number): boolean {
+		const card = this.cardAt(point);
+		if (!card) return false;
+		const index = card.layout.scrollers.findIndex((v) => card.x >= v.x && card.x <= v.x + v.w && card.y >= v.y && card.y <= v.y + v.h);
+		const view = card.layout.scrollers[index];
+		if (!view) return false;
+		const key = `${card.id}:${index}`;
+		const now = this.scrolls.get(key) ?? 0;
+		const next = Math.max(0, Math.min(view.content - view.w, now + dx));
+		if (next !== now) {
+			this.scrolls.set(key, next);
+			this.dirty = true;
+			this.schedule();
+		}
+		return true;
 	}
 
 	within(r: Frame): string[] {
@@ -202,7 +241,7 @@ export class PenLayer {
 	private recordSlide(): void {
 		const { ck, fonts, slide, painted } = this;
 		if (!ck || !fonts || !slide || !painted) return;
-		const ctx = { ck, fonts, doc: painted.doc, placed: painted.placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight) };
+		const ctx = { ck, fonts, doc: painted.doc, placed: painted.placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight), scroll: this.scrollOf };
 		const record = (paint: (canvas: ReturnType<InstanceType<CanvasKit["PictureRecorder"]>["beginRecording"]>) => void) => {
 			const recorder = new ck.PictureRecorder();
 			paint(recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7)));
@@ -293,6 +332,7 @@ export class PenLayer {
 	setScheme(scheme: "light" | "dark"): void {
 		if (scheme === this.scheme) return;
 		this.scheme = scheme;
+		if (this.fonts) this.fonts.scheme = scheme;
 		this.dirty = true;
 		this.schedule();
 	}
@@ -326,6 +366,7 @@ export class PenLayer {
 			this.ck = ck;
 			this.fonts = new PenFonts(ck);
 			this.fonts.images = (url) => this.image(url);
+			this.fonts.scheme = this.scheme;
 			this.dirty = true;
 			this.schedule();
 		});
@@ -414,7 +455,7 @@ export class PenLayer {
 		this.drawnDoc = this.doc;
 		this.painted = { nodes, doc, placed };
 		this.under = backdrops(nodes, this.bounds, placed);
-		const ctx = { ck, fonts, doc, placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight), skip: this.hidden, mute: this.muted };
+		const ctx = { ck, fonts, doc, placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight), skip: this.hidden, mute: this.muted, scroll: this.scrollOf };
 		const parts = this.split(nodes);
 		for (const name of ["under", "over"] as const) {
 			const recorder = new ck.PictureRecorder();

@@ -27,6 +27,8 @@ import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type
 import { scheme } from "../lib/theme.ts";
 import { ARROW, arrowEnd, arrowRoute, baseTheme, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
+import { CARD_PALETTE } from "./pen/markdown-layout.ts";
+import { NOTE_RADIUS } from "./pen/paint.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
 
 /** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
@@ -684,8 +686,10 @@ export function Stage(props: {
 		const firstColour = fillsOf(node.fill).map((f) => (typeof f === "string" ? f : f && f.type === "color" ? (f as { color: string }).color : undefined)).find(Boolean);
 		const card = node.type !== "text";
 		const NOTE_PAPER: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe", context: "#bfdbfe" };
-		const paper = card ? (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? (isMarkdown(node) ? "#ffffff" : (NOTE_PAPER[node.type] ?? NOTE_PAPER.note!))) : undefined;
-		const ink = card ? "#1f2328" : (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? (scheme() === "dark" ? "#e6e6e6" : "#1f2328"));
+		const palette = CARD_PALETTE[scheme()];
+		const paper = card ? (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? (isMarkdown(node) ? palette.paper : (NOTE_PAPER[node.type] ?? NOTE_PAPER.note!))) : undefined;
+		// A card's words are the app's own colour, light or dark; a sticky note's are dark on its colour.
+		const ink = isMarkdown(node) ? palette.fg : card ? "#1f2328" : (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? (scheme() === "dark" ? "#e6e6e6" : "#1f2328"));
 		return {
 			font: pageFont(style.fontFamily, style.fontWeight, style.fontStyle === "italic"),
 			size: style.fontSize,
@@ -1735,6 +1739,14 @@ export function Stage(props: {
 
 	const onWheel = (event: WheelEvent) => {
 		event.preventDefault();
+		/*
+		 * A sideways scroll over a card's wide table scrolls the table, as it would in a page; Shift and
+		 * a wheel is sideways too. Everything else, over a table or not, moves the camera.
+		 */
+		if (!event.ctrlKey && !event.metaKey && props.pen && !props.drawing) {
+			const sideways = event.shiftKey && event.deltaX === 0 ? event.deltaY : Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : 0;
+			if (sideways !== 0 && penLayer.scrollBy(worldAt(event), sideways / localCamera.zoom)) return;
+		}
 		const at = local(event);
 		// `ctrlKey` is a trackpad pinch, not a key anybody pressed; `metaKey` is the
 		// deliberate mouse-wheel zoom. Everything else is a two-finger scroll.
@@ -2090,12 +2102,19 @@ export function Stage(props: {
 		penDrawn();
 		const id = hoverId();
 		if (props.mode !== "edit") return undefined;
-		if (id && id !== penText()?.id) return penLayer.bounds.get(id);
+		const bounds = id && id !== penText()?.id ? penLayer.bounds.get(id) : undefined;
+		if (bounds) return { ...bounds, id };
 		// A board under the pointer, unless it is the one selected, which has its own outline, or a drag is on.
 		const path = hoverBoard();
 		const board = path && path !== props.selected && !boardDrag() && !panning() ? props.boards.find((candidate) => candidate.path === path) : undefined;
 		return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true } : undefined;
 	});
+
+	/** Notes and cards have a board's corners, and so does the outline round one. */
+	const rounded = (id: string) => {
+		const type = penLayer.placed.get(id)?.node.type;
+		return type === "note" || type === "prompt" || type === "context";
+	};
 
 	/** The last tap on a drawn item, so a second one soon after on the same item opens its words. */
 	let lastTap: { id: string; at: number } | undefined;
@@ -2530,6 +2549,7 @@ export function Stage(props: {
 					{(box) => (
 						<div
 							class="pen-selection"
+							data-round={rounded(box.id) ? "true" : undefined}
 							style={{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
 						/>
 					)}
@@ -2539,6 +2559,7 @@ export function Stage(props: {
 						<div
 							class="pen-hover"
 							data-board={"board" in box() ? "true" : undefined}
+							data-round={"id" in box() && rounded((box() as { id: string }).id) ? "true" : undefined}
 							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
 						/>
 					)}
@@ -2677,7 +2698,7 @@ export function Stage(props: {
 									"text-align": look.align as "left",
 									color: look.ink,
 									background: look.paper ?? "transparent",
-									"border-radius": look.paper ? "6px" : "2px",
+									"border-radius": look.paper ? `${NOTE_RADIUS}px` : "2px",
 									"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
 								}}
 								value={open.value}

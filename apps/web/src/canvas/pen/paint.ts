@@ -1,6 +1,7 @@
 import type { Canvas, CanvasKit, Image, Paint, Path, Shader } from "canvaskit-wasm";
 import { bool, color, fillsOf, isArrow, isMarkdown, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
 import type { PenFonts } from "./fonts.ts";
+import { CARD_PALETTE } from "./markdown-layout.ts";
 import type { IconShape } from "./icons.ts";
 
 /**
@@ -36,9 +37,18 @@ export interface PaintContext {
 	skip?: ReadonlySet<string>;
 	/** Items drawn without their words: the ones being typed into, where the editor shows the words. */
 	mute?: ReadonlySet<string>;
+	/** How far a card's wide table has been scrolled sideways, by the card and the table's place in it. */
+	scroll?(id: string, index: number): number;
 }
 
 const NOTE_COLORS: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe", context: "#bfdbfe" };
+/** A board's corner on the canvas (`--radius-panel`). */
+export const NOTE_RADIUS = 12;
+/** The app's `--shadow`, light and dark (`index.css`): each layer's drop, blur and darkness. */
+const SHADOWS = {
+	light: [{ y: 1, blur: 2, alpha: 0.06 }, { y: 4, blur: 12, alpha: 0.05 }],
+	dark: [{ y: 1, blur: 2, alpha: 0.4 }, { y: 6, blur: 18, alpha: 0.3 }],
+} as const;
 
 export function paintDocument(canvas: Canvas, nodes: readonly PenNode[], ctx: PaintContext): void {
 	for (const node of nodes) paintNode(canvas, node, ctx);
@@ -126,34 +136,41 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 		case "prompt":
 		case "context": {
 			const fills = fillsOf(node.fill);
-			const rrect = ck.RRectXY(ck.LTRBRect(x, y, x + w, y + h), 6, 6);
-			const shadow = new ck.Paint();
-			shadow.setAntiAlias(true);
-			shadow.setColor(ck.Color4f(0, 0, 0, ctx.scheme === "dark" ? 0.45 : 0.14));
-			shadow.setMaskFilter(ck.MaskFilter.MakeBlur(ck.BlurStyle.Normal, 4, true));
-			canvas.save();
-			canvas.translate(0, 2);
-			canvas.drawRRect(rrect, shadow);
-			canvas.restore();
-			shadow.delete();
+			/*
+			 * Shaped as a board is on the canvas (`canvas.css`, `.board-node > .shade`): the panel radius,
+			 * the app's two-layer shadow for the scheme, and a hairline edge in the app's line colour.
+			 */
+			const rrect = ck.RRectXY(ck.LTRBRect(x, y, x + w, y + h), NOTE_RADIUS, NOTE_RADIUS);
+			for (const layer of SHADOWS[ctx.scheme]) {
+				const shadow = new ck.Paint();
+				shadow.setAntiAlias(true);
+				shadow.setColor(ck.Color4f(0, 0, 0, layer.alpha));
+				shadow.setMaskFilter(ck.MaskFilter.MakeBlur(ck.BlurStyle.Normal, layer.blur / 2, true));
+				canvas.save();
+				canvas.translate(0, layer.y);
+				canvas.drawRRect(rrect, shadow);
+				canvas.restore();
+				shadow.delete();
+			}
+			const markdown = isMarkdown(node);
 			if (fills.length) paintFills(canvas, ctx, node.fill, theme, placed.box, (paint) => canvas.drawRRect(rrect, paint));
 			else {
 				const paint = new ck.Paint();
 				paint.setAntiAlias(true);
-				// A markdown card is white paper; a note is its sticky colour.
-				paint.setColor(colorOf(ck, isMarkdown(node) ? "#ffffff" : (NOTE_COLORS[node.type] ?? NOTE_COLORS.note!)));
+				// A markdown card is the app's panel, light or dark; a note is its sticky colour.
+				paint.setColor(colorOf(ck, markdown ? CARD_PALETTE[ctx.scheme].paper : (NOTE_COLORS[node.type] ?? NOTE_COLORS.note!)));
 				canvas.drawRRect(rrect, paint);
 				paint.delete();
 			}
-			if (isMarkdown(node)) {
-				// A card has an edge, as a page does, and its words are markdown (`fonts.markdown`).
-				const edge = new ck.Paint();
-				edge.setAntiAlias(true);
-				edge.setStyle(ck.PaintStyle.Stroke);
-				edge.setStrokeWidth(1);
-				edge.setColor(ck.Color4f(0.82, 0.84, 0.87, 1));
-				canvas.drawRRect(ck.RRectXY(ck.LTRBRect(x + 0.5, y + 0.5, x + w - 0.5, y + h - 0.5), 6, 6), edge);
-				edge.delete();
+			const edge = new ck.Paint();
+			edge.setAntiAlias(true);
+			edge.setStyle(ck.PaintStyle.Stroke);
+			edge.setStrokeWidth(1);
+			edge.setColor(ctx.scheme === "dark" ? ck.Color4f(1, 1, 1, 0.12) : ck.Color4f(0, 0, 0, 0.1));
+			// Outside the box, as a CSS outline is.
+			canvas.drawRRect(ck.RRectXY(ck.LTRBRect(x - 0.5, y - 0.5, x + w + 0.5, y + h + 0.5), NOTE_RADIUS + 0.5, NOTE_RADIUS + 0.5), edge);
+			edge.delete();
+			if (markdown) {
 				paintMarkdown(canvas, ctx, node, theme, placed);
 				break;
 			}
@@ -461,7 +478,7 @@ function paintMarkdown(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: 
 	if (!content) return;
 	const style = textStyleOf(ctx.doc, node, theme);
 	const { x, y, w } = placed.box;
-	ctx.fonts.markdown(content, style, { width: w - NOTE_PAD * 2, align: node.textAlign ?? "left" }).draw(canvas, x + NOTE_PAD, y + NOTE_PAD);
+	ctx.fonts.markdown(content, style, { width: w - NOTE_PAD * 2, align: node.textAlign ?? "left" }).draw(canvas, x + NOTE_PAD, y + NOTE_PAD, (index) => ctx.scroll?.(node.id, index) ?? 0);
 }
 
 // --- icons -------------------------------------------------------------------------------------

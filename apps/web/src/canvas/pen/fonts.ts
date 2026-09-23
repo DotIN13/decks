@@ -143,6 +143,8 @@ export class PenFonts {
 	images: ((url: string) => Image | undefined) | undefined;
 	/** Bumped when an image arrives, so a card laid out without it is laid out again. */
 	imageVersion = 0;
+	/** The app's light or dark, which a card's colours follow (`markdown-layout.ts`). */
+	scheme: "light" | "dark" = "light";
 	private readonly cards = new Map<string, MarkdownLayout>();
 
 	/**
@@ -152,14 +154,14 @@ export class PenFonts {
 	 * does not delete what it is given.
 	 */
 	markdown(text: string, style: TextStyle, options: { width: number; align?: string }): MarkdownLayout {
-		const key = JSON.stringify([this.generation, this.imageVersion, Math.round(options.width * 10), options.align ?? "left", style, text]);
+		const key = JSON.stringify([this.generation, this.imageVersion, this.scheme, Math.round(options.width * 10), options.align ?? "left", style, text]);
 		const known = this.cards.get(key);
 		if (known) {
 			this.cards.delete(key);
 			this.cards.set(key, known);
 			return known;
 		}
-		const made = layoutMarkdown({ ck: this.ck, provider: this.provider, chain: (family) => this.chain(family), image: (url) => this.images?.(url), mono: MONO_FAMILY }, parseMarkdown(text), style, Math.max(1, options.width), options.align);
+		const made = layoutMarkdown({ ck: this.ck, provider: this.provider, chain: (family) => this.chain(family), image: (url) => this.images?.(url), mono: MONO_FAMILY, scheme: this.scheme }, parseMarkdown(text), style, Math.max(1, options.width), options.align);
 		this.cards.set(key, made);
 		// The least recently used go, beyond what a stage of cards needs at once.
 		while (this.cards.size > 64) {

@@ -25,8 +25,8 @@ import { decodeEntities } from "./markdown.ts";
 
 /**
  * A card's fenced code, coloured as GitHub colours it: highlight.js reads the language named after
- * the fence, and each piece it marks takes the colour GitHub's light theme gives that kind of
- * piece. A language it does not know, or none, is left in one colour, as GitHub leaves it.
+ * the fence, and each piece it marks takes the colour GitHub's light or dark theme gives that kind
+ * of piece, with the app's own light or dark. A language it does not know, or none, is left in one colour, as GitHub leaves it.
  */
 
 for (const [name, language] of Object.entries({ bash, c, cpp, css, diff, go, java, javascript, json, kotlin, markdown, php, python, r, ruby, rust, shell, sql, swift, typescript, xml, yaml })) {
@@ -45,7 +45,7 @@ hljs.registerAliases(["rb"], { languageName: "ruby" });
 hljs.registerAliases(["patch"], { languageName: "diff" });
 
 /** GitHub's light theme, by highlight.js's name for the piece. */
-const COLOURS: Record<string, string> = {
+const LIGHT: Record<string, string> = {
 	keyword: "#cf222e",
 	"selector-tag": "#cf222e",
 	"template-tag": "#cf222e",
@@ -72,7 +72,6 @@ const COLOURS: Record<string, string> = {
 	meta: "#0550ae",
 	built_in: "#953800",
 	type: "#953800",
-	params: "#1f2328",
 	comment: "#59636e",
 	quote: "#59636e",
 	name: "#116329",
@@ -85,6 +84,46 @@ const COLOURS: Record<string, string> = {
 	operator: "#cf222e",
 };
 
+/** GitHub's dark theme, the same pieces. */
+const DARK: Record<string, string> = {
+	keyword: "#ff7b72",
+	"selector-tag": "#ff7b72",
+	"template-tag": "#ff7b72",
+	doctag: "#ff7b72",
+	title: "#d2a8ff",
+	"title.function": "#d2a8ff",
+	"title.class": "#ffa657",
+	"title.class.inherited": "#ffa657",
+	string: "#a5d6ff",
+	regexp: "#a5d6ff",
+	"meta.string": "#a5d6ff",
+	number: "#79c0ff",
+	literal: "#79c0ff",
+	attr: "#79c0ff",
+	attribute: "#79c0ff",
+	variable: "#ffa657",
+	"template-variable": "#ffa657",
+	symbol: "#79c0ff",
+	"selector-id": "#79c0ff",
+	"selector-class": "#d2a8ff",
+	"selector-attr": "#79c0ff",
+	"selector-pseudo": "#79c0ff",
+	property: "#79c0ff",
+	meta: "#79c0ff",
+	built_in: "#ffa657",
+	type: "#ffa657",
+	comment: "#8b949e",
+	quote: "#8b949e",
+	name: "#7ee787",
+	tag: "#7ee787",
+	section: "#79c0ff",
+	bullet: "#ffa657",
+	addition: "#aff5b4",
+	deletion: "#ffa198",
+	link: "#a5d6ff",
+	operator: "#ff7b72",
+};
+
 export interface CodeRun {
 	text: string;
 	/** A colour from GitHub's theme; none is the code's own colour. */
@@ -94,7 +133,8 @@ export interface CodeRun {
 }
 
 /** Code in a language, as coloured runs; unknown languages are one run. */
-export function highlight(code: string, lang: string): CodeRun[] {
+export function highlight(code: string, lang: string, scheme: "light" | "dark" = "light"): CodeRun[] {
+	const COLOURS = scheme === "dark" ? DARK : LIGHT;
 	if (!lang || !hljs.getLanguage(lang)) return [{ text: code }];
 	let html: string;
 	try {

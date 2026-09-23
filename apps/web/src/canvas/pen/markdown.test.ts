@@ -47,4 +47,5 @@ test("code in a known language is coloured as GitHub colours it, and an unknown 
 	assert.equal(runs.find((run) => run.text.includes('"yes"'))?.colour, "#0a3069");
 	assert.equal(runs.find((run) => run.text.includes("// why"))?.colour, "#59636e");
 	assert.deepEqual(highlight("a < b", "klingon"), [{ text: "a < b" }]);
+	assert.equal(highlight("const x = 1", "js", "dark").find((run) => run.text === "const")?.colour, "#ff7b72");
 });

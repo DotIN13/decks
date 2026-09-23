@@ -963,8 +963,8 @@
 	.world > .pen-join {
 	background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
-	/* A board's hover outline follows the board's own corners. */
-	.world > .pen-hover[data-board="true"] {
+	/* A board's hover outline follows the board's own corners, and so does a note's or a card's, which share them. */
+	.world > :is(.pen-hover, .pen-selection):is([data-board="true"], [data-round="true"]) {
 	border-radius: var(--radius-panel, 12px);
 }
 	/* Where a drag or a resize snapped: a line it lines up on, or a gap it repeats. */

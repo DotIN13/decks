@@ -1,7 +1,7 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "6969ef1d3f557d95dd4a47d858d2f4339f57017a8a19c21864565e0f2bdd6945",
+	"hash": "b1f7029dcdfcfe7ee25ba2b0050c957fbb7da8e52bfe7e81288ed1372fff386c",
 	"rules": 773,
 	"sheets": 18,
 	"ties": 0,
@@ -553,7 +553,7 @@
 		["styles/canvas.css","@layer components ▸ .world > :is(.pen-selection,.pen-hover,.pen-join,.pen-guides,.pen-handle,.pen-text,.pen-draft,.pen-draft-line){z-index:3}"],
 		["styles/canvas.css","@layer components ▸ .world > :is(.pen-hover,.pen-join){position:absolute;border-radius:4px;pointer-events:none}"],
 		["styles/canvas.css","@layer components ▸ .world > .pen-join{background:color-mix(in srgb, var(--color-accent) 10%, transparent)}"],
-		["styles/canvas.css","@layer components ▸ .world > .pen-hover[data-board=\"true\"]{border-radius:var(--radius-panel, 12px)}"],
+		["styles/canvas.css","@layer components ▸ .world > :is(.pen-hover,.pen-selection):is([data-board=\"true\"],[data-round=\"true\"]){border-radius:var(--radius-panel, 12px)}"],
 		["styles/canvas.css","@layer components ▸ .world > .pen-guides{position:absolute;top:0;left:0;overflow:visible;pointer-events:none}"],
 		["styles/canvas.css","@layer components ▸ .world > .pen-guides line{stroke:#f24e1e}"],
 		["styles/canvas.css","@layer components ▸ .world > .pen-selection{position:absolute;border-radius:4px;pointer-events:none}"],
