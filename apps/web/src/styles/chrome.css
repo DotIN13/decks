@@ -900,39 +900,22 @@
 	 * label somebody chose.
 	 */
 	/*
-	 * The runtime: a filled **box**, where a tag is a pill.
+	 * The runtime: a quiet word after the name, in the name's own face.
 	 *
-	 * Same size, same mono, same grey — and a different shape, which is the whole of what
-	 * tells them apart. They are not the same kind of fact: a tag is something somebody said
-	 * about this agent and there can be four of them; the runtime is what the agent *is* and
-	 * there is exactly one. Shape carries that, so the fill does not have to, and both can
-	 * keep the quiet grey they read best in.
-	 *
-	 * This is why the filled chip is affordable again after being stripped for being five
-	 * grey slabs down a list of five: it is now the only square thing in the row.
+	 * It was a filled mono box, the only square thing on the row. Beside a name it read as a
+	 * second label competing with the first; muted text on the name's baseline says the same
+	 * fact, `pi` or `claude`, as a qualifier of the name rather than a thing of its own.
 	 */
 	.kind {
 		flex: none;
-		padding: 1px 5px;
-		border-radius: var(--radius-inline);
-		background: var(--fill);
 		color: var(--muted);
-		font-family: var(--font-mono);
-		font-size: var(--type-tag);
-		line-height: 14px;
-		letter-spacing: 0.01em;
+		font-size: var(--type-ui);
+		font-weight: 400;
+		white-space: nowrap;
 	}
 
-	/*
-	 * Hollow on an agent with no runtime behind it.
-	 *
-	 * A dormant chat has a `kind` recorded and nothing running, so the word is a fact about
-	 * what it *will* resume as — and the emptied box is a good picture of that. It cannot be
-	 * mistaken for one of your tags, which are outlined too: those are pills, this is a box.
-	 */
+	/* On an agent with no runtime behind it, fainter: what it will resume as, not what is running. */
 	.kind[data-dormant] {
-		background: transparent;
-		box-shadow: inset 0 0 0 1px var(--line);
 		color: var(--faint);
 	}
 

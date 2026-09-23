@@ -19,7 +19,7 @@
  */
 import { open, say, settle } from "../harness.mjs";
 
-const { browser, page, errors } = await open({ width: 1400, height: 980 });
+const { browser, page, context, errors } = await open({ width: 1400, height: 980 });
 
 await page.addInitScript(() => {
 	if (window.top !== window.self) return;
@@ -187,7 +187,8 @@ await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 500);
 
 /*
- * What the panel opens on, before a single control is pressed: the **workspace** axis.
+ * What the panel opens on, before a single control is pressed: the **workspace** axis, which is
+ * now the only one — and **two lines** per agent.
  *
  * The question a panel of a dozen agents is usually opened with is which project somebody is
  * on, and a project heading is a place that stays where it is while turns start and end. None
@@ -196,110 +197,108 @@ await settle(page, 500);
  * by not having been told something.
  */
 const opened = await page.evaluate(() => ({
-	/* The view square beside the search says which grouping is showing; a press gives the other. */
-	axis: document.querySelector(".panel-view")?.getAttribute("data-view"),
+	/* The square beside the search is the row height on this tab, not a grouping. */
+	view: document.querySelector(".panel-view")?.getAttribute("data-view"),
+	offer: document.querySelector(".panel-view")?.getAttribute("aria-label"),
+	lines: document.querySelector(".row-list.agent-list")?.getAttribute("data-lines"),
 	sections: [...document.querySelectorAll(".panel-section")].map((one) => `${one.dataset.kind}:${one.querySelectorAll(".agent-row").length}`),
 	label: document.querySelector(".panel-meta > span")?.textContent,
 }));
-say("the agents list opens cut by workspace", opened.axis === "workspace", JSON.stringify(opened.axis));
 say(
-	"…which is one heading here, since none of these five has a project",
+	"the agents list opens cut by workspace, which is one heading here, since none of these five has a project",
 	JSON.stringify(opened.sections) === JSON.stringify(["unfiled:5"]) && opened.label === "No workspace",
 	JSON.stringify([opened.sections, opened.label]),
 );
+say("…with two lines per agent, and the square offering one", opened.view === "lines-2" && opened.lines === "2" && opened.offer === "One line per agent", JSON.stringify(opened));
 
-/* The other axis is one press away, and the rest of this section is about it. */
-await page.locator('.panel-view[data-view="workspace"]').click();
-await settle(page, 400);
+const rowsNow = () =>
+	page.evaluate(() =>
+		[...document.querySelectorAll(".agent-row")].map((agent) => ({
+			name: agent.querySelector(".row-label")?.textContent,
+			lines: agent.dataset.lines,
+			h: Math.round(agent.getBoundingClientRect().height),
+			kind: agent.querySelector(".kind")?.textContent,
+			weight: getComputedStyle(agent.querySelector(".row-label")).fontWeight,
+			avatar: Math.round(agent.querySelector(".row-icon")?.getBoundingClientRect().width ?? 0),
+			state: agent.querySelector(".agent-state")?.textContent?.trim(),
+			said: agent.querySelector(".agent-said")?.textContent?.trim(),
+			dormant: agent.dataset.dormant ?? null,
+			/* How far the face's centre sits from the text's: the face is centred on the words. */
+			offCentre: (() => {
+				const mid = (el) => {
+					const box = el?.getBoundingClientRect();
+					return box ? box.top + box.height / 2 : NaN;
+				};
+				return Math.round(Math.abs(mid(agent.querySelector(".row-icon")) - mid(agent.querySelector(".agent-body"))) * 10) / 10;
+			})(),
+			/* The name line, then at most one more: what it is doing, or what it last said. */
+			shape: [...agent.querySelectorAll(".agent-body > *")].map((line) => line.className.split(" ")[0]),
+			metaColumn: [agent.querySelector(".agent-line > .ago") !== null, agent.querySelector(".agent-line > .kind") !== null],
+			/* Tags and the workspace are off the row: the heading names the workspace, the search
+			   matches both, and the edit window shows them. */
+			chips: agent.querySelectorAll(".tags, .tag").length,
+			/* Side by side, not stacked: the row vocabulary collapses to one column unless the
+			   avatar is in an `.row-icon` slot, and that mistake put the name under the face. */
+			sideBySide: (() => {
+				const ic = agent.querySelector(".row-icon")?.getBoundingClientRect();
+				const body = agent.querySelector(".agent-body")?.getBoundingClientRect();
+				return Boolean(ic && body && body.left >= ic.right);
+			})(),
+		})),
+	);
 
-const panel = await page.evaluate(() => ({
-	sections: [...document.querySelectorAll(".panel-section")].map((section) => `${section.dataset.kind}:${section.querySelectorAll(".agent-row").length}`),
-	labels: [...document.querySelectorAll(".panel-meta")].map((meta) => meta.textContent?.replace(/\s+/g, " ").trim()),
-	rows: [...document.querySelectorAll(".agent-row")].map((agent) => ({
-		name: agent.querySelector(".row-label")?.textContent,
-		h: Math.round(agent.getBoundingClientRect().height),
-		kind: agent.querySelector(".kind")?.textContent,
-		avatar: Math.round(agent.querySelector(".row-icon")?.getBoundingClientRect().width ?? 0),
-		state: agent.querySelector(".agent-state")?.textContent?.trim(),
-		dormant: agent.dataset.dormant ?? null,
-		/*
-		 * The row is `AgentHoverCard` laid flat, with one deliberate difference: the runtime
-		 * rides with the name — `Rune claude` is one thing being identified — and the right
-		 * end of the name line is the time, which is the column the two buttons take over.
-		 */
-		shape: [...agent.querySelectorAll(".agent-body > *")].map((line) => line.className.split(" ")[0]),
-		metaColumn: [agent.querySelector(".agent-line > .ago") !== null, agent.querySelector(".agent-line > .kind") !== null],
-		tags: [...agent.querySelectorAll(".tag")].map((tag) => `${tag.textContent}${tag.dataset.mine ? "*" : ""}`),
-		said: agent.querySelector(".agent-said")?.textContent?.trim(),
-		/* Side by side, not stacked: the row vocabulary collapses to one column unless the
-		   avatar is in an `.row-icon` slot, and that mistake put the name under the face. */
-		sideBySide: (() => {
-			const ic = agent.querySelector(".row-icon")?.getBoundingClientRect();
-			const body = agent.querySelector(".agent-body")?.getBoundingClientRect();
-			return Boolean(ic && body && body.left >= ic.right);
-		})(),
-	})),
-	/* There is no foot: the count is in the headings, and the one control beside the search
-	   is the grouping on this tab, showing what is up and offering the other. */
-	foot: document.querySelector(".panel-foot")?.textContent?.trim(),
-	grouping: document.querySelector(".panel-view")?.getAttribute("data-view"),
-	groupingOffer: document.querySelector(".panel-view")?.getAttribute("aria-label"),
-	placeholder: document.querySelector(".panel-shell .field input")?.placeholder,
-}));
+const panel = {
+	rows: await rowsNow(),
+	...(await page.evaluate(() => ({
+		foot: document.querySelector(".panel-foot")?.textContent?.trim(),
+		placeholder: document.querySelector(".panel-shell .field input")?.placeholder,
+	}))),
+};
+const rowOf = (name) => panel.rows.find((agent) => agent.name === name);
 
+/* In the order they last said something: Ada 4s ago, Pi, Iris, Wren, Basil two hours ago. */
+say("the rows are in the order they last said something", JSON.stringify(panel.rows.map((r) => r.name)) === JSON.stringify(["Ada", "Pi", "Iris", "Wren", "Basil"]), JSON.stringify(panel.rows.map((r) => r.name)));
 /*
- * The sections are `agent-order.ts`'s own ranking with headings on it, so the panel and the
- * corner stack cannot disagree about who is most urgent — which they would within a week if
- * each sorted for itself.
+ * A finished turn keeps its place and says it is unread: "come and read this" is not the same
+ * demand as "answer this now", and no heading promotes it.
  */
-say("three sections, most urgent first", JSON.stringify(panel.sections) === JSON.stringify(["wants:1", "working:2", "quiet:2"]), JSON.stringify(panel.sections));
-say("…named in sentence case, with no count on the heading", JSON.stringify(panel.labels) === JSON.stringify(["Wants you", "Working", "Quiet"]), JSON.stringify(panel.labels));
-/*
- * A finished turn stays in Quiet with the green ring rather than being promoted: "come and
- * read this" is not the same demand as "answer this now".
- */
-say("a finished turn does not jump the queue", panel.rows[3]?.name === "Wren" && /not read yet/.test(panel.rows[3]?.state ?? ""), panel.rows[3]?.state);
+say("a finished turn keeps its place, and says it is not read yet", panel.rows[3]?.name === "Wren" && /not read yet/.test(panel.rows[3]?.state ?? ""), JSON.stringify(panel.rows[3]));
+say("every row is two lines", panel.rows.every((agent) => agent.lines === "2" && agent.shape.length === 2 && agent.shape[0] === "agent-line"), JSON.stringify(panel.rows.map((r) => r.shape)));
 say("the avatar is beside the name, not above it", panel.rows.every((agent) => agent.sideBySide), JSON.stringify(panel.rows.map((r) => r.sideBySide)));
-say("…at 28px, where the dropdown's is 20", panel.rows.every((agent) => agent.avatar === 28), JSON.stringify(panel.rows.map((r) => r.avatar)));
-say("a row carries the runtime, the state, the tags and the last line", panel.rows[0]?.kind === "claude" && Boolean(panel.rows[0]?.state) && panel.rows[0]?.tags.length === 3 && Boolean(panel.rows[0]?.said), JSON.stringify(panel.rows[0]));
-/*
- * And in the hover card's order, because the row *is* the card laid flat: name, state, tags,
- * what it said. The card is the surface nobody has ever complained about, so the panel takes
- * its shape rather than inventing a fourth one.
- */
-say("…in the hover card's four lines", JSON.stringify(panel.rows[0]?.shape) === JSON.stringify(["agent-line", "agent-state", "tags", "agent-said"]), JSON.stringify(panel.rows[0]?.shape));
-/* Two columns, and the right one is meta: how long ago, then what runtime. */
-say("…the runtime beside the name, the time at the line's end", JSON.stringify(panel.rows[0]?.metaColumn) === JSON.stringify([true, true]), JSON.stringify(panel.rows[0]?.metaColumn));
-say("…with your tags told apart from the agent's", JSON.stringify(panel.rows[0]?.tags) === JSON.stringify(["e2e", "flaky-editing", "mine*"]), JSON.stringify(panel.rows[0]?.tags));
-/*
- * The row shrinks rather than reserving space. Basil has no tags and nothing quoted, so it is
- * the shortest row in the list — a list of five where two are short reads better than five
- * each carrying an empty third line.
- */
-const basil = panel.rows.find((agent) => agent.name === "Basil");
-const ada = panel.rows.find((agent) => agent.name === "Ada");
-say("an agent with nothing to say gets a shorter row", basil.h < ada.h - 20, `Basil ${basil.h} vs Ada ${ada.h}`);
+say("…at 26px", panel.rows.every((agent) => agent.avatar === 26), JSON.stringify(panel.rows.map((r) => r.avatar)));
+say("…on a 48px row, the face centred on the two lines", panel.rows.every((agent) => agent.h === 48 && agent.offCentre <= 1), JSON.stringify(panel.rows.map((r) => [r.h, r.offCentre])));
+/* Busy is asking, working, or finished unread: then the second line is what it is doing. */
+say(
+	"a busy agent's second line is what it is doing, in words",
+	rowOf("Iris")?.shape[1] === "agent-state" && /\S/.test(rowOf("Iris")?.state ?? "") && rowOf("Ada")?.shape[1] === "agent-state" && rowOf("Pi")?.shape[1] === "agent-state" && rowOf("Ada")?.said === undefined,
+	JSON.stringify(["Iris", "Ada", "Pi"].map((name) => [name, rowOf(name)?.state, rowOf(name)?.said])),
+);
+/* A dormant agent's name is set a step lighter, the way its runtime word is fainter. */
+say(
+	"the name is set in 600, a dormant one's lighter",
+	panel.rows.every((agent) => (agent.dormant ? Number(agent.weight) < 600 : agent.weight === "600")),
+	JSON.stringify(panel.rows.map((r) => `${r.name}:${r.weight}`)),
+);
+say("the runtime beside the name, the time at the line's end", JSON.stringify(rowOf("Ada")?.metaColumn) === JSON.stringify([true, true]) && rowOf("Ada")?.kind === "claude", JSON.stringify(rowOf("Ada")));
+say("no row carries a tag or a workspace chip", panel.rows.every((agent) => agent.chips === 0), JSON.stringify(panel.rows.map((r) => r.chips)));
 /*
  * Dormant beats idle: both are true and only one of them explains why nothing is happening.
- * One word, where it used to be "Dormant — not resumed" — the row is marked and its runtime
- * word is boxed, so the sentence had two other things saying it.
+ * Basil has said nothing, so its second line is the state, in one word.
  */
-say("…and dormant beats idle, in one word", basil.dormant === "true" && basil.state?.includes("Dormant"), JSON.stringify([basil.dormant, basil.state]));
+const basil = rowOf("Basil");
+say("…and dormant beats idle, in one word", basil?.dormant === "true" && basil?.state?.includes("Dormant"), JSON.stringify([basil?.dormant, basil?.state]));
 /* The foot counts, and it is the only count: the headings carry a + instead. */
 say("there is no foot under the list: the count lives in the headings", panel.foot === undefined, String(panel.foot));
-/* Pictures or rows is a question about thumbnails; an agent has no second rendering. */
-say("the square beside the search is the grouping on Agents: attention is up, and a press offers workspace", panel.grouping === "attention" && panel.groupingOffer === "Group agents by workspace", `${panel.grouping} / ${panel.groupingOffer}`);
-say("the field says what it searches", /agents, tags or workspaces/.test(panel.placeholder ?? ""), panel.placeholder);
+/* It names what it searches and how many; it still matches tags and workspaces, as below. */
+say("the field says what it searches, and how many", panel.placeholder === "Search 5 agents", panel.placeholder);
 
 // --- approaching a row, and what is allowed to move ---------------------------------
 /*
  * The two buttons arrive over the *first line* and nothing else may move.
  *
- * They were flex siblings of the row's body, so their arrival took 24px off it — 46px on a
- * row that can also be closed — and the state, the tags and the last thing the agent said
- * all reflowed as the pointer crossed the list, losing words to an ellipsis for a button
- * 40px above them. They are 22px tall at the top of a 90px row; nothing under the name was
- * ever in their way.
+ * They were flex siblings of the row's body, so their arrival took 24px off it, and the lines
+ * under the name reflowed as the pointer crossed the list, losing words to an ellipsis for a
+ * button above them. They stand on the name line; nothing under it was ever in their way.
  */
 const geometry = () =>
 	page.evaluate(() => {
@@ -313,7 +312,6 @@ const geometry = () =>
 		return {
 			body: Math.round(row.querySelector(".agent-body").getBoundingClientRect().width),
 			said: Math.round(row.querySelector(".agent-said")?.getBoundingClientRect().width ?? 0),
-			tags: Math.round(row.querySelector(".tags")?.getBoundingClientRect().width ?? 0),
 			state: Math.round(row.querySelector(".agent-state")?.getBoundingClientRect().width ?? 0),
 			nameRoom: Math.round(line.clientWidth - parseFloat(style.paddingRight)),
 			buttons: shown.length,
@@ -329,9 +327,9 @@ const approached = await geometry();
 
 say("approaching a row brings its buttons out", approached.buttons > 0 && still.buttons === 0, `${still.buttons} → ${approached.buttons}`);
 say(
-	"…and the three lines under the name do not move",
-	approached.said === still.said && approached.tags === still.tags && approached.state === still.state,
-	`said ${still.said}→${approached.said}, tags ${still.tags}→${approached.tags}, state ${still.state}→${approached.state}`,
+	"…and the line under the name does not move",
+	approached.said === still.said && approached.state === still.state && still.state > 0,
+	`said ${still.said}→${approached.said}, state ${still.state}→${approached.state}`,
 );
 /* The one line that does give ground — it is the line they stand on. */
 say("…while the name line gives up exactly their column", approached.nameRoom < still.nameRoom, `${still.nameRoom} → ${approached.nameRoom}`);
@@ -375,9 +373,11 @@ say("…and the placeholder follows the tab", /boards$/.test((await page.locator
  */
 await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 400);
-await page.locator(".agent-row").first().hover();
+/* Iris's pen: she is the one with a tag of yours, and the one the window's assertions are about. */
+const irisRow = page.locator(".agent-row").filter({ hasText: "Iris" }).first();
+await irisRow.hover();
 await settle(page, 250);
-await page.locator(".agent-row .agent-tagbtn").first().click();
+await irisRow.locator(".agent-tagbtn").click();
 await page.waitForSelector('[role="dialog"]', { timeout: 4000 });
 await settle(page, 400);
 
@@ -476,15 +476,9 @@ for (const [id, name, tags, workspace] of [
 }
 await settle(page, 500);
 
-const attention = await page.evaluate(() => [...document.querySelectorAll(".panel-section")].map((one) => one.dataset.kind));
-say("the attention axis is still the one that was asked for", JSON.stringify(attention) === JSON.stringify(["wants", "working", "quiet"]), JSON.stringify(attention));
-/* The chip is drawn in both groupings: a fact about an agent is not a decoration of the
-   section it happens to be under, and in this one the heading says nothing about a project. */
-const chipped = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => `${row.querySelector(".row-label")?.textContent}:${row.querySelector(".tag.ws")?.textContent ?? "-"}`));
-say("…and a workspace is on the row in the urgency grouping too", chipped.includes("Ada:political-llm") && chipped.includes("Basil:-"), JSON.stringify(chipped));
-
-await page.locator('.panel-view[data-view="attention"]').click();
-await settle(page, 400);
+/* Filed, and still no chip: the heading names the workspace, so the row does not repeat it. */
+const chipped = await page.evaluate(() => document.querySelectorAll(".agent-row .tag, .agent-row .tags").length);
+say("a workspace is not drawn on the row: its heading says it", chipped === 0, `${chipped} chips`);
 
 const filed = await page.evaluate(() => {
 	return [...document.querySelectorAll(".panel-section")].map((section) => ({
@@ -549,6 +543,12 @@ const moved = await page.evaluate(() =>
 const loose = moved.find((one) => one.label === "No workspace");
 say("a new message moves a row to the top of its heading", JSON.stringify(loose?.rows) === JSON.stringify(["Basil", "Iris"]), JSON.stringify(loose?.rows));
 say("…while the one waiting stays where it is, and the heading still says so", loose?.note === "1 wants you", JSON.stringify(loose?.note));
+/* Basil is not busy — dormant, asking nothing — so now that it has said something, that is its second line. */
+const basilSaid = await page.evaluate(() => {
+	const row = [...document.querySelectorAll(".agent-row")].find((one) => one.querySelector(".row-label")?.textContent === "Basil");
+	return { said: row?.querySelector(".agent-said")?.textContent?.trim(), state: row?.querySelector(".agent-state")?.textContent?.trim() };
+});
+say("an agent with nothing going on shows the last thing it said instead of a state", basilSaid.said === "Just arrived" && basilSaid.state === undefined, JSON.stringify(basilSaid));
 
 /* Searching by project works in either grouping — which is what makes it a way to *find* one. */
 await page.locator(".panel-shell input").first().fill("irb");
@@ -556,6 +556,136 @@ await settle(page, 400);
 const byProject = await page.evaluate(() => [...document.querySelectorAll(".agent-row")].map((row) => row.querySelector(".row-label")?.textContent));
 say("searching a project name finds its agents", JSON.stringify(byProject) === JSON.stringify(["Wren"]), JSON.stringify(byProject));
 await page.locator(".panel-shell input").first().fill("");
+await settle(page, 300);
+
+// --- one line or two -----------------------------------------------------------------
+
+/*
+ * In the two-line view the row says what the agent is doing, so pointing at it opens nothing:
+ * the card would repeat the row beside the row.
+ */
+const two = await rowsNow();
+await page.locator(".agent-row").filter({ hasText: "Iris" }).first().locator("[data-row]").hover();
+await settle(page, 300);
+const cardInTwo = await page.evaluate(() => [...document.querySelectorAll(".agent-hover")].filter((el) => el.dataset.shown === "true").length);
+say("in the two-line view pointing at a row opens no card", cardInTwo === 0, `${cardInTwo} cards shown`);
+await page.mouse.move(700, 500);
+await settle(page, 200);
+
+/* The square switches the rows to one line: name, runtime and time, and a smaller face. */
+await page.locator('.panel-view[data-view="lines-2"]').click();
+await settle(page, 400);
+const one = {
+	rows: await rowsNow(),
+	...(await page.evaluate(() => ({
+		view: document.querySelector(".panel-view")?.getAttribute("data-view"),
+		offer: document.querySelector(".panel-view")?.getAttribute("aria-label"),
+		lists: [...document.querySelectorAll(".row-list.agent-list")].map((list) => list.getAttribute("data-lines")),
+		stored: localStorage.getItem("decks.agentLines"),
+	}))),
+};
+say("pressing the square gives one line per agent, and it offers two", one.view === "lines-1" && one.offer === "Two lines per agent" && one.lists.length > 0 && one.lists.every((n) => n === "1"), JSON.stringify([one.view, one.offer, one.lists]));
+say("…each row only its name line", one.rows.every((agent) => agent.lines === "1" && JSON.stringify(agent.shape) === JSON.stringify(["agent-line"])), JSON.stringify(one.rows.map((r) => r.shape)));
+say("…with a 20px face", one.rows.every((agent) => agent.avatar === 20), JSON.stringify(one.rows.map((r) => r.avatar)));
+say("…on a 26px row, the face centred on the line", one.rows.every((agent) => agent.h === 26 && agent.offCentre <= 1), JSON.stringify(one.rows.map((r) => [r.h, r.offCentre])));
+say(
+	"…and every row shorter than it was",
+	one.rows.length === two.length && one.rows.every((agent) => agent.h < (two.find((was) => was.name === agent.name)?.h ?? 0)),
+	`${JSON.stringify(two.map((r) => r.h))} → ${JSON.stringify(one.rows.map((r) => r.h))}`,
+);
+say("…and the choice is remembered", one.stored === "1", String(one.stored));
+
+/* With the second line gone, the card beside the panel says what the row no longer does. */
+const irisOne = page.locator(".agent-row").filter({ hasText: "Iris" }).first();
+await irisOne.locator("[data-row]").hover();
+await settle(page, 300);
+const beside = await page.evaluate(() => {
+	const shown = [...document.querySelectorAll(".agent-hover")].find((el) => el.dataset.shown === "true");
+	if (!shown) return { shown: false };
+	const box = shown.getBoundingClientRect();
+	const panelBox = document.querySelector(".panel-shell").getBoundingClientRect();
+	const row = [...document.querySelectorAll(".agent-row")].find((one) => one.querySelector(".row-label")?.textContent === "Iris").getBoundingClientRect();
+	return {
+		shown: true,
+		text: shown.innerText.replace(/\n+/g, " | "),
+		/* Beside the row it describes, not over it. (It is anchored on the row, so it can
+		   overlap the panel's own outer padding by a few pixels; the rows are what it must clear.) */
+		beside: Math.round(box.left) >= Math.round(row.right),
+		/* Level with the row it describes, not parked at the top of the screen. */
+		level: box.top <= row.bottom && box.bottom >= row.top,
+		box: { left: Math.round(box.left), top: Math.round(box.top), bottom: Math.round(box.bottom) },
+		panel: Math.round(panelBox.right),
+		row: { top: Math.round(row.top), bottom: Math.round(row.bottom), right: Math.round(row.right) },
+	};
+});
+say("in the one-line view pointing at a row opens its card", beside.shown === true && /Iris/.test(beside.text ?? ""), JSON.stringify(beside));
+say("…beside the row, level with it", beside.beside === true && beside.level === true, JSON.stringify([beside.box, beside.panel, beside.row]));
+await page.mouse.move(700, 500);
+await settle(page, 400);
+const gone = await page.evaluate(() => [...document.querySelectorAll(".agent-hover")].filter((el) => el.dataset.shown === "true").length);
+say("…and leaving the row puts it away", gone === 0, `${gone} cards shown`);
+
+/* The buttons still arrive over the name line, which gives up their column. */
+const adaOne = page.locator(".agent-row").filter({ hasText: "Ada" }).first();
+const stillOne = await geometry();
+await adaOne.hover();
+await settle(page, 400);
+const approachedOne = await geometry();
+say(
+	"…and in one line, approaching a row still brings its buttons over the name line",
+	stillOne.buttons === 0 && approachedOne.buttons > 0 && approachedOne.nameRoom < stillOne.nameRoom && approachedOne.wordsEndAt <= approachedOne.firstButtonAt,
+	JSON.stringify([stillOne, approachedOne]),
+);
+await page.mouse.move(700, 500);
+await settle(page, 300);
+
+// --- the boards' grid and the agents' lines are two settings ---------------------------
+
+/*
+ * The square is one button with two jobs, one per tab, and the two must not leak: the boards'
+ * grid once laid agent rows two across, because the list carried the density on both tabs.
+ */
+const agentLayout = () =>
+	page.evaluate(() => {
+		const rows = [...document.querySelectorAll(".agent-row")].map((row) => row.getBoundingClientRect());
+		return {
+			density: document.querySelector(".panel-list")?.getAttribute("data-density") ?? null,
+			lines: document.querySelector(".row-list.agent-list")?.getAttribute("data-lines"),
+			/* One column: every row starts at the same left, each below the last. */
+			column: rows.length > 1 && rows.every((box) => Math.round(box.left) === Math.round(rows[0].left)) && rows.every((box, i) => i === 0 || box.top >= rows[i - 1].bottom - 1),
+		};
+	});
+const boardsView = async () => {
+	await page.getByRole("tab", { name: "Boards" }).click();
+	await settle(page, 300);
+	return page.evaluate(() => document.querySelector(".panel-view")?.getAttribute("data-view"));
+};
+const densityBefore = await boardsView();
+await page.locator(".panel-view").click();
+await settle(page, 300);
+const densityGrid = await page.evaluate(() => document.querySelector(".panel-view")?.getAttribute("data-view"));
+await page.getByRole("tab", { name: "Agents" }).click();
+await settle(page, 400);
+const underGrid = await agentLayout();
+say(
+	"with the boards as a grid, the agents are still one column, at the line count they had",
+	densityGrid !== densityBefore && underGrid.density === null && underGrid.column && underGrid.lines === "1",
+	JSON.stringify({ boards: `${densityBefore}→${densityGrid}`, ...underGrid }),
+);
+await page.locator('.panel-view[data-view="lines-1"]').click();
+await settle(page, 300);
+const densityAfterLines = await boardsView();
+say("…and switching agent lines leaves the boards' density alone", densityAfterLines === densityGrid, `${densityGrid} → ${densityAfterLines}`);
+/* Put both back: the boards as they were, the agents in one line. */
+await page.locator(".panel-view").click();
+await settle(page, 300);
+await page.getByRole("tab", { name: "Agents" }).click();
+await settle(page, 300);
+await page.locator('.panel-view[data-view="lines-2"]').click();
+await settle(page, 300);
+const restored = { lines: await page.evaluate(() => document.querySelector(".panel-view")?.getAttribute("data-view")), boards: await boardsView() };
+say("…and both are back where they were", restored.lines === "lines-1" && restored.boards === densityBefore, JSON.stringify(restored));
+await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 300);
 
 /* And the dropdown, where two named workspaces are two runs to tell apart. */
@@ -615,6 +745,23 @@ const landed = await page.evaluate(() => ({
 	rows: document.querySelectorAll(".panel-shell .agent-row").length,
 }));
 say("…and pressing it opens the panel on its Agents tab, with every agent listed", landed.popover === 0 && landed.panel && landed.tab === "Agents" && landed.rows === 16, JSON.stringify(landed));
+
+/*
+ * The choice outlives the page. A second tab in the same browser, because the harness clears
+ * storage on every load of the first one — which is exactly the thing being tested.
+ */
+const second = await context.newPage();
+await second.goto(page.url(), { waitUntil: "load" });
+await settle(second, 1500);
+if (!(await second.evaluate(() => Boolean(document.querySelector(".panel-shell"))))) await second.locator('[aria-label*="boards panel" i]').first().click();
+await second.waitForSelector(".panel-shell", { timeout: 5000 });
+await second.getByRole("tab", { name: "Agents" }).click();
+await settle(second, 400);
+/* Wait for the square to be the agents' one: the tab switch is a render away. */
+await second.waitForFunction(() => /^lines-/.test(document.querySelector(".panel-view")?.getAttribute("data-view") ?? ""), null, { timeout: 4000 }).catch(() => {});
+const reopened = await second.evaluate(() => document.querySelector(".panel-view")?.getAttribute("data-view"));
+say("one line per agent survives a new page", reopened === "lines-1", String(reopened));
+await second.close();
 
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();

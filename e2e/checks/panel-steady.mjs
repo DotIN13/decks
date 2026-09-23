@@ -23,9 +23,13 @@
  *    scroll position all live on the elements, so re-creating a row throws them away — an
  *    arrows-only reader loses their place, a popup they had opened closes under them.
  *
- * And one that a change *is* allowed to cost: an agent that moves between sections is one row
- * destroyed and one created, because the sections are different lists. That is the grouping
+ * And one that a change *is* allowed to cost: an agent that moves to another workspace is one
+ * row destroyed and one created, because the sections are different lists. That is the grouping
  * doing its job rather than a bug, so it is asserted too, as a bound rather than as zero.
+ *
+ * The list is always cut by workspace now, so a *state* change never moves a row between
+ * headings; what it may do, in the two-line view, is swap a row's second line between the last
+ * thing said and the state. That is bounded too. The one-line view is measured at the end.
  *
  * The socket is driven directly, exactly as `agents-tab.mjs` does and for the same reason:
  * these are states that would otherwise need a dozen real sessions and several minutes each,
@@ -74,7 +78,8 @@ const chat = (id, name, kind, state, lastLine, ago, extra = {}) => ({
  *
  * The count is not decoration: the scroll assertion needs a list that can scroll, and the
  * churn count is only interesting when there is enough of it to be a flash rather than a
- * repaint. Three sections, so a change that moves an agent across one is available to feed.
+ * repaint. Three workspaces — `irb-84069` for the two waiting, `political-llm` for the eight
+ * working, none for the quiet four — so a change that moves an agent across one is available.
  */
 const agents = [
 	chat("w1", "Iris", "claude", "waiting", "Allow this command?", 90_000),
@@ -93,8 +98,10 @@ const agents = [
 	chat("q4", "Kestrel", "claude", "idle", undefined, 7_200_000, { dormant: true }),
 ];
 await feed({ type: "agents", defaultKind: "pi", focused: "k1", chats: agents });
+const workspaceOf = (id) => (id.startsWith("w") ? "irb-84069" : id.startsWith("k") ? "political-llm" : undefined);
 for (const [id, name] of agents.map((one) => [one.id, one.name])) {
-	await feed({ type: "agent.identity", id, identity: { name, color: "#3b5cf6", tags: [] } });
+	const workspace = workspaceOf(id);
+	await feed({ type: "agent.identity", id, identity: { name, color: "#3b5cf6", tags: [], ...(workspace ? { workspace } : {}) } });
 }
 await settle(page, 600);
 
@@ -106,16 +113,16 @@ await page.waitForSelector(".panel-shell", { timeout: 5000 });
 await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 400);
 
-/*
- * The **attention** axis, which is now the second press rather than the first.
- *
- * What this check is about is what a state change costs the DOM, and the interesting case is one
- * that moves a row between headings. Under the workspace axis, which the panel opens on, none of
- * these agents has a project, so they are all in one heading and no state change can move
- * anything. The workspace case is measured lower down, on purpose.
- */
-await page.locator('.panel-view[data-view="workspace"]').click();
-await settle(page, 400);
+/* The workspace cut, which is the only one, in two lines per agent, which is where it opens. */
+const opened = await page.evaluate(() => ({
+	view: document.querySelector(".panel-view")?.getAttribute("data-view"),
+	sections: [...document.querySelectorAll(".panel-section")].map((one) => `${one.querySelector(".panel-meta > span")?.textContent}:${one.querySelectorAll(".agent-row").length}`),
+}));
+say(
+	"the list opens by workspace, in two lines per agent",
+	opened.view === "lines-2" && JSON.stringify(opened.sections) === JSON.stringify(["irb-84069:2", "political-llm:8", "No workspace:4"]),
+	JSON.stringify(opened),
+);
 
 /*
  * The whole measurement happens inside the page, in one place, for one reason: an element is
@@ -164,7 +171,14 @@ await page.evaluate(() => {
 		const lost = [...before.rows].filter(([name, row]) => still.get(name) !== row).map(([name, row]) => `${name}${row.isConnected ? "" : " (gone)"}`);
 		const state = (name) => {
 			const row = still.get(name);
-			return row ? { text: row.querySelector(".agent-state")?.textContent?.trim(), status: row.dataset.status } : null;
+			return row
+				? {
+						text: row.querySelector(".agent-state")?.textContent?.trim(),
+						said: row.querySelector(".agent-said")?.textContent?.trim(),
+						status: row.dataset.status,
+						section: row.closest(".panel-section")?.querySelector(".panel-meta > span")?.textContent,
+					}
+				: null;
 		};
 		const running = pulse();
 		return {
@@ -219,7 +233,9 @@ const inside = await change("Basil: tool → streaming", { type: "agent.state", 
 
 say("a state change adds no node and removes none", inside.churn.added === 0 && inside.churn.removed === 0, JSON.stringify(inside.churn) + JSON.stringify(inside.moved));
 say("…every row is the element it was", inside.kept === inside.rows, `${inside.kept} of ${inside.rows} kept${inside.lost.length ? ` (lost ${inside.lost.join(", ")})` : ""}`);
-say("…and the row it was about says so", inside.state.Basil?.text === "Typing…" && inside.state.Basil?.status === "working", JSON.stringify(inside.state.Basil));
+say("…and the row it was about says so, on its second line", inside.state.Basil?.text === "Typing…" && inside.state.Basil?.status === "working", JSON.stringify(inside.state.Basil));
+/* A quiet agent's second line is not a state but the last thing it said, as a chat list's is. */
+say("an idle agent's second line is the last thing it said", inside.state.Vale?.said === "Nothing to add" && inside.state.Vale?.text === undefined, JSON.stringify(inside.state.Vale));
 say("…with a keyboard reader still on their row", inside.focusKept, "focus moved, or went to the body");
 say("…and the list still scrolled where it was", inside.scrollKept, "the scroll position was reset");
 /*
@@ -262,15 +278,28 @@ say("…with nothing added or removed behind it", popup.churn.added === 0 && pop
 await page.keyboard.press("Escape");
 await settle(page, 300);
 
+// --- a state change that swaps a row's second line ------------------------------------------
+
+/*
+ * Mira goes from idle to working. Under the workspace cut she stays where she is, in `No
+ * workspace`; what changes is her second line — the last thing she said gives way to the state
+ * — and the heading, which starts saying somebody in it is working.
+ */
+const swapped = await change("Mira: idle → working", { type: "agent.state", id: "q1", state: "streaming" });
+
+say("a state change moves no row between headings", swapped.kept === swapped.rows && swapped.state.Mira?.section === "No workspace", `${swapped.kept} of ${swapped.rows} kept · ${JSON.stringify(swapped.state.Mira)}`);
+say("…and swaps only her second line, and the heading's note", swapped.elements.added <= 2 && swapped.elements.removed <= 2, `${JSON.stringify(swapped.elements)} · ${JSON.stringify(swapped.moved)}`);
+say("…which now says what she is doing", swapped.state.Mira?.status === "working" && Boolean(swapped.state.Mira?.text) && swapped.state.Mira?.said === undefined, JSON.stringify(swapped.state.Mira));
+
 // --- a change that moves an agent between sections ----------------------------------------
 
-const across = await change("Mira: idle → working", { type: "agent.state", id: "q1", state: "streaming" });
+const across = await change("Vale: into political-llm", { type: "agent.identity", id: "q2", identity: { name: "Vale", color: "#3b5cf6", tags: [], workspace: "political-llm" } });
 
-say("an agent changing section costs one row", across.churn.added > 0 && across.churn.added <= 4 && across.churn.removed <= 4, JSON.stringify(across.churn));
+say("an agent changing workspace costs one row", across.churn.added > 0 && across.churn.added <= 4 && across.churn.removed <= 4, JSON.stringify(across.churn));
 say("…and the rows it left behind are the ones that were there", across.kept === across.rows - 1, `${across.kept} of ${across.rows} kept (lost ${across.lost.join(", ")})`);
-say("…and it arrived where it belongs", across.state.Mira?.status === "working", JSON.stringify(across.state.Mira));
+say("…and it arrived where it belongs", across.state.Vale?.section === "political-llm", JSON.stringify(across.state.Vale));
 
-// --- a change to an agent's identity ------------------------------------------------------
+// --- a change to an agent's tags ------------------------------------------------------------
 
 const tagged = await change("Mira's tags", {
 	type: "agent.identity",
@@ -279,55 +308,47 @@ const tagged = await change("Mira's tags", {
 });
 
 /*
- * A tag is the one change that genuinely adds markup — the chip was not there and now is — so
- * this asks for exactly that: the chip, and nothing else. What it must not do is take the row,
- * or any other row, with it.
+ * Tags are not drawn on a row any more — the search matches them and the edit window shows
+ * them — so a tag arriving has nothing to draw. Elements, here and not every node: `Show`
+ * inserts its value beside an empty text node, which is a bookmark rather than a thing on screen.
  */
-/*
- * Elements, here and not every node: `Show` inserts its value beside an empty text node, which
- * is a bookmark rather than a thing on screen. What nobody should see is an *element* leaving.
- */
-say(
-	"a tag arriving draws its chip and no other element",
-	tagged.elements.added === 1 && tagged.elements.removed === 0,
-	`${JSON.stringify(tagged.elements)} of ${JSON.stringify(tagged.churn)} · ${JSON.stringify(tagged.moved)}`,
-);
+say("a tag arriving adds no element and removes none", tagged.elements.added === 0 && tagged.elements.removed === 0, `${JSON.stringify(tagged.elements)} of ${JSON.stringify(tagged.churn)} · ${JSON.stringify(tagged.moved)}`);
 say("…and it is the same row", tagged.kept === tagged.rows, `${tagged.kept} of ${tagged.rows} kept`);
-const chip = await page.evaluate(() => [...(window.__rowFor("Mira")?.querySelectorAll(".tag") ?? [])].map((tag) => tag.textContent));
-say("…with the tag on it", JSON.stringify(chip) === JSON.stringify(["panel-css"]), JSON.stringify(chip));
 
-// --- the same change, in the other grouping ------------------------------------------------
+// --- the heading's note ---------------------------------------------------------------------
 
-/*
- * Cut by workspace, a state change has nowhere to move a row to: the heading holds every status,
- * so the only thing a change can touch is the heading's own note and the row it was about. It is
- * the second axis of the same list, and the one place the store's `note` update is exercised —
- * a field that only exists on some sections, which is where a reconciler that drops what it was
- * not told about would show up.
- */
-for (const agent of agents) {
-	await feed({ type: "agent.identity", id: agent.id, identity: { name: agent.name, color: "#3b5cf6", tags: [], workspace: agent.id.startsWith("w") ? "irb-84069" : "political-llm" } });
-}
-await settle(page, 400);
-await page.locator('.panel-view[data-view="attention"]').click();
-await settle(page, 400);
-
-const filed = await change("Iris: waiting → working", { type: "agent.state", id: "w1", state: "streaming" });
-
-say("in the workspace grouping a state change moves nothing", filed.churn.added === 0 && filed.churn.removed === 0, JSON.stringify(filed.churn) + JSON.stringify(filed.moved));
-say("…every row is still the row it was", filed.kept === filed.rows, `${filed.kept} of ${filed.rows} kept (lost ${filed.lost.join(", ")})`);
 /*
  * The heading is where this grouping keeps its urgency, so it is what has to move: the section
- * Iris was waiting in said `2 want you` and says `1 wants you` now, which is the same sentence
- * with the verb agreeing with the other number. Checked as a transition
+ * Iris was waiting in said `2 want you` and says `1 wants you` now. Checked as a transition
  * rather than as a value, because a note that was always "1 wants you" would prove nothing
  * about whether the field reaches the DOM at all.
  */
+const filed = await change("Iris: waiting → working", { type: "agent.state", id: "w1", state: "streaming" });
+
+say("a waiting agent starting work moves nothing", filed.churn.added === 0 && filed.churn.removed === 0, JSON.stringify(filed.churn) + JSON.stringify(filed.moved));
+say("…every row is still the row it was", filed.kept === filed.rows, `${filed.kept} of ${filed.rows} kept (lost ${filed.lost.join(", ")})`);
 say(
 	"…and the heading says what its group is doing now",
 	filed.notesBefore.includes("workspace:2 want you") && filed.notes.includes("workspace:1 wants you"),
 	`${JSON.stringify(filed.notesBefore)} → ${JSON.stringify(filed.notes)}`,
 );
+
+// --- one line per agent ---------------------------------------------------------------------
+
+/*
+ * The square switches every row to one line. That is a prop on the rows, not a new list, so the
+ * rows it draws are the rows that were there.
+ */
+await page.evaluate(() => window.__hold("to one line"));
+await page.locator('.panel-view[data-view="lines-2"]').click();
+await settle(page, 500);
+const toOne = await page.evaluate(() => window.__verdict());
+say("switching to one line keeps every row the element it was", toOne.kept === toOne.rows, `${toOne.kept} of ${toOne.rows} kept (lost ${toOne.lost.join(", ")})`);
+
+const oneLine = await change("Pi: streaming → tool, in one line", { type: "agent.state", id: "k2", state: "tool" });
+say("in one line, a state change adds no node and removes none", oneLine.churn.added === 0 && oneLine.churn.removed === 0, JSON.stringify(oneLine.churn) + JSON.stringify(oneLine.moved));
+say("…every row is the element it was", oneLine.kept === oneLine.rows, `${oneLine.kept} of ${oneLine.rows} kept`);
+say("…and the working face keeps its pulse", oneLine.pulse.before !== null && oneLine.pulse.after !== null && oneLine.pulse.after > oneLine.pulse.before, JSON.stringify(oneLine.pulse));
 
 // --- nothing threw -------------------------------------------------------------------------
 

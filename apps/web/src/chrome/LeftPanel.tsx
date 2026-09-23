@@ -1,7 +1,6 @@
 import type { Board } from "@decks/protocol";
-import Activity from "lucide-solid/icons/activity";
-import Folder from "lucide-solid/icons/folder";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
+import Rows2 from "lucide-solid/icons/rows-2";
 import Rows3 from "lucide-solid/icons/rows-3";
 import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
@@ -12,6 +11,7 @@ import { BoardRow, BoardTile } from "./BoardRow.tsx";
 import { panelSections, panelTally } from "./panel-groups.ts";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
+import { AgentHoverCard } from "./AgentHoverCard.tsx";
 import { AgentRow } from "./AgentRow.tsx";
 import { NewAgentButton } from "./AgentPill.tsx";
 import type { AgentKind } from "@decks/protocol";
@@ -201,7 +201,28 @@ export function LeftPanel(props: {
 	 * Workspace, which is the axis this list opens on. `AgentGroup` argues it: a project is a
 	 * place you look for, and "who needs you" is a ranking that moves as turns start and end.
 	 */
-	const [ownGroup, setOwnGroup] = createSignal<AgentGroup>("workspace");
+	const ownGroup = () => "workspace" as AgentGroup;
+	/*
+	 * One line or two per agent. Remembered, like a density: it is how this person likes the
+	 * list, not a question about it. Two is what it opens on, because the second line is the
+	 * one fact worth reading at a glance: what each agent is doing.
+	 */
+	const [lines, setLines] = createSignal<1 | 2>(readLines());
+	const goLines = (next: 1 | 2) => {
+		setLines(next);
+		try {
+			localStorage.setItem(LINES_KEY, String(next));
+		} catch {
+			// A private window with storage off keeps the choice for the session.
+		}
+	};
+	/* The row under the pointer, for the one hover card the list shares, and only in the one-line view. */
+	const [hovered, setHovered] = createSignal<{ id: string; at: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height"> } | undefined>();
+	/* Beside the panel and level with the row: the row's height, the panel's sides, so the card clears the panel's edge. */
+	const besideRow = (row: DOMRect, element: Element | null) => {
+		const side = element?.getBoundingClientRect() ?? row;
+		return { left: side.left, right: side.right, width: side.width, top: row.top, bottom: row.bottom, height: row.height };
+	};
 	const [query, setQuery] = createSignal("");
 	const [tab, setTab] = createSignal<PanelTab>("boards");
 	createEffect(() => {
@@ -356,10 +377,7 @@ export function LeftPanel(props: {
 		setOwnDensity(next);
 		props.onDensity?.(next);
 	};
-	const goGroup = (next: AgentGroup) => {
-		setOwnGroup(next);
-		props.onGroup?.(next);
-	};	const type = (next: string) => {
+	const type = (next: string) => {
 		setQuery(next);
 		props.onSearch?.(next);
 	};
@@ -641,7 +659,7 @@ export function LeftPanel(props: {
 							   with room to show the answer. */
 							placeholder={
 								tab() === "agents"
-									? `Search ${allAgents().total} agent${allAgents().total === 1 ? "" : "s"}, tags or workspaces`
+									? `Search ${allAgents().total} agent${allAgents().total === 1 ? "" : "s"}`
 									: `Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`
 							}
 							value={query()}
@@ -692,23 +710,23 @@ export function LeftPanel(props: {
 					<button
 						type="button"
 						class="icon-button panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
-						data-view={tab() === "boards" ? density() : group()}
+						data-view={tab() === "boards" ? density() : `lines-${lines()}`}
 						aria-label={
 							tab() === "boards"
 								? density() === "list"
 									? "Show boards as a grid"
 									: "Show boards as a list"
-								: group() === "workspace"
-									? "Group agents by what needs you"
-									: "Group agents by workspace"
+								: lines() === 2
+									? "One line per agent"
+									: "Two lines per agent"
 						}
-						title={tab() === "boards" ? (density() === "list" ? "Grid" : "List") : group() === "workspace" ? "Working, waiting, quiet" : "One section per workspace"}
+						title={tab() === "boards" ? (density() === "list" ? "Grid" : "List") : lines() === 2 ? "One line per agent" : "Two lines per agent"}
 						onClick={() => {
 							if (tab() === "boards") goDensity(density() === "list" ? "grid" : "list");
-							else goGroup(group() === "workspace" ? "attention" : "workspace");
+							else goLines(lines() === 2 ? 1 : 2);
 						}}
 					>
-						<Icon of={tab() === "boards" ? (density() === "list" ? LayoutGrid : Rows3) : group() === "workspace" ? Activity : Folder} size={13} />
+						<Icon of={tab() === "boards" ? (density() === "list" ? LayoutGrid : Rows3) : lines() === 2 ? Rows3 : Rows2} size={13} />
 					</button>
 					</div>
 				</div>
@@ -733,7 +751,8 @@ export function LeftPanel(props: {
 					 * argument as `data-kind` on a section: name the thing rather than infer it from content.
 					 */
 					data-tab={tab()}
-					data-density={density()}
+					/* The boards' grid only: set on the agents tab too, it laid the agent rows out two across. */
+					data-density={tab() === "boards" ? density() : undefined}
 					onKeyDown={rove}
 					onScroll={growIfNearEnd}
 				>
@@ -775,7 +794,7 @@ export function LeftPanel(props: {
 										Re-implementing it instead is how two lists in one panel come to nearly
 										match: the board rows above are the same object.
 									*/}
-									<div class="row-list agent-list">
+									<div class="row-list agent-list" data-lines={lines()}>
 									<For each={section.rows.slice(0, allowance(index()))}>
 										{(row) => (
 											<AgentRow
@@ -788,6 +807,8 @@ export function LeftPanel(props: {
 												{...(props.onAgentWorkspace ? { onWorkspace: (workspace: string | null) => props.onAgentWorkspace?.(row.chat.id, workspace) } : {})}
 												{...(props.onAgentRename ? { onRename: (name: string) => props.onAgentRename?.(row.chat.id, name) } : {})}
 												taken={(name) => nameTaken(name, row.chat.id)}
+												lines={lines()}
+												onHover={(at) => setHovered((was) => (at ? { id: row.chat.id, at: besideRow(at, list?.closest(".panel-shell") ?? null) } : was?.id === row.chat.id ? undefined : was))}
 												{...(props.onMirrorAgent ? { onMirror: () => props.onMirrorAgent?.(row.chat.id) } : {})}
 											/>
 										)}
@@ -894,6 +915,16 @@ export function LeftPanel(props: {
 					</Show>
 				</div>
 
+				{/* In the one-line view the row says only who; the card beside it says what they are doing. */}
+				<Show when={tab() === "agents" && lines() === 1 && hovered()}>
+					{(over) => (
+						<Show when={(props.chats ?? []).find((chat) => chat.id === over().id)}>
+							{(chat) => (
+								<AgentHoverCard chat={chat()} identity={props.identities?.[chat().id]} unread={props.unread?.[chat().id] ?? 0} anchor={over().at} beside shown />
+							)}
+						</Show>
+					)}
+				</Show>
 			</aside>
 		</>
 	);
@@ -906,6 +937,17 @@ export function LeftPanel(props: {
  * see the note at the top. `matchMedia` in a `try` for the same reason `lib/media.ts` does
  * it: a test environment without one should get the desktop answer, not an exception.
  */
+const LINES_KEY = "decks.agentLines";
+
+/** The remembered line count for agent rows; two when nothing is stored. */
+function readLines(): 1 | 2 {
+	try {
+		return localStorage.getItem(LINES_KEY) === "1" ? 1 : 2;
+	} catch {
+		return 2;
+	}
+}
+
 function createSheet(): () => boolean {
 	let query: MediaQueryList | undefined;
 	try {

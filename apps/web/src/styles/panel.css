@@ -329,6 +329,48 @@
 	}
 
 	/*
+	 * The two heights the panel's square switches between: one line with a 20px face, or two
+	 * with a 26px face. Both centre the face on the text rather than hanging it from the top,
+	 * because neither row is tall enough any more for the difference to read as a choice.
+	 */
+	.row-list.agent-list[data-lines="1"] [data-row] {
+		padding: 3px 6px;
+		align-items: center;
+		grid-template-columns: 20px 1fr;
+		column-gap: 8px;
+	}
+
+	.row-list.agent-list[data-lines="2"] [data-row] {
+		padding: 5px 6px;
+		align-items: center;
+		grid-template-columns: 26px 1fr;
+		column-gap: 9px;
+	}
+
+	/*
+	 * One grid row, not two. The row vocabulary spans its icon over a label row and a note row,
+	 * and an agent row has no note: the empty second row and its 3px gap sat under the text and
+	 * put it 1.5px above the face's centre.
+	 */
+	.row-list.agent-list[data-lines] [data-row] {
+		row-gap: 0;
+	}
+
+	.row-list.agent-list[data-lines] [data-row] > .row-icon {
+		grid-row: 1;
+	}
+
+	/* Centred on the 26px row. */
+	.agent-list[data-lines="1"] .row-act > :is(.close, .agent-tagbtn) {
+		top: 2px;
+	}
+
+	/* Centred on the first line: 5px of padding plus half its 19.5px, less half the 22px button. */
+	.agent-list[data-lines="2"] .row-act > :is(.close, .agent-tagbtn) {
+		top: 4px;
+	}
+
+	/*
 	 * The two buttons stand **over** the row's first line rather than beside its body.
 	 *
 	 * They were flex siblings of `.agent-body`, top-aligned so they sat level with the name —
@@ -463,6 +505,11 @@
 	 * quiet signals in the place of one loud one, and the `title` on the row still says it
 	 * in words for anyone who asks.
 	 */
+	/* The name in bold, the one strong word on the row; the runtime and time after it are muted. */
+	.agent-list .agent-line > .row-label {
+		font-weight: 600;
+	}
+
 	.agent-row[data-dormant] .row-label {
 		color: var(--muted);
 		font-weight: 500;

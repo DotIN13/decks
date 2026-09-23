@@ -2,7 +2,7 @@ import type { Identity } from "@decks/protocol";
 import PictureInPicture2 from "lucide-solid/icons/picture-in-picture-2";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { AgentEdit } from "./AgentEdit.tsx";
 import { Icon } from "../ui/icons.tsx";
@@ -12,29 +12,18 @@ import { canHover } from "../lib/media.ts";
 import type { AgentRow as Row } from "./agent-sections.ts";
 
 /**
- * One agent in the panel's Agents tab: **the hover card, laid flat.**
+ * One agent in the panel's Agents tab, in one of two heights.
  *
- * It was four stacked things in four type sizes — a name line, a status line with its own
- * dot and sentence, a row of tags, and two clamped lines of italic quotation — five times
- * down the panel, and it read as a heap.
+ * It was four lines (name; state; workspace and tags; the last thing said), about 90px a row,
+ * and the panel held eight. Now:
  *
- * The fix was not to invent a shape but to take one that was already right: `AgentHoverCard`
- * is the same five facts about the same object and nobody has complained about it. So this
- * row is that card's four lines, in the panel's width:
+ * - **one line**: face, name, runtime, time. The face's ring is the state, and the hover card
+ *   the panel draws beside the row says the rest.
+ * - **two lines**: the same, and under it what the agent is doing when it is asking, working
+ *   or finished unread, or else the last thing it said, the way a chat list shows a message.
  *
- * 1. **the name**, with its runtime beside it and the time at the right
- * 2. **the state** — swatch, then the word
- * 3. **the tags**, when there are any
- * 4. **the last thing it said**, one line
- *
- * The runtime sits with the name rather than in the right-hand column, which is the one
- * place this parts from the card: `Rune claude` is one thing being identified, and the card
- * can afford to spread that over two lines where a 264px row reads it better as a phrase.
- *
- * What is different from the card is what a *list* has to do: the time gives its column to
- * the two buttons — `+` for your tags, × to close — when the row is approached, and on a
- * touch screen they are simply always there. The card has neither, because a card is
- * something you read and a row is something you act on.
+ * The square beside the search switches the two. The time gives its column to the buttons
+ * when the row is approached, and on a touch screen they are always there.
  */
 export function AgentRow(props: {
 	row: Row;
@@ -77,6 +66,10 @@ export function AgentRow(props: {
 	workspaces?: string[];
 	/** Whether another agent already answers to a name, for the window's red line. */
 	taken?: (name: string) => boolean;
+	/** One line (name, runtime, time) or two (and what it is doing); the panel's square switches them. */
+	lines: 1 | 2;
+	/** The pointer or focus arrived on the row (its box) or left it (`undefined`), for the hover card. */
+	onHover?: (at: DOMRect | undefined) => void;
 }) {
 	const chat = () => props.row.chat;
 	const name = () => props.identity?.name ?? chat().name;
@@ -99,6 +92,8 @@ export function AgentRow(props: {
 	 * touchscreen mid-session, and `CanvasOps` reads it the same way.
 	 */
 	const touch = !canHover();
+	/** Worth a line of its own: asking, working, or finished and unread. */
+	const busy = () => !chat().dormant && props.row.status !== "idle";
 	const stateWords = () => {
 		const base = chat().dormant ? "Dormant" : statusWords(props.row.status, chat().state);
 		return touch && chat().lastAt !== undefined ? `${base} · ${since(chat().lastAt)}` : base;
@@ -110,7 +105,7 @@ export function AgentRow(props: {
 		 * one — the same arrangement the dropdown row and the account row use, and the reason
 		 * the wash belongs to the box rather than to the button inside it.
 		 */
-		<div class="agent-row row-act" data-current={props.row.current} data-status={props.row.status} data-dormant={chat().dormant ? "true" : undefined}>
+		<div class="agent-row row-act" data-lines={props.lines} data-current={props.row.current} data-status={props.row.status} data-dormant={chat().dormant ? "true" : undefined}>
 			<button
 				type="button"
 				class="min-w-0 flex-1"
@@ -119,6 +114,10 @@ export function AgentRow(props: {
 				data-current={props.row.current ? "true" : undefined}
 				title={props.row.current ? `${name()} — the conversation on screen` : `Switch to ${name()}`}
 				onClick={props.onFocus}
+				onPointerEnter={(event) => canHover() && props.onHover?.(event.currentTarget.getBoundingClientRect())}
+				onPointerLeave={() => props.onHover?.(undefined)}
+				onFocus={(event) => props.onHover?.(event.currentTarget.getBoundingClientRect())}
+				onBlur={() => props.onHover?.(undefined)}
 				/* Delete closes it, for the keyboard, exactly as the dropdown row does. */
 				onKeyDown={(event) => {
 					if (event.key !== "Delete" && event.key !== "Backspace") return;
@@ -136,18 +135,10 @@ export function AgentRow(props: {
 					it the avatar and the name stacked instead of sitting side by side.
 				*/}
 				<span class="row-icon">
-					<AgentFace chat={chat()} identity={props.identity} unread={props.row.unread} size={28} ring={1.75} />
+					<AgentFace chat={chat()} identity={props.identity} unread={props.row.unread} size={props.lines === 1 ? 20 : 26} ring={props.lines === 1 ? 1.5 : 1.75} />
 				</span>
 
 				<span class="agent-body">
-					{/*
-						The card's first line: the name, and how long ago in the right-hand column.
-
-						`data-yield` gives that column up when the row is approached — the two buttons
-						arrive where the time was, rather than a 44px gutter standing empty down the
-						whole list. On a touch screen the buttons are always there and the time is not:
-						see `chrome.css`, where both halves of that live.
-					*/}
 					<span class="agent-line">
 						<span class="row-label block truncate">{name()}</span>
 						<span class="kind" data-dormant={chat().dormant ? "true" : undefined}>{chat().kind}</span>
@@ -155,44 +146,19 @@ export function AgentRow(props: {
 					</span>
 
 					{/*
-						And the card's second line: the state in words, beside its swatch.
-
-						One word for a parked agent, where the card would say "Idle": dormant is the
-						reason nothing is happening, and it is not the same claim.
+						The second line, only in the two-line view: what it is doing while that is
+						worth knowing, and otherwise the last thing it said. Tags and the workspace
+						are not on the row any more: the section heading names the workspace, the
+						search still matches both, and the edit window shows them.
 					*/}
-					<span class="agent-state">
-						<span class="agent-swatch" data-status={props.row.status} aria-hidden="true" />
-						<span class="min-w-0 flex-1 truncate">{stateWords()}</span>
-					</span>
-
-					<Show when={props.row.tags.length + props.row.userTags.length > 0 || workspace()}>
-						<span class="tags">
-							{/*
-								The workspace, first, in a box rather than a pill.
-
-								A box because `.kind` is one: this is a fact about the agent, where a tag is a
-								claim by it. Drawn on every row in both groupings — a fact about an agent is not a
-								decoration of the section it happens to be under, and in the attention grouping the
-								section says nothing about where it works.
-
-								First rather than last, because it is the one chip a reader is scanning *for* when
-								the list is long, and the tag line is the only place on the row that wraps.
-							*/}
-							<Show when={workspace()}>{(at) => <span class="tag ws">{at()}</span>}</Show>
-							<For each={props.row.tags}>{(tag) => <span class="tag">{tag}</span>}</For>
-							<For each={props.row.userTags}>{(tag) => <span class="tag" data-mine="true">{tag}</span>}</For>
-						</span>
+					<Show when={props.lines === 2}>
+						<Show when={busy() || !chat().lastLine} fallback={<span class="agent-said">{chat().lastLine}</span>}>
+							<span class="agent-state">
+								<span class="agent-swatch" data-status={props.row.status} aria-hidden="true" />
+								<span class="min-w-0 flex-1 truncate">{stateWords()}</span>
+							</span>
+						</Show>
 					</Show>
-
-					{/*
-						The last thing it said — one line, no quotation marks, no italics.
-						
-						It was two clamped lines in italic inside curly quotes, which is three
-						decorations on the least important thing in the row. A chat list does not
-						quote the message either: its position under the name is what says whose it
-						is.
-					*/}
-					<Show when={chat().lastLine}>{(line) => <span class="agent-said">{line()}</span>}</Show>
 				</span>
 			</button>
 
