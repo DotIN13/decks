@@ -8,7 +8,6 @@ import { runtimeDir } from "@decks/runtime";
 import { Deck } from "../deck/loader.ts";
 import { StageService } from "./service.ts";
 import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec } from "./tool.ts";
-import type { ScheduleSpec } from "@decks/protocol";
 
 /**
  * What the tool *says*, as opposed to what it does (DESIGN §6.3).
@@ -26,9 +25,6 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 
 	const sends: Array<{ target: string; spec: SendSpec }> = [];
 	const created: CreateSpec[] = [];
-	const scheduled: ScheduleSpec[] = [];
-	/** Dashboard tasks the tool asked for — what `send("dispatcher", …)` turns into. */
-	const tasks: Array<{ text: string; boards?: string[] }> = [];
 	const others = [
 		{ id: "a1", name: "Ada", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html"], holding: 1, tags: ["panel-css"], workspace: "political-llm", queued: 3 },
 		{ id: "a2", name: "Rune", state: "idle" as const, kind: "claude" as const, context: ["boards/plan.html", "boards/notes.html"], holding: 2, tags: [], workspace: "political-llm", queued: 0 },
@@ -115,15 +111,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 				created.push(spec);
 				return { agent: `new-${created.length}`, name: spec.name };
 			},
-			schedule: (spec) => {
-				scheduled.push(spec);
-				return { id: "s-1", ...spec, task: spec.task, boards: spec.boards ?? [], createdAt: 1, nextRunAt: 2, missed: 0, enabled: true };
-			},
 			queue: () => waiting,
-			task: (spec) => {
-				tasks.push({ text: spec.text, ...(spec.boards ? { boards: spec.boards } : {}) });
-				return { id: `t-${tasks.length}`, state: "open", why: "the stub placed it" };
-			},
 			recordRevision: () => undefined,
 			worked: (path) => void worked.push(path),
 			boardPathOf: () => undefined,
@@ -135,8 +123,6 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		moved,
 		sends,
 		created,
-		tasks,
-		scheduled,
 		deck,
 		extents,
 		service,
@@ -244,24 +230,8 @@ test("send needs an address and a task, and passes both on", async () => {
 	cleanup();
 });
 
-test("schedule checks the shape, hands the rest to the deck, and returns what was made", async () => {
-	const { tool, scheduled, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-
-	assert.match((await tool.run(`return await stage.schedule({ name: " ", at: "09:00", days: [1], workspace: "w", task: "x" })`)).text, /needs a name/);
-	assert.match((await tool.run(`return await stage.schedule({ name: "x", at: "09:00", days: [1], workspace: "w", kind: "digest" })`)).text, /needs `task`/);
-	assert.equal(scheduled.length, 0);
-
-	const made = await tool.run(`return await stage.schedule({ name: " Morning digest ", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", task: " Write the morning digest. " })`);
-	assert.equal(made.isError, false);
-	assert.match(made.text, /"id": "s-1"/);
-	assert.deepEqual(scheduled, [{ name: "Morning digest", at: "09:00", days: [1, 2, 3, 4, 5], workspace: "political-llm", task: "Write the morning digest." }]);
-
-	// A named place is passed through as said, never converted; a name that is not a zone is refused.
-	assert.match((await tool.run(`return await stage.schedule({ name: "x", at: "09:00", days: [1], workspace: "w", task: "x", timezone: "London" })`)).text, /not a timezone/);
-	await tool.run(`return await stage.schedule({ name: "London nine", at: "09:00", days: [1], workspace: "w", task: "x", timezone: "Europe/London" })`);
-	assert.equal(scheduled[1]?.timezone, "Europe/London");
-	assert.equal(scheduled[1]?.at, "09:00");
-
+test("now is the time where the person is, in the process clock's zone", async () => {
+	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
 	// And the time where the person is: the process clock's zone, with the same instant as an epoch.
 	const now = JSON.parse((await tool.run(`return await stage.now()`)).text) as { iso: string; timezone: string; epoch: number; words: string };
 	assert.equal(now.timezone, new Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -314,16 +284,6 @@ test("send with a shape makes the agent and queues the work for it", async () =>
 	assert.match(made.text, /"agent": "new-1"/);
 	assert.deepEqual(created, [{ name: "Survey", tags: ["survey-design"] }]);
 	assert.deepEqual(sends, [{ target: "new-1", spec: { task: "Draft the questions" } }], "the work went to the agent it just made");
-	cleanup();
-});
-
-test('send("dispatcher") makes a dashboard task rather than queueing work into the dispatcher', async () => {
-	const { tool, tasks, sends, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
-
-	const placed = await tool.run(`return await stage.send("Dispatcher", { task: " Remeasure the panel ", boards: ["boards/plan.html"] })`);
-	assert.equal(placed.isError, false, placed.text);
-	assert.deepEqual(tasks, [{ text: "Remeasure the panel", boards: ["boards/plan.html"] }]);
-	assert.equal(sends.length, 0, "nothing was queued: the deck places it");
 	cleanup();
 });
 
@@ -650,7 +610,7 @@ test("stage.me reads with nothing and writes with a patch, and says what was sto
 	// The five verbs it replaced each say what to write instead, for a conversation resumed
 	// against this build with the old names in its transcript.
 	assert.match((await tool.run(`return await stage.me.setName("Kit")`)).text, /stage\.me\(\{ name \}\)/);
-	assert.match((await tool.run(`return await stage.me.setWorkspace("political-llm")`)).text, /stage\.canvas\(name\)/);
+	assert.match((await tool.run(`return await stage.me.setWorkspace("political-llm")`)).text, /stage\.me\(\{ workspace \}\)/);
 	cleanup();
 });
 
@@ -688,12 +648,8 @@ test("a move is written on the canvas of the agent that asked, not on whichever 
 	cleanup();
 });
 
-/*
- * A canvas is added to, never cleared. `show` used to make the canvas exactly what it named,
- * which was one call away from emptying a room others were working in; a new topic is a new
- * canvas now, and `hide` says so when it is asked to empty one.
- */
-test("show adds to the canvas, and hide takes off only what it names and never the last board", async () => {
+/* `show` adds to the stage and `hide` takes off only what it names. */
+test("show adds to the stage, and hide takes off only what it names", async () => {
 	const root = mkdtempSync(join(tmpdir(), "decks-additive-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	for (const name of ["a.html", "b.html", "c.html"]) {
@@ -751,9 +707,7 @@ test("show adds to the canvas, and hide takes off only what it names and never t
 	assert.deepEqual(up, ["boards/a.html", "boards/c.html"], "an out-of-date board comes off by name");
 
 	const emptied = await tool.run(`await stage.hide(["boards/a.html", "boards/c.html"])`);
-	assert.equal(emptied.isError, true);
-	assert.match(emptied.text, /would empty the canvas/);
-	assert.match(emptied.text, /stage\.canvas\(/, "the refusal names the way to start a new topic");
-	assert.deepEqual(up, ["boards/a.html", "boards/c.html"], "nothing came off");
+	assert.equal(emptied.isError, false, emptied.text);
+	assert.deepEqual(up, [], "an agent's own stage can be cleared");
 	rmSync(root, { recursive: true, force: true });
 });

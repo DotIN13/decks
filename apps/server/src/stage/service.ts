@@ -65,7 +65,7 @@ export interface StageHost {
 	 * test can build one without a stage behind it. `StageService.boards` falls back to the deck's
 	 * own list; no id means the conversation on screen, which is what a board's own code gets.
 	 */
-	boards?(agentId?: string, canvasId?: string): Board[];
+	boards?(agentId?: string): Board[];
 
 }
 
@@ -98,43 +98,6 @@ export interface WebHost {
 	board(): string;
 }
 
-/**
- * What the stage tool needs of the goal-driven browser agent (`web/jev.ts`).
- *
- * The other half of `WebHost`: `web` is the person's own Chrome driven one verb at a
- * time, `web_jev` is a whole goal run by an agent — in the person's own tab, where the two
- * gates hold anything that sends or types, or in a browser of the server's own. A run
- * outlives a stage call, so the shape is a job — start, follow, answer, stop.
- */
-export interface JevHost {
-	status(): {
-		ready: boolean;
-		missing: string[];
-		/** A Chrome is shared, so a run with no `browser` drives the person's own tab. */
-		shared: boolean;
-		note: string;
-		running?: { id: string; url: string; goal: string; startedAt: number; steps: number; browser: "chrome" | "headless"; waiting?: { id: string; kind: "allow" | "words"; action: string; tab?: string; field?: string; since: number } };
-		last?: { id: string; status: string; steps: number; elapsedMs: number; note?: string };
-	};
-	run(spec: { url: string; goal: string; browser?: "chrome" | "headless" }): Promise<{ id: string; note: string }>;
-	state(): {
-		id: string;
-		url: string;
-		goal: string;
-		status: "starting" | "running" | "done" | "blocked" | "failed" | "stopped";
-		elapsedMs: number;
-		browser: "chrome" | "headless";
-		waiting?: { id: string; kind: "allow" | "words"; action: string; tab?: string; field?: string; since: number };
-		gate: Array<{ at: number; kind: string; text: string }>;
-		steps: Array<{ at: number; status: string; elapsedMs: number; steps: number; url?: string; last?: { action: string; operation: string; text: string | null } }>;
-		note?: string;
-		endedAt?: number;
-	};
-	/** Answer what a gate is holding: `allow` before something is sent, `text` for what gets typed. */
-	answer(input: { allow?: boolean; text?: string }): { answered: string };
-	stop(note?: string): Promise<void>;
-}
-
 /** The room `fit` leaves under the content — the margin a board's own components start at. */
 const FIT_MARGIN = 48;
 
@@ -151,9 +114,6 @@ export class StageService {
 	 */
 	web: WebHost | undefined;
 
-	/** The goal-driven browser agent, on the same terms as `web`: one per server, read only by the stage tool. */
-	jev: JevHost | undefined;
-
 	constructor(
 		private deck: Deck,
 		private readonly host: StageHost,
@@ -165,8 +125,8 @@ export class StageService {
 
 	// --- reads --------------------------------------------------------------------
 
-	/** Every board, placed as `canvasId` has them when one is named, else as the asking agent's canvas does. */
-	boards(agentId?: string, canvasId?: string): Board[] {
+	/** Every board, placed as the asking agent's stage has them. */
+	boards(agentId?: string): Board[] {
 		const holders = this.host.agents();
 		/*
 		 * The host's arrangement when there is one, and the deck's own list when there is not.
@@ -175,7 +135,7 @@ export class StageService {
 		 * became per stage — so returning `deck.boards` here for a real app would tell every agent that
 		 * every board is at the origin, which is worse than saying nothing.
 		 */
-		return (this.host.boards?.(agentId, canvasId) ?? this.deck.boards).map((board) => {
+		return (this.host.boards?.(agentId) ?? this.deck.boards).map((board) => {
 			// A measurement of an older revision is left off rather than reported: it is a
 			// number, and a number gets believed.
 			const content = this.host.extent(board.path, board.rev);

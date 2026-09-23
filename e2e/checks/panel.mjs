@@ -94,13 +94,12 @@ try {
 	 * **Agents is the first tab and Boards is the one that is showing**, and both halves are
 	 * asserted because they are different decisions. The order is the panel's reading order:
 	 * the agents are the list that changes while you watch, so it is read first. The default is
-	 * the canvas you were already looking at, which is what the app opens on.
+	 * the stage you were already looking at, which is what the app opens on.
 	 */
-	const tabs = await page.getByRole("tab").allInnerTexts();
-	say("three tabs, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Canvases", "Agents", "Boards"]), JSON.stringify(tabs));
-	// Scoped to the panel: the dispatch dashboard behind the stage has a tab strip of its own.
+	const tabs = await page.locator('.panel-shell [role="tab"]').allInnerTexts();
+	say("two tabs, and they partition nothing", JSON.stringify(tabs) === JSON.stringify(["Agents", "Boards"]), JSON.stringify(tabs));
 	const selected = await page.evaluate(() => [...document.querySelectorAll('.panel-shell [role="tab"]')].filter((tab) => tab.getAttribute("aria-selected") === "true").map((tab) => tab.textContent));
-	say("…canvases first, and the panel opens on Boards", JSON.stringify(selected) === JSON.stringify(["Boards"]), JSON.stringify(selected));
+	say("…agents first, and the panel opens on Boards", JSON.stringify(selected) === JSON.stringify(["Boards"]), JSON.stringify(selected));
 
 	/*
 	 * The header is 32px, both controls, which is `--control-md` — the height a labelled chip

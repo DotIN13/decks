@@ -40,7 +40,7 @@ say("the fixture has boards to be placed among", paths.length >= 2, JSON.stringi
 // --- a board picked out of the rail, from the far end of the old column ----------------
 
 const stray = paths.at(-1);
-const link = await socket({ canvas: true });
+const link = await socket();
 /* Off the canvas and half a million pixels down: the place the deck-wide layout used to give a
    board that nobody had put anywhere. */
 link.send({ type: "board.hide", path: stray });

@@ -58,14 +58,3 @@ test("a settings file with an unknown zone, or not JSON, reads as nothing chosen
 	assert.equal(warnings.length, 1);
 	rmSync(dir, { recursive: true, force: true });
 });
-
-test("the dispatcher's runtime is kept beside the zone, and a runtime nobody has is dropped on reading", () => {
-	const deck = mkdtempSync(join(tmpdir(), "decks-settings-"));
-	const store = new SettingsStore(deck);
-	store.setTimezone("Europe/London");
-	assert.deepEqual(store.setDispatcherKind("claude"), { timezone: "Europe/London", dispatcherKind: "claude" });
-	assert.deepEqual(new SettingsStore(deck).get(), { timezone: "Europe/London", dispatcherKind: "claude" });
-	writeFileSync(join(deck, ".decks", "settings.json"), JSON.stringify({ dispatcherKind: "gpt" }));
-	assert.deepEqual(new SettingsStore(deck).get(), {});
-	store.setTimezone(null);
-});

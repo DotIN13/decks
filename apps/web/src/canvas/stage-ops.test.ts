@@ -141,15 +141,3 @@ test("a remembered view is not animated, whatever it asked for", () => {
 	assert.equal(animated.length, 0);
 	assert.equal(remembered.length, 1);
 });
-
-test("on a shared canvas, an agent's show lands the board and offers the way there instead of moving you", () => {
-	const { api, moved, selected } = host("A");
-	const arrivals: Array<{ agentId: string; path: string }> = [];
-	const inRoom: StageOpsHost = { ...api, inRoom: () => true, arrived: (arrival) => arrivals.push({ agentId: arrival.agentId, path: arrival.path }) };
-	const result = runStageCall(call("A", "show", { paths: ["boards/risks.html"] }), inRoom) as { shown: string[]; waiting?: string };
-	assert.deepEqual(result.shown, ["boards/risks.html"]);
-	assert.match(result.waiting ?? "", /view did not move/, "the agent is told, so it does not claim the person is looking");
-	assert.equal(moved.length, 0, "even the agent you are talking to does not take the camera");
-	assert.deepEqual(selected, []);
-	assert.deepEqual(arrivals, [{ agentId: "A", path: "boards/risks.html" }], "the chip is offered");
-});

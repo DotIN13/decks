@@ -36,8 +36,8 @@ test("a board an agent moved reads back moved, whoever the browser is looking at
 	const { app, cleanup } = open();
 	try {
 		// Restored rows: a chat that exists and starts no runtime, which is all this needs.
-		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], createdAt: 1 } });
-		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], createdAt: 1 } });
+		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
+		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
 		// Both have the board up, so both have a place for it — as two agents on one project do.
 		for (const agent of [mover, elsewhere]) agent.setInPlay(["boards/plan.html"], { place: true });
 		const before = app.stage.boards(mover.id).find((board) => board.path === "boards/plan.html")!;
@@ -61,8 +61,8 @@ test("the other conversation's canvas is untouched, which is what made the stale
 	const { app, cleanup } = open();
 	try {
 		// Restored rows: a chat that exists and starts no runtime, which is all this needs.
-		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], createdAt: 1 } });
-		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], createdAt: 1 } });
+		const mover = app.agents.create({ name: "Mover", restored: { id: "mover", context: [], inPlay: [], createdAt: 1 } });
+		const elsewhere = app.agents.create({ name: "Elsewhere", restored: { id: "elsewhere", context: [], inPlay: [], createdAt: 1 } });
 		for (const agent of [mover, elsewhere]) agent.setInPlay(["boards/risks.html"], { place: true });
 		const before = app.stage.boards(mover.id).find((board) => board.path === "boards/risks.html")!;
 

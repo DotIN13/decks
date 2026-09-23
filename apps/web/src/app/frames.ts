@@ -19,7 +19,7 @@ import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
-import { releaseBoards, setDraft, setUnread, setUsagePanel, surface, tookReport } from "../state/ui.ts";
+import { releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
 
 /** What the frame handler needs from the component it used to live in. */
@@ -160,7 +160,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * being written, so it is not news. Reading it is how the browser says so, and the read
 					 * stamp is the server's, so the mark clears on every device signed in.
 					 */
-					if (watchedBeingNamed(board, { surface: surface(), focused: state.focused })) {
+					if (watchedBeingNamed(board, { focused: state.focused })) {
 						send({ type: "board.seen", path: board.path });
 					}
 					/*
@@ -218,7 +218,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 						if (changed(state.contexts[chat.id], chat.boards)) setState("contexts", chat.id, chat.boards ?? []);
 						const held = state.agents[chat.id];
 						if (changed(held?.inPlay, chat.inPlay)) setState("agents", chat.id, "inPlay", chat.inPlay ?? []);
-						if (held?.canvas !== chat.canvas) setState("agents", chat.id, "canvas", chat.canvas);
 						if (changed(held?.model, chat.model)) setState("agents", chat.id, "model", chat.model);
 						if (changed(held?.usage, chat.usage)) setState("agents", chat.id, "usage", chat.usage);
 						if (held?.spending !== chat.account) setState("agents", chat.id, "spending", chat.account);
@@ -402,7 +401,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("contexts", message.agentId, message.boards);
 					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "inPlay", message.inPlay);
-					if (state.agents[message.agentId]?.canvas !== message.canvas) setState("agents", message.agentId, "canvas", message.canvas);
 					return;
 
 				case "stage.call": {
@@ -432,10 +430,9 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 								// browser that was told, which is the same scope as the ones parked on
 								// a switch.
 								agentViews(state.deck?.path ?? "").keep(agentId, viewToPark(camera, selected));
-								// So `stage.camera()` answers for that agent's canvas rather than falling
-								// back to wherever the last person to look at anything was — tagged with
-								// that canvas, so the reading may anchor boards placed there and nowhere else.
-								reportCamera(camera, agentId, state.agents[agentId]?.canvas);
+								// So `stage.camera()` answers for that agent's stage rather than falling
+								// back to wherever the last person to look at anything was.
+								reportCamera(camera, agentId);
 							},
 							select: (path) => setSelected(path),
 							reload: (path) => setState("nonces", path, (current = 0) => current + 1),
@@ -444,9 +441,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							annotate: (agentId, path, next) =>
 								setMarks((was) => [...was.filter((mark) => mark.agentId !== agentId || mark.path !== path), ...next]),
 							toast: (text) => notice("info", text),
-							// On a canvas the camera is the person's: see the note on `inRoom`.
-							inRoom: () => state.canvas !== undefined,
-							arrived: (arrival) => setState("arrival", { ...arrival, at: Date.now() }),
 						});
 					} catch (error) {
 						value = { error: error instanceof Error ? error.message : String(error) };
@@ -516,24 +510,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				 * The shared Chrome. The code rides only on the greeting's copy, so a later
 				 * status keeps the code the greeting brought rather than dropping it.
 				 */
-				case "canvases":
-					/*
-					 * Every canvas, whole. `reconcile` for the same reason the task list uses it:
-					 * a card whose changed mark flips is the thing the reader is watching, and a
-					 * fresh array would rebuild every card and lose the pulse.
-					 */
-					setState("canvases", reconcile(message.canvases, { key: "id", merge: false }));
-					// `""` is the server saying this browser is on no canvas — back on a chat's own
-					// stage — which is a different answer from "I did not mention it".
-					if (message.focused !== undefined) setState("canvas", message.focused === "" ? undefined : message.focused);
-					return;
-				case "tasks":
-					// The dashboard's whole second half in one frame. `reconcile` like the
-					// agents list: a task row changing state must update in place, not be
-					// rebuilt — the state chip is the thing the reader is watching.
-					setState("tasks", reconcile(message.tasks, { key: "id", merge: false }));
-					setState("schedules", reconcile(message.schedules, { key: "id", merge: false }));
-					return;
 				case "settings":
 					// The zone first, so everything the store change redraws is drawn in it.
 					setTimeZone(message.settings.timezone);

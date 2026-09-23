@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { examplesDir, runtimeLib } from "@decks/runtime";
-import type { AgentKind, Board, Camera, Canvas, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
+import type { Board, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
 import { Registry } from "./agents/registry.ts";
 import { Acts } from "./agents/acts.ts";
 import { BoardService } from "./boards/service.ts";
@@ -10,15 +10,10 @@ import { EvalTrust } from "./boards/eval-trust.ts";
 import { runtimeList } from "./runtimes/registry.ts";
 import { isBoardFormat } from "./boards/templates.ts";
 import { StageBridge } from "./stage/bridge.ts";
-import { TaskService } from "./tasks/service.ts";
-import { TaskStore } from "./tasks/store.ts";
 import { SettingsStore } from "./settings.ts";
-import { CanvasStore } from "./canvas/store.ts";
-import { canvasStage, type StageTarget } from "./canvas/stage.ts";
 import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./web/bridge.ts";
-import { JevService } from "./web/jev.ts";
 import { ThumbService } from "./boards/thumbs.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
@@ -28,7 +23,7 @@ import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncExamplesDir, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { watchDeck } from "./deck/watcher.ts";
-import { cameraFor, type CameraReading } from "./deck/place.ts";
+import type { CameraReading } from "./deck/place.ts";
 import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 
@@ -40,9 +35,6 @@ import type { DeckAgent } from "./agents/session.ts";
  */
 /** How long an account's identity is worth reusing before asking the CLI again. */
 const IDENTITY_TTL_MS = 60_000;
-
-/** How long the dashboard waits between looks at its schedules. */
-const TASKS_MS = 30_000;
 
 const RESYNC_MS = 4000;
 
@@ -62,17 +54,8 @@ export class App {
 	readonly acts: Acts;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
 	readonly boards: BoardService;
-	/** Tasks and schedules: the dashboard's store, rule and scheduler (`tasks/service.ts`). */
-	readonly tasks: TaskService;
 	/** The deck's own settings. Built first: it sets the clock everything after it reads. */
 	readonly settings: SettingsStore;
-	/**
-	 * The deck's canvases: what holds the boards, their places and the arrows between them.
-	 *
-	 * One per deck, shared by every agent on it, which is the whole point — two agents working
-	 * on one thing are on one canvas and see one arrangement.
-	 */
-	readonly canvases: CanvasStore;
 	/** Which boards may run their own code, and the list the first question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */
@@ -83,8 +66,6 @@ export class App {
 	readonly bridge = new StageBridge();
 	/** The user's own Chrome, shared through the Decks extension (`web/bridge.ts`). */
 	readonly web: WebBridge;
-	/** The goal-driven browser agent behind `stage.web_jev` (`web/jev.ts`). */
-	readonly jev: JevService;
 	readonly thumbs: ThumbService;
 	private hub: Hub | undefined;
 	/** The browser whose frame is being handled right now, if any — see `handle`. */
@@ -92,8 +73,6 @@ export class App {
 	private unwatch: (() => void) | undefined;
 	/** The safety net under the watcher — see `watch()`. */
 	private resyncTimer: NodeJS.Timeout | undefined;
-	/** The dashboard's scheduler — see `watch()`. */
-	private tasksTimer: NodeJS.Timeout | undefined;
 	/**
 	 * Where the browser last said it was looking.
 	 *
@@ -106,7 +85,7 @@ export class App {
 	 * And one per conversation, because the camera belongs to the conversation.
 	 *
 	 * The browser reports which agent's view it is reporting, so `stage.camera()` answers
-	 * "where is my canvas looking" rather than "where is the user looking". An agent nobody
+	 * "where is my stage looking" rather than "where is the user looking". An agent nobody
 	 * has looked at yet falls back to the last reading, which is the only honest guess.
 	 */
 	readonly cameras = new Map<string, CameraReading>();
@@ -120,7 +99,6 @@ export class App {
 		deck: Deck,
 	) {
 		this.deck = deck;
-		this.canvases = new CanvasStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text }));
 		this.evalTrust = new EvalTrust(config.dataDir);
 		this.boards = new BoardService(deck, {
 			send: (message) => this.send(message),
@@ -131,11 +109,7 @@ export class App {
 			 */
 			state: () => this.stageState(),
 			edited: (path, summary) => this.agents.userEdited(path, summary),
-			removed: (path) => {
-				// A board that left the deck leaves every canvas, with its place and its arrows.
-				this.canvases.boardRemoved(path);
-				this.agents.boardRemoved(path);
-			},
+			removed: (path) => this.agents.boardRemoved(path),
 		});
 		this.stage = new StageService(deck, {
 			/*
@@ -159,7 +133,7 @@ export class App {
 			},
 
 			/*
-			 * `stage.boards()` reads the arrangement **of the agent that asked** — the same canvas
+			 * `stage.boards()` reads the arrangement **of the agent that asked** — the same stage
 			 * `stage.move` writes to. Served from the conversation on screen instead, an agent
 			 * working while the person read another chat moved a board and read back the place it
 			 * had before, with the move itself correct on disk.
@@ -167,9 +141,7 @@ export class App {
 			 * No id is a board running its own code, which acts for the conversation in front of
 			 * the person (`stage/board-actor.ts`), so that case keeps the old answer.
 			 */
-			boards: (agentId?: string, canvasId?: string) =>
-				// A named canvas answers with its own places: `stage.boards({ canvas })` reads a room the agent is not in.
-				canvasId && this.canvases.get(canvasId) ? this.canvasState(canvasId).boards : this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
+			boards: (agentId?: string) => this.stageState(agentId ? this.agents.get(agentId) : undefined).boards,
 
 			newBoard: ({ format, ...rest }) => this.boards.newBoard({ ...rest, ...(isBoardFormat(format) ? { format } : {}) }),
 			newMirror: (options) => this.boards.newMirror(options),
@@ -201,38 +173,10 @@ export class App {
 		 * property of this server, not of a deck. Every change is broadcast, so the status
 		 * board and the extension's popup say the same thing at the same time.
 		 */
-		this.web = new WebBridge(config.dataDir, (status) => {
-			this.send({ type: "web.status", status });
-			// A Chrome that connected or went away changes what `web_jev` will drive, so the
-			// address it was told about is replaced rather than kept.
-			this.jev.setShared(this.web.debuggerEndpoint());
-		});
+		this.web = new WebBridge(config.dataDir, (status) => this.send({ type: "web.status", status }));
 		this.stage.web = Object.assign(this.web, { board: () => this.boards.newWebBoard() }) as typeof this.web & { board: () => string };
 		/*
-		 * The browser agent, pointed at the same Chrome `stage.web` drives.
-		 *
-		 * Two functions and an address, which is the whole of what the gate package needs from this
-		 * side: the question the person already answers for a submit, and the handover that lends
-		 * them the tab. The gate itself lives in `@decks/web-gate`, so nothing here decides what a
-		 * submit is, and the address a run attaches to is the bridge's own debugger endpoint rather
-		 * than a browser this server launches.
-		 */
-		this.jev = new JevService(undefined, {
-			person: (text) => this.web.ask(text),
-			borrow: () => this.web.handOver(),
-		});
-		this.jev.setShared(this.web.debuggerEndpoint());
-		this.stage.jev = this.jev;
-		/*
-		 * The dashboard: tasks and schedules, per deck like the agents they belong to.
-		 *
-		 * Its `registry` is the three things it may touch — the roster the rule ranks, the
-		 * queue it writes into, and the queue it takes a cancelled task back out of — so
-		 * the service stays a service and the registry stays a registry. Warnings about a
-		 * corrupt store ride the same notice strip an agent uses.
-		 */
-		/*
-		 * Board pictures for the dashboard, taken by this server of itself. `127.0.0.1` whatever
+		 * Board pictures, taken by this server of itself. `127.0.0.1` whatever
 		 * the host is: `0.0.0.0` is somewhere to listen, not somewhere to go.
 		 */
 		this.thumbs = new ThumbService({
@@ -260,16 +204,6 @@ export class App {
 			},
 		});
 		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text }));
-		this.tasks = new TaskService(
-			new TaskStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text })),
-			{
-				roster: () => this.agents.summaries(),
-				deliver: (target, spec) => this.agents.deliver(target, spec),
-				removeQueued: (agentId, taskId) => this.agents.removeQueued(agentId, taskId),
-				decide: (task) => this.agents.decide(task),
-			},
-			(message) => this.send(message),
-		);
 		this.acts = new Acts({
 			emit: (message) => this.send(message),
 			identity: (agentId) => this.agents.get(agentId)?.who(),
@@ -290,9 +224,7 @@ export class App {
 				port: config.port,
 				act: (agentId, act) => this.acts.act(agentId, act),
 				defaultKind: config.backend,
-				dispatcherKind: () => this.settings.get().dispatcherKind,
 				camera: (agentId) => (this.cameras.get(agentId) ?? this.lastCamera).at,
-				cameraOn: (agentId, canvasId) => cameraFor(this.cameras.get(agentId) ?? this.lastCamera, canvasId),
 				/*
 				 * A board joining a canvas was given a place (`agents/session.ts`). The browsers draw a
 				 * board where the deck state says it is, so the state goes out here — before the
@@ -300,9 +232,6 @@ export class App {
 				 * arrive in.
 				 */
 				arranged: () => this.send({ type: "deck.state", deck: this.stageState() }),
-				canvases: this.canvases,
-				canvasList: () => this.canvasList(),
-				publishCanvases: () => this.publishCanvases(),
 				publishRuntimes: () => this.send({ type: "runtimes", list: this.runtimes() }),
 				recordRevision: (path) => this.boards.recordRevision(path),
 				wrote: (path, who) => this.boards.wrote(path, who),
@@ -310,17 +239,6 @@ export class App {
 				accounts: this.claudeAccounts,
 				accountsChanged: () => void this.publishAccounts(),
 				bridge: this.bridge,
-				tasks: {
-					create: (spec, fromId) => this.tasks.create(spec, undefined, fromId),
-					started: (taskId) => this.tasks.taskStarted(taskId),
-					finished: (finish) => this.tasks.taskFinished(finish),
-					agentRemoved: (id) => this.tasks.agentRemoved(id),
-					assigned: (placement) => this.tasks.assignedByDispatcher(placement),
-					decided: (outcome) => this.tasks.decided(outcome),
-					schedule: (spec) => this.tasks.createSchedule(spec),
-					scheduled: (outcome) => this.tasks.scheduled(outcome),
-					cronOf: (taskId) => this.tasks.cronOf(taskId),
-				},
 			},
 		);
 	}
@@ -537,8 +455,6 @@ export class App {
 		 * deck.
 		 */
 		if (this.agents.restore() === 0) this.agents.create();
-		// And the dashboard's dispatcher, one per deck, whether the deck is new or restored.
-		this.agents.ensureDispatcher();
 		/*
 		 * After the rows are back: drop per-agent account links for agents this install no
 		 * longer has. `remove` covers the ordinary close; this covers a chat pruned while the
@@ -616,18 +532,6 @@ export class App {
 		clearInterval(this.resyncTimer);
 		this.resyncTimer = setInterval(() => this.resyncBoards(), RESYNC_MS);
 		this.resyncTimer.unref?.();
-
-		/*
-		 * And the dashboard's scheduler under it, on its own slower beat.
-		 *
-		 * A task lands at :09:00, not :09:00:00 — the digest does not care about the
-		 * second — so thirty seconds is a fine quantum and downtime of less than that
-		 * costs nothing. `unref`, like the resync, so a headless run can exit with
-		 * schedules waiting.
-		 */
-		clearInterval(this.tasksTimer);
-		this.tasksTimer = setInterval(() => this.tasks.tick(), TASKS_MS);
-		this.tasksTimer.unref?.();
 	}
 
 	/**
@@ -685,9 +589,6 @@ export class App {
 		// A new browser starts on the conversation last opened anywhere, and moves on its own after.
 		if (view) view.focused = this.agents.looking()?.id;
 		reply({ type: "deck.state", deck: this.stageState() });
-		// And what canvases there are: the dashboard's cards, and the list the composer's
-		// `@` and the canvas switcher read.
-		reply({ type: "canvases", canvases: this.canvasList(), ...(view?.canvas ? { focused: view.canvas } : {}) });
 		/*
 		 * And what this install can run.
 		 *
@@ -717,9 +618,6 @@ export class App {
 		// And the shared browser, with the code the extension pairs with: the status board
 		// shows it when nothing is connected yet, and the browser is where the user reads it.
 		reply({ type: "web.status", status: this.web.status(), code: this.web.code() });
-		// And the dashboard's tasks and schedules, with the boards: everything the panel
-		// draws is part of the greeting, so a reconnect is a refresh.
-		reply({ type: "tasks", ...this.tasks.summary() });
 		reply(this.settingsMessage());
 	}
 
@@ -727,31 +625,11 @@ export class App {
 		return { type: "settings", settings: this.settings.get(), machineZone: this.settings.machineZone() };
 	}
 
-	/**
-	 * Choose the deck's timezone. The clock moves at once, every schedule on the deck's
-	 * clock is re-read against it, and every browser hears both.
-	 */
+	/** Choose the deck's timezone. The clock moves at once, and every browser hears it. */
 	setTimezone(zone: string | null): { error: string } | undefined {
 		const outcome = this.settings.setTimezone(zone);
 		if ("error" in outcome) return outcome;
-		this.tasks.rezone();
 		this.send(this.settingsMessage());
-		return undefined;
-	}
-
-	/**
-	 * Choose the runtime the dashboard's dispatcher is. A runtime this machine cannot start is
-	 * refused with its own reason; otherwise the dispatcher of that kind is found or made, and
-	 * every browser hears the setting and the chat list.
-	 */
-	setDispatcherKind(kind: AgentKind): { error: string } | undefined {
-		const runtime = this.runtimes().find((candidate) => candidate.kind === kind);
-		if (!runtime) return { error: `"${kind}" is not a runtime this server has.` };
-		if (!runtime.available) return { error: runtime.reason ?? `${runtime.label} is not installed on this machine.` };
-		this.settings.setDispatcherKind(kind);
-		this.agents.ensureDispatcher();
-		this.send(this.settingsMessage());
-		this.agents.publish();
 		return undefined;
 	}
 
@@ -770,19 +648,11 @@ export class App {
 		App.refreshExamples(this.deck);
 		this.stage.setDeck(this.deck);
 		this.boards.setDeck(this.deck);
-		// A different deck is a different set of canvases, read from its own folder.
-		this.canvases.setDeck(this.deck.path);
-		// The new deck's clock first: its schedules are read against it.
 		this.settings.setDeck(this.deck.path);
-		// Tasks and schedules belong to the deck they name, so a switch is a fresh read —
-		// the dashboard that opens here is the new deck's, not the old one's.
-		this.tasks.reset(this.deck);
 		// An agent's cwd is the deck, and a Pi session's cwd cannot move, so opening
 		// another deck starts again rather than re-pointing what is running.
 		void this.agents.reset(this.deck).then(() => {
 			if (this.agents.restore() === 0) this.agents.create();
-		// And the dashboard's dispatcher, one per deck, whether the deck is new or restored.
-		this.agents.ensureDispatcher();
 		/*
 		 * After the rows are back: drop per-agent account links for agents this install no
 		 * longer has. `remove` covers the ordinary close; this covers a chat pruned while the
@@ -816,12 +686,6 @@ export class App {
 	 * deck's own auto-layout, which is what a deck with nobody looking at it has anyway.
 	 */
 	stageState(asked?: DeckAgent): DeckState {
-		/*
-		 * A frame from a browser that has opened a canvas is answered with that canvas. Asked
-		 * about a particular agent — a per-view render, a board the agent placed — the answer is
-		 * that agent's canvas, as before.
-		 */
-		if (!asked && this.viewing?.canvas && this.canvases.get(this.viewing.canvas)) return this.canvasState(this.viewing.canvas);
 		const agent = asked ?? this.agents.looking();
 		if (!agent) return this.deck.state();
 		const seeded: Array<{ path: string; x: number; y: number }> = [];
@@ -837,77 +701,9 @@ export class App {
 		return state;
 	}
 
-	/**
-	 * The deck as one canvas sees it: its boards, in the places that canvas has put them.
-	 *
-	 * The same two halves as `stageState` — the arrangement, and writing down any place that had
-	 * to be worked out — with the canvas as the owner instead of a chat. A canvas that is gone
-	 * is the deck's own layout rather than an error: a stale tab asking for one should draw
-	 * something.
-	 */
-	canvasState(canvasId: string): DeckState {
-		const canvas = this.canvases.get(canvasId);
-		if (!canvas) return this.deck.state();
-		const seeded: Array<{ path: string; x: number; y: number }> = [];
-		const state = this.deck.state(this.canvases.places(canvas.id), (path, at) => seeded.push({ path, ...at }), this.canvases.boards(canvas.id));
-		for (const { path, x, y } of seeded) this.canvases.place(canvas.id, path, x, y);
-		return state;
-	}
-
-	/**
-	 * What a board frame acts on: the canvas this browser opened, else the chat it is in.
-	 *
-	 * The canvas when there is one, because that is what the person is looking at and adding
-	 * to — whoever they happen to be talking to. The agent otherwise, which is exactly what
-	 * every board frame did before canvases.
-	 */
-	target(): StageTarget {
-		const id = this.viewing?.canvas;
-		if (id && this.canvases.get(id)) {
-			return canvasStage({
-				canvases: this.canvases,
-				deck: this.deck,
-				id,
-				// Of this canvas or nothing: the reading may be a parked view of another room.
-				camera: () => cameraFor(this.cameras.get(this.viewing?.focused ?? "") ?? this.lastCamera, id),
-				changed: () => this.agents.canvasChanged(id),
-			});
-		}
+	/** What a board frame acts on: the stage of the conversation this browser is in. */
+	target(): DeckAgent {
 		return this.agents.focused();
-	}
-
-	/**
-	 * Every canvas as the browser needs it, with the agents on each.
-	 *
-	 * On, not working-on-now: an agent belongs to every canvas it has worked in
-	 * (`session.canvasIds`), so one agent shows up in several rooms and a room keeps the
-	 * faces of everybody who has done something there.
-	 */
-	canvasList(): Canvas[] {
-		const working = new Map<string, string[]>();
-		for (const agent of this.agents.all()) {
-			for (const id of agent.canvasIds) {
-				const on = working.get(id);
-				if (on) on.push(agent.id);
-				else working.set(id, [agent.id]);
-			}
-		}
-		return this.canvases.list().map((canvas) => ({
-			id: canvas.id,
-			name: canvas.name,
-			...(canvas.workspace ? { workspace: canvas.workspace } : {}),
-			boards: [...canvas.boards],
-			kept: this.canvases.kept(canvas.id).filter((path) => this.deck.board(path)),
-			links: canvas.links.map((link) => ({ ...link })),
-			groups: canvas.groups.map((group) => ({ name: group.name, boards: [...group.boards] })),
-			changedAt: canvas.changedAt,
-			...(canvas.openedAt === undefined ? {} : { openedAt: canvas.openedAt }),
-			agents: working.get(canvas.id) ?? [],
-		}));
-	}
-
-	publishCanvases(): void {
-		this.send({ type: "canvases", canvases: this.canvasList() });
 	}
 
 	/**
@@ -936,14 +732,6 @@ export class App {
 		if (message.type === "board.changed") {
 			if (message.removed) this.thumbs.forget(message.path);
 			else if (message.board) this.thumbs.changed(message.board);
-			/*
-			 * And the canvases holding it are news until somebody opens them. The mark is about
-			 * the board's *contents*, so it is set here — where every write to a board passes,
-			 * whoever made it — and not where boards are moved.
-			 */
-			const marked = this.canvases.holding(message.path);
-			for (const canvas of marked) this.canvases.changed(canvas.id);
-			if (marked.length > 0) queueMicrotask(() => this.publishCanvases());
 		}
 		this.hub?.each((view) => this.forView(message, view));
 	}
@@ -957,19 +745,6 @@ export class App {
 	 * A browser whose conversation was closed is moved to the registry's, which is the nearest row.
 	 */
 	private forView(message: ServerMessage, view: View): ServerMessage {
-		/*
-		 * A browser that has opened a canvas is sent that canvas's boards, whatever chat it is
-		 * on. This is the whole of the decoupling on the wire: the canvas decides the boards,
-		 * the chat decides the conversation, and one browser can change either on its own.
-		 */
-		if (view.canvas && this.canvases.get(view.canvas)) {
-			if (message.type === "deck.state") return { ...message, deck: this.canvasState(view.canvas) };
-			if (message.type === "canvases") return { ...message, focused: view.canvas };
-			if (message.type === "board.changed" && message.board) {
-				const placed = this.canvasState(view.canvas).boards.find((one) => one.path === message.path);
-				if (placed) return { ...message, board: { ...message.board, x: placed.x, y: placed.y } };
-			}
-		}
 		const shared = this.agents.looking();
 		if (view === this.viewing) return message;
 		const own = this.agents.get(view.focused);
@@ -999,7 +774,6 @@ export class App {
 		clearInterval(this.resyncTimer);
 		this.resyncTimer = undefined;
 		this.web.dispose();
-		void this.jev.dispose();
 		this.thumbs.dispose();
 		this.agents.dispose();
 	}

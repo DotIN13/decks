@@ -17,7 +17,6 @@
 		"@decks/board-kit": "*",
 		"@decks/protocol": "*",
 		"@decks/runtime": "*",
-		"@decks/web-gate": "*",
 		"@earendil-works/pi-coding-agent": "^0.85.0",
 		"@earendil-works/pi-server": "^0.85.0",
 		"@opencode-ai/sdk": "^1.18.29",

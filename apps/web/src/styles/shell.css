@@ -1,6 +1,6 @@
 /*
- * The one-page shell: a surface that slides between the dashboard and a stage, two floats
- * over it, a stationary sidebar beside it, and the segments the two toolbars grow.
+ * The shell: the stage, two floats over it, a stationary sidebar beside it, and the
+ * segments the two toolbars grow.
  *
  * Only new selectors live here, so the import order against `index.css` cannot change
  * which of two rules for one selector wins (see the note on splitting `index.css`).
@@ -22,7 +22,7 @@
 }
 
 @layer components {
-	/* ---- the surface, and its two layers ---------------------------------------- */
+	/* ---- the surface: the stage, with the floats over it ------------------------- */
 	.surface {
 		position: absolute;
 		inset: 0;
@@ -32,74 +32,6 @@
 	.surface-layer {
 		position: absolute;
 		inset: 0;
-		transition:
-			transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
-			opacity 200ms ease-out,
-			visibility 0s linear 220ms;
-	}
-
-	/* The dashboard leaves to the left, the stage arrives from the right, and back. */
-	.surface[data-surface="stage"] > .surface-layer[data-layer="dispatch"],
-	.surface[data-surface="dispatch"] > .surface-layer[data-layer="stage"] {
-		opacity: 0;
-		visibility: hidden;
-		pointer-events: none;
-	}
-	.surface[data-surface="stage"] > .surface-layer[data-layer="dispatch"] {
-		transform: translateX(-40px);
-	}
-	.surface[data-surface="dispatch"] > .surface-layer[data-layer="stage"] {
-		transform: translateX(40px);
-	}
-	.surface[data-surface="dispatch"] > .surface-layer[data-layer="dispatch"],
-	.surface[data-surface="stage"] > .surface-layer[data-layer="stage"] {
-		transition-delay: 0s;
-	}
-
-	/*
-	 * Opening a canvas from its card, and going back into it (`app/canvas-morph.ts`).
-	 *
-	 * The camera does the moving — the canvas grows out of the card — so the layers must not
-	 * slide past each other as well: that says the two surfaces are side by side, and one is
-	 * inside the other. The dashboard fades and grows a little as you pass through it, and the
-	 * stage is simply there, because its own boards are what is arriving.
-	 */
-	.surface[data-morph="true"][data-surface="stage"] > .surface-layer[data-layer="dispatch"] {
-		transform: scale(1.04);
-		transition:
-			transform 300ms cubic-bezier(0.2, 0.7, 0.2, 1),
-			opacity 180ms ease-out,
-			visibility 0s linear 300ms;
-	}
-	.surface[data-morph="true"][data-surface="dispatch"] > .surface-layer[data-layer="stage"],
-	.surface[data-morph="true"] > .surface-layer[data-layer="stage"] {
-		transform: none;
-	}
-	.surface[data-morph="true"][data-surface="dispatch"] > .surface-layer[data-layer="dispatch"] {
-		transition:
-			transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1),
-			opacity 200ms ease-out;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.surface[data-morph="true"] > .surface-layer {
-			transform: none;
-			transition: opacity 120ms ease-out;
-		}
-	}
-
-	/* The dashboard starts under the top cluster and beside the sidebar, like the canvas. */
-	.surface-layer[data-layer="dispatch"] {
-		box-sizing: border-box;
-		padding: calc(var(--inset-top, 0px) + 12px) 16px 12px calc(var(--inset-left, 0px) + 16px);
-		background: var(--stage);
-		transition-property: transform, opacity, visibility, padding-left;
-		transition-duration: 220ms, 200ms, 0s, 160ms;
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.surface-layer {
-			transition-duration: 0s;
-		}
 	}
 
 	/* ---- the sidebar's mark, and the pill beside it ------------------------------ */
@@ -129,150 +61,11 @@
 		font-weight: 600;
 	}
 
-
 	/* The sidebar beside the canvas: one hairline on its right, no lift. It is the ground's
 	   neighbour, not something floating on it. A sheet (narrow screens) keeps the card look. */
 	.panel-shell:not([data-sheet="true"]) {
 		border-right-color: var(--line);
 		box-shadow: none;
-	}
-
-	/* ---- the two names in the line: the canvas's and the agent's ------------------ */
-	/*
-	 * Both are renamed in place — a chip that turns into a field (`EditableName`) — so they
-	 * share the chip and the field rather than each having a pair. The canvas used to carry
-	 * the faces of everybody on it as well; they are gone, because the agent you are
-	 * addressing is drawn in the same line and appeared twice.
-	 */
-	.pill-canvas {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--pill-gap, 4px);
-		white-space: nowrap;
-	}
-	.pill-name {
-		max-width: 180px;
-		overflow: hidden;
-		padding: 0 9px;
-		/* No outline: it is the name of the room, read a hundred times and pressed once. The
-		   fill on hover is what says it can be pressed; the border is transparent rather than
-		   gone so the chip keeps its height. */
-		border-color: transparent;
-		color: var(--fg);
-		font-weight: 600;
-		text-overflow: ellipsis;
-	}
-	.pill-name:hover {
-		border-color: transparent;
-	}
-	/*
-	 * The agent's name is a chip like the canvas's, and 12px like the line it is in: it sits
-	 * next to a 28px avatar rather than between two dividers, so the canvas chip's padding
-	 * would push the chevron away from the face it belongs to.
-	 */
-	.pill-name-field {
-		width: 160px;
-		height: 26px;
-		padding: 0 8px;
-		border: 1px solid var(--color-accent);
-		border-radius: var(--control-radius);
-		background: var(--panel);
-		color: var(--fg);
-		font: inherit;
-		font-weight: 600;
-	}
-	/*
-	 * A canvas with something new on it, in the switcher: the dashboard card's mark, at the
-	 * size a menu row can spare. A dot rather than a count, because the question this
-	 * answers is "is there anything", and the shelf is where "how much" is asked.
-	 */
-	.pill-canvas-news {
-		width: 7px;
-		height: 7px;
-		flex: none;
-		border-radius: 50%;
-		background: var(--color-accent);
-	}
-	/*
-	 * A canvas row in the pill's menu: the mark's slot, the name, and what is on it. The slot
-	 * is the same 16px column the verbs under the rule put their icons in, so the names line
-	 * up with Rename and Move to… rather than sitting a dot's width to their left.
-	 */
-	.popover.canvas-menu .pill-canvas-row > .row-icon {
-		display: grid;
-		flex: none;
-		width: 16px;
-		place-items: center;
-	}
-	.popover.canvas-menu .pill-canvas-row > .row-label {
-		min-width: 0;
-		flex: 1;
-	}
-	.pill-name > .chevron {
-		color: var(--muted);
-	}
-	@media (max-width: 640px) {
-		.pill-name {
-			max-width: 110px;
-		}
-	}
-
-	/* ---- Home, grown into the pill ----------------------------------------------- */
-	.pill-home {
-		display: inline-flex;
-		align-items: center;
-		/* The same 4px the pill puts between its children: without it the divider after
-		   Home stood 4px off the button and the one before it 8px. */
-		gap: var(--pill-gap, 4px);
-		max-width: 0;
-		opacity: 0;
-		overflow: hidden;
-		white-space: nowrap;
-		transition:
-			max-width 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
-			opacity 160ms ease;
-	}
-	.pill-home[data-on="true"] {
-		max-width: 160px;
-		opacity: 1;
-	}
-	/* Folded to nothing it still sat in the pill's flex gap, which put 12px before the tabs
-	   and 7px after them on the dashboard. The margin gives that gap back. */
-	.pill-home:not([data-on="true"]) {
-		margin-left: calc(-1 * var(--pill-gap, 4px));
-	}
-	/* The chip's own colour, not the accent: it is a way back, not the thing to notice. */
-	.pill-home-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		/* More on the right than the left: the arrow is light and the word is bold, so with
-		   equal padding the pair read as sitting right of centre. */
-		padding: 0 11px 0 8px;
-		color: var(--fg);
-		font-weight: 600;
-	}
-	.pill-home-n {
-		display: inline-block;
-		min-width: 15px;
-		height: 15px;
-		padding: 0 4px;
-		border-radius: var(--radius-pill);
-		background: var(--color-warn);
-		color: white;
-		font-size: var(--type-tag);
-		line-height: 15px;
-		font-weight: 600;
-		text-align: center;
-	}
-	/* The phone's Home icon carries its badge on its top-right corner. */
-	.pill-home-icon {
-		position: relative;
-	}
-	.pill-home-icon-n {
-		position: absolute;
-		top: 2px;
-		right: 2px;
 	}
 	.pill-deck-glyph {
 		display: inline-flex;
@@ -351,9 +144,8 @@
 		pointer-events: none;
 	}
 	/*
-	 * Who gets the line: the word `To`, a chip with the agent's face and name, and, when the
-	 * agent is not on this canvas, what sending will do. The chip opens the pill's agent menu
-	 * (`chat/composer/Recipient.tsx` says how it differs from the pill's own chevron).
+	 * Who gets the line: the word `To` and a chip with the agent's face and name. The chip
+	 * opens the pill's agent menu (`chat/composer/Recipient.tsx`).
 	 */
 	.dock-to {
 		display: flex;
@@ -399,22 +191,7 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.dock-to-joins {
-		color: var(--muted);
-	}
-	/* The dispatcher's mark in the completion, where there is no chat to draw a face from. */
-	.mention-mark {
-		display: grid;
-		width: 20px;
-		height: 20px;
-		flex: none;
-		place-items: center;
-		border-radius: 50%;
-		background: var(--fg);
-		color: var(--bg);
-		font-size: var(--type-micro);
-		font-weight: 700;
-	}
+	
 
 	/* ---- the conversation as a float --------------------------------------------- */
 	/*
@@ -572,20 +349,6 @@
 }
 
 @layer components {
-	/* The dashboard runs to the bottom of the window and its content scrolls *under* the
-	   composer, the way the canvas does; the room the last row needs to clear the bar is
-	   padding inside the scroller (`.dispatch-scroll`), not a band of bare ground beneath
-	   it. A card without a picture yet is a tile of a fixed height rather than a column of
-	   the whole grid. */
-	.surface-layer[data-layer="dispatch"] {
-		padding-bottom: 0;
-	}
-	.surface-layer[data-layer="dispatch"] .dispatch-scroll {
-		padding-bottom: 156px;
-	}
-	.dispatch-card-pic {
-		height: 120px;
-	}
 	/*
  * One area, full height. There is no title bar to reserve a row for.
  *

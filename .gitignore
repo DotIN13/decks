@@ -38,4 +38,3 @@ dist/
 
 # The antigravity runtime's own home, created under the data directory on first use.
 /example/antigravity-home/
-__pycache__/

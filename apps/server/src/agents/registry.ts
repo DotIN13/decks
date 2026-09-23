@@ -1,21 +1,18 @@
 import { readFileSync } from "node:fs";
-import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, Canvas, ModelOption, Schedule, ScheduleSpec, ServerMessage, TaskResult, TaskSpec } from "@decks/protocol";
+import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ModelOption, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import { dispatcherBrief } from "../tasks/brief.ts";
 import { nowWords, processZone } from "../clock.ts";
 import type { StageBridge } from "../stage/bridge.ts";
 import type { StageService } from "../stage/service.ts";
-import type { CanvasStore } from "../canvas/store.ts";
-import { planCanvases } from "../canvas/migrate.ts";
 import type { Act } from "./acts.ts";
 import { numberedName } from "../names.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { CreateSpec, SendSpec } from "../stage/tool.ts";
-import type { TaskFinish } from "../tasks/service.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore, type AgentRecord } from "./store.ts";
+import { readCanvasStage } from "./from-canvas.ts";
 
 /**
  * Which agents exist, and which one the browser is looking at.
@@ -40,9 +37,6 @@ export class Registry {
 	/** The chat list on disk, so it survives a restart (§6.2). */
 	private store: AgentStore;
 
-	/** A task the dispatcher is deciding, and the canvas it was asked for on. Read once, at the send. */
-	private readonly taskCanvases = new Map<string, string>();
-
 	constructor(
 		private deck: Deck,
 		private readonly emit: (message: ServerMessage) => void,
@@ -51,19 +45,9 @@ export class Registry {
 			port: number;
 			/** The runtime a new agent gets unless it asks for another one. */
 			defaultKind: AgentKind;
-			/** The runtime chosen for the dashboard's dispatcher, if one has been (`settings.ts`). */
-			dispatcherKind?: () => AgentKind | undefined;
 			camera(agentId: string): Camera;
-			/** The reading, only when it is of this canvas — what a placement may anchor on. Optional so a bare fixture keeps the plain camera. */
-			cameraOn?(agentId: string, canvasId: string): Camera | undefined;
 			/** Say that a board was placed, so the deck state goes out before the canvas changes. */
 			arranged?(): void;
-			/** The deck's canvases: what holds the boards (`canvas/store.ts`). */
-			canvases: CanvasStore;
-			/** Every canvas as the browser sees it, with who is on each. */
-			canvasList?(): Canvas[];
-			/** Send the canvas list to every browser. */
-			publishCanvases?(): void;
 			/** Send the runtime list again: one of them reported a model catalogue. */
 			publishRuntimes?(): void;
 			recordRevision(path: string): string | undefined;
@@ -78,30 +62,6 @@ export class Registry {
 			accountsChanged?(): void;
 			/** The canvas tool's HTTP end, for a runtime that is not in this process. */
 			bridge?: StageBridge;
-			/**
-			 * The dashboard, when the deck has one — the seam an agent and a removal reach it through.
-			 *
-			 * Separate from `TaskService` itself so the registry can stay a registry: it hands
-			 * the stage its `task` verb, reports a queue item's life back, and tells the
-			 * service when an assigned agent goes away. Absent means no dashboard, and every
-			 * hook is a no-op.
-			 */
-			tasks?: {
-				create(spec: TaskSpec, fromId?: string): TaskResult;
-				started(taskId: string): void;
-				finished(finish: TaskFinish): void;
-				agentRemoved(id: string): void;
-				/** The dispatcher handed a task to an agent: the registry saw its `send`. */
-				assigned(placement: { taskId: string; agentId: string; agentName: string; why: string }): void;
-				/** The dispatcher's turn over a task ended, with or without a `send`. */
-				decided(outcome: { taskId: string; sent: boolean; report: string }): void;
-				/** Make a schedule — `stage.schedule`. */
-				schedule(spec: ScheduleSpec): Schedule | { error: string };
-				/** A deciding dispatcher made a schedule for its task instead of sending it: the task is done. */
-				scheduled(outcome: { taskId: string; schedule: Schedule }): void;
-				/** The name of the cron job that made this task, when a schedule did rather than a person. */
-				cronOf(taskId: string): string | undefined;
-			};
 		},
 	) {
 		this.store = new AgentStore(deck);
@@ -131,7 +91,7 @@ export class Registry {
 	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number }> {
 		// Not the dispatcher: it is the dashboard's, and an agent deciding who to hand work
 		// to must not hand it to the thing that hands work out.
-		return this.agents.filter((agent) => agent.role !== "dispatcher").map((agent) => {
+		return this.agents.map((agent) => {
 			const chat = agent.chat();
 			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand
 			// something to can see, in one call, both what they are doing and how much is
@@ -183,16 +143,6 @@ export class Registry {
 			mode?: AgentMode;
 			/** The Claude subscription to open on — a delegating parent's, handed down. */
 			account?: string;
-			/** The deck's dispatcher. Made by `ensureDispatcher`, never by a person. */
-			role?: "dispatcher";
-			/**
-			 * The canvas to work on, by id: a delegating parent's, or the one a task arrived with.
-			 *
-			 * A child works where its parent was working, for the reason it inherits the account —
-			 * a fan-out that puts its boards on a canvas nobody is looking at is work you have to
-			 * go and find.
-			 */
-			canvas?: string;
 			/**
 			 * The workspace to open in — a delegating parent's, or a chat's own record.
 			 *
@@ -206,14 +156,9 @@ export class Registry {
 			restored?: {
 				id: string;
 				context: string[];
-				/**
-				 * The canvas this conversation was working on, by id.
-				 *
-				 * Where its boards sit and which are up live on the canvas now, so this one field
-				 * replaces the list and the map a chat used to carry — and it is what makes a
-				 * dragged board stay where it was put, for everyone on that canvas.
-				 */
-				canvas?: string;
+				inPlay: string[];
+				/** Where this conversation had put its boards: a stage's own arrangement. */
+				positions?: Record<string, { x: number; y: number }>;
 				avatar?: string;
 				createdAt: number;
 				/**
@@ -240,66 +185,14 @@ export class Registry {
 			{
 				port: this.host.port,
 				camera: (agentId: string) => this.host.camera(agentId),
-				cameraOn: (agentId: string, canvasId: string) => this.host.cameraOn?.(agentId, canvasId),
-				// A board that was given a place: the browsers need the arrangement, not just the canvas.
+				// A board that was given a place: the browsers need the arrangement, not just the list.
 				arranged: () => this.host.arranged?.(),
-				/*
-				 * One agent changed a shared canvas. Everyone else on it is looking at the same
-				 * boards, so each of their browsers is told, and the arrangement goes out once.
-				 */
-				canvasChanged: (canvasId: string, except: string) => this.canvasChanged(canvasId, except),
-				canvasList: () => this.host.canvasList?.() ?? [],
-				canvasesChanged: () => this.host.publishCanvases?.(),
 				runtimesChanged: () => this.host.publishRuntimes?.(),
 				agents: () => this.summaries(),
 				send: (fromId, target, spec) => this.send(fromId, target, spec),
 				create: (fromId, spec) => this.createFor(fromId, spec),
 			report: (agentId, text) => this.get(agentId)?.translator.notice("info", text),
 				queue: (agentId) => this.get(agentId)?.queue() ?? [],
-				/**
-				 * A dashboard task popped and its turn ended: reported to the deck's own
-				 * service, which records the state. Never awaited — the session has a turn
-				 * to finish and the dashboard only records.
-				 */
-				taskStarted: (taskId) => this.host.tasks?.started(taskId),
-				taskFinished: (finish) => this.host.tasks?.finished(finish),
-				decided: (outcome) => {
-					this.host.tasks?.decided(outcome);
-					// A task's dispatcher has done its one job: the runtime goes, the log stays.
-					if (agent.role === "dispatcher" && agent.parentId) void agent.sleep().then(() => this.publish());
-				},
-				task: (spec: TaskSpec): TaskResult => {
-					if (!this.host.tasks) throw new Error("This deck has no dashboard.");
-					// Work an agent asks for is for the canvas it is on, unless it said otherwise.
-					const canvas = spec.canvas ?? agent.canvas;
-					return this.host.tasks.create({ ...spec, ...(canvas ? { canvas } : {}) }, agent.id);
-				},
-				/*
-				 * A schedule from a deciding dispatcher is that task's answer: the person asked
-				 * for something recurring, and what they get is the schedule rather than one
-				 * turn of it. So the task is done, with the schedule as its result, and the
-				 * dispatcher's turn does not count as "sent nothing".
-				 */
-				schedule: (spec: ScheduleSpec) => {
-					if (!this.host.tasks) throw new Error("This deck has no dashboard.");
-					/*
-					 * A dispatcher deciding a task that a cron job made must not answer it with
-					 * another schedule: the task's recurring words are the cron's own text, and a
-					 * schedule made here would fire tomorrow, be dispatched, and enlist a third.
-					 * The brief already says so; refused here too, so a missed sentence cannot
-					 * loop the deck.
-					 */
-					if (agent.role === "dispatcher" && agent.deciding) {
-						const cron = this.host.tasks.cronOf(agent.deciding);
-						if (cron) return { error: `This task is one firing of the cron job "${cron}", which already exists. Hand the work to an agent with stage.send instead of scheduling it again.` };
-					}
-					const made = this.host.tasks.schedule(spec);
-					if (!("error" in made) && agent.role === "dispatcher" && agent.deciding && !agent.decidedSend) {
-						agent.decidedSend = true;
-						this.host.tasks.scheduled({ taskId: agent.deciding, schedule: made });
-					}
-					return made;
-				},
 				brief: (task, boards) => brief(task, boards, this.deck),
 				recordRevision: (path) => this.host.recordRevision(path),
 				wrote: (path, who) => this.host.wrote?.(path, who),
@@ -328,8 +221,6 @@ export class Registry {
 				kind: options.kind ?? this.host.defaultKind,
 				snapshots: this.snapshots,
 				store: this.store,
-				canvases: this.host.canvases,
-				...(options.canvas ? { canvas: options.canvas } : {}),
 			},
 		);
 		this.agents.push(agent);
@@ -354,21 +245,23 @@ export class Registry {
 	 * decide whether the deck still needs its first agent — a restored deck does not.
 	 */
 	restore(): number {
-		const records = this.store.list().map(({ record }) => record);
-		const canvases = this.migrate(records);
+		// The deck's dispatcher is gone with the dashboard; its records stay on disk, unread.
+		const records = this.store
+			.list()
+			.map(({ record }) => record)
+			.filter((record) => !record.wasDispatcher)
+			.map((record) => this.fromCanvas(record));
 		for (const record of [...records].reverse()) {
-			const canvas = record.canvas ?? canvases.get(record.id);
 			this.create({
 				name: record.name,
 				kind: record.kind,
 				color: record.color,
 				...(record.resumeRef ? { resumeRef: record.resumeRef } : {}),
 				...(record.parentId ? { parentId: record.parentId } : {}),
-				...(record.role ? { role: record.role } : {}),
 				restored: {
 					id: record.id,
-					...(canvas ? { canvas } : {}),
-					...(record.canvases?.length ? { canvases: record.canvases } : {}),
+					inPlay: record.inPlay,
+					...(record.positions ? { positions: record.positions } : {}),
 					// The transcript is not read here. It is read when somebody opens the chat
 					// (`session.transcript`), which is the difference between a list that costs
 					// a directory read and one that costs every conversation ever had.
@@ -400,110 +293,32 @@ export class Registry {
 		 * `create` sets `focusedId ??=`, and the list is restored oldest-first so the colour
 		 * fallback lands in the original order — which together would focus the *oldest* chat.
 		 */
-		this.fileCanvases();
 		this.focusedId = this.agents.at(-1)?.id;
 		this.publish();
 		return this.agents.length;
 	}
 
 	/**
-	 * One-way, once: the chats that exist become the canvases they were describing.
+	 * A record that named a shared canvas takes that canvas's boards as its own stage, once.
 	 *
-	 * A record written before canvases carries what it had up, where it sat, and the word its
-	 * agent typed about itself. `canvas/migrate.ts` decides what canvases those make; this
-	 * writes them and answers with the chat id to canvas id map `restore` then hands each agent.
-	 * A record that already names a canvas is left alone, so this is a no-op on the second open.
+	 * Written straight back, so the next open reads the chat's own fields and the canvas file is
+	 * never needed again. Every chat that was on one canvas gets its own copy of it: from here
+	 * on each agent's stage is its own, and moving a board in one does not move it in another.
 	 */
-	/**
-	 * A canvas nobody has filed takes the workspace of the agents standing on it.
-	 *
-	 * Once, on open, and only for canvases with no workspace of their own: a canvas made
-	 * before canvases had workspaces sits under "No workspace" otherwise, while every agent on
-	 * it says which project it is. When they disagree the most common word wins; a canvas
-	 * nobody with a workspace stands on is left as it is, for the person to file from its
-	 * card. Nothing on a canvas moves.
-	 */
-	private fileCanvases(): void {
-		const votes = new Map<string, Map<string, number>>();
-		for (const agent of this.agents) {
-			const workspace = agent.workspace;
-			if (!workspace) continue;
-			for (const id of agent.canvasIds) {
-				const tally = votes.get(id) ?? new Map<string, number>();
-				tally.set(workspace, (tally.get(workspace) ?? 0) + 1);
-				votes.set(id, tally);
-			}
+	private fromCanvas(record: AgentRecord): AgentRecord {
+		if (!record.fromCanvas) return record;
+		const { fromCanvas, ...rest } = record;
+		const canvas = rest.inPlay.length === 0 && !rest.positions ? readCanvasStage(this.deck.path, fromCanvas) : undefined;
+		if (!canvas) {
+			this.store.writeRecord(rest);
+			return rest;
 		}
-		for (const canvas of this.host.canvases.list()) {
-			if (canvas.workspace) continue;
-			const tally = votes.get(canvas.id);
-			if (!tally) continue;
-			const best = [...tally.entries()].sort(([left, a], [right, b]) => b - a || left.localeCompare(right))[0]?.[0];
-			if (best) this.host.canvases.setWorkspace(canvas.id, best);
-		}
-	}
-
-	private migrate(records: readonly AgentRecord[]): Map<string, string> {
-		const assigned = new Map<string, string>();
-		// Not the dispatchers: they hand work out and never put a board up, so they are on no canvas.
-		const stale = records.filter((record) => record.role !== "dispatcher" && !record.canvas && (record.legacyWorkspace || record.legacyInPlay?.length));
-		if (stale.length === 0) return assigned;
-		const plans = planCanvases(
-			stale.map((record) => ({
-				id: record.id,
-				name: record.name,
-				...(record.legacyWorkspace ? { workspace: record.legacyWorkspace } : {}),
-				inPlay: record.legacyInPlay ?? [],
-				...(record.legacyPositions ? { positions: record.legacyPositions } : {}),
-				lastAt: record.lastAt,
-			})),
-			// Sizes, so the plan can tell an arrangement from the old auto-layout's leavings.
-			(path) => this.deck.board(path),
-		);
-		for (const plan of plans) {
-			/*
-			 * A workspace word several chats said is one canvas, and a canvas of that name already
-			 * made is it. A chat's own name is not: two chats called "Agent" get two canvases.
-			 */
-			const existing = plan.shared ? this.host.canvases.byName(plan.name) : undefined;
-			const canvas = existing ?? this.host.canvases.create({ name: plan.shared ? plan.name : this.host.canvases.freeName(plan.name), ...(plan.shared ? { workspace: plan.name } : {}), boards: plan.boards, places: plan.places });
-			for (const member of plan.members) assigned.set(member, canvas.id);
-		}
-		/*
-		 * Written now, not at the chat's next save. A restored chat is dormant and may never be
-		 * saved again, and a record still without a canvas would be migrated again on the next
-		 * open — making "Agent 7" out of a chat that already has "Agent". The three old fields go
-		 * in the same write, which is what makes this happen once.
-		 */
-		for (const record of stale) {
-			const canvas = assigned.get(record.id);
-			const { legacyInPlay: _inPlay, legacyPositions: _positions, legacyWorkspace: _workspace, ...rest } = record;
-			this.store.writeRecord({ ...rest, ...(canvas ? { canvas } : {}) });
-		}
-		return assigned;
-	}
-
-	/**
-	 * A shared canvas changed: every agent on it is told, and the arrangement goes out once.
-	 *
-	 * `except` is whoever made the change, which has already said so itself. A person changing
-	 * a canvas from the browser has no agent to except, and every agent there hears.
-	 */
-	canvasChanged(canvasId: string, except = ""): void {
-		for (const other of this.agents) {
-			if (other.id === except || other.canvas !== canvasId) continue;
-			other.canvasMoved();
-		}
-		this.host.arranged?.();
-		/*
-		 * And the canvases themselves, because **what is on a canvas is part of the canvas**.
-		 *
-		 * A browser draws its stage from the canvas's own board list now, not from the focused
-		 * agent's in-play set, so a board shown or hidden on a shared canvas reached every
-		 * agent and no window: `deck.state` says where the boards *are*, and this is what says
-		 * which of them are up.
-		 */
-		this.host.publishCanvases?.();
+		const boards = canvas.boards.filter((path) => this.deck.board(path));
+		const context = [...boards, ...rest.context.filter((path) => !boards.includes(path))];
+		const places = Object.fromEntries(Object.entries(canvas.places).filter(([path]) => context.includes(path)));
+		const next: AgentRecord = { ...rest, context, inPlay: boards, ...(Object.keys(places).length > 0 ? { positions: places } : {}) };
+		this.store.writeRecord(next);
+		return next;
 	}
 
 	get(id: string | undefined): DeckAgent | undefined {
@@ -515,14 +330,11 @@ export class Registry {
 	 * Whether another chat already answers to this name.
 	 *
 	 * Case-insensitive, because that is how the bar reads an `@name` (`app/send-from-bar.ts`)
-	 * — `@sable` and `@Sable` are one address, so they are one name here. The dispatcher is
-	 * included: `@Dispatcher` is a reserved word, and an agent called Dispatcher would take
-	 * a line meant for the dashboard.
+	 * — `@sable` and `@Sable` are one address, so they are one name here.
 	 */
 	nameTaken(name: string, exceptId?: string): boolean {
 		const wanted = name.trim().toLowerCase();
 		if (!wanted) return false;
-		if (wanted === "dispatcher") return true;
 		return this.agents.some((agent) => agent.id !== exceptId && agent.chat().name.trim().toLowerCase() === wanted);
 	}
 
@@ -594,9 +406,6 @@ export class Registry {
 		// And the symlink that said which subscription it spent. Nothing else of an agent
 		// lives in the account store, so this is the whole of that cleanup.
 		this.host.accounts?.releaseAgent?.(id);
-		// And the work it was assigned: a dashboard task it was carrying comes back out of
-		// its queue and is re-decided, so nothing points at a ghost (tasks/service.ts).
-		this.host.tasks?.agentRemoved(id);
 		for (const child of this.agents) child.orphan(id);
 
 		// The focus moves to whatever is nearest, or to a new agent on the next request —
@@ -634,22 +443,14 @@ export class Registry {
 	 *
 	 * A peer rather than a child: it has no parent to report to and is not counted against
 	 * `MAX_CHILDREN`, because the one making it is not going to wait for it. It opens on the
-	 * creator's account, workspace and model unless told otherwise. For a task's dispatcher
-	 * the model is the dashboard's composer, which is where a person says what new work
-	 * should run on; a model named here is the dispatcher's own decision, and a model the
-	 * runtime cannot open is a notice in the creator's transcript, not an error.
+	 * creator's account, workspace and model unless told otherwise; a model the runtime cannot
+	 * open is a notice in the creator's transcript, not an error.
 	 */
 	async createFor(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string }> {
 		const from = this.get(fromId);
 		if (!from) throw new Error("The creating agent is gone");
 		const workspace = spec.workspace ?? from.workspace;
-		/*
-		 * The creator's runtime unless another is named. It used to be the server's default,
-		 * which was the same thing while every dispatcher was the default runtime, and is not
-		 * now: a Claude dispatcher handing its Claude model to a new Pi agent is a model that
-		 * agent cannot open. The dashboard's bar chooses the runtime new work runs on, as it
-		 * chooses the model.
-		 */
+		// The creator's runtime unless another is named, so an inherited model is one it can open.
 		const kind = spec.kind ?? from.kind;
 		const inherited = !spec.model && kind === from.kind ? from.currentModel() : undefined;
 		const made = this.create({
@@ -699,15 +500,6 @@ export class Registry {
 		if (!from) throw new Error("The sending agent is gone");
 
 		const to = this.resolve(target);
-		if (to.role === "dispatcher") throw new Error("The dispatcher hands work out; it does not take any. Send to an agent from stage.agents().");
-		/*
-		 * The dispatcher placing a task: its `send` during the deciding turn *is* the
-		 * dashboard's answer, so the item carries the task's id (which is what turns the
-		 * task running and done as the receiver's queue drains) and the dashboard hears who
-		 * took it. A second send in the same turn is refused rather than split.
-		 */
-		const placing = from.role === "dispatcher" ? from.deciding : undefined;
-		if (from.role === "dispatcher" && placing && from.decidedSend) throw new Error("This task was already handed to an agent; one send per task.");
 		// Only boards that exist, and no context change on the receiver: what it is holding is
 		// its own decision, and a sender that could rewrite it would be a sender that can take
 		// somebody's canvas away. The source rides in the briefing instead.
@@ -718,121 +510,10 @@ export class Registry {
 			task: spec.task.trim(),
 			boards: handed,
 			at: Date.now(),
-			...(placing ? { taskId: placing } : {}),
-			...(spec.reply ? { reply: true } : {}),
-		});
-		if (placing) {
-			from.decidedSend = true;
-			/*
-			 * A task asked for on a canvas is done on that canvas: the agent it went to moves
-			 * there, so the boards it makes land in front of the person who asked, and the card
-			 * for that canvas says it is working there.
-			 */
-			const canvas = this.host.canvases.get(this.taskCanvases.get(placing));
-			if (canvas) to.useCanvas(canvas.name);
-			this.taskCanvases.delete(placing);
-			this.host.tasks?.assigned({ taskId: placing, agentId: to.id, agentName: to.chat().name, why: firstLineOf(spec.task) });
-		}
-		this.publish();
-		return { queued: true, position };
-	}
-
-	/**
-	 * The deck's dispatcher: one agent, made here and never by a person, on the default
-	 * runtime. It answers the dashboard's bar, and its transcript is the dashboard's log.
-	 * Hidden from the lists (`AgentChat.role`), and never the focused stage: a person who
-	 * lands on it would find an agent that refuses to do anything but hand work out.
-	 */
-	ensureDispatcher(): DeckAgent {
-		/*
-		 * One template per runtime that has been chosen, because a runtime is fixed when an
-		 * agent is made: choosing Claude in the dashboard's bar cannot change the Pi dispatcher,
-		 * it can only put a Claude one in its place. The others stay, hidden like every
-		 * dispatcher, holding the model and mode they were left on for when they are chosen again.
-		 */
-		const kind = this.host.dispatcherKind?.() ?? this.host.defaultKind;
-		const have = this.agents.find((agent) => agent.role === "dispatcher" && !agent.parentId && agent.kind === kind);
-		if (have) {
-			this.unfocusDispatcher();
-			return have;
-		}
-		const made = this.create({ name: "Dispatcher", role: "dispatcher", kind });
-		this.unfocusDispatcher();
-		return made;
-	}
-
-	private unfocusDispatcher(): void {
-		const focused = this.get(this.focusedId);
-		if (focused?.role !== "dispatcher") return;
-		this.focusedId = this.agents.find((agent) => agent.role !== "dispatcher")?.id;
-		this.publish();
-	}
-
-	/**
-	 * Ask a dispatcher to place a task: a **new one for this task**, spawned from the
-	 * template with the model, thinking, mode and account the composer set there, so its
-	 * transcript is this task's own log and two tasks never share a context. It is not
-	 * handed the roster: the brief tells it to read `stage.agents()` itself. The briefing
-	 * goes into its queue as a `decide` item and runs the moment it is up; when the turn
-	 * ends the runtime is stopped and the conversation kept (`DeckAgent.sleep`).
-	 */
-	decide(task: { id: string; text: string; boards: string[]; workspace?: string; canvas?: string; promptPath?: string; schedule?: string }): { dispatcherId: string } {
-		const template = this.ensureDispatcher();
-		const canvasName = this.host.canvases.get(task.canvas)?.name;
-		if (task.canvas && canvasName) this.taskCanvases.set(task.id, task.canvas);
-		const model = template.currentModel();
-		const mode = template.chat().mode;
-		const account = template.accountId();
-		const dispatcher = this.create({
-			name: "Dispatcher",
-			role: "dispatcher",
-			parentId: template.id,
-			kind: template.kind,
-			...(model ? { model } : {}),
-			...(mode ? { mode } : {}),
-			...(account ? { account } : {}),
-		});
-		this.unfocusDispatcher();
-		dispatcher.enqueue({
-			from: "deck",
-			fromName: "The dashboard",
-			task: dispatcherBrief({ ...task, ...(canvasName ? { canvasName } : {}), now: nowWords(Date.now(), processZone()) }),
-			boards: [],
-			at: Date.now(),
-			decide: task.id,
-		});
-		this.publish();
-		return { dispatcherId: dispatcher.id };
-	}
-
-	/**
-	 * Put work in an existing agent's queue with **no sending agent** — the dashboard's
-	 * half of `send`. The same resolution by id or name, the same queue, the same cap;
-	 * the sender it names is the dashboard, so a queue notice reads "The dashboard
-	 * queued work for you" and a drain keeps it that way.
-	 */
-	deliver(target: string, spec: SendSpec & { taskId: string; fromName: string; canvas?: string }): { queued: true; position: number } {
-		const to = this.resolve(target);
-		// The work is for a canvas: the agent moves there first, so what it shows lands in front of the person who asked.
-		const canvas = this.host.canvases.get(spec.canvas);
-		if (canvas) to.useCanvas(canvas.name);
-		const handed = (spec.boards ?? []).filter((path) => this.deck.board(path));
-		const position = to.enqueue({
-			from: "deck",
-			fromName: spec.fromName,
-			task: spec.task.trim(),
-			boards: handed,
-			at: Date.now(),
-			taskId: spec.taskId,
 			...(spec.reply ? { reply: true } : {}),
 		});
 		this.publish();
 		return { queued: true, position };
-	}
-
-	/** Take a dashboard task back out of an agent's queue — a cancelled task must not run. */
-	removeQueued(agentId: string, taskId: string): boolean {
-		return this.get(agentId)?.cancelWork(taskId) ?? false;
 	}
 
 	/** One agent, by id or by a name that only one agent answers to. */
@@ -942,7 +623,3 @@ function brief(task: string, boards: string[], deck: Deck): string {
 	return parts.join("\n");
 }
 
-/** The first line of a piece of work, for the dashboard's "why" beside a placed task. */
-function firstLineOf(text: string): string {
-	return text.trim().split("\n")[0]?.trim().slice(0, 160) ?? "";
-}

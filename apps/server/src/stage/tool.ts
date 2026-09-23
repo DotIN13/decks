@@ -1,10 +1,8 @@
-import { isoIn, isZone, nowWords, offsetLabel, partsIn, processZone } from "../clock.ts";
+import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../clock.ts";
 import { existsSync, readFileSync } from "node:fs";
-import type { ActKind, AgentKind, AgentMode, AgentState, Camera, Canvas, Identity, Schedule, ScheduleSpec, TaskResult, TaskSpec, ThinkingLevel } from "@decks/protocol";
+import type { ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
-import { slug } from "../agents/slug.ts";
-import { MAX_CANVAS_NAME } from "../canvas/store.ts";
 import { cleanWorkspace, roster } from "../agents/workspaces.ts";
 import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
@@ -80,22 +78,8 @@ export interface QueuedWork {
 	task: string;
 	boards: string[];
 	at: number;
-	/**
-	 * The dashboard task this item belongs to, when the dashboard made it.
-	 *
-	 * Carried so the drain can report back: the task turns `assigned` into `running`
-	 * when this item pops, and `done` or `failed` when its turn ends. Without it a
-	 * task would sit in `assigned` forever and the panel would have to guess.
-	 */
-	taskId?: string;
 	/** The sender asked for the report back — see `SendSpec.reply`. */
 	reply?: boolean;
-	/**
-	 * A dashboard task this item asks the *dispatcher* to place rather than to do. While it
-	 * runs, a `send` from the dispatcher is read as the answer; ending without one blocks
-	 * the task with what the dispatcher said.
-	 */
-	decide?: string;
 }
 
 export interface StageAgentHooks {
@@ -113,22 +97,6 @@ export interface StageAgentHooks {
 	setTags(tags: unknown): string[];
 	/** Replaces the agent's workspace and returns it as stored — see `agents/workspaces.ts`. */
 	setWorkspace(workspace: unknown): string | null;
-	/**
-	 * The canvas this agent works on, and the verbs that draw between its boards.
-	 *
-	 * Optional so a host with no canvases — a board running its own code — can leave it out;
-	 * the verbs then refuse with a sentence rather than doing something to a canvas nobody
-	 * meant. Every verb answers with the canvas as it now is, so an agent sees what it did.
-	 */
-	canvas?: {
-		current(): Canvas | undefined;
-		list(): Canvas[];
-		use(name: string, workspace?: string): Canvas | undefined;
-		link(from: string, to: string, label?: string): Canvas | undefined;
-		unlink(from: string, to: string): Canvas | undefined;
-		group(paths: string[], name: string): Canvas | undefined;
-		ungroup(name: string): Canvas | undefined;
-	};
 	agents(): Array<{ id: string; name: string; state: AgentState; context: string[]; holding: number; kind: AgentKind; tags: string[]; workspace?: string; queued?: number }>;
 	/** Where the browser last said it was looking. */
 	camera(): Camera;
@@ -138,18 +106,6 @@ export interface StageAgentHooks {
 	create?(spec: CreateSpec): Promise<{ agent: string; name: string }>;
 	/** What is waiting for an agent — this one, unless another is named. */
 	queue(agentId?: string): QueuedWork[];
-	/**
-	 * Make a dashboard task: the deck decides which agent it belongs to.
-	 *
-	 * An agent asking for work to be done *somewhere* — a fan-out it does not want to
-	 * supervise, a board it has no right to write — hands the text to the same rule
-	 * and the same queue the panel uses, and gets back where it went. Optional so a
-	 * caller with no dashboard (a board actor) can leave it out; the stage verb then
-	 * refuses with a sentence.
-	 */
-	task?(spec: TaskSpec): TaskResult;
-	/** Make a schedule — `stage.schedule`. Optional on the same terms as `task`. */
-	schedule?(spec: ScheduleSpec): Schedule | { error: string };
 	/**
 	 * Store the board's current bytes as a revision and return its id.
 	 *
@@ -236,9 +192,6 @@ export interface StageTool {
 
 const STAGE_TOOL_NAME = "stage_eval";
 
-/** A canvas name as the store tells names apart: `Political LLM` and `political-llm` are one. */
-const slugName = (name: string) => slug(name, MAX_CANVAS_NAME);
-
 /**
  * The tool's description, read from `runtime/tool-description.txt`.
  *
@@ -291,13 +244,21 @@ const GONE: Record<string, string> = {
 	read: "stage.read is gone. A board is a file — read it with your own file tools.",
 	roots: "stage.roots is gone. stage.resolve(file) answers, and says which roots it may reach when it cannot.",
 	context: "stage.context() is gone. stage.boards() marks what each agent holds, in inContext.",
-	workspaces: "stage.workspaces() is gone. stage.canvases({ workspace }) is the list, with who is working on each.",
-	inPlay: "stage.inPlay() is now stage.boards(): with no filter it is the boards on your canvas.",
-	attach: "stage.attach is gone: stage.show(path) puts a board on your canvas, and you hold what you show.",
-	detach: "stage.detach is gone: stage.hide(path) takes a board off your canvas.",
-	unlink: "stage.unlink(a, b) is now stage.link(a, b, null).",
-	ungroup: 'stage.ungroup(name) is now stage.group([], { name }).',
-	task: 'stage.task({ text }) is now stage.send("dispatcher", { task: text }).',
+	workspaces: "stage.workspaces() is gone. stage.agents({ filter: { workspace } }) lists who is on a project.",
+	inPlay: "stage.inPlay() is now stage.boards(), whose inContext says what each agent holds.",
+	attach: "stage.attach is gone: stage.show(path) puts a board on your stage, and you hold what you show.",
+	detach: "stage.detach is gone: stage.hide(path) takes a board off your stage.",
+	task: "stage.task is gone, with the dashboard. Hand work to an agent with stage.send(name, { task }).",
+	schedule: "stage.schedule is gone, with the dashboard's cron list. Nothing in the deck runs on a timer.",
+	canvas: "stage.canvas is gone: each agent has its own stage now, and stage.boards() is what is on it.",
+	canvases: "stage.canvases is gone: each agent has its own stage now. stage.agents() lists who else is working.",
+	useCanvas: "stage.useCanvas is gone: each agent has its own stage now, and there is nothing to move to.",
+	newCanvas: "stage.newCanvas is gone: each agent has its own stage now. Show your boards with stage.show.",
+	link: "stage.link is gone with canvases. Link one board to another with an <a href> inside the board.",
+	group: "stage.group is gone with canvases.",
+	unlink: "stage.unlink is gone with canvases.",
+	ungroup: "stage.ungroup is gone with canvases.",
+	web_jev: "stage.web_jev is gone. stage.web drives the person's shared Chrome one step at a time.",
 	delegate: "stage.delegate is gone: a stage run is abandoned after 20 seconds, so it could never return a subagent's report. Use stage.send({ name, kind }, { task, reply: true }) — the agent is made, the work is queued, and its report reaches you on your next turn.",
 	create: 'stage.create({ name }) is now the first argument of send: stage.send({ name, kind }, { task }).',
 };
@@ -332,11 +293,6 @@ export function createStageTool(deps: {
 		if (!service.web) throw new Error("This server has no shared browser.");
 		return service.web;
 	};
-	/** The goal-driven browser agent, or the sentence that says this server has none. */
-	const needJev = () => {
-		if (!service.jev) throw new Error("This server has no jev browser agent.");
-		return service.jev;
-	};
 	/**
 	 * A target as the agent wrote it, checked here rather than in the bridge.
 	 *
@@ -360,7 +316,7 @@ export function createStageTool(deps: {
 	};
 
 	/**
-	 * The boards as **this agent** sees them: its own canvas, which is the one `stage.move` writes
+	 * The boards as **this agent** sees them: its own stage, which is the one `stage.move` writes
 	 * to. Every read in this file goes through here, so a verb cannot quietly answer for somebody
 	 * else's arrangement.
 	 */
@@ -371,39 +327,11 @@ export function createStageTool(deps: {
 		if (!clean) throw new Error('workspace is a project name, as in { workspace: "political-llm" }.');
 		return clean;
 	};
-	/** A canvas by id or by name, as the store matches names, or a sentence naming the call that makes one. */
-	const findCanvas = (raw: string): Canvas => {
-		const list = canvasHooks().list();
-		const found = list.find((canvas) => canvas.id === raw) ?? list.find((canvas) => slugName(canvas.name) === slugName(raw));
-		if (!found) throw new Error(`No canvas "${raw}". stage.canvases() lists them; stage.newCanvas("${raw}") makes one.`);
-		return found;
-	};
-	/** The rooms a `boards` filter names, or `undefined` for "your own canvas". */
-	const canvasScope = (filter?: { canvas?: string; workspace?: string }): Canvas[] | undefined => {
-		if (!filter || (filter.canvas === undefined && filter.workspace === undefined)) return undefined;
-		const workspace = filter.workspace === undefined ? undefined : askedWorkspace(filter.workspace);
-		const rooms = filter.canvas === undefined ? canvasHooks().list() : [findCanvas(filter.canvas)];
-		return workspace === undefined ? rooms : rooms.filter((canvas) => (canvas.workspace ?? "") === workspace);
-	};
 
 	const stage: Stage = {
 		// --- reads ---------------------------------------------------------------
-		/**
-		 * Every board in the deck, or the ones a filter names. `filter.canvas` is one room by name
-		 * or id, `filter.workspace` every room in a project; both together narrow to that room
-		 * when it is in the project. A filtered board says which canvas it was found on, placed as
-		 * that canvas has it, so a board on two canvases comes back twice.
-		 */
-		boards: async (options?: { filter?: { canvas?: string; workspace?: string } }) => {
-			const rooms = canvasScope(options?.filter);
-			if (!rooms) return here();
-			return rooms.flatMap((room) =>
-				service
-					.boards(agent.id, room.id)
-					.filter((board) => room.boards.includes(board.path))
-					.map((board) => ({ ...board, canvas: room.name })),
-			);
-		},
+		/** Every board in the deck, placed as this agent's stage has them. */
+		boards: async () => here(),
 		resolve: async (file: string) => service.resolve(file),
 		url: async (path: string) => service.url(path, port),
 		/**
@@ -554,16 +482,12 @@ export function createStageTool(deps: {
 			return { reported: paths };
 		},
 
-		// --- the canvas ------------------------------------------------------------
+		// --- the stage -------------------------------------------------------------
 		/**
-		 * Put these boards on the canvas, beside what is already there.
+		 * Put these boards on this agent's stage, beside what is already there.
 		 *
-		 * **A canvas is added to, never narrowed.** `show` used to make the canvas exactly what
-		 * was named, which let one call clear a room other agents and the person were working
-		 * in, and agents used it to start a new topic on top of an old one. A new topic is a new
-		 * canvas (`stage.canvas(name)`); on the same topic the boards pile up and only the ones
-		 * that are truly out of date are taken off with `hide`. The camera fits what was named,
-		 * and anything not already held is attached — showing a board is working on it.
+		 * Added to, never narrowed: taking a board off is `hide`. The camera fits what was named,
+		 * and anything not already held is held from now on — showing a board is working on it.
 		 *
 		 * `animate: true` makes the camera **arrive** rather than jump — 420ms, easing out. It is off
 		 * by default: an op states where to look, and something watching the camera a frame later
@@ -584,22 +508,11 @@ export function createStageTool(deps: {
 			for (const one of paths) agent.acted?.("show", one);
 			return service.show(agent.id, paths, options ?? {});
 		},
-		/**
-		 * Take boards off the canvas, keeping them in context.
-		 *
-		 * Refused when it would leave the canvas empty: clearing a room is how an agent used to
-		 * start a new topic, and the room is shared — the person and other agents lose what
-		 * they were looking at. The sentence says what to do instead.
-		 */
+		/** Take boards off this agent's stage, keeping them in context. */
 		hide: async (path: string | string[]) => {
 			const dropping = new Set(asList(path));
 			const up = agent.inPlay();
 			const left = up.filter((playing) => !dropping.has(playing));
-			if (left.length === 0 && up.length > 0) {
-				throw new Error(
-					"That would empty the canvas, and a canvas is not cleared. For a new topic, start a new canvas with stage.canvas(\"a name for the topic\") and show your boards there; on the same topic, add to this one and hide only the boards that are really out of date.",
-				);
-			}
 			agent.setInPlay(left);
 			for (const one of dropping) if (up.includes(one)) agent.acted?.("hide", one);
 		},
@@ -642,10 +555,10 @@ export function createStageTool(deps: {
 		 * that out, and the alternative — silently storing something other than what it thinks it
 		 * set — is how an agent ends up setting the same tags forever.
 		 *
-		 * Which canvas you work on is `stage.canvas(name)`, not a field here: it is a fact about
-		 * the deck's boards rather than about you.
+		 * `workspace` is the project it works in, as a slug: `"Political LLM"` comes back as
+		 * `political-llm`, the word the others on that project use too.
 		 */
-		me: async (patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[] }) => {
+		me: async (patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string }) => {
 			if (patch?.name !== undefined) {
 				const clean = String(patch.name).trim().slice(0, 40);
 				if (!clean) throw new Error("A name cannot be empty");
@@ -673,15 +586,15 @@ export function createStageTool(deps: {
 				}
 			}
 			if (patch?.tags !== undefined) agent.setTags(patch.tags);
+			if (patch?.workspace !== undefined) agent.setWorkspace(patch.workspace);
 			return agent.identity();
 		},
 
 		/**
 		 * Hand work to somebody else, and carry on.
 		 *
-		 * One verb for the three that were: a **name or id** sends to an agent that exists; a
-		 * **shape** — `{ name, kind }` — makes the agent and sends to it; and the word
-		 * `"dispatcher"` makes a dashboard task, which the deck places for you. It always
+		 * One verb for the two that were: a **name or id** sends to an agent that exists, and a
+		 * **shape** — `{ name, kind }` — makes the agent and sends to it. It always
 		 * returns at once, because it has to: a stage run is abandoned after twenty seconds and
 		 * a turn is minutes, so there is no honest way to wait for an answer inside a call.
 		 * `reply: true` is how the answer reaches you — their report lands in your transcript
@@ -700,7 +613,7 @@ export function createStageTool(deps: {
 			};
 			/*
 			 * A shape rather than a name: the agent is made first, on your runtime, account and
-			 * canvas unless it says otherwise, and the work goes into its queue. This is what
+			 * workspace unless it says otherwise, and the work goes into its queue. This is what
 			 * `create` and `delegate` were, minus the wait that could not be kept.
 			 */
 			if (target && typeof target === "object") {
@@ -711,16 +624,7 @@ export function createStageTool(deps: {
 				return { ...agent.send(made.agent, work), agent: made.agent, name: made.name };
 			}
 			const to = String(target ?? "").trim();
-			if (!to) throw new Error('Say who: a name or id from stage.agents(), { name } to make one, or "dispatcher" to let the deck place it.');
-			/*
-			 * The dispatcher is not an agent you queue work into — it is the rule that decides
-			 * who should have it — so this word makes a dashboard task instead. It is the one
-			 * name `send` reads rather than resolves, which is what `task` used to be.
-			 */
-			if (to.toLowerCase() === "dispatcher") {
-				if (!agent.task) throw new Error("This deck has no dashboard.");
-				return agent.task({ text: spec.task.trim(), ...(spec.boards ? { boards: spec.boards } : {}) });
-			}
+			if (!to) throw new Error("Say who: a name or id from stage.agents(), or { name } to make one.");
 			return agent.send(to, work);
 		},
 		/** What is waiting for an agent: yours, or another's if you name it. */
@@ -746,33 +650,6 @@ export function createStageTool(deps: {
 		},
 
 		/**
-		 * Make a schedule: a task the deck makes on its own, at a time, on the days named.
-		 *
-		 * The dashboard's Cron tab is the list of these. The server checks the fields — a
-		 * time is "HH:MM", days are 0 (Sunday) to 6, a job needs its text — and answers
-		 * with the schedule made, or a sentence saying what was wrong with it.
-		 */
-		schedule: async (spec: ScheduleSpec) => {
-			if (!spec?.name?.trim()) throw new Error("A schedule needs a name");
-			if (!spec.at || !Array.isArray(spec.days)) throw new Error("A schedule needs a time (HH:MM) and its days (0 Sunday to 6 Saturday)");
-			if (!spec.workspace?.trim()) throw new Error("A schedule needs a workspace to write into");
-			if (!spec.task?.trim()) throw new Error("A schedule needs `task`: the work, as an instruction to the agent that will run it");
-			if (spec.timezone !== undefined && !isZone(spec.timezone)) throw new Error(`"${String(spec.timezone)}" is not a timezone. Use an IANA name, like "America/Los_Angeles", or leave it out for the person's own`);
-			if (!agent.schedule) throw new Error("This deck has no dashboard.");
-			const made = agent.schedule({
-				name: spec.name.trim(),
-				at: spec.at.trim(),
-				days: spec.days,
-				...(spec.timezone ? { timezone: spec.timezone } : {}),
-				workspace: spec.workspace.trim(),
-				task: spec.task.trim(),
-				...(spec.boards ? { boards: spec.boards } : {}),
-			});
-			if ("error" in made) throw new Error(made.error);
-			return made;
-		},
-
-		/**
 		 * The user's own Chrome, shared with the deck through the Decks extension.
 		 *
 		 * Every call throws a sentence when no tab is shared, which is the state to expect
@@ -788,7 +665,7 @@ export function createStageTool(deps: {
 			pairing: async () => ({ code: needWeb().code(), path: "/api/web/relay", note: "Paste the Decks address and this code into the Decks extension's popup, then share a tab." }),
 			/** A fresh code; the extension has to be paired again. */
 			repair: async () => ({ code: needWeb().repair() }),
-			/** Make (or find) the status board, attach it and put it on the canvas. */
+			/** Make (or find) the status board, and put it on this agent's stage. */
 			board: async () => {
 				const path = needWeb().board();
 				agent.setInPlay([...agent.inPlay().filter((shown) => shown !== path), path]);
@@ -823,52 +700,12 @@ export function createStageTool(deps: {
 			stop: async () => needWeb().stop(),
 		},
 
-		/**
-		 * The goal-driven browser agent (jev-ultrafast), beside the shared Chrome.
-		 *
-		 * `web` is the person's own tab, driven one verb at a time and watched by them.
-		 * `web_jev` is a whole goal run by an agent: one URL, one goal, and the agent decides its
-		 * own clicks until the goal is done or blocked. Left alone it drives the tab the person
-		 * shared, because that is the browser the logins are in — and two gates stop it there, so
-		 * nothing is sent without an answer and the words typed into a field are yours, not its.
-		 * `{ browser: "headless" }` is a Chromium of the server's own instead, for pages nobody is
-		 * logged into. A run outlives a stage call, so `run` returns at once, `state` is how the
-		 * run is followed, and `answer` is how a held one carries on — on the next turn, never in
-		 * a loop inside this one.
-		 */
-		web_jev: {
-			/** Whether a run can start, whether a Chrome is shared, and what the run going now is doing. */
-			status: async () => needJev().status(),
-			/** Start one run. One at a time; the answer says how to follow it. */
-			run: async (spec?: { url?: string; goal?: string; browser?: string }) =>
-				needJev().run({
-					url: String(spec?.url ?? ""),
-					goal: String(spec?.goal ?? ""),
-					...(spec?.browser === "headless" || spec?.browser === "chrome" ? { browser: spec.browser } : {}),
-				}),
-			/** The run going now, or the last one: every step the agent took, and every gate it met. */
-			state: async () => needJev().state(),
-			/**
-			 * Answer what a gate is holding. `{ allow: true }` lets a press that would send something
-			 * through; `{ text: "…" }` is what actually gets typed, because the browser agent's own
-			 * words never reach a field. `state()` says which of the two is being asked.
-			 */
-			answer: async (input?: { allow?: boolean; text?: string }) => needJev().answer({ ...(typeof input?.allow === "boolean" ? { allow: input.allow } : {}), ...(typeof input?.text === "string" ? { text: input.text } : {}) }),
-			/** End the run; the browser it drove closes with it. */
-			stop: async () => needJev().stop(),
-		},
-
-		/**
-		 * Every agent, or the ones a filter names: `filter.workspace` is the project each agent
-		 * declares (the same field it shows), `filter.canvas` the agents who have worked in that room.
-		 */
-		agents: async (options?: { filter?: { workspace?: string; canvas?: string } }) => {
+		/** Every agent, or with `filter.workspace` the ones that say they work on that project. */
+		agents: async (options?: { filter?: { workspace?: string } }) => {
 			const filter = options?.filter;
-			const room = filter?.canvas === undefined ? undefined : findCanvas(filter.canvas);
 			const workspace = filter?.workspace === undefined ? undefined : askedWorkspace(filter.workspace);
 			return agent
 				.agents()
-				.filter((other) => (room ? room.agents.includes(other.id) : true))
 				.filter((other) => (workspace === undefined ? true : (other.workspace ?? "") === workspace))
 				.map((other) => ({
 					id: other.id,
@@ -888,110 +725,7 @@ export function createStageTool(deps: {
 				}));
 		},
 
-		/*
-		 * The canvas verbs. Each answers with the canvas as it now is, so an agent that drew an
-		 * arrow can see it, and each refuses in a sentence when there is nothing to draw on — a
-		 * board running its own code has no canvas of its own.
-		 */
-		/**
-		 * The canvas you work on, read-only. Moving is `useCanvas` and making one is `newCanvas`;
-		 * a name handed here is refused with both, because it used to mean "move, and make it
-		 * if it is not there" and a resumed transcript will still call it that way.
-		 */
-		canvas: async (name?: unknown) => {
-			if (name !== undefined) throw new Error(`stage.canvas() only reads where you are. Move with stage.useCanvas(${JSON.stringify(name)}); make a canvas with stage.newCanvas(${JSON.stringify(name)}, { workspace }).`);
-			return canvasHooks().current();
-		},
-		/**
-		 * Move to a canvas that exists, by name or id.
-		 *
-		 * Moving takes nothing with you — what you have read is yours and stays; what you show
-		 * from then on goes there, and pressing you in the app takes the person there. A name
-		 * nobody has is refused rather than made: making a room is `newCanvas`, and a typo that
-		 * quietly made one was a new room nobody would find.
-		 */
-		useCanvas: async (name: string) => {
-			if (typeof name !== "string" || !name.trim()) throw new Error('stage.useCanvas("Political LLM") moves you to a canvas; stage.canvas() says which one you are on.');
-			const found = findCanvas(name);
-			return must(canvasHooks().use(found.name, found.workspace), "That canvas could not be joined.");
-		},
-		/**
-		 * Make a canvas for a new topic, and move to it.
-		 *
-		 * In your own workspace, or in `workspace` when one is named. A name is used once per
-		 * deck, so a name that is taken is refused with the call that joins it instead.
-		 */
-		newCanvas: async (name: string, options?: { workspace?: string }) => {
-			if (typeof name !== "string" || !name.trim()) throw new Error('stage.newCanvas("Bench surfaces") makes a canvas and moves you to it.');
-			const workspace = options?.workspace === undefined ? undefined : askedWorkspace(options.workspace);
-			const taken = canvasHooks().list().find((canvas) => slugName(canvas.name) === slugName(name));
-			if (taken) {
-				throw new Error(
-					`A canvas named "${taken.name}" already exists, in ${taken.workspace ? `the workspace ${taken.workspace}` : "no workspace"}, and a name is used once per deck. Move to it with stage.useCanvas("${taken.name}"), or pick another name.`,
-				);
-			}
-			return must(canvasHooks().use(name.trim(), workspace || undefined), "That canvas could not be made.");
-		},
-		/** Every canvas, with who is working on each, or the ones in `filter.workspace`. */
-		canvases: async (options?: { filter?: { workspace?: string } }) => {
-			const filter = options?.filter;
-			const workspace = filter?.workspace === undefined ? undefined : askedWorkspace(filter.workspace);
-			const all = canvasHooks().list();
-			return workspace === undefined ? all : all.filter((canvas) => (canvas.workspace ?? "") === workspace);
-		},
-		/**
-		 * An arrow from one board to another on your canvas: this led to that.
-		 *
-		 * A label of `null` takes the arrow away, which is why there is no `unlink`: removing a
-		 * line is the same act with nothing to write on it.
-		 */
-		link: async (from: string, to: string, label?: string | null) => {
-			const [a, b] = [boardPath(from), boardPath(to)];
-			if (a === b) throw new Error("An arrow needs two different boards.");
-			if (label === null) return changed(canvasHooks().unlink(a, b), "There was no arrow between those two.");
-			return must(canvasHooks().link(a, b, typeof label === "string" ? label.slice(0, 60) : undefined), "The arrow was already there.");
-		},
-		/**
-		 * A dashed border round two or more boards: one piece of work.
-		 *
-		 * An empty list takes the group away, on the same argument as `link(a, b, null)`: the
-		 * group with nothing in it is no group.
-		 */
-		group: async (paths: string[], options: { name: string }) => {
-			if (typeof options?.name !== "string" || !options.name.trim()) throw new Error("A group needs a name, which is what is written on its border.");
-			const name = options.name.trim();
-			if (Array.isArray(paths) && paths.length === 0) return changed(canvasHooks().ungroup(name), `There is no group called ${name}.`);
-			if (!Array.isArray(paths) || paths.length < 2) throw new Error("A group is two or more boards: stage.group([a, b], { name }), or [] to take one away.");
-			return must(canvasHooks().group(paths.map(boardPath), name), "That group could not be drawn.");
-		},
 	};
-
-	/** The canvas hooks, or a sentence saying there are none. */
-	function canvasHooks(): NonNullable<StageAgentHooks["canvas"]> {
-		if (!agent.canvas) throw new Error("There is no canvas here to draw on.");
-		return agent.canvas;
-	}
-
-	/** A board this deck has, by the path an agent uses; a sentence when it is not one. */
-	function boardPath(path: string): string {
-		const wanted = typeof path === "string" ? path.replace(/^\.?\//, "") : "";
-		if (!here().some((board) => board.path === wanted)) {
-			throw new Error(`No such board: ${String(path)}. Use the path from stage.boards(), like "boards/plan.html".`);
-		}
-		return wanted;
-	}
-
-	/** For a removal: nothing to remove is worth saying, where drawing the same arrow twice is not. */
-	function changed(canvas: Canvas | undefined, otherwise: string): Canvas {
-		if (!canvas) throw new Error(otherwise);
-		return canvas;
-	}
-
-	function must(canvas: Canvas | undefined, otherwise: string): Canvas {
-		const now = canvas ?? canvasHooks().current();
-		if (!now) throw new Error(otherwise);
-		return now;
-	}
 
 	const snapshot = (): StageSnapshot => ({
 		// The arrangement this stage is looking at, so a resume or a rewind restores where the boards
@@ -1024,14 +758,14 @@ export function createStageTool(deps: {
 		setName: async () => { throw new Error('stage.me.setName(name) is now stage.me({ name }).'); },
 		setAvatar: async () => { throw new Error("stage.me.setAvatar(avatar) is now stage.me({ avatar })."); },
 		setTags: async () => { throw new Error("stage.me.setTags(tags) is now stage.me({ tags })."); },
-		setWorkspace: async () => { throw new Error('stage.me.setWorkspace(name) is now stage.canvas(name): the canvas is what holds the boards.'); },
+		setWorkspace: async () => { throw new Error('stage.me.setWorkspace(name) is now stage.me({ workspace }).'); },
 	});
 
 	return {
 		name: STAGE_TOOL_NAME,
 		label: "Stage",
 		description: toolDescription(),
-		promptSnippet: "Run TypeScript against the canvas: show boards, hold them in context, name yourself",
+		promptSnippet: "Run TypeScript against your stage: show boards, hold them in context, name yourself",
 		guidelines: GUIDELINES,
 		parameterDescription: "TypeScript, run as an async function body with `stage` in scope. Return a value to see it.",
 		stage,

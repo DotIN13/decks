@@ -1,15 +1,11 @@
 import type { AgentChat, Identity } from "@decks/protocol";
-import { createEffect, For, Show } from "solid-js";
+import { createEffect, For } from "solid-js";
 import { AgentFace } from "../../chrome/AgentPill.tsx";
 
-/** Somebody an `@` in the line can name: an agent, or the dispatcher, which has no chat of its own on the list. */
+/** Somebody an `@` in the line can name: an agent. */
 export interface Mentionable {
 	name: string;
-	/** On the canvas on screen. Off it, the note says the agent will join. */
-	here: boolean;
-	chat?: AgentChat;
-	/** The dispatcher: named like an agent, but the line becomes a task. */
-	task?: boolean;
+	chat: AgentChat;
 }
 
 const MAX = 8;
@@ -33,7 +29,6 @@ export function MentionMenu(props: {
 	matches: Mentionable[];
 	identities: Record<string, Identity>;
 	activeIndex: number;
-	canvasName?: string;
 	onHover: (index: number) => void;
 	onPick: (one: Mentionable) => void;
 }) {
@@ -66,12 +61,9 @@ export function MentionMenu(props: {
 							props.onPick(one);
 						}}
 					>
-						<Show when={one.chat} fallback={<span class="mention-mark" aria-hidden="true">D</span>}>
-							{(chat) => <AgentFace chat={chat()} identity={props.identities[chat().id]} size={20} ring={1.5} />}
-						</Show>
+						<AgentFace chat={one.chat} identity={props.identities[one.chat.id]} size={20} ring={1.5} />
 						<span class="row-label row-name block truncate">{one.name}</span>
-						<Show when={one.chat && !one.task}>{(_) => <span class="kind">{one.chat!.kind}</span>}</Show>
-						<span class="meta flex-none text-micro">{one.task ? "as a task" : one.here ? "here" : props.canvasName ? `joins ${props.canvasName}` : "elsewhere"}</span>
+						<span class="kind">{one.chat.kind}</span>
 					</button>
 				)}
 			</For>

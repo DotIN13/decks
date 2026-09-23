@@ -1,0 +1,90 @@
+/*
+ * Small shapes shared by forms: the outlined action button Settings uses, and the field a new
+ * workspace is named in, with the rule-topped row that opens it.
+ *
+ * Inside `@layer components` like the rest, so a utility on the same element still wins.
+ */
+@layer components {
+	.action-button {
+		display: inline-flex;
+		align-items: center;
+		height: 24px;
+		padding: 0 9px;
+		border: 1px solid var(--line);
+		border-radius: var(--control-radius, 8px);
+		background: transparent;
+		color: var(--muted);
+		cursor: pointer;
+		font: inherit;
+		font-size: var(--type-label);
+		transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+	}
+	.action-button:hover {
+		border-color: var(--line-strong);
+		background: var(--line);
+		color: var(--fg);
+	}
+	.action-button:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+	/* The one that acts, in the accent. */
+	.action-button[data-primary] {
+		border-color: transparent;
+		background: var(--color-accent);
+		color: #fff;
+	}
+	.action-button[data-primary]:hover {
+		border-color: transparent;
+		background: color-mix(in oklab, var(--color-accent) 88%, var(--fg));
+		color: #fff;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.action-button {
+			transition: none;
+		}
+	}
+	/* *New workspace…* under a rule, at the foot of the list. */
+	.menu-new {
+		margin-top: 4px;
+		padding-top: 10px;
+		border-top: 1px solid var(--line);
+		border-radius: 0 0 7px 7px;
+	}
+	/* The shared name field: what a new workspace is typed into, wherever it is typed. */
+	.ws-new {
+		padding: 3px 3px 2px;
+	}
+	.ws-new-line {
+		display: flex;
+		gap: 5px;
+	}
+	.ws-new-create {
+		height: 32px;
+		flex: none;
+		padding: 0 11px;
+		border: 1px solid var(--fg);
+		border-radius: var(--control-radius, 7px);
+		background: var(--fg);
+		color: var(--bg);
+		font: inherit;
+		font-size: var(--type-ui);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.ws-new-create:disabled {
+		cursor: default;
+		opacity: 0.45;
+	}
+	.ws-new-slug {
+		margin: 7px 3px 2px;
+		color: var(--muted);
+		font-size: var(--type-note);
+	}
+	.ws-new-slug > code {
+		color: var(--fg);
+		font-family: var(--font-mono);
+		font-size: var(--type-note);
+	}
+}

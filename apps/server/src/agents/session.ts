@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import type { ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, Canvas, ChatItem, Identity, ModelOption, Schedule, ScheduleSpec, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
+import type { ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
-import type { TaskResult, TaskSpec } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentStateStore } from "./agent-state.ts";
@@ -18,7 +17,6 @@ import type { Act } from "./acts.ts";
 import { forBrowser, HISTORY_ITEMS } from "./wire.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace, sameWorkspace } from "./workspaces.ts";
-import type { CanvasStore } from "../canvas/store.ts";
 
 /**
  * How long an agent must have been quiet before it starts on queued work.
@@ -157,145 +155,28 @@ export class DeckAgent {
 	 * board is a fresh touch, which is why `attach` moves it to the front rather than leaving
 	 * it where it sat.
 	 */
-	private get held(): string[] {
-		/*
-		 * What the canvas holds: the boards up on it, then the ones taken off that it keeps a
-		 * place for. Boards belong to canvases now, so an agent's context is its canvas's — two
-		 * agents in one room have one context, and an agent that moves rooms reads the new one.
-		 */
-		const canvas = this.canvas;
-		if (!canvas) return [];
-		const up = this.canvases.boards(canvas);
-		return [...up, ...this.canvases.kept(canvas).filter((path) => !up.includes(path) && this.deck.board(path))];
-	}
+	private held: string[] = [];
 	/**
-	 * The subset of those on the canvas.
+	 * The subset of those on the stage.
 	 *
 	 * Separate from the context because they are different decisions: what the agent is
 	 * working from, and what it wants the user looking at now. A board is put in play by
-	 * being attached or shown, and taken out of play without leaving the context.
+	 * being shown, and taken out of play without leaving the context.
 	 */
-	private get playing(): string[] {
-		// The non-creating read: an agent nobody has given work to has no canvas, and asking
-		// what is on its canvas must not make one. Showing a board does (`canvasId`).
-		return this.canvas ? this.canvases.boards(this.canvas) : [];
-	}
-
+	private playing: string[] = [];
 	/**
-	 * Showing and hiding write the canvas, and everybody on it hears.
+	 * Where this stage has put its boards, by path.
 	 *
-	 * This used to be a list per chat, which is why two agents working on one thing each had
-	 * their own idea of what was up. `canvasChanged` is how the others find out.
+	 * Beside `playing`, and for the same reason: it is the stage this conversation is looking at,
+	 * and it is per conversation. Empty means nothing has been moved here, and `Deck.arrange` gives
+	 * every board a place under this stage's own boards.
 	 */
-	private set playing(paths: string[]) {
-		if (this.canvases.setBoards(this.canvasId, paths)) this.host.canvasChanged?.(this.canvasId, this.id);
-	}
-
-	/**
-	 * Where the canvas has put its boards, by path.
-	 *
-	 * A read of the canvas rather than a field: the arrangement belongs to the canvas, so a
-	 * board dragged in one chat is in the same place in the next one on that canvas. Writes go
-	 * through `setPosition`, because what comes back here is a copy.
-	 */
-	private get places(): Record<string, { x: number; y: number }> {
-		return this.canvas ? this.canvases.places(this.canvas) : {};
-	}
-
-	/** The canvas this conversation is working on, once it has needed one. */
-	private canvasChosen: string | undefined;
+	private places: Record<string, { x: number; y: number }> = {};
 	/** The workspace it works in — its own fact, set by it or by you, kept on the record. */
 	private workspaceChosen: string | undefined;
-	/**
-	 * Every canvas it has worked on, oldest first. Membership, where `canvasChosen` is *now*.
-	 *
-	 * An agent does not leave a room by going to another one: it is on the shelf of both, in
-	 * the panel's "on this canvas" section of both, and addressable from either. Kept in the
-	 * order it joined so a card's faces are stable, and read back through the store so a
-	 * canvas that has been deleted drops out without anything having to prune it.
-	 */
-	private canvasesUsed: string[] = [];
 
-	/** Remember it joined, without changing which one is current. */
-	private joinCanvas(id: string): void {
-		if (this.canvasesUsed.includes(id)) return;
-		this.canvasesUsed.push(id);
-	}
-
-	/**
-	 * The canvas this agent works on, made on first use.
-	 *
-	 * An agent with nothing up is on no canvas, which is the honest state for a chat nobody
-	 * has given work to: it shows on the dashboard as available rather than as an empty card.
-	 * The moment it shows a board it needs one, and what it gets is a canvas of its own with
-	 * a name nothing else has (`names.ts`): `Canvas 1`, `Canvas 2`. It used to be named after the
-	 * chat, which read as a claim that the room belongs to that agent — and it does not, since
-	 * anyone can be addressed there and an agent is in every room it has worked in. Both the
-	 * canvas and the chat are renamed the moment there is something to name them after.
-	 */
-	get canvasId(): string {
-		const chosen = this.canvases.get(this.canvasChosen);
-		if (chosen) return chosen.id;
-		const made = this.canvases.create({ name: this.canvases.newName() });
-		this.canvasChosen = made.id;
-		this.joinCanvas(made.id);
-		this.save();
-		return made.id;
-	}
-
-	/** The canvas it is on, if it is on one. Reading this must not make one. */
-	get canvas(): string | undefined {
-		return this.canvases.get(this.canvasChosen)?.id;
-	}
-
-	/**
-	 * Every canvas it is on: the ones it has worked in, and the one it is on now.
-	 *
-	 * Filtered through the store rather than pruned on deletion, so removing a canvas is one
-	 * file going away and not a sweep through every agent that ever stood on it.
-	 */
-	get canvasIds(): string[] {
-		const ids = this.canvasesUsed.filter((id) => this.canvases.get(id));
-		const now = this.canvas;
-		return now && !ids.includes(now) ? [...ids, now] : ids;
-	}
-
-	/**
-	 * Work on a canvas, by name: the verb behind `stage.me.setWorkspace` and a task's canvas.
-	 *
-	 * Nothing moves with the agent. What it has read is its own and stays; what it puts up
-	 * from now on goes to the canvas it has joined.
-	 */
-	useCanvas(name: string | null | undefined, workspace?: string): string | undefined {
-		if (!name) return this.canvas;
-		// The named project's canvas of that name first, else its own project's; a new one is made there.
-		const canvas = this.canvases.ensure(name, workspace ?? this.workspaceChosen);
-		return this.standOn(canvas.id);
-	}
-
-	/**
-	 * Stand on a canvas: join it and make it the one shown to from now on.
-	 *
-	 * An agent with no workspace that steps onto a filed canvas adopts the canvas's — it has
-	 * said nothing about where it works, and the room it chose has. One with a workspace keeps
-	 * it: an agent works in a project and visits its rooms, and visiting is not moving house.
-	 */
-	private standOn(id: string): string | undefined {
-		const canvas = this.canvases.get(id);
-		if (!canvas) return this.canvas;
-		this.joinCanvas(canvas.id);
-		if (canvas.id === this.canvasChosen) return canvas.id;
-		this.canvasChosen = canvas.id;
-		if (!this.workspaceChosen && canvas.workspace) this.declareWorkspace(canvas.workspace);
-		this.save();
-		this.publishContext();
-		// Who is on which canvas is on every card, so joining one is news for the dashboard.
-		this.host.canvasesChanged?.();
-		return canvas.id;
-	}
-
-	/** Record the workspace and say so, without moving: `setWorkspace` and `standOn` both write through here. */
-	private declareWorkspace(workspace: string): void {
+	/** Record the workspace and say so: `setWorkspace` writes through here. */
+	private declareWorkspace(workspace: string | undefined): void {
 		this.workspaceChosen = workspace;
 		this.identity = { ...this.identity, workspace };
 		this.emit({ type: "agent.identity", id: this.id, identity: this.identity });
@@ -329,12 +210,6 @@ export class DeckAgent {
 	 * timer cannot fire under any of them.
 	 */
 	private drainTimer: ReturnType<typeof setTimeout> | undefined;
-	/** `"dispatcher"` for the deck's dispatcher; see `AgentChat.role`. */
-	readonly role: "dispatcher" | undefined;
-	/** The task the dispatcher is placing right now, while its turn over it runs. */
-	deciding: string | undefined;
-	/** Whether that turn has handed the task to somebody yet — set by the registry's `send`. */
-	decidedSend = false;
 	private tool: StageTool | undefined;
 
 	constructor(
@@ -345,33 +220,12 @@ export class DeckAgent {
 			port: number;
 			camera(agentId: string): Camera;
 			/**
-			 * The reading, only when it is of this canvas: what `placeJoining` anchors on.
-			 *
-			 * Separate from `camera` because the two callers want different failures. An agent
-			 * asking `stage.camera()` wants the best reading there is; a placement anchoring a
-			 * board wants **no** reading rather than one of another canvas, because positions are
-			 * per canvas and the middle of somebody else's view is inside somebody else's cluster.
-			 */
-			cameraOn?(agentId: string, canvasId: string): Camera | undefined;
-			/**
 			 * A board was given a place: the arrangement changed, so the deck state has to go out.
 			 *
 			 * Optional because a unit fixture has no browsers to tell; absent means the place is
 			 * recorded and nothing is broadcast, which is exactly right for a test.
 			 */
 			arranged?(): void;
-			/**
-			 * This agent changed a canvas somebody else may be on: tell them.
-			 *
-			 * A canvas is shared, so showing a board or dragging one is a change to every
-			 * conversation working there. Optional on the same terms as `arranged`: a unit
-			 * fixture has nobody else to tell.
-			 */
-			canvasChanged?(canvasId: string, exceptAgentId: string): void;
-			/** Every canvas as the browser sees it, for `stage.canvas()` and `stage.canvases()`. */
-			canvasList?(): Canvas[];
-			/** A canvas was made, joined, or drawn on: send the list again. */
-			canvasesChanged?(): void;
 			/**
 			 * This agent's runtime answered with a model catalogue: send the runtime list again.
 			 *
@@ -400,31 +254,6 @@ export class DeckAgent {
 			 */
 			act?(agentId: string, act: Act): void;
 			/**
-			 * A queued item belonging to a task was popped: the task is now running.
-			 *
-			 * Optional so a unit fixture that is not testing tasks can leave it out;
-			 * absent means no dashboard and the drain's calls are no-ops.
-			 */
-			taskStarted?(taskId: string): void;
-			/**
-			 * A queued item belonging to a task ended — turn finished or thrown.
-			 *
-			 * The report and the boards the turn wrote are the task's own account of
-			 * what happened, so they travel back: the dashboard's `result` is what it
-			 * can show next to a done task. Optional on the same terms as `taskStarted`.
-			 */
-			taskFinished?(finish: { taskId: string; ok: boolean; report: string; boards: string[] }): void;
-			/**
-			 * The dispatcher's turn over a task ended. `sent` says whether it handed the work
-			 * to somebody (the registry saw a `send` during the turn); `report` is what it
-			 * said, which is the reason shown beside a task nobody took.
-			 */
-			decided?(outcome: { taskId: string; sent: boolean; report: string }): void;
-			/** Make a dashboard task — `stage.task`. Optional on the same terms. */
-			task?(spec: TaskSpec): TaskResult;
-			/** Make a schedule — `stage.schedule`. Optional on the same terms. */
-			schedule?(spec: ScheduleSpec): Schedule | { error: string };
-			/**
 			 * The briefing a handed-over task is run with — the same one `delegate` uses.
 			 *
 			 * Called when the item *runs*, not when it was queued, so the receiver reads the
@@ -433,7 +262,7 @@ export class DeckAgent {
 			 */
 			brief(task: string, boards: string[]): string;
 			recordRevision(path: string): string | undefined;
-			/** This agent said it wrote a board; optional on the same terms as `taskStarted`. */
+			/** This agent said it wrote a board. Optional: a unit fixture has no byline to keep. */
 			wrote?(path: string, who: string): void;
 			boardPathOf(file: string): string | undefined;
 		},
@@ -445,11 +274,7 @@ export class DeckAgent {
 			kind: AgentKind;
 			snapshots: AgentStateStore;
 			store: AgentStore;
-			/** The deck's canvases: what holds the boards, and what two agents can share. */
-			canvases: CanvasStore;
-			/** The canvas to open on — a delegating parent's, or the one a task arrived with. */
-			canvas?: string;
-			/** The agent this one was forked from, so its canvas can be inherited. */
+			/** The agent this one was forked from, so its stage can be inherited. */
 			forkedFrom?: { agentId: string; at: number };
 			/** The model and mode to open on, handed down rather than read off disk — see `Registry.create`. */
 			model?: AgentModel;
@@ -480,15 +305,16 @@ export class DeckAgent {
 			 * (`agents/store.ts`). Its presence is also what makes the agent dormant: it
 			 * exists, it can be read, and it starts nothing until it is prompted.
 			 */
-			/** The deck's dispatcher, and nothing else so far. See `AgentChat.role`. */
-			role?: "dispatcher";
 			restored?: {
 				id: string;
 				context: string[];
-				/** The canvas it was working on, by id — see `canvas/store.ts`. */
-				canvas?: string;
-				/** Every canvas it had worked on, by id: membership, where `canvas` is the current one. */
-				canvases?: string[];
+				inPlay: string[];
+				/**
+				 * Where this conversation had put its boards, so the arrangement it was looking at comes
+				 * back with it. Absent on a record written before a stage could have one, and the stage
+				 * then falls to the auto-layout rather than to nothing.
+				 */
+				positions?: Record<string, { x: number; y: number }>;
 				avatar?: string;
 				createdAt: number;
 				/**
@@ -514,13 +340,7 @@ export class DeckAgent {
 	) {
 		this.id = options.restored?.id ?? randomUUID();
 		this.store = options.store;
-		this.canvases = options.canvases;
-		if (options.canvas) {
-			this.canvasChosen = options.canvas;
-			this.joinCanvas(options.canvas);
-		}
 		this.restored = options.restored !== undefined;
-		this.role = options.role;
 		/*
 		 * What the conversation was last on, before any runtime exists to ask.
 		 *
@@ -578,17 +398,6 @@ export class DeckAgent {
 		if (workspace) {
 			this.workspaceChosen = workspace;
 			this.identity = { ...this.identity, workspace };
-			/*
-			 * A new agent made in a project stands in the project's first room, the same room
-			 * `setWorkspace` moves an agent into — unless it was made in a room already
-			 * (`options.canvas`, the one the person is looking at). A restored chat keeps
-			 * whatever room its record names.
-			 */
-			if (!options.restored && !this.canvasChosen) {
-				const room = this.canvases.inWorkspace(workspace)[0] ?? this.canvases.create({ name: this.canvases.freeName(workspace), workspace });
-				this.canvasChosen = room.id;
-				this.joinCanvas(room.id);
-			}
 		}
 		this.parentId = options.parentId;
 		this.resumeRef = options.resumeRef;
@@ -662,21 +471,15 @@ export class DeckAgent {
 			if (options.restored.lastLine) {
 				this.storedLast = { text: options.restored.lastLine, at: options.restored.lastAt ?? this.createdAt };
 			}
+			this.held = [...options.restored.context];
+			this.playing = options.restored.inPlay.filter((path) => this.held.includes(path));
 			/*
-			 * The canvas it was working on. What is up and where it sits are the canvas's now, so
-			 * nothing is put back here: the record names a canvas and the canvas has the rest.
-			 * `canvas/migrate.ts` is what gave a chat written before canvases one to name.
+			 * And where this conversation had put its boards, which is a stage's own state and has no
+			 * other home: the record is read here rather than the model record, so a board dragged before
+			 * a restart is in the same place after it.
 			 */
-			this.canvasChosen = options.restored.canvas;
-			this.canvasesUsed = [...(options.restored.canvases ?? [])];
-			if (this.canvasChosen) this.joinCanvas(this.canvasChosen);
-			const canvas = options.canvases.get(this.canvasChosen);
-			// A chat that never said where it works, standing on a filed canvas, is in that
-			// project: the same adoption `standOn` makes, so a restart and a join agree.
-			if (canvas?.workspace && !this.workspaceChosen) {
-				this.workspaceChosen = canvas.workspace;
-				this.identity = { ...this.identity, workspace: canvas.workspace };
-			}
+			const kept = cleanPlaces(options.restored.positions);
+			if (kept) this.places = kept;
 		}
 
 		this.bridge = new ExtensionUiBridge({
@@ -698,7 +501,6 @@ export class DeckAgent {
 	private resumeRef: string | undefined;
 	private readonly snapshots: AgentStateStore;
 	private readonly store: AgentStore;
-	private readonly canvases: CanvasStore;
 	/** Restored from disk and not yet started — a row you can read but nothing is running. */
 	private restored: boolean;
 	/**
@@ -731,43 +533,18 @@ export class DeckAgent {
 		this.parentId = undefined;
 	}
 
-	/**
-	 * The canvas verbs an agent gets: read where it is, move, and draw between boards.
-	 *
-	 * Drawing goes on the canvas it is working on, made on first use like a shown board is —
-	 * an agent that links two boards before showing either still has somewhere to put the line.
-	 */
-	private canvasHooks() {
-		const current = () => (this.canvas ? this.host.canvasList?.().find((canvas) => canvas.id === this.canvas) : undefined);
-		const drew = (changed: unknown) => {
-			if (!changed) return undefined;
-			this.host.canvasesChanged?.();
-			return current();
-		};
-		return {
-			current,
-			list: () => this.host.canvasList?.() ?? [],
-			use: (name: string, workspace?: string) => {
-				this.useCanvas(name, workspace);
-				return current();
-			},
-			link: (from: string, to: string, label?: string) => drew(this.canvases.link(this.canvasId, from, to, label)),
-			unlink: (from: string, to: string) => drew(this.canvas ? this.canvases.unlink(this.canvas, from, to) : undefined),
-			group: (paths: string[], name: string) => drew(this.canvases.group(this.canvasId, name, paths)),
-			ungroup: (name: string) => drew(this.canvas ? this.canvases.ungroup(this.canvas, name) : undefined),
-		};
-	}
-
-	/** Put a remembered canvas back: what the agent held, showed and called itself. */
+	/** Put a remembered stage back: what the agent held, showed and called itself. */
 	private apply(snapshot: StageSnapshot | undefined): void {
 		if (!snapshot) return;
+		if (Array.isArray(snapshot.context)) this.setContext(snapshot.context.filter((path) => typeof path === "string"));
 		if (Array.isArray(snapshot.inPlay)) this.setInPlay(snapshot.inPlay.filter((path) => typeof path === "string"));
 		if (snapshot.positions && typeof snapshot.positions === "object") {
-			// A rewind puts the arrangement back on the canvas, which is where it lives now, so
-			// everybody looking at that canvas sees the boards go back to where they were.
 			const kept = cleanPlaces(snapshot.positions);
-			for (const [path, at] of Object.entries(kept ?? {})) this.canvases.place(this.canvasId, path, at.x, at.y);
-			if (kept) this.host.canvasChanged?.(this.canvasId, this.id);
+			if (kept) {
+				this.places = kept;
+				this.save();
+				this.host.arranged?.();
+			}
 		}
 		if (snapshot.identity?.name) this.rename(snapshot.identity.name);
 		if (snapshot.identity?.avatar) this.setAvatar(snapshot.identity.avatar);
@@ -804,7 +581,6 @@ export class DeckAgent {
 			rename: (name: string) => this.rename(name),
 			setTags: (tags: unknown) => this.setTags(tags),
 			setWorkspace: (workspace: unknown) => this.setWorkspace(workspace),
-			canvas: this.canvasHooks(),
 			setAvatar: (url: string) => this.setAvatar(url),
 			agents: () => this.host.agents(),
 			camera: () => this.host.camera(this.id),
@@ -814,14 +590,6 @@ export class DeckAgent {
 				return this.host.create(this.id, spec);
 			},
 			queue: (agentId?: string) => this.host.queue(agentId ?? this.id),
-			task: (spec: TaskSpec): TaskResult => {
-				if (!this.host.task) throw new Error("This deck has no dashboard.");
-				return this.host.task(spec);
-			},
-			schedule: (spec: ScheduleSpec): Schedule | { error: string } => {
-				if (!this.host.schedule) throw new Error("This deck has no dashboard.");
-				return this.host.schedule(spec);
-			},
 			recordRevision: (path: string) => this.host.recordRevision(path),
 			worked: (path: string) => this.workedOn(path),
 			acted: (what: ActKind, path: string) => this.host.act?.(this.id, { kind: "verb", what, path }),
@@ -851,11 +619,23 @@ export class DeckAgent {
 	 * canvas is one write rather than sixty.
 	 */
 	setPosition(path: string, x: number, y: number): void {
-		if (this.canvases.place(this.canvasId, path, x, y)) this.host.canvasChanged?.(this.canvasId, this.id);
+		if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+		this.places[path] = { x: Math.round(x), y: Math.round(y) };
+		this.save();
 	}
 
 	/**
-	 * Set what is on the canvas.
+	 * Set what the agent holds. `held` is most-recently-touched first, and the callers build the
+	 * argument that way; anything no longer held leaves the stage too.
+	 */
+	setContext(paths: string[]): void {
+		this.held = paths.filter((path, index) => paths.indexOf(path) === index);
+		this.playing = this.playing.filter((path) => this.held.includes(path));
+		this.publishContext();
+	}
+
+	/**
+	 * Set what is on the stage. Anything shown is held, so showing is also taking it up.
 	 *
 	 * `place` is what tells this call apart from the two that merely *restate* the canvas — a
 	 * record read back from disk and a rewind — and it is the difference between "these boards
@@ -866,6 +646,8 @@ export class DeckAgent {
 	setInPlay(paths: string[], options: { place?: boolean } = {}): void {
 		const wanted = paths.filter((path, index) => paths.indexOf(path) === index);
 		if (options.place) this.placeJoining(wanted);
+		// A board shown for the first time is the most recent touch, so it leads the held list.
+		for (const path of [...wanted].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
 		this.playing = wanted;
 		this.publishContext();
 	}
@@ -898,19 +680,12 @@ export class DeckAgent {
 				const board = this.deck.board(path);
 				return board ? { w: board.w, h: board.h } : undefined;
 			},
-			/*
-			 * Only a reading of this canvas may anchor: the plain `camera` falls back to the last
-			 * reading from *any* canvas, and anchoring on that is how a board joining this canvas
-			 * landed inside another one's cluster. With no reading of this canvas, `joinSpot`
-			 * places against the boards already here, which is where a background room grows.
-			 */
-			camera: this.host.cameraOn ? this.host.cameraOn(this.id, this.canvasId) : this.host.camera(this.id),
+			camera: this.host.camera(this.id),
 		});
 		const entries = Object.entries(spots);
 		if (entries.length === 0) return;
-		const canvasId = this.canvasId;
-		for (const [path, spot] of entries) this.canvases.place(canvasId, path, spot.x, spot.y);
-		this.host.canvasChanged?.(canvasId, this.id);
+		for (const [path, spot] of entries) this.places[path] = spot;
+		this.save();
 		/*
 		 * The browser draws a board where the deck state says it is, so a place worked out here
 		 * has to be sent before the canvas is told the board is on it — which is the order these
@@ -930,25 +705,16 @@ export class DeckAgent {
 	 * shows the whole deck" fallback does not fire. It reads as the deck being gone.
 	 */
 	forget(path: string): boolean {
-		if (!this.playing.includes(path)) return false;
+		if (!this.held.includes(path) && !this.playing.includes(path)) return false;
+		this.held = this.held.filter((held) => held !== path);
 		this.playing = this.playing.filter((playing) => playing !== path);
+		delete this.places[path];
 		this.publishContext();
 		return true;
 	}
 
-	/**
-	 * Somebody else changed the canvas this agent is on: say so, without writing anything.
-	 *
-	 * The canvas is shared, so a board another agent put up is on this agent's canvas too and
-	 * its browser has to hear about it. Nothing here touches the record — the canvas is what
-	 * changed, and it has already written itself.
-	 */
-	canvasMoved(): void {
-		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing], ...(this.canvas ? { canvas: this.canvas } : {}) });
-	}
-
 	private publishContext(): void {
-		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing], ...(this.canvas ? { canvas: this.canvas } : {}) });
+		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
 		// The boards are part of the record, and this is not a transcript change, so the
 		// translator's hook does not cover it.
 		this.save();
@@ -1077,15 +843,14 @@ export class DeckAgent {
 		return {
 			id: this.id,
 			kind: this.kind,
-			...(this.role ? { role: this.role } : {}),
 			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
 			name: this.identity.name,
 			...(this.identity.avatar ? { avatar: this.identity.avatar } : {}),
 			color: this.identity.color,
 			...(this.parentId ? { parentId: this.parentId } : {}),
 			context: [...this.held],
-			...(this.canvasChosen ? { canvas: this.canvasChosen } : {}),
-			...(this.canvasIds.length > 0 ? { canvases: this.canvasIds } : {}),
+			inPlay: [...this.playing],
+			...(Object.keys(this.places).length > 0 ? { positions: { ...this.places } } : {}),
 			...(this.workspaceChosen ? { workspace: this.workspaceChosen } : {}),
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
@@ -1411,17 +1176,6 @@ export class DeckAgent {
 		return [...this.work];
 	}
 
-	/**
-	 * Take a queued task back out — the dashboard's cancel, which must not leave work
-	 * that then runs. The sender's arrival notice stays; the task is what goes.
-	 */
-	cancelWork(taskId: string): boolean {
-		const before = this.work.length;
-		this.work = this.work.filter((item) => item.taskId !== taskId);
-		if (this.work.length === 0) this.cancelDrain();
-		return this.work.length < before;
-	}
-
 	/** How much is waiting, for the chat list and for `stage.agents()`. */
 	get queued(): number {
 		return this.work.length;
@@ -1454,31 +1208,8 @@ export class DeckAgent {
 		if (this.state !== "idle") return;
 		const item = this.work.shift();
 		if (!item) return;
-		/*
-		 * A task to *place*, for the dispatcher: the briefing is the item itself (it was
-		 * composed with the roster in it, `tasks/brief.ts`), the turn is marked so a `send`
-		 * during it is read as the placement, and the end of the turn says whether one came.
-		 */
-		if (item.decide) {
-			this.deciding = item.decide;
-			this.decidedSend = false;
-			try {
-				const result = await this.run(item.task);
-				this.host.decided?.({ taskId: item.decide, sent: this.decidedSend, report: result.report });
-			} catch (error) {
-				this.host.decided?.({ taskId: item.decide, sent: this.decidedSend, report: (error as Error).message });
-			} finally {
-				this.deciding = undefined;
-			}
-			this.armDrain();
-			return;
-		}
 		try {
-			// Told before the turn so the dashboard can draw "running": this is the
-			// moment the task became somebody's actual work.
-			if (item.taskId) this.host.taskStarted?.(item.taskId);
 			const result = await this.run(this.host.brief(item.task, item.boards));
-			if (item.taskId) this.host.taskFinished?.({ taskId: item.taskId, ok: true, report: result.report, boards: result.boards });
 			// A report the sender asked for is delivered to them as a notice, not as a queued
 			// task. The distinction is the whole of the no-loop rule: an item in a queue runs a
 			// turn when it drains, and a turn that answers a report with another report is two
@@ -1489,7 +1220,6 @@ export class DeckAgent {
 				if (report) this.host.report(item.from, `${this.identity.name} finished "${firstLine(item.task)}": ${report}`);
 			}
 		} catch (error) {
-			if (item.taskId) this.host.taskFinished?.({ taskId: item.taskId, ok: false, report: "", boards: [] });
 			this.translator.notice("error", `Queued work from ${item.fromName} failed: ${(error as Error).message}`);
 		}
 		// Belt and braces: the state hook re-arms on the way back to idle, but a turn that
@@ -1785,22 +1515,11 @@ export class DeckAgent {
 		if (!workspace) return this.workspaceChosen ?? null;
 		if (workspace === this.workspaceChosen) return workspace;
 		this.declareWorkspace(workspace);
-		/*
-		 * Moving house moves the agent into a room of the new project: the first canvas in it
-		 * (newest change first, the order every list shows), or one made and named after the
-		 * project when it has none. A canvas it is already on that is in the project stays.
-		 */
-		const here = this.canvases.get(this.canvasChosen);
-		if (here?.workspace !== workspace) {
-			const room = this.canvases.inWorkspace(workspace)[0] ?? this.canvases.create({ name: this.canvases.freeName(workspace), workspace });
-			this.standOn(room.id);
-		}
 		this.save();
-		this.publishContext();
 		return workspace;
 	}
 
-	/** The workspace it works in, as a slug: what every list groups by, and what a task is routed on. */
+	/** The workspace it works in, as a slug: what the agent list groups by. */
 	get workspace(): string | undefined {
 		return this.workspaceChosen;
 	}
@@ -1854,7 +1573,6 @@ export class DeckAgent {
 			name: this.identity.name,
 			...(this.identity.avatar ? { avatar: this.identity.avatar } : {}),
 			...(this.parentId ? { parentId: this.parentId } : {}),
-			...(this.role ? { role: this.role } : {}),
 			state: this.state,
 			...this.rowFacts(),
 			unread: 0,
@@ -1863,7 +1581,6 @@ export class DeckAgent {
 			identity: this.identity,
 			boards: [...this.held],
 			inPlay: [...this.playing],
-			...(this.canvas ? { canvas: this.canvas } : {}),
 			...(model ? { model } : {}),
 			/*
 			 * What it will spend, and what it has spent. Both were once missing from the

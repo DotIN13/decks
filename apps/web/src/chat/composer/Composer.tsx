@@ -1,4 +1,4 @@
-import type { AgentKind, AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Square from "lucide-solid/icons/square";
@@ -10,7 +10,6 @@ import { commentLabel, draftComments, draftForAgent, draftIsEmpty, draftText, no
 import { Icon } from "../../ui/icons.tsx";
 import { Hints } from "./Hints.tsx";
 import { ModeMenu } from "./ModeMenu.tsx";
-import { RuntimeMenu } from "./RuntimeMenu.tsx";
 import { parkedDrafts, reconcilePills } from "./parked.ts";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { ContextDial } from "./ContextDial.tsx";
@@ -58,11 +57,6 @@ export function Composer(props: {
 	modes: AgentMode[];
 	mode: AgentMode | undefined;
 	onMode: (mode: AgentMode) => void;
-	/**
-	 * Choose the runtime of the agent behind the bar. Supplied only on the dashboard, where
-	 * that agent is the dispatcher; a stage's agent had its runtime fixed when it was made.
-	 */
-	onRuntime?: (kind: AgentKind) => void;
 	/** The typed words, and the ids of the comments whose pills were in the field with them. */
 	onSend: (text: string, comments: string[]) => void;
 	/**
@@ -98,7 +92,7 @@ export function Composer(props: {
 	/** Files dropped on the bar: the app copies them into the deck and hands back mentions. */
 	onDropFiles?: (files: File[]) => void;
 	/**
-	 * Where a line will land, in a word: "to dispatcher", "to Sable", "note on risk-model".
+	 * Where a line will land, in a word: "to Sable", "note on risk-model".
 	 * A label and not a control. It is read from where you are and what you typed, so the
 	 * bar carries no chips and nobody has to guess where Return sends a sentence.
 	 */
@@ -399,7 +393,6 @@ export function Composer(props: {
 					matches={atMatches()}
 					identities={props.recipient?.identities ?? {}}
 					activeIndex={atIndex()}
-					{...(props.recipient?.canvasName ? { canvasName: props.recipient.canvasName } : {})}
 					onHover={setAtIndex}
 					onPick={pickMention}
 				/>
@@ -551,9 +544,6 @@ export function Composer(props: {
 
 					{/* Mode before model, because it is the larger decision: what the agent may
 					    do at all, rather than which one is doing it. */}
-					<Show when={props.onRuntime}>
-						{(choose) => <RuntimeMenu kind={props.runtime as AgentKind | undefined} onKind={(kind) => choose()(kind)} />}
-					</Show>
 					<ModeMenu modes={props.modes} mode={props.mode} onMode={props.onMode} />
 					<ModelPicker
 						model={props.model}

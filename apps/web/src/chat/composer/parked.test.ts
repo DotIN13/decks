@@ -10,11 +10,9 @@ const memory = () => {
 const words = (text: string): Draft => [{ type: "text", text }];
 const pill = (id: string) => ({ type: "mention" as const, kind: "comment" as const, id, label: `“${id}”` });
 
-test("Home is one page and each agent's stage is one, whoever is behind the bar", () => {
-	assert.equal(pageKey("dispatch", "dispatcher-pi"), "home");
-	assert.equal(pageKey("dispatch", "dispatcher-claude"), "home", "choosing the dispatcher's runtime does not change the page");
-	assert.equal(pageKey("stage", "a1"), "agent:a1");
-	assert.equal(pageKey("stage", undefined), "agent:none");
+test("each agent's stage is one page", () => {
+	assert.equal(pageKey("a1"), "agent:a1");
+	assert.equal(pageKey(undefined), "agent:none");
 });
 
 test("each page keeps its own draft, and a reload reads them back", () => {

@@ -14,14 +14,6 @@ import { WebSocketServer, type WebSocket } from "ws";
 export interface View {
 	/** The agent this browser's stage is on. `undefined` until it has said. */
 	focused?: string;
-	/**
-	 * The canvas this browser is looking at, which is what decides the boards it is sent.
-	 *
-	 * Separate from the agent, because a canvas is the deck's and a conversation is not: two
-	 * agents work on one canvas, and a canvas with nobody on it is still something to open.
-	 * Absent means "whatever the focused chat is working on", which is where a browser starts.
-	 */
-	canvas?: string;
 }
 
 /**

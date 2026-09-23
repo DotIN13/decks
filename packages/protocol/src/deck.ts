@@ -1,6 +1,5 @@
 /** The open deck: the boards, where they sit, and the roots an embed may reach. */
 
-import type { AgentKind } from "./chat.ts";
 
 /** A directory the deck declares readable, so an embed can reach outside it. */
 export interface Root {
@@ -22,17 +21,11 @@ export interface Root {
  * What the person has set for the whole deck, kept by the server rather than by a browser.
  *
  * `timezone` is an IANA name such as "America/Los_Angeles". The server adopts it as its own
- * clock, schedules with no zone of their own are read in it, agents are told it, and the
+ * clock, agents are told it, and the
  * app draws every time in it. Absent means nobody has chosen: the machine's zone is in force.
  */
 export interface DeckSettings {
 	timezone?: string;
-	/**
-	 * The runtime the dashboard's dispatcher is, chosen in the dashboard's bar. Absent means
-	 * the server's default. A runtime is fixed when an agent is made, so choosing another one
-	 * here means a different dispatcher answers the bar, with its own models.
-	 */
-	dispatcherKind?: AgentKind;
 }
 
 export interface Board {

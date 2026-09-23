@@ -1,25 +1,27 @@
 /**
- * What belongs to a conversation, and what belongs to the room it is held in.
+ * Each agent has a stage of its own, and switching agent is switching stage.
  *
- * A stage is a canvas now, and several agents work on one. So the line moved: the **room**
- * owns the boards, the camera and the selection, and the **conversation** owns the draft,
- * the transcript and any question its agent has asked. Switching agent is a change of
- * addressee — `?agent=` in the hash — and it must leave the room exactly as it was, which is
- * the opposite of what this check used to assert: the canvas swapping under a switch was the
- * behaviour when a canvas was one agent's in-play set.
+ * One agent, one stage: the boards on screen are the focused agent's in-play set, where they
+ * sit is that agent's arrangement, and the server keeps both in the agent's own record. So a
+ * switch swaps every board on screen, and the camera has to go with them — the only automatic
+ * fit in the app runs once per page load, and two agents working in different corners of a
+ * deck used to mean coming back to one of them and looking at empty canvas 3000px from
+ * anything. The camera rules are unit-tested in `camera/agent-view.ts`; what a browser is
+ * needed for is whether they are *wired*: whether `focusAgent` parks and restores the view,
+ * whether the composer's own text follows the agent it was typed to, and whether a question
+ * drawn over the input bar belongs to one conversation rather than to whichever is on screen.
  *
- * What a browser is needed for is whether that is *wired*: whether the view survives a
- * switch, whether the composer's text follows the agent it was typed to, and whether a
- * question drawn over the input bar belongs to one conversation rather than to whichever is
- * on screen.
- *
- * Two agents are driven over the socket. Doing it with real ones would need two models and
- * several minutes, and the interesting states — a question outstanding for the agent you are
- * *not* looking at — cannot be produced on demand at all.
+ * The three agents are real ones, made and given their boards over the socket, because what
+ * this check is about is that the *server* keeps a stage per agent — fed frames would only
+ * prove the browser can draw one. None of them is ever prompted, so no model is needed. The
+ * questions are fed: a question outstanding for the agent you are *not* looking at cannot be
+ * produced on demand any other way.
  */
-import { deckState, open, ready, say, settle, socket, still, WEB } from "../harness.mjs";
+import { deckState, open, ready, say, settle, socket, still } from "../harness.mjs";
 
-const { browser, page, errors } = await open({ width: 1500, height: 1000 });
+const { browser, page, errors, stopAnswering } = await open({ width: 1500, height: 1000 });
+/* The harness presses Allow on any dialog it sees, and this check is about dialogs being left alone. */
+stopAnswering();
 
 await page.addInitScript(() => {
 	if (window.top !== window.self) return;
@@ -31,64 +33,60 @@ await page.addInitScript(() => {
 		}
 	};
 });
-
-/*
- * A room of this check's own, because a canvas is shared now.
- *
- * Every other check opens the canvas the fixture's first agent works on, and several of
- * them put boards up and take boards down while they run. That was invisible while the
- * canvas drew one agent's in-play set — each check had its own — and it is not now: a board
- * arriving under this one's cursor moved the boards it was about to press, and a board
- * *leaving* took the selection with it. So this check makes a canvas, puts two of the
- * fixture's boards on it, and opens that.
- */
-const link = await socket();
-link.send({ type: "canvas.create", name: `Per-agent ${Date.now()}` });
-await settle(page, 600);
-const room = link.last("canvases")?.focused;
-if (!room) throw new Error("per-agent: the server made no canvas to work in");
-const deck = await deckState();
-const wanted = deck.boards.map((board) => board.path).slice(0, 2);
-// The socket is looking at the canvas it just made, so a play lands there (`wire/canvas.ts`).
-for (const path of wanted) link.send({ type: "board.play", path });
-await settle(page, 500);
-
-/*
- * `goto` then `reload`, and the second one is not belt-and-braces: the only difference
- * between this URL and the one the page is on is the hash, which is a same-document
- * navigation — so the init script above, added after `open()`, would never run and
- * `window.__ws` would not exist. The reload is what makes it a new document.
- */
-await page.goto(`${WEB}/#/canvas/${room}`, { waitUntil: "load" });
+/* The init script only runs in a new document, and `open` has already loaded this one. */
 await page.reload({ waitUntil: "load" });
 await ready(page);
-await settle(page, 1500);
+await settle(page, 800);
 
 const feed = (message) => page.evaluate((text) => window.__ws.dispatchEvent(new MessageEvent("message", { data: text })), JSON.stringify(message));
-const boards = await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => node.dataset.path));
-say("the fixture has at least two boards to be far apart", boards.length >= 2, JSON.stringify(boards));
 
-const chat = (id, name) => ({
-	id,
-	name,
-	kind: "claude",
-	state: "idle",
-	lastAt: Date.now(),
-	unread: 0,
-	identity: { name, color: "#3b5cf6" },
-	boards: ["boards/plan.html"],
-	inPlay: [],
-});
-await feed({ type: "agents", defaultKind: "pi", focused: "A", chats: [chat("A", "Ada"), chat("B", "Bo")] });
-/* Deliberately different corners of the deck: `plan` at 0,0 and `deep` at 0,2440. */
-await feed({ type: "context.changed", agentId: "A", boards: [boards[0]], inPlay: [boards[0]] });
-await feed({ type: "context.changed", agentId: "B", boards: [boards.at(-1)], inPlay: [boards.at(-1)] });
-await settle(page, 900);
+/** Wait for something the socket will say, instead of sleeping through it. */
+const until = async (test, what, timeout = 15000) => {
+	const deadline = Date.now() + timeout;
+	while (Date.now() < deadline) {
+		const found = test();
+		if (found) return found;
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	throw new Error(`per-agent: waited ${timeout}ms for ${what}`);
+};
+
+const link = await socket();
+const home = await until(() => link.last("agents")?.focused, "the greeting to name the focused agent");
+const paths = (await deckState()).boards.map((board) => board.path);
+say("the fixture has at least two boards to be far apart", paths.length >= 2, JSON.stringify(paths));
+
+/*
+ * Make an agent, name it, and give it a board — all as the socket, which is on the new agent
+ * from the moment it is made (`agent.create` focuses it for the browser that asked, and this
+ * socket is that browser). The page is not moved: its focus is its own.
+ *
+ * Moved after it is played, and far apart: a board joining an empty stage is placed in the
+ * middle of that agent's view (`deck/place.ts`), so two fresh agents would otherwise put their
+ * boards in the same spot and a switch between them would not have to move the camera at all.
+ */
+const make = async (name, path, y) => {
+	const known = new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
+	link.send({ type: "agent.create" });
+	const id = await until(() => (link.last("agents")?.chats ?? []).find((chat) => !known.has(chat.id))?.id, `${name} to exist`);
+	link.send({ type: "agent.rename", id, name });
+	if (path) {
+		link.send({ type: "board.play", path });
+		link.send({ type: "board.move", path, x: 0, y });
+	}
+	/* A rename is answered with the agent's identity, not a new list. */
+	await until(() => link.received.some((m) => m.type === "agent.identity" && m.id === id && m.identity?.name === name), `${name} to be called that`);
+	return id;
+};
+const adaBoard = paths[0];
+const boBoard = paths.at(-1);
+const A = await make("Ada", adaBoard, 0);
+const B = await make("Bo", boBoard, 3200);
 
 /** Everything that should belong to one conversation, read in one go. */
 const look = () =>
 	page.evaluate(() => {
-		const world = document.querySelector("[style*='translate']");
+		const world = document.querySelector(".world");
 		return {
 			world: world ? (world.getAttribute("style") ?? "").replace(/\s+/g, " ") : "?",
 			zoom: document.querySelector('.pill [aria-label^="Zoom"]')?.textContent?.trim(),
@@ -99,44 +97,58 @@ const look = () =>
 		};
 	});
 
-const goTo = async (name) => {
-	await page.evaluate(() => {
-		const trigger = [...document.querySelectorAll(".float.pill button")].find((button) => /^Agents/.test(button.getAttribute("aria-label") ?? ""));
-		trigger?.click();
-	});
+/*
+ * Switch the way a person does: the composer's recipient chip opens the agent list, and a
+ * pick there goes to that agent's stage — the same as pressing its row in the panel.
+ *
+ * Done when the stage shows exactly the boards the agent is known to have up and the camera
+ * has stopped: the boards arrive with the server's answer to `agent.focus`, and the camera
+ * waits for them. Not thrown on a timeout, so a switch that shows the wrong boards is reported
+ * by the assertion that says so rather than by a stack trace.
+ */
+const goTo = async (name, expected) => {
+	await page.locator(".dock-to-chip").click();
 	await page.waitForSelector(".popover", { timeout: 4000 });
 	await page.locator('.popover [data-agent="true"]').filter({ hasText: name }).first().click();
-	await settle(page, 900);
+	await page
+		.waitForFunction(
+			(wanted) => JSON.stringify([...document.querySelectorAll(".board-node")].map((node) => node.dataset.path).sort()) === JSON.stringify(wanted),
+			[...expected].sort(),
+			{ timeout: 10000 },
+		)
+		.catch(() => {});
+	await settle(page, 400);
+	await still(page);
+	if (expected.length) await ready(page);
 };
+
+// --- Ada's stage is Ada's -------------------------------------------------------------
+
+const first = await look();
+await goTo("Ada", [adaBoard]);
+const arrived = await look();
+say(
+	"picking Ada from the chip shows Ada's stage: her one board, and none of what was up before",
+	JSON.stringify(arrived.shown) === JSON.stringify([adaBoard]),
+	`${first.shown.length} boards -> ${JSON.stringify(arrived.shown)}`,
+);
+say("…and the chip now addresses her", /^to Ada/.test((await page.locator(".dock-to").getAttribute("data-dest")) ?? ""), await page.locator(".dock-to").getAttribute("data-dest"));
 
 // --- set up a distinct view, draft, selection and question for Ada ------------------
 
 /*
- * Fit through the button, and then wait for the camera to stop.
- *
- * It was `keyboard.press("0")`, which is the same verb and only works when the cursor is
- * not in a field — and after an open it usually is, so the fit quietly did nothing and this
- * check ran on whatever view the page had loaded with. That was invisible while the canvas
- * held one agent's boards and is not now: the room is shared, so a board another check puts
- * up can be the first in the list and a thousand pixels off screen. The press is a press on
- * the control, and `still` is the stage's own answer to "has it arrived".
+ * Fit through the button, and then wait for the camera to stop. `0` on the keyboard is the
+ * same verb and only works when the cursor is not in a field — after an open it usually is,
+ * so the fit quietly did nothing and the check ran on whatever view the page loaded with.
  */
 await page.locator('[aria-label="Fit the boards on the canvas"]').click();
 await still(page);
 await settle(page, 300);
 await page.locator(".dockfield").fill("meant for Ada");
-/*
- * Waited for rather than slept through, and not pinned to one path.
- *
- * The canvas is the room's now, so another check running beside this one can put a board on
- * it or take one off while this one is pressing: a named board may be gone by the time it is
- * clicked, and a fixed wait after the press can end before the mark arrives. Press whatever
- * is first *now*, and wait for something to be selected.
- */
 await page.locator(".board-node .chrome").first().click();
 await page.waitForSelector('.board-node[data-selected="true"]', { timeout: 5000 });
 await settle(page, 350);
-await feed({ type: "extension.ui.prompt", agentId: "A", prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });
+await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });
 await settle(page, 500);
 
 const ada = await look();
@@ -144,23 +156,22 @@ say("Ada has a view, a draft, a selection and a question", Boolean(ada.selected)
 
 // --- switch to Bo: none of it should have come along --------------------------------
 
-await goTo("Bo");
+await goTo("Bo", [boBoard]);
 const bo = await look();
 
+say("switching to Bo swaps the stage for his", JSON.stringify(bo.shown) === JSON.stringify([boBoard]), JSON.stringify(bo.shown));
 /*
- * The room stays. Both of these were the other way round while a canvas was one agent's: the
- * boards swapped and the camera had to be made to follow them. In a room a switch is a change
- * of addressee, and a canvas that rearranged itself when you spoke to somebody else would be
- * the strongest possible argument that the boards are not really shared.
+ * The bug this check was first written for. It used to be byte-identical here: the boards
+ * changed and the camera did not, leaving the viewport thousands of pixels from the only board
+ * on screen.
  */
-say("the boards stay: they are the room's, not the agent's", JSON.stringify(bo.shown) === JSON.stringify(ada.shown), JSON.stringify(bo.shown));
-say("…and so does the camera", bo.world === ada.world, `${ada.zoom} → ${bo.zoom}`);
-say("…and the selection, which is a board in the room", bo.selected === ada.selected, JSON.stringify(bo.selected));
+say("…and the camera went with it", bo.world !== ada.world, `${ada.zoom} → ${bo.zoom}`);
 /*
  * The sharpest of the five: a half-written prompt used to follow you, addressed to the new
  * agent and one Enter from being sent to a conversation it was not written for.
  */
 say("your draft did not follow you", bo.typed === "", JSON.stringify(bo.typed));
+say("…nor did the selection", bo.selected === null, JSON.stringify(bo.selected));
 /*
  * The question was Ada's. It used to be drawn over whichever conversation you were in, and
  * the card could not say whose it was because the frame carried no id.
@@ -174,46 +185,71 @@ await settle(page, 250);
 
 // --- back to Ada: everything exactly as it was --------------------------------------
 
-await goTo("Ada");
+await goTo("Ada", [adaBoard]);
 const back = await look();
 
-say("the view is where you left it, having never moved", back.world === ada.world && back.zoom === ada.zoom, `${ada.zoom} → ${back.zoom}`);
+say("back on Ada, her stage is hers again", JSON.stringify(back.shown) === JSON.stringify([adaBoard]), JSON.stringify(back.shown));
+say("…and the view comes back exactly, not as a fresh fit of it", back.world === ada.world && back.zoom === ada.zoom, `${ada.zoom} → ${back.zoom}`);
 say("…the draft comes back to the agent it was written for", back.typed === "meant for Ada", JSON.stringify(back.typed));
+say("…the selection with it", back.selected === ada.selected, JSON.stringify(back.selected));
 say("…and the question is still waiting where it was asked", back.dialog?.includes("Run it?"), JSON.stringify(back.dialog));
 
-await goTo("Bo");
-say("and Bo's own draft was parked, not lost", (await look()).typed === "meant for Bo");
+/*
+ * And the server has it too. Which agent a browser is on is remembered by the server rather
+ * than written in the address — there is nothing in the URL that could say which one — so a
+ * reload lands on the same agent's stage.
+ */
+await page.reload({ waitUntil: "load" });
+await ready(page);
+await settle(page, 600);
+const reloaded = await look();
+say("a reload lands on the same agent's stage", JSON.stringify(reloaded.shown) === JSON.stringify([adaBoard]), JSON.stringify(reloaded.shown));
 
-// --- an agent that has put nothing up is addressed in the room it is addressed from ----
+await goTo("Bo", [boBoard]);
+/* A reload starts the browser's memory over, drafts included: this is about the switch, not the reload. */
+await page.locator(".dockfield").fill("meant for Bo");
+await goTo("Ada", [adaBoard]);
+await goTo("Bo", [boBoard]);
+say("and Bo's own draft was parked, not lost", (await look()).typed === "meant for Bo", JSON.stringify((await look()).typed));
+
+// --- an agent with an empty stage does not move the camera --------------------------
 
 /*
- * The case that used to throw the camera: a brand-new agent holds nothing, and a canvas made
- * of its holdings would be empty. In a room there is nothing to empty — the boards are the
- * canvas's — so the only thing that changes is who the bar is talking to.
+ * Moving to look at nothing is worse than not moving: the view would jump for no reason and
+ * land nowhere. This is also the common case for a brand-new agent, which would otherwise
+ * throw the camera on every `+`.
  */
-const before = await look();
-await feed({ type: "agents", defaultKind: "pi", focused: "B", chats: [chat("A", "Ada"), chat("B", "Bo"), chat("C", "Cass")] });
-await feed({ type: "context.changed", agentId: "C", boards: [], inPlay: [] });
-await settle(page, 500);
-await goTo("Cass");
+const C = await make("Cass");
+await settle(page, 300);
+const beforeEmpty = await look();
+await goTo("Cass", []);
 const empty = await look();
-say("switching to an agent that holds nothing leaves the camera alone", empty.world === before.world, `${before.zoom} → ${empty.zoom}`);
-say("…and the room's boards are still on screen", JSON.stringify(empty.shown) === JSON.stringify(before.shown), JSON.stringify(empty.shown));
+say("switching to an agent with an empty stage leaves the camera alone", empty.world === beforeEmpty.world, `${beforeEmpty.zoom} → ${empty.zoom}`);
+say("…and its stage really is empty", empty.shown.length === 0, JSON.stringify(empty.shown));
 
 // --- a question for an agent you are not looking at ---------------------------------
 
 /*
- * Cass asks while you are in Cass; then a question arrives for Ada. Only the one belonging to
- * the conversation on screen is drawn — the other is reported by the agent list, not by a
+ * A question arrives for Ada while you are in Cass. Only the one belonging to the
+ * conversation on screen is drawn — the other is reported by the agent list, not by a
  * dialog over somebody else's transcript.
  */
-await feed({ type: "extension.ui.prompt", agentId: "A", prompt: { id: "q2", method: "confirm", title: "Second question", message: "also Ada's" } });
+await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q2", method: "confirm", title: "Second question", message: "also Ada's" } });
 await settle(page, 500);
 say("a background agent's question does not appear over your conversation", (await look()).dialog === null, JSON.stringify((await look()).dialog));
 
-await goTo("Ada");
+await goTo("Ada", [adaBoard]);
 const asked = await look();
-say("…and is there when you go to that conversation", asked.dialog?.includes("Run it?") || asked.dialog?.includes("Second question"), JSON.stringify(asked.dialog));
+say("…and is there when you go to that conversation", asked.dialog?.includes("Second question"), JSON.stringify(asked.dialog));
+
+/*
+ * Leave the deck as it was found for the checks after this one. The socket goes back to the
+ * agent the page opened on first — which also makes that the conversation a new browser
+ * starts on — so the three removals are of agents nobody is on and move no one's focus.
+ */
+link.send({ type: "agent.focus", id: home });
+for (const id of [A, B, C]) link.send({ type: "agent.remove", id });
+await until(() => !(link.last("agents")?.chats ?? []).some((chat) => [A, B, C].includes(chat.id)), "the three agents to be removed").catch(() => {});
 
 link.close();
 say("no console errors", errors.length === 0, errors.join(" | "));

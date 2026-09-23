@@ -1,14 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { AGENT_KINDS, type AgentKind, type DeckSettings } from "@decks/protocol";
+import type { DeckSettings } from "@decks/protocol";
 import { isZone, processZone } from "./clock.ts";
 
 /**
  * What the person has set for the whole deck, kept by the server: today, their timezone.
  *
- * Every other setting lives in a browser, and this one cannot. A schedule fires with
- * nobody's browser open, and an agent's shell is a child of this process; both need the
- * zone where the server can read it. So it is a file beside the deck's other state,
+ * Every other setting lives in a browser, and this one cannot. An agent's shell is a child of
+ * this process, and it needs the zone where the server can read it. So it is a file beside the deck's other state,
  * `.decks/settings.json`, and every browser is sent it on connect.
  *
  * **The zone is adopted as the process clock.** Node re-reads `TZ` the moment it is
@@ -16,8 +15,7 @@ import { isZone, processZone } from "./clock.ts";
  * for the app, the `date` an agent runs in its shell and the "today" a runtime tells its
  * model all follow the person from one assignment. The alternative, passing a zone to every
  * place that formats a time, is a list that is never finished and fails silently where it
- * is not. Schedules are the exception, because one may name a zone of its own: their
- * arithmetic takes the zone as an argument (`clock.ts`).
+ * is not.
  */
 
 /** The machine's own zone and `TZ`, read before anything here assigns one. */
@@ -64,13 +62,6 @@ export class SettingsStore {
 	}
 
 	/** Another deck was opened: its settings, and its clock. */
-	/** The runtime the dashboard's dispatcher is. Availability is the caller's question, not this file's. */
-	setDispatcherKind(kind: AgentKind): DeckSettings {
-		this.settings = { ...this.settings, dispatcherKind: kind };
-		this.save();
-		return this.get();
-	}
-
 	setDeck(deckPath: string): void {
 		this.file = join(deckPath, ".decks", "settings.json");
 		this.settings = this.load();
@@ -91,7 +82,6 @@ export class SettingsStore {
 			// silently means UTC, which is the fault this file exists to remove.
 			return {
 				...(isZone(parsed?.timezone) ? { timezone: parsed.timezone } : {}),
-				...(AGENT_KINDS.includes(parsed?.dispatcherKind as AgentKind) ? { dispatcherKind: parsed.dispatcherKind as AgentKind } : {}),
 			};
 		} catch (error) {
 			this.warn(`The deck's settings could not be read, so the defaults are in use: ${(error as Error).message}`);

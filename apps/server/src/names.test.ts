@@ -4,7 +4,7 @@ import { numberedName } from "./names.ts";
 
 /*
  * What a thing is called before anybody names it. The point of the number is that it is
- * unique — an agent is addressed by `@name` and a canvas is joined by name — so the cases
+ * unique — an agent is addressed by `@name` — so the cases
  * worth pinning are the counting, and what it does with a number already in use.
  */
 
@@ -19,7 +19,7 @@ test("they count up, and no two share a number", () => {
 });
 
 test("a number that is free again is used again, rather than counting past it", () => {
-	// Three canvases with the second deleted: the next one is `Canvas 2`, because the number
+	// Three rows with the second closed: the next one is `Canvas 2`, because the number
 	// is what a person counting the rooms in front of them sees, not how many there have been.
 	const here = new Set(["Canvas 1", "Canvas 3"]);
 	assert.equal(numberedName("Canvas", (name) => here.has(name)), "Canvas 2");

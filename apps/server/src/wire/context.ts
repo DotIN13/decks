@@ -1,17 +1,15 @@
-import type { AgentKind, Camera, Canvas, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
+import type { Camera, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
 import type { CameraReading } from "../deck/place.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { Acts } from "../agents/acts.ts";
 import type { BoardService } from "../boards/service.ts";
 import type { EvalTrust } from "../boards/eval-trust.ts";
 import type { StageService } from "../stage/service.ts";
-import type { TaskService } from "../tasks/service.ts";
 import type { ClaudeAccounts } from "../runtimes/claude/accounts.ts";
 import type { Deck } from "../deck/loader.ts";
 import type { WebBridge } from "../web/bridge.ts";
 import type { View } from "../ws.ts";
-import type { CanvasStore } from "../canvas/store.ts";
-import type { StageTarget } from "../canvas/stage.ts";
+import type { DeckAgent } from "../agents/session.ts";
 
 /** How a frame answers the socket it came from — and only that socket. */
 export type Reply = (message: ServerMessage) => void;
@@ -76,8 +74,6 @@ export interface WireContext {
 	readonly acts: Acts;
 	readonly web: WebBridge;
 	readonly claudeAccounts: ClaudeAccounts;
-	/** Tasks and schedules — the dashboard's store (takes frames, not boards). */
-	readonly tasks: TaskService;
 	/**
 	 * The stage, for the one frame that runs a board's own code (`wire/boards.ts`).
 	 *
@@ -101,23 +97,10 @@ export interface WireContext {
 	 */
 	stageState(): DeckState;
 
-	/** The deck's canvases: what holds the boards (`canvas/store.ts`). */
-	readonly canvases: CanvasStore;
-	/**
-	 * The deck as one canvas sees it: its boards, in the places it has put them.
-	 *
-	 * The same seeding `stageState` does, written back onto the canvas rather than onto a
-	 * chat — a board with no place of its own is placed once, beside the boards already there.
-	 */
-	canvasState(canvasId: string): DeckState;
-	/** Every canvas as the browser needs it, with the agents working on each. */
-	canvasList(): Canvas[];
-	/** What a board frame acts on: the canvas this browser opened, else the focused chat. */
-	target(): StageTarget;
-	/** Say what canvases exist, to everyone, after one is made, renamed, joined or removed. */
-	publishCanvases(): void;
+	/** What a board frame acts on: the stage of the conversation this browser is in. */
+	target(): DeckAgent;
 
-	/** The camera a browser last reported, and the per-agent readings beside it, each tagged with the canvas it was of. */
+	/** The camera a browser last reported, and the per-agent readings beside it. */
 	lastCamera: CameraReading;
 	readonly cameras: Map<string, CameraReading>;
 	/** The canvas calls waiting on a browser, keyed by call id. */
@@ -134,8 +117,6 @@ export interface WireContext {
 
 	/** Choose the deck's timezone, or `null` for the machine's. Returns a sentence when it is not one. */
 	setTimezone(zone: string | null): { error: string } | undefined;
-	/** Choose the dispatcher's runtime; an error names why that runtime cannot be used here. */
-	setDispatcherKind(kind: AgentKind): { error: string } | undefined;
 
 	/** The install's Claude subscriptions, republished after anything moves one. */
 	publishAccounts(reply?: Reply, options?: { reread?: boolean }): Promise<void>;

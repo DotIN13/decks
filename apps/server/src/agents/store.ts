@@ -68,26 +68,26 @@ export interface AgentRecord {
 	avatar?: string;
 	color: string;
 	parentId?: string;
-	/** The deck's dispatcher, kept across restarts so the deck never grows a second one. */
-	role?: "dispatcher";
 	context: string[];
+	inPlay: string[];
 	/**
-	 * The canvas this chat is working on, by id (`canvas/store.ts`).
+	 * Where this conversation has put its boards.
 	 *
-	 * What is on that canvas, where each board sits and the arrows between them are the
-	 * canvas's own record, shared with every other chat on it. Before canvases this was three
-	 * fields here — `inPlay`, `positions` and a `workspace` word — one private copy per chat.
+	 * **Per stage, not per deck.** A board's place belongs to the arrangement you are looking at, so
+	 * the same board can sit differently in this chat and the next. Absent means "this stage has not
+	 * placed it", which falls through to `Deck.arrange`. No `w`/`h`: a board's size is its file's
+	 * `<meta>`, or its own measured extent, and a copy here would go stale.
 	 */
-	canvas?: string;
+	positions?: Record<string, { x: number; y: number }>;
 	/**
-	 * Every canvas this chat has worked on, by id, oldest first, including `canvas` above.
+	 * The canvas a record written while boards lived on shared canvases pointed at, by id.
 	 *
-	 * An agent belongs to a room by having worked in it, and it does not leave when it starts
-	 * work somewhere else: the panel's "on this canvas" section and a canvas card's faces are
-	 * this list read backwards. `canvas` stays the *current* one — where the next board it
-	 * shows will land — which is the one thing a single field could never say twice.
+	 * Read once and never written: `restore` copies that canvas's boards and places onto this
+	 * chat's own stage (`agents/from-canvas.ts`), and the next write stores them here instead.
 	 */
-	canvases?: string[];
+	fromCanvas?: string;
+	/** The deck's dispatcher, which no longer exists: its record is read so it can be skipped. */
+	wasDispatcher?: true;
 	/** The workspace the agent works in, as a slug (`workspaces.ts`). Its own fact, kept across restarts. */
 	workspace?: string;
 	createdAt: number;
@@ -125,17 +125,6 @@ export interface AgentRecord {
 	tags?: string[];
 	/** What *you* said it was doing, from the customise popup. Never written by the agent. */
 	userTags?: string[];
-	/**
-	 * The three fields a record written before canvases carried, read once and never written.
-	 *
-	 * `canvas/migrate.ts` turns them into canvases on the first open — the workspace word into
-	 * a canvas of that name, the boards and their places onto it — and after that write the
-	 * record names a canvas instead. Kept as their own names so nothing can mistake them for
-	 * state this build maintains.
-	 */
-	legacyInPlay?: string[];
-	legacyPositions?: Record<string, { x: number; y: number }>;
-	legacyWorkspace?: string;
 	/**
 	 * A summary of the transcript, not a copy of it. A row shows a preview of the last
 	 * thing said, and the only other place that line lives is `chat.json` — so without this
@@ -484,24 +473,12 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(typeof source.avatar === "string" ? { avatar: source.avatar } : {}),
 		color: typeof source.color === "string" ? source.color : "#3b5cf6",
 		...(typeof source.parentId === "string" ? { parentId: source.parentId } : {}),
-		...(source.role === "dispatcher" ? { role: "dispatcher" as const } : {}),
 		context: strings(source.context),
-		...(typeof source.canvas === "string" && source.canvas ? { canvas: source.canvas } : {}),
-		...(strings(source.canvases).length > 0 ? { canvases: strings(source.canvases) } : {}),
-		/*
-		 * What a record written before canvases had: what was up, where it sat, and the word the
-		 * agent typed about itself. Read back only so `canvas/migrate.ts` can turn them into a
-		 * canvas on the first open, and never written again.
-		 */
-		...(strings(source.inPlay).length > 0 ? { legacyInPlay: strings(source.inPlay) } : {}),
-		...(positions ? { legacyPositions: positions } : {}),
-		/*
-		 * A workspace is the agent's own again, kept on the record. A chat written before
-		 * canvases existed has one and no canvas, and `registry.migrate` reads it as the old
-		 * per-chat room as well: `legacyWorkspace` is that reading, and only for those.
-		 */
+		inPlay: strings(source.inPlay),
+		...(positions ? { positions } : {}),
+		...(typeof source.canvas === "string" && source.canvas ? { fromCanvas: source.canvas } : {}),
+		...(source.role === "dispatcher" ? { wasDispatcher: true as const } : {}),
 		...(typeof source.workspace === "string" && source.workspace ? { workspace: source.workspace } : {}),
-		...(typeof source.workspace === "string" && source.workspace && !(typeof source.canvas === "string" && source.canvas) ? { legacyWorkspace: source.workspace } : {}),
 		createdAt: created,
 		...(model ? { model } : {}),
 		...(usage ? { usage } : {}),

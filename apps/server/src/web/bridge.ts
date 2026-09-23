@@ -50,14 +50,10 @@ export class WebBridge {
 	private readonly wss = new WebSocketServer({ noServer: true });
 	private relay: Relay | undefined;
 	private browser: Browser | undefined;
-	/** The debugger endpoint the relay listens on, while a Chrome is attached to it. */
-	private endpoint: string | undefined;
 	private readonly actions: WebAction[] = [];
 	private pending: { id: string; text: string; resolve: (ok: boolean) => void; timer: NodeJS.Timeout } | undefined;
 	private closed: string | undefined;
 	private connecting: Promise<void> | undefined;
-	/** A browser agent has the tab right now, so `stage.web` is not the one driving it. */
-	private handedOver = false;
 	/**
 	 * The address the last `read`'s references belong to.
 	 *
@@ -145,16 +141,27 @@ export class WebBridge {
 			if (this.relay !== relay) return;
 			this.relay = undefined;
 			this.browser = undefined;
-			this.endpoint = undefined;
 			this.closed = reason;
 			this.settle(false);
 			this.changed(this.status());
 		};
 		this.connecting = (async () => {
 			const endpoint = await relay.start();
-			this.endpoint = endpoint;
 			await relay.ready();
-			await this.attach(relay, endpoint);
+			const browser = await this.connect(endpoint);
+			if (this.relay !== relay) {
+				await browser.close().catch(() => {});
+				return;
+			}
+			this.browser = browser;
+			browser.on("disconnected", () => {
+				if (this.browser === browser) this.browser = undefined;
+			});
+			for (const context of browser.contexts()) {
+				for (const page of context.pages()) this.watch(page);
+				context.on("page", (page) => this.watch(page));
+			}
+			this.changed(this.status());
 		})();
 		this.connecting.catch((error: Error) => {
 			this.note(`could not connect to the shared tab: ${error.message}`, false);
@@ -163,30 +170,8 @@ export class WebBridge {
 		await this.connecting.catch(() => {});
 	}
 
-	/**
-	 * Attach Playwright to the relay's debugger endpoint, and watch every tab it can see.
-	 *
-	 * Separate from `accept` because it happens twice: once when the extension connects, and
-	 * again when a browser agent hands the tab back after a run.
-	 */
-	private async attach(relay: Relay, endpoint: string): Promise<void> {
-		const browser = await this.connect(endpoint);
-		if (this.relay !== relay) {
-			await browser.close().catch(() => {});
-			return;
-		}
-		this.browser = browser;
-		browser.on("disconnected", () => {
-			if (this.browser === browser) this.browser = undefined;
-		});
-		for (const context of browser.contexts()) {
-			for (const page of context.pages()) this.watch(page);
-			context.on("page", (page) => this.watch(page));
-		}
-		this.changed(this.status());
-	}
-
-	private watch(page: Page): void {		const refresh = async () => {
+	private watch(page: Page): void {
+		const refresh = async () => {
 			try {
 				const url = page.url();
 				const title = await page.title();
@@ -221,65 +206,13 @@ export class WebBridge {
 		const tabs = (this.relay?.tabs() ?? []).map((tab) => ({ title: (tab.url && this.titles.get(tab.url)) || tab.title || "", url: tab.url ?? "" }));
 		return {
 			paired: existsSync(join(this.dataDir, "web-bridge.json")),
-			// A tab a browser agent has borrowed is still connected — the extension is up and the
-			// tab is there — it is just not the deck's to drive for the length of that run.
-			connected: (this.browser !== undefined || this.handedOver) && tabs.length > 0,
+			connected: this.browser !== undefined && tabs.length > 0,
 			...(tabs[0] ? { tab: tabs[0] } : {}),
 			tabs,
 			actions: [...this.actions],
 			...(this.pending ? { pending: { id: this.pending.id, text: this.pending.text } } : {}),
 			...(this.closed ? { closed: this.closed } : {}),
 		};
-	}
-
-	/**
-	 * Let go of the tab for the length of a run, and say how to take it back.
-	 *
-	 * The relay speaks to one CDP client at a time, which is what makes a tab a single thing
-	 * being driven rather than two agents fighting over it. So a browser agent that runs a goal
-	 * in the person's own Chrome takes that connection rather than sharing it: this detaches
-	 * Playwright and waits for the socket to really be gone, and the returned function attaches
-	 * Playwright again when the run is over.
-	 *
-	 * While it is out, the verbs of `stage.web` say the tab is busy rather than acting on a page
-	 * that has moved on without them.
-	 */
-	async handOver(): Promise<() => Promise<void>> {
-		const relay = this.relay;
-		const endpoint = this.endpoint;
-		if (!relay || !endpoint) throw new Error("No Chrome is shared, so there is no tab to hand over.");
-		const browser = this.browser;
-		this.browser = undefined;
-		this.handedOver = true;
-		if (browser) await browser.close().catch(() => {});
-		await relay.releaseClient();
-		this.changed(this.status());
-		return async () => {
-			this.handedOver = false;
-			if (this.relay !== relay || !this.endpoint) return;
-			await this.attach(relay, this.endpoint).catch(() => {});
-		};
-	}
-
-	/**
-	 * The debugger endpoint a browser agent can attach to, when a Chrome is shared and attached.
-	 *
-	 * It speaks real Chrome DevTools Protocol, which is what makes it the one wire both halves of
-	 * the browser work can use: `stage.web` connects Playwright to it, and `stage.web_jev` puts a
-	 * gate in front of the same address and lets a browser agent drive the person's own tab.
-	 */
-	debuggerEndpoint(): string | undefined {
-		return this.browser?.isConnected() ? this.endpoint : undefined;
-	}
-
-	/**
-	 * Ask the person a yes or no, on the status board, and wait for the answer.
-	 *
-	 * This is `submit`'s own question, opened up: a browser agent driving the shared tab has
-	 * more than one thing it may not do alone, and all of them are the same question.
-	 */
-	ask(text: string): Promise<boolean> {
-		return this.askUser(text);
 	}
 
 	/** The user's answer to a pending submit, from the status board. */
@@ -308,8 +241,6 @@ export class WebBridge {
 	/** The page the agent drives: the first shared tab. Throws a sentence when there is none. */
 	async page(): Promise<Page> {
 		if (this.connecting) await this.connecting.catch(() => {});
-		if (this.handedOver)
-			throw new Error("A browser agent is driving the shared tab right now. stage.web_jev.state() follows that run and stage.web_jev.stop() ends it; the tab comes back to stage.web afterwards.");
 		const browser = this.browser;
 		if (!browser || !browser.isConnected()) {
 			throw new Error(

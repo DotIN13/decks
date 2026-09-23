@@ -64,31 +64,10 @@ export function viewBox(camera?: Camera): Box | undefined {
 	return { x: camera.x - w / 2, y: camera.y - h / 2, w, h };
 }
 
-/**
- * A camera reading as the browser reported it: where, and of which canvas.
- *
- * The canvas rides on the reading because the two stores holding these (`app.ts`) outlive any
- * one view: `lastCamera` is whatever was reported last, from any canvas, and the per-agent map
- * keeps readings from before an agent moved rooms.
- */
+
+/** A camera reading as the browser reported it. */
 export interface CameraReading {
 	at: Camera;
-	canvas?: string;
-}
-
-/**
- * The camera a placement on this canvas may anchor on: the reading, if it is of this canvas.
- *
- * Anything else answers undefined — a reading of another canvas, and a reading that does not
- * say (an older browser, or the {0,0,1} a restart starts with). Placement then falls back to
- * the edge of the boards already there (`joinSpot`), which is the right answer for a canvas
- * nobody is looking at. This is the whole fix for the bug where a board joining one canvas
- * landed inside another's cluster: the anchor was the middle of the last reading, and nothing
- * checked whose view that was.
- */
-export function cameraFor(reading: CameraReading | undefined, canvasId: string): Camera | undefined {
-	if (!reading || reading.canvas !== canvasId) return undefined;
-	return reading.at;
 }
 
 /**

@@ -6,50 +6,20 @@
  * itself cannot disagree: both ask `destination` and get the same answer.
  *
  * Precedence, highest first: a note target the person picked on a board; an `@Name` in the
- * text; then the surface, which is the dispatcher on the dispatch surface and the focused
- * agent on a stage. A stage with nobody focused has nowhere to send to, and says so.
- *
- * **On a canvas the bar is a room's, addressed to somebody in it.** Who that is comes from
- * the pill and the panel (`?agent=` in the hash), so a line that names nobody goes to the
- * agent you chose, and works *here*: the room rides along, and the server puts that agent on
- * this canvas before it hears the line. `@Sable` reaches Sable wherever it was, on the same
- * terms. A room with nobody chosen falls back to the dispatcher for that canvas, which hands
- * the line to an agent already on it.
- *
- * It used to be the other way round — every unnamed line on a canvas became a dispatcher task
- * — and that was right while a canvas had no addressee. Now that choosing one is a click in
- * two places, a bar that ignored the choice would make the choice mean nothing.
- *
- * `@Dispatcher` is a name like any other, and works from any bar: on an agent's stage it
- * turns the line into a task for the dispatcher to place, which is otherwise a trip Home.
- * It is a reserved word rather than an agent, because the dispatcher is kept out of every
- * list a person picks an agent from; an agent that really is called Dispatcher keeps its name.
+ * text; then the focused agent, whose stage is on screen. Nobody focused is nowhere to send
+ * to, and says so.
  */
 
-/** The word that addresses the dispatcher, as typed after an `@`. Matched without case. */
-export const DISPATCHER_NAME = "Dispatcher";
-
 export interface BarContext {
-	surface: "dispatch" | "stage";
 	focused?: { id: string; name: string };
-	/** The canvas this browser has open, when it has one: the room the bar is in. */
-	canvas?: { id: string; name: string };
 	agents: Array<{ id: string; name: string }>;
 	note?: { board: string; component: string };
-	/**
-	 * Who the composer's chip was set to, when it was: an agent by id, or the dispatcher. A
-	 * typed `@Name` still wins — it is in the words — and the chip is what stands when there
-	 * is none, before the focused agent does.
-	 */
-	addressed?: { id: string; name: string } | "dispatcher";
 }
 
 export type Destination =
 	| { kind: "note"; board: string; component: string }
-	/** `named` is true when an `@` in the text chose the agent, false when the stage did. `canvas` is where it is brought to work. */
-	| { kind: "prompt"; id: string; name: string; named: boolean; canvas?: { id: string; name: string } }
-	/** `named` is present when `@Dispatcher` in the text chose it, and the token is to be taken out. `canvas` is the room it was asked in. */
-	| { kind: "task"; named?: true; canvas?: { id: string; name: string } }
+	/** `named` is true when an `@` in the text chose the agent, false when the stage did. */
+	| { kind: "prompt"; id: string; name: string; named: boolean }
 	| { kind: "nowhere" };
 
 /** Characters that may appear in an agent name; a mention ends at the first one that is not. */
@@ -85,18 +55,12 @@ function findMention(text: string, names: readonly string[]): Mention | undefine
 
 export function destination(text: string, context: BarContext): Destination {
 	if (context.note) return { kind: "note", board: context.note.board, component: context.note.component };
-	const mention = findMention(text, [...context.agents.map((a) => a.name), DISPATCHER_NAME]);
-	const room = context.surface === "stage" && context.canvas ? { canvas: context.canvas } : {};
+	const mention = findMention(text, context.agents.map((a) => a.name));
 	if (mention) {
 		const agent = context.agents.find((a) => a.name.toLowerCase() === mention.name.toLowerCase());
-		if (agent) return { kind: "prompt", id: agent.id, name: agent.name, named: true, ...room };
-		if (mention.name.toLowerCase() === DISPATCHER_NAME.toLowerCase()) return { kind: "task", named: true, ...room };
+		if (agent) return { kind: "prompt", id: agent.id, name: agent.name, named: true };
 	}
-	if (context.addressed === "dispatcher") return { kind: "task", ...room };
-	if (context.addressed) return { kind: "prompt", id: context.addressed.id, name: context.addressed.name, named: false, ...room };
-	if (context.surface === "dispatch") return { kind: "task" };
-	if (context.focused) return { kind: "prompt", id: context.focused.id, name: context.focused.name, named: false, ...room };
-	if (context.canvas) return { kind: "task", ...room };
+	if (context.focused) return { kind: "prompt", id: context.focused.id, name: context.focused.name, named: false };
 	return { kind: "nowhere" };
 }
 
@@ -106,15 +70,13 @@ function boardName(board: string): string {
 	return last.endsWith(".html") ? last.slice(0, -".html".length) : last;
 }
 
-/** Short enough to sit beside the bar: "note on risk-model", "to Sable, on Political LLM", "to dispatcher", "no agent". */
+/** Short enough to sit beside the bar: "note on risk-model", "to Sable", "no agent". */
 export function destinationLabel(dest: Destination): string {
 	switch (dest.kind) {
 		case "note":
 			return `note on ${boardName(dest.board)}`;
 		case "prompt":
-			return dest.canvas ? `to ${dest.name}, on ${dest.canvas.name}` : `to ${dest.name}`;
-		case "task":
-			return dest.canvas ? `to dispatcher, on ${dest.canvas.name}` : "to dispatcher";
+			return `to ${dest.name}`;
 		case "nowhere":
 			return "no agent";
 	}

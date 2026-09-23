@@ -86,11 +86,6 @@ export function agentsTemplate(): string {
 	return resolve(HERE, "AGENTS.md.tmpl");
 }
 
-/** The vendored jev-ultrafast agent and its runner, spawned by `stage.web_jev` (`web/jev.ts`). */
-export function jevDir(): string {
-	return resolve(HERE, "jev");
-}
-
 /** opencode's config directory: where its canvas tool and Decks' skills are handed to it. */
 export function opencodeConfigDir(): string {
 	return resolve(HERE, "opencode");
@@ -117,6 +112,5 @@ export const SHIPPED: ReadonlyArray<{ path: string; what: string; dir?: boolean 
 	{ path: "tool-description.txt", what: "the canvas tool's words, for every runtime" },
 	{ path: "guidelines.txt", what: "the guidelines appended to every agent's context, one per line" },
 	{ path: "opencode", what: "opencode's config directory: its tool and Decks' skills", dir: true },
-	{ path: "jev", what: "the vendored jev-ultrafast browser agent stage.web_jev runs", dir: true },
 	{ path: "antigravity/mcp-server.mjs", what: "antigravity's one-tool MCP server" },
 ];

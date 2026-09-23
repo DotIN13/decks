@@ -4,7 +4,7 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { Popover } from "../ui/Popover.tsx";
 import { Icon } from "../ui/icons.tsx";
-import { NO_WORKSPACE } from "./canvas-sections.ts";
+import { NO_WORKSPACE } from "./agent-sections.ts";
 import { WorkspaceField } from "./NewWorkspace.tsx";
 
 /** The server keeps four of your tags at most (`agents/tags.ts`); past that the field goes away. */
@@ -252,8 +252,7 @@ export function AgentEdit(props: {
 /**
  * The workspace, as a list to pick from: a field-shaped button showing the current one, and
  * under it every workspace in use, *No workspace*, and *New workspace…*, which turns the
- * list into the shared name field. The same list the canvas menu's *Move to* shows, so the
- * two places a thing is filed under a project look alike.
+ * list into the shared name field.
  */
 function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (workspace: string | null) => void }) {
 	const [making, setMaking] = createSignal(false);
@@ -320,7 +319,7 @@ function WorkspacePick(props: { value?: string; workspaces: string[]; onPick: (w
 						);
 					}}
 				</For>
-				<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="canvas-menu-new" onClick={() => setMaking(true)}>
+				<button type="button" data-row data-flat="true" role="menuitem" aria-expanded={false} class="menu-new" onClick={() => setMaking(true)}>
 					<span class="row-label flex-1">New workspace…</span>
 				</button>
 			</Show>

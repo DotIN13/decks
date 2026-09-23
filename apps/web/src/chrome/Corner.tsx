@@ -62,12 +62,6 @@ const STEP = 1.25;
  */
 
 export function Corner(props: {
-	/**
-	 * Which surface is up. Zoom, fit and clear are canvas tools and fold away on the
-	 * dashboard, where there is no canvas; the faces, new board, the conversation and
-	 * More are on both.
-	 */
-	surface?: "dispatch" | "stage";
 	chats: AgentChat[];
 	identities: Record<string, Identity>;
 	focused: string | undefined;
@@ -145,9 +139,6 @@ export function Corner(props: {
 
 	return (
 		<div class="float pill absolute top-3 right-3 z-20" data-inset="top">
-			{/* On the dashboard the corner is two buttons: the dispatcher's conversation and the
-			    menu. The faces are the sidebar's there, and a new board belongs to a stage. */}
-			<Show when={props.surface !== "dispatch"}>
 			<AgentStack
 				chats={props.chats}
 				identities={props.identities}
@@ -173,7 +164,6 @@ export function Corner(props: {
 			 * route between the two. `--control-md` rather than `--control`, because a labelled
 			 * chip is read far more often than it is pressed.
 			 */}
-			<Show when={props.surface !== "dispatch"}>
 			<span class="flex items-center max-[1100px]:hidden">
 				<Popover
 					placement="bottom-end"
@@ -244,7 +234,6 @@ export function Corner(props: {
 			 * agent cluster.
 			 */}
 			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
-			</Show>
 
 			{/*
 			 * What the canvas holds: one board more, or none at all.
@@ -332,7 +321,6 @@ export function Corner(props: {
 			</button>
 
 			<span class="pill-sep max-[1100px]:hidden" aria-hidden="true" />
-			</Show>
 
 			{/*
 			 * The conversation, and its three states.
@@ -349,9 +337,7 @@ export function Corner(props: {
 				data-on={historyButton() === "on" ? "true" : historyButton() === "yield" ? "yield" : undefined}
 				aria-pressed={historyButton() !== "off"}
 				title={
-					props.surface === "dispatch"
-						? "Messages with the dispatcher (⌘/)"
-						: historyButton() === "yield"
+					historyButton() === "yield"
 							? "Conversation: the inspector has the edge (⌘/)"
 							: "Conversation (⌘/)"
 				}

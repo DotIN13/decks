@@ -68,16 +68,6 @@ export function moveCamera(next: Camera, options?: { animate?: boolean; ms?: num
 	});
 }
 
-/**
- * How long opening a canvas from its card takes, and going back into the card.
- *
- * Shorter than `GLIDE_MS` because it is a press rather than a journey: the card is already a
- * small picture of the canvas, so there is no distance to read, only a size to grow into. Back is
- * a hair quicker again, because leaving is less interesting than arriving.
- */
-export const OPEN_MS = 360;
-export const CLOSE_MS = 350;
-
 /** Leaving a board's page for the canvas: the fall into it reversed, a beat quicker. */
 export const LEAVE_BOARD_MS = 360;
 

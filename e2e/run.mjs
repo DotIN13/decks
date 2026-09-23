@@ -110,13 +110,6 @@ const CHECKS = [
 	 * first run asks. Needs no model, because nothing is prompted — the run is a click.
 	 */
 	{ file: "board-eval.mjs", needsAgent: false },
-	/*
-	 * The workspace dashboard's third tab: a task created from the panel, dispatched by
-	 * the real rule into the real agent's queue, cancelled before the drain can fire, and
-	 * a schedule created and removed. Needs no model for the same reason board-eval
-	 * does not: the task never runs, because the check cancels it while it is queued.
-	 */
-	{ file: "tasks.mjs", needsAgent: false },
 	{ file: "shell.mjs", needsAgent: false },
 	/*
 	 * The focus view: the canvas as one page. Its own check rather than a section of
@@ -151,16 +144,6 @@ const CHECKS = [
 	 * one is about what the DOM does when the same row's state changes underneath it.
 	 */
 	{ file: "panel-steady.mjs", needsAgent: false },
-	/*
-	 * Canvases under workspaces, on the shelf and in the panel's Canvases tab: the headings,
-	 * the order inside them, New canvas on a heading, and the card's menu. Fed frames, no agent.
-	 */
-	{ file: "canvases.mjs", needsAgent: false },
-	/*
-	 * Agents are the way in: a row in the Agents tab and a face in the corner go to the canvas
-	 * the agent is working on, and follow it when it moves itself. Fed frames, no agent.
-	 */
-	{ file: "agent-canvas.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },

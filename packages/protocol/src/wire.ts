@@ -17,9 +17,7 @@ import type { ExtensionUiAnswer, ExtensionUiPrompt } from "./extension-ui.ts";
 import type { ActKind, StageCall, StageResult, Camera } from "./stage.ts";
 import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
-import type { Schedule, ScheduleSpec, Task, TaskSpec } from "./tasks.ts";
 import type { WebStatus } from "./web.ts";
-import type { Canvas } from "./canvas.ts";
 export type ClientMessage =
 	| { type: "deck.open"; path: string }
 	| { type: "board.move"; path: string; x: number; y: number }
@@ -127,33 +125,8 @@ export type ClientMessage =
 	 * `stage.camera()` answers "where is my canvas looking" rather than "where is the user
 	 * looking" — which is what it always claimed to mean.
 	 */
-	/**
-	 * Where the person is looking. `agentId` names a parked conversation's view; `canvas` says
-	 * which canvas the reading is of, because positions are per canvas and a board must never
-	 * be placed by a camera that was looking at a different one (`deck/place.ts`, `cameraFor`).
-	 */
-	| { type: "camera.set"; camera: Camera; agentId?: string; canvas?: string }
-	/**
-	 * Look at a canvas.
-	 *
-	 * Per browser, like the chat it is looking at: two windows on one deck can be on two
-	 * canvases. The answer is that canvas's `deck.state`, and opening it clears its changed
-	 * mark — which is the one write a look makes.
-	 */
-	| { type: "canvas.focus"; id: string }
-	/** A new canvas, in a workspace or in none. */
-	| { type: "canvas.create"; name: string; workspace?: string | null }
-	| { type: "canvas.rename"; id: string; name: string }
-	/** Move a canvas into a workspace, or out of one with `null`. Nothing on it moves. */
-	| { type: "canvas.workspace"; id: string; workspace: string | null }
-	| { type: "canvas.remove"; id: string }
-	/** Put an agent to work on a canvas. What it has read stays with it; what it shows goes there. */
-	| { type: "canvas.use"; agentId: string; canvasId: string }
-	/** An arrow between two boards, drawn on the canvas rather than inside a board. */
-	| { type: "canvas.link"; id: string; from: string; to: string; label?: string }
-	| { type: "canvas.unlink"; id: string; from: string; to: string }
-	| { type: "canvas.group"; id: string; name: string; boards: string[] }
-	| { type: "canvas.ungroup"; id: string; name: string }
+	/** Where the person is looking. `agentId` names a parked conversation's view. */
+	| { type: "camera.set"; camera: Camera; agentId?: string }
 	/** A new agent — in a workspace, when made from under its heading. */
 	| { type: "agent.create"; parentId?: string; kind?: AgentKind; workspace?: string }
 	| { type: "agent.focus"; id: string }
@@ -249,32 +222,8 @@ export type ClientMessage =
 	| { type: "web.answer"; id: string; ok: boolean }
 	/** Detach from the shared tab — the Stop button on the status board. */
 	| { type: "web.stop" }
-	/**
-	 * A task, from the dashboard's third tab or from `stage.task`.
-	 *
-	 * The server answers with the whole `tasks` broadcast. `agentId` names the agent a
-	 * person chose; with it absent, the dispatcher rule chooses (`tasks/dispatch.ts`) and
-	 * its decision is recorded on the task. A task that finds nobody is `blocked`, and
-	 * the reason travels on it.
-	 */
-	| { type: "task.create"; task: TaskSpec; requestedBy?: string }
-	/** Take a task back. Only one that has not run can be: a running task is aborted in its chat. */
-	| { type: "task.cancel"; id: string }
-	/** Run the dispatcher again on a blocked or failed task, or reassign a cancelled one. */
-	| { type: "task.retry"; id: string }
-	| { type: "schedule.create"; schedule: ScheduleSpec }
-	| { type: "schedule.cancel"; id: string }
-	/** Make and dispatch the task a schedule would have made, now. */
-	| { type: "schedule.run"; id: string }
 	/** Choose the deck's timezone, or `null` to go back to the machine's. */
 	| { type: "settings.set"; timezone: string | null }
-	/**
-	 * Choose the runtime the dashboard's dispatcher is, from the dashboard's bar.
-	 *
-	 * Not `agent.create`: nobody makes a dispatcher. The server keeps one per runtime it has
-	 * been asked for, and this says which of them answers the bar and places the next task.
-	 */
-	| { type: "dispatcher.setKind"; kind: AgentKind }
 	/** Make (or find) the status board and put it on the canvas. */
 	| { type: "web.board" }
 	/** A fresh pairing code; the extension has to be paired again. Answered with `web.status`. */
@@ -282,13 +231,6 @@ export type ClientMessage =
 
 export type ServerMessage =
 	| { type: "deck.state"; deck: DeckState }
-	/**
-	 * Every canvas in the deck, and the one this browser is looking at.
-	 *
-	 * Sent whole rather than as a delta: a deck has a handful of canvases where it has
-	 * hundreds of boards, and the dashboard reads all of them to draw its cards.
-	 */
-	| { type: "canvases"; canvases: Canvas[]; focused?: string }
 	/**
 	 * What this install can run, and what to call it — sent on connect, and whenever a
 	 * client asks.
@@ -375,7 +317,7 @@ export type ServerMessage =
 	 * the agent is working from, which the rail lists — and `inPlay` is the subset it has
 	 * put on the canvas for the user to look at now.
 	 */
-	| { type: "context.changed"; agentId: string; boards: string[]; inPlay: string[]; canvas?: string }
+	| { type: "context.changed"; agentId: string; boards: string[]; inPlay: string[] }
 	| { type: "stage.call"; call: StageCall }
 	/**
 	 * An agent acting on a board, said by the server rather than the agent: the cursor and the
@@ -423,12 +365,6 @@ export type ServerMessage =
 	| { type: "agent.account"; id: string; account: string }
 	/** The shared browser's state, on connect and whenever it changes (`WebStatus`). */
 	| { type: "web.status"; status: WebStatus; code?: string }
-	/**
-	 * The dashboard's whole state: tasks and schedules, sent on connect and re-sent on
-	 * every change to either. One frame rather than two because they are one pipeline
-	 * and one panel draws them together.
-	 */
-	| { type: "tasks"; tasks: Task[]; schedules: Schedule[] }
 	/** The deck's settings, and the zone the server's machine is on when none is chosen. */
 	| { type: "settings"; settings: DeckSettings; machineZone: string }
 	| { type: "error"; text: string };

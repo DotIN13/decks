@@ -14,11 +14,16 @@ export const deck = {
 
 	"camera.set": (message, _reply, wire) => {
 		// Recorded, not acted on: the camera is the browser's, and this is the reading an
-		// agent gets when it asks what the user can see. The canvas it is of rides along,
-		// so a placement can refuse a reading of somebody else's room (`deck/place.ts`).
-		const reading = { at: message.camera, ...(message.canvas ? { canvas: message.canvas } : {}) };
+		// agent gets when it asks what the user can see.
+		const reading = { at: message.camera };
 		wire.lastCamera = reading;
 		if (message.agentId) wire.cameras.set(message.agentId, reading);
+	},
+
+	/** The deck's timezone, from Settings. */
+	"settings.set": (message, reply, wire) => {
+		const outcome = wire.setTimezone(message.timezone);
+		if (outcome) reply({ type: "notice", level: "warn", text: outcome.error });
 	},
 
 	"stage.result": (message, _reply, wire) => {

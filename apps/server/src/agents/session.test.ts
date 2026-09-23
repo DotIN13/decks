@@ -10,7 +10,6 @@ import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
 import { HISTORY_ITEMS, TOOL_PREVIEW } from "./wire.ts";
-import { CanvasStore } from "../canvas/store.ts";
 
 /**
  * The two sets and the invariant between them (DESIGN §2).
@@ -90,7 +89,7 @@ function agentOn(
 		// Given a store, but nothing reaches it here: an agent with no user message is never
 		// written down, which is what keeps these tests off the disk. A restored row's transcript
 		// is the one thing that does — written above, read back only when asked for.
-		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store, canvases: new CanvasStore(deck.path), ...rest, ...(restored ? { restored: row } : {}) },
+		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store, ...rest, ...(restored ? { restored: row } : {}) },
 	);
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");
@@ -272,17 +271,17 @@ function agentOn(
 		rmSync(root, { recursive: true, force: true });
 	});
 
-test("the context is the canvas's: what is up, then what it took off and keeps a place for", () => {
+test("showing a board holds it, and taking it off the stage keeps holding it", () => {
 	const { agent, context, inPlay, cleanup } = agentOn(["a.html", "b.html", "c.html"]);
-	assert.equal(context(), "", "on no canvas, holding nothing");
+	assert.equal(context(), "", "holding nothing yet");
 
 	agent.setInPlay(["boards/a.html", "boards/b.html"], { place: true });
 	assert.equal(context(), "boards/a.html boards/b.html");
 
-	// What `stage.hide` and the board's × both do: off the canvas, still held by it.
+	// What `stage.hide` and the board's × both do: off the stage, still held.
 	agent.setInPlay(["boards/b.html"]);
 	assert.equal(inPlay(), "boards/b.html");
-	assert.equal(context(), "boards/b.html boards/a.html", "a board taken off stays held, after the ones up");
+	assert.equal(context(), "boards/a.html boards/b.html", "a board taken off stays held");
 	cleanup();
 });
 
@@ -401,7 +400,7 @@ function probeOn(): { agent: Probe; sent: ServerMessage[]; reportCalls: Array<{ 
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
+		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 	return { agent, sent, reportCalls, sentTos, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }

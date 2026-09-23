@@ -4,15 +4,9 @@
  * anything you `console.log`. This is the whole API: if something is not here, it does not
  * exist. Board content is files: write it with your ordinary tools.
  */
-export interface Board { path: string; title: string; x: number; y: number; w: number; h: number; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string; canvas?: string }
+export interface Board { path: string; title: string; x: number; y: number; w: number; h: number; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string }
 
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
-
-/**
- * A canvas: the boards on it, the arrows and groups drawn between them, and who works there.
- * Boards belong to canvases, not to agents. Two agents on one canvas see one arrangement.
- */
-export interface Canvas { id: string; name: string; workspace?: string; boards: string[]; links: Array<{ from: string; to: string; label?: string }>; groups: Array<{ name: string; boards: string[] }>; changedAt: number; agents: string[] }
 
 export interface Stage {
 	/**
@@ -23,7 +17,7 @@ export interface Stage {
 	 * that are now one, and both still mean "board".)
 	 */
 	newBoard(o: { title: string; format?: "board" | "slides"; w?: number; h?: number }): Promise<string>;
-	/** Add these boards to your canvas, beside what is there, and move the camera to them. `highlight` outlines one `data-id`. */
+	/** Add these boards to your stage, beside what is there, and move the camera to them. `highlight` outlines one `data-id`. */
 	show(path: string | string[], o?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }): Promise<{ shown: string[] }>;
 	/**
 	 * Set a board's height from its measured content; the board must be shown first. The result
@@ -36,15 +30,11 @@ export interface Stage {
 	resize(path: string, size: { w?: number; h?: number }): Promise<{ path: string; w: number; h: number }>;
 	/** Name boards you edited without showing them, so they are listed as yours. */
 	report(path: string | string[]): Promise<{ reported: string[] }>;
-	/** Take boards that are out of date off the canvas, keeping them in your context. Refused when it would empty the canvas: a new topic is a new canvas. */
+	/** Take boards off your stage, keeping them in your context. */
 	hide(path: string | string[]): Promise<void>;
-	/**
-	 * Every board in the deck, or with `filter` the boards on one canvas (name or id) or on every
-	 * canvas of a workspace, each saying which `canvas` it was found on. `clipped` means content
-	 * is past the edge.
-	 */
-	boards(o?: { filter?: { canvas?: string; workspace?: string } }): Promise<Board[]>;
-	/** The room the canvas has, in CSS pixels. */
+	/** Every board in the deck, placed as your stage has them. `inContext` names the agents holding each; `clipped` means content is past the edge. */
+	boards(): Promise<Board[]>;
+	/** The room your stage has on screen, in CSS pixels. */
 	viewport(): Promise<{ width: number; height: number } | undefined>;
 	move(path: string, at: { x: number; y: number }): Promise<Board>;
 	/** Bubbles with arrows pointing at `data-id`s you changed. Nothing is written to the board. `null` clears. */
@@ -53,14 +43,13 @@ export interface Stage {
 	url(path: string): Promise<string>;
 	/** A file on disk -> the URL a board should embed. */
 	resolve(file: string): Promise<string>;
-	/** Where your canvas is looking, or move it. `zoom` 1 is life size. */
+	/** Where your stage is looking, or move it. `zoom` 1 is life size. */
 	camera(): Promise<{ x: number; y: number; zoom: number }>;
 	camera(at: { x: number; y: number; zoom: number }, o?: { animate?: boolean }): Promise<void>;
 	/** Reload a board's frame, if you changed something the watcher cannot see. */
 	reload(path: string): Promise<void>;
 	/** A labelled dot on a board, at board coordinates; `null` removes it. */
 	cursor(path: string, at: { x: number; y: number } | null): Promise<void>;
-	/** A board that is a live view of a conversation: yours, or `of` another agent's. */
 	/** What is waiting in an agent's queue: yours, or another's. */
 	queue(agentId?: string): Promise<Array<{ from: string; fromName: string; task: string; boards: string[]; at: number }>>;
 	/**
@@ -88,81 +77,24 @@ export interface Stage {
 		submit(what?: WebTarget, o?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
 		stop(): Promise<void>;
 	};
-	/**
-	 * A goal-driven browser agent (jev-ultrafast), beside `web`: a headless browser of the
-	 * server's, never the person's Chrome. Give `run` one URL and one goal in plain words;
-	 * the agent picks its own clicks and typing until the goal is done or blocked. A run
-	 * outlives a stage call, so `run` returns at once — follow it with `state()` on your
-	 * next turn, one run at a time. `status()` says whether the server has the model keys
-	 * a run needs; relay its sentence when it says no.
-	 */
-	/**
-	 * A goal-driven browser agent (jev-ultrafast), beside the shared Chrome: one URL, one
-	 * goal, and the agent decides its own clicks until the goal is done or blocked.
-	 *
-	 * Left alone it drives the tab the person shared through the extension, because that is
-	 * the browser their logins are in — and two gates hold it there: nothing is sent without
-	 * an answer, and the words typed into a field are the supervising agent's, never its own.
-	 * `{ browser: "headless" }` is a Chromium of the server's own instead, for pages nobody is
-	 * logged into. A run outlives a stage call (a run is seconds to minutes; a stage run is
-	 * abandoned after twenty), so `run` returns at once, `state` follows the run, and `answer`
-	 * is how a held one carries on — on your next turn, never in a loop inside this one.
-	 */
-	web_jev: {
-		/** Whether a run can start, whether a Chrome is shared, and what the run going now is doing. */
-		status(): Promise<{ ready: boolean; missing: string[]; shared: boolean; note: string; running?: { id: string; url: string; goal: string; startedAt: number; steps: number; browser: "chrome" | "headless"; waiting?: { id: string; kind: "allow" | "words"; action: string; tab?: string; field?: string; since: number } }; last?: { id: string; status: string; steps: number; elapsedMs: number; note?: string } }>;
-		/**
-		 * Start one run. One at a time. Without `browser` it uses the shared Chrome when there is
-		 * one, and `headless` forces a browser of the server's own.
-		 */
-		run(o: { url: string; goal: string; browser?: "chrome" | "headless" }): Promise<{ id: string; note: string }>;
-		/** The run going now, or the last one: every step it took and every gate it met. */
-		state(): Promise<{ id: string; url: string; goal: string; status: "starting" | "running" | "done" | "blocked" | "failed" | "stopped"; elapsedMs: number; browser: "chrome" | "headless"; waiting?: { id: string; kind: "allow" | "words"; action: string; tab?: string; field?: string; since: number }; gate: Array<{ at: number; kind: string; text: string }>; steps: Array<{ at: number; status: string; elapsedMs: number; steps: number; url?: string; last?: { action: string; operation: string; text: string | null } }>; note?: string; endedAt?: number }>;
-		/**
-		 * Answer what a gate is holding. `{ allow: true }` lets a press that would send something
-		 * through; `{ text: "…" }` is what actually gets typed, because the browser agent's own
-		 * words never reach a field. `state()` says which of the two is being asked.
-		 */
-		answer(o: { allow?: boolean; text?: string }): Promise<{ answered: string }>;
-		stop(): Promise<void>;
-	};
 	now(): Promise<{ iso: string; timezone: string; words: string; epoch: number }>;
 	/**
 	 * Who you are and what you are doing: read with nothing, change with a patch. Answers with the
-	 * identity as stored — tags are slugged, deduped and capped at four. Your canvas is `canvas()`.
+	 * identity as stored — tags are slugged, deduped and capped at four, and `workspace` (the
+	 * project you work in) is slugged too.
 	 */
-	me(patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[] }): Promise<{ name: string; avatar?: string; color: string; tags?: string[]; workspace?: string }>;
-	/** The canvas you are working on, or undefined before you have shown anything. */
-	canvas(): Promise<Canvas | undefined>;
+	me(patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string }): Promise<{ name: string; avatar?: string; color: string; tags?: string[]; workspace?: string }>;
+	/** Every agent; `filter.workspace` narrows to one project. */
+	agents(o?: { filter?: { workspace?: string } }): Promise<Array<{ id: string; name: string; me: boolean; state: string; kind: string; tags: string[]; workspace?: string; queued: number }>>;
 	/**
-	 * Move to a canvas that exists, by name or id: what you show from then on goes there, and
-	 * pressing you in the app takes the person there.
-	 */
-	useCanvas(name: string): Promise<Canvas>;
-	/**
-	 * Make a canvas for a new topic and move to it: in your own workspace, or in `workspace`.
-	 * A name is used once per deck; a taken one is refused.
-	 */
-	newCanvas(name: string, o?: { workspace?: string }): Promise<Canvas>;
-	/** Every canvas, with who is working on each; `filter.workspace` narrows to one project. Check it before making one. */
-	canvases(o?: { filter?: { workspace?: string } }): Promise<Canvas[]>;
-	/** An arrow between two boards on your canvas: this led to that. A label of `null` takes it away. Drawn under the boards; nothing is written into either file. */
-	link(from: string, to: string, label?: string | null): Promise<Canvas>;
-	/** A dashed border round two or more boards: one piece of work. The same name replaces it; `[]` takes it away. */
-	group(paths: string[], o: { name: string }): Promise<Canvas>;
-	/** Every agent; `filter.workspace` narrows to one project, `filter.canvas` to who has worked in that room. */
-	agents(o?: { filter?: { workspace?: string; canvas?: string } }): Promise<Array<{ id: string; name: string; me: boolean; state: string; kind: string; tags: string[]; workspace?: string; queued: number }>>;
-	/**
-	 * Hand work over, and carry on. Three targets: a name from `agents()`; `{ name, kind }`, which
-	 * makes the agent first; or `"dispatcher"`, which makes a dashboard task for the deck to place.
+	 * Hand work over, and carry on. Two targets: a name from `agents()`, or `{ name, kind }`, which
+	 * makes the agent first.
 	 * Always returns at once — nothing can wait for a turn inside a 20-second run. `reply: true`
 	 * puts their report in your transcript, to read on your next turn.
 	 */
 	send(
 		to: string | { name: string; kind?: "pi" | "claude" | "opencode" | "antigravity"; model?: string; thinking?: string; mode?: "manual" | "acceptEdits" | "plan" | "auto"; tags?: string[]; workspace?: string },
 		work: { task: string; boards?: string[]; reply?: boolean },
-	): Promise<{ queued?: true; position?: number; agent?: string; name?: string; id?: string; state?: string; why?: string }>;
-	/** A repeating task. `at` is HH:MM in the person's timezone; never convert it yourself. */
-	schedule(spec: { name: string; at: string; days: number[]; timezone?: string; workspace: string; task: string; boards?: string[] }): Promise<{ id: string; nextRunAt: number }>;
+	): Promise<{ queued: true; position: number; agent?: string; name?: string }>;
 }
 declare const stage: Stage;

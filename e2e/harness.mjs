@@ -147,15 +147,12 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 		}
 	}, scheme);
 	/*
-	 * `#/canvas/<id>`: the room the fixture's boards are in.
-	 *
-	 * The app opens on the dispatch dashboard by default, and every check in this suite was
-	 * written against a canvas on screen. There is no `#/stage` and no agent address any
-	 * more — an agent is on every canvas it has worked in, so neither could name one place —
-	 * so the id is asked of the server first. `resetStage` has already played the fixture's
-	 * boards onto the focused agent's canvas, which is the one wanted here.
+	 * The plain web root. There is one screen in the app — the focused agent's stage — and the
+	 * server remembers which agent each browser is on, so there is no address to name a place
+	 * with. A new browser starts on the conversation last opened anywhere, which is the one
+	 * `resetStage` has just played the fixture's boards onto.
 	 */
-	await page.goto(`${WEB}/#/canvas/${await stageCanvasId()}`, { waitUntil: "load" });
+	await page.goto(`${WEB}/`, { waitUntil: "load" });
 	/*
 	 * Answer permission questions, because a check cannot.
 	 *
@@ -352,7 +349,7 @@ export async function ask(page, text, { timeout = 600000 } = {}) {
 }
 
 /** Talk to the server the way the client does. */
-export async function socket({ canvas } = {}) {
+export async function socket() {
 	const ws = new WebSocket(`${API.replace("http", "ws")}/ws`);
 	const received = [];
 	await new Promise((resolve, reject) => {
@@ -367,51 +364,19 @@ export async function socket({ canvas } = {}) {
 		close: () => ws.close(),
 	};
 	/*
-	 * `canvas: true` puts this socket in the same room as the page.
-	 *
-	 * What a board frame acts on is **the canvas that socket is looking at**, and a socket
-	 * that has not opened one falls back to whoever the server has focused — which is global,
-	 * so another check running beside this one can move it. A play or a hide then landed on a
-	 * canvas nobody in this check was looking at, and the assertion failed as if hiding were
-	 * broken. Checks that drive boards over the wire ask for the page's room by name.
+	 * What a board frame acts on is **the stage of the agent this socket is on**. A new socket
+	 * starts on the conversation last opened anywhere, which is the page's own when a check has
+	 * just opened one; a check that drives boards over the wire for a particular agent sends
+	 * `agent.focus` first, which moves this socket alone.
 	 */
-	if (canvas) {
-		link.send({ type: "canvas.focus", id: canvas === true ? await stageCanvasId() : canvas });
-		await new Promise((resolve) => setTimeout(resolve, 200));
-	}
 	return link;
 }
 
 /**
- * The canvas a check should open: the focused agent's, else whichever one exists.
- *
- * Read off the greeting rather than guessed, because the id is a uuid the fixture cannot
- * know. Waits, because the first check of a run reaches a server that is still starting its
- * first agent — the same race `resetStage` documents below, arriving here through a hash
- * that would otherwise be `#/canvas/undefined`.
- */
-export async function stageCanvasId({ timeout = 25000 } = {}) {
-	const link = await socket();
-	const deadline = Date.now() + timeout;
-	try {
-		while (Date.now() < deadline) {
-			const canvases = link.last("canvases")?.canvases ?? [];
-			const focused = link.last("agents")?.focused;
-			const mine = canvases.find((canvas) => focused && canvas.agents.includes(focused)) ?? canvases[0];
-			if (mine) return mine.id;
-			await new Promise((resolve) => setTimeout(resolve, 200));
-		}
-	} finally {
-		link.close();
-	}
-	throw new Error("stageCanvasId: the deck has no canvas to open");
-}
-
-/**
- * Put the whole deck on the canvas.
+ * Put the whole deck on the focused agent's stage.
  *
  * Most of these checks predate the context/in-play tiers and expect to see every board.
- * Without this they inherit whatever the previous check narrowed the canvas to, and fail
+ * Without this they inherit whatever the previous check narrowed the stage to, and fail
  * for reasons that have nothing to do with what they test.
  */
 export async function resetStage() {
@@ -432,14 +397,14 @@ export async function resetStage() {
 	 *
 	 * This used to send the plays and wait 400ms. Long enough once the server has settled
 	 * and not for the first check of a run: `board.play` is attributed to the focused agent,
-	 * and a fresh server is still starting one — so the plays landed on nobody, the canvas
+	 * and a fresh server is still starting one — so the plays landed on nobody, the stage
 	 * stayed empty, and the check failed thirty seconds later waiting for a board that was
 	 * never coming. Always the first two checks, which is what a race at startup looks like
 	 * and what it gets blamed on last.
 	 *
 	 * Waiting for any `context.changed` was not enough either. A restored session and a new
 	 * agent both send one, so the last message could describe an agent the browser is not
-	 * looking at — the plays were real and on the wrong canvas. So the agent is named: the
+	 * looking at — the plays were real and on the wrong stage. So the agent is named: the
 	 * greeting says who is focused, and this waits for that one's in-play set.
 	 */
 	const deadline = Date.now() + 25000;
@@ -458,7 +423,7 @@ export async function resetStage() {
 	link.close();
 	if (!agent) throw new Error("resetStage: the server never said which agent is focused");
 	if (!wanted.every((path) => landed.includes(path))) {
-		throw new Error(`resetStage: ${landed.length} of ${wanted.length} boards reached ${agent}'s canvas`);
+		throw new Error(`resetStage: ${landed.length} of ${wanted.length} boards reached ${agent}'s stage`);
 	}
 	return wanted;
 }
@@ -507,16 +472,16 @@ export async function openPanel(page, tab = "context") {
 }
 
 /**
- * Open the agent selector: the chevron beside the active agent's name.
+ * Open the agent selector: the composer's recipient chip.
  *
- * A popover rather than a panel, so what a check waits for is the menu rather than a
- * `data-open` on a surface that no longer exists.
+ * The pill has no agent segment any more, so the one list you switch agents with hangs off the
+ * chip that says who the line is going to — picking a row there focuses that agent, the same
+ * as pressing its row in the panel. A popover rather than a panel, so what a check waits for
+ * is the menu rather than a `data-open` on a surface that no longer exists.
  */
 export async function openAgents(page) {
 	if (await page.locator(".popover").count()) return;
-	/* The agent's own chevron, by name. `[aria-haspopup="menu"]` used to be enough and is not:
-	   the canvas segment beside it opens a menu too, and it comes first in the pill. */
-	await page.locator('.pill button[aria-label^="Agents"], .pill button[aria-label^="Switch agent"]').first().click();
+	await page.locator(".dock-to-chip").first().click();
 	await page.waitForSelector(".popover", { timeout: 6000 });
 }
 
@@ -564,7 +529,7 @@ export async function openHistory(page) {
  */
 export async function newAgent(page, kind = "pi") {
 	/*
-	 * From the selector under the agent's own name, which is where the list went.
+	 * From the agent list the composer's chip opens, which is where the list went.
 	 *
 	 * It used to be a `+` in the header of the agents *panel*, and the panel is gone: a list
 	 * you switch with is a selector, so it hangs off the thing it selects.
@@ -572,15 +537,14 @@ export async function newAgent(page, kind = "pi") {
 	 * `+ New agent` is one row that unfolds: pressing it shows `New claude agent` / `New pi
 	 * agent` / … in place, because the runtime cannot change afterwards and that is the only
 	 * moment it can be chosen. The row itself creates nothing, so this always goes on to name
-	 * the runtime — and it is the *last* row in the menu, which is why the click needs no
-	 * selector beyond that.
+	 * the runtime. Found by its label rather than as the last row, which it is only until
+	 * something is drawn under it.
 	 */
 	await openAgents(page);
-	const rows = () => page.locator(".popover [data-row]");
 	const agentsBefore = await page.evaluate(
 		() => document.querySelectorAll('.popover [data-row][data-flat="true"]').length,
 	);
-	await rows().last().click();
+	await page.locator('.popover [aria-label="New agent: choose its runtime"]').click();
 	await page.locator(".popover [data-row]").filter({ hasText: new RegExp(`^New ${kind} agent`, "i") }).first().click();
 	/*
 	 * Counted with the menu re-opened, because picking closes it — and counted as agent

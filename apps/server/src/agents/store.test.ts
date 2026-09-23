@@ -22,7 +22,7 @@ function record(over: Partial<AgentRecord> = {}): AgentRecord {
 		name: "Kestrel",
 		color: "#3b5cf6",
 		context: ["boards/plan.html"],
-		canvas: "cv_one",
+		inPlay: ["boards/plan.html"],
 		createdAt: 1000,
 		lastAt: 2000,
 		...over,
@@ -46,38 +46,33 @@ test("a record and its transcript come back as they went in", () => {
 	cleanup();
 });
 
-test("the canvas a chat works on is written and read back", () => {
+test("a stage's arrangement is written and read back, one bad place dropped", () => {
 	const { deck, cleanup } = deckOn();
 	const store = new AgentStore(deck);
 
-	store.write(record({ canvas: "cv_7f2a" }), items);
-	assert.equal(store.read("agent-1")?.record.canvas, "cv_7f2a");
+	store.write(record({ positions: { "boards/plan.html": { x: 8, y: 16 } } }), items);
+	assert.deepEqual(store.read("agent-1")?.record.positions, { "boards/plan.html": { x: 8, y: 16 } });
+	writeFileSync(
+		join(deck.path, ".decks", "agents", "agent-1", "meta.json"),
+		JSON.stringify({ ...record(), positions: { "boards/plan.html": { x: "left", y: 0 }, "boards/notes.html": { x: 8, y: 16 } } }),
+	);
+	assert.deepEqual(store.read("agent-1")?.record.positions, { "boards/notes.html": { x: 8, y: 16 } });
 	cleanup();
 });
 
-test("a record written before canvases gives up its arrangement once, for the migration", () => {
+test("a record that named a shared canvas says so once, for the stage to be read back from it", () => {
 	const { deck, cleanup } = deckOn();
 	const store = new AgentStore(deck);
 
-	// What an older build wrote: boards up, where they sat, and the word the agent typed.
-	// Read back under their own names so `canvas/migrate.ts` can turn them into a canvas, and
-	// never written again — one bad place costs that board, not the whole arrangement.
 	store.write(record(), items);
 	writeFileSync(
 		join(deck.path, ".decks", "agents", "agent-1", "meta.json"),
-		JSON.stringify({
-			...record(),
-			canvas: undefined,
-			inPlay: ["boards/plan.html"],
-			workspace: "political-llm",
-			positions: { "boards/plan.html": { x: "left", y: 0 }, "boards/notes.html": { x: 8, y: 16 } },
-		}),
+		JSON.stringify({ ...record(), inPlay: undefined, canvas: "cv_7f2a", canvases: ["cv_7f2a"], role: "dispatcher" }),
 	);
 	const back = store.read("agent-1")?.record;
-	assert.deepEqual(back?.legacyInPlay, ["boards/plan.html"]);
-	assert.equal(back?.legacyWorkspace, "political-llm");
-	assert.deepEqual(back?.legacyPositions, { "boards/notes.html": { x: 8, y: 16 } });
-	assert.equal(back?.canvas, undefined);
+	assert.equal(back?.fromCanvas, "cv_7f2a");
+	assert.equal(back?.wasDispatcher, true);
+	assert.deepEqual(back?.inPlay, []);
 	cleanup();
 });
 
@@ -239,6 +234,7 @@ test("the model and the mode come back, because a resumed chat is opened on them
 		name: "Iris",
 		color: "#3b5cf6",
 		context: [],
+		inPlay: [],
 		createdAt: 1,
 		lastAt: 2,
 		model: { provider: "anthropic", model: "opus[1m]", thinking: "high" },
@@ -311,6 +307,7 @@ test("the account comes back too, because a restart must not move an agent's sub
 			name: "Rune",
 			color: "#2eaf5a",
 			context: [],
+			inPlay: [],
 			createdAt: 1,
 			lastAt: 2,
 			account: "67d596a8-a998-4ccf-a6f9-097c5f72fbd6",

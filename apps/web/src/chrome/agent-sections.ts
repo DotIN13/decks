@@ -27,6 +27,19 @@ import { agentStatus, type AgentStatus } from "./agent-order.ts";
  * unanswerable in the place it is asked.
  */
 
+/** What a list calls the group of agents that have not said which project they are on. */
+export const NO_WORKSPACE = "No workspace";
+
+/**
+ * Every workspace the agents say they are in, A to Z. A workspace exists by being named, so
+ * this is the list a person picks one from.
+ */
+export function workspaceNames(identities: Record<string, { workspace?: string }>): string[] {
+	const names = new Set<string>();
+	for (const identity of Object.values(identities)) if (identity.workspace) names.add(identity.workspace);
+	return [...names].sort((left, right) => left.localeCompare(right));
+}
+
 export type AgentSectionKind = "wants" | "working" | "quiet" | "workspace" | "unfiled";
 
 /**
@@ -121,9 +134,9 @@ export interface AgentListInput {
 	/** Which axis to cut the list by. Absent is attention — see `AgentGroup`. */
 	group?: AgentGroup;
 	/**
-	 * The workspace of the canvas on screen, whose section leads the workspace cut. Absent
-	 * when there is no room to be in (the dashboard), and when the room is in no workspace:
-	 * `No workspace` jumping to the top would read as a mistake, so the alphabet stands.
+	 * A workspace whose section leads the workspace cut, marked `here`. Absent, and when it is
+	 * no workspace: `No workspace` jumping to the top would read as a mistake, so the alphabet
+	 * stands.
 	 */
 	here?: string;
 }

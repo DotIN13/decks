@@ -2,8 +2,8 @@
  * When a board that is news has been read on the canvas.
  *
  * A board an agent named while the person was elsewhere carries a glow on the canvas until it is
- * read (`isNews`, `chrome/dispatch-view.ts`). The dashboard's preview and the focus view already
- * count as reading; this is the third way, and the ordinary one: the person zooms in on the
+ * read (`isNews`, `chrome/board-news.ts`). The focus view already counts as reading; this is the
+ * other way, and the ordinary one: the person zooms in on the
  * board and rests on it. Three things have to be true at once, and stay true for a moment:
  *
  * - **Close enough to read.** Body text on a board is 17px, and at 70% it is 12px on the

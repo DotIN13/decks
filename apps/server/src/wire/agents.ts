@@ -16,22 +16,11 @@ export const agents = {
 		 * this the picker for a fresh conversation showed nothing selected until
 		 * something else happened to republish the list.
 		 */
-		/*
-		 * Made **in the room the person is in**, when they are in one.
-		 *
-		 * A canvas is where work happens, so an agent made while looking at one belongs to
-		 * it: its first board lands where the person who asked for it is looking, rather
-		 * than on a canvas of its own named after the chat that nobody has open. Made from
-		 * the dashboard there is no room, and the old rule stands — the canvas is made when
-		 * it first shows something.
-		 */
-		const room = wire.viewing?.canvas;
 		const agent = wire.agents.create({
 			... (message.parentId ? { parentId: message.parentId } : {}),
-			// From under a workspace heading: the agent is in that project, and stands in its first room.
+			// From under a workspace heading: the agent is in that project.
 			...(message.workspace ? { workspace: message.workspace } : {}),
 			... (message.kind ? { kind: message.kind } : {}),
-			... (room && wire.canvases.get(room) ? { canvas: room } : {}),
 		});
 		/*
 		 * Asked for by a person, so it is what they want to talk to. A subagent is
@@ -39,8 +28,6 @@ export const agents = {
 		 * the focus — its parent is mid-turn and still has something to say.
 		 */
 		wire.agents.focus(agent.id);
-		// Who is in the room changed, and the pill and the panel draw that.
-		if (room) wire.publishCanvases();
 		void wire.publishAccounts();
 	},
 

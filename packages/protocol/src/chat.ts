@@ -139,13 +139,6 @@ export interface AgentChat {
 	avatar?: string;
 	/** A subagent is a chat too, tagged with the parent it reports to. */
 	parentId?: string;
-	/**
-	 * The deck's dispatcher: the agent the dashboard's bar talks to. It hands each task
-	 * to the right agent with `stage.send` and never does the work itself. One per deck,
-	 * made by the server, and **not in the agent lists** — the browser draws it only as
-	 * the conversation behind the dashboard.
-	 */
-	role?: "dispatcher";
 	state: AgentState;
 	lastLine?: string;
 	lastAt?: number;
@@ -172,15 +165,8 @@ export interface AgentChat {
 	identity: Identity;
 	/** The boards it holds — its reading. */
 	boards: string[];
-	/** The boards it has put on the canvas, a subset of the above. */
+	/** The boards it has put on its stage, a subset of the above. */
 	inPlay: string[];
-	/**
-	 * The canvas it is working on now, by id. Absent until it has shown something.
-	 *
-	 * An agent is *on* every canvas it has worked in (`Canvas.agents`), but it works on one
-	 * at a time, and this is that one: the room pressing its row or its face takes you to.
-	 */
-	canvas?: string;
 	/** The model and thinking level it is on, live from a running runtime or as last recorded. */
 	model?: AgentModel;
 	/** The Claude subscription it spends, when it is on one of its own. */

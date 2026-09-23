@@ -11,7 +11,6 @@ import { runtimeOf } from "../runtimes/registry.ts";
 import { DeckAgent } from "./session.ts";
 import { AgentStateStore } from "./agent-state.ts";
 import { AgentStore } from "./store.ts";
-import { CanvasStore } from "../canvas/store.ts";
 
 /**
  * That the chat list survives the process (DESIGN §6.2).
@@ -55,7 +54,7 @@ function agentOn(deck: Deck, color = "#3b5cf6"): DeckAgent {
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color, kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
+		{ color, kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 }
 
@@ -64,7 +63,6 @@ function registryOn(deck: Deck): { registry: Registry; sent: ServerMessage[] } {
 	const registry = new Registry(deck, (message) => sent.push(message), {} as StageService, {
 		port: 4329,
 		defaultKind: "pi",
-		canvases: new CanvasStore(deck.path),
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		recordRevision: () => undefined,
 		boardPathOf: () => undefined,
@@ -362,6 +360,7 @@ test("a restored chat is opened on the model the conversation was last held in",
 			name: "Ada",
 			color: "#3b5cf6",
 			context: [],
+			inPlay: [],
 			createdAt: 1,
 			lastAt: 2,
 			model: { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "high" },
@@ -379,6 +378,42 @@ test("a restored chat is opened on the model the conversation was last held in",
 	registry.get("held")?.dispose();
 	assert.deepEqual(store.read("held")?.record.model, { provider: "opencode-go", model: "deepseek-v4-pro", thinking: "high" });
 	assert.equal(sent.length > 0, true);
+	cleanup();
+});
+
+/*
+ * Boards lived on shared canvases for a while, and a chat's record named its canvas instead of
+ * carrying its own boards. Each agent owns its stage again, so such a record is given that
+ * canvas's boards and places once, on restore, and the dispatcher's records are skipped.
+ */
+test("a chat that was on a shared canvas comes back with that canvas as its own stage", () => {
+	const { deck, cleanup } = deckOn();
+	const dir = join(deck.path, ".decks", "canvases");
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(
+		join(dir, "bench.json"),
+		JSON.stringify({ version: 1, id: "cv_bench", name: "Bench", boards: ["boards/plan.html", "boards/gone.html"], places: { "boards/plan.html": { x: 40, y: 80 } }, links: [], groups: [], changedAt: 1 }),
+	);
+	const agents = join(deck.path, ".decks", "agents");
+	const meta = (id: string, extra: Record<string, unknown>) => {
+		mkdirSync(join(agents, id), { recursive: true });
+		writeFileSync(join(agents, id, "meta.json"), JSON.stringify({ id, kind: "pi", name: id, color: "#3b5cf6", context: ["boards/notes.html"], createdAt: 1, lastAt: 2, ...extra }));
+	};
+	meta("ada", { canvas: "cv_bench", canvases: ["cv_bench"] });
+	meta("dispatcher", { role: "dispatcher" });
+
+	const { registry } = registryOn(deck);
+	assert.equal(registry.restore(), 1, "the dispatcher is not restored");
+	const ada = registry.get("ada");
+	assert.deepEqual([...(ada?.inPlay ?? [])], ["boards/plan.html"], "the canvas's boards that still exist are up");
+	assert.deepEqual([...(ada?.context ?? [])], ["boards/plan.html", "boards/notes.html"], "and held, before what it held already");
+	assert.deepEqual(ada?.positions(), { "boards/plan.html": { x: 40, y: 80 } }, "where they sat");
+
+	// Written back at once, so the next open reads the chat's own fields.
+	const record = new AgentStore(deck).read("ada")?.record;
+	assert.deepEqual(record?.inPlay, ["boards/plan.html"]);
+	assert.equal(record?.fromCanvas, undefined);
+	registry.dispose();
 	cleanup();
 });
 
@@ -540,7 +575,6 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 					kind: options.kind ?? childKind,
 					snapshots: new AgentStateStore(),
 					store: new AgentStore(deck),
-					canvases: new CanvasStore(deck.path),
 				},
 			);
 			child = agent;
@@ -551,7 +585,6 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 	const registry = new SpyRegistry(deck, (message) => sent.push(message), {} as StageService, {
 		port: 4329,
 		defaultKind: "pi",
-		canvases: new CanvasStore(deck.path),
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		recordRevision: () => undefined,
 		boardPathOf: () => undefined,
@@ -574,7 +607,7 @@ function spawnHarness(deck: Deck, childKind: AgentKind): { registry: Registry; p
 			recordRevision: () => undefined,
 			boardPathOf: () => undefined,
 		},
-		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
+		{ color: "#3b5cf6", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 	parent.translator.user("delegate something");
 	(registry as unknown as { agents: DeckAgent[] }).agents.push(parent);
@@ -713,7 +746,7 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 					recordRevision: () => undefined,
 					boardPathOf: () => undefined,
 				},
-				{ name: options.name ?? "Agent", color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
+				{ name: options.name ?? "Agent", color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 			);
 			(this as unknown as { agents: DeckAgent[] }).agents.push(agent);
 			(this as unknown as { focusedId?: string }).focusedId ??= agent.id;
@@ -723,7 +756,6 @@ function replyHarness(deck: Deck): { registry: Registry; sender: DrainingChild; 
 	})(deck, (message) => sent.push(message), {} as StageService, {
 		port: 4329,
 		defaultKind: "pi",
-		canvases: new CanvasStore(deck.path),
 		camera: () => ({ x: 0, y: 0, zoom: 1 }),
 		recordRevision: () => undefined,
 		boardPathOf: () => undefined,
@@ -831,7 +863,7 @@ test("a turn's boards are the ones the agent named, not the ones that moved mean
 			wrote: (path: string, who: string) => void wrote.push([path, who]),
 			boardPathOf: () => undefined,
 		},
-		{ color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck), canvases: new CanvasStore(deck.path) },
+		{ color: "#2eaf5a", kind: "pi", snapshots: new AgentStateStore(), store: new AgentStore(deck) },
 	);
 	const result = await agent.run("do it");
 	assert.deepEqual(result.boards, ["boards/plan.html"]);

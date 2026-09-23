@@ -1,5 +1,4 @@
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
-import { CanvasWires } from "./CanvasWires.tsx";
 import X from "lucide-solid/icons/x";
 import { Icon } from "../ui/icons.tsx";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
@@ -135,9 +134,6 @@ export function Stage(props: {
 	news?: Record<string, string>;
 	/** A board that was news was read on the canvas. */
 	onRead?: (path: string) => void;
-	/** The arrows and dashed groups the canvas on screen has, drawn under its boards. */
-	links?: import("@decks/protocol").CanvasLink[];
-	groups?: import("@decks/protocol").CanvasGroup[];
 	/** Every agent's annotations, across all boards. Each frame takes the ones that are its. */
 	marks?: import("./annotations.ts").Mark[];
 	/** So the server can answer `stage.camera()` with what the user can see. */
@@ -1448,7 +1444,6 @@ export function Stage(props: {
 				/>
 			</Show>
 			<div class="world" data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
-				<CanvasWires boards={props.boards} links={props.links ?? []} groups={props.groups ?? []} zoom={props.camera.zoom} />
 				<For each={props.boards.filter((board) => board.path !== props.focus)} fallback={null}>
 					{(board) => boardNode(board)}
 				</For>

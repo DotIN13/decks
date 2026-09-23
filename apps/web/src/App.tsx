@@ -1,18 +1,18 @@
-import type { AgentKind, Board, Camera, Identity, ThinkingLevel } from "@decks/protocol";
+import type { Board, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
 import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import Sun from "lucide-solid/icons/sun";
-import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack} from "solid-js";
+import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show} from "solid-js";
 import type { EditorHost } from "./canvas/Editor.ts";
 import { Settings } from "./chat/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import type { Presenting } from "./state/ui.ts";
 import { createAlerts } from "./app/alerts.ts";
-import { camera, CLOSE_MS, GLIDE_MS, glide, LEAVE_BOARD_MS, moveCamera, OPEN_MS, reducedMotion, setCamera } from "./state/camera.ts";
+import { camera, GLIDE_MS, glide, LEAVE_BOARD_MS, moveCamera, reducedMotion, setCamera } from "./state/camera.ts";
 import { cameraOntoPage } from "./camera/morph.ts";
-import { createCanvasMorph, flyAlong } from "./app/canvas-morph.ts";
+import { flyAlong } from "./app/fly-along.ts";
 import { handleFrame, type FrameHooks } from "./app/frames.ts";
 import { createFileDrops } from "./app/files.ts";
 import { reportCamera, reportCameraSoon, setCameraAndReport } from "./app/camera-report.ts";
@@ -25,12 +25,10 @@ import { on, send, start } from "./state/socket.ts";
 import { Icon } from "./ui/icons.tsx";
 import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
 import { notice } from "./state/notices.ts";
-import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport, surface, setSurface, dispatchTab, setDispatchTab, dispatchPreview, setDispatchPreview} from "./state/ui.ts";
-import { installRoute, type Place } from "./app/route.ts";
-import { destination, destinationLabel, DISPATCHER_NAME, stripMention } from "./app/send-from-bar.ts";
+import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
+import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
 import { makeFloat } from "./chrome/float.ts";
-import { DispatchView } from "./chrome/DispatchView.tsx";
-import { isNews, wantsYou } from "./chrome/dispatch-view.ts";
+import { isNews } from "./chrome/board-news.ts";
 import { canvasApiPresent, effectiveRenderer, loadRenderer, type RendererChoice, saveRenderer } from "./lib/renderer.ts";
 import { FilePicker } from "./canvas/FilePicker.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./canvas/inspect.ts";
@@ -43,7 +41,6 @@ import { markComment, unmarkComments } from "./canvas/comment-select.ts";
 import { addComment, commenting, removeComment, setCommenting, takeComments, waitingComments } from "./state/comments.ts";
 import { drawing, setDrawing } from "./state/ink.ts";
 import { CanvasOps } from "./canvas/CanvasOps.tsx";
-import { firstCanvasIn, workspaceNames } from "./chrome/canvas-sections.ts";
 import { Stage } from "./canvas/Stage.tsx";
 import { Dialog } from "./chat/Dialog.tsx";
 import { Composer } from "./chat/composer/Composer.tsx";
@@ -53,7 +50,6 @@ import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./chrome/AgentPill.tsx";
 import { Corner } from "./chrome/Corner.tsx";
-import { ArrivalChip } from "./canvas/ArrivalChip.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./chrome/LeftPanel.tsx";
 import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
@@ -155,157 +151,6 @@ export function App() {
 	});
 
 	/*
-	 * Where the person is, from the hash.
-	 *
-	 * The middle of the window is one of two surfaces: the dispatch dashboard, or an agent's
-	 * stage. Neither is set by a gesture directly. A gesture writes the hash through `go`,
-	 * and the one place that reads the hash sets the signals, so a press, the browser's Back
-	 * button, a reload and a pasted link all arrive by the same road. The stage's agent is
-	 * `state.focused`, which the server owns: arriving at `?agent=x` asks for x the way a
-	 * row in the panel does, and the camera comes back from `agent-views.ts` as it always has.
-	 */
-	const [routeAgent, setRouteAgent] = createSignal<string | undefined>();
-	/** The canvas the hash names: the place, where the agent is only who is being addressed on it. */
-	const [routeCanvas, setRouteCanvas] = createSignal<string | undefined>();
-	/*
-	 * Opening a canvas grows it out of the card that was pressed, and going Home shrinks it back
-	 * in (`app/canvas-morph.ts`). `morphing` tells the surface not to slide its layers while the
-	 * camera is doing the moving; `arriving` is the canvas whose boards the camera is waiting for.
-	 */
-	const morph = createCanvasMorph({ deckPath: () => state.deck?.path ?? "", stage: () => document.querySelector(".stage"), camera });
-	const [morphing, setMorphing] = createSignal(false);
-	let morphDone: ReturnType<typeof setTimeout> | undefined;
-	const morphFor = (ms: number) => {
-		setMorphing(true);
-		clearTimeout(morphDone);
-		morphDone = setTimeout(() => setMorphing(false), ms + 120);
-	};
-	let arriving: { id: string; at: number } | undefined;
-	/** The place last applied, so a delayed switch can tell whether it is still wanted. */
-	let currentPlace: Place | undefined;
-	/** How long a canvas is given to produce a board to land on, before the camera is left alone. */
-	const LAND_WINDOW = 6000;
-	/**
-	 * The canvas asked for has its boards: land on it — out of the card when a card was pressed,
-	 * else straight to where it was left or a fit. Once per arrival, not on every board change.
-	 *
-	 * **Given up on after a few seconds**, and that is the whole of a bug worth naming. A canvas
-	 * with nothing on it has nowhere to land, so `arrived` says no and the request stays
-	 * outstanding — and every later change to what is on the canvas asks again. On a shared
-	 * canvas that later change is somebody *else* putting a board up, minutes on, and the answer
-	 * then is a camera that flies to a stored view while you are reading something. An arrival
-	 * is a moment, so it expires.
-	 */
-	const landCanvas = () => {
-		if (!arriving || arriving.id !== state.canvas) return;
-		// Only done asking once it has somewhere to land: a canvas arrives before its boards do.
-		if (morph.arrived(arriving.id, stageBoards()) || Date.now() - arriving.at > LAND_WINDOW) arriving = undefined;
-	};
-	const applyPlace = (place: Place) => {
-		currentPlace = place;
-		// Read before anything sets it: whether we are leaving a canvas we were looking at.
-		const wasOnStage = surface() === "stage";
-		if (place.surface === "dispatch") {
-			const leaving = wasOnStage ? state.canvas : undefined;
-			if (leaving) {
-				morphFor(CLOSE_MS);
-				morph.leave(leaving, stageBoards(), () => {
-					// Only if nothing else moved in the meantime: a second press wins.
-					if (currentPlace?.surface === "dispatch") setSurface("dispatch");
-				});
-			} else setSurface("dispatch");
-			setDispatchTab(place.tab);
-			setDispatchPreview(place.board);
-			setRouteAgent(undefined);
-			setRouteCanvas(undefined);
-			return;
-		}
-		setSurface("stage");
-		setDispatchPreview(undefined);
-		/*
-		 * A stage is a canvas, always.
-		 *
-		 * Opening one is a frame of its own: the server answers this socket with that canvas's
-		 * boards and clears its changed mark. Who you are talking to rides on the same place —
-		 * `?agent=` — and changing it does not touch the room, which is why an agent switch is
-		 * a `replace` and a canvas switch is a push.
-		 */
-		setRouteAgent(place.agent);
-		setRouteCanvas(place.canvas);
-		/*
-		 * Keep where the canvas being left was looking, for the next time it is opened — but
-		 * only when we were looking at it. Coming back through the dashboard, the camera has
-		 * already flown into the card by now, and `morph.leave` parked the real view on the
-		 * way out; parking again here wrote the shrunken card camera over it, and the next
-		 * open of that canvas landed at one percent with the boards in the corner.
-		 */
-		if (wasOnStage && state.canvas && state.canvas !== place.canvas) morph.keep(state.canvas, camera());
-		/*
-		 * Whether this is an *arrival*, which is what decides if the camera lands.
-		 *
-		 * Two ways in: the canvas changed, or the stage did — coming back from the dashboard
-		 * is an arrival even when it is the same room, because going Home flew the camera
-		 * into that room's card (`morph.leave`) and left it there. Without this the second
-		 * opening of a canvas showed its boards shrunk into the corner the card had been in,
-		 * which is the camera nobody moved rather than the camera going wrong.
-		 *
-		 * And *not* an arrival when only `?agent=` changed. A canvas is not re-landed because
-		 * you addressed somebody else: the boards did not move, and a camera that jumped on
-		 * every switch would be the room moving under the conversation.
-		 */
-		const room = place.canvas !== state.canvas;
-		if (room || !wasOnStage) arriving = { id: place.canvas, at: Date.now() };
-		if (room) send({ type: "canvas.focus", id: place.canvas });
-		else landCanvas();
-		/*
-		 * The room is the place; the agent is who the composer addresses in it. Told to the
-		 * server only when it is somebody else, so opening a canvas with the same agent on
-		 * screen is one frame rather than two.
-		 */
-		if (place.agent && place.agent !== state.focused) {
-			requested = place.agent;
-			focusAgent(place.agent);
-		}
-	};
-	/*
-	 * The stage follows the server's focus, and the hash follows the stage.
-	 *
-	 * Focus is the server's: closing the conversation on screen moves it to the nearest row,
-	 * and a `#/agent/x` for an x that does not exist is answered with whoever is focused.
-	 * Either way the canvas already shows that agent, so the hash is replaced to say so
-	 * rather than left naming one that is not there. A change we asked for ourselves is
-	 * not a correction: `requested` is the id a route asked for, and its answer is skipped.
-	 */
-	let requested: string | undefined;
-	createEffect(
-		watch(
-			() => state.focused,
-			(id) => {
-				if (surface() !== "stage" || !id) return;
-				if (requested) {
-					if (id === requested) requested = undefined;
-					return;
-				}
-				const canvas = state.canvas ?? routeCanvas();
-				if (canvas && id !== routeAgent()) go({ surface: "stage", canvas, agent: id }, { replace: true });
-			},
-			{ defer: true },
-		),
-	);
-	createEffect(
-		watch(
-			() => state.chats.map((chat) => chat.id).join(","),
-			() => {
-				// The roster arrived without the agent a route asked for: the ask is over.
-				if (!requested || state.chats.length === 0 || state.chats.some((chat) => chat.id === requested)) return;
-				requested = undefined;
-				const canvas = state.canvas ?? routeCanvas();
-				if (surface() === "stage" && state.focused && canvas) go({ surface: "stage", canvas, agent: state.focused }, { replace: true });
-			},
-			{ defer: true },
-		),
-	);
-	/*
 	 * The boards that are news, each in its writer's colour: what the canvas draws a glow round
 	 * until the board is read there (`canvas/glow.ts`). The same rule as the sidebar's mark, so a
 	 * board glows on the canvas exactly when it is marked in the list.
@@ -319,14 +164,14 @@ export function App() {
 		return out;
 	});
 	/*
-	 * Reading a board is what takes its "changed" mark off the dashboard: its preview there, or
-	 * the focus view on a stage. Said once per opening; the server ignores a board already read
-	 * since its last write, and the next write brings the mark back.
+	 * Reading a board in the focus view is what takes its "changed" mark off. Said once per
+	 * opening; the server ignores a board already read since its last write, and the next write
+	 * brings the mark back.
 	 */
 	createEffect(
 		watch(
 			() => {
-				const path = surface() === "dispatch" ? dispatchPreview() : focus();
+				const path = focus();
 				// The file's time is part of the key: a board rewritten while it is open is still
 				// being read, so the mark must not come back under the reader's eyes.
 				return path ? `${state.boards.find((board) => board.path === path)?.modifiedAt ?? 0}|${path}` : undefined;
@@ -336,296 +181,31 @@ export function App() {
 			},
 		),
 	);
-	/* Installed once the socket is open (below, with the frame handler): landing on
-	   `#/canvas/x` asks the server for x, and a send before `start` is a throw. */
-	let route: ReturnType<typeof installRoute> | undefined;
-	const go = (place: Place, options?: { replace?: boolean }) => route?.go(place, options);
-	/** The canvas somebody looked at most recently, which is where a stage with nothing else to go on lands. */
-	const lastOpenedCanvas = () => [...state.canvases].sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0))[0];
-	/**
-	 * The canvas an agent is working on now, when it is one that still exists.
-	 *
-	 * The server says so on the chat row and on every `context.changed`, and the agent moves
-	 * itself with `stage.canvas(name)`, so this follows the agent rather than the reader.
-	 */
-	const workingOn = (id: string) => {
-		const canvas = state.agents[id]?.canvas;
-		return canvas && state.canvases.some((one) => one.id === canvas) ? canvas : undefined;
-	};
-	/**
-	 * Which room to open for an agent.
-	 *
-	 * An agent is on every canvas it has worked in, so this is a preference rather than a
-	 * lookup: the room you are already in if it is one of its, then the one of its rooms
-	 * opened most recently, then wherever you were. `undefined` means the deck has no canvas
-	 * at all yet, and the caller makes one.
-	 */
-	const canvasFor = (agentId?: string): string | undefined => {
-		if (agentId) {
-			const now = workingOn(agentId);
-			if (now) return now;
-			const here = state.canvases.find((canvas) => canvas.id === state.canvas && canvas.agents.includes(agentId));
-			if (here) return here.id;
-			const theirs = state.canvases.filter((canvas) => canvas.agents.includes(agentId)).sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0))[0];
-			if (theirs) return theirs.id;
-		}
-		return state.canvas ?? lastOpenedCanvas()?.id;
-	};
-	/**
-	 * Who to address on a canvas the server has not made yet.
-	 *
-	 * `canvas.create` answers with the whole list and says which one this browser is now on;
-	 * the effect below is what turns that into a place. An empty string is "open it, with
-	 * nobody named", which is what the pill's own `+` means.
-	 */
-	let openingWith: string | undefined;
-	/**
-	 * A new canvas, opened when `open` says who to talk to there, in `workspace` when one is given.
-	 *
-	 * Named after the workspace when it is the first canvas in it — the room a project opens
-	 * with is the project's — and "Canvas n" otherwise, out of the way of every name in use.
-	 */
-	const newCanvas = (open?: string, workspace?: string, o?: { stay?: boolean }) => {
-		// By slug, as the server tells names apart: "Political LLM" and `political-llm` are one name.
-		const key = (name: string) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-		const taken = new Set(state.canvases.map((canvas) => key(canvas.name)));
-		let name: string;
-		if (workspace && !taken.has(key(workspace))) name = workspace;
-		else {
-			let n = 1;
-			while (taken.has(`canvas-${n}`)) n += 1;
-			name = `Canvas ${n}`;
-		}
-		// Opened, so the name can be typed where it will be read, with whoever you were talking to —
-		// unless the caller says to stay: a new workspace is made from the dashboard, and its first
-		// canvas appearing under a new heading is the whole point of making it there.
-		openingWith = o?.stay ? undefined : (open ?? state.focused ?? "");
-		send({ type: "canvas.create", name, ...(workspace ? { workspace } : {}) });
-	};
-	/** A stage, from anywhere. Switching agent while already on one replaces the entry, so five presses are one Back. */
-	const openStage = (id: string) => {
-		const canvas = canvasFor(id);
-		if (!canvas) {
-			// Nothing to stand on: the first canvas is made, and opened with this agent on it.
-			newCanvas(id);
-			return;
-		}
-		go({ surface: "stage", canvas, agent: id }, { replace: surface() === "stage" });
-	};
-	/**
-	 * Go to an agent: to the canvas it is working on, and talk to it there.
-	 *
-	 * **Agents are the way in, and an agent's room is where its work is.** Its row in the
-	 * Agents tab, its face in the toolbar and in the corner all land here, from a stage or from
-	 * the dashboard, and all three go to the canvas the agent is on now: the one it chose with
-	 * `stage.canvas`, or the one it was handed work on. Pressing the agent you are already with,
-	 * in the room it is in, moves nothing.
-	 *
-	 * An agent that has shown nothing yet is on no canvas, and is addressed without moving you
-	 * when you are in a room, or — from the dashboard, or when it declared a workspace — in the
-	 * first room of its project, which is where its first board will land.
-	 */
-	const visitAgent = (id: string) => {
-		const replace = surface() === "stage";
-		const canvas = workingOn(id);
-		if (canvas) {
-			go({ surface: "stage", canvas, agent: id }, { replace });
-			return;
-		}
-		const workspace = state.identities[id]?.workspace;
-		const here = surface() === "stage" ? state.canvases.find((one) => one.id === state.canvas) : undefined;
-		if (here && (!workspace || here.workspace === workspace)) {
-			go({ surface: "stage", canvas: here.id, agent: id }, { replace: true });
-			return;
-		}
-		if (!workspace) {
-			openStage(id);
-			return;
-		}
-		const room = firstCanvasIn(state.canvases, workspace);
-		if (room) {
-			go({ surface: "stage", canvas: room.id, agent: id }, { replace });
-			return;
-		}
-		newCanvas(id, workspace);
-	};
-	const addressAgent = visitAgent;
-	/*
-	 * The view follows the agent you are talking to when it moves itself.
-	 *
-	 * An agent moves with `stage.useCanvas` or `stage.newCanvas`, and pressing it goes to where
-	 * it is — so the room you are in should be where it went, not where it was. Without this the
-	 * person stayed behind, and their next line brought the agent back (`canvas.use` before a
-	 * prompt), which undid the move it had just made. Only a move by the same agent counts:
-	 * switching agent is `visitAgent`'s business, and a move into the room you are already in
-	 * is no move at all. A canvas made in the same breath can reach the list a frame after the
-	 * move does, so the follow waits for it rather than landing on a room that is not there yet.
-	 */
-	let followed: { agent: string; canvas?: string } | undefined;
-	createEffect(() => {
-		const agent = state.focused;
-		const canvas = agent ? state.agents[agent]?.canvas : undefined;
-		const listed = !!canvas && state.canvases.some((one) => one.id === canvas);
-		untrack(() => {
-			if (!agent) {
-				followed = undefined;
-				return;
-			}
-			if (canvas && !listed) return;
-			const last = followed;
-			followed = { agent, ...(canvas ? { canvas } : {}) };
-			if (!canvas || !last || last.agent !== agent || last.canvas === canvas) return;
-			if (surface() !== "stage" || state.canvas === canvas) return;
-			go({ surface: "stage", canvas, agent });
-		});
-	});
-	/** Open a canvas, keeping whoever you are talking to: the room changes, the conversation does not. */
-	const openCanvas = (id: string, options?: { replace?: boolean }) =>
-		go({ surface: "stage", canvas: id, ...(state.focused ? { agent: state.focused } : {}) }, options);
-	/** Back to the dashboard, on the tab it was left on. */
-	const goHome = () => go({ surface: "dispatch", tab: dispatchTab() });
-	/*
-	 * A canvas the server has just put this browser on becomes the place.
-	 *
-	 * The server answers `canvas.create` with the list and a `focused` id, and a made canvas
-	 * is one nobody has a hash for yet. On a stage the hash is corrected to whatever the
-	 * server says we are looking at; on the dashboard nothing moves unless the canvas was
-	 * made in order to be opened.
-	 */
-	createEffect(
-		watch(
-			() => state.canvas,
-			(id) => {
-				const opening = openingWith;
-				openingWith = undefined;
-				if (!id) return;
-				if (opening !== undefined) {
-					go({ surface: "stage", canvas: id, ...(opening ? { agent: opening } : {}) });
-					return;
-				}
-				if (surface() !== "stage" || id === routeCanvas()) return;
-				go({ surface: "stage", canvas: id, ...(state.focused ? { agent: state.focused } : {}) }, { replace: true });
-			},
-			{ defer: true },
-		),
-	);
-	/*
-	 * A stage always has a canvas, so a hash naming one that is gone is not a blank screen.
-	 *
-	 * The likeliest way in is an old link or a canvas somebody deleted from another browser.
-	 * Waits for the list to exist — it arrives second in the greeting, before any board — and
-	 * then lands on the canvas last opened, or goes Home when the deck has none at all.
-	 */
-	createEffect(() => {
-		if (surface() !== "stage") return;
-		const id = routeCanvas();
-		if (!id || state.canvases.length === 0) return;
-		if (state.canvases.some((canvas) => canvas.id === id)) return;
-		const fallback = lastOpenedCanvas();
-		if (fallback) openCanvas(fallback.id, { replace: true });
-		else goHome();
-	});
-	/*
-	 * Escape goes Home from a stage, and ⌘1 ⌘2 ⌘3 pick a dashboard tab.
-	 *
-	 * After everything that owns Escape ahead of this: a field, a dialog, a selection
-	 * (`app/keys.ts`), the conversation when it is showing, a board being presented. Only a
-	 * stage with nothing to let go of goes back to the dashboard.
-	 */
-	onMount(() => {
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.defaultPrevented) return;
-			const target = event.target as HTMLElement | null;
-			const inField = !!target?.closest?.("input, textarea, select, [contenteditable]");
-			if ((event.metaKey || event.ctrlKey) && !event.altKey && ["1", "2", "3"].includes(event.key) && surface() === "dispatch" && !inField) {
-				event.preventDefault();
-				const tab = ({ "1": "canvases", "2": "tasks", "3": "cron" } as const)[event.key as "1" | "2" | "3"];
-				go({ surface: "dispatch", tab });
-				return;
-			}
-			if (event.key !== "Escape" || inField) return;
-			if (surface() !== "stage") return;
-			// Everything that owns Escape on a stage keeps it: a selection, a dialog, a board
-			// being presented or read in the focus view, the conversation, the source editor,
-			// the file picker, settings, the cheat sheet and the usage panel.
-			if (component() || dialog() || presenting() || historyShown() || focus() || editingSource() || picking() || settings() || ops() || usagePanel()) return;
-			event.preventDefault();
-			goHome();
-		};
-		window.addEventListener("keydown", onKeyDown);
-		onCleanup(() => window.removeEventListener("keydown", onKeyDown));
-	});
+	/** Go to an agent: its stage, and its conversation. Every row, face and banner lands here. */
+	const visitAgent = (id: string) => focusAgent(id);
 
 	/*
 	 * The bar's destination, decided in one place.
 	 *
-	 * Where a line lands depends on which surface is up, who is focused, and whether the
-	 * text names an agent. The word on the bar is this same function run without sending,
-	 * so the label and the frame cannot disagree. `barText` is what the composer holds right
-	 * now, reported on every keystroke, so an @ name changes the word as it is typed.
+	 * Where a line lands depends on who is focused and whether the text names an agent. The
+	 * word on the bar is this same function run without sending, so the label and the frame
+	 * cannot disagree. `barText` is what the composer holds right now, reported on every
+	 * keystroke, so an @ name changes the word as it is typed.
 	 */
 	const [barText, setBarText] = createSignal("");
-	/*
-	 * The dispatcher: the agent behind the dashboard's bar. Made by the server, one per
-	 * deck, and kept out of every list a person picks an agent from — `visibleChats` is what
-	 * the sidebar, the pill and the corner draw. On the dashboard the bar, its model picker
-	 * and the conversation float are the dispatcher's; on a stage they are the focused
-	 * agent's. `barAgent` is that one switch.
-	 */
-	/*
-	 * Two dispatchers to tell apart. The **template** is the one with no parent: it never
-	 * places anything, it holds the model, thinking and mode the composer sets on the
-	 * dashboard, and every task's dispatcher is spawned from it. A **task's dispatcher** is
-	 * a child of the template, one per task, and its transcript is that task's log: the
-	 * float on the dashboard shows the one whose row was last opened, else the template.
-	 */
-	/* One template per runtime that has been chosen (`RuntimeMenu`); the bar's is the chosen one. */
-	const dispatcherId = createMemo(() => {
-		const templates = state.chats.filter((chat) => chat.role === "dispatcher" && !chat.parentId);
-		const wanted = state.settings.dispatcherKind ?? state.defaultKind;
-		return (templates.find((chat) => chat.kind === wanted) ?? templates[0])?.id;
-	});
-	const visibleChats = createMemo(() => state.chats.filter((chat) => chat.role !== "dispatcher"));
-	const [logAgent, setLogAgent] = createSignal<string | undefined>(undefined);
-	const barAgent = () => (surface() === "dispatch" ? dispatcherId() : state.focused);
-	const barChat = createMemo(() => state.chats.find((chat) => chat.id === barAgent()));
-	const streamAgent = () => (surface() === "dispatch" ? (logAgent() && state.chats.some((chat) => chat.id === logAgent()) ? logAgent() : dispatcherId()) : state.focused);
-	const streamChat = createMemo(() => state.chats.find((chat) => chat.id === streamAgent()));
 	const agentName = (id: string) => state.identities[id]?.name ?? state.chats.find((chat) => chat.id === id)?.name ?? id;
-	/*
-	 * Who the composer's chip was set to, on this stage: an agent, or the dispatcher.
-	 *
-	 * Kept apart from `state.focused` on purpose. Focusing an agent is *following* it now — the
-	 * pill's face takes you to the canvas it works on and keeps up as it moves — and the chip is
-	 * the other direction: the line carries this canvas with it, and the agent comes here. So a
-	 * pick in the chip changes only where the next line goes, and it lasts until the agent you
-	 * follow or the room changes, which is when the question is asked afresh.
-	 */
-	const [addressed, setAddressed] = createSignal<{ id: string } | "dispatcher" | undefined>();
-	createEffect(() => {
-		void state.focused;
-		void state.canvas;
-		setAddressed(undefined);
-	});
 	const barContext = () => {
 		const focusedId = state.focused;
-		const nameOf = agentName;
-		const open = state.canvases.find((canvas) => canvas.id === state.canvas);
-		const to = addressed();
-		const addressedAgent = to && to !== "dispatcher" && state.chats.some((chat) => chat.id === to.id) ? { id: to.id, name: nameOf(to.id) } : undefined;
 		return {
-			surface: surface(),
-			...(focusedId ? { focused: { id: focusedId, name: nameOf(focusedId) } } : {}),
-			...(open ? { canvas: { id: open.id, name: open.name } } : {}),
-			agents: visibleChats().map((chat) => ({ id: chat.id, name: nameOf(chat.id) })),
-			...(to === "dispatcher" ? { addressed: "dispatcher" as const } : addressedAgent ? { addressed: addressedAgent } : {}),
+			...(focusedId ? { focused: { id: focusedId, name: agentName(focusedId) } } : {}),
+			agents: state.chats.map((chat) => ({ id: chat.id, name: agentName(chat.id) })),
 		};
 	};
 	const sendFromBar = (typed: string, commentIds: string[] = []) => {
 		const dest = destination(typed, barContext());
 		/*
 		 * The comments whose pills were in the field go in front of the words, whoever the words
-		 * are for, and stop waiting. They are kept under the agent whose canvas they were made
+		 * are for, and stop waiting. They are kept under the agent whose stage they were made
 		 * on, which is the focused one: the only place a comment can be made is its stage.
 		 */
 		// In the order their pills sat in the text, which is the order `[comment n]` counts in.
@@ -634,23 +214,9 @@ export function App() {
 		unmarkComments(notes.map((note) => note.id));
 		const text = withComments(typed, notes);
 		switch (dest.kind) {
-			case "task":
-				send({
-					type: "task.create",
-					task: { text: dest.named ? withComments(stripMention(typed, DISPATCHER_NAME), notes) : text, ...(dest.canvas ? { canvas: dest.canvas.id } : {}) },
-					requestedBy: "you",
-				});
-				// From a stage nothing on screen changes, so it is said: the task is on the dashboard.
-				if (surface() === "stage") notice("info", dest.canvas ? `Handed to the dispatcher, for ${dest.canvas.name}. Whoever takes it works here.` : "Handed to the dispatcher. It is on the dashboard's Tasks tab.");
-				return;
 			case "prompt": {
 				const line = dest.named ? withComments(stripMention(typed, dest.name), notes) : text;
 				if (dest.id === state.focused) clearMarks(dest.id);
-				/*
-				 * Named in a room: the agent is brought to this canvas before it hears the line, so
-				 * what it puts up lands here. The order on the wire is the order it happens in.
-				 */
-				if (dest.canvas) send({ type: "canvas.use", agentId: dest.id, canvasId: dest.canvas.id });
 				send({ type: "agent.prompt", id: dest.id, text: line });
 				return;
 			}
@@ -658,7 +224,7 @@ export function App() {
 				notice("info", "Notes on a component are not built yet.");
 				return;
 			default:
-				notice("info", "Pick an agent first, or go Home and dispatch it.");
+				notice("info", "Pick an agent first.");
 		}
 	};
 
@@ -687,7 +253,7 @@ export function App() {
 	};
 	/* The popup belongs to browsing with the pen down; anything else puts it away. */
 	createEffect(() => {
-		if (mode() !== "browse" || drawing() || surface() !== "stage") setCommenting(undefined);
+		if (mode() !== "browse" || drawing()) setCommenting(undefined);
 	});
 
 	/*
@@ -854,8 +420,6 @@ export function App() {
 		});
 		const off = on((message) => handleFrame(message, frames));
 		onCleanup(off);
-		route = installRoute({ onPlace: applyPlace });
-		onCleanup(() => route?.dispose());
 	});
 
 	/**
@@ -912,14 +476,13 @@ export function App() {
 	};
 
 	const focusedChat = createMemo(() => state.chats.find((chat) => chat.id === state.focused));
-	/* The conversation float shows whoever the bar addresses: the dispatcher on the
-	   dashboard, the focused agent on a stage. Its history is asked for when it is shown. */
+	/* The conversation float shows the focused agent. Its history is asked for when it is shown. */
 	const transcript = createMemo(() => {
-		const id = streamAgent();
+		const id = state.focused;
 		return id ? state.agents[id]?.transcript ?? [] : [];
 	});
 	createEffect(() => {
-		if (historyShown()) ensureHistory(streamAgent());
+		if (historyShown()) ensureHistory(state.focused);
 	});
 	const busy = createMemo(() => {
 		const chat = focusedChat();
@@ -946,35 +509,9 @@ export function App() {
 	 * like boards disappearing. An empty canvas beside a full rail says what is true, and
 	 * says it before anything has happened rather than after.
 	 */
-	/**
-	 * The canvas the stage is drawing: the one this browser opened, else the one the focused chat
-	 * works on. Its arrows and groups are drawn under the boards.
-	 */
-	const stageCanvas = createMemo(() => state.canvases.find((one) => one.id === state.canvas) ?? state.canvases.find((one) => !!state.focused && one.agents.includes(state.focused)));
-
 	const stageBoards = createMemo(() => {
-		/*
-		 * What is on the canvas, from the canvas — and from the focused chat when this browser
-		 * has not opened one.
-		 *
-		 * The canvas is what holds the boards, so a window that has opened one draws its list
-		 * whoever it is talking to, and two agents working there draw the same thing. Without
-		 * a canvas this is what it always was: the focused conversation's own set.
-		 */
-		const canvas = state.canvases.find((one) => one.id === state.canvas);
-		const playing = new Set(canvas ? canvas.boards : state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
+		const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
 		return state.boards.filter((board) => playing.has(board.path));
-	});
-
-	/*
-	 * A canvas that was asked for has arrived — the server has said this browser is on it, and
-	 * its boards came with that — so the camera lands on it. Tracked on both, because the boards
-	 * are what decide where to land and the canvas is what says they are the right ones.
-	 */
-	createEffect(() => {
-		void state.canvas;
-		void stageBoards();
-		untrack(landCanvas);
 	});
 
 	/**
@@ -1351,47 +888,32 @@ export function App() {
 	};
 
 	/**
-	 * Switch to an agent.
+	 * Switch to an agent: its stage, its conversation, and the view this device left it in.
 	 *
-	 * Named, where it used to be written inline in the agents panel, because there are
-	 * three ways in now — the pill's dropdown, a face in the top-right stack, and the `+n`
-	 * chip — and three copies of seven steps is three chances to forget one.
-	 *
-	 * **In a room, switching changes the conversation and nothing else.** The boards belong
-	 * to the canvas and so does the camera, so who you are talking to is a change of
-	 * addressee: the transcript, the unread count and the draft follow the agent, while the
-	 * view, the boards and the selection stay where they are. Off a canvas — which is only
-	 * the moment before one opens — the old per-agent camera still applies.
+	 * Named, because there are several ways in — the pill's dropdown, a face in the top-right
+	 * stack, a row in the panel — and several copies of these steps is several chances to
+	 * forget one.
 	 */
 	const focusAgent = (id: string) => {
 		const leaving = state.focused;
 		if (leaving === id) return;
-		/* The hash is set before this runs (`applyPlace`), so a switch made on the way into a
-		   room counts as being in one: the canvas is about to land the camera itself. */
-		const inRoom = Boolean(routeCanvas() ?? state.canvas);
 
 		/*
 		 * Park the view you are leaving, then take the one you are arriving at.
 		 *
-		 * Only where the canvas is the agent's own, which on a stage it no longer is. Two
-		 * agents in a room look at one arrangement, so a camera that jumped when you
-		 * addressed somebody else would be the room moving under the conversation; the view
-		 * a room is left in is kept against the *canvas* instead (`app/canvas-morph.ts`).
-		 *
 		 * `agent-view.ts` owns the three cases and argues for them. In short: nothing on the
-		 * canvas leaves the camera alone, a remembered view comes back *exactly*, and an agent
+		 * stage leaves the camera alone, a remembered view comes back *exactly*, and an agent
 		 * with no memory gets a fit of what it holds.
 		 */
-		if (!inRoom && leaving) views().keep(leaving, viewToPark(camera(), selected()));
+		if (leaving) views().keep(leaving, viewToPark(camera(), selected()));
 
 		setState("focused", id);
 		setUnread(id, 0);
-		// A component selected in a board another agent was holding is not your selection —
-		// unless the board is the room's, in which case neither is the selection.
-		if (!inRoom) setComponent(undefined);
+		// A component selected in a board another agent was holding is not your selection.
+		setComponent(undefined);
 
 		/*
-		 * The camera and the selection wait for the canvas itself.
+		 * The camera and the selection wait for the stage itself.
 		 *
 		 * `agent.focus` is answered with the whole deck as the *new* stage sees it, and where the
 		 * boards are is half of what `viewOnSwitch` decides on — a remembered view that no longer
@@ -1399,7 +921,7 @@ export function App() {
 		 * the conversation being left, which is the one arrangement that is definitely not the one
 		 * about to be shown. `landed` is the other half.
 		 */
-		if (!inRoom) awaiting = id;
+		awaiting = id;
 
 		ensureHistory(id);
 		setDraft(undefined);
@@ -1452,14 +974,6 @@ export function App() {
 			setFraming(undefined);
 			return;
 		}
-		/*
-		 * On the canvas, which is the room's list rather than the agent's.
-		 *
-		 * A board you put up while looking at a canvas is placed by the canvas
-		 * (`canvas/stage.ts`), so the agent's in-play set never moves and a flight that waited
-		 * for it waited forever: the board arrived half a million pixels away and the camera
-		 * stayed where it was.
-		 */
 		if (!stageBoards().some((one) => one.path === wanted.path)) return;
 		const board = state.boards.find((one) => one.path === wanted.path);
 		if (!board) return;
@@ -1566,61 +1080,8 @@ export function App() {
 				 * document lives in a different element under each renderer, and moving an iframe
 				 * reloads it anyway, so a clean remount is the honest version of the same cost.
 				 */}
-				<div class="surface" data-surface={surface()} data-morph={morphing() ? "true" : undefined}>
-					{/*
-					 * The dashboard in front by default, the stage behind it, and a press slides
-					 * one over the other. The layer behind is `data-hidden` and `inert`, the same
-					 * two attributes the canvas uses for its world behind the focus view: a `Show`
-					 * here would tear down every board document to reach the dashboard.
-					 */}
-					<div class="surface-layer" data-layer="dispatch" data-hidden={surface() === "dispatch" ? undefined : "true"} inert={surface() === "dispatch" ? undefined : true} aria-hidden={surface() !== "dispatch"}>
-						<DispatchView
-							tab={dispatchTab()}
-							onTab={(tab) => go({ surface: "dispatch", tab })}
-							boards={state.boards}
-							identities={state.identities}
-							canvases={state.canvases}
-							onOpenCanvas={(canvas, card) => {
-								morph.open(canvas.id, card);
-								morphFor(OPEN_MS);
-								openCanvas(canvas.id);
-							}}
-							onNewCanvas={(workspace) => newCanvas(undefined, workspace)}
-							onRenameCanvas={(id, name) => send({ type: "canvas.rename", id, name })}
-							onMoveCanvas={(id, workspace) => send({ type: "canvas.workspace", id, workspace })}
-							onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
-							workspaces={workspaceNames(state.canvases, state.identities)}
-							/* Named as typed and filed under the server's slug of it, which is what the heading will say. */
-							onNewWorkspace={(name) => newCanvas(undefined, name, { stay: true })}
-							chats={visibleChats()}
-							contexts={state.contexts}
-							tasks={state.tasks}
-							schedules={state.schedules}
-							onOpenLog={(id) => {
-								setLogAgent(id);
-								openHistory();
-							}}
-							preview={dispatchPreview()}
-							onPreview={(path) => go({ surface: "dispatch", tab: dispatchTab(), ...(path ? { board: path } : {}) })}
-							onOpenOnCanvas={(path) => {
-								/* Whoever holds it, else the agent you were last with. `agent.focus` goes
-								   first on the wire, so the play is attributed to the right stage. */
-								const holder = Object.entries(state.contexts).find(([, paths]) => paths.includes(path))?.[0] ?? state.focused;
-								if (!holder) {
-									notice("info", "No agent to open it with. Make one first.");
-									return;
-								}
-								openStage(holder);
-								playAndFrame(path);
-							}}
-							onOpenAgent={addressAgent}
-							onCancelTask={(id) => send({ type: "task.cancel", id })}
-							onRetryTask={(id) => send({ type: "task.retry", id })}
-							onRunSchedule={(id) => send({ type: "schedule.run", id })}
-							onCancelSchedule={(id) => send({ type: "schedule.cancel", id })}
-						/>
-					</div>
-					<div class="surface-layer" data-layer="stage" data-hidden={surface() === "stage" ? undefined : "true"} inert={surface() === "stage" ? undefined : true} aria-hidden={surface() !== "stage"}>
+				<div class="surface" data-surface="stage">
+					<div class="surface-layer" data-layer="stage">
 				<Show when={renderer()} keyed>
 					{(current) => (
 					<Stage
@@ -1636,17 +1097,12 @@ export function App() {
 						 * (not known yet) has to be told apart from "nothing remembered".
 						 */
 						opening={state.focused ? { camera: openingCamera() } : undefined}
-						/* Board documents start only once a stage is on screen. The dashboard is
-						   metadata and pictures; the first press pays for the mount, as the design
-						   says, and a person who never opens a stage never pays it. */
-						boardsMayStart={boardsMayStart() && surface() === "stage"}
+						boardsMayStart={boardsMayStart()}
 						// The panel's list and the rail's thumbnails are less urgent: after the canvas.
 						onBoardsStarted={canvasOpened}
 						mode={mode()}
 						marks={marks()}
 						boards={stageBoards()}
-						links={stageCanvas()?.links ?? []}
-						groups={stageCanvas()?.groups ?? []}
 						camera={camera()}
 						glide={glide()}
 						setCamera={setCameraAndReport}
@@ -1823,22 +1279,6 @@ export function App() {
 					`data-inset="top"` where there were two.
 				*/}
 				<AgentPill
-					{...(stageCanvas() && state.canvas
-						? {
-								canvas: {
-									id: stageCanvas()!.id,
-									name: stageCanvas()!.name,
-									agents: [...stageCanvas()!.agents],
-								},
-								onRenameCanvas: (name: string) => send({ type: "canvas.rename", id: stageCanvas()!.id, name }),
-							}
-						: {})}
-					canvases={state.canvases}
-					onOpenCanvas={(id) => openCanvas(id)}
-					onNewCanvas={() => newCanvas(state.focused ?? "")}
-					workspaces={workspaceNames(state.canvases, state.identities)}
-					onMoveCanvas={(id, workspace) => send({ type: "canvas.workspace", id, workspace })}
-					onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
 					mode={mode()}
 					onMode={(next) => {
 						// A press while editing means "this component", so the pen is put down first.
@@ -1847,11 +1287,6 @@ export function App() {
 					}}
 					drawing={drawing()}
 					onDrawing={setDrawing}
-					surface={surface()}
-					onHome={goHome}
-					wantsYou={wantsYou(state.tasks)}
-					tab={dispatchTab()}
-					onTab={(tab) => go({ surface: "dispatch", tab })}
 					boardsOpen={boardsOpen()}
 					onToggleBoards={() => showBoards(!boardsOpen())}
 					tool={tool()}
@@ -1867,15 +1302,14 @@ export function App() {
 				/>
 
 				<Corner
-					chats={visibleChats()}
+					chats={state.chats}
 					identities={state.identities}
 					focused={state.focused}
 					unread={unread}
-					onFocus={addressAgent}
+					onFocus={visitAgent}
 					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					onMore={openAgentsPanel}
 					onClose={closeAgent}
-					surface={surface()}
 					zoom={camera().zoom}
 					onZoom={(zoom) => setCamera((c) => ({ ...c, zoom }))}
 					/*
@@ -1889,17 +1323,12 @@ export function App() {
 					 */
 					onFit={() => fitAll(stageBoards(), setCamera)}
 					onNewBoard={(format) => {
-						/* From the dashboard a new board is made for the agent you were last with, and
-						   the stage opens so it lands somewhere you can see. */
-						if (surface() === "dispatch") {
-							if (!state.focused) {
-								notice("info", "Make an agent first: a board is made on an agent's canvas.");
-								return;
-							}
-							openStage(state.focused);
+						if (!state.focused) {
+							notice("info", "Make an agent first: a board is made on an agent's stage.");
+							return;
 						}
 						/* Asked for by name, so the camera can arrive on it: the server places a new
-						   board in the middle of this canvas's view and clear of what is there, which
+						   board in the middle of this stage's view and clear of what is there, which
 						   is near but not always on screen when the middle is taken. */
 						void files
 							.askForBoard((request) => send({ type: "board.create", ...(format ? { format } : {}), request }))
@@ -1977,7 +1406,7 @@ export function App() {
 					)}
 				</Show>
 
-				<Show when={drawing() && mode() === "browse" && surface() === "stage"}>
+				<Show when={drawing() && mode() === "browse"}>
 					<InkBar onDone={() => setDrawing(false)} />
 				</Show>
 
@@ -2018,18 +1447,13 @@ export function App() {
 				<LeftPanel
 					{...(panelAsk() ? { ask: panelAsk()! } : {})}
 					boards={state.boards}
-					listMayGrow={boardsStarted() || surface() === "dispatch"}
+					listMayGrow={boardsStarted()}
 					current={selected()}
-					/*
-					 * What is on the canvas, which is the room's list and not the agent's.
-					 *
-					 * `stageBoards` is the same answer the stage draws from, so the panel's "on the
-					 * canvas" section and the boards on screen cannot disagree — they did the moment a
-					 * canvas stopped being one agent's in-play set.
-					 */
+					/* `stageBoards` is the same answer the stage draws from, so the panel's "on the
+					   stage" section and the boards on screen cannot disagree. */
 					inPlay={stageBoards().map((board) => board.path)}
-					/* What the room took off and keeps: boards belong to the canvas, not to whoever you are talking to. */
-					kept={stageCanvas()?.kept ?? []}
+					/* What the focused agent holds and has taken off its stage. */
+					kept={state.focused ? (state.contexts[state.focused] ?? []) : []}
 					focused={state.focused}
 					open={boardsOpen()}
 					onOpenChange={showBoards}
@@ -2038,21 +1462,13 @@ export function App() {
 					 * The Agents tab. The same three signals the corner and the dropdown already
 					 * take, so the panel is not a second source of truth about who exists — and
 					 * `focusAgent` rather than a bare `agent.focus`, because switching moves the
-					 * canvas, the camera, the transcript and the draft together.
+					 * stage, the camera, the transcript and the draft together.
 					 */
-					chats={visibleChats()}
+					chats={state.chats}
 					identities={state.identities}
 					unread={unread}
-					/* The room's project, on a stage: the workspace of the canvas you are looking at leads both lists. */
-					hereWorkspace={surface() === "stage" ? stageCanvas()?.workspace : undefined}
 					onFocusAgent={visitAgent}
 					onNewAgent={(workspace) => send({ type: "agent.create", ...(workspace ? { workspace } : {}) })}
-					/* The Canvases tab: the rooms, under their projects, and a way between them. */
-					canvases={state.canvases}
-					currentCanvas={surface() === "stage" ? state.canvas : undefined}
-					onOpenCanvas={(id) => openCanvas(id)}
-					onNewCanvas={(workspace) => newCanvas(undefined, workspace)}
-					onRemoveCanvas={(id) => send({ type: "canvas.remove", id })}
 					onCloseAgent={closeAgent}
 					onMirrorAgent={(id) =>
 						void files.askForBoard((request) => send({ type: "agent.mirror", agentId: id, request })).then((path) => path && frameWhenPlaced(path))
@@ -2064,14 +1480,7 @@ export function App() {
 					   agent declares one and you can move it, and whoever wrote last is where it is. */
 					onAgentWorkspace={(id, workspace) => send({ type: "agent.workspace", id, workspace })}
 					onAgentRename={(id, name) => send({ type: "agent.rename", id, name })}
-					onPick={(board) => {
-						/* On the dashboard a board row is a preview; on a stage it is the canvas. */
-						if (surface() === "dispatch") {
-							go({ surface: "dispatch", tab: dispatchTab(), board: board.path });
-							return;
-						}
-						playAndFrame(board.path);
-					}}
+					onPick={(board) => playAndFrame(board.path)}
 					/*
 					 * Delete the file. The row asks twice before this is called (`BoardRow.tsx`).
 					 *
@@ -2158,12 +1567,12 @@ export function App() {
 					 * ask for it. The column owns the window over what is held; the server owns
 					 * everything older (`agents/store.ts`), and this is the seam between them.
 					 */
-					more={streamAgent() ? state.agents[streamAgent()!]?.moreHistory === true : false}
-					onEarlier={() => (streamAgent() ? loadEarlier(streamAgent()!) : Promise.resolve(0))}
-					agentId={streamAgent() ?? ""}
-					state={streamChat()?.state ?? "idle"}
-					name={state.identities[streamAgent() ?? ""]?.name ?? streamChat()?.name ?? "It"}
-					agent={streamChat()?.kind ?? state.defaultKind}
+					more={state.focused ? state.agents[state.focused!]?.moreHistory === true : false}
+					onEarlier={() => (state.focused ? loadEarlier(state.focused!) : Promise.resolve(0))}
+					agentId={state.focused ?? ""}
+					state={focusedChat()?.state ?? "idle"}
+					name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
+					agent={focusedChat()?.kind ?? state.defaultKind}
 					{...(atTurn() ? { scrollTo: atTurn()! } : {})}
 					previewing={preview()?.entryId ?? null}
 					onPreview={(entryId) => {
@@ -2224,30 +1633,27 @@ export function App() {
 					</Show>
 
 					<StatusLine
-						state={barChat()?.state ?? "idle"}
-						name={state.identities[barAgent() ?? ""]?.name ?? barChat()?.name ?? "It"}
-						agent={barChat()?.kind ?? state.defaultKind}
+						state={focusedChat()?.state ?? "idle"}
+						name={state.identities[state.focused ?? ""]?.name ?? focusedChat()?.name ?? "It"}
+						agent={focusedChat()?.kind ?? state.defaultKind}
 					/>
 
-					{/* On the dashboard every control here is the dispatcher's: its model, its
-					    thinking level, its mode and its usage. `barAgent` is the one switch. */}
 					<Composer
 						draft={draft()}
-						agentId={barAgent()}
-						page={pageKey(surface(), state.focused)}
-						usage={barAgent() ? state.agents[barAgent()!]?.usage : undefined}
-						onUsage={() => openUsage(barAgent())}
+						agentId={state.focused}
+						page={pageKey(state.focused)}
+						usage={state.focused ? state.agents[state.focused!]?.usage : undefined}
+						onUsage={() => openUsage(state.focused)}
 						busy={busy()}
-						model={barAgent() ? state.agents[barAgent()!]?.model : undefined}
-						models={runtimeFor(barChat()?.kind)?.models ?? []}
-						commands={barChat()?.commands ?? runtimeFor(barChat()?.kind)?.commands ?? []}
-						runtime={barChat()?.kind}
-						modes={runtimeFor(barChat()?.kind)?.capabilities?.modes ?? []}
-						mode={barChat()?.mode}
-						onMode={(mode) => send({ type: "agent.setMode", id: barAgent() ?? "", mode })}
-						{...(surface() === "dispatch" ? { onRuntime: (kind: AgentKind) => send({ type: "dispatcher.setKind", kind }) } : {})}
+						model={state.focused ? state.agents[state.focused!]?.model : undefined}
+						models={runtimeFor(focusedChat()?.kind)?.models ?? []}
+						commands={focusedChat()?.commands ?? runtimeFor(focusedChat()?.kind)?.commands ?? []}
+						runtime={focusedChat()?.kind}
+						modes={runtimeFor(focusedChat()?.kind)?.capabilities?.modes ?? []}
+						mode={focusedChat()?.mode}
+						onMode={(mode) => send({ type: "agent.setMode", id: state.focused ?? "", mode })}
 						onSend={sendFromBar}
-						comments={surface() === "stage" ? waitingComments(state.focused) : []}
+						comments={waitingComments(state.focused)}
 						onCommentsGone={(ids) => {
 							for (const id of ids) if (state.focused) removeComment(state.focused, id);
 							unmarkComments(ids);
@@ -2255,26 +1661,18 @@ export function App() {
 						onText={setBarText}
 						destination={destinationLabel(destination(barText(), barContext()))}
 						recipient={{
-							chats: visibleChats(),
+							chats: state.chats,
 							identities: state.identities,
 							unread,
 							focused: state.focused,
-							here: surface() === "stage" ? [...(stageCanvas()?.agents ?? [])] : [],
 							dest: destination(barText(), barContext()),
 							label: destinationLabel(destination(barText(), barContext())),
-							...(dispatcherId() ? { dispatcher: state.chats.find((chat) => chat.id === dispatcherId()) } : {}),
-							...(surface() === "stage" && stageCanvas() ? { canvasName: stageCanvas()!.name } : {}),
-							// On a stage the chip addresses; on the dashboard, where there is no room to bring anyone to, an agent is the way in.
-							onPick: (id) => (surface() === "stage" ? setAddressed({ id }) : visitAgent(id)),
-							onDispatcher: () => setAddressed("dispatcher"),
+							onPick: visitAgent,
 							onNew: (kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) }),
 							onClose: closeAgent,
 							onMore: openAgentsPanel,
 						}}
-						mentionables={[
-							...visibleChats().map((chat) => ({ name: agentName(chat.id), here: (stageCanvas()?.agents ?? []).includes(chat.id), chat })),
-							{ name: DISPATCHER_NAME, here: true, task: true, ...(dispatcherId() ? { chat: state.chats.find((chat) => chat.id === dispatcherId()) } : {}) },
-						]}
+						mentionables={state.chats.map((chat) => ({ name: agentName(chat.id), chat }))}
 						onAbort={() => send({ type: "agent.abort", id: state.focused ?? "" })}
 						/*
 						 * `thinking` comes back with the model now. Switching to a model that does
@@ -2285,14 +1683,14 @@ export function App() {
 						onModel={(provider, model, thinking) =>
 							send({
 								type: "agent.setModel",
-								id: barAgent() ?? "",
+								id: state.focused ?? "",
 								provider,
 								model,
 								...(thinking ? { thinking } : {}),
 							})
 						}
 						onThinking={(thinking: ThinkingLevel) =>
-							send({ type: "agent.thinking", id: barAgent() ?? "", thinking })
+							send({ type: "agent.thinking", id: state.focused ?? "", thinking })
 						}
 						/*
 						 * Which subscription this conversation spends.
@@ -2384,20 +1782,6 @@ export function App() {
 				    shown a turn. */}
 
 				<NoticeStrip />
-				<Show when={surface() === "stage"}>
-					<ArrivalChip
-						arrival={state.arrival}
-						identities={state.identities}
-						boards={state.boards}
-						onGo={(target, path) => {
-							// A press is about the journey, so it arrives rather than jumps.
-							moveCamera(target, { animate: true });
-							setSelected(path);
-							setState("arrival", undefined);
-						}}
-						onDismiss={() => setState("arrival", undefined)}
-					/>
-				</Show>
 
 			</div>
 		</div>

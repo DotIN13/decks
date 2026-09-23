@@ -470,7 +470,7 @@ function TimeSettings() {
 					</span>
 				</span>
 				<Show when={chosen() !== mine}>
-					<button type="button" class="dispatch-act" data-primary={!chosen() || undefined} onClick={() => set(mine)}>
+					<button type="button" class="action-button" data-primary={!chosen() || undefined} onClick={() => set(mine)}>
 						Use {mine}
 					</button>
 				</Show>
@@ -495,11 +495,11 @@ function TimeSettings() {
 					<datalist id="set-zones">
 						<For each={zones()}>{(zone) => <option value={zone} />}</For>
 					</datalist>
-					<button type="button" class="dispatch-act" disabled={!known(draft()) || draft() === chosen()} onClick={() => set(draft())}>
+					<button type="button" class="action-button" disabled={!known(draft()) || draft() === chosen()} onClick={() => set(draft())}>
 						Set
 					</button>
 					<Show when={chosen()}>
-						<button type="button" class="dispatch-act" title={`Back to the server's own clock, ${state.machineZone}`} onClick={() => set(null)}>
+						<button type="button" class="action-button" title={`Back to the server's own clock, ${state.machineZone}`} onClick={() => set(null)}>
 							Clear
 						</button>
 					</Show>

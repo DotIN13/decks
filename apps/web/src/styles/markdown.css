@@ -1,5 +1,5 @@
 /*
- * Markdown, as the conversation and the dispatch cards render it.
+ * Markdown, as the conversation renders it.
  *
  * The renderer's own typography: headings at four sizes, lists and their nesting depth,
  * the table that scrolls in its own box, quotes, rules, inline code, links and strong. It

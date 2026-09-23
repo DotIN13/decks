@@ -3,11 +3,8 @@ import { draftIsEmpty, normalize, parseDraft, type Draft } from "./draft.ts";
 /**
  * What was being typed on each page, so that leaving a page never loses a message.
  *
- * **Keyed by the page, not by the agent behind the bar.** Home is one page and each agent's
- * stage is one page, and that is what a person means by "where I was typing". The agent
- * behind the bar is not the same thing: on Home it is the dispatcher, and the dispatcher
- * changes when its runtime is chosen (`RuntimeMenu.tsx`), so a draft parked under its id was
- * left behind under an agent nobody can open.
+ * **Keyed by the page.** Each agent's stage is one page, and that is what a person means by
+ * "where I was typing".
  *
  * Kept in localStorage as well as in memory, so a reload, a crash or a closed tab keeps the
  * half-written message too. Every change is written, because the moment a draft is lost is
@@ -19,9 +16,9 @@ export const DRAFTS_KEY = "decks.drafts";
 /** Pages remembered at once. An agent that was closed leaves its draft behind; this is what clears it out. */
 export const DRAFTS_LIMIT = 40;
 
-/** The page a bar is on: Home, or one agent's stage. */
-export function pageKey(surface: "dispatch" | "stage", agentId: string | undefined): string {
-	return surface === "dispatch" ? "home" : `agent:${agentId ?? "none"}`;
+/** The page a bar is on: one agent's stage. */
+export function pageKey(agentId: string | undefined): string {
+	return `agent:${agentId ?? "none"}`;
 }
 
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
