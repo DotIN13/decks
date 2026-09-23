@@ -1,6 +1,7 @@
 import type { Canvas, CanvasKit, Image, Paint, Path, Shader } from "canvaskit-wasm";
 import { bool, color, fillsOf, isArrow, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
 import type { PenFonts } from "./fonts.ts";
+import type { IconShape } from "./icons.ts";
 
 /**
  * Drawing a laid-out `.pen` document with CanvasKit.
@@ -18,7 +19,7 @@ import type { PenFonts } from "./fonts.ts";
  *   own agent, are drawn the same way in their own colours.
  *
  * What is not drawn yet is drawn as what it is — a dashed box with its type — rather than dropped:
- * icons, scripts, and web pages other than the deck's own boards.
+ * scripts, and web pages other than the deck's own boards.
  */
 
 export interface PaintContext {
@@ -29,6 +30,8 @@ export interface PaintContext {
 	scheme: "light" | "dark";
 	/** An image fill's picture, once loaded; undefined asks for it and draws nothing this time. */
 	image(url: string): Image | undefined;
+	/** An icon's shapes, once fetched; undefined asks for it and draws nothing this time. */
+	icon(library: string, name: string, weight: number): IconShape | undefined;
 }
 
 const NOTE_COLORS: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe", context: "#bfdbfe" };
@@ -142,6 +145,10 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 		}
 		case "group":
 			for (const child of node.children ?? []) paintNode(canvas, child, ctx);
+			break;
+		case "icon":
+		case "icon_font":
+			paintIcon(canvas, ctx, node, theme, placed);
 			break;
 		case "browser":
 			// A deck board: the stage draws the board itself in this box, over the drawing.
@@ -426,6 +433,45 @@ function paintText(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: Them
 	const offset = vertical === "middle" ? (inner - paragraph.getHeight()) / 2 : vertical === "bottom" ? inner - paragraph.getHeight() : 0;
 	canvas.drawParagraph(paragraph, x + pad, y + pad + Math.max(0, offset));
 	paragraph.delete();
+}
+
+// --- icons -------------------------------------------------------------------------------------
+
+function paintIcon(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: ThemeState, placed: Placed): void {
+	const { ck, doc } = ctx;
+	const library = String(resolve(doc, node.type === "icon_font" ? node.iconFontFamily : node.library, theme) ?? "lucide");
+	const name = String(resolve(doc, node.type === "icon_font" ? node.iconFontName : node.icon, theme) ?? "");
+	const weight = num(doc, node.weight, theme, 400);
+	const shape = name ? ctx.icon(library, name, weight) : undefined;
+	if (!shape) return;
+	const first = fillsOf(node.fill).map((f) => (typeof f === "string" ? f : f && f.type === "color" ? (f as { color: string }).color : undefined)).find(Boolean);
+	const rgba = (first ? color(doc, first, theme) : undefined) ?? color(doc, ctx.scheme === "dark" ? "#e6e6e6" : "#1f2328", theme)!;
+	const { x, y, w, h } = placed.box;
+	const [vx, vy, vw, vh] = shape.viewBox;
+	const scale = Math.min(w / vw, h / vh);
+	canvas.save();
+	canvas.translate(x + (w - vw * scale) / 2, y + (h - vh * scale) / 2);
+	canvas.scale(scale, scale);
+	canvas.translate(-vx, -vy);
+	for (const part of shape.parts) {
+		const path = ck.Path.MakeFromSVGString(part.d);
+		if (!path) continue;
+		if (part.evenOdd) path.setFillType(ck.FillType.EvenOdd);
+		const paint = new ck.Paint();
+		paint.setAntiAlias(true);
+		paint.setColor(rgbaColor(ck, rgba));
+		if (part.fill) canvas.drawPath(path, paint);
+		if (part.stroke) {
+			paint.setStyle(ck.PaintStyle.Stroke);
+			paint.setStrokeWidth(part.strokeWidth);
+			paint.setStrokeCap(part.cap === "round" ? ck.StrokeCap.Round : part.cap === "square" ? ck.StrokeCap.Square : ck.StrokeCap.Butt);
+			paint.setStrokeJoin(part.join === "round" ? ck.StrokeJoin.Round : part.join === "bevel" ? ck.StrokeJoin.Bevel : ck.StrokeJoin.Miter);
+			canvas.drawPath(path, paint);
+		}
+		paint.delete();
+		path.delete();
+	}
+	canvas.restore();
 }
 
 // --- what is not drawn yet ---------------------------------------------------------------------

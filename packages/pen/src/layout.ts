@@ -161,7 +161,7 @@ export function layout(doc: PenDocument, nodes: readonly PenNode[], options: { t
 			return { w, h };
 		}
 		// Rectangles, ellipses, polygons, browsers, icons, scripts, placeholders: the box they state.
-		const fallback = node.type === MISSING ? 120 : 100;
+		const fallback = node.type === MISSING ? 120 : node.type === "icon" || node.type === "icon_font" ? 24 : 100;
 		const ws = sizing(doc, node.width, t, { kind: "fixed", value: fallback });
 		const hs = sizing(doc, node.height, t, { kind: "fixed", value: fallback });
 		return { w: forcedW ?? fixedOr(ws, fallback), h: forcedH ?? fixedOr(hs, fallback) };
@@ -330,5 +330,6 @@ export function layout(doc: PenDocument, nodes: readonly PenNode[], options: { t
 function defaultSizing(node: PenNode): Sizing {
 	if (node.type === "frame" || node.type === "group") return { kind: "hug" };
 	if (TEXTY.has(node.type)) return { kind: "hug" };
+	if (node.type === "icon" || node.type === "icon_font") return { kind: "fixed", value: 24 };
 	return { kind: "fixed", value: 100 };
 }

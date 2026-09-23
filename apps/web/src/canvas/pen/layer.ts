@@ -10,6 +10,7 @@ export interface PenHit {
 import type { Camera } from "@decks/protocol";
 import { canvasKit } from "./canvaskit.ts";
 import { PenFonts, type FontNeed } from "./fonts.ts";
+import { PenIcons } from "./icons.ts";
 import { paintDocument } from "./paint.ts";
 
 /**
@@ -43,6 +44,10 @@ export class PenLayer {
 	private frame = 0;
 	private starting: Promise<void> | undefined;
 	private readonly images = new Map<string, Image | "loading" | "failed">();
+	private readonly icons = new PenIcons(() => {
+		this.dirty = true;
+		this.schedule();
+	});
 	/** Where the boards are, for an arrow that ends on one. */
 	private boards = new Map<string, Frame>();
 	private boardKey = "";
@@ -207,7 +212,7 @@ export class PenLayer {
 		this.placed = placed;
 		const recorder = new ck.PictureRecorder();
 		const canvas = recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7));
-		paintDocument(canvas, nodes, { ck, fonts, doc, placed, scheme: this.scheme, image: (url) => this.image(url) });
+		paintDocument(canvas, nodes, { ck, fonts, doc, placed, scheme: this.scheme, image: (url) => this.image(url), icon: (library, name, weight) => this.icons.get(library, name, weight) });
 		this.picture = recorder.finishRecordingAsPicture();
 		recorder.delete();
 		this.drawn?.();
