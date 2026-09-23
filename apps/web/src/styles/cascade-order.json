@@ -1,8 +1,8 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "32ddaf18f200b0bfd8660aab1d615c567e979718dd8ccbb7d696a5bff623fd16",
-	"rules": 761,
+	"hash": "b941565e38e7471d7f0d1609855f6ccf1df886a4966331e1728bcbeed2fa40ad",
+	"rules": 762,
 	"sheets": 18,
 	"ties": 0,
 	"outsideLayer": 0,
@@ -21,7 +21,7 @@
 		"apps/web/src/styles/marks.css": 33,
 		"apps/web/src/styles/panel.css": 118,
 		"apps/web/src/styles/rail.css": 13,
-		"apps/web/src/styles/settings.css": 39,
+		"apps/web/src/styles/settings.css": 40,
 		"apps/web/src/styles/shell.css": 52,
 		"apps/web/src/styles/stream.css": 90,
 		"apps/web/src/styles/usage.css": 31
@@ -689,6 +689,7 @@
 		["styles/settings.css","@layer components ▸ .set-k{display:flex;min-width:0;flex:1;flex-direction:column;gap:2px}"],
 		["styles/settings.css","@layer components ▸ .set-cue{width:116px;justify-content:space-between}"],
 		["styles/settings.css","@layer components ▸ .set-vol{width:196px}"],
+		["styles/settings.css","@layer components ▸ .set-renderer > button{padding:0 12px}"],
 		["styles/settings.css","@layer components ▸ @media (max-width: 420px) ▸ .set-row:has(> .set-vol){flex-wrap:wrap}"],
 		["styles/settings.css","@layer components ▸ @media (max-width: 420px) ▸ .set-row > .set-vol{width:100%}"],
 		["styles/settings.css","@layer components ▸ .set-strip{display:flex;align-items:flex-start;padding:9px 12px;gap:8px;box-shadow:inset 0 1px 0 0 var(--line);background:color-mix(in srgb, var(--color-warn) 10%, transparent);color:var(--fg);font-size:var(--type-note);line-height:1.45}"],
