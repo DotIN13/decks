@@ -1097,7 +1097,11 @@ export function App() {
 						mode={mode()}
 						marks={marks()}
 						boards={stageBoards()}
-						{...(stagePen() ? { pen: stagePen()! } : {})}
+						/*
+						 * A plain prop, never a spread: a conditional spread makes every prop the stage reads
+						 * depend on it, so each drawing update re-ran the camera's effects and cut a fly short.
+						 */
+						pen={stagePen()}
 						onPenEdit={(ops) => {
 							const agentId = state.focused;
 							if (agentId) send({ type: "stage.pen.edit", agentId, ops });
