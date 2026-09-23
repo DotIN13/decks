@@ -187,6 +187,11 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
 		}
 		.decks-editing { outline: 2px solid var(--b-accent, #3b5cf6); outline-offset: 2px; }
+		/*
+		 * A design tool's hover: in edit mode a component outlines itself under the pointer, before it
+		 * is pressed, so it is plain which block a press would pick up.
+		 */
+		:root[data-decks-edit] body > [data-id]:hover:not(.decks-editing) { outline: 1px solid var(--b-accent, #3b5cf6); outline-offset: 2px; }
 
 		/*
 		 * The source editor. Monospace because this is markdown or Mermaid source, where a

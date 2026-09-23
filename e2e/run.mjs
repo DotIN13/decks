@@ -151,6 +151,11 @@ const CHECKS = [
 	 * same file reached from the wire, from a hand edit of the file, and from a drag in the page.
 	 */
 	{ file: "pen-stage.mjs", needsAgent: false },
+	/*
+	 * The stage's gestures against a design tool's and a notes app's: tools and a marquee in browse
+	 * mode, selections that move together and snap, arrow ends, finger taps, and the pen's gestures.
+	 */
+	{ file: "stage-gestures.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },

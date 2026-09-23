@@ -36,7 +36,8 @@ const browse = await state();
  * you meant to browse means a component has moved and been written to disk.
  */
 say("the canvas opens in browse mode", browse.mode === "browse", browse.mode);
-say("…with no editing tools, because they add to the stage", browse.tools === 0, String(browse.tools));
+// The stage's tools are there in both modes: browse leaves the boards' pages alone, not the drawing.
+say("…with the stage's eight tools, because the drawing is edited in both modes", browse.tools === 8, String(browse.tools));
 say("…no inspector, because it is a properties panel", browse.inspector === 0);
 say("…and nothing drawn to say editing is on", browse.ring === "none", `${browse.ring}`);
 say("the pencil offers to start editing", browse.toggle === "Edit the boards", browse.toggle);
@@ -88,7 +89,7 @@ say("a click while browsing selects no component", afterClick.editing === 0 && a
 await editMode(page);
 const editing = await state();
 say("the pencil turns editing on", editing.mode === "edit", editing.mode);
-say("…the stage's eight tools come with it", editing.tools === 8, String(editing.tools));
+say("…and the stage's eight tools stay", editing.tools === 8, String(editing.tools));
 /*
  * And no ring in either mode. There was one — an inset ring of the accent around the whole
  * stage, standing in for a confirmation dialog on the pencil, on the argument that a mode
@@ -96,10 +97,10 @@ say("…the stage's eight tools come with it", editing.tools === 8, String(editi
  * for off: a border around everything reads as the edge of the app, and it was on screen for
  * the whole session rather than for the moment that mattered.
  *
- * What carries the sign instead is the pair asserted just above and below this — the pencil's
- * own pressed state, and the five tools that are drawn in edit mode and not in browse. Both
- * are in the chrome, neither is painted over the work, and both are asserted rather than
- * assumed, so the removal is a decision this check holds rather than a rule somebody deleted.
+ * What carries the sign instead is the pencil's own pressed state, asserted below, and the
+ * outline a board draws round itself under the pointer while editing. Neither is painted over the
+ * work for the whole session, and the pencil is asserted rather than assumed, so the removal is a
+ * decision this check holds rather than a rule somebody deleted.
  */
 say("…and no ring around the canvas, because the tools are the sign now", editing.ring === "none", `${editing.ring}`);
 say("…and no word in the corner either", editing.word === "none", `${editing.word}`);
@@ -118,7 +119,7 @@ say("…and the inspector arrives with it", nowClicked.inspector === 1);
 
 await editMode(page, false);
 const back = await state();
-say("and pressing it again puts everything back", back.mode === "browse" && back.tools === 0 && back.ring === "none", JSON.stringify(back));
+say("and pressing it again puts everything back", back.mode === "browse" && back.tools === 8 && back.ring === "none", JSON.stringify(back));
 say("…including dropping the selection's inspector", back.inspector === 0);
 
 // --- the column has no caret ------------------------------------------------------------

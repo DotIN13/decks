@@ -39,6 +39,17 @@
 		fill: color-mix(in srgb, var(--color-accent) 8%, transparent);
 		cursor: move;
 	}
+	/* The lasso box's corners, which resize what it holds. */
+	.ink-corner {
+		fill: var(--panel);
+		stroke: var(--color-accent);
+	}
+	.ink-corner:is([data-corner="nw"], [data-corner="se"]) {
+		cursor: nwse-resize;
+	}
+	.ink-corner:is([data-corner="ne"], [data-corner="sw"]) {
+		cursor: nesw-resize;
+	}
 
 	/* The drawing tools: a second row under the top-left cluster. */
 	.ink-bar {

@@ -11,10 +11,14 @@ import type { PenDocument, PenNode } from "./types.ts";
  *
  *     { "type": "path", "id": "then", "metadata": { "type": "decks.arrow", "from": "draft", "to": "boards/report.html" } }
  *
- * `from` and `to` name an item by id, or a board by its path. After an edit, `reroute` redraws
- * every such path between the nearest edges of its two ends: the box, the viewBox and the
- * geometry are rewritten, and the stroke is left as the writer set it. `route: "elbow"` draws a
- * right-angled line instead of a straight one. An arrow whose end cannot be found is left alone.
+ * `from` and `to` name an item by id, a board by its path, or a point on the stage as `[x, y]` —
+ * the end of an arrow that stops on bare canvas. After an edit, `reroute` redraws every such path
+ * between the nearest edges of its two ends: the box, the viewBox and the geometry are rewritten,
+ * and the stroke is left as the writer set it. `route: "elbow"` draws a right-angled line instead
+ * of a straight one. An arrow whose end cannot be found is left alone.
+ *
+ * A point end is where it is on the stage, not in the arrow's own box, so moving an arrow by its
+ * `x` and `y` alone is undone by the next reroute: `moveArrowEnds` shifts its points with it.
  */
 
 export const ARROW = "decks.arrow";
@@ -38,12 +42,11 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 	for (const node of walk(doc.children)) {
 		if (!isArrow(node)) continue;
 		const meta = node.metadata as { from?: unknown; to?: unknown; route?: unknown };
-		const end = (name: unknown) => (typeof name === "string" ? (placed.get(name)?.box ?? extra?.(name)) : undefined);
-		const from = end(meta.from);
-		const to = end(meta.to);
+		const from = arrowEnd(meta.from, placed, extra);
+		const to = arrowEnd(meta.to, placed, extra);
 		if (!from || !to) continue;
 		const stroke = typeof node.strokeWidth === "number" ? node.strokeWidth : 2;
-		const shape = arrowShape(route(from, to, meta.route === "elbow"), stroke);
+		const shape = arrowShape(arrowRoute(from, to, meta.route === "elbow"), stroke);
 		const parent = index.get(node.id)?.parent;
 		const origin = parent ? placed.get(parent.id)?.box : undefined;
 		const next = { ...shape, x: round(shape.x - (origin?.x ?? 0)), y: round(shape.y - (origin?.y ?? 0)) };
@@ -61,6 +64,23 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 }
 
 type Point = [number, number];
+
+/** A point end, `[x, y]` on the stage. */
+export function isPointEnd(end: unknown): end is Point {
+	return Array.isArray(end) && end.length === 2 && typeof end[0] === "number" && typeof end[1] === "number";
+}
+
+/** Where an arrow's end is: an item's box, a board's (through `extra`), or a point as a box of no size. */
+export function arrowEnd(end: unknown, placed: ReadonlyMap<string, Placed>, extra?: (name: string) => Frame | undefined): Frame | undefined {
+	if (isPointEnd(end)) return { x: end[0], y: end[1], w: 0, h: 0 };
+	return typeof end === "string" ? (placed.get(end)?.box ?? extra?.(end)) : undefined;
+}
+
+/** An arrow's metadata with its point ends moved by `dx dy`; joined ends stay joined. */
+export function moveArrowEnds(metadata: Record<string, unknown>, dx: number, dy: number): Record<string, unknown> {
+	const shift = (end: unknown) => (isPointEnd(end) ? [round(end[0] + dx), round(end[1] + dy)] : end);
+	return { ...metadata, from: shift(metadata.from), to: shift(metadata.to) };
+}
 
 /**
  * A line through `points` with a head at the last one, as the fields of a pen `path`: its corner
@@ -87,8 +107,8 @@ export function arrowShape(points: Point[], strokeWidth = 2): { x: number; y: nu
 	};
 }
 
-/** From the edge of `a` that faces `b`, to the edge of `b` that faces `a`. */
-function route(a: Frame, b: Frame, elbow: boolean): Point[] {
+/** From the edge of `a` that faces `b`, to the edge of `b` that faces `a`: the line's points, first to last. */
+export function arrowRoute(a: Frame, b: Frame, elbow: boolean): Point[] {
 	const ac: Point = [a.x + a.w / 2, a.y + a.h / 2];
 	const bc: Point = [b.x + b.w / 2, b.y + b.h / 2];
 	const dx = bc[0] - ac[0];

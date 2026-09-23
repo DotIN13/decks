@@ -782,6 +782,10 @@
 	.board-node[data-selected="true"] > .shade {
 	outline: 2px solid var(--color-accent);
 }
+	/* In edit mode a board outlines itself under the pointer, as the drawing's items do (`pen-hover`). */
+	.stage[data-mode="edit"] .board-node[data-hover="true"]:not([data-selected="true"]) > .shade {
+	outline: 1.5px solid var(--color-accent);
+}
 	/*
  * A board that is news (`board/glow.ts`): an agent named it and the person has not read it.
  *
@@ -947,8 +951,32 @@
 	.world > .pen-hits > .pen-hit {
 	pointer-events: all;
 }
-	.world > :is(.pen-selection, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
+	.world > :is(.pen-selection, .pen-hover, .pen-join, .pen-guides, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
 	z-index: 3;
+}
+	/*
+	 * What the pointer is over, before a press (`Stage.tsx`): a thin line, thinner than a selection's,
+	 * the way a design tool answers "what would I pick here". What an arrow's end would join, while it
+	 * is carried, is the same box drawn heavier with a wash inside.
+	 */
+	.world > :is(.pen-hover, .pen-join) {
+	position: absolute;
+	border-radius: 4px;
+	pointer-events: none;
+}
+	.world > .pen-join {
+	background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+	/* Where a drag or a resize snapped: a line it lines up on, or a gap it repeats. */
+	.world > .pen-guides {
+	position: absolute;
+	top: 0;
+	left: 0;
+	overflow: visible;
+	pointer-events: none;
+}
+	.world > .pen-guides line {
+	stroke: #f24e1e;
 }
 	/* The drawn item picked up in edit mode, and the box its words are edited in (`Stage.tsx`). */
 	.world > .pen-selection {

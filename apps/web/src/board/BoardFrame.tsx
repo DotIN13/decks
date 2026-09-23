@@ -121,6 +121,13 @@ export function BoardFrame(props: {
 	onSelect: () => void;
 	onMove: (x: number, y: number) => void;
 	/**
+	 * A mouse or pen press on the title bar, offered to the stage first: it moves the board with the
+	 * rest of a selection and snaps it (`Stage.dragBoard`). True means it took the drag.
+	 */
+	drag?: (event: PointerEvent) => boolean;
+	/** How far the stage is carrying this board in a drag of its own, until the move is sent. */
+	shift?: { dx: number; dy: number };
+	/**
 	 * The board dragged to a new size, in board units.
 	 *
 	 * Sent on release rather than while dragging: a board's size is a number in its own file,
@@ -312,7 +319,7 @@ export function BoardFrame(props: {
 	 * layout of every board. The focus view has no world and no camera, so it places the frame
 	 * itself (`canvas/Stage.tsx`).
 	 */
-	const at = () => props.origin ?? ghost() ?? { x: props.board.x, y: props.board.y };
+	const at = () => props.origin ?? ghost() ?? (props.shift ? { x: props.board.x + props.shift.dx, y: props.board.y + props.shift.dy } : { x: props.board.x, y: props.board.y });
 	const frameSrc = () => {
 		if (props.previewSha) return `/api/revision/${props.previewSha}`;
 		// 0 means unpinned: show whatever the board now is.
@@ -784,6 +791,7 @@ export function BoardFrame(props: {
 		 * (`claimTouch`), which leaves the board draggable by one finger and pinchable by
 		 * two. `pinching()` below is where the second finger takes the gesture back.
 		 */
+		if (!touched && props.drag?.(event)) return;
 		if (touched) props.gestures.claimTouch(event.pointerId);
 		else event.stopPropagation();
 		event.preventDefault();
@@ -951,9 +959,10 @@ export function BoardFrame(props: {
 			ref={(element) => {
 				nodeEl = element;
 			}}
-			data-dragging={dragging()}
+			data-dragging={dragging() || !!props.shift}
 			onPointerEnter={() => setHovered(true)}
 			onPointerLeave={() => setHovered(false)}
+			data-hover={hovered() || undefined}
 			data-selected={props.selected}
 			data-inert={inert()}
 			data-path={props.board.path}
@@ -992,7 +1001,7 @@ export function BoardFrame(props: {
 			<div
 				class="chrome"
 				data-path={props.board.path}
-				data-dragging={dragging()}
+				data-dragging={dragging() || !!props.shift}
 				data-hover={hovered() || undefined}
 				ref={(bar) => {
 					createEffect(() => props.placeBar?.(bar, { x: at().x, y: at().y, w: sizing()?.w ?? props.board.w }));

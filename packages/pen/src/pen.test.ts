@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { apply, baseTheme, color, emptyDocument, expand, layout, parse, pathBounds, read, reroute, serialize, strokeOf, variable, type PenDocument, type TextStyle } from "./index.ts";
+import { apply, baseTheme, color, emptyDocument, expand, layout, moveArrowEnds, parse, pathBounds, read, reroute, serialize, strokeOf, variable, type PenDocument, type TextStyle } from "./index.ts";
 
 /** A fixed-width font, so text boxes are exact: every character is half its size wide. */
 const mono = (text: string, style: TextStyle, maxWidth: number | undefined) => {
@@ -204,6 +204,23 @@ test("an arrow is redrawn between the facing edges of its ends, and follows them
 	doc.children[1]!.x = 600;
 	assert.equal(reroute(doc, layout(doc, expand(doc), light), () => board), true);
 	assert.equal((ab.x as number) + (ab.width as number) >= 600, true);
+});
+
+test("an arrow end can be a point on the stage, which a move shifts and a joined end ignores", () => {
+	const doc = parse(JSON.stringify({ version: "2.14", children: [
+		{ type: "rectangle", id: "a", x: 0, y: 0, width: 100, height: 50 },
+		{ type: "path", id: "half", metadata: { type: "decks.arrow", from: "a", to: [400, 25] } },
+		{ type: "path", id: "free", metadata: { type: "decks.arrow", from: [0, 200], to: [100, 300] } },
+	] }));
+	assert.equal(reroute(doc, layout(doc, expand(doc), light)), true);
+	const half = doc.children[1]!;
+	// From a's right edge to the point: the head reaches 400 and stops there.
+	assert.equal(half.x! <= 100, true);
+	assert.equal(Math.abs(half.x! + (half.width as number) - 400) <= 2, true);
+	const free = doc.children[2]!;
+	assert.equal(free.x! <= 0 && free.y! <= 200 && free.y! + (free.height as number) >= 300, true);
+	assert.deepEqual(moveArrowEnds(free.metadata!, 10, -5), { type: "decks.arrow", from: [10, 195], to: [110, 295] });
+	assert.deepEqual(moveArrowEnds(half.metadata!, 10, 10).from, "a");
 });
 
 test("the variables edit sets and removes document variables and theme axes", () => {

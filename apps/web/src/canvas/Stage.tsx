@@ -1,7 +1,7 @@
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
 import { Icon } from "../ui/icons.tsx";
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
+import { For, Show, batch, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import type { AgentAct } from "./acts.ts";
 import { between, boxOf, easeOutCubic, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
@@ -25,7 +25,8 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, arrowShape, ids as penIds, indexOf, newId, type PenDocument, type PenNode } from "@decks/pen";
+import { ARROW, arrowEnd, arrowRoute, isArrow, moveArrowEnds, ids as penIds, indexOf, newId, type PenDocument, type PenNode } from "@decks/pen";
+import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
 
 /**
  * `v`, select: the one palette key left. The tools that add things are the stage's own now, armed
@@ -354,12 +355,12 @@ export function Stage(props: {
 			 */
 			if (props.editing) return;
 			/*
-			 * The drawing's own keys, in edit mode. None of them fire while a text box has the caret
+			 * The drawing's own keys, in either mode but not while drawing. None of them fire while a text box has the caret
 			 * (above). Delete, the arrows and ⌘D act on what is selected; ⌘Z and ⇧⌘Z step through the
 			 * person's own edits; Escape lets go, then puts the tool down; a letter arms a tool
 			 * (`PEN_TOOL_KEYS`), from this document only.
 			 */
-			if (props.mode === "edit" && props.onPenEdit && penKey(event)) {
+			if (props.onPenEdit && !props.drawing && penKey(event)) {
 				event.preventDefault();
 				return;
 			}
@@ -543,6 +544,22 @@ export function Stage(props: {
 	const [penDraft, setPenDraft] = createSignal<{ tool: PenTool; x1: number; y1: number; x2: number; y2: number } | undefined>();
 	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; card: boolean; fontSize: number; fill: string; fresh?: boolean } | undefined>();
 	const [penDrawn, setPenDrawn] = createSignal(0);
+	/**
+	 * Boards picked up with the drawing: by a marquee, or Shift and a press on a title bar. They move
+	 * with the selected items as one selection. The app's own selected board is a different thing —
+	 * the one board whose page takes the keys — and a single press on a board is still only that.
+	 */
+	const [boardPicks, setBoardPicks] = createSignal<readonly string[]>([]);
+	/** Boards being dragged, and by how much, until the move is sent. */
+	const [boardDrag, setBoardDrag] = createSignal<{ paths: readonly string[]; dx: number; dy: number } | undefined>();
+	/** Where the drag or resize in hand snapped, in stage pixels (`pen/snap.ts`). */
+	const [guides, setGuides] = createSignal<readonly Guide[]>([]);
+	/** The item under the pointer, outlined the way a design tool does before anything is pressed. */
+	const [hoverId, setHoverId] = createSignal<string | undefined>();
+	/** What an arrow's end would join if it were let go now: an item or a board, lit up. */
+	const [joinHint, setJoinHint] = createSignal<readonly Box[]>([]);
+	/** An arrow end being dragged: the line from the end that stays to the pointer. */
+	const [endDraft, setEndDraft] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
 	/** When a tool last made an item, so the second press of a double-click does not make a board. */
 	let penMadeAt = 0;
 	/** A card just made, whose title opens for typing when it is first drawn. */
@@ -578,14 +595,24 @@ export function Stage(props: {
 		const kept = selected.filter((id) => present.has(id) || penAwaited.has(id));
 		if (kept.length !== selected.length) setPenSelection(kept);
 	});
+	createEffect(() => {
+		const present = new Set(props.boards.map((board) => board.path));
+		const picks = untrack(boardPicks);
+		if (picks.some((path) => !present.has(path))) setBoardPicks(picks.filter((path) => present.has(path)));
+	});
 	/** Select what was just asked for, which the drawing does not have until the server answers. */
 	const selectMade = (made: string[]) => {
 		for (const id of made) penAwaited.add(id);
 		setPenSelection(made);
 	};
+	/*
+	 * The drawing is edited in both modes — browse keeps the boards' pages as they are, edit opens
+	 * them for editing too — but not while the pen is out: ink has its own selection (the lasso).
+	 */
 	createEffect(() => {
-		if (props.mode !== "edit") {
+		if (props.drawing) {
 			setPenSelection([]);
+			setBoardPicks([]);
 			setPenText(undefined);
 			setPenTool("select");
 		}
@@ -604,6 +631,13 @@ export function Stage(props: {
 			const box = penLayer.bounds.get(id);
 			if (box) out.push({ id, x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h });
 		}
+		const moving = boardDrag();
+		for (const path of boardPicks()) {
+			const board = props.boards.find((candidate) => candidate.path === path);
+			if (!board) continue;
+			const shift = moving?.paths.includes(path) ? moving : { dx: 0, dy: 0 };
+			out.push({ id: `board:${path}`, x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h });
+		}
 		const marquee = penMarquee();
 		if (marquee) out.push({ id: "", x: Math.min(marquee.x1, marquee.x2), y: Math.min(marquee.y1, marquee.y2), w: Math.abs(marquee.x2 - marquee.x1), h: Math.abs(marquee.y2 - marquee.y1) });
 		return out;
@@ -611,7 +645,7 @@ export function Stage(props: {
 	/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
 	const penHandles = createMemo(() => {
 		const outlines = penOutlines();
-		if (outlines.length !== 1 || !outlines[0]!.id) return undefined;
+		if (outlines.length !== 1 || !outlines[0]!.id || outlines[0]!.id.startsWith("board:")) return undefined;
 		const node = penLayer.placed.get(outlines[0]!.id)?.node;
 		// A group is as big as what is in it, and pen does not scale children, so it moves but is not sized.
 		if (!node || node.metadata?.type === ARROW || node.type === "group") return undefined;
@@ -666,9 +700,12 @@ export function Stage(props: {
 			setPenSelection([]);
 			return true;
 		}
-		if (key === "Escape" && (selected.length || penTool() !== "select")) {
+		if (key === "Escape" && (selected.length || boardPicks().length || penTool() !== "select")) {
 			if (penTool() !== "select") setPenTool("select");
-			else setPenSelection([]);
+			else {
+				setPenSelection([]);
+				setBoardPicks([]);
+			}
 			return true;
 		}
 		if (selected.length && command && !event.altKey && key.toLowerCase() === "d") {
@@ -676,9 +713,10 @@ export function Stage(props: {
 			return true;
 		}
 		const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[key];
-		if (selected.length && nudge && !command && !event.altKey) {
+		if ((selected.length || boardPicks().length) && nudge && !command && !event.altKey) {
 			const step = event.shiftKey ? 10 : 1;
 			penMoveBy(selected, nudge[0]! * step, nudge[1]! * step);
+			moveBoards(boardPicks(), nudge[0]! * step, nudge[1]! * step);
 			return true;
 		}
 		/*
@@ -715,9 +753,25 @@ export function Stage(props: {
 		penEdit(
 			idsToMove.flatMap((id) => {
 				const node = penNode(id);
-				return node ? [{ op: "update", id, set: { x: Math.round(own(node.x) + dx), y: Math.round(own(node.y) + dy) } }] : [];
+				return node ? [{ op: "update", id, set: movedBy(node, dx, dy) }] : [];
 			}),
 		);
+	};
+	/**
+	 * What moving an item by `dx dy` sets. An arrow's point ends are on the stage rather than in its
+	 * box, so they move with it; its joined ends stay joined (`moveArrowEnds`).
+	 */
+	const movedBy = (node: PenNode, dx: number, dy: number) => ({
+		x: Math.round(own(node.x) + dx),
+		y: Math.round(own(node.y) + dy),
+		...(isArrow(node) && node.metadata ? { metadata: moveArrowEnds(node.metadata, dx, dy) } : {}),
+	});
+	/** Move boards by `dx dy`, each to its own new corner. */
+	const moveBoards = (paths: readonly string[], dx: number, dy: number) => {
+		for (const path of paths) {
+			const board = props.boards.find((candidate) => candidate.path === path);
+			if (board) props.onMove(path, Math.round(board.x + dx), Math.round(board.y + dy));
+		}
 	};
 
 	const penDuplicate = () => {
@@ -729,15 +783,40 @@ export function Stage(props: {
 			const as = newId(taken);
 			taken.add(as);
 			made.push(as);
-			return [{ op: "copy", id, as }, { op: "update", id: as, set: { x: own(node.x) + 24, y: own(node.y) + 24 } }];
+			return [{ op: "copy", id, as }, { op: "update", id: as, set: movedBy(node, 24, 24) }];
+		});
+		penEdit(ops);
+		if (made.length) selectMade(made);
+	};
+	/** Copies of items, `dx dy` from where they are: an Alt-drag lets go of copies and leaves the originals. */
+	const penCopyBy = (idsToCopy: readonly string[], dx: number, dy: number) => {
+		const taken = props.pen ? penIds(props.pen.doc) : new Set<string>();
+		const made: string[] = [];
+		const ops = idsToCopy.flatMap((id) => {
+			const node = penNode(id);
+			if (!node) return [];
+			const as = newId(taken);
+			taken.add(as);
+			made.push(as);
+			return [{ op: "copy", id, as }, { op: "update", id: as, set: movedBy(node, dx, dy) }];
 		});
 		penEdit(ops);
 		if (made.length) selectMade(made);
 	};
 
-	/** Follow one press to its release: `move` on each step past a 3px slop, `done` at the end. */
-	const follow = (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void) => {
-		element.setPointerCapture(event.pointerId);
+	/**
+	 * Follow one press to its release: `move` on each step past a 3px slop, `done` at the end.
+	 *
+	 * The pointer is captured by `on`, the stage unless said otherwise, and the click that ends the
+	 * press goes to whatever captured it — so a press on a board's title bar keeps it on the bar, or
+	 * its double-click would reach the canvas and make a board.
+	 */
+	const follow = (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void, on: HTMLElement = element) => {
+		try {
+			on.setPointerCapture(event.pointerId);
+		} catch {
+			// Refused for a pointer the browser no longer has; the listeners still end the press.
+		}
 		const start = { x: event.clientX, y: event.clientY };
 		let moved = false;
 		const onMove = (e: PointerEvent) => {
@@ -746,23 +825,121 @@ export function Stage(props: {
 			move(e);
 		};
 		const finish = (e: PointerEvent) => {
-			element.removeEventListener("pointermove", onMove);
-			element.removeEventListener("pointerup", finish);
-			element.removeEventListener("pointercancel", finish);
+			on.removeEventListener("pointermove", onMove);
+			on.removeEventListener("pointerup", finish);
+			on.removeEventListener("pointercancel", finish);
 			done(moved, e);
 		};
-		element.addEventListener("pointermove", onMove);
-		element.addEventListener("pointerup", finish);
-		element.addEventListener("pointercancel", finish);
+		on.addEventListener("pointermove", onMove);
+		on.addEventListener("pointerup", finish);
+		on.addEventListener("pointercancel", finish);
 	};
 
-	/** A press on the drawing in edit mode; true when it was the drawing's to handle. */
+	/**
+	 * What a moving selection lines up with (`pen/snap.ts`): the items around it and the boards,
+	 * as far as the window shows. Top-level items, and the siblings of an item inside a frame; never
+	 * what is moving, the inside of an instance, or an arrow, whose box is only where its line runs.
+	 */
+	const snapTargets = (ids: readonly string[], boards: readonly string[]): Box[] => {
+		const v = view();
+		const a = toWorld(localCamera, v, { x: 0, y: 0 });
+		const b = toWorld(localCamera, v, { x: v.width, y: v.height });
+		const seen = (box: Box) => box.x < b.x && box.x + box.w > a.x && box.y < b.y && box.y + box.h > a.y;
+		const moving = new Set(ids);
+		const parents = new Set(ids.map((id) => penLayer.placed.get(id)?.parent).filter((id): id is string => !!id));
+		const out: Box[] = [];
+		for (const placed of penLayer.placed.values()) {
+			const { node } = placed;
+			if (moving.has(node.id) || node.id.includes("/") || isArrow(node)) continue;
+			if (node.type === "browser" && node.metadata?.type === "decks.board") continue;
+			if (placed.parent && !parents.has(placed.parent)) continue;
+			const box = penLayer.bounds.get(node.id) ?? placed.box;
+			if (seen(box)) out.push(box);
+		}
+		for (const board of props.boards) if (!boards.includes(board.path) && seen(board)) out.push({ x: board.x, y: board.y, w: board.w, h: board.h });
+		return out;
+	};
+	/** Snapping reaches this many screen pixels, whatever the zoom. */
+	const SNAP_PX = 6;
+	/** The box round everything in a selection: items as drawn, boards as placed. */
+	const selectionBox = (ids: readonly string[], boards: readonly string[]): Box | undefined => {
+		const boxes: Box[] = [
+			...ids.flatMap((id) => {
+				const box = penLayer.bounds.get(id) ?? penLayer.placed.get(id)?.box;
+				return box ? [box] : [];
+			}),
+			...props.boards.filter((board) => boards.includes(board.path)).map((board) => ({ x: board.x, y: board.y, w: board.w, h: board.h })),
+		];
+		if (boxes.length === 0) return undefined;
+		const x1 = Math.min(...boxes.map((box) => box.x));
+		const y1 = Math.min(...boxes.map((box) => box.y));
+		const x2 = Math.max(...boxes.map((box) => box.x + box.w));
+		const y2 = Math.max(...boxes.map((box) => box.y + box.h));
+		return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+	};
+
+	/**
+	 * Drag a selection — items and boards together — the way a design tool does: it snaps to what is
+	 * around it and draws guides (⌘ or Ctrl held turns that off), Shift keeps it to one axis, and Alt
+	 * lets go of copies of the items, leaving the originals where they were.
+	 */
+	const dragSelection = (event: PointerEvent, ids: readonly string[], boards: readonly string[], on?: HTMLElement) => {
+		const start = selectionBox(ids, boards);
+		const targets = snapTargets(ids, boards);
+		let offset = { dx: 0, dy: 0 };
+		follow(
+			event,
+			(e) => {
+				let dx = (e.clientX - event.clientX) / localCamera.zoom;
+				let dy = (e.clientY - event.clientY) / localCamera.zoom;
+				if (e.shiftKey) {
+					if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+					else dx = 0;
+				}
+				let lines: Guide[] = [];
+				if (start && !(e.metaKey || e.ctrlKey)) {
+					const snapped = snapMove({ ...start, x: start.x + dx, y: start.y + dy }, targets, SNAP_PX / localCamera.zoom);
+					if (!e.shiftKey || dx !== 0) dx += snapped.dx;
+					if (!e.shiftKey || dy !== 0) dy += snapped.dy;
+					lines = snapped.guides;
+				}
+				offset = { dx, dy };
+				pannedAt = performance.now();
+				batch(() => {
+					setGuides(lines);
+					if (ids.length) setPenDrag(offset);
+					if (boards.length) setBoardDrag({ paths: boards, ...offset });
+				});
+				if (ids.length) penLayer.preview(new Map(ids.map((id) => [id, offset])));
+			},
+			(moved, e) => {
+				batch(() => {
+					setGuides([]);
+					if (!moved) {
+						setBoardDrag(undefined);
+						return;
+					}
+					if (e.altKey && ids.length) {
+						penLayer.preview(undefined);
+						setPenDrag({ dx: 0, dy: 0 });
+						penCopyBy(ids, offset.dx, offset.dy);
+					} else penMoveBy(ids, offset.dx, offset.dy);
+					moveBoards(boards, offset.dx, offset.dy);
+					setBoardDrag(undefined);
+				});
+			},
+			on,
+		);
+	};
+
+	/** A press on the drawing; true when it was the drawing's to handle. */
 	const penPress = (event: PointerEvent): boolean => {
 		const at = worldAt(event);
 		const tool = penTool();
 		if (tool !== "select") {
 			event.preventDefault();
 			props.onSelect(undefined);
+			setBoardPicks([]);
 			penCreate(event, tool, at);
 			return true;
 		}
@@ -777,44 +954,76 @@ export function Stage(props: {
 				setPenSelection(selected.includes(hit.id) ? selected.filter((id) => id !== hit.id) : [...selected, hit.id]);
 				return true;
 			}
-			const moving = selected.includes(hit.id) ? selected : [hit.id];
-			setPenSelection(moving);
-			let offset = { dx: 0, dy: 0 };
-			follow(
-				event,
-				(e) => {
-					offset = { dx: (e.clientX - event.clientX) / localCamera.zoom, dy: (e.clientY - event.clientY) / localCamera.zoom };
-					setPenDrag(offset);
-					penLayer.preview(new Map(moving.map((id) => [id, offset])));
-				},
-				(moved) => {
-					if (moved) penMoveBy(moving, offset.dx, offset.dy);
-				},
-			);
+			const group = selected.includes(hit.id);
+			const moving = group ? selected : [hit.id];
+			const boards = group ? boardPicks() : [];
+			if (!group) {
+				setPenSelection(moving);
+				setBoardPicks([]);
+			}
+			setHoverId(undefined);
+			dragSelection(event, moving, boards);
 			return true;
 		}
+		/*
+		 * Bare canvas: a marquee, as in a design tool, picking the items and the boards wholly inside
+		 * it as it goes. Shift adds to what is already selected. The camera pans with a scroll, a
+		 * pinch, Space and a drag, or the middle button — never with a plain drag here.
+		 */
+		event.preventDefault();
+		props.onSelect(undefined);
+		const adding = event.shiftKey;
+		const keptItems = adding ? penSelection() : [];
+		const keptBoards = adding ? boardPicks() : [];
+		if (!adding) {
+			setPenSelection([]);
+			setBoardPicks([]);
+		}
+		setPenMarquee({ x1: at.x, y1: at.y, x2: at.x, y2: at.y });
+		const pick = (m: { x1: number; y1: number; x2: number; y2: number }) => {
+			const r = { x: Math.min(m.x1, m.x2), y: Math.min(m.y1, m.y2), w: Math.abs(m.x2 - m.x1), h: Math.abs(m.y2 - m.y1) };
+			const inside = (b: Box) => b.x >= r.x && b.y >= r.y && b.x + b.w <= r.x + r.w && b.y + b.h <= r.y + r.h;
+			batch(() => {
+				setPenSelection([...new Set([...keptItems, ...penLayer.within(r)])]);
+				setBoardPicks([...new Set([...keptBoards, ...props.boards.filter(inside).map((board) => board.path)])]);
+			});
+		};
+		follow(
+			event,
+			(e) => {
+				const now = worldAt(e);
+				const m = { x1: at.x, y1: at.y, x2: now.x, y2: now.y };
+				pannedAt = performance.now();
+				setPenMarquee(m);
+				pick(m);
+			},
+			() => setPenMarquee(undefined),
+		);
+		return true;
+	};
+
+	/**
+	 * A press on a board's title bar (`BoardFrame`), with a mouse or a pen: the stage moves it, so it
+	 * moves with whatever else is selected and snaps like everything else. Shift adds the board to the
+	 * selection or takes it out. A finger's drag stays the board's own, where a pinch can take it back.
+	 */
+	const dragBoard = (path: string, event: PointerEvent): boolean => {
+		if (event.button !== 0) return false;
+		event.stopPropagation();
+		event.preventDefault();
+		const picks = boardPicks();
 		if (event.shiftKey) {
-			event.preventDefault();
-			props.onSelect(undefined);
-			setPenMarquee({ x1: at.x, y1: at.y, x2: at.x, y2: at.y });
-			follow(
-				event,
-				(e) => {
-					const now = worldAt(e);
-					setPenMarquee({ x1: at.x, y1: at.y, x2: now.x, y2: now.y });
-				},
-				() => {
-					const m = penMarquee();
-					setPenMarquee(undefined);
-					if (!m) return;
-					const picked = penLayer.within({ x: Math.min(m.x1, m.x2), y: Math.min(m.y1, m.y2), w: Math.abs(m.x2 - m.x1), h: Math.abs(m.y2 - m.y1) });
-					setPenSelection([...new Set([...penSelection(), ...picked])]);
-				},
-			);
+			setBoardPicks(picks.includes(path) ? picks.filter((p) => p !== path) : [...picks, path]);
 			return true;
 		}
-		setPenSelection([]);
-		return false;
+		const group = picks.includes(path);
+		if (!group) {
+			setBoardPicks([]);
+			setPenSelection([]);
+		}
+		props.onSelect(path);
+		dragSelection(event, group ? penSelection() : [], group ? picks : [path], event.currentTarget as HTMLElement);
+		return true;
 	};
 
 	/** The eight handles round a single selection, by the edges each one moves. */
@@ -838,6 +1047,13 @@ export function Stage(props: {
 			return { x: drawn.x - (start.x - given.x) * sx, y: drawn.y - (start.y - given.y) * sy, w: given.w * sx, h: given.h * sy };
 		};
 		let next = start;
+		const targets = snapTargets([id], []);
+		const edges = [
+			...(handle.includes("w") ? (["x1"] as const) : []),
+			...(handle.includes("e") ? (["x2"] as const) : []),
+			...(handle.includes("n") ? (["y1"] as const) : []),
+			...(handle.includes("s") ? (["y2"] as const) : []),
+		];
 		follow(
 			event,
 			(e) => {
@@ -847,6 +1063,14 @@ export function Stage(props: {
 				let x2 = start.x + start.w + (handle.includes("e") ? dx : 0);
 				let y1 = start.y + (handle.includes("n") ? dy : 0);
 				let y2 = start.y + start.h + (handle.includes("s") ? dy : 0);
+				// The edges being dragged snap to what is around, unless ⌘ or Ctrl is held.
+				let lines: Guide[] = [];
+				if (!(e.metaKey || e.ctrlKey)) {
+					const snapped = snapEdges({ x1, y1, x2, y2 }, edges, targets, SNAP_PX / localCamera.zoom);
+					({ x1, y1, x2, y2 } = snapped.box);
+					lines = snapped.guides;
+				}
+				setGuides(lines);
 				// Shift keeps the shape: the wider of the two changes sets both.
 				if (e.shiftKey && handle.length === 2 && start.w > 0 && start.h > 0) {
 					const scale = Math.max((x2 - x1) / start.w, (y2 - y1) / start.h);
@@ -861,6 +1085,7 @@ export function Stage(props: {
 				penLayer.preview(new Map<string, PenPreview>([[id, { dx: box.x - given.x, dy: box.y - given.y, w: box.w, h: box.h }]]));
 			},
 			(moved) => {
+				setGuides([]);
 				if (!moved) return;
 				const box = givenFor(next);
 				const r = (n: number) => Math.round(n * 10) / 10;
@@ -899,6 +1124,78 @@ export function Stage(props: {
 	const boardAt = (point: { x: number; y: number }) =>
 		props.boards.findLast((b) => point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h)?.path;
 
+	/**
+	 * What an arrow's end joins at a point: the item on top there, or else the board, with its box
+	 * to light up. Never an arrow — joining one line to another is not something the drawing does —
+	 * and never the arrow whose end it is.
+	 */
+	const joinAt = (point: { x: number; y: number }, not?: string): { name: string; box: Box } | undefined => {
+		const hit = penLayer.hitTest(point, { skip: (node) => isArrow(node) || node.id === not });
+		if (hit) return { name: hit.id, box: hit.box };
+		const path = boardAt(point);
+		const board = path ? props.boards.find((candidate) => candidate.path === path) : undefined;
+		return board ? { name: board.path, box: { x: board.x, y: board.y, w: board.w, h: board.h } } : undefined;
+	};
+	const pointEnd = (point: { x: number; y: number }): [number, number] => [Math.round(point.x * 10) / 10, Math.round(point.y * 10) / 10];
+
+	/** The two ends of a selected arrow as drawn, for the handles that pick them up. */
+	const arrowEnds = createMemo(() => {
+		penDrawn();
+		const ids = penSelection();
+		if (ids.length !== 1 || boardPicks().length) return undefined;
+		const node = penLayer.placed.get(ids[0]!)?.node;
+		if (!node || !isArrow(node)) return undefined;
+		const meta = node.metadata as { from?: unknown; to?: unknown; route?: unknown };
+		const boards = (name: string) => props.boards.find((board) => board.path === name);
+		const from = arrowEnd(meta.from, penLayer.placed, boards);
+		const to = arrowEnd(meta.to, penLayer.placed, boards);
+		if (!from || !to) return undefined;
+		const points = arrowRoute(from, to, meta.route === "elbow");
+		const drag = penDrag();
+		const [fx, fy] = points[0]!;
+		const [tx, ty] = points[points.length - 1]!;
+		return { id: node.id, from: { x: fx + drag.dx, y: fy + drag.dy }, to: { x: tx + drag.dx, y: ty + drag.dy } };
+	});
+
+	/**
+	 * An arrow's end, picked up and put down somewhere else: on an item or a board it joins it, and
+	 * follows it from then on; on bare canvas it stays at that point. What it would join lights up
+	 * while it is carried, as it does while the arrow is drawn.
+	 */
+	const dragArrowEnd = (event: PointerEvent, which: "from" | "to") => {
+		const ends = arrowEnds();
+		if (event.button !== 0 || !ends) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const node = penNode(ends.id);
+		if (!node?.metadata) return;
+		const stays = which === "from" ? ends.to : ends.from;
+		follow(
+			event,
+			(e) => {
+				const now = worldAt(e);
+				const join = joinAt(now, ends.id);
+				batch(() => {
+					setEndDraft(which === "from" ? { x1: now.x, y1: now.y, x2: stays.x, y2: stays.y } : { x1: stays.x, y1: stays.y, x2: now.x, y2: now.y });
+					setJoinHint(join ? [join.box] : []);
+				});
+			},
+			(moved, e) => {
+				batch(() => {
+					setEndDraft(undefined);
+					setJoinHint([]);
+				});
+				if (!moved) return;
+				const now = worldAt(e);
+				const other = node.metadata![which === "from" ? "to" : "from"];
+				const join = joinAt(now, ends.id);
+				// An arrow from a thing to itself is a point on it instead.
+				const end = join && join.name !== other ? join.name : pointEnd(now);
+				penEdit([{ op: "update", id: ends.id, set: { metadata: { ...node.metadata, [which]: end } } }]);
+			},
+		);
+	};
+
 	/** The innermost free-standing frame under a point: an item drawn inside one belongs to it. */
 	const frameAt = (point: { x: number; y: number }) => {
 		let best: { id: string; order: number } | undefined;
@@ -913,29 +1210,37 @@ export function Stage(props: {
 
 	const penCreate = (event: PointerEvent, tool: Exclude<PenTool, "select">, at: { x: number; y: number }) => {
 		setPenDraft({ tool, x1: at.x, y1: at.y, x2: at.x, y2: at.y });
+		// An arrow lights up what each of its ends would join, from the first press to the release.
+		const startJoin = tool === "arrow" ? joinAt(at) : undefined;
+		if (startJoin) setJoinHint([startJoin.box]);
 		follow(
 			event,
 			(e) => {
 				const now = worldAt(e);
 				setPenDraft({ tool, x1: at.x, y1: at.y, x2: now.x, y2: now.y });
+				if (tool === "arrow") {
+					const endJoin = joinAt(now);
+					setJoinHint([...(startJoin ? [startJoin.box] : []), ...(endJoin && endJoin.name !== startJoin?.name ? [endJoin.box] : [])]);
+				}
 			},
 			(moved, e) => {
 				setPenDraft(undefined);
+				setJoinHint([]);
 				setPenTool("select");
 				penMadeAt = performance.now();
 				const end = worldAt(e);
 				const id = freshId();
 				if (tool === "arrow") {
-					// Joined when both ends are on something, so it follows them; a free arrow otherwise.
-					const endOf = (point: { x: number; y: number }) => penLayer.hitTest(point)?.id ?? boardAt(point);
-					const from = endOf(at);
-					const to = endOf(end);
-					if (from && to && from !== to) {
-						penEdit([{ op: "insert", node: { type: "path", id, metadata: { type: ARROW, from, to } } }]);
-					} else if (moved) {
-						const shape = arrowShape([[at.x, at.y], [end.x, end.y]], 2);
-						penEdit([{ op: "insert", node: { type: "path", id, ...shape, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } }]);
-					} else return;
+					/*
+					 * Each end joins what it was let go on, and follows it from then on; an end on bare
+					 * canvas is a point there. A click with no drag makes an arrow only between two things.
+					 */
+					const fromJoin = joinAt(at)?.name;
+					const toJoin = joinAt(end)?.name;
+					const from = fromJoin ?? pointEnd(at);
+					const to = toJoin && toJoin !== fromJoin ? toJoin : pointEnd(end);
+					if (!moved && (!fromJoin || !toJoin || fromJoin === toJoin)) return;
+					penEdit([{ op: "insert", node: { type: "path", id, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", metadata: { type: ARROW, from, to } } }]);
 					selectMade([id]);
 					return;
 				}
@@ -1629,6 +1934,115 @@ export function Stage(props: {
 	};
 
 	/**
+	 * The outline a design tool draws round what the pointer is over, before anything is pressed:
+	 * what a press there would select. A mouse or a pen with no button down, over the drawing; a board
+	 * outlines itself (`canvas.css`, edit mode), and anything else clears it. Once per frame at most.
+	 */
+	let hoverFrame: number | undefined;
+	let hoverAt: { x: number; y: number } | undefined;
+	const onHover = (event: PointerEvent) => {
+		if (event.pointerType === "touch" || !props.onPenEdit || props.drawing) return;
+		if (event.buttons !== 0 || penTool() !== "select" || !onCanvas(event.target)) {
+			hoverAt = undefined;
+			if (hoverId()) setHoverId(undefined);
+			return;
+		}
+		hoverAt = worldAt(event);
+		hoverFrame ??= requestAnimationFrame(() => {
+			hoverFrame = undefined;
+			const hit = hoverAt ? penLayer.hitTest(hoverAt) : undefined;
+			setHoverId(hit && !penSelection().includes(hit.id) ? hit.id : undefined);
+		});
+	};
+	onCleanup(() => {
+		if (hoverFrame !== undefined) cancelAnimationFrame(hoverFrame);
+	});
+	/** The hovered item's box as it is drawn now. */
+	const hoverBox = createMemo(() => {
+		penDrawn();
+		const id = hoverId();
+		return id ? penLayer.bounds.get(id) : undefined;
+	});
+
+	/** The last tap on a drawn item, so a second one soon after on the same item opens its words. */
+	let lastTap: { id: string; at: number } | undefined;
+	/**
+	 * A finger on the drawing. On an item already selected it moves the selection (the finger is
+	 * claimed, so the camera stays put); anywhere else it is a pan unless it lifts where it landed,
+	 * which is a tap: the item is selected, and a second tap on words opens them for typing.
+	 */
+	const touchOnDrawing = (event: PointerEvent) => {
+		const at = worldAt(event);
+		const hit = penLayer.hitTest(at);
+		if (!hit) return;
+		const pointer = event.pointerId;
+		const from = { x: event.clientX, y: event.clientY };
+		const since = performance.now();
+		const selected = penSelection();
+		const carrying = selected.includes(hit.id);
+		if (carrying) claimed.add(pointer);
+		let offset = { dx: 0, dy: 0 };
+		let moved = false;
+		const done = () => {
+			window.removeEventListener("pointermove", move);
+			window.removeEventListener("pointerup", up);
+			window.removeEventListener("pointercancel", cancel);
+		};
+		const abandon = () => {
+			done();
+			if (moved && carrying) {
+				penLayer.preview(undefined);
+				setPenDrag({ dx: 0, dy: 0 });
+				setBoardDrag(undefined);
+			}
+		};
+		const move = (e: PointerEvent) => {
+			if (e.pointerId !== pointer) return;
+			// A second finger: this was the start of a pinch, and whatever it carried goes back.
+			if (touches.count() > 1) return abandon();
+			if (!moved && Math.hypot(e.clientX - from.x, e.clientY - from.y) < 10) return;
+			moved = true;
+			if (!carrying) return;
+			offset = { dx: (e.clientX - from.x) / localCamera.zoom, dy: (e.clientY - from.y) / localCamera.zoom };
+			batch(() => {
+				setPenDrag(offset);
+				if (boardPicks().length) setBoardDrag({ paths: boardPicks(), ...offset });
+			});
+			penLayer.preview(new Map(selected.map((id) => [id, offset])));
+		};
+		const up = (e: PointerEvent) => {
+			if (e.pointerId !== pointer) return;
+			done();
+			if (moved) {
+				if (carrying)
+					batch(() => {
+						penMoveBy(selected, offset.dx, offset.dy);
+						moveBoards(boardPicks(), offset.dx, offset.dy);
+						setBoardDrag(undefined);
+					});
+				return;
+			}
+			if (performance.now() - since > 600) return;
+			const deep = penLayer.hitTest(at, { deep: true });
+			if (lastTap && lastTap.id === hit.id && performance.now() - lastTap.at < 400 && deep && TEXTY.has(deep.node.type)) {
+				lastTap = undefined;
+				openPenText(deep);
+				return;
+			}
+			lastTap = { id: hit.id, at: performance.now() };
+			props.onSelect(undefined);
+			setBoardPicks([]);
+			setPenSelection([hit.id]);
+		};
+		const cancel = (e: PointerEvent) => {
+			if (e.pointerId === pointer) abandon();
+		};
+		window.addEventListener("pointermove", move);
+		window.addEventListener("pointerup", up);
+		window.addEventListener("pointercancel", cancel);
+	};
+
+	/**
 	 * When the camera was last dragged, so a double-click can tell itself apart from a pan.
 	 *
 	 * Chromium fires `dblclick` after two presses whatever happened between them, and a quick
@@ -1646,7 +2060,7 @@ export function Stage(props: {
 	 * bubble out of a frame. So the test is the node, not the element.
 	 */
 	const onDblClick = (event: MouseEvent) => {
-		if (props.mode === "edit" && props.onPenEdit && onCanvas(event.target)) {
+		if (props.onPenEdit && !props.drawing && onCanvas(event.target)) {
 			// The second press of a quick double-click on a tool's first item is not a request for a board.
 			if (performance.now() - penMadeAt < 500) return;
 			// A double-click reaches inside a group: words open for rewriting, anything else is selected on its own.
@@ -1677,16 +2091,28 @@ export function Stage(props: {
 		 * here would take focus away from the composer mid-sentence.
 		 */
 		if (event.pointerType === "touch") {
+			/*
+			 * A finger with a tool armed makes the item, as a pencil or a mouse does. A finger on a
+			 * drawn item selects it with a tap and moves it once it is selected — the same rule a
+			 * board's components follow (`Editor.ts`), so a pan across the drawing never picks
+			 * anything up by accident. Both only for the first finger: a second is a pinch.
+			 */
+			const pen = props.onPenEdit && !props.drawing && touches.count() === 0 && onCanvas(event.target);
+			if (pen && penTool() !== "select") {
+				penPress(event);
+				return;
+			}
 			beginTouch(event);
+			if (pen && onDrawn(event.target)) touchOnDrawing(event);
 			return;
 		}
 
 		/*
-		 * The drawing, in edit mode: an armed tool makes its item; otherwise a press on an item picks
-		 * it up, a shift-press adds it to the selection or takes it out, and a shift-drag on empty
-		 * canvas draws a marquee. A plain press on empty canvas lets go and pans, as it always has.
+		 * The drawing, in either mode: an armed tool makes its item; otherwise a press on an item picks
+		 * it up, a shift-press adds it to the selection or takes it out, and a drag on empty canvas
+		 * draws a marquee. The camera pans with Space and a drag, the middle button, a scroll or a pinch.
 		 */
-		if (props.mode === "edit" && props.onPenEdit && event.button === 0 && onCanvas(event.target) && !spaceHeld()) {
+		if (props.onPenEdit && !props.drawing && event.button === 0 && onCanvas(event.target) && !spaceHeld()) {
 			if (penPress(event)) return;
 		}
 
@@ -1862,7 +2288,16 @@ export function Stage(props: {
 							{...(props.onWebReply ? { onWebReply: props.onWebReply } : {})}
 							{...(props.onOpenBoard ? { onOpenBoard: props.onOpenBoard } : {})}
 							{...(props.onBoardEval ? { onBoardEval: props.onBoardEval } : {})}
-							onSelect={() => props.onSelect(board.path)}
+							onSelect={() => {
+								// A press in a board is that board alone, unless it is part of the selection already.
+								if (!untrack(boardPicks).includes(board.path) && (untrack(boardPicks).length || untrack(penSelection).length)) {
+									setBoardPicks([]);
+									setPenSelection([]);
+								}
+								props.onSelect(board.path);
+							}}
+							drag={(event) => (props.onPenEdit ? dragBoard(board.path, event) : false)}
+							shift={boardDrag()?.paths.includes(board.path) ? boardDrag() : undefined}
 							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}
 							{...(props.onResize ? { onResize: (size) => props.onResize?.(board.path, size) } : {})}
@@ -1907,12 +2342,14 @@ export function Stage(props: {
 			data-previewing={Boolean(props.preview)}
 			data-focus={props.focus ? "true" : undefined}
 			data-panning={panning()}
-			data-pen-tool={props.mode === "edit" && props.onPenEdit && penTool() !== "select" ? penTool() : undefined}
+			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
 			data-scaling={scaling() && props.boards.filter(isVisible).length <= LAYER_BUDGET}
 			data-gliding={gliding()}
 			ref={element}
 			onWheel={onWheel}
 			onPointerDown={onPointerDown}
+			onPointerMove={onHover}
+			onPointerLeave={() => setHoverId(undefined)}
 			onDblClick={onDblClick}
 			style={{ cursor: spaceHeld() ? "grab" : undefined }}
 		>
@@ -1952,6 +2389,76 @@ export function Stage(props: {
 						/>
 					)}
 				</For>
+				<Show when={hoverBox()}>
+					{(box) => (
+						<div
+							class="pen-hover"
+							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${1 / props.camera.zoom}px var(--color-accent)` }}
+						/>
+					)}
+				</Show>
+				<For each={joinHint()}>
+					{(box) => (
+						<div
+							class="pen-join"
+							style={{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, "box-shadow": `0 0 0 ${2 / props.camera.zoom}px var(--color-accent)` }}
+						/>
+					)}
+				</For>
+				<Show when={guides().length > 0}>
+					<svg class="pen-guides" width="1" height="1" overflow="visible" aria-hidden="true">
+						<For each={guides()}>
+							{(guide) => (
+								<>
+									<line x1={guide.x1} y1={guide.y1} x2={guide.x2} y2={guide.y2} data-kind={guide.kind} stroke-width={1 / props.camera.zoom} />
+									<Show when={guide.kind === "gap"}>
+										{(() => {
+											const tick = 4 / props.camera.zoom;
+											const across = guide.y1 === guide.y2;
+											return (
+												<>
+													<line x1={across ? guide.x1 : guide.x1 - tick} y1={across ? guide.y1 - tick : guide.y1} x2={across ? guide.x1 : guide.x1 + tick} y2={across ? guide.y1 + tick : guide.y1} data-kind="gap" stroke-width={1 / props.camera.zoom} />
+													<line x1={across ? guide.x2 : guide.x2 - tick} y1={across ? guide.y2 - tick : guide.y2} x2={across ? guide.x2 : guide.x2 + tick} y2={across ? guide.y2 + tick : guide.y2} data-kind="gap" stroke-width={1 / props.camera.zoom} />
+												</>
+											);
+										})()}
+									</Show>
+								</>
+							)}
+						</For>
+					</svg>
+				</Show>
+				<Show when={arrowEnds()}>
+					{(ends) => (
+						<For each={["from", "to"] as const}>
+							{(which) => {
+								const size = () => 11 / props.camera.zoom;
+								return (
+									<div
+										class="pen-handle"
+										data-end={which}
+										style={{
+											left: `${ends()[which].x - size() / 2}px`,
+											top: `${ends()[which].y - size() / 2}px`,
+											width: `${size()}px`,
+											height: `${size()}px`,
+											"border-radius": "50%",
+											"border-width": `${1.5 / props.camera.zoom}px`,
+										}}
+										onPointerDown={(event) => dragArrowEnd(event, which)}
+									/>
+								);
+							}}
+						</For>
+					)}
+				</Show>
+				<Show when={endDraft()}>
+					{(line) => (
+						<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
+							<line x1={line().x1} y1={line().y1} x2={line().x2} y2={line().y2} stroke="var(--color-accent)" stroke-width={2 / props.camera.zoom} stroke-dasharray={`${6 / props.camera.zoom}`} />
+						</svg>
+					)}
+				</Show>
 				<Show when={penHandles()}>
 					{(box) => (
 						<For each={HANDLES}>
@@ -2046,6 +2553,7 @@ export function Stage(props: {
 					colourEdit={() => inkVariableEdit(props.pen?.doc)}
 					newId={freshId}
 					onShift={(ids, dx, dy) => penMoveBy(ids, dx, dy)}
+					{...(props.onPenStep ? { onStep: props.onPenStep } : {})}
 				/>
 			</Show>
 			<Show when={focused()} keyed>

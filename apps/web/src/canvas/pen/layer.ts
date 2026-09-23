@@ -98,11 +98,12 @@ export class PenLayer {
 	 * double-click. Boards are not drawn here and are not found; an item inside an instance is
 	 * found as the instance, because a copy is moved and deleted whole.
 	 */
-	hitTest(point: { x: number; y: number }, options?: { deep?: boolean }): PenHit | undefined {
+	hitTest(point: { x: number; y: number }, options?: { deep?: boolean; skip?: (node: PenNode) => boolean }): PenHit | undefined {
 		let best: Placed | undefined;
 		for (const placed of this.placed.values()) {
 			const { node } = placed;
 			if (node.id.includes("/") || node.type === "group") continue;
+			if (options?.skip?.(node)) continue;
 			if (node.type === "browser" && node.metadata?.type === "decks.board") continue;
 			const box = this.bounds.get(node.id) ?? placed.box;
 			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;

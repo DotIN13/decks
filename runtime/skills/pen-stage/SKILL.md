@@ -154,7 +154,10 @@ await stage.pen.edit([
 ]);
 ```
 
-`from` and `to` are an item's id or a board's path. `metadata.route: "elbow"` draws right angles
+`from` and `to` are an item's id, a board's path, or a point on the stage as `[x, y]`: an end
+that stops on bare canvas, which the person makes by letting an arrow go there. A point end stays
+where it is on the stage, so to move such an arrow shift its points in `metadata` along with its
+`x` and `y`, or the next redraw puts it back. `metadata.route: "elbow"` draws right angles
 instead of a straight line. Set `stroke` and `strokeWidth` if you want a colour or weight other
 than the grey default; a label is a `text` placed by the arrow's `box`.
 

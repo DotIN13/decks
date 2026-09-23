@@ -1432,7 +1432,8 @@ export function App() {
 					/>
 				</Show>
 
-				<Show when={mode() === "edit" && stagePen()}>
+				{/* The drawing's tools, in both modes: browse leaves the boards' pages as they are, not the drawing. */}
+				<Show when={!(drawing() && mode() === "browse") && stagePen()}>
 					{(pen) => (
 						<PenBar
 							doc={pen().doc}
