@@ -350,7 +350,8 @@ export function Corner(props: {
 			<Popover
 				placement="bottom-end"
 				label="More"
-				class="w-[248px]"
+				/* As wide as its longest row: three short words on a desktop, the folded toolbar on a phone. */
+				class="w-max min-w-[168px] max-w-[248px]"
 				trigger={(api) => (
 					<button
 						ref={api.ref}
