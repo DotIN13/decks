@@ -42,6 +42,8 @@ const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key: string
 	{ tool: "text", icon: Type, label: "Text", key: "T" },
 	{ tool: "arrow", icon: ArrowUpRight, label: "Arrow: drag from one thing to another and it stays joined", key: "A" },
 ];
+
+const FILLS = ["#ffffff", "#dbe4f0", "#fde68a", "#bbf7d0", "#bfdbfe", "#fecaca", "#1f2328"];
 const LINE_WIDTHS = [0, 1, 2, 4];
 const TEXTY = new Set(["text", "note", "prompt", "context"]);
 

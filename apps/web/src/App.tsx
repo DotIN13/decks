@@ -1314,14 +1314,6 @@ export function App() {
 					onDrawing={setDrawing}
 					boardsOpen={boardsOpen()}
 					onToggleBoards={() => showBoards(!boardsOpen())}
-					onUndo={() => {
-						const path = selected() ?? component()?.path;
-						if (!path) {
-							notice("info", "Pick the board to undo on first.");
-							return;
-						}
-						send({ type: "board.undo", path });
-					}}
 				/>
 
 				<Corner

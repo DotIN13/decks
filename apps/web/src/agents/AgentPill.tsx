@@ -3,7 +3,6 @@ import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
-import Undo2 from "lucide-solid/icons/undo-2";
 import Pencil from "lucide-solid/icons/pencil";
 import Brush from "lucide-solid/icons/brush";
 import Hand from "lucide-solid/icons/hand";
@@ -28,8 +27,8 @@ import { AgentHoverCard } from "./AgentHoverCard.tsx";
  * and they used to have to dodge the palette; and **a line that fits a 393px phone**, which
  * two clusters never did.
  *
- * In edit mode it carries undo for a board. The tools that add things are the stage's own now,
- * in a column on the canvas's left edge (`canvas/pen/PenBar.tsx`).
+ * The tools that add things, and undo and redo, are the stage's own, in a column on the canvas's
+ * left edge (`canvas/pen/PenBar.tsx`). A board's own edits still undo with ⌘Z inside the board.
  *
  * Presentational on purpose. It takes the chats, the identities and a callback per verb —
  * nothing here reads the socket or `App`'s state, so the whole cluster can be drawn from a
@@ -530,8 +529,6 @@ export function AgentPill(props: {
 	/** Whether the boards panel is showing. A button, not a hover — folded means gone. */
 	boardsOpen: boolean;
 	onToggleBoards: () => void;
-	/** Undo the last edit to the selected board. Absent when there is nothing to undo. */
-	onUndo?: () => void;
 	/** The agents, for the switcher: a face and a name, one button, opening the agent list. */
 	chats: AgentChat[];
 	identities: Record<string, Identity>;
@@ -697,37 +694,6 @@ export function AgentPill(props: {
 			</Show>
 
 
-			{/*
-				Editing chrome, only while editing. The tools that used to sit here inserted components
-				into a board; the stage's own tools add to the stage now, and live in the column on the
-				canvas's left edge (`canvas/pen/PenBar.tsx`). What is left is undo for a board.
-			*/}
-			<Show when={props.mode === "edit"}>
-			{/*
-			 * Undo, last, behind its own rule.
-			 *
-			 * Not a tool — it does not change what a click on the canvas does — and it sits
-			 * with them anyway, because this pill is the editing chrome and on a touchscreen
-			 * it is the *only* editing chrome. ⌘Z remains the desktop's answer; this is the
-			 * one for a device with no ⌘.
-			 */}
-			<Show when={props.onUndo}>
-				{(undo) => (
-					<>
-						<span class="pill-sep" aria-hidden="true" />
-						<button
-							type="button"
-							class="icon-button"
-							title="Undo the last edit to this board (⌘Z)"
-							aria-label="Undo the last edit to this board"
-							onClick={() => undo()()}
-						>
-							<Icon of={Undo2} size={15} />
-						</button>
-					</>
-				)}
-			</Show>
-			</Show>
 		</div>
 	);
 }
