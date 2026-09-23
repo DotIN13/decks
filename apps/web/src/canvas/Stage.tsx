@@ -1941,8 +1941,8 @@ export function Stage(props: {
 				</For>
 				{/*
 				 * The drawing over the boards, and the invisible shapes that catch clicks on it: after
-				 * the boards, so over them, and under the selected board, which is lifted over both
-				 * (`canvas.css`). See `pen/layer.ts`.
+				 * the boards, so over them; a click goes through to a board wherever nothing drawn is in
+				 * the way. See `pen/layer.ts`.
 				 */}
 				<canvas class="pen-over" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas, "over")} />
 				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />

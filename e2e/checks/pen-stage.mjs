@@ -190,8 +190,12 @@ if (boardItem) {
 	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "e2e-over", fill: "#bfdbfe" }, box: { x1: boardItem.x + 20, y1: boardItem.y + 20, x2: boardItem.x + 20 + w, y2: boardItem.y + 20 + h } }] });
 	await until(() => onDisk().children.some((n) => n.id === "e2e-over"));
 	await page.keyboard.press("Escape");
-	await page.keyboard.press("0");
-	await settle(page, 900);
+	// Close enough that the board is live: below that zoom a board is a picture and a click only selects it.
+	await page.locator(`.board-node[data-path="${firstBoard}"] .chrome`).click();
+	await page.keyboard.press("1");
+	await settle(page, 1200);
+	await page.keyboard.press("Escape");
+	await settle(page, 200);
 	const at = await page.evaluate(({ x, y }) => {
 		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
 		return { x: m.e + x * m.a, y: m.f + y * m.a };
@@ -215,17 +219,20 @@ if (boardItem) {
 		}
 	}, firstBoard);
 	say("the board has an uncovered spot on screen", !!free);
-	if (free) await page.mouse.click(free.x, free.y);
-	const raised = await until(() => node.evaluate((n) => n.dataset.selected === "true" && getComputedStyle(n).zIndex === "2"));
-	say("a click on the board's uncovered part selects it and lifts it over the drawing", !!raised && (await under()) === "board", await under());
-	// The rectangle is under the raised board now; a press beside the board, on bare canvas, lets it go.
-	const bare = await page.evaluate(() => {
-		const stage = document.querySelector(".stage");
-		for (let y = 120; y < innerHeight - 120; y += 15) for (let x = 320; x < innerWidth - 20; x += 15) if (document.elementFromPoint(x, y) === stage) return { x, y };
+	// Count the presses the board's own page receives.
+	await node.evaluate((n) => {
+		const doc = n.querySelector("iframe").contentDocument;
+		doc.__presses = 0;
+		doc.addEventListener("pointerdown", () => (doc.__presses += 1), true);
 	});
-	if (bare) await page.mouse.click(bare.x, bare.y);
-	await until(() => node.evaluate((n) => n.dataset.selected !== "true"));
-	say("a press on bare canvas lets the board go, back under the drawing", (await under()) === "drawing:e2e-over", await under());
+	const presses = () => node.evaluate((n) => n.querySelector("iframe").contentDocument.__presses);
+	if (free) await page.mouse.click(free.x, free.y);
+	const reached = await until(() => node.evaluate((n) => n.dataset.selected === "true"));
+	say("a click beside the drawing goes straight through to the board's page, with nothing to lift first", !!reached && (await presses()) === 1, `presses ${await presses()}`);
+	say("…and the drawing stays on top of the selected board", (await under()) === "drawing:e2e-over", await under());
+	await page.mouse.click(at.x, at.y);
+	await settle(page, 300);
+	say("a click on the drawing does not reach the page under it", (await presses()) === 1, `presses ${await presses()}`);
 }
 await editMode(page, false);
 

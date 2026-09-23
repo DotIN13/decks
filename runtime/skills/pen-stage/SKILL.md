@@ -19,9 +19,9 @@ as it is, and every type and field here is pen's, untranslated. It holds two kin
 
 **Boards are at the back.** The drawing is shown over the boards, so a note placed on a board
 covers that part of it. One exception: an item listed *before* a board in the file that holds the
-whole board (a frame or panel round it) is a backdrop, and is drawn under the boards. When the
-person clicks a board it is lifted over the drawing until they click away. So keep notes beside a
-board rather than on it, unless covering part of it is the point.
+whole board (a frame or panel round it) is a backdrop, and is drawn under the boards. The person
+can use a board everywhere nothing is drawn over it, and not where something is. So keep notes
+beside a board rather than on it, unless covering part of it is the point.
 
 The person can move, delete and rewrite drawn items by hand in edit mode, so read before you edit:
 the file may have changed since you last looked.

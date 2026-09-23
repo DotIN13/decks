@@ -957,8 +957,9 @@
 }
 	/*
 	 * Boards are at the back (`pen/layer.ts`): the drawing's over sheet and its click shapes are among
-	 * the boards and above them, the selected board is lifted above both so the board in use is whole,
-	 * and what the drawing's editing puts on screen is above everything.
+	 * the boards and above them, and what the drawing's editing puts on screen is above everything. A
+	 * board is never lifted over the drawing, selected or not: a click reaches it wherever nothing drawn
+	 * is in the way, so there is nothing to lift it for.
 	 */
 	.world > .pen-over {
 	position: absolute;
@@ -978,9 +979,6 @@
 }
 	.world > .pen-hits > .pen-hit {
 	pointer-events: all;
-}
-	.world > .board-node[data-selected="true"] {
-	z-index: 2;
 }
 	.world > :is(.pen-selection, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
 	z-index: 3;

@@ -29,7 +29,7 @@ import { backdrops, boundsOf } from "./bounds.ts";
  * **Boards are at the back.** The drawing is on a sheet *over* the boards, so a note put on a board
  * is on it. The one exception is a backdrop: an item listed before a board in the file that holds
  * the whole board — a frame round it, a panel behind it — goes on the sheet *under* the boards
- * (`backdrops`). The selected board is lifted over both, so a board you are using is whole.
+ * (`backdrops`). A board is never lifted over the drawing: what covers it stays on top of it.
  *
  * **Clicks go to what you see** (`hits`). The over sheet lets every click through; above it is an
  * SVG of invisible shapes, one per drawn item with its outline, which the browser tests each click
