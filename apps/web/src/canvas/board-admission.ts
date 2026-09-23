@@ -33,6 +33,14 @@ import { createSignal, onCleanup } from "solid-js";
  * then. The memory cost is bounded by how many boards one gesture can pass over.
  */
 const KEEP_MS = 3000;
+/**
+ * How many documents a stage keeps without letting any go.
+ *
+ * Letting go is for the deck of forty; a stage of three boards lost a board's document three
+ * seconds after it left the screen, so panning back to it was a white box that then filled in,
+ * every time. Up to this many, a document once loaded stays until the board leaves the canvas.
+ */
+const KEEP_ALL = 8;
 /** How long the camera has to have been still before a document is taken away. */
 const QUIET_MS = 1000;
 
@@ -127,6 +135,18 @@ export function createAdmission(host: AdmissionHost): Admission {
 		}
 		const seen = lastSeen.get(board.path);
 		if (seen === undefined) return false;
+		/*
+		 * Kept means *kept*: only a board that still has its document. The grace below used to
+		 * answer for any board ever seen, so the first step of a pan gave an already-let-go board a
+		 * new document off screen; when the pan brought it into view, the rule above took that
+		 * document away again (on screen, not live, moving); and the pan's end started a third.
+		 * Two loads and two white flashes for one pan.
+		 */
+		if (!live.has(board.path)) return false;
+		// Counting only boards still on the canvas: one taken off it has no frame to keep.
+		const onCanvas = new Set(host.boards().map((one) => one.path));
+		for (const path of live) if (!onCanvas.has(path)) live.delete(path);
+		if (live.size <= KEEP_ALL) return true;
 		const gone = now - seen;
 		const still = now - host.lastMoved();
 		/*
