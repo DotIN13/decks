@@ -1,5 +1,4 @@
 import X from "lucide-solid/icons/x";
-import { PALETTE } from "@decks/board-kit";
 import { For, Match, Show, Switch } from "solid-js";
 import { Icon } from "../ui/icons.tsx";
 import { canHover } from "../lib/media.ts";
@@ -63,7 +62,8 @@ function pointerGroups(): Group[] {
 			title: "Drawing",
 			rows: [
 				{ keys: "V", what: "select, drag and resize" },
-				...PALETTE.map((component) => ({ keys: component.key.toUpperCase(), what: component.label.toLowerCase() })),
+				{ keys: "N · C · T", what: "a note · a card · words, on the stage" },
+				{ keys: "R · O · F · A", what: "a rectangle · an ellipse · a frame · an arrow" },
 				{ keys: "drop a file on a board", what: "embed it where it landed" },
 			],
 		},

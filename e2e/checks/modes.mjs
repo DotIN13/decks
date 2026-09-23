@@ -21,7 +21,7 @@ const state = () =>
 		ring: getComputedStyle(document.querySelector(".stage"), "::after").boxShadow,
 		/** There was an "Editing" pill in the bottom-left corner. There is not now. */
 		word: getComputedStyle(document.querySelector(".stage"), "::before").content,
-		tools: document.querySelectorAll(".float.pill .palette .icon-button").length,
+		tools: document.querySelectorAll(".pen-tools button[data-tool]").length,
 		inspector: document.querySelectorAll(".inspector").length,
 		toggle: document.querySelector('[aria-label="Edit the boards"], [aria-label="Stop editing"]')?.getAttribute("aria-label") ?? null,
 	}));
@@ -36,7 +36,7 @@ const browse = await state();
  * you meant to browse means a component has moved and been written to disk.
  */
 say("the canvas opens in browse mode", browse.mode === "browse", browse.mode);
-say("…with no editing tools, because they insert components", browse.tools === 0, String(browse.tools));
+say("…with no editing tools, because they add to the stage", browse.tools === 0, String(browse.tools));
 say("…no inspector, because it is a properties panel", browse.inspector === 0);
 say("…and nothing drawn to say editing is on", browse.ring === "none", `${browse.ring}`);
 say("the pencil offers to start editing", browse.toggle === "Edit the boards", browse.toggle);
@@ -88,7 +88,7 @@ say("a click while browsing selects no component", afterClick.editing === 0 && a
 await editMode(page);
 const editing = await state();
 say("the pencil turns editing on", editing.mode === "edit", editing.mode);
-say("…the five tools come with it", editing.tools === 5, String(editing.tools));
+say("…the stage's eight tools come with it", editing.tools === 8, String(editing.tools));
 /*
  * And no ring in either mode. There was one — an inset ring of the accent around the whole
  * stage, standing in for a confirmation dialog on the pencil, on the argument that a mode

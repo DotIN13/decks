@@ -132,6 +132,7 @@ const spot = await page.evaluate(() => {
 });
 say("the canvas has room to draw in", !!spot);
 let drawnId;
+let cardId;
 if (spot) {
 	await page.mouse.click(spot.x + 150, spot.y + 100);
 	await page.keyboard.press("r");
@@ -154,6 +155,21 @@ if (spot) {
 	await page.keyboard.press("Control+z");
 	const undone = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#dbe4f0");
 	say("⌘Z takes back the person's own last edit", !!undone, JSON.stringify(onDisk().children.find((n) => n.id === drawnId)?.fill));
+
+	// A card is pen's own: a frame that stacks a title, and the title opens for typing.
+	await page.keyboard.press("Escape");
+	const before = new Set(onDisk().children.map((n) => n.id));
+	await page.keyboard.press("c");
+	await page.mouse.click(spot.x + 10, spot.y + 150);
+	const card = await until(() => onDisk().children.find((n) => !before.has(n.id) && n.type === "frame"));
+	cardId = card?.id;
+	say("C then a click makes a card: a frame with a title in it", card?.layout === "vertical" && card?.children?.[0]?.type === "text" && card.children[0].content === "Untitled", JSON.stringify(card));
+	const typing = await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text") && document.activeElement.value));
+	say("…and its title opens for typing", typing === "Untitled", String(typing));
+	await page.keyboard.type("Plan");
+	await page.keyboard.press("Control+Enter");
+	const titled = await until(() => onDisk().children.find((n) => n.id === cardId)?.children?.[0]?.content === "Plan");
+	say("…and what is typed is its title in the file", !!titled);
 }
 // --- boards at the back: a drawing over a board catches its own clicks; the selected board rises ---
 const boardItem = onDisk().children.find((n) => n.metadata?.path === firstBoard);
@@ -203,7 +219,7 @@ if (boardItem) {
 await editMode(page, false);
 
 // Leave the fixture's stage as it was, minus the check's own drawing.
-link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.id.startsWith("e2e-") || n.id === drawnId).map((n) => ({ op: "delete", id: n.id })) });
+link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.id.startsWith("e2e-") || n.id === drawnId || n.id === cardId).map((n) => ({ op: "delete", id: n.id })) });
 await settle(page, 300);
 link.close();
 say("no page errors", errors.length === 0, errors.join(" | "));

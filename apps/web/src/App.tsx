@@ -1314,8 +1314,6 @@ export function App() {
 					onDrawing={setDrawing}
 					boardsOpen={boardsOpen()}
 					onToggleBoards={() => showBoards(!boardsOpen())}
-					tool={tool()}
-					onTool={pickTool}
 					onUndo={() => {
 						const path = selected() ?? component()?.path;
 						if (!path) {

@@ -1,16 +1,9 @@
-import { PALETTE, type ComponentKind } from "@decks/board-kit";
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
-import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
-import ImageIcon from "lucide-solid/icons/image";
-import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
-import StickyNote from "lucide-solid/icons/sticky-note";
-import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
-import FileText from "lucide-solid/icons/file-text";
 import Pencil from "lucide-solid/icons/pencil";
 import Brush from "lucide-solid/icons/brush";
 import Hand from "lucide-solid/icons/hand";
@@ -35,67 +28,12 @@ import { AgentHoverCard } from "./AgentHoverCard.tsx";
  * and they used to have to dodge the palette; and **a line that fits a 393px phone**, which
  * two clusters never did.
  *
- * The tools live *inside* it, `V`/`S`/`C`/`T`/`E` and undo, and under 1100px they fold into
- * one control that opens them as a menu — the pill is the width of its contents and a
- * narrow window has other things to spend it on. The folding is Tailwind variants in the
- * markup rather than a `@media` block in the stylesheet, because a layer keeps its
- * precedence inside a media query and would lose to the utilities beside it; the long note
- * at the top of `index.css` is the story of finding that out.
+ * In edit mode it carries undo for a board. The tools that add things are the stage's own now,
+ * in a column on the canvas's left edge (`canvas/pen/PenBar.tsx`).
  *
  * Presentational on purpose. It takes the chats, the identities and a callback per verb —
  * nothing here reads the socket or `App`'s state, so the whole cluster can be drawn from a
  * fixture.
- */
-
-/*
- * The tools, moved in from `canvas/Palette.tsx` rather than imported from it.
- *
- * The palette does not export its list, and it is about to stop existing — the tools are
- * children of this pill now — so copying the five entries here and letting the integrator
- * delete the file is a smaller change than exporting from a component on its way out. The
- * keys in the tooltips are handled by the stage, beside the camera shortcuts, since a board
- * frame is its own document and a keypress over one never reaches a component either way.
- */
-interface ToolEntry {
-	tool: Tool;
-	icon: LucideIcon;
-	label: string;
-	key: string;
-}
-
-/*
- * The icons, one per kind, and *all* of them — a `Partial` here would let a kind gain a
- * palette key in the vocabulary and appear with no icon, which is a button with a hole in it.
- * The rest of a button — its label, its key, the order — is `@decks/board-kit`'s.
- */
-const ICONS: Record<ComponentKind, LucideIcon> = {
-	sticky: StickyNote,
-	card: RectangleHorizontal,
-	text: Type,
-	embed: FileText,
-	image: ImageIcon,
-};
-
-/* A non-empty tuple rather than an array: `select` is the fallback when the current tool is
-   somehow not one of these, and typing it this way is how that fallback is a fact rather
-   than a `!`. */
-const TOOLS: [ToolEntry, ...ToolEntry[]] = [
-	{ tool: "select", icon: MousePointer2, label: "Select, drag, resize", key: "V" },
-	...PALETTE.map((component) => ({
-		tool: component.kind as Tool,
-		icon: ICONS[component.kind],
-		label: component.label,
-		key: component.key.toUpperCase(),
-	})),
-];
-
-/*
- * The tools fold away under 1100px; the agent and the panel button stay at any width.
- *
- * `max-[1100px]:hidden` is written out at each site rather than held in a constant, and
- * that is not laziness: Tailwind finds classes by scanning the source text, so a class name
- * assembled from a variable is a class name that never gets generated. A constant here
- * would have compiled, run, and quietly done nothing.
  */
 
 /**
@@ -592,8 +530,6 @@ export function AgentPill(props: {
 	/** Whether the boards panel is showing. A button, not a hover — folded means gone. */
 	boardsOpen: boolean;
 	onToggleBoards: () => void;
-	tool: Tool;
-	onTool: (tool: Tool) => void;
 	/** Undo the last edit to the selected board. Absent when there is nothing to undo. */
 	onUndo?: () => void;
 	/** The agents, for the switcher: a face and a name, one button, opening the agent list. */
@@ -607,7 +543,6 @@ export function AgentPill(props: {
 	/** Open the Agents panel, from the agent list's overflow row. */
 	onMoreAgents?: () => void;
 }) {
-	const current = () => TOOLS.find((entry) => entry.tool === props.tool) ?? TOOLS[0];
 	const active = () => props.chats.find((chat) => chat.id === props.focused);
 	const name = () => {
 		const chat = active();
@@ -763,111 +698,11 @@ export function AgentPill(props: {
 
 
 			{/*
-				The tools, and only while editing.
-
-				They insert components, which is editing by definition — in browse mode they
-				would be five controls that cannot act. Gone rather than disabled, for the reason
-				the corner gives about the close button on a busy agent: a control that cannot be
-				pressed is worth drawing when its absence would be a mystery, and the pencil
-				beside them is not a mystery.
+				Editing chrome, only while editing. The tools that used to sit here inserted components
+				into a board; the stage's own tools add to the stage now, and live in the column on the
+				canvas's left edge (`canvas/pen/PenBar.tsx`). What is left is undo for a board.
 			*/}
 			<Show when={props.mode === "edit"}>
-			<span class="pill-sep max-[1100px]:hidden" aria-hidden="true" />
-
-			{/*
-				The tools, at any width that has room for five of them.
-
-				`palette` as well as the utilities, and it is not decoration: it is the name the
-				canvas checks address this group by, and it is still the same group of controls —
-				what changed is which cluster it sits in. Renaming a handle because a thing moved
-				house is how a suite stops testing what it says it tests.
-			*/}
-			<span class="palette flex items-center gap-1 max-[1100px]:hidden" role="group" aria-label="Tools">
-				<For each={TOOLS}>
-					{(entry) => (
-						<button
-							type="button"
-							class="icon-button"
-							data-on={props.tool === entry.tool ? "true" : undefined}
-							aria-pressed={props.tool === entry.tool}
-							title={`${entry.label} (${entry.key})`}
-							aria-label={entry.label}
-							onClick={() => props.onTool(entry.tool)}
-						>
-							<Icon of={entry.icon} size={15} />
-						</button>
-					)}
-				</For>
-			</span>
-
-			{/*
-			 * And below it, the same five as a menu.
-			 *
-			 * The trigger wears the *current* tool's icon rather than a generic one, so
-			 * folding the group costs the tool count but not the tool you are holding —
-			 * which is the only one of the five you need to see at a glance.
-			 */}
-			<span class="hidden max-[1100px]:block">
-				<Popover
-					placement="bottom-start"
-					label="Tools"
-					class="w-[212px]"
-					trigger={(api) => (
-						<button
-							type="button"
-							class="icon-button"
-							ref={api.ref}
-							aria-haspopup="menu"
-							aria-expanded={api.open}
-							data-on="true"
-							title={`${current().label} (${current().key})`}
-							aria-label={`Tools — currently ${current().label}`}
-							onClick={api.toggle}
-						>
-							<Icon of={current().icon} size={15} />
-						</button>
-					)}
-				>
-					<For each={TOOLS}>
-						{(entry) => (
-							<button
-								type="button"
-								role="menuitem"
-								data-row
-								data-flat="true"
-								data-current={props.tool === entry.tool ? "true" : undefined}
-								onClick={() => props.onTool(entry.tool)}
-							>
-								<Icon of={entry.icon} size={14} class="flex-none text-muted" />
-								<span class="row-label flex-1">{entry.label}</span>
-								<span class="meta flex-none text-micro">{entry.key}</span>
-							</button>
-						)}
-					</For>
-					{/*
-						Undo joins them under 640px, where it leaves the line.
-
-						It is not a tool — it does not change what a click on the canvas does —
-						but this menu is the editing chrome on a touchscreen, and a rule plus a
-						row is cheaper than 53px of a 320px line. The button stays in the pill at
-						every width that can hold it, because reaching for undo through a menu is
-						worse than reaching for it directly.
-					*/}
-					<Show when={props.onUndo}>
-						{(undo) => (
-							<>
-								<span class="rule hidden max-[640px]:block" />
-								<button type="button" role="menuitem" data-row data-flat="true" onClick={() => undo()()} class="hidden max-[640px]:flex">
-									<Icon of={Undo2} size={14} class="flex-none text-muted" />
-									<span class="row-label flex-1">Undo the last edit</span>
-									<span class="meta flex-none text-micro">⌘Z</span>
-								</button>
-							</>
-						)}
-					</Show>
-				</Popover>
-			</span>
-
 			{/*
 			 * Undo, last, behind its own rule.
 			 *
@@ -879,10 +714,10 @@ export function AgentPill(props: {
 			<Show when={props.onUndo}>
 				{(undo) => (
 					<>
-						<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
+						<span class="pill-sep" aria-hidden="true" />
 						<button
 							type="button"
-							class="icon-button max-[640px]:hidden"
+							class="icon-button"
 							title="Undo the last edit to this board (⌘Z)"
 							aria-label="Undo the last edit to this board"
 							onClick={() => undo()()}

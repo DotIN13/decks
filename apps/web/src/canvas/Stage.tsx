@@ -15,7 +15,6 @@ import { deckMode, type DeckHandle, type SlideAction, slideKey } from "../presen
 import { cssEscape } from "../board/inspect.ts";
 import type { LiveWebReply } from "../board/live-chat.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
-import { PALETTE } from "@decks/board-kit";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
@@ -28,16 +27,10 @@ import { scheme } from "../lib/theme.ts";
 import { ARROW, arrowShape, ids as penIds, indexOf, newId, type PenDocument, type PenNode } from "@decks/pen";
 
 /**
- * The palette's keys: `select`, then whatever `@decks/board-kit` says the palette offers.
- *
- * Written out here until the vocabulary had one home; the point of asking the manifest is
- * that a kind with a `key` cannot be missing from the keyboard, and a key cannot outlive
- * the kind it armed.
+ * `v`, select: the one palette key left. The tools that add things are the stage's own now, armed
+ * by `PEN_TOOL_KEYS` (`state/pen-tools.ts`); the ones that inserted components into a board are gone.
  */
-const TOOL_KEYS: Record<string, Tool> = Object.fromEntries([
-	["v", "select"] as const,
-	...PALETTE.map((component) => [component.key, component.kind] as const),
-]);
+const TOOL_KEYS: Record<string, Tool> = { v: "select" };
 
 /**
  * The stage: one transform over the boards, and the gestures that move it.
@@ -550,7 +543,17 @@ export function Stage(props: {
 	const [penDrawn, setPenDrawn] = createSignal(0);
 	/** When a tool last made an item, so the second press of a double-click does not make a board. */
 	let penMadeAt = 0;
+	/** A card just made, whose title opens for typing when it is first drawn. */
+	let penTitleOf: string | undefined;
 	penLayer.drawn = () => {
+		if (penTitleOf) {
+			const card = penLayer.placed.get(penTitleOf);
+			const title = card && [...penLayer.placed.values()].find((p) => p.parent === penTitleOf && p.node.type === "text");
+			if (title) {
+				penTitleOf = undefined;
+				queueMicrotask(() => openPenText({ id: title.node.id, node: title.node, box: { ...title.box } }));
+			}
+		}
 		/*
 		 * The answer to a drag has been drawn: the layout is where the drag left things, so the offset
 		 * goes. Not when the answer *arrives* — the layout is only redone on the next frame, and for
@@ -862,6 +865,23 @@ export function Stage(props: {
 		ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
 		frame: { node: { type: "frame", name: "Frame", layout: "none", fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: 12, clip: true }, w: 400, h: 300 },
 		text: { node: { type: "text", content: "", fontSize: 24 }, w: 240, h: 32 },
+		// A card is pen's own: a frame that stacks its children, with a title in it to type over.
+		card: {
+			node: {
+				type: "frame",
+				name: "Card",
+				layout: "vertical",
+				gap: 6,
+				padding: 20,
+				fill: "#ffffff",
+				stroke: "#d0d7de",
+				strokeWidth: 1,
+				cornerRadius: 12,
+				children: [{ type: "text", content: "Untitled", fontSize: 20, fontWeight: "600", textGrowth: "fixed-width", width: "fill_container" } as PenNode],
+			},
+			w: 320,
+			h: 0,
+		},
 		note: { node: { type: "note", content: "" }, w: 240, h: 80 },
 	};
 
@@ -916,10 +936,14 @@ export function Stage(props: {
 				const h = moved ? Math.max(8, Math.round(Math.abs(end.y - at.y))) : made.h;
 				const parent = frameAt(at);
 				// A text grows with its words unless a width was drawn for it; its height is always its words'.
-				const box = tool === "text" ? (moved ? { x1, y1, x2: x1 + w } : { x1, y1 }) : tool === "note" && !moved ? { x1, y1 } : { x1, y1, x2: x1 + w, y2: y1 + h };
+				// A card is as tall as what is in it, so only its width is taken.
+				const box =
+					tool === "text" ? (moved ? { x1, y1, x2: x1 + w } : { x1, y1 }) : tool === "note" && !moved ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + w } : { x1, y1, x2: x1 + w, y2: y1 + h };
 				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node: { ...made.node, id }, box }]);
 				selectMade([id]);
 				if (tool === "text" || tool === "note") openPenText({ id, node: { ...made.node, id } as PenNode, box: { x: x1, y: y1, w, h } }, true);
+				// The card's title opens for typing once the card has been laid out and its title has a box.
+				if (tool === "card") penTitleOf = id;
 			},
 		);
 	};

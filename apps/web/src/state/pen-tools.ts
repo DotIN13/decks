@@ -8,10 +8,13 @@ import { createSignal } from "solid-js";
  * resting tool: a press picks an item up. Every other tool makes one item and hands back to
  * `select`, the way a design tool does, so a second press is never a second rectangle by surprise.
  */
-export type PenTool = "select" | "rectangle" | "ellipse" | "frame" | "text" | "note" | "arrow";
+export type PenTool = "select" | "note" | "card" | "text" | "rectangle" | "ellipse" | "frame" | "arrow";
 
-/** The key that arms each tool; `select` shares the board palette's `v`. */
-export const PEN_TOOL_KEYS: Record<string, PenTool> = { r: "rectangle", o: "ellipse", f: "frame", T: "text", n: "note", a: "arrow" };
+/**
+ * The key that arms each tool. `v` is select, handled with the camera's keys. `s` still makes a
+ * note, because it made a sticky when the tools inserted into boards.
+ */
+export const PEN_TOOL_KEYS: Record<string, PenTool> = { n: "note", s: "note", c: "card", t: "text", r: "rectangle", o: "ellipse", f: "frame", a: "arrow" };
 
 const [penTool, setPenTool] = createSignal<PenTool>("select");
 /** Ids of the selected items, in the order they were picked. */

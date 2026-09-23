@@ -147,7 +147,7 @@ try {
 	// That press moved the camera, and it takes 260ms to arrive: every `pick` below is a
 	// coordinate, so it waits for the view to stop before measuring anything.
 	await still(page);
-	await page.waitForSelector(".palette", { state: "visible", timeout: 8000 });
+	await page.waitForSelector(".pen-tools", { state: "visible", timeout: 8000 });
 
 	const frame = () => page.frameLocator(`.board-node[data-path="${path}"] iframe`);
 	const inspector = page.locator(".inspector");
@@ -481,10 +481,10 @@ try {
 	// --- a diagram the author drew, which is what replaced the connector ---------------
 
 	say(
-		"the palette has no connect tool",
-		(await page.locator('.palette button[title*="Connect"]').count()) === 0 &&
-			(await page.locator(".palette button:not(.undo)").count()) === 5,
-		(await page.locator(".palette button:not(.undo)").evaluateAll((buttons) => buttons.map((button) => button.title))).join(" | "),
+		"the tools have no connect tool: an arrow is the stage's",
+		(await page.locator('.pen-tools button[title*="Connect"]').count()) === 0 &&
+			(await page.locator(".pen-tools button[data-tool]").count()) === 8,
+		(await page.locator(".pen-tools button[data-tool]").evaluateAll((buttons) => buttons.map((button) => button.title))).join(" | "),
 	);
 
 	await pick("diagram");

@@ -6,6 +6,7 @@ import Circle from "lucide-solid/icons/circle";
 import Copy from "lucide-solid/icons/copy";
 import FrameIcon from "lucide-solid/icons/frame";
 import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
+import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
 import Redo2 from "lucide-solid/icons/redo-2";
 import SendToBack from "lucide-solid/icons/send-to-back";
 import Square from "lucide-solid/icons/square";
@@ -21,8 +22,9 @@ import { Icon } from "../../ui/icons.tsx";
  * The drawing's controls, in edit mode, in two floats.
  *
  * **The tools** are a column on the canvas's left edge, halfway down, with undo and redo under
- * them: always there while editing, so they stand where no board's title bar is framed. A row
- * under the top clusters was tried first and covered exactly that strip, which a fitted board puts
+ * them. They add to the stage — a note, a card, words, shapes, arrows — and are the only tools there
+ * are: the ones that inserted components into a board are gone. They are always there while
+ * editing, so they stand where no board's title bar is framed. A row under the top clusters was tried first and covered exactly that strip, which a fitted board puts
  * its title in (`camera/insets.ts` on what may float over the canvas and what may not).
  *
  * **What the selection is** — its colour, its line, its type size or corners, its order, a copy
@@ -30,15 +32,16 @@ import { Icon } from "../../ui/icons.tsx";
  * selected: summoned, like the inspector, so it may cover what is under it. Every control sends a
  * pen operation, the same one an agent would, and shows the value of the first selected item.
  */
-const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key: string }> = [
+const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key: string; after?: boolean }> = [
 	{ tool: "select", icon: MousePointer2, label: "Select and move; shift adds, shift-drag draws a box round several", key: "V" },
-	{ tool: "rectangle", icon: Square, label: "Rectangle: drag to size it, or click for one", key: "R" },
+	{ tool: "note", icon: StickyNote, label: "Note", key: "N" },
+	{ tool: "card", icon: RectangleHorizontal, label: "Card: a box with a title", key: "C" },
+	{ tool: "text", icon: Type, label: "Text", key: "T" },
+	{ tool: "rectangle", icon: Square, label: "Rectangle: drag to size it, or click for one", key: "R", after: true },
 	{ tool: "ellipse", icon: Circle, label: "Ellipse", key: "O" },
 	{ tool: "frame", icon: FrameIcon, label: "Frame: a box that holds what is drawn inside it", key: "F" },
-	{ tool: "text", icon: Type, label: "Text", key: "⇧T" },
-	{ tool: "note", icon: StickyNote, label: "Note", key: "N" },
 	{ tool: "arrow", icon: ArrowUpRight, label: "Arrow: drag from one thing to another and it stays joined", key: "A" },
-];
+]
 
 const FILLS = ["#ffffff", "#dbe4f0", "#fde68a", "#bbf7d0", "#bfdbfe", "#fecaca", "#1f2328"];
 const LINE_WIDTHS = [0, 1, 2, 4];
@@ -127,6 +130,10 @@ export function PenBar(props: { doc: PenDocument | undefined; onEdit: (ops: unkn
 		<div class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
 			<For each={TOOLS}>
 				{(entry) => (
+					<>
+					<Show when={entry.after}>
+						<span class="pen-rule" aria-hidden="true" />
+					</Show>
 					<button
 						type="button"
 						class="icon-button"
@@ -142,6 +149,7 @@ export function PenBar(props: { doc: PenDocument | undefined; onEdit: (ops: unkn
 					>
 						<Icon of={entry.icon} size={15} />
 					</button>
+					</>
 				)}
 			</For>
 			<span class="pen-rule" aria-hidden="true" />
