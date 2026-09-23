@@ -1,5 +1,16 @@
-import type { CanvasKit, Paragraph, TypefaceFontProvider } from "canvaskit-wasm";
-import type { MeasureText, TextStyle } from "@decks/pen";
+import type { Canvas, CanvasKit, Paragraph, TypefaceFontProvider } from "canvaskit-wasm";
+import { isMarkdown, type MeasureText, type TextStyle } from "@decks/pen";
+import { parseMarkdown, type Run } from "./markdown.ts";
+
+/** The face a card's `code` is set in. */
+export const MONO_FAMILY = "JetBrains Mono";
+
+/** A card's markdown, laid out: paragraphs and shapes at offsets from its top-left, and its height. */
+export interface MarkdownLayout {
+	height: number;
+	draw(canvas: Canvas, x: number, y: number): void;
+	delete(): void;
+}
 
 /**
  * Fonts for the drawing, fetched when a text needs them.
@@ -123,8 +134,124 @@ export class PenFonts {
 		return paragraph;
 	}
 
-	/** The measure `@decks/pen`'s layout takes, with this browser's fonts. */
-	readonly measure: MeasureText = (text, style, maxWidth) => {
+	/**
+	 * A card's words read as markdown (`markdown.ts`) and set block by block: a heading larger and
+	 * bold, a list item behind its marker and indented by its depth, a quote behind a bar, code in a
+	 * monospace face on a tint, a rule as a line. Each block is its own paragraph, stacked downwards.
+	 */
+	markdown(text: string, style: TextStyle, options: { color: Float32Array; width: number; align?: string }): MarkdownLayout {
+		const ck = this.ck;
+		const s = style.fontSize;
+		const width = Math.max(1, options.width);
+		const muted = Float32Array.of(options.color[0]!, options.color[1]!, options.color[2]!, (options.color[3] ?? 1) * 0.65);
+		const linkColor = ck.Color4f(0.15, 0.39, 0.92, 1);
+		const tint = ck.Color4f(0, 0, 0, 0.06);
+		const paragraphs: Array<{ p: Paragraph; x: number; y: number }> = [];
+		const shapes: Array<{ x: number; y: number; w: number; h: number; color: Float32Array; r: number }> = [];
+		const textStyle = (run: Partial<Run>, size: number, weight: number, color: Float32Array) => ({
+			color: run.link ? linkColor : color,
+			fontFamilies: this.chain(run.code ? MONO_FAMILY : style.fontFamily),
+			fontSize: run.code ? size * 0.9 : size,
+			fontStyle: { weight: { value: roundWeight(run.bold ? Math.max(700, weight) : weight) }, slant: run.italic || style.fontStyle === "italic" ? ck.FontSlant.Italic : ck.FontSlant.Upright },
+			letterSpacing: style.letterSpacing,
+			...(style.lineHeight !== undefined ? { heightMultiplier: style.lineHeight, halfLeading: true } : {}),
+			...(run.link ? { decoration: ck.UnderlineDecoration, decorationColor: linkColor } : {}),
+			...(run.code ? { backgroundColor: tint } : {}),
+		});
+		const set = (runs: readonly Partial<Run>[], size: number, weight: number, color: Float32Array, w: number, align = options.align) => {
+			const paragraphStyle = new ck.ParagraphStyle({
+				textAlign: align === "center" ? ck.TextAlign.Center : align === "right" ? ck.TextAlign.Right : ck.TextAlign.Left,
+				textStyle: textStyle({}, size, weight, color),
+			});
+			const builder = ck.ParagraphBuilder.MakeFromFontProvider(paragraphStyle, this.provider);
+			for (const run of runs.length ? runs : [{ text: " " }]) {
+				builder.pushStyle(new ck.TextStyle(textStyle(run, size, weight, color)));
+				builder.addText(run.text ?? "");
+				builder.pop();
+			}
+			const paragraph = builder.build();
+			builder.delete();
+			paragraph.layout(Math.max(1, w));
+			return paragraph;
+		};
+		let y = 0;
+		let previous: string | undefined;
+		for (const block of parseMarkdown(text)) {
+			// The room between two blocks: a little inside a list, more above a heading.
+			const gap = previous === undefined ? 0 : block.kind === "heading" ? s * 0.8 : block.kind === "item" && previous === "item" ? s * 0.25 : s * 0.6;
+			y += gap;
+			previous = block.kind;
+			switch (block.kind) {
+				case "heading": {
+					const size = s * ([1.5, 1.25, 1.1][block.level - 1] ?? 1);
+					const p = set(block.runs, size, block.level === 3 ? 600 : 700, options.color, width);
+					paragraphs.push({ p, x: 0, y });
+					y += p.getHeight();
+					break;
+				}
+				case "paragraph": {
+					const p = set(block.runs, s, style.fontWeight, options.color, width);
+					paragraphs.push({ p, x: 0, y });
+					y += p.getHeight();
+					break;
+				}
+				case "item": {
+					const indent = block.depth * s * 1.2;
+					const marker = block.checked !== undefined ? (block.checked ? "☑" : "☐") : block.ordered ? `${block.number}.` : block.depth % 2 ? "◦" : "•";
+					const gutter = block.ordered ? s * (block.number >= 10 ? 1.7 : 1.3) : s * 1.1;
+					const mark = set([{ text: marker }], s, style.fontWeight, block.checked === undefined ? options.color : muted, gutter, "left");
+					const p = set(block.runs, s, style.fontWeight, block.checked ? muted : options.color, width - indent - gutter, "left");
+					paragraphs.push({ p: mark, x: indent, y }, { p, x: indent + gutter, y });
+					y += p.getHeight();
+					break;
+				}
+				case "quote": {
+					const p = set(block.runs, s, style.fontWeight, muted, width - s, "left");
+					shapes.push({ x: 0, y, w: 3, h: p.getHeight(), color: ck.Color4f(0, 0, 0, 0.18), r: 1.5 });
+					paragraphs.push({ p, x: s, y });
+					y += p.getHeight();
+					break;
+				}
+				case "code": {
+					const pad = s * 0.5;
+					const p = set([{ text: block.text || " ", code: true }], s, 400, options.color, width - pad * 2, "left");
+					shapes.push({ x: 0, y, w: width, h: p.getHeight() + pad * 2, color: tint, r: 4 });
+					paragraphs.push({ p, x: pad, y: y + pad });
+					y += p.getHeight() + pad * 2;
+					break;
+				}
+				case "rule":
+					shapes.push({ x: 0, y: y + s * 0.3, w: width, h: 1, color: ck.Color4f(0, 0, 0, 0.15), r: 0 });
+					y += s * 0.6;
+					break;
+			}
+		}
+		return {
+			height: y,
+			draw: (canvas, x, top) => {
+				const paint = new ck.Paint();
+				paint.setAntiAlias(true);
+				for (const shape of shapes) {
+					paint.setColor(shape.color);
+					canvas.drawRRect(ck.RRectXY(ck.XYWHRect(x + shape.x, top + shape.y, shape.w, shape.h), shape.r, shape.r), paint);
+				}
+				paint.delete();
+				for (const { p, x: dx, y: dy } of paragraphs) canvas.drawParagraph(p, x + dx, top + dy);
+			},
+			delete: () => {
+				for (const { p } of paragraphs) p.delete();
+			},
+		};
+	}
+
+	/** The measure `@decks/pen`'s layout takes, with this browser's fonts. A card's markdown is measured as it is drawn. */
+	readonly measure: MeasureText = (text, style, maxWidth, node) => {
+		if (node && isMarkdown(node)) {
+			const md = this.markdown(text, style, { color: this.ck.BLACK, width: maxWidth ?? 240 });
+			const h = md.height;
+			md.delete();
+			return { w: maxWidth ?? 240, h };
+		}
 		const paragraph = this.paragraph(text || " ", style, { width: maxWidth ?? 1e6 });
 		const w = maxWidth === undefined ? Math.ceil(paragraph.getMaxIntrinsicWidth()) : Math.min(maxWidth, Math.ceil(paragraph.getLongestLine()));
 		const h = paragraph.getHeight();

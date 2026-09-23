@@ -96,6 +96,7 @@ no field for: `{ type: "…", … }`).
 | type | what it is | its own fields |
 |---|---|---|
 | `note` | a sticky note | `content`; `fill` for its colour; `width` (240 when left out); height follows the words |
+| `note` + `metadata: { type: "decks.markdown" }` | a **card**: white, with an edge, its words markdown | `content` in markdown; `width` (320 reads well); height follows what the markdown draws |
 | `text` | words on the stage | `content`, `fontSize`, `fontWeight` ("400"…"700"), `fontFamily`, `textAlign`, `lineHeight` (× size), `fill` (the colour), `textGrowth` |
 | `rectangle` | a box | `fill`, `stroke`, `strokeWidth`, `cornerRadius` |
 | `ellipse` | a circle or oval, in its box | `fill`, `stroke`; `innerRadius` 0–1 for a ring; `startAngle`, `sweepAngle` for an arc |
@@ -111,6 +112,22 @@ no field for: `{ type: "…", … }`).
 and ignores `width`; `"fixed-width"` wraps at `width` and grows down; `"fixed-width-height"` is the
 box you give it. A text given a box with a width is switched to `"fixed-width"` for you. Write
 text at 18 or larger: the stage is read zoomed out.
+
+**Cards.** A card is the drawing's way to say something with structure: a heading, a few points,
+a link. Its words are markdown — `#`, `##`, `###` headings, paragraphs, `-` and `1.` lists (indent
+two spaces to nest), `- [ ]` / `- [x]` tasks, `> ` quotes, fenced code, `---` rules, and inside a
+line `**bold**`, `*italic*`, `` `code` `` and `[words](url)`. Anything else stays as its words.
+Decks draws it; pen.dev, which has no rich text, opens the same note with the markdown as typed.
+
+```ts
+{ op: "insert", node: { type: "note", id: "plan", metadata: { type: "decks.markdown" },
+  content: "## Next\n\n- Cut the **pilot** to 20 questions\n- Ask [Verasight](https://verasight.io) for a quote" },
+  box: { x1: 1060, y1: 0, x2: 1380 } }
+```
+
+A card is still a note: move it, colour it with `fill`, point arrows at it. Use a plain `note` for
+one line; a card when there is a heading or a list. Keep it short: a card is read on the canvas,
+and a long document is a board.
 
 **Colour.** `fill` and `stroke` take `"#RRGGBB"` or `"#RRGGBBAA"`, a variable `"$name"`, or a list
 of fills drawn in order (`{ type: "color", color }`, `{ type: "gradient", gradientType: "linear",

@@ -30,7 +30,19 @@ export interface Frame {
 }
 
 /** Measure text: one line when `maxWidth` is undefined, wrapped at it otherwise. */
-export type MeasureText = (text: string, style: TextStyle, maxWidth: number | undefined) => { w: number; h: number };
+/**
+ * `node` is the item the words belong to, for a measure that sets some items' words differently:
+ * the browser reads a markdown card's words as markdown (`MARKDOWN`), which is not the height of
+ * the same words as one plain paragraph.
+ */
+export type MeasureText = (text: string, style: TextStyle, maxWidth: number | undefined, node?: PenNode) => { w: number; h: number };
+
+/**
+ * A note whose words are markdown: `metadata: { type: "decks.markdown" }`. pen has no rich text, so
+ * pen.dev shows such a note with its markdown as the words it is; Decks draws it as a card.
+ */
+export const MARKDOWN = "decks.markdown";
+export const isMarkdown = (node: PenNode): boolean => node.type !== "text" && node.metadata?.type === MARKDOWN;
 
 export interface TextStyle {
 	fontFamily: string;
@@ -177,7 +189,7 @@ export function layout(doc: PenDocument, nodes: readonly PenNode[], options: { t
 			const ws = sizing(doc, node.width, t, { kind: "fixed", value: NOTE_WIDTH });
 			const w = forcedW ?? fixedOr(ws, NOTE_WIDTH);
 			const hs = sizing(doc, node.height, t, { kind: "hug" });
-			const words = measure(content, style, Math.max(1, w - NOTE_PAD * 2));
+			const words = measure(content, style, Math.max(1, w - NOTE_PAD * 2), node);
 			const h = forcedH ?? (hs.kind === "fixed" ? hs.value : words.h + NOTE_PAD * 2);
 			return { w, h };
 		}

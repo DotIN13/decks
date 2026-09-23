@@ -352,13 +352,13 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	});
 	await page.keyboard.press("c");
 	await page.mouse.click(at.x, at.y);
-	const card = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.type === "frame"));
+	const card = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.metadata?.type === "decks.markdown"));
 	await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text")), 3000);
 	const height = () => page.evaluate((id) => document.querySelector(`.pen-hits [data-id="${id}"]`)?.getBoundingClientRect().height ?? 0, card?.id);
 	const before = await until(height, 3000);
-	await page.keyboard.type("A title long enough to wrap onto a second and then a third line of the card");
+	await page.keyboard.type("# A heading\n\nA paragraph long enough to wrap onto a second and then a third line of the card\n\n- a point\n- another");
 	const grown = await until(async () => (await height()) > before * 1.3, 3000);
-	say("a card grows round its title while the title is typed, before it is saved", !!grown, JSON.stringify({ before, now: await height() }));
+	say("a card grows round its markdown while it is typed, before it is saved", !!grown, JSON.stringify({ before, now: await height() }));
 	await page.keyboard.press("Control+Enter");
 	await page.keyboard.press("Escape");
 	if (card) link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: card.id }] });

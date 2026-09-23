@@ -167,20 +167,20 @@ if (spot) {
 	const undone = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#dbe4f0");
 	say("⌘Z takes back the person's own last edit", !!undone, JSON.stringify(onDisk().children.find((n) => n.id === drawnId)?.fill));
 
-	// A card is pen's own: a frame that stacks a title, and the title opens for typing.
+	// A card is pen's own note with a mark that says its words are markdown, and it opens for typing.
 	await page.keyboard.press("Escape");
 	const before = new Set(onDisk().children.map((n) => n.id));
 	await page.keyboard.press("c");
 	await page.mouse.click(spot.x + 10, spot.y + 150);
-	const card = await until(() => onDisk().children.find((n) => !before.has(n.id) && n.type === "frame"));
+	const card = await until(() => onDisk().children.find((n) => !before.has(n.id) && n.type === "note"));
 	cardId = card?.id;
-	say("C then a click makes a card: a frame with a title in it", card?.layout === "vertical" && card?.children?.[0]?.type === "text" && card.children[0].content === "Untitled", JSON.stringify(card));
-	const typing = await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text") && document.activeElement.value));
-	say("…and its title opens for typing", typing === "Untitled", String(typing));
-	await page.keyboard.type("Plan");
+	say("C then a click makes a card: a note marked as markdown", card?.metadata?.type === "decks.markdown", JSON.stringify(card));
+	const typing = await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text")));
+	say("…and it opens for typing", !!typing);
+	await page.keyboard.type("## Plan\n\n- **one**\n- two");
 	await page.keyboard.press("Control+Enter");
-	const titled = await until(() => onDisk().children.find((n) => n.id === cardId)?.children?.[0]?.content === "Plan");
-	say("…and what is typed is its title in the file", !!titled);
+	const titled = await until(() => onDisk().children.find((n) => n.id === cardId)?.content === "## Plan\n\n- **one**\n- two");
+	say("…and what is typed is its markdown in the file, as typed", !!titled, JSON.stringify(onDisk().children.find((n) => n.id === cardId)?.content));
 }
 // --- boards at the back: a drawing over a board catches its own clicks; the selected board rises ---
 const boardItem = onDisk().children.find((n) => n.metadata?.path === firstBoard);

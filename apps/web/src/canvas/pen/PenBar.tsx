@@ -6,7 +6,7 @@ import Circle from "lucide-solid/icons/circle";
 import Copy from "lucide-solid/icons/copy";
 import FrameIcon from "lucide-solid/icons/frame";
 import ImageDown from "lucide-solid/icons/image-down";
-import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
+import FileText from "lucide-solid/icons/file-text";
 import Redo2 from "lucide-solid/icons/redo-2";
 import SendToBack from "lucide-solid/icons/send-to-back";
 import Square from "lucide-solid/icons/square";
@@ -37,7 +37,7 @@ const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key: string
 	{ tool: "ellipse", icon: Circle, label: "Ellipse", key: "O" },
 	{ tool: "frame", icon: FrameIcon, label: "Frame: a box that holds what is drawn inside it", key: "F" },
 	{ tool: "note", icon: StickyNote, label: "Note", key: "N", after: true },
-	{ tool: "card", icon: RectangleHorizontal, label: "Card: a box with a title", key: "C" },
+	{ tool: "card", icon: FileText, label: "Card: write markdown, see headings, lists, bold and links", key: "C" },
 	{ tool: "text", icon: Type, label: "Text", key: "T" },
 	{ tool: "arrow", icon: ArrowUpRight, label: "Arrow: drag from one thing to another and it stays joined", key: "A" },
 ];

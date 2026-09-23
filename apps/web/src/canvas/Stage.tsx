@@ -25,7 +25,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, arrowEnd, arrowRoute, baseTheme, color, fillsOf, isArrow, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, arrowEnd, arrowRoute, baseTheme, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
 
@@ -46,6 +46,8 @@ interface TextLook {
 	paper?: string;
 	/** A text that grows as wide as its words, or a box of fixed width that grows down. */
 	grows: "wide" | "tall";
+	/** A card: its words are markdown, typed as markdown and drawn as it reads. */
+	markdown?: boolean;
 }
 
 /**
@@ -584,18 +586,8 @@ export function Stage(props: {
 	const [endDraft, setEndDraft] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
 	/** When a tool last made an item, so the second press of a double-click does not make a board. */
 	let penMadeAt = 0;
-	/** A card just made, whose title opens for typing when it is first drawn. */
-	let penTitleOf: string | undefined;
 	penLayer.drawn = () => {
 		if (unmute && penLayer.placed.get(unmute.id)?.node.content === unmute.value) unmuteNow();
-		if (penTitleOf) {
-			const card = penLayer.placed.get(penTitleOf);
-			const title = card && [...penLayer.placed.values()].find((p) => p.parent === penTitleOf && p.node.type === "text");
-			if (title) {
-				penTitleOf = undefined;
-				queueMicrotask(() => openPenText({ id: title.node.id, node: title.node, box: { ...title.box } }));
-			}
-		}
 		/*
 		 * The answer to a drag has been drawn: the layout is where the drag left things, so the offset
 		 * goes. Not when the answer *arrives* — the layout is only redone on the next frame, and for
@@ -692,7 +684,7 @@ export function Stage(props: {
 		const firstColour = fillsOf(node.fill).map((f) => (typeof f === "string" ? f : f && f.type === "color" ? (f as { color: string }).color : undefined)).find(Boolean);
 		const card = node.type !== "text";
 		const NOTE_PAPER: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe", context: "#bfdbfe" };
-		const paper = card ? (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? NOTE_PAPER[node.type] ?? NOTE_PAPER.note!) : undefined;
+		const paper = card ? (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? (isMarkdown(node) ? "#ffffff" : (NOTE_PAPER[node.type] ?? NOTE_PAPER.note!))) : undefined;
 		const ink = card ? "#1f2328" : (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? (scheme() === "dark" ? "#e6e6e6" : "#1f2328"));
 		return {
 			font: pageFont(style.fontFamily, style.fontWeight, style.fontStyle === "italic"),
@@ -707,6 +699,7 @@ export function Stage(props: {
 			ink,
 			...(paper ? { paper } : {}),
 			grows: node.type === "text" ? ((node.textGrowth ?? "auto") === "auto" ? "wide" : "tall") : "tall",
+			...(isMarkdown(node) ? { markdown: true } : {}),
 		};
 	};
 	const openPenText = (hit: PenHit, fresh?: boolean) => {
@@ -1221,23 +1214,11 @@ export function Stage(props: {
 		ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
 		frame: { node: { type: "frame", name: "Frame", layout: "none", fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: 12, clip: true }, w: 400, h: 300 },
 		text: { node: { type: "text", content: "", fontSize: 24 }, w: 240, h: 32 },
-		// A card is pen's own: a frame that stacks its children, with a title in it to type over.
-		card: {
-			node: {
-				type: "frame",
-				name: "Card",
-				layout: "vertical",
-				gap: 6,
-				padding: 20,
-				fill: "#ffffff",
-				stroke: "#d0d7de",
-				strokeWidth: 1,
-				cornerRadius: 12,
-				children: [{ type: "text", content: "Untitled", fontSize: 20, fontWeight: "600", textGrowth: "fixed-width", width: "fill_container" } as PenNode],
-			},
-			w: 320,
-			h: 0,
-		},
+		/*
+		 * A card is a note whose words are markdown (`MARKDOWN`): pen's own note, so pen.dev opens it
+		 * as one, with a mark in pen's extension field that Decks reads its words by.
+		 */
+		card: { node: { type: "note", name: "Card", content: "", metadata: { type: MARKDOWN } }, w: 320, h: 0 },
 		note: { node: { type: "note", content: "" }, w: 240, h: 80 },
 	};
 
@@ -1372,14 +1353,12 @@ export function Stage(props: {
 				const h = moved ? Math.max(8, Math.round(Math.abs(end.y - at.y))) : made.h;
 				const parent = frameAt(at);
 				// A text grows with its words unless a width was drawn for it; its height is always its words'.
-				// A card is as tall as what is in it, so only its width is taken.
+				// A card is as tall as its words, so only its width is taken, drawn or not.
 				const box =
-					tool === "text" ? (moved ? { x1, y1, x2: x1 + w } : { x1, y1 }) : tool === "note" && !moved ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + w } : { x1, y1, x2: x1 + w, y2: y1 + h };
+					tool === "text" ? (moved ? { x1, y1, x2: x1 + w } : { x1, y1 }) : tool === "note" && !moved ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + (moved ? w : made.w) } : { x1, y1, x2: x1 + w, y2: y1 + h };
 				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node: { ...made.node, id }, box }]);
 				selectMade([id]);
-				if (tool === "text" || tool === "note") openPenText({ id, node: { ...made.node, id } as PenNode, box: { x: x1, y: y1, w, h } }, true);
-				// The card's title opens for typing once the card has been laid out and its title has a box.
-				if (tool === "card") penTitleOf = id;
+				if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node: { ...made.node, id } as PenNode, box: { x: x1, y: y1, w, h: tool === "card" ? 80 : h } }, true);
 			},
 		);
 	};
@@ -2650,6 +2629,7 @@ export function Stage(props: {
 							<textarea
 								class="pen-text"
 								data-grows={look.grows}
+								placeholder={look.markdown ? "# A heading\n\nWords, **bold**, *italic*, `code`\n- a list\n[a link](https://…)" : undefined}
 								spellcheck={false}
 								style={{
 									left: `${box().x}px`,

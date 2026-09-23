@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, Image, Paint, Path, Shader } from "canvaskit-wasm";
-import { bool, color, fillsOf, isArrow, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
+import { bool, color, fillsOf, isArrow, isMarkdown, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
 import type { PenFonts } from "./fonts.ts";
 import type { IconShape } from "./icons.ts";
 
@@ -140,9 +140,22 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 			else {
 				const paint = new ck.Paint();
 				paint.setAntiAlias(true);
-				paint.setColor(colorOf(ck, NOTE_COLORS[node.type] ?? NOTE_COLORS.note!));
+				// A markdown card is white paper; a note is its sticky colour.
+				paint.setColor(colorOf(ck, isMarkdown(node) ? "#ffffff" : (NOTE_COLORS[node.type] ?? NOTE_COLORS.note!)));
 				canvas.drawRRect(rrect, paint);
 				paint.delete();
+			}
+			if (isMarkdown(node)) {
+				// A card has an edge, as a page does, and its words are markdown (`fonts.markdown`).
+				const edge = new ck.Paint();
+				edge.setAntiAlias(true);
+				edge.setStyle(ck.PaintStyle.Stroke);
+				edge.setStrokeWidth(1);
+				edge.setColor(ck.Color4f(0.82, 0.84, 0.87, 1));
+				canvas.drawRRect(ck.RRectXY(ck.LTRBRect(x + 0.5, y + 0.5, x + w - 0.5, y + h - 0.5), 6, 6), edge);
+				edge.delete();
+				paintMarkdown(canvas, ctx, node, theme, placed);
+				break;
 			}
 			// A card's words are dark on its light colour, whatever the stage's scheme.
 			paintText(canvas, ctx, node, theme, placed, NOTE_PAD, "#1f2328");
@@ -439,6 +452,18 @@ function paintText(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: Them
 	const offset = vertical === "middle" ? (inner - paragraph.getHeight()) / 2 : vertical === "bottom" ? inner - paragraph.getHeight() : 0;
 	canvas.drawParagraph(paragraph, x + pad, y + pad + Math.max(0, offset));
 	paragraph.delete();
+}
+
+/** A markdown card's words, set as markdown inside its padding (`fonts.markdown`). */
+function paintMarkdown(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: ThemeState, placed: Placed): void {
+	if (ctx.mute?.has(node.id)) return;
+	const content = String(resolve(ctx.doc, node.content, withTheme(theme, node)) ?? "");
+	if (!content) return;
+	const style = textStyleOf(ctx.doc, node, theme);
+	const { x, y, w } = placed.box;
+	const md = ctx.fonts.markdown(content, style, { color: rgbaColor(ctx.ck, color(ctx.doc, "#1f2328", theme)!), width: w - NOTE_PAD * 2, align: node.textAlign ?? "left" });
+	md.draw(canvas, x + NOTE_PAD, y + NOTE_PAD);
+	md.delete();
 }
 
 // --- icons -------------------------------------------------------------------------------------

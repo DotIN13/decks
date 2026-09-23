@@ -1,5 +1,5 @@
 import type { CanvasKit, Image, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, indexOf, isArrow, layout, pathBounds, reroute, walk, textStyleOf, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { baseTheme, expand, indexOf, isArrow, isMarkdown, layout, pathBounds, reroute, walk, textStyleOf, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 
 /** A drag or a resize in progress: moved by `dx dy`, and sized `w h` when resizing. */
 export interface PenPreview {
@@ -17,7 +17,7 @@ export interface PenHit {
 }
 import type { Camera } from "@decks/protocol";
 import { canvasKit } from "./canvaskit.ts";
-import { PenFonts, type FontNeed } from "./fonts.ts";
+import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
 import { PenIcons } from "./icons.ts";
 import { paintDocument } from "./paint.ts";
 import { backdrops, boundsOf } from "./bounds.ts";
@@ -320,6 +320,13 @@ export class PenLayer {
 			if (typeof node.content !== "string" || !node.content) continue;
 			const style = textStyleOf(doc, node, theme);
 			needs.push({ family: style.fontFamily, weight: style.fontWeight, italic: style.fontStyle === "italic", text: node.content });
+			// A markdown card sets headings and bold heavier, emphasis in italic and code in a monospace face.
+			if (isMarkdown(node)) {
+				// The list and task markers are signs Inter does not draw: asked for with the words.
+				needs.push({ family: style.fontFamily, weight: 400, italic: false, text: "◦☐☑" });
+				needs.push({ family: style.fontFamily, weight: 700, italic: false, text: node.content }, { family: style.fontFamily, weight: 600, italic: false, text: node.content }, { family: style.fontFamily, weight: style.fontWeight, italic: true, text: node.content });
+				if (node.content.includes("`")) needs.push({ family: MONO_FAMILY, weight: 400, italic: false, text: node.content });
+			}
 		}
 		return needs;
 	}
