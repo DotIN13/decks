@@ -17,8 +17,10 @@ describe("renderer preference", () => {
 		assert.equal(loadRenderer(storage), "dom");
 		saveRenderer("canvas-per-board", storage);
 		assert.equal(loadRenderer(storage), "canvas-per-board");
-		saveRenderer("one-canvas", storage);
-		assert.equal(loadRenderer(storage), "one-canvas");
+		// The removed one-canvas renderer comes back as the canvas renderer that is left.
+		storage.map.set("decks.renderer", "one-canvas");
+		assert.equal(loadRenderer(storage), "canvas-per-board");
+		assert.equal(isRenderer("one-canvas"), false);
 	});
 
 	it("ignores a value it does not know, and a storage that throws", () => {
@@ -46,7 +48,6 @@ describe("renderer preference", () => {
 	});
 
 	it("falls back to the DOM renderer when the browser has no drawElementImage", () => {
-		assert.equal(effectiveRenderer("one-canvas", false), "dom");
 		assert.equal(effectiveRenderer("canvas-per-board", false), "dom");
 		assert.equal(effectiveRenderer("canvas-per-board", true), "canvas-per-board");
 		assert.equal(effectiveRenderer("dom", true), "dom");

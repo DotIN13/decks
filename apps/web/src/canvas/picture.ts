@@ -36,8 +36,7 @@ export interface PictureSize {
 /**
  * How large to draw a board's picture for the zoom it is seen at. Always at least a pixel.
  *
- * `cap` is one number for both sides, or a box the picture has to fit — the one-canvas
- * renderer captures pictures through a canvas of its own and cannot take one larger than it.
+ * `cap` is one number for both sides, or a box the picture has to fit.
  *
  * How many pixels, and nothing about the transform to draw with: that is `drawScale`, which
  * has to be measured off the element rather than worked out from the board and the zoom.
@@ -129,17 +128,9 @@ export function elementContext(canvas: HTMLCanvasElement): ElementDrawingContext
 }
 
 /**
- * What a board frame is given by the stage when a canvas renderer is on.
- *
- * The queue spreads settle redraws over frames for every board at once. The rest is only
- * for the one-canvas renderer, where a board's document lives in the stage's darkroom
- * canvas rather than in the board's own box: `darkroom` is where to put it, `changed` is how
- * to say its picture is stale, and `has` says whether the stage is still holding a picture
- * for a board whose document has been let go.
+ * What a board frame is given by the stage when the canvas renderer is on: the queue that
+ * spreads settle redraws over frames for every board at once.
  */
 export interface PictureHost {
 	queue: import("./redraw-queue.ts").RedrawQueue;
-	darkroom?: HTMLCanvasElement;
-	changed(path: string): void;
-	has(path: string): boolean;
 }
