@@ -4,12 +4,15 @@
  * Two tools a reader has without entering edit mode. Selecting words offers a comment on
  * them, which either becomes a pill in the input bar, to go with the next message, or
  * is sent at once; and
- * the brush draws on the board, into the board's own file as one `<svg data-ink-layer>`.
+ * the brush draws on the stage, into its `.pen` file as one pen `path` per stroke with the
+ * points it was drawn from in `metadata` (`canvas/pen/ink.ts`). The board's own file is untouched.
  *
  * No agent is prompted: `agent.prompt` frames are caught on their way into the socket and
  * read here, because what matters is the message the agent would have been given.
  */
-import { boardPath, open, read, say, settle } from "../harness.mjs";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { boardPath, deckState, open, read, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 
@@ -120,32 +123,46 @@ const dropped = await page.evaluate((selector) => ({
 }), node);
 say("Backspace deletes a pill whole, and the comment and its mark go with it", (await pills().count()) === 0 && dropped.stored === null && dropped.marked === false, JSON.stringify(dropped));
 
-// --- drawing -----------------------------------------------------------------------------
+// --- drawing, on the stage ------------------------------------------------------------------
+
+const deck = await deckState();
+/** The stage file the drawing lands in: the one most recently written. */
+const stageFile = () => {
+	const dir = join(deck.path, "stages");
+	if (!existsSync(dir)) return undefined;
+	return readdirSync(dir)
+		.map((name) => join(dir, name, "stage.pen"))
+		.filter((f) => existsSync(f))
+		.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+};
+const stage = () => {
+	const f = stageFile();
+	return f ? JSON.parse(read(f)) : { children: [] };
+};
+const inks = () => stage().children.filter((n) => n.type === "path" && n.metadata?.type === "decks.ink");
+const startInks = inks().length;
+const drawn = () => inks().length - startInks;
 
 await page.locator(`${node} .chrome`).click();
 await page.keyboard.press("1");
 await settle(page, 900);
-await page.click('[aria-label="Draw on the boards"]');
+await page.click('[aria-label="Draw on the stage"]');
 await page.waitForSelector(".ink-bar");
 say("the brush brings the drawing tools", (await page.locator(".ink-bar .icon-button").count()) >= 8);
 
-const sheet = await page.locator(`${node} .ink-input`).boundingBox();
+const sheet = await page.locator(`${node}`).boundingBox();
 const x0 = sheet.x + sheet.width * 0.35;
 const y0 = sheet.y + sheet.height * 0.3;
-const inFile = () => (read(file).match(/<path data-ink=/g) ?? []).length;
-const inFrame = () => page.evaluate((selector) => document.querySelector(`${selector} iframe`).contentDocument.querySelectorAll("svg[data-ink-layer] path").length, node);
-const loads = () => page.evaluate((selector) => (document.querySelector(`${selector} iframe`).contentWindow.__inkProbe ??= Math.random()), node);
-const probe = await loads();
 
 await page.mouse.move(x0, y0);
 await page.mouse.down();
 for (let i = 1; i <= 16; i++) await page.mouse.move(x0 + i * 7, y0 + Math.sin(i / 2.5) * 24);
 await page.mouse.up();
 await settle(page, 900);
-say("a stroke is in the board at once", (await inFrame()) === 1);
-say("…and in the board's own file, as one layer before the scripts", inFile() === 1 && /<svg class="ink" data-ink-layer[\s\S]*<\/svg>\s*<script/.test(read(file)), String(inFile()));
-say("…and nothing else in the file moved", read(file).replace(/[\t ]*<svg class="ink"[\s\S]*?<\/svg>\n/, "") === before);
-say("…and the board did not reload to show it", (await loads()) === probe);
+const firstInk = inks().at(-1);
+say("a stroke over a board goes on the stage, as a pen path with its points", drawn() === 1 && typeof firstInk?.geometry === "string" && Array.isArray(firstInk?.metadata?.points), JSON.stringify(firstInk)?.slice(0, 200));
+say("…in the ink colour, which follows light and dark", firstInk?.stroke === "$decks-ink" && Array.isArray(stage().variables?.["decks-ink"]?.value), JSON.stringify(stage().variables));
+say("…and the board's own file is untouched", read(file) === before);
 
 await page.click('.ink-bar [aria-label^="Marker"]');
 await page.click('.ink-bar [aria-label="Yellow"]');
@@ -154,14 +171,15 @@ await page.mouse.down();
 await page.mouse.move(x0 + 130, y0 + 72, { steps: 6 });
 await page.mouse.up();
 await settle(page, 900);
-say("a marker stroke is wide, yellow and see-through", /data-tool="marker" data-color="yellow"[^>]*opacity="0\.4"/.test(read(file)));
+const marker = inks().at(-1);
+say("a marker stroke is wide, yellow and see-through", marker?.metadata?.tool === "marker" && marker?.metadata?.color === "yellow" && marker?.opacity === 0.4, JSON.stringify(marker?.metadata && { ...marker.metadata, points: undefined }));
 
 await page.keyboard.press("Control+z");
 await settle(page, 900);
-say("⌘Z takes the last stroke back, in the board and in the file", (await inFrame()) === 1 && inFile() === 1, `${await inFrame()} ${inFile()}`);
+say("⌘Z takes the last stroke back", drawn() === 1, String(drawn()));
 await page.keyboard.press("Control+Shift+z");
 await settle(page, 900);
-say("⇧⌘Z puts it back", (await inFrame()) === 2 && inFile() === 2, `${await inFrame()} ${inFile()}`);
+say("⇧⌘Z puts it back", drawn() === 2, String(drawn()));
 
 await page.click('.ink-bar [aria-label^="Lasso"]');
 await page.mouse.move(x0 - 20, y0 - 45);
@@ -170,17 +188,17 @@ for (const [dx, dy] of [[150, -45], [150, 45], [-20, 45], [-20, -45]]) await pag
 await page.mouse.up();
 await settle(page, 300);
 say("a lasso round a stroke selects it", (await page.locator(".ink-selection").count()) === 1);
-const pointsOf = () => read(file).match(/data-tool="pen"[^>]*data-points="([^" ]+)/)?.[1];
-const was = pointsOf();
+const wasY = inks().find((n) => n.id === firstInk.id)?.y;
 await page.mouse.move(x0 + 40, y0);
 await page.mouse.down();
 await page.mouse.move(x0 + 40, y0 + 120, { steps: 5 });
 await page.mouse.up();
 await settle(page, 900);
-say("…and dragging the selection moves it, in the file too", pointsOf() !== was && inFile() === 2, `${was} -> ${pointsOf()}`);
+const nowY = inks().find((n) => n.id === firstInk.id)?.y;
+say("…and dragging the selection moves it, in the file too", typeof nowY === "number" && nowY > wasY && drawn() === 2, `${wasY} -> ${nowY}`);
 await page.keyboard.press("Delete");
 await settle(page, 900);
-say("…and Delete removes it", (await inFrame()) === 1 && inFile() === 1);
+say("…and Delete removes it", drawn() === 1 && !inks().some((n) => n.id === firstInk.id));
 
 await page.click('.ink-bar [aria-label^="Eraser"]');
 await page.mouse.move(x0 + 50, y0 + 50);
@@ -188,40 +206,41 @@ await page.mouse.down();
 await page.mouse.move(x0 + 50, y0 + 95, { steps: 6 });
 await page.mouse.up();
 await settle(page, 900);
-say("the eraser removes the stroke it touches, and the last stroke takes the layer with it", (await inFrame()) === 0 && read(file) === before);
+say("the eraser removes the stroke it touches", drawn() === 0, String(drawn()));
 
 // --- a pencil -----------------------------------------------------------------------------
 
 /* Playwright has no stylus, so the events are made by hand: what matters is what the sheet does with them. */
 const pointer = (type, kind, id, x, y, pressure) =>
 	page.evaluate(
-		([selector, type, kind, id, x, y, pressure]) => {
-			const target = document.querySelector(`${selector} .ink-input`);
+		([type, kind, id, x, y, pressure]) => {
+			const target = document.querySelector(".stage-ink");
 			target.dispatchEvent(new PointerEvent(type, { pointerType: kind, pointerId: id, clientX: x, clientY: y, pressure, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true, isPrimary: true }));
 		},
-		[node, type, kind, id, x, y, pressure],
+		[type, kind, id, x, y, pressure],
 	);
 await page.click('.ink-bar [aria-label^="Pen"]');
 await pointer("pointerdown", "pen", 41, x0, y0, 0.15);
 for (let i = 1; i <= 10; i++) await pointer("pointermove", "pen", 41, x0 + i * 8, y0 + i * 2, 0.15 + i * 0.08);
 await pointer("pointerup", "pen", 41, x0 + 80, y0 + 20, 0);
 await settle(page, 900);
-const pen = read(file).match(/<path data-ink=[^>]*>/)?.[0] ?? "";
-say("a pencil's pressure is kept, point by point", /data-points="[^"]*,0\.15 [^"]*,0\.9/.test(pen), pen.slice(0, 160));
-say("…and drawn as a filled outline, thin where it was light", /fill="(?!none)/.test(pen) && !/stroke-width/.test(pen), pen.slice(0, 120));
+const pen = inks().at(-1);
+const pressures = (pen?.metadata?.points ?? []).filter((_, i) => i % 3 === 2);
+say("a pencil's pressure is kept, point by point", pressures[0] === 0.15 && Math.max(...pressures) >= 0.85, pressures.join(" "));
+say("…and drawn as a filled outline, thin where it was light", !!pen?.fill && pen?.strokeWidth === undefined, JSON.stringify(pen && { fill: pen.fill, strokeWidth: pen.strokeWidth }));
 
 await pointer("pointerdown", "touch", 42, x0, y0 + 60, 0.5);
 await pointer("pointermove", "touch", 42, x0 + 60, y0 + 60, 0.5);
 await pointer("pointerup", "touch", 42, x0 + 60, y0 + 60, 0);
 await settle(page, 600);
-say("once a pencil has drawn, a finger moves the canvas and draws nothing", (await inFrame()) === 1 && inFile() === 1);
+say("once a pencil has drawn, a finger moves the canvas and draws nothing", drawn() === 1, String(drawn()));
 
 await page.keyboard.press("Control+z");
 await settle(page, 900);
-say("the board ends as it began", read(file) === before);
+say("the stage ends with the ink it began with", drawn() === 0 && read(file) === before, String(drawn()));
 await page.keyboard.press("Escape");
 await settle(page, 300);
-say("Escape puts the pen down", (await page.locator(".ink-bar").count()) === 0 && (await page.locator(".ink-input").count()) === 0);
+say("Escape puts the pen down", (await page.locator(".ink-bar").count()) === 0 && (await page.locator(".stage-ink").count()) === 0);
 
 say("no console errors", errors.length === 0, errors.join(" | "));
 await browser.close();

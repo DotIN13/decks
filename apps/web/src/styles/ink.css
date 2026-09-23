@@ -6,12 +6,13 @@
  * of two rules for one selector wins (see the note on splitting `index.css`).
  */
 @layer components {
-	/* The sheet over a board. `touch-action: none` is what lets a pencil and a finger draw
-	   rather than scroll; the stage gets its fingers from `InkLayer` by hand. */
-	.ink-input {
+	/* The glass over the stage while the draw tool is on (`pen/StageInk.tsx`). `touch-action:
+	   none` is what lets a pencil and a finger draw rather than scroll. */
+	.stage-ink {
 		position: absolute;
 		left: 0;
 		top: 0;
+		z-index: 1;
 		overflow: visible;
 		pointer-events: auto;
 		touch-action: none;
@@ -20,10 +21,10 @@
 		user-select: none;
 		-webkit-touch-callout: none;
 	}
-	.ink-input[data-tool="eraser"] {
+	.stage-ink[data-tool="eraser"] {
 		cursor: cell;
 	}
-	.ink-input[data-tool="lasso"] {
+	.stage-ink[data-tool="lasso"] {
 		cursor: default;
 	}
 	.ink-loop,

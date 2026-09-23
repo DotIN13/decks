@@ -674,7 +674,7 @@ export function AgentPill(props: {
 			</button>
 
 			{/*
-				Draw on the boards, while browsing. Held rather than chosen, like the pencil beside
+				Draw on the stage, while browsing. Held rather than chosen, like the pencil beside
 				it, so it wears the same soft wash; its own tools are a row of their own
 				(`InkBar.tsx`), because a pen, a marker, five colours and undo do not fit in here.
 				Not offered while editing: a press there already means "this component".
@@ -685,8 +685,8 @@ export function AgentPill(props: {
 					class="icon-button"
 					data-on={props.drawing ? "soft" : undefined}
 					aria-pressed={props.drawing}
-					title={props.drawing ? "Stop drawing" : "Draw on the boards"}
-					aria-label={props.drawing ? "Stop drawing" : "Draw on the boards"}
+					title={props.drawing ? "Stop drawing" : "Draw on the stage"}
+					aria-label={props.drawing ? "Stop drawing" : "Draw on the stage"}
 					onClick={() => props.onDrawing(!props.drawing)}
 				>
 					<Icon of={Brush} size={15} />

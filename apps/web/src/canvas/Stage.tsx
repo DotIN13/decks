@@ -22,6 +22,8 @@ import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
 import { createOneCanvas } from "./one-canvas.ts";
 import { PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts";
+import { StageInk } from "./pen/StageInk.tsx";
+import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
 import { ARROW, arrowShape, ids as penIds, indexOf, newId, type PenDocument, type PenNode } from "@decks/pen";
@@ -91,6 +93,8 @@ export function Stage(props: {
 	onPenEdit?: (ops: unknown[]) => void;
 	/** Take back the person's last edit to the drawing, or put it back (`stage.pen.step`). */
 	onPenStep?: (direction: "undo" | "redo") => void;
+	/** The draw tool is on: pen, marker, eraser and lasso draw on the stage (`pen/StageInk.tsx`). */
+	drawing?: boolean;
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
 	/**
@@ -636,6 +640,14 @@ export function Stage(props: {
 	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
 	/** Bare canvas or something drawn on it: either way not a board, and the canvas's to handle. */
 	const onCanvas = (target: EventTarget | null) => target === element || onDrawn(target);
+	/** The ink on the stage, each stroke in stage pixels, for the eraser and the lasso. */
+	const inkStrokes = createMemo(() => {
+		penDrawn();
+		return [...penLayer.placed.values()].flatMap((placed) => {
+			const stroke = placed.node.id.includes("/") ? undefined : strokeOf(placed);
+			return stroke ? [stroke] : [];
+		});
+	});
 	const penEdit = (ops: unknown[]) => {
 		if (ops.length) props.onPenEdit?.(ops);
 	};
@@ -2023,6 +2035,19 @@ export function Stage(props: {
 					)}
 				</Show>
 			</div>
+			<Show when={props.drawing && props.onPenEdit && !props.focus}>
+				<StageInk
+					camera={props.camera}
+					view={view()}
+					toStage={(event) => toWorld(localCamera, view(), stagePoint(event))}
+					strokes={inkStrokes}
+					layer={penLayer}
+					onEdit={(ops) => penEdit(ops)}
+					colourEdit={() => inkVariableEdit(props.pen?.doc)}
+					newId={freshId}
+					onShift={(ids, dx, dy) => penMoveBy(ids, dx, dy)}
+				/>
+			</Show>
 			<Show when={focused()} keyed>
 				{(board) => (
 					<>

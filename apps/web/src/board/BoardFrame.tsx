@@ -21,10 +21,7 @@ import { attachFrameGestures, type FrameGestureHost } from "./frame-gestures.ts"
 import { attachLiveWant, liveDelta, pushLive, pushLiveWeb, type LiveWebReply } from "./live-chat.ts";
 import { attachBoardOpen } from "./board-links.ts";
 import { attachBoardEval } from "./board-eval.ts";
-import { InkLayer } from "../markup/InkLayer.tsx";
-import { readLayer, syncLayer } from "../markup/ink-dom.ts";
 import { attachCommentSelect } from "../markup/comment-select.ts";
-import { adoptInk, drawing, inkOf } from "../state/ink.ts";
 import { paintFrame } from "../lib/theme.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
 import { canvasPixelRatio, drawScale, elementContext, needsRedraw, type PaintEvent, type PictureHost, pictureSize } from "../canvas/picture.ts";
@@ -464,19 +461,6 @@ export function BoardFrame(props: {
 	createEffect(applySrc);
 
 	/**
-	 * Ink: the strokes this board should be showing, kept in the frame's own document.
-	 *
-	 * Not a deck of slides, whose one layer would sit over every slide alike, and not a live
-	 * view, which has no file of its own to keep a drawing in.
-	 */
-	const inkable = () => props.board.format !== "slides" && !props.board.live;
-	const [inkDoc, setInkDoc] = createSignal<Document | undefined>(undefined);
-	createEffect(() => {
-		const doc = inkDoc();
-		if (doc && doc === frameEl?.contentDocument) syncLayer(doc, inkOf(props.board.path));
-	});
-
-	/**
 	 * Wire a document that has just loaded: theme, editor, gestures, drops, live feeds, and
 	 * the measurement. Called from the frame's `load` whichever renderer put it there.
 	 */
@@ -525,11 +509,6 @@ export function BoardFrame(props: {
 		// Words selected while browsing offer a comment on them (`comment-select.ts`).
 		detachComments?.();
 		detachComments = attachCommentSelect(frame, props.board.path);
-		// What is drawn on this board, read out of the document that has just loaded.
-		if (inkable()) {
-			adoptInk(props.board.path, readLayer(doc));
-			setInkDoc(doc ?? undefined);
-		}
 		detachEditor = attachEditor(frame, props.board.path, props.editor);
 		// Told where the board is, so a finger's position is arithmetic
 		// rather than a layout read on every event (`frame-gestures.ts`).
@@ -1243,10 +1222,7 @@ export function BoardFrame(props: {
 				</Switch>
 			</div>
 
-			{/* The sheet the draw tool draws on. Over the surface, so the press never reaches the board. */}
-			<Show when={drawing() && props.mounted && inkable() && !props.editing}>
-				<InkLayer path={props.board.path} w={props.board.w} h={props.board.h} gestures={props.gestures} />
-			</Show>
+
 
 			{/*
 				Agents pointing at components: a bubble with a small arrow, per mark.

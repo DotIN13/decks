@@ -196,6 +196,17 @@ export class PenLayer {
 		slide.carried = record((canvas) => paintDocument(canvas, carried, ctx));
 	}
 
+	/** Items drawn as if gone, while an eraser is over them and before the delete comes back. */
+	private hidden: ReadonlySet<string> = new Set();
+
+	hide(ids: ReadonlySet<string> | undefined): void {
+		const next = ids ?? new Set<string>();
+		if (next.size === 0 && this.hidden.size === 0) return;
+		this.hidden = next;
+		this.dirty = true;
+		this.schedule();
+	}
+
 	attach(element: HTMLCanvasElement, sheet: SheetName = "under"): void {
 		this.sheets[sheet].surface?.delete();
 		this.sheets[sheet] = { element, size: "", ...(this.sheets[sheet].picture ? { picture: this.sheets[sheet].picture } : {}) };
@@ -221,6 +232,7 @@ export class PenLayer {
 		if (doc === this.doc && base === this.base) return;
 		// The server's answer has arrived, so whatever a drag was previewing is now the drawing itself.
 		this.moving = undefined;
+		this.hidden = new Set();
 		this.dropSlide();
 		this.doc = doc;
 		this.base = base;
@@ -356,7 +368,7 @@ export class PenLayer {
 		this.drawnDoc = this.doc;
 		this.painted = { nodes, doc, placed };
 		this.under = backdrops(nodes, this.bounds, placed);
-		const ctx = { ck, fonts, doc, placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight) };
+		const ctx = { ck, fonts, doc, placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight), skip: this.hidden };
 		const parts = this.split(nodes);
 		for (const name of ["under", "over"] as const) {
 			const recorder = new ck.PictureRecorder();

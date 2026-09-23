@@ -158,6 +158,19 @@ await stage.pen.edit([
 instead of a straight line. Set `stroke` and `strokeWidth` if you want a colour or weight other
 than the grey default; a label is a `text` placed by the arrow's `box`.
 
+## Ink
+
+What the person draws with the brush is on the stage too: one `path` per stroke, drawn as it
+looks, with what was drawn in its `metadata`:
+
+```json
+{ "type": "path", "name": "Ink", "metadata": { "type": "decks.ink", "tool": "pen", "color": "red", "size": 4, "points": [12.5, 8, 0.5, …] } }
+```
+
+`points` are `x, y, pressure` triples from the path's own top-left corner, so its `box` is where
+the stroke is. Read ink to see what the person circled, underlined or crossed out, and what it is
+near. Leave it as they drew it: move or delete a stroke only when asked.
+
 ## Patterns
 
 - **A note beside a board:** read the board's `box` from `stage.boards()`, insert a `note` with

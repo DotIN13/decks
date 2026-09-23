@@ -1120,6 +1120,7 @@ export function App() {
 							if (agentId) send({ type: "stage.pen.edit", agentId, ops });
 						}}
 						onPenStep={penStep}
+						drawing={drawing() && mode() === "browse"}
 						camera={camera()}
 						glide={glide()}
 						setCamera={setCameraAndReport}
@@ -1421,7 +1422,14 @@ export function App() {
 				</Show>
 
 				<Show when={drawing() && mode() === "browse"}>
-					<InkBar onDone={() => setDrawing(false)} />
+					<InkBar
+						onDone={() => setDrawing(false)}
+						onStep={penStep}
+						onDelete={(ids) => {
+							const agentId = state.focused;
+							if (agentId) send({ type: "stage.pen.edit", agentId, ops: ids.map((id) => ({ op: "delete", id })) });
+						}}
+					/>
 				</Show>
 
 				<Show when={mode() === "edit" && stagePen()}>

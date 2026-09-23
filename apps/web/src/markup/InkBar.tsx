@@ -9,23 +9,7 @@ import Trash2 from "lucide-solid/icons/trash-2";
 import Undo2 from "lucide-solid/icons/undo-2";
 import X from "lucide-solid/icons/x";
 import { For, onCleanup, onMount, Show } from "solid-js";
-import {
-	canRedoInk,
-	canUndoInk,
-	deleteInkSelection,
-	INK_WIDTHS,
-	inkColor,
-	inkSelection,
-	inkTool,
-	inkWidth,
-	redoInk,
-	setInkColor,
-	setInkSelection,
-	setInkTool,
-	setInkWidth,
-	undoInk,
-	type InkTool,
-} from "../state/ink.ts";
+import { INK_WIDTHS, inkColor, inkSelection, inkTool, inkWidth, setInkColor, setInkSelection, setInkTool, setInkWidth, type InkTool } from "../state/ink.ts";
 import { Icon } from "../ui/icons.tsx";
 import { inkKey } from "./ink-keys.ts";
 
@@ -46,7 +30,17 @@ const TOOLS: Array<{ tool: InkTool; icon: LucideIcon; label: string }> = [
 
 const COLOR_NAMES: Record<(typeof INK_COLORS)[number], string> = { ink: "Black or white, with the theme", red: "Red", blue: "Blue", green: "Green", yellow: "Yellow" };
 
-export function InkBar(props: { onDone: () => void }) {
+/**
+ * What is drawn goes on the stage (`canvas/pen/StageInk.tsx`), so undo and redo are the stage's
+ * own, and delete takes what the lasso holds off the stage.
+ */
+export function InkBar(props: { onDone: () => void; onStep: (direction: "undo" | "redo") => void; onDelete: (ids: string[]) => void }) {
+	const deleteSelection = () => {
+		const held = inkSelection();
+		if (!held?.ids.length) return;
+		props.onDelete(held.ids);
+		setInkSelection(undefined);
+	};
 	/*
 	 * The keys, while the tool is on. On the window and in the capture phase, because the
 	 * stage answers the same keys for the board (⌘Z is "undo on this board") and while you
@@ -61,11 +55,11 @@ export function InkBar(props: { onDone: () => void }) {
 			if (action === "escape") {
 				if (inkSelection()) setInkSelection(undefined);
 				else props.onDone();
-			} else if (action === "undo") undoInk();
-			else if (action === "redo") redoInk();
+			} else if (action === "undo") props.onStep("undo");
+			else if (action === "redo") props.onStep("redo");
 			else if (action === "delete") {
 				if (!inkSelection()) return;
-				deleteInkSelection();
+				deleteSelection();
 			}
 			event.preventDefault();
 			event.stopPropagation();
@@ -138,16 +132,16 @@ export function InkBar(props: { onDone: () => void }) {
 
 			<Show when={inkSelection()}>
 				<span class="pill-sep" aria-hidden="true" />
-				<button type="button" class="icon-button" title="Delete the selected strokes (Delete)" aria-label="Delete the selected strokes" onClick={deleteInkSelection}>
+				<button type="button" class="icon-button" title="Delete the selected strokes (Delete)" aria-label="Delete the selected strokes" onClick={deleteSelection}>
 					<Icon of={Trash2} size={15} />
 				</button>
 			</Show>
 
 			<span class="pill-sep" aria-hidden="true" />
-			<button type="button" class="icon-button" disabled={!canUndoInk()} title="Undo the last stroke (⌘Z)" aria-label="Undo the last stroke" onClick={undoInk}>
+			<button type="button" class="icon-button" title="Undo your last change to the stage (⌘Z)" aria-label="Undo" onClick={() => props.onStep("undo")}>
 				<Icon of={Undo2} size={15} />
 			</button>
-			<button type="button" class="icon-button" disabled={!canRedoInk()} title="Redo (⇧⌘Z)" aria-label="Redo" onClick={redoInk}>
+			<button type="button" class="icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" onClick={() => props.onStep("redo")}>
 				<Icon of={Redo2} size={15} />
 			</button>
 			<span class="pill-sep" aria-hidden="true" />

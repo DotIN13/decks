@@ -12,7 +12,6 @@ import { reportCamera } from "./camera-report.ts";
 import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
 import { ensureHistory, resolveEarlier } from "../state/history.ts";
 import { boardChanged, forgetInFlight, forgetPatches, patchAccepted, patchRefused } from "../state/patches.ts";
-import { forgetInk } from "../state/ink.ts";
 import { notice } from "../state/notices.ts";
 import { setTimeZone } from "../lib/time.ts";
 import { setComponent, setMarks, setSelected } from "../state/selection.ts";
@@ -150,7 +149,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				case "board.changed": {
 					if (message.removed) {
 						forgetPatches(message.path);
-						forgetInk(message.path);
 						setState("boards", (boards) => boards.filter((board) => board.path !== message.path));
 						return;
 					}
