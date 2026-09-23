@@ -4,9 +4,9 @@ import { join } from "node:path";
 import type { Board } from "@decks/protocol";
 
 /**
- * A picture of a board, taken on the server, for the dashboard's gallery.
+ * A picture of a board, taken on the server, for the panel's thumbnails.
  *
- * The gallery used to show a picture only of a board this browser had already had open on
+ * The thumbnails used to show a picture only of a board this browser had already had open on
  * the canvas (`thumb-cache.ts` photographs a live frame), so on a deck of six hundred boards
  * it was six hundred grey tiles with a title on each. A picture nobody has to have opened the
  * board for has to be taken somewhere else, and the server is the one place that can reach
@@ -75,7 +75,7 @@ export interface ThumbHost {
 	 * A flow document's height, as the page laid it out (`measured` below), for the deck to keep.
 	 *
 	 * A flow board's height is its content's and the file cannot state it, so until a browser
-	 * has shown one on the canvas the record carries a 240px placeholder: the dashboard's preview
+	 * has shown one on the canvas the record carries a 240px placeholder: a preview
 	 * showed the top 240px of a page and the picture was cut off the same way. The page that
 	 * takes the picture has laid the document out, which is the one thing a measurement needs.
 	 */

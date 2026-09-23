@@ -58,7 +58,6 @@ export class AntigravityStream {
 	/** Tool steps this turn has opened, keyed by `step_index`, so `DONE` closes the one it belongs to. */
 	private tools = new Set<number>();
 	private replying = false;
-	private conversational = false;
 
 	constructor(
 		private readonly t: Translator,

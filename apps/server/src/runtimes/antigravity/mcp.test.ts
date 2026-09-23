@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { createInterface } from "node:readline";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { mcpServerPath } from "./install.ts";
 
@@ -18,8 +16,6 @@ import { mcpServerPath } from "./install.ts";
  * `/api/stage/eval`. That covers the whole round trip through the CLI's own mechanism
  * except the CLI itself.
  */
-
-const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** A stand-in for Decks' own `/api/stage/eval`, which answers and remembers. */
 async function stageServer(answer: { text: string; isError?: boolean }) {

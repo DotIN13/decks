@@ -642,7 +642,7 @@ test("create opens the new agent on its creator's runtime, not the server's defa
 	const { registry, parentId, created } = spawnHarness(deck, "claude");
 
 	await registry.createFor(parentId, { name: "Survey" });
-	assert.equal(created()?.kind, "pi", "the dashboard's bar chooses the runtime new work runs on");
+	assert.equal(created()?.kind, "pi", "new work runs on its creator's runtime");
 	await registry.createFor(parentId, { name: "Maps", kind: "opencode" });
 	assert.equal(created()?.kind, "opencode", "a runtime that is named still wins");
 	cleanup();

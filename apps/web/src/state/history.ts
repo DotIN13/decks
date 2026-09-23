@@ -1,6 +1,6 @@
-import { PAGE, prepend } from "../chat/history-page.ts";
+import { PAGE } from "../chat/history-page.ts";
 import { scratch } from "./agent.ts";
-import { state, setState } from "./deck.ts";
+import { state } from "./deck.ts";
 import { send, started } from "./socket.ts";
 
 /**

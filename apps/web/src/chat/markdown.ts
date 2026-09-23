@@ -441,36 +441,3 @@ function safeHref(raw: string): string | undefined {
 	if (!href) return undefined;
 	return /^(?:https?:\/\/|mailto:)[^\s]+$/i.test(href) ? href : undefined;
 }
-
-/**
- * The same text with its markup taken off, for somewhere too small to render it.
- *
- * The dock's peek is one or two lines in a strip over the input bar, so it cannot draw a
- * list or a heading — but showing raw `**` there while the bubble below renders it bold is
- * the app disagreeing with itself in two places at once.
- */
-export function plainText(text: string): string {
-	const say = (spans: Inline[]): string =>
-		spans
-			.map((span) => (span.kind === "text" || span.kind === "code" ? span.text : say(span.spans)))
-			.join("");
-	return blocks(text)
-		.map((block) => {
-			switch (block.kind) {
-				case "code":
-					return block.text;
-				case "rule":
-					return "";
-				case "list":
-					return block.items.map((item) => `• ${say(item.spans)}`).join("\n");
-				// A row per line, cells separated by something that is not a pipe: this is read
-				// aloud by a notification, where the source's own punctuation is noise.
-				case "table":
-					return [block.head, ...block.rows].map((row) => row.map(say).join(" · ")).join("\n");
-				default:
-					return say(block.spans);
-			}
-		})
-		.filter((line) => line.length > 0)
-		.join("\n");
-}

@@ -89,8 +89,6 @@ export class Registry {
 	 * the absence the panel draws one section for.
 	 */
 	summaries(): Array<{ id: string; name: string; state: AgentState; kind: AgentKind; context: string[]; holding: number; tags: string[]; workspace: string | undefined; queued: number }> {
-		// Not the dispatcher: it is the dashboard's, and an agent deciding who to hand work
-		// to must not hand it to the thing that hands work out.
 		return this.agents.map((agent) => {
 			const chat = agent.chat();
 			// `queued` is here for the same reason `tags` is: so an agent deciding who to hand

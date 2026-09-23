@@ -4,9 +4,8 @@
  * The server's machine is usually on UTC and the person is not. Two things follow the
  * person's zone: the process clock, which `settings.ts` sets from the deck's setting so
  * that an agent's shell and the runtime's own "today" agree with them, and everything in
- * this file, which takes the zone as an argument. A schedule may carry a zone of its own
- * ("every weekday at nine, London time"), so its arithmetic cannot lean on the process
- * clock, and a test of it should not depend on the machine it runs on.
+ * this file, which takes the zone as an argument, so a test of it does not depend on the
+ * machine it runs on.
  *
  * `Intl` is the only source of zone rules here. There is no table of offsets and no
  * library: the runtime already ships the tz database, and a second copy is a second
@@ -84,35 +83,6 @@ export function offsetAt(ts: number, zone: string): number {
 	const at = partsIn(ts, zone);
 	const asUtc = Date.UTC(at.year, at.month - 1, at.day, at.hour, at.minute, at.second);
 	return asUtc - Math.floor(ts / 1000) * 1000;
-}
-
-/**
- * The instant at which `zone`'s wall clock reads the given date and minutes past midnight.
- *
- * Built from the calendar date and the clock time, never by adding minutes to midnight:
- * on the two days a year the clocks change, midnight plus eight hours is 07:00 or 09:00.
- * The offset is looked up twice because the first guess may fall on the other side of a
- * change, and the answer is whichever of the two the zone's clock really reads as that
- * time. A time the clocks skip (02:30 on a spring-forward night) is read by neither, and
- * lands after the gap.
- */
-export function instantIn(zone: string, year: number, month: number, day: number, minutes: number): number {
-	const wall = Date.UTC(year, month - 1, day, 0, minutes);
-	const early = wall - offsetAt(wall, zone);
-	const late = wall - offsetAt(early, zone);
-	const reads = (ts: number) => {
-		const at = partsIn(ts, zone);
-		return at.day === day && at.hour * 60 + at.minute === minutes;
-	};
-	if (reads(late)) return late;
-	if (reads(early)) return early;
-	return Math.max(early, late);
-}
-
-/** The calendar date `days` after the one given, as a date: month ends and leap years handled. */
-export function addCalendarDays(year: number, month: number, day: number, days: number): { year: number; month: number; day: number; weekday: number } {
-	const at = new Date(Date.UTC(year, month - 1, day + days));
-	return { year: at.getUTCFullYear(), month: at.getUTCMonth() + 1, day: at.getUTCDate(), weekday: at.getUTCDay() };
 }
 
 /** "UTC−7", "UTC+5:30", "UTC". */

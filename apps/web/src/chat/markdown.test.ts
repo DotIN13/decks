@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { blocks, inline, plainText, type Block, type Inline } from "./markdown.ts";
+import { blocks, inline, type Block, type Inline } from "./markdown.ts";
 
 /** A span tree as a readable string, so a failure says what it got. */
 function shape(spans: Inline[]): string {
@@ -180,12 +180,6 @@ test("plain prose is one paragraph and nothing else", () => {
 
 // --- the peek -------------------------------------------------------------------------
 
-test("plainText strips the syntax and keeps the words", () => {
-	assert.equal(plainText("**bold** and `code`"), "bold and code");
-	assert.equal(plainText("# Title\n\n- one\n- two"), "Title\n• one\n• two");
-	assert.equal(plainText("see [the docs](https://example.com)"), "see the docs");
-	assert.equal(plainText("---"), "");
-});
 
 /*
  * Tables.

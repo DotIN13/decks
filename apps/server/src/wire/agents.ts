@@ -17,7 +17,6 @@ export const agents = {
 		 * something else happened to republish the list.
 		 */
 		const agent = wire.agents.create({
-			... (message.parentId ? { parentId: message.parentId } : {}),
 			// From under a workspace heading: the agent is in that project.
 			...(message.workspace ? { workspace: message.workspace } : {}),
 			... (message.kind ? { kind: message.kind } : {}),

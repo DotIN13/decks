@@ -1,4 +1,4 @@
-import type { Camera, ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
+import type { ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
 import type { CameraReading } from "../deck/place.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { Acts } from "../agents/acts.ts";

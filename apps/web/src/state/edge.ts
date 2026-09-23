@@ -100,10 +100,3 @@ export function setInspectable(can: boolean): void {
 	// the inspector, and it must not take it away from a history that had claimed it.
 	if (can && !had) setClaim("inspector");
 }
-
-/** For tests: back to nothing wanted, nothing selected. */
-export function resetEdge(): void {
-	setWanted(false);
-	setDescribable(false);
-	setClaim("inspector");
-}

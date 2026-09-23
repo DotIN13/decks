@@ -8,14 +8,14 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup,
 import { createStore, reconcile } from "solid-js/store";
 import { DecksMark, Icon } from "../ui/icons.tsx";
 import { BoardRow, BoardTile } from "./BoardRow.tsx";
-import { panelSections, panelTally } from "./panel-groups.ts";
+import { panelSections } from "./panel-groups.ts";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 import { AgentRow } from "./AgentRow.tsx";
 import { NewAgentButton } from "./AgentPill.tsx";
 import type { AgentKind } from "@decks/protocol";
-import { agentSections, agentTally, type AgentGroup, type AgentSection } from "./agent-sections.ts";
+import { agentSections, type AgentSection } from "./agent-sections.ts";
 
 /**
  * The left panel: one surface, **one list**, and a button that makes it go away.
@@ -34,9 +34,8 @@ import { agentSections, agentTally, type AgentGroup, type AgentSection } from ".
  *
  * So there is one scroller with three headings in it — **on the canvas**, **held, not
  * shown**, **in the deck** — and one search field over all of it. `panel-groups.ts` owns the
- * grouping and argues it; what is left here is the surface. Agents were never a tab either:
- * a list you switch *with* is a selector, and it hangs off the thing it selects (the avatar
- * in the top-left pill).
+ * grouping and argues it; what is left here is the surface. Agents are the second tab, filed by
+ * workspace (`agent-sections.ts`).
  *
  * The first two sections are the **focused agent's**, all of them and nothing else — no
  * other agent's holdings appear anywhere, and a board somebody else is holding is simply in
@@ -120,16 +119,6 @@ export function LeftPanel(props: {
 	/** Folded is gone. Owned by the pill's button, so the two can never disagree. */
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	/**
-	 * How the list draws its boards. Uncontrolled when absent.
-	 *
-	 * One setting for one list. It used to be remembered per tab — seven boards an agent
-	 * chose are worth seeing as pictures and seventy-eight are not — and with the tabs gone
-	 * that argument goes with them: the sections are the same list, and a density that
-	 * changed halfway down it would be two lists again.
-	 */
-	density?: Density;
-	onDensity?: (density: Density) => void;
 	onPick: (board: Board) => void;
 	/**
 	 * Delete a board's file. Absent means no row has a delete on it.
@@ -145,8 +134,6 @@ export function LeftPanel(props: {
 	onDelete?: (board: Board) => void;
 	/** Take a board off the canvas, keeping the file. */
 	onHide?: (board: Board) => void;
-	/** What is typed, for a caller that wants to keep it — `⌘K` opening on a query, say. */
-	onSearch?: (query: string) => void;
 	/**
 	 * A stamp that means "find a board now": take the cursor into the search field.
 	 *
@@ -183,25 +170,10 @@ export function LeftPanel(props: {
 	onAgentWorkspace?: (id: string, workspace: string | null) => void;
 	/** Rename an agent, from the edit window its row opens. */
 	onAgentRename?: (id: string, name: string) => void;
-	/**
-	 * Which axis the agents list is cut by — see `AgentGroup`. Uncontrolled when absent, and
-	 * **workspace** is what it opens on.
-	 *
-	 * A preference rather than state that belongs to a caller, on the same terms as `density`:
-	 * it is how this list draws itself, and the panel is the only thing that reads it. It is
-	 * *not* remembered between sessions — unlike density, which is a property of the person, an
-	 * axis is a property of the question being asked, and the question is answered in one press.
-	 */
-	group?: AgentGroup;
-	onGroup?: (group: AgentGroup) => void;
 }) {
 	const ids = createUniqueId();
-	const [ownDensity, setOwnDensity] = createSignal<Density>("list");
-	/*
-	 * Workspace, which is the axis this list opens on. `AgentGroup` argues it: a project is a
-	 * place you look for, and "who needs you" is a ranking that moves as turns start and end.
-	 */
-	const ownGroup = () => "workspace" as AgentGroup;
+	/* Pictures or rows for the boards: one setting for the one list, not remembered. */
+	const [density, setDensity] = createSignal<Density>("list");
 	/*
 	 * One line or two per agent. Remembered, like a density: it is how this person likes the
 	 * list, not a question about it. Two is what it opens on, because the second line is the
@@ -291,11 +263,7 @@ export function LeftPanel(props: {
 		if (next === tab()) return;
 		setTab(next);
 		setQuery("");
-		props.onSearch?.("");
 	};
-
-	const density = () => props.density ?? ownDensity();
-	const group = () => props.group ?? ownGroup();
 
 	/**
 	 * The workspaces in use, for the popup's suggestions.
@@ -318,7 +286,6 @@ export function LeftPanel(props: {
 		unread: props.unread ?? {},
 		focused: props.focused,
 		query: query(),
-		group: group(),
 	});
 
 	/**
@@ -349,7 +316,6 @@ export function LeftPanel(props: {
 	const [agentList, setAgentList] = createStore<AgentSection[]>(agentSections(agentInput()));
 	createEffect(() => setAgentList(reconcile(agentSections(agentInput()))));
 
-	/** Every agent, unfiltered — what the foot counts and the placeholder says. */
 	/* Every name on the deck but the agent's own: what the edit window checks a new name against
 	   before the server does, so the refusal is a red line under the field rather than a notice. */
 	const nameTaken = (name: string, self: string) => {
@@ -357,7 +323,8 @@ export function LeftPanel(props: {
 		return (props.chats ?? []).some((chat) => chat.id !== self && (props.identities?.[chat.id]?.name ?? chat.name).trim().toLowerCase() === wanted);
 	};
 
-	const allAgents = createMemo(() => agentTally(agentSections({ chats: props.chats ?? [], identities: props.identities ?? {}, unread: props.unread ?? {}, focused: props.focused })));
+	/** Every agent, unfiltered — what the placeholder and the empty state count. */
+	const agentCount = () => props.chats?.length ?? 0;
 
 	let list: HTMLDivElement | undefined;
 	let field: HTMLInputElement | undefined;
@@ -373,14 +340,7 @@ export function LeftPanel(props: {
 		});
 	});
 
-	const goDensity = (next: Density) => {
-		setOwnDensity(next);
-		props.onDensity?.(next);
-	};
-	const type = (next: string) => {
-		setQuery(next);
-		props.onSearch?.(next);
-	};
+	const type = (next: string) => setQuery(next);
 
 	const sections = createMemo(() =>
 		panelSections({
@@ -390,7 +350,6 @@ export function LeftPanel(props: {
 			query: query(),
 		}),
 	);
-	const tally = createMemo(() => panelTally(sections()));
 
 	/*
 	 * How many rows are drawn, across the sections in order.
@@ -522,9 +481,8 @@ export function LeftPanel(props: {
 				aria-label="Boards"
 				/*
 				 * A stationary column, not a card. Beside the canvas it runs the full height of
-				 * the window at the left edge, with the deck mark on top, so the two surfaces
-				 * (the dashboard and a stage) share one sidebar that never moves while the
-				 * middle slides. A sheet keeps the geometry it had: it covers the canvas on a
+				 * the window at the left edge, with the deck mark on top, and never moves while
+				 * the middle slides. A sheet keeps the geometry it had: it covers the canvas on a
 				 * phone and starts under the pill.
 				 */
 				style={sheet() ? undefined : { width: `${width()}px` }}
@@ -659,7 +617,7 @@ export function LeftPanel(props: {
 							   with room to show the answer. */
 							placeholder={
 								tab() === "agents"
-									? `Search ${allAgents().total} agent${allAgents().total === 1 ? "" : "s"}`
+									? `Search ${agentCount()} agent${agentCount() === 1 ? "" : "s"}`
 									: `Search ${props.boards.length} board${props.boards.length === 1 ? "" : "s"}`
 							}
 							value={query()}
@@ -702,10 +660,9 @@ export function LeftPanel(props: {
 					{/*
 						One control beside the search, and it is the foot's two, folded into one press.
 
-						Pictures or rows is a question about *thumbnails*, so it belongs to Boards; an
-						agent list has two ways of being cut up — by who needs you, or by which project
-						they are on — so on Agents the same square switches the grouping. The icon is
-						what a press will give you, and `data-view` is what is showing now, for a check.
+						Pictures or rows is a question about *thumbnails*, so it belongs to Boards; on
+						Agents the same square switches rows between one line and two. The icon is what
+						a press will give you, and `data-view` is what is showing now, for a check.
 					*/}
 					<button
 						type="button"
@@ -722,7 +679,7 @@ export function LeftPanel(props: {
 						}
 						title={tab() === "boards" ? (density() === "list" ? "Grid" : "List") : lines() === 2 ? "One line per agent" : "Two lines per agent"}
 						onClick={() => {
-							if (tab() === "boards") goDensity(density() === "list" ? "grid" : "list");
+							if (tab() === "boards") setDensity(density() === "list" ? "grid" : "list");
 							else goLines(lines() === 2 ? 1 : 2);
 						}}
 					>
@@ -773,10 +730,10 @@ export function LeftPanel(props: {
 										<Show when={section.note}>{(note) => <span class="note">{note()}</span>}</Show>
 										{/*
 											No count: the rows are right under it, and what the slot is for is a
-											`+` — an agent made from under a project's heading is in that project. Only where the heading *is* a
-											project; the attention cut's headings are not places to make one in.
+											`+` — an agent made from under a project's heading is in that project, and one made
+											under `No workspace` is in none.
 										*/}
-										<Show when={props.onNewAgent && (section.kind === "workspace" || section.kind === "unfiled")}>
+										<Show when={props.onNewAgent}>
 											<NewAgentButton
 												onNew={(kind) => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined, kind)}
 												label={section.kind === "workspace" ? `Add an agent in ${section.label}` : "Add an agent in no workspace"}
@@ -788,8 +745,8 @@ export function LeftPanel(props: {
 									{/*
 										`.row-list` is the row vocabulary — the grid, the corner, the hover, the
 										current wash, `.row-act` and its ×, and the `.row-label`/`.row-note` type scale. The
-										agent row wants all of that and two overrides (a 28px icon column and a
-										top-aligned action), which `.agent-list` in `panel.css` supplies.
+										agent row wants all of that and its own overrides (a 20px or 26px face column,
+										by `data-lines`), which `.agent-list` in `panel.css` supplies.
 
 										Re-implementing it instead is how two lists in one panel come to nearly
 										match: the board rows above are the same object.
@@ -822,7 +779,7 @@ export function LeftPanel(props: {
 						    a panel that is blank for a good reason still looks broken without it. */}
 						<Show when={agentList.length === 0}>
 							<p class="m-0 px-1 py-2 text-ui leading-normal text-faint">
-								{allAgents().total === 0 ? "No agents yet. Start one with `+`." : `No agent matches “${query().trim()}”.`}
+								{agentCount() === 0 ? "No agents yet. Start one with `+`." : `No agent matches “${query().trim()}”.`}
 							</p>
 						</Show>
 					</Show>
@@ -930,13 +887,6 @@ export function LeftPanel(props: {
 	);
 }
 
-/**
- * Whether the panel has to go over the canvas rather than beside it.
- *
- * A signal and not a media query, because what changes across this line is `data-inset` —
- * see the note at the top. `matchMedia` in a `try` for the same reason `lib/media.ts` does
- * it: a test environment without one should get the desktop answer, not an exception.
- */
 const LINES_KEY = "decks.agentLines";
 
 /** The remembered line count for agent rows; two when nothing is stored. */
@@ -948,6 +898,13 @@ function readLines(): 1 | 2 {
 	}
 }
 
+/**
+ * Whether the panel has to go over the canvas rather than beside it.
+ *
+ * A signal and not a media query, because what changes across this line is `data-inset` —
+ * see the note at the top. `matchMedia` in a `try` for the same reason `lib/media.ts` does
+ * it: a test environment without one should get the desktop answer, not an exception.
+ */
 function createSheet(): () => boolean {
 	let query: MediaQueryList | undefined;
 	try {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";import { tmpdir } from "node:os";
+import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Authors } from "./authors.ts";

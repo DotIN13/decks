@@ -94,19 +94,8 @@ export const pointFromBoard = (at: FrameAt, x: number, y: number): Point<"stage"
 });
 
 /**
- * A movement measured in board pixels → the same movement in stage pixels.
- *
- * No offset: a difference has no origin, and adding one is the bug this being a separate
- * function prevents.
- */
-export const deltaFromBoard = (at: FrameAt, dx: number, dy: number): Delta<"stage"> => ({
-	dx: dx * at.scale,
-	dy: dy * at.scale,
-});
-
-/**
- * A movement in stage pixels → board pixels. The inverse, kept beside it so the two cannot
- * drift apart — for scrolling a box inside a board, which is laid out in board pixels.
+ * A movement in stage pixels → board pixels, for scrolling a box inside a board, which is
+ * laid out in board pixels. No offset: a difference has no origin.
  */
 export const deltaToBoard = (at: FrameAt, dx: number, dy: number): Delta<"board"> => ({
 	dx: dx / at.scale,

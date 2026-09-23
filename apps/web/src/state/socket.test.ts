@@ -5,11 +5,11 @@ import type { ServerMessage } from "@decks/protocol";
 /*
  * How frames reach the app: in waves, once per paint.
  *
- * The greeting is not one frame. It is the deck, the canvases, the chat list and then seven
- * frames for every conversation on the deck, which on a real deck is a couple of hundred —
- * sent by the server in a tenth of a second. Applied one at a time, each one ran the whole
- * reactive graph, and the page was blocked for ten to seventeen seconds while the dashboard
- * regrouped nine hundred boards over and over. What is pinned here is the collecting: nothing
+ * The greeting is not one frame. It is the deck, the chat list and then seven frames for
+ * every conversation on the deck, which on a real deck is a couple of hundred — sent by the
+ * server in a tenth of a second. Applied one at a time, each one ran the whole reactive graph,
+ * and the page was blocked for seconds while the same derived state was recomputed over and
+ * over. What is pinned here is the collecting: nothing
  * is dropped, nothing is reordered, and a window that never paints still gets its frames.
  */
 
@@ -80,12 +80,11 @@ function connected() {
 test("frames that arrive together are applied together, in the order they came", () => {
 	const app = connected();
 	app.arrive("deck.state");
-	app.arrive("canvases");
 	for (const id of ["a", "b", "c"]) app.arrive("agent.identity", id);
 	assert.deepEqual(app.heard, [], "nothing is applied before the paint");
 	app.paint();
-	assert.deepEqual(app.heard, ["deck.state:", "canvases:", "agent.identity:a", "agent.identity:b", "agent.identity:c"]);
-	assert.deepEqual(app.waves, [5], "one wave, not five");
+	assert.deepEqual(app.heard, ["deck.state:", "agent.identity:a", "agent.identity:b", "agent.identity:c"]);
+	assert.deepEqual(app.waves, [4], "one wave, not four");
 });
 
 test("frames that arrive after a paint are the next wave, still in order", () => {

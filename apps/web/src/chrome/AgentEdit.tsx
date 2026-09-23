@@ -42,7 +42,6 @@ const MAX_TAGS = 4;
  * agent five times on the way to *Sable*.
  */
 export function AgentEdit(props: {
-	agentId: string;
 	/** The agent's name as the deck has it; the field follows this, so a refusal puts it back. */
 	name: string;
 	/** What you say about it. This is what the tag field edits. */

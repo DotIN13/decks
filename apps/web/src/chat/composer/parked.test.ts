@@ -18,11 +18,11 @@ test("each agent's stage is one page", () => {
 test("each page keeps its own draft, and a reload reads them back", () => {
 	const store = memory();
 	const drafts = parkedDrafts(store);
-	drafts.set("home", words("a task, half written"));
+	drafts.set("agent:a0", words("a task, half written"));
 	drafts.set("agent:a1", [...words("see "), pill("c1")]);
-	assert.deepEqual(drafts.get("home"), words("a task, half written"));
+	assert.deepEqual(drafts.get("agent:a0"), words("a task, half written"));
 	const again = parkedDrafts(store);
-	assert.deepEqual(again.get("home"), words("a task, half written"));
+	assert.deepEqual(again.get("agent:a0"), words("a task, half written"));
 	assert.deepEqual(again.get("agent:a1"), [...words("see "), pill("c1")]);
 	assert.equal(again.get("agent:a2"), undefined);
 });
@@ -30,9 +30,9 @@ test("each page keeps its own draft, and a reload reads them back", () => {
 test("a sent or cleared draft is forgotten, and nothing at all is nothing stored", () => {
 	const store = memory();
 	const drafts = parkedDrafts(store);
-	drafts.set("home", words("x"));
-	drafts.set("home", words("  "));
-	assert.equal(drafts.get("home"), undefined);
+	drafts.set("agent:a0", words("x"));
+	drafts.set("agent:a0", words("  "));
+	assert.equal(drafts.get("agent:a0"), undefined);
 	assert.equal(store.held.has(DRAFTS_KEY), false);
 });
 
@@ -43,8 +43,8 @@ test("the oldest pages go once there are too many, and a broken store is an empt
 	assert.equal(drafts.get("agent:0"), undefined);
 	assert.deepEqual(drafts.get(`agent:${DRAFTS_LIMIT}`), words(`draft ${DRAFTS_LIMIT}`));
 	store.held.set(DRAFTS_KEY, "{not json");
-	assert.equal(parkedDrafts(store).get("home"), undefined);
-	assert.equal(parkedDrafts(undefined).get("home"), undefined);
+	assert.equal(parkedDrafts(store).get("agent:a0"), undefined);
+	assert.equal(parkedDrafts(undefined).get("agent:a0"), undefined);
 });
 
 test("a restored draft agrees with the comments still waiting", () => {
@@ -58,8 +58,8 @@ test("two tabs typing on different pages do not write over each other", () => {
 	const store = memory();
 	const one = parkedDrafts(store);
 	const two = parkedDrafts(store);
-	one.set("home", words("typed in the first tab"), 1);
+	one.set("agent:a0", words("typed in the first tab"), 1);
 	two.set("agent:a1", words("typed in the second"), 2);
-	assert.deepEqual(parkedDrafts(store).get("home"), words("typed in the first tab"));
+	assert.deepEqual(parkedDrafts(store).get("agent:a0"), words("typed in the first tab"));
 	assert.deepEqual(parkedDrafts(store).get("agent:a1"), words("typed in the second"));
 });

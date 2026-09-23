@@ -374,10 +374,6 @@ export class StageService {
 		return this.ask(agentId, { op: "annotate", args: { agentId, path, marks: marks ?? null } });
 	}
 
-	async toast(agentId: string, text: string): Promise<void> {
-		await this.ask(agentId, { op: "toast", args: { text } });
-	}
-
 	private async ask(agentId: string, call: Omit<StageCall, "id" | "agentId">): Promise<unknown> {
 		if (!this.host.connected()) {
 			// Not an error: an agent can do useful work with nobody watching, and it

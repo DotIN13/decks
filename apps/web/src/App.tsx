@@ -1,4 +1,4 @@
-import type { Board, Camera, Identity, ThinkingLevel } from "@decks/protocol";
+import type { Board, Camera, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
 import Moon from "lucide-solid/icons/moon";
@@ -181,8 +181,6 @@ export function App() {
 			},
 		),
 	);
-	/** Go to an agent: its stage, and its conversation. Every row, face and banner lands here. */
-	const visitAgent = (id: string) => focusAgent(id);
 
 	/*
 	 * The bar's destination, decided in one place.
@@ -796,7 +794,7 @@ export function App() {
 	 * one destination — the bytes are copied into the deck's `assets/`.
 	 */
 	const files = createFileDrops({ editor });
-	const { addFile, drops, intoComposer, paste } = files;
+	const { addFile, drops, intoComposer } = files;
 
 
 	// A paste, and a drop that missed every board (`app/files.ts`).
@@ -1045,18 +1043,6 @@ export function App() {
 		send({ type: "board.eval", path, id, ...(value !== undefined ? { value } : {}) });
 	};
 
-	/**
-	 * Open the conversation around a turn — the deck's scrub, which is what the spine is
-	 * for.
-	 *
-	 * `atTurn` carries a timestamp as well as an id so that clicking the same block twice
-	 * is a new request: the float keys its jump on both and would otherwise treat the
-	 * second click as one it had already carried out.
-	 */
-	const scrubToTurn = (turn: { id: string }) => {
-		setAtTurn({ id: turn.id, at: Date.now() });
-		openHistory();
-	};
 
 	return (
 		<div class="app">
@@ -1283,7 +1269,7 @@ export function App() {
 					identities={state.identities}
 					focused={state.focused}
 					unread={unread}
-					onFocus={visitAgent}
+					onFocus={focusAgent}
 					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					onClose={closeAgent}
 					onMoreAgents={openAgentsPanel}
@@ -1314,7 +1300,7 @@ export function App() {
 					identities={state.identities}
 					focused={state.focused}
 					unread={unread}
-					onFocus={visitAgent}
+					onFocus={focusAgent}
 					onMore={openAgentsPanel}
 					onClose={closeAgent}
 					zoom={camera().zoom}
@@ -1474,7 +1460,7 @@ export function App() {
 					chats={state.chats}
 					identities={state.identities}
 					unread={unread}
-					onFocusAgent={visitAgent}
+					onFocusAgent={focusAgent}
 					onNewAgent={(workspace, kind) => send({ type: "agent.create", kind, ...(workspace ? { workspace } : {}) })}
 					onCloseAgent={closeAgent}
 					onMirrorAgent={(id) =>
@@ -1674,7 +1660,7 @@ export function App() {
 							focused: state.focused,
 							dest: destination(barText(), barContext()),
 							label: destinationLabel(destination(barText(), barContext())),
-							onPick: visitAgent,
+							onPick: focusAgent,
 							onNew: (kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) }),
 							onClose: closeAgent,
 							onMore: openAgentsPanel,

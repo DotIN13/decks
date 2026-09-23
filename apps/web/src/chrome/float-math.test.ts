@@ -3,7 +3,6 @@ import { test } from "node:test";
 import {
 	FLOATS_KEY,
 	clamp,
-	clearFloats,
 	fromAnchor,
 	fling,
 	fromSaved,
@@ -13,14 +12,12 @@ import {
 	saveFloat,
 	settle,
 	snapHome,
-	toAnchor,
 	velocityFrom,
 	stowsRight,
 	stowedAt,
 	loadStowed,
 	saveStowed,
 	STOWED_KEY,
-	type Anchor,
 	type Box,
 	type Saved,
 } from "./float-math.ts";
@@ -76,32 +73,6 @@ test("snapHome inside the radius is home, outside is untouched", () => {
 	assert.deepEqual(snapHome({ x: 520, y: 320 }, home, 30), { p: home, home: true });
 });
 
-test("toAnchor picks the nearest corner and measures from it", () => {
-	assert.deepEqual(toAnchor({ x: 110, y: 60 }, size, bounds), { anchor: "tl", dx: 10, dy: 10 });
-	assert.deepEqual(toAnchor({ x: 680, y: 60 }, size, bounds), { anchor: "tr", dx: 20, dy: 10 });
-	assert.deepEqual(toAnchor({ x: 110, y: 520 }, size, bounds), { anchor: "bl", dx: 10, dy: 30 });
-	assert.deepEqual(toAnchor({ x: 680, y: 520 }, size, bounds), { anchor: "br", dx: 20, dy: 30 });
-});
-
-test("toAnchor and fromAnchor round-trip at every corner", () => {
-	const home = { x: 0, y: 0 };
-	const points = [
-		{ x: 110, y: 60 },
-		{ x: 680, y: 60 },
-		{ x: 110, y: 520 },
-		{ x: 680, y: 520 },
-		{ x: 400, y: 300 },
-	];
-	const seen = new Set<Anchor>();
-	for (const p of points) {
-		const saved = toAnchor(p, size, bounds);
-		assert.notEqual(saved, "home");
-		if (saved !== "home" && "anchor" in saved) seen.add(saved.anchor);
-		assert.deepEqual(fromAnchor(saved, size, bounds, home), p);
-	}
-	assert.deepEqual([...seen].sort(), ["bl", "br", "tl", "tr"]);
-});
-
 test("fromAnchor keeps the inset when the bounds change size", () => {
 	const saved: Saved = { anchor: "br", dx: 20, dy: 30 };
 	assert.deepEqual(fromAnchor(saved, size, { x: 0, y: 0, w: 1000, h: 800 }, { x: 0, y: 0 }), { x: 780, y: 670 });
@@ -119,9 +90,6 @@ test("save and load with a fake storage", () => {
 	assert.deepEqual(loadFloats(storage), { bar: { anchor: "br", dx: 1, dy: 2 }, panel: "home" });
 	saveFloat("bar", "home", storage);
 	assert.deepEqual(loadFloats(storage), { bar: "home", panel: "home" });
-	clearFloats(storage);
-	assert.deepEqual(loadFloats(storage), {});
-	assert.equal(storage.getItem(FLOATS_KEY), null);
 });
 
 test("load tolerates garbage and drops entries of the wrong shape", () => {

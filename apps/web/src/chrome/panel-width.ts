@@ -1,7 +1,7 @@
 /**
  * How wide the sidebar is, when the person has said.
  *
- * Nothing else has to hear about it. The canvas, the composer and the dashboard all read
+ * Nothing else has to hear about it. The canvas and the composer both read
  * `--inset-left`, and `camera/insets.ts` measures that from the panel's real box, so a
  * panel that is wider is a column that is narrower without a second number anywhere.
  *

@@ -26,7 +26,7 @@
  *   server's business.
  */
 import type { EditorOp } from "@decks/protocol";
-import { bodyOf, type TreeNode } from "./node.ts";
+import type { TreeNode } from "./node.ts";
 import { pathOf } from "./address.ts";
 
 /**
@@ -155,16 +155,3 @@ export const ops = {
 		return { op: "source", text };
 	},
 };
-
-/** The body's address is the empty path, which is where every other path is counted from. */
-export function isInBody(root: TreeNode, node: TreeNode): boolean {
-	const body = bodyOf(root);
-	if (!body) return false;
-	let found = false;
-	const walk = (candidate: TreeNode) => {
-		if (candidate === node) found = true;
-		for (const part of candidate.parts) if (part.kind === "element") walk(part.node);
-	};
-	walk(body);
-	return found;
-}

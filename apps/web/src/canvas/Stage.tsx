@@ -3,7 +3,7 @@ import X from "lucide-solid/icons/x";
 import { Icon } from "../ui/icons.tsx";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import type { AgentAct } from "./acts.ts";
-import { between, boxOf, easeOutCubic, fit, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
+import { between, boxOf, easeOutCubic, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "./BoardFrame.tsx";
@@ -531,9 +531,9 @@ export function Stage(props: {
 	 * The focus view: one board, as a page.
 	 *
 	 * Not a camera trick — the canvas is *not rendered* while this is on, and this is a
-	 * separate view with its own scroll box and its own zoom (`canvas/FocusView.tsx` explains
-	 * why). So the zoom lives here, because the stage is what owns the frame's wiring and the
-	 * gesture host the view's frame reports to.
+	 * separate view with its own scroll box and its own zoom (the `.focus` box below). So the
+	 * zoom lives here, because the stage is what owns the frame's wiring and the gesture host
+	 * the view's frame reports to.
 	 */
 	const [focusZoom, setFocusZoom] = createSignal(1);
 	let focusEl: HTMLDivElement | undefined;
@@ -1297,7 +1297,7 @@ export function Stage(props: {
 	 * One board, as the canvas draws it: the frame, its title bar, its marks, its editor.
 	 *
 	 * A function because the focus view renders exactly one of these in a different box
-	 * (`canvas/FocusView.tsx`), and two copies of this — forty props, every wire the board
+	 * (the `.focus` page below), and two copies of this — forty props, every wire the board
 	 * needs — is how the two views would drift apart.
 	 */
 	const boardNode = (board: Board, alone = false) => (

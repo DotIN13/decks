@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { closeHistory, edgeOwner, historyButton, resetEdge, setInspectable, toggleHistory } from "./edge.ts";
+import { closeHistory, edgeOwner, historyButton, setInspectable, toggleHistory } from "./edge.ts";
+
+/** Back to nothing wanted, nothing selected, and the inspector holding the claim — through the public calls. */
+function resetEdge(): void {
+	closeHistory();
+	setInspectable(false);
+	setInspectable(true);
+	setInspectable(false);
+}
 
 /*
  * The right edge has one occupant and two claimants. Every case here is one a naive

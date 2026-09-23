@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { clockTime, dayKey, formatDate, setTimeZone, timeZone, yearOf, zoneShortName } from "./time.ts";
+import { clockTime, dayKey, formatDate, setTimeZone, timeZone, yearOf } from "./time.ts";
 
 afterEach(() => setTimeZone(undefined));
 
@@ -28,10 +28,4 @@ test("a zone Intl refuses is ignored, and unset means the browser's own", () => 
 	setTimeZone("Mars/Olympus");
 	assert.equal(timeZone(), undefined);
 	assert.doesNotThrow(() => clockTime(at));
-});
-
-test("a zone's short name, for beside a schedule's hour", () => {
-	assert.equal(zoneShortName("America/Los_Angeles", Date.UTC(2026, 6, 1)), "PDT");
-	assert.equal(zoneShortName("America/Los_Angeles", Date.UTC(2026, 0, 1)), "PST");
-	assert.equal(zoneShortName("Mars/Olympus"), "");
 });

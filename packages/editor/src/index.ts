@@ -114,7 +114,6 @@ export function createEditor(frame: HTMLIFrameElement, options: EditorOptions): 
 	let tree = parseBoard(options.source);
 	let rendered: Document | undefined;
 	let selection: Selection | undefined;
-	let ready = false;
 
 	/*
 	 * The document goes in whole, through `srcdoc`.
@@ -137,7 +136,6 @@ export function createEditor(frame: HTMLIFrameElement, options: EditorOptions): 
 	 * has parsed what we wrote, which is what `load` means.
 	 */
 	function render(): void {
-		ready = false;
 		rendered = undefined;
 		frame.srcdoc = serialize(tree, { base: options.base });
 	}
@@ -160,10 +158,7 @@ export function createEditor(frame: HTMLIFrameElement, options: EditorOptions): 
 		 */
 		const win = frame.contentWindow as (Window & { __boardReady?: boolean }) | null;
 		if (!win) return;
-		const done = () => {
-			ready = true;
-			options.onReady?.();
-		};
+		const done = () => options.onReady?.();
 		if (win.__boardReady) done();
 		else doc.addEventListener("board:ready", done, { once: true });
 	});

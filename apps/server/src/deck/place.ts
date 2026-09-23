@@ -3,9 +3,9 @@ import type { Camera } from "@decks/protocol";
 /**
  * Where a board goes when nobody said where.
  *
- * One rule, in one place, because the app has six ways for a board to arrive on a canvas —
+ * One rule, in one place, because the app has five ways for a board to arrive on a canvas —
  * an agent's `stage.newBoard`, `stage.show`, the ＋ in the corner, a board picked out of the
- * rail, the dashboard's "open on canvas", a mirror — and each of them used to fall through to
+ * panel, a mirror — and each of them used to fall through to
  * the deck's own auto-layout: rows of three, starting below **every board that stage had ever
  * been given a place for**. On a deck of 900 boards that is a column a million pixels tall, so
  * a new board landed forty screens below the one you were reading and nothing moved to show it.
@@ -158,10 +158,9 @@ export function keepsPlace(box: Box, onCanvas: readonly Box[], camera?: Camera):
  * The three cases in order: a board with no place gets one in the middle of the view and clear
  * of what is there; a board whose place is visible, or near the boards already on the canvas,
  * keeps it; a board whose place is neither is placed again. What is returned is the new spots,
- * so the caller writes them wherever places live — a canvas, for everything since canvases.
+ * so the caller writes them into the agent's stage.
  *
- * Pure, and shared by the two things that put boards on a canvas: an agent showing one, and a
- * person adding one to a canvas they are looking at with nobody's conversation behind it.
+ * Pure, so the rule is tested apart from the stage that uses it.
  */
 export function joinPlaces(options: {
 	wanted: readonly string[];

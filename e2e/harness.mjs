@@ -282,7 +282,7 @@ export async function changed(file, was, { timeout = 15000 } = {}) {
  * never run: not the model, the selector.
  */
 export async function idle(page, { timeout = 600000 } = {}) {
-	await page.waitForFunction(() => document.querySelector('.sendbtn[data-stop="true"]') === null, null, {
+	await page.waitForFunction(() => document.querySelector('.send-button[data-stop="true"]') === null, null, {
 		timeout,
 	});
 }
@@ -301,7 +301,7 @@ export async function idle(page, { timeout = 600000 } = {}) {
  */
 export async function useModel(page, wanted = MODEL) {
 	if (!wanted) return undefined;
-	const chip = page.locator(".dockrow .chipbtn").last();
+	const chip = page.locator('.chip-button[data-picker="model"]');
 	await chip.waitFor({ state: "visible", timeout: 20000 });
 	const before = (await chip.innerText()).trim();
 	/*
@@ -325,8 +325,7 @@ export async function useModel(page, wanted = MODEL) {
 	// than for a timer: `agent.setModel` is a round trip and the picker closes optimistically.
 	await page.waitForFunction(
 		(was) => {
-			const chips = document.querySelectorAll(".dockrow .chipbtn");
-			return (chips[chips.length - 1]?.textContent ?? "") !== was;
+			return (document.querySelector('.chip-button[data-picker="model"]')?.textContent ?? "") !== was;
 		},
 		before,
 		{ timeout: 20000 },
@@ -342,7 +341,7 @@ export async function ask(page, text, { timeout = 600000 } = {}) {
 	await page.locator(".dockfield").press("Enter");
 	// The turn has to be seen *starting*, or a prompt that never left the box reads as a
 	// turn that answered instantly and every assertion after it is about the turn before.
-	await page.waitForFunction(() => document.querySelector('.sendbtn[data-stop="true"]') !== null, null, {
+	await page.waitForFunction(() => document.querySelector('.send-button[data-stop="true"]') !== null, null, {
 		timeout: 20000,
 	});
 	await idle(page, { timeout });

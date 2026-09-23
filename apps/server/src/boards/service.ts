@@ -117,7 +117,7 @@ export class BoardService {
 	}
 
 	/**
-	 * The person looked at a board: its preview on the dashboard, or the focus view.
+	 * The person looked at a board: read it on the canvas, or in the focus view.
 	 *
 	 * Stamped with the later of now and the board's own last time, so a clock that disagrees with
 	 * the disk cannot leave a board marked that has just been read. Nothing is sent when the board
@@ -520,7 +520,7 @@ export class BoardService {
 			// so the browser's optimistic edit is confirmed without waiting on the disk.
 			this.hooks.send({ type: "board.patched", path, rev: updated?.rev ?? board.rev });
 			if (updated) {
-				// The person's own act, named and timed like an agent's, so the dashboard knows it is
+				// The person's own act, named and timed like an agent's, so the canvas knows it is
 				// not news to them rather than reading it off the file they just moved.
 				this.wrote(path, "you");
 			}

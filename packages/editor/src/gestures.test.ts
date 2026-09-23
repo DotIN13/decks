@@ -61,7 +61,8 @@ test("a reorder moves the node among its siblings, which is the order every path
 	const b = el("p", [], [], true, "Second");
 	const c = el("p", [], [], true, "Third");
 	const doc = el("div", [["class", "doc"]], [child(a), child(b), child(c)]);
-	const root = el("html", [], [child(el("head")), child(el("body", [["class", "board"]], [child(doc)]))]);
+	// Built for its side effect: it parents the body, so `doc` sits in a whole document.
+	el("html", [], [child(el("head")), child(el("body", [["class", "board"]], [child(doc)]))]);
 	const order = () => doc.parts.filter((part) => part.kind === "element").map((part) => (part.node as TreeNode).content);
 
 	moveInTree(c, 0);

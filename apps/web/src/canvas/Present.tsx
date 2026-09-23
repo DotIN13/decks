@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import type { Board } from "@decks/protocol";
 import { type DeckHandle, slideKey } from "./slide-keys.ts";
 import { enterFullscreen, exitFullscreen, onFullscreenLeft } from "./fullscreen.ts";

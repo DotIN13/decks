@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import type { ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";
 import type { Stage } from "../../../../runtime/stage.d.ts";
-import { cleanWorkspace, roster } from "../agents/workspaces.ts";
+import { cleanWorkspace } from "../agents/workspaces.ts";
 import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService, WebTarget } from "./service.ts";

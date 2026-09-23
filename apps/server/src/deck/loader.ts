@@ -429,11 +429,9 @@ export class Deck {
 			// never reloads. A content hash also means an edit that puts a board back
 			// the way it was does not churn every open frame.
 			rev: revisionOf(source),
-			// The *other* reading of the same file, published because the dashboard's
-			// first half sorts by it: "what did this workspace generate lately" has no
-			// answer without a time. A reading and not a promise — a board touched
-			// without being edited has a new time and the same revision, which is
-			// exactly what "latest" should mean to a person looking for new boards.
+			// The *other* reading of the same file, published because the canvas's
+			// "changed" mark needs a time (`board-news.ts`). A reading and not a promise:
+			// a board touched without being edited has a new time and the same revision.
 			// `signatureOf` has already stat-ed the file by now; this is the stat whose
 			// number it kept private.
 			modifiedAt: modifiedAtOf(absolute),
@@ -454,7 +452,7 @@ function signatureOf(absolute: string): string {
 	}
 }
 
-/** The last modification, as the dashboard sorts by — `0` if the file went away mid-scan. */
+/** The last modification, for the "changed" mark — `0` if the file went away mid-scan. */
 function modifiedAtOf(absolute: string): number {
 	try {
 		return statSync(absolute).mtimeMs;

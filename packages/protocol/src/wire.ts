@@ -70,7 +70,7 @@ export type ClientMessage =
 	/** A live view of one conversation, as a board. `request` asks for a `board.created` naming it. */
 	| { type: "agent.mirror"; agentId: string; request?: string }
 	| { type: "board.play"; path: string }
-	/** The person looked at this board (dashboard preview, focus view): clears its "changed" mark. */
+	/** The person looked at this board (on the canvas, or in the focus view): clears its "changed" mark. */
 	| { type: "board.seen"; path: string }
 	| { type: "board.hide"; path: string }
 	/**
@@ -128,7 +128,7 @@ export type ClientMessage =
 	/** Where the person is looking. `agentId` names a parked conversation's view. */
 	| { type: "camera.set"; camera: Camera; agentId?: string }
 	/** A new agent — in a workspace, when made from under its heading. */
-	| { type: "agent.create"; parentId?: string; kind?: AgentKind; workspace?: string }
+	| { type: "agent.create"; kind?: AgentKind; workspace?: string }
 	| { type: "agent.focus"; id: string }
 	/**
 	 * Take an agent off the list.

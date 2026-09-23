@@ -63,18 +63,6 @@ export function snapHome(p: Point, home: Point, radius = 24): { p: Point; home: 
 	return d <= radius ? { p: { x: home.x, y: home.y }, home: true } : { p, home: false };
 }
 
-/** The corner of `bounds` nearest the float's centre, and the float's inset from it. */
-export function toAnchor(p: Point, size: Size, bounds: Box): Saved {
-	const cx = p.x + size.w / 2;
-	const cy = p.y + size.h / 2;
-	const right = cx - bounds.x > bounds.w / 2;
-	const bottom = cy - bounds.y > bounds.h / 2;
-	const anchor: Anchor = bottom ? (right ? "br" : "bl") : right ? "tr" : "tl";
-	const dx = right ? bounds.x + bounds.w - (p.x + size.w) : p.x - bounds.x;
-	const dy = bottom ? bounds.y + bounds.h - (p.y + size.h) : p.y - bounds.y;
-	return { anchor, dx, dy };
-}
-
 /** The room a float has to move in, each axis, once the margin is taken off both sides. */
 function room(size: Size, bounds: Box, margin: number): Size {
 	return { w: Math.max(0, bounds.w - size.w - 2 * margin), h: Math.max(0, bounds.h - size.h - 2 * margin) };
@@ -126,7 +114,7 @@ export function fromSaved(saved: Saved, size: Size, bounds: Box, home: Point, ma
 	return fromAnchor(saved, size, bounds, home);
 }
 
-/** The inverse of `toAnchor`, for the older saved form. */
+/** A corner-anchored save back to a point, for the older saved form. */
 export function fromAnchor(saved: Saved, size: Size, bounds: Box, home: Point): Point {
 	if (saved === "home") return { x: home.x, y: home.y };
 	if ("fx" in saved) return fromSaved(saved, size, bounds, home);
@@ -335,12 +323,4 @@ export function saveStowed(key: string, fy: number | undefined, storage?: Storag
 export function glideMs(from: Point, to: Point, min = 180, max = 420): number {
 	const distance = Math.hypot(to.x - from.x, to.y - from.y);
 	return Math.round(Math.min(max, Math.max(min, min + distance * 0.6)));
-}
-
-export function clearFloats(storage?: Storage): void {
-	try {
-		(storage ?? defaultStorage())?.removeItem(FLOATS_KEY);
-	} catch {
-		// Nothing to clear.
-	}
 }

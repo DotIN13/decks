@@ -2,7 +2,6 @@ import { parseFragment } from "parse5";
 import type { DefaultTreeAdapterMap } from "parse5";
 
 type Element = DefaultTreeAdapterMap["element"];
-type Node = DefaultTreeAdapterMap["node"];
 
 /**
  * The model's markup, indented to sit where it is going.

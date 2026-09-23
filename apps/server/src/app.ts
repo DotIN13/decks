@@ -192,9 +192,8 @@ export class App {
 			 * lines of wrapping. Both readings are honest and only one can be the board's. It has
 			 * to be the reader's, or the board is cut for the person actually looking at it.
 			 *
-			 * So this fills in a height nobody has reported yet — a board on the dashboard that
-			 * has never been opened, which is the reason the callback exists — and never overrules
-			 * a frame's.
+			 * So this fills in a height nobody has reported yet — a board no browser has opened,
+			 * which is the reason the callback exists — and never overrules a frame's.
 			 */
 			measured: (path, rev, h) => {
 				const board = this.deck.board(path);

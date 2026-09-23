@@ -1,85 +1,13 @@
 /*
- * The board rail, and the chats list that shares its column.
+ * The board rail's items.
  *
- * The list of boards down the left edge (`chrome/BoardRail.tsx`), the head with its tools,
- * the item and its thumbnail, and the chats list above it (`chat/Chats.tsx`) — one column,
- * one file, because they are drawn in the same place and their spacing is one decision.
+ * A board in the list (`chrome/BoardRail.tsx`): the item, its thumbnail and its label; and
+ * the palette's sizes for a finger and a phone.
  *
  * These rules were in `index.css`, which held every region at once. The rules and the notes
  * above them are as they were; the gate's report on the move is in the commit.
  */
 @layer components {
-	.rail {
-	display: flex;
-	flex-direction: column;
-	padding: 8px;
-	gap: 6px;
-}
-	/*
- * Both panel headers: a small-caps label at the left, its controls at the right.
- *
- * Written bare rather than under `.rail`, which is what it used to be — and `.chats` is
- * `.rail`'s *sibling*, not its child, so the agent list's header matched none of this. It
- * was a plain block, which is why its `flex: 1` spacer measured zero and its three controls
- * crowded against the label, and why its label was body text while the boards rail's was
- * small caps.
- */
-.rail-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 6px;
-	color: var(--faint);
-	/*
-	 * Sentence case, and this is the settled rule rather than a preference.
-	 *
-	 * It was 11px uppercase at 0.04em, which is one of six places in this app that used
-	 * the same treatment for three different jobs — a decorative kicker, a label someone
-	 * reads in order to act, and a live count. At that tracking the eye reads letters
-	 * rather than words, and some screen readers announce a long uppercase run letter by
-	 * letter. See `.label` and `.meta` in `styles/chrome.css`, which is what replaced it:
-	 * 11.5px, weight 500, no tracking, and split by job.
-	 */
-	font-size: var(--type-label);
-	font-weight: 500;
-}
-	.rail .rail-head {
-	padding: 2px 4px 6px;
-}
-	/* The controls, as one thing: they belong to the label, not to the gap. */
-.rail-head .tools {
-	display: flex;
-	align-items: center;
-	flex: 0 0 auto;
-	gap: 2px;
-}
-	.rail .items {
-	display: flex;
-	/*
-	 * A pixel of room for the current board's ring.
-	 *
-	 * The selected item is a 1px border plus a 1px `box-shadow` *outside* its box, and this
-	 * is a scroll container: setting `overflow-y` makes `overflow-x` compute to `auto` as
-	 * well, so anything painted outside the item is clipped. With the items exactly as wide
-	 * as the content box, the accent showed on the top and bottom edges and was cut off down
-	 * both sides.
-	 *
-	 * Padding rather than an inset shadow, which was the other candidate: an inset shadow
-	 * paints on the element's own background, underneath its children, and the thumbnail is
-	 * opaque — so it would have been hidden everywhere except the label strip.
-	 */
-	padding: 1px;
-	overflow-y: auto;
-	/* `min-height: 0` is what makes the scroll real. A flex child defaults to
-	   `min-height: auto`, which refuses to shrink below its content, so a rail of
-	   fourteen boards grew to its full height and ran off the bottom of the screen
-	   instead of scrolling — `overflow-y: auto` never engages on a box that is never
-	   smaller than what is inside it. */
-	min-height: 0;
-	flex: 1;
-	flex-direction: column;
-	gap: 6px;
-}
 	.rail-item {
 	display: flex;
 	flex-direction: column;
@@ -90,18 +18,6 @@
 	cursor: pointer;
 	gap: 0;
 	text-align: left;
-}
-	/*
- * Held but not on the canvas: dimmed, because the agent is working from it without asking
- * you to look at it.
- *
- * Only in the context panel, which is the surface where "held" and "shown" are two different
- * things. Browsing the deck it meant nothing — every board is equally a board there, and
- * marking the ones not currently up made forty thumbnails 45% opaque, which is a list that
- * looks switched off rather than a list you are reading.
- */
-.side .rail-item[data-off-canvas="true"] {
-	opacity: 0.45;
 }
 	/*
  * The one under the cursor, said with a border rather than by dimming the rest.
@@ -156,134 +72,6 @@
  * one set of rules about how a press outside dismisses it.
  */
 
-/* --- the chat list ---------------------------------------------------------- */
-
-/*
- * The board rail is away by default and comes when reached for — the canvas is the
- * work, and the chrome should not sit on top of it while unused. A sliver stays visible
- * so there is something to aim at, and the transform is what moves: one composited
- * property, so a panel arriving never costs a layout.
- */
-.side[data-open="true"] {
-	opacity: 1;
-	transform: none;
-	pointer-events: auto;
-}
-	/*
- * One corner, two panels, one at a time.
- *
- * `.side` is the box; which of the two is in it is `App`'s business, and the rule it keeps
- * is that opening either closes the other — the same 200px of screen cannot hold both, and
- * a panel behind a panel is one nobody can see and cannot get rid of.
- *
- * It slides rather than appears, and the transform is what moves: one composited property,
- * so a panel arriving never costs a layout. Closed it is fully off — the sliver that used to
- * stay behind was something to aim a *cursor* at, and there is nothing to aim at any more
- * now that the way in is a button (`state/ui.ts`).
- */
-.side {
-	top: 12px;
-	/*
-	 * As tall as what is in it, up to the room there is.
-	 *
-	 * It used to reach the bottom always, which was right when it held two lists stacked and
-	 * wrong now that it holds one: three agents in a full-height panel is a wall of empty
-	 * chrome down the side of the canvas, and the canvas is the work. `max-height` rather
-	 * than `bottom` is the whole difference — the inner list still scrolls when there is more
-	 * of it than fits, because `flex: 1` and `min-height: 0` do not care which of the two
-	 * bounded it.
-	 */
-	max-height: calc(100% - 24px - var(--keyboard) - env(safe-area-inset-bottom));
-	left: max(12px, env(safe-area-inset-left));
-	z-index: var(--z-chrome);
-	display: flex;
-	width: 200px;
-	flex-direction: column;
-	padding: 0;
-	gap: 0;
-	opacity: 0;
-	transform: translateX(calc(-100% - 24px));
-	transition:
-		transform 190ms cubic-bezier(0.22, 0.8, 0.24, 1),
-		opacity 190ms ease;
-	/* Closed, it is scenery: clicks belong to whatever is behind it. */
-	pointer-events: none;
-}
-	.side[data-open="true"] {
-	opacity: 1;
-	transform: none;
-	pointer-events: auto;
-}
-	/*
- * Each panel fills its own box now.
- *
- * The agent list used to be capped at 42% of the panel because the boards rail was
- * underneath it in the same one, and the two were competing for the height. They are
- * separate surfaces, so neither has to give the other room.
- */
-.side .chats,
-.side .rail {
-	position: static;
-	width: auto;
-	/* Without this the content takes its own height and overflows `.side`, which is the
-	   box that is actually bounded. */
-	min-height: 0;
-	max-height: none;
-	flex: 1;
-	flex-direction: column;
-	display: flex;
-	border: 0;
-	background: none;
-	box-shadow: none;
-}
-	.chats .rail-head {
-	padding: 8px 10px 6px;
-}
-	/*
- * The `+` and the menu it opens, which hangs off it rather than off the header.
- *
- * `relative` here and not on `.rail-head`: the header is 200px of panel and the menu is
- * ~132px, so anchoring to the header would leave it floating in the middle of a row it has
- * nothing to do with. Anchored to the button, its right edge lines up with the button's.
- */
-.chats .rail-head .new {
-	position: relative;
-	display: flex;
-}
-	/*
- * `inline-grid`, not `grid`: the agent list's head is a line of inline boxes rather than
- * a flex row, so a block-level button on it stacked the `+`, the runtime and the pin into
- * a column. Inline keeps the row, the grid still centres the icon in its square, and the
- * chat header — which *is* a flex row — blockifies it back on its own.
- */
-.chats .rail-head button:hover {
-	background: var(--line);
-}
-	/*
- * The line between this run's chats and the ones restored from disk.
- *
- * A label rather than a rule, because a bare `border-top` in a list of rounded rows reads
- * as a mistake. `::after` draws the rule so the text can sit at the left and the line take
- * whatever is left, without a wrapper element or a background-colour trick that would have
- * to know the panel's colour.
- */
-.chats .earlier {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin: 10px 2px 4px;
-	color: var(--muted);
-	/* Sentence case — see the note on `.rail-head`. The hairline after it does the
-	   separating that the tracking was failing to do. */
-	font-size: var(--type-label);
-	font-weight: 500;
-}
-	.chats .earlier::after {
-	content: "";
-	flex: 1;
-	height: 1px;
-	background: var(--line);
-}
 	/* --- a phone, and a hand ------------------------------------------------------ */
 
 /*
@@ -296,8 +84,7 @@
  * - `(hover: none)` is **discoverability**. Everything this app reveals by approaching
  *   it — the rail at the left edge, the `×` on a board's title bar, the row of
  *   `rewind · fork · restore boards` under a message — reveals itself to nothing at all
- *   on a touchscreen. So where there is no hover, those things are simply there, and the
- *   rail grows the title-bar button that `.touch-only` marks.
+ *   on a touchscreen. So where there is no hover, those things are simply there.
  * - `(pointer: coarse)` is **size**. The chrome draws its icon buttons at 20–30px, which
  *   is right for a cursor and roughly half of what a fingertip can reliably hit. Nothing
  *   moves; the targets grow.
@@ -313,34 +100,6 @@
  * one, and above these thresholds the stylesheet is byte-for-byte the app it was.
  */
 
-/*
- * Two controls exist only for a pointer that cannot hover: the panel toggles in the
- * title bar and the palette's undo. Spelled out per selector rather than as a bare
- * `.touch-only`, because `.palette button` sets
- * `display` themselves and would win against one class.
- */
-.palette button.touch-only {
-	display: none;
-}
-
-	/* The same rules, under the same query. */
-	@media (hover: none) {
-	.palette button.touch-only {
-		display: grid;
-	}
-	/* Separated from the tools: it acts on the board, not on the next thing you draw. */
-	.palette button.undo {
-		margin-left: 6px;
-		border-left: 1px solid var(--line);
-		border-radius: 0 8px 8px 0;
-	}
-	/* Nothing un-dims it here, so it is dimmed less: on a touchscreen there is no hover to
-	   bring it back with, and "dimmed" with no way out is just harder to read. */
-	.side .rail-item[data-off-canvas="true"] {
-		opacity: 0.62;
-	}
-}
-
 	/* The same rules, under the same query. */
 	@media (pointer: coarse) {
 	.palette {
@@ -350,31 +109,10 @@
 		width: 44px;
 		height: 44px;
 	}
-	.chats .rail-head button {
-		width: 38px;
-		height: 38px;
-	}
 }
 
 	/* The same rules, under the same query. */
 	@media (max-width: 760px) {
-	/*
-	 * A panel becomes a sheet, with the canvas behind it rather than beside it.
-	 *
-	 * A sidebar, not a takeover: at full width the rail was two-thirds empty stretched
-	 * across the screen, and a narrower panel leaves a strip of canvas beside it — which is
-	 * the difference between chrome and a wall. It reaches the bottom of the screen, past
-	 * the dock: the composer sits behind the sheet while it is open, and 88px of empty
-	 * chrome under the thing you opened is a phone's whole lower third.
-	 */
-	.side {
-		left: max(8px, env(safe-area-inset-left));
-		right: auto;
-		max-height: calc(100% - 16px - var(--keyboard) - env(safe-area-inset-bottom));
-		width: min(340px, 78vw);
-		/* A transform is the one property that costs nothing to animate. */
-		transform: translateX(calc(-100% - 16px));
-	}
 	/*
 	 * A rail item turns on its side. The thumbnail is the board itself scaled by a fixed
 	 * 150px (`BoardRail`), so in a full-width sheet a column layout left two thirds of

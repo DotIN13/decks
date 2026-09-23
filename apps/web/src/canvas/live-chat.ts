@@ -122,11 +122,6 @@ export function liveDelta(sent: readonly TurnCard[], next: readonly TurnCard[]):
 	return { from: common, turns: next.slice(common) };
 }
 
-/** Apply what `liveDelta` produced. The board's half of the same rule, kept here so it is tested. */
-export function applyDelta(held: readonly TurnCard[], delta: { from: number; turns: TurnCard[] }): TurnCard[] {
-	return [...held.slice(0, delta.from), ...delta.turns];
-}
-
 /**
  * Listen for a board asking to be fed, and say which conversation it wants.
  *

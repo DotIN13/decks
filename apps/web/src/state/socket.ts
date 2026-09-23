@@ -63,14 +63,12 @@ function connect(onStateChange: (connected: boolean) => void): Socket {
 	/**
 	 * Every frame that has arrived since the last paint, applied as one change.
 	 *
-	 * A frame is one `setState`, and a `setState` runs the whole reactive graph over it: on
-	 * this deck that is the dashboard's grouping over nine hundred boards. One frame at a
-	 * time, that cost is paid per frame — and the greeting is not one frame. It is the deck,
-	 * the canvases, the chat list and then **seven frames for every conversation on the deck**
+	 * A frame is one `setState`, and a `setState` runs the whole reactive graph over it. One
+	 * frame at a time, that cost is paid per frame — and the greeting is not one frame. It is
+	 * the deck, the chat list and then **seven frames for every conversation on the deck**
 	 * (`session.greet`): 240 of them on a deck of 34 chats, sent by the server in 120ms and
-	 * applied by the browser over 44 *seconds*, with the main thread blocked throughout. That
-	 * is what "the boards and the canvases appear one by one" was: not a slow server, and not
-	 * pictures, but the same grouping recomputed 240 times while the page could not paint.
+	 * once applied by the browser over 44 *seconds*, with the main thread blocked throughout:
+	 * the same derived state recomputed 240 times while the page could not paint.
 	 *
 	 * So frames are collected and handed to the listeners inside one `batch`, once per paint.
 	 * Nothing is dropped and nothing is reordered; the greeting lands as two or three waves

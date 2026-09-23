@@ -104,16 +104,6 @@
 		border-right-color: var(--line);
 		box-shadow: none;
 	}
-	.pill-deck-glyph {
-		display: inline-flex;
-		width: 22px;
-		height: 22px;
-		align-items: center;
-		justify-content: center;
-		border-radius: var(--radius-pill);
-		background: var(--fg);
-		color: var(--bg);
-	}
 
 	/* ---- the composer as a float ------------------------------------------------- */
 	.dock-grip {

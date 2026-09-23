@@ -127,8 +127,8 @@ export function AgentRow(props: {
 				}}
 			>
 				{/*
-					28px, where the dropdown's is 20: this is the one place an agent's own drawing is
-					worth seeing at a size, and several on this deck have drawn one.
+					26px on a two-line row and 20 on a one-line one, where the dropdown's is 20: this is
+					the one place an agent's own drawing is worth seeing at a size.
 
 					Wrapped in `.row-icon`, which is the row vocabulary's icon slot and not decoration —
 					`[data-row]:not(:has(> .row-icon))` collapses the grid to a single column, so without
@@ -197,7 +197,6 @@ export function AgentRow(props: {
 						<Show when={editing()}>
 							<Portal>
 								<AgentEdit
-									agentId={chat().id}
 									name={name()}
 									userTags={props.row.userTags}
 									face={<AgentFace chat={chat()} identity={props.identity} size={22} ring={1.5} />}

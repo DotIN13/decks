@@ -98,28 +98,25 @@ export interface Board {
 	/**
 	 * The file's last modification, as `mtimeMs`.
 	 *
-	 * The one field the dashboard's first half sorts by: "the latest boards a
-	 * workspace generated" has nothing to order on without it. The loader reads it on
-	 * every scan (the same `stat` that builds the change signature) but kept it
-	 * private; this publishes it. Optional because every fixture and every older
-	 * record predates it — the server always sends it, and a reader treats its
-	 * absence as "unknown" rather than "zero" (`?? 0` in `workspace-panel.ts`).
+	 * Half of what the canvas's "changed" mark reads (`board-news.ts`). Optional because
+	 * every fixture and every older record predates it — the server always sends it, and a
+	 * reader treats its absence as "unknown" (`?? 0`).
 	 */
 	modifiedAt?: number;
 	/**
 	 * When a writer last *named* this board: an agent fitting, showing or reporting it through the
 	 * stage tool, or the person's own edit in the canvas.
 	 *
-	 * The dashboard's mark is about the act, not the file. `modifiedAt` moves for any write at all,
+	 * The "changed" mark is about the act, not the file. `modifiedAt` moves for any write at all,
 	 * which cannot tell an agent's work from the person's own drag, and `show` and `report` write no
 	 * file at all — so the most common act of all left no trace to mark. This is the trace: said by
 	 * the writer, never read off the disk, and kept beside the byline in `.decks/authors.json`.
 	 */
 	namedAt?: number;
 	/**
-	 * When the person last looked at this board: its preview on the dashboard, or the focus view.
+	 * When the person last looked at this board: on the canvas, or in the focus view.
 	 *
-	 * The dashboard's "changed" mark is for news, and a board somebody has read is not news until
+	 * The canvas's "changed" mark is for news, and a board somebody has read is not news until
 	 * it is written again: a card is marked only while the newest act is newer than this. Kept by
 	 * the server (`.decks/seen.json`), so a board read on the laptop is read on the phone too.
 	 */

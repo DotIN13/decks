@@ -149,6 +149,5 @@ export type BoxClass = (typeof BOX_CLASSES)[number];
  * card is an attribute nothing looks at.
  */
 export const CALLOUT_TONES = ["warn", "danger", "ok"] as const;
-export type CalloutTone = (typeof CALLOUT_TONES)[number];
 
 export * from "./ink.ts";

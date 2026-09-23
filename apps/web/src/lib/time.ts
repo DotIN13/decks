@@ -4,8 +4,8 @@
  * The browser formats a time in its own zone, which is the person's on their laptop and is
  * not on a borrowed machine, a phone abroad, or a server they are screen-sharing from. The
  * deck has one timezone (Settings, Time), the one its schedules fire in and its agents are
- * told, and the app agrees with them: a job the Cron tab says runs at 08:00 should not sit
- * beside a turn stamped in another zone.
+ * told, and the app agrees with them: a turn stamped 08:00 means 08:00 where the deck's
+ * schedules and agents say it is.
  *
  * Until a zone is chosen, `undefined` is passed to `Intl`, which means the browser's own:
  * exactly what every call site did before this file existed.
@@ -77,14 +77,4 @@ export function dayKey(at: number | Date): string {
 
 export function yearOf(at: number | Date): number {
 	return Number(new Intl.DateTimeFormat("en-US", withZone({ year: "numeric" })).format(new Date(at)));
-}
-
-/** "PDT", "GMT+8": the short name a zone goes by at that instant, for beside a schedule's hour. */
-export function zoneShortName(inZone: string | undefined, at: number | Date = Date.now()): string {
-	try {
-		const parts = new Intl.DateTimeFormat("en-US", { ...(inZone ? { timeZone: inZone } : {}), timeZoneName: "short" }).formatToParts(new Date(at));
-		return parts.find((part) => part.type === "timeZoneName")?.value ?? "";
-	} catch {
-		return "";
-	}
 }

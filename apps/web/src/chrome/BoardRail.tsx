@@ -1,5 +1,5 @@
 import type { Board } from "@decks/protocol";
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { claimThumb } from "../canvas/thumb-budget.ts";
 import { BoardPicture } from "./BoardPicture.tsx";
 import { boardUrl, deckFileUrl } from "../lib/api.ts";

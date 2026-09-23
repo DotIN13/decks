@@ -10,9 +10,3 @@ export type ChatItem =
 	 */
 	| { kind: "tool"; id: string; name: string; title: string; args?: unknown; result?: string; full?: number; images?: number; state: "running" | "done" | "error" }
 	| { kind: "notice"; id: string; level: "info" | "warn" | "error"; text: string; at: number };
-
-/** The tool's own rendering hint: how the chip reads before you expand it. */
-export interface ToolSummary {
-	name: string;
-	title: string;
-}

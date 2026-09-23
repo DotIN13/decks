@@ -1,8 +1,6 @@
-import type { BoardPatch } from "@decks/protocol";
 import { AgentCursor } from "./AgentCursor.tsx";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import BookOpen from "lucide-solid/icons/book-open";
-import FilePenLine from "lucide-solid/icons/file-pen-line";
 import ExternalLink from "lucide-solid/icons/external-link";
 import Maximize from "lucide-solid/icons/maximize-2";
 import X from "lucide-solid/icons/x";

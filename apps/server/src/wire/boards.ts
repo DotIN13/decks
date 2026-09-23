@@ -139,7 +139,7 @@ export const boards = {
 		agent.setInPlay([...agent.inPlay, message.path], { place: true });
 	},
 
-	/** The person read it, so it is no longer news on the dashboard until it is written again. */
+	/** The person read it, so it is no longer news on the canvas until it is written again. */
 	"board.seen": (message, _reply, wire) => {
 		wire.boards.seen(message.path);
 	},

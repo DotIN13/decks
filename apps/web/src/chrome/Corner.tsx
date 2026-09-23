@@ -414,9 +414,8 @@ export function Corner(props: {
 					<span class="rule hidden pointer-coarse:block" />
 				</Show>
 
-				{/* The conversation, as a row, on the narrowest phones: at 320px the dashboard's
-				    three tabs and the panel toggle leave the corner room for one button, and the
-				    menu is the one that has to stay. */}
+				{/* The conversation, as a row, on the narrowest phones: at 320px the corner has
+				    room for one button, and the menu is the one that has to stay. */}
 				<button type="button" role="menuitem" data-row data-flat="true" class="hidden max-[360px]:flex" onClick={() => toggleHistory()}>
 					<span class="row-icon">
 						<Icon of={MessageSquare} size={15} />

@@ -2,7 +2,7 @@ import type { AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, Sla
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Square from "lucide-solid/icons/square";
-import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
 import { carriesFiles } from "../../canvas/file-drop.ts";
 import type { BoardComment } from "../../canvas/comments.ts";
 import { DraftField, type DraftFieldApi } from "./DraftField.tsx";
@@ -124,8 +124,8 @@ export function Composer(props: {
 	 */
 	agentId: string | undefined;
 	/**
-	 * The page the bar is on, `home` or `agent:<id>` (`parked.ts`). What is typed is kept per
-	 * page, so leaving a page, or the dispatcher behind Home changing, never loses a message.
+	 * The page the bar is on, `agent:<id>` (`parked.ts`). What is typed is kept per page, so
+	 * leaving a page never loses a message.
 	 */
 	page: string;
 	/**
@@ -160,11 +160,10 @@ export function Composer(props: {
 	};
 
 	/**
-	 * What you had typed on each page: Home, and each agent's stage (`parked.ts`).
+	 * What you had typed on each agent's stage (`parked.ts`).
 	 *
-	 * Keyed by the page rather than by the agent behind the bar, and written on every change
-	 * rather than only on a switch, so a draft outlives a change of page, a change of the
-	 * dispatcher's runtime, and a reload. `held` is the page the field is showing.
+	 * Written on every change rather than only on a switch, so a draft outlives a change of
+	 * page and a reload. `held` is the page the field is showing.
 	 */
 	const parked = parkedDrafts(typeof localStorage === "undefined" ? undefined : localStorage);
 	let held: string | undefined;

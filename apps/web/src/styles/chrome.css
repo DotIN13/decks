@@ -895,9 +895,6 @@
 	 * their own faces (`stage.me.setAvatar`), so a badge would be a third mark on a 22px
 	 * circle that already carries a status ring and an unread dot, sitting on top of artwork
 	 * nobody controls. A word cannot collide with any of that, and it is readable aloud.
-	 *
-	 * Mono, because it is an identifier — the string the server calls the runtime, not a
-	 * label somebody chose.
 	 */
 	/*
 	 * The runtime: a quiet word after the name, in the name's own face.
@@ -956,25 +953,18 @@
 	}
 
 	/*
-	 * Two pills and a box: **the agent's tags are filled pills, yours are outlined pills, and
-	 * the runtime is a filled box.** Tags are what somebody says about the agent, and which
-	 * of the two somebody it was is the fill; the runtime is what the agent *is*, and that is
-	 * a different kind of fact, so it gets a different shape rather than a third fill.
+	 * Two pills: **the agent's tags are filled, yours are outlined.** Which of the two
+	 * somebodies said it is the fill. The runtime is not a tag at all — it is `.kind`, a
+	 * plain muted word after the name.
 	 */
 
 	/*
-	 * And a fourth: the workspace, which is a box like the runtime and nothing like it.
+	 * And a third: the workspace, in the hover card (`AgentHoverCard`).
 	 *
 	 * A box because it is a fact rather than a claim — the agent's own tags are what it says it
-	 * is doing, and this is where it *is*, which the other agents in it agree about. Mono, at
-	 * the runtime's size, because a workspace is an identifier too: `political-llm` is the word
-	 * everybody has to type, and it should look like one.
-	 *
-	 * Outlined rather than filled, which is the one thing that could have gone either way. The
-	 * filled box is the runtime, and two filled boxes in the same line would be two chips of the
-	 * same weight where one of them is what the agent *is*; the outline reads as "this one is
-	 * about a group", which is true — the box is the same word on every row under the same
-	 * heading, and on every row of the panel when the grouping is Attention.
+	 * is doing, and this is where it *is*, which the other agents in it agree about. Mono,
+	 * because a workspace is an identifier: `political-llm` is the word everybody has to type,
+	 * and it should look like one. Outlined, so it reads as "this one is about a group".
 	 */
 	.tag.ws {
 		border-radius: var(--radius-inline);
@@ -1060,17 +1050,8 @@ svg.lucide {
 		background 120ms ease,
 		color 120ms ease;
 }
-	/*
- * The small one, for a control that shares a row with a list item's own content: a chat
- * row's `×`, and the panel header's `+`.
- *
- * `:not(.menu *)` because the `+` opens a menu that lives *inside* the header, and a
- * descendant selector cannot tell a control from a control's contents. Without it every menu
- * item was squeezed into the same 22px square — so the row's hover wash was a square behind
- * the runtime mark, with the name and the tick outside it and nothing to press but the icon.
- */
-.inspector header .close,
-.chats .rail-head button:not(.menu *) {
+	/* The small one, for a control that shares a row with other content: the inspector's `×`. */
+.inspector header .close {
 
 	display: grid;
 	width: var(--control-sm);
@@ -1087,8 +1068,7 @@ svg.lucide {
 .ops-sheet header button:hover,
 .inspector .row.file button:hover,
 .inspector .acts button:hover,
-.inspector header .close:hover,
-.chats .rail-head button:not(.menu *):hover {
+.inspector header .close:hover {
 
 	background: var(--line);
 	color: var(--fg);

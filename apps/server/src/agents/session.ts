@@ -5,7 +5,7 @@ import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
-import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot, type StageTool } from "../stage/tool.ts";
+import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot } from "../stage/tool.ts";
 import type { AgentBackend, AgentBackendContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentStateStore } from "./agent-state.ts";
@@ -16,7 +16,7 @@ import { Translator } from "./translator.ts";
 import type { Act } from "./acts.ts";
 import { forBrowser, HISTORY_ITEMS } from "./wire.ts";
 import { cleanTags, sameTags } from "./tags.ts";
-import { cleanWorkspace, sameWorkspace } from "./workspaces.ts";
+import { cleanWorkspace } from "./workspaces.ts";
 
 /**
  * How long an agent must have been quiet before it starts on queued work.
@@ -210,7 +210,6 @@ export class DeckAgent {
 	 * timer cannot fire under any of them.
 	 */
 	private drainTimer: ReturnType<typeof setTimeout> | undefined;
-	private tool: StageTool | undefined;
 
 	constructor(
 		private readonly deck: Deck,
@@ -889,7 +888,6 @@ export class DeckAgent {
 			// at that point and a fork can inherit it (§6.2).
 			persist: (snapshot) => this.snapshots.record(this.id, snapshot),
 		});
-		this.tool = tool;
 
 		const context: AgentBackendContext = {
 			cwd: this.deck.path,
@@ -1644,27 +1642,6 @@ export class DeckAgent {
 	/** The model this conversation is on, live if a runtime is up, else as last recorded. */
 	currentModel(): AgentModel | undefined {
 		return this.backend?.model() ?? this.lastModel;
-	}
-
-	/**
-	 * Put the runtime away and keep the conversation: a dormant chat, readable, that the
-	 * next prompt starts again. For an agent whose one job is done (a task's dispatcher)
-	 * and whose transcript is the reason it is kept. Everything `dispose` does except the
-	 * parts that mean "gone": the record and transcript are flushed first, the canvas token
-	 * is revoked so a stray call from the dying process is refused, and the memoised start
-	 * is cleared so `start()` can build a fresh runtime.
-	 */
-	async sleep(): Promise<void> {
-		if (this.state !== "idle" || this.work.length > 0) return;
-		this.cancelDrain();
-		if (this.saving) clearTimeout(this.saving);
-		this.saving = undefined;
-		this.flush();
-		this.stageBridge?.revoke(this.id);
-		this.backend?.dispose();
-		this.backend = undefined;
-		this.starting = undefined;
-		this.restored = true;
 	}
 
 	dispose(): void {

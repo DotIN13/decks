@@ -36,7 +36,6 @@ function host(focused: string | undefined) {
 		reload: () => {},
 		cursor: () => {},
 		annotate: () => {},
-		toast: () => {},
 	};
 	return { api, moved, animated, remembered, selected };
 }
@@ -55,7 +54,7 @@ test("the conversation on screen moves the canvas, as it always did", () => {
 });
 
 test("an agent you are not reading does not move it", () => {
-	const { api, moved, remembered, selected } = host("A");
+	const { api, moved, selected } = host("A");
 	const result = runStageCall(call("B", "show", { paths: ["boards/risks.html"] }), api) as { shown: string[]; deferred?: string };
 
 	assert.equal(moved.length, 0, "your canvas stayed where it was");

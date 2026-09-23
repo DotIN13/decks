@@ -38,7 +38,7 @@ export interface StageCall {
 	agentId: string;
 	/** `annotate` is the newest: bubbles with arrows, drawn on the canvas and never written
 	 *  to a board file. See `canvas/annotations.ts`. */
-	op: "show" | "camera" | "move" | "highlight" | "reload" | "cursor" | "annotate" | "toast" | "read";
+	op: "show" | "camera" | "reload" | "cursor" | "annotate";
 	args: unknown;
 }
 

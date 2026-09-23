@@ -443,12 +443,6 @@
 		font-family: var(--mono, monospace);
 		font-size: var(--type-hint);
 	}
-@keyframes arrival-in {
-	from {
-		opacity: 0;
-		transform: translate(-50%, -6px);
-	}
-}
 	/* --- the stage --------------------------------------------------------------- */
 
 .stage {
@@ -670,7 +664,6 @@
  */
 .board-node > .chrome .hide,
 .board-node > .chrome .present-open,
-.board-node > .chrome .doc-open,
 .board-node > .chrome .open-tab,
 .board-node > .chrome .focus-open {
 	display: grid;
@@ -688,14 +681,12 @@
 }
 	.board-node:hover > .chrome .hide,
 .board-node:hover > .chrome .present-open,
-.board-node:hover > .chrome .doc-open,
 .board-node:hover > .chrome .open-tab,
 .board-node:hover > .chrome .focus-open {
 	opacity: 1;
 }
 	.board-node > .chrome .hide:hover,
 .board-node > .chrome .present-open:hover,
-.board-node > .chrome .doc-open:hover,
 .board-node > .chrome .open-tab:hover,
 .board-node > .chrome .focus-open:hover {
 	background: var(--line);
@@ -995,13 +986,12 @@
 	 * that *removes* something as the only one offering itself. Measured with an iPhone 14 Pro
 	 * context before the fix: `.hide` at `opacity: 1`, the other three at `opacity: 0`.
 	 *
-	 * The five selectors are the five the shape rule uses, deliberately: the list of what a bar
+	 * The four selectors are the four the shape rule uses, deliberately: the list of what a bar
 	 * draws has to be one list, or the next control added to it is visible everywhere except
 	 * the device where it is the only route to what it does.
 	 */
 	.board-node > .chrome .hide,
 	.board-node > .chrome .present-open,
-	.board-node > .chrome .doc-open,
 	.board-node > .chrome .open-tab,
 	.board-node > .chrome .focus-open {
 		opacity: 1;

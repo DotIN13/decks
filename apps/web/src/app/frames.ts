@@ -1,6 +1,6 @@
-import type { AgentState, BoardPatch, Camera, ServerMessage } from "@decks/protocol";
+import type { AgentState, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
-import { PAGE, prepend } from "../chat/history-page.ts";
+import { prepend } from "../chat/history-page.ts";
 import { receiveToolResult } from "../chat/tool-results.ts";
 import { viewToPark } from "../camera/agent-view.ts";
 import { agentViews } from "../camera/agent-views.ts";
@@ -208,8 +208,8 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					 * **Only what changed is written.** The list is published for a dozen
 					 * reasons that have nothing to do with these fields — a prompt sent, a turn
 					 * finished, a chat focused — and a write of an equal value is still a write:
-					 * it would invalidate every agent's boards on every prompt, and the
-					 * dashboard groups the deck by exactly that. A separate message only ever
+					 * it would invalidate every agent's boards on every prompt, and everything
+					 * derived from them. A separate message only ever
 					 * arrived when something had actually moved, and this has to mean the same.
 					 */
 					for (const chat of message.chats) {
@@ -445,7 +445,6 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							/* Replace one agent's marks on one board, leaving every other agent's alone. */
 							annotate: (agentId, path, next) =>
 								setMarks((was) => [...was.filter((mark) => mark.agentId !== agentId || mark.path !== path), ...next]),
-							toast: (text) => notice("info", text),
 						});
 					} catch (error) {
 						value = { error: error instanceof Error ? error.message : String(error) };

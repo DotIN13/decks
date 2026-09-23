@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { opencodeConfigDir } from "@decks/runtime";
 import { opencodeExecutable } from "./install.ts";

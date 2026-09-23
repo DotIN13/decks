@@ -2,23 +2,14 @@ import type { AgentChat, Identity } from "@decks/protocol";
 import { agentStatus, type AgentStatus } from "./agent-order.ts";
 
 /**
- * What the panel's Agents tab lists, and which of its three sections each agent belongs to.
+ * What the panel's Agents tab lists: every agent, filed under the workspace it says it is in.
  *
  * Pure and tested, for the reason `panel-groups.ts` is: this is the whole of what the list
- * *knows*, and leaving it inside the component would mean the only way to ask "does a
- * dormant agent count as quiet" is to render one and look.
+ * *knows*, and leaving it inside the component would mean the only way to ask "which heading
+ * is this agent under" is to render one and look.
  *
- * ### The sections are the corner's own ranking, with headings
- *
- * `agent-order.ts` already derives `waiting` / `done` / `working` / `idle` and ranks them in
- * that order, and the corner stack draws faces in exactly that sequence. This groups the same
- * ranking rather than inventing a second one, so **the panel and the corner cannot disagree
- * about who is most urgent** — which they would within a week if each sorted for itself.
- *
- * Three headings from four statuses, and the fold is deliberate: `done` sits inside **Quiet**
- * rather than being promoted to its own section. A finished turn is not urgent, it is unread,
- * and the green ring already says so. Promoting it would put "come and read this" beside
- * "answer this now", which are not the same demand.
+ * Urgency is not a heading: every workspace heading carries its own note (`1 wants you`) and
+ * every row its state, from the same `agentStatus` the corner ranks by.
  *
  * ### Why the search matches tags
  *
@@ -30,46 +21,7 @@ import { agentStatus, type AgentStatus } from "./agent-order.ts";
 /** What a list calls the group of agents that have not said which project they are on. */
 export const NO_WORKSPACE = "No workspace";
 
-/**
- * Every workspace the agents say they are in, A to Z. A workspace exists by being named, so
- * this is the list a person picks one from.
- */
-export function workspaceNames(identities: Record<string, { workspace?: string }>): string[] {
-	const names = new Set<string>();
-	for (const identity of Object.values(identities)) if (identity.workspace) names.add(identity.workspace);
-	return [...names].sort((left, right) => left.localeCompare(right));
-}
-
-export type AgentSectionKind = "wants" | "working" | "quiet" | "workspace" | "unfiled";
-
-/**
- * How the list is cut up.
- *
- * **Workspace** is the default: the question a panel of a dozen agents is opened with is
- * usually which project somebody is on, and a project is a stable thing to look for where
- * "who needs you" is a ranking that moves under the reader as turns start and end. Urgency is
- * not lost with the headings — every workspace heading carries its own note (`2 want you`) and
- * every row carries its state — and the attention axis is one press away in the foot.
- *
- * **Attention** is the other answer: the same agents cut into waiting, working and quiet. The
- * two are read at different times and neither is derivable from the other.
- *
- * Inside a section, either way, the rows are in the order they last *said* something — see
- * `byRecency` — so the axis changes the headings and not the ranking.
- */
-export type AgentGroup = "workspace" | "attention";
-
-/**
- * The heading that leads the workspace cut is the room's.
- *
- * A canvas belongs to a workspace, so on a stage the first question the panel is opened with
- * is "who else is on this project" — and the section for the workspace of the canvas on
- * screen goes first, marked `here`, with the rest A to Z after it. It is the one heading
- * whose place depends on where you stand, which is why it is marked: a heading in first place
- * that says nothing reads as an alphabet mistake. There is no section for the canvas itself
- * any more; an agent works in a project and visits its rooms, so the room's roster is the
- * project's.
- */
+export type AgentSectionKind = "workspace" | "unfiled";
 
 export interface AgentRow {
 	/**
@@ -102,24 +54,19 @@ export interface AgentSection {
 	/**
 	 * What `reconcile` joins this section on, unique within the list it is in.
 	 *
-	 * The kind in the attention grouping, and `ws:` + the workspace's name in the workspace one,
-	 * where the bare `ws:` is the empty name — which is the section an agent with no workspace is
-	 * in. Prefixed there and not here because a workspace is a word a person types and `quiet`
-	 * is a heading this file owns; the prefix is what keeps the two from ever being one section.
+	 * `ws:` + the workspace's name, where the bare `ws:` is the empty name — the section an agent
+	 * with no workspace is in.
 	 */
 	id: string;
 	kind: AgentSectionKind;
 	/** The whole label, sentence case, without the count. Never uppercase. */
 	label: string;
 	rows: AgentRow[];
-	/** Whether this is the workspace of the canvas on screen — the section that leads the workspace cut. */
-	here?: boolean;
 	/**
 	 * Something true about the *group*, in the heading's right-hand column.
 	 *
-	 * Only a workspace section has one, and it exists for the case the workspace axis creates:
-	 * a section you are not in can be the one that needs you, and a heading that only counted
-	 * its rows would say "3" about a group with somebody waiting in it.
+	 * It exists because a section you are not in can be the one that needs you, and a heading
+	 * that only counted its rows would say "3" about a group with somebody waiting in it.
 	 */
 	note?: string;
 }
@@ -131,21 +78,7 @@ export interface AgentListInput {
 	focused?: string;
 	/** What is typed in the panel's search field. Matches the name, the tags and the workspace. */
 	query?: string;
-	/** Which axis to cut the list by. Absent is attention — see `AgentGroup`. */
-	group?: AgentGroup;
-	/**
-	 * A workspace whose section leads the workspace cut, marked `here`. Absent, and when it is
-	 * no workspace: `No workspace` jumping to the top would read as a mistake, so the alphabet
-	 * stands.
-	 */
-	here?: string;
 }
-
-const SECTIONS: { kind: AgentSectionKind; label: string; holds: AgentStatus[] }[] = [
-	{ kind: "wants", label: "Wants you", holds: ["waiting"] },
-	{ kind: "working", label: "Working", holds: ["working"] },
-	{ kind: "quiet", label: "Quiet", holds: ["done", "idle"] },
-];
 
 /** Trimmed and folded once, so callers do not each do it differently. */
 const fold = (query?: string) => (query ?? "").trim().toLowerCase();
@@ -154,9 +87,8 @@ const fold = (query?: string) => (query ?? "").trim().toLowerCase();
  * Does this agent match what was typed — by name, by either kind of tag, or by workspace?
  *
  * Both tag lists, because the point of typing `panel-css` is to find every agent on it, and
- * an agent you tagged yourself is one of them. The workspace too, and that is the one that
- * pays off most: `irb` is how you find five agents whose rows say nothing about 84069, and it
- * works in either grouping rather than only in the one that puts the name on screen.
+ * an agent you tagged yourself is one of them. The workspace too: `irb` finds every agent
+ * filed under `irb-84069`.
  *
  * Substring and case-insensitive rather than fuzzy, as `panel-groups.ts` matches a board: tags
  * and workspaces are slugs, so what somebody types is usually a word that is really in one.
@@ -167,15 +99,7 @@ export function agentMatches(row: Pick<AgentRow, "chat" | "tags" | "userTags" | 
 }
 
 /**
- * The sections, in urgency order, with the empty ones left out.
- *
- * Dropped rather than drawn as "Working · 0", for the reason the boards list drops one: the
- * label is a line *inside* the list, so a zero is a sentence with nothing under it — and with
- * a search running, most of them are empty most of the time.
- *
- * Within a section the order is **most recent first**, not the corner's full tie-breaking:
- * inside one status there is nothing left to rank by except when it last did something, and
- * an agent that has never run sorts last rather than first.
+ * The sections, one per workspace in use, with `No workspace` last — see `workspaceSections`.
  */
 export function agentSections(input: AgentListInput): AgentSection[] {
 	const needle = fold(input.query);
@@ -195,17 +119,11 @@ export function agentSections(input: AgentListInput): AgentSection[] {
 	});
 
 	const all = rows.filter((row) => agentMatches(row, needle));
-	if (input.group === "workspace") return workspaceSections(all, input.here);
-	const out: AgentSection[] = [];
-	for (const section of SECTIONS) {
-		const mine = all.filter((row) => section.holds.includes(row.status)).sort(byRecency);
-		if (mine.length > 0) out.push({ id: section.kind, kind: section.kind, label: section.label, rows: mine });
-	}
-	return out;
+	return workspaceSections(all);
 }
 
 /**
- * Newest message first, which is the row order under **both** axes.
+ * Newest message first, which is the row order inside every section.
  *
  * `lastAt` is the time of the last thing the agent said, not the time of the last write
  * (`protocol/chat.ts` says so on the field, and the server keeps it on the transcript for
@@ -224,7 +142,7 @@ export function agentSections(input: AgentListInput): AgentSection[] {
 const byRecency = (a: AgentRow, b: AgentRow) => (b.chat.lastAt ?? 0) - (a.chat.lastAt ?? 0);
 
 /**
- * The same list, cut by workspace instead of by urgency.
+ * The list, cut by workspace.
  *
  * **Alphabetical, and nothing else.** A heading's position is a place, not a rank: the whole
  * point of grouping by project is that the project you are looking for is always in the same
@@ -238,11 +156,11 @@ const byRecency = (a: AgentRow, b: AgentRow) => (b.chat.lastAt ?? 0) - (a.chat.l
  * workspace is a fact the list should be able to state. It is where the ones nobody has told
  * about a project are, which is the common state rather than an error.
  *
- * Rows inside a section are in the order they last said something, exactly as they are under the
- * attention axis — see `byRecency`. The `note` is what puts urgency back into the heading: a
- * group with somebody waiting in it says so, without the rows having to be read.
+ * Rows inside a section are in the order they last said something — see `byRecency`. The
+ * `note` is what puts urgency into the heading: a group with somebody waiting in it says so,
+ * without the rows having to be read.
  */
-function workspaceSections(rows: AgentRow[], here?: string): AgentSection[] {
+function workspaceSections(rows: AgentRow[]): AgentSection[] {
 	const groups = new Map<string, AgentRow[]>();
 	for (const row of rows) {
 		const name = row.workspace ?? "";
@@ -255,10 +173,7 @@ function workspaceSections(rows: AgentRow[], here?: string): AgentSection[] {
 		.sort((left, right) => left.localeCompare(right))
 		.map((name) => section("workspace", `ws:${name}`, name, groups.get(name) ?? []));
 	const loose = groups.get("");
-	const all = loose ? [...named, section("unfiled", "ws:", "No workspace", loose)] : named;
-	// The room's project first, and said so.
-	const room = here ? all.find((one) => one.id === `ws:${here}`) : undefined;
-	return room ? [{ ...room, here: true }, ...all.filter((one) => one !== room)] : all;
+	return loose ? [...named, section("unfiled", "ws:", "No workspace", loose)] : named;
 }
 
 function section(kind: AgentSectionKind, id: string, label: string, rows: AgentRow[]): AgentSection {
@@ -281,52 +196,4 @@ function sectionNote(rows: AgentRow[]): string | undefined {
 	const working = rows.filter((row) => row.status === "working").length;
 	if (working > 0) return `${working} working`;
 	return undefined;
-}
-
-/**
- * What the sections add up to, for the foot.
- *
- * **Counted from the rows and not from the headings**, which is the whole of why it is written
- * this way. It used to switch on `section.kind`, and a kind is an urgency word only under the
- * attention axis: under the workspace axis every agent in a project counted as active (a
- * finished one included) and `wants` was always zero (a waiting one included). Both numbers
- * looked maintained while being wrong — the comment said what they meant, a test asserted them —
- * and nothing failed when the workspace cut became the default. A row's own `status` means the
- * same thing whichever way the list is cut up.
- *
- * `active` is anything not quiet, the number that answers "is this deck spending money right
- * now". **Neither clause is in the foot today**: it prints the total and nothing else, for the
- * reason its own body gives. They are here because they are the numbers it would print, and
- * because the heading notes and a badge will want them.
- */
-export function agentTally(sections: AgentSection[]): { total: number; active: number; wants: number } {
-	const rows = sections.flatMap((section) => section.rows);
-	return {
-		total: rows.length,
-		active: rows.filter((row) => row.status === "waiting" || row.status === "working").length,
-		wants: rows.filter((row) => row.status === "waiting").length,
-	};
-}
-
-/**
- * The foot's sentence: the number of agents, or how many of them a search matched.
- *
- * Built here rather than in the markup so it can be asserted without a DOM. It takes the whole
- * tally even though it prints one field of it, which is what the caller has: the clause it used
- * to print (`3 active · 1 wants you`) was the three headings above it read out again, and the
- * argument for dropping it is in the body. Keeping the parameter shape means the numbers stay
- * available to whoever puts a clause back, and that they have to be right for both cuts by then.
- */
-export function agentFoot(tally: { total: number; active: number; wants: number }, matching?: number): string {
-	if (matching !== undefined) return `${matching} of ${tally.total} match`;
-	if (tally.total === 0) return "No agents yet";
-	/*
-	 * The count, and nothing else.
-	 *
-	 * It used to read `5 agents · 3 active · 1 wants you`, which is the three section
-	 * headings above it — each already carrying its own count — read out again at the bottom
-	 * of the list. The boards tab's foot says how many boards there are; this says how many
-	 * agents there are.
-	 */
-	return `${tally.total} agent${tally.total === 1 ? "" : "s"}`;
 }

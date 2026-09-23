@@ -121,6 +121,7 @@ export function ModelPicker(props: {
 						 * came out "edit fre…" for want of a rounding error.
 						 */
 						class="chip-button min-w-0 shrink-[100]"
+						data-picker="model"
 						type="button"
 						disabled={props.disabled || props.models.length === 0}
 						aria-haspopup="menu"

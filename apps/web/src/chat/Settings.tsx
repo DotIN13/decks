@@ -23,8 +23,7 @@ import type { AlertPrefs } from "../alerts/policy.ts";
  * is pointed at a symlink, so moving that link changes which subscription the *next turn*
  * spends — no session restart, no interrupted conversation.
  *
- * A modal rather than a panel, for the reason the all-canvases modal is one: this is a thing
- * you open, do, and close. It borrows the picker's backdrop — open, read, dismiss is one set
+ * A modal rather than a panel: this is a thing you open, do, and close. It borrows the picker's backdrop — open, read, dismiss is one set
  * of rules about how a press outside dismisses it.
  *
  * ### What a row can be

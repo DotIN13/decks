@@ -8,7 +8,7 @@ npx playwright install chromium
 ```
 
 ```sh
-npm run test:e2e                        # the twenty-three that need no model  (~2m)
+npm run test:e2e                        # the twenty-nine that need no model
 DECKS_E2E_AGENT=1 npm run test:e2e      # and the five that prompt an agent — slower, spends tokens
 npm run test:e2e -- panel tiers         # just these
 DECKS_BACKEND=claude npm run test:e2e   # the same checks, on the Claude runtime
@@ -34,7 +34,7 @@ run went against a real deck and dragged boards around before anyone noticed.
 ## What is covered, and what is not
 
 There were forty-five of these. The full suite took 8m 17s, a suite nobody runs between edits
-is not protecting anything, so it was cut to twelve. The set has grown back to twenty-three as
+is not protecting anything, so it was cut to twelve. The set has grown back to twenty-nine as
 surfaces came back, and what follows is the part that is still not covered.
 
 **What went is in git, not gone.** `git log --diff-filter=D --name-only -- e2e/checks` lists
@@ -53,7 +53,7 @@ Nothing asserts these any more, and the gaps are worth knowing before trusting a
 | `chat-history.mjs`, `streaming.mjs` | paging back through a transcript, and the column while a reply arrives |
 | `accounts.mjs`, `accounts-per-agent.mjs`, `model-picker.mjs`, `usage.mjs` | the account and model surfaces, and the usage panel |
 | `web-bridge.mjs` | the shared-Chrome bridge with the real extension |
-| the rest | `clusters`, `edge`, `dock`, `keys`, `no-flicker`, `deleted-board`, `agent-close`, `agent-camera`, `runtimes`, `annotate`, `preview`, `dormant-controls` |
+| the rest | `clusters`, `edge`, `dock`, `keys`, `no-flicker`, `deleted-board`, `agent-close`, `agent-camera`, `runtimes`, `preview`, `dormant-controls` |
 
 `accounts.mjs` also carried the one assertion that was failing before the cut — the accounts
 list's order. **Deleting it did not fix that; it removed the only thing reporting it.**

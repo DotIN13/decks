@@ -125,10 +125,8 @@
 	}
 
 	/*
-	 * `pulse` in `index.css` fades an element's opacity, which is right for a 7px dot and
-	 * wrong here — it would fade the avatar and the letter in it too, so the agent's
-	 * identity would flicker to report its state. Animating the outline's colour leaves
-	 * the face alone and moves only the channel that is carrying the message.
+	 * The outline's colour, not the face's opacity: fading the face would fade the avatar
+	 * and the letter in it too, so the agent's identity would flicker to report its state.
 	 */
 	@keyframes ring-pulse {
 		50% {

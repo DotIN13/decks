@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ChatItem } from "@decks/protocol";
 import { turnCards } from "../chat/turn-cards.ts";
-import { applyDelta, liveDelta } from "./live-chat.ts";
+import type { TurnCard } from "../chat/turn-cards.ts";
+import { liveDelta } from "./live-chat.ts";
 
 /**
  * Feeding a mirror board.
@@ -20,6 +21,8 @@ import { applyDelta, liveDelta } from "./live-chat.ts";
 const ask = (id: string, text: string): ChatItem => ({ kind: "user", id, text, at: 0 });
 const say = (id: string, text: string, streaming = false): ChatItem => ({ kind: "assistant", id, text, at: 0, ...(streaming ? { streaming } : {}) });
 const cards = (...items: ChatItem[]) => turnCards(items);
+/** The board's half of the rule: keep the first `from`, then append these. */
+const applyDelta = (held: readonly TurnCard[], delta: { from: number; turns: TurnCard[] }): TurnCard[] => [...held.slice(0, delta.from), ...delta.turns];
 
 test("an unchanged conversation is nothing to send", () => {
 	const items = [ask("1", "hello"), say("2", "hi")];

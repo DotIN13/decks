@@ -315,7 +315,6 @@
 	--z-mark: 6; /* a mark on a board, and the handle that resizes it */
 	--z-conversation: 9; /* the conversation column */
 	--z-chrome: 10; /* the rail and the dock: the chrome you work in */
-	--z-turnbar: 11; /* the turn bar, at the conversation's edge */
 	--z-backdrop: 20; /* a dialog's backdrop */
 	--z-float: 30; /* over the work and under a menu: a notice, the ink tools */
 	--z-menu: 40; /* menus and popovers */

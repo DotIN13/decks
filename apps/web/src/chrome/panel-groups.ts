@@ -14,9 +14,8 @@ import type { Board } from "@decks/protocol";
  *
  * 1. **On the canvas** — what the canvas has up. The accent dot, and the only rows at full
  *    strength, because this list is the canvas written down.
- * 2. **Held, not shown** — boards the canvas has taken off and keeps a place for
- *    (`Canvas.kept`). Boards belong to canvases, not agents, so this is the room's shelf and
- *    the same for everybody in it; showing one puts it back where it was.
+ * 2. **Held, not shown** — boards the focused agent has taken off its stage and keeps a
+ *    place for (its context); showing one puts it back where it was.
  *    Dimmed: `[data-off-canvas]` in the old rail did this with 45% opacity on a picture,
  *    which made a list look switched off; on a text row it is the muted colour.
  * 3. **In the deck** — everything else there is. Neither dimmed nor marked: browsing the
@@ -142,23 +141,4 @@ export function panelSections(input: PanelInput): PanelSection[] {
 	}
 
 	return sections;
-}
-
-/**
- * What the sections add up to, for the foot.
- *
- * `held` is the first two together — what the focused agent is working from, on screen or
- * not — and `shown` is every row, which is what a search narrows. Summed from the sections
- * rather than from the input, so the foot cannot disagree with the list above it.
- */
-export function panelTally(sections: PanelSection[]): { onCanvas: number; held: number; deck: number; shown: number } {
-	let onCanvas = 0;
-	let held = 0;
-	let deck = 0;
-	for (const section of sections) {
-		if (section.kind === "deck") deck += section.rows.length;
-		else held += section.rows.length;
-		if (section.kind === "canvas") onCanvas += section.rows.length;
-	}
-	return { onCanvas, held, deck, shown: held + deck };
 }

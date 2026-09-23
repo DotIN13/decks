@@ -183,11 +183,3 @@ export const INLINE_TAGS = [
 	"a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "dfn", "em", "i", "kbd",
 	"mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup", "time", "u", "var", "wbr",
 ] as const;
-
-/** What the agent is told the user changed, and what `stage.edits()` returns. */
-export interface UserEdit {
-	path: string;
-	at: number;
-	summary: string;
-	ids: string[];
-}

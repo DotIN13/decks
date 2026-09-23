@@ -41,7 +41,6 @@ export interface StageOpsHost {
 	cursor(cursor: { path: string; x: number; y: number; label: string; color: string } | null): void;
 	/** Replace one agent's annotations on one board. An empty list clears them. */
 	annotate(agentId: string, path: string, marks: Mark[]): void;
-	toast(text: string): void;
 }
 
 /**
@@ -164,12 +163,6 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 					: null,
 			);
 			return { cursor: at ? "shown" : "cleared" };
-		}
-
-		case "toast": {
-			const text = typeof args.text === "string" ? args.text : "";
-			if (text) host.toast(text);
-			return { toasted: Boolean(text) };
 		}
 
 		default:

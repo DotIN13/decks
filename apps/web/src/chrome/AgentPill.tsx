@@ -115,7 +115,7 @@ export function AgentFace(props: {
 	identity: Identity | undefined;
 	/** What makes an idle agent read as `done`. Zero, or omitted, and idle is idle. */
 	unread?: number;
-	/** Diameter. 24 in the corner and the pill, 20 in a dropdown row. */
+	/** Diameter: 26 in the corner stack, 20 in the pill and a dropdown row, 24 when omitted. */
 	size?: number;
 	/** The ring's thickness *and* its offset — they are one number, or the gap stops
 	 *  looking like a gap. 2 at 24px, 1.5 at 20px. */
@@ -235,13 +235,12 @@ export function NewAgentButton(props: {
 /**
  * The agent list — every agent, and the only place an idle one appears.
  *
- * Exported because two controls open it: the chevron beside the active agent's name, and
- * the `+n` chip in the top-right stack. One list, two ways in — so it is a component with a
- * `trigger` rather than markup inside the pill, and `AgentStack` borrows it.
+ * Exported because three controls open it: the chevron beside the active agent's name, the
+ * `+n` chip in the top-right stack, and the composer's recipient chip. One list, three ways
+ * in — so it is a component with a `trigger` rather than markup inside the pill.
  *
- * No last line on a row. The rows say *state*, not content: a 264px row with a truncated
- * sentence in it is the chat list, which is what the hover card and the boards panel are
- * for.
+ * No last line on a row. The rows say *state*, not content: the last thing an agent said is
+ * for the hover card and the panel's two-line rows.
  *
  * ### The × per row, and where the keyboard argument went
  *
@@ -272,8 +271,6 @@ export function AgentMenu(props: {
 	trigger: (api: { open: boolean; toggle: () => void; ref: (el: HTMLElement) => void }) => JSX.Element;
 	placement?: Placement;
 	label?: string;
-	/** Rows of the caller's own, under the rule and above New agent. */
-	foot?: JSX.Element;
 	/** Open the Agents panel, for the agents this list has no room for. Without it, the count is only said. */
 	onMore?: () => void;
 }) {
@@ -552,10 +549,6 @@ export function AgentMenu(props: {
 				</Show>
 			</Show>
 
-			<Show when={props.foot}>
-				<div class="rule" />
-				{props.foot}
-			</Show>
 					{/*
 				One card for the whole menu, mounted with it and only unhidden on hover.
 				

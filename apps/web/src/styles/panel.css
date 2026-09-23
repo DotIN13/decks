@@ -293,14 +293,13 @@
 	/*
 	 * One agent in the Agents tab: the reading surface.
 	 *
-	 * Taller than a board row and multi-line, because it is answering a different question.
-	 * A board row is a name you pick from a list; this is the whole story of one agent, so
-	 * the row grows with what there is to say and **shrinks when there is nothing** — an
-	 * agent with no tags and nothing quoted is two lines, and a list of five where two are
-	 * short reads better than five each carrying an empty third line.
+	 * Taller than a board row, because it is answering a different question. A board row is
+	 * a name you pick from a list; this is one agent, in one or two lines — the count is the
+	 * list's `data-lines` (`.agent-list[data-lines]`). No tags on the row; they are in the
+	 * hover card.
 	 *
 	 * `align-items: flex-start` on the button: the avatar sits level with the name rather
-	 * than floating in the middle of a four-line row.
+	 * than floating in the middle of a two-line row.
 	 */
 	/*
 	 * Two overrides on the row vocabulary, and nothing else.
@@ -310,7 +309,7 @@
 	 * here is how two lists in one panel come to nearly match. What differs is only what has
 	 * to: the icon column is 28px rather than 16 because the avatar is worth seeing at that
 	 * size here, and the actions sit on the *first line* rather than centred in a row that
-	 * may be four lines tall.
+	 * may be two lines tall.
 	 */
 	/* `.row-list.agent-list`, not `.agent-list`: the vocabulary's own selector is
 	   `:is(.popover, .row-list) [data-row]`, so matching its specificity would leave the
@@ -500,10 +499,9 @@
 	/*
 	 * A parked agent, said by dimming rather than by a sentence.
 	 *
-	 * The row used to spell out "Dormant — not resumed" on its own line. It is in the Quiet
-	 * section, its runtime word is drawn hollow, and now its name is muted as well — three
-	 * quiet signals in the place of one loud one, and the `title` on the row still says it
-	 * in words for anyone who asks.
+	 * The row used to spell out "Dormant — not resumed" on its own line. Now its name is
+	 * muted and its runtime word is fainter (`.kind[data-dormant]`) — quiet signals in the
+	 * place of one loud one, and the `title` on the row still says it in words.
 	 */
 	/* The name in bold, the one strong word on the row; the runtime and time after it are muted. */
 	.agent-list .agent-line > .row-label {
@@ -801,8 +799,7 @@
 	 * An inset ring, not an offset one. The list is a scroll container, so an outline drawn
 	 * outside the row is an outline clipped on the left and right edges.
 	 */
-	.board-row:focus-visible,
-	.board-tile:focus-visible {
+	.board-row:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: -2px;
 	}
@@ -1123,67 +1120,6 @@
 	   identity colour, which the component sets inline and so wins over both. */
 	.board-row[data-current="true"] .board-thumb {
 		border-color: var(--color-accent);
-	}
-
-	/*
-	 * The same board as a tile. A border here rather than a wash, because this one *is* a
-	 * picture and a border is the only thing you can put round a picture without changing
-	 * what is in it.
-	 */
-	.board-tile {
-		display: flex;
-		overflow: hidden;
-		box-sizing: border-box;
-		flex-direction: column;
-		padding: 0;
-		border: 1px solid var(--line);
-		border-radius: var(--control-radius);
-		background: var(--bg);
-		color: var(--fg);
-		cursor: pointer;
-		font: inherit;
-		text-align: left;
-		transition:
-			border-color 120ms ease,
-			box-shadow 120ms ease;
-	}
-
-	.board-tile:hover {
-		border-color: var(--line-strong);
-	}
-
-	.board-tile[data-current="true"] {
-		border-color: var(--color-accent);
-		box-shadow: 0 0 0 1px var(--color-accent);
-	}
-
-	.board-tile > .im {
-		position: relative;
-		display: block;
-		overflow: hidden;
-		height: 62px;
-		border-bottom: 1px solid var(--line);
-		background: var(--bg-deep);
-	}
-
-	.board-tile > .im > img {
-		display: block;
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		object-position: 0 0;
-	}
-
-	.board-tile > .tile-caption {
-		overflow: hidden;
-		padding: 4px 6px;
-		font-size: var(--type-hint);
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.board-tile[data-dim="true"] > .tile-caption {
-		color: var(--faint);
 	}
 
 	/*

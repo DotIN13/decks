@@ -74,8 +74,8 @@ class PathNotes<T> {
  * A file event cannot say who wrote a file, so authorship is never read off the disk. It is
  * *said*: an agent that fits, shows or reports a board through the stage tool is its writer, and
  * the canvas editor's patch is the person's. This is where those statements are kept, so the
- * gallery's "by" chip survives a restart — and so does the time, which is what tells the
- * dashboard that a board a person read is news again.
+ * byline survives a restart — and so does the time, which is what tells the canvas that a
+ * board a person read is news again.
  *
  * A file written by an older version holds a bare `"agent-1"`, which reads as *the writer, at a
  * time nobody recorded*: the byline comes back and the act has no date, so the board is timed off
@@ -109,7 +109,7 @@ export class Authors extends PathNotes<Author> {
 /**
  * When the person last looked at each board: `.decks/seen.json`, board path to a timestamp.
  *
- * The dashboard marks a board "changed" only while the newest act on it is newer than this, so
+ * The canvas marks a board "changed" only while the newest act on it is newer than this, so
  * reading a board clears its mark and the next act brings it back.
  */
 export class Seen extends PathNotes<number> {

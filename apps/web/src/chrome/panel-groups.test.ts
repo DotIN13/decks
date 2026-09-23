@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Board } from "@decks/protocol";
-import { basename, matches, panelSections, panelTally } from "./panel-groups.ts";
+import { basename, matches, panelSections } from "./panel-groups.ts";
 
 /*
  * The panel is a picture of these three sections, so every case here is one a reader of the
@@ -101,18 +101,12 @@ test("search runs over the whole list, and drops the sections it empties", () =>
 	const sections = panelSections({ boards: deck, kept, inPlay, query: "  SHELL " });
 	assert.deepEqual(sections.map((section) => section.label), ["On the canvas"]);
 	assert.equal(sections[0]?.rows.length, 1, "the count is what is under it, not what would be");
-	assert.deepEqual(panelTally(sections), { onCanvas: 1, held: 1, deck: 0, shown: 1 });
 });
 
 test("…including the part of it the canvas is not holding", () => {
 	const sections = panelSections({ boards: deck, kept, inPlay, query: "conversation" });
 	assert.deepEqual(sections.map((section) => section.label), ["In the deck"]);
 	assert.deepEqual(sections[0]?.rows.map((row) => row.board.title), ["The conversation"]);
-});
-
-test("the tally is the sections, so the foot cannot disagree with the list", () => {
-	assert.deepEqual(panelTally(room()), { onCanvas: 3, held: 5, deck: 2, shown: 7 });
-	assert.deepEqual(panelTally([]), { onCanvas: 0, held: 0, deck: 0, shown: 0 });
 });
 
 test("search matches the file's basename as well as its title", () => {

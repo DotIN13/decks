@@ -140,7 +140,7 @@ export function createHttpApp(app: App): Express {
 	);
 
 	/**
-	 * A picture of a board, for the dashboard's gallery (`boards/thumbs.ts`).
+	 * A picture of a board, for the panel's thumbnails (`boards/thumbs.ts`).
 	 *
 	 * The answer waits for the picture: an `<img>` has no way to be told "later", and a
 	 * request that is held is what lets the newest-first queue know who is still looking.
