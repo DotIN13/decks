@@ -1,18 +1,35 @@
 ---
 name: pen-stage
-description: How to draw on your stage — notes, text, shapes, arrows and frames under the boards — kept as a native pen.dev .pen file. The item types and fields, how stage.pen.edit and boxes work, and patterns for annotating boards. Read before your first stage.pen edit.
+description: Your stage is a native pen.dev .pen file — its boards, and notes, text, shapes, icons, arrows and frames around them. The item types and fields, stage.pen.edit and boxes, moving between stages, and patterns for arranging boards. Read before your first stage.pen edit.
 ---
 
 # Drawing on the stage
 
-Your stage has two layers. The **boards** are HTML pages, put up with `stage.show` and written as
-files. Under them is the **drawing**: notes, text, shapes, arrows and frames, drawn by the canvas
-itself. Use the drawing for what sits *between* boards — a note beside one, an arrow from one board
-to the next, a titled area behind a group, a label over a cluster. Put an answer on a board; put
-the arrangement around it in the drawing.
+Your stage is one file, `stages/<name>/stage.pen`, in **pen.dev's own format**: it opens in pen.dev
+as it is, and every type and field here is pen's, untranslated. It holds two kinds of thing.
 
-The drawing is one file, `stages/<name>/stage.pen`, in **pen.dev's own format**: the file opens in
-pen.dev as it is, and every type and field here is pen's, untranslated.
+- **Boards**: the HTML pages you write. Each one on the stage is a pen `browser` item pointing at
+  its file, tagged `metadata: { type: "decks.board", path: "boards/…" }`. `stage.show`, `stage.hide`
+  and `stage.move` add, remove and move them; you can also move them with `stage.pen.edit`, or put
+  them inside a frame that lays them out. Never make a board by inserting a `browser` item: write it
+  with `stage.newBoard` and show it.
+- **The drawing**: notes, text, shapes, icons, arrows and frames, drawn by the canvas under the
+  boards. Use it for what sits *between* boards — a note beside one, an arrow from one to the next,
+  a titled area behind a group. Put an answer on a board; put the arrangement around it here.
+
+The person can move, delete and rewrite drawn items by hand in edit mode, so read before you edit:
+the file may have changed since you last looked.
+
+## Stages
+
+```ts
+await stage.stages();                  // every stage: { name, open: [agents], boards, mine? }
+await stage.open("deploy");            // work on another stage: its boards become yours
+await stage.newStage("Launch plan");   // an empty stage, opened; answers its folder name
+```
+
+The person sees the stage the agent they are talking to has open. Two agents on one stage share
+its boards and its drawing. Make a new stage for a new piece of work; open an old one to continue it.
 
 ## The three calls
 
@@ -81,6 +98,8 @@ no field for: `{ type: "…", … }`).
 | `frame` | a container, with layout | `children`, `layout`, `gap`, `padding`, `justifyContent`, `alignItems`, `clip`, `fill`, `stroke`, `cornerRadius` |
 | `group` | a container, no layout: its box is its children's | `children` |
 | `ref` | a copy of a `reusable: true` item | `ref` (the item's id), `descendants`, and any field to lay over the copy |
+| `icon` | an icon from a library | `library` (`"lucide"`, `"feather"`, `"phosphor"`, `"Material Symbols Outlined"` / `"Rounded"` / `"Sharp"`), `icon` (its name there, e.g. `"rocket"`), `fill` (its colour), `weight` 100–700; 24 by 24 unless sized |
+| `browser` | a deck board (see above) | `url`, `metadata: { type: "decks.board", path }` — put up with `stage.show`, not inserted |
 
 **Text.** `textGrowth` decides the size: `"auto"` (the default) is one line as long as the words,
 and ignores `width`; `"fixed-width"` wraps at `width` and grows down; `"fixed-width-height"` is the
@@ -142,6 +161,9 @@ than the grey default; a label is a `text` placed by the arrow's `box`.
   above its top edge. Insert it at `index: 0` so it paints first.
 - **A flow:** boards left to right with `decks.arrow` paths between them; the arrows follow when
   a board is moved.
+- **Boards in a row:** a frame with `gap: 80` and no size, then `move` each board's item into it:
+  the frame lines them up, and keeps them lined up as they grow.
+- **A labelled icon:** a row frame with `alignItems: "center"`, `gap: 8`, an `icon` and a `text`.
 - **A checklist:** a vertical `frame` of `text` items; update each `content` as work lands.
 
 Keep the drawing light: a handful of notes and arrows around the boards, not a second document.

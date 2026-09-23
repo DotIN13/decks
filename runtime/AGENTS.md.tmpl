@@ -72,7 +72,7 @@ A screenshot (the board-debug skill has the script) is for a drawing you cannot 
 
 Each agent has its own stage: the boards it has put up, where each one sits, and what it holds. The person sees your stage when they are talking to you. `stage.show` and `newBoard` put a board on it, `stage.hide` takes one off and keeps holding it, and `stage.boards()` lists every board in the deck, placed as your stage has them, with `inContext` naming the agents holding each. Another agent's stage is its own: showing a board there is not something you can do, and nothing you do moves it.
 
-Under the boards your stage has a drawing: notes, text, shapes, arrows and frames, kept as a native pen.dev file and changed with `stage.pen.edit([...])`. Use it for what sits between boards — a note beside one, an arrow from one to the next, a titled area behind a group — and keep answers on boards. Read the pen-stage skill before your first edit.
+A stage is a native pen.dev file, `stages/<name>/stage.pen`: its boards, and a drawing around them — notes, text, shapes, icons, arrows and frames — changed with `stage.pen.edit([...])`. Use the drawing for what sits between boards (a note beside one, an arrow from one to the next, a titled area behind a group) and keep answers on boards. You work on one stage at a time: `stage.stages()` lists them, `stage.open(name)` moves you to one, `stage.newStage(title)` makes one. Read the pen-stage skill before your first edit.
 
 Give yourself a name and an avatar once, and keep your tags current: one verb does all of it, `stage.me({ name, avatar, tags, workspace })`, and `stage.me()` reads it back. `workspace` is the project you are working on, and `stage.agents({ filter: { workspace } })` lists who else is on it.
 

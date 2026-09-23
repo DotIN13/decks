@@ -144,6 +144,11 @@ const CHECKS = [
 	 * one is about what the DOM does when the same row's state changes underneath it.
 	 */
 	{ file: "panel-steady.mjs", needsAgent: false },
+	/*
+	 * The stage as a pen.dev file: boards as browser items in it, a drawing under them, and the
+	 * same file reached from the wire, from a hand edit of the file, and from a drag in the page.
+	 */
+	{ file: "pen-stage.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },
