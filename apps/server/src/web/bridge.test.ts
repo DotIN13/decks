@@ -108,6 +108,15 @@ async function launchChromium(): Promise<{ devtools: Devtools; targetId: string 
  * `chrome.debugger.onEvent [{ tabId }, …]`, a worker's on its own child session and go up
  * with that session id, which is how the real `chrome.debugger` reports them too.
  */
+/**
+ * The commands a tab's debugger session may not carry.
+ *
+ * They are browser-level in CDP: `Target.getTargets` enumerates every tab, `Target.attachToTarget`
+ * picks one. Chrome answers `Not allowed` for them on a session that belongs to a single tab, so
+ * the relay has to answer them from what the extension told it instead of forwarding them.
+ */
+const BROWSER_LEVEL = new Set(["Target.getTargets", "Target.attachToTarget", "Target.createTarget", "Target.closeTarget", "Target.activateTarget"]);
+
 async function fakeExtension(devtools: Devtools, targetId: string, code: string): Promise<WebSocket> {
 	const ws = new WebSocket(`ws://127.0.0.1:${port}/api/web/relay?code=${encodeURIComponent(code)}`);
 	await new Promise<void>((resolve, reject) => {
@@ -163,6 +172,13 @@ async function fakeExtension(devtools: Devtools, targetId: string, code: string)
 				case "chrome.debugger.sendCommand": {
 					const target = first as { tabId: number; sessionId?: string };
 					const tab = tabOf(target.tabId);
+					/*
+					 * Chrome refuses a browser-level command sent down a tab's own debugger session, and
+					 * says `Not allowed` when it does. That is what the real extension hits, and why the
+					 * relay answers these itself; a fake that forwarded them to the browser socket would
+					 * answer them cheerfully and hide the whole problem.
+					 */
+					if (BROWSER_LEVEL.has(second as string)) throw new Error(JSON.stringify({ code: -32000, message: "Not allowed" }));
 					return devtools.send(second as string, third, target.sessionId ?? tab.sessionId);
 				}
 				case "chrome.tabs.create": {
@@ -396,6 +412,46 @@ test("a browser agent can borrow the tab, and the deck's own verbs say so while 
 	const page = await bridge.page();
 	assert.equal(page.url(), (await value("location.href")) as string);
 	assert.equal(bridge.debuggerEndpoint(), endpoint, "and the address a run would attach to is unchanged");
+});
+
+test("a raw client lists the shared targets and attaches to one, which is how a browser agent opens", async () => {
+	/*
+	 * browser-harness speaks raw CDP and opens with `Target.getTargets`, then attaches to the
+	 * target it picked. Playwright never asks for either — it turns auto-attach on and is told
+	 * about the tabs — so this is the one path that was missing from the relay, and it killed
+	 * every supervised run at the daemon's first call with `Not allowed`.
+	 */
+	const endpoint = bridge.debuggerEndpoint();
+	assert.ok(endpoint, "a shared tab has a debugger endpoint");
+	const restore = await bridge.handOver();
+	const socket = new WebSocket(endpoint);
+	try {
+		await new Promise<void>((resolve, reject) => {
+			socket.once("open", () => resolve());
+			socket.once("error", reject);
+		});
+		const client = new Devtools(socket);
+		const { targetInfos } = (await client.send("Target.getTargets")) as { targetInfos: Array<{ targetId: string; type: string }> };
+		const page = targetInfos.find((target) => target.type === "page");
+		assert.ok(page, "the shared tab is one of the targets");
+		const { sessionId } = (await client.send("Target.attachToTarget", { targetId: page.targetId, flatten: true })) as { sessionId: string };
+		assert.ok(sessionId, "attaching to it hands back a session");
+		const answer = (await client.send("Runtime.evaluate", { expression: "document.title", returnByValue: true }, sessionId)) as { result: { value: unknown } };
+		assert.equal(typeof answer.result.value, "string", "and the session drives the tab");
+	} finally {
+		/*
+		 * The relay speaks to one client at a time and refuses a second, so the socket has to be
+		 * gone before the deck's Playwright comes back: closing it and waiting for the close is
+		 * what makes the next attach land rather than be turned away.
+		 */
+		await new Promise<void>((resolve) => {
+			socket.once("close", () => resolve());
+			socket.close();
+		});
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		await restore();
+	}
+	await until("the deck's own client back", () => bridge.status().connected);
 });
 
 test("stop lets go of the tab; the extension's socket closes and the status says why", async () => {

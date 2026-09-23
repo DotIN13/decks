@@ -158,6 +158,36 @@ class BrowserModel {
 		return this.find((s) => s.sessionId === sessionId)?.targetInfo;
 	}
 
+	/**
+	 * Every target a client can see, which is the tabs the user shared.
+	 *
+	 * A target id only exists once the debugger is attached to the tab, so this attaches as it
+	 * lists. The extension announces nothing but the tabs the user handed over, so that is the tab
+	 * they picked and no other. A client that never asked for auto-attach has no other way to
+	 * learn an id to attach to: browser-harness speaks raw CDP and opens with `Target.getTargets`,
+	 * which used to be forwarded to the extension as a browser-level command and came back
+	 * `Not allowed`, killing a supervised run before its first step.
+	 */
+	async getTargets(): Promise<{ targetInfos: Record<string, unknown>[] }> {
+		const targetInfos: Record<string, unknown>[] = [];
+		for (const tabId of this.known.keys()) {
+			const session = await this.attachTab(tabId).catch(() => undefined);
+			if (session?.targetInfo) targetInfos.push({ ...session.targetInfo, attached: true });
+		}
+		return { targetInfos };
+	}
+
+	/** Attach to one target by the id `getTargets` handed out, which is how a raw client gets a session. */
+	async attachToTarget(targetId: string | undefined): Promise<{ sessionId: string }> {
+		if (!targetId) throw new Error("Target.attachToTarget needs a targetId");
+		const existing = this.find((session) => session.targetInfo?.targetId === targetId);
+		if (existing) return { sessionId: existing.sessionId };
+		const tabId = [...this.known.entries()].find(([, tab]) => String(tab.id) === targetId)?.[0];
+		if (tabId === undefined) throw new Error(`No tab on this relay is target ${targetId}`);
+		const session = await this.attachTab(tabId);
+		return { sessionId: session.sessionId };
+	}
+
 	/** A browser-level command has no tab; it goes through whichever tab is attached. */
 	async sendBrowserCommand(method: string, params: unknown): Promise<unknown> {
 		const session = this.sessions.values().next().value;
@@ -454,6 +484,10 @@ export class Relay {
 				return {};
 			case "Target.createTarget":
 				return this.model.createTarget((params as { url?: string } | undefined)?.url);
+			case "Target.getTargets":
+				return this.model.getTargets();
+			case "Target.attachToTarget":
+				return this.model.attachToTarget((params as { targetId?: string } | undefined)?.targetId);
 			case "Target.closeTarget":
 				return this.model.closeTarget((params as { targetId?: string } | undefined)?.targetId);
 			case "Target.getTargetInfo":
