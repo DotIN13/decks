@@ -1112,23 +1112,26 @@
 	.stage[data-pen-tool] .world > .board-node {
 	pointer-events: none;
 }
+	/*
+	 * The editor over a drawn item's words (`Stage.tsx`, `textLookOf`): its font, size, spacing,
+	 * padding and colours come from the item, so the words stay exactly where the canvas set them.
+	 * It grows with what is typed, the way the item will: a text across, a note or a card's title down.
+	 */
 	.world > .pen-text {
 	position: absolute;
 	box-sizing: border-box;
 	margin: 0;
-	padding: 0;
 	border: none;
-	border-radius: 6px;
-	outline: 2px solid var(--color-accent);
-	color: var(--fg);
-	font-family: Inter, system-ui, sans-serif;
-	line-height: 1.2;
+	outline: none;
+	overflow: hidden;
 	resize: none;
 	field-sizing: content;
+	caret-color: var(--color-accent);
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
 }
-	.world > .pen-text[data-card="true"] {
-	padding: 16px;
-	color: #1f2328;
+	.world > .pen-text[data-grows="wide"] {
+	white-space: pre;
 }
 	.board-node .placeholder {
 	display: flex;

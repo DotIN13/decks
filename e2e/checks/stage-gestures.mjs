@@ -304,6 +304,34 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	await page.keyboard.press("Escape");
 }
 
+// --- typing into a note: the editor sits exactly on it, and the canvas stops drawing its words -------
+{
+	const at = item("g-b");
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "note", id: "g-note", content: "Words to edit" }, box: { x1: at.x, y1: at.y + at.height + Math.round(60 / m.a) } }] });
+	await until(() => page.evaluate(() => !!document.querySelector('.pen-hits [data-id="g-note"]')));
+	// A note is as tall as its words, so the file has no size for it: aim at what is drawn.
+	await settle(page, 400);
+	const c = await page.evaluate(() => {
+		const r = document.querySelector('.pen-hits [data-id="g-note"]').getBoundingClientRect();
+		return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+	});
+	await page.mouse.dblclick(c.x, c.y);
+	const fit = await until(() => page.evaluate(() => {
+		const editor = document.querySelector(".pen-text");
+		const hit = document.querySelector('.pen-hits [data-id="g-note"]');
+		if (!editor || !hit) return undefined;
+		const e = editor.getBoundingClientRect();
+		const h = hit.getBoundingClientRect();
+		return { dx: Math.abs(e.x - h.x), dy: Math.abs(e.y - h.y), dw: Math.abs(e.width - h.width), handles: document.querySelectorAll(".pen-handle").length };
+	}), 3000);
+	say("double-clicking a note opens an editor exactly on it, with no handles over it", !!fit && fit.dx < 2 && fit.dy < 2 && fit.dw < 2 && fit.handles === 0, JSON.stringify(fit));
+	await page.keyboard.press("End");
+	await page.keyboard.type(" and more");
+	await page.keyboard.press("Control+Enter");
+	say("…and what is typed is the note's words in the file", !!(await until(() => item("g-note")?.content === "Words to edit and more")));
+	await page.keyboard.press("Escape");
+}
+
 // --- edit mode: a board outlines itself under the pointer -------------------------------------------
 {
 	const spot = await page.evaluate(() => {

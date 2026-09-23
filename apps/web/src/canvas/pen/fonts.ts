@@ -132,3 +132,35 @@ export class PenFonts {
 		return { w, h };
 	};
 }
+
+/**
+ * The same font files the canvas draws with, for the page's own text: the editor that types over a
+ * drawn item has to set its words exactly where the canvas set them, and a system font in its place
+ * wraps and spaces them differently. Registered under a name of their own ("Pen Inter"), so the
+ * app's interface fonts are never touched, and fetched once per family, weight and style.
+ */
+const pageFonts = new Map<string, Promise<void>>();
+export function pageFont(family: string, weight: number, italic: boolean): string {
+	const face = (name: string) => {
+		const w = roundWeight(weight);
+		const style = italic ? "italic" : "normal";
+		const key = `${name}/${w}/${style}`;
+		if (!pageFonts.has(key)) {
+			const id = fontsourceId(name);
+			const load = async () => {
+				{
+					const font = new FontFace(`Pen ${name}`, `url(${CDN}/${id}@latest/latin-${w}-${style}.woff2)`, { weight: String(w), style });
+					try {
+						document.fonts.add(await font.load());
+					} catch {
+						/* a family the CDN does not have: the next name in the list is used */
+					}
+				}
+			};
+			pageFonts.set(key, load());
+		}
+	};
+	face(family);
+	face(FALLBACK);
+	return `"Pen ${family}", "Pen ${FALLBACK}", system-ui, sans-serif`;
+}

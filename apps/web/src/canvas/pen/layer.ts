@@ -199,6 +199,16 @@ export class PenLayer {
 
 	/** Items drawn as if gone, while an eraser is over them and before the delete comes back. */
 	private hidden: ReadonlySet<string> = new Set();
+	/** Items drawn without their words, while the words are being typed in an editor over them. */
+	private muted: ReadonlySet<string> = new Set();
+
+	muteText(ids: ReadonlySet<string> | undefined): void {
+		const next = ids ?? new Set<string>();
+		if (next.size === 0 && this.muted.size === 0) return;
+		this.muted = next;
+		this.dirty = true;
+		this.schedule();
+	}
 
 	hide(ids: ReadonlySet<string> | undefined): void {
 		const next = ids ?? new Set<string>();
@@ -369,7 +379,7 @@ export class PenLayer {
 		this.drawnDoc = this.doc;
 		this.painted = { nodes, doc, placed };
 		this.under = backdrops(nodes, this.bounds, placed);
-		const ctx = { ck, fonts, doc, placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight), skip: this.hidden };
+		const ctx = { ck, fonts, doc, placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight), skip: this.hidden, mute: this.muted };
 		const parts = this.split(nodes);
 		for (const name of ["under", "over"] as const) {
 			const recorder = new ck.PictureRecorder();

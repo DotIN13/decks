@@ -25,8 +25,28 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, arrowEnd, arrowRoute, isArrow, moveArrowEnds, ids as penIds, indexOf, newId, type PenDocument, type PenNode } from "@decks/pen";
+import { ARROW, arrowEnd, arrowRoute, baseTheme, color, fillsOf, isArrow, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { pageFont } from "./pen/fonts.ts";
 import { snapEdges, snapMove, type Box, type Guide } from "./pen/snap.ts";
+
+/** How a drawn item's words are set, for the editor that types over them (`textLookOf`). */
+interface TextLook {
+	font: string;
+	size: number;
+	weight: number;
+	italic: boolean;
+	spacing: number;
+	/** A multiple of the size; unset is the font's own. */
+	line?: number;
+	align: string;
+	/** Between the item's edge and its words: a note's padding, none for a text. */
+	pad: number;
+	ink: string;
+	/** A note's colour, drawn under the editor when its words outgrow the note. */
+	paper?: string;
+	/** A text that grows as wide as its words, or a box of fixed width that grows down. */
+	grows: "wide" | "tall";
+}
 
 /**
  * `v`, select: the one palette key left. The tools that add things are the stage's own now, armed
@@ -542,7 +562,7 @@ export function Stage(props: {
 	const [penResize, setPenResize] = createSignal<{ id: string; x: number; y: number; w: number; h: number } | undefined>();
 	const [penMarquee, setPenMarquee] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
 	const [penDraft, setPenDraft] = createSignal<{ tool: PenTool; x1: number; y1: number; x2: number; y2: number } | undefined>();
-	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; card: boolean; fontSize: number; fill: string; fresh?: boolean } | undefined>();
+	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; style: TextLook; fresh?: boolean } | undefined>();
 	const [penDrawn, setPenDrawn] = createSignal(0);
 	/**
 	 * Boards picked up with the drawing: by a marquee, or Shift and a press on a title bar. They move
@@ -565,6 +585,7 @@ export function Stage(props: {
 	/** A card just made, whose title opens for typing when it is first drawn. */
 	let penTitleOf: string | undefined;
 	penLayer.drawn = () => {
+		if (unmute && penLayer.placed.get(unmute.id)?.node.content === unmute.value) unmuteNow();
 		if (penTitleOf) {
 			const card = penLayer.placed.get(penTitleOf);
 			const title = card && [...penLayer.placed.values()].find((p) => p.parent === penTitleOf && p.node.type === "text");
@@ -623,7 +644,10 @@ export function Stage(props: {
 		const drag = penDrag();
 		const resize = penResize();
 		const out: Array<{ id: string; x: number; y: number; w: number; h: number }> = [];
+		const typing = penText()?.id;
 		for (const id of penSelection()) {
+			// The item being typed into is outlined by its editor.
+			if (id === typing) continue;
 			if (resize?.id === id) {
 				out.push(resize);
 				continue;
@@ -652,21 +676,80 @@ export function Stage(props: {
 		return outlines[0]!;
 	});
 	const TEXTY = new Set(["text", "note", "prompt", "context"]);
+	/**
+	 * How the canvas sets an item's words (`pen/paint.ts`, `paintText`), for the editor that types
+	 * over them: the same font, size, weight, spacing, line height, padding and colour, so the words do
+	 * not move when the editor opens or closes. The canvas keeps drawing the item — its paper, its
+	 * shadow, its card — and leaves out only the words while they are the editor's (`muteText`).
+	 */
+	const textLookOf = (node: PenNode, placed: Placed | undefined): TextLook => {
+		const doc = props.pen?.doc ?? { version: "", children: [] };
+		const theme = placed?.theme ?? baseTheme(doc, scheme());
+		const style = textStyleOf(doc, node, theme);
+		const css = (rgba: ReturnType<typeof color>) => (rgba ? `rgba(${Math.round(rgba[0] * 255)}, ${Math.round(rgba[1] * 255)}, ${Math.round(rgba[2] * 255)}, ${rgba[3]})` : undefined);
+		const firstColour = fillsOf(node.fill).map((f) => (typeof f === "string" ? f : f && f.type === "color" ? (f as { color: string }).color : undefined)).find(Boolean);
+		const card = node.type !== "text";
+		const NOTE_PAPER: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe", context: "#bfdbfe" };
+		const paper = card ? (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? NOTE_PAPER[node.type] ?? NOTE_PAPER.note!) : undefined;
+		const ink = card ? "#1f2328" : (css(firstColour ? color(doc, firstColour, theme) : undefined) ?? (scheme() === "dark" ? "#e6e6e6" : "#1f2328"));
+		return {
+			font: pageFont(style.fontFamily, style.fontWeight, style.fontStyle === "italic"),
+			size: style.fontSize,
+			weight: style.fontWeight,
+			italic: style.fontStyle === "italic",
+			spacing: style.letterSpacing,
+			// Skia's line height, left unset, is the font's own: CSS's "normal".
+			line: style.lineHeight,
+			align: node.textAlign ?? "left",
+			pad: card ? NOTE_PAD : 0,
+			ink,
+			...(paper ? { paper } : {}),
+			grows: node.type === "text" ? ((node.textGrowth ?? "auto") === "auto" ? "wide" : "tall") : "tall",
+		};
+	};
 	const openPenText = (hit: PenHit, fresh?: boolean) => {
 		const node = hit.node;
-		const card = node.type !== "text";
-		const size = typeof node.fontSize === "number" ? node.fontSize : 14;
-		const fill = card && typeof node.fill === "string" && node.fill.startsWith("#") ? node.fill : card ? "#fde68a" : "transparent";
-		setPenText({ id: hit.id, box: hit.box, value: typeof node.content === "string" ? node.content : "", card, fontSize: size, fill, ...(fresh ? { fresh } : {}) });
+		const placed = penLayer.placed.get(hit.id);
+		const box = placed?.box ?? hit.box;
+		penLayer.muteText(new Set([hit.id]));
+		setPenText({ id: hit.id, box: { ...box }, value: typeof node.content === "string" ? node.content : "", style: textLookOf(placed?.node ?? node, placed), ...(fresh ? { fresh } : {}) });
+	};
+	// The editor's font, fetched before it is first needed so the words never open in a stand-in.
+	createEffect(() => {
+		if (!props.pen) return;
+		pageFont("Inter", 400, false);
+		pageFont("Inter", 600, false);
+	});
+		/** Where the item being typed into is now: a made item is placed once the server answers. */
+	const penTextBox = createMemo(() => {
+		penDrawn();
+		const open = penText();
+		return open ? (penLayer.placed.get(open.id)?.box ?? open.box) : undefined;
+	});
+	/*
+	 * The canvas leaves the words out until it draws the new ones: taking the editor away before the
+	 * server's answer has been drawn shows the old words for a moment, and then the new.
+	 */
+	let unmute: { id: string; value: string; timer: ReturnType<typeof setTimeout> } | undefined;
+	const unmuteNow = () => {
+		if (unmute) clearTimeout(unmute.timer);
+		unmute = undefined;
+		penLayer.muteText(undefined);
 	};
 	const commitPenText = (value: string) => {
 		const open = penText();
 		setPenText(undefined);
-		if (!open || !props.onPenEdit) return;
+		if (!open || !props.onPenEdit) return unmuteNow();
 		// A text or note made by a tool and left empty was never wanted.
-		if (open.fresh && !value.trim()) return props.onPenEdit([{ op: "delete", id: open.id }]);
+		if (open.fresh && !value.trim()) {
+			unmuteNow();
+			return props.onPenEdit([{ op: "delete", id: open.id }]);
+		}
 		const was = penLayer.placed.get(open.id)?.node.content;
-		if (value !== was) props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
+		if (value === was) return unmuteNow();
+		if (unmute) clearTimeout(unmute.timer);
+		unmute = { id: open.id, value, timer: setTimeout(unmuteNow, 3000) };
+		props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
 	};
 	/** A press on a drawn item's click shape (`pen/layer.ts`), which is over the boards. */
 	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
@@ -1961,7 +2044,7 @@ export function Stage(props: {
 	const hoverBox = createMemo(() => {
 		penDrawn();
 		const id = hoverId();
-		return id ? penLayer.bounds.get(id) : undefined;
+		return id && id !== penText()?.id ? penLayer.bounds.get(id) : undefined;
 	});
 
 	/** The last tap on a drawn item, so a second one soon after on the same item opens its words. */
@@ -2507,37 +2590,53 @@ export function Stage(props: {
 					)}
 				</Show>
 				<Show when={penText()} keyed>
-					{(open) => (
-						<textarea
-							class="pen-text"
-							data-card={open.card ? "true" : undefined}
-							style={{
-								left: `${open.box.x}px`,
-								top: `${open.box.y}px`,
-								width: `${Math.max(open.box.w, 160)}px`,
-								"min-height": `${Math.max(open.box.h, open.fontSize * 2)}px`,
-								"font-size": `${open.fontSize}px`,
-								background: open.fill,
-							}}
-							value={open.value}
-							ref={(area) => requestAnimationFrame(() => {
-								area.focus();
-								area.select();
-							})}
-							onBlur={(event) => commitPenText(event.currentTarget.value)}
-							onKeyDown={(event) => {
-								if (event.key === "Escape") {
-									event.preventDefault();
-									const open = penText();
-									setPenText(undefined);
-									if (open?.fresh) props.onPenEdit?.([{ op: "delete", id: open.id }]);
-								} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-									event.preventDefault();
-									event.currentTarget.blur();
-								}
-							}}
-						/>
-					)}
+					{(open) => {
+						const look = open.style;
+						const box = () => penTextBox() ?? open.box;
+						return (
+							<textarea
+								class="pen-text"
+								data-grows={look.grows}
+								spellcheck={false}
+								style={{
+									left: `${box().x}px`,
+									top: `${box().y}px`,
+									...(look.grows === "wide" ? { "min-width": `${box().w + 1}px` } : { width: `${box().w}px` }),
+									"min-height": `${box().h}px`,
+									padding: `${look.pad}px`,
+									"font-family": look.font,
+									"font-size": `${look.size}px`,
+									"font-weight": String(look.weight),
+									"font-style": look.italic ? "italic" : "normal",
+									"letter-spacing": `${look.spacing}px`,
+									"line-height": look.line === undefined ? "normal" : String(look.line),
+									"text-align": look.align as "left",
+									color: look.ink,
+									background: look.paper ?? "transparent",
+									"border-radius": look.paper ? "6px" : "2px",
+									"box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)`,
+								}}
+								value={open.value}
+								ref={(area) => requestAnimationFrame(() => {
+									area.focus();
+									area.select();
+								})}
+								onBlur={(event) => commitPenText(event.currentTarget.value)}
+								onKeyDown={(event) => {
+									if (event.key === "Escape") {
+										event.preventDefault();
+										const open = penText();
+										setPenText(undefined);
+										unmuteNow();
+										if (open?.fresh) props.onPenEdit?.([{ op: "delete", id: open.id }]);
+									} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+										event.preventDefault();
+										event.currentTarget.blur();
+									}
+								}}
+							/>
+						);
+					}}
 				</Show>
 			</div>
 			{/* The boards' title bars: over the canvas, and not zoomed with it (`placeBar` above). */}

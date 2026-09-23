@@ -34,6 +34,8 @@ export interface PaintContext {
 	icon(library: string, name: string, weight: number): IconShape | undefined;
 	/** Items left out, with everything inside them: the ones a drag is carrying on a picture of their own. */
 	skip?: ReadonlySet<string>;
+	/** Items drawn without their words: the ones being typed into, where the editor shows the words. */
+	mute?: ReadonlySet<string>;
 }
 
 const NOTE_COLORS: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe", context: "#bfdbfe" };
@@ -415,6 +417,7 @@ function paintShadows(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: T
 
 function paintText(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: ThemeState, placed: Placed, pad: number, fallbackColor?: string): void {
 	const { ck, doc, fonts } = ctx;
+	if (ctx.mute?.has(node.id)) return;
 	const content = String(resolve(doc, node.content, withTheme(theme, node)) ?? "");
 	if (!content) return;
 	const style = textStyleOf(doc, node, theme);
