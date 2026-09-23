@@ -27,7 +27,7 @@ export const RENDERERS: Array<{ id: RendererChoice; label: string; note: string 
 	{ id: "dom", label: "Documents", note: "Each board is a live document under one transform. Works everywhere." },
 	{
 		id: "canvas-per-board",
-		label: "A canvas per board",
+		label: "Canvas",
 		note: "Each board is drawn into its own canvas and redrawn when the camera rests. Boards stay clickable.",
 	},
 ];

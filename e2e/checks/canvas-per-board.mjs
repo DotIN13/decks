@@ -1,5 +1,5 @@
 /**
- * The "A canvas per board" renderer (Settings → Boards), which draws each board into a canvas of
+ * The "Canvas" renderer (Settings → Boards, `canvas-per-board` in code), which draws each board into a canvas of
  * its own with Chrome's HTML-in-Canvas API (`board/BoardFrame.tsx`, `canvas/picture.ts`).
  *
  * It is an option and stays one, so it is checked here rather than only by eye: a board's picture
