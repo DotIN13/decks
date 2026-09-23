@@ -1279,6 +1279,14 @@ export function App() {
 					`data-inset="top"` where there were two.
 				*/}
 				<AgentPill
+					chats={state.chats}
+					identities={state.identities}
+					focused={state.focused}
+					unread={unread}
+					onFocus={visitAgent}
+					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+					onClose={closeAgent}
+					onMoreAgents={openAgentsPanel}
 					mode={mode()}
 					onMode={(next) => {
 						// A press while editing means "this component", so the pen is put down first.

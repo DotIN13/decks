@@ -34,6 +34,24 @@
 		inset: 0;
 	}
 
+	/* The agent in the top-left pill: face, name and chevron, one button. */
+	.pill-agent {
+		gap: 6px;
+		padding: 0 7px 0 3px;
+		border-color: transparent;
+		color: var(--fg);
+	}
+	.pill-agent[data-on="soft"] {
+		background: var(--line);
+	}
+	.pill-agent-name {
+		max-width: 160px;
+		overflow: hidden;
+		font-weight: 600;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
 	/* ---- the sidebar's mark, and the pill beside it ------------------------------ */
 	.panel-mark {
 		display: flex;

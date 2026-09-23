@@ -600,8 +600,23 @@ export function AgentPill(props: {
 	onTool: (tool: Tool) => void;
 	/** Undo the last edit to the selected board. Absent when there is nothing to undo. */
 	onUndo?: () => void;
+	/** The agents, for the switcher: a face and a name, one button, opening the agent list. */
+	chats: AgentChat[];
+	identities: Record<string, Identity>;
+	focused: string | undefined;
+	unread: Record<string, number>;
+	onFocus: (id: string) => void;
+	onNew: (kind?: AgentKind) => void;
+	onClose: (id: string) => void;
+	/** Open the Agents panel, from the agent list's overflow row. */
+	onMoreAgents?: () => void;
 }) {
 	const current = () => TOOLS.find((entry) => entry.tool === props.tool) ?? TOOLS[0];
+	const active = () => props.chats.find((chat) => chat.id === props.focused);
+	const name = () => {
+		const chat = active();
+		return chat ? (props.identities[chat.id]?.name ?? chat.name) : undefined;
+	};
 
 	return (
 		/*
@@ -650,6 +665,46 @@ export function AgentPill(props: {
 			</button>
 
 			{/* Hairlines are decoration, and the first thing to go when the line is short. */}
+			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
+
+			{/*
+			 * The agent whose stage this is: its face and its name, as one button. Pressing it
+			 * opens the agent list, and picking a row goes to that agent's stage.
+			 *
+			 * The name stops at 160px and goes on a phone, where the face alone still says whose
+			 * window this is and its ring still says what the agent is doing.
+			 */}
+			<AgentMenu
+				chats={props.chats}
+				identities={props.identities}
+				focused={props.focused}
+				unread={props.unread}
+				onFocus={props.onFocus}
+				onNew={props.onNew}
+				onClose={props.onClose}
+				{...(props.onMoreAgents ? { onMore: props.onMoreAgents } : {})}
+				label="Agents"
+				trigger={(api) => (
+					<button
+						type="button"
+						class="chip-button pill-agent"
+						ref={api.ref}
+						aria-haspopup="menu"
+						aria-expanded={api.open}
+						data-on={api.open ? "soft" : undefined}
+						title="Switch agent"
+						aria-label={name() ? `Agents — currently ${name()}` : "Agents"}
+						onClick={api.toggle}
+					>
+						<Show when={active()} fallback={<span class="pill-agent-name">No agent</span>}>
+							{(chat) => <AgentFace chat={chat()} identity={props.identities[chat().id]} unread={props.unread[chat().id] ?? 0} size={20} ring={1.5} />}
+						</Show>
+						<Show when={name()}>{(label) => <span class="pill-agent-name max-[768px]:hidden">{label()}</span>}</Show>
+						<Icon of={ChevronDown} size={12} />
+					</button>
+				)}
+			/>
+
 			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
 
 
