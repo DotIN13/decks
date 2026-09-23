@@ -1098,6 +1098,10 @@ export function App() {
 						marks={marks()}
 						boards={stageBoards()}
 						{...(stagePen() ? { pen: stagePen()! } : {})}
+						onPenEdit={(ops) => {
+							const agentId = state.focused;
+							if (agentId) send({ type: "stage.pen.edit", agentId, ops });
+						}}
 						camera={camera()}
 						glide={glide()}
 						setCamera={setCameraAndReport}

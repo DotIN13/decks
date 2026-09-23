@@ -120,6 +120,12 @@ export type ClientMessage =
 	 */
 	| { type: "board.delete"; path: string }
 	/**
+	 * The person's own edits to a stage drawing — a drag, a deletion, new words in a note — in the
+	 * same pen operations an agent sends through `stage.pen.edit` (`@decks/pen`'s `Op`). Applied to
+	 * the stage the named agent has open, together or not at all.
+	 */
+	| { type: "stage.pen.edit"; agentId: string; ops: unknown[] }
+	/**
 	 * Where the browser is looking, and which conversation's view that is.
 	 *
 	 * The camera belongs to the conversation, so the server keeps one reading per agent and

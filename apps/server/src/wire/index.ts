@@ -5,6 +5,7 @@ import { boards } from "./boards.ts";
 import { deck } from "./deck.ts";
 import type { Reply, WireContext, WireTable } from "./context.ts";
 import { web } from "./web.ts";
+import { pen } from "./pen.ts";
 
 /**
  * Every frame, and what answers it — the one table.
@@ -26,6 +27,7 @@ const WIRE: WireTable = {
 	...agents,
 	...accounts,
 	...web,
+	...pen,
 };
 
 /**

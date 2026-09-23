@@ -3,7 +3,7 @@ import X from "lucide-solid/icons/x";
 import { Icon } from "../ui/icons.tsx";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import type { AgentAct } from "./acts.ts";
-import { between, boxOf, easeOutCubic, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, zoomAbout, type Viewport } from "../camera/camera.ts";
+import { between, boxOf, easeOutCubic, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
@@ -22,7 +22,7 @@ import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
 import { createOneCanvas } from "./one-canvas.ts";
-import { PenLayer } from "./pen/layer.ts";
+import { PenLayer, type PenHit } from "./pen/layer.ts";
 import { scheme } from "../lib/theme.ts";
 import type { PenDocument } from "@decks/pen";
 
@@ -89,6 +89,12 @@ export function Stage(props: {
 	 * against (`canvas/pen/layer.ts`). Drawn under the boards, with the same camera.
 	 */
 	pen?: { doc: PenDocument; base: string };
+	/**
+	 * The person's edits to the drawing, as pen operations (`stage.pen.edit` on the wire). Absent
+	 * means the drawing is read-only here. Edits are made in edit mode only, so browsing the canvas
+	 * never picks a note up by accident.
+	 */
+	onPenEdit?: (ops: unknown[]) => void;
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
 	/**
@@ -349,6 +355,29 @@ export function Stage(props: {
 			 */
 			if (props.editing) return;
 			/*
+			 * The drawing's own keys, in edit mode: Delete takes away the selected item, Escape lets it
+			 * go, and `n` makes a note. None of them fire while a text box has the caret (above).
+			 */
+			if (props.mode === "edit" && props.onPenEdit) {
+				const selected = penSelected();
+				if (selected && (event.key === "Delete" || event.key === "Backspace")) {
+					event.preventDefault();
+					props.onPenEdit([{ op: "delete", id: selected.id }]);
+					setPenSelected(undefined);
+					return;
+				}
+				if (selected && event.key === "Escape") {
+					event.preventDefault();
+					setPenSelected(undefined);
+					return;
+				}
+				if (event.key === "n" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+					event.preventDefault();
+					newPenNote();
+					return;
+				}
+			}
+			/*
 			 * The view's own two keys, and deliberately *not* in `shortcut`: a board's keys are
 			 * forwarded there (`frame-gestures.ts`), so a `d` in that table would be a `d` typed
 			 * at whatever board happens to have the focus. These fire only when the keystroke
@@ -516,6 +545,63 @@ export function Stage(props: {
 	createEffect(() => penLayer.setScheme(scheme()));
 	createEffect(() => penLayer.setDoc(props.pen?.doc, props.pen?.base ?? ""));
 	createEffect(() => penLayer.setBoards(props.boards));
+
+	/*
+	 * Editing the drawing by hand: in edit mode a press on a drawn item selects it and a drag moves
+	 * it; Delete removes it; a double-click on a text or note opens its words in a text box; `n` puts
+	 * a new note in the middle of the view. Each is sent as the same pen operation an agent would
+	 * send, and the drawing redraws from the server's answer.
+	 */
+	const [penSelected, setPenSelected] = createSignal<PenHit | undefined>();
+	const [penDrag, setPenDrag] = createSignal({ dx: 0, dy: 0 });
+	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; card: boolean; fontSize: number; fill: string; fresh?: boolean } | undefined>();
+	const [penDrawn, setPenDrawn] = createSignal(0);
+	penLayer.drawn = () => setPenDrawn((n) => n + 1);
+	createEffect(() => {
+		// The answer to a drag has arrived: the drawing is where the drag left it, so the offset goes.
+		void props.pen?.doc;
+		setPenDrag({ dx: 0, dy: 0 });
+	});
+	createEffect(() => {
+		if (props.mode !== "edit") {
+			setPenSelected(undefined);
+			setPenText(undefined);
+		}
+	});
+	/** Where the selected item is now, drawn around it, moved by any drag in progress. */
+	const penSelectionBox = createMemo(() => {
+		penDrawn();
+		const id = penSelected()?.id;
+		const box = id ? penLayer.placed.get(id)?.box : undefined;
+		if (!box) return undefined;
+		const drag = penDrag();
+		return { x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h };
+	});
+	const TEXTY = new Set(["text", "note", "prompt", "context"]);
+	const openPenText = (hit: PenHit) => {
+		const node = hit.node;
+		const card = node.type !== "text";
+		const size = typeof node.fontSize === "number" ? node.fontSize : 14;
+		const fill = typeof node.fill === "string" && node.fill.startsWith("#") ? node.fill : card ? "#fde68a" : "transparent";
+		setPenText({ id: hit.id, box: hit.box, value: typeof node.content === "string" ? node.content : "", card, fontSize: size, fill });
+	};
+	const commitPenText = (value: string) => {
+		const open = penText();
+		setPenText(undefined);
+		if (!open || !props.onPenEdit) return;
+		// A note made with `n` and left empty was never wanted.
+		if (open.fresh && !value.trim()) return props.onPenEdit([{ op: "delete", id: open.id }]);
+		const was = penLayer.placed.get(open.id)?.node.content;
+		if (value !== was) props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
+	};
+	const newPenNote = () => {
+		if (!props.onPenEdit) return;
+		const middle = toWorld(localCamera, view(), centre());
+		const id = `note-${Math.random().toString(36).slice(2, 7)}`;
+		const box = { x: Math.round(middle.x - 120), y: Math.round(middle.y - 40), w: 240, h: 80 };
+		props.onPenEdit([{ op: "insert", node: { type: "note", id, content: "" }, box: { x1: box.x, y1: box.y } }]);
+		setPenText({ id, box, value: "", card: true, fontSize: 14, fill: "#fde68a", fresh: true });
+	};
 
 	const writeTransform = (cam: Camera) => {
 		const v = view();
@@ -1166,6 +1252,13 @@ export function Stage(props: {
 	 * bubble out of a frame. So the test is the node, not the element.
 	 */
 	const onDblClick = (event: MouseEvent) => {
+		if (props.mode === "edit" && props.onPenEdit && event.target === element) {
+			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)));
+			if (hit && TEXTY.has(hit.node.type)) {
+				openPenText(hit);
+				return;
+			}
+		}
 		if (!props.onCreateBoard) return;
 		const target = event.target as HTMLElement | null;
 		if (target?.closest?.(".board-node")) return;
@@ -1184,6 +1277,40 @@ export function Stage(props: {
 		if (event.pointerType === "touch") {
 			beginTouch(event);
 			return;
+		}
+
+		/*
+		 * A drawn item, in edit mode: pick it up. Anywhere else on the drawing is canvas, and pans.
+		 */
+		if (props.mode === "edit" && props.onPenEdit && event.button === 0 && event.target === element && !spaceHeld()) {
+			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)));
+			if (hit) {
+				event.preventDefault();
+				props.onSelect(undefined);
+				setPenSelected(hit);
+				element.setPointerCapture(event.pointerId);
+				const start = { x: event.clientX, y: event.clientY };
+				let moved = false;
+				let offset = { dx: 0, dy: 0 };
+				const move = (moveEvent: PointerEvent) => {
+					if (!moved && Math.hypot(moveEvent.clientX - start.x, moveEvent.clientY - start.y) < 3) return;
+					moved = true;
+					offset = { dx: (moveEvent.clientX - start.x) / localCamera.zoom, dy: (moveEvent.clientY - start.y) / localCamera.zoom };
+					setPenDrag(offset);
+					penLayer.preview({ id: hit.id, ...offset });
+				};
+				const finish = () => {
+					element.removeEventListener("pointermove", move);
+					element.removeEventListener("pointerup", finish);
+					element.removeEventListener("pointercancel", finish);
+					if (moved) props.onPenEdit?.([{ op: "update", id: hit.id, box: { x1: Math.round(hit.box.x + offset.dx), y1: Math.round(hit.box.y + offset.dy) } }]);
+				};
+				element.addEventListener("pointermove", move);
+				element.addEventListener("pointerup", finish);
+				element.addEventListener("pointercancel", finish);
+				return;
+			}
+			setPenSelected(undefined);
 		}
 
 		const middle = event.button === 1;
@@ -1470,6 +1597,47 @@ export function Stage(props: {
 				<For each={props.boards.filter((board) => board.path !== props.focus)} fallback={null}>
 					{(board) => boardNode(board)}
 				</For>
+				<Show when={penSelectionBox()}>
+					{(box) => (
+						<div
+							class="pen-selection"
+							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${2 / props.camera.zoom}px var(--accent)` }}
+						/>
+					)}
+				</Show>
+				<Show when={penText()} keyed>
+					{(open) => (
+						<textarea
+							class="pen-text"
+							data-card={open.card ? "true" : undefined}
+							style={{
+								left: `${open.box.x}px`,
+								top: `${open.box.y}px`,
+								width: `${Math.max(open.box.w, 160)}px`,
+								"min-height": `${Math.max(open.box.h, open.fontSize * 2)}px`,
+								"font-size": `${open.fontSize}px`,
+								background: open.fill,
+							}}
+							value={open.value}
+							ref={(area) => requestAnimationFrame(() => {
+								area.focus();
+								area.select();
+							})}
+							onBlur={(event) => commitPenText(event.currentTarget.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Escape") {
+									event.preventDefault();
+									const open = penText();
+									setPenText(undefined);
+									if (open?.fresh) props.onPenEdit?.([{ op: "delete", id: open.id }]);
+								} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+									event.preventDefault();
+									event.currentTarget.blur();
+								}
+							}}
+						/>
+					)}
+				</Show>
 			</div>
 			<Show when={focused()} keyed>
 				{(board) => (

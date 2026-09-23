@@ -938,6 +938,30 @@
 	.stage[data-focus="true"] > .pen-layer {
 	display: none;
 }
+	/* The drawn item picked up in edit mode, and the box its words are edited in (`Stage.tsx`). */
+	.world > .pen-selection {
+	position: absolute;
+	border-radius: 4px;
+	pointer-events: none;
+}
+	.world > .pen-text {
+	position: absolute;
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+	border: none;
+	border-radius: 6px;
+	outline: 2px solid var(--accent);
+	color: var(--fg);
+	font-family: Inter, system-ui, sans-serif;
+	line-height: 1.2;
+	resize: none;
+	field-sizing: content;
+}
+	.world > .pen-text[data-card="true"] {
+	padding: 16px;
+	color: #1f2328;
+}
 	/*
  * Shown, not hidden, and as large as its last capture. A canvas at `opacity: 0`, clipped
  * away or `visibility: hidden` is one Chrome never records a paint for, and one shown at a

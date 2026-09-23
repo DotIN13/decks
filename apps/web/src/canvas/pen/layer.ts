@@ -1,5 +1,12 @@
 import type { CanvasKit, Image, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, isArrow, layout, reroute, walk, textStyleOf, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { baseTheme, expand, indexOf, isArrow, layout, reroute, walk, textStyleOf, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+
+/** What a press found in the drawing: the item, and where it is on the stage. */
+export interface PenHit {
+	id: string;
+	node: PenNode;
+	box: Frame;
+}
 import type { Camera } from "@decks/protocol";
 import { canvasKit } from "./canvaskit.ts";
 import { PenFonts, type FontNeed } from "./fonts.ts";
@@ -42,6 +49,35 @@ export class PenLayer {
 	private disposed = false;
 	/** The layout last drawn, by id, for whoever needs to know where an item is. */
 	placed: ReadonlyMap<string, Placed> = new Map();
+	/** Called after every new picture, so the stage can redraw a selection around what moved. */
+	drawn: (() => void) | undefined;
+	/** An item being dragged, drawn moved by this much until the edit comes back from the server. */
+	private moving: { id: string; dx: number; dy: number } | undefined;
+
+	/**
+	 * The item under a stage point: the one drawn last, since that is the one on top.
+	 *
+	 * Boards are not drawn here and are not found; an item inside an instance is found as the
+	 * instance, because a copy is moved and deleted whole.
+	 */
+	hitTest(point: { x: number; y: number }): PenHit | undefined {
+		let best: Placed | undefined;
+		for (const placed of this.placed.values()) {
+			const { node, box } = placed;
+			if (node.id.includes("/")) continue;
+			if (node.type === "browser" && node.metadata?.type === "decks.board") continue;
+			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
+			if (!best || placed.order > best.order) best = placed;
+		}
+		return best ? { id: best.node.id, node: best.node, box: { ...best.box } } : undefined;
+	}
+
+	/** Draw an item moved by a drag that has not been saved yet; nothing to stop. */
+	preview(moving: { id: string; dx: number; dy: number } | undefined): void {
+		this.moving = moving;
+		this.dirty = true;
+		this.schedule();
+	}
 
 	attach(element: HTMLCanvasElement): void {
 		this.element = element;
@@ -51,6 +87,8 @@ export class PenLayer {
 
 	setDoc(doc: PenDocument | undefined, base: string): void {
 		if (doc === this.doc && base === this.base) return;
+		// The server's answer has arrived, so whatever a drag was previewing is now the drawing itself.
+		this.moving = undefined;
 		this.doc = doc;
 		this.base = base;
 		this.dirty = true;
@@ -143,6 +181,15 @@ export class PenLayer {
 		 * a moment ago, has arrows whose geometry the server has not redrawn yet. The copy is only for
 		 * drawing; the file is the server's to rewrite.
 		 */
+		if (this.moving) {
+			const copy = structuredClone(doc);
+			const found = indexOf(copy).get(this.moving.id);
+			if (found) {
+				found.node.x = (typeof found.node.x === "number" ? found.node.x : 0) + this.moving.dx;
+				found.node.y = (typeof found.node.y === "number" ? found.node.y : 0) + this.moving.dy;
+				doc = copy;
+			}
+		}
 		if ([...walk(doc.children)].some((node) => isArrow(node))) {
 			const copy = structuredClone(doc);
 			if (reroute(copy, layout(copy, expand(copy), { theme, measure: fonts.measure }), (path) => this.boards.get(path))) doc = copy;
@@ -163,6 +210,7 @@ export class PenLayer {
 		paintDocument(canvas, nodes, { ck, fonts, doc, placed, scheme: this.scheme, image: (url) => this.image(url) });
 		this.picture = recorder.finishRecordingAsPicture();
 		recorder.delete();
+		this.drawn?.();
 	}
 
 	/** An image fill's picture, fetched once; the drawing is redone when it arrives. */
