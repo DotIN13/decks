@@ -550,13 +550,18 @@ export function Stage(props: {
 	const [penDrawn, setPenDrawn] = createSignal(0);
 	/** When a tool last made an item, so the second press of a double-click does not make a board. */
 	let penMadeAt = 0;
-	penLayer.drawn = () => setPenDrawn((n) => n + 1);
-	createEffect(() => {
-		// The answer to a drag has arrived: the drawing is where the drag left it, so the offset goes.
-		void props.pen?.doc;
-		setPenDrag({ dx: 0, dy: 0 });
-		setPenResize(undefined);
-	});
+	penLayer.drawn = () => {
+		/*
+		 * The answer to a drag has been drawn: the layout is where the drag left things, so the offset
+		 * goes. Not when the answer *arrives* — the layout is only redone on the next frame, and for
+		 * that frame the outline sat on the old layout with no offset, back where the drag began.
+		 */
+		if (penLayer.drawnDoc === props.pen?.doc) {
+			setPenDrag({ dx: 0, dy: 0 });
+			setPenResize(undefined);
+		}
+		setPenDrawn((n) => n + 1);
+	};
 	/** Items made or copied here that the server has not answered with yet: selected, and not let go. */
 	const penAwaited = new Set<string>();
 	createEffect(() => {

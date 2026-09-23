@@ -64,6 +64,8 @@ export class PenLayer {
 	placed: ReadonlyMap<string, Placed> = new Map();
 	/** Called after every new picture, so the stage can redraw a selection around what moved. */
 	drawn: (() => void) | undefined;
+	/** The document the current layout and picture were made from. */
+	drawnDoc: PenDocument | undefined;
 	/** Items being dragged or resized, drawn changed by this much until the edit comes back from the server. */
 	private moving: ReadonlyMap<string, PenPreview> | undefined;
 
@@ -306,6 +308,7 @@ export class PenLayer {
 		const placed = layout(doc, nodes, { theme, measure: fonts.measure });
 		this.placed = placed;
 		this.bounds = boundsOf(placed);
+		this.drawnDoc = this.doc;
 		this.painted = { nodes, doc, placed };
 		const recorder = new ck.PictureRecorder();
 		const canvas = recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7));
