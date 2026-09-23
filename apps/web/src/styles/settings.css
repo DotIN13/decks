@@ -105,6 +105,11 @@
 .set-vol {
 	width: 196px;
 }
+	/* The renderer choice: room on each side of a word, which `.segmented` alone does not give,
+   so a bold "Documents" is not pressed against its own highlight. */
+.set-renderer > button {
+	padding: 0 12px;
+}
 
 	/* The same rules, under the same query. */
 	@media (max-width: 420px) {

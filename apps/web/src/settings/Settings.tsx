@@ -520,7 +520,7 @@ function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: 
 		<section class="set-group" data-group="renderer">
 			<header>
 				<span class="set-title">Boards</span>
-				<span class="set-note">How the canvas draws them. The canvas renderers need Chrome's HTML-in-Canvas API{props.canvasApi ? ", which this browser has." : ", which this browser does not have."}</span>
+				<span class="set-note">How the canvas draws them. Canvas needs Chrome's HTML-in-Canvas API{props.canvasApi ? ", which this browser has." : ", which this browser does not have."}</span>
 			</header>
 			<div class="set-row">
 				<span class="set-k">
