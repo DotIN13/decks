@@ -22,6 +22,9 @@ import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
 import { createOneCanvas } from "./one-canvas.ts";
+import { PenLayer } from "./pen/layer.ts";
+import { scheme } from "../lib/theme.ts";
+import type { PenDocument } from "@decks/pen";
 
 /**
  * The palette's keys: `select`, then whatever `@decks/board-kit` says the palette offers.
@@ -81,6 +84,11 @@ export function Stage(props: {
 	/** Every board on screen at the open has been let in, so less urgent documents may start. */
 	onBoardsStarted?: () => void;
 	boards: Board[];
+	/**
+	 * This chat's stage drawing: its `.pen` document and the folder URL its image fills are read
+	 * against (`canvas/pen/layer.ts`). Drawn under the boards, with the same camera.
+	 */
+	pen?: { doc: PenDocument; base: string };
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
 	/**
@@ -498,10 +506,23 @@ export function Stage(props: {
 
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
 
+	/*
+	 * The drawing under the boards (`canvas/pen/layer.ts`). The camera reaches it through
+	 * `writeTransform`; the document, the window's size and the colour scheme through these.
+	 */
+	const penLayer = new PenLayer();
+	onCleanup(() => penLayer.dispose());
+	createEffect(() => penLayer.setView(view()));
+	createEffect(() => penLayer.setScheme(scheme()));
+	createEffect(() => penLayer.setDoc(props.pen?.doc, props.pen?.base ?? ""));
+	createEffect(() => penLayer.setBoards(props.boards));
+
 	const writeTransform = (cam: Camera) => {
 		const v = view();
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
 		oneCanvas.requestPicture();
+		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
+		penLayer.setCamera(cam);
 	};
 
 	/**
@@ -525,6 +546,7 @@ export function Stage(props: {
 		scaleSettle = setTimeout(() => setScaling(false), 300);
 	};
 	onCleanup(() => clearTimeout(scaleSettle));
+
 
 
 	/**
@@ -1423,6 +1445,7 @@ export function Stage(props: {
 			{/* The one-canvas renderer's two canvases: the picture everyone sees, and the
 			    darkroom the documents live in (see `drawScene`). Under the world, so the
 			    bars, shadows and marks stay HTML on top of the pictures. */}
+			<canvas class="pen-layer" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas)} />
 			<Show when={props.renderer === "one-canvas"}>
 				{/* The darkroom first, so the picture is painted over it (`index.css`). */}
 				<canvas

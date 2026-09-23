@@ -81,6 +81,8 @@ export interface WireContext {
 	 * gets the same `stage` object (`stage/tool.ts`) and the same service behind it.
 	 */
 	readonly stage: StageService;
+	/** The `stage.pen` frame for one agent, when its stage has a drawing (`stage/pens.ts`). */
+	penMessage(agentId: string): ServerMessage | undefined;
 	/** Which boards may run their own code, and the list the question writes (`boards/eval-trust.ts`). */
 	readonly evalTrust: EvalTrust;
 	/** The port this server is on, so a board's `stage.url()` answers like an agent's. */

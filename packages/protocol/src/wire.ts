@@ -18,6 +18,7 @@ import type { ActKind, StageCall, StageResult, Camera } from "./stage.ts";
 import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
 import type { WebStatus } from "./web.ts";
+import type { PenDocument } from "@decks/pen";
 export type ClientMessage =
 	| { type: "deck.open"; path: string }
 	| { type: "board.move"; path: string; x: number; y: number }
@@ -319,6 +320,13 @@ export type ServerMessage =
 	 */
 	| { type: "context.changed"; agentId: string; boards: string[]; inPlay: string[] }
 	| { type: "stage.call"; call: StageCall }
+	/**
+	 * An agent's stage drawing, whole: its `.pen` document (`stage/pens.ts`). Sent when it changes,
+	 * by an edit or by hand, and to a browser opening that agent's chat. `error` says the file on
+	 * disk does not parse and `doc` is the last good version. `base` is the stage folder's URL,
+	 * which an image fill's relative `url` is read against.
+	 */
+	| { type: "stage.pen"; agentId: string; stage: string; rev: number; doc: PenDocument; error?: string; base: string }
 	/**
 	 * An agent acting on a board, said by the server rather than the agent: the cursor and the
 	 * editing marks are drawn from it (`canvas/acts.ts`). `start` is a write or edit tool call

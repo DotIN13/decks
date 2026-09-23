@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@decks/board-kit": "*",
+    "@decks/pen": "*",
     "@decks/protocol": "*",
+    "canvaskit-wasm": "^0.42.0",
     "lucide-solid": "^1.37.0",
     "solid-js": "^1.9.14"
   },

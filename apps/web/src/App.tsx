@@ -24,6 +24,7 @@ import {clearMarks, component, marks, mode, selected, setComponent, setMode, set
 import { on, send, start } from "./state/socket.ts";
 import { Icon } from "./ui/icons.tsx";
 import {clearDialog, clearPreview, dialog, preview, runtimeFor, setState, state} from "./state/deck.ts";
+import { pens } from "./state/pens.ts";
 import { notice } from "./state/notices.ts";
 import {boardsMayStart, boardsOpen, boardsStarted, canvasOpened, focus, releaseBoards, draft, editingSource, ops, openSource, openUsage, picking, presenting, readUsage, setBoardsOpen, setDraft, setEditingSource, setFocus, setOps, setPicking, setPresenting, setSettings, setUnread, setUsagePanel, settings, unread, usagePanel, usageReport} from "./state/ui.ts";
 import { destination, destinationLabel, stripMention } from "./app/send-from-bar.ts";
@@ -507,6 +508,13 @@ export function App() {
 	 * like boards disappearing. An empty canvas beside a full rail says what is true, and
 	 * says it before anything has happened rather than after.
 	 */
+	/** The drawing of the chat on screen, when it has one (`state/pens.ts`). */
+	const stagePen = createMemo(() => {
+		const id = state.focused;
+		const pen = id ? pens()[id] : undefined;
+		return pen ? { doc: pen.doc, base: pen.base } : undefined;
+	});
+
 	const stageBoards = createMemo(() => {
 		const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
 		return state.boards.filter((board) => playing.has(board.path));
@@ -1089,6 +1097,7 @@ export function App() {
 						mode={mode()}
 						marks={marks()}
 						boards={stageBoards()}
+						{...(stagePen() ? { pen: stagePen()! } : {})}
 						camera={camera()}
 						glide={glide()}
 						setCamera={setCameraAndReport}

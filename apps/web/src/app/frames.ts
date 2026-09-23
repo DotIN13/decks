@@ -21,6 +21,7 @@ import { finished, startedAsking } from "../alerts/policy.ts";
 import { historyShown } from "../state/edge.ts";
 import { releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
+import { forgetPen, receivePen } from "../state/pens.ts";
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
@@ -250,6 +251,7 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("acts", message.id, undefined);
 					setState("identities", message.id, undefined as never);
 					setState("contexts", message.id, undefined as never);
+					forgetPen(message.id);
 					setUnread(message.id, 0);
 					return;
 				}
@@ -400,6 +402,11 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				case "timeline.preview":
 					ensureAgent(message.agentId);
 					setState("agents", message.agentId, "preview", message.entryId ? { entryId: message.entryId, boards: message.boards } : undefined);
+					return;
+
+				case "stage.pen":
+					receivePen(message);
+					if (message.error) notice("warn", message.error);
 					return;
 
 				case "context.changed":

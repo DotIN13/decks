@@ -927,6 +927,17 @@
 	height: 100%;
 	pointer-events: none;
 }
+	/* The stage's drawing (`canvas/pen/layer.ts`): under the boards, and never in the way of a gesture. */
+	.stage > .pen-layer {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}
+	.stage[data-focus="true"] > .pen-layer {
+	display: none;
+}
 	/*
  * Shown, not hidden, and as large as its last capture. A canvas at `opacity: 0`, clipped
  * away or `visibility: hidden` is one Chrome never records a paint for, and one shown at a

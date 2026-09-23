@@ -8,6 +8,7 @@ import { runtimeDir } from "@decks/runtime";
 import { Deck } from "../deck/loader.ts";
 import { StageService } from "./service.ts";
 import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec } from "./tool.ts";
+import { StagePens } from "./pens.ts";
 
 /**
  * What the tool *says*, as opposed to what it does (DESIGN §6.3).
@@ -115,6 +116,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			recordRevision: () => undefined,
 			worked: (path) => void worked.push(path),
 			boardPathOf: () => undefined,
+			stageName: () => "ada",
 		},
 	});
 	return {
@@ -710,4 +712,34 @@ test("show adds to the stage, and hide takes off only what it names", async () =
 	assert.equal(emptied.isError, false, emptied.text);
 	assert.deepEqual(up, [], "an agent's own stage can be cleared");
 	rmSync(root, { recursive: true, force: true });
+});
+
+test("stage.pen edits the drawing in pen's own words, answers with boxes, and reads it back", async () => {
+	const { tool, service, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	assert.match((await tool.run(`return await stage.pen.read()`)).text, /keeps no stage drawing/);
+	service.pens = new StagePens(deck.path, () => {});
+	try {
+		const edited = await tool.run(`return await stage.pen.edit([
+			{ op: "insert", node: { type: "note", id: "n", content: "Check the margin" }, box: { x1: 1060, y1: 0, x2: 1300, y2: 120 } },
+			{ op: "insert", node: { type: "path", id: "to-plan", metadata: { type: "decks.arrow", from: "n", to: "boards/plan.html" } } },
+		])`);
+		assert.equal(edited.isError, false, edited.text);
+		const answer = JSON.parse(edited.text) as { results: Array<{ id: string; box?: { x1: number; x2: number } }> };
+		assert.deepEqual(answer.results[0]!.box, { x1: 1060, y1: 0, x2: 1300, y2: 120 });
+		// The arrow to the board was drawn: the board is where the deck's own list has it.
+		assert.ok(answer.results[1]!.box, "the arrow has a box once it is routed");
+		const read = JSON.parse((await tool.run(`return await stage.pen.read()`)).text) as { file: string; children: Array<{ id: string; type: string }> };
+		assert.equal(read.file, "stages/ada/stage.pen");
+		assert.deepEqual(read.children.map((c) => c.id), ["n", "to-plan"]);
+		assert.equal((await tool.run(`return await stage.pen.file()`)).text, `"stages/ada/stage.pen"`);
+		const bad = await tool.run(`return await stage.pen.edit([{ op: "wiggle", id: "n" }])`);
+		assert.equal(bad.isError, true);
+		assert.match(bad.text, /Edit 1 \(wiggle\) failed, and nothing was saved/);
+		// And every board read has its box, so an edge is never a sum.
+		const boards = JSON.parse((await tool.run(`return await stage.boards()`)).text) as Array<{ x: number; w: number; box: { x1: number; x2: number } }>;
+		assert.equal(boards[0]!.box.x2, boards[0]!.x + boards[0]!.w);
+	} finally {
+		service.pens.close();
+		cleanup();
+	}
 });

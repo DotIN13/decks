@@ -13,6 +13,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@decks/board-kit": "*"
+    "@decks/board-kit": "*",
+    "@decks/pen": "*"
   }
 }

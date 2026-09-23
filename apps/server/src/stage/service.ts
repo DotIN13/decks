@@ -6,6 +6,7 @@ import type { Deck } from "../deck/loader.ts";
 import { withBoardSize } from "../deck/meta.ts";
 
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
+import type { StagePens } from "./pens.ts";
 
 /**
  * The single path from a tool to the canvas.
@@ -113,6 +114,13 @@ export class StageService {
 	 * it. `undefined` in the tests that build a service on its own.
 	 */
 	web: WebHost | undefined;
+	/**
+	 * Every agent's stage drawing, as `.pen` files (`stage/pens.ts`).
+	 *
+	 * On the service for the reason `web` is: one per server, and the stage tool is what reads it.
+	 * `undefined` in tests that build a service without a deck on disk.
+	 */
+	pens: StagePens | undefined;
 
 	constructor(
 		private deck: Deck,

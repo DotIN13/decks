@@ -5,6 +5,7 @@ import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/r
 import type { Stage } from "../../../../runtime/stage.d.ts";
 import { cleanWorkspace } from "../agents/workspaces.ts";
 import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts";
+import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService, WebTarget } from "./service.ts";
 
@@ -124,6 +125,8 @@ export interface StageAgentHooks {
 	acted?(what: ActKind, path: string): void;
 	/** Deck-relative path for an absolute one, or undefined if it is not a board. */
 	boardPathOf(file: string): string | undefined;
+	/** The folder this agent's stage drawing lives in, named on first use (`stage/pens.ts`). Optional for hosts with no drawing. */
+	stageName?(): string | undefined;
 }
 
 /**
@@ -288,6 +291,17 @@ export function createStageTool(deps: {
 
 	/** The canvas's own size, or nothing if no browser has ever reported one. */
 	const viewport = () => service.viewport(agent.id);
+	/** The drawing's files, or the sentence that says this server keeps none. */
+	const needPens = () => {
+		if (!service.pens) throw new Error("This server keeps no stage drawing.");
+		return service.pens;
+	};
+	/** This agent's stage folder, claimed the first time it draws. */
+	const needStage = () => {
+		const name = agent.stageName?.();
+		if (!name) throw new Error("This stage has no drawing: the server keeps no stage files.");
+		return name;
+	};
 	/** The shared Chrome, or the sentence that says this server has none. */
 	const needWeb = () => {
 		if (!service.web) throw new Error("This server has no shared browser.");
@@ -330,8 +344,8 @@ export function createStageTool(deps: {
 
 	const stage: Stage = {
 		// --- reads ---------------------------------------------------------------
-		/** Every board in the deck, placed as this agent's stage has them. */
-		boards: async () => here(),
+		/** Every board in the deck, placed as this agent's stage has them, with its box's two corners. */
+		boards: async () => here().map(withBox),
 		resolve: async (file: string) => service.resolve(file),
 		url: async (path: string) => service.url(path, port),
 		/**
@@ -519,7 +533,7 @@ export function createStageTool(deps: {
 		move: async (path: string, at: { x: number; y: number }) => {
 			const board = service.move(agent.id, path, at);
 			agent.acted?.("move", board.path);
-			return board;
+			return withBox(board);
 		},
 		camera: (async (at?: Camera, options?: { animate?: boolean }) => {
 			if (!at) return agent.camera();
@@ -700,6 +714,37 @@ export function createStageTool(deps: {
 			stop: async () => needWeb().stop(),
 		},
 
+		/**
+		 * The stage's drawing: a native pen.dev document at `stages/<name>/stage.pen`.
+		 *
+		 * Notes, text, shapes, arrows and frames live here, drawn under the boards by the canvas.
+		 * `read` gives every item as saved plus its `box` on the stage; `edit` applies pen operations
+		 * together or not at all and answers with each item's new box; `file` is the path, for an
+		 * agent that would rather edit the JSON with its own tools. The wording of the format is
+		 * pen.dev's, untranslated — the skill `pen-stage` teaches it.
+		 */
+		pen: {
+			file: async () => `stages/${needStage()}/stage.pen`,
+			read: async () => {
+				const { file: _file, ...view } = needPens().read(needStage());
+				return { ...view, file: `stages/${view.stage}/stage.pen` };
+			},
+			edit: async (ops: readonly unknown[]) => {
+				const pens = needPens();
+				// Checked by `apply`, which answers a malformed edit with a sentence naming it.
+				const boards = new Map(here().map((board) => [board.path, { x: board.x, y: board.y, w: board.w, h: board.h }]));
+				const { entry, results } = pens.edit(needStage(), ops as readonly Op[], (path) => boards.get(path));
+				const placed = placements(entry.doc, { theme: baseTheme(entry.doc, "light") });
+				return {
+					rev: entry.rev,
+					results: results.map((result) => {
+						const box = result.op === "delete" ? undefined : boxOf(placed.get(result.id));
+						return { ...result, ...(box ? { box } : {}) };
+					}),
+				};
+			},
+		},
+
 		/** Every agent, or with `filter.workspace` the ones that say they work on that project. */
 		agents: async (options?: { filter?: { workspace?: string } }) => {
 			const filter = options?.filter;
@@ -800,6 +845,11 @@ export function createStageTool(deps: {
 			};
 		},
 	};
+}
+
+/** A board with its box as both corners, beside `x`, `y`, `w`, `h`, so a reader never adds a width. */
+function withBox<B extends { x: number; y: number; w: number; h: number }>(board: B): B & { box: { x1: number; y1: number; x2: number; y2: number } } {
+	return { ...board, box: { x1: board.x, y1: board.y, x2: board.x + board.w, y2: board.y + board.h } };
 }
 
 function escapeXml(text: string): string {

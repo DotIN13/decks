@@ -26,6 +26,8 @@ import { watchDeck } from "./deck/watcher.ts";
 import type { CameraReading } from "./deck/place.ts";
 import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
+import { StagePens, type PenEntry } from "./stage/pens.ts";
+import { fileUrl } from "./deck/roots.ts";
 
 /**
  * How often the deck re-reads its boards from disk regardless of what the watcher said.
@@ -50,6 +52,8 @@ export class App {
 	deck: Deck;
 	readonly agents: Registry;
 	readonly stage: StageService;
+	/** Every agent's stage drawing, as `.pen` files under `stages/` (`stage/pens.ts`). */
+	readonly pens: StagePens;
 	/** What each agent is doing to which board, said to the browsers as it happens (`agents/acts.ts`). */
 	readonly acts: Acts;
 	/** The board files: writing, revisioning, editing, deleting (`boards/service.ts`). */
@@ -159,6 +163,13 @@ export class App {
 			camera: (agentId) => (this.cameras.get(agentId) ?? this.lastCamera).at,
 			agents: () => this.agents.summaries(),
 		});
+		/*
+		 * The stage drawings. A change — through the tool or by hand — goes to every browser, keyed by
+		 * the agents whose stage it is, since two chats never share a folder but the browser draws per chat.
+		 */
+		this.pens = new StagePens(deck.path, (name, entry) => this.publishPen(name, entry));
+		this.stage.pens = this.pens;
+		this.pens.watch();
 		/*
 		 * The Claude subscriptions this install can use (`claude/accounts.ts`).
 		 *
@@ -646,6 +657,7 @@ export class App {
 		if (existing) App.refreshLib(this.deck);
 		App.refreshExamples(this.deck);
 		this.stage.setDeck(this.deck);
+		this.pens.setDeck(this.deck.path);
 		this.boards.setDeck(this.deck);
 		this.settings.setDeck(this.deck.path);
 		// An agent's cwd is the deck, and a Pi session's cwd cannot move, so opening
@@ -767,6 +779,26 @@ export class App {
 		}
 	}
 
+	/** A stage drawing changed: tell every browser, once per agent whose stage it is. */
+	private publishPen(name: string, entry: PenEntry): void {
+		for (const agent of this.agents?.all() ?? []) {
+			if (agent.stageName() !== name) continue;
+			this.send(this.penFrame(agent.id, name, entry));
+		}
+	}
+
+	/** The drawing for one agent's stage, for a browser opening its chat; nothing if it has never drawn. */
+	penMessage(agentId: string): ServerMessage | undefined {
+		const agent = this.agents.get(agentId);
+		const name = agent?.stageName();
+		if (!name) return undefined;
+		return this.penFrame(agentId, name, this.pens.get(name));
+	}
+
+	private penFrame(agentId: string, name: string, entry: PenEntry): ServerMessage {
+		return { type: "stage.pen", agentId, stage: name, rev: entry.rev, doc: entry.doc, base: `${fileUrl(join(this.pens.dir, name))}/`, ...(entry.error ? { error: entry.error } : {}) };
+	}
+
 	dispose(): void {
 		this.unwatch?.();
 		this.unwatch = undefined;
@@ -774,6 +806,7 @@ export class App {
 		this.resyncTimer = undefined;
 		this.web.dispose();
 		this.thumbs.dispose();
+		this.pens.close();
 		this.agents.dispose();
 	}
 }

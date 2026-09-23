@@ -174,6 +174,8 @@ export class DeckAgent {
 	private places: Record<string, { x: number; y: number }> = {};
 	/** The workspace it works in — its own fact, set by it or by you, kept on the record. */
 	private workspaceChosen: string | undefined;
+	/** The folder its stage drawing lives in, once it has one (`stage/pens.ts`). */
+	private stageFolder: string | undefined;
 
 	/** Record the workspace and say so: `setWorkspace` writes through here. */
 	private declareWorkspace(workspace: string | undefined): void {
@@ -334,6 +336,8 @@ export class DeckAgent {
 				tags?: string[];
 				userTags?: string[];
 				workspace?: string;
+				/** The folder its stage drawing is in (`stage/pens.ts`). */
+				stage?: string;
 			};
 		},
 	) {
@@ -398,6 +402,7 @@ export class DeckAgent {
 			this.workspaceChosen = workspace;
 			this.identity = { ...this.identity, workspace };
 		}
+		this.stageFolder = options.restored?.stage;
 		this.parentId = options.parentId;
 		this.resumeRef = options.resumeRef;
 		this.kind = options.kind;
@@ -593,6 +598,7 @@ export class DeckAgent {
 			worked: (path: string) => this.workedOn(path),
 			acted: (what: ActKind, path: string) => this.host.act?.(this.id, { kind: "verb", what, path }),
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
+			stageName: () => this.stageName(true),
 		};
 	}
 
@@ -602,6 +608,21 @@ export class DeckAgent {
 
 	get inPlay(): readonly string[] {
 		return this.playing;
+	}
+
+	/**
+	 * The folder this agent's stage drawing lives in (`stage/pens.ts`).
+	 *
+	 * Named the first time it is needed with `claim`, from the agent's name at that moment, and
+	 * kept on the record — a rename later leaves the folder where it is.
+	 */
+	stageName(claim = false): string | undefined {
+		if (this.stageFolder || !claim) return this.stageFolder;
+		const pens = this.stage.pens;
+		if (!pens) return undefined;
+		this.stageFolder = pens.claim(this.identity.name);
+		this.save();
+		return this.stageFolder;
 	}
 
 	/** Where this stage has put its boards: what the client draws, and what a switch has to send. */
@@ -621,6 +642,28 @@ export class DeckAgent {
 		if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 		this.places[path] = { x: Math.round(x), y: Math.round(y) };
 		this.save();
+		this.followArrows();
+	}
+
+	private following: ReturnType<typeof setTimeout> | undefined;
+
+	/**
+	 * Redraw the drawing's arrows that end on a board, after boards moved (`stage/pens.ts`).
+	 *
+	 * Debounced: a drag is sixty moves a second, and the arrow only has to be right when it stops.
+	 */
+	private followArrows(): void {
+		if (!this.stageFolder || !this.stage.pens) return;
+		clearTimeout(this.following);
+		this.following = setTimeout(() => {
+			const name = this.stageFolder;
+			if (!name) return;
+			this.stage.pens?.follow(name, (path) => {
+				const at = this.places[path];
+				const board = this.deck.board(path);
+				return at && board ? { x: at.x, y: at.y, w: board.w, h: board.h } : undefined;
+			});
+		}, 150);
 	}
 
 	/**
@@ -851,6 +894,7 @@ export class DeckAgent {
 			inPlay: [...this.playing],
 			...(Object.keys(this.places).length > 0 ? { positions: { ...this.places } } : {}),
 			...(this.workspaceChosen ? { workspace: this.workspaceChosen } : {}),
+			...(this.stageFolder ? { stage: this.stageFolder } : {}),
 			createdAt: this.createdAt,
 			...(this.lastModel ? { model: this.lastModel } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
@@ -1653,6 +1697,7 @@ export class DeckAgent {
 		// one cannot answer. A pending debounce is cancelled because this write supersedes it.
 		if (this.saving) clearTimeout(this.saving);
 		this.saving = undefined;
+		clearTimeout(this.following);
 		this.flush();
 		this.bridge.dispose();
 		this.backend?.dispose();

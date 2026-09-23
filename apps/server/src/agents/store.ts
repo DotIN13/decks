@@ -90,6 +90,12 @@ export interface AgentRecord {
 	wasDispatcher?: true;
 	/** The workspace the agent works in, as a slug (`workspaces.ts`). Its own fact, kept across restarts. */
 	workspace?: string;
+	/**
+	 * The folder its stage drawing lives in, `stages/<stage>/stage.pen` (`stage/pens.ts`).
+	 *
+	 * Named once, when the stage is first drawn on, and kept: the folder does not follow a rename.
+	 */
+	stage?: string;
 	createdAt: number;
 	/** The model (and thinking level) the chat was last on, so a dormant row can still say what it will use. */
 	model?: AgentModel;
@@ -479,6 +485,7 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(typeof source.canvas === "string" && source.canvas ? { fromCanvas: source.canvas } : {}),
 		...(source.role === "dispatcher" ? { wasDispatcher: true as const } : {}),
 		...(typeof source.workspace === "string" && source.workspace ? { workspace: source.workspace } : {}),
+		...(typeof source.stage === "string" && /^[^/\\.][^/\\]*$/.test(source.stage) ? { stage: source.stage } : {}),
 		createdAt: created,
 		...(model ? { model } : {}),
 		...(usage ? { usage } : {}),

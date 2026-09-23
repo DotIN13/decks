@@ -4,9 +4,22 @@
  * anything you `console.log`. This is the whole API: if something is not here, it does not
  * exist. Board content is files: write it with your ordinary tools.
  */
-export interface Board { path: string; title: string; x: number; y: number; w: number; h: number; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string }
+export interface Board { path: string; title: string; x: number; y: number; w: number; h: number; box: Box; content?: { w: number; h: number }; clipped?: boolean; inContext: string[]; lastWrittenBy?: string }
 
 export type WebTarget = string | { ref: string } | { name: string; nth?: number };
+
+/** A box on the stage: both corners, so an edge is never a sum. */
+export interface Box { x1: number; y1: number; x2: number; y2: number }
+/** One item of a pen.dev `.pen` document: a `type`, an `id`, and pen's own fields (the pen-stage skill lists them). */
+export type PenItem = { type: string; id?: string; children?: PenItem[]; [field: string]: unknown };
+/** An edit to the drawing. Items are named by id; one inside an instance by its path, `"card-1/label"`. */
+export type PenEdit =
+	| { op: "insert"; node: PenItem; parent?: string; index?: number; box?: Partial<Box> }
+	| { op: "update"; id: string; set?: Record<string, unknown>; box?: Partial<Box> }
+	| { op: "replace"; id: string; node: PenItem }
+	| { op: "delete"; id: string }
+	| { op: "move"; id: string; parent?: string | null; index?: number; box?: Partial<Box> }
+	| { op: "copy"; id: string; parent?: string; index?: number; box?: Partial<Box>; as?: string };
 
 export interface Stage {
 	/**
@@ -76,6 +89,18 @@ export interface Stage {
 		press(key: string): Promise<{ pressed: string }>;
 		submit(what?: WebTarget, o?: { ask?: boolean }): Promise<{ submitted: string; allowed: boolean }>;
 		stop(): Promise<void>;
+	};
+	/**
+	 * Your stage's drawing — notes, text, shapes, arrows and frames, drawn under the boards — kept as a
+	 * native pen.dev `.pen` file in pen's own types and fields; the pen-stage skill teaches them.
+	 * `read` gives every item as saved plus its `box` on the stage. `edit` applies edits together or
+	 * not at all. A `box` places an item on the stage; the server turns it into pen's own x, y, width
+	 * and height, so you never add a parent's corner. `file` is the path, to edit it by hand instead.
+	 */
+	pen: {
+		file(): Promise<string>;
+		read(): Promise<{ stage: string; file: string; version: string; error?: string; children: Array<PenItem & { box: Box }> }>;
+		edit(edits: PenEdit[]): Promise<{ rev: number; results: Array<{ op: string; id: string; box?: Box; note?: string }> }>;
 	};
 	now(): Promise<{ iso: string; timezone: string; words: string; epoch: number }>;
 	/**

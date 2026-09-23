@@ -282,6 +282,7 @@ export class Registry {
 					...(record.tags ? { tags: record.tags } : {}),
 					...(record.userTags ? { userTags: record.userTags } : {}),
 					...(record.workspace ? { workspace: record.workspace } : {}),
+					...(record.stage ? { stage: record.stage } : {}),
 				},
 			});
 		}

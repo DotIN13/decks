@@ -120,7 +120,11 @@ export const agents = {
 	 */
 	"chat.open": (message, reply, wire) => {
 		const asked = wire.agents.get(message.agentId);
-		if (asked) reply(asked.historyMessage());
+		if (!asked) return;
+		reply(asked.historyMessage());
+		// And its drawing, which is part of what that chat's stage shows.
+		const pen = wire.penMessage(message.agentId);
+		if (pen) reply(pen);
 	},
 
 	"chat.tool": (message, reply, wire) => {
