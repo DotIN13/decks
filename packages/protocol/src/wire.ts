@@ -125,6 +125,8 @@ export type ClientMessage =
 	 * the stage the named agent has open, together or not at all.
 	 */
 	| { type: "stage.pen.edit"; agentId: string; ops: unknown[] }
+	/** Take back the person's last edit to the drawing, or put it back (`StagePens.step`). */
+	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo" }
 	/**
 	 * Where the browser is looking, and which conversation's view that is.
 	 *

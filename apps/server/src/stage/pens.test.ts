@@ -103,3 +103,28 @@ test("a stage's boards are browser items: synced in, read back in order, moved, 
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("the person's edits undo and redo, and a step is refused once an agent has drawn since", () => {
+	const dir = deck();
+	const pens = new StagePens(dir, () => {});
+	try {
+		const name = pens.claim("u");
+		const ids = () => pens.get(name).doc.children.map((n) => n.id);
+		pens.edit(name, [{ op: "insert", node: { type: "note", id: "a" } }], undefined, { undoable: true });
+		pens.edit(name, [{ op: "insert", node: { type: "note", id: "b" } }], undefined, { undoable: true });
+		assert.deepEqual(pens.steps(name), { undo: true, redo: false });
+		pens.step(name, "undo");
+		assert.deepEqual(ids(), ["a"]);
+		pens.step(name, "redo");
+		assert.deepEqual(ids(), ["a", "b"]);
+		pens.step(name, "undo");
+		// An agent's edit is not the person's, and undoing past it would take it back too.
+		pens.edit(name, [{ op: "insert", node: { type: "note", id: "agent" } }]);
+		assert.throws(() => pens.step(name, "undo"), /changed since/);
+		assert.deepEqual(ids(), ["a", "agent"]);
+		assert.throws(() => pens.step(name, "redo"), /Nothing to redo/);
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

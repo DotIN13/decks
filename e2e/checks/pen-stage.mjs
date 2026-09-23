@@ -120,10 +120,45 @@ if (inView) {
 } else {
 	say("the note is on screen to be dragged", false, JSON.stringify(screen));
 }
+// --- the drawing tools: a rectangle drawn by hand, a fill from the bar, and undo ---------------------
+const spot = await page.evaluate(() => {
+	const stage = document.querySelector(".stage");
+	const empty = (x, y) => document.elementFromPoint(x, y) === stage;
+	for (let y = 200; y < 820; y += 30) {
+		for (let x = 340; x < 1400; x += 30) {
+			if (empty(x, y) && empty(x + 160, y) && empty(x, y + 110) && empty(x + 160, y + 110)) return { x, y };
+		}
+	}
+});
+say("the canvas has room to draw in", !!spot);
+let drawnId;
+if (spot) {
+	await page.mouse.click(spot.x + 150, spot.y + 100);
+	await page.keyboard.press("r");
+	const armed = await page.evaluate(() => document.querySelector(".stage").dataset.penTool);
+	say("R arms the rectangle tool", armed === "rectangle", armed);
+	const had = new Set(onDisk().children.map((n) => n.id));
+	await page.mouse.move(spot.x, spot.y);
+	await page.mouse.down();
+	await page.mouse.move(spot.x + 60, spot.y + 40, { steps: 5 });
+	await page.mouse.move(spot.x + 120, spot.y + 80, { steps: 5 });
+	await page.mouse.up();
+	const rect = await until(() => onDisk().children.find((n) => n.type === "rectangle" && !had.has(n.id)));
+	drawnId = rect?.id;
+	say("a drag with the rectangle tool draws one into the file", !!rect && rect.width > 0 && rect.height > 0, JSON.stringify(rect));
+	const handles = await until(() => page.evaluate(() => document.querySelectorAll(".pen-handle").length === 8));
+	say("…and it is selected, with eight handles", !!handles);
+	await page.locator('.pen-bar [aria-label="Fill #fde68a"]').click();
+	const filled = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#fde68a");
+	say("the bar's fill colours the selected item in the file", !!filled);
+	await page.keyboard.press("Control+z");
+	const undone = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#dbe4f0");
+	say("⌘Z takes back the person's own last edit", !!undone, JSON.stringify(onDisk().children.find((n) => n.id === drawnId)?.fill));
+}
 await editMode(page, false);
 
 // Leave the fixture's stage as it was, minus the check's own drawing.
-link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.id.startsWith("e2e-")).map((n) => ({ op: "delete", id: n.id })) });
+link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.id.startsWith("e2e-") || n.id === drawnId).map((n) => ({ op: "delete", id: n.id })) });
 await settle(page, 300);
 link.close();
 say("no page errors", errors.length === 0, errors.join(" | "));

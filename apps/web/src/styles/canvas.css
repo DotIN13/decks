@@ -413,7 +413,7 @@
 		overflow: hidden;
 		flex-direction: column;
 		border-radius: var(--radius, 8px);
-		background: var(--bg, #fff);
+		background: var(--panel);
 		inset: 0;
 	}
 
@@ -944,6 +944,134 @@
 	border-radius: 4px;
 	pointer-events: none;
 }
+	/* A single selection's eight handles, and what a tool is drawing before it is made. */
+	.world > .pen-handle {
+	position: absolute;
+	box-sizing: border-box;
+	border: 1.5px solid var(--color-accent);
+	border-radius: 2px;
+	background: var(--panel);
+}
+	.world > .pen-handle:is([data-handle="nw"], [data-handle="se"]) {
+	cursor: nwse-resize;
+}
+	.world > .pen-handle:is([data-handle="ne"], [data-handle="sw"]) {
+	cursor: nesw-resize;
+}
+	.world > .pen-handle:is([data-handle="n"], [data-handle="s"]) {
+	cursor: ns-resize;
+}
+	.world > .pen-handle:is([data-handle="e"], [data-handle="w"]) {
+	cursor: ew-resize;
+}
+	.world > .pen-draft {
+	position: absolute;
+	box-sizing: border-box;
+	border: 1.5px dashed var(--color-accent);
+	background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+	pointer-events: none;
+}
+	.world > .pen-draft[data-tool="ellipse"] {
+	border-radius: 50%;
+}
+	.world > .pen-draft-line {
+	position: absolute;
+	pointer-events: none;
+}
+	/* The drawing's tools (`pen/PenBar.tsx`): a column on the canvas's left edge, halfway down. */
+	.pen-tools {
+	position: absolute;
+	z-index: var(--z-float);
+	top: 50%;
+	left: calc(var(--inset-left, 0px) + 12px);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 5px;
+	transform: translateY(-50%);
+	border-color: var(--line-strong);
+}
+	.pen-tools > .pen-rule {
+	width: 18px;
+	height: 1px;
+	margin: 3px 0;
+	background: var(--line-strong);
+}
+	/* What the selection is, in the ink bar's place and shape: there only while something is selected. */
+	.pen-bar {
+	position: absolute;
+	z-index: var(--z-float);
+	top: calc(var(--control, 28px) + 32px);
+	left: calc(var(--inset-left, 0px) + 12px);
+	max-width: calc(100% - var(--inset-left, 0px) - 24px);
+	gap: 2px;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+	.pen-bar .pen-custom {
+	position: relative;
+	cursor: pointer;
+}
+	.pen-bar .pen-custom::before {
+	background: conic-gradient(from 90deg, #f87171, #fbbf24, #4ade80, #60a5fa, #c084fc, #f87171);
+}
+	.pen-bar .pen-line::before {
+	background: var(--swatch);
+}
+	.pen-bar .pen-custom > input {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: pointer;
+}
+	.pen-bar .pen-word {
+	height: 24px;
+	padding: 0 7px;
+	border-radius: var(--radius-item);
+	color: var(--muted, inherit);
+	font-size: var(--type-ui);
+}
+	.pen-bar .pen-word[data-on="true"] {
+	background: var(--line);
+	color: var(--fg);
+}
+	.pen-bar .pen-none {
+	display: block;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	box-shadow: inset 0 0 0 1.5px currentColor;
+	background: linear-gradient(135deg, transparent 45%, currentColor 45% 55%, transparent 55%);
+}
+	.pen-bar .pen-field {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 4px;
+	padding: 0 4px;
+	font-size: var(--type-ui);
+	color: var(--muted, inherit);
+}
+	.pen-bar .pen-field > input {
+	width: 48px;
+	height: 24px;
+	padding: 0 4px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--radius-item);
+	background: transparent;
+	color: var(--fg);
+	font: inherit;
+}
+	/* A tool is armed: the press is the drawing's, even over a board, and the cursor says so. */
+	.stage[data-pen-tool] {
+	cursor: crosshair;
+}
+	.stage[data-pen-tool] .world > .board-node {
+	pointer-events: none;
+}
 	.world > .pen-text {
 	position: absolute;
 	box-sizing: border-box;
@@ -951,7 +1079,7 @@
 	padding: 0;
 	border: none;
 	border-radius: 6px;
-	outline: 2px solid var(--accent);
+	outline: 2px solid var(--color-accent);
 	color: var(--fg);
 	font-family: Inter, system-ui, sans-serif;
 	line-height: 1.2;

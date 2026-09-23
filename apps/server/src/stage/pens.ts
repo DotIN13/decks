@@ -56,14 +56,19 @@ export interface PenEntry {
 	error?: string;
 	/** The layout of `doc`, worked out the first time it is asked for. */
 	placed?: Map<string, Placed>;
+	/** The file's text as last read or written. */
+	text?: string;
 }
 
 const FILE = "stage.pen";
+/** How many of the person's edits each stage can take back. */
+const HISTORY = 100;
 
 export class StagePens {
 	private readonly cache = new Map<string, PenEntry & { mtime: number; text: string }>();
 	private watcher: FSWatcher | undefined;
 	private pending = new Map<string, NodeJS.Timeout>();
+	private readonly history = new Map<string, { undo: Array<{ before: string; after: string }>; redo: Array<{ before: string; after: string }> }>();
 
 	constructor(
 		private deckPath: string,
@@ -134,14 +139,62 @@ export class StagePens {
 	 * Arrows are redrawn after the edits, so one that joins something that moved follows it
 	 * (`@decks/pen`'s `reroute`). `boards` finds a board by path, for an arrow that ends on one.
 	 */
-	edit(name: string, ops: readonly Op[], boards?: (path: string) => Frame | undefined): { entry: PenEntry; results: OpResult[] } {
+	edit(name: string, ops: readonly Op[], boards?: (path: string) => Frame | undefined, options?: { undoable?: boolean }): { entry: PenEntry; results: OpResult[] } {
 		const current = this.get(name);
 		if (current.error) throw new PenError(`${current.error}. Fix the file, or replace it whole, before editing it.`);
 		const theme = baseTheme(current.doc, "light");
 		const { doc, results } = apply(current.doc, ops, { theme });
 		const placed = placements(doc, { theme });
 		reroute(doc, placed, (path) => boardBox(doc, placed, path) ?? boards?.(path));
-		return { entry: this.write(name, doc), results };
+		const before = current.text ?? serialize(current.doc);
+		const entry = this.write(name, doc);
+		if (options?.undoable) {
+			const history = this.historyOf(name);
+			history.undo.push({ before, after: entry.text! });
+			if (history.undo.length > HISTORY) history.undo.shift();
+			history.redo = [];
+		}
+		return { entry, results };
+	}
+
+	/**
+	 * Take back the person's last edit, or put it back again.
+	 *
+	 * Only edits made by hand are kept (`undoable`), and only while nothing else has changed the
+	 * file since: an agent's edit or a hand edit of the file in between would be taken back with
+	 * it, so the step is refused with a sentence instead. The history is the server's memory and
+	 * goes with a restart.
+	 */
+	step(name: string, direction: "undo" | "redo"): PenEntry {
+		const history = this.historyOf(name);
+		const from = direction === "undo" ? history.undo : history.redo;
+		const to = direction === "undo" ? history.redo : history.undo;
+		const last = from[from.length - 1];
+		if (!last) throw new PenError(direction === "undo" ? "Nothing on this stage to undo." : "Nothing to redo.");
+		const current = this.get(name);
+		const now = current.text ?? serialize(current.doc);
+		const expected = direction === "undo" ? last.after : last.before;
+		if (now !== expected) {
+			history.undo = [];
+			history.redo = [];
+			throw new PenError("The drawing has changed since, by an agent or in the file, so there is nothing safe to take back.");
+		}
+		from.pop();
+		const entry = this.write(name, parse(direction === "undo" ? last.before : last.after));
+		to.push(last);
+		return entry;
+	}
+
+	/** Whether there is a step each way, for the buttons. */
+	steps(name: string): { undo: boolean; redo: boolean } {
+		const history = this.history.get(name);
+		return { undo: !!history?.undo.length, redo: !!history?.redo.length };
+	}
+
+	private historyOf(name: string) {
+		let history = this.history.get(name);
+		if (!history) this.history.set(name, (history = { undo: [], redo: [] }));
+		return history;
 	}
 
 	/**

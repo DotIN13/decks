@@ -22,9 +22,10 @@ import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
 import { createOneCanvas } from "./one-canvas.ts";
-import { PenLayer, type PenHit } from "./pen/layer.ts";
+import { PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts";
+import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import type { PenDocument } from "@decks/pen";
+import { ARROW, arrowShape, ids as penIds, newId, type PenDocument, type PenNode } from "@decks/pen";
 
 /**
  * The palette's keys: `select`, then whatever `@decks/board-kit` says the palette offers.
@@ -95,6 +96,8 @@ export function Stage(props: {
 	 * never picks a note up by accident.
 	 */
 	onPenEdit?: (ops: unknown[]) => void;
+	/** Take back the person's last edit to the drawing, or put it back (`stage.pen.step`). */
+	onPenStep?: (direction: "undo" | "redo") => void;
 	camera: Camera;
 	setCamera: (camera: Camera) => void;
 	/**
@@ -355,27 +358,14 @@ export function Stage(props: {
 			 */
 			if (props.editing) return;
 			/*
-			 * The drawing's own keys, in edit mode: Delete takes away the selected item, Escape lets it
-			 * go, and `n` makes a note. None of them fire while a text box has the caret (above).
+			 * The drawing's own keys, in edit mode. None of them fire while a text box has the caret
+			 * (above). Delete, the arrows and ⌘D act on what is selected; ⌘Z and ⇧⌘Z step through the
+			 * person's own edits; Escape lets go, then puts the tool down; a letter arms a tool
+			 * (`PEN_TOOL_KEYS`), from this document only.
 			 */
-			if (props.mode === "edit" && props.onPenEdit) {
-				const selected = penSelected();
-				if (selected && (event.key === "Delete" || event.key === "Backspace")) {
-					event.preventDefault();
-					props.onPenEdit([{ op: "delete", id: selected.id }]);
-					setPenSelected(undefined);
-					return;
-				}
-				if (selected && event.key === "Escape") {
-					event.preventDefault();
-					setPenSelected(undefined);
-					return;
-				}
-				if (event.key === "n" && !event.metaKey && !event.ctrlKey && !event.altKey) {
-					event.preventDefault();
-					newPenNote();
-					return;
-				}
+			if (props.mode === "edit" && props.onPenEdit && penKey(event)) {
+				event.preventDefault();
+				return;
 			}
 			/*
 			 * The view's own two keys, and deliberately *not* in `shortcut`: a board's keys are
@@ -547,60 +537,365 @@ export function Stage(props: {
 	createEffect(() => penLayer.setBoards(props.boards));
 
 	/*
-	 * Editing the drawing by hand: in edit mode a press on a drawn item selects it and a drag moves
-	 * it; Delete removes it; a double-click on a text or note opens its words in a text box; `n` puts
-	 * a new note in the middle of the view. Each is sent as the same pen operation an agent would
-	 * send, and the drawing redraws from the server's answer.
+	 * Editing the drawing by hand, in edit mode (`state/pen-tools.ts` holds the tool and the
+	 * selection, `pen/PenBar.tsx` shows them). Every change is sent as the same pen operation an
+	 * agent would send, and the drawing redraws from the server's answer; until it arrives, a drag
+	 * or a resize is drawn as a preview.
 	 */
-	const [penSelected, setPenSelected] = createSignal<PenHit | undefined>();
 	const [penDrag, setPenDrag] = createSignal({ dx: 0, dy: 0 });
+	const [penResize, setPenResize] = createSignal<{ id: string; x: number; y: number; w: number; h: number } | undefined>();
+	const [penMarquee, setPenMarquee] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
+	const [penDraft, setPenDraft] = createSignal<{ tool: PenTool; x1: number; y1: number; x2: number; y2: number } | undefined>();
 	const [penText, setPenText] = createSignal<{ id: string; box: { x: number; y: number; w: number; h: number }; value: string; card: boolean; fontSize: number; fill: string; fresh?: boolean } | undefined>();
 	const [penDrawn, setPenDrawn] = createSignal(0);
+	/** When a tool last made an item, so the second press of a double-click does not make a board. */
+	let penMadeAt = 0;
 	penLayer.drawn = () => setPenDrawn((n) => n + 1);
 	createEffect(() => {
 		// The answer to a drag has arrived: the drawing is where the drag left it, so the offset goes.
 		void props.pen?.doc;
 		setPenDrag({ dx: 0, dy: 0 });
+		setPenResize(undefined);
 	});
+	/** Items made or copied here that the server has not answered with yet: selected, and not let go. */
+	const penAwaited = new Set<string>();
+	createEffect(() => {
+		// A selection of items the drawing no longer has is let go, whoever took them away.
+		const doc = props.pen?.doc;
+		const present = doc ? penIds(doc) : new Set<string>();
+		for (const id of penAwaited) if (present.has(id)) penAwaited.delete(id);
+		const selected = untrack(penSelection);
+		const kept = selected.filter((id) => present.has(id) || penAwaited.has(id));
+		if (kept.length !== selected.length) setPenSelection(kept);
+	});
+	/** Select what was just asked for, which the drawing does not have until the server answers. */
+	const selectMade = (made: string[]) => {
+		for (const id of made) penAwaited.add(id);
+		setPenSelection(made);
+	};
 	createEffect(() => {
 		if (props.mode !== "edit") {
-			setPenSelected(undefined);
+			setPenSelection([]);
 			setPenText(undefined);
+			setPenTool("select");
 		}
 	});
-	/** Where the selected item is now, drawn around it, moved by any drag in progress. */
-	const penSelectionBox = createMemo(() => {
+	/** Where each selected item is now, moved by any drag and sized by any resize in progress. */
+	const penOutlines = createMemo(() => {
 		penDrawn();
-		const id = penSelected()?.id;
-		const box = id ? penLayer.placed.get(id)?.box : undefined;
-		if (!box) return undefined;
 		const drag = penDrag();
-		return { x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h };
+		const resize = penResize();
+		const out: Array<{ id: string; x: number; y: number; w: number; h: number }> = [];
+		for (const id of penSelection()) {
+			if (resize?.id === id) {
+				out.push(resize);
+				continue;
+			}
+			const box = penLayer.placed.get(id)?.box;
+			if (box) out.push({ id, x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h });
+		}
+		const marquee = penMarquee();
+		if (marquee) out.push({ id: "", x: Math.min(marquee.x1, marquee.x2), y: Math.min(marquee.y1, marquee.y2), w: Math.abs(marquee.x2 - marquee.x1), h: Math.abs(marquee.y2 - marquee.y1) });
+		return out;
+	});
+	/** One item selected, and not a joined arrow (which the server redraws) or a group: it gets handles. */
+	const penHandles = createMemo(() => {
+		const outlines = penOutlines();
+		if (outlines.length !== 1 || !outlines[0]!.id) return undefined;
+		const node = penLayer.placed.get(outlines[0]!.id)?.node;
+		// A group is as big as what is in it, and pen does not scale children, so it moves but is not sized.
+		if (!node || node.metadata?.type === ARROW || node.type === "group") return undefined;
+		return outlines[0]!;
 	});
 	const TEXTY = new Set(["text", "note", "prompt", "context"]);
-	const openPenText = (hit: PenHit) => {
+	const openPenText = (hit: PenHit, fresh?: boolean) => {
 		const node = hit.node;
 		const card = node.type !== "text";
 		const size = typeof node.fontSize === "number" ? node.fontSize : 14;
-		const fill = typeof node.fill === "string" && node.fill.startsWith("#") ? node.fill : card ? "#fde68a" : "transparent";
-		setPenText({ id: hit.id, box: hit.box, value: typeof node.content === "string" ? node.content : "", card, fontSize: size, fill });
+		const fill = card && typeof node.fill === "string" && node.fill.startsWith("#") ? node.fill : card ? "#fde68a" : "transparent";
+		setPenText({ id: hit.id, box: hit.box, value: typeof node.content === "string" ? node.content : "", card, fontSize: size, fill, ...(fresh ? { fresh } : {}) });
 	};
 	const commitPenText = (value: string) => {
 		const open = penText();
 		setPenText(undefined);
 		if (!open || !props.onPenEdit) return;
-		// A note made with `n` and left empty was never wanted.
+		// A text or note made by a tool and left empty was never wanted.
 		if (open.fresh && !value.trim()) return props.onPenEdit([{ op: "delete", id: open.id }]);
 		const was = penLayer.placed.get(open.id)?.node.content;
 		if (value !== was) props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
 	};
-	const newPenNote = () => {
-		if (!props.onPenEdit) return;
-		const middle = toWorld(localCamera, view(), centre());
-		const id = `note-${Math.random().toString(36).slice(2, 7)}`;
-		const box = { x: Math.round(middle.x - 120), y: Math.round(middle.y - 40), w: 240, h: 80 };
-		props.onPenEdit([{ op: "insert", node: { type: "note", id, content: "" }, box: { x1: box.x, y1: box.y } }]);
-		setPenText({ id, box, value: "", card: true, fontSize: 14, fill: "#fde68a", fresh: true });
+	const penEdit = (ops: unknown[]) => {
+		if (ops.length) props.onPenEdit?.(ops);
+	};
+	const worldAt = (event: { clientX: number; clientY: number }) => toWorld(localCamera, view(), stagePoint(event as PointerEvent));
+	const freshId = () => newId(props.pen ? penIds(props.pen.doc) : new Set());
+
+	/** The keys of the drawing, in edit mode; true when the key was one of them. */
+	const penKey = (event: KeyboardEvent): boolean => {
+		const selected = penSelection();
+		const command = event.metaKey || event.ctrlKey;
+		const key = event.key;
+		if (command && !event.altKey && key.toLowerCase() === "z" && props.onPenStep) {
+			props.onPenStep(event.shiftKey ? "redo" : "undo");
+			return true;
+		}
+		if (selected.length && (key === "Delete" || key === "Backspace")) {
+			penEdit(selected.map((id) => ({ op: "delete", id })));
+			setPenSelection([]);
+			return true;
+		}
+		if (key === "Escape" && (selected.length || penTool() !== "select")) {
+			if (penTool() !== "select") setPenTool("select");
+			else setPenSelection([]);
+			return true;
+		}
+		if (selected.length && command && !event.altKey && key.toLowerCase() === "d") {
+			penDuplicate();
+			return true;
+		}
+		const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[key];
+		if (selected.length && nudge && !command && !event.altKey) {
+			const step = event.shiftKey ? 10 : 1;
+			penMoveBy(selected, nudge[0]! * step, nudge[1]! * step);
+			return true;
+		}
+		/*
+		 * The letters that arm a tool: from the app's own document only — never forwarded from a
+		 * board's (`shortcut`) — and only while no board is selected. Words typed over a board with
+		 * nothing editable under them fall through to the stage, and an armed tool takes the boards'
+		 * pointer away: "Zoo" typed there armed the ellipse, and the next click drew one instead of
+		 * selecting what was under it. With a board selected the keys are the board's; a press on
+		 * bare canvas lets it go, and then they are the drawing's.
+		 */
+		const tool = !command && !event.altKey && !props.selected ? PEN_TOOL_KEYS[key] : undefined;
+		if (tool) {
+			armPenTool(tool);
+			return true;
+		}
+		return false;
+	};
+
+	const armPenTool = (tool: PenTool) => {
+		// The board palette's tool goes down first: picking one of its tools puts this one down.
+		if (tool !== "select") props.onTool?.("select");
+		setPenTool(tool);
+	};
+
+	/**
+	 * Move items by `dx dy` from where they are, or from `from` — the boxes a drag started with, since
+	 * the layout a drag's preview draws already has them moved.
+	 */
+	const penMoveBy = (idsToMove: readonly string[], dx: number, dy: number, from?: ReadonlyMap<string, { x: number; y: number }>) => {
+		penEdit(
+			idsToMove.flatMap((id) => {
+				const box = from?.get(id) ?? penLayer.placed.get(id)?.box;
+				return box ? [{ op: "update", id, box: { x1: Math.round(box.x + dx), y1: Math.round(box.y + dy) } }] : [];
+			}),
+		);
+	};
+
+	const penDuplicate = () => {
+		const taken = props.pen ? penIds(props.pen.doc) : new Set<string>();
+		const made: string[] = [];
+		const ops = penSelection().flatMap((id) => {
+			const box = penLayer.placed.get(id)?.box;
+			if (!box) return [];
+			const as = newId(taken);
+			taken.add(as);
+			made.push(as);
+			return [{ op: "copy", id, as, box: { x1: Math.round(box.x + 24), y1: Math.round(box.y + 24) } }];
+		});
+		penEdit(ops);
+		if (made.length) selectMade(made);
+	};
+
+	/** Follow one press to its release: `move` on each step past a 3px slop, `done` at the end. */
+	const follow = (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void) => {
+		element.setPointerCapture(event.pointerId);
+		const start = { x: event.clientX, y: event.clientY };
+		let moved = false;
+		const onMove = (e: PointerEvent) => {
+			if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
+			moved = true;
+			move(e);
+		};
+		const finish = (e: PointerEvent) => {
+			element.removeEventListener("pointermove", onMove);
+			element.removeEventListener("pointerup", finish);
+			element.removeEventListener("pointercancel", finish);
+			done(moved, e);
+		};
+		element.addEventListener("pointermove", onMove);
+		element.addEventListener("pointerup", finish);
+		element.addEventListener("pointercancel", finish);
+	};
+
+	/** A press on the drawing in edit mode; true when it was the drawing's to handle. */
+	const penPress = (event: PointerEvent): boolean => {
+		const at = worldAt(event);
+		const tool = penTool();
+		if (tool !== "select") {
+			event.preventDefault();
+			props.onSelect(undefined);
+			penCreate(event, tool, at);
+			return true;
+		}
+		const hit = penLayer.hitTest(at);
+		if (hit) {
+			event.preventDefault();
+			props.onSelect(undefined);
+			const selected = penSelection();
+			if (event.shiftKey) {
+				setPenSelection(selected.includes(hit.id) ? selected.filter((id) => id !== hit.id) : [...selected, hit.id]);
+				return true;
+			}
+			const moving = selected.includes(hit.id) ? selected : [hit.id];
+			setPenSelection(moving);
+			const from = new Map(moving.flatMap((id) => {
+				const box = penLayer.placed.get(id)?.box;
+				return box ? [[id, { x: box.x, y: box.y }] as const] : [];
+			}));
+			let offset = { dx: 0, dy: 0 };
+			follow(
+				event,
+				(e) => {
+					offset = { dx: (e.clientX - event.clientX) / localCamera.zoom, dy: (e.clientY - event.clientY) / localCamera.zoom };
+					setPenDrag(offset);
+					penLayer.preview(new Map(moving.map((id) => [id, offset])));
+				},
+				(moved) => {
+					if (moved) penMoveBy(moving, offset.dx, offset.dy, from);
+				},
+			);
+			return true;
+		}
+		if (event.shiftKey) {
+			event.preventDefault();
+			props.onSelect(undefined);
+			setPenMarquee({ x1: at.x, y1: at.y, x2: at.x, y2: at.y });
+			follow(
+				event,
+				(e) => {
+					const now = worldAt(e);
+					setPenMarquee({ x1: at.x, y1: at.y, x2: now.x, y2: now.y });
+				},
+				() => {
+					const m = penMarquee();
+					setPenMarquee(undefined);
+					if (!m) return;
+					const picked = penLayer.within({ x: Math.min(m.x1, m.x2), y: Math.min(m.y1, m.y2), w: Math.abs(m.x2 - m.x1), h: Math.abs(m.y2 - m.y1) });
+					setPenSelection([...new Set([...penSelection(), ...picked])]);
+				},
+			);
+			return true;
+		}
+		setPenSelection([]);
+		return false;
+	};
+
+	/** The eight handles round a single selection, by the edges each one moves. */
+	const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+	const resizeFrom = (event: PointerEvent, handle: (typeof HANDLES)[number]) => {
+		const box = penHandles();
+		if (event.button !== 0 || !box) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const { id } = box;
+		const start = { x: box.x, y: box.y, w: box.w, h: box.h };
+		let next = start;
+		follow(
+			event,
+			(e) => {
+				const dx = (e.clientX - event.clientX) / localCamera.zoom;
+				const dy = (e.clientY - event.clientY) / localCamera.zoom;
+				let x1 = start.x + (handle.includes("w") ? dx : 0);
+				let x2 = start.x + start.w + (handle.includes("e") ? dx : 0);
+				let y1 = start.y + (handle.includes("n") ? dy : 0);
+				let y2 = start.y + start.h + (handle.includes("s") ? dy : 0);
+				// Shift keeps the shape: the wider of the two changes sets both.
+				if (e.shiftKey && handle.length === 2 && start.w > 0 && start.h > 0) {
+					const scale = Math.max((x2 - x1) / start.w, (y2 - y1) / start.h);
+					if (handle.includes("w")) x1 = x2 - start.w * scale;
+					else x2 = x1 + start.w * scale;
+					if (handle.includes("n")) y1 = y2 - start.h * scale;
+					else y2 = y1 + start.h * scale;
+				}
+				next = { x: Math.round(Math.min(x1, x2)), y: Math.round(Math.min(y1, y2)), w: Math.max(4, Math.round(Math.abs(x2 - x1))), h: Math.max(4, Math.round(Math.abs(y2 - y1))) };
+				setPenResize({ id, ...next });
+				penLayer.preview(new Map<string, PenPreview>([[id, { dx: next.x - start.x, dy: next.y - start.y, w: next.w, h: next.h }]]));
+			},
+			(moved) => {
+				if (moved) penEdit([{ op: "update", id, box: { x1: next.x, y1: next.y, x2: next.x + next.w, y2: next.y + next.h } }]);
+			},
+		);
+	};
+
+	/** What each tool makes, before its box: pen's own items, with nothing of ours in them. */
+	const MADE: Record<Exclude<PenTool, "select" | "arrow">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
+		rectangle: { node: { type: "rectangle", fill: "#dbe4f0", cornerRadius: 8 }, w: 160, h: 100 },
+		ellipse: { node: { type: "ellipse", fill: "#c7ddf7" }, w: 120, h: 120 },
+		frame: { node: { type: "frame", name: "Frame", layout: "none", fill: "#ffffff", stroke: "#d0d7de", strokeWidth: 1, cornerRadius: 12, clip: true }, w: 400, h: 300 },
+		text: { node: { type: "text", content: "", fontSize: 24 }, w: 240, h: 32 },
+		note: { node: { type: "note", content: "" }, w: 240, h: 80 },
+	};
+
+	/** The board under a stage point, when there is one: an arrow may start or end on it. */
+	const boardAt = (point: { x: number; y: number }) =>
+		props.boards.findLast((b) => point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h)?.path;
+
+	/** The innermost free-standing frame under a point: an item drawn inside one belongs to it. */
+	const frameAt = (point: { x: number; y: number }) => {
+		let best: { id: string; order: number } | undefined;
+		for (const placed of penLayer.placed.values()) {
+			const { node, box } = placed;
+			if (node.type !== "frame" || node.id.includes("/") || node.layout !== "none") continue;
+			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
+			if (!best || placed.order > best.order) best = { id: node.id, order: placed.order };
+		}
+		return best?.id;
+	};
+
+	const penCreate = (event: PointerEvent, tool: Exclude<PenTool, "select">, at: { x: number; y: number }) => {
+		setPenDraft({ tool, x1: at.x, y1: at.y, x2: at.x, y2: at.y });
+		follow(
+			event,
+			(e) => {
+				const now = worldAt(e);
+				setPenDraft({ tool, x1: at.x, y1: at.y, x2: now.x, y2: now.y });
+			},
+			(moved, e) => {
+				setPenDraft(undefined);
+				setPenTool("select");
+				penMadeAt = performance.now();
+				const end = worldAt(e);
+				const id = freshId();
+				if (tool === "arrow") {
+					// Joined when both ends are on something, so it follows them; a free arrow otherwise.
+					const endOf = (point: { x: number; y: number }) => penLayer.hitTest(point)?.id ?? boardAt(point);
+					const from = endOf(at);
+					const to = endOf(end);
+					if (from && to && from !== to) {
+						penEdit([{ op: "insert", node: { type: "path", id, metadata: { type: ARROW, from, to } } }]);
+					} else if (moved) {
+						const shape = arrowShape([[at.x, at.y], [end.x, end.y]], 2);
+						penEdit([{ op: "insert", node: { type: "path", id, ...shape, stroke: "#8a8f98", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } }]);
+					} else return;
+					selectMade([id]);
+					return;
+				}
+				const made = MADE[tool];
+				const x1 = Math.round(moved ? Math.min(at.x, end.x) : at.x);
+				const y1 = Math.round(moved ? Math.min(at.y, end.y) : at.y);
+				const w = moved ? Math.max(8, Math.round(Math.abs(end.x - at.x))) : made.w;
+				const h = moved ? Math.max(8, Math.round(Math.abs(end.y - at.y))) : made.h;
+				const parent = frameAt(at);
+				// A text grows with its words unless a width was drawn for it; its height is always its words'.
+				const box = tool === "text" ? (moved ? { x1, y1, x2: x1 + w } : { x1, y1 }) : tool === "note" && !moved ? { x1, y1 } : { x1, y1, x2: x1 + w, y2: y1 + h };
+				penEdit([{ op: "insert", ...(parent ? { parent } : {}), node: { ...made.node, id }, box }]);
+				selectMade([id]);
+				if (tool === "text" || tool === "note") openPenText({ id, node: { ...made.node, id } as PenNode, box: { x: x1, y: y1, w, h } }, true);
+			},
+		);
 	};
 
 	const writeTransform = (cam: Camera) => {
@@ -1253,6 +1548,8 @@ export function Stage(props: {
 	 */
 	const onDblClick = (event: MouseEvent) => {
 		if (props.mode === "edit" && props.onPenEdit && event.target === element) {
+			// The second press of a quick double-click on a tool's first item is not a request for a board.
+			if (performance.now() - penMadeAt < 500) return;
 			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)));
 			if (hit && TEXTY.has(hit.node.type)) {
 				openPenText(hit);
@@ -1280,37 +1577,12 @@ export function Stage(props: {
 		}
 
 		/*
-		 * A drawn item, in edit mode: pick it up. Anywhere else on the drawing is canvas, and pans.
+		 * The drawing, in edit mode: an armed tool makes its item; otherwise a press on an item picks
+		 * it up, a shift-press adds it to the selection or takes it out, and a shift-drag on empty
+		 * canvas draws a marquee. A plain press on empty canvas lets go and pans, as it always has.
 		 */
 		if (props.mode === "edit" && props.onPenEdit && event.button === 0 && event.target === element && !spaceHeld()) {
-			const hit = penLayer.hitTest(toWorld(localCamera, view(), stagePoint(event)));
-			if (hit) {
-				event.preventDefault();
-				props.onSelect(undefined);
-				setPenSelected(hit);
-				element.setPointerCapture(event.pointerId);
-				const start = { x: event.clientX, y: event.clientY };
-				let moved = false;
-				let offset = { dx: 0, dy: 0 };
-				const move = (moveEvent: PointerEvent) => {
-					if (!moved && Math.hypot(moveEvent.clientX - start.x, moveEvent.clientY - start.y) < 3) return;
-					moved = true;
-					offset = { dx: (moveEvent.clientX - start.x) / localCamera.zoom, dy: (moveEvent.clientY - start.y) / localCamera.zoom };
-					setPenDrag(offset);
-					penLayer.preview({ id: hit.id, ...offset });
-				};
-				const finish = () => {
-					element.removeEventListener("pointermove", move);
-					element.removeEventListener("pointerup", finish);
-					element.removeEventListener("pointercancel", finish);
-					if (moved) props.onPenEdit?.([{ op: "update", id: hit.id, box: { x1: Math.round(hit.box.x + offset.dx), y1: Math.round(hit.box.y + offset.dy) } }]);
-				};
-				element.addEventListener("pointermove", move);
-				element.addEventListener("pointerup", finish);
-				element.addEventListener("pointercancel", finish);
-				return;
-			}
-			setPenSelected(undefined);
+			if (penPress(event)) return;
 		}
 
 		const middle = event.button === 1;
@@ -1546,6 +1818,7 @@ export function Stage(props: {
 			data-previewing={Boolean(props.preview)}
 			data-focus={props.focus ? "true" : undefined}
 			data-panning={panning()}
+			data-pen-tool={props.mode === "edit" && props.onPenEdit && penTool() !== "select" ? penTool() : undefined}
 			data-scaling={scaling() && props.boards.filter(isVisible).length <= LAYER_BUDGET}
 			data-gliding={gliding()}
 			ref={element}
@@ -1597,12 +1870,59 @@ export function Stage(props: {
 				<For each={props.boards.filter((board) => board.path !== props.focus)} fallback={null}>
 					{(board) => boardNode(board)}
 				</For>
-				<Show when={penSelectionBox()}>
+				<For each={penOutlines()}>
 					{(box) => (
 						<div
 							class="pen-selection"
-							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${2 / props.camera.zoom}px var(--accent)` }}
+							style={{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
 						/>
+					)}
+				</For>
+				<Show when={penHandles()}>
+					{(box) => (
+						<For each={HANDLES}>
+							{(handle) => {
+								const size = () => 9 / props.camera.zoom;
+								return (
+									<div
+										class="pen-handle"
+										data-handle={handle}
+										style={{
+											left: `${box().x + (handle.includes("w") ? 0 : handle.includes("e") ? box().w : box().w / 2) - size() / 2}px`,
+											top: `${box().y + (handle.includes("n") ? 0 : handle.includes("s") ? box().h : box().h / 2) - size() / 2}px`,
+											width: `${size()}px`,
+											height: `${size()}px`,
+											"border-width": `${1.5 / props.camera.zoom}px`,
+										}}
+										onPointerDown={(event) => resizeFrom(event, handle)}
+									/>
+								);
+							}}
+						</For>
+					)}
+				</Show>
+				<Show when={penDraft()}>
+					{(draft) => (
+						<Show
+							when={draft().tool !== "arrow"}
+							fallback={
+								<svg class="pen-draft-line" style={{ left: "0px", top: "0px" }} width="1" height="1" overflow="visible">
+									<line x1={draft().x1} y1={draft().y1} x2={draft().x2} y2={draft().y2} stroke="var(--color-accent)" stroke-width={2 / props.camera.zoom} stroke-dasharray={`${6 / props.camera.zoom}`} />
+								</svg>
+							}
+						>
+							<div
+								class="pen-draft"
+								data-tool={draft().tool}
+								style={{
+									left: `${Math.min(draft().x1, draft().x2)}px`,
+									top: `${Math.min(draft().y1, draft().y2)}px`,
+									width: `${Math.abs(draft().x2 - draft().x1)}px`,
+									height: `${Math.abs(draft().y2 - draft().y1)}px`,
+									"border-width": `${1.5 / props.camera.zoom}px`,
+								}}
+							/>
+						</Show>
 					)}
 				</Show>
 				<Show when={penText()} keyed>

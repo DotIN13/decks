@@ -43,27 +43,10 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 		const to = end(meta.to);
 		if (!from || !to) continue;
 		const stroke = typeof node.strokeWidth === "number" ? node.strokeWidth : 2;
-		const head = Math.max(8, stroke * HEAD);
-		const points = route(from, to, meta.route === "elbow");
-		const all = [...points, ...headPoints(points, head)];
-		const pad = stroke;
-		const minX = Math.min(...all.map((p) => p[0])) - pad;
-		const minY = Math.min(...all.map((p) => p[1])) - pad;
-		const maxX = Math.max(...all.map((p) => p[0])) + pad;
-		const maxY = Math.max(...all.map((p) => p[1])) + pad;
-		const local = (p: [number, number]) => `${round(p[0] - minX)} ${round(p[1] - minY)}`;
-		const [a, b, c] = headPoints(points, head);
-		const geometry = `M${points.map(local).join(" L")} M${local(a!)} L${local(b!)} L${local(c!)}`;
+		const shape = arrowShape(route(from, to, meta.route === "elbow"), stroke);
 		const parent = index.get(node.id)?.parent;
 		const origin = parent ? placed.get(parent.id)?.box : undefined;
-		const next = {
-			x: round(minX - (origin?.x ?? 0)),
-			y: round(minY - (origin?.y ?? 0)),
-			width: round(maxX - minX),
-			height: round(maxY - minY),
-			viewBox: [0, 0, round(maxX - minX), round(maxY - minY)] as [number, number, number, number],
-			geometry,
-		};
+		const next = { ...shape, x: round(shape.x - (origin?.x ?? 0)), y: round(shape.y - (origin?.y ?? 0)) };
 		if (node.geometry === next.geometry && node.x === next.x && node.y === next.y) continue;
 		Object.assign(node, next);
 		if (node.stroke === undefined) node.stroke = "#8a8f98";
@@ -78,6 +61,31 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 }
 
 type Point = [number, number];
+
+/**
+ * A line through `points` with a head at the last one, as the fields of a pen `path`: its corner
+ * on the stage, its size, its `viewBox` and its `geometry`. What `reroute` writes for a joined
+ * arrow, and what a free arrow drawn by hand is made of.
+ */
+export function arrowShape(points: Point[], strokeWidth = 2): { x: number; y: number; width: number; height: number; viewBox: [number, number, number, number]; geometry: string } {
+	const head = Math.max(8, strokeWidth * HEAD);
+	const all = [...points, ...headPoints(points, head)];
+	const pad = strokeWidth;
+	const minX = Math.min(...all.map((p) => p[0])) - pad;
+	const minY = Math.min(...all.map((p) => p[1])) - pad;
+	const maxX = Math.max(...all.map((p) => p[0])) + pad;
+	const maxY = Math.max(...all.map((p) => p[1])) + pad;
+	const local = (p: Point) => `${round(p[0] - minX)} ${round(p[1] - minY)}`;
+	const [a, b, c] = headPoints(points, head);
+	return {
+		x: round(minX),
+		y: round(minY),
+		width: round(maxX - minX),
+		height: round(maxY - minY),
+		viewBox: [0, 0, round(maxX - minX), round(maxY - minY)],
+		geometry: `M${points.map(local).join(" L")} M${local(a)} L${local(b)} L${local(c)}`,
+	};
+}
 
 /** From the edge of `a` that faces `b`, to the edge of `b` that faces `a`. */
 function route(a: Frame, b: Frame, elbow: boolean): Point[] {

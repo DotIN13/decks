@@ -1,6 +1,14 @@
 import type { CanvasKit, Image, SkPicture as Picture, Surface } from "canvaskit-wasm";
 import { baseTheme, expand, indexOf, isArrow, layout, reroute, walk, textStyleOf, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 
+/** A drag or a resize in progress: moved by `dx dy`, and sized `w h` when resizing. */
+export interface PenPreview {
+	dx: number;
+	dy: number;
+	w?: number;
+	h?: number;
+}
+
 /** What a press found in the drawing: the item, and where it is on the stage. */
 export interface PenHit {
 	id: string;
@@ -56,8 +64,8 @@ export class PenLayer {
 	placed: ReadonlyMap<string, Placed> = new Map();
 	/** Called after every new picture, so the stage can redraw a selection around what moved. */
 	drawn: (() => void) | undefined;
-	/** An item being dragged, drawn moved by this much until the edit comes back from the server. */
-	private moving: { id: string; dx: number; dy: number } | undefined;
+	/** Items being dragged or resized, drawn changed by this much until the edit comes back from the server. */
+	private moving: ReadonlyMap<string, PenPreview> | undefined;
 
 	/**
 	 * The item under a stage point: the one drawn last, since that is the one on top.
@@ -77,8 +85,25 @@ export class PenLayer {
 		return best ? { id: best.node.id, node: best.node, box: { ...best.box } } : undefined;
 	}
 
-	/** Draw an item moved by a drag that has not been saved yet; nothing to stop. */
-	preview(moving: { id: string; dx: number; dy: number } | undefined): void {
+	/**
+	 * Every item wholly inside a stage rectangle, leaving out any whose parent is picked too:
+	 * what a marquee selects. Boards and the inside of an instance are not items to select.
+	 */
+	within(r: Frame): string[] {
+		const index = this.doc ? indexOf(this.doc) : new Map();
+		const inside = new Set<string>();
+		for (const { node, box } of this.placed.values()) {
+			if (node.id.includes("/") || (node.type === "browser" && node.metadata?.type === "decks.board")) continue;
+			if (box.x >= r.x && box.y >= r.y && box.x + box.w <= r.x + r.w && box.y + box.h <= r.y + r.h) inside.add(node.id);
+		}
+		return [...inside].filter((id) => {
+			for (let parent = index.get(id)?.parent; parent; parent = index.get(parent.id)?.parent) if (inside.has(parent.id)) return false;
+			return true;
+		});
+	}
+
+	/** Draw items moved or resized by a gesture that has not been saved yet; nothing to stop. */
+	preview(moving: ReadonlyMap<string, PenPreview> | undefined): void {
 		this.moving = moving;
 		this.dirty = true;
 		this.schedule();
@@ -186,14 +211,19 @@ export class PenLayer {
 		 * a moment ago, has arrows whose geometry the server has not redrawn yet. The copy is only for
 		 * drawing; the file is the server's to rewrite.
 		 */
-		if (this.moving) {
+		if (this.moving?.size) {
 			const copy = structuredClone(doc);
-			const found = indexOf(copy).get(this.moving.id);
-			if (found) {
-				found.node.x = (typeof found.node.x === "number" ? found.node.x : 0) + this.moving.dx;
-				found.node.y = (typeof found.node.y === "number" ? found.node.y : 0) + this.moving.dy;
-				doc = copy;
+			const index = indexOf(copy);
+			for (const [id, change] of this.moving) {
+				const found = index.get(id);
+				if (!found) continue;
+				found.node.x = (typeof found.node.x === "number" ? found.node.x : 0) + change.dx;
+				found.node.y = (typeof found.node.y === "number" ? found.node.y : 0) + change.dy;
+				if (change.w !== undefined) found.node.width = change.w;
+				if (change.h !== undefined && !(found.node.type === "text" && found.node.textGrowth !== "fixed-width-height")) found.node.height = change.h;
+				if (change.w !== undefined && found.node.type === "text" && (found.node.textGrowth ?? "auto") === "auto") found.node.textGrowth = "fixed-width";
 			}
+			doc = copy;
 		}
 		if ([...walk(doc.children)].some((node) => isArrow(node))) {
 			const copy = structuredClone(doc);

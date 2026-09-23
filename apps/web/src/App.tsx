@@ -5,7 +5,7 @@ import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import Sun from "lucide-solid/icons/sun";
 import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show} from "solid-js";
-import type { EditorHost } from "./board/Editor.ts";
+import type { EditorHost, Tool } from "./board/Editor.ts";
 import { Settings } from "./settings/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
 import type { Presenting } from "./state/ui.ts";
@@ -35,6 +35,8 @@ import { FilePicker } from "./board/FilePicker.tsx";
 import { applyLive, patchesFor, readShape, type Edit, type Shape } from "./board/inspect.ts";
 import { Inspector } from "./board/Inspector.tsx";
 import { InkBar } from "./markup/InkBar.tsx";
+import { PenBar } from "./canvas/pen/PenBar.tsx";
+import { setPenTool } from "./state/pen-tools.ts";
 import { pageKey } from "./chat/composer/parked.ts";
 import { CommentPopup } from "./markup/CommentPopup.tsx";
 import { commentBlock, withComments } from "./markup/comments.ts";
@@ -514,6 +516,17 @@ export function App() {
 		const pen = id ? pens()[id] : undefined;
 		return pen ? { doc: pen.doc, base: pen.base } : undefined;
 	});
+
+	/** Undo or redo the person's own last edit to the drawing (`StagePens.step`). */
+	const penStep = (direction: "undo" | "redo") => {
+		const agentId = state.focused;
+		if (agentId) send({ type: "stage.pen.step", agentId, direction });
+	};
+	/** A board tool, from the palette or its key; one armed tool at a time, so the drawing's is put down. */
+	const pickTool = (next: Tool) => {
+		setTool(next);
+		setPenTool("select");
+	};
 
 	const stageBoards = createMemo(() => {
 		const playing = new Set(state.focused ? (state.agents[state.focused]?.inPlay ?? []) : []);
@@ -1106,6 +1119,7 @@ export function App() {
 							const agentId = state.focused;
 							if (agentId) send({ type: "stage.pen.edit", agentId, ops });
 						}}
+						onPenStep={penStep}
 						camera={camera()}
 						glide={glide()}
 						setCamera={setCameraAndReport}
@@ -1212,7 +1226,7 @@ export function App() {
 						onViewport={() => reportCameraSoon(camera())}
 						onExtent={(path, extent) => send({ type: "board.extent", path, ...extent })}
 						editor={editor}
-						onTool={setTool}
+						onTool={pickTool}
 						drops={drops}
 						frameRevs={frameRevs}
 						preview={preview()?.boards}
@@ -1301,7 +1315,7 @@ export function App() {
 					boardsOpen={boardsOpen()}
 					onToggleBoards={() => showBoards(!boardsOpen())}
 					tool={tool()}
-					onTool={setTool}
+					onTool={pickTool}
 					onUndo={() => {
 						const path = selected() ?? component()?.path;
 						if (!path) {
@@ -1418,6 +1432,22 @@ export function App() {
 
 				<Show when={drawing() && mode() === "browse"}>
 					<InkBar onDone={() => setDrawing(false)} />
+				</Show>
+
+				<Show when={mode() === "edit" && stagePen()}>
+					{(pen) => (
+						<PenBar
+							doc={pen().doc}
+							onEdit={(ops) => {
+								const agentId = state.focused;
+								if (agentId) send({ type: "stage.pen.edit", agentId, ops });
+							}}
+							onStep={penStep}
+							onArm={(next) => {
+								if (next !== "select") setTool("select");
+							}}
+						/>
+					)}
 				</Show>
 
 				<Show when={ops()}>
