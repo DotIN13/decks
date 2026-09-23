@@ -1,8 +1,8 @@
 {
 	"note": "The app CSS's cascade order, flattened and hashed, and the rules themselves so a stale baseline can still say what moved. Re-stamp with `npm run css:order -- --update` only when the order is meant to change, and read the diff: a move that changes which rule wins is a change to the page.",
 	"entry": "apps/web/src/index.css",
-	"hash": "0bdf6d7f3299a37e4f6d752a7b489a428c2e8c135fa825b0939e37988694fcd3",
-	"rules": 778,
+	"hash": "ecd90bc43b9f36c48fb700a0c0cb20c3d9fe0be76e6ef2211addebbdd20d6868",
+	"rules": 779,
 	"sheets": 18,
 	"ties": 3,
 	"outsideLayer": 0,
@@ -22,7 +22,7 @@
 		"apps/web/src/styles/panel.css": 117,
 		"apps/web/src/styles/rail.css": 34,
 		"apps/web/src/styles/settings.css": 39,
-		"apps/web/src/styles/shell.css": 52,
+		"apps/web/src/styles/shell.css": 53,
 		"apps/web/src/styles/stream.css": 101,
 		"apps/web/src/styles/usage.css": 31
 	},
@@ -564,6 +564,7 @@
 		["styles/shell.css","@layer components ▸ .surface{position:absolute;inset:0;overflow:hidden}"],
 		["styles/shell.css","@layer components ▸ .surface-layer{position:absolute;inset:0}"],
 		["styles/shell.css","@layer components ▸ .dock-to-new{width:22px;height:22px;border:1px solid var(--line);border-radius:var(--radius-item);background:var(--panel);color:var(--muted)}"],
+		["styles/shell.css","@layer components ▸ [data-color-scheme=\"dark\"] .dock-to-new{color:#fff}"],
 		["styles/shell.css","@layer components ▸ .dock-to-new:hover,.dock-to-new[aria-expanded=\"true\"]{border-color:var(--line-strong);background:var(--line);color:var(--fg)}"],
 		["styles/shell.css","@layer components ▸ .pill-agent{gap:6px;padding:0 7px 0 3px;border-color:transparent;color:var(--fg)}"],
 		["styles/shell.css","@layer components ▸ .pill-agent[data-on=\"soft\"]{background:var(--line)}"],

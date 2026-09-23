@@ -43,6 +43,9 @@
 		background: var(--panel);
 		color: var(--muted);
 	}
+	[data-color-scheme="dark"] .dock-to-new {
+		color: #fff;
+	}
 	.dock-to-new:hover,
 	.dock-to-new[aria-expanded="true"] {
 		border-color: var(--line-strong);
