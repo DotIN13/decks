@@ -62,8 +62,8 @@ function pointerGroups(): Group[] {
 			title: "Drawing",
 			rows: [
 				{ keys: "V", what: "select, drag and resize" },
-				{ keys: "N · C · T", what: "a note · a card · words, on the stage" },
-				{ keys: "R · O · F · A", what: "a rectangle · an ellipse · a frame · an arrow" },
+				{ keys: "R · O · F", what: "a rectangle · an ellipse · a frame" },
+				{ keys: "N · C · T · A", what: "a note · a card · words · an arrow" },
 				{ keys: "drop a file on a board", what: "embed it where it landed" },
 			],
 		},

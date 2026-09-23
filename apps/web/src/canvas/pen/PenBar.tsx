@@ -34,16 +34,14 @@ import { Icon } from "../../ui/icons.tsx";
  */
 const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key: string; after?: boolean }> = [
 	{ tool: "select", icon: MousePointer2, label: "Select and move; shift adds, shift-drag draws a box round several", key: "V" },
-	{ tool: "note", icon: StickyNote, label: "Note", key: "N" },
-	{ tool: "card", icon: RectangleHorizontal, label: "Card: a box with a title", key: "C" },
-	{ tool: "text", icon: Type, label: "Text", key: "T" },
 	{ tool: "rectangle", icon: Square, label: "Rectangle: drag to size it, or click for one", key: "R", after: true },
 	{ tool: "ellipse", icon: Circle, label: "Ellipse", key: "O" },
 	{ tool: "frame", icon: FrameIcon, label: "Frame: a box that holds what is drawn inside it", key: "F" },
+	{ tool: "note", icon: StickyNote, label: "Note", key: "N", after: true },
+	{ tool: "card", icon: RectangleHorizontal, label: "Card: a box with a title", key: "C" },
+	{ tool: "text", icon: Type, label: "Text", key: "T" },
 	{ tool: "arrow", icon: ArrowUpRight, label: "Arrow: drag from one thing to another and it stays joined", key: "A" },
-]
-
-const FILLS = ["#ffffff", "#dbe4f0", "#fde68a", "#bbf7d0", "#bfdbfe", "#fecaca", "#1f2328"];
+];
 const LINE_WIDTHS = [0, 1, 2, 4];
 const TEXTY = new Set(["text", "note", "prompt", "context"]);
 
