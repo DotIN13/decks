@@ -196,26 +196,7 @@ export function AgentEdit(props: {
 					<div class="agent-edit-row agent-edit-tags">
 						<span class="agent-edit-k">Tags</span>
 						<div class="agent-edit-v">
-							<Show when={props.userTags.length > 0}>
-								<div class="tags">
-									<For each={props.userTags}>
-										{(tag) => (
-											<span class="tag" data-mine="true">
-												{tag}
-												<button
-													type="button"
-													class="tag-x"
-													title={`Remove ${tag}`}
-													aria-label={`Remove ${tag}`}
-													onClick={() => props.onTags(props.userTags.filter((other) => other !== tag))}
-												>
-													<Icon of={X} size={9} />
-												</button>
-											</span>
-										)}
-									</For>
-								</div>
-							</Show>
+							{/* The field first, level with its label like the two above; what you have added lists under it. */}
 							<Show when={props.userTags.length < MAX_TAGS}>
 								<label class="field h-8 flex-none gap-1.5 rounded-md">
 									<input
@@ -240,6 +221,26 @@ export function AgentEdit(props: {
 										}}
 									/>
 								</label>
+							</Show>
+							<Show when={props.userTags.length > 0}>
+								<div class="tags">
+									<For each={props.userTags}>
+										{(tag) => (
+											<span class="tag" data-mine="true">
+												{tag}
+												<button
+													type="button"
+													class="tag-x"
+													title={`Remove ${tag}`}
+													aria-label={`Remove ${tag}`}
+													onClick={() => props.onTags(props.userTags.filter((other) => other !== tag))}
+												>
+													<Icon of={X} size={9} />
+												</button>
+											</span>
+										)}
+									</For>
+								</div>
 							</Show>
 						</div>
 					</div>

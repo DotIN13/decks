@@ -254,8 +254,13 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					return;
 				}
 
+				/*
+				 * Replaced, not merged. A store setter merges an object into what is there, and the
+				 * server leaves an empty field out: removing the last tag, or taking an agent out
+				 * of its workspace, sent an identity without that key and the old value stayed.
+				 */
 				case "agent.identity":
-					setState("identities", message.id, message.identity);
+					setState("identities", message.id, reconcile(message.identity));
 					return;
 
 				/*

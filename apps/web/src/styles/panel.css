@@ -590,7 +590,8 @@
 	.agent-edit {
 		display: flex;
 		flex-direction: column;
-		padding: 6px 0 10px;
+		/* The same 14px above the first field and below the last: 8 here and 6 of each row's. */
+		padding: 8px 0;
 	}
 	.agent-edit-row {
 		display: flex;
@@ -601,7 +602,13 @@
 	}
 	.agent-edit-row.agent-edit-tags {
 		align-items: flex-start;
-		padding-top: 8px;
+	}
+
+	/* At the cap the field goes and the chips come first: then their line is a field's height,
+	   so the label beside it stays level with them. */
+	.agent-edit-tags .agent-edit-v > .tags:first-child {
+		min-height: 32px;
+		align-items: center;
 	}
 	.agent-edit-row.agent-edit-tags > .agent-edit-k {
 		line-height: 32px;
