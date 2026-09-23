@@ -100,7 +100,7 @@ export interface Stage {
 	open(name: string): Promise<{ stage: string; boards: string[] }>;
 	newStage(title: string): Promise<{ stage: string }>;
 	/**
-	 * Your stage's drawing — notes, text, shapes, arrows and frames, drawn under the boards — kept as a
+	 * Your stage's drawing — notes, text, shapes, arrows and frames, drawn over the boards except a backdrop listed before the board it holds — kept as a
 	 * native pen.dev `.pen` file in pen's own types and fields; the pen-stage skill teaches them.
 	 * `read` gives every item as saved plus its `box` on the stage. `edit` applies edits together or
 	 * not at all. A `box` places an item on the stage; the server turns it into pen's own x, y, width

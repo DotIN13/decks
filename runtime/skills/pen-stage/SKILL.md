@@ -13,9 +13,15 @@ as it is, and every type and field here is pen's, untranslated. It holds two kin
   and `stage.move` add, remove and move them; you can also move them with `stage.pen.edit`, or put
   them inside a frame that lays them out. Never make a board by inserting a `browser` item: write it
   with `stage.newBoard` and show it.
-- **The drawing**: notes, text, shapes, icons, arrows and frames, drawn by the canvas under the
-  boards. Use it for what sits *between* boards — a note beside one, an arrow from one to the next,
-  a titled area behind a group. Put an answer on a board; put the arrangement around it here.
+- **The drawing**: notes, text, shapes, icons, arrows and frames. Use it for what sits *between*
+  boards — a note beside one, an arrow from one to the next, a titled area behind a group. Put an
+  answer on a board; put the arrangement around it here.
+
+**Boards are at the back.** The drawing is shown over the boards, so a note placed on a board
+covers that part of it. One exception: an item listed *before* a board in the file that holds the
+whole board (a frame or panel round it) is a backdrop, and is drawn under the boards. When the
+person clicks a board it is lifted over the drawing until they click away. So keep notes beside a
+board rather than on it, unless covering part of it is the point.
 
 The person can move, delete and rewrite drawn items by hand in edit mode, so read before you edit:
 the file may have changed since you last looked.

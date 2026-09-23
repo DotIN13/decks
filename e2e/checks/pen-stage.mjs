@@ -155,6 +155,51 @@ if (spot) {
 	const undone = await until(() => onDisk().children.find((n) => n.id === drawnId)?.fill === "#dbe4f0");
 	say("⌘Z takes back the person's own last edit", !!undone, JSON.stringify(onDisk().children.find((n) => n.id === drawnId)?.fill));
 }
+// --- boards at the back: a drawing over a board catches its own clicks; the selected board rises ---
+const boardItem = onDisk().children.find((n) => n.metadata?.path === firstBoard);
+if (boardItem) {
+	const w = Math.round((boardItem.width ?? 400) * 0.4);
+	const h = Math.round((boardItem.height ?? 300) * 0.3);
+	link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "insert", node: { type: "rectangle", id: "e2e-over", fill: "#bfdbfe" }, box: { x1: boardItem.x + 20, y1: boardItem.y + 20, x2: boardItem.x + 20 + w, y2: boardItem.y + 20 + h } }] });
+	await until(() => onDisk().children.some((n) => n.id === "e2e-over"));
+	await page.keyboard.press("Escape");
+	await page.keyboard.press("0");
+	await settle(page, 900);
+	const at = await page.evaluate(({ x, y }) => {
+		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		return { x: m.e + x * m.a, y: m.f + y * m.a };
+	}, { x: boardItem.x + 20 + w / 2, y: boardItem.y + 20 + h / 2 });
+	const under = () => page.evaluate(({ x, y }) => {
+		const e = document.elementFromPoint(x, y);
+		return e?.closest(".board-node") ? "board" : e?.classList.contains("pen-hit") ? `drawing:${e.dataset.id}` : e?.className?.baseVal ?? e?.className ?? "nothing";
+	}, at);
+	const shown = await until(() => under().then((u) => u.startsWith("drawing") && u));
+	say("a drawing over a board is on top of it and catches the click there", shown === "drawing:e2e-over", await under());
+	const node = page.locator(`.board-node[data-path="${firstBoard}"]`);
+	// A point where this board is the top thing: not another board over it, not a drawn item.
+	const free = await page.evaluate((path) => {
+		const n = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+		const r = n.getBoundingClientRect();
+		for (let y = r.y + r.height - 8; y > r.y + 30; y -= 7) {
+			for (let x = r.x + r.width - 8; x > r.x + 8; x -= 7) {
+				if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) continue;
+				if (document.elementFromPoint(x, y)?.closest(".board-node") === n) return { x, y };
+			}
+		}
+	}, firstBoard);
+	say("the board has an uncovered spot on screen", !!free);
+	if (free) await page.mouse.click(free.x, free.y);
+	const raised = await until(() => node.evaluate((n) => n.dataset.selected === "true" && getComputedStyle(n).zIndex === "2"));
+	say("a click on the board's uncovered part selects it and lifts it over the drawing", !!raised && (await under()) === "board", await under());
+	// The rectangle is under the raised board now; a press beside the board, on bare canvas, lets it go.
+	const bare = await page.evaluate(() => {
+		const stage = document.querySelector(".stage");
+		for (let y = 120; y < innerHeight - 120; y += 15) for (let x = 320; x < innerWidth - 20; x += 15) if (document.elementFromPoint(x, y) === stage) return { x, y };
+	});
+	if (bare) await page.mouse.click(bare.x, bare.y);
+	await until(() => node.evaluate((n) => n.dataset.selected !== "true"));
+	say("a press on bare canvas lets the board go, back under the drawing", (await under()) === "drawing:e2e-over", await under());
+}
 await editMode(page, false);
 
 // Leave the fixture's stage as it was, minus the check's own drawing.

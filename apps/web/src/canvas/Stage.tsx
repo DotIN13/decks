@@ -629,6 +629,10 @@ export function Stage(props: {
 		const was = penLayer.placed.get(open.id)?.node.content;
 		if (value !== was) props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
 	};
+	/** A press on a drawn item's click shape (`pen/layer.ts`), which is over the boards. */
+	const onDrawn = (target: EventTarget | null) => !!(target as Element | null)?.closest?.(".pen-hits");
+	/** Bare canvas or something drawn on it: either way not a board, and the canvas's to handle. */
+	const onCanvas = (target: EventTarget | null) => target === element || onDrawn(target);
 	const penEdit = (ops: unknown[]) => {
 		if (ops.length) props.onPenEdit?.(ops);
 	};
@@ -1381,7 +1385,7 @@ export function Stage(props: {
 		// A tap on bare canvas clears the selection, exactly as a click does. Decided on
 		// the way down rather than on the way up: a pan that starts on empty stage is not
 		// a gesture that wants to keep a component selected either.
-		if (event.target === element) props.onSelect(undefined);
+		if (onCanvas(event.target)) props.onSelect(undefined);
 		/*
 		 * The browser's own word for "nothing else is down": the primary pointer of a
 		 * touch sequence is the first finger on the glass. Anything still carried at that
@@ -1569,7 +1573,7 @@ export function Stage(props: {
 	 * bubble out of a frame. So the test is the node, not the element.
 	 */
 	const onDblClick = (event: MouseEvent) => {
-		if (props.mode === "edit" && props.onPenEdit && event.target === element) {
+		if (props.mode === "edit" && props.onPenEdit && onCanvas(event.target)) {
 			// The second press of a quick double-click on a tool's first item is not a request for a board.
 			if (performance.now() - penMadeAt < 500) return;
 			// A double-click reaches inside a group: words open for rewriting, anything else is selected on its own.
@@ -1585,7 +1589,8 @@ export function Stage(props: {
 		}
 		if (!props.onCreateBoard) return;
 		const target = event.target as HTMLElement | null;
-		if (target?.closest?.(".board-node")) return;
+		// Not on a board, and not on something drawn over one.
+		if (target?.closest?.(".board-node") || onDrawn(target)) return;
 		if (performance.now() - pannedAt < 400) return;
 		props.onCreateBoard(stagePoint(event));
 	};
@@ -1608,12 +1613,13 @@ export function Stage(props: {
 		 * it up, a shift-press adds it to the selection or takes it out, and a shift-drag on empty
 		 * canvas draws a marquee. A plain press on empty canvas lets go and pans, as it always has.
 		 */
-		if (props.mode === "edit" && props.onPenEdit && event.button === 0 && event.target === element && !spaceHeld()) {
+		if (props.mode === "edit" && props.onPenEdit && event.button === 0 && onCanvas(event.target) && !spaceHeld()) {
 			if (penPress(event)) return;
 		}
 
 		const middle = event.button === 1;
-		const emptySpace = event.button === 0 && event.target === element;
+		// A press on a drawn item while browsing is a press on the canvas: it pans, and a board lets go.
+		const emptySpace = event.button === 0 && onCanvas(event.target);
 		if (!middle && !emptySpace && !(spaceHeld() && event.button === 0)) return;
 
 		event.preventDefault();
@@ -1897,6 +1903,13 @@ export function Stage(props: {
 				<For each={props.boards.filter((board) => board.path !== props.focus)} fallback={null}>
 					{(board) => boardNode(board)}
 				</For>
+				{/*
+				 * The drawing over the boards, and the invisible shapes that catch clicks on it: after
+				 * the boards, so over them, and under the selected board, which is lifted over both
+				 * (`canvas.css`). See `pen/layer.ts`.
+				 */}
+				<canvas class="pen-over" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas, "over")} />
+				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />
 				<For each={penOutlines()}>
 					{(box) => (
 						<div

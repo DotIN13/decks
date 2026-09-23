@@ -938,6 +938,36 @@
 	.stage[data-focus="true"] > .pen-layer {
 	display: none;
 }
+	/*
+	 * Boards are at the back (`pen/layer.ts`): the drawing's over sheet and its click shapes are among
+	 * the boards and above them, the selected board is lifted above both so the board in use is whole,
+	 * and what the drawing's editing puts on screen is above everything.
+	 */
+	.world > .pen-over {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 1;
+	transform-origin: 0 0;
+	pointer-events: none;
+}
+	.world > .pen-hits {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 1;
+	overflow: visible;
+	pointer-events: none;
+}
+	.world > .pen-hits > .pen-hit {
+	pointer-events: all;
+}
+	.world > .board-node[data-selected="true"] {
+	z-index: 2;
+}
+	.world > :is(.pen-selection, .pen-handle, .pen-text, .pen-draft, .pen-draft-line) {
+	z-index: 3;
+}
 	/* The drawn item picked up in edit mode, and the box its words are edited in (`Stage.tsx`). */
 	.world > .pen-selection {
 	position: absolute;

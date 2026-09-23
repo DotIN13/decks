@@ -721,7 +721,7 @@ export function createStageTool(deps: {
 		/**
 		 * The stage's drawing: a native pen.dev document at `stages/<name>/stage.pen`.
 		 *
-		 * Notes, text, shapes, arrows and frames live here, drawn under the boards by the canvas.
+		 * Notes, text, shapes, arrows and frames live here, drawn over the boards by the canvas, backdrops under them.
 		 * `read` gives every item as saved plus its `box` on the stage; `edit` applies pen operations
 		 * together or not at all and answers with each item's new box; `file` is the path, for an
 		 * agent that would rather edit the JSON with its own tools. The wording of the format is

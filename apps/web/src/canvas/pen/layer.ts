@@ -20,29 +20,46 @@ import { canvasKit } from "./canvaskit.ts";
 import { PenFonts, type FontNeed } from "./fonts.ts";
 import { PenIcons } from "./icons.ts";
 import { paintDocument } from "./paint.ts";
+import { backdrops, boundsOf } from "./bounds.ts";
 
 /**
- * The stage's drawing layer: one `<canvas>` under the boards, drawn by CanvasKit.
+ * The stage's drawing: two `<canvas>` sheets drawn by CanvasKit, and a layer of invisible shapes
+ * that catches clicks on what is drawn.
  *
- * The document is laid out and recorded **once per change** into a Skia picture in stage
- * coordinates; every frame after that only replays the picture under the camera — a translate and
- * a scale — so a pan or a pinch costs the same whether the drawing has five items or five hundred,
- * and stays sharp at any zoom because the picture is vectors, not pixels.
+ * **Boards are at the back.** The drawing is on a sheet *over* the boards, so a note put on a board
+ * is on it. The one exception is a backdrop: an item listed before a board in the file that holds
+ * the whole board — a frame round it, a panel behind it — goes on the sheet *under* the boards
+ * (`backdrops`). The selected board is lifted over both, so a board you are using is whole.
  *
- * It follows the camera by being told, in the same call that moves the boards' transform
- * (`Stage.writeTransform`), and draws at most once per animation frame. Pointer events pass
- * through it: the drawing is read-only to the person for now.
+ * **Clicks go to what you see** (`hits`). The over sheet lets every click through; above it is an
+ * SVG of invisible shapes, one per drawn item with its outline, which the browser tests each click
+ * against. A click on a shape is the drawing's; a click beside it reaches the board underneath.
+ *
+ * The document is laid out and recorded **once per change** into Skia pictures in stage
+ * coordinates; every frame after that only replays them under the camera — a translate and a scale
+ * — so a pan costs the same whether the drawing has five items or five hundred, and stays sharp at
+ * any zoom because the pictures are vectors, not pixels. The under sheet is fixed to the window;
+ * the over sheet lives among the boards, so it is placed back over the window each time it is drawn.
  *
  * CanvasKit is loaded the first time a document has anything in it, never for an empty stage.
  */
 
+interface Sheet {
+	element?: HTMLCanvasElement;
+	surface?: Surface;
+	size: string;
+	picture?: Picture;
+}
+
+export type SheetName = "under" | "over";
+
 export class PenLayer {
-	private element: HTMLCanvasElement | undefined;
+	private readonly sheets: Record<SheetName, Sheet> = { under: { size: "" }, over: { size: "" } };
+	private hits: SVGSVGElement | undefined;
+	/** The top-level items drawn under the boards (`backdrops`). */
+	private under = new Set<string>();
 	private ck: CanvasKit | undefined;
 	private fonts: PenFonts | undefined;
-	private surface: Surface | undefined;
-	private surfaceSize = "";
-	private picture: Picture | undefined;
 	private doc: PenDocument | undefined;
 	private base = "";
 	private scheme: "light" | "dark" = "light";
@@ -132,7 +149,8 @@ export class PenLayer {
 			const key = [...moving!.keys()].sort().join("|");
 			if (this.slide?.key !== key) this.dropSlide();
 			const first = moving!.values().next().value!;
-			this.slide = { key, ids: new Set(moving!.keys()), dx: first.dx, dy: first.dy, base: this.slide?.base, over: this.slide?.over };
+			const kept = this.slide;
+			this.slide = { key, ids: new Set(moving!.keys()), dx: first.dx, dy: first.dy, ...(kept?.base ? { base: kept.base } : {}), ...(kept?.carried ? { carried: kept.carried } : {}) };
 			this.schedule();
 			return;
 		}
@@ -142,14 +160,15 @@ export class PenLayer {
 		this.schedule();
 	}
 
-	/** The two pictures a move slides between, while one is in progress. */
-	private slide: { key: string; ids: Set<string>; dx: number; dy: number; base: Picture | undefined; over: Picture | undefined } | undefined;
+	/** The pictures a move slides between: each sheet without the moving items, and the moving items alone. */
+	private slide: { key: string; ids: Set<string>; dx: number; dy: number; base?: Record<SheetName, Picture>; carried?: Picture } | undefined;
 	/** What the last picture was painted from, so a slide can record from the same thing. */
 	private painted: { nodes: PenNode[]; doc: PenDocument; placed: Map<string, Placed> } | undefined;
 
 	private dropSlide(): void {
-		this.slide?.base?.delete();
-		this.slide?.over?.delete();
+		this.slide?.base?.under.delete();
+		this.slide?.base?.over.delete();
+		this.slide?.carried?.delete();
 		this.slide = undefined;
 	}
 
@@ -164,18 +183,38 @@ export class PenLayer {
 			recorder.delete();
 			return picture;
 		};
-		slide.base = record((canvas) => paintDocument(canvas, painted.nodes, { ...ctx, skip: slide.ids }));
+		const { under, over } = this.split(painted.nodes);
+		slide.base = {
+			under: record((canvas) => paintDocument(canvas, under, { ...ctx, skip: slide.ids })),
+			over: record((canvas) => paintDocument(canvas, over, { ...ctx, skip: slide.ids })),
+		};
 		const carried = [...slide.ids].flatMap((id) => {
 			const node = painted.placed.get(id)?.node;
 			return node ? [node] : [];
 		});
-		slide.over = record((canvas) => paintDocument(canvas, carried, ctx));
+		// Carried on the over sheet, so what you are dragging is never hidden under a board.
+		slide.carried = record((canvas) => paintDocument(canvas, carried, ctx));
 	}
 
-	attach(element: HTMLCanvasElement): void {
-		this.element = element;
-		this.surfaceSize = "";
+	attach(element: HTMLCanvasElement, sheet: SheetName = "under"): void {
+		this.sheets[sheet].surface?.delete();
+		this.sheets[sheet] = { element, size: "", ...(this.sheets[sheet].picture ? { picture: this.sheets[sheet].picture } : {}) };
 		this.schedule();
+	}
+
+	/** The SVG the click shapes are written into, among the boards and over the over sheet. */
+	attachHits(svg: SVGSVGElement): void {
+		this.hits = svg;
+		this.writeHits();
+	}
+
+	/** Whether a top-level item is drawn under the boards. */
+	isUnder(id: string): boolean {
+		return this.under.has(id);
+	}
+
+	private split(nodes: readonly PenNode[]) {
+		return { under: nodes.filter((node) => this.under.has(node.id)), over: nodes.filter((node) => !this.under.has(node.id)) };
 	}
 
 	setDoc(doc: PenDocument | undefined, base: string): void {
@@ -224,10 +263,10 @@ export class PenLayer {
 		this.disposed = true;
 		this.dropSlide();
 		cancelAnimationFrame(this.frame);
-		this.picture?.delete();
-		this.picture = undefined;
-		this.surface?.delete();
-		this.surface = undefined;
+		for (const sheet of Object.values(this.sheets)) {
+			sheet.picture?.delete();
+			sheet.surface?.delete();
+		}
 		for (const image of this.images.values()) if (typeof image === "object") image.delete();
 		this.images.clear();
 	}
@@ -266,12 +305,18 @@ export class PenLayer {
 		const { ck, fonts } = this;
 		let doc = this.doc;
 		if (!ck || !fonts) return;
-		this.picture?.delete();
-		this.picture = undefined;
+		for (const sheet of Object.values(this.sheets)) {
+			sheet.picture?.delete();
+			delete sheet.picture;
+		}
 		this.placed = new Map();
 		this.bounds = new Map();
 		this.dropSlide();
-		if (!doc || doc.children.length === 0) return;
+		if (!doc || doc.children.length === 0) {
+			this.under = new Set();
+			this.writeHits();
+			return;
+		}
 		const theme = baseTheme(doc, this.scheme);
 		/*
 		 * Arrows are routed here as well as on the server: a file written by hand, or a board dragged
@@ -310,11 +355,16 @@ export class PenLayer {
 		this.bounds = boundsOf(placed);
 		this.drawnDoc = this.doc;
 		this.painted = { nodes, doc, placed };
-		const recorder = new ck.PictureRecorder();
-		const canvas = recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7));
-		paintDocument(canvas, nodes, { ck, fonts, doc, placed, scheme: this.scheme, image: (url) => this.image(url), icon: (library, name, weight) => this.icons.get(library, name, weight) });
-		this.picture = recorder.finishRecordingAsPicture();
-		recorder.delete();
+		this.under = backdrops(nodes, this.bounds, placed);
+		const ctx = { ck, fonts, doc, placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight) };
+		const parts = this.split(nodes);
+		for (const name of ["under", "over"] as const) {
+			const recorder = new ck.PictureRecorder();
+			paintDocument(recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7)), parts[name], ctx);
+			this.sheets[name].picture = recorder.finishRecordingAsPicture();
+			recorder.delete();
+		}
+		this.writeHits();
 		this.drawn?.();
 	}
 
@@ -338,84 +388,121 @@ export class PenLayer {
 	}
 
 	private render(): void {
-		const { element, ck } = this;
-		if (!element || this.disposed) return;
+		const { ck } = this;
+		if (this.disposed) return;
 		const empty = !this.doc || this.doc.children.length === 0;
-		element.hidden = empty;
+		for (const sheet of Object.values(this.sheets)) if (sheet.element) sheet.element.hidden = empty;
 		if (empty || !ck) return;
-		const dpr = window.devicePixelRatio || 1;
-		const width = Math.max(1, Math.round(this.view.width * dpr));
-		const height = Math.max(1, Math.round(this.view.height * dpr));
-		const size = `${width}x${height}`;
-		if (!this.surface || size !== this.surfaceSize) {
-			this.surface?.delete();
-			element.width = width;
-			element.height = height;
-			this.surface = ck.MakeWebGLCanvasSurface(element) ?? ck.MakeSWCanvasSurface(element) ?? undefined;
-			this.surfaceSize = size;
-			if (!this.surface) return;
-		}
 		if (this.dirty) {
 			this.dirty = false;
 			this.rebuild();
 		}
-		const canvas = this.surface.getCanvas();
-		canvas.clear(ck.TRANSPARENT);
 		if (this.slide && !this.slide.base) this.recordSlide();
-		const slide = this.slide?.base && this.slide.over ? this.slide : undefined;
-		if (this.picture) {
-			canvas.save();
-			canvas.scale(dpr, dpr);
-			canvas.translate(this.view.width / 2, this.view.height / 2);
-			canvas.scale(this.camera.zoom, this.camera.zoom);
-			canvas.translate(-this.camera.x, -this.camera.y);
-			if (slide) {
-				canvas.drawPicture(slide.base!);
-				canvas.translate(slide.dx, slide.dy);
-				canvas.drawPicture(slide.over!);
-			} else canvas.drawPicture(this.picture);
-			canvas.restore();
-		}
-		this.surface.flush();
+		const slide = this.slide?.base && this.slide.carried ? this.slide : undefined;
+		this.paint("under", slide ? slide.base!.under : this.sheets.under.picture);
+		this.paint("over", slide ? slide.base!.over : this.sheets.over.picture, slide ? { picture: slide.carried!, dx: slide.dx, dy: slide.dy } : undefined);
 	}
-}
 
-/**
- * What each item looks like it covers, which is not always the box it was given.
- *
- * A path fills its box with its `viewBox`, so a petal drawn in one corner of a 600 by 700 viewBox
- * has a 600 by 700 box; what it covers is its geometry, mapped into that box, and widened by half
- * its stroke. A group covers what its children cover. Everything else covers its box.
- */
-export function boundsOf(placed: ReadonlyMap<string, Placed>): Map<string, Frame> {
-	const out = new Map<string, Frame>();
-	const children = new Map<string, Placed[]>();
-	for (const item of placed.values()) if (item.parent) (children.get(item.parent) ?? children.set(item.parent, []).get(item.parent)!).push(item);
-	const visit = (item: Placed): Frame => {
-		const known = out.get(item.node.id);
-		if (known) return known;
-		const { node, box } = item;
-		let bounds: Frame = box;
-		if (node.type === "path" && typeof node.geometry === "string") {
-			const drawn = pathBounds(node.geometry);
-			const vb = node.viewBox;
-			if (drawn && vb && vb[2] > 0 && vb[3] > 0) {
-				const sx = box.w / vb[2];
-				const sy = box.h / vb[3];
-				const pad = (typeof node.strokeWidth === "number" && node.stroke !== undefined ? node.strokeWidth : 0) / 2;
-				bounds = { x: box.x + (drawn.x - vb[0]) * sx - pad, y: box.y + (drawn.y - vb[1]) * sy - pad, w: drawn.w * sx + pad * 2, h: drawn.h * sy + pad * 2 };
-			}
-		} else if (node.type === "group") {
-			const kids = (children.get(node.id) ?? []).map(visit);
-			if (kids.length) {
-				const x1 = Math.min(...kids.map((k) => k.x));
-				const y1 = Math.min(...kids.map((k) => k.y));
-				bounds = { x: x1, y: y1, w: Math.max(...kids.map((k) => k.x + k.w)) - x1, h: Math.max(...kids.map((k) => k.y + k.h)) - y1 };
-			}
+	/** Draw one sheet: its picture under the camera, and anything being dragged on top of it. */
+	private paint(name: SheetName, picture: Picture | undefined, carried?: { picture: Picture; dx: number; dy: number }): void {
+		const { ck } = this;
+		const sheet = this.sheets[name];
+		const element = sheet.element;
+		if (!ck || !element) return;
+		const dpr = window.devicePixelRatio || 1;
+		const width = Math.max(1, Math.round(this.view.width * dpr));
+		const height = Math.max(1, Math.round(this.view.height * dpr));
+		const size = `${width}x${height}`;
+		if (!sheet.surface || size !== sheet.size) {
+			sheet.surface?.delete();
+			element.width = width;
+			element.height = height;
+			sheet.surface = ck.MakeWebGLCanvasSurface(element) ?? ck.MakeSWCanvasSurface(element) ?? undefined;
+			sheet.size = size;
+			if (!sheet.surface) return;
 		}
-		out.set(node.id, bounds);
-		return bounds;
-	};
-	for (const item of placed.values()) visit(item);
-	return out;
+		const { x, y, zoom } = this.camera;
+		if (name === "over") {
+			/*
+			 * The over sheet is among the boards, inside their transform, so it is placed back over the
+			 * window: the inverse of the camera. Set here, with the camera this picture is drawn for, so
+			 * between two frames it moves with the boards instead of a frame ahead of them.
+			 */
+			element.style.width = `${this.view.width}px`;
+			element.style.height = `${this.view.height}px`;
+			element.style.transform = `translate(${x - this.view.width / 2 / zoom}px, ${y - this.view.height / 2 / zoom}px) scale(${1 / zoom})`;
+		}
+		const canvas = sheet.surface.getCanvas();
+		canvas.clear(ck.TRANSPARENT);
+		canvas.save();
+		canvas.scale(dpr, dpr);
+		canvas.translate(this.view.width / 2, this.view.height / 2);
+		canvas.scale(zoom, zoom);
+		canvas.translate(-x, -y);
+		if (picture) canvas.drawPicture(picture);
+		if (carried) {
+			canvas.translate(carried.dx, carried.dy);
+			canvas.drawPicture(carried.picture);
+		}
+		canvas.restore();
+		sheet.surface.flush();
+	}
+
+	/**
+	 * The click shapes: one invisible SVG shape per drawn item on the over sheet, in stage units,
+	 * among the boards. A filled shape catches clicks over its area; a line, over a band 12 units
+	 * wide, so a thin arrow can still be picked up. A group has no shape of its own: its children do.
+	 */
+	private writeHits(): void {
+		const svg = this.hits;
+		if (!svg) return;
+		const NS = "http://www.w3.org/2000/svg";
+		const shapes: SVGElement[] = [];
+		const add = (placed: Placed) => {
+			const { node, box } = placed;
+			if (node.id.includes("/") && node.type === "group") return;
+			if (node.type === "browser" && node.metadata?.type === "decks.board") return;
+			if (node.type === "group") return;
+			let shape: SVGElement;
+			if (node.type === "ellipse") {
+				shape = document.createElementNS(NS, "ellipse");
+				shape.setAttribute("cx", String(box.x + box.w / 2));
+				shape.setAttribute("cy", String(box.y + box.h / 2));
+				shape.setAttribute("rx", String(box.w / 2));
+				shape.setAttribute("ry", String(box.h / 2));
+			} else if (node.type === "path" && typeof node.geometry === "string") {
+				const vb = node.viewBox ?? (() => {
+					const b = pathBounds(node.geometry as string);
+					return b ? ([b.x, b.y, b.w, b.h] as const) : undefined;
+				})();
+				if (!vb || vb[2] <= 0 || vb[3] <= 0) return;
+				shape = document.createElementNS(NS, "path");
+				shape.setAttribute("d", node.geometry);
+				shape.setAttribute("transform", `translate(${box.x} ${box.y}) scale(${box.w / vb[2]} ${box.h / vb[3]}) translate(${-vb[0]} ${-vb[1]})`);
+				const filled = node.fill !== undefined && node.fill !== null;
+				shape.setAttribute("stroke-width", String(Math.max(12, typeof node.strokeWidth === "number" ? node.strokeWidth : 0)));
+				shape.setAttribute("vector-effect", "non-scaling-stroke");
+				shape.style.pointerEvents = filled ? "all" : "stroke";
+			} else {
+				const bounds = this.bounds.get(node.id) ?? box;
+				shape = document.createElementNS(NS, "rect");
+				shape.setAttribute("x", String(bounds.x));
+				shape.setAttribute("y", String(bounds.y));
+				shape.setAttribute("width", String(Math.max(0, bounds.w)));
+				shape.setAttribute("height", String(Math.max(0, bounds.h)));
+			}
+			shape.setAttribute("class", "pen-hit");
+			shape.setAttribute("fill", "none");
+			shape.setAttribute("stroke", "none");
+			shape.dataset.id = node.id;
+			shapes.push(shape);
+		};
+		for (const placed of this.placed.values()) {
+			let top = placed;
+			while (top.parent) top = this.placed.get(top.parent) ?? top;
+			if (top.parent || this.under.has(top.node.id)) continue;
+			add(placed);
+		}
+		svg.replaceChildren(...shapes);
+	}
 }
