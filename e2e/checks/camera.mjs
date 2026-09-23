@@ -346,13 +346,14 @@ say("…and every board that is on screen still has one", bars.bars === bars.nea
  * Zooming in puts every other board outside the margin within a few steps, and zooming out
  * brings them back: unloading on the way in and parsing again on the way out was 37ms per
  * step of `Document::shutdown` in the middle of the gesture, and every document rebuilt in
- * the middle of the next. So the boards that just left are still documents here — and are
- * let go once they have been gone for a few seconds.
+ * the middle of the next. So the boards that just left are still documents here. On a stage of
+ * this size (up to `KEEP_ALL` in `board-admission.ts`) they stay documents: letting them go after a
+ * few seconds made every pan back to one a white box that filled in. A large stage still lets go.
  */
 say("…while the boards that just left the screen keep their documents for now", bars.documents === bars.nodes, `${bars.documents} of ${bars.nodes}`);
 await settle(page, 3600);
 const later = await barsNow();
-say("…and are let go once they have been gone a few seconds", later.documents < later.nodes && later.documents >= later.bars, JSON.stringify(later));
+say("…and, on a stage of seven, still have them seconds later, so panning back is not a white box", later.documents === later.nodes, JSON.stringify(later));
 
 /*
  * 7. A middle-drag over a board moves the canvas exactly as far as the mouse.
@@ -506,6 +507,35 @@ for (let d = -1; d <= 3; d += 0.5) {
 	}
 }
 say("a scroll landing on a board's outline pans the canvas", stuck.length === 0, stuck.join(", ") || "every point panned");
+
+/*
+ * A pan does not reload boards. A board that had been off screen for a few seconds used to be
+ * given a document at the first step of a pan, had it taken away when the pan brought it into
+ * view, and got a third at the end: a white box that filled in, twice. Now a stage this size keeps
+ * every document it has loaded, and none is started or stopped by the pan itself.
+ */
+await page.keyboard.press("0");
+await settle(page, 900);
+await page.locator(".board-node .chrome").first().click();
+await page.keyboard.press("1");
+await settle(page, 5000);
+await page.evaluate(() => {
+	window.__frameChurn = [];
+	new MutationObserver((records) => {
+		for (const r of records) {
+			for (const n of r.addedNodes) if (n.nodeName === "IFRAME") window.__frameChurn.push("+");
+			for (const n of r.removedNodes) if (n.nodeName === "IFRAME") window.__frameChurn.push("-");
+		}
+	}).observe(document.querySelector(".world"), { subtree: true, childList: true });
+});
+await page.mouse.move(700, 450);
+for (let i = 0; i < 40; i++) {
+	await page.mouse.wheel(40, 0);
+	await page.waitForTimeout(20);
+}
+await settle(page, 1200);
+const churn = await page.evaluate(() => window.__frameChurn.join(""));
+say("a pan neither drops nor reloads a board's page", !churn.includes("-"), churn || "no frames added or removed");
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();
