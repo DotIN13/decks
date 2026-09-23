@@ -15,7 +15,9 @@
     "@decks/pen": "*",
     "@decks/protocol": "*",
     "canvaskit-wasm": "^0.42.0",
+    "highlight.js": "^11.12.0",
     "lucide-solid": "^1.37.0",
+    "marked": "^15.0.12",
     "solid-js": "^1.9.14"
   },
   "devDependencies": {

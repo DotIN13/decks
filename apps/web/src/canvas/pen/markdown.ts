@@ -1,142 +1,268 @@
+import { Lexer, type Token, type Tokens } from "marked";
+
 /**
- * The markdown a card on the stage is written in, read into blocks the canvas can set.
+ * The markdown a card on the stage is written in, read the way GitHub reads it.
  *
  * pen has no rich text: a note's `content` is a plain string. A card is a note whose metadata says
- * `{ "type": "decks.markdown" }`, and Decks reads its words as markdown; pen.dev, which knows
- * nothing of the mark, shows the same words as they were typed. So this is a small reader for what
- * a card needs — headings, paragraphs, lists, quotes, fenced code, and inside a line bold, italic,
- * code and links — not a full CommonMark parser. What it does not know stays as the words it is.
+ * `{ "type": "decks.markdown" }`, and Decks reads its words as GitHub-flavoured markdown; pen.dev,
+ * which knows nothing of the mark, shows the same words as they were typed.
+ *
+ * `marked`'s lexer does the reading — CommonMark and GFM: tables, task lists, strikethrough,
+ * autolinks, reference links, nested blocks — and this file turns its tokens into the handful of
+ * blocks and styled runs the canvas lays out (`markdown-layout.ts`). What GitHub adds on top of
+ * GFM is done here: footnotes, the `> [!NOTE]` alerts and `:emoji:` shortcodes. Raw HTML is shown
+ * as the words inside it, with `<br>` as a break.
  */
 
 export interface Run {
 	text: string;
 	bold?: boolean;
 	italic?: boolean;
+	strike?: boolean;
 	code?: boolean;
 	/** Where a link goes; the run is its words. */
 	link?: string;
+	/** A footnote's number, set small. */
+	sup?: boolean;
+	/** An image in a line, shown by its words. */
+	image?: { url: string; alt: string };
 }
+
+export type Alert = "note" | "tip" | "important" | "warning" | "caution";
+export type Align = "left" | "center" | "right" | null;
 
 export type Block =
-	| { kind: "heading"; level: 1 | 2 | 3; runs: Run[] }
+	| { kind: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; runs: Run[] }
 	| { kind: "paragraph"; runs: Run[] }
-	| { kind: "item"; ordered: boolean; number: number; depth: number; checked?: boolean; runs: Run[] }
-	| { kind: "quote"; runs: Run[] }
-	| { kind: "code"; text: string }
-	| { kind: "rule" };
+	| { kind: "image"; url: string; alt: string }
+	| { kind: "list"; ordered: boolean; start: number; loose: boolean; items: Array<{ checked?: boolean; blocks: Block[] }> }
+	| { kind: "quote"; alert?: Alert; blocks: Block[] }
+	| { kind: "code"; lang: string; text: string }
+	| { kind: "table"; align: Align[]; header: Run[][]; rows: Run[][][] }
+	| { kind: "rule" }
+	| { kind: "footnotes"; items: Array<{ number: number; blocks: Block[] }> };
 
-/** The words inside a line, split into styled runs. */
-export function inline(text: string): Run[] {
-	const runs: Run[] = [];
-	const push = (run: Run) => {
-		if (!run.text) return;
-		const last = runs.at(-1);
-		if (last && !last.link && !run.link && !!last.bold === !!run.bold && !!last.italic === !!run.italic && !!last.code === !!run.code) last.text += run.text;
-		else runs.push(run);
-	};
-	const walk = (s: string, style: { bold?: boolean; italic?: boolean }) => {
-		let i = 0;
-		let plain = "";
-		const flush = () => {
-			push({ text: plain, ...style });
-			plain = "";
-		};
-		while (i < s.length) {
-			const rest = s.slice(i);
-			// `code`: nothing inside is read.
-			const code = /^`([^`]+)`/.exec(rest);
-			if (code) {
-				flush();
-				push({ text: code[1]!, code: true, ...style });
-				i += code[0].length;
-				continue;
-			}
-			// [words](url)
-			const link = /^\[([^\]]+)\]\(([^)\s]+)\)/.exec(rest);
-			if (link) {
-				flush();
-				for (const run of inline(link[1]!)) push({ ...run, ...style, ...(run.bold ? { bold: true } : {}), link: link[2]! });
-				i += link[0].length;
-				continue;
-			}
-			// **bold** or __bold__
-			const bold = /^(\*\*|__)(?=\S)([\s\S]*?\S)\1/.exec(rest);
-			if (bold) {
-				flush();
-				walk(bold[2]!, { ...style, bold: true });
-				i += bold[0].length;
-				continue;
-			}
-			// *italic* or _italic_, and an underscore inside a word is only an underscore
-			const italic = /^(\*|_)(?=\S)([\s\S]*?\S)\1(?![\w*])/.exec(rest);
-			if (italic && !(italic[1] === "_" && /\w$/.test(plain))) {
-				flush();
-				walk(italic[2]!, { ...style, italic: true });
-				i += italic[0].length;
-				continue;
-			}
-			plain += s[i];
-			i += 1;
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", copy: "©", reg: "®", trade: "™", hellip: "…", mdash: "—", ndash: "–", larr: "←", rarr: "→", uarr: "↑", darr: "↓", times: "×", middot: "·", bull: "•", deg: "°" };
+export function decodeEntities(text: string): string {
+	return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, name: string) => {
+		if (name[0] === "#") {
+			const code = name[1] === "x" || name[1] === "X" ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+			return Number.isFinite(code) ? String.fromCodePoint(code) : whole;
 		}
-		flush();
-	};
-	walk(text, {});
-	return runs;
+		return ENTITIES[name.toLowerCase()] ?? whole;
+	});
 }
+
+/** GitHub's shortcodes for the emoji people actually type. */
+const EMOJI: Record<string, string> = {
+	smile: "😄", smiley: "😃", grin: "😁", laughing: "😆", joy: "😂", wink: "😉", blush: "😊", heart_eyes: "😍", thinking: "🤔", neutral_face: "😐", confused: "😕", cry: "😢", sob: "😭", scream: "😱", sweat_smile: "😅", sunglasses: "😎", upside_down_face: "🙃", eyes: "👀",
+	"+1": "👍", thumbsup: "👍", "-1": "👎", thumbsdown: "👎", clap: "👏", wave: "👋", pray: "🙏", muscle: "💪", point_right: "👉", point_left: "👈", ok_hand: "👌", raised_hands: "🙌",
+	heart: "❤️", broken_heart: "💔", fire: "🔥", star: "⭐", sparkles: "✨", tada: "🎉", rocket: "🚀", zap: "⚡", boom: "💥", bulb: "💡", memo: "📝", pencil: "✏️", pushpin: "📌", link: "🔗", lock: "🔒", key: "🔑", bell: "🔔", mag: "🔍", bookmark: "🔖", books: "📚", book: "📖", calendar: "📅", clock: "🕐", hourglass: "⌛", chart_with_upwards_trend: "📈", chart_with_downwards_trend: "📉", bar_chart: "📊", package: "📦", gear: "⚙️", wrench: "🔧", hammer: "🔨", bug: "🐛", construction: "🚧", rotating_light: "🚨", warning: "⚠️", no_entry: "⛔", x: "❌", white_check_mark: "✅", heavy_check_mark: "✔️", ballot_box_with_check: "☑️", question: "❓", exclamation: "❗", information_source: "ℹ️", arrow_right: "➡️", arrow_left: "⬅️", arrow_up: "⬆️", arrow_down: "⬇️", recycle: "♻️", checkered_flag: "🏁", trophy: "🏆", gift: "🎁", art: "🎨", computer: "💻", iphone: "📱", globe_with_meridians: "🌐", earth_americas: "🌎", sun: "☀️", cloud: "☁️", umbrella: "☂️", snowflake: "❄️", coffee: "☕", pizza: "🍕", seedling: "🌱", herb: "🌿", money_with_wings: "💸", dollar: "💵", moneybag: "💰", speech_balloon: "💬", thought_balloon: "💭", lipstick: "💄", robot: "🤖", brain: "🧠", test_tube: "🧪", microscope: "🔬", telescope: "🔭", 100: "💯",
+};
+const emojify = (text: string) => text.replace(/:([a-z0-9_+-]+):/g, (whole, name: string) => EMOJI[name] ?? whole);
 
 /** A card's markdown, as the blocks it is drawn in, top to bottom. */
 export function parseMarkdown(source: string): Block[] {
-	const blocks: Block[] = [];
-	const lines = source.replace(/\r\n?/g, "\n").split("\n");
-	let paragraph: string[] = [];
-	const endParagraph = () => {
-		if (paragraph.length) blocks.push({ kind: "paragraph", runs: inline(paragraph.join(" ")) });
-		paragraph = [];
-	};
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i]!;
-		if (/^\s*```/.test(line)) {
-			endParagraph();
-			const body: string[] = [];
-			for (i += 1; i < lines.length && !/^\s*```/.test(lines[i]!); i++) body.push(lines[i]!);
-			blocks.push({ kind: "code", text: body.join("\n") });
-			continue;
-		}
-		if (!line.trim()) {
-			endParagraph();
-			continue;
-		}
-		const heading = /^(#{1,6})\s+(.*)$/.exec(line);
-		if (heading) {
-			endParagraph();
-			blocks.push({ kind: "heading", level: Math.min(3, heading[1]!.length) as 1 | 2 | 3, runs: inline(heading[2]!.replace(/\s+#+\s*$/, "")) });
-			continue;
-		}
-		if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
-			endParagraph();
-			blocks.push({ kind: "rule" });
-			continue;
-		}
-		const item = /^(\s*)([-*+]|(\d+)[.)])\s+(.*)$/.exec(line);
-		if (item) {
-			endParagraph();
-			const depth = Math.min(4, Math.floor(item[1]!.replace(/\t/g, "  ").length / 2));
-			let text = item[4]!;
-			const task = /^\[([ xX])\]\s+(.*)$/.exec(text);
-			if (task) text = task[2]!;
-			blocks.push({ kind: "item", ordered: !!item[3], number: item[3] ? Number(item[3]) : 0, depth, ...(task ? { checked: task[1] !== " " } : {}), runs: inline(text) });
-			continue;
-		}
-		const quote = /^\s*>\s?(.*)$/.exec(line);
-		if (quote) {
-			endParagraph();
-			const last = blocks.at(-1);
-			if (last?.kind === "quote" && lines[i - 1]?.trim().startsWith(">")) last.runs.push(...inline(` ${quote[1]}`));
-			else blocks.push({ kind: "quote", runs: inline(quote[1]!) });
-			continue;
-		}
-		paragraph.push(line.trim());
-	}
-	endParagraph();
+	const { body, notes } = footnotesOf(source.replace(/\r\n?/g, "\n"));
+	const numbers = new Map<string, number>();
+	const tokens = new Lexer({ gfm: true, breaks: false }).lex(body);
+	const blocks = blocksOf(tokens, numbers);
+	// GitHub lists footnotes in the order they are first cited, and leaves out the ones never cited.
+	const items = [...numbers].flatMap(([label, number]) => {
+		const text = notes.get(label);
+		return text === undefined ? [] : [{ number, blocks: blocksOf(new Lexer({ gfm: true }).lex(text), numbers) }];
+	});
+	if (items.length) blocks.push({ kind: "footnotes", items });
 	return blocks;
+}
+
+/** Take `[^label]: text` definitions, and the indented lines under them, out of the source. */
+function footnotesOf(source: string): { body: string; notes: Map<string, string> } {
+	const notes = new Map<string, string>();
+	const out: string[] = [];
+	const lines = source.split("\n");
+	for (let i = 0; i < lines.length; i++) {
+		const def = /^\[\^([^\]\s]+)\]:\s?(.*)$/.exec(lines[i]!);
+		if (!def) {
+			out.push(lines[i]!);
+			continue;
+		}
+		const text = [def[2]!];
+		while (i + 1 < lines.length && /^( {2,}|\t)\S/.test(lines[i + 1]!)) text.push(lines[++i]!.trim());
+		notes.set(def[1]!, text.join("\n"));
+	}
+	return { body: out.join("\n"), notes };
+}
+
+function blocksOf(tokens: readonly Token[], notes: Map<string, number>): Block[] {
+	const out: Block[] = [];
+	for (const token of tokens) {
+		switch (token.type) {
+			case "heading": {
+				const t = token as Tokens.Heading;
+				out.push({ kind: "heading", level: Math.min(6, Math.max(1, t.depth)) as 1, runs: runsOf(t.tokens, notes) });
+				break;
+			}
+			case "paragraph":
+			case "text": {
+				const t = token as Tokens.Paragraph | Tokens.Text;
+				const runs = t.tokens ? runsOf(t.tokens, notes) : textRuns(t.text, {}, notes);
+				// An image on a line of its own is drawn as the picture.
+				const only = runs.filter((run) => run.image || run.text.trim());
+				if (only.length === 1 && only[0]!.image) out.push({ kind: "image", url: only[0]!.image.url, alt: only[0]!.image.alt });
+				else if (runs.length) out.push({ kind: "paragraph", runs });
+				break;
+			}
+			case "list": {
+				const t = token as Tokens.List;
+				out.push({
+					kind: "list",
+					ordered: t.ordered,
+					start: typeof t.start === "number" ? t.start : 1,
+					loose: t.loose,
+					items: t.items.map((item) => ({ ...(item.task ? { checked: !!item.checked } : {}), blocks: blocksOf(item.tokens.filter((x) => x.type !== "checkbox"), notes) })),
+				});
+				break;
+			}
+			case "blockquote": {
+				const t = token as Tokens.Blockquote;
+				const inner = blocksOf(t.tokens, notes);
+				// GitHub's alerts: a quote whose first line is [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION].
+				const first = inner[0];
+				const mark = first?.kind === "paragraph" ? /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i.exec(first.runs[0]?.text ?? "") : null;
+				if (mark && first?.kind === "paragraph") {
+					first.runs[0] = { ...first.runs[0]!, text: first.runs[0]!.text.slice(mark[0].length) };
+					if (!first.runs[0].text) first.runs.shift();
+					if (!first.runs.some((run) => run.text.trim() || run.image)) inner.shift();
+					out.push({ kind: "quote", alert: mark[1]!.toLowerCase() as Alert, blocks: inner });
+				} else out.push({ kind: "quote", blocks: inner });
+				break;
+			}
+			case "code": {
+				const t = token as Tokens.Code;
+				out.push({ kind: "code", lang: (t.lang ?? "").trim().split(/\s+/)[0]!.toLowerCase(), text: t.text });
+				break;
+			}
+			case "table": {
+				const t = token as Tokens.Table;
+				out.push({ kind: "table", align: t.align, header: t.header.map((cell) => runsOf(cell.tokens, notes)), rows: t.rows.map((row) => row.map((cell) => runsOf(cell.tokens, notes))) });
+				break;
+			}
+			case "hr":
+				out.push({ kind: "rule" });
+				break;
+			case "html": {
+				// Raw HTML is shown as the words in it, a <br> as a break and a block tag as a new paragraph.
+				const text = decodeEntities(token.raw.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h\d|tr|summary|details)>/gi, "\n").replace(/<[^>]+>/g, "")).trim();
+				for (const line of text.split(/\n{2,}/)) if (line.trim()) out.push({ kind: "paragraph", runs: textRuns(line, {}, notes) });
+				break;
+			}
+			default:
+				break; // space, def: nothing to draw
+		}
+	}
+	return out;
+}
+
+type Style = Omit<Run, "text" | "image">;
+
+/** Plain words, with their `[^label]` footnote marks and `:shortcodes:` turned into what they stand for. */
+function textRuns(text: string, style: Style, notes: Map<string, number>): Run[] {
+	const out: Run[] = [];
+	const parts = emojify(decodeEntities(text)).split(/(\[\^[^\]\s]+\])/);
+	for (const part of parts) {
+		const mark = /^\[\^([^\]\s]+)\]$/.exec(part);
+		if (mark) {
+			if (!notes.has(mark[1]!)) notes.set(mark[1]!, notes.size + 1);
+			out.push({ text: String(notes.get(mark[1]!)), ...style, sup: true });
+		} else if (part) out.push({ text: part, ...style });
+	}
+	return out;
+}
+
+function runsOf(tokens: readonly Token[] | undefined, notes: Map<string, number>, style: Style = {}): Run[] {
+	const out: Run[] = [];
+	for (const token of tokens ?? []) {
+		switch (token.type) {
+			case "text": {
+				const t = token as Tokens.Text;
+				out.push(...(t.tokens ? runsOf(t.tokens, notes, style) : textRuns(t.text, style, notes)));
+				break;
+			}
+			case "escape":
+				out.push({ text: (token as Tokens.Escape).text, ...style });
+				break;
+			case "strong":
+				out.push(...runsOf((token as Tokens.Strong).tokens, notes, { ...style, bold: true }));
+				break;
+			case "em":
+				out.push(...runsOf((token as Tokens.Em).tokens, notes, { ...style, italic: true }));
+				break;
+			case "del":
+				out.push(...runsOf((token as Tokens.Del).tokens, notes, { ...style, strike: true }));
+				break;
+			case "codespan":
+				out.push({ text: decodeEntities((token as Tokens.Codespan).text), ...style, code: true });
+				break;
+			case "br":
+				out.push({ text: "\n", ...style });
+				break;
+			case "link": {
+				const t = token as Tokens.Link;
+				out.push(...runsOf(t.tokens, notes, { ...style, link: t.href }));
+				break;
+			}
+			case "image": {
+				const t = token as Tokens.Image;
+				out.push({ text: t.text || "image", ...style, image: { url: t.href, alt: t.text } });
+				break;
+			}
+			case "html": {
+				const raw = token.raw;
+				if (/^<br\s*\/?>$/i.test(raw)) out.push({ text: "\n", ...style });
+				else if (!/^<\/?[a-z][^>]*>$/i.test(raw)) out.push(...textRuns(raw.replace(/<[^>]+>/g, ""), style, notes));
+				break;
+			}
+			default:
+				if ("text" in token && typeof token.text === "string") out.push(...textRuns(token.text, style, notes));
+		}
+	}
+	// Neighbours in the same style become one run.
+	const merged: Run[] = [];
+	for (const run of out) {
+		const last = merged.at(-1);
+		if (last && !last.image && !run.image && sameStyle(last, run)) last.text += run.text;
+		else merged.push({ ...run });
+	}
+	return merged;
+}
+
+const sameStyle = (a: Run, b: Run) => !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike && !!a.code === !!b.code && !!a.sup === !!b.sup && a.link === b.link;
+
+/** Every word a card will draw, for fetching the fonts it needs before it is laid out. */
+export function wordsOf(blocks: readonly Block[]): string {
+	const runs = (list: readonly Run[]) => list.map((run) => run.text).join("");
+	return blocks
+		.map((block) => {
+			switch (block.kind) {
+				case "heading":
+				case "paragraph":
+					return runs(block.runs);
+				case "image":
+					return block.alt;
+				case "list":
+					return block.items.map((item) => wordsOf(item.blocks)).join("\n");
+				case "quote":
+					return wordsOf(block.blocks);
+				case "code":
+					return block.text;
+				case "table":
+					return [...block.header, ...block.rows.flat()].map(runs).join(" ");
+				case "footnotes":
+					return block.items.map((item) => wordsOf(item.blocks)).join("\n");
+				default:
+					return "";
+			}
+		})
+		.join("\n");
 }

@@ -461,9 +461,7 @@ function paintMarkdown(canvas: Canvas, ctx: PaintContext, node: PenNode, theme: 
 	if (!content) return;
 	const style = textStyleOf(ctx.doc, node, theme);
 	const { x, y, w } = placed.box;
-	const md = ctx.fonts.markdown(content, style, { color: rgbaColor(ctx.ck, color(ctx.doc, "#1f2328", theme)!), width: w - NOTE_PAD * 2, align: node.textAlign ?? "left" });
-	md.draw(canvas, x + NOTE_PAD, y + NOTE_PAD);
-	md.delete();
+	ctx.fonts.markdown(content, style, { width: w - NOTE_PAD * 2, align: node.textAlign ?? "left" }).draw(canvas, x + NOTE_PAD, y + NOTE_PAD);
 }
 
 // --- icons -------------------------------------------------------------------------------------

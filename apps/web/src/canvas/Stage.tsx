@@ -997,7 +997,7 @@ export function Stage(props: {
 	 * around it and draws guides (⌘ or Ctrl held turns that off), Shift keeps it to one axis, and Alt
 	 * lets go of copies of the items, leaving the originals where they were.
 	 */
-	const dragSelection = (event: PointerEvent, ids: readonly string[], boards: readonly string[], on?: HTMLElement) => {
+	const dragSelection = (event: PointerEvent, ids: readonly string[], boards: readonly string[], on?: HTMLElement, onTap?: () => void) => {
 		const start = selectionBox(ids, boards);
 		const targets = snapTargets(ids, boards);
 		let offset = { dx: 0, dy: 0 };
@@ -1031,6 +1031,7 @@ export function Stage(props: {
 					setGuides([]);
 					if (!moved) {
 						setBoardDrag(undefined);
+						onTap?.();
 						return;
 					}
 					if (e.altKey && ids.length) {
@@ -1045,6 +1046,20 @@ export function Stage(props: {
 			on,
 		);
 	};
+
+	/** A card's link, followed in a new tab; a relative one is read against the stage's folder. */
+	const openLink = (href: string) => {
+		let url: URL;
+		try {
+			url = new URL(href, new URL(props.pen?.base || "/", location.href));
+		} catch {
+			return;
+		}
+		if (url.protocol !== "http:" && url.protocol !== "https:" && url.protocol !== "mailto:") return;
+		window.open(url.href, "_blank", "noopener,noreferrer");
+	};
+	/** A link is under the pointer: the cursor says so. */
+	const [overLink, setOverLink] = createSignal(false);
 
 	/** A press on the drawing; true when it was the drawing's to handle. */
 	const penPress = (event: PointerEvent): boolean => {
@@ -1076,7 +1091,13 @@ export function Stage(props: {
 				setBoardPicks([]);
 			}
 			setHoverId(undefined);
-			dragSelection(event, moving, boards);
+			/*
+			 * A link in a card: a click that does not move follows it, in a new tab. While browsing,
+			 * any click; while editing, where a click is for selecting, one with ⌘ or Ctrl.
+			 */
+			const href = penLayer.linkAt(at);
+			const follows = href && (props.mode === "browse" || event.metaKey || event.ctrlKey);
+			dragSelection(event, moving, boards, undefined, follows ? () => openLink(href) : undefined);
 			return true;
 		}
 		/*
@@ -2043,15 +2064,20 @@ export function Stage(props: {
 	let hoverFrame: number | undefined;
 	let hoverAt: { x: number; y: number } | undefined;
 	const onHover = (event: PointerEvent) => {
-		if (event.pointerType === "touch" || !props.onPenEdit || props.drawing || props.mode !== "edit") return;
+		if (event.pointerType === "touch" || !props.onPenEdit || props.drawing) return;
 		if (event.buttons !== 0 || penTool() !== "select" || !onCanvas(event.target)) {
 			hoverAt = undefined;
 			if (hoverId()) setHoverId(undefined);
+			if (overLink()) setOverLink(false);
 			return;
 		}
 		hoverAt = worldAt(event);
 		hoverFrame ??= requestAnimationFrame(() => {
 			hoverFrame = undefined;
+			const href = hoverAt ? penLayer.linkAt(hoverAt) : undefined;
+			setOverLink(!!href && props.mode === "browse");
+			// The outline is edit mode's; browsing shows only the hand over a link.
+			if (props.mode !== "edit") return;
 			const hit = hoverAt ? penLayer.hitTest(hoverAt) : undefined;
 			setHoverId(hit && !penSelection().includes(hit.id) ? hit.id : undefined);
 		});
@@ -2136,6 +2162,8 @@ export function Stage(props: {
 				openPenText(deep);
 				return;
 			}
+			const href = props.mode === "browse" ? penLayer.linkAt(at) : undefined;
+			if (href) return openLink(href);
 			lastTap = { id: hit.id, at: performance.now() };
 			props.onSelect(undefined);
 			setBoardPicks([]);
@@ -2463,9 +2491,12 @@ export function Stage(props: {
 			onWheel={onWheel}
 			onPointerDown={onPointerDown}
 			onPointerMove={onHover}
-			onPointerLeave={() => setHoverId(undefined)}
+			onPointerLeave={() => {
+				setHoverId(undefined);
+				setOverLink(false);
+			}}
 			onDblClick={onDblClick}
-			style={{ cursor: spaceHeld() ? "grab" : undefined }}
+			style={{ cursor: spaceHeld() ? "grab" : overLink() ? "pointer" : undefined }}
 		>
 			{/*
 			 * The focus view is a *sibling* of the world, and the world stays where it is.

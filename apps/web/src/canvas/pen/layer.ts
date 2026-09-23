@@ -1,5 +1,5 @@
 import type { CanvasKit, Image, SkPicture as Picture, Surface } from "canvaskit-wasm";
-import { baseTheme, expand, indexOf, isArrow, isMarkdown, layout, pathBounds, reroute, walk, textStyleOf, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { baseTheme, expand, indexOf, isArrow, isMarkdown, layout, NOTE_PAD, pathBounds, reroute, resolve, walk, textStyleOf, withTheme, type Frame, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 
 /** A drag or a resize in progress: moved by `dx dy`, and sized `w h` when resizing. */
 export interface PenPreview {
@@ -18,6 +18,7 @@ export interface PenHit {
 import type { Camera } from "@decks/protocol";
 import { canvasKit } from "./canvaskit.ts";
 import { MONO_FAMILY, PenFonts, type FontNeed } from "./fonts.ts";
+import { parseMarkdown, wordsOf } from "./markdown.ts";
 import { PenIcons } from "./icons.ts";
 import { paintDocument } from "./paint.ts";
 import { backdrops, boundsOf } from "./bounds.ts";
@@ -122,6 +123,31 @@ export class PenLayer {
 	 * Every item wholly inside a stage rectangle, leaving out any whose parent is picked too:
 	 * what a marquee selects. Boards and the inside of an instance are not items to select.
 	 */
+	/**
+	 * The link under a stage point, in a markdown card: where a press there would go. The card's
+	 * layout is the one it was drawn with (`fonts.markdown` keeps it), so the boxes are exact.
+	 */
+	linkAt(point: { x: number; y: number }): string | undefined {
+		const fonts = this.fonts;
+		const doc = this.drawnDoc;
+		if (!fonts || !doc) return undefined;
+		let found: string | undefined;
+		let order = -1;
+		for (const placed of this.placed.values()) {
+			const { node, box } = placed;
+			if (!isMarkdown(node) || placed.order < order || this.hidden.has(node.id)) continue;
+			if (point.x < box.x || point.x > box.x + box.w || point.y < box.y || point.y > box.y + box.h) continue;
+			const content = String(resolve(doc, node.content, withTheme(placed.theme, node)) ?? "");
+			const card = fonts.markdown(content, textStyleOf(doc, node, placed.theme), { width: box.w - NOTE_PAD * 2, align: node.textAlign ?? "left" });
+			const x = point.x - box.x - NOTE_PAD;
+			const y = point.y - box.y - NOTE_PAD;
+			const link = card.links.find((l) => x >= l.x && x <= l.x + l.w && y >= l.y && y <= l.y + l.h);
+			order = placed.order;
+			found = link?.href;
+		}
+		return found;
+	}
+
 	within(r: Frame): string[] {
 		const index = this.doc ? indexOf(this.doc) : new Map();
 		const inside = new Set<string>();
@@ -299,6 +325,7 @@ export class PenLayer {
 			if (this.disposed) return;
 			this.ck = ck;
 			this.fonts = new PenFonts(ck);
+			this.fonts.images = (url) => this.image(url);
 			this.dirty = true;
 			this.schedule();
 		});
@@ -322,10 +349,11 @@ export class PenLayer {
 			needs.push({ family: style.fontFamily, weight: style.fontWeight, italic: style.fontStyle === "italic", text: node.content });
 			// A markdown card sets headings and bold heavier, emphasis in italic and code in a monospace face.
 			if (isMarkdown(node)) {
-				// The list and task markers are signs Inter does not draw: asked for with the words.
-				needs.push({ family: style.fontFamily, weight: 400, italic: false, text: "◦☐☑" });
+				// The words as drawn (emoji for their shortcodes, and so on), and the list markers and the
+				// picture sign, which are signs Inter does not draw.
+				needs.push({ family: style.fontFamily, weight: 400, italic: false, text: `${wordsOf(parseMarkdown(node.content))}◦▪🖼` });
 				needs.push({ family: style.fontFamily, weight: 700, italic: false, text: node.content }, { family: style.fontFamily, weight: 600, italic: false, text: node.content }, { family: style.fontFamily, weight: style.fontWeight, italic: true, text: node.content });
-				if (node.content.includes("`")) needs.push({ family: MONO_FAMILY, weight: 400, italic: false, text: node.content });
+				if (/`|^( {4}|\t)|<code|<pre/m.test(node.content)) needs.push({ family: MONO_FAMILY, weight: 400, italic: false, text: node.content }, { family: MONO_FAMILY, weight: 700, italic: false, text: node.content });
 			}
 		}
 		return needs;
@@ -410,6 +438,7 @@ export class PenLayer {
 			.then((bytes) => {
 				const image = this.ck?.MakeImageFromEncoded(new Uint8Array(bytes));
 				this.images.set(absolute, image ?? "failed");
+				if (this.fonts) this.fonts.imageVersion++;
 				this.dirty = true;
 				this.schedule();
 			})

@@ -114,10 +114,14 @@ box you give it. A text given a box with a width is switched to `"fixed-width"` 
 text at 18 or larger: the stage is read zoomed out.
 
 **Cards.** A card is the drawing's way to say something with structure: a heading, a few points,
-a link. Its words are markdown — `#`, `##`, `###` headings, paragraphs, `-` and `1.` lists (indent
-two spaces to nest), `- [ ]` / `- [x]` tasks, `> ` quotes, fenced code, `---` rules, and inside a
-line `**bold**`, `*italic*`, `` `code` `` and `[words](url)`. Anything else stays as its words.
-Decks draws it; pen.dev, which has no rich text, opens the same note with the markdown as typed.
+a table, a link. Its words are **GitHub-flavoured markdown**, drawn the way GitHub draws it:
+headings `#` to `######`, lists (nested, numbered, `- [ ]` / `- [x]` tasks), `>` quotes and GitHub's
+alerts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`), fenced code with its
+language coloured (` ```ts `), tables with `:--:` alignment, `---` rules, images (`![alt](url)`, a
+path beside the stage file or a web address), footnotes (`[^1]` and `[^1]: …`), and inside a line
+`**bold**`, `*italic*`, `~~struck~~`, `` `code` ``, `[words](url)`, bare `https://` links and
+`:emoji:` shortcodes. Raw HTML shows the words inside it. A person follows a card's link with a
+click. Decks draws it; pen.dev, which has no rich text, opens the same note with the markdown as typed.
 
 ```ts
 { op: "insert", node: { type: "note", id: "plan", metadata: { type: "decks.markdown" },
