@@ -1241,6 +1241,19 @@ export function BoardFrame(props: {
 						</Show>
 					</Match>
 				</Switch>
+				{/*
+					The board's edge, claimed for the canvas.
+
+					A scroll that lands exactly on a board's outline hits the frame's own border pixel,
+					which the frame's document does not cover: the browser sends that wheel to neither
+					document, and a trackpad latches the whole two-finger gesture to where it began, so
+					the canvas would not pan at all until the fingers lifted. This ring, a few screen
+					pixels wide and invisible, is over that pixel and belongs to this document, so the
+					wheel reaches the stage.
+				*/}
+				<svg class="edge" aria-hidden="true">
+					<rect x="0" y="0" width="100%" height="100%" />
+				</svg>
 			</div>
 
 			{/* The sheet the draw tool draws on. Over the surface, so the press never reaches the board. */}
