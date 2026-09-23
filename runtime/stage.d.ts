@@ -100,6 +100,13 @@ export interface Stage {
 	open(name: string): Promise<{ stage: string; boards: string[] }>;
 	newStage(title: string): Promise<{ stage: string }>;
 	/**
+	 * A picture of your stage, or part of it, as the person sees it: drawing and boards together.
+	 * You see it in this call's result; it is also saved to `file`. `of` is an item's id, a board's
+	 * path, a list of them, or a box; nothing is the whole stage. Check your drawing with it after a
+	 * big change. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on.
+	 */
+	screenshot(o?: { of?: string | string[] | Partial<Box>; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark" }): Promise<{ file: string; width: number; height: number; box: Box }>;
+	/**
 	 * Your stage's drawing — notes, text, shapes, arrows and frames, drawn over the boards except a backdrop listed before the board it holds — kept as a
 	 * native pen.dev `.pen` file in pen's own types and fields; the pen-stage skill teaches them.
 	 * `read` gives every item as saved plus its `box` on the stage. `edit` applies edits together or

@@ -5,6 +5,7 @@ import BringToFront from "lucide-solid/icons/bring-to-front";
 import Circle from "lucide-solid/icons/circle";
 import Copy from "lucide-solid/icons/copy";
 import FrameIcon from "lucide-solid/icons/frame";
+import ImageDown from "lucide-solid/icons/image-down";
 import MousePointer2 from "lucide-solid/icons/mouse-pointer-2";
 import RectangleHorizontal from "lucide-solid/icons/rectangle-horizontal";
 import Redo2 from "lucide-solid/icons/redo-2";
@@ -57,7 +58,14 @@ const hexOf = (value: unknown): string | undefined => {
 /** A stroke written in pen's older one-object spelling, which is changed in that spelling. */
 const legacyStroke = (node: PenNode) => (node.stroke && typeof node.stroke === "object" && !Array.isArray(node.stroke) && !("type" in node.stroke) ? (node.stroke as Record<string, unknown>) : undefined);
 
-export function PenBar(props: { doc: PenDocument | undefined; onEdit: (ops: unknown[]) => void; onStep: (direction: "undo" | "redo") => void; onArm: (tool: PenTool) => void }) {
+export function PenBar(props: {
+	doc: PenDocument | undefined;
+	onEdit: (ops: unknown[]) => void;
+	onStep: (direction: "undo" | "redo") => void;
+	onArm: (tool: PenTool) => void;
+	/** Download a picture of these items, taken by the server (`server/stage/shots.ts`). */
+	onExport: (ids: string[]) => void;
+}) {
 	const selected = createMemo(() => {
 		const doc = props.doc;
 		if (!doc) return [];
@@ -262,6 +270,9 @@ export function PenBar(props: { doc: PenDocument | undefined; onEdit: (ops: unkn
 				</button>
 				<button type="button" class="icon-button" title="Duplicate (⌘D)" aria-label="Duplicate" onClick={duplicate}>
 					<Icon of={Copy} size={15} />
+				</button>
+				<button type="button" class="icon-button" title="Export as a picture (PNG)" aria-label="Export as a picture" onClick={() => props.onExport(selected().map((node) => node.id))}>
+					<Icon of={ImageDown} size={15} />
 				</button>
 				<button type="button" class="icon-button" title="Delete (Delete)" aria-label="Delete" onClick={remove}>
 					<Icon of={Trash2} size={15} />

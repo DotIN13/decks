@@ -7,7 +7,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { deckState, editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
+import { API, deckState, editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -85,6 +85,17 @@ const drawn = await until(() => page.evaluate(() => {
 	return !!canvas && !canvas.hidden && canvas.width > 1;
 }), 15000);
 say("the drawing layer is on screen", !!drawn);
+
+// --- a picture of the stage, taken by the server's own Chromium --------------------------------------
+const shotAt = Date.now();
+const shot = await fetch(`${API}/api/stage-shot?agent=${agentId}&of=e2e-note&format=png`);
+const png = Buffer.from(await shot.arrayBuffer());
+const pngSize = png.length > 24 && png.readUInt32BE(0) === 0x89504e47 ? { w: png.readUInt32BE(16), h: png.readUInt32BE(20) } : undefined;
+say("the server takes a PNG of an item on the stage", shot.status === 200 && !!pngSize, `${shot.status} ${JSON.stringify(pngSize)} in ${Date.now() - shotAt} ms`);
+// The note is 240 wide and framed with 24 on each side, at scale 2.
+say("…framed on the item with a margin, at twice the pixels", pngSize?.w === (240 + 48) * 2, JSON.stringify(pngSize));
+const whole = await fetch(`${API}/api/stage-shot?agent=${agentId}&format=pdf`);
+say("…and the whole stage as a PDF", whole.status === 200 && Buffer.from(await whole.arrayBuffer()).subarray(0, 4).toString() === "%PDF", String(whole.status));
 
 // --- a hand edit of the file reaches the browser ----------------------------------------------------
 const revBefore = link.received.filter((m) => m.type === "stage.pen" && m.agentId === agentId).at(-1)?.rev ?? 0;

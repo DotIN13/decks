@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Stage picture</title>
+		<!-- One stage, drawn for a picture the server takes of it (`src/shot.ts`, `server/stage/shots.ts`). -->
+		<style>
+			html,
+			body {
+				margin: 0;
+				height: 100%;
+				overflow: hidden;
+				background: #fafafa;
+			}
+			@media (prefers-color-scheme: dark) {
+				html,
+				body {
+					background: #101010;
+				}
+			}
+			#stage {
+				position: fixed;
+				inset: 0;
+				overflow: hidden;
+			}
+			#stage > canvas.under {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+			}
+			#world {
+				position: absolute;
+				top: 0;
+				left: 0;
+				transform-origin: 0 0;
+			}
+			#world > iframe {
+				position: absolute;
+				border: 0;
+				border-radius: 8px;
+				background: #fff;
+				box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 8px 24px rgb(0 0 0 / 8%);
+			}
+			#world > canvas.over {
+				position: absolute;
+				top: 0;
+				left: 0;
+				z-index: 1;
+				transform-origin: 0 0;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="stage">
+			<canvas class="under"></canvas>
+			<div id="world"><canvas class="over"></canvas></div>
+		</div>
+		<script type="module" src="/src/shot.ts"></script>
+	</body>
+</html>

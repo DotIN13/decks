@@ -158,6 +158,21 @@ await stage.pen.edit([
 instead of a straight line. Set `stroke` and `strokeWidth` if you want a colour or weight other
 than the grey default; a label is a `text` placed by the arrow's `box`.
 
+## Look at it
+
+`stage.screenshot()` takes a picture of your stage as the person sees it, boards and drawing
+together, and hands it to you in the call's result. Check with it after a big change: text that
+overflows a note, an arrow that crosses a board, a frame that clips what is in it are plain in a
+picture and invisible in `read()`.
+
+```ts
+await stage.screenshot();                               // the whole stage
+await stage.screenshot({ of: "summary" });             // one item, with a margin
+await stage.screenshot({ of: ["boards/plan.html", "then"] });
+await stage.screenshot({ of: { x1: 0, y1: 0, x2: 1200, y2: 800 }, scale: 2 });
+await stage.screenshot({ format: "pdf", to: "exports/plan.pdf" });   // a file to hand on
+```
+
 ## Ink
 
 What the person draws with the brush is on the stage too: one `path` per stroke, drawn as it

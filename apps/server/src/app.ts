@@ -15,6 +15,7 @@ import { dispatch } from "./wire/index.ts";
 import type { Reply } from "./wire/context.ts";
 import { WebBridge } from "./browser/bridge.ts";
 import { ThumbService } from "./boards/thumbs.ts";
+import { StageShots } from "./stage/shots.ts";
 import { StageService } from "./stage/service.ts";
 import { ClaudeAccounts, DEFAULT_ACCOUNT } from "./runtimes/claude/accounts.ts";
 import { claudeIdentity } from "./runtimes/claude/backend.ts";
@@ -215,6 +216,18 @@ export class App {
 				if (this.boards.extent(path, rev)) return;
 				if (this.deck.setHeight(path, h)) this.send({ type: "deck.state", deck: this.stageState() });
 			},
+		});
+		/*
+		 * Pictures of a stage (`stage/shots.ts`), in the same Chromium as the board pictures. The page
+		 * it loads, `shot.html`, is part of the web app: served by this server in production, and by
+		 * Vite in development, whose port the dev scripts put in `DECKS_WEB_PORT`.
+		 */
+		const apiOrigin = () => `http://${config.host === "0.0.0.0" || config.host === "::" ? "127.0.0.1" : config.host}:${config.port}`;
+		this.stage.shots = new StageShots({
+			deck: deck.path,
+			pens: this.pens,
+			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : apiOrigin()),
+			borrow: (use) => this.thumbs.borrow(use),
 		});
 		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text }));
 		this.acts = new Acts({

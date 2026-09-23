@@ -743,3 +743,24 @@ test("stage.pen edits the drawing in pen's own words, answers with boxes, and re
 		cleanup();
 	}
 });
+
+test("stage.screenshot hands the picture to the model with the run's result, and names the file", async () => {
+	const { tool, service, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	try {
+		assert.match((await tool.run(`return await stage.screenshot()`)).text, /cannot take pictures/);
+		const asked: unknown[] = [];
+		service.shots = {
+			take: async (request: unknown) => {
+				asked.push(request);
+				return { file: ".decks/shots/ada.png", bytes: Buffer.from("png!"), format: "png", width: 20, height: 10, box: { x1: 0, y1: 0, x2: 10, y2: 5 } };
+			},
+		} as unknown as NonNullable<typeof service.shots>;
+		const result = await tool.run(`return await stage.screenshot({ of: "n", scale: 2 })`);
+		assert.equal(result.isError, false, result.text);
+		assert.equal(JSON.parse(result.text).file, ".decks/shots/ada.png");
+		assert.deepEqual(result.images, [{ data: Buffer.from("png!").toString("base64"), mimeType: "image/png" }]);
+		assert.deepEqual(asked, [{ stage: "ada", of: "n", scale: 2 }]);
+	} finally {
+		cleanup();
+	}
+});

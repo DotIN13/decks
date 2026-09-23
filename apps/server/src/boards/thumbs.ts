@@ -396,6 +396,32 @@ export class ThumbService {
 		}
 	}
 
+	/**
+	 * The same browser, lent for something other than a board picture: a stage screenshot
+	 * (`stage/shots.ts`). Counted as running, so it is not closed under the borrower, and rested
+	 * afterwards like any other use. Throws the sentence the pictures use when there is no Chromium.
+	 */
+	async borrow<T>(use: (browser: Browser) => Promise<T>): Promise<T> {
+		if (this.broken) throw new Error(this.broken);
+		clearTimeout(this.idle);
+		let browser: Browser;
+		try {
+			this.browser ??= this.launch();
+			browser = await this.browser;
+		} catch (error) {
+			this.browser = undefined;
+			this.broken = `No Chromium to take pictures with: ${(error as Error).message.split("\n")[0]}`;
+			throw new Error(this.broken);
+		}
+		this.running += 1;
+		try {
+			return await use(browser);
+		} finally {
+			this.running -= 1;
+			if (this.running === 0 && this.queue.length === 0) this.rest();
+		}
+	}
+
 	private rest(): void {
 		clearTimeout(this.idle);
 		this.idle = setTimeout(() => void this.close(), IDLE_MS);

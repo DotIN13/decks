@@ -6,6 +6,7 @@ import type { Deck } from "../deck/loader.ts";
 import { withBoardSize } from "../deck/meta.ts";
 
 import { fileUrl, resolveFileRequest } from "../deck/roots.ts";
+import type { StageShots } from "./shots.ts";
 import type { StagePens } from "./pens.ts";
 
 /**
@@ -121,6 +122,8 @@ export class StageService {
 	 * `undefined` in tests that build a service without a deck on disk.
 	 */
 	pens: StagePens | undefined;
+	/** Pictures of a stage, taken in the server's own Chromium (`stage/shots.ts`). */
+	shots: StageShots | undefined;
 
 	constructor(
 		private deck: Deck,

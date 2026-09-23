@@ -172,6 +172,49 @@ export function createHttpApp(app: App): Express {
 	);
 
 	/**
+	 * One stage, for `shot.html` to draw (`stage/shots.ts`): its `.pen` document, the folder its
+	 * image fills are read against, and where each board on it is.
+	 */
+	api.get("/stage-pen/:name", (req, res) => {
+		const pens = app.stage.pens;
+		const name = String(req.params.name ?? "");
+		if (!pens || !pens.names().includes(name)) {
+			res.status(404).end();
+			return;
+		}
+		const frame = pens.frame("", name) as { doc: unknown; base: string };
+		res.setHeader("Cache-Control", "no-store");
+		res.json({ doc: frame.doc, base: frame.base, boards: pens.boards(name).map(({ path, x, y, w, h }) => ({ path, x, y, w, h })) });
+	});
+
+	/**
+	 * A picture of what is selected on an agent's stage, to download: the drawing's Export
+	 * button. `of` is a comma-separated list of item ids, or nothing for the whole stage.
+	 */
+	api.get(
+		"/stage-shot",
+		asyncRoute(async (req, res) => {
+			const shots = app.stage.shots;
+			const agent = app.agents.get(String(req.query.agent ?? ""));
+			const stage = agent?.stageName(false);
+			if (!shots || !stage) {
+				res.status(404).type("text").send("That agent has no stage to picture.");
+				return;
+			}
+			const of = typeof req.query.of === "string" && req.query.of ? req.query.of.split(",") : undefined;
+			const format = req.query.format === "jpeg" || req.query.format === "pdf" ? req.query.format : "png";
+			try {
+				const shot = await shots.take({ stage, of, format, scale: 2, scheme: req.query.scheme === "dark" ? "dark" : "light" });
+				res.setHeader("Content-Disposition", `attachment; filename="${stage}.${format === "jpeg" ? "jpg" : format}"`);
+				res.type(format === "pdf" ? "application/pdf" : format === "jpeg" ? "jpeg" : "png");
+				res.send(shot.bytes);
+			} catch (error) {
+				res.status(503).type("text").send((error as Error).message);
+			}
+		}),
+	);
+
+	/**
 	 * The board primitives, reachable from a document not served under `/board`.
 	 *
 	 * A revision preview is served at `/api/revision/<sha>`, so the `../lib/board.css` in

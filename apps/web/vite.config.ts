@@ -1,4 +1,5 @@
 import tailwind from "@tailwindcss/vite";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
 
@@ -73,5 +74,13 @@ export default defineConfig({
 			"/ws": { target: `ws://127.0.0.1:${API_PORT}`, ws: true },
 		},
 	},
-	build: { target: "es2022", sourcemap: true },
+	/*
+	 * Two pages: the app, and `shot.html`, the page the server's own Chromium loads to take a
+	 * picture of a stage (`server/stage/shots.ts`). The editor's dev page is not built.
+	 */
+	build: {
+		target: "es2022",
+		sourcemap: true,
+		rollupOptions: { input: { index: fileURLToPath(new URL("./index.html", import.meta.url)), shot: fileURLToPath(new URL("./shot.html", import.meta.url)) } },
+	},
 });

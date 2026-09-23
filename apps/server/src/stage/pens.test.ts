@@ -93,11 +93,11 @@ test("a stage's boards are browser items: synced in, read back in order, moved, 
 		assert.deepEqual([item.type, item.id, item.url, item.width, item.metadata], ["browser", "a", "../../boards/a.html", 1000, { type: "decks.board", path: "boards/a.html" }]);
 		assert.deepEqual(pens.boards(name).map((one) => [one.path, one.x, one.y]), [["boards/a.html", 0, 0], ["boards/b.html", 1200, 0]]);
 		pens.syncBoards(name, [{ ...a, x: 50, h: 900 }]);
-		assert.deepEqual(pens.boards(name), [{ path: "boards/a.html", id: "a", x: 50, y: 0 }]);
+		assert.deepEqual(pens.boards(name), [{ path: "boards/a.html", id: "a", x: 50, y: 0, w: 1000, h: 900 }]);
 		assert.equal(pens.get(name).doc.children[0]!.height, 900);
 		// A board put inside a column by an edit is placed by the column, and read back there.
 		pens.edit(name, [{ op: "insert", node: { type: "frame", id: "col", layout: "vertical", gap: 40, x: 0, y: 2000, children: [] } }, { op: "move", id: "a", parent: "col" }]);
-		assert.deepEqual(pens.boards(name), [{ path: "boards/a.html", id: "a", x: 0, y: 2000 }]);
+		assert.deepEqual(pens.boards(name), [{ path: "boards/a.html", id: "a", x: 0, y: 2000, w: 1000, h: 900 }]);
 	} finally {
 		pens.close();
 		rmSync(dir, { recursive: true, force: true });

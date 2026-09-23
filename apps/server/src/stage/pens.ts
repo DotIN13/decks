@@ -217,13 +217,13 @@ export class StagePens {
 	}
 
 	/** The deck boards on a stage, in paint order, each where the layout puts it. */
-	boards(name: string): Array<{ path: string; id: string; x: number; y: number }> {
+	boards(name: string): Array<{ path: string; id: string; x: number; y: number; w: number; h: number }> {
 		const placed = this.placedOf(name);
-		const out: Array<{ path: string; id: string; x: number; y: number }> = [];
+		const out: Array<{ path: string; id: string; x: number; y: number; w: number; h: number }> = [];
 		for (const node of walk(this.get(name).doc.children)) {
 			const path = boardOf(node);
 			const box = path ? placed.get(node.id)?.box : undefined;
-			if (path && box && !out.some((one) => one.path === path)) out.push({ path, id: node.id, x: Math.round(box.x), y: Math.round(box.y) });
+			if (path && box && !out.some((one) => one.path === path)) out.push({ path, id: node.id, x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.w), h: Math.round(box.h) });
 		}
 		return out;
 	}

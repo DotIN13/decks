@@ -8,6 +8,7 @@ import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts
 import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService, WebTarget } from "./service.ts";
+import type { ShotFormat, ShotOf } from "./shots.ts";
 
 /**
  * The canvas tool, defined once for every runtime (DESIGN §6.3).
@@ -751,6 +752,20 @@ export function createStageTool(deps: {
 			if (typeof title !== "string" || !title.trim()) throw new Error('newStage takes a title, as in stage.newStage("Launch plan").');
 			if (!agent.newStage) throw new Error("This agent cannot make stages.");
 			return { stage: agent.newStage(title.trim()) };
+		},
+
+		/**
+		 * A picture of your stage, or of part of it, as the person sees it: the drawing and the live
+		 * boards together. Attached to this call's result so you see it at once, and saved to `file`.
+		 * `of` is an item's id, a board's path, a list of them, or a box; nothing is the whole stage.
+		 * `to` saves it where you say instead, and `format: "pdf"` or `"jpeg"` for other kinds.
+		 */
+		screenshot: async (options?: { of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark" }) => {
+			if (!service.shots) throw new Error("This server cannot take pictures of a stage.");
+			const { of, scale, format, to, scheme } = options ?? {};
+			const shot = await service.shots.take({ stage: needStage(), of, ...(scale !== undefined ? { scale } : {}), ...(format ? { format } : {}), ...(to ? { to } : {}), ...(scheme ? { scheme } : {}) });
+			if (shot.format !== "pdf") images.push({ data: shot.bytes.toString("base64"), mimeType: shot.format === "jpeg" ? "image/jpeg" : "image/png" });
+			return { file: shot.file, width: shot.width, height: shot.height, box: shot.box };
 		},
 
 		pen: {

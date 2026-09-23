@@ -1444,6 +1444,16 @@ export function App() {
 							onArm={(next) => {
 								if (next !== "select") setTool("select");
 							}}
+							onExport={(ids) => {
+								const agentId = state.focused;
+								if (!agentId) return;
+								// A link the browser downloads: the picture is taken on the server, which can take a moment.
+								notice("info", "Taking the picture…");
+								const link = document.createElement("a");
+								link.href = `/api/stage-shot?${new URLSearchParams({ agent: agentId, of: ids.join(","), format: "png", scheme: scheme() })}`;
+								link.download = "";
+								link.click();
+							}}
 						/>
 					)}
 				</Show>
