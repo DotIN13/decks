@@ -54,7 +54,7 @@ const inside = (board) => {
  * lands on one of them presses it.
  */
 const first = (await boardPath("plan.html")) && "boards/plan.html";
-await page.locator(`.board-node[data-path="${first}"] .chrome`).dblclick({ position: { x: 24, y: 12 } });
+await page.locator(`.bar-layer .chrome[data-path="${first}"]`).dblclick({ position: { x: 24, y: 12 } });
 await settle(page, 900);
 say("flying to a board selects it from its title bar", (await selected()).includes(first), (await selected()).join(", ") || "nothing selected");
 

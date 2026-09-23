@@ -103,8 +103,8 @@ say("the panel's own two headings list the same two", (await mine()).join() === 
 // wherever the previous check put it the button can sit off-screen or exactly where the
 // neighbouring board begins — which is a fact about the camera, not about hiding.
 const first = two[0];
-await page.locator(`.board-node[data-path="${first}"] .chrome`).hover();
-await page.locator(`.board-node[data-path="${first}"] .chrome .hide`).click();
+await page.locator(`.bar-layer .chrome[data-path="${first}"]`).hover();
+await page.locator(`.bar-layer .chrome[data-path="${first}"] .hide`).click();
 await page.waitForFunction((wanted) => !document.querySelector(`.board-node[data-path="${wanted}"]`), first, { timeout: 8000 });
 say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*

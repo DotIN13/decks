@@ -536,57 +536,28 @@
 	position: absolute;
 }
 	/*
- * Counter-scaled against the camera.
+ * A board's title bar, in the stage's bar layer rather than in the board.
  *
- * The bar is the one part of a board that has to change when the *zoom* changes: it stays 24
- * screen pixels tall however far out you are, so its scale, its width and its offset are all
- * functions of the zoom. `BoardFrame` writes `--zoom` on it, and the three are derived here.
- *
- * The identity to keep in mind: this box sits inside a world scaled by the zoom and carries
- * `scale(1 / zoom)`, so the two cancel and **its layout size is its size on screen**. Height
- * and width are therefore screen pixels (24, and the board's on-screen width — `BoardFrame`
- * writes that one, because it is the only thing here that depends on the board). `top` is
- * the exception: it positions the layout box *before* the transform, and the transform's
- * origin is the box's bottom-left — so the constant part is the 24 the box will occupy, and
- * only the visual gap divides by the zoom. Asking for `24 / zoom` made the bar 88px tall at
- * 27% zoom, which is why it appeared to drift off the boards as they shrank.
- *
- * ### And it is blurry when you zoom in, which is *not* fixed here
- *
- * A transform makes the bar part of the world's composited layer (`will-change: transform` up
- * there is what makes a pan a matrix rather than a repaint of sixteen documents), so its pixels
- * are rastered at a sub-1 local scale and then upscaled by the camera: at 4× the title is
- * visibly soft beside the crisp panel next to it. `will-change` on this box and `translateZ(0)`
- * in its transform both produced byte-identical pixels, which rules the compositor out; the
- * transform itself is the cause, and removing it needs the bar to be laid out in screen space
- * rather than cancelled — either a bar layer outside `.world`, or `zoom` for the scale, which
- * was tried and moves the bar: lengths on this box are then in screen pixels while `top` and
- * `width` are still being written for the transform's coordinate space.
+ * It stays 24 screen pixels tall however far out the camera is. Inside the zoomed world that
+ * meant counter-scaling it: a layout at every new zoom, so it was held still during a pinch
+ * (growing and shrinking with the board) and snapped to size when the camera rested, and its
+ * text was soft at high zoom from being resampled twice. The layer does not zoom, so the bar is
+ * laid out once at its size on screen and only moved: a translate on every camera frame, and a
+ * new width when the zoom changes (`Stage.placeBar`). What was the "bar layer outside
+ * `.world`" this note used to name as the fix for the blur is this.
  */
-.board-node > .chrome {
+.bar-layer .chrome {
 	position: absolute;
 	/*
-	 * One screen pixel, in the coordinates this box is laid out in.
-	 *
-	 * The bar stays 24 screen pixels tall however far out the camera is, and the camera scales
-	 * everything by the zoom — so every length that has to stay a constant *screen* size is
-	 * written as `N * --unit`. One custom property, written once per frame by `BoardFrame`
-	 * beside the zoom it is derived from.
-	 *
-	 * **And this is what stops the blur.** It used to be a `transform: scale(1 / zoom)` on top of
-	 * a layout already in board units, so the world's layer — rastered at the camera's scale,
-	 * because `will-change: transform` up there is what makes a pan a matrix instead of a repaint
-	 * of sixteen documents — had its pixels resampled down by 1/zoom and then scaled back up by
-	 * the camera: two resamples of the same pixels, which is why the title was visibly soft at 4×
-	 * beside a crisp panel. `will-change` on the bar and `translateZ(0)` in its transform changed
-	 * not one pixel, and that is what pointed at the resample rather than at the layer.
-	 *
-	 * Laid out at the size it is drawn, there is nothing to resample. The cost is that a *zoom*
-	 * lays the bar out again — a pan does not, because `--zoom` does not change.
+	 * One screen pixel. The bar used to sit in the zoomed world and write every length as
+	 * `N * --unit` with `--unit` at `1px / zoom`; in the bar layer nothing is zoomed, so a pixel
+	 * is a pixel and the rules below keep their `N * --unit` unchanged. The stage places the box
+	 * with a transform and sets its width (`Stage.placeBar`).
 	 */
-	--unit: calc(1px / var(--zoom, 1));
-	top: calc(-26 * var(--unit));
+	--unit: 1px;
+	top: 0;
 	left: 0;
+	pointer-events: auto;
 	display: flex;
 	/*
 	 * The text on the baseline, the controls on the centre.
@@ -604,17 +575,16 @@
 	   width of the board and written across the board next to it. */
 	overflow: hidden;
 	gap: calc(8 * var(--unit));
-	width: 100%;
 	height: calc(24 * var(--unit));
 	font-size: calc(13 * var(--unit));
 	color: var(--muted);
 	cursor: grab;
 	user-select: none;
 }
-	.board-node[data-dragging="true"] > .chrome {
+	.bar-layer .chrome[data-dragging="true"] {
 	cursor: grabbing;
 }
-	.board-node > .chrome .title {
+	.bar-layer .chrome .title {
 	overflow: hidden;
 	font-weight: 600;
 	text-overflow: ellipsis;
@@ -628,7 +598,7 @@
  * a deck's Present button sat half a board away from the × it belongs beside — 500px of
  * empty bar between two controls that are one cluster.
  */
-.board-node > .chrome .acts {
+.bar-layer .chrome .acts {
 	display: flex;
 	flex: none;
 	margin-left: auto;
@@ -657,10 +627,10 @@
  * *smaller* than they were. Measured with an iPhone 14 Pro context: `9×9` for the × against
  * `18×18` for its neighbours, five pixels lower in the same row.
  */
-.board-node > .chrome .hide,
-.board-node > .chrome .present-open,
-.board-node > .chrome .open-tab,
-.board-node > .chrome .focus-open {
+.bar-layer .chrome .hide,
+.bar-layer .chrome .present-open,
+.bar-layer .chrome .open-tab,
+.bar-layer .chrome .focus-open {
 	display: grid;
 	width: calc(var(--act, 18) * var(--unit));
 	height: calc(var(--act, 18) * var(--unit));
@@ -674,16 +644,16 @@
 	place-items: center;
 	transition: opacity 120ms ease;
 }
-	.board-node:hover > .chrome .hide,
-.board-node:hover > .chrome .present-open,
-.board-node:hover > .chrome .open-tab,
-.board-node:hover > .chrome .focus-open {
+	.bar-layer .chrome:is(:hover, [data-hover="true"]) .hide,
+.bar-layer .chrome:is(:hover, [data-hover="true"]) .present-open,
+.bar-layer .chrome:is(:hover, [data-hover="true"]) .open-tab,
+.bar-layer .chrome:is(:hover, [data-hover="true"]) .focus-open {
 	opacity: 1;
 }
-	.board-node > .chrome .hide:hover,
-.board-node > .chrome .present-open:hover,
-.board-node > .chrome .open-tab:hover,
-.board-node > .chrome .focus-open:hover {
+	.bar-layer .chrome .hide:hover,
+.bar-layer .chrome .present-open:hover,
+.bar-layer .chrome .open-tab:hover,
+.bar-layer .chrome .focus-open:hover {
 	background: var(--line);
 	color: var(--fg);
 }
@@ -697,7 +667,7 @@
  * specificity `.hide`'s `width: 18px` won and the button was an 18px box with the word
  * clipped inside it.
  */
-.board-node > .chrome .present-open {
+.bar-layer .chrome .present-open {
 	width: auto;
 	padding: 0 calc(7 * var(--unit));
 	font-size: calc(10.5 * var(--unit));
@@ -712,7 +682,7 @@
  * button it was drawn in. CSS beats the width/height *attributes*, so one rule puts all four on
  * the same unit — and on one size, which they were not: the × was 14 to the others' 12.
  */
-.board-node > .chrome .acts svg {
+.bar-layer .chrome .acts svg {
 	width: calc(12 * var(--unit));
 	height: calc(12 * var(--unit));
 }
@@ -767,11 +737,11 @@
 	}
 }
 	/* The same box as the three beside it: one square, whichever glyph is in it. */
-.board-node > .chrome .present-open[data-glyph="true"] {
+.bar-layer .chrome .present-open[data-glyph="true"] {
 	width: calc(var(--act, 18) * var(--unit));
 	padding: 0;
 }
-	.board-node > .chrome .file {
+	.bar-layer .chrome .file {
 	/*
 	 * The path is what gives way when the bar is clipped, and it takes saying so twice.
 	 * A nowrap flex item's automatic minimum size is its content, so it refused to shrink
@@ -944,6 +914,20 @@
 	 * board is never lifted over the drawing, selected or not: a click reaches it wherever nothing drawn
 	 * is in the way, so there is nothing to lift it for.
 	 */
+	/*
+	 * The boards' title bars, over the canvas and not zoomed with it (`Stage.tsx`, `placeBar`).
+	 * Over the boards because it comes after them, and with no `z-index` of its own: one lifted it
+	 * over the app's floating panels too, and a long bar running under the inspector took its clicks.
+	 */
+	.stage > .bar-layer {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	pointer-events: none;
+}
+	.stage > .bar-layer[data-hidden="true"] {
+	display: none;
+}
 	.world > .pen-over {
 	position: absolute;
 	top: 0;
@@ -1168,10 +1152,10 @@
 	 * draws has to be one list, or the next control added to it is visible everywhere except
 	 * the device where it is the only route to what it does.
 	 */
-	.board-node > .chrome .hide,
-	.board-node > .chrome .present-open,
-	.board-node > .chrome .open-tab,
-	.board-node > .chrome .focus-open {
+	.bar-layer .chrome .hide,
+	.bar-layer .chrome .present-open,
+	.bar-layer .chrome .open-tab,
+	.bar-layer .chrome .focus-open {
 		opacity: 1;
 	}
 }
@@ -1193,7 +1177,7 @@
 	 * 24 rather than 44: the bar it sits in is 24 tall, and a target taller than the thing it
 	 * belongs to would cover the board underneath it.
 	 */
-	.board-node > .chrome .acts {
+	.bar-layer .chrome .acts {
 		--act: 24;
 	}
 }

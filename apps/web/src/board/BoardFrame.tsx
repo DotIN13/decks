@@ -6,6 +6,7 @@ import Maximize from "lucide-solid/icons/maximize-2";
 import X from "lucide-solid/icons/x";
 import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, Index, Match, onCleanup, Show, Switch } from "solid-js";
+import { Portal } from "solid-js/web";
 import { unwrap } from "solid-js/store";
 import { Icon } from "../ui/icons.tsx";
 import { boardUrl, deckFileUrl } from "../lib/api.ts";
@@ -97,6 +98,10 @@ export function BoardFrame(props: {
 	origin?: { x: number; y: number };
 	/** Whether the board is on screen or within a viewport of it — what the title bar keys on. */
 	visible: boolean;
+	/** The stage's layer that does not zoom, where the title bar lives (`Stage.tsx`). */
+	barLayer?: HTMLElement | undefined;
+	/** Put a bar on screen for a board at this place and width, and keep it there as the camera moves. */
+	placeBar?: (bar: HTMLElement, at: { x: number; y: number; w: number }) => void;
 	selected: boolean;
 	/** Bumped by `stage.reload`, for a change the watcher cannot see. */
 	nonce?: number;
@@ -331,6 +336,8 @@ export function BoardFrame(props: {
 	 * value rather than reading the camera, so nothing downstream even re-runs.
 	 */
 	const zoom = createMemo((previous?: number) => (props.moving && previous !== undefined ? previous : props.camera.zoom));
+	/** The board or its bar is under the pointer: the bar's buttons show for either (`canvas.css`). */
+	const [hovered, setHovered] = createSignal(false);
 	const inert = createMemo(() => zoom() < INTERACT_ZOOM);
 
 	/*
@@ -945,6 +952,8 @@ export function BoardFrame(props: {
 				nodeEl = element;
 			}}
 			data-dragging={dragging()}
+			onPointerEnter={() => setHovered(true)}
+			onPointerLeave={() => setHovered(false)}
 			data-selected={props.selected}
 			data-inert={inert()}
 			data-path={props.board.path}
@@ -970,28 +979,27 @@ export function BoardFrame(props: {
 				entirely (48ms). Off-screen boards do not load their documents for the same
 				reason; this is the rest of that rule.
 			*/}
-			<Show when={props.visible}>
+			<Show when={props.visible ? props.barLayer : undefined}>
+			{(layer) => (
+			<Portal mount={layer()}>
 			{/*
-				Counter-scaled against the camera, so the title stays legible at any zoom —
-				one that shrinks with the board is unreadable exactly when the board is too
-				small to identify by its content.
-
-				The scale, the offset and the width are CSS (`index.css`, `.board-node >
-				.chrome`), derived from the one number written here: `--zoom`, a registered
-				non-inherited property, so a change to it restyles this box and nothing
-				beneath it. One write per board per frame of a zoom, and none during a pan —
-				`zoom()` is a memo, so a camera that only moved re-runs nothing here.
+				In the stage's bar layer, not in this node: the layer does not zoom, so the bar is the
+				same size on screen at every zoom and through a pinch, with nothing to counter-scale.
+				The stage moves it with the camera (`Stage.placeBar`); this says where the board is and
+				how wide — the size being dragged, like the node and the surface, not the record's, so
+				a resize takes its bar along with it before the write lands.
 			*/}
 			<div
 				class="chrome"
-				/*
-				 * The size being dragged, like the node and the surface — not the record's, which is the
-				 * size the *file* still holds. The bar is the board's own width, so it is the most visible
-				 * thing about a resize: leaving it on `props.board.w` meant the board grew and its title
-				 * stayed behind, a bar hanging over 60 pixels of nothing until the write landed.
-				 */
-				style={{ "--zoom": zoom(), width: `${(sizing()?.w ?? props.board.w)}px` }}
+				data-path={props.board.path}
+				data-dragging={dragging()}
+				data-hover={hovered() || undefined}
+				ref={(bar) => {
+					createEffect(() => props.placeBar?.(bar, { x: at().x, y: at().y, w: sizing()?.w ?? props.board.w }));
+				}}
 				onPointerDown={startDrag}
+				onPointerEnter={() => setHovered(true)}
+				onPointerLeave={() => setHovered(false)}
 				onDblClick={() => props.onOpen()}
 			>
 				<span class="title">{props.board.title}</span>
@@ -1131,6 +1139,8 @@ export function BoardFrame(props: {
 				</Show>
 				</span>
 			</div>
+			</Portal>
+			)}
 			</Show>
 
 			{/*

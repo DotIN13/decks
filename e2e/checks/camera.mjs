@@ -126,7 +126,7 @@ const fittedZoom = await zoomOf();
  */
 const iconsAt = () =>
 	page.evaluate(() => {
-		const acts = document.querySelector(".board-node .chrome .acts");
+		const acts = document.querySelector(".bar-layer .chrome .acts");
 		if (!acts) return null;
 		return [...acts.children].map((child) => Math.round(child.querySelector("svg")?.getBoundingClientRect().width ?? 0));
 	});
@@ -334,7 +334,7 @@ const barsNow = () =>
 			nodes: document.querySelectorAll(".board-node").length,
 			near,
 			documents: document.querySelectorAll(".board-node iframe").length,
-			bars: document.querySelectorAll(".board-node > .chrome").length,
+			bars: document.querySelectorAll(".bar-layer .chrome").length,
 		};
 	});
 const bars = await barsNow();
@@ -516,7 +516,7 @@ say("a scroll landing on a board's outline pans the canvas", stuck.length === 0,
  */
 await page.keyboard.press("0");
 await settle(page, 900);
-await page.locator(".board-node .chrome").first().click();
+await page.locator(`.bar-layer .chrome[data-path="${await page.evaluate(() => document.querySelector(".board-node").dataset.path)}"]`).click();
 await page.keyboard.press("1");
 await settle(page, 5000);
 await page.evaluate(() => {
@@ -536,6 +536,45 @@ for (let i = 0; i < 40; i++) {
 await settle(page, 1200);
 const churn = await page.evaluate(() => window.__frameChurn.join(""));
 say("a pan neither drops nor reloads a board's page", !churn.includes("-"), churn || "no frames added or removed");
+
+/*
+ * A board's title bar is the same size on screen through a pinch, not only once it rests. It used
+ * to be counter-scaled inside the zoomed world and held still while the camera moved, so it grew
+ * and shrank with the board and snapped back; it lives in a layer that does not zoom now.
+ */
+await page.keyboard.press("0");
+await settle(page, 900);
+await page.evaluate(() => {
+	window.__barFrames = [];
+	const tick = () => {
+		const node = document.querySelector(".board-node");
+		const bar = document.querySelector(`.bar-layer .chrome[data-path="${CSS.escape(node.dataset.path)}"]`);
+		if (bar) {
+			const b = bar.getBoundingClientRect();
+			const s = node.querySelector(".surface").getBoundingClientRect();
+			window.__barFrames.push([b.height, Math.abs(b.width - s.width), s.top - b.bottom]);
+		}
+		if (window.__barFrames.length < 150) requestAnimationFrame(tick);
+	};
+	requestAnimationFrame(tick);
+});
+await page.mouse.move(700, 450);
+await page.keyboard.down("Control");
+for (let i = 0; i < 20; i++) {
+	await page.mouse.wheel(0, -25);
+	await page.waitForTimeout(16);
+}
+await page.keyboard.up("Control");
+await settle(page, 800);
+const barFrames = await page.evaluate(() => window.__barFrames);
+const heights = barFrames.map((f) => f[0]);
+const widthOff = Math.max(...barFrames.map((f) => f[1]));
+const gaps = barFrames.map((f) => f[2]);
+say(
+	"a board's title bar stays 24 pixels tall and its board's width through a pinch",
+	barFrames.length > 20 && heights.every((h) => h === 24) && widthOff <= 1 && gaps.every((g) => g >= 1 && g <= 3),
+	`${barFrames.length} frames, height ${Math.min(...heights)}..${Math.max(...heights)}, width off by up to ${widthOff.toFixed(1)}, gap ${Math.min(...gaps).toFixed(1)}..${Math.max(...gaps).toFixed(1)}`,
+);
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

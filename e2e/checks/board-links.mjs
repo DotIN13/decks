@@ -179,7 +179,7 @@ link.send({ type: "board.hide", path: LINKED });
 await settle(page, 500);
 await focus(SOURCE);
 const presented = await page.evaluate((wanted) => {
-	const button = document.querySelector(`.board-node[data-path="${wanted}"] .chrome .present-open`);
+	const button = document.querySelector(`.bar-layer .chrome[data-path="${wanted}"] .present-open`);
 	if (!button) return false;
 	button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
 	button.click();

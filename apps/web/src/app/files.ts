@@ -295,7 +295,7 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		onMount(() => {
 			onCleanup(
 				guardDocumentDrops(document, (at, files) => {
-					const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node");
+					const over = document.elementFromPoint(at.x, at.y)?.closest(".board-node, .bar-layer .chrome");
 					// While the timeline is being previewed the frames take no pointer events, so
 					// every drop arrives here — and "zoom in" would be a lie about why.
 					if (deps.preview()) {

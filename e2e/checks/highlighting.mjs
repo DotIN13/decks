@@ -203,7 +203,7 @@ try {
 
 		// Fly to the fixture, and zoom past the threshold below which a frame takes no pointer
 		// events at all.
-		await app.page.locator('.board-node[data-path="boards/highlight-fixture.html"] .chrome').dblclick({ position: { x: 24, y: 12 } });
+		await app.page.locator('.bar-layer .chrome[data-path="boards/highlight-fixture.html"]').dblclick({ position: { x: 24, y: 12 } });
 		await settle(app.page, 800);
 		for (let attempt = 0; attempt < 8; attempt++) {
 			const level = await app.page.evaluate(() =>

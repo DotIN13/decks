@@ -235,7 +235,7 @@ say(
  * it needs a board to click.
  */
 const countNow = await page.evaluate(() => document.querySelectorAll(".board-node").length);
-await page.locator(`.board-node[data-path="${flowPath}"] .chrome`).dblclick({ position: { x: 24, y: 12 } });
+await page.locator(`.bar-layer .chrome[data-path="${flowPath}"]`).dblclick({ position: { x: 24, y: 12 } });
 await settle(page, 900);
 const countAfterBar = await page.evaluate(() => document.querySelectorAll(".board-node").length);
 /*

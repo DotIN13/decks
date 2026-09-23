@@ -34,7 +34,7 @@ await page.evaluate(() => {
 });
 const prompts = () => page.evaluate(() => window.__prompts);
 
-await page.locator(".board-node .chrome").first().click();
+await page.locator(`.bar-layer .chrome[data-path="${await page.evaluate(() => document.querySelector(".board-node").dataset.path)}"]`).click();
 await page.keyboard.press("1");
 await settle(page, 900);
 
@@ -143,7 +143,7 @@ const inks = () => stage().children.filter((n) => n.type === "path" && n.metadat
 const startInks = inks().length;
 const drawn = () => inks().length - startInks;
 
-await page.locator(`${node} .chrome`).click();
+await page.locator(`.bar-layer .chrome[data-path="${path}"]`).click();
 await page.keyboard.press("1");
 await settle(page, 900);
 await page.click('[aria-label="Draw on the stage"]');

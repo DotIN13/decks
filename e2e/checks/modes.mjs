@@ -48,7 +48,7 @@ say("the pencil offers to start editing", browse.toggle === "Edit the boards", b
  * is live. Only the *editor* stands down. This is what makes a board that is a game playable
  * and a board that is prose copyable.
  */
-await page.locator(".board-node .chrome").first().click();
+await page.locator(`.bar-layer .chrome[data-path="${await page.evaluate(() => document.querySelector(".board-node").dataset.path)}"]`).click();
 await page.keyboard.press("1");
 await settle(page, 900);
 

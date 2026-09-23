@@ -191,7 +191,7 @@ if (boardItem) {
 	await until(() => onDisk().children.some((n) => n.id === "e2e-over"));
 	await page.keyboard.press("Escape");
 	// Close enough that the board is live: below that zoom a board is a picture and a click only selects it.
-	await page.locator(`.board-node[data-path="${firstBoard}"] .chrome`).click();
+	await page.locator(`.bar-layer .chrome[data-path="${firstBoard}"]`).click();
 	await page.keyboard.press("1");
 	await settle(page, 1200);
 	await page.keyboard.press("Escape");

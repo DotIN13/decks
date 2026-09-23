@@ -36,7 +36,7 @@ const sourceEditor = () => page.evaluate(() => Boolean(document.querySelector(".
  * — after which the board's own frame is gone and the run of words this check is about is in a
  * different document.
  */
-await page.locator('.board-node[data-path="boards/notes.html"] .chrome').dblclick({ position: { x: 24, y: 12 } });
+await page.locator('.bar-layer .chrome[data-path="boards/notes.html"]').dblclick({ position: { x: 24, y: 12 } });
 await settle(page, 900);
 for (let i = 0; i < 6; i++) {
 	const level = await page.evaluate(() =>

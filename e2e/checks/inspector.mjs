@@ -232,7 +232,7 @@ try {
 	say("a press on bare canvas lets it go too", await gone(), JSON.stringify(bare));
 
 	await pick("note");
-	const bar = await page.locator(`.board-node[data-path="${path}"] .chrome`).boundingBox();
+	const bar = await page.locator(`.bar-layer .chrome[data-path="${path}"]`).boundingBox();
 	await page.mouse.click(bar.x + 30, bar.y + 8);
 	/*
 	 * The detail names what the press actually landed on, because this one assertion fails in a full-suite

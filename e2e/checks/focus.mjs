@@ -32,7 +32,7 @@ say("the flow board is on the canvas to focus on", onCanvas === 1, `${onCanvas} 
  * shorthand for the same thing.
  */
 const bar = await page.evaluate((path) => {
-	const acts = document.querySelector(`.board-node[data-path="${path}"] .chrome .acts`);
+	const acts = document.querySelector(`.bar-layer .chrome[data-path="${path}"] .acts`);
 	return [...(acts?.children ?? [])].map((child) => ({
 		cls: child.className,
 		w: Math.round(child.getBoundingClientRect().width),
@@ -85,7 +85,7 @@ const markedBefore = await page.evaluate(() => {
  * until the button is its own. Two turns of the wheel is plenty; the loop is so a change in the
  * pill's height cannot quietly make this a coin toss again.
  */
-const openButton = page.locator(`.board-node[data-path="${NOTES}"] .chrome .focus-open`);
+const openButton = page.locator(`.bar-layer .chrome[data-path="${NOTES}"] .focus-open`);
 for (let tries = 0; tries < 4; tries += 1) {
 	const pill = await page.locator('.float.pill[data-inset="top"]').first().boundingBox();
 	const button = await openButton.boundingBox();
@@ -196,7 +196,7 @@ say("…with nothing drawn over it, which is what makes it pressable", exit.hit 
  * `camera.mjs` asserts that nothing puts the promise back.
  */
 const raster = await page.evaluate(() => {
-	const bar = document.querySelector(".board-node .chrome");
+	const bar = document.querySelector(".bar-layer .chrome");
 	const world = document.querySelector(".world");
 	return { barTransform: getComputedStyle(bar).transform, worldWillChange: getComputedStyle(world).willChange };
 });

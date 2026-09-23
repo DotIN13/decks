@@ -40,8 +40,7 @@ const sizeOf = (path) =>
 /** Press the board's own fullscreen button — the affordance, not a keyboard route. */
 const present = (path) =>
 	page.evaluate((wanted) => {
-		const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
-		const button = node?.querySelector(".chrome .present-open");
+		const button = document.querySelector(`.bar-layer .chrome[data-path="${wanted}"] .present-open`);
 		if (!button) return false;
 		button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
 		button.click();
@@ -81,7 +80,7 @@ const leave = async () => {
 const buttons = await page.evaluate(() =>
 	[...document.querySelectorAll(".board-node")].map((node) => ({
 		path: node.dataset.path,
-		label: node.querySelector(".chrome .present-open")?.getAttribute("aria-label") ?? null,
+		label: document.querySelector(`.bar-layer .chrome[data-path="${node.dataset.path}"] .present-open`)?.getAttribute("aria-label") ?? null,
 	})),
 );
 const live = formats.filter((board) => board.live);
@@ -109,7 +108,7 @@ say(
 const tabs = await page.evaluate(() =>
 	[...document.querySelectorAll(".board-node")].map((node) => ({
 		path: node.dataset.path,
-		href: node.querySelector(".chrome .open-tab")?.getAttribute("href") ?? null,
+		href: document.querySelector(`.bar-layer .chrome[data-path="${node.dataset.path}"] .open-tab`)?.getAttribute("href") ?? null,
 	})),
 );
 const tabOf = (board) => tabs.find((tab) => tab.path === board.path)?.href ?? null;
@@ -160,7 +159,7 @@ say(
 	`${documentButton?.label} / ${boxesButton?.label}`,
 );
 const words = await page.evaluate(() =>
-	[...document.querySelectorAll(".board-node .chrome .present-open")].map((button) => button.textContent?.trim() ?? ""),
+	[...document.querySelectorAll(".bar-layer .chrome .present-open")].map((button) => button.textContent?.trim() ?? ""),
 );
 say(
 	"…so only a deck's bar carries the word, and the narrow ones are a glyph",
@@ -275,7 +274,7 @@ say("…and Escape leaves it too", (await leave()) === false, "overlay gone");
 // Editing on, because the inspector is the editor's properties panel: in browse mode a click
 // selects nothing and there is no panel to look at (`e2e/checks/modes.mjs`).
 await editMode(page);
-await page.locator('.board-node[data-path="boards/sources.html"] .chrome').dblclick();
+await page.locator('.bar-layer .chrome[data-path="boards/sources.html"]').dblclick();
 await settle(page, 900);
 for (let i = 0; i < 6; i++) {
 	const level = await page.evaluate(() =>
@@ -338,7 +337,7 @@ say("leaving the embed with Escape", (await leave()) === false, "overlay gone");
  *    is also the assertion that the key and the panel agree.
  */
 const pickBox = async (id) => {
-	await page.locator('.board-node[data-path="boards/sources.html"] .chrome').dblclick();
+	await page.locator('.bar-layer .chrome[data-path="boards/sources.html"]').dblclick();
 	await settle(page, 700);
 	const box = await page.frameLocator('.board-node[data-path="boards/sources.html"] iframe').locator(`[data-id="${id}"]`).boundingBox();
 	await page.mouse.click(box.x + 16, box.y + 16);

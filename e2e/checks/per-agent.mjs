@@ -145,7 +145,7 @@ await page.locator('[aria-label="Fit the boards on the canvas"]').click();
 await still(page);
 await settle(page, 300);
 await page.locator(".dockfield").fill("meant for Ada");
-await page.locator(".board-node .chrome").first().click();
+await page.locator(`.bar-layer .chrome[data-path="${await page.evaluate(() => document.querySelector(".board-node").dataset.path)}"]`).click();
 await page.waitForSelector('.board-node[data-selected="true"]', { timeout: 5000 });
 await settle(page, 350);
 await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });

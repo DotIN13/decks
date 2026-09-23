@@ -208,7 +208,7 @@ const zoom = () => page.evaluate(() => Number((document.querySelector('.pill [ar
  * pointer events at all: every wheel assertion below would pass for the wrong reason on a
  * canvas fitted to twenty boards, which is exactly how this check first went green.
  */
-await page.locator(`${MIRROR} .chrome`).first().dblclick();
+await page.locator('.bar-layer .chrome[data-path^="boards/mirrors/"]').first().dblclick();
 await settle(page, 900);
 await page.waitForFunction(
 	() =>

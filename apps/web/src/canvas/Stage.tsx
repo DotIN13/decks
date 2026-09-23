@@ -958,12 +958,52 @@ export function Stage(props: {
 		);
 	};
 
+	/*
+	 * The boards' title bars, in a layer over the canvas that does not zoom (`.bar-layer`).
+	 *
+	 * A bar is the same size on screen at every zoom, so inside the zooming world it had to be
+	 * counter-scaled — laid out again at every new zoom, which is why it used to be held still
+	 * while the camera moved and then jump to its size when it rested. Here it is laid out once
+	 * at its screen size and moved: a pan is a translate, which the compositor does, and a zoom
+	 * is that and the bar's width. Each board says where it is and how wide (`BoardFrame`), and
+	 * every camera frame places every bar from that, in the same call that moves the boards.
+	 */
+	const [barLayer, setBarLayer] = createSignal<HTMLElement>();
+	const barAt = new WeakMap<HTMLElement, { x: number; y: number; w: number }>();
+	const barWidth = new WeakMap<HTMLElement, number>();
+	/** Above the board's top edge by the bar's 24 pixels and a 2-pixel gap. */
+	const BAR_ABOVE = 26;
+	const positionBar = (bar: HTMLElement, cam: Camera) => {
+		const at = barAt.get(bar);
+		if (!at) return;
+		const v = view();
+		const dpr = window.devicePixelRatio || 1;
+		// Whole device pixels, so the words are never drawn between two.
+		const x = Math.round((v.width / 2 + (at.x - cam.x) * cam.zoom) * dpr) / dpr;
+		const y = Math.round((v.height / 2 + (at.y - cam.y) * cam.zoom - BAR_ABOVE) * dpr) / dpr;
+		bar.style.transform = `translate(${x}px, ${y}px)`;
+		const width = Math.round(at.w * cam.zoom);
+		if (barWidth.get(bar) !== width) {
+			barWidth.set(bar, width);
+			bar.style.width = `${width}px`;
+		}
+	};
+	const placeBar = (bar: HTMLElement, at: { x: number; y: number; w: number }) => {
+		barAt.set(bar, at);
+		positionBar(bar, localCamera);
+	};
+
 	const writeTransform = (cam: Camera) => {
 		const v = view();
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
 		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
 		penLayer.setCamera(cam);
+		// And the title bars, which are in a layer of their own that does not zoom.
+		const layer = barLayer();
+		if (layer) for (const bar of layer.querySelectorAll<HTMLElement>(".chrome")) positionBar(bar, cam);
 	};
+
+
 
 	/**
 	 * Say the scale is moving, and arrange to notice when it stops.
@@ -1622,8 +1662,8 @@ export function Stage(props: {
 		}
 		if (!props.onCreateBoard) return;
 		const target = event.target as HTMLElement | null;
-		// Not on a board, and not on something drawn over one.
-		if (target?.closest?.(".board-node") || onDrawn(target)) return;
+		// Not on a board, its title bar (in the bar layer, not in the board), or something drawn over one.
+		if (target?.closest?.(".board-node, .bar-layer") || onDrawn(target)) return;
 		if (performance.now() - pannedAt < 400) return;
 		props.onCreateBoard(stagePoint(event));
 	};
@@ -1793,6 +1833,8 @@ export function Stage(props: {
 							 * panel still says which board it is.
 							 */
 							visible={alone ? false : isVisible(board)}
+							barLayer={barLayer()}
+							placeBar={placeBar}
 							{...(alone ? { origin: { x: 0, y: 0 } } : {})}
 							selected={props.selected === board.path}
 							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
@@ -1991,6 +2033,8 @@ export function Stage(props: {
 					)}
 				</Show>
 			</div>
+			{/* The boards' title bars: over the canvas, and not zoomed with it (`placeBar` above). */}
+			<div class="bar-layer" data-hidden={props.focus ? "true" : undefined} ref={setBarLayer} />
 			<Show when={props.drawing && props.onPenEdit && !props.focus}>
 				<StageInk
 					camera={props.camera}

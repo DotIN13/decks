@@ -257,7 +257,7 @@ const agent = {
  * it is about a panel that is drawn at every width. A bar belongs to a *board*, though, and
  * `resetStage` plays the deck onto the agent the **server** has focused: with a fed agent in
  * place those plays land on a canvas the browser is not looking at, and the first version of
- * this measured `.board-node > .chrome` as `null` three times. So: a real session, the deck
+ * this measured `.bar-layer .chrome` as `null` three times. So: a real session, the deck
  * played, and then the bar.
  */
 {
@@ -265,7 +265,7 @@ const agent = {
 	await resetStage();
 	await settle(page, 1400);
 	const acts = await page.evaluate(() => {
-		const bar = document.querySelector(".board-node > .chrome");
+		const bar = document.querySelector(".bar-layer .chrome");
 		if (!bar) return null;
 		const buttons = [...bar.querySelectorAll(".acts > *")];
 		const box = (el) => el.getBoundingClientRect();
