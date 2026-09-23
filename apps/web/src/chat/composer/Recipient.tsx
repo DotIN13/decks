@@ -1,6 +1,6 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
-import { AgentFace, AgentMenu } from "../../chrome/AgentPill.tsx";
+import { AgentFace, AgentMenu, NewAgentButton } from "../../chrome/AgentPill.tsx";
 import { Icon } from "../../ui/icons.tsx";
 import type { Destination } from "../../app/send-from-bar.ts";
 
@@ -15,7 +15,7 @@ export interface RecipientProps {
 	label: string;
 	/** Go to an agent's stage: picking one here is the same as pressing its row. */
 	onPick: (id: string) => void;
-	onNew: (kind?: AgentKind) => void;
+	onNew: (kind: AgentKind) => void;
 	onClose: (id: string) => void;
 	/** Open the Agents panel, for the agents the list has no room for. */
 	onMore?: () => void;
@@ -52,7 +52,6 @@ export function Recipient(props: RecipientProps) {
 				focused={props.dest.kind === "prompt" ? props.dest.id : props.focused}
 				unread={props.unread}
 				onFocus={props.onPick}
-				onNew={props.onNew}
 				onClose={props.onClose}
 				{...(props.onMore ? { onMore: props.onMore } : {})}
 				placement="top-start"
@@ -74,6 +73,7 @@ export function Recipient(props: RecipientProps) {
 					</button>
 				)}
 			/>
+			<NewAgentButton onNew={props.onNew} placement="top-start" size={12} class="dock-to-new" />
 		</span>
 	);
 }

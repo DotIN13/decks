@@ -93,9 +93,9 @@ const chipMenu = await page.evaluate(() => ({
 	agents: [...document.querySelectorAll(".popover [data-row][data-agent]")].map((row) => row.querySelector(".row-label")?.textContent?.trim()),
 	current: document.querySelector('.popover [data-row][data-agent][data-current="true"] .row-label')?.textContent?.trim(),
 	dispatcher: document.querySelectorAll(".popover .dock-to-dispatcher").length,
-	fresh: [...document.querySelectorAll(".popover [data-row]")].some((row) => row.textContent?.includes("New agent")),
+	fresh: [...document.querySelectorAll(".popover [data-row]")].some((row) => row.textContent?.includes("New ")),
 }));
-say("the chip opens the agent list, the focused agent marked, New agent at the foot and no dispatcher", chipMenu.agents.length >= 1 && chipMenu.current === agentName && chipMenu.fresh && chipMenu.dispatcher === 0, JSON.stringify(chipMenu));
+say("the chip opens the agent list, the focused agent marked, no New agent row and no dispatcher", chipMenu.agents.length >= 1 && chipMenu.current === agentName && !chipMenu.fresh && chipMenu.dispatcher === 0, JSON.stringify(chipMenu));
 await page.keyboard.press("Escape");
 await settle(page, 300);
 

@@ -1,4 +1,4 @@
-import type { AgentChat, AgentKind, AgentUsage, Identity } from "@decks/protocol";
+import type { AgentChat, AgentUsage, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import Maximize from "lucide-solid/icons/maximize";
@@ -67,7 +67,6 @@ export function Corner(props: {
 	focused: string | undefined;
 	unread: Record<string, number>;
 	onFocus: (id: string) => void;
-	onNew: (kind?: AgentKind) => void;
 	/** Open the Agents panel, from the stack's overflow row. */
 	onMore?: () => void;
 	/** Passed through to the `+n` chip's dropdown, which is the pill's list. */
@@ -145,7 +144,6 @@ export function Corner(props: {
 				focused={props.focused}
 				unread={props.unread}
 				onFocus={props.onFocus}
-				onNew={props.onNew}
 				{...(props.onMore ? { onMore: props.onMore } : {})}
 				onClose={props.onClose}
 			/>

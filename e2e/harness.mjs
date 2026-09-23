@@ -529,27 +529,20 @@ export async function openHistory(page) {
  */
 export async function newAgent(page, kind = "pi") {
 	/*
-	 * From the agent list the composer's chip opens, which is where the list went.
-	 *
-	 * It used to be a `+` in the header of the agents *panel*, and the panel is gone: a list
-	 * you switch with is a selector, so it hangs off the thing it selects.
-	 *
-	 * `+ New agent` is one row that unfolds: pressing it shows `New claude agent` / `New pi
-	 * agent` / … in place, because the runtime cannot change afterwards and that is the only
-	 * moment it can be chosen. The row itself creates nothing, so this always goes on to name
-	 * the runtime. Found by its label rather than as the last row, which it is only until
-	 * something is drawn under it.
+	 * From the `+` in the top-left pill, which opens the runtimes — the same `+` and list the
+	 * composer and the panel carry. The runtime cannot change afterwards, so picking one is
+	 * what makes the agent. The count is of the agent list's rows, which only lists agents now.
 	 */
 	await openAgents(page);
 	const agentsBefore = await page.evaluate(
 		() => document.querySelectorAll('.popover [data-row][data-flat="true"]').length,
 	);
-	await page.locator('.popover [aria-label="New agent: choose its runtime"]').click();
+	await page.keyboard.press("Escape");
+	await page.locator(".pill .new-agent").click();
 	await page.locator(".popover [data-row]").filter({ hasText: new RegExp(`^New ${kind} agent`, "i") }).first().click();
 	/*
 	 * Counted with the menu re-opened, because picking closes it — and counted as agent
-	 * *rows* rather than every `[data-row]`, since `+ New agent` and the four runtimes are
-	 * rows too.
+	 * *rows* rather than every `[data-row]`.
 	 */
 	await page.waitForTimeout(500);
 	await openAgents(page);

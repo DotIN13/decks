@@ -1315,7 +1315,6 @@ export function App() {
 					focused={state.focused}
 					unread={unread}
 					onFocus={visitAgent}
-					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
 					onMore={openAgentsPanel}
 					onClose={closeAgent}
 					zoom={camera().zoom}
@@ -1476,7 +1475,7 @@ export function App() {
 					identities={state.identities}
 					unread={unread}
 					onFocusAgent={visitAgent}
-					onNewAgent={(workspace) => send({ type: "agent.create", ...(workspace ? { workspace } : {}) })}
+					onNewAgent={(workspace, kind) => send({ type: "agent.create", kind, ...(workspace ? { workspace } : {}) })}
 					onCloseAgent={closeAgent}
 					onMirrorAgent={(id) =>
 						void files.askForBoard((request) => send({ type: "agent.mirror", agentId: id, request })).then((path) => path && frameWhenPlaced(path))

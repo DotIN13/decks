@@ -147,11 +147,10 @@ export function AgentFace(props: {
 /**
  * Every runtime an agent can be, as rows — the whole of "add an agent", written once.
  *
- * Two controls open this list: the `+` in the top-left pill, and the `+ New agent` row at the
- * foot of the agents menu that unfolds in place. They are the same question asked from two
- * places — a live session cannot swap the process behind it, so choosing a runtime *is*
- * creating the agent — and a list copied per caller is how "New claude agent" and "New
- * Claude agent" end up in the same menu as two different things.
+ * One list, behind one `+` (`NewAgentButton`) wherever an agent can be made: the top-left
+ * pill, the composer and the panel. A live session cannot swap the process behind it, so
+ * choosing a runtime *is* creating the agent — and a list copied per caller is how "New claude
+ * agent" and "New Claude agent" end up in the same menu as two different things.
  *
  * The list comes from the server, which is the only thing that knows what this machine
  * has: the runtime's own name for itself, and whether it can start here. A runtime that
@@ -181,6 +180,55 @@ function AgentChoices(props: { onPick: (kind: AgentKind) => void }) {
 				</button>
 			)}
 		</For>
+	);
+}
+
+/**
+ * Add an agent: a `+` that opens the runtimes, and picking one makes the agent.
+ *
+ * The same button and the same list in the top-left pill, the composer and the panel, so
+ * "new agent" is one control learned once. The agent list itself only switches.
+ */
+export function NewAgentButton(props: {
+	onNew: (kind: AgentKind) => void;
+	placement?: Placement;
+	/** Said in the tooltip and to a screen reader: "Add an agent", or "…in political-llm". */
+	label?: string;
+	class?: string;
+	size?: number;
+}) {
+	let dismiss: (() => void) | undefined;
+	return (
+		<Popover
+			placement={props.placement ?? "bottom-start"}
+			label="Add an agent"
+			class="w-[248px]"
+			trigger={(api) => {
+				dismiss = () => api.open && api.toggle();
+				return (
+					<button
+						type="button"
+						class={`icon-button new-agent ${props.class ?? ""}`}
+						ref={api.ref}
+						aria-haspopup="menu"
+						aria-expanded={api.open}
+						data-on={api.open ? "soft" : undefined}
+						title={`${props.label ?? "Add an agent"}: pick its runtime`}
+						aria-label={props.label ?? "Add an agent"}
+						onClick={api.toggle}
+					>
+						<Icon of={Plus} size={props.size ?? 15} />
+					</button>
+				);
+			}}
+		>
+			<AgentChoices
+				onPick={(kind) => {
+					dismiss?.();
+					props.onNew(kind);
+				}}
+			/>
+		</Popover>
 	);
 }
 
@@ -218,8 +266,6 @@ export function AgentMenu(props: {
 	focused: string | undefined;
 	unread: Record<string, number>;
 	onFocus: (id: string) => void;
-	/** `kind` is the runtime, chosen here because it cannot change afterwards. */
-	onNew: (kind?: AgentKind) => void;
 	/** Take a chat off the list. The transcript is a file on disk and stays there. */
 	onClose: (id: string) => void;
 	/** The control that opens it, given `Popover`'s api so it can draw itself pressed. */
@@ -231,8 +277,6 @@ export function AgentMenu(props: {
 	/** Open the Agents panel, for the agents this list has no room for. Without it, the count is only said. */
 	onMore?: () => void;
 }) {
-	/** Whether the runtime row has unfolded into its two choices. */
-	const [picking, setPicking] = createSignal(false);
 
 	/*
 	 * Which row the card is describing, and where that row is.
@@ -317,7 +361,6 @@ export function AgentMenu(props: {
 	let dismiss: (() => void) | undefined;
 
 	const pick = (run: () => void) => {
-		setPicking(false);
 		dismiss?.();
 		run();
 	};
@@ -347,7 +390,6 @@ export function AgentMenu(props: {
 			placement={props.placement ?? "bottom-start"}
 			label={props.label ?? "Agents"}
 			class="w-[264px]"
-			onOpenChange={(open) => !open && setPicking(false)}
 			trigger={(api) => {
 				dismiss = () => api.open && api.toggle();
 				return props.trigger(api);
@@ -510,48 +552,9 @@ export function AgentMenu(props: {
 				</Show>
 			</Show>
 
-			<div class="rule" />
-			{props.foot}
-
-			{/*
-				New agent, as one control that unfolds.
-
-				It was two: a label that created an agent on the server's default runtime, and a chip
-				beside it, showing that runtime's name, that opened the four choices. So the menu
-				asked you to know which runtime you wanted before it showed you one — and the runtime
-				is the one thing about a new agent that cannot be changed afterwards. The pair is one
-				button now, and pressing it shows the four.
-
-				A row rather than a row with a button in it: a button inside a button is invalid, and a
-				non-`[data-row]` control here would be the one thing in the menu the arrow keys could
-				not reach.
-
-				`aria-expanded` is load-bearing rather than descriptive: `Popover` reads it to tell a
-				disclosure inside the menu from a choice that should close it, so without it the press
-				that unfolds the list would take the menu with it.
-			*/}
-			<button
-				type="button"
-				role="menuitem"
-				data-row
-				data-flat="true"
-				aria-expanded={picking()}
-				aria-label="New agent: choose its runtime"
-				title="The runtime cannot change once an agent exists"
-				onClick={() => setPicking((was) => !was)}
-			>
-				<Icon of={Plus} size={13} class="flex-none text-muted" />
-				<span class="row-label flex-1 whitespace-nowrap">New agent</span>
-				<Icon of={ChevronDown} size={11} class="flex-none text-muted" />
-			</button>
-
-			{/*
-			 * The runtime is not a setting on a new agent, it is the same question as "new
-			 * agent" asked once — a live session cannot swap the process behind it — so
-			 * picking one here *creates* rather than remembering a preference.
-			 */}
-			<Show when={picking()}>
-				<AgentChoices onPick={(kind) => pick(() => props.onNew(kind))} />
+			<Show when={props.foot}>
+				<div class="rule" />
+				{props.foot}
 			</Show>
 					{/*
 				One card for the whole menu, mounted with it and only unhidden on hover.
@@ -606,7 +609,7 @@ export function AgentPill(props: {
 	focused: string | undefined;
 	unread: Record<string, number>;
 	onFocus: (id: string) => void;
-	onNew: (kind?: AgentKind) => void;
+	onNew: (kind: AgentKind) => void;
 	onClose: (id: string) => void;
 	/** Open the Agents panel, from the agent list's overflow row. */
 	onMoreAgents?: () => void;
@@ -680,7 +683,6 @@ export function AgentPill(props: {
 				focused={props.focused}
 				unread={props.unread}
 				onFocus={props.onFocus}
-				onNew={props.onNew}
 				onClose={props.onClose}
 				{...(props.onMoreAgents ? { onMore: props.onMoreAgents } : {})}
 				label="Agents"
@@ -704,6 +706,7 @@ export function AgentPill(props: {
 					</button>
 				)}
 			/>
+			<NewAgentButton onNew={props.onNew} class="max-[480px]:hidden" />
 
 			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
 

@@ -3,7 +3,6 @@ import Activity from "lucide-solid/icons/activity";
 import Folder from "lucide-solid/icons/folder";
 import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Rows3 from "lucide-solid/icons/rows-3";
-import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
 import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
@@ -14,6 +13,8 @@ import { panelSections, panelTally } from "./panel-groups.ts";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
 import { AgentRow } from "./AgentRow.tsx";
+import { NewAgentButton } from "./AgentPill.tsx";
+import type { AgentKind } from "@decks/protocol";
 import { agentSections, agentTally, type AgentGroup, type AgentSection } from "./agent-sections.ts";
 
 /**
@@ -171,7 +172,7 @@ export function LeftPanel(props: {
 	unread?: Record<string, number>;
 	onFocusAgent?: (id: string) => void;
 	/** Make an agent in a workspace (`undefined` for none) — the `+` on a heading of the workspace cut. */
-	onNewAgent?: (workspace: string | undefined) => void;
+	onNewAgent?: (workspace: string | undefined, kind: AgentKind) => void;
 
 	onCloseAgent?: (id: string) => void;
 	/** Put a live view of that agent's conversation on the canvas (`canvas/live-chat.ts`). */
@@ -688,6 +689,10 @@ export function LeftPanel(props: {
 						they are on — so on Agents the same square switches the grouping. The icon is
 						what a press will give you, and `data-view` is what is showing now, for a check.
 					*/}
+					{/* Add an agent: the same `+` and the same list as the pill's and the composer's. */}
+					<Show when={tab() === "agents" && props.onNewAgent}>
+						<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} class="size-8 flex-none rounded-lg pointer-coarse:size-10" />
+					</Show>
 					<button
 						type="button"
 						class="icon-button panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
@@ -757,15 +762,12 @@ export function LeftPanel(props: {
 											project; the attention cut's headings are not places to make one in.
 										*/}
 										<Show when={props.onNewAgent && (section.kind === "workspace" || section.kind === "unfiled")}>
-											<button
-												type="button"
-												class="icon-button size-5 flex-none rounded-sm pointer-coarse:size-8"
-												aria-label={section.kind === "workspace" ? `New agent in ${section.label}` : "New agent in no workspace"}
-												title={section.kind === "workspace" ? `New agent in ${section.label}` : "New agent, in no workspace"}
-												onClick={() => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined)}
-											>
-												<Icon of={Plus} size={12} />
-											</button>
+											<NewAgentButton
+												onNew={(kind) => props.onNewAgent?.(section.kind === "workspace" ? section.label : undefined, kind)}
+												label={section.kind === "workspace" ? `Add an agent in ${section.label}` : "Add an agent in no workspace"}
+												class="size-5 flex-none rounded-sm pointer-coarse:size-8"
+												size={12}
+											/>
 										</Show>
 									</div>
 									{/*

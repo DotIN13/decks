@@ -516,7 +516,7 @@ say(
 	filed[0]?.note === null && filed[1]?.note === "2 working" && filed[2]?.note === "1 wants you",
 	JSON.stringify(filed.map((one) => one.note)),
 );
-say("…and each heading carries a + that makes an agent in that project, instead of a count", JSON.stringify(filed.map((one) => one.plus)) === JSON.stringify(["New agent in irb-84069", "New agent in political-llm", "New agent in no workspace"]), JSON.stringify(filed.map((one) => one.plus)));
+say("…and each heading carries a + that makes an agent in that project, instead of a count", JSON.stringify(filed.map((one) => one.plus)) === JSON.stringify(["Add an agent in irb-84069", "Add an agent in political-llm", "Add an agent in no workspace"]), JSON.stringify(filed.map((one) => one.plus)));
 
 /*
  * **A message moves a row, and nothing else does.** Basil is dormant and Iris has been waiting

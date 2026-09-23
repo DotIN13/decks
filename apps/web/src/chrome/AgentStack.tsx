@@ -1,4 +1,4 @@
-import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
+import type { AgentChat, Identity } from "@decks/protocol";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { AgentHoverCard } from "./AgentHoverCard.tsx";
 import { AgentFace, AgentMenu } from "./AgentPill.tsx";
@@ -35,8 +35,6 @@ export function AgentStack(props: {
 	focused: string | undefined;
 	unread: Record<string, number>;
 	onFocus: (id: string) => void;
-	/** The `+n` chip opens the pill's dropdown, and that list ends in "New agent". */
-	onNew: (kind?: AgentKind) => void;
 	onMore?: () => void;
 	/** …and every row in it has an ×, so the same list closes chats from either way in. */
 	onClose: (id: string) => void;
@@ -186,7 +184,6 @@ export function AgentStack(props: {
 						focused={props.focused}
 						unread={props.unread}
 						onFocus={props.onFocus}
-						onNew={props.onNew}
 						onClose={props.onClose}
 						{...(props.onMore ? { onMore: props.onMore } : {})}
 						placement="bottom-end"
