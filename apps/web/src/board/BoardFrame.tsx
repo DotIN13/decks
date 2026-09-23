@@ -53,6 +53,31 @@ export interface BoardEditing {
 	onCancel: () => void;
 }
 
+/** A copy of a canvas's pixels, to put back if the next draw turns out empty. */
+function copyOf(canvas: HTMLCanvasElement): HTMLCanvasElement {
+	const copy = document.createElement("canvas");
+	copy.width = canvas.width;
+	copy.height = canvas.height;
+	copy.getContext("2d")?.drawImage(canvas, 0, 0);
+	return copy;
+}
+
+/**
+ * Whether a board's picture came out with nothing in it. Read from an 8 by 8 copy, one small read
+ * rather than a read of the whole canvas: a board's page always paints a background, so a picture
+ * with no opaque pixel at all is a snapshot of a page that has not painted yet.
+ */
+const probe = typeof document === "undefined" ? undefined : Object.assign(document.createElement("canvas"), { width: 8, height: 8 });
+function isEmpty(canvas: HTMLCanvasElement): boolean {
+	const ctx = probe?.getContext("2d", { willReadFrequently: true });
+	if (!ctx || !probe) return false;
+	ctx.clearRect(0, 0, 8, 8);
+	ctx.drawImage(canvas, 0, 0, 8, 8);
+	const data = ctx.getImageData(0, 0, 8, 8).data;
+	for (let i = 3; i < data.length; i += 4) if (data[i]! > 0) return false;
+	return true;
+}
+
 export function BoardFrame(props: {
 	board: Board;
 	camera: Camera;
@@ -647,8 +672,20 @@ export function BoardFrame(props: {
 		const frame = frameEl;
 		if (!canvas || !frame || !frame.isConnected || frame.parentElement !== canvas) return;
 		if (!drawable) return;
+		/*
+		 * Not while the board is off screen. Chrome's snapshot of a page it is not showing can be
+		 * empty, and drawing it cleared the picture the board already had: a board panned away and
+		 * back was blank the whole time it was gone and for half a second after. It is drawn once
+		 * it is on screen again (the effect below watches `visible`).
+		 */
+		if (!props.visible) {
+			stale = true;
+			return;
+		}
 		const ctx = elementContext(canvas);
 		if (!ctx) return;
+		// What is on the canvas now, kept until the new snapshot is known to have something in it.
+		const keep = drawn() && canvas.width > 1 ? copyOf(canvas) : undefined;
 		const dpr = window.devicePixelRatio || 1;
 		if (resize || !have) {
 			const size = pictureSize(props.board, props.camera.zoom, dpr);
@@ -677,6 +714,14 @@ export function BoardFrame(props: {
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 			ctx.setTransform(scale.x, 0, 0, scale.y, 0, 0);
 			ctx.drawElementImage(frame, 0, 0);
+			if (keep && isEmpty(canvas)) {
+				// An empty snapshot: the page is not painted yet. Put the old picture back, stretched to
+				// the new size if there is one, and draw again at the page's next paint.
+				ctx.setTransform(1, 0, 0, 1, 0, 0);
+				ctx.drawImage(keep, 0, 0, canvas.width, canvas.height);
+				stale = true;
+				return;
+			}
 			setDrawn(true);
 		} catch {
 			// "Before an initial snapshot has been recorded": the document is a frame away
@@ -707,7 +752,7 @@ export function BoardFrame(props: {
 	 * says so.
 	 */
 	createEffect(() => {
-		if (props.renderer !== "canvas-per-board" || props.scaling || props.moving) return;
+		if (props.renderer !== "canvas-per-board" || props.scaling || props.moving || !props.visible) return;
 		const zoom = props.camera.zoom;
 		void props.mounted;
 		const size = pictureSize(props.board, zoom, window.devicePixelRatio || 1);
