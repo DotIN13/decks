@@ -329,9 +329,39 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text")), 2000);
 	await page.keyboard.press("End");
 	await page.keyboard.type(" and more");
+	// A double-click inside the editor picks a word; it is not a double-click on the canvas.
+	const boardsBefore = await count(".board-node");
+	const inEditor = await page.evaluate(() => {
+		const r = document.querySelector(".pen-text").getBoundingClientRect();
+		return { x: r.x + 20, y: r.y + r.height / 2 };
+	});
+	await page.mouse.dblclick(inEditor.x, inEditor.y);
+	await settle(page, 800);
+	say("a double-click inside the editor makes no board", (await count(".board-node")) === boardsBefore && (await count(".pen-text")) === 1, `${boardsBefore} -> ${await count(".board-node")}`);
 	await page.keyboard.press("Control+Enter");
 	say("…and what is typed is the note's words in the file", !!(await until(() => item("g-note")?.content === "Words to edit and more")));
 	await page.keyboard.press("Escape");
+}
+
+// --- a card grows round its title as the title is typed ----------------------------------------------
+{
+	const had = new Set(onDisk().children.map((n) => n.id));
+	const at = await page.evaluate(() => {
+		const r = document.querySelector('.pen-hits [data-id="g-note"]').getBoundingClientRect();
+		return { x: r.x, y: r.y + r.height + 40 };
+	});
+	await page.keyboard.press("c");
+	await page.mouse.click(at.x, at.y);
+	const card = await until(() => onDisk().children.find((n) => !had.has(n.id) && n.type === "frame"));
+	await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text")), 3000);
+	const height = () => page.evaluate((id) => document.querySelector(`.pen-hits [data-id="${id}"]`)?.getBoundingClientRect().height ?? 0, card?.id);
+	const before = await until(height, 3000);
+	await page.keyboard.type("A title long enough to wrap onto a second and then a third line of the card");
+	const grown = await until(async () => (await height()) > before * 1.3, 3000);
+	say("a card grows round its title while the title is typed, before it is saved", !!grown, JSON.stringify({ before, now: await height() }));
+	await page.keyboard.press("Control+Enter");
+	await page.keyboard.press("Escape");
+	if (card) link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: card.id }] });
 }
 
 // --- edit mode: items and boards outline themselves under the pointer --------------------------------

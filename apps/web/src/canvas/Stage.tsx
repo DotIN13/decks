@@ -722,7 +722,38 @@ export function Stage(props: {
 		pageFont("Inter", 400, false);
 		pageFont("Inter", 600, false);
 	});
-		/** Where the item being typed into is now: a made item is placed once the server answers. */
+		/**
+	 * The drawing laid out with the words being typed, so what holds them grows as they are typed:
+	 * a card round its title, a note round its words. A copy of the document with the one item's
+	 * words changed, drawn in place of the real one until the server answers with the real edit.
+	 * Once a frame at most.
+	 */
+	let typedFrame: number | undefined;
+	let typedValue: { id: string; value: string } | undefined;
+	const previewTyped = (id: string, value: string) => {
+		typedValue = { id, value };
+		typedFrame ??= requestAnimationFrame(() => {
+			typedFrame = undefined;
+			const doc = props.pen?.doc;
+			if (!doc || !typedValue) return;
+			const copy = structuredClone(doc);
+			const found = indexOf(copy).get(typedValue.id);
+			if (!found) return;
+			found.node.content = typedValue.value;
+			penLayer.setDoc(copy, props.pen?.base ?? "");
+		});
+	};
+	/** Back to the document as the server has it, for an edit taken back with Escape. */
+	const dropTyped = () => {
+		if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
+		typedFrame = undefined;
+		typedValue = undefined;
+		penLayer.setDoc(props.pen?.doc, props.pen?.base ?? "");
+	};
+	onCleanup(() => {
+		if (typedFrame !== undefined) cancelAnimationFrame(typedFrame);
+	});
+	/** Where the item being typed into is now: a made item is placed once the server answers. */
 	const penTextBox = createMemo(() => {
 		penDrawn();
 		const open = penText();
@@ -745,10 +776,15 @@ export function Stage(props: {
 		// A text or note made by a tool and left empty was never wanted.
 		if (open.fresh && !value.trim()) {
 			unmuteNow();
+			dropTyped();
 			return props.onPenEdit([{ op: "delete", id: open.id }]);
 		}
-		const was = penLayer.placed.get(open.id)?.node.content;
-		if (value === was) return unmuteNow();
+		// Against the document the server has: the one drawn already has the typed words in it.
+		const was = props.pen ? indexOf(props.pen.doc).get(open.id)?.node.content : undefined;
+		if (value === was) {
+			unmuteNow();
+			return dropTyped();
+		}
 		if (unmute) clearTimeout(unmute.timer);
 		unmute = { id: open.id, value, timer: setTimeout(unmuteNow, 3000) };
 		props.onPenEdit([{ op: "update", id: open.id, set: { content: value } }]);
@@ -2167,9 +2203,12 @@ export function Stage(props: {
 			}
 		}
 		if (!props.onCreateBoard) return;
-		const target = event.target as HTMLElement | null;
-		// Not on a board, its title bar (in the bar layer, not in the board), or something drawn over one.
-		if (target?.closest?.(".board-node, .bar-layer") || onDrawn(target)) return;
+		/*
+		 * Only on the bare stage itself. Not on a board, its title bar, something drawn, or anything
+		 * laid over the drawing — the editor a note's words are typed in is one, and a double-click
+		 * to pick a word in it made a board.
+		 */
+		if (event.target !== element) return;
 		if (performance.now() - pannedAt < 400) return;
 		props.onCreateBoard(stagePoint(event));
 	};
@@ -2635,6 +2674,7 @@ export function Stage(props: {
 									area.focus();
 									area.select();
 								})}
+								onInput={(event) => previewTyped(open.id, event.currentTarget.value)}
 								onBlur={(event) => commitPenText(event.currentTarget.value)}
 								onKeyDown={(event) => {
 									if (event.key === "Escape") {
@@ -2642,6 +2682,7 @@ export function Stage(props: {
 										const open = penText();
 										setPenText(undefined);
 										unmuteNow();
+										dropTyped();
 										if (open?.fresh) props.onPenEdit?.([{ op: "delete", id: open.id }]);
 									} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 										event.preventDefault();
