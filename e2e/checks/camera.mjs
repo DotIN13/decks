@@ -480,5 +480,32 @@ say(
 	steps.join(" "),
 );
 
+/*
+ * A scroll that lands exactly on a board's outline pans. That pixel is the frame's border, which its
+ * document does not cover, so the wheel used to reach neither document — and a trackpad latches a
+ * whole gesture to where it began, so a pan that started there never moved at all. Probed across
+ * the edge at half-pixel steps, since where the boundary falls depends on the zoom.
+ */
+await page.keyboard.press("0");
+await settle(page, 900);
+const surface = await page.locator(".board-node .surface").first().boundingBox();
+const camNow = () => page.evaluate(() => getComputedStyle(document.querySelector(".world")).transform);
+const stuck = [];
+for (let d = -1; d <= 3; d += 0.5) {
+	for (const [side, x, y] of [["left", surface.x + d, surface.y + surface.height / 2], ["top", surface.x + surface.width / 2, surface.y + d]]) {
+		if (x < 1 || y < 1) continue;
+		const before = await camNow();
+		await page.mouse.move(x, y);
+		await page.mouse.wheel(0, 30);
+		await settle(page, 150);
+		if ((await camNow()) === before) stuck.push(`${side} ${d}`);
+		else {
+			await page.mouse.wheel(0, -30);
+			await settle(page, 150);
+		}
+	}
+}
+say("a scroll landing on a board's outline pans the canvas", stuck.length === 0, stuck.join(", ") || "every point panned");
+
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

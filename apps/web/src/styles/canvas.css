@@ -876,6 +876,23 @@
 	display: block;
 	border: 0;
 }
+	/* The board's outline, taken by the canvas so a scroll landing on it pans (`BoardFrame.tsx`). */
+	.board-node > .surface > .edge {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	pointer-events: none;
+}
+	.board-node > .surface > .edge > rect {
+	fill: none;
+	stroke: transparent;
+	stroke-width: 8px;
+	vector-effect: non-scaling-stroke;
+	pointer-events: stroke;
+}
 	/* Above the interaction threshold the frame is inert, so a pan that crosses a
    board is a pan and not a click into somebody's page. Descendant rather than child,
    because under the canvas-per-board renderer the frame sits inside a canvas. */
