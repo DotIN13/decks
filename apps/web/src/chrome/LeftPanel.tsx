@@ -689,10 +689,6 @@ export function LeftPanel(props: {
 						they are on — so on Agents the same square switches the grouping. The icon is
 						what a press will give you, and `data-view` is what is showing now, for a check.
 					*/}
-					{/* Add an agent: the same `+` and the same list as the pill's and the composer's. */}
-					<Show when={tab() === "agents" && props.onNewAgent}>
-						<NewAgentButton onNew={(kind) => props.onNewAgent?.(undefined, kind)} class="size-8 flex-none rounded-lg pointer-coarse:size-10" />
-					</Show>
 					<button
 						type="button"
 						class="icon-button panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"

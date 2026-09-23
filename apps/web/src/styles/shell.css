@@ -34,11 +34,21 @@
 		inset: 0;
 	}
 
-	/* Add an agent, beside the composer's recipient chip: as tall as the chip. */
+	/* Add an agent, beside the composer's recipient chip: a pebble as tall as the chip. */
 	.dock-to-new {
-		width: 22px;
+		width: 28px;
 		height: 22px;
-		border-radius: 6px;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--panel);
+		color: var(--muted);
+		box-shadow: 0 1px 1px color-mix(in oklab, var(--fg) 6%, transparent);
+	}
+	.dock-to-new:hover,
+	.dock-to-new[aria-expanded="true"] {
+		border-color: var(--line-strong);
+		background: var(--line);
+		color: var(--fg);
 	}
 
 	/* The agent in the top-left pill: face, name and chevron, one button. */
