@@ -204,7 +204,7 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 export async function editMode(page, on = true) {
 	const now = await page.evaluate(() => document.querySelector(".stage")?.dataset.mode ?? "browse");
 	if ((now === "edit") === on) return;
-	await page.locator(on ? '[aria-label="Edit the boards"]' : '[aria-label="Stop editing"]').click();
+	await page.locator(on ? '[aria-label="Edit the boards"]' : '[aria-label="Browse the boards"]').click();
 	await page.waitForFunction((want) => (document.querySelector(".stage")?.dataset.mode ?? "browse") === want, on ? "edit" : "browse", {
 		timeout: 4000,
 	});

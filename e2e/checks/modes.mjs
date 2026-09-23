@@ -23,7 +23,9 @@ const state = () =>
 		word: getComputedStyle(document.querySelector(".stage"), "::before").content,
 		tools: document.querySelectorAll(".pen-tools button[data-tool]").length,
 		inspector: document.querySelectorAll(".inspector").length,
-		toggle: document.querySelector('[aria-label="Edit the boards"], [aria-label="Stop editing"]')?.getAttribute("aria-label") ?? null,
+		/** The pressed one of the three mode buttons, and their order, left to right. */
+		toggle: document.querySelector('.mode-set [aria-pressed="true"]')?.getAttribute("aria-label") ?? null,
+		order: [...document.querySelectorAll(".mode-set button")].map((b) => b.getAttribute("aria-label")).join(" / "),
 	}));
 
 // --- browse is where a session starts -------------------------------------------------
@@ -40,7 +42,8 @@ say("the canvas opens in browse mode", browse.mode === "browse", browse.mode);
 say("…with the stage's eight tools, because the drawing is edited in both modes", browse.tools === 8, String(browse.tools));
 say("…no inspector, because it is a properties panel", browse.inspector === 0);
 say("…and nothing drawn to say editing is on", browse.ring === "none", `${browse.ring}`);
-say("the pencil offers to start editing", browse.toggle === "Edit the boards", browse.toggle);
+say("the mode buttons are browse, edit and draw, in that order", browse.order === "Browse the boards / Edit the boards / Draw on the stage", browse.order);
+say("…and browse is the one pressed", browse.toggle === "Browse the boards", browse.toggle);
 
 // --- a board is a document -------------------------------------------------------------
 
@@ -104,7 +107,7 @@ say("…and the stage's eight tools stay", editing.tools === 8, String(editing.t
  */
 say("…and no ring around the canvas, because the tools are the sign now", editing.ring === "none", `${editing.ring}`);
 say("…and no word in the corner either", editing.word === "none", `${editing.word}`);
-say("…and the button now offers to stop", editing.toggle === "Stop editing", editing.toggle);
+say("…and the pencil is the one pressed now", editing.toggle === "Edit the boards", editing.toggle);
 
 if (clicked) {
 	await page.mouse.click(clicked.x, clicked.y);

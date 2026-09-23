@@ -5,7 +5,7 @@ import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
 import Pencil from "lucide-solid/icons/pencil";
 import Brush from "lucide-solid/icons/brush";
-import Hand from "lucide-solid/icons/hand";
+import MousePointer from "lucide-solid/icons/mouse-pointer-2";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { AgentMark } from "./agent-marks.tsx";
@@ -637,61 +637,57 @@ export function AgentPill(props: {
 
 
 			{/*
-				Browse or edit, and it is the first thing after the agent because it changes what
-				every control to its right means.
+				The three modes, as one set, and first after the agent because they change what every
+				press on the canvas means: browse (the cursor) reads the boards and moves the drawing,
+				edit (the pencil) opens the boards' pages for editing too, draw (the brush) puts the pen
+				on the stage. The one in force is pressed, in the accent, as a tool picked from a set is.
 
-				A pencil when you are browsing (press it to start editing) and a hand when you
-				are editing (press it to stop) — the icon is **what pressing it does**, not what
-				mode you are in, which is the convention every drawing tool has settled on and
-				the opposite of what reads naturally when you write the markup.
-
-				No confirmation. A single press is right for something this reversible, and the
-				guard against pressing it by accident is that this button changes, the pencil for a hand
-				— what used to stand behind it was a ring around the whole canvas in edit mode, and that
-				ring is gone at the request of the person who works in this app (`index.css` says why).
-				A dialog in front of a mode switch is a dialog you learn to dismiss without reading.
+				No confirmation. A single press is right for something this reversible, and what guards
+				against an accidental one is that the pressed button changes where you can see it.
 			*/}
-			<button
-				type="button"
-				class="icon-button"
-				/*
-				 * `soft` — the grey wash the panel toggle wears, not the accent fill.
-				 *
-				 * The accent is for one of a set: which tool is selected, read from across the
-				 * window. Editing is not one of a set, it is a thing being *held* — the same
-				 * kind of fact as "the panel is open" — and `data-on="soft"` is the state this
-				 * file's own note reserves for exactly that. It was the accent, which put the
-				 * loudest control in the pill next to the tool that is actually chosen and made
-				 * the two look like peers.
-				 */
-				data-on={props.mode === "edit" ? "soft" : undefined}
-				aria-pressed={props.mode === "edit"}
-				title={props.mode === "edit" ? "Stop editing, back to browsing" : "Edit the boards: drag components, retype text"}
-				aria-label={props.mode === "edit" ? "Stop editing" : "Edit the boards"}
-				onClick={() => props.onMode(props.mode === "edit" ? "browse" : "edit")}
-			>
-				<Icon of={props.mode === "edit" ? Hand : Pencil} size={15} />
-			</button>
-
-			{/*
-				Draw on the stage, while browsing. Held rather than chosen, like the pencil beside
-				it, so it wears the same soft wash; its own tools are a row of their own
-				(`InkBar.tsx`), because a pen, a marker, five colours and undo do not fit in here.
-				Not offered while editing: a press there already means "this component".
-			*/}
-			<Show when={props.mode === "browse"}>
+			<div class="mode-set" role="group" aria-label="Mode">
 				<button
 					type="button"
 					class="icon-button"
-					data-on={props.drawing ? "soft" : undefined}
+					data-on={props.mode === "browse" && !props.drawing ? "true" : undefined}
+					aria-pressed={props.mode === "browse" && !props.drawing}
+					title="Browse: read the boards, move and retype what is drawn"
+					aria-label="Browse the boards"
+					onClick={() => {
+						props.onDrawing(false);
+						props.onMode("browse");
+					}}
+				>
+					<Icon of={MousePointer} size={15} />
+				</button>
+				<button
+					type="button"
+					class="icon-button"
+					data-on={props.mode === "edit" ? "true" : undefined}
+					aria-pressed={props.mode === "edit"}
+					title="Edit the boards: drag components, retype text"
+					aria-label="Edit the boards"
+					onClick={() => props.onMode("edit")}
+				>
+					<Icon of={Pencil} size={15} />
+				</button>
+				{/* Its own tools are a row of their own (`InkBar.tsx`): a pen, a marker, colours and undo do not fit in here. */}
+				<button
+					type="button"
+					class="icon-button"
+					data-on={props.drawing ? "true" : undefined}
 					aria-pressed={props.drawing}
-					title={props.drawing ? "Stop drawing" : "Draw on the stage"}
-					aria-label={props.drawing ? "Stop drawing" : "Draw on the stage"}
-					onClick={() => props.onDrawing(!props.drawing)}
+					title="Draw on the stage"
+					aria-label="Draw on the stage"
+					onClick={() => {
+						// The pen is out only while browsing: a press in edit mode means "this component".
+						if (props.mode === "edit") props.onMode("browse");
+						props.onDrawing(true);
+					}}
 				>
 					<Icon of={Brush} size={15} />
 				</button>
-			</Show>
+			</div>
 
 
 		</div>

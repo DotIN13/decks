@@ -47,6 +47,13 @@
 		gap: 4px;
 	}
 
+	/* Browse, edit and draw: three buttons of one set, spaced as the pill spaces its controls. */
+	.mode-set {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
 	/* The divider inside a pill: one hairline, 20px of it, with its own breathing room. */
 	.pill-sep {
 		width: 1px;
