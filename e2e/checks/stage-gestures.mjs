@@ -129,9 +129,9 @@ say("the canvas is browsing", (await page.evaluate(() => document.querySelector(
 say("…and the stage's tools are there", (await count(".pen-tools button[data-tool]")) === 8);
 const a0 = await centre("g-a");
 await page.mouse.move(a0.x, a0.y);
-say("an item outlines itself under the pointer, before any press", !!(await until(() => count(".pen-hover").then((n) => n === 1), 2000)));
+await settle(page, 300);
+say("browsing draws no outline under the pointer", (await count(".pen-hover")) === 0);
 await page.mouse.move(room.x + 5, room.y + 5);
-say("…and the outline goes when the pointer leaves it", !!(await until(() => count(".pen-hover").then((n) => n === 0), 2000)));
 
 await page.mouse.down();
 await page.mouse.move(room.x + 300, room.y + 100, { steps: 5 });
@@ -325,6 +325,8 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 		return { dx: Math.abs(e.x - h.x), dy: Math.abs(e.y - h.y), dw: Math.abs(e.width - h.width), handles: document.querySelectorAll(".pen-handle").length };
 	}), 3000);
 	say("double-clicking a note opens an editor exactly on it, with no handles over it", !!fit && fit.dx < 2 && fit.dy < 2 && fit.dw < 2 && fit.handles === 0, JSON.stringify(fit));
+	// The editor takes the caret a frame after it opens.
+	await until(() => page.evaluate(() => document.activeElement?.classList.contains("pen-text")), 2000);
 	await page.keyboard.press("End");
 	await page.keyboard.type(" and more");
 	await page.keyboard.press("Control+Enter");
@@ -332,30 +334,39 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	await page.keyboard.press("Escape");
 }
 
-// --- edit mode: a board outlines itself under the pointer -------------------------------------------
+// --- edit mode: items and boards outline themselves under the pointer --------------------------------
 {
+	await editMode(page, true);
+	await drawnWhereFileSays("g-a");
+	const a = await centre("g-a");
+	await page.mouse.move(a.x, a.y);
+	say("in edit mode an item outlines itself under the pointer, before any press", !!(await until(() => count(".pen-hover:not([data-board])").then((n) => n === 1), 2000)));
+	await page.mouse.move(room.x + 5, room.y + 5);
+	say("…and the outline goes when the pointer leaves it", !!(await until(() => count(".pen-hover").then((n) => n === 0), 2000)));
 	const spot = await page.evaluate(() => {
 		for (const node of document.querySelectorAll(".board-node")) {
+			if (node.dataset.selected === "true") continue;
 			const r = node.getBoundingClientRect();
 			const x = r.x + r.width - 30;
 			const y = r.y + Math.min(80, r.height / 2);
 			if (x > 320 && x < 1560 && y > 120 && y < 880 && document.elementFromPoint(x, y)?.closest(".board-node") === node) return { x, y, path: node.dataset.path };
 		}
 	});
-	const outline = () => page.evaluate((path) => getComputedStyle(document.querySelector(`.board-node[data-path="${CSS.escape(path)}"] > .shade`)).outlineStyle, spot?.path);
 	if (spot) {
-		await page.mouse.move(spot.x, spot.y);
-		await settle(page, 200);
-		const colourOf = () => page.evaluate((path) => getComputedStyle(document.querySelector(`.board-node[data-path="${CSS.escape(path)}"] > .shade`)).outlineColor, spot.path);
-		const browsing = await colourOf();
-		await editMode(page, true);
-		await page.mouse.move(spot.x + 2, spot.y + 2);
-		await settle(page, 200);
-		const editing = await colourOf();
-		const accent = await page.evaluate(() => getComputedStyle(document.querySelector(".stage")).getPropertyValue("--color-accent").trim());
-		// Every board has a faint outline of its own; under the pointer in edit mode it is the accent's.
-		say("in edit mode a board outlines itself under the pointer, in the accent", editing !== browsing && (await outline()) === "solid", JSON.stringify({ browsing, editing, accent }));
+		await page.mouse.move(spot.x, spot.y, { steps: 3 });
+		const outlined = await until(() => page.evaluate((path) => {
+			const hover = document.querySelector('.pen-hover[data-board="true"]');
+			const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+			if (!hover || !node) return undefined;
+			const h = hover.getBoundingClientRect();
+			const n = node.getBoundingClientRect();
+			return Math.abs(h.x - n.x) < 2 && Math.abs(h.width - n.width) < 2 ? { width: getComputedStyle(hover).boxShadow } : undefined;
+		}, spot.path), 2000);
+		say("…and a board does too, round its own edge", !!outlined, JSON.stringify(outlined));
 		await editMode(page, false);
+		await page.mouse.move(spot.x - 4, spot.y + 4);
+		await settle(page, 200);
+		say("…and not when browsing", (await count(".pen-hover")) === 0);
 	} else say("a board is on screen to hover", false);
 }
 

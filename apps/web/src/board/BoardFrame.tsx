@@ -125,6 +125,8 @@ export function BoardFrame(props: {
 	 * rest of a selection and snaps it (`Stage.dragBoard`). True means it took the drag.
 	 */
 	drag?: (event: PointerEvent) => boolean;
+	/** The pointer came onto the board or its title bar, or left both: for the stage's hover outline. */
+	onHover?: (on: boolean) => void;
 	/** How far the stage is carrying this board in a drag of its own, until the move is sent. */
 	shift?: { dx: number; dy: number };
 	/**
@@ -345,6 +347,7 @@ export function BoardFrame(props: {
 	const zoom = createMemo((previous?: number) => (props.moving && previous !== undefined ? previous : props.camera.zoom));
 	/** The board or its bar is under the pointer: the bar's buttons show for either (`canvas.css`). */
 	const [hovered, setHovered] = createSignal(false);
+	createEffect(() => props.onHover?.(hovered()));
 	const inert = createMemo(() => zoom() < INTERACT_ZOOM);
 
 	/*

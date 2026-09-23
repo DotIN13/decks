@@ -576,6 +576,8 @@ export function Stage(props: {
 	const [guides, setGuides] = createSignal<readonly Guide[]>([]);
 	/** The item under the pointer, outlined the way a design tool does before anything is pressed. */
 	const [hoverId, setHoverId] = createSignal<string | undefined>();
+	/** The board under the pointer, outlined the same way in edit mode. */
+	const [hoverBoard, setHoverBoard] = createSignal<string | undefined>();
 	/** What an arrow's end would join if it were let go now: an item or a board, lit up. */
 	const [joinHint, setJoinHint] = createSignal<readonly Box[]>([]);
 	/** An arrow end being dragged: the line from the end that stays to the pointer. */
@@ -2018,13 +2020,15 @@ export function Stage(props: {
 
 	/**
 	 * The outline a design tool draws round what the pointer is over, before anything is pressed:
-	 * what a press there would select. A mouse or a pen with no button down, over the drawing; a board
-	 * outlines itself (`canvas.css`, edit mode), and anything else clears it. Once per frame at most.
+	 * what a press there would select. Edit mode only: browsing selects and edits the drawing all the
+	 * same, but without a line following the pointer about. A mouse or a pen with no button down, over
+	 * the drawing; a board says when it is under the pointer (`BoardFrame`), and anything else clears
+	 * the item's. Once per frame at most.
 	 */
 	let hoverFrame: number | undefined;
 	let hoverAt: { x: number; y: number } | undefined;
 	const onHover = (event: PointerEvent) => {
-		if (event.pointerType === "touch" || !props.onPenEdit || props.drawing) return;
+		if (event.pointerType === "touch" || !props.onPenEdit || props.drawing || props.mode !== "edit") return;
 		if (event.buttons !== 0 || penTool() !== "select" || !onCanvas(event.target)) {
 			hoverAt = undefined;
 			if (hoverId()) setHoverId(undefined);
@@ -2044,7 +2048,12 @@ export function Stage(props: {
 	const hoverBox = createMemo(() => {
 		penDrawn();
 		const id = hoverId();
-		return id && id !== penText()?.id ? penLayer.bounds.get(id) : undefined;
+		if (props.mode !== "edit") return undefined;
+		if (id && id !== penText()?.id) return penLayer.bounds.get(id);
+		// A board under the pointer, unless it is the one selected, which has its own outline, or a drag is on.
+		const path = hoverBoard();
+		const board = path && path !== props.selected && !boardDrag() && !panning() ? props.boards.find((candidate) => candidate.path === path) : undefined;
+		return board ? { x: board.x, y: board.y, w: board.w, h: board.h, board: true } : undefined;
 	});
 
 	/** The last tap on a drawn item, so a second one soon after on the same item opens its words. */
@@ -2381,6 +2390,10 @@ export function Stage(props: {
 							}}
 							drag={(event) => (props.onPenEdit ? dragBoard(board.path, event) : false)}
 							shift={boardDrag()?.paths.includes(board.path) ? boardDrag() : undefined}
+							onHover={(on) => {
+								if (on) setHoverBoard(board.path);
+								else if (untrack(hoverBoard) === board.path) setHoverBoard(undefined);
+							}}
 							{...(props.onExtent ? { onExtent: (extent) => props.onExtent?.(board.path, extent) } : {})}
 							onMove={(x, y) => props.onMove(board.path, x, y)}
 							{...(props.onResize ? { onResize: (size) => props.onResize?.(board.path, size) } : {})}
@@ -2476,7 +2489,8 @@ export function Stage(props: {
 					{(box) => (
 						<div
 							class="pen-hover"
-							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${1 / props.camera.zoom}px var(--color-accent)` }}
+							data-board={"board" in box() ? "true" : undefined}
+							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
 						/>
 					)}
 				</Show>

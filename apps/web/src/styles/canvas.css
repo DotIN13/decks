@@ -782,10 +782,6 @@
 	.board-node[data-selected="true"] > .shade {
 	outline: 2px solid var(--color-accent);
 }
-	/* In edit mode a board outlines itself under the pointer, as the drawing's items do (`pen-hover`). */
-	.stage[data-mode="edit"] .board-node[data-hover="true"]:not([data-selected="true"]) > .shade {
-	outline: 1.5px solid var(--color-accent);
-}
 	/*
  * A board that is news (`board/glow.ts`): an agent named it and the person has not read it.
  *
@@ -966,6 +962,10 @@
 }
 	.world > .pen-join {
 	background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+	/* A board's hover outline follows the board's own corners. */
+	.world > .pen-hover[data-board="true"] {
+	border-radius: var(--radius-panel, 12px);
 }
 	/* Where a drag or a resize snapped: a line it lines up on, or a gap it repeats. */
 	.world > .pen-guides {
