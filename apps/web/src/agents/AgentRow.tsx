@@ -113,14 +113,14 @@ export function AgentRow(props: {
 	 * to describe one differently. It carries the time itself where the time is the interesting
 	 * half of the answer, which is why nothing else on the row carries one.
 	 *
-	 * **A dormant agent reads `dormant · 2h`**, in the shape an idle one reads: the state and when
-	 * it last ran, which are two different questions and both worth answering in the width there
-	 * is. Dormant rather than idle because both are true and only one of them explains why
-	 * nothing is happening — the runtime behind this one is not running at all.
+	 * **A dormant agent shows when it last ran, and no word.** Parked is said by the name instead
+	 * — a step down in weight from every other row (`panel.css`) — so the slot is free to carry
+	 * the one thing about a parked agent that is worth reading. The row's `title` still says it
+	 * in words for anyone who rests on it.
 	 */
 	const shortState = () => {
 		if (!chat().dormant) return rowWords(props.row.status, chat().state, chat().lastAt);
-		return chat().lastAt === undefined ? "dormant" : `dormant · ${since(chat().lastAt)}`;
+		return chat().lastAt === undefined ? "never run" : since(chat().lastAt);
 	};
 
 	/**

@@ -219,6 +219,7 @@ const rowsNow = () =>
 			h: Math.round(agent.getBoundingClientRect().height),
 			kind: agent.querySelector(".kind")?.textContent,
 			weight: getComputedStyle(agent.querySelector(".row-label")).fontWeight,
+			nameColour: getComputedStyle(agent.querySelector(".row-label")).color,
 			avatar: Math.round(agent.querySelector(".row-icon")?.getBoundingClientRect().width ?? 0),
 			state: agent.querySelector(".agent-state")?.textContent?.trim(),
 			said: agent.querySelector(".agent-said")?.textContent?.trim(),
@@ -312,11 +313,11 @@ say(
 	rowOf("Pi")?.shape[1] === "agent-said" && rowOf("Pi")?.said === "Writing the report" && rowOf("Pi")?.rowTags?.length === 0,
 	JSON.stringify(["Pi", "Basil"].map((name) => [name, rowOf(name)?.shape, rowOf(name)?.said])),
 );
-/* A dormant agent's name is set a step lighter, the way its runtime word is fainter. */
+/* The name is the strong word on the row; a dormant one steps down a weight and stays legible. */
 say(
-	"the name is set in 600, a dormant one's lighter",
-	panel.rows.every((agent) => (agent.dormant ? Number(agent.weight) < 600 : agent.weight === "600")),
-	JSON.stringify(panel.rows.map((r) => `${r.name}:${r.weight}`)),
+	"every name is bold and full-strength, a dormant one one step lighter",
+	panel.rows.every((agent) => (agent.dormant ? agent.weight === "600" : agent.weight === "700")) && panel.rows.every((agent) => agent.nameColour === panel.rows[0]?.nameColour),
+	JSON.stringify(panel.rows.map((r) => `${r.name}:${r.weight}:${r.nameColour}`)),
 );
 say("the runtime beside the name, the state at the line's end", JSON.stringify(rowOf("Ada")?.metaColumn) === JSON.stringify([true, true]) && rowOf("Ada")?.kind === "claude", JSON.stringify(rowOf("Ada")));
 say("no row carries a workspace chip: the heading above it says that", panel.rows.every((agent) => agent.chips === 0), JSON.stringify(panel.rows.map((r) => r.chips)));
@@ -325,11 +326,12 @@ say("no row carries a workspace chip: the heading above it says that", panel.row
  * Basil has said nothing, so its second line is the state, in one word.
  */
 /*
- * Dormant beats idle: both are true of a parked agent and only one of them explains why nothing
- * is happening. It reads in the shape an idle row reads — the state, then when it last ran.
+ * A parked agent says so with its name, which steps down one weight, and spends the state's slot
+ * on when it last ran — the one thing about a parked agent that is not said anywhere else. The
+ * row's `title` still has the word for anyone who rests on it.
  */
 const basil = rowOf("Basil");
-say("…and dormant beats idle, with the time beside it", basil?.dormant === "true" && basil?.doing === "dormant · 2h", JSON.stringify([basil?.dormant, basil?.doing]));
+say("…and a dormant row shows when it last ran, with the word in its title", basil?.dormant === "true" && basil?.doing === "2h" && /Dormant/.test(basil?.title ?? ""), JSON.stringify([basil?.dormant, basil?.doing, basil?.title]));
 /* The foot counts, and it is the only count: the headings carry a + instead. */
 say("there is no foot under the list: the count lives in the headings", panel.foot === undefined, String(panel.foot));
 /* It names what it searches and how many; it still matches tags and workspaces, as below. */

@@ -562,20 +562,27 @@
 	}
 
 	/*
-	 * A parked agent, said by dimming rather than by a sentence.
-	 *
-	 * The row used to spell out "Dormant — not resumed" on its own line. Now its name is
-	 * muted and its runtime word is fainter (`.kind[data-dormant]`) — quiet signals in the
-	 * place of one loud one, and the `title` on the row still says it in words.
+	 * The name is the strong word on the row: full-strength and bold, with the runtime, the state
+	 * and the second line all set quieter around it. It is what the eye lands on going down a
+	 * list of fourteen, and every other thing on the row is read only once a name has been found.
 	 */
-	/* The name in bold, the one strong word on the row; the runtime and time after it are muted. */
 	.agent-list .agent-line > .row-label {
-		font-weight: 600;
+		color: var(--fg);
+		font-weight: 700;
 	}
 
+	/*
+	 * A parked agent, said by its name rather than by a sentence.
+	 *
+	 * The row used to spell out "Dormant — not resumed" on its own line, then to say `dormant` in
+	 * the state's slot. Now the name steps down one weight — still full-strength, and still
+	 * bolder than anything beside it — and the runtime word is fainter (`.kind[data-dormant]`).
+	 * A step in a gradient rather than a grey: a name nobody can read at a glance is a poor way
+	 * to say that its agent is only asleep. The state's slot carries when it last ran, and the
+	 * row's `title` still says the word.
+	 */
 	.agent-row[data-dormant] .row-label {
-		color: var(--muted);
-		font-weight: 500;
+		font-weight: 600;
 	}
 
 	/*
