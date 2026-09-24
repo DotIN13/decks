@@ -112,8 +112,17 @@ export function AgentRow(props: {
 	 * `rowWords` is the agent dropdown's own wording, so two lists of the same agents cannot come
 	 * to describe one differently. It carries the time itself where the time is the interesting
 	 * half of the answer, which is why nothing else on the row carries one.
+	 *
+	 * **A dormant agent shows the time alone.** Its name is already set lighter and its runtime
+	 * word fainter (`panel.css`), which is how the list says parked — so the word as well would
+	 * be the same fact three times, in the one slot that could be saying something else. What is
+	 * worth knowing about a parked agent is when it last ran. The row's `title` still says it in
+	 * words for anyone who rests on it.
 	 */
-	const shortState = () => (chat().dormant ? "dormant" : rowWords(props.row.status, chat().state, chat().lastAt));
+	const shortState = () => {
+		if (!chat().dormant) return rowWords(props.row.status, chat().state, chat().lastAt);
+		return chat().lastAt === undefined ? "never run" : since(chat().lastAt);
+	};
 
 	/**
 	 * The tags on the second line: the agent's own first, then yours — what it says it is doing,
