@@ -181,7 +181,16 @@ await settle(page, 400);
 say("a double-click inside a named inner block still opens its run", (await openRun()) === 1, `${await openRun()} open`);
 await page.keyboard.press("End");
 await page.keyboard.type(" Typed in the nested block.");
-await frame().locator(".doc h1").first().click();
+/*
+ * Away from the run, to commit it — on the *panel*, not on the board's own heading.
+ *
+ * The heading is at the top of a board this check has panned down, so it is off screen, and the
+ * click only used to land because opening the run moved the camera there: the editor asked to
+ * reveal the whole page and `keepVisible` flew to its top. That is fixed (5c), so the way out
+ * has to be somewhere that is on screen whatever the camera is doing. Anywhere outside the
+ * frame does it: the run commits on `focusout`.
+ */
+await page.mouse.click(24, 700);
 await settle(page, 900);
 const nestedAfter = read(file);
 const blockAt = nestedAfter.indexOf('data-id="method"');
@@ -232,6 +241,66 @@ say("…and the rest of the file is as it was", differ(nestedBefore, nestedAfter
 	say("…and it stays outlined when the pointer leaves", kept.outlined === 1 && kept.hovered === 0, JSON.stringify(kept));
 	say("…with no handle to resize it by", picked.handle === "none", picked.handle);
 	say("…and the press wrote nothing", read(file) === was, "the file is untouched by a selection");
+}
+
+/*
+ * 5c. And opening a run does not move the camera out from under it.
+ *
+ * The editor asks the camera to keep what is being typed in view, for the on-screen keyboard.
+ * It used to ask for the whole *component*, which on a board written as a document is the page:
+ * a box taller than the screen, which `keepVisible` aligns to its top — so a double-click half
+ * way down a board flew the board up and took the caret off the bottom with it. Measured before
+ * the fix, on a board at 100%: the camera moved 177px.
+ */
+{
+	const camera = () => page.evaluate(() => {
+		const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+		return { x: Math.round(m.e), y: Math.round(m.f) };
+	});
+	const onScreen = () => page.evaluate(() => {
+		const node = document.querySelector('.board-node[data-path="boards/notes.html"] iframe');
+		const run = node?.contentDocument?.querySelector("[contenteditable='plaintext-only']");
+		if (!node || !run) return null;
+		const frame = node.getBoundingClientRect();
+		const k = frame.width / node.clientWidth;
+		const box = run.getBoundingClientRect();
+		const top = frame.y + box.y * k;
+		const stage = document.querySelector(".stage").getBoundingClientRect();
+		return { top: Math.round(top), bottom: Math.round(top + box.height * k), within: Math.round(stage.height) };
+	});
+	// A paragraph that is already fully on screen: bringing one into view is the feature, and
+	// what is asserted here is that opening one that needs nothing moves nothing.
+	const at = await page.evaluate(() => {
+		const node = document.querySelector('.board-node[data-path="boards/notes.html"] iframe');
+		const frame = node.getBoundingClientRect();
+		const k = frame.width / node.clientWidth;
+		const stage = document.querySelector(".stage").getBoundingClientRect();
+		for (const element of node.contentDocument.querySelectorAll(".doc p")) {
+			const box = element.getBoundingClientRect();
+			const top = frame.y + box.y * k;
+			const bottom = top + box.height * k;
+			if (top > stage.y + 120 && bottom < stage.y + stage.height - 220) return { x: frame.x + (box.x + 30) * k, y: (top + bottom) / 2 };
+		}
+		return null;
+	});
+	say("a paragraph is fully on screen to open", at !== null, JSON.stringify(at));
+	const was = await camera();
+	await page.mouse.dblclick(at.x, at.y);
+	await settle(page, 700);
+	const now = await camera();
+	const caret = await onScreen();
+	say(
+		"opening a run for typing leaves the camera where it was",
+		Math.abs(now.x - was.x) <= 2 && Math.abs(now.y - was.y) <= 2,
+		JSON.stringify({ was, now }),
+	);
+	say(
+		"…so the words being typed are still on the screen",
+		caret !== null && caret.top > 0 && caret.bottom < caret.within,
+		JSON.stringify(caret),
+	);
+	await page.keyboard.press("Escape");
+	await settle(page, 300);
 }
 
 const beforePressAway = read(file);

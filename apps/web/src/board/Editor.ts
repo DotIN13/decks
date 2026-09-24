@@ -1071,13 +1071,21 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		win.getSelection()?.removeAllRanges();
 		win.getSelection()?.addRange(range);
 		/*
-		 * Focusing a `contenteditable` on a phone raises the keyboard over the bottom
-		 * half of the screen, which is where the thing being typed usually is. The box
-		 * asked for is the component rather than the run, so the heading of a card stays
-		 * visible with the card it belongs to.
+		 * Focusing a `contenteditable` on a phone raises the keyboard over the bottom half of
+		 * the screen, which is where the thing being typed usually is — so the camera is asked
+		 * to keep it in view.
+		 *
+		 * **The run, with a little room round it, and never the component.** It used to ask for
+		 * the component, so that a card's heading stayed visible with its card. On a board
+		 * written as a document the component is the *page*: one block as tall as the board. A
+		 * box taller than the room left is aligned to its top (`keepVisible`), so double-clicking
+		 * a paragraph half way down flew the camera to the top of the board and took the caret
+		 * off the bottom of the screen with it — the camera moving to reveal the very thing it
+		 * was hiding. The run is what a caret is in, and it is small enough to be shown.
 		 */
-		const box = rectOf(component);
-		host.reveal(path, { x: box.left, y: box.top, w: box.width ?? 0, h: box.height ?? 0 });
+		const box = rectOf(run);
+		const room = 24;
+		host.reveal(path, { x: box.left - room, y: box.top - room, w: (box.width ?? 0) + room * 2, h: (box.height ?? 0) + room * 2 });
 		return true;
 	};
 
