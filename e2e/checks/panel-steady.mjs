@@ -173,8 +173,10 @@ await page.evaluate(() => {
 			const row = still.get(name);
 			return row
 				? {
-						text: row.querySelector(".agent-state")?.textContent?.trim(),
+						/* What it is doing is at the end of the name line now, where the time was. */
+						text: row.querySelector(".agent-line > .ago")?.textContent?.trim(),
 						said: row.querySelector(".agent-said")?.textContent?.trim(),
+						tags: [...row.querySelectorAll(".agent-tags .tag")].map((tag) => tag.textContent?.trim()),
 						status: row.dataset.status,
 						section: row.closest(".panel-section")?.querySelector(".panel-meta > span")?.textContent,
 					}
@@ -233,9 +235,10 @@ const inside = await change("Basil: tool → streaming", { type: "agent.state", 
 
 say("a state change adds no node and removes none", inside.churn.added === 0 && inside.churn.removed === 0, JSON.stringify(inside.churn) + JSON.stringify(inside.moved));
 say("…every row is the element it was", inside.kept === inside.rows, `${inside.kept} of ${inside.rows} kept${inside.lost.length ? ` (lost ${inside.lost.join(", ")})` : ""}`);
-say("…and the row it was about says so, on its second line", inside.state.Basil?.text === "Typing…" && inside.state.Basil?.status === "working", JSON.stringify(inside.state.Basil));
-/* A quiet agent's second line is not a state but the last thing it said, as a chat list's is. */
-say("an idle agent's second line is the last thing it said", inside.state.Vale?.said === "Nothing to add" && inside.state.Vale?.text === undefined, JSON.stringify(inside.state.Vale));
+say("…and the row it was about says so, at the end of its name line", inside.state.Basil?.text === "typing…" && inside.state.Basil?.status === "working", JSON.stringify(inside.state.Basil));
+/* And the second line says what an agent is working under, or the last thing it said when it is
+   working under nothing — a chat list's line, in the place the state used to take. */
+say("an untagged agent's second line is the last thing it said", inside.state.Vale?.said === "Nothing to add" && inside.state.Vale?.tags?.length === 0, JSON.stringify(inside.state.Vale));
 say("…with a keyboard reader still on their row", inside.focusKept, "focus moved, or went to the body");
 say("…and the list still scrolled where it was", inside.scrollKept, "the scroll position was reset");
 /*
@@ -289,7 +292,7 @@ const swapped = await change("Mira: idle → working", { type: "agent.state", id
 
 say("a state change moves no row between headings", swapped.kept === swapped.rows && swapped.state.Mira?.section === "No workspace", `${swapped.kept} of ${swapped.rows} kept · ${JSON.stringify(swapped.state.Mira)}`);
 say("…and swaps only her second line, and the heading's note", swapped.elements.added <= 2 && swapped.elements.removed <= 2, `${JSON.stringify(swapped.elements)} · ${JSON.stringify(swapped.moved)}`);
-say("…which now says what she is doing", swapped.state.Mira?.status === "working" && Boolean(swapped.state.Mira?.text) && swapped.state.Mira?.said === undefined, JSON.stringify(swapped.state.Mira));
+say("…which now says what she is doing", swapped.state.Mira?.status === "working" && Boolean(swapped.state.Mira?.text), JSON.stringify(swapped.state.Mira));
 
 // --- a change that moves an agent between sections ----------------------------------------
 
@@ -308,11 +311,12 @@ const tagged = await change("Mira's tags", {
 });
 
 /*
- * Tags are not drawn on a row any more — the search matches them and the edit window shows
- * them — so a tag arriving has nothing to draw. Elements, here and not every node: `Show`
- * inserts its value beside an empty text node, which is a bookmark rather than a thing on screen.
+ * A tag arriving is drawn now: the second line is what an agent is working under, so Mira's
+ * last words give way to her first tag. That is a line swapped inside a row rather than a list
+ * redrawn — the row is the element it was, and nothing outside that one line moves.
  */
-say("a tag arriving adds no element and removes none", tagged.elements.added === 0 && tagged.elements.removed === 0, `${JSON.stringify(tagged.elements)} of ${JSON.stringify(tagged.churn)} · ${JSON.stringify(tagged.moved)}`);
+say("a tag arriving swaps that row's second line and nothing else", tagged.elements.added <= 1 && tagged.elements.removed <= 1, `${JSON.stringify(tagged.elements)} of ${JSON.stringify(tagged.churn)} · ${JSON.stringify(tagged.moved)}`);
+say("…to the tag itself", JSON.stringify(tagged.state.Mira?.tags) === JSON.stringify(["panel-css"]) && tagged.state.Mira?.said === undefined, JSON.stringify(tagged.state.Mira));
 say("…and it is the same row", tagged.kept === tagged.rows, `${tagged.kept} of ${tagged.rows} kept`);
 
 // --- the heading's note ---------------------------------------------------------------------

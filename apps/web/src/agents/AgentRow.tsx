@@ -2,12 +2,12 @@ import type { Identity } from "@decks/protocol";
 import PictureInPicture2 from "lucide-solid/icons/picture-in-picture-2";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
-import { createSignal, Show } from "solid-js";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { Portal } from "solid-js/web";
 import { AgentEdit } from "./AgentEdit.tsx";
 import { Icon } from "../ui/icons.tsx";
 import { AgentFace } from "./AgentPill.tsx";
-import { closeWords, since, statusWords } from "./agent-order.ts";
+import { closeWords, rowWords, since, statusWords } from "./agent-order.ts";
 import { canHover } from "../lib/media.ts";
 import type { AgentRow as Row } from "./agent-sections.ts";
 
@@ -17,13 +17,21 @@ import type { AgentRow as Row } from "./agent-sections.ts";
  * It was four lines (name; state; workspace and tags; the last thing said), about 90px a row,
  * and the panel held eight. Now:
  *
- * - **one line**: face, name, runtime, time. The face's ring is the state, and the hover card
- *   the panel draws beside the row says the rest.
- * - **two lines**: the same, and under it what the agent is doing when it is asking, working
- *   or finished unread, or else the last thing it said, the way a chat list shows a message.
+ * - **one line**: face, name, runtime, and what it is doing. The face's ring is the state too,
+ *   and the hover card the panel draws beside the row says the rest.
+ * - **two lines**: the same, and under it the tags it is working under, or the last thing it
+ *   said when it has none, the way a chat list shows a message.
  *
- * The square beside the search switches the two. The time gives its column to the buttons
- * when the row is approached, and on a touch screen they are always there.
+ * **The state is where the time used to be, and the tags are where the last words used to be.**
+ * The time on its own answered a question nobody had — `4m` says an agent is quiet but not
+ * whether it is quiet *waiting for an answer* — so the right-hand column now reads `waiting for
+ * you`, `running tools…` or `idle · 2h`, which is the state and the time in the same width. The
+ * state has left the second line with it, so the line below can say what the agent is working
+ * on rather than repeating the line above.
+ *
+ * The square beside the search switches the two heights. The state gives its column to the
+ * buttons when the row is approached, and on a touch screen they are always there — so there
+ * the state rides on the second line instead, the one column a finger never covers.
  */
 export function AgentRow(props: {
 	row: Row;
@@ -92,11 +100,56 @@ export function AgentRow(props: {
 	 * touchscreen mid-session, and `CanvasOps` reads it the same way.
 	 */
 	const touch = !canHover();
-	/** Worth a line of its own: asking, working, or finished and unread. */
+	/** Asking, working, or finished and unread: worth a swatch, and worth reading before the name's time. */
 	const busy = () => !chat().dormant && props.row.status !== "idle";
 	const stateWords = () => {
 		const base = chat().dormant ? "Dormant" : statusWords(props.row.status, chat().state);
 		return touch && chat().lastAt !== undefined ? `${base} · ${since(chat().lastAt)}` : base;
+	};
+	/**
+	 * The state in the register a 264px row can afford: `waiting for you`, `idle · 2h`.
+	 *
+	 * `rowWords` is the agent dropdown's own wording, so two lists of the same agents cannot come
+	 * to describe one differently. It carries the time itself where the time is the interesting
+	 * half of the answer, which is why nothing else on the row carries one.
+	 */
+	const shortState = () => (chat().dormant ? "dormant" : rowWords(props.row.status, chat().state, chat().lastAt));
+
+	/**
+	 * The tags on the second line: the agent's own first, then yours — what it says it is doing,
+	 * then what you say it is, which is the hover card's order and its reasoning.
+	 *
+	 * Two, then `+n`. A row is scanned rather than read, and chips that wrapped would make the
+	 * rows different heights, which is the one thing a list you scan cannot have.
+	 */
+	const TAGS = 2;
+	/*
+	 * Read off the **identity**, not off `row.tags`, and that is not a preference.
+	 *
+	 * The panel keeps its rows in a store and updates them with `reconcile`, so that a state
+	 * change writes a word on one row instead of rebuilding the list (`LeftPanel`). Reconciling
+	 * an array of plain strings does not notify a reader of that array: measured, a tag arriving
+	 * reached `row.tags` — the panel's search matched it at once — and the row went on drawing
+	 * the last thing the agent said until something else redrew it. `identities[id]` is the
+	 * object `agent-sections.ts` copies those tags *from*, it is reconciled as an object, and
+	 * reading it here is both reactive and one hop closer to the source.
+	 */
+	const tags = () => [
+		...(props.identity?.tags ?? props.row.tags).map((text) => ({ text, mine: false })),
+		...(props.identity?.userTags ?? props.row.userTags).map((text) => ({ text, mine: true })),
+	];
+	/**
+	 * What the second line says: the tags, else the last thing said.
+	 *
+	 * Except on a touch screen, where the buttons hold the first line's right-hand column at all
+	 * times — there a busy agent spends the second line saying so, because that is the only place
+	 * left to say it, and a quiet one falls through to the same two answers as everywhere else.
+	 */
+	const second = (): "state" | "tags" | "said" | "none" => {
+		if (touch && busy()) return "state";
+		if (tags().length > 0) return "tags";
+		if (chat().lastLine) return "said";
+		return touch ? "state" : "none";
 	};
 
 	return (
@@ -142,22 +195,53 @@ export function AgentRow(props: {
 					<span class="agent-line">
 						<span class="row-label block truncate">{name()}</span>
 						<span class="kind" data-dormant={chat().dormant ? "true" : undefined}>{chat().kind}</span>
-						<span class="ago meta tabular-nums" data-yield>{since(chat().lastAt)}</span>
+						{/*
+								Where the time was. `data-yield` is what hands this column to the buttons on
+								approach (`chrome.css`), and it is the column the hover card puts its own
+								time in — so the card reads as this row with more room.
+							*/}
+							<span class="ago meta tabular-nums" data-yield data-busy={busy() ? "true" : undefined} title={stateWords()}>
+								<Show when={busy()}>
+									<span class="agent-swatch" data-status={props.row.status} aria-hidden="true" />
+								</Show>
+								<span class="truncate">{shortState()}</span>
+							</span>
 					</span>
 
 					{/*
-						The second line, only in the two-line view: what it is doing while that is
-						worth knowing, and otherwise the last thing it said. Tags and the workspace
-						are not on the row any more: the section heading names the workspace, the
-						search still matches both, and the edit window shows them.
+						The second line, only in the two-line view: what this agent is working
+						under, and the last thing it said when it is working under nothing. Not the
+						workspace — the section heading above the row names it — and the search
+						still matches every one of these whether the row draws it or not.
 					*/}
 					<Show when={props.lines === 2}>
-						<Show when={busy() || !chat().lastLine} fallback={<span class="agent-said">{chat().lastLine}</span>}>
-							<span class="agent-state">
-								<span class="agent-swatch" data-status={props.row.status} aria-hidden="true" />
-								<span class="min-w-0 flex-1 truncate">{stateWords()}</span>
-							</span>
-						</Show>
+						<Switch>
+							<Match when={second() === "tags"}>
+								<span class="tags agent-tags">
+									<For each={tags().slice(0, TAGS)}>
+										{(tag) => (
+											<span class="tag" data-mine={tag.mine ? "true" : undefined} title={tag.mine ? `Your tag: ${tag.text}` : `${name()} is working on ${tag.text}`}>
+												{tag.text}
+											</span>
+										)}
+									</For>
+									<Show when={tags().length > TAGS}>
+										<span class="tag-more" title={tags().slice(TAGS).map((tag) => tag.text).join(", ")}>
+											+{tags().length - TAGS}
+										</span>
+									</Show>
+								</span>
+							</Match>
+							<Match when={second() === "said"}>
+								<span class="agent-said">{chat().lastLine}</span>
+							</Match>
+							<Match when={second() === "state"}>
+								<span class="agent-state">
+									<span class="agent-swatch" data-status={props.row.status} aria-hidden="true" />
+									<span class="min-w-0 flex-1 truncate">{stateWords()}</span>
+								</span>
+							</Match>
+						</Switch>
 					</Show>
 				</span>
 			</button>

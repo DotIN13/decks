@@ -190,6 +190,27 @@ export function LeftPanel(props: {
 	};
 	/* The row under the pointer, for the one hover card the list shares, and only in the one-line view. */
 	const [hovered, setHovered] = createSignal<{ id: string; at: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height"> } | undefined>();
+	/*
+	 * The card the list shares, held after the pointer leaves so it is **mounted once**.
+	 *
+	 * `AgentHoverCard` is built to be mounted and then unhidden: it places itself on the frame
+	 * after its anchor changes, and until it has it draws nothing, so that it can never flash at
+	 * `0,0` on its way to a row. Drawn inside a `<Show when={hovered()}>` that promise is
+	 * inverted — every row entered built a new card, hid it for a frame and faded it in, and
+	 * every row left threw it away. Running down a dense list that reads as a strobe: one flash
+	 * per row, and the 160ms slide between rows never ran at all because there was never a card
+	 * old enough to slide.
+	 *
+	 * So the memo keeps the last agent while the card fades out, and `shown` alone says whether
+	 * it is up. Nothing is rebuilt between rows; the anchor changes and the card travels.
+	 */
+	const card = createMemo<{ chat: AgentChat; at: Pick<DOMRect, "left" | "right" | "top" | "bottom" | "width" | "height"> } | undefined>((previous) => {
+		const over = hovered();
+		if (!over) return previous;
+		const chat = (props.chats ?? []).find((one) => one.id === over.id);
+		return chat ? { chat, at: over.at } : previous;
+	});
+	const cardShown = () => tab() === "agents" && lines() === 1 && hovered() !== undefined;
 	/* Beside the panel and level with the row: the row's height, the panel's sides, so the card clears the panel's edge. */
 	const besideRow = (row: DOMRect, element: Element | null) => {
 		const side = element?.getBoundingClientRect() ?? row;
@@ -872,14 +893,17 @@ export function LeftPanel(props: {
 					</Show>
 				</div>
 
-				{/* In the one-line view the row says only who; the card beside it says what they are doing. */}
-				<Show when={tab() === "agents" && lines() === 1 && hovered()}>
+				{/* In the one-line view the row says who and what it is doing; the card says the rest. */}
+				<Show when={card()}>
 					{(over) => (
-						<Show when={(props.chats ?? []).find((chat) => chat.id === over().id)}>
-							{(chat) => (
-								<AgentHoverCard chat={chat()} identity={props.identities?.[chat().id]} unread={props.unread?.[chat().id] ?? 0} anchor={over().at} beside shown />
-							)}
-						</Show>
+						<AgentHoverCard
+							chat={over().chat}
+							identity={props.identities?.[over().chat.id]}
+							unread={props.unread?.[over().chat.id] ?? 0}
+							anchor={over().at}
+							beside
+							shown={cardShown()}
+						/>
 					)}
 				</Show>
 			</aside>

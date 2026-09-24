@@ -347,6 +347,24 @@
 	}
 
 	/*
+	 * Two lines is a height, not a count of what there happens to be to say.
+	 *
+	 * An agent with no tags that has never said anything has one line of content, and without
+	 * this its row came out 36px among 48s — a list that scans as a column of names loses that
+	 * the moment the names are at uneven intervals. The second line is simply empty there.
+	 */
+	.row-list.agent-list[data-lines="2"] .agent-body {
+		min-height: 38px;
+		justify-content: center;
+	}
+
+	/* And the second line keeps its own height whether it is chips, a sentence or nothing, so
+	   a row of tags and a row of words are the same row. */
+	.row-list.agent-list[data-lines="2"] .agent-body > :nth-child(2) {
+		min-height: 16px;
+	}
+
+	/*
 	 * One grid row, not two. The row vocabulary spans its icon over a label row and a note row,
 	 * and an agent row has no note: the empty second row and its 3px gap sat under the text and
 	 * put it 1.5px above the face's centre.
@@ -452,14 +470,34 @@
 	}
 
 	/*
-	 * The right-hand column of the first line: how long ago, and the column the two buttons
-	 * take over on approach. The hover card puts the time in exactly this place.
+	 * The right-hand column of the first line: what the agent is doing, and the column the
+	 * buttons take over on approach. The hover card puts its own time in exactly this place.
+	 *
+	 * It held the time alone and now holds the state, which carries a time when the time is the
+	 * point (`idle · 2h`). So it is a row of two things — a swatch and a phrase — rather than one
+	 * word, and it is allowed to eat into the name: a name is recognised from its first few
+	 * letters and `waiting for you` is not recognised from `waiting f…`. Half the row at most,
+	 * because a name clipped to nothing is not recognised either.
 	 */
 	.agent-line > .ago {
+		display: flex;
+		max-width: 55%;
+		align-items: center;
 		margin-left: auto;
 		flex: none;
+		gap: 5px;
 		font-size: var(--type-micro);
 		white-space: nowrap;
+	}
+
+	/*
+	 * Asking, working or finished unread, in the row's own voice: the words take the reading
+	 * colour and the weight the name has. Quiet agents stay meta, which is what makes a list of
+	 * six answer "who needs me" without being read word by word.
+	 */
+	.agent-line > .ago[data-busy] {
+		color: var(--fg);
+		font-weight: 600;
 	}
 
 	/*
@@ -477,6 +515,33 @@
 		gap: 5px;
 		color: var(--muted);
 		font-size: var(--type-note);
+	}
+
+	/*
+	 * The tags on the second line: one row, never wrapping, and the row's own scale.
+	 *
+	 * `.tags`/`.tag` are the shared vocabulary (`chrome.css`) — the agent's filled, yours
+	 * outlined, the same pills the hover card and the edit window draw — and this only says that
+	 * in a row the line is fixed: two chips and a `+n`, so every row in the list is the same
+	 * height whatever an agent has called its work.
+	 */
+	.agent-tags {
+		overflow: hidden;
+		flex-wrap: nowrap;
+		align-items: center;
+	}
+
+	.agent-tags > .tag {
+		flex: 0 1 auto;
+	}
+
+	/* How many more there are, said as a word rather than as a third pill: a chip that is a
+	   count is a chip you would try to read. */
+	.tag-more {
+		flex: none;
+		color: var(--faint);
+		font-size: var(--type-tag);
+		line-height: 14px;
 	}
 
 	/*

@@ -222,6 +222,13 @@ const rowsNow = () =>
 			avatar: Math.round(agent.querySelector(".row-icon")?.getBoundingClientRect().width ?? 0),
 			state: agent.querySelector(".agent-state")?.textContent?.trim(),
 			said: agent.querySelector(".agent-said")?.textContent?.trim(),
+			/* The right-hand end of the name line: what the agent is doing, where the time used to be. */
+			doing: agent.querySelector(".agent-line > .ago")?.textContent?.trim(),
+			busy: agent.querySelector(".agent-line > .ago")?.dataset.busy ?? null,
+			swatch: agent.querySelector(".agent-line > .ago > .agent-swatch")?.dataset.status ?? null,
+			/* The second line's tags, yours marked, and how many more it says there are. */
+			rowTags: [...agent.querySelectorAll(".agent-tags .tag")].map((tag) => `${tag.textContent.trim()}${tag.dataset.mine ? "*" : ""}`),
+			more: agent.querySelector(".tag-more")?.textContent?.trim() ?? null,
 			dormant: agent.dataset.dormant ?? null,
 			/* How far the face's centre sits from the text's: the face is centred on the words. */
 			offCentre: (() => {
@@ -234,9 +241,9 @@ const rowsNow = () =>
 			/* The name line, then at most one more: what it is doing, or what it last said. */
 			shape: [...agent.querySelectorAll(".agent-body > *")].map((line) => line.className.split(" ")[0]),
 			metaColumn: [agent.querySelector(".agent-line > .ago") !== null, agent.querySelector(".agent-line > .kind") !== null],
-			/* Tags and the workspace are off the row: the heading names the workspace, the search
-			   matches both, and the edit window shows them. */
-			chips: agent.querySelectorAll(".tags, .tag").length,
+			/* The workspace is off the row — the heading above it names it — while the tags are on
+			   it, which is what the second line is for. */
+			chips: agent.querySelectorAll(".tag.ws").length,
 			/* Side by side, not stacked: the row vocabulary collapses to one column unless the
 			   avatar is in an `.row-icon` slot, and that mistake put the name under the face. */
 			sideBySide: (() => {
@@ -262,16 +269,47 @@ say("the rows are in the order they last said something", JSON.stringify(panel.r
  * A finished turn keeps its place and says it is unread: "come and read this" is not the same
  * demand as "answer this now", and no heading promotes it.
  */
-say("a finished turn keeps its place, and says it is not read yet", panel.rows[3]?.name === "Wren" && /not read yet/.test(panel.rows[3]?.state ?? ""), JSON.stringify(panel.rows[3]));
-say("every row is two lines", panel.rows.every((agent) => agent.lines === "2" && agent.shape.length === 2 && agent.shape[0] === "agent-line"), JSON.stringify(panel.rows.map((r) => r.shape)));
+say("a finished turn keeps its place, and says it is not read yet", panel.rows[3]?.name === "Wren" && /^done · /.test(panel.rows[3]?.doing ?? ""), JSON.stringify(panel.rows[3]));
+/*
+ * Two lines is a height, not a count of what there is to say: Basil has no tags and has never
+ * said anything, and its row is the same height as the rest with an empty second line.
+ */
+say("every row is two lines", panel.rows.every((agent) => agent.lines === "2" && agent.shape[0] === "agent-line" && agent.shape.length <= 2), JSON.stringify(panel.rows.map((r) => r.shape)));
 say("the avatar is beside the name, not above it", panel.rows.every((agent) => agent.sideBySide), JSON.stringify(panel.rows.map((r) => r.sideBySide)));
 say("…at 26px", panel.rows.every((agent) => agent.avatar === 26), JSON.stringify(panel.rows.map((r) => r.avatar)));
 say("…on a 48px row, the face centred on the two lines", panel.rows.every((agent) => agent.h === 48 && agent.offCentre <= 1), JSON.stringify(panel.rows.map((r) => [r.h, r.offCentre])));
-/* Busy is asking, working, or finished unread: then the second line is what it is doing. */
+/*
+ * **What it is doing is where the time was**, at the right-hand end of the name line, in the
+ * row's short wording: `waiting for you`, `running tools…`, `done · 15m`, `idle · 2h`. It reads
+ * as the state and the time at once, which the bare time never did — `4m` says an agent is
+ * quiet and not whether it is quiet waiting for an answer.
+ */
 say(
-	"a busy agent's second line is what it is doing, in words",
-	rowOf("Iris")?.shape[1] === "agent-state" && /\S/.test(rowOf("Iris")?.state ?? "") && rowOf("Ada")?.shape[1] === "agent-state" && rowOf("Pi")?.shape[1] === "agent-state" && rowOf("Ada")?.said === undefined,
-	JSON.stringify(["Iris", "Ada", "Pi"].map((name) => [name, rowOf(name)?.state, rowOf(name)?.said])),
+	"the state is at the end of the name line, in the row's own wording",
+	rowOf("Iris")?.doing === "waiting for you" && rowOf("Ada")?.doing === "running tools…" && rowOf("Pi")?.doing === "typing…" && /^done · /.test(rowOf("Wren")?.doing ?? ""),
+	JSON.stringify(panel.rows.map((r) => [r.name, r.doing])),
+);
+/* Asking, working or finished unread reads in the row's own colour, with the ring's colour beside it. */
+say(
+	"…and a busy one is marked: a swatch in the status colour, and the reading weight",
+	rowOf("Iris")?.busy === "true" && rowOf("Iris")?.swatch === "waiting" && rowOf("Ada")?.swatch === "working" && rowOf("Wren")?.swatch === "done" && rowOf("Basil")?.busy === null && rowOf("Basil")?.swatch === null,
+	JSON.stringify(panel.rows.map((r) => [r.name, r.busy, r.swatch])),
+);
+/*
+ * **The tags are where the last words were**: what an agent is working under is a standing
+ * fact and the last line is a moment, and the moment is the one the hover card can hold.
+ * Two of them, then how many more, so every row is the same height.
+ */
+say(
+	"the second line is the tags, the agent's own and yours, two and a count",
+	JSON.stringify(rowOf("Iris")?.rowTags) === JSON.stringify(["e2e", "flaky-editing"]) && rowOf("Iris")?.more === "+1" && JSON.stringify(rowOf("Ada")?.rowTags) === JSON.stringify(["panel-css", "measuring"]) && rowOf("Ada")?.more === null,
+	JSON.stringify(panel.rows.map((r) => [r.name, r.rowTags, r.more])),
+);
+/* And the last thing it said when there are none, the way a chat list shows a message. */
+say(
+	"…and the last thing it said when it has no tags",
+	rowOf("Pi")?.shape[1] === "agent-said" && rowOf("Pi")?.said === "Writing the report" && rowOf("Pi")?.rowTags?.length === 0,
+	JSON.stringify(["Pi", "Basil"].map((name) => [name, rowOf(name)?.shape, rowOf(name)?.said])),
 );
 /* A dormant agent's name is set a step lighter, the way its runtime word is fainter. */
 say(
@@ -279,14 +317,14 @@ say(
 	panel.rows.every((agent) => (agent.dormant ? Number(agent.weight) < 600 : agent.weight === "600")),
 	JSON.stringify(panel.rows.map((r) => `${r.name}:${r.weight}`)),
 );
-say("the runtime beside the name, the time at the line's end", JSON.stringify(rowOf("Ada")?.metaColumn) === JSON.stringify([true, true]) && rowOf("Ada")?.kind === "claude", JSON.stringify(rowOf("Ada")));
-say("no row carries a tag or a workspace chip", panel.rows.every((agent) => agent.chips === 0), JSON.stringify(panel.rows.map((r) => r.chips)));
+say("the runtime beside the name, the state at the line's end", JSON.stringify(rowOf("Ada")?.metaColumn) === JSON.stringify([true, true]) && rowOf("Ada")?.kind === "claude", JSON.stringify(rowOf("Ada")));
+say("no row carries a workspace chip: the heading above it says that", panel.rows.every((agent) => agent.chips === 0), JSON.stringify(panel.rows.map((r) => r.chips)));
 /*
  * Dormant beats idle: both are true and only one of them explains why nothing is happening.
  * Basil has said nothing, so its second line is the state, in one word.
  */
 const basil = rowOf("Basil");
-say("…and dormant beats idle, in one word", basil?.dormant === "true" && basil?.state?.includes("Dormant"), JSON.stringify([basil?.dormant, basil?.state]));
+say("…and dormant beats idle, in one word", basil?.dormant === "true" && basil?.doing === "dormant", JSON.stringify([basil?.dormant, basil?.doing]));
 /* The foot counts, and it is the only count: the headings carry a + instead. */
 say("there is no foot under the list: the count lives in the headings", panel.foot === undefined, String(panel.foot));
 /* It names what it searches and how many; it still matches tags and workspaces, as below. */
@@ -311,8 +349,8 @@ const geometry = () =>
 		const words = [...line.children].filter((child) => getComputedStyle(child).display !== "none").pop();
 		return {
 			body: Math.round(row.querySelector(".agent-body").getBoundingClientRect().width),
-			said: Math.round(row.querySelector(".agent-said")?.getBoundingClientRect().width ?? 0),
-			state: Math.round(row.querySelector(".agent-state")?.getBoundingClientRect().width ?? 0),
+			/* The second line, whatever it is drawing: tags, the last words, or the state. */
+			second: Math.round(row.querySelector(".agent-body > :nth-child(2)")?.getBoundingClientRect().width ?? 0),
 			nameRoom: Math.round(line.clientWidth - parseFloat(style.paddingRight)),
 			buttons: shown.length,
 			firstButtonAt: shown.length > 0 ? Math.round(Math.min(...shown.map((button) => button.getBoundingClientRect().left - at.left))) : null,
@@ -328,8 +366,8 @@ const approached = await geometry();
 say("approaching a row brings its buttons out", approached.buttons > 0 && still.buttons === 0, `${still.buttons} → ${approached.buttons}`);
 say(
 	"…and the line under the name does not move",
-	approached.said === still.said && approached.state === still.state && still.state > 0,
-	`said ${still.said}→${approached.said}, state ${still.state}→${approached.state}`,
+	approached.second === still.second && still.second > 0,
+	`the second line ${still.second}→${approached.second}`,
 );
 /* The one line that does give ground — it is the line they stand on. */
 say("…while the name line gives up exactly their column", approached.nameRoom < still.nameRoom, `${still.nameRoom} → ${approached.nameRoom}`);
@@ -476,9 +514,12 @@ for (const [id, name, tags, workspace] of [
 }
 await settle(page, 500);
 
-/* Filed, and still no chip: the heading names the workspace, so the row does not repeat it. */
-const chipped = await page.evaluate(() => document.querySelectorAll(".agent-row .tag, .agent-row .tags").length);
-say("a workspace is not drawn on the row: its heading says it", chipped === 0, `${chipped} chips`);
+/* Filed, and the row says its tags but never its workspace: the heading above it names that. */
+const chipped = await page.evaluate(() => ({
+	ws: document.querySelectorAll(".agent-row .tag.ws").length,
+	tags: document.querySelectorAll(".agent-row .tag").length,
+}));
+say("a workspace is not drawn on the row: its heading says it", chipped.ws === 0 && chipped.tags > 0, JSON.stringify(chipped));
 
 const filed = await page.evaluate(() => {
 	return [...document.querySelectorAll(".panel-section")].map((section) => ({
@@ -620,6 +661,41 @@ const beside = await page.evaluate(() => {
 });
 say("in the one-line view pointing at a row opens its card", beside.shown === true && /Iris/.test(beside.text ?? ""), JSON.stringify(beside));
 say("…beside the row, level with it", beside.beside === true && beside.level === true, JSON.stringify([beside.box, beside.panel, beside.row]));
+
+/*
+ * **And it is one card that travels, not a new card per row.**
+ *
+ * `AgentHoverCard` is built to be mounted once and unhidden: until it has measured itself
+ * against a new anchor it draws nothing, so that it can never flash at `0,0` on the way to a
+ * row. Mounted inside a `Show` on the hovered row that promise inverts — every row entered
+ * built one, hid it for a frame and faded it in, every row left threw it away, and running the
+ * pointer down a dense list read as a strobe. The card is marked here and looked for again
+ * after crossing to another row: the same element, moved, still up.
+ */
+await page.evaluate(() => {
+	const shown = [...document.querySelectorAll(".agent-hover")].find((el) => el.dataset.shown === "true");
+	if (shown) shown.dataset.marked = "1";
+});
+const wasAt = await page.evaluate(() => Math.round([...document.querySelectorAll(".agent-hover")].find((el) => el.dataset.marked)?.getBoundingClientRect().top ?? 0));
+await page.locator(".agent-row").filter({ hasText: "Basil" }).first().locator("[data-row]").hover();
+await settle(page, 300);
+const travelled = await page.evaluate(() => {
+	const shown = [...document.querySelectorAll(".agent-hover")].find((el) => el.dataset.shown === "true");
+	return shown ? { same: shown.dataset.marked === "1", top: Math.round(shown.getBoundingClientRect().top), text: shown.innerText.replace(/\n+/g, " | ") } : { same: false, top: 0, text: "" };
+});
+say(
+	"crossing to another row moves that one card rather than building a second",
+	travelled.same === true && /Basil/.test(travelled.text) && travelled.top !== wasAt,
+	JSON.stringify({ wasAt, ...travelled }),
+);
+/* And leaving the list hides it where it is, rather than tearing it down. */
+await page.mouse.move(700, 500);
+await settle(page, 400);
+const kept = await page.evaluate(() => {
+	const card = [...document.querySelectorAll(".agent-hover")].find((el) => el.dataset.marked);
+	return { there: Boolean(card), shown: card?.dataset.shown };
+});
+say("…and leaving the list hides that card rather than throwing it away", kept.there === true && kept.shown === "false", JSON.stringify(kept));
 await page.mouse.move(700, 500);
 await settle(page, 400);
 const gone = await page.evaluate(() => [...document.querySelectorAll(".agent-hover")].filter((el) => el.dataset.shown === "true").length);
