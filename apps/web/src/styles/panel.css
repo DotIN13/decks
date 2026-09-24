@@ -224,6 +224,31 @@
 		margin-top: 6px;
 	}
 
+	/*
+	 * An agent being dragged onto a heading, to move it into that project.
+	 *
+	 * Drawn on the heading and on the rows under it rather than around the section, because
+	 * `display: contents` leaves a section no box of its own to outline. Both together are what
+	 * says *where it would land*: the name of the project it is joining, and the group it is
+	 * joining in.
+	 */
+	.panel-section[data-drop] > .panel-meta {
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+		color: var(--fg);
+	}
+
+	.panel-section[data-drop] > .row-list {
+		border-radius: 8px;
+		outline: 1px dashed var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* The row that is in flight, left behind at half strength so the list still says where it came from. */
+	.agent-row[data-dragging] {
+		opacity: 0.45;
+	}
+
 	.panel-list[data-density="grid"] .panel-meta {
 		grid-column: 1 / -1;
 	}

@@ -37,6 +37,8 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	/** What a browser would have reported, if one were looking. */
 	const extents = new Map<string, { rev: number; w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number }>();
 	const worked: string[] = [];
+	/** The stage ops sent to the browser, in order. */
+	const calls: unknown[] = [];
 	/** Every `stage.move`, with the stage it was written on. */
 	const moved: Array<{ agentId: string; path: string; x: number; y: number }> = [];
 	const service = new StageService(deck, {
@@ -74,7 +76,11 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			return { ...(words === undefined ? {} : { words }), ...(minFont === undefined ? {} : { minFont }), ...(overflowX === undefined ? {} : { overflowX }) };
 		},
 		...(views ? { views: async () => views } : {}),
-		call: async () => ({ ok: true }),
+		/* Every op the browser was asked to carry out, so a test can read what travelled. */
+		call: async (asked: unknown) => {
+			calls.push(asked);
+			return { ok: true };
+		},
 		connected: () => true,
 		/* Who a move was written for, so a test can read back *whose* canvas it landed on. */
 		place: (agentId, path, x, y) => {
@@ -122,6 +128,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 	return {
 		tool,
 		worked,
+		calls,
 		moved,
 		sends,
 		created,
@@ -738,6 +745,39 @@ test("stage.pen edits the drawing in pen's own words, answers with boxes, and re
 		// And every board read has its box, so an edge is never a sum.
 		const boards = JSON.parse((await tool.run(`return await stage.boards()`)).text) as Array<{ x: number; w: number; box: { x1: number; x2: number } }>;
 		assert.equal(boards[0]!.box.x2, boards[0]!.x + boards[0]!.w);
+	} finally {
+		service.pens.close();
+		cleanup();
+	}
+});
+
+/**
+ * `stage.show` on a **drawn item**: the same verb, because the question it answers is the same
+ * one — look at this. What travels is the box, measured off the stage's layout here, because
+ * the browser paints the drawing on a canvas and has no node to look an id up in.
+ */
+test("stage.show takes a drawn item's id and sends the browser its box", async () => {
+	const { tool, service, deck, calls, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	service.pens = new StagePens(deck.path, () => {});
+	try {
+		await tool.run(`await stage.pen.edit([{ op: "insert", node: { type: "note", id: "n", content: "Check the margin" }, box: { x1: 1060, y1: 0, x2: 1300, y2: 120 } }])`);
+		calls.length = 0;
+
+		const shown = await tool.run(`return await stage.show("n")`);
+		assert.equal(shown.isError, false, shown.text);
+		const sent = calls.at(-1) as { op: string; args: { paths: string[]; items?: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }> } };
+		assert.deepEqual(sent.args.paths, [], "an item is not a board and is not held");
+		assert.deepEqual(sent.args.items, [{ id: "n", box: { x: 1060, y: 0, w: 240, h: 120 } }]);
+
+		const both = await tool.run(`return await stage.show(["boards/plan.html", "n"])`);
+		assert.equal(both.isError, false, both.text);
+		const pair = calls.at(-1) as { args: { paths: string[]; items?: unknown[] } };
+		assert.deepEqual(pair.args.paths, ["boards/plan.html"]);
+		assert.equal(pair.args.items?.length, 1, "the board is held, the item is only framed");
+
+		const missing = await tool.run(`return await stage.show("nothing-by-that-name")`);
+		assert.equal(missing.isError, true);
+		assert.match(missing.text, /No such board or drawn item: nothing-by-that-name/);
 	} finally {
 		service.pens.close();
 		cleanup();

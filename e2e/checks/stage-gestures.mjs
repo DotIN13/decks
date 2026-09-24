@@ -241,6 +241,41 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	await page.keyboard.press("Escape");
 }
 
+// --- dropped on the composer: talk about it rather than move it --------------------------------------
+
+/*
+ * Dragging a drawn item into the box you are typing in is not a request to park it there. So the
+ * move is undone at the last moment and the item's id arrives in the draft as `@item:<id>`,
+ * which is how the agent looks it up in `stage.pen.read()`.
+ */
+{
+	await drawnWhereFileSays("g-a");
+	const before = item("g-a");
+	const from = await centre("g-a");
+	const box = await page.locator(".composer-box").boundingBox();
+	await page.mouse.move(from.x, from.y);
+	await page.mouse.down();
+	await page.mouse.move(from.x + 20, from.y + 20, { steps: 4 });
+	await page.mouse.move(box.x + box.width / 2, box.y + 18, { steps: 12 });
+	await settle(page, 200);
+	const marked = await page.evaluate(() => document.querySelector(".composer-box")?.dataset.refer ?? null);
+	await page.mouse.up();
+	await settle(page, 500);
+	const typed = await page.evaluate(() => document.querySelector(".dockfield")?.textContent?.trim() ?? "");
+	say("the composer says a dragged item would be mentioned here", marked === "true", String(marked));
+	say("…and letting go writes its id into what you are typing", typed === "@item:g-a", typed);
+	const after = item("g-a");
+	say("…and leaves the item where it was, because that was never a move", after.x === before.x && after.y === before.y, JSON.stringify({ before: [before.x, before.y], after: [after.x, after.y] }));
+	/* The field is shared with everything below: leave it empty, and leave the keyboard to the
+	   canvas — the stage's tools are single letters, and `a` typed into a focused field is an `a`. */
+	await page.locator(".dockfield").click();
+	await page.keyboard.press("ControlOrMeta+A");
+	await page.keyboard.press("Backspace");
+	await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+	await page.keyboard.press("Escape");
+	await settle(page, 200);
+}
+
 // --- arrows: the ends light up what they will join, and can be picked up again -----------------------
 {
 	await drawnWhereFileSays("g-a");

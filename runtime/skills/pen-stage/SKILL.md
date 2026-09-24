@@ -194,6 +194,19 @@ together, and hands it to you in the call's result. Check with it after a big ch
 overflows a note, an arrow that crosses a board, a frame that clips what is in it are plain in a
 picture and invisible in `read()`.
 
+**Point the person's camera at one item** with `stage.show`, the same verb that puts a board up:
+an item's id is taken where a board's path is, and the canvas flies to it. Nothing is held and
+nothing moves — the item is on the stage already — and naming an item and a board together frames
+both.
+
+```ts
+await stage.show("summary");                          // look at this note
+await stage.show(["boards/plan.html", "summary"]);    // the board and the note beside it
+```
+
+The person can drag an item **into the composer** to talk about it, and it arrives in their
+message as `@item:<id>` — the id to look up in `read()`.
+
 ```ts
 await stage.screenshot();                               // the whole stage
 await stage.screenshot({ of: "summary" });             // one item, with a margin

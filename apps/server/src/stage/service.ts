@@ -352,10 +352,20 @@ export class StageService {
 	 * conversation — §7). Typed rather than `unknown` because `stage.d.ts` promises the
 	 * shape to the agent, and the agent writes code against what that file says.
 	 */
-	async show(agentId: string, paths: string[], options: { fit?: "board" | "all"; highlight?: string; animate?: boolean } = {}): Promise<{ shown: string[]; deferred?: string }> {
+	async show(
+		agentId: string,
+		paths: string[],
+		options: { fit?: "board" | "all"; highlight?: string; animate?: boolean; items?: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }> } = {},
+	): Promise<{ shown: string[]; deferred?: string }> {
 		for (const path of paths) {
 			if (!this.deck.board(path)) throw new Error(`No such board: ${path}`);
 		}
+		/*
+		 * Drawn items travel as boxes rather than as ids, because where an item *is* is a
+		 * question about the layout, and the server has already answered it (`pens.placedOf`).
+		 * The browser would have to ask its own canvas the same question and could get a
+		 * different answer while a file is being rewritten.
+		 */
 		const answer = await this.ask(agentId, { op: "show", args: { paths, ...options } });
 		const result = (answer ?? {}) as { shown?: unknown; deferred?: unknown };
 		return {

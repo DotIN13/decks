@@ -307,6 +307,20 @@ export function createStageTool(deps: {
 		if (!name) throw new Error("This stage has no drawing: the server keeps no stage files.");
 		return name;
 	};
+	/**
+	 * Where a drawn item is on this stage, or nothing when there is no item by that id.
+	 *
+	 * What makes `show` work on the drawing as well as on the boards. An id is looked up in the
+	 * layout rather than in the file, because the layout is the only thing that knows where a
+	 * note inside a frame ends up, and "fly to it" is a question about the stage, not the JSON.
+	 */
+	const itemBox = (id: string): { x: number; y: number; w: number; h: number } | undefined => {
+		const name = agent.stageName?.();
+		if (!service.pens || !name) return undefined;
+		const box = service.pens.placedOf(name).get(id)?.box;
+		return box ? { x: box.x, y: box.y, w: box.w, h: box.h } : undefined;
+	};
+
 	/** The shared Chrome, or the sentence that says this server has none. */
 	const needWeb = () => {
 		if (!service.web) throw new Error("This server has no shared browser.");
@@ -503,29 +517,41 @@ export function createStageTool(deps: {
 
 		// --- the stage -------------------------------------------------------------
 		/**
-		 * Put these boards on this agent's stage, beside what is already there.
+		 * Put these boards on this agent's stage, beside what is already there — or look at a
+		 * **drawn item**, by its id in `stage.pen`.
 		 *
 		 * Added to, never narrowed: taking a board off is `hide`. The camera fits what was named,
-		 * and anything not already held is held from now on — showing a board is working on it.
+		 * and anything not already held is held from now on — showing a board is working on it. An
+		 * item is not held, because it is part of the stage already; naming one is only "look at
+		 * this", and naming an item and a board together frames both.
 		 *
 		 * `animate: true` makes the camera **arrive** rather than jump — 420ms, easing out. It is off
 		 * by default: an op states where to look, and something watching the camera a frame later
 		 * should see what was asked for. The board's own links and the panel glide without being
 		 * asked, because those are a person's hands.
 		 */
-		show: async (path: string | string[], options?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }) => {
-			const paths = asList(path);
-			for (const one of paths) {
-				if (!here().some((board) => board.path === one)) throw new Error(`No such board: ${one}`);
+		show: async (target: string | string[], options?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }) => {
+			const wanted = asList(target);
+			const paths: string[] = [];
+			const items: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }> = [];
+			for (const one of wanted) {
+				if (here().some((board) => board.path === one)) {
+					paths.push(one);
+					continue;
+				}
+				const box = itemBox(one);
+				if (!box) throw new Error(`No such board or drawn item: ${one}`);
+				items.push({ id: one, box });
 			}
 			const up = agent.inPlay();
 			agent.setInPlay([...up, ...paths.filter((one) => !up.includes(one))]);
 			// One board named is the focusing gesture: "look at what I made". Several is arranging
-			// the canvas, and is nobody's byline.
+			// the canvas, and is nobody's byline. A drawn item is neither: it is already on the
+			// stage, and looking at it is not authorship of anything.
 			const [only] = paths;
-			if (only !== undefined && paths.length === 1) agent.worked?.(only);
+			if (only !== undefined && wanted.length === 1) agent.worked?.(only);
 			for (const one of paths) agent.acted?.("show", one);
-			return service.show(agent.id, paths, options ?? {});
+			return service.show(agent.id, paths, { ...(options ?? {}), ...(items.length > 0 ? { items } : {}) });
 		},
 		/** Take boards off this agent's stage, keeping them in context. */
 		hide: async (path: string | string[]) => {

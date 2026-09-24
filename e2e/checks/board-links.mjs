@@ -43,8 +43,8 @@ const frame = () => page.frameLocator(`.board-node[data-path="${SOURCE}"] iframe
  * Zoom is not politeness: below half zoom a board takes no pointer events at all — the frame is
  * inert so that a pan across it is a pan — so a click "inside" one lands on the canvas
  * underneath, and every assertion after it would be about a click that never reached the board.
- * That is not hypothetical here: opening the second board flies the camera out to hold both of
- * them, which is below the threshold, so this runs again before the tab half.
+ * Opening the second board takes the camera to *that* board, so it stays above the threshold;
+ * this runs again between the halves anyway, because each one starts from one board alone.
  */
 const focus = async (path) => {
 	for (const other of (await onCanvas()).filter((one) => one !== path)) link.send({ type: "board.hide", path: other });
@@ -90,13 +90,24 @@ const placed = await nodeBox(LINKED);
 const beside = Boolean(source && placed) && Math.abs(placed.left - (source.left + source.w + 32)) < 2 && Math.abs(placed.top - source.top) < 2;
 say("…placed beside the board that linked to it", beside, JSON.stringify({ source, placed }));
 
-/* And framed with it: a board opened where the camera is not looking is a board nobody read. */
+/*
+ * And framed: a board opened where the camera is not looking is a board nobody read.
+ *
+ * **The board that was asked for, and only it.** The camera used to fit the pair, so that you
+ * could see what the new board had arrived beside — and two boards side by side fit at half the
+ * zoom of one, which on this viewport is under the half-zoom line where a board stops taking
+ * pointer events at all. So the thing the link was followed for landed too small to read and
+ * too small to click into. Both halves are asserted, because "in view" alone passed before.
+ */
 const view = page.viewportSize();
 const visible = async (path) => {
 	const box = await page.locator(`.board-node[data-path="${path}"]`).boundingBox({ timeout: 2000 }).catch(() => null);
 	return Boolean(box) && box.x < view.width && box.y < view.height && box.x + box.width > 0 && box.y + box.height > 0;
 };
-say("…with both boards in view", (await visible(SOURCE)) && (await visible(LINKED)));
+say("…with the board it opened in view", await visible(LINKED));
+const zoom = () => page.evaluate(() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
+const level = await zoom();
+say("…and close enough to read and to click into, which the pair never was", level >= 50, `${level}%`);
 
 const kept = await where();
 say("…and the board that carried the link is still the board in the frame", kept === `/api/board/${SOURCE}`, kept);

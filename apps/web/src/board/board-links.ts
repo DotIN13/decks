@@ -71,3 +71,49 @@ export function attachBoardOpen(frame: HTMLIFrameElement, onOpen: (path: string)
 	view.addEventListener("message", listener);
 	return () => view.removeEventListener("message", listener);
 }
+
+/**
+ * The deck board a link **in the drawing** points at, or nothing.
+ *
+ * A markdown card on the stage can carry links like any other markdown, and a link from one to
+ * a board of this deck means what the same link on a board means: open that board here, beside
+ * what is already up. Left to `window.open` it would put the board's bare file in a tab, with
+ * no canvas, no title bar and no way back.
+ *
+ * The stage's own folder is the base every relative link in it is read against — `/api/f/<deck
+ * path>/stages/<name>/` — so the deck's prefix is that with the last two segments taken off. A
+ * link that lands inside it and names a board file (`.html`, `.md`) is a board; everything
+ * else, including an asset in the deck, is a tab, which is the same rule `lib/board.js` applies
+ * on a board.
+ */
+export function deckBoardLink(href: string, base: string): string | undefined {
+	let url: URL;
+	let from: URL;
+	try {
+		// A page to read both against: the app's own, or a stand-in where there is no page.
+		const here = typeof location === "undefined" ? "http://deck.invalid/" : location.href;
+		from = new URL(base || "/", here);
+		url = new URL(href, from);
+	} catch {
+		return undefined;
+	}
+	if (url.origin !== from.origin) return undefined;
+	const parts = from.pathname.split("/").filter(Boolean);
+	// `/api/f/<deck>/stages/<name>/` — the deck is everything before the last two.
+	if (parts.length < 4 || parts[0] !== "api" || parts[1] !== "f") return undefined;
+	const root = `/${parts.slice(0, -2).join("/")}/`;
+	if (!url.pathname.startsWith(root)) return undefined;
+	const path = url.pathname
+		.slice(root.length)
+		.split("/")
+		.map((part) => {
+			try {
+				return decodeURIComponent(part);
+			} catch {
+				return part;
+			}
+		})
+		.join("/");
+	if (!/\.(html|md)$/i.test(path)) return undefined;
+	return deckPath(path);
+}

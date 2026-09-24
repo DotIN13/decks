@@ -631,6 +631,57 @@ const basilSaid = await page.evaluate(() => {
 });
 say("an agent with nothing going on shows the last thing it said instead of a state", basilSaid.said === "Just arrived" && basilSaid.state === undefined, JSON.stringify(basilSaid));
 
+// --- dragging a row into a project ------------------------------------------------------
+
+/*
+ * The gesture a list filed under headings invites: pick a row up and drop it under another
+ * heading. It writes the same field the row's window writes and the agent's own
+ * `stage.me({ workspace })` writes, so there is no new state — what is checked is that the
+ * heading says where the row would land while it is in flight, and that the drop sends the
+ * move for the agent whose row it is.
+ */
+const heading = (label) => page.locator(".panel-section").filter({ has: page.locator(".panel-meta > span", { hasText: new RegExp(`^${label}$`) }) }).first();
+const dragRowTo = async (name, label, { drop = true } = {}) => {
+	const row = page.locator(".agent-row").filter({ hasText: name }).first();
+	const from = await row.boundingBox();
+	const to = await heading(label).locator(".panel-meta").first().boundingBox();
+	await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+	await settle(page, 200);
+	/* One more small move, because a browser stops sending `dragover` the moment the pointer
+	   stops, and a mark read after the last event of a perfectly still mouse is a mark read in a
+	   state no hand ever produces. */
+	await page.mouse.move(to.x + to.width / 2 + 2, to.y + to.height / 2, { steps: 3 });
+	await settle(page, 200);
+	const marks = await page.evaluate(() => ({
+		over: [...document.querySelectorAll(".panel-section[data-drop]")].map((one) => one.querySelector(".panel-meta > span")?.textContent),
+		lifted: [...document.querySelectorAll(".agent-row[data-dragging]")].map((one) => one.querySelector(".row-label")?.textContent),
+	}));
+	if (drop) await page.mouse.up();
+	else await page.keyboard.press("Escape");
+	await settle(page, 300);
+	return marks;
+};
+
+const dragged = await dragRowTo("Iris", "irb-84069");
+say("the heading a row is over says it would land there, and the row says it is in flight", JSON.stringify(dragged.over) === JSON.stringify(["irb-84069"]) && JSON.stringify(dragged.lifted) === JSON.stringify(["Iris"]), JSON.stringify(dragged));
+const dropped = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.workspace")).map((frame) => JSON.parse(frame)).at(-1));
+say("…and letting go moves that agent into that project", dropped?.id === "a3" && dropped?.workspace === "irb-84069", JSON.stringify(dropped));
+
+/*
+ * And out again. `null` here means *take it out*, which is not what the same `null` from an
+ * agent means — an agent that says nothing has declined to say, and must not empty a field a
+ * person filled in (`agents/session.ts`).
+ */
+await declare("a3", "Iris", { workspace: "irb-84069" });
+await settle(page, 300);
+await dragRowTo("Iris", "No workspace");
+const cleared = await page.evaluate(() => window.__sent.filter((frame) => frame.includes("agent.workspace")).map((frame) => JSON.parse(frame)).at(-1));
+say("dropping a row under No workspace takes it out of its project", cleared?.id === "a3" && cleared?.workspace === null, JSON.stringify(cleared));
+await declare("a3", "Iris", { workspace: undefined });
+await settle(page, 300);
+
 /* Searching by project works in either grouping — which is what makes it a way to *find* one. */
 await page.locator(".panel-shell input").first().fill("irb");
 await settle(page, 400);

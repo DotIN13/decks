@@ -1689,6 +1689,22 @@ export class DeckAgent {
 		return workspace;
 	}
 
+	/**
+	 * Take the workspace away, because **you** said to — dropping the row under `No workspace`,
+	 * or choosing it in the row's window.
+	 *
+	 * A separate verb from `setWorkspace`, and the difference is who is speaking. An agent that
+	 * sends nothing is saying "I am not going to say", which must not empty a field somebody
+	 * else filled in; a person who drags a row out of a project is saying "take it out". One
+	 * function cannot mean both, and the one it used to mean was the agent's, so this half of
+	 * the panel's own popup quietly did nothing.
+	 */
+	clearWorkspace(): void {
+		if (this.workspaceChosen === undefined) return;
+		this.declareWorkspace(undefined);
+		this.save();
+	}
+
 	/** The workspace it works in, as a slug: what the agent list groups by. */
 	get workspace(): string | undefined {
 		return this.workspaceChosen;

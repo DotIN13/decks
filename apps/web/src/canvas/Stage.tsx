@@ -13,6 +13,7 @@ import type { FrameGestureHost } from "../board/frame-gestures.ts";
 import { zoomKey } from "./zoom-keys.ts";
 import { deckMode, type DeckHandle, type SlideAction, slideKey } from "../present/slide-keys.ts";
 import { cssEscape } from "../board/inspect.ts";
+import { deckBoardLink } from "../board/board-links.ts";
 import type { LiveWebReply } from "../board/live-chat.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
@@ -204,6 +205,15 @@ export function Stage(props: {
 	onOpenBoard?: (path: string, from: string) => boolean;
 	/** A component on a board carrying code was pressed (`board/board-eval.ts`). */
 	onBoardEval?: (path: string, id: string, value: unknown) => void;
+	/**
+	 * Drawn items dropped on the composer: talk about them rather than move them.
+	 *
+	 * Dragging a note onto the box you are typing in is not a request to park it there, it is a
+	 * request to mention it — so the drop is undone as a move and the ids arrive here, for the
+	 * composer to write in. Boards are not included: a board dragged to the bottom of the canvas
+	 * is a board being put somewhere, which is what dragging one has always meant.
+	 */
+	onReferItems?: (ids: string[]) => void;
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
 	/**
@@ -1023,6 +1033,31 @@ export function Stage(props: {
 	 * around it and draws guides (⌘ or Ctrl held turns that off), Shift keeps it to one axis, and Alt
 	 * lets go of copies of the items, leaving the originals where they were.
 	 */
+	/**
+	 * The composer under a point, when a drag of drawn items could be a mention instead of a move.
+	 *
+	 * `elementFromPoint` rather than a rectangle we keep: the composer is a float the person can
+	 * drag anywhere and can be folded away to a tab, so where it is is a question only the
+	 * document can answer. Pointer capture does not change hit testing, so this works mid-drag.
+	 *
+	 * Only for a drag of the drawing alone. A board dropped here goes on being a board dropped
+	 * here: parking one at the bottom of the canvas is an arrangement, and taking that away to
+	 * gain a mention would be a worse trade than the mention is worth.
+	 */
+	const composerUnder = (at: { clientX: number; clientY: number }, ids: readonly string[], boards: readonly string[]): HTMLElement | undefined => {
+		if (!props.onReferItems || ids.length === 0 || boards.length > 0) return undefined;
+		const element = document.elementFromPoint(at.clientX, at.clientY) as HTMLElement | null;
+		return element?.closest<HTMLElement>(".composer-box") ?? undefined;
+	};
+	/** The composer being told it is a drop target, so the mark can be taken off wherever the drag ends. */
+	let referTarget: HTMLElement | undefined;
+	const markComposer = (element: HTMLElement | undefined) => {
+		if (referTarget === element) return;
+		if (referTarget) delete referTarget.dataset.refer;
+		referTarget = element;
+		if (element) element.dataset.refer = "true";
+	};
+
 	const dragSelection = (event: PointerEvent, ids: readonly string[], boards: readonly string[], on?: HTMLElement, onTap?: () => void) => {
 		const start = selectionBox(ids, boards);
 		const targets = snapTargets(ids, boards);
@@ -1044,6 +1079,7 @@ export function Stage(props: {
 					lines = snapped.guides;
 				}
 				offset = { dx, dy };
+				markComposer(composerUnder(e, ids, boards));
 				pannedAt = performance.now();
 				batch(() => {
 					setGuides(lines);
@@ -1053,11 +1089,26 @@ export function Stage(props: {
 				if (ids.length) penLayer.preview(new Map(ids.map((id) => [id, offset])));
 			},
 			(moved, e) => {
+				const referring = moved && composerUnder(e, ids, boards) !== undefined;
+				markComposer(undefined);
 				batch(() => {
 					setGuides([]);
 					if (!moved) {
 						setBoardDrag(undefined);
 						onTap?.();
+						return;
+					}
+					/*
+					 * Dropped on the composer: the move is undone and the items are mentioned instead.
+					 * Undone rather than never started, because the preview is what makes the gesture
+					 * legible — you drag the note to the box and it goes back where it was, with its
+					 * name now in what you are typing.
+					 */
+					if (referring) {
+						penLayer.preview(undefined);
+						setPenDrag({ dx: 0, dy: 0 });
+						setBoardDrag(undefined);
+						props.onReferItems?.([...ids]);
 						return;
 					}
 					if (e.altKey && ids.length) {
@@ -1073,8 +1124,14 @@ export function Stage(props: {
 		);
 	};
 
-	/** A card's link, followed in a new tab; a relative one is read against the stage's folder. */
+	/**
+	 * A card's link. A link to a board of this deck opens that board on the canvas, exactly as
+	 * the same link on a board does (`board/board-links.ts`); anything else is a new tab. A
+	 * relative link is read against the stage's own folder.
+	 */
 	const openLink = (href: string) => {
+		const board = deckBoardLink(href, props.pen?.base ?? "");
+		if (board && props.onOpenBoard?.(board, "")) return;
 		let url: URL;
 		try {
 			url = new URL(href, new URL(props.pen?.base || "/", location.href));

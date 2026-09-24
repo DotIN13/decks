@@ -9,6 +9,7 @@ import { Icon } from "../ui/icons.tsx";
 import { AgentFace } from "./AgentPill.tsx";
 import { closeWords, rowWords, since, statusWords } from "./agent-order.ts";
 import { canHover } from "../lib/media.ts";
+import { carryAgent } from "./agent-drag.ts";
 import type { AgentRow as Row } from "./agent-sections.ts";
 
 /**
@@ -83,6 +84,8 @@ export function AgentRow(props: {
 	const name = () => props.identity?.name ?? chat().name;
 	/** Whether this row's edit window is open. One per row, and only the open one is drawn. */
 	const [editing, setEditing] = createSignal(false);
+	/** Whether this row is the one being dragged to another heading, so it can fade while it is. */
+	const [dragging, setDragging] = createSignal(false);
 	/** Off the row, where `agent-sections.ts` put it — one source for one fact, like the tags. */
 	const workspace = () => props.row.workspace;
 	/** The tooltip if this agent can be closed, and `undefined` if it cannot. */
@@ -166,7 +169,28 @@ export function AgentRow(props: {
 		 * one — the same arrangement the dropdown row and the account row use, and the reason
 		 * the wash belongs to the box rather than to the button inside it.
 		 */
-		<div class="agent-row row-act" data-lines={props.lines} data-current={props.row.current} data-status={props.row.status} data-dormant={chat().dormant ? "true" : undefined}>
+		<div
+			class="agent-row row-act"
+			data-lines={props.lines}
+			data-current={props.row.current}
+			data-status={props.row.status}
+			data-dormant={chat().dormant ? "true" : undefined}
+			/*
+			 * The row is the handle for moving this agent to another project: drag it onto a
+			 * heading (`LeftPanel`). Only when the move is allowed at all — without `onWorkspace`
+			 * there is nothing a drop could do — and never while the edit window is open, where a
+			 * drag would take the text being selected in a field with it.
+			 */
+			draggable={props.onWorkspace && !editing() ? true : undefined}
+			data-dragging={dragging() ? "true" : undefined}
+			onDragStart={(event) => {
+				carryAgent(event.dataTransfer, chat().id, name());
+				setDragging(true);
+				// The card follows the pointer, and the pointer has left to carry a row.
+				props.onHover?.(undefined);
+			}}
+			onDragEnd={() => setDragging(false)}
+		>
 			<button
 				type="button"
 				class="min-w-0 flex-1"

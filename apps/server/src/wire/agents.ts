@@ -82,14 +82,21 @@ export const agents = {
 	},
 
 	/*
-	 * The workspace, from the row's customise popup.
+	 * The workspace, from the row's customise popup or from dragging the row onto a heading.
 	 *
 	 * One field and one writer at a time: this is the same value `stage.me.setWorkspace` writes,
 	 * so whoever moved last is where the agent is. Silent when the agent is gone, like the tags
 	 * above — the row a popup was opened from can be removed by another tab.
+	 *
+	 * `null` **clears** it here, where the same `null` from an agent does not. Only a person
+	 * arrives on this message, and a person who picks `No workspace` has said to take it out;
+	 * an agent that sends nothing has only declined to say (`session.setWorkspace`).
 	 */
 	"agent.workspace": (message, _reply, wire) => {
-		wire.agents.get(message.id)?.setWorkspace(message.workspace);
+		const agent = wire.agents.get(message.id);
+		if (!agent) return;
+		if (message.workspace === null) agent.clearWorkspace();
+		else agent.setWorkspace(message.workspace);
 	},
 
 	"agent.prompt": (message, _reply, wire) => {

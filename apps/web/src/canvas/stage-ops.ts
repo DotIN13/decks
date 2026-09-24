@@ -82,17 +82,29 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 		case "show": {
 			const paths = (Array.isArray(args.paths) ? args.paths : []).filter((path): path is string => typeof path === "string");
 			const boards = host.boards().filter((board) => paths.includes(board.path));
-			if (boards.length === 0) return { error: "none of those boards are on the canvas" };
+			/*
+			 * Drawn items arrive as boxes the server measured off the stage's layout, because an
+			 * item's id means nothing to this file: the drawing is painted on a canvas, not
+			 * mounted, so there is no node to look up. They frame like a board and are not
+			 * selected — selection here means a *board*, and an item has its own on the stage.
+			 */
+			const items = (Array.isArray(args.items) ? args.items : []).filter(
+				(item): item is { id: string; box: { x: number; y: number; w: number; h: number } } =>
+					Boolean(item) && typeof (item as { id?: unknown }).id === "string" && typeof (item as { box?: { w?: unknown } }).box?.w === "number",
+			);
+			if (boards.length === 0 && items.length === 0) return { error: "none of those boards are on the canvas" };
 
-			const fitAll = args.fit === "all" || boards.length > 1;
-			const wanted = fit(fitAll ? boards.map(boxOf) : [boxOf(boards[0]!)], host.viewport());
-			const waiting = defer(call, host, wanted, boards[0]!.path);
-			if (waiting) return { shown: boards.map((board) => board.path), ...waiting };
+			const shown = [...boards.map((board) => board.path), ...items.map((item) => item.id)];
+			const boxes = [...boards.map(boxOf), ...items.map((item) => item.box)];
+			const fitAll = args.fit === "all" || boxes.length > 1;
+			const wanted = fit(fitAll ? boxes : [boxes[0]!], host.viewport());
+			const waiting = defer(call, host, wanted, boards[0]?.path);
+			if (waiting) return { shown, ...waiting };
 			host.setCamera(wanted, { animate: args.animate === true });
-			host.select(boards[0]!.path);
+			if (boards[0]) host.select(boards[0].path);
 
-			if (typeof args.highlight === "string") highlight(boards[0]!.path, args.highlight);
-			return { shown: boards.map((board) => board.path) };
+			if (typeof args.highlight === "string" && boards[0]) highlight(boards[0].path, args.highlight);
+			return { shown };
 		}
 
 		case "camera": {

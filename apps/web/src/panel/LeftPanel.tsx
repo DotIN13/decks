@@ -16,6 +16,7 @@ import { AgentRow } from "../agents/AgentRow.tsx";
 import { NewAgentButton } from "../agents/AgentPill.tsx";
 import type { AgentKind } from "@decks/protocol";
 import { agentSections, type AgentSection } from "../agents/agent-sections.ts";
+import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
 
 /**
  * The left panel: one surface, **one list**, and a button that makes it go away.
@@ -293,6 +294,23 @@ export function LeftPanel(props: {
 	 * only a word somebody is using, so the set of them *is* this list, and a fetch for it would
 	 * be a second source of truth free to disagree.
 	 */
+	/** The section a dragged agent is over, by its id, so the heading it would land under says so. */
+	const [over, setOver] = createSignal<string | undefined>(undefined);
+	/*
+	 * However a drag ends — dropped here, dropped elsewhere, or abandoned with Escape — no
+	 * heading is under it any more. On the window because `dragend` fires on the row that was
+	 * picked up, which is not the section that marked itself.
+	 */
+	onMount(() => {
+		const done = () => setOver(undefined);
+		window.addEventListener("dragend", done);
+		window.addEventListener("drop", done);
+		onCleanup(() => {
+			window.removeEventListener("dragend", done);
+			window.removeEventListener("drop", done);
+		});
+	});
+
 	const workspaceNames = createMemo(() => {
 		const names = new Set<string>();
 		for (const identity of Object.values(props.identities ?? {})) if (identity.workspace) names.add(identity.workspace);
@@ -737,7 +755,48 @@ export function LeftPanel(props: {
 					<Show when={tab() === "agents"}>
 						<For each={agentList}>
 							{(section, index) => (
-								<div class="panel-section" data-kind={section.kind}>
+								<div
+									class="panel-section"
+									data-kind={section.kind}
+									/*
+									 * A heading is where an agent is dropped to change the project it says it is
+									 * in (`agents/agent-drag.ts`). The whole section takes the drop, not the
+									 * heading's own line: the target you aim at is the group of rows, and a 20px
+									 * strip of text is a target you miss.
+									 *
+									 * `preventDefault` on `dragover` is what makes a drop possible at all, and
+									 * saying it only for our own type is what keeps a file dragged in from
+									 * landing here instead of on the canvas.
+									 */
+									data-drop={over() === section.id ? "true" : undefined}
+									onDragOver={(event) => {
+										if (!props.onAgentWorkspace || !carriesAgent(event.dataTransfer)) return;
+										event.preventDefault();
+										if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+										setOver(section.id);
+									}}
+									onDragLeave={(event) => {
+										/*
+										 * Only when the pointer left this section for somewhere we can name.
+										 * Crossing a row inside it fires this too — hence the containment test —
+										 * and a `dragleave` with no `relatedTarget` at all is the browser's way of
+										 * saying "somewhere else", which during a drag over our own list is
+										 * usually a frame boundary rather than a departure. Clearing on those left
+										 * the heading unmarked while the hand held still over it. The end of the
+										 * drag clears it whatever happens (below).
+										 */
+										const to = event.relatedTarget as Node | null;
+										if (!to || event.currentTarget.contains(to)) return;
+										setOver((was) => (was === section.id ? undefined : was));
+									}}
+									onDrop={(event) => {
+										const id = draggedAgent(event.dataTransfer);
+										setOver(undefined);
+										if (!id) return;
+										event.preventDefault();
+										props.onAgentWorkspace?.(id, section.kind === "workspace" ? section.label : null);
+									}}
+								>
 									<div class="panel-meta meta">
 										<span class="truncate">{section.label}</span>
 										<span class="flex-1" />

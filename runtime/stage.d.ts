@@ -30,8 +30,12 @@ export interface Stage {
 	 * that are now one, and both still mean "board".)
 	 */
 	newBoard(o: { title: string; format?: "board" | "slides"; w?: number; h?: number }): Promise<string>;
-	/** Add these boards to your stage, beside what is there, and move the camera to them. `highlight` outlines one `data-id`. */
-	show(path: string | string[], o?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }): Promise<{ shown: string[] }>;
+	/**
+	 * Add these boards to your stage, beside what is there, and move the camera to them.
+	 * `highlight` outlines one `data-id`. A drawn item's id (`stage.pen`) can be named instead of
+	 * a board path, or beside one: the camera goes to it, and nothing is held or moved.
+	 */
+	show(target: string | string[], o?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }): Promise<{ shown: string[] }>;
 	/**
 	 * Set a board's height from its measured content; the board must be shown first. The result
 	 * also says, in a sentence, what the browser found: the height, the word count, the smallest

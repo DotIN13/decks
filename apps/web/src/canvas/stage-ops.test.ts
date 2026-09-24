@@ -140,3 +140,39 @@ test("a remembered view is not animated, whatever it asked for", () => {
 	assert.equal(animated.length, 0);
 	assert.equal(remembered.length, 1);
 });
+
+/*
+ * Showing a **drawn item**: a note or a frame on the stage, named by its id.
+ *
+ * The item's box is measured by the server off the stage's layout and travels with the call,
+ * because the drawing is painted on a canvas rather than mounted — there is no node here to
+ * look an id up in. So the whole of this half is: frame the box, select nothing.
+ */
+const ITEM = { id: "plan-note", box: { x: 2000, y: 400, w: 300, h: 200 } };
+
+test("an item is framed by the box that came with it, and selects no board", () => {
+	const { api, moved, selected } = host("A");
+	const result = runStageCall(call("A", "show", { paths: [], items: [ITEM] }), api) as { shown: string[] };
+
+	assert.deepEqual(result.shown, ["plan-note"]);
+	assert.equal(moved.length, 1, "the camera moved to it");
+	assert.ok(Math.abs(moved[0]!.x - 2150) < 1 && Math.abs(moved[0]!.y - 500) < 1, `the middle of the item: ${JSON.stringify(moved[0])}`);
+	assert.deepEqual(selected, [], "an item is not a board, and selecting boards is what select means here");
+});
+
+test("an item named with a board frames both", () => {
+	const { api, moved } = host("A");
+	const result = runStageCall(call("A", "show", { paths: ["boards/plan.html"], items: [ITEM] }), api) as { shown: string[] };
+
+	assert.deepEqual(result.shown, ["boards/plan.html", "plan-note"]);
+	assert.equal(moved.length, 1);
+	assert.ok(moved[0]!.zoom < 1, "zoomed out to hold the pair");
+});
+
+test("a show of nothing this canvas has is an error, not a camera move", () => {
+	const { api, moved } = host("A");
+	const result = runStageCall(call("A", "show", { paths: ["boards/gone.html"], items: [] }), api) as { error?: string };
+
+	assert.match(result.error ?? "", /none of those boards/);
+	assert.equal(moved.length, 0);
+});

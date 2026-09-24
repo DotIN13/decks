@@ -813,6 +813,31 @@ test("a workspace survives a restart, because a dormant chat has no session to a
 	cleanup();
 });
 
+/**
+ * Who is speaking decides what `null` means.
+ *
+ * An agent that sends nothing has declined to say, and must not empty a field a person filled
+ * in. A person who drags the row out of a project, or picks `No workspace` in its window, has
+ * said to take it out — so the two have separate verbs, and this is the pair of them.
+ */
+test("an agent saying nothing keeps its workspace; the person clearing it takes it away", () => {
+	const { deck, cleanup } = deckOn();
+	const agent = agentOn(deck);
+	agent.translator.user("hello");
+	agent.setWorkspace("political-llm");
+
+	assert.equal(agent.setWorkspace(null), "political-llm", "the agent declining to say changes nothing");
+	assert.equal(agent.workspace, "political-llm");
+
+	agent.clearWorkspace();
+	assert.equal(agent.workspace, undefined, "and the person taking it out does");
+	// Twice is no worse than once: a row already in no workspace can be dropped there again.
+	agent.clearWorkspace();
+	assert.equal(agent.workspace, undefined);
+	agent.dispose();
+	cleanup();
+});
+
 test("the summaries carry the workspace, and `undefined` is a real answer", () => {
 	const { deck, cleanup } = deckOn();
 	const one = agentOn(deck);

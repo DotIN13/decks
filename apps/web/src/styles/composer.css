@@ -18,4 +18,14 @@
 	outline: 2px dashed var(--accent, #3b82f6);
 	outline-offset: 2px;
 }
+
+	/*
+	 * A drawn item dragged over it from the stage: dropping mentions it instead of moving it
+	 * (`Stage.tsx`). The same mark as a file's, because it is the same promise — let go here and
+	 * this goes into what you are typing — and the two can never be up at once.
+	 */
+.composer-box[data-refer="true"] {
+	outline: 2px dashed var(--accent, #3b82f6);
+	outline-offset: 2px;
+}
 }

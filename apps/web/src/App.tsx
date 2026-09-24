@@ -1004,9 +1004,8 @@ export function App() {
 	 * Frame these boards, whatever they are: the camera moves to hold them all.
 	 *
 	 * A function over a list rather than one board, because the two things that fly — a row in
-	 * the rail, and a board a link on another board opened (below) — both want the same
-	 * arithmetic, and the second one wants the *pair*: a board that arrives beside the one you
-	 * were reading is only useful if you can see it is beside it.
+	 * the rail, and a board a link on another board opened (below) — want the same arithmetic,
+	 * and a list is also what an agent's `stage.show` of several boards asks for.
 	 *
 	 * `animate` is what the two of them ask for and nothing else does: after a link or a press a
 	 * camera that *arrives* says which way it went, where a camera that jumps leaves you to work
@@ -1029,10 +1028,16 @@ export function App() {
 	 * one answer that is any use is saying so.
 	 *
 	 * **Placed, not stacked.** A board that arrives on top of the one the reader is reading is
-	 * a board they then have to drag apart; so it lands to the right of the link's own board,
-	 * and both are framed, because the pair is the thing being looked at. Only when it is not
-	 * already on the canvas: a board the user put somewhere is theirs, and following a link is
-	 * not a reason to move it.
+	 * a board they then have to drag apart; so it lands to the right of the link's own board.
+	 * Only when it is not already on the canvas: a board the user put somewhere is theirs, and
+	 * following a link is not a reason to move it.
+	 *
+	 * **The camera goes to the board that was asked for, and only to it.** It used to frame the
+	 * pair, on the argument that a board arriving beside another is only useful if you can see
+	 * that it did. What that costs is the thing the link was followed for: two boards side by
+	 * side fit at half the zoom of one, which on a laptop is under `INTERACT_ZOOM` — the board
+	 * lands too small to read and too small to click into. Where it sits is answerable by
+	 * zooming out; text too small to read is not answerable at all.
 	 */
 	const openLinkedBoard = (path: string, from: string): boolean => {
 		const board = state.boards.find((one) => one.path === path);
@@ -1047,7 +1052,7 @@ export function App() {
 		send({ type: "board.play", path });
 		setSelected(path);
 		setComponent(undefined);
-		flyToBoards(source ? [source, board] : [board], { animate: true });
+		flyToBoards([board], { animate: true });
 		return true;
 	};
 
@@ -1258,6 +1263,23 @@ export function App() {
 						 */
 						onOpenBoard={openLinkedBoard}
 						onBoardEval={evalBoard}
+						/*
+						 * Drawn items dropped on the composer: talk about them.
+						 *
+						 * `@item:<id>` is the spelling, and it is the file mention's spelling with the
+						 * thing it names changed — a file is `@boards/plan.html` because that is the
+						 * address an agent reads it by, and a drawn item's address is its id in
+						 * `stage.pen`. Inserted at the caret through the same one-shot draft handoff a
+						 * dropped file uses (`app/files.ts`), so a sentence half typed survives it.
+						 */
+						onReferItems={(ids) =>
+							setDraft({
+								text: ids.map((id) => `@item:${id}`).join(" "),
+								at: Date.now(),
+								insert: true,
+								...(state.focused ? { agentId: state.focused } : {}),
+							})
+						}
 						agentIdentity={(agentId) => {
 							const identity = state.identities[agentId];
 							return identity ? { name: identity.name, color: identity.color } : undefined;
