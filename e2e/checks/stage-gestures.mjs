@@ -277,6 +277,27 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 		say("carrying an end over an item lights it up", litEnd === 1, String(litEnd));
 		const rejoined = await until(() => onDisk().children.find((n) => n.id === arrow.id)?.metadata.to === "g-b");
 		say("…and letting go joins the arrow to it", !!rejoined, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
+		// Its style, from the bar: a curve, heads at both ends, dashed. The path is redrawn from it.
+		await page.click('.pen-bar [data-route="curved"]');
+		const curved = await until(() => {
+			const now = onDisk().children.find((n) => n.id === arrow.id);
+			// Two items side by side on one level are joined by a straight line even when curved.
+			return now?.metadata.route === "curved" ? now : undefined;
+		});
+		say("an arrow's bar makes it curved", !!curved, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
+		await page.click('.pen-bar [data-heads="both"]');
+		await page.click('.pen-bar [aria-label="Dashed line"]');
+		const styled = await until(() => {
+			const now = onDisk().children.find((n) => n.id === arrow.id);
+			return now?.metadata.heads === "both" && now.metadata.dash === true && now.geometry.split("M").length - 1 === 3 ? now : undefined;
+		});
+		say("…with a head at each end, and dashed", !!styled, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
+		await page.click('.pen-bar [data-route="straight"]');
+		const straight = await until(() => {
+			const now = onDisk().children.find((n) => n.id === arrow.id);
+			return now && now.metadata.route === undefined && !/ C/.test(now.geometry) ? now : undefined;
+		});
+		say("…and straight again drops the route from the file", !!straight, JSON.stringify(onDisk().children.find((n) => n.id === arrow.id)?.metadata));
 		link.send({ type: "stage.pen.edit", agentId, ops: [{ op: "delete", id: arrow.id }] });
 	}
 	await page.keyboard.press("Escape");
@@ -398,6 +419,62 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 		await settle(page, 200);
 		say("…and not when browsing", (await count(".pen-hover")) === 0);
 	} else say("a board is on screen to hover", false);
+}
+
+// --- a board's bar and handles: the words fill the bar at rest; the handles are an item's, at any zoom --
+{
+	// The boards sit behind the panel and under the composer here, so the canvas is panned to them and back.
+	const find = () => page.evaluate(() => {
+		for (const chrome of document.querySelectorAll(".bar-layer .chrome")) {
+			const r = chrome.getBoundingClientRect();
+			for (const x of [r.x + 30, r.x + r.width * 0.3, r.x + r.width * 0.5]) {
+				const y = r.y + r.height / 2;
+				if (x > 320 && x < 1500 && y > 290 && y < 880 && document.elementFromPoint(x, y)?.closest(".chrome") === chrome) return { x, y, path: chrome.dataset.path };
+			}
+		}
+	});
+	await page.mouse.move(900, 500);
+	let target = await find();
+	let panned = { x: 0, y: 0 };
+	for (let tries = 0; !target && tries < 4; tries += 1) {
+		await page.mouse.wheel(-200, 250);
+		panned = { x: panned.x - 200, y: panned.y + 250 };
+		await settle(page, 400);
+		target = await find();
+	}
+	say("a board's title bar is on screen to press", !!target);
+	if (target) {
+		const acts = () => page.evaluate((path) => getComputedStyle(document.querySelector(`.bar-layer .chrome[data-path="${CSS.escape(path)}"] .acts`)).display, target.path);
+		await page.mouse.move(target.x, target.y - 200);
+		await settle(page, 150);
+		say("at rest a bar's buttons take no room, so its title and path have the whole bar", (await acts()) === "none", await acts());
+		await page.mouse.move(target.x, target.y);
+		await settle(page, 150);
+		say("…and they show while the pointer is over it", (await acts()) === "flex", await acts());
+		await page.mouse.click(target.x, target.y);
+		const handles = () => page.evaluate((path) => [...document.querySelectorAll(`.pen-handle[data-board="${CSS.escape(path)}"]`)].map((h) => Math.round(h.getBoundingClientRect().width)), target.path);
+		const outline = () => page.evaluate(() => {
+			const box = document.querySelector('.pen-selection[data-board="true"]');
+			const m = new DOMMatrix(getComputedStyle(document.querySelector(".world")).transform);
+			return box ? Math.round(Number.parseFloat(getComputedStyle(box).boxShadow.split(" ").at(-1)) * m.a * 10) / 10 : 0;
+		});
+		const near = await until(() => handles().then((h) => (h.length === 8 ? h : undefined)), 3000);
+		say("a selected board has an item's eight handles", !!near && near.every((w) => w === 9), JSON.stringify(near));
+		const nearLine = await outline();
+		await page.keyboard.press("Control+Minus");
+		await settle(page, 700);
+		const far = await handles();
+		const farLine = await outline();
+		say("…the same size on screen when zoomed out, and so is the outline", far.length === 8 && far.every((w) => w === 9) && nearLine === 1.5 && farLine === 1.5, JSON.stringify({ near, far, nearLine, farLine }));
+		await page.keyboard.press("Control+Equal");
+		await settle(page, 500);
+		await page.keyboard.press("Escape");
+	}
+	if (panned.x || panned.y) {
+		await page.mouse.move(900, 500);
+		await page.mouse.wheel(-panned.x, -panned.y);
+		await settle(page, 500);
+	}
 }
 
 // --- the pen: a held stroke straightens, two fingers undo, the lasso resizes -------------------------

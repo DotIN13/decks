@@ -180,18 +180,25 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	style.dataset.decksUi = "true";
 	style.textContent = `
 		[data-decks-ui] { position: absolute; z-index: 2147483000; }
-		.decks-handle {
-			width: 12px; height: 12px; margin: -6px 0 0 -6px;
-			border: 2px solid var(--b-bg, #fff); border-radius: 3px;
-			background: var(--b-accent, #3b5cf6); cursor: nwse-resize;
-			box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
-		}
-		.decks-editing { outline: 2px solid var(--b-accent, #3b5cf6); outline-offset: 2px; }
 		/*
-		 * A design tool's hover: in edit mode a component outlines itself under the pointer, before it
-		 * is pressed, so it is plain which block a press would pick up.
+		 * The handle and the outlines are the canvas's own, the pen-handle and pen-selection look, and a screen
+		 * size at every zoom: --decks-px is one screen pixel in this document's pixels, written from
+		 * the frame's scale on the canvas whenever the pointer moves or the selection changes.
 		 */
-		:root[data-decks-edit] body > [data-id]:hover:not(.decks-editing) { outline: 1px solid var(--b-accent, #3b5cf6); outline-offset: 2px; }
+		.decks-handle {
+			box-sizing: border-box;
+			width: calc(9 * var(--decks-px, 1px)); height: calc(9 * var(--decks-px, 1px));
+			margin: calc(-4.5 * var(--decks-px, 1px)) 0 0 calc(-4.5 * var(--decks-px, 1px));
+			border: calc(1.5 * var(--decks-px, 1px)) solid var(--b-accent, #3b5cf6); border-radius: calc(2 * var(--decks-px, 1px));
+			background: var(--b-bg, #fff); cursor: nwse-resize;
+		}
+		.decks-editing { outline: calc(1.5 * var(--decks-px, 1px)) solid var(--b-accent, #3b5cf6); outline-offset: 0; }
+		/*
+		 * A design tool's hover: in edit mode what a press or a double-click would pick up outlines
+		 * itself under the pointer: a run of words, a named block, a placed box, or the box the pointer
+		 * is in (see hoverTarget).
+		 */
+		:root[data-decks-edit] .decks-hover:not(.decks-editing) { outline: calc(1.5 * var(--decks-px, 1px)) solid var(--b-accent, #3b5cf6); outline-offset: 0; }
 
 		/*
 		 * The source editor. Monospace because this is markdown or Mermaid source, where a
@@ -221,7 +228,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * the corner it marks stays exactly where the component's corner is.
 		 */
 		@media (pointer: coarse) {
-			.decks-handle { width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 6px; }
+			.decks-handle { width: calc(16 * var(--decks-px, 1px)); height: calc(16 * var(--decks-px, 1px)); margin: calc(-8 * var(--decks-px, 1px)) 0 0 calc(-8 * var(--decks-px, 1px)); }
 		}
 
 		/*
@@ -321,7 +328,50 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		height: element.offsetHeight,
 	});
 
+	/** One screen pixel in this document's pixels, from the frame's scale on the canvas. */
+	let screenPx = 0;
+	const measureScale = () => {
+		const width = frame.offsetWidth;
+		const scale = width > 0 ? frame.getBoundingClientRect().width / width : 1;
+		const px = scale > 0 ? Math.round((1 / scale) * 1000) / 1000 : 1;
+		if (px === screenPx) return;
+		screenPx = px;
+		doc.documentElement.style.setProperty("--decks-px", `${px}px`);
+	};
+	cleanups.push(() => doc.documentElement.style.removeProperty("--decks-px"));
+
+	/**
+	 * What the pointer would pick up, for the hover outline: the run of words a double-click would
+	 * open, else a named block, else the box the pointer is in, else a placed component. Never the
+	 * page itself: a block that fills the board is outlined by the board's own outline.
+	 */
+	const hoverTarget = (target: EventTarget | null): HTMLElement | undefined => {
+		const element = target as HTMLElement | null;
+		if (!element?.closest || element.closest("[data-decks-ui]")) return undefined;
+		const component = componentAt(element);
+		if (!component) return undefined;
+		const inDrawing = element.closest("svg");
+		if (inDrawing) return (inDrawing as Element) === component ? undefined : ((inDrawing.parentElement as HTMLElement | null) ?? undefined);
+		const drawn = element.closest("[data-md], [data-mermaid]") as HTMLElement | null;
+		if (drawn && component.contains(drawn)) return drawn;
+		const run = runAt(element, component);
+		if (run && run !== component) return run;
+		const named = element.closest("[data-id]") as HTMLElement | null;
+		if (named && named !== component) return named;
+		if (element !== component) return element;
+		return isPlaced(component) ? component : undefined;
+	};
+	let hovered: HTMLElement | undefined;
+	const setHover = (next: HTMLElement | undefined) => {
+		if (next === hovered) return;
+		hovered?.classList.remove("decks-hover");
+		hovered = next;
+		next?.classList.add("decks-hover");
+	};
+	cleanups.push(() => setHover(undefined));
+
 	const placeHandle = () => {
+		measureScale();
 		const selection = host.selected();
 		const element = selection?.path === path ? (doc.querySelector(`[data-id="${cssEscape(selection.id)}"]`) as HTMLElement | null) : null;
 		for (const marked of doc.querySelectorAll(".decks-editing")) marked.classList.remove("decks-editing");
@@ -547,7 +597,16 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		gesture = { kind: "move", element, from: { x: event.clientX, y: event.clientY }, origin: rectOf(element) };
 	});
 
+	// Before a run opens for typing, so the outline's class is never among what it writes back.
+	on("dblclick", () => setHover(undefined), { capture: true });
+	on("pointerout", (event) => {
+		if (!event.relatedTarget) setHover(undefined);
+	});
 	on("pointermove", (event) => {
+		if (event.pointerType === "mouse" && host.enabled() && !gesture && !editing) {
+			measureScale();
+			setHover(hoverTarget(event.target));
+		} else setHover(undefined);
 		if (tap) tap.moved = Math.max(tap.moved, Math.hypot(event.clientX - tap.at.x, event.clientY - tap.at.y));
 		if (!gesture) return;
 		const dx = event.clientX - gesture.from.x;

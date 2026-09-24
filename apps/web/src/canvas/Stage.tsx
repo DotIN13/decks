@@ -576,6 +576,8 @@ export function Stage(props: {
 	const [boardPicks, setBoardPicks] = createSignal<readonly string[]>([]);
 	/** Boards being dragged, and by how much, until the move is sent. */
 	const [boardDrag, setBoardDrag] = createSignal<{ paths: readonly string[]; dx: number; dy: number } | undefined>();
+	/** A board being resized by its handles, held from the first move until the board is at it. */
+	const [boardResize, setBoardResize] = createSignal<{ path: string; x: number; y: number; w: number; h: number } | undefined>();
 	/** Where the drag or resize in hand snapped, in stage pixels (`pen/snap.ts`). */
 	const [guides, setGuides] = createSignal<readonly Guide[]>([]);
 	/** The item under the pointer, outlined the way a design tool does before anything is pressed. */
@@ -658,6 +660,14 @@ export function Stage(props: {
 			const shift = moving?.paths.includes(path) ? moving : { dx: 0, dy: 0 };
 			out.push({ id: `board:${path}`, x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h });
 		}
+		// The board the app has selected, outlined as a drawn item is, so the two look alike at every zoom.
+		const chosen = props.selected;
+		const board = chosen && chosen !== props.focus && !boardPicks().includes(chosen) ? props.boards.find((candidate) => candidate.path === chosen) : undefined;
+		if (board) {
+			const sized = boardResize();
+			const shift = moving?.paths.includes(board.path) ? moving : { dx: 0, dy: 0 };
+			out.push(sized?.path === board.path ? { id: `board:${board.path}`, x: sized.x, y: sized.y, w: sized.w, h: sized.h } : { id: `board:${board.path}`, x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h });
+		}
 		const marquee = penMarquee();
 		if (marquee) out.push({ id: "", x: Math.min(marquee.x1, marquee.x2), y: Math.min(marquee.y1, marquee.y2), w: Math.abs(marquee.x2 - marquee.x1), h: Math.abs(marquee.y2 - marquee.y1) });
 		return out;
@@ -671,6 +681,18 @@ export function Stage(props: {
 		if (!node || node.metadata?.type === ARROW || node.type === "group") return undefined;
 		return outlines[0]!;
 	});
+	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
+	const boardHandles = createMemo(() => {
+		const outlines = penOutlines();
+		if (!props.onResize || boardDrag() || outlines.length !== 1 || !outlines[0]!.id.startsWith("board:")) return undefined;
+		const path = outlines[0]!.id.slice("board:".length);
+		const board = props.boards.find((candidate) => candidate.path === path);
+		if (!board) return undefined;
+		return { ...outlines[0]!, path, slides: board.format === "slides" };
+	});
+	/** Handles are a screen size: a finger's on a touch screen, a pointer's otherwise. */
+	const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+	const HANDLE_PX = coarse ? 16 : 9;
 	const TEXTY = new Set(["text", "note", "prompt", "context"]);
 	/**
 	 * How the canvas sets an item's words (`pen/paint.ts`, `paintText`), for the editor that types
@@ -1232,6 +1254,89 @@ export function Stage(props: {
 			},
 		);
 	};
+
+	/**
+	 * A board's handles, as an item's: every edge and corner, snapping to what is around, ⌘ or Ctrl
+	 * to not snap, Shift to keep the shape. The board is drawn at the new box at once; letting go
+	 * moves it if a left or top edge was dragged, and writes the size to its file. A slide deck's
+	 * height follows from its aspect, so it is sized by its width alone.
+	 */
+	const BOARD_MIN = { w: 320, h: 200 };
+	const resizeBoard = (event: PointerEvent, handle: (typeof HANDLES)[number]) => {
+		const box = boardHandles();
+		if (event.button !== 0 || !box) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const { path, slides } = box;
+		const start = { x: box.x, y: box.y, w: box.w, h: box.h };
+		const targets = snapTargets([], [path]);
+		const edges = [
+			...(handle.includes("w") ? (["x1"] as const) : []),
+			...(handle.includes("e") ? (["x2"] as const) : []),
+			...(!slides && handle.includes("n") ? (["y1"] as const) : []),
+			...(!slides && handle.includes("s") ? (["y2"] as const) : []),
+		];
+		let next = start;
+		follow(
+			event,
+			(e) => {
+				const dx = (e.clientX - event.clientX) / localCamera.zoom;
+				const dy = (e.clientY - event.clientY) / localCamera.zoom;
+				let x1 = start.x + (handle.includes("w") ? dx : 0);
+				let x2 = start.x + start.w + (handle.includes("e") ? dx : 0);
+				let y1 = start.y + (!slides && handle.includes("n") ? dy : 0);
+				let y2 = start.y + start.h + (!slides && handle.includes("s") ? dy : 0);
+				let lines: Guide[] = [];
+				if (!(e.metaKey || e.ctrlKey)) {
+					const snapped = snapEdges({ x1, y1, x2, y2 }, edges, targets, SNAP_PX / localCamera.zoom);
+					({ x1, y1, x2, y2 } = snapped.box);
+					lines = snapped.guides;
+				}
+				setGuides(lines);
+				if (!slides && e.shiftKey && handle.length === 2) {
+					const scale = Math.max((x2 - x1) / start.w, (y2 - y1) / start.h);
+					if (handle.includes("w")) x1 = x2 - start.w * scale;
+					else x2 = x1 + start.w * scale;
+					if (handle.includes("n")) y1 = y2 - start.h * scale;
+					else y2 = y1 + start.h * scale;
+				}
+				// Never smaller than a board can be: the edge being dragged stops, the other stays put.
+				if (x2 - x1 < BOARD_MIN.w) {
+					if (handle.includes("w")) x1 = x2 - BOARD_MIN.w;
+					else x2 = x1 + BOARD_MIN.w;
+				}
+				if (!slides && y2 - y1 < BOARD_MIN.h) {
+					if (handle.includes("n")) y1 = y2 - BOARD_MIN.h;
+					else y2 = y1 + BOARD_MIN.h;
+				}
+				const w = Math.round(x2 - x1);
+				next = { x: Math.round(x1), y: Math.round(y1), w, h: slides ? Math.round((start.h * w) / start.w) : Math.round(y2 - y1) };
+				setBoardResize({ path, ...next });
+			},
+			(moved) => {
+				setGuides([]);
+				if (!moved) {
+					setBoardResize(undefined);
+					return;
+				}
+				if (next.x !== start.x || next.y !== start.y) props.onMove(path, next.x, next.y);
+				if (next.w !== start.w || next.h !== start.h) props.onResize?.(path, { w: next.w, h: next.h });
+				// The box is let go of when the board is at it, or after a moment if the file settles elsewhere.
+				const held = { path, ...next };
+				setTimeout(() => {
+					if (untrack(boardResize) === held) setBoardResize(undefined);
+				}, 4000);
+			},
+		);
+	};
+	createEffect(() => {
+		const held = boardResize();
+		if (!held || held.path === undefined) return;
+		const board = props.boards.find((candidate) => candidate.path === held.path);
+		if (!board) return setBoardResize(undefined);
+		const slides = board.format === "slides";
+		if (board.x === held.x && board.y === held.y && board.w === held.w && (slides || board.h >= held.h)) setBoardResize(undefined);
+	});
 
 	/** What each tool makes, before its box: pen's own items, with nothing of ours in them. */
 	const MADE: Record<Exclude<PenTool, "select" | "arrow">, { node: Partial<PenNode> & { type: string }; w: number; h: number }> = {
@@ -2455,6 +2560,7 @@ export function Stage(props: {
 							}}
 							drag={(event) => (props.onPenEdit ? dragBoard(board.path, event) : false)}
 							shift={boardDrag()?.paths.includes(board.path) ? boardDrag() : undefined}
+							resized={boardResize()?.path === board.path ? boardResize() : undefined}
 							onHover={(on) => {
 								if (on) setHoverBoard(board.path);
 								else if (untrack(hoverBoard) === board.path) setHoverBoard(undefined);
@@ -2549,6 +2655,7 @@ export function Stage(props: {
 					{(box) => (
 						<div
 							class="pen-selection"
+							data-board={box.id.startsWith("board:") ? "true" : undefined}
 							data-round={rounded(box.id) ? "true" : undefined}
 							style={{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
 						/>
@@ -2630,7 +2737,7 @@ export function Stage(props: {
 					{(box) => (
 						<For each={HANDLES}>
 							{(handle) => {
-								const size = () => 9 / props.camera.zoom;
+								const size = () => HANDLE_PX / props.camera.zoom;
 								return (
 									<div
 										class="pen-handle"
@@ -2643,6 +2750,30 @@ export function Stage(props: {
 											"border-width": `${1.5 / props.camera.zoom}px`,
 										}}
 										onPointerDown={(event) => resizeFrom(event, handle)}
+									/>
+								);
+							}}
+						</For>
+					)}
+				</Show>
+				<Show when={boardHandles()}>
+					{(box) => (
+						<For each={box().slides ? HANDLES.filter((handle) => handle !== "n" && handle !== "s") : HANDLES}>
+							{(handle) => {
+								const size = () => HANDLE_PX / props.camera.zoom;
+								return (
+									<div
+										class="pen-handle"
+										data-handle={handle}
+										data-board={box().path}
+										style={{
+											left: `${box().x + (handle.includes("w") ? 0 : handle.includes("e") ? box().w : box().w / 2) - size() / 2}px`,
+											top: `${box().y + (handle.includes("n") ? 0 : handle.includes("s") ? box().h : box().h / 2) - size() / 2}px`,
+											width: `${size()}px`,
+											height: `${size()}px`,
+											"border-width": `${1.5 / props.camera.zoom}px`,
+										}}
+										onPointerDown={(event) => resizeBoard(event, handle)}
 									/>
 								);
 							}}

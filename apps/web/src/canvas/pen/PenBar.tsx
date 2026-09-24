@@ -1,14 +1,20 @@
-import { indexOf, isArrow, newId, ids as penIds, type PenDocument, type PenNode } from "@decks/pen";
+import { arrowStyle, indexOf, isArrow, newId, ids as penIds, type ArrowHeads, type ArrowRoute, type PenDocument, type PenNode } from "@decks/pen";
 import type { LucideIcon } from "lucide-solid";
+import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
+import ArrowRight from "lucide-solid/icons/arrow-right";
 import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import BringToFront from "lucide-solid/icons/bring-to-front";
 import Circle from "lucide-solid/icons/circle";
 import Copy from "lucide-solid/icons/copy";
+import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import FrameIcon from "lucide-solid/icons/frame";
 import ImageDown from "lucide-solid/icons/image-down";
 import FileText from "lucide-solid/icons/file-text";
+import Minus from "lucide-solid/icons/minus";
+import MoveRight from "lucide-solid/icons/move-right";
 import Redo2 from "lucide-solid/icons/redo-2";
 import SendToBack from "lucide-solid/icons/send-to-back";
+import Spline from "lucide-solid/icons/spline";
 import Square from "lucide-solid/icons/square";
 import StickyNote from "lucide-solid/icons/sticky-note";
 import Trash2 from "lucide-solid/icons/trash-2";
@@ -44,6 +50,17 @@ const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key: string
 
 const FILLS = ["#ffffff", "#dbe4f0", "#fde68a", "#bbf7d0", "#bfdbfe", "#fecaca", "#1f2328"];
 const LINE_WIDTHS = [0, 1, 2, 4];
+/** An arrow's three ways between its ends, and its three choices of head (`@decks/pen`, `arrowStyle`). */
+const ROUTES: Array<{ route: ArrowRoute; icon: LucideIcon; label: string }> = [
+	{ route: "straight", icon: MoveRight, label: "Straight" },
+	{ route: "curved", icon: Spline, label: "Curved" },
+	{ route: "elbow", icon: CornerDownRight, label: "Elbow" },
+];
+const HEADS: Array<{ heads: ArrowHeads; icon: LucideIcon; label: string }> = [
+	{ heads: "end", icon: ArrowRight, label: "A head at the end" },
+	{ heads: "both", icon: ArrowLeftRight, label: "A head at both ends" },
+	{ heads: "none", icon: Minus, label: "No head" },
+];
 const TEXTY = new Set(["text", "note", "prompt", "context"]);
 
 /** The colour a value names, for the colour input: a hex colour, or undefined for a variable or a gradient. */
@@ -78,6 +95,9 @@ export function PenBar(props: {
 	const fillable = () => selected().filter((node) => !isArrow(node) && node.type !== "browser" && node.type !== "group");
 	const lined = () => selected().filter((node) => !TEXTY.has(node.type) && node.type !== "browser" && node.type !== "group");
 	const texty = () => selected().filter((node) => TEXTY.has(node.type));
+	const arrows = () => selected().filter(isArrow);
+	const style = () => arrowStyle(arrows()[0]?.metadata);
+	const setArrow = (patch: Record<string, unknown>) => set(arrows(), (node) => ({ metadata: { ...(node.metadata ?? {}), ...patch } }));
 	const cornered = () => selected().filter((node) => node.type === "rectangle" || node.type === "frame");
 	/** "Colour" when everything picked is words, whose fill is the colour of the letters. */
 	const fillWord = () => (fillable().length && fillable().every((node) => node.type === "text") ? "Text colour" : "Fill");
@@ -220,6 +240,58 @@ export function PenBar(props: {
 							</button>
 						)}
 					</For>
+				</span>
+			</Show>
+
+			<Show when={arrows().length > 0}>
+				<span class="pill-sep" aria-hidden="true" />
+				<span class="inkbar-widths" role="group" aria-label="Arrow route">
+					<For each={ROUTES}>
+						{(entry) => (
+							<button
+								type="button"
+								class="icon-button"
+								data-route={entry.route}
+								data-on={style().route === entry.route ? "soft" : undefined}
+								aria-pressed={style().route === entry.route}
+								title={`${entry.label} arrow`}
+								aria-label={`${entry.label} arrow`}
+								onClick={() => setArrow({ route: entry.route === "straight" ? undefined : entry.route })}
+							>
+								<Icon of={entry.icon} size={15} />
+							</button>
+						)}
+					</For>
+				</span>
+				<span class="pill-sep" aria-hidden="true" />
+				<span class="inkbar-widths" role="group" aria-label="Arrow heads">
+					<For each={HEADS}>
+						{(entry) => (
+							<button
+								type="button"
+								class="icon-button"
+								data-heads={entry.heads}
+								data-on={style().heads === entry.heads ? "soft" : undefined}
+								aria-pressed={style().heads === entry.heads}
+								title={entry.label}
+								aria-label={entry.label}
+								onClick={() => setArrow({ heads: entry.heads === "end" ? undefined : entry.heads })}
+							>
+								<Icon of={entry.icon} size={15} />
+							</button>
+						)}
+					</For>
+					<button
+						type="button"
+						class="pen-word"
+						data-on={style().dash ? "true" : undefined}
+						aria-pressed={style().dash}
+						title="Draw the line dashed"
+						aria-label="Dashed line"
+						onClick={() => setArrow({ dash: style().dash ? undefined : true })}
+					>
+						Dashed
+					</button>
 				</span>
 			</Show>
 

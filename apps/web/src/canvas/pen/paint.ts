@@ -1,5 +1,5 @@
 import type { Canvas, CanvasKit, Image, Paint, Path, Shader } from "canvaskit-wasm";
-import { bool, color, fillsOf, isArrow, isMarkdown, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
+import { arrowStyle, bool, color, fillsOf, isArrow, isMarkdown, MISSING, NOTE_PAD, num, pathBounds, radiiOf, resolve, strokeOf, textStyleOf, withTheme, type Fill, type PenDocument, type PenNode, type Placed, type Rgba, type ThemeState } from "@decks/pen";
 import type { PenFonts } from "./fonts.ts";
 import { CARD_PALETTE } from "./markdown-layout.ts";
 import type { IconShape } from "./icons.ts";
@@ -121,7 +121,22 @@ function paintNode(canvas: Canvas, node: PenNode, ctx: PaintContext): void {
 			if (stroke) {
 				const paint = strokePaint(ctx, stroke.fills, theme, placed.box, stroke.widths[0], stroke);
 				if (paint) {
-					if (isArrow(node) || stroke.align === "center") canvas.drawPath(path, paint);
+					if (isArrow(node) && arrowStyle(node.metadata).dash && typeof node.geometry === "string") {
+						// Dashed on the line alone, the geometry's first subpath; the heads after it stay solid.
+						const [line = "", ...heads] = node.geometry.split(/(?=M)/);
+						const width = stroke.widths[0] ?? 2;
+						const dashed = paint.copy();
+						const effect = ck.PathEffect.MakeDash([width * 3, width * 2.5], 0);
+						dashed.setPathEffect(effect);
+						const linePath = geometryPath(ck, { ...node, geometry: line }, placed);
+						if (linePath) canvas.drawPath(linePath, dashed);
+						const headPath = heads.length ? geometryPath(ck, { ...node, geometry: heads.join("") }, placed) : null;
+						if (headPath) canvas.drawPath(headPath, paint);
+						linePath?.delete();
+						headPath?.delete();
+						effect?.delete();
+						dashed.delete();
+					} else if (isArrow(node) || stroke.align === "center") canvas.drawPath(path, paint);
 					else paintAligned(canvas, ck, stroke.align, paint, stroke.widths[0], (p) => canvas.drawPath(path, p), (op) => canvas.clipPath(path, op, true));
 					paint.delete();
 				}

@@ -30,7 +30,11 @@ say("the flow board is on the canvas to focus on", onCanvas === 1, `${onCanvas} 
  * The button, not the key: the bar above *this* board is where the affordance lives — beside
  * the file's address, filling the window, and taking the board away — and the key is the
  * shorthand for the same thing.
+ *
+ * With a mouse the buttons take no room until the bar is hovered, so it is hovered first.
  */
+const hoverBar = () => page.locator(`.bar-layer .chrome[data-path="${NOTES}"] .title`).hover();
+await hoverBar();
 const bar = await page.evaluate((path) => {
 	const acts = document.querySelector(`.bar-layer .chrome[data-path="${path}"] .acts`);
 	return [...(acts?.children ?? [])].map((child) => ({
@@ -87,6 +91,7 @@ const markedBefore = await page.evaluate(() => {
  */
 const openButton = page.locator(`.bar-layer .chrome[data-path="${NOTES}"] .focus-open`);
 for (let tries = 0; tries < 4; tries += 1) {
+	await hoverBar();
 	const pill = await page.locator('.float.pill[data-inset="top"]').first().boundingBox();
 	const button = await openButton.boundingBox();
 	if (!pill || !button) break;
@@ -96,6 +101,7 @@ for (let tries = 0; tries < 4; tries += 1) {
 	await page.mouse.wheel(0, -160);
 	await settle(page, 250);
 }
+await hoverBar();
 await openButton.click();
 await settle(page, 700);
 

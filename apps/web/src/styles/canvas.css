@@ -650,6 +650,16 @@
 .bar-layer .chrome:is(:hover, [data-hover="true"]) .focus-open {
 	opacity: 1;
 }
+	/*
+ * With a pointer that hovers, the buttons take no room until the board or its bar is under it: the
+ * title and the path have the whole bar at rest, and give way to the buttons on hover. A touch
+ * screen has no hover, so there they are always shown (the (hover: none) rule below).
+ */
+@media (hover: hover) {
+	.bar-layer .chrome:not(:hover, [data-hover="true"]) .acts {
+		display: none;
+	}
+}
 	.bar-layer .chrome .hide:hover,
 .bar-layer .chrome .present-open:hover,
 .bar-layer .chrome .open-tab:hover,
@@ -685,56 +695,6 @@
 .bar-layer .chrome .acts svg {
 	width: calc(12 * var(--unit));
 	height: calc(12 * var(--unit));
-}
-	/*
- * The resize handle, on the board the canvas has selected.
- *
- * At the bottom-right corner and half outside the node, so the corner is what it marks: the
- * board's edge is the thing being dragged, and a handle drawn entirely inside would have to be
- * aimed at with the knowledge that it is there.
- *
- * **A screen size, not a board size** — `calc(N * var(--unit))`, the same form the bar's
- * buttons use, because `--unit` is `1px / var(--zoom)` and so cancels the camera. A plain 12px
- * here would be 3px at 0.25 zoom and a 48px block over the board at 4×, which is the bug the
- * bar's own sizes had.
- *
- * Two shapes, one control. A component board's size is two numbers in its own file, so its
- * handle is a corner. A flow document's height is its content and a slide deck's follows from
- * its aspect — for those only the width is storable, so the handle is a wide, flat bar and the
- * `ew-resize` cursor says so before the drag starts.
- */
-.board-node > .resize-handle {
-	/*
-	 * Declared *here*, on the box that has `--zoom` written on it inline — the same shape the
-	 * bar uses (`--unit` is `calc(1px / var(--zoom, 1))` in the rule that also carries `.chrome`).
-	 * Inheriting it instead does not work and fails silently: a custom property's `var()` is
-	 * substituted where the property is *computed*, so a `--zoom` set on this element cannot
-	 * change a `--unit` it inherited from an ancestor. Measured: the handle was `0px` wide,
-	 * because the inherited `--unit` was invalid and `width` fell back to `auto`.
-	 */
-	--unit: calc(1px / var(--zoom, 1));
-	position: absolute;
-	right: calc(-7 * var(--unit));
-	bottom: calc(-7 * var(--unit));
-	z-index: var(--z-mark);
-	width: calc(14 * var(--unit));
-	height: calc(14 * var(--unit));
-	border: calc(2 * var(--unit)) solid var(--bg, #fff);
-	border-radius: calc(4 * var(--unit));
-	background: var(--color-accent);
-	box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
-	cursor: nwse-resize;
-	touch-action: none;
-}
-
-	/* The same rules, under the same query. */
-	@media (pointer: coarse) {
-	.board-node > .resize-handle {
-		width: calc(24 * var(--unit));
-		height: calc(24 * var(--unit));
-		right: calc(-12 * var(--unit));
-		bottom: calc(-12 * var(--unit));
-	}
 }
 	/* The same box as the three beside it: one square, whichever glyph is in it. */
 .bar-layer .chrome .present-open[data-glyph="true"] {
@@ -778,9 +738,6 @@
 	inset: 0;
 	outline: 1px solid var(--line);
 	pointer-events: none;
-}
-	.board-node[data-selected="true"] > .shade {
-	outline: 2px solid var(--color-accent);
 }
 	/*
  * A board that is news (`board/glow.ts`): an agent named it and the person has not read it.

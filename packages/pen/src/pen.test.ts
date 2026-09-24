@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { apply, baseTheme, color, emptyDocument, expand, layout, moveArrowEnds, parse, pathBounds, read, reroute, serialize, strokeOf, variable, type PenDocument, type TextStyle } from "./index.ts";
+import { apply, baseTheme, color, emptyDocument, expand, layout, arrowRoute, arrowShape, arrowStyle, moveArrowEnds, parse, pathBounds, read, reroute, serialize, strokeOf, variable, type PenDocument, type TextStyle } from "./index.ts";
 
 /** A fixed-width font, so text boxes are exact: every character is half its size wide. */
 const mono = (text: string, style: TextStyle, maxWidth: number | undefined) => {
@@ -250,4 +250,21 @@ test("a group's box is the box round its children, and moving it by a box shifts
 	assert.equal(group.width, undefined);
 	assert.match(results[0]!.note ?? "", /moved but not resized/);
 	assert.deepEqual(layout(moved, expand(moved), { theme }).get("g")!.box, { x: 110, y: 40, w: 80, h: 60 });
+});
+
+test("an arrow's style: straight by default, a curve square to both edges, an elbow, and its heads", () => {
+	const a = { x: 0, y: 0, w: 100, h: 100 };
+	const b = { x: 300, y: 200, w: 100, h: 100 };
+	assert.deepEqual(arrowStyle(undefined), { route: "straight", heads: "end", dash: false });
+	assert.deepEqual(arrowStyle({ route: "curved", heads: "both", dash: true }), { route: "curved", heads: "both", dash: true });
+	assert.equal(arrowRoute(a, b, "straight").length, 2);
+	const curve = arrowRoute(a, b, "curved");
+	assert.deepEqual(curve, [[100, 50], [200, 50], [200, 250], [300, 250]]);
+	assert.equal(arrowRoute(a, b, "elbow").length, 4);
+	assert.equal(arrowRoute(a, b, true).length, 4);
+	const curved = arrowShape(curve, 2, { route: "curved" });
+	assert.match(curved.geometry, /^M\S+ \S+ C/);
+	assert.equal(curved.geometry.split("M").length - 1, 2);
+	assert.equal(arrowShape(curve, 2, { route: "curved", heads: "both" }).geometry.split("M").length - 1, 3);
+	assert.equal(arrowShape([[0, 0], [100, 0]], 2, { heads: "none" }).geometry, "M2 2 L102 2");
 });

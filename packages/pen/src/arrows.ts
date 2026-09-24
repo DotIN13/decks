@@ -14,8 +14,11 @@ import type { PenDocument, PenNode } from "./types.ts";
  * `from` and `to` name an item by id, a board by its path, or a point on the stage as `[x, y]` —
  * the end of an arrow that stops on bare canvas. After an edit, `reroute` redraws every such path
  * between the nearest edges of its two ends: the box, the viewBox and the geometry are rewritten,
- * and the stroke is left as the writer set it. `route: "elbow"` draws a right-angled line instead
- * of a straight one. An arrow whose end cannot be found is left alone.
+ * and the stroke is left as the writer set it. An arrow whose end cannot be found is left alone.
+ *
+ * Its style is three more fields there, all optional: `route` is `"straight"` (the default),
+ * `"curved"` or `"elbow"`; `heads` is `"end"` (the default), `"both"` or `"none"`; and `dash: true`
+ * draws the line dashed, which pen.dev, knowing nothing of it, draws solid.
  *
  * A point end is where it is on the stage, not in the arrow's own box, so moving an arrow by its
  * `x` and `y` alone is undone by the next reroute: `moveArrowEnds` shifts its points with it.
@@ -41,12 +44,13 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 	let changed = false;
 	for (const node of walk(doc.children)) {
 		if (!isArrow(node)) continue;
-		const meta = node.metadata as { from?: unknown; to?: unknown; route?: unknown };
+		const meta = node.metadata as { from?: unknown; to?: unknown };
 		const from = arrowEnd(meta.from, placed, extra);
 		const to = arrowEnd(meta.to, placed, extra);
 		if (!from || !to) continue;
 		const stroke = typeof node.strokeWidth === "number" ? node.strokeWidth : 2;
-		const shape = arrowShape(arrowRoute(from, to, meta.route === "elbow"), stroke);
+		const style = arrowStyle(node.metadata);
+		const shape = arrowShape(arrowRoute(from, to, style.route), stroke, style);
 		const parent = index.get(node.id)?.parent;
 		const origin = parent ? placed.get(parent.id)?.box : undefined;
 		const next = { ...shape, x: round(shape.x - (origin?.x ?? 0)), y: round(shape.y - (origin?.y ?? 0)) };
@@ -64,6 +68,22 @@ export function reroute(doc: PenDocument, placed: ReadonlyMap<string, Placed>, e
 }
 
 type Point = [number, number];
+
+export type ArrowRoute = "straight" | "curved" | "elbow";
+export type ArrowHeads = "end" | "both" | "none";
+export interface ArrowStyle {
+	route: ArrowRoute;
+	heads: ArrowHeads;
+	dash: boolean;
+}
+
+/** An arrow's style from its metadata, with the defaults for what it does not say. */
+export function arrowStyle(metadata: unknown): ArrowStyle {
+	const meta = (metadata ?? {}) as { route?: unknown; heads?: unknown; dash?: unknown };
+	const route: ArrowRoute = meta.route === "curved" || meta.route === "elbow" ? meta.route : "straight";
+	const heads: ArrowHeads = meta.heads === "both" || meta.heads === "none" ? meta.heads : "end";
+	return { route, heads, dash: meta.dash === true };
+}
 
 /** A point end, `[x, y]` on the stage. */
 export function isPointEnd(end: unknown): end is Point {
@@ -83,32 +103,54 @@ export function moveArrowEnds(metadata: Record<string, unknown>, dx: number, dy:
 }
 
 /**
- * A line through `points` with a head at the last one, as the fields of a pen `path`: its corner
- * on the stage, its size, its `viewBox` and its `geometry`. What `reroute` writes for a joined
- * arrow, and what a free arrow drawn by hand is made of.
+ * A line through `points` with its heads, as the fields of a pen `path`: its corner on the stage,
+ * its size, its `viewBox` and its `geometry`. What `reroute` writes for a joined arrow, and what a
+ * free arrow drawn by hand is made of. A curved route's four points are a cubic Bézier's start,
+ * two controls and end. The line is the geometry's first subpath and each head one after it, so a
+ * dash can be put on the line alone.
  */
-export function arrowShape(points: Point[], strokeWidth = 2): { x: number; y: number; width: number; height: number; viewBox: [number, number, number, number]; geometry: string } {
+export function arrowShape(points: Point[], strokeWidth = 2, style: Partial<ArrowStyle> = {}): { x: number; y: number; width: number; height: number; viewBox: [number, number, number, number]; geometry: string } {
 	const head = Math.max(8, strokeWidth * HEAD);
-	const all = [...points, ...headPoints(points, head)];
+	const heads = style.heads ?? "end";
+	const curved = style.route === "curved" && points.length === 4;
+	const arms: Array<[Point, Point, Point]> = [
+		...(heads !== "none" ? [headPoints(points, head)] : []),
+		...(heads === "both" ? [headPoints([...points].reverse(), head)] : []),
+	];
+	const all = [...points, ...arms.flat()];
 	const pad = strokeWidth;
 	const minX = Math.min(...all.map((p) => p[0])) - pad;
 	const minY = Math.min(...all.map((p) => p[1])) - pad;
 	const maxX = Math.max(...all.map((p) => p[0])) + pad;
 	const maxY = Math.max(...all.map((p) => p[1])) + pad;
 	const local = (p: Point) => `${round(p[0] - minX)} ${round(p[1] - minY)}`;
-	const [a, b, c] = headPoints(points, head);
+	const line = curved ? `M${local(points[0]!)} C${local(points[1]!)} ${local(points[2]!)} ${local(points[3]!)}` : `M${points.map(local).join(" L")}`;
 	return {
 		x: round(minX),
 		y: round(minY),
 		width: round(maxX - minX),
 		height: round(maxY - minY),
 		viewBox: [0, 0, round(maxX - minX), round(maxY - minY)],
-		geometry: `M${points.map(local).join(" L")} M${local(a)} L${local(b)} L${local(c)}`,
+		geometry: [line, ...arms.map(([a, b, c]) => `M${local(a)} L${local(b)} L${local(c)}`)].join(" "),
 	};
 }
 
-/** From the edge of `a` that faces `b`, to the edge of `b` that faces `a`: the line's points, first to last. */
-export function arrowRoute(a: Frame, b: Frame, elbow: boolean): Point[] {
+/**
+ * From the edge of `a` that faces `b`, to the edge of `b` that faces `a`: the line's points, first
+ * to last. A curve leaves and arrives square to those edges, so its points are its start, two
+ * controls out from each edge by half the distance between them, and its end. `true` is the elbow
+ * route and `false` the straight one, as this took before routes had names.
+ */
+export function arrowRoute(a: Frame, b: Frame, route: ArrowRoute | boolean): Point[] {
+	const kind: ArrowRoute = route === true ? "elbow" : route === false ? "straight" : route;
+	const elbow = kind === "elbow";
+	const curve = (start: Point, end: Point, across: boolean): Point[] => {
+		const reach = Math.max(24, (across ? Math.abs(end[0] - start[0]) : Math.abs(end[1] - start[1])) / 2);
+		const sign = across ? Math.sign(end[0] - start[0]) || 1 : Math.sign(end[1] - start[1]) || 1;
+		const c1: Point = across ? [start[0] + sign * reach, start[1]] : [start[0], start[1] + sign * reach];
+		const c2: Point = across ? [end[0] - sign * reach, end[1]] : [end[0], end[1] - sign * reach];
+		return [start, c1, c2, end];
+	};
 	const ac: Point = [a.x + a.w / 2, a.y + a.h / 2];
 	const bc: Point = [b.x + b.w / 2, b.y + b.h / 2];
 	const dx = bc[0] - ac[0];
@@ -126,6 +168,7 @@ export function arrowRoute(a: Frame, b: Frame, elbow: boolean): Point[] {
 		const level = shared(a.y, a.y + a.h, b.y, b.y + b.h);
 		const start: Point = [dx >= 0 ? a.x + a.w : a.x, level ?? ac[1]];
 		const end: Point = [dx >= 0 ? b.x : b.x + b.w, level ?? bc[1]];
+		if (kind === "curved" && start[1] !== end[1]) return curve(start, end, true);
 		if (!elbow || start[1] === end[1]) return [start, end];
 		const mid = (start[0] + end[0]) / 2;
 		return [start, [mid, start[1]], [mid, end[1]], end];
@@ -133,6 +176,7 @@ export function arrowRoute(a: Frame, b: Frame, elbow: boolean): Point[] {
 	const column = shared(a.x, a.x + a.w, b.x, b.x + b.w);
 	const start: Point = [column ?? ac[0], dy >= 0 ? a.y + a.h : a.y];
 	const end: Point = [column ?? bc[0], dy >= 0 ? b.y : b.y + b.h];
+	if (kind === "curved" && start[0] !== end[0]) return curve(start, end, false);
 	if (!elbow || start[0] === end[0]) return [start, end];
 	const mid = (start[1] + end[1]) / 2;
 	return [start, [start[0], mid], [end[0], mid], end];

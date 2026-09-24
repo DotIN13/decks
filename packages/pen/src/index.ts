@@ -6,4 +6,4 @@ export { apply, type Op, type OpResult } from "./ops.ts";
 export { boxOf, placements, read, type ReadItem } from "./read.ts";
 export { pathBounds } from "./geometry.ts";
 export * from "./values.ts";
-export { ARROW, arrowEnd, arrowRoute, arrowShape, isArrow, isPointEnd, moveArrowEnds, reroute } from "./arrows.ts";
+export { ARROW, arrowEnd, arrowRoute, arrowShape, arrowStyle, isArrow, isPointEnd, moveArrowEnds, reroute, type ArrowHeads, type ArrowRoute, type ArrowStyle } from "./arrows.ts";
