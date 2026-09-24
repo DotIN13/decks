@@ -325,12 +325,11 @@ say("no row carries a workspace chip: the heading above it says that", panel.row
  * Basil has said nothing, so its second line is the state, in one word.
  */
 /*
- * A parked agent shows the time alone: the lighter name and the fainter runtime word already say
- * dormant, and when it last ran is the part that is not said anywhere else. The row's `title`
- * still spells it out.
+ * Dormant beats idle: both are true of a parked agent and only one of them explains why nothing
+ * is happening. It reads in the shape an idle row reads — the state, then when it last ran.
  */
 const basil = rowOf("Basil");
-say("…and a dormant row shows the time alone, not the word again", basil?.dormant === "true" && basil?.doing === "2h" && /Dormant/.test(basil?.title ?? ""), JSON.stringify([basil?.dormant, basil?.doing, basil?.title]));
+say("…and dormant beats idle, with the time beside it", basil?.dormant === "true" && basil?.doing === "dormant · 2h", JSON.stringify([basil?.dormant, basil?.doing]));
 /* The foot counts, and it is the only count: the headings carry a + instead. */
 say("there is no foot under the list: the count lives in the headings", panel.foot === undefined, String(panel.foot));
 /* It names what it searches and how many; it still matches tags and workspaces, as below. */
