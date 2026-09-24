@@ -193,6 +193,47 @@ say(
 );
 say("…and the rest of the file is as it was", differ(nestedBefore, nestedAfter).tags.before === differ(nestedBefore, nestedAfter).tags.after, "no tag changed");
 
+/*
+ * 5b. A single press picks the block under it, and keeps it outlined.
+ *
+ * A board written as a document is one block filling the board, so the selection the app
+ * makes is that whole page — which said nothing about what a press had landed on. The
+ * outline now goes on the element the hover outlined, and stays there when the pointer
+ * moves away. What it does *not* get is a handle: a block the page lays out has nowhere to
+ * be dragged or resized to, and the file would ignore the numbers.
+ */
+{
+	const was = read(file);
+	await frame().locator(".doc p").first().click();
+	await settle(page, 400);
+	const picked = await page.evaluate(() => {
+		const doc = document.querySelector('.board-node[data-path="boards/notes.html"] iframe').contentDocument;
+		const outlined = [...doc.querySelectorAll(".decks-editing")];
+		return {
+			tags: outlined.map((element) => element.tagName.toLowerCase()),
+			width: outlined[0] ? Math.round(outlined[0].getBoundingClientRect().width) : 0,
+			page: Math.round(doc.querySelector(".doc").getBoundingClientRect().width),
+			outline: outlined[0] ? getComputedStyle(outlined[0]).outlineWidth : "none",
+			handle: getComputedStyle(doc.querySelector(".decks-handle")).display,
+		};
+	});
+	say(
+		"a press on a paragraph outlines that paragraph, not the page around it",
+		picked.tags.length === 1 && picked.tags[0] === "p" && picked.width < picked.page && picked.outline !== "0px",
+		JSON.stringify(picked),
+	);
+	// Away from it: the outline is the selection's, not the pointer's.
+	await page.mouse.move(24, 940);
+	await settle(page, 300);
+	const kept = await page.evaluate(() => {
+		const doc = document.querySelector('.board-node[data-path="boards/notes.html"] iframe').contentDocument;
+		return { outlined: doc.querySelectorAll(".decks-editing").length, hovered: doc.querySelectorAll(".decks-hover").length };
+	});
+	say("…and it stays outlined when the pointer leaves", kept.outlined === 1 && kept.hovered === 0, JSON.stringify(kept));
+	say("…with no handle to resize it by", picked.handle === "none", picked.handle);
+	say("…and the press wrote nothing", read(file) === was, "the file is untouched by a selection");
+}
+
 const beforePressAway = read(file);
 await frame().locator(".doc p").first().dblclick();
 await settle(page, 600);

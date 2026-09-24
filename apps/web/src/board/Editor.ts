@@ -361,6 +361,14 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		if (element !== component) return element;
 		return isPlaced(component) ? component : undefined;
 	};
+	/**
+	 * What the last press picked, and so what wears the outline: the same element the hover
+	 * outlined, which is a run of words or a box inside the board as often as it is a whole
+	 * component. The app's own selection is still a component — that is what the inspector
+	 * reads and what a patch can address — so this is the finer half of the same answer, and
+	 * it is dropped the moment the selection moves somewhere it is not inside.
+	 */
+	let picked: HTMLElement | undefined;
 	let hovered: HTMLElement | undefined;
 	const setHover = (next: HTMLElement | undefined) => {
 		if (next === hovered) return;
@@ -370,18 +378,55 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 	};
 	cleanups.push(() => setHover(undefined));
 
+	/**
+	 * Pick what a press landed on, and tell the app which component that is.
+	 *
+	 * The pick is the finer half: the element the hover outlined, which is what the outline
+	 * stays on. The app is told a `data-id` — the pick's own when it has one, so the inspector
+	 * names the block that was pressed, and otherwise the component around it, because an id
+	 * the file cannot address is one a patch cannot write.
+	 */
+	const selectPicked = (target: EventTarget | null, component: HTMLElement) => {
+		const pick = hoverTarget(target);
+		picked = pick && pick !== component ? pick : undefined;
+		host.select({ path, id: picked?.dataset.id ?? component.dataset.id! });
+	};
+
 	const placeHandle = () => {
 		measureScale();
 		const selection = host.selected();
-		const element = selection?.path === path ? (doc.querySelector(`[data-id="${cssEscape(selection.id)}"]`) as HTMLElement | null) : null;
+		const chosen = selection?.path === path ? (doc.querySelector(`[data-id="${cssEscape(selection.id)}"]`) as HTMLElement | null) : null;
+		/*
+		 * The outline goes on what the press picked, while that is still inside what the app has
+		 * selected; otherwise on the selected component, which is what a selection made anywhere
+		 * else — the inspector, another board — comes to.
+		 */
+		if (picked && !(doc.contains(picked) && chosen && (chosen === picked || chosen.contains(picked)))) picked = undefined;
+		const element = picked ?? chosen;
 		for (const marked of doc.querySelectorAll(".decks-editing")) marked.classList.remove("decks-editing");
-		// No resize handle on a block the page is laying out: a handle that moved one would
-		// fight the stylesheet rather than change it.
-		if (!element || !host.enabled() || !isPlaced(element)) {
+		if (!element || !host.enabled()) {
+			handle.style.display = "none";
+			return;
+		}
+		/*
+		 * Except the page itself. A board written as a document keeps everything in one
+		 * block that fills it, so an outline there would be a second line just inside the
+		 * board's own — saying "this board" twice and nothing about what was picked.
+		 */
+		if (element.parentElement === doc.body && !isPlaced(element)) {
 			handle.style.display = "none";
 			return;
 		}
 		element.classList.add("decks-editing");
+		/*
+		 * A handle only where the drag has somewhere to write: a placed component, and the one
+		 * the press actually picked. A box inside the page's layout is selectable and outlined,
+		 * and moving it by 8px would mean nothing, so it is offered no corner to pull.
+		 */
+		if (element !== chosen || !isPlaced(element)) {
+			handle.style.display = "none";
+			return;
+		}
 		/*
 		 * Every measurement in this file is `offsetLeft`/`offsetWidth`, which belong to
 		 * `HTMLElement` — an `SVGElement` has neither, so a top-level `<svg>` reads as
@@ -571,18 +616,28 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			 * what makes a drag across a board a pan rather than a rearrangement.
 			 */
 			if (!element || !onSelection || element.isContentEditable || editing) return;
-			if (!isPlaced(element)) return;
+			// The same rule as a mouse press: what is inside a component is selected, not carried.
+			if (hoverTarget(event.target) !== element || !isPlaced(element)) return;
 			event.preventDefault();
 			gesture = { kind: "move", element, from: { x: event.clientX, y: event.clientY }, origin: rectOf(element) };
 			return;
 		}
 
 		if (!element) {
+			picked = undefined;
 			host.select(undefined);
 			return;
 		}
 
-		host.select({ path, id: element.dataset.id! });
+		/*
+		 * What the press picks is what the hover outlined: the run of words, the box, or the
+		 * component, whichever the pointer was actually over. The *app* is told about a
+		 * component — an id the file can address is the only thing the inspector and a patch
+		 * can work with — so a pick inside one selects that one, and the outline stays where
+		 * the eye was.
+		 */
+		setHover(undefined);
+		selectPicked(event.target, element);
 		/*
 		 * A text edit in progress owns its own pointer events; dragging the box you are
 		 * typing in is not a gesture anyone means. Asked of the element being edited and
@@ -591,8 +646,14 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * was picking the card up and dropping the caret wherever the drag ended.
 		 */
 		if (element.isContentEditable || editingOwns(event.target)) return;
-		// Selected, and not picked up: a block the page lays out has nowhere to be dragged to.
-		if (!isPlaced(element)) return;
+		/*
+		 * Selected, and not picked up. Two blocks have nowhere to be dragged to: one the page
+		 * lays out, whose place is its stylesheet's; and anything *inside* a component, whose
+		 * place is its parent's. Pressing a card's heading therefore selects the heading rather
+		 * than carrying the card off — the card still moves by its own margin, as its outline
+		 * says.
+		 */
+		if (picked || !isPlaced(element)) return;
 		event.preventDefault();
 		gesture = { kind: "move", element, from: { x: event.clientX, y: event.clientY }, origin: rectOf(element) };
 	});
@@ -669,7 +730,7 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 			return;
 		}
 		if (!finished.onSelection) {
-			host.select({ path, id: element.dataset.id! });
+			selectPicked(finished.target, element);
 			return;
 		}
 		if (editingOwns(finished.target)) return;

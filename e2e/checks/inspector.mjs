@@ -483,7 +483,8 @@ try {
 	say(
 		"the tools have no connect tool: an arrow is the stage's",
 		(await page.locator('.pen-tools button[title*="Connect"]').count()) === 0 &&
-			(await page.locator(".pen-tools button[data-tool]").count()) === 8,
+			// Seven: the select tool went when pressing the armed tool again became how you put it down.
+			(await page.locator(".pen-tools button[data-tool]").count()) === 7,
 		(await page.locator(".pen-tools button[data-tool]").evaluateAll((buttons) => buttons.map((button) => button.title))).join(" | "),
 	);
 
