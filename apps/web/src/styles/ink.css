@@ -197,7 +197,7 @@
 		display: inline;
 		padding: 1px 4px;
 		border-radius: var(--radius-inline);
-		background: color-mix(in srgb, #f2b200 22%, transparent);
+		background: color-mix(in srgb, var(--pill, #f2b200) 22%, transparent);
 		color: var(--fg);
 		font-weight: 500;
 		white-space: nowrap;
@@ -210,5 +210,19 @@
 		margin-inline-end: 3px;
 		vertical-align: -0.1em;
 		opacity: 0.7;
+	}
+
+	/*
+	 * A colour per kind, so three pills in one sentence are told apart before they are read:
+	 * amber for a comment, the app's own blue for a board, violet for something drawn on the
+	 * stage. The icon in front of each says the same thing again, for anyone who cannot use the
+	 * difference in colour.
+	 */
+	[data-slot="composer-input"] [data-component="mention-pill"][data-kind="board"] {
+		--pill: var(--color-accent);
+	}
+
+	[data-slot="composer-input"] [data-component="mention-pill"][data-kind="item"] {
+		--pill: #8b5cf6;
 	}
 }

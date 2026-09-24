@@ -7,19 +7,31 @@
  * stands for has to be guessed back out of its label. So the draft is a list of nodes, each
  * mention carrying the id it stands for, and text is *derived* from it.
  *
- * Decks has one kind of mention so far: a **comment** on words selected on a board
- * (`markup/comments.ts`). A file is still spelled `@path` in plain text, as it was, because
- * that spelling is what the agent reads and there is no identity to lose.
+ * Three kinds of mention, each standing for something the app already holds:
+ *
+ * - a **comment** on words selected on a board (`markup/comments.ts`), whose id is the
+ *   comment's;
+ * - a **board**, whose id is its path;
+ * - an **item** drawn on the stage, whose id is its id in `stage.pen`.
+ *
+ * The last two arrive by dragging the thing onto the input bar (`canvas/Stage.tsx`). They are
+ * pills rather than typed text for the reason the comment is: what a mention stands for should
+ * not have to be guessed back out of its label, and a thing you dragged is a thing you pointed
+ * at, not a path you typed. A file attached from disk is still spelled `@path` in plain text,
+ * because a file has no identity here to lose.
  */
+
+/** What a pill stands for. Each has its own colour and icon in the field. */
+export type MentionKind = "comment" | "board" | "item";
 
 export type DraftNode =
 	| { type: "text"; text: string }
 	| {
 			type: "mention";
-			kind: "comment";
-			/** The comment's id in `state/comments.ts`. */
+			kind: MentionKind;
+			/** The comment's id in `state/comments.ts`, a board's path, or an item's id on the stage. */
 			id: string;
-			/** What the pill shows after its icon: the start of the quoted words. */
+			/** What the pill shows after its icon: the quoted words, the board's title, the item's name. */
 			label: string;
 	  };
 
@@ -56,10 +68,26 @@ export function draftLabel(node: DraftMention): string {
 
 export const LABEL_LIMIT = 28;
 
+/** Any words, on one line, short enough to sit in a sentence. */
+export function shortLabel(words: string): string {
+	const flat = words.replace(/\s+/g, " ").trim();
+	return flat.length > LABEL_LIMIT ? `${flat.slice(0, LABEL_LIMIT - 1).trimEnd()}…` : flat;
+}
+
 /** The start of a quotation, in quotes, short enough to sit in a sentence. */
 export function commentLabel(quote: string): string {
-	const flat = quote.replace(/\s+/g, " ").trim();
-	return `“${flat.length > LABEL_LIMIT ? `${flat.slice(0, LABEL_LIMIT - 1).trimEnd()}…` : flat}”`;
+	return `“${shortLabel(quote)}”`;
+}
+
+/**
+ * How the agent reads a pill that stands for a thing with an address.
+ *
+ * A board is `@boards/plan.html`, which is how a file dropped on the bar is already spelled,
+ * because the path is what an agent opens it by. A drawn item has no file, so it is the same
+ * spelling with the kind said: its id on the stage, which is what `stage.pen.read()` lists.
+ */
+export function mentionAddress(node: DraftMention): string {
+	return node.kind === "board" ? `@${node.id}` : `@item:${node.id}`;
 }
 
 /**
@@ -82,24 +110,32 @@ export function draftText(draft: Draft): string {
  * nothing but pills sends no words at all: the list is the whole message.
  */
 export function draftForAgent(draft: Draft): string {
-	if (draftText(draft).trim() === "") return "";
 	let count = 0;
-	return draft
-		.map((node) => (node.type === "text" ? node.text : `[comment ${++count}]`))
+	const written = draft
+		.map((node) => {
+			if (node.type === "text") return node.text;
+			return node.kind === "comment" ? `[comment ${++count}]` : mentionAddress(node);
+		})
 		.join("")
 		.trim();
+	/*
+	 * A draft of comment pills and nothing else sends no words: the comments are the whole
+	 * message, and each is composed into a block of its own. A board or an item is not composed
+	 * into anything, so its address *is* the message, and dropping it would send nothing at all.
+	 */
+	return draftText(draft).trim() === "" && !draft.some((node) => node.type === "mention" && node.kind !== "comment") ? "" : written;
 }
 
-/** The comments the draft carries, in the order their pills sit in it. */
+/** The comments the draft carries, in the order their pills sit in it — not the other pills. */
 export function draftComments(draft: Draft): string[] {
 	const ids: string[] = [];
-	for (const node of draft) if (node.type === "mention") ids.push(node.id);
+	for (const node of draft) if (node.type === "mention" && node.kind === "comment") ids.push(node.id);
 	return ids;
 }
 
-/** Nothing typed and nothing mentioned. A comment alone is a message. */
+/** Nothing typed and nothing mentioned. A comment, a board or an item alone is a message. */
 export function draftIsEmpty(draft: Draft): boolean {
-	return draftText(draft).trim() === "" && draftComments(draft).length === 0;
+	return draftText(draft).trim() === "" && !draft.some((node) => node.type === "mention");
 }
 
 export function textDraft(text: string): Draft {
@@ -123,8 +159,13 @@ export function parseDraft(raw: string): Draft | null {
 			if (!node || typeof node !== "object") return null;
 			const value = node as Record<string, unknown>;
 			if (value.type === "text" && typeof value.text === "string") draft.push({ type: "text", text: value.text });
-			else if (value.type === "mention" && value.kind === "comment" && typeof value.id === "string" && typeof value.label === "string") {
-				draft.push({ type: "mention", kind: "comment", id: value.id, label: value.label });
+			else if (
+				value.type === "mention" &&
+				(value.kind === "comment" || value.kind === "board" || value.kind === "item") &&
+				typeof value.id === "string" &&
+				typeof value.label === "string"
+			) {
+				draft.push({ type: "mention", kind: value.kind, id: value.id, label: value.label });
 			} else return null;
 		}
 		return normalize(draft);

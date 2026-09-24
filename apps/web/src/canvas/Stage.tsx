@@ -14,6 +14,7 @@ import { zoomKey } from "./zoom-keys.ts";
 import { deckMode, type DeckHandle, type SlideAction, slideKey } from "../present/slide-keys.ts";
 import { cssEscape } from "../board/inspect.ts";
 import { deckBoardLink } from "../board/board-links.ts";
+import { shortLabel } from "../chat/composer/draft.ts";
 import type { LiveWebReply } from "../board/live-chat.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
 import { createTouches, type Finger, type TouchStep } from "./touch.ts";
@@ -26,7 +27,7 @@ import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
 import { scheme } from "../lib/theme.ts";
-import { ARROW, arrowEnd, arrowRoute, baseTheme, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { ARROW, arrowEnd, arrowRoute, baseTheme, color, fillsOf, isArrow, isMarkdown, MARKDOWN, moveArrowEnds, NOTE_PAD, ids as penIds, indexOf, newId, textStyleOf, walk, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import { pageFont } from "./pen/fonts.ts";
 import { CARD_PALETTE } from "./pen/markdown-layout.ts";
 import { NOTE_RADIUS } from "./pen/paint.ts";
@@ -206,14 +207,15 @@ export function Stage(props: {
 	/** A component on a board carrying code was pressed (`board/board-eval.ts`). */
 	onBoardEval?: (path: string, id: string, value: unknown) => void;
 	/**
-	 * Drawn items dropped on the composer: talk about them rather than move them.
+	 * Dropped on the composer: talk about it rather than move it.
 	 *
-	 * Dragging a note onto the box you are typing in is not a request to park it there, it is a
-	 * request to mention it — so the drop is undone as a move and the ids arrive here, for the
-	 * composer to write in. Boards are not included: a board dragged to the bottom of the canvas
-	 * is a board being put somewhere, which is what dragging one has always meant.
+	 * Dragging a note or a board onto the box you are typing in is not a request to park it
+	 * there, it is a request to mention it — so the drop is undone as a move and what was
+	 * dragged arrives here, for the composer to write in. Whole pills rather than ids: what was
+	 * dragged is the only thing that knows what to call it, a board by its title and an item by
+	 * its name on the stage.
 	 */
-	onReferItems?: (ids: string[]) => void;
+	onRefer?: (pills: Array<{ kind: "board" | "item"; id: string; label: string }>) => void;
 	/** While previewing a past point: board path -> revision sha to render instead. */
 	preview?: Record<string, string>;
 	/**
@@ -1040,15 +1042,40 @@ export function Stage(props: {
 	 * drag anywhere and can be folded away to a tab, so where it is is a question only the
 	 * document can answer. Pointer capture does not change hit testing, so this works mid-drag.
 	 *
-	 * Only for a drag of the drawing alone. A board dropped here goes on being a board dropped
-	 * here: parking one at the bottom of the canvas is an arrangement, and taking that away to
-	 * gain a mention would be a worse trade than the mention is worth.
+	 * Boards as well as drawn items, and a drag of both mentions both. The composer is a small
+	 * target a hand has to aim at, so a board parked at the bottom of the canvas is parked *beside*
+	 * it rather than on it; and a board is the thing most worth saying "this one" about.
 	 */
 	const composerUnder = (at: { clientX: number; clientY: number }, ids: readonly string[], boards: readonly string[]): HTMLElement | undefined => {
-		if (!props.onReferItems || ids.length === 0 || boards.length > 0) return undefined;
+		if (!props.onRefer || ids.length + boards.length === 0) return undefined;
 		const element = document.elementFromPoint(at.clientX, at.clientY) as HTMLElement | null;
 		return element?.closest<HTMLElement>(".composer-box") ?? undefined;
 	};
+	/**
+	 * What to call each thing that was dropped on the composer.
+	 *
+	 * A board is its title, which is the sentence on its own bar; an item is its name, or the
+	 * words it draws when it has none — a note reads as what it says — and its id when it is a
+	 * shape with neither. The id is what the mention *is*; this is only what it shows.
+	 */
+	const referPills = (ids: readonly string[], boards: readonly string[]): Array<{ kind: "board" | "item"; id: string; label: string }> => {
+		const named = new Map<string, PenNode>();
+		if (props.pen) for (const node of walk(props.pen.doc.children)) named.set(node.id, node);
+		return [
+			...boards.map((path) => ({
+				kind: "board" as const,
+				id: path,
+				label: shortLabel(props.boards.find((board) => board.path === path)?.title || (path.split("/").pop() ?? path)),
+			})),
+			...ids.map((id) => {
+				const node = named.get(id);
+				const content = (node as { content?: unknown } | undefined)?.content;
+				const words = node?.name || (typeof content === "string" ? content : "");
+				return { kind: "item" as const, id, label: shortLabel(words) || id };
+			}),
+		];
+	};
+
 	/** The composer being told it is a drop target, so the mark can be taken off wherever the drag ends. */
 	let referTarget: HTMLElement | undefined;
 	const markComposer = (element: HTMLElement | undefined) => {
@@ -1108,7 +1135,7 @@ export function Stage(props: {
 						penLayer.preview(undefined);
 						setPenDrag({ dx: 0, dy: 0 });
 						setBoardDrag(undefined);
-						props.onReferItems?.([...ids]);
+						props.onRefer?.(referPills(ids, boards));
 						return;
 					}
 					if (e.altKey && ids.length) {

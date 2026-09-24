@@ -243,6 +243,9 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 
 // --- dropped on the composer: talk about it rather than move it --------------------------------------
 
+/** The wash behind an item's pill, for the board's pill to be compared with at the end. */
+let ITEM_WASH = "";
+
 /*
  * Dragging a drawn item into the box you are typing in is not a request to park it there. So the
  * move is undone at the last moment and the item's id arrives in the draft as `@item:<id>`,
@@ -261,11 +264,22 @@ say("Escape lets the whole selection go", (await count(".pen-selection")) === 0)
 	const marked = await page.evaluate(() => document.querySelector(".composer-box")?.dataset.refer ?? null);
 	await page.mouse.up();
 	await settle(page, 500);
-	const typed = await page.evaluate(() => document.querySelector(".dockfield")?.textContent?.trim() ?? "");
+	const pills = () =>
+		page.evaluate(() =>
+			[...document.querySelectorAll('.composer-box [data-component="mention-pill"]')].map((pill) => ({
+				kind: pill.dataset.kind,
+				id: pill.dataset.mentionId,
+				icon: Boolean(pill.querySelector('[data-slot="pill-icon"]')),
+				wash: getComputedStyle(pill).backgroundColor,
+			})),
+		);
+	const dropped = await pills();
+	ITEM_WASH = dropped[0]?.wash ?? "";
 	say("the composer says a dragged item would be mentioned here", marked === "true", String(marked));
-	say("…and letting go writes its id into what you are typing", typed === "@item:g-a", typed);
+	say("…and letting go puts it in as a pill, with an icon of its own", dropped.length === 1 && dropped[0].kind === "item" && dropped[0].id === "g-a" && dropped[0].icon, JSON.stringify(dropped));
 	const after = item("g-a");
 	say("…and leaves the item where it was, because that was never a move", after.x === before.x && after.y === before.y, JSON.stringify({ before: [before.x, before.y], after: [after.x, after.y] }));
+
 	/* The field is shared with everything below: leave it empty, and leave the keyboard to the
 	   canvas — the stage's tools are single letters, and `a` typed into a focused field is an `a`. */
 	await page.locator(".dockfield").click();
@@ -578,6 +592,48 @@ await page.waitForSelector(".stage-ink");
 }
 await page.keyboard.press("Escape");
 await page.keyboard.press("Escape");
+
+// --- a board dropped on the composer, which is a pill of another colour ------------------------------
+
+/*
+ * Last, because it moves the view: this check opens past the right-hand edge of every board, and a
+ * title bar has to be on screen to be dragged by. Everything measured in screen pixels is done.
+ */
+{
+	await page.mouse.move(900, 500);
+	await page.mouse.wheel(-700, 0);
+	await settle(page, 400);
+	const chrome = await page.evaluate(() => {
+		for (const bar of document.querySelectorAll(".bar-layer .chrome")) {
+			const r = bar.getBoundingClientRect();
+			const x = r.x + 30;
+			const y = r.y + r.height / 2;
+			const at = document.elementFromPoint(x, y);
+			if (x > 320 && x < 1560 && y > 90 && y < 900 && at?.closest(".chrome") === bar && !at.closest("button")) return { x, y, path: bar.dataset.path };
+		}
+	});
+	say("a board's title bar is on screen to drag by", !!chrome, JSON.stringify(chrome ?? null));
+	if (chrome) {
+		const box = await page.locator(".composer-box").boundingBox();
+		const was = onDisk().children.find((n) => n.metadata?.path === chrome.path);
+		await page.mouse.move(chrome.x, chrome.y);
+		await page.mouse.down();
+		await page.mouse.move(chrome.x + 20, chrome.y + 40, { steps: 4 });
+		await page.mouse.move(box.x + box.width / 2, box.y + 18, { steps: 12 });
+		await page.mouse.up();
+		await settle(page, 600);
+		const pill = await page.evaluate(() => {
+			const one = document.querySelector('.composer-box [data-component="mention-pill"][data-kind="board"]');
+			return one ? { id: one.dataset.mentionId, label: one.dataset.mentionLabel, icon: Boolean(one.querySelector('[data-slot="pill-icon"]')), wash: getComputedStyle(one).backgroundColor } : null;
+		});
+		/* Its own colour and its own icon: a board, a drawn item and a comment are three kinds of
+		   pill that can sit in one sentence, and they are told apart before they are read. */
+		say("a board dropped on the composer is a pill, named by its title", pill?.id === chrome.path && !!pill.label && pill.icon, JSON.stringify(pill));
+		say("…in the board colour, not the drawing's", pill?.wash !== ITEM_WASH, `${pill?.wash} against the item's ${ITEM_WASH}`);
+		const now = onDisk().children.find((n) => n.metadata?.path === chrome.path);
+		say("…and the board did not move: that was a mention, not a drag", !!was && !!now && now.x === was.x && now.y === was.y, JSON.stringify({ was: [was?.x, was?.y], now: [now?.x, now?.y] }));
+	}
+}
 
 link.send({ type: "stage.pen.edit", agentId, ops: onDisk().children.filter((n) => n.id.startsWith("g-")).map((n) => ({ op: "delete", id: n.id })) });
 await settle(page, 300);

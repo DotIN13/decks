@@ -1,5 +1,5 @@
 import { onCleanup, onMount } from "solid-js";
-import { DRAFT_MIME, draftLabel, draftText, normalize, parseDraft, serializeDraft, textDraft, type Draft, type DraftMention, type DraftNode } from "./draft.ts";
+import { DRAFT_MIME, draftLabel, draftText, normalize, parseDraft, serializeDraft, textDraft, type Draft, type DraftMention, type DraftNode, type MentionKind } from "./draft.ts";
 import { withMention } from "./mention.ts";
 
 /**
@@ -51,9 +51,21 @@ export interface DraftFieldApi {
 	focus(): void;
 }
 
-/* Lucide's `message-square`, as markup: a pill is made outside JSX, where a component cannot go. */
-const COMMENT_ICON =
-	'<svg data-slot="pill-icon" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+/*
+ * One icon per kind of mention, as markup: a pill is made outside JSX, where a component cannot
+ * go. Lucide's `message-square`, `layout-template` and `shapes` — a comment, a board, a thing
+ * drawn on the stage. The wash behind each is its own colour too (`styles/ink.css`), because
+ * three kinds of pill in one sentence should be told apart at a glance rather than read.
+ */
+const ICON = (body: string) =>
+	`<svg data-slot="pill-icon" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const ICONS: Record<MentionKind, string> = {
+	comment: ICON('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
+	board: ICON('<rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/>'),
+	item: ICON(
+		'<path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/>',
+	),
+};
 
 /** A mention, as the DOM holds it. Atomic because the browser is told it is. */
 function mentionElement(node: DraftMention, describe?: (node: DraftMention) => string | undefined): HTMLElement {
@@ -65,7 +77,7 @@ function mentionElement(node: DraftMention, describe?: (node: DraftMention) => s
 	span.dataset.mentionLabel = node.label;
 	span.textContent = draftLabel(node);
 	// In front of the label, and no part of it: an icon contributes no text.
-	span.insertAdjacentHTML("afterbegin", COMMENT_ICON);
+	span.insertAdjacentHTML("afterbegin", ICONS[node.kind] ?? ICONS.comment);
 	const words = describe?.(node);
 	if (words) span.title = words;
 	return span;
@@ -75,7 +87,7 @@ function nodeOf(el: Element): DraftNode | null {
 	const id = (el as HTMLElement).dataset?.mentionId;
 	const label = (el as HTMLElement).dataset?.mentionLabel;
 	const kind = (el as HTMLElement).dataset?.kind;
-	if (!id || !label || kind !== "comment") return null;
+	if (!id || !label || (kind !== "comment" && kind !== "board" && kind !== "item")) return null;
 	return { type: "mention", kind, id, label };
 }
 

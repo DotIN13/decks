@@ -82,7 +82,7 @@ export function Composer(props: {
 	 * requests — an effect on the text alone would treat the second as one it had already
 	 * carried out, which is the same reason `atTurn` carries one.
 	 */
-	draft: { text: string; at: number; agentId?: string; insert?: boolean; comment?: string } | undefined;
+	draft: { text: string; at: number; agentId?: string; insert?: boolean; comment?: string; pills?: Array<{ kind: "board" | "item"; id: string; label: string }> } | undefined;
 	/**
 	 * The draft above has been put in the field: forget it. A handover happens once — a draft
 	 * still held after it was taken is one that can be put back by anything that re-reads it,
@@ -218,9 +218,11 @@ export function Composer(props: {
 			// A draft addressed to one conversation is not put into another's field.
 			if (handed.agentId === undefined || handed.agentId === props.agentId) {
 				const kept = handed.comment ? props.comments?.find((candidate) => candidate.id === handed.comment) : undefined;
-				// A comment kept on a board arrives as a pill; a dropped file as its `@path`, spaced
-				// from its neighbours; anything else replaces what is there.
+				// A comment kept on a board arrives as a pill, and so does a board or an item dragged
+				// onto the bar; a dropped file as its `@path`, spaced from its neighbours; anything
+				// else replaces what is there.
 				if (kept) field?.append(pillFor(kept));
+				else if (handed.pills?.length) for (const pill of handed.pills) field?.append({ type: "mention", ...pill });
 				else if (handed.insert) field?.insertText(handed.text);
 				else put(textDraft(handed.text));
 				field?.focus();

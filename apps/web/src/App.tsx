@@ -1264,17 +1264,21 @@ export function App() {
 						onOpenBoard={openLinkedBoard}
 						onBoardEval={evalBoard}
 						/*
-						 * Drawn items dropped on the composer: talk about them.
+						 * Dropped on the composer: talk about it.
 						 *
-						 * `@item:<id>` is the spelling, and it is the file mention's spelling with the
-						 * thing it names changed — a file is `@boards/plan.html` because that is the
-						 * address an agent reads it by, and a drawn item's address is its id in
-						 * `stage.pen`. Inserted at the caret through the same one-shot draft handoff a
-						 * dropped file uses (`app/files.ts`), so a sentence half typed survives it.
+						 * Each arrives as a **pill**, the object the comment pill already is: an icon, a
+						 * colour of its own, and the thing it stands for carried inside it rather than
+						 * guessed back out of a label (`chat/composer/draft.ts`). What the agent reads
+						 * for one is its address — `@boards/plan.html`, which is how a dropped file is
+						 * already spelled, and `@item:<id>` for something drawn on the stage.
+						 *
+						 * Through the same one-shot draft handoff a dropped file uses, so a sentence
+						 * half typed survives it.
 						 */
-						onReferItems={(ids) =>
+						onRefer={(pills) =>
 							setDraft({
-								text: ids.map((id) => `@item:${id}`).join(" "),
+								text: "",
+								pills,
 								at: Date.now(),
 								insert: true,
 								...(state.focused ? { agentId: state.focused } : {}),

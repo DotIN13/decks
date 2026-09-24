@@ -128,7 +128,26 @@ function createUi() {
 	 * Stamped, so rewinding twice to the same message is two handovers rather than one the
 	 * composer has already acted on.
 	 */
-	const [draft, setDraft] = createSignal<{ text: string; at: number; agentId?: string; insert?: boolean; /** A kept comment, by id: it arrives as a pill. */ comment?: string } | undefined>(undefined);
+	const [draft, setDraft] = createSignal<
+		| {
+				text: string;
+				at: number;
+				agentId?: string;
+				insert?: boolean;
+				/** A kept comment, by id: it arrives as a pill. */
+				comment?: string;
+				/**
+				 * Boards and drawn items dragged onto the bar, each already a pill.
+				 *
+				 * Whole mentions rather than ids, because what is dragged is the only thing that
+				 * knows what to call it — a board its title, an item its name on the stage — and a
+				 * label worked out again at the other end would be a second answer to the same
+				 * question (`chat/composer/draft.ts`).
+				 */
+				pills?: Array<{ kind: "board" | "item"; id: string; label: string }>;
+		  }
+		| undefined
+	>(undefined);
 
 	/**
 	 * Whether the canvas cheat sheet is open (see `CanvasOps`).
