@@ -321,6 +321,39 @@ say(
 );
 say("the runtime beside the name, the state at the line's end", JSON.stringify(rowOf("Ada")?.metaColumn) === JSON.stringify([true, true]) && rowOf("Ada")?.kind === "claude", JSON.stringify(rowOf("Ada")));
 say("no row carries a workspace chip: the heading above it says that", panel.rows.every((agent) => agent.chips === 0), JSON.stringify(panel.rows.map((r) => r.chips)));
+
+/*
+ * **The panel and the dropdown say the same words about the same agent.**
+ *
+ * They are two lists of one set of agents, so a difference between them is the app
+ * contradicting itself. It did: `since` was a pure function of two numbers, so a panel row
+ * drawn at `just now` kept saying it while the dropdown — rebuilt every time it opens — said
+ * `6m` about the same agent. Both read one clock now (`agent-order.ts`), which is what makes
+ * this assertion something other than a coincidence of timing.
+ */
+await page.locator(".dock-to-chip").click();
+await page.waitForSelector(".popover", { timeout: 4000 });
+await settle(page, 300);
+const sameWords = await page.evaluate(() => {
+	const inMenu = Object.fromEntries([...document.querySelectorAll('.popover [data-agent="true"]')].map((row) => [row.querySelector(".row-label")?.textContent, row.querySelector(".meta")?.textContent?.trim()]));
+	const inPanel = Object.fromEntries([...document.querySelectorAll(".agent-row")].map((row) => [row.querySelector(".row-label")?.textContent, row.querySelector(".agent-line > .ago")?.textContent?.trim()]));
+	/* The time each of them ends on: `just now`, or the `2h` after the state's word. */
+	const clock = (words) => (words ?? "").match(/(just now|\d+[mhd])$/)?.[0] ?? null;
+	const names = Object.keys(inMenu);
+	return {
+		inMenu,
+		inPanel,
+		/* The same clock, for every agent either of them names a time for. */
+		clocks: names.every((name) => clock(inMenu[name]) === clock(inPanel[name])),
+		/* And the same words, except for a parked agent: the panel's name says dormant by its
+		   weight and spends the slot on the time, and a menu row has no such cue to lean on. */
+		words: names.filter((name) => name !== "Basil").every((name) => inMenu[name] === inPanel[name]),
+	};
+});
+say("the panel and the dropdown read one clock", sameWords.clocks === true && Object.keys(sameWords.inMenu).length > 0, JSON.stringify(sameWords));
+say("…and say the same words, bar a parked agent, whose name says that in the panel", sameWords.words === true, JSON.stringify([sameWords.inMenu.Basil, sameWords.inPanel.Basil]));
+await page.keyboard.press("Escape");
+await settle(page, 300);
 /*
  * Dormant beats idle: both are true and only one of them explains why nothing is happening.
  * Basil has said nothing, so its second line is the state, in one word.

@@ -1,3 +1,4 @@
+import { createSignal } from "solid-js";
 import type { AgentChat, AgentState, Identity } from "@decks/protocol";
 
 /**
@@ -174,6 +175,34 @@ export function rowWords(status: AgentStatus, state: AgentState, at: number | un
 }
 
 /**
+ * **The clock every relative time on this screen reads.**
+ *
+ * `since` is a pure function of two numbers, so a row that drew `just now` went on saying it
+ * for as long as nothing else about that agent changed — while the dropdown, which is built
+ * afresh each time it opens, said `6m` about the same agent. Two surfaces disagreeing about
+ * the time, and neither of them wrong at the moment it was drawn.
+ *
+ * So the default `now` is a signal rather than `Date.now()`: every caller that reads it inside
+ * a component re-runs when it moves, and the panel row, the state at the end of it, the hover
+ * card and the dropdown all say the same thing because they are all reading one clock. Callers
+ * that pass their own `now` — the tests, and anything sorting — are untouched.
+ *
+ * Every 30 seconds, and started on the first read rather than on import: a module that sets a
+ * timer merely by being imported is a module no test can import quietly. `unref` is Node's, so
+ * the suite's process can still exit; in a browser it is not there and there is nothing to do.
+ */
+const [clockNow, setClockNow] = createSignal(Date.now());
+let ticking = false;
+const clock = (): number => {
+	if (!ticking) {
+		ticking = true;
+		const timer = setInterval(() => setClockNow(Date.now()), 30_000);
+		(timer as unknown as { unref?: () => void }).unref?.();
+	}
+	return clockNow();
+};
+
+/**
  * How long ago, in the two characters a corner has room for.
  *
  * Not "3 minutes ago": the hover card's line is already `writer · 2m`, and the word "ago"
@@ -181,7 +210,7 @@ export function rowWords(status: AgentStatus, state: AgentState, at: number | un
  * reads "just now" rather than "0m", because zero of something is the one value a
  * shortened unit says badly.
  */
-export function since(at: number | undefined, now: number = Date.now()): string {
+export function since(at: number | undefined, now: number = clock()): string {
 	if (at === undefined) return "";
 	const seconds = Math.max(0, Math.round((now - at) / 1000));
 	if (seconds < 45) return "just now";
