@@ -321,6 +321,21 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		return owner ?? undefined;
 	};
 
+	/**
+	 * Where an element is **on the board**, in the board's own coordinates.
+	 *
+	 * `offsetLeft`/`offsetTop` are measured from the nearest *positioned* ancestor, which for a
+	 * component is the body and so is the board — and for anything inside a placed box is that
+	 * box. So a paragraph in a card reads as "14px from the left" and the camera, told that is
+	 * where it is on the board, moves somewhere else entirely. Everything the editor places on
+	 * top of a component can go on using `rectOf`; anything the *canvas* is told about has to
+	 * come through here.
+	 */
+	const boxInDoc = (element: HTMLElement) => {
+		const box = element.getBoundingClientRect();
+		return { left: box.left + win.scrollX, top: box.top + win.scrollY, width: box.width, height: box.height };
+	};
+
 	const rectOf = (element: HTMLElement) => ({
 		left: element.offsetLeft,
 		top: element.offsetTop,
@@ -872,7 +887,8 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		editing = { kind: "source", element, area, ...at, before: text, indent };
 		// The editor's own box, not the component's: on a phone the keyboard takes the
 		// bottom half of the screen and the thing being typed is what has to stay in view.
-		host.reveal(path, { x: box.left, y: box.top, w: box.width ?? 0, h: Math.max(box.height ?? 0, 180) });
+		const onBoard = boxInDoc(element);
+		host.reveal(path, { x: onBoard.left, y: onBoard.top, w: onBoard.width, h: Math.max(onBoard.height, 180) });
 		return true;
 	};
 
@@ -1083,9 +1099,18 @@ export function attachEditor(frame: HTMLIFrameElement, path: string, host: Edito
 		 * off the bottom of the screen with it — the camera moving to reveal the very thing it
 		 * was hiding. The run is what a caret is in, and it is small enough to be shown.
 		 */
-		const box = rectOf(run);
+		const box = boxInDoc(run);
 		const room = 24;
-		host.reveal(path, { x: box.left - room, y: box.top - room, w: (box.width ?? 0) + room * 2, h: (box.height ?? 0) + room * 2 });
+		/*
+		 * The **start** of the run, not all of it. A paragraph is as wide as the board, so asking
+		 * for the whole of one asks the camera to bring its far end into view — a sideways slide
+		 * of a few hundred pixels, away from the words, for a line whose beginning was already on
+		 * the screen. The caret starts at the left, and nothing is obscuring the right, so that is
+		 * the end worth guaranteeing. The full height still goes, because the keyboard is what
+		 * this is for and it covers rows rather than columns.
+		 */
+		const START = 240;
+		host.reveal(path, { x: box.left - room, y: box.top - room, w: Math.min(box.width, START) + room * 2, h: box.height + room * 2 });
 		return true;
 	};
 
