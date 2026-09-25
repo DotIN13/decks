@@ -128,7 +128,12 @@ const iconsAt = () =>
 	page.evaluate(() => {
 		const acts = document.querySelector(".bar-layer .chrome .acts");
 		if (!acts) return null;
-		return [...acts.children].map((child) => Math.round(child.querySelector("svg")?.getBoundingClientRect().width ?? 0));
+		// The buttons show only under the pointer, and hidden they measure nothing: shown for the reading.
+		const was = acts.style.display;
+		acts.style.display = "flex";
+		const sizes = [...acts.children].map((child) => Math.round(child.querySelector("svg")?.getBoundingClientRect().width ?? 0));
+		acts.style.display = was;
+		return sizes;
 	});
 const iconsBefore = await iconsAt();
 await page.keyboard.press("Control+Equal");
