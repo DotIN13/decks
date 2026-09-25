@@ -252,8 +252,7 @@ export const boxOf = (board: Board) => ({ x: board.x, y: board.y, w: board.w, h:
  *
  * **Not `fit`.** Fitting everything a stage holds is right for two or three boards and wrong the
  * moment one of them is parked far out — a single stray board takes a whole stage to a few per
- * cent, where nothing can be read and no board takes a click, which is exactly the state the
- * stage manager exists to get someone out of.
+ * cent and the arrival is a blank grey field.
  *
  * **And not the average, either.** An average is dragged by the same stray board: weighting by a
  * board's area helps and does not fix it, because a small board 40,000px away still moves the
@@ -261,27 +260,35 @@ export const boxOf = (board: Board) => ({ x: board.x, y: board.y, w: board.w, h:
  * on its own cannot move at all: you land where most of the work is, and the outlier is somewhere
  * off to one side, findable by panning.
  *
- * The zoom comes from the *typical* board rather than from the bounding box — the median board's
- * width against the region's — capped so nothing lands below `INTERACT_ZOOM`, where a board takes
- * no clicks, or magnified past life size. A stage with nothing on it keeps the camera where it is.
+ * The zoom is a flat `STAGE_ZOOM` rather than something computed from the boards. Arriving is a
+ * question of "what is here", which is a few boards at once and not one board to read — and a
+ * zoom that depends on the stage would make every arrival a different scale, so the gesture would
+ * never settle into a habit.
  */
+/**
+ * What an arrival looks at: a few boards at once, not one board's words.
+ *
+ * Below `INTERACT_ZOOM` a board takes no pointer events, so this is deliberately a *looking*
+ * scale and not a working one — you land seeing what the stage holds and zoom into the board you
+ * came for. A landing that could be typed into straight away would have to be a landing on one
+ * board, and the manager's whole job is the other question.
+ */
+export const STAGE_ZOOM = 0.3;
+
 export function middleOf(
 	boxes: Array<{ x: number; y: number; w: number; h: number }>,
 	region: { x: number; y: number; width: number; height: number },
 	view: Viewport,
 	at?: Camera,
 ): Camera {
-	if (boxes.length === 0) return { x: at?.x ?? 0, y: at?.y ?? 0, zoom: Math.max(INTERACT_ZOOM, Math.min(1, at?.zoom ?? 1)) };
+	const zoom = clampZoom(STAGE_ZOOM);
+	if (boxes.length === 0) return { x: at?.x ?? 0, y: at?.y ?? 0, zoom };
 	const median = (values: number[]) => {
 		const sorted = [...values].sort((a, b) => a - b);
 		const half = Math.floor(sorted.length / 2);
 		return sorted.length % 2 === 0 ? ((sorted[half - 1] ?? 0) + (sorted[half] ?? 0)) / 2 : (sorted[half] ?? 0);
 	};
 	const middle = { x: median(boxes.map((box) => box.x + box.w / 2)), y: median(boxes.map((box) => box.y + box.h / 2)) };
-	const widths = boxes.map((box) => box.w).sort((a, b) => a - b);
-	const typical = widths[Math.floor(widths.length / 2)] ?? 1000;
-	const room = Math.max(1, region.width - EDGE_FLOOR * 2);
-	const zoom = clampZoom(Math.max(INTERACT_ZOOM, Math.min(1, room / Math.max(1, typical))));
 	return {
 		zoom,
 		x: middle.x - (region.x + region.width / 2 - view.width / 2) / zoom,

@@ -95,12 +95,15 @@ say("the panel closes on a pick", await page.evaluate(() => !document.querySelec
 say("…the agent you are talking to is on that stage now", (await pillStage()) === wanted, `${mine} → ${await pillStage()}`);
 say("…and the server says so too", sent.find((one) => one.name === wanted)?.agents.some((agent) => agent.id === focused) === true, JSON.stringify(sent.map((one) => [one.name, one.agents.length])));
 /*
- * Landed somewhere a board can be read. Below half zoom a board takes no pointer events at all,
- * so a landing under it is a stage you have arrived at and cannot touch — which is the state the
- * manager exists to get somebody out of, not one it may leave them in.
+ * Landed at the arriving zoom, which is the same one every time (`camera.STAGE_ZOOM`).
+ *
+ * A looking scale rather than a working one: what an arrival answers is "what is on this stage",
+ * several boards at once. Pinned here as well as in the unit test because the number that matters
+ * is the one that comes out of the whole round trip — the pick, the boards arriving, the camera.
  */
 const zoom = await page.evaluate(() => Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "0%").replace(/[^0-9.]/g, "")));
-say("…at a zoom where a board can be read and clicked into", zoom >= 50, `${zoom}%`);
+say("…at the arriving zoom, the same for every stage", zoom === 30, `${zoom}%`);
+say("…and says nothing about it: a toast for a thing you just did is noise", (await page.evaluate(() => document.querySelectorAll(".notice").length)) === 0);
 
 // --- and Escape leaves everything as it was -----------------------------------------------------
 

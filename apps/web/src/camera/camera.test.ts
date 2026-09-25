@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { between, breathingRoom, clampZoom, easeOutCubic, EDGE_FLOOR, fit, fitInto, INTERACT_ZOOM, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
+import { between, breathingRoom, clampZoom, easeOutCubic, EDGE_FLOOR, fit, fitInto, INTERACT_ZOOM, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, STAGE_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
 
 const view = { width: 1200, height: 800 };
 
@@ -243,23 +243,26 @@ test("landing frames the middle of the work, and a stray board does not drag it"
 	assert.ok(Math.abs(near.x - 1020) < 1, `the middle of the pair: ${near.x}`);
 	// The median lands on a board of the cluster, and the stray one 39,000px away cannot move it off.
 	assert.ok(strayed.x >= 0 && strayed.x <= 2040, `landed at ${Math.round(strayed.x)}, which should be inside the cluster`);
-	assert.ok(strayed.zoom >= INTERACT_ZOOM, `still clickable: ${strayed.zoom}`);
 	assert.ok(fit([...cluster, { x: 40000, y: 30000, w: 300, h: 200 }], VIEW).zoom < 0.1, "where a fit of the same boards is unreadable");
 });
 
-test("the zoom comes from a typical board, and never leaves the clickable range", () => {
+/*
+ * Arriving is a looking scale, the same one every time.
+ *
+ * Deliberately below the line where a board takes pointer events: what an arrival answers is
+ * "what is on this stage", which is several boards at once. A zoom worked out from the boards
+ * would make every arrival a different size, and the gesture would never become a habit.
+ */
+test("every landing is at the same zoom, whatever the stage holds", () => {
 	const one = middleOf([{ x: 0, y: 0, w: 1000, h: 700 }], REGION, VIEW);
-	assert.ok(one.zoom > INTERACT_ZOOM && one.zoom <= 1, `${one.zoom}`);
-	// A stage of huge boards still lands above the line a board takes clicks at.
-	const huge = middleOf([{ x: 0, y: 0, w: 9000, h: 6000 }], REGION, VIEW);
-	assert.equal(huge.zoom, INTERACT_ZOOM);
-	// And a tiny one is not magnified past life size.
-	const tiny = middleOf([{ x: 0, y: 0, w: 200, h: 120 }], REGION, VIEW);
-	assert.equal(tiny.zoom, 1);
+	const many = middleOf([{ x: 0, y: 0, w: 9000, h: 6000 }, { x: 200, y: 200, w: 200, h: 120 }], REGION, VIEW);
+	assert.equal(one.zoom, STAGE_ZOOM);
+	assert.equal(many.zoom, STAGE_ZOOM);
+	assert.ok(STAGE_ZOOM < INTERACT_ZOOM, "a looking scale, not a working one");
 });
 
-test("an empty stage leaves the camera where it is, at a zoom that can be worked in", () => {
+test("an empty stage leaves the camera where it is, at the same arriving zoom", () => {
 	const kept = middleOf([], REGION, VIEW, { x: 50, y: 60, zoom: 0.02 });
 	assert.deepEqual({ x: kept.x, y: kept.y }, { x: 50, y: 60 });
-	assert.equal(kept.zoom, INTERACT_ZOOM);
+	assert.equal(kept.zoom, STAGE_ZOOM);
 });

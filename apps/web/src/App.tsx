@@ -1036,7 +1036,7 @@ export function App() {
 	 * `middleOf` rather than a fit: see `camera/camera.ts` for why one stray board must not decide
 	 * where a whole stage is read from.
 	 */
-	const landOnStage = (name: string) => {
+	const landOnStage = () => {
 		const asked = Date.now();
 		const stop = () => clearInterval(timer);
 		const timer = setInterval(() => {
@@ -1049,7 +1049,6 @@ export function App() {
 			stop();
 			const view = { width: stage.clientWidth, height: stage.clientHeight };
 			moveCamera(middleOf(boards.map(boxOf), canvasBox(view), view, camera()), { animate: true });
-			notice("info", `On ${name}`);
 		}, 200);
 	};
 
@@ -1393,13 +1392,13 @@ export function App() {
 						const agentId = state.focused;
 						if (!agentId || stageOf(agentId)?.name === name) return;
 						send({ type: "agent.stage", id: agentId, stage: name });
-						landOnStage(name);
+						landOnStage();
 					}}
 					onNew={(title) => {
 						const agentId = state.focused;
 						if (!agentId) return;
 						send({ type: "stage.new", id: agentId, title });
-						landOnStage(title);
+						landOnStage();
 					}}
 					scheme={scheme()}
 				/>
