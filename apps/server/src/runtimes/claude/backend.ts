@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import {
 	forkSession,
@@ -417,6 +417,12 @@ export class ClaudeBackend implements AgentBackend {
 		// `AskUserQuestion` is not a permission question, it *is* the question
 		// (`ask-user-question.ts`).
 		if (toolName === "AskUserQuestion") return answerQuestions(input, (request) => this.context.bridge.choose(request));
+		/*
+		 * Its own memory, in auto mode: allowed without asking. Claude Code asks for these because the
+		 * memory folder is in its config folder, outside the one it works in, and in auto mode a
+		 * question about the agent's own notes is one nobody wants to be interrupted by.
+		 */
+		if (this.currentMode === "auto" && this.isOwnMemory(toolName, input)) return { behavior: "allow", updatedInput: input };
 		const detail = describe(input);
 		// The bridge's own fallback for a confirm is `false`, which is the answer this
 		// wants: an abandoned question denies rather than waves a command through.
@@ -1315,6 +1321,23 @@ export class ClaudeBackend implements AgentBackend {
 	 * Reassigned by `rewindTo`, which forks and stays in the new session — so this is the
 	 * live branch rather than the one the agent started on.
 	 */
+	/** The Claude Code config folder this agent's session runs under: its account's, or the machine's. */
+	private configDir(): string {
+		const accounts = this.context.accounts;
+		const account = this.context.account;
+		const env = accounts && account ? accounts.environmentFor(this.context.stageAgent.id, account.id()) : accounts?.activeEnvironment();
+		return env?.CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+	}
+
+	/**
+	 * Whether a file tool is writing this agent's own memory: `projects/<folder>/memory/` in its
+	 * Claude config folder, by either spelling of the path (the config folder is a link).
+	 */
+	private isOwnMemory(toolName: string, input: Record<string, unknown>): boolean {
+		if (!["Write", "Edit", "MultiEdit"].includes(toolName) || typeof input.file_path !== "string") return false;
+		return inMemoryFolder(this.configDir(), input.file_path);
+	}
+
 	/**
 	 * Make a conversation resumable from this folder.
 	 *
@@ -1325,10 +1348,7 @@ export class ClaudeBackend implements AgentBackend {
 	 * stays, so the old folder can still open it.
 	 */
 	private bringTranscriptHere(id: string): void {
-		const accounts = this.context.accounts;
-		const account = this.context.account;
-		const env = accounts && account ? accounts.environmentFor(this.context.stageAgent.id, account.id()) : accounts?.activeEnvironment();
-		const root = join(env?.CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
+		const root = join(this.configDir(), "projects");
 		const here = join(root, this.context.cwd.replace(/[^a-zA-Z0-9]/g, "-"));
 		if (existsSync(join(here, `${id}.jsonl`)) || !existsSync(root)) return;
 		for (const folder of readdirSync(root)) {
@@ -1498,6 +1518,34 @@ function contentStartsWith(message: unknown, shown: string): boolean {
 }
 
 /** A one-line description of what a tool was asked to do, for the confirm dialog. */
+/**
+ * Whether `file` is in a memory folder of this Claude config folder, `projects/<folder>/memory/`,
+ * by either spelling of either path — the config folder Decks hands an agent is a link.
+ */
+export function inMemoryFolder(configDir: string, file: string): boolean {
+	const target = resolve(file);
+	const projects = join(configDir, "projects");
+	const roots = [projects];
+	try {
+		roots.push(realpathSync(projects));
+	} catch {
+		// No projects folder yet: only the plain spelling can match.
+	}
+	const spellings = [target];
+	try {
+		spellings.push(join(realpathSync(dirname(target)), basename(target)));
+	} catch {
+		// A memory file in a folder not made yet: the plain spelling is all there is.
+	}
+	return spellings.some((path) =>
+		roots.some((root) => {
+			const rel = relative(root, path);
+			const parts = rel.split(sep);
+			return !rel.startsWith("..") && !isAbsolute(rel) && parts.length >= 3 && parts[1] === "memory" && !parts.includes("..");
+		}),
+	);
+}
+
 function describe(input: Record<string, unknown>): string {
 	for (const key of ["command", "file_path", "path", "pattern", "url"]) {
 		const value = input[key];
