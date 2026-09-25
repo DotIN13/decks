@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { boardFolders } from "./stage-boards.ts";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { Board, DeckState } from "@decks/protocol";
 import { DECK_DIR } from "../config.ts";
@@ -205,7 +206,7 @@ export class Deck {
 		return resolveInDeck(this.path, normalizeBoardPath(boardPath));
 	}
 
-	/** Re-read `deck.json` and re-scan `boards/`. Cheap enough to do on any change. */
+	/** Re-read `deck.json` and re-scan the board folders. Cheap enough to do on any change. */
 	reload(): void {
 		this.warnings.length = 0;
 
@@ -227,7 +228,7 @@ export class Deck {
 			if (!root.exists) this.warnings.push(`Root ${root.path} does not exist; embeds under it will not resolve.`);
 		}
 
-		const found = scanBoards(join(this.path, "boards"), this.path);
+		const found = boardFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
 		/*
 		 * No positions in the scan. Where a board sits is a stage's business now and this is only the
 		 * list of boards; `arrange` gives them a place when they are sent.
@@ -253,7 +254,7 @@ export class Deck {
 	 * server restarts.
 	 */
 	resync(): { changed: Board[]; removed: string[] } {
-		const found = scanBoards(join(this.path, "boards"), this.path);
+		const found = boardFolders(this.path).flatMap((folder) => scanBoards(join(this.path, folder), this.path));
 		const changed: Board[] = [];
 		const removed: string[] = [];
 
@@ -461,7 +462,7 @@ function modifiedAtOf(absolute: string): number {
 	}
 }
 
-/** Every board file under `boards/`, deck-relative, sorted, dotfiles skipped. */
+/** Every board file under one board folder (`deck/stage-boards.ts`), deck-relative, sorted, dotfiles skipped. */
 function scanBoards(dir: string, deckRoot: string): string[] {
 	if (!existsSync(dir)) return [];
 	const out: string[] = [];

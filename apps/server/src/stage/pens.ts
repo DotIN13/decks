@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import { apply, baseTheme, emptyDocument, ids, parse, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import type { ServerMessage } from "@decks/protocol";
@@ -98,6 +98,37 @@ export class StagePens {
 		mkdirSync(join(this.dir, name), { recursive: true });
 		if (!this.watcher) this.watch();
 		return name;
+	}
+
+	/**
+	 * Move a stage to a new folder name, drawing and all. Board items whose path `repoint` changes
+	 * (boards kept in the stage's own folder, which moved with it) are pointed at the new path in
+	 * place, so their ids — and any arrow joined to them — stay as they were.
+	 */
+	rename(from: string, to: string, repoint: (path: string) => string): void {
+		if (!this.names().includes(from)) throw new Error(`No stage "${from}".`);
+		if (this.names().includes(to)) throw new Error(`A stage called "${to}" already exists.`);
+		renameSync(join(this.dir, from), join(this.dir, to));
+		this.cache.delete(from);
+		const history = this.history.get(from);
+		this.history.delete(from);
+		if (history) this.history.set(to, history);
+		const ops: Op[] = [];
+		for (const node of walk(this.get(to).doc.children)) {
+			const path = boardOf(node);
+			if (!path || repoint(path) === path) continue;
+			const next = repoint(path);
+			ops.push({ op: "update", id: node.id, set: { url: `../../${next}`, metadata: { ...node.metadata, path: next } } });
+		}
+		if (ops.length > 0) this.edit(to, ops, undefined, { undoable: false });
+	}
+
+	/** Delete a stage: its folder, its drawing and any boards kept in it. */
+	remove(name: string): void {
+		if (!this.names().includes(name)) throw new Error(`No stage "${name}".`);
+		rmSync(join(this.dir, name), { recursive: true, force: true });
+		this.cache.delete(name);
+		this.history.delete(name);
 	}
 
 	/** A folder name for a new stage, from a title, not already taken by a file or by `alsoTaken`. */

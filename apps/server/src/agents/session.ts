@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
 import type { ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { joinPlaces } from "../deck/place.ts";
@@ -7,7 +9,7 @@ import type { BoardSpot } from "../stage/pens.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
 import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec, type StageSnapshot } from "../stage/tool.ts";
-import type { AgentBackend, AgentBackendContext } from "./backend.ts";
+import type { AgentBackend, AgentBackendContext, IsolationContext } from "./backend.ts";
 import { ExtensionUiBridge } from "./extension-ui.ts";
 import type { AgentStateStore } from "./agent-state.ts";
 import type { ClaudeAccountSwitcher } from "./backend.ts";
@@ -18,6 +20,10 @@ import type { Act } from "./acts.ts";
 import { forBrowser, HISTORY_ITEMS } from "./wire.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
+import { IsolatedView } from "./isolation.ts";
+import { relink, stageBoardsDir } from "../deck/stage-boards.ts";
+import { copyStage, isIsolatedStage, markIsolated, numberedName, originOf } from "../stage/isolated-stages.ts";
+import { isolationNote } from "./context.ts";
 
 /**
  * How long an agent must have been quiet before it starts on queued work.
@@ -95,6 +101,16 @@ export class DeckAgent {
 
 	private backend: AgentBackend | undefined;
 	private starting: Promise<void> | undefined;
+	/**
+	 * Isolated mode (`agents/isolation.ts`): the runtime runs in a temporary folder of copies of
+	 * this stage's boards, and is told to leave the Decks data alone. On the record, so a restart
+	 * keeps it; `view` is the live folder while it is on.
+	 */
+	private isolatedOn = false;
+	private view: IsolatedView | undefined;
+	/** The isolated stages this agent has used while isolated: each is copied back when isolation ends. */
+	private isolatedStages: string[] = [];
+
 	private failure: string | undefined;
 	private state: AgentState = "idle";
 	/**
@@ -334,6 +350,11 @@ export class DeckAgent {
 				usage?: AgentUsage;
 				/** Which subscription it was spending, so a restart does not move it. */
 				account?: string;
+				/** Isolated mode, so a restart keeps the agent in its stage's folder. */
+				isolated?: true;
+				/** The isolated stages it has used, to be copied back when isolation ends. */
+				isolatedStages?: string[];
+
 				tags?: string[];
 				userTags?: string[];
 				workspace?: string;
@@ -404,6 +425,9 @@ export class DeckAgent {
 			this.identity = { ...this.identity, workspace };
 		}
 		this.stageFolder = options.restored?.stage;
+		this.isolatedOn = options.restored?.isolated === true;
+		this.isolatedStages = options.restored?.isolatedStages ?? [];
+
 		// After construction, so nothing is announced for a chat the browsers have not been told of yet.
 		if (options.restored) setTimeout(() => this.adoptStage(), 0);
 		this.parentId = options.parentId;
@@ -603,6 +627,8 @@ export class DeckAgent {
 			acted: (what: ActKind, path: string) => this.host.act?.(this.id, { kind: "verb", what, path }),
 			boardPathOf: (file: string) => this.host.boardPathOf(file),
 			stageName: () => this.stageName(true),
+			isolated: () => this.isolatedOn,
+
 			openStage: (name: string) => this.openStage(name),
 			newStage: (title: string) => this.newStage(title),
 		};
@@ -761,6 +787,9 @@ export class DeckAgent {
 		const pens = this.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
 		if (!pens.names().includes(name)) throw new Error(`No stage "${name}". stage.stages() lists them; stage.newStage(title) makes one.`);
+		// Isolated, the only stages there are are isolated ones (`stage/isolated-stages.ts`).
+		if (this.isolatedOn && !isIsolatedStage(pens, name)) throw new Error(`Isolated mode: "${name}" is not an isolated stage, and an isolated agent can open only those.`);
+		if (this.isolatedOn && !this.isolatedStages.includes(name)) this.isolatedStages.push(name);
 		this.flushSyncOut();
 		if (name === this.stageFolder) return;
 		this.stageFolder = name;
@@ -775,11 +804,58 @@ export class DeckAgent {
 		this.emit(pens.frame(this.id, name));
 	}
 
+	/**
+	 * A stage was renamed (`stage/stage-admin.ts`). If it is this agent's, it follows: the stage's
+	 * name, and the paths of boards kept in its folder, wherever this session holds them.
+	 */
+	stageRenamed(from: string, to: string, repoint: (path: string) => string): void {
+		this.isolatedStages = this.isolatedStages.map((name) => (name === from ? to : name));
+		if (this.stageFolder !== from) {
+			this.save();
+			return;
+		}
+		this.stageFolder = to;
+		this.playing = this.playing.map(repoint);
+		this.held = this.held.map(repoint);
+		const places: typeof this.places = {};
+		for (const [path, at] of Object.entries(this.places)) places[repoint(path)] = at;
+		this.places = places;
+		this.save();
+		this.host.arranged?.();
+		this.publishContext();
+		const pens = this.stage.pens;
+		if (pens) this.emit(pens.frame(this.id, to));
+	}
+
+	/**
+	 * A stage was deleted. If it was this agent's, it moves to a fresh, empty stage of its own — an
+	 * isolated one when it is isolated — and keeps holding the deck's boards it had; boards that were
+	 * kept in the deleted stage's folder are gone with it.
+	 */
+	stageDeleted(name: string): void {
+		this.isolatedStages = this.isolatedStages.filter((one) => one !== name);
+		if (this.stageFolder !== name) {
+			this.save();
+			return;
+		}
+		const gone = (path: string) => path.startsWith(`${stageBoardsDir(name)}/`) || !this.deck.board(path);
+		this.held = this.held.filter((path) => !gone(path));
+		for (const path of Object.keys(this.places)) if (gone(path)) delete this.places[path];
+		this.stageFolder = undefined;
+		this.playing = [];
+		this.save();
+		const pens = this.stage.pens;
+		if (pens) this.newStage(this.identity.name);
+		else this.publishContext();
+	}
+
 	/** A new, empty stage, named from a title, and opened. Returns its folder name. */
 	newStage(title: string): string {
 		const pens = this.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
 		const name = pens.claim(title.trim() || this.identity.name);
+		// Made while isolated, it is isolated, and comes back as an ordinary stage with the rest.
+		if (this.isolatedOn) markIsolated(pens, name);
 		this.openStage(name);
 		return name;
 	}
@@ -884,7 +960,12 @@ export class DeckAgent {
 	}
 
 	private publishContext(): void {
+		// Isolated: a board that joined the stage becomes the stage's own copy before anyone hears of it.
+		if (this.isolatedOn) this.localize();
 		this.emit({ type: "context.changed", agentId: this.id, boards: [...this.held], inPlay: [...this.playing] });
+		// A board joined or left the stage: the isolated folder and its fence follow at once, so
+		// the next tool call can reach a board the agent was just given.
+		this.view?.sync();
 		// The boards are part of the record, and this is not a transcript change, so the
 		// translator's hook does not cover it.
 		this.save();
@@ -1014,6 +1095,8 @@ export class DeckAgent {
 			id: this.id,
 			kind: this.kind,
 			...(this.resumeRef ? { resumeRef: this.resumeRef } : {}),
+			...(this.isolatedOn ? { isolated: true as const } : {}),
+			...(this.isolatedOn && this.isolatedStages.length ? { isolatedStages: [...this.isolatedStages] } : {}),
 			name: this.identity.name,
 			...(this.identity.avatar ? { avatar: this.identity.avatar } : {}),
 			color: this.identity.color,
@@ -1061,8 +1144,10 @@ export class DeckAgent {
 			persist: (snapshot) => this.snapshots.record(this.id, snapshot),
 		});
 
+		const view = this.isolatedOn ? this.openView() : undefined;
 		const context: AgentBackendContext = {
-			cwd: this.deck.path,
+			cwd: view?.dir ?? this.deck.path,
+			...(view ? { isolation: this.isolationContext(view) } : {}),
 			deck: this.deck,
 			translator: this.translator,
 			bridge: this.bridge,
@@ -1466,6 +1551,146 @@ export class DeckAgent {
 		this.currentMode = mode;
 	}
 
+	get isolated(): boolean {
+		return this.isolatedOn;
+	}
+
+	private isolationContext(view: IsolatedView): IsolationContext {
+		// What the agent is told to leave alone is the deck: its boards, stages and records. The data
+		// folder around it also holds runtimes' own homes, which they read as part of running.
+		return { dir: view.dir, deck: this.deck.path, data: this.deck.path };
+	}
+
+	/**
+	 * Isolated mode keeps the stage's boards in the stage (`deck/stage-boards.ts`): every board on it
+	 * that is not yet in `stages/<name>/boards/` is copied there, its relative links re-pointed for
+	 * the deeper folder, and the stage points at the copy, in the same place. The original in the
+	 * deck's `boards/` is never written again by this agent, and the copy stays with the stage when
+	 * isolation ends. True when anything moved.
+	 */
+	private localize(): boolean {
+		const name = this.stageName(true);
+		if (!name) return false;
+		const folder = stageBoardsDir(name);
+		let moved = false;
+		const next = this.playing.map((path) => {
+			if (path.startsWith(`${folder}/`)) return path;
+			const source = join(this.deck.path, path);
+			if (!existsSync(source)) return path;
+			const file = basename(path);
+			const dot = file.lastIndexOf(".");
+			const [stem, ext] = dot > 0 ? [file.slice(0, dot), file.slice(dot)] : [file, ""];
+			let target = `${folder}/${file}`;
+			for (let n = 2; existsSync(join(this.deck.path, target)); n++) target = `${folder}/${stem}-${n}${ext}`;
+			mkdirSync(join(this.deck.path, folder), { recursive: true });
+			writeFileSync(join(this.deck.path, target), relink(readFileSync(source, "utf8"), dirname(path), folder));
+			this.deck.refresh(target);
+			if (this.places[path]) {
+				this.places[target] = this.places[path]!;
+				delete this.places[path];
+			}
+			this.held = this.held.map((one) => (one === path ? target : one));
+			moved = true;
+			return target;
+		});
+		if (!moved) return false;
+		this.playing = next;
+		this.scheduleSyncOut();
+		this.host.arranged?.();
+		return true;
+	}
+
+	/** The isolated folder, built the first time it is needed and kept until isolation ends. */
+	private openView(): IsolatedView {
+		if (this.view) return this.view;
+		this.stageName(true);
+		if (this.localize()) this.publishContext();
+		const view = new IsolatedView({
+			root: join(tmpdir(), "decks-isolation", this.id),
+			deck: this.deck.path,
+			boards: () => this.playing,
+			folder: () => (this.stageFolder ? stageBoardsDir(this.stageFolder) : undefined),
+			stage: () => this.stageFolder,
+			adopt: (path) => {
+				if (this.playing.includes(path)) return;
+				this.playing = [...this.playing, path];
+				if (!this.held.includes(path)) this.held.unshift(path);
+				this.scheduleSyncOut();
+				this.host.arranged?.();
+				this.publishContext();
+			},
+			notice: (text) => this.translator.notice("warn", text),
+		});
+		view.open();
+		this.view = view;
+		return view;
+	}
+
+	/**
+	 * Turn isolation on or off: the runtime is restarted in the stage's folder (or back in the
+	 * deck), on the same conversation, and its next message says what changed.
+	 *
+	 * Refused mid-turn: a runtime cannot move folders under a tool call in progress.
+	 */
+	async setIsolated(on: boolean): Promise<void> {
+		if (on === this.isolatedOn) return;
+		if (this.running) throw new Error("Wait for this turn to finish, or stop it, before changing isolation.");
+		const backend = this.backend;
+		this.resumeRef = backend?.sessionRef() ?? this.resumeRef;
+		this.isolatedOn = on;
+		const pens = this.stage.pens;
+		if (on && pens) {
+			// An isolated copy of the stage it is on, and it moves there: the stage it came from is left alone.
+			this.flushSyncOut();
+			const from = this.stageName(true);
+			if (from) {
+				const isolated = pens.freshName(`${from}-isolated`);
+				copyStage(this.deck, pens, from, isolated, { isolated: true, origin: from });
+				this.isolatedStages = [];
+				this.openStage(isolated);
+			}
+		}
+		if (!on) {
+			// Last edits into the isolated stages first, then each comes back as an ordinary stage.
+			this.view?.close();
+			this.view = undefined;
+			this.flushSyncOut();
+			if (pens) {
+				const copies = new Map<string, string>();
+				for (const name of this.isolatedStages) {
+					if (!pens.names().includes(name)) continue;
+					const origin = originOf(pens, name) ?? name.replace(/-isolated(-\d+)?$/, "");
+					// A stage that was itself copied back (`deploy-1`) comes back as `deploy-2`, not `deploy-1-1`.
+					const trimmed = origin.replace(/-\d+$/, "");
+					const base = trimmed !== origin && pens.names().includes(trimmed) ? trimmed : origin;
+					const copy = numberedName(pens, base);
+					copyStage(this.deck, pens, name, copy, { isolated: false, back: true });
+					copies.set(name, copy);
+				}
+				this.isolatedStages = [];
+				const current = this.stageFolder ? copies.get(this.stageFolder) : undefined;
+				if (current) this.openStage(current);
+			}
+		}
+		const to = on ? this.openView().dir : this.deck.path;
+		this.pending.push(
+			on
+				? `[${isolationNote({ dir: to, data: this.deck.path }, this.playing)}]`
+				: `[Isolated mode is off. You are back in the deck at ${to}, and can see every board again.]`,
+		);
+		this.save();
+		if (backend?.setIsolation) {
+			await backend.setIsolation(on ? this.isolationContext(this.openView()) : undefined);
+		} else if (backend) {
+			backend.dispose();
+			this.backend = undefined;
+			this.starting = undefined;
+			this.stageBridge?.revoke(this.id);
+			await this.start();
+		}
+		this.sayRow();
+	}
+
 	get running(): boolean {
 		return this.state !== "idle";
 	}
@@ -1795,11 +2020,12 @@ export class DeckAgent {
 	 * one. `mode` is here rather than beside the model because nothing else announces it —
 	 * a runtime reports what it asks before acting when it starts, and that is a row change.
 	 */
-	private rowFacts(): Pick<AgentChat, "lastLine" | "lastAt" | "mode" | "dormant"> {
+	private rowFacts(): Pick<AgentChat, "lastLine" | "lastAt" | "mode" | "dormant" | "isolated"> {
 		const last = this.translator.lastLine() ?? this.storedLast;
 		return {
 			...(last ? { lastLine: last.text.slice(0, PREVIEW_CHARS), lastAt: last.at } : {}),
 			...(this.currentMode ? { mode: this.currentMode } : {}),
+			...(this.isolatedOn ? { isolated: true as const } : {}),
 			// Restored and untouched: readable, but nothing is running until it is prompted.
 			...(this.restored && !this.starting ? { dormant: true as const } : {}),
 		};
@@ -1850,6 +2076,8 @@ export class DeckAgent {
 		this.flush();
 		this.bridge.dispose();
 		this.backend?.dispose();
+		this.view?.close();
+		this.view = undefined;
 	}
 }
 

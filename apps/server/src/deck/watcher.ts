@@ -1,4 +1,5 @@
 import { readdirSync, statSync, watch, type FSWatcher } from "node:fs";
+import { boardFolders, inBoardFolder } from "./stage-boards.ts";
 import { isBoardFile } from "./kinds.ts";
 import { join } from "node:path";
 import { normalizeBoardPath } from "./schema.ts";
@@ -92,7 +93,7 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 				}
 			}
 		};
-		walk(join(root, "boards"), "boards");
+		for (const folder of boardFolders(root)) walk(join(root, folder), folder);
 	};
 
 	/** True when this path is not the file it was — replaced, or gone. Unknown paths are not news. */
@@ -118,7 +119,7 @@ export function watchDeck(root: string, onChange: (change: DeckChange) => void, 
 				if (replaced(path)) rearm();
 				if (path === "deck.json") onChange({ kind: "deck" });
 				// Every format the loader lists, so a saved `.md` reloads its frame like a `.html`.
-				else if (/^boards\/.+/i.test(path) && isBoardFile(path)) onChange({ kind: "board", path });
+				else if (inBoardFolder(path) && isBoardFile(path)) onChange({ kind: "board", path });
 				else onChange({ kind: "asset", path });
 			}, quietMs),
 		);

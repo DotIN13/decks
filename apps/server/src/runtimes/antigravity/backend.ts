@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
-import { deckContext } from "../../agents/context.ts";
+import { deckContext, briefingFor } from "../../agents/context.ts";
 import { helpText, parseSlash } from "../../agents/slash.ts";
 import { agyExecutable, agyModels, antigravityHomeDir, antigravityAvailability, prepareAntigravityHome } from "./install.ts";
 import { AntigravityStream, type AntigravityResult, type AntigravityStep } from "./events.ts";
@@ -121,7 +121,9 @@ export class AntigravityBackend implements AgentBackend {
 			...(conversation ? ["--conversation", conversation] : []),
 		];
 		const child = spawn(executable, args, {
-			cwd: deck.path,
+			// The deck, or the isolated copy of the stage (`agents/isolation.ts`), which is then
+			// also the CLI's workspace.
+			cwd: this.context.cwd,
 			env: {
 				...process.env,
 				HOME: antigravityHomeDir(),
@@ -230,7 +232,7 @@ export class AntigravityBackend implements AgentBackend {
 	 */
 	private briefing(): string {
 		const { deck, tool } = this.context;
-		return [deckContext(deck, tool.name, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
+		return [deckContext(deck, tool.name, briefingFor(this.context)), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
 	}
 
 	async abort(): Promise<void> {

@@ -34,18 +34,36 @@
 		box-sizing: border-box;
 		padding: 24px;
 		background: rgb(0 0 0 / 30%);
-		animation: stage-manager-in 120ms ease;
+		/*
+		 * The design's one motion, both ways: 120ms of opacity in and 120ms out. It only faded in
+		 * at first, and closing was a cut, which read as the panel breaking rather than leaving.
+		 * The component stays mounted through the fade out (`data-open` goes first, the unmount
+		 * after `transitionend`).
+		 */
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 120ms ease;
 	}
 
-	@keyframes stage-manager-in {
-		from {
-			opacity: 0;
-		}
+	.stage-manager[data-open] {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	/* The canvas goes quiet behind the panel, as in the design: dimmer, not scaled. The ground
+	   stays, so what fades is the work on it rather than the room. */
+	.stage > * {
+		transition: opacity 120ms ease;
+	}
+
+	body:has(.stage-manager[data-open]) .stage > * {
+		opacity: 0.45;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.stage-manager {
-			animation: none;
+		.stage-manager,
+		.stage > * {
+			transition: none;
 		}
 	}
 
@@ -73,8 +91,10 @@
 		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
-		padding: 10px;
+		/* Room, as in the design: the field, the cards and the edge each stand apart. At 10px
+		   every gap was the same hairline and the panel read as a packed tray. */
+		gap: 14px;
+		padding: 14px;
 		border-radius: var(--radius-xl);
 	}
 
@@ -101,20 +121,24 @@
 	 */
 	.stage-wall {
 		display: grid;
-		/* The rest of the box, with the cards standing in the middle of it. */
+		/* The rest of the box, with the cards from the top of it, under the field, as in the
+		   design: centred, a short deck floated in the middle with a gap under the search. */
 		flex: 1;
-		align-content: center;
+		align-content: start;
 		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 		grid-auto-rows: min-content;
-		gap: 8px;
+		gap: 12px;
 		overflow: auto;
 		min-height: 0;
+		/* The scroller clips, and a hit card's ring sits 1px outside it. */
+		padding: 2px;
+		margin: -2px;
 	}
 
 	/*
 	 * A card is mostly picture. The line under it carries the name and who is on it, and nothing
-	 * else: the board count and "you are here" are in the tooltip and in the border, and a second
-	 * line would have repeated them.
+	 * else: the board count and "you are here" are in the tooltip. The current stage has no border
+	 * of its own, because the pill already names it and a black frame was the loudest thing here.
 	 */
 	.stage-card {
 		display: flex;
@@ -122,7 +146,7 @@
 		text-align: left;
 		padding: 0;
 		font: inherit;
-		background: var(--surface);
+		background: var(--raise);
 		color: var(--fg);
 		border: 1px solid var(--line);
 		border-radius: var(--radius-lg);
@@ -137,14 +161,69 @@
 		border-color: var(--line-strong);
 	}
 
-	.stage-card:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 1px;
+	.stage-card:focus-within {
+		border-color: var(--line-strong);
 	}
 
-	/* The stage this conversation is on: the border says it, so the line does not have to. */
-	.stage-card[data-here] {
-		border-color: var(--fg);
+	/* The picture is the card's button: it opens the stage, and it is what the keyboard lands on. */
+	.stage-open {
+		position: relative;
+		display: block;
+		width: 100%;
+		padding: 0;
+		border: 0;
+		background: none;
+		cursor: pointer;
+	}
+
+	.stage-open:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -2px;
+	}
+
+	/* Rename and delete, always there: the card has the room, and a control that appears on hover
+	   is one a person has to find first. */
+	.stage-acts {
+		display: flex;
+		flex: none;
+		gap: 2px;
+		margin-right: -4px;
+	}
+
+	.stage-acts .icon-button {
+		width: 24px;
+		height: 24px;
+	}
+
+	/* Delete asks once, in the place the bin was: red, and named, so it cannot be mistaken. */
+	.stage-confirm {
+		height: 24px;
+		padding: 0 9px;
+		border: 0;
+		border-radius: var(--control-radius, 6px);
+		background: var(--color-danger);
+		color: #fff;
+		font: inherit;
+		font-size: var(--type-note);
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	/* The name, edited where it is drawn. */
+	.stage-rename {
+		flex: 1;
+		min-width: 0;
+		height: 24px;
+		padding: 0 6px;
+		margin-left: -6px;
+		border: 1px solid var(--color-accent);
+		border-radius: var(--control-radius, 6px);
+		background: var(--raise);
+		color: var(--fg);
+		font: inherit;
+		font-size: 13px;
+		font-weight: 600;
+		outline: none;
 	}
 
 	/* A miss while searching stays where it is, dimmed: the wall keeps its shape under the hand. */
@@ -173,7 +252,11 @@
 		/* The whole stage, letterboxed on the canvas's own colour: a card is a stage at 6%, and a
 		   crop would make two stages with work in different corners look the same. */
 		object-fit: contain;
-		background: var(--canvas);
+		/* The stage drawn with a margin of its own ground, as the mock's pictures are: work that
+		   runs to the card's edge reads as a crop. */
+		box-sizing: border-box;
+		padding: 10px;
+		background: var(--stage);
 		border-bottom: 1px solid var(--line);
 	}
 
@@ -181,8 +264,8 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		min-height: 26px;
-		padding: 4px 9px;
+		min-height: 32px;
+		padding: 6px 10px;
 	}
 
 	.stage-foot > .row-label {
@@ -195,6 +278,26 @@
 		font-weight: 600;
 	}
 
+	/* A stage copied back from an isolated one: a pill on the picture's top-right corner, raised off
+	   the drawing so it reads over whatever the stage holds there. */
+	.stage-badge {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		padding: 2px 8px 2px 6px;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--raise);
+		box-shadow: var(--shadow);
+		color: var(--muted);
+		font-size: var(--type-note);
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
 	/* Stacked, as a group of faces is everywhere else in this app. */
 	.stage-faces {
 		display: flex;
@@ -203,37 +306,74 @@
 
 	.stage-faces > .agent-face {
 		margin-left: -5px;
-		box-shadow: 0 0 0 2px var(--surface);
+		box-shadow: 0 0 0 2px var(--raise);
 	}
 
-	/* The pill's stage segment: the glyph, the name, and the chevron that opens all this. */
+	/* The pill's stage segment: the app's mark, the name, and the chevron that opens all this.
+	   `.pill-agent` keeps 3px on the left because a round face fills its own corner; a square
+	   mark does not, so it gets the same 7px as the right. */
+	.pill-agent.pill-stage {
+		padding-left: 7px;
+	}
+
+	/* The mark itself, centred in its own box. */
 	.pill-stage-glyph {
-		display: inline-grid;
-		grid-template-columns: 6px 6px;
-		gap: 2px;
-		align-content: center;
+		display: grid;
+		place-items: center;
 		flex: none;
 	}
 
-	.pill-stage-glyph > i {
-		display: block;
-		border-radius: 1.5px;
-		background: currentColor;
+	/*
+	 * On a phone the stage segment is what made the top-left pill too wide: at 390px it ran 25px
+	 * under the right-hand cluster, hiding the draw button behind the conversation button. The
+	 * chevrons go (the face and the mark still read as buttons, and a press still opens the
+	 * menu), and the pill's gaps close from 4px to 2px, which gives back 44px.
+	 */
+	@media (max-width: 480px) {
+		.pill .pill-agent > svg {
+			display: none;
+		}
+		.pill .pill-agent {
+			padding: 0 3px;
+		}
+		.pill .pill-agent.pill-stage {
+			padding: 0 6px;
+		}
+		.pill:has(> .pill-stage),
+		.pill:has(> .pill-stage) .mode-set {
+			gap: 2px;
+		}
 	}
 
-	.pill-stage-glyph > i:nth-child(1) {
-		height: 5px;
-		opacity: 0.9;
+	/* At 320px (an iPhone SE) the two clusters still met edge to edge: the pill's square buttons
+	   lose 4px of width each, still 36px wide under a finger, and a 25px gap opens between them. */
+	@media (max-width: 360px) {
+		.pill .icon-button {
+			width: 36px;
+		}
 	}
 
-	.pill-stage-glyph > i:nth-child(2) {
-		height: 11px;
-		opacity: 0.55;
-		grid-row: span 2;
-	}
-
-	.pill-stage-glyph > i:nth-child(3) {
-		height: 4px;
-		opacity: 0.55;
+	/* The manager on a phone: two cards across rather than one tall one, and the room it keeps
+	   on a laptop given back to the pictures. */
+	@media (max-width: 640px) {
+		.stage-manager {
+			padding: 12px;
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.stage-box {
+			width: 100%;
+			/* A grid item's floor is its content's, and the field's input asked for 330px of a
+			   296px phone, pushing the + off the edge. */
+			min-width: 0;
+			padding: 10px;
+			gap: 10px;
+		}
+		.stage-wall {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 8px;
+		}
+		.stage-shot {
+			padding: 6px;
+		}
 	}
 }

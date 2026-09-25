@@ -10,7 +10,7 @@ import X from "lucide-solid/icons/x";
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { AgentMark } from "./agent-marks.tsx";
 import type { CanvasMode, Tool } from "../board/Editor.ts";
-import { Icon } from "../ui/icons.tsx";
+import { DecksMark, Icon } from "../ui/icons.tsx";
 import { Popover, type Placement } from "../ui/Popover.tsx";
 import { runtimes } from "../state/deck.ts";
 import { canHover } from "../lib/media.ts";
@@ -661,7 +661,7 @@ export function AgentPill(props: {
 						<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
 						<button
 							type="button"
-							class="chip-button pill-agent"
+							class="chip-button pill-agent pill-stage"
 							data-on={props.stagesOpen ? "soft" : undefined}
 							aria-haspopup="dialog"
 							aria-expanded={props.stagesOpen ?? false}
@@ -669,10 +669,9 @@ export function AgentPill(props: {
 							aria-label={props.stage ? `Stages — currently ${props.stage}` : "Stages — this chat is on none"}
 							onClick={() => props.onStages?.()}
 						>
+							{/* The app's own mark, not a drawing of it: a stage is what the mark is a picture of. */}
 							<span class="pill-stage-glyph" aria-hidden="true">
-								<i />
-								<i />
-								<i />
+								<DecksMark size={15} />
 							</span>
 							<Show when={props.stage}>{(name) => <span class="pill-agent-name max-[768px]:hidden">{name()}</span>}</Show>
 							<Icon of={ChevronDown} size={12} />

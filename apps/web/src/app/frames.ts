@@ -297,9 +297,10 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 					setState("chats", (chats) =>
 						chats.map((chat) => {
 							if (chat.id !== message.id) return chat;
-							const { lastLine: _line, lastAt: _at, mode: _mode, dormant: _dormant, ...rest } = chat;
+							const { lastLine: _line, lastAt: _at, mode: _mode, dormant: _dormant, isolated: _isolated, ...rest } = chat;
 							return {
 								...rest,
+								...(message.isolated ? { isolated: true as const } : {}),
 								...(message.lastLine === undefined ? {} : { lastLine: message.lastLine }),
 								...(message.lastAt === undefined ? {} : { lastAt: message.lastAt }),
 								...(message.mode ? { mode: message.mode } : {}),

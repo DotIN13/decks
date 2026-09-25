@@ -101,6 +101,10 @@ export interface AgentRecord {
 	model?: AgentModel;
 	/** What it last asked before acting. Claude Code only; `capabilities.modes` is empty for pi. */
 	mode?: AgentMode;
+	/** Isolated mode: it runs in a temporary copy of its stage (`agents/isolation.ts`). */
+	isolated?: true;
+	/** The isolated stages it has used, copied back as ordinary stages when isolation ends. */
+	isolatedStages?: string[];
 	/**
 	 * Which Claude subscription this agent spends, by account id (`claude/accounts.ts`).
 	 *
@@ -490,6 +494,8 @@ function validate(raw: unknown, id: string): AgentRecord {
 		...(model ? { model } : {}),
 		...(usage ? { usage } : {}),
 		...(MODES.includes(source.mode as AgentMode) ? { mode: source.mode as AgentMode } : {}),
+		...(source.isolated === true ? { isolated: true as const } : {}),
+		...(Array.isArray(source.isolatedStages) ? { isolatedStages: source.isolatedStages.filter((name): name is string => typeof name === "string" && /^[^/\\.][^/\\]*$/.test(name)) } : {}),
 		/*
 		 * Which subscription it was spending.
 		 *

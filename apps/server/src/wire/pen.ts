@@ -1,4 +1,5 @@
 import type { Op } from "@decks/pen";
+import { deleteStage, renameStage } from "../stage/stage-admin.ts";
 import type { WirePart } from "./context.ts";
 
 /**
@@ -53,6 +54,34 @@ export const pen = {
 		if (!title) return;
 		try {
 			agent.newStage(title);
+		} catch (error) {
+			reply({ type: "notice", level: "warn", text: (error as Error).message });
+			return;
+		}
+		reply({ type: "deck.state", deck: wire.stageState() });
+		wire.publishStages();
+	},
+
+	/** Rename a stage (`stage/stage-admin.ts`): its folder, its boards' paths, and every agent on it. */
+	"stage.rename": (message, reply, wire) => {
+		const pens = wire.stage.pens;
+		if (!pens || typeof message.name !== "string" || typeof message.to !== "string") return;
+		try {
+			renameStage({ deck: wire.deck, pens, agents: wire.agents.all() }, message.name, message.to);
+		} catch (error) {
+			reply({ type: "notice", level: "warn", text: (error as Error).message });
+			return;
+		}
+		reply({ type: "deck.state", deck: wire.stageState() });
+		wire.publishStages();
+	},
+
+	/** Delete a stage (`stage/stage-admin.ts`); agents on it move to a fresh stage of their own. */
+	"stage.delete": (message, reply, wire) => {
+		const pens = wire.stage.pens;
+		if (!pens || typeof message.name !== "string") return;
+		try {
+			deleteStage({ deck: wire.deck, pens, agents: wire.agents.all() }, message.name);
 		} catch (error) {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
 			return;

@@ -1385,6 +1385,9 @@ export function App() {
 				*/}
 				<StageManager
 					stages={stages()}
+					isolated={state.chats.find((chat) => chat.id === state.focused)?.isolated === true}
+					onRename={(name, to) => send({ type: "stage.rename", name, to })}
+					onDelete={(name) => send({ type: "stage.delete", name })}
 					here={stageOf(state.focused)?.name}
 					open={stagesOpen()}
 					onClose={() => void setStagesOpen(false)}
@@ -1449,6 +1452,17 @@ export function App() {
 						for (const board of stageBoards()) send({ type: "board.hide", path: board.path });
 					}}
 					onCanvas={stageBoards().length}
+					/* Isolation belongs to the agent you are talking to; the server restarts it in its
+					   stage's folder and says so on the row (`agent.row.isolated`). */
+					{...(state.focused
+						? {
+								isolated: state.chats.find((chat) => chat.id === state.focused)?.isolated === true,
+								onIsolate: () => {
+									const on = state.chats.find((chat) => chat.id === state.focused)?.isolated !== true;
+									send({ type: "agent.setIsolated", id: state.focused ?? "", on });
+								},
+							}
+						: {})}
 					/*
 					 * The context reading, which used to be a dial under the input bar. It is a
 					 * row of numbers in `⋯` now, and the corner's own button wears the warning.

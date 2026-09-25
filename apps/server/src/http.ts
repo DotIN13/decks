@@ -47,7 +47,8 @@ function asyncRoute(handler: (req: Request, res: Response) => Promise<void>) {
  * needs — a wrong answer that reads as "editing stopped working".
  */
 function isBoardPath(requested: string): boolean {
-	return /^boards\/[^\0]*\.x?html?$/i.test(requested.split("\\").join("/").replace(/^\/+/, ""));
+	// The deck's `boards/`, or a stage's own board folder (`deck/stage-boards.ts`): both are boards.
+	return /^(?:boards|stages\/[^/\0]+\/boards)\/[^\0]*\.x?html?$/i.test(requested.split("\\").join("/").replace(/^\/+/, ""));
 }
 
 /** The wildcard segment of `/api/board/*path`, as one forward-slashed string. */

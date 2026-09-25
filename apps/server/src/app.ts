@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { fromIsolation, isIsolatedStage } from "./stage/isolated-stages.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { examplesDir, runtimeLib } from "@decks/runtime";
@@ -829,6 +830,8 @@ export class App {
 				boards,
 				rev,
 				words,
+				...(isIsolatedStage(pens, name) ? { isolated: true as const } : {}),
+				...(fromIsolation(pens, name) ? { fromIsolation: true as const } : {}),
 				agents: everyone
 					.filter((agent) => agent.stageName() === name)
 					.map((agent) => ({ id: agent.id, name: agent.name, color: agent.color })),

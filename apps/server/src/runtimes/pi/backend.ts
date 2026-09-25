@@ -14,7 +14,7 @@ import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../..
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { decksStage } from "./extension.ts";
 import { skillsDir } from "@decks/runtime";
-import { deckContext } from "../../agents/context.ts";
+import { deckContext, briefingFor } from "../../agents/context.ts";
 import { handlePiEvent } from "./events.ts";
 
 /**
@@ -92,7 +92,7 @@ export class PiBackend implements AgentBackend {
 			 * truth about a deck the agent can simply look at.
 			 */
 			agentsFilesOverride: (base) => ({
-				agentsFiles: [...base.agentsFiles, { path: `${deck.path} (deck)`, content: deckContext(deck, tool.name, { web: tool.webShared() }) }],
+				agentsFiles: [...base.agentsFiles, { path: `${deck.path} (deck)`, content: deckContext(deck, tool.name, briefingFor(this.context)) }],
 			}),
 		});
 		await loader.reload();

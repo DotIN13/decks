@@ -30,6 +30,10 @@ export interface StageRow {
 	agents: Array<{ id: string; name: string; color: string }>;
 	/** The words its boards and notes carry, for the manager's search field. */
 	words: string;
+	/** An isolated stage: the only kind an isolated agent may open (`stage/isolated-stages.ts`). */
+	isolated?: true;
+	/** Copied back from an isolated stage when isolation ended: badged in the manager. */
+	fromIsolation?: true;
 }
 import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
@@ -150,6 +154,10 @@ export type ClientMessage =
 	| { type: "agent.stage"; id: string; stage: string }
 	/** Make a stage from a name you typed, and put this agent on it. */
 	| { type: "stage.new"; id: string; title: string }
+	/** Rename a stage from the manager; the name is made folder-safe, and refused when taken. */
+	| { type: "stage.rename"; name: string; to: string }
+	/** Delete a stage from the manager, with its drawing and the boards kept in its folder. */
+	| { type: "stage.delete"; name: string }
 	/** Take back the person's last edit to the drawing, or put it back (`StagePens.step`). */
 	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo" }
 	/**
@@ -199,6 +207,8 @@ export type ClientMessage =
 	| { type: "agent.setModel"; id: string; provider: string; model: string; thinking?: ThinkingLevel }
 	| { type: "agent.thinking"; id: string; thinking: ThinkingLevel }
 	| { type: "agent.setMode"; id: string; mode: AgentMode }
+	/** Isolated mode on or off: the agent restarts in its stage's folder, on the same conversation. */
+	| { type: "agent.setIsolated"; id: string; on: boolean }
 	/**
 	 * Read this agent's full usage report — the panel, not the ring.
 	 *
@@ -302,7 +312,7 @@ export type ServerMessage =
 	 * one means absent. That is what keeps it from becoming a second, disagreeing account of a
 	 * row — the failure this protocol has already had once.
 	 */
-	| { type: "agent.row"; id: string; lastLine?: string; lastAt?: number; dormant?: true; mode?: AgentMode }
+	| { type: "agent.row"; id: string; lastLine?: string; lastAt?: number; dormant?: true; mode?: AgentMode; isolated?: true }
 	/** An agent is off the list; anything the browser kept for it can go. */
 	| { type: "agent.removed"; id: string }
 	| { type: "agent.identity"; id: string; identity: Identity }

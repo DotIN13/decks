@@ -4,6 +4,7 @@ import ChevronDown from "lucide-solid/icons/chevron-down";
 import Maximize from "lucide-solid/icons/maximize";
 import MessageSquare from "lucide-solid/icons/message-square";
 import Eraser from "lucide-solid/icons/eraser";
+import Lock from "lucide-solid/icons/lock";
 import FilePlus from "lucide-solid/icons/file-plus";
 import Presentation from "lucide-solid/icons/presentation";
 import MoreHorizontal from "lucide-solid/icons/more-horizontal";
@@ -96,6 +97,12 @@ export function Corner(props: {
 	onClearStage: () => void;
 	/** Whether there is anything up there to clear. */
 	onCanvas: number;
+	/**
+	 * Isolated mode for the agent you are talking to: whether it is on, and the press that turns
+	 * it over. Absent when there is no agent, and then there is no button.
+	 */
+	isolated?: boolean;
+	onIsolate?: () => void;
 	/**
 	 * How full the focused agent's context is, and what it has cost. Drawn inside `⋯`.
 	 *
@@ -329,6 +336,29 @@ export function Corner(props: {
 			 * silently forgotten what you asked it for. `state/edge.ts` owns the bit; the only
 			 * thing here is the translation into the attribute `.icon-button` draws from.
 			 */}
+			{/*
+				Isolated mode: the agent sees only its stage (`agents/isolation.ts` on the server).
+				A lock, pressed in the accent and named when on, because it changes what the agent
+				can reach and that should be legible from across the room. Folded into `⋯` on a
+				phone, where the corner has no room for another button.
+			*/}
+			<Show when={props.onIsolate}>
+				<button
+					type="button"
+					class="icon-button isolate-button max-[640px]:hidden"
+					data-on={props.isolated ? "true" : undefined}
+					aria-pressed={props.isolated === true}
+					title={props.isolated ? "Isolated: this agent sees only the boards on its stage. Press to let it see the deck." : "Isolate: let this agent see only the boards on its stage"}
+					aria-label={props.isolated ? "Isolated — press to end" : "Isolate this agent to its stage"}
+					onClick={() => props.onIsolate?.()}
+				>
+					<Icon of={Lock} size={15} />
+					<Show when={props.isolated}>
+						<span class="isolate-label">Isolated</span>
+					</Show>
+				</button>
+			</Show>
+
 			<button
 				type="button"
 				class="icon-button max-[360px]:hidden"
@@ -412,6 +442,20 @@ export function Corner(props: {
 						<span class="meta flex-none tabular-nums">{Math.round(contextPercent(props.usage) ?? 0)}%</span>
 					</button>
 					<span class="rule hidden pointer-coarse:block" />
+				</Show>
+
+				{/* Isolation, as a row, on a phone. */}
+				<Show when={props.onIsolate}>
+					<button type="button" role="menuitem" data-row data-flat="true" class="hidden max-[640px]:flex" aria-pressed={props.isolated === true} onClick={() => props.onIsolate?.()}>
+						<span class="row-icon">
+							<Icon of={Lock} size={15} />
+						</span>
+						<span class="row-label flex-1">{props.isolated ? "Isolated to its stage" : "Isolate to its stage"}</span>
+						<Show when={props.isolated}>
+							<span class="meta flex-none">On</span>
+						</Show>
+					</button>
+					<span class="rule hidden max-[640px]:block" />
 				</Show>
 
 				{/* The conversation, as a row, on the narrowest phones: at 320px the corner has

@@ -2,8 +2,9 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk";
 import type { AgentCapabilities, AgentMode, AgentModel, AgentUsage, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
+import type { IsolationContext } from "../../agents/backend.ts";
 import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../../agents/backend.ts";
-import { deckContext } from "../../agents/context.ts";
+import { deckContext, isolationNote } from "../../agents/context.ts";
 import { helpText, mergeCommands, parseSlash } from "../../agents/slash.ts";
 import { DEFAULT_THINKING } from "@decks/protocol";
 import { OpencodeStream } from "./events.ts";
@@ -173,6 +174,7 @@ export class OpencodeBackend implements AgentBackend {
 		// The canvas tool's calls name this session; the bridge resolves that to this
 		// agent. Registered before the conversation can run a single turn.
 		this.context.stageBridge?.registerSession(this.sessionId, this.context.stageAgent.id, this.context.tool);
+		if (this.context.isolation) await this.setIsolation(this.context.isolation);
 
 		this.stream = new OpencodeStream(translator, this.sessionId, {
 			idle: () => {
@@ -199,6 +201,8 @@ export class OpencodeBackend implements AgentBackend {
 	private briefingFile(): string {
 		const { deck, tool } = this.context;
 		const path = resolve(deck.path, ".decks-agent.md");
+		// Shared by every opencode agent in the deck, so never an isolated one's: that rides on the
+		// prompt instead (`send`).
 		const text = [deckContext(deck, tool.name, { web: tool.webShared() }), "", ...tool.guidelines.map((line) => `- ${line}`)].join("\n");
 		try {
 			/*
@@ -301,8 +305,12 @@ export class OpencodeBackend implements AgentBackend {
 	private async send(text: string): Promise<void> {
 		const model = this.currentModel;
 		const variant = this.currentVariant();
+		// Isolated: the turn runs in the copy of the stage, so relative paths and a bare search land
+		// there, and the isolation instructions ride on the prompt as system text, because the
+		// deck's briefing file is every opencode agent's.
 		await this.client.session.promptAsync({
 			path: { id: this.sessionId! },
+			...(this.isolation ? { query: { directory: this.isolation.dir } } : {}),
 			body: {
 				...(model ? { model: { providerID: model.provider, modelID: model.model } } : {}),
 				// The level, as the variant this model offers — the server's `PromptInput`
@@ -310,6 +318,7 @@ export class OpencodeBackend implements AgentBackend {
 				// type has not caught up; the cast is the same gap `setMode` documents).
 				// `undefined` says no level was asked, so opencode keeps its own default.
 				...(variant ? { variant } : {}),
+				...(this.isolation ? { system: isolationNote(this.isolation, this.context.stageAgent.inPlay()) } : {}),
 				parts: [{ type: "text", text }],
 			},
 		});
@@ -496,6 +505,17 @@ export class OpencodeBackend implements AgentBackend {
 
 	sessionRef(): string | undefined {
 		return this.sessionId;
+	}
+
+	/** Isolated mode, while it is on (`agents/isolation.ts`). */
+	private isolation: IsolationContext | undefined;
+
+	/**
+	 * Isolation on or off, in place. opencode opens a new session on every start, so restarting it
+	 * would lose the conversation; the next turn simply runs in the new folder with the new words.
+	 */
+	async setIsolation(isolation: IsolationContext | undefined): Promise<void> {
+		this.isolation = isolation;
 	}
 
 	/**

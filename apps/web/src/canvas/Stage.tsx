@@ -2790,7 +2790,8 @@ export function Stage(props: {
 					{(ends) => (
 						<For each={["from", "to"] as const}>
 							{(which) => {
-								const size = () => 11 / props.camera.zoom;
+								// A finger needs a bigger end than a mouse does, as the box handles get (`HANDLE_PX`).
+								const size = () => (coarse ? 18 : 11) / props.camera.zoom;
 								return (
 									<div
 										class="pen-handle"

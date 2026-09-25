@@ -212,6 +212,19 @@
 	.dock-to-chip > svg {
 		color: var(--muted);
 	}
+
+	/* Under a finger, 22px is a target you miss: the recipient chip and its + grow to 30px on a
+	   touch screen, and stay the quiet size under a mouse. */
+	@media (pointer: coarse) {
+		.dock-to-chip {
+			height: 30px;
+			padding: 0 8px 0 4px;
+		}
+		.dock-to-new {
+			width: 30px;
+			height: 30px;
+		}
+	}
 	.dock-to-name {
 		max-width: 160px;
 		overflow: hidden;

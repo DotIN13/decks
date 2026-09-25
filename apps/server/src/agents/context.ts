@@ -57,7 +57,30 @@ export function apiFor(api: string, options: { web: boolean }): string {
 	);
 }
 
-export function deckContext(deck: Deck, toolName: string, options: { web?: boolean } = {}): string {
+/**
+ * What an isolated agent is told instead of the deck: the folder it runs in, and only the boards
+ * on its stage (`agents/isolation.ts`). Everything else in the briefing is the same.
+ */
+export interface IsolatedBriefing {
+	dir: string;
+	data: string;
+	boards: readonly string[];
+}
+
+/**
+ * The isolation instructions, the one place their words live: the briefing carries them, a
+ * switch mid-chat sends them, and opencode (whose briefing is shared) sends them with each turn.
+ */
+export function isolationNote(isolated: { dir: string; data: string }, boards: readonly string[]): string {
+	const list = boards.length ? boards.map((path) => `\`${path}\``).join(", ") : "none yet";
+	return [
+		`**Isolated mode is on.** You are working in \`${isolated.dir}\`, a temporary folder holding only your stage: ${list}.`,
+		"Your stage's boards are its own copies now, in its `stages/<name>/boards/` folder; the paths above are those copies, at the same paths in your folder. Read and edit them there, and your edits reach the canvas. A board you make with `newBoard`, or a new file you write in that folder, joins your stage.",
+		`Do not read, list, search or change the Decks data in \`${isolated.data}\` (the original boards, other stages, other agents' files), with your file tools or your shell. Work only with what is in your folder.`,
+	].join(" ");
+}
+
+export function deckContext(deck: Deck, toolName: string, options: { web?: boolean; isolated?: IsolatedBriefing } = {}): string {
 	const template = agentsTemplate();
 	if (!existsSync(template)) {
 		// A missing template is a broken install, not a reason to refuse to run: the
@@ -65,7 +88,8 @@ export function deckContext(deck: Deck, toolName: string, options: { web?: boole
 		return `You are working in a deck at ${deck.path}. Boards are HTML files under boards/. The canvas tool is \`${toolName}\`.`;
 	}
 
-	const boards = deck.boards;
+	const isolated = options.isolated;
+	const boards = isolated ? deck.boards.filter((board) => isolated.boards.includes(board.path)) : deck.boards;
 	const boardList =
 		boards.length === 0
 			? "_None yet. Write the first one._"
@@ -89,8 +113,8 @@ export function deckContext(deck: Deck, toolName: string, options: { web?: boole
 	return readFileSync(template, "utf8")
 		.replaceAll("{{STAGE_API}}", api ? ["```ts", apiFor(api, { web: options.web === true }).trim(), "```"].join("\n") : "_The stage API is not available in this install._")
 		.replaceAll("{{DECK_NAME}}", deck.name)
-		.replaceAll("{{DECK_PATH}}", deck.path)
-		.replaceAll("{{BOARDS}}", boardList)
+		.replaceAll("{{DECK_PATH}}", isolated ? isolated.dir : deck.path)
+		.replaceAll("{{BOARDS}}", isolated ? `${boardList}\n\n${isolationNote(isolated, isolated.boards)}` : boardList)
 		.replaceAll("{{ROOTS}}", rootList)
 		.replaceAll("{{TIME}}", timeLine())
 		/*
@@ -101,4 +125,12 @@ export function deckContext(deck: Deck, toolName: string, options: { web?: boole
 		 * runtime reads instructions naming a tool it does not have.
 		 */
 		.replaceAll("{{STAGE_TOOL}}", toolName);
+}
+
+/** The briefing options a backend passes, from its context: isolation included when it is on. */
+export function briefingFor(context: { isolation?: { dir: string; data: string }; stageAgent: { inPlay(): readonly string[] }; tool: { webShared(): boolean } }): { web: boolean; isolated?: IsolatedBriefing } {
+	return {
+		web: context.tool.webShared(),
+		...(context.isolation ? { isolated: { dir: context.isolation.dir, data: context.isolation.data, boards: context.stageAgent.inPlay() } } : {}),
+	};
 }

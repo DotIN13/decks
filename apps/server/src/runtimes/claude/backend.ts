@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { spawn } from "node:child_process";
 import {
 	forkSession,
@@ -18,7 +21,7 @@ import type { AgentBackend, AgentBackendContext, ConversationPoint } from "../..
 import { helpText, mergeCommands, parseSlash, sameCommands } from "../../agents/slash.ts";
 import { answerQuestions } from "./ask-user-question.ts";
 import { runtimeDir } from "@decks/runtime";
-import { deckContext } from "../../agents/context.ts";
+import { deckContext, briefingFor } from "../../agents/context.ts";
 import { claudeAvailability, claudeBundledExecutable, claudeExecutable } from "./available.ts";
 import { firstUrl, lastLine, plain } from "./cli-output.ts";
 import { handleClaudeMessage, newStreamState } from "./events.ts";
@@ -191,6 +194,13 @@ export class ClaudeBackend implements AgentBackend {
 	 */
 	private async startQuery(resume?: string): Promise<void> {
 		const { deck, translator, notice } = this.context;
+		if (resume) {
+			try {
+				this.bringTranscriptHere(resume);
+			} catch {
+				// Unreadable projects folder: the resume fails as it would have, and says so.
+			}
+		}
 		const executable = claudeExecutable();
 		const state = newStreamState();
 		/*
@@ -213,7 +223,7 @@ export class ClaudeBackend implements AgentBackend {
 			systemPrompt: {
 				type: "preset",
 				preset: "claude_code",
-				append: [deckContext(deck, qualifiedToolName(this.context.tool), { web: this.context.tool.webShared() }), "", ...this.context.tool.guidelines.map((line) => `- ${line}`)].join(
+				append: [deckContext(deck, qualifiedToolName(this.context.tool), briefingFor(this.context)), "", ...this.context.tool.guidelines.map((line) => `- ${line}`)].join(
 					"\n",
 				),
 			},
@@ -1305,6 +1315,31 @@ export class ClaudeBackend implements AgentBackend {
 	 * Reassigned by `rewindTo`, which forks and stays in the new session — so this is the
 	 * live branch rather than the one the agent started on.
 	 */
+	/**
+	 * Make a conversation resumable from this folder.
+	 *
+	 * Claude Code files a session under `projects/<the folder, every other character a dash>/`, so a
+	 * session resumed from another folder — isolation turned on or off, even while the agent was
+	 * dormant — is looked for where it is not, and fails with "No conversation found". When the
+	 * file is not under this folder, it is found under any other and copied here; the original
+	 * stays, so the old folder can still open it.
+	 */
+	private bringTranscriptHere(id: string): void {
+		const accounts = this.context.accounts;
+		const account = this.context.account;
+		const env = accounts && account ? accounts.environmentFor(this.context.stageAgent.id, account.id()) : accounts?.activeEnvironment();
+		const root = join(env?.CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
+		const here = join(root, this.context.cwd.replace(/[^a-zA-Z0-9]/g, "-"));
+		if (existsSync(join(here, `${id}.jsonl`)) || !existsSync(root)) return;
+		for (const folder of readdirSync(root)) {
+			const source = join(root, folder, `${id}.jsonl`);
+			if (!existsSync(source)) continue;
+			mkdirSync(here, { recursive: true });
+			copyFileSync(source, join(here, `${id}.jsonl`));
+			return;
+		}
+	}
+
 	sessionRef(): string | undefined {
 		return this.sessionId;
 	}

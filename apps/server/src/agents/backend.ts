@@ -15,8 +15,26 @@ import type { Translator } from "./translator.ts";
  * What differs between runtimes lives in `capabilities` rather than in a method that
  * throws: a client that can see what an agent cannot do never offers it.
  */
+/**
+ * Isolated mode, as a backend sees it (`agents/isolation.ts`).
+ *
+ * `cwd` is already `dir`, a temporary copy of the stage's boards. Isolation is by instruction:
+ * the agent is told where it works and not to touch `data` (`isolationNote` in
+ * `agents/context.ts`); nothing on disk is fenced.
+ */
+export interface IsolationContext {
+	/** The temporary folder holding copies of the stage's boards. */
+	dir: string;
+	/** The deck it was copied from. */
+	deck: string;
+	/** The deck folder, which the agent is told to leave alone: every board, stage and record in it. */
+	data: string;
+}
+
 export interface AgentBackendContext {
 	cwd: string;
+	/** Present when the agent is isolated: see `IsolationContext`. */
+	isolation?: IsolationContext;
 	deck: Deck;
 	translator: Translator;
 	bridge: ExtensionUiBridge;
@@ -214,6 +232,11 @@ export interface AgentBackend {
 	setThinking(level: ThinkingLevel): void;
 	/** Only meaningful when `capabilities.modes` is non-empty. */
 	setMode?(mode: AgentMode): Promise<void>;
+	/**
+	 * Isolation on or off without a restart, for a runtime that can change folders in place and
+	 * would lose the conversation by restarting (opencode). One that has this is not restarted.
+	 */
+	setIsolation?(isolation: IsolationContext | undefined): Promise<void>;
 	mode?(): AgentMode | undefined;
 	models(): Promise<ModelOption[]>;
 	usage(): AgentUsage | null;

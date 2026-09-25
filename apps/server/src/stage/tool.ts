@@ -1,4 +1,6 @@
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
+import { isIsolatedStage } from "./isolated-stages.ts";
+import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { existsSync, readFileSync } from "node:fs";
 import type { ActKind, AgentKind, AgentMode, AgentState, Camera, Identity, ThinkingLevel } from "@decks/protocol";
 import { guidelinesFile, toolDescription as toolDescriptionPath } from "@decks/runtime";
@@ -128,6 +130,8 @@ export interface StageAgentHooks {
 	boardPathOf(file: string): string | undefined;
 	/** The folder this agent's stage drawing lives in, named on first use (`stage/pens.ts`). Optional for hosts with no drawing. */
 	stageName?(): string | undefined;
+	/** Isolated mode (`agents/isolation.ts`): this agent may see only its own stage's boards. */
+	isolated?(): boolean;
 	/** Work on another stage: its boards become this agent's (`agents/session.ts`). */
 	openStage?(name: string): void;
 	/** Make an empty stage from a title, open it, and return its name. */
@@ -353,7 +357,20 @@ export function createStageTool(deps: {
 	 * to. Every read in this file goes through here, so a verb cannot quietly answer for somebody
 	 * else's arrangement.
 	 */
-	const here = () => service.boards(agent.id);
+	const isolated = () => agent.isolated?.() === true;
+	/*
+	 * Isolated mode (`agents/isolation.ts`): the stage is all there is. Every read goes through
+	 * `here`, so filtering it is what keeps the rest of the deck out of every verb at once.
+	 */
+	const here = () => {
+		const all = service.boards(agent.id);
+		if (!isolated()) return all;
+		const mine = new Set(agent.inPlay());
+		return all.filter((board) => mine.has(board.path));
+	};
+	const notWhileIsolated = (what: string): never => {
+		throw new Error(`Isolated mode: ${what} is not available while this agent can see only its own stage.`);
+	};
 	/** A workspace a caller named, cleaned as the store cleans it, or a sentence. */
 	const askedWorkspace = (raw: unknown): string => {
 		const clean = typeof raw === "string" ? cleanWorkspace(raw) : null;
@@ -365,7 +382,13 @@ export function createStageTool(deps: {
 		// --- reads ---------------------------------------------------------------
 		/** Every board in the deck, placed as this agent's stage has them, with its box's two corners. */
 		boards: async () => here().map(withBox),
-		resolve: async (file: string) => service.resolve(file),
+		resolve: async (file: string) => {
+			if (isolated()) {
+				const path = agent.boardPathOf(file) ?? file;
+				if (!agent.inPlay().includes(path)) notWhileIsolated(`resolving ${file}, which is not on this stage,`);
+			}
+			return service.resolve(file);
+		},
 		url: async (path: string) => service.url(path, port),
 		/**
 		 * How much room the canvas has, in CSS pixels — the window minus the chrome standing
@@ -422,10 +445,13 @@ export function createStageTool(deps: {
 			 */
 			const view = viewport();
 			const width = boardWidth(options.w, view?.width, format);
+			// Isolated, a new board is the stage's own from the start (`deck/stage-boards.ts`).
+			const stageName = isolated() ? agent.stageName?.() : undefined;
 			const path = service.newBoard({
 				title,
 				format,
 				size: { w: width, ...(options.h ? { h: options.h } : {}) },
+				...(stageName ? { folder: stageBoardsDir(stageName) } : {}),
 			});
 			agent.setInPlay([...agent.inPlay(), path]);
 			agent.worked?.(path);
@@ -540,6 +566,7 @@ export function createStageTool(deps: {
 					continue;
 				}
 				const box = itemBox(one);
+				if (!box && isolated()) notWhileIsolated(`showing ${one}, which is not on this stage,`);
 				if (!box) throw new Error(`No such board or drawn item: ${one}`);
 				items.push({ id: one, box });
 			}
@@ -759,7 +786,8 @@ export function createStageTool(deps: {
 			const pens = needPens();
 			const mine = agent.stageName?.();
 			const everyone = agent.agents();
-			return pens.names().map((name) => ({
+			// Isolated, the isolated stages are all there are (`stage/isolated-stages.ts`).
+			return pens.names().filter((name) => !isolated() || isIsolatedStage(pens, name)).map((name) => ({
 				name,
 				open: everyone.filter((other) => (other.id === agent.id ? mine : other.stage) === name).map((other) => other.name),
 				boards: pens.boards(name).length,

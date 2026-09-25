@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { relink } from "../deck/stage-boards.ts";
 import { dirname, join } from "node:path";
 import type { Board, DeckState, ServerMessage, AnyBoardPatch } from "@decks/protocol";
 import { applyPatches, mintId, PatchRefused } from "./patch.ts";
@@ -285,7 +286,7 @@ export class BoardService {
 	 * The name is minted from the title and made unique by suffixing, so an agent answering
 	 * three questions about the same thing gets `-2` and `-3` rather than an error.
 	 */
-	newBoard(options: { title: string; format?: BoardFormat; size?: { w?: number; h?: number } }): string {
+	newBoard(options: { title: string; format?: BoardFormat; size?: { w?: number; h?: number }; folder?: string }): string {
 		/*
 		 * The extension comes from the format and from nowhere else.
 		 *
@@ -298,14 +299,17 @@ export class BoardService {
 		const format = options.format ?? "board";
 		const extension = extensionFor(format);
 		const base = slugFor(options.title);
-		let path = `boards/${base}${extension}`;
+		// `boards/`, or a stage's own board folder for an isolated agent (`deck/stage-boards.ts`).
+		const folder = options.folder ?? "boards";
+		let path = `${folder}/${base}${extension}`;
 		for (let suffix = 2; existsSync(join(this.deck.path, path)); suffix++) {
-			path = `boards/${base}-${suffix}${extension}`;
+			path = `${folder}/${base}-${suffix}${extension}`;
 			if (suffix > 200) throw new Error(`Too many boards called ${base}`);
 		}
 
 		const file = this.deck.fileOf(path);
-		const html = format === "slides" ? renderSlides(options.title, options.size) : renderBlank(options.title, options.size);
+		// Written for `boards/`, so re-pointed when it is made deeper.
+		const html = relink(format === "slides" ? renderSlides(options.title, options.size) : renderBlank(options.title, options.size), "boards", folder);
 		mkdirSync(dirname(file), { recursive: true });
 		writeFileSync(file, html);
 		this.revisions.record(path, html);

@@ -111,7 +111,11 @@ await page.locator(".pill [aria-label^='Stages']").click();
 await page.waitForSelector(".stage-manager", { timeout: 6000 });
 await page.keyboard.press("Escape");
 await settle(page, 500);
-say("Escape closes it, and the stage is the one it was", (await page.evaluate(() => !document.querySelector(".stage-manager"))) && (await pillStage()) === wanted);
+{
+	const gone = await page.evaluate(() => !document.querySelector(".stage-manager"));
+	const now = await pillStage();
+	say("Escape closes it, and the stage is the one it was", gone && now === wanted, JSON.stringify({ gone, now, wanted }));
+}
 
 link.close();
 say("no console errors", errors.length === 0, errors.slice(0, 2).join(" | "));

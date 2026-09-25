@@ -204,6 +204,23 @@ export const agents = {
 			});
 	},
 
+	"agent.setIsolated": (message, reply, wire) => {
+		const agent = wire.agents.get(message.id);
+		if (!agent) return;
+		void agent
+			.setIsolated(message.on === true)
+			.then(() => {
+				wire.agents.publish();
+				// It changed stages (to an isolated copy, or back to an ordinary one): the manager's list
+				// and the boards on the canvas are both different now.
+				wire.publishStages();
+				reply({ type: "deck.state", deck: wire.stageState() });
+			})
+			.catch((error: unknown) => {
+				reply({ type: "notice", level: "warn", text: `Could not change isolation: ${(error as Error).message}` });
+			});
+	},
+
 	"rewind.preview": (message, reply, wire) => {
 		const agent = wire.agents.get(message.id);
 		if (!agent) return;

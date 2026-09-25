@@ -207,6 +207,20 @@
 		color: var(--color-danger);
 	}
 
+	/* Isolated mode's lock (`chrome/Corner.tsx`): a square button at rest, and when on it widens to
+	   carry its name beside the lock, in the pill's pressed accent. */
+	.icon-button.isolate-button[data-on="true"] {
+		display: flex;
+		width: auto;
+		gap: 5px;
+		padding: 0 9px 0 8px;
+	}
+
+	.isolate-label {
+		font-size: var(--type-ui);
+		font-weight: 600;
+	}
+
 	/*
 	 * A labelled control: an icon, a word, and usually a chevron.
 	 *

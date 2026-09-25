@@ -155,6 +155,8 @@ export interface AgentChat {
 	commands?: SlashCommand[];
 	/** Absent when the runtime has no modes. */
 	mode?: AgentMode;
+	/** Isolated mode: it can see only its stage's boards, and its tools are fenced to them. */
+	isolated?: true;
 	/**
 	 * What the agent says about itself: its colour, its tags, the workspace it works in.
 	 *
