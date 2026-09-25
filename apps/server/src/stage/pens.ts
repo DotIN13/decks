@@ -272,6 +272,26 @@ export class StagePens {
 		return true;
 	}
 
+	/**
+	 * What one stage holds, for the manager's list: how many boards, and the words in it.
+	 *
+	 * The words are what the manager's search matches beyond the name — every board's title and
+	 * every note's text — gathered here because this is the only place that reads the file. A
+	 * stage with a file that does not parse still answers, from the last good document.
+	 */
+	summary(name: string): { boards: number; rev: number; words: string } {
+		const entry = this.get(name);
+		const words: string[] = [];
+		let boards = 0;
+		for (const node of walk(entry.doc.children)) {
+			if (boardOf(node)) boards += 1;
+			if (typeof node.name === "string" && node.name) words.push(node.name);
+			const content = (node as { content?: unknown }).content;
+			if (typeof content === "string" && content) words.push(content);
+		}
+		return { boards, rev: entry.rev, words: words.join(" ").replace(/\s+/g, " ").slice(0, 600) };
+	}
+
 	/** The `stage.pen` frame for one agent looking at this stage. */
 	frame(agentId: string, name: string): ServerMessage {
 		const entry = this.get(name);

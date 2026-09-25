@@ -1,5 +1,5 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, relative } from "node:path";
 import type { Box } from "@decks/pen";
 import { resolveInDeck } from "../deck/roots.ts";
 import type { StagePens } from "./pens.ts";
@@ -132,4 +132,43 @@ export class StageShots {
 		writeFileSync(target, bytes);
 		return { file: relative(this.host.deck, target), bytes, format, width: Math.round(width * scale), height: Math.round(height * scale), box };
 	}
+
+	/**
+	 * A small picture of a whole stage, for the manager's cards, taken once per revision.
+	 *
+	 * Kept on disk by name, revision and scheme, exactly as a board's picture is
+	 * (`boards/thumbs.ts`) and for the same reason: the picture is the expensive part, a browser
+	 * asks for it by a URL carrying the revision, and an unchanged stage never misses. Older
+	 * revisions of the same stage are removed as they are replaced, so the folder is one file per
+	 * stage per scheme rather than a history nobody reads.
+	 *
+	 * One at a time per stage: two cards asking at once would otherwise start two Chromium pages
+	 * for one picture.
+	 */
+	async thumb(stage: string, rev: number, scheme: "light" | "dark"): Promise<string> {
+		const dir = join(this.host.deck, ".decks", "thumbs", "stages");
+		const file = join(dir, `${stage}-${rev}-${scheme}.jpg`);
+		if (existsSync(file)) return file;
+		const key = `${stage}-${scheme}`;
+		const waiting = this.thumbing.get(key);
+		if (waiting) return waiting;
+		const work = (async () => {
+			const shot = await this.take({ stage, scheme, format: "jpeg", scale: 1, to: relative(this.host.deck, file) });
+			// Whatever this stage's picture was before, at any older revision.
+			for (const old of existsSync(dir) ? readdirSync(dir) : []) {
+				if (old.startsWith(`${stage}-`) && old.endsWith(`-${scheme}.jpg`) && old !== basename(file)) rmSync(join(dir, old), { force: true });
+			}
+			void shot;
+			return file;
+		})();
+		this.thumbing.set(key, work);
+		try {
+			return await work;
+		} finally {
+			this.thumbing.delete(key);
+		}
+	}
+
+	/** A picture being taken now, by stage and scheme: the second asker waits for the first. */
+	private readonly thumbing = new Map<string, Promise<string>>();
 }

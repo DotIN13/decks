@@ -24,6 +24,43 @@ export const pen = {
 			reply(pens.frame(agent.id, name));
 		}
 	},
+	/**
+	 * Put an agent on a stage, because the person picked it in the manager.
+	 *
+	 * The same call the agent makes with `stage.open`, so nothing here knows anything the agent's
+	 * own path does not: the session takes that stage's boards as its own and sends its browser the
+	 * drawing. The arrangement goes back to the asker, because the boards on the canvas have just
+	 * been replaced and `deck.state` is how a browser is told where they are.
+	 */
+	"agent.stage": (message, reply, wire) => {
+		const agent = wire.agents.get(message.id);
+		if (!agent) return;
+		try {
+			agent.openStage(message.stage);
+		} catch (error) {
+			reply({ type: "notice", level: "warn", text: (error as Error).message });
+			return;
+		}
+		reply({ type: "deck.state", deck: wire.stageState() });
+		wire.publishStages();
+	},
+
+	/** A stage made from a name you typed, opened for that agent at once. */
+	"stage.new": (message, reply, wire) => {
+		const agent = wire.agents.get(message.id);
+		if (!agent) return;
+		const title = typeof message.title === "string" ? message.title.trim() : "";
+		if (!title) return;
+		try {
+			agent.newStage(title);
+		} catch (error) {
+			reply({ type: "notice", level: "warn", text: (error as Error).message });
+			return;
+		}
+		reply({ type: "deck.state", deck: wire.stageState() });
+		wire.publishStages();
+	},
+
 	/** Undo and redo the person's own edits (`StagePens.step`): refused, with a sentence, when an agent has drawn since. */
 	"stage.pen.step": (message, reply, wire) => {
 		const agent = wire.agents.get(message.agentId);

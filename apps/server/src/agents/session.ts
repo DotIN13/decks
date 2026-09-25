@@ -1718,6 +1718,11 @@ export class DeckAgent {
 		return this.identity.color;
 	}
 
+	/** What it answers to. Public because a list of agents outside this class draws it. */
+	get name(): string {
+		return this.identity.name;
+	}
+
 	/** What it is on now, live if it is running and from the record if it is not. */
 	get model(): AgentModel | undefined {
 		return this.backend?.model() ?? this.lastModel;

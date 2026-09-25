@@ -34,6 +34,7 @@
 @import "./styles/dock.css";
 @import "./styles/usage.css";
 @import "./styles/canvas.css";
+@import "./styles/stages.css";
 @import "./styles/shell.css";
 @import "./styles/ink.css";
 @import "./styles/board-picture.css";

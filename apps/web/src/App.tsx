@@ -52,10 +52,12 @@ import { PresentEmbed } from "./present/PresentEmbed.tsx";
 import { StatusLine } from "./chat/StatusLine.tsx";
 import { Stream } from "./chat/Stream.tsx";
 import { AgentPill } from "./agents/AgentPill.tsx";
+import { StageManager } from "./canvas/StageManager.tsx";
+import { stageOf, stages } from "./state/stages.ts";
 import { Corner } from "./chrome/Corner.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
-import {boxOf, fitInto, INTERACT_ZOOM, keepVisible} from "./camera/camera.ts";
+import {boxOf, fitInto, INTERACT_ZOOM, keepVisible, middleOf} from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
 import { agentViews } from "./camera/agent-views.ts";
 import {closeHistory, historyShown, openHistory, setInspectable} from "./state/edge.ts";
@@ -1020,6 +1022,37 @@ export function App() {
 		moveCamera(fitInto(boards.map(boxOf), view, canvasBox(view)), options);
 	};
 
+	/** Whether the stage manager is up. One state, because there is one of it (`StageManager`). */
+	const [stagesOpen, setStagesOpen] = createSignal(false);
+
+	/**
+	 * Land on a stage that has just been opened: the middle of its work.
+	 *
+	 * Waits for the boards, because moving an agent to a stage is a round trip — the server takes
+	 * that stage's boards as the session's and sends the arrangement back — and a camera moved
+	 * before they arrive is a camera moved to where the *old* stage was. Given up on after a few
+	 * seconds, so a stage the server never answers about cannot fly the camera later.
+	 *
+	 * `middleOf` rather than a fit: see `camera/camera.ts` for why one stray board must not decide
+	 * where a whole stage is read from.
+	 */
+	const landOnStage = (name: string) => {
+		const asked = Date.now();
+		const stop = () => clearInterval(timer);
+		const timer = setInterval(() => {
+			if (Date.now() - asked > 6000) return stop();
+			const stage = document.querySelector(".stage");
+			if (!stage) return;
+			// The boards of the conversation on screen, which are that stage's the moment it lands.
+			const boards = stageBoards();
+			if (boards.length === 0 && Date.now() - asked < 1200) return;
+			stop();
+			const view = { width: stage.clientWidth, height: stage.clientHeight };
+			moveCamera(middleOf(boards.map(boxOf), canvasBox(view), view, camera()), { animate: true });
+			notice("info", `On ${name}`);
+		}, 200);
+	};
+
 	/**
 	 * A link **on a board** that points at another board — the app's half of it.
 	 *
@@ -1341,6 +1374,34 @@ export function App() {
 					onDrawing={setDrawing}
 					boardsOpen={boardsOpen()}
 					onToggleBoards={() => showBoards(!boardsOpen())}
+					{...(stageOf(state.focused) ? { stage: stageOf(state.focused)!.name } : {})}
+					{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
+				/>
+
+				{/*
+					The stage manager: every stage in the deck, over the canvas.
+
+					Here rather than inside the pill, because it covers the canvas and the pill is a
+					cluster of controls 40px tall. The pill owns the button; this owns the surface.
+				*/}
+				<StageManager
+					stages={stages()}
+					here={stageOf(state.focused)?.name}
+					open={stagesOpen()}
+					onClose={() => void setStagesOpen(false)}
+					onPick={(name) => {
+						const agentId = state.focused;
+						if (!agentId || stageOf(agentId)?.name === name) return;
+						send({ type: "agent.stage", id: agentId, stage: name });
+						landOnStage(name);
+					}}
+					onNew={(title) => {
+						const agentId = state.focused;
+						if (!agentId) return;
+						send({ type: "stage.new", id: agentId, title });
+						landOnStage(title);
+					}}
+					scheme={scheme()}
 				/>
 
 				<Corner

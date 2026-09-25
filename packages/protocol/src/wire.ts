@@ -15,6 +15,22 @@ import type {
 import type { Board, DeckSettings, DeckState } from "./deck.ts";
 import type { ExtensionUiAnswer, ExtensionUiPrompt } from "./extension-ui.ts";
 import type { ActKind, StageCall, StageResult, Camera } from "./stage.ts";
+
+/**
+ * One stage, as the manager lists it.
+ *
+ * `agents` is who has it open — the faces on its card — and `boards` how many boards are on it.
+ * Both are read off the server's own records rather than the file, because a stage nobody has
+ * opened is still a stage and has to be listed.
+ */
+export interface StageRow {
+	name: string;
+	boards: number;
+	rev: number;
+	agents: Array<{ id: string; name: string; color: string }>;
+	/** The words its boards and notes carry, for the manager's search field. */
+	words: string;
+}
 import type { ChatItem } from "./transcript.ts";
 import type { AgentUsage, UsageReport } from "./usage.ts";
 import type { WebStatus } from "./web.ts";
@@ -125,6 +141,15 @@ export type ClientMessage =
 	 * the stage the named agent has open, together or not at all.
 	 */
 	| { type: "stage.pen.edit"; agentId: string; ops: unknown[] }
+	/**
+	 * Put an agent on a stage — the person's half of `stage.open`, from the manager.
+	 *
+	 * The same call the agent makes for itself, so there is no second path and no second
+	 * record: whoever moved last is where the agent is.
+	 */
+	| { type: "agent.stage"; id: string; stage: string }
+	/** Make a stage from a name you typed, and put this agent on it. */
+	| { type: "stage.new"; id: string; title: string }
 	/** Take back the person's last edit to the drawing, or put it back (`StagePens.step`). */
 	| { type: "stage.pen.step"; agentId: string; direction: "undo" | "redo" }
 	/**
@@ -335,6 +360,15 @@ export type ServerMessage =
 	 * which an image fill's relative `url` is read against.
 	 */
 	| { type: "stage.pen"; agentId: string; stage: string; rev: number; doc: PenDocument; error?: string; base: string }
+	/**
+	 * Every stage in the deck, for the stage manager (`canvas/StageManager.tsx`).
+	 *
+	 * A stage is a folder — `stages/<name>/stage.pen` — and which one a chat is on is one field
+	 * on its record, so this is the only frame that says what stages *exist*. Sent on connect and
+	 * whenever the set or who is on it changes; `rev` is the drawing's revision, which is what
+	 * makes a stage's picture cacheable for a year and still current.
+	 */
+	| { type: "stages"; stages: StageRow[] }
 	/**
 	 * An agent acting on a board, said by the server rather than the agent: the cursor and the
 	 * editing marks are drawn from it (`canvas/acts.ts`). `start` is a write or edit tool call

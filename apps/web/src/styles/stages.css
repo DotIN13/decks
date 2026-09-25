@@ -1,0 +1,187 @@
+@layer components {
+	/*
+	 * The stage manager (`canvas/StageManager.tsx`): every stage in the deck, as cards, in a
+	 * panel over the canvas.
+	 *
+	 * The panel itself is `.float`, the field is `.field`, the faces are `.agent-face` — the app's
+	 * own components, because a surface for choosing between rooms is not a reason to invent a
+	 * second set of them. What is here is the card, which the app has never had: a picture of a
+	 * whole stage with one line under it.
+	 */
+	.stage-manager {
+		position: fixed;
+		inset: 0;
+		z-index: 60;
+		display: grid;
+		place-items: start center;
+		box-sizing: border-box;
+		/* Clear of the pill, which stays where it is: the canvas has not gone anywhere. */
+		padding: calc(var(--inset-top, 0px) + 64px) 16px 24px;
+		/* The canvas, quieter. Not a black scrim: what is behind is the work, not a background. */
+		background: color-mix(in srgb, var(--canvas) 55%, transparent);
+		animation: stage-manager-in 120ms ease;
+	}
+
+	@keyframes stage-manager-in {
+		from {
+			opacity: 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.stage-manager {
+			animation: none;
+		}
+	}
+
+	.stage-box {
+		width: min(96%, 720px);
+		max-height: 100%;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		padding: 10px;
+		border-radius: var(--radius-xl);
+	}
+
+	.stage-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex: none;
+	}
+
+	.stage-count {
+		flex: none;
+		font-size: 12px;
+		color: var(--faint);
+	}
+
+	/* Three across on a laptop, one under a finger; the rows scroll and the head does not. */
+	.stage-wall {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+		gap: 8px;
+		overflow: auto;
+		min-height: 0;
+	}
+
+	/*
+	 * A card is mostly picture. The line under it carries the name and who is on it, and nothing
+	 * else: the board count and "you are here" are in the tooltip and in the border, and a second
+	 * line would have repeated them.
+	 */
+	.stage-card {
+		display: flex;
+		flex-direction: column;
+		text-align: left;
+		padding: 0;
+		font: inherit;
+		background: var(--surface);
+		color: var(--fg);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		cursor: pointer;
+		transition:
+			border-color 120ms ease,
+			opacity 120ms ease;
+	}
+
+	.stage-card:hover {
+		border-color: var(--line-strong);
+	}
+
+	.stage-card:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+
+	/* The stage this conversation is on: the border says it, so the line does not have to. */
+	.stage-card[data-here] {
+		border-color: var(--fg);
+	}
+
+	/* A miss while searching stays where it is, dimmed: the wall keeps its shape under the hand. */
+	.stage-card[data-dim] {
+		opacity: 0.3;
+		pointer-events: none;
+	}
+
+	.stage-card[data-hit] {
+		border-color: var(--color-accent);
+		box-shadow: 0 0 0 1px var(--color-accent);
+	}
+
+	.stage-shot {
+		display: block;
+		width: 100%;
+		height: 90px;
+		/* The whole stage, letterboxed on the canvas's own colour: a card is a stage at 6%, and a
+		   crop would make two stages with work in different corners look the same. */
+		object-fit: contain;
+		background: var(--canvas);
+		border-bottom: 1px solid var(--line);
+	}
+
+	.stage-foot {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-height: 26px;
+		padding: 4px 9px;
+	}
+
+	.stage-foot > .row-label {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 13px;
+		font-weight: 600;
+	}
+
+	/* Stacked, as a group of faces is everywhere else in this app. */
+	.stage-faces {
+		display: flex;
+		flex: none;
+	}
+
+	.stage-faces > .agent-face {
+		margin-left: -5px;
+		box-shadow: 0 0 0 2px var(--surface);
+	}
+
+	/* The pill's stage segment: the glyph, the name, and the chevron that opens all this. */
+	.pill-stage-glyph {
+		display: inline-grid;
+		grid-template-columns: 6px 6px;
+		gap: 2px;
+		align-content: center;
+		flex: none;
+	}
+
+	.pill-stage-glyph > i {
+		display: block;
+		border-radius: 1.5px;
+		background: currentColor;
+	}
+
+	.pill-stage-glyph > i:nth-child(1) {
+		height: 5px;
+		opacity: 0.9;
+	}
+
+	.pill-stage-glyph > i:nth-child(2) {
+		height: 11px;
+		opacity: 0.55;
+		grid-row: span 2;
+	}
+
+	.pill-stage-glyph > i:nth-child(3) {
+		height: 4px;
+		opacity: 0.55;
+	}
+}

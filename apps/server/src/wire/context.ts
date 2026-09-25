@@ -99,6 +99,9 @@ export interface WireContext {
 	 */
 	stageState(): DeckState;
 
+	/** Tell every browser what stages exist and who is on them (`app.stagesMessage`). */
+	publishStages(): void;
+
 	/** What a board frame acts on: the stage of the conversation this browser is in. */
 	target(): DeckAgent;
 

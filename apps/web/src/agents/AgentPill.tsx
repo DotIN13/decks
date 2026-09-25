@@ -539,6 +539,20 @@ export function AgentPill(props: {
 	onClose: (id: string) => void;
 	/** Open the Agents panel, from the agent list's overflow row. */
 	onMoreAgents?: () => void;
+	/**
+	 * The stage this conversation is on, and the way to every other one.
+	 *
+	 * A segment of its own behind the pill's own hairline, marked by a small stage glyph — not
+	 * `Ada · deploy`, because a separator in this pill is a hairline everywhere else and a middle
+	 * dot would be a second kind of separator on one line.
+	 *
+	 * The name is absent for a chat that has never drawn on one, and then the glyph stands alone:
+	 * the way in cannot depend on already being somewhere. The whole segment is absent only when
+	 * the deck keeps no stages at all.
+	 */
+	stage?: string;
+	onStages?: () => void;
+	stagesOpen?: boolean;
 }) {
 	const active = () => props.chats.find((chat) => chat.id === props.focused);
 	const name = () => {
@@ -632,6 +646,40 @@ export function AgentPill(props: {
 				)}
 			/>
 			<NewAgentButton onNew={props.onNew} class="max-[480px]:hidden" />
+
+			{/*
+				The stage: what this agent's work is kept in, and the button that opens the manager.
+
+				It had never been on screen at all, so two stages looked like one canvas that had
+				changed. The name goes where it is read with the agent — this pill is already the
+				answer to "whose work am I looking at" — and pressing it is the answer to "what else
+				is there" (`canvas/StageManager.tsx`).
+			*/}
+			<Show when={props.onStages}>
+				{(_on) => (
+					<>
+						<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
+						<button
+							type="button"
+							class="chip-button pill-agent"
+							data-on={props.stagesOpen ? "soft" : undefined}
+							aria-haspopup="dialog"
+							aria-expanded={props.stagesOpen ?? false}
+							title={props.stage ? `Stage: ${props.stage}` : "Stages"}
+							aria-label={props.stage ? `Stages — currently ${props.stage}` : "Stages — this chat is on none"}
+							onClick={() => props.onStages?.()}
+						>
+							<span class="pill-stage-glyph" aria-hidden="true">
+								<i />
+								<i />
+								<i />
+							</span>
+							<Show when={props.stage}>{(name) => <span class="pill-agent-name max-[768px]:hidden">{name()}</span>}</Show>
+							<Icon of={ChevronDown} size={12} />
+						</button>
+					</>
+				)}
+			</Show>
 
 			<span class="pill-sep max-[640px]:hidden" aria-hidden="true" />
 

@@ -172,6 +172,37 @@ export function createHttpApp(app: App): Express {
 	);
 
 	/**
+	 * A picture of a whole stage, for the manager's cards (`stage/shots.ts`).
+	 *
+	 * The board thumbnails' bargain, one level up: the request waits for the picture because an
+	 * `<img>` cannot be told "later", `v` is the drawing's revision and is what makes the URL new
+	 * when the stage changes, and a year of caching is safe because of it. 503 when this machine
+	 * has no Chromium, 404 for no such stage; the card draws its plain tile for either.
+	 */
+	api.get(
+		"/stage-thumb/:name",
+		asyncRoute(async (req, res) => {
+			const shots = app.stage.shots;
+			const pens = app.stage.pens;
+			const name = String(req.params.name ?? "");
+			if (!shots || !pens || !pens.names().includes(name)) {
+				res.status(404).end();
+				return;
+			}
+			const scheme = req.query.scheme === "dark" ? "dark" : "light";
+			const { rev } = pens.summary(name);
+			try {
+				const file = await shots.thumb(name, rev, scheme);
+				res.setHeader("Cache-Control", req.query.v === String(rev) ? "private, max-age=31536000, immutable" : "no-cache");
+				res.type("jpeg");
+				await sendFile(res, file);
+			} catch (error) {
+				res.status(503).type("text").send((error as Error).message);
+			}
+		}),
+	);
+
+	/**
 	 * One stage, for `shot.html` to draw (`stage/shots.ts`): its `.pen` document, the folder its
 	 * image fills are read against, and where each board on it is.
 	 */

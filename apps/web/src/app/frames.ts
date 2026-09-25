@@ -21,6 +21,7 @@ import { historyShown } from "../state/edge.ts";
 import { releaseBoards, setDraft, setUnread, setUsagePanel, tookReport } from "../state/ui.ts";
 import { watchedBeingNamed } from "./watching.ts";
 import { forgetPen, receivePen } from "../state/pens.ts";
+import { receiveStages } from "../state/stages.ts";
 
 /** What the frame handler needs from the component it used to live in. */
 export interface FrameHooks {
@@ -405,6 +406,11 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 				case "stage.pen":
 					receivePen(message);
 					if (message.error) notice("warn", message.error);
+					return;
+
+				// What stages there are, and who is on them: the manager's whole list.
+				case "stages":
+					receiveStages(message);
 					return;
 
 				case "context.changed":

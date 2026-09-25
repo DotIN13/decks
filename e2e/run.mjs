@@ -156,6 +156,12 @@ const CHECKS = [
 	 * mode, selections that move together and snap, arrow ends, finger taps, and the pen's gestures.
 	 */
 	{ file: "stage-gestures.mjs", needsAgent: false },
+	/*
+	 * The stage manager: what stages exist, and the person's way between them. The one surface
+	 * where a deck of several stages is visible at all — the pill's name, the panel of cards, the
+	 * search, and the landing.
+	 */
+	{ file: "stages.mjs", needsAgent: false },
 	{ file: "agent-rows.mjs", needsAgent: true },
 	{ file: "stage-api.mjs", needsAgent: true },
 	{ file: "running.mjs", needsAgent: true },

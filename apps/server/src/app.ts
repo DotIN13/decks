@@ -643,6 +643,8 @@ export class App {
 		void this.publishAccounts(reply);
 		// And the shared browser, with the code the extension pairs with: the status board
 		// shows it when nothing is connected yet, and the browser is where the user reads it.
+		// Which stages exist: the manager's list, and the name the pill shows beside the agent.
+		reply(this.stagesMessage());
 		reply({ type: "web.status", status: this.web.status(), code: this.web.code() });
 		reply(this.settingsMessage());
 	}
@@ -805,6 +807,38 @@ export class App {
 			agent.penChanged();
 			this.send(this.pens.frame(agent.id, name));
 		}
+		// The manager lists what each stage holds, and this is the moment that changed.
+		this.publishStages();
+	}
+
+	/**
+	 * Every stage in the deck, and who is on it: the manager's whole list (`protocol/StageRow`).
+	 *
+	 * Built from two records that already exist — the folders under `stages/`, and each session's
+	 * own stage field — because a stage nobody has open is still a stage, and an agent with a stage
+	 * that has never been drawn on still has one. A server with no stage files answers with nothing,
+	 * and the manager draws nothing rather than an empty room.
+	 */
+	stagesMessage(): ServerMessage {
+		const pens = this.pens;
+		const everyone = this.agents?.all() ?? [];
+		const stages = pens.names().map((name) => {
+			const { boards, rev, words } = pens.summary(name);
+			return {
+				name,
+				boards,
+				rev,
+				words,
+				agents: everyone
+					.filter((agent) => agent.stageName() === name)
+					.map((agent) => ({ id: agent.id, name: agent.name, color: agent.color })),
+			};
+		});
+		return { type: "stages", stages };
+	}
+
+	publishStages(): void {
+		this.send(this.stagesMessage());
 	}
 
 	/** The drawing for one agent's stage, for a browser opening its chat; nothing if it has never drawn. */
