@@ -49,12 +49,27 @@
 		}
 	}
 
-	/* Big: this is the one surface that shows the whole deck, and a card is a picture of a stage. */
+	/*
+	 * Big, and the same shape whatever is in it: the box grows with the window up to a cap.
+	 *
+	 * It shrank to fit its cards at first, which made a deck of four stages a short strip
+	 * floating in the middle of a dimmed screen — the size of the surface told you how many
+	 * stages you had, which is not a thing a surface should say. So the height is the window's,
+	 * the cards sit at the top of it, and a deck that outgrows it scrolls.
+	 */
 	.stage-box {
-		width: min(94vw, 1180px);
-		/* As tall as the stages need, and no taller: four cards should not sit above 500px of
-		   empty panel. A deck of thirty scrolls instead. */
-		max-height: min(84vh, 760px);
+		width: min(92vw, 1180px);
+		/*
+		 * As tall as the stages need, between a floor and the window.
+		 *
+		 * Fitting the content exactly made a deck of four stages a short strip floating in a
+		 * dimmed screen; a fixed tall box made the same four a strip at the top of an empty one.
+		 * The floor is what stops it looking like a bar, and the ceiling is the window, so the
+		 * surface grows with the deck and with the screen and never states how many stages
+		 * there are by its own shape.
+		 */
+		min-height: min(520px, 82vh);
+		max-height: 82vh;
 		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
@@ -77,8 +92,18 @@
 	}
 
 	/* Three across on a laptop, one under a finger; the rows scroll and the head does not. */
+	/*
+	 * The cards fill the box rather than sitting in a strip at the top of it.
+	 *
+	 * Rows share the height that is there, floored at 170px so a deck of thirty is still a grid
+	 * of readable cards and not a list of slivers. Four stages on a laptop become four tall
+	 * cards, which is the whole point of showing a picture of each one.
+	 */
 	.stage-wall {
 		display: grid;
+		/* The rest of the box, with the cards standing in the middle of it. */
+		flex: 1;
+		align-content: center;
 		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 		grid-auto-rows: min-content;
 		gap: 8px;
@@ -133,10 +158,18 @@
 		box-shadow: 0 0 0 1px var(--color-accent);
 	}
 
+	/*
+	 * A stage's shape, not the card's: 16:10, which is about what a canvas of boards comes to.
+	 *
+	 * Stretching the picture to whatever height the row had left it letterboxed inside a tall
+	 * card — a wide thing in a narrow frame, with grey above and below. Held to an aspect, every
+	 * card is the same shape whatever the deck holds, and the room left over is around the grid
+	 * rather than inside the pictures.
+	 */
 	.stage-shot {
 		display: block;
 		width: 100%;
-		height: 132px;
+		aspect-ratio: 16 / 10;
 		/* The whole stage, letterboxed on the canvas's own colour: a card is a stage at 6%, and a
 		   crop would make two stages with work in different corners look the same. */
 		object-fit: contain;
