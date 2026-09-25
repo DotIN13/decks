@@ -1034,6 +1034,71 @@
 	.app:has(.panel-shell[data-sheet="true"][data-open="true"]) :is(.pen-tools, .ink-bar, .pen-bar) {
 	visibility: hidden;
 }
+	/*
+	 * The ear: a small pull tab at the screen's left edge that snaps the drawing toolbar open
+	 * and shut on touch devices. Always rendered, hidden on fine-pointer devices by CSS.
+	 *
+	 * The toolbar slides behind the left edge; the ear stays flush with it. Tapping the ear
+	 * toggles `data-open` on both, which drives the translate.
+	 */
+	.pen-ear {
+	display: none; /* fine-pointer: the toolbar is always visible */
+	position: absolute;
+	z-index: calc(var(--z-float) + 1);
+	top: 50%;
+	left: calc(env(safe-area-inset-left));
+	width: 20px;
+	height: 48px;
+	transform: translateY(-50%);
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 0;
+	border-radius: 0 6px 6px 0;
+	background: var(--panel);
+	box-shadow: var(--shadow-row);
+	color: var(--muted);
+	cursor: pointer;
+	transition:
+		color 120ms ease,
+		transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+	.pen-ear > svg {
+	flex: none;
+	transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+	.pen-ear[data-open="true"] > svg {
+	transform: rotate(180deg);
+}
+	@media (pointer: coarse) {
+		.pen-ear {
+			display: flex;
+		}
+		/* Slide the toolbar off the left edge; the ear peeks out as the visible handle.
+		   `left: 0` anchors the toolbar to the safe-area left edge. */
+		.pen-tools {
+			left: env(safe-area-inset-left);
+			transform: translateY(-50%) translateX(calc(-100% - 4px));
+			transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+		}
+		/* Landscape on phone: the ear is still on the left even though tools are a row under the
+		   right cluster — hide the ear there so only the portrait layout uses it. */
+		@media (max-height: 560px) and (orientation: landscape) {
+			.pen-ear { display: none; }
+			.pen-tools {
+				transform: none;
+			}
+		}
+		/* Open: slide the toolbar in flush with the safe area. The ear follows because it is
+		   a sibling absolutely positioned at `left: 0`. */
+		.pen-tools[data-open="true"] {
+			transform: translateY(-50%) translateX(20px);
+		}
+		/* When the panel sheet is open, hide the ear too. */
+		.app:has(.panel-shell[data-sheet="true"][data-open="true"]) .pen-ear {
+			visibility: hidden;
+		}
+	}
 	.pen-tools > .pen-rule {
 	width: 18px;
 	height: 1px;

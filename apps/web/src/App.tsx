@@ -60,7 +60,7 @@ import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
 import {boxOf, fitInto, INTERACT_ZOOM, keepVisible, middleOf} from "./camera/camera.ts";
 import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
 import { agentViews } from "./camera/agent-views.ts";
-import {closeHistory, historyShown, openHistory, setInspectable} from "./state/edge.ts";
+import {closeHistory, historyShown, openHistory, setInspectable, toggleHistory} from "./state/edge.ts";
 import { canvasBox, insets, watchInsets } from "./camera/insets.ts";
 import { canHover, NARROW } from "./lib/media.ts";
 import { installViewport, obscured } from "./app/viewport.ts";
@@ -1872,6 +1872,8 @@ export function App() {
 						}}
 						onDraftTaken={() => setDraft(undefined)}
 						onDropFiles={(files) => void intoComposer(files)}
+						onHistory={toggleHistory}
+						historyOn={historyShown()}
 					/>
 				</div>
 

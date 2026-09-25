@@ -1,5 +1,6 @@
 import type { AgentMode, AgentModel, AgentUsage, ClaudeAccount, ModelOption, SlashCommand, ThinkingLevel } from "@decks/protocol";
 import ArrowUp from "lucide-solid/icons/arrow-up";
+import MessageSquare from "lucide-solid/icons/message-square";
 import Paperclip from "lucide-solid/icons/paperclip";
 import Square from "lucide-solid/icons/square";
 import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
@@ -136,6 +137,14 @@ export function Composer(props: {
 	 * this row everybody already knows, so it is the one they will believe.
 	 */
 	onAttach?: () => void;
+	/**
+	 * Toggle the conversation history — the mobile path to it. On a coarse-pointer device the
+	 * corner's MessageSquare is tucked behind ⋯; this puts it in the bar itself, always one tap
+	 * away. When absent the button does not render.
+	 */
+	onHistory?: () => void;
+	/** Whether history is currently showing — sets `data-on` so the button shows its state. */
+	historyOn?: boolean;
 }) {
 	/*
 	 * The field holds a document, not a string (`draft.ts`, ported from picone): runs of text,
@@ -537,6 +546,19 @@ export function Composer(props: {
 				{/* The controls row. `dockrow` is only the two control sizes the board fixes
 				    for this row (26px, 34 under a finger); the layout is here. */}
 				<div class="dock-row mt-2 flex items-center gap-1.5">
+					<Show when={props.onHistory}>
+						<button
+							class="icon-button pointer-fine:hidden"
+							type="button"
+							data-on={props.historyOn ? "true" : undefined}
+							aria-pressed={props.historyOn}
+							aria-label={props.historyOn ? "Hide the conversation" : "Show the conversation"}
+							title={props.historyOn ? "Hide the conversation" : "Show the conversation"}
+							onClick={() => props.onHistory?.()}
+						>
+							<Icon of={MessageSquare} size={15} />
+						</button>
+					</Show>
 					<Show when={props.onAttach}>
 						<button class="icon-button" type="button" aria-label="Attach a file" title="Attach a file" onClick={() => props.onAttach?.()}>
 							<Icon of={Paperclip} size={15} />

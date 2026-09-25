@@ -386,6 +386,41 @@
 			transition-duration: 0s;
 		}
 	}
+
+	/*
+	 * Mobile: the history unrolls like paper coming out of a typewriter — it grows upward
+	 * from the composer rather than fading in from above. The clip reveals the stream from
+	 * the bottom (nearest the composer) to the top over ~300 ms, then settles with a small
+	 * spring overshoot on the translate. Works only on coarse-pointer (phone/tablet); a
+	 * trackpad laptop with a narrow window keeps the standard desktop fade.
+	 */
+	@media (pointer: coarse) {
+		.stream {
+			/* Start clipped from the top: the paper has not emerged yet. Hiding with clip-path
+			   rather than opacity lets the scroll container stay live for the opening frame,
+			   so the newest card is already scrolled into view when the paper arrives. */
+			clip-path: inset(100% 0 0 0 round 12px);
+			opacity: 1;
+			translate: none;
+			transition:
+				clip-path 300ms cubic-bezier(0.22, 1, 0.36, 1),
+				transform 300ms ease;
+		}
+		.stream[data-shown="true"] {
+			/* Reveal from the bottom upward — the clip collapses to nothing. */
+			clip-path: inset(0% 0 0 0 round 12px);
+		}
+	}
+	@media (pointer: coarse) and (prefers-reduced-motion: reduce) {
+		.stream {
+			clip-path: none;
+			opacity: 0;
+			transition: opacity 160ms ease;
+		}
+		.stream[data-shown="true"] {
+			opacity: 1;
+		}
+	}
 }
 
 @layer components {

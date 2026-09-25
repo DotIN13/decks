@@ -4,6 +4,7 @@ import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import BringToFront from "lucide-solid/icons/bring-to-front";
+import ChevronRight from "lucide-solid/icons/chevron-right";
 import Circle from "lucide-solid/icons/circle";
 import Copy from "lucide-solid/icons/copy";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
@@ -20,7 +21,7 @@ import StickyNote from "lucide-solid/icons/sticky-note";
 import Trash2 from "lucide-solid/icons/trash-2";
 import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
-import { createMemo, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../../state/pen-tools.ts";
 import { Icon } from "../../ui/icons.tsx";
 
@@ -81,6 +82,8 @@ export function PenBar(props: {
 	/** Download a picture of these items, taken by the server (`server/stage/shots.ts`). */
 	onExport: (ids: string[]) => void;
 }) {
+	const [earOpen, setEarOpen] = createSignal(false);
+
 	const selected = createMemo(() => {
 		const doc = props.doc;
 		if (!doc) return [];
@@ -153,7 +156,18 @@ export function PenBar(props: {
 
 	return (
 		<>
-		<div class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
+		{/* The ear: always at the left edge on touch screens, opens/closes the toolbar. */}
+		<button
+			type="button"
+			class="pen-ear"
+			data-open={earOpen() ? "true" : undefined}
+			aria-label={earOpen() ? "Close drawing tools" : "Open drawing tools"}
+			title={earOpen() ? "Close drawing tools" : "Open drawing tools"}
+			onClick={() => setEarOpen((v) => !v)}
+		>
+			<Icon of={ChevronRight} size={14} />
+		</button>
+		<div class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools" data-open={earOpen() ? "true" : undefined}>
 			<For each={TOOLS}>
 				{(entry) => (
 					<>
