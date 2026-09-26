@@ -4,6 +4,7 @@ import {
 	type Point,
 	type Sample,
 	type Saved,
+	type Side,
 	type Size,
 	clamp,
 	fling,
@@ -16,7 +17,11 @@ import {
 	settle as restingPlace,
 	snapHome,
 	stowedAt,
-	stowsRight,
+	stowSide,
+	avoid,
+	within,
+	stowY,
+	clearUpward,
 	toFraction,
 	velocityFrom,
 	verticalShare,
@@ -53,16 +58,39 @@ export interface FloatOptions {
 	disabled?: () => boolean;
 	/**
 	 * `undefined` means at home: remove the inline position so the CSS places it. `stowed`
-	 * is true while the float is put away behind the right edge, where `p` leaves only its
-	 * tab showing; the caller draws the tab and makes the rest unreachable.
+	 * is the edge the float is put away behind, while it is, where `p` leaves only its tab
+	 * showing; the caller draws the tab on that side and makes the rest unreachable.
 	 */
-	apply: (p: Point | undefined, home: boolean, stowed: boolean) => void;
+	apply: (p: Point | undefined, home: boolean, stowed: Side | undefined) => void;
 	/**
-	 * Let a hard throw at the right edge put the float away (`stowsRight`), with `tab`
-	 * pixels of it left showing. `unstow` on the returned handle brings it back to where it
-	 * was. Without this a throw at the edge parks against it, as it always has.
+	 * Let a hard throw at the left or right edge put the float away behind it (`stowSide`),
+	 * with `tab` pixels of it left showing. `unstow` on the returned handle brings it back to
+	 * where it was. Without this a throw at an edge parks against it, as it always has.
 	 */
-	stow?: { tab: number };
+	stow?: {
+		/** How much of it shows when put away: a number, or a function when it depends on the window (a finger's tab is wider). */
+		tab: number | (() => number);
+		tabHeight?: () => number;
+		/**
+		 * Put away behind this edge until the person first moves it, rather than at home: where
+		 * room is short (a phone), a toolbar starts as its tab. Taken out, it is remembered as
+		 * at home, so it does not tuck itself away again.
+		 */
+		initially?: Side;
+	};
+	/**
+	 * The boxes of the other floats, in the same frame as `bounds`. Wherever this one comes to
+	 * rest away from home (dropped, put away, or re-placed after a resize) it takes the
+	 * nearest place clear of them (`avoid`). Only what is inside the bounds counts, so a
+	 * put-away float is just its tab.
+	 */
+	others?: () => Box[];
+	/**
+	 * Called when a move the person made (a drop, a tab pressed, a double-click home) has
+	 * finished gliding, so the other floats can step out of its way: home is not moved for
+	 * anyone, so whoever is standing there moves instead.
+	 */
+	onSettled?: () => void;
 	/**
 	 * Where the element's top-left is *now*, when the DOM may know better than the last
 	 * `apply`: a float pinned by its bottom edge moves its top whenever its height changes
@@ -81,8 +109,14 @@ export interface FloatOptions {
 	pin?: Pin;
 }
 
+/** How far a tucked float's tab keeps from every other float: the throw bends up until it is this clear. */
+const TAB_SAFE_ZONE = 80;
+
 /** Fewer pixels than this and a press was a click, not a drag; nothing is saved. */
 const DRAG_THRESHOLD = 3;
+
+/** How far a tucked float's tab must be pulled in off its edge before the float comes out with it. */
+const PULL_OUT = 48;
 
 /** How many recent pointer positions to keep for the velocity at release. */
 const SAMPLES = 8;
@@ -99,12 +133,29 @@ export function makeFloat(
 	let current: Point | undefined;
 	let drag: { pointerId: number; startPointer: Point; startPos: Point; moved: boolean; samples: Sample[] } | undefined;
 
-	/** Put away behind the right edge. Where it comes back to is whatever `key` has saved. */
-	let stowed = false;
+	const tabWidth = (): number => {
+		const tab = options.stow?.tab ?? 0;
+		return typeof tab === "function" ? tab() : tab;
+	};
+
+	/** The edge it is put away behind, or nothing. Where it comes back to is whatever `key` has saved. */
+	let stowed: Side | undefined;
 
 	const place = (p: Point | undefined): void => {
 		current = p;
-		apply(p, p === undefined, stowed && p !== undefined);
+		apply(p, p === undefined, p !== undefined ? stowed : undefined);
+	};
+
+	/**
+	 * Clear of the other floats: floating, the nearest clear place; put away, the throw bent
+	 * up along the edge until its tab is clear (`clearUpward`).
+	 */
+	const clear = (p: Point): Point => {
+		if (!options.others) return p;
+		const box = bounds();
+		const others = options.others().flatMap((other) => within(other, box) ?? []);
+		const tab = options.stow?.tabHeight?.();
+		return stowed ? clearUpward(p, size(), others, box, { gap: TAB_SAFE_ZONE, ...(tab ? { tab } : {}) }) : avoid(p, size(), others, box);
 	};
 
 	/**
@@ -123,7 +174,7 @@ export function makeFloat(
 		settling = undefined;
 		delete el.dataset.snapping;
 	};
-	const settle = (p: Point, thenHome: boolean): void => {
+	const settle = (p: Point, thenHome: boolean, byHand = false): void => {
 		cancelSettle();
 		const ms = glideMs(current ?? home(), p);
 		el.style.setProperty("--snap-ms", `${ms}ms`);
@@ -133,6 +184,7 @@ export function makeFloat(
 			// A child's own transition (a border colour, say) ends too, and is not this one.
 			if (event && event.target !== el) return;
 			cancelSettle();
+			if (byHand) options.onSettled?.();
 			if (!thenHome) return;
 			// The stylesheet's own `left` transition (the dock slides when the sidebar folds)
 			// would animate the handoff too, and half the width of a transform is a visible
@@ -162,21 +214,28 @@ export function makeFloat(
 		cancelSettle();
 		if (disabled()) {
 			// Nothing is thrown where nothing is dragged; it is not forgotten, only not drawn.
-			stowed = false;
+			stowed = undefined;
 			place(undefined);
 			return;
 		}
 		const away = options.stow ? loadStowed(storage)[key] : undefined;
 		if (options.stow && away !== undefined) {
-			stowed = true;
-			const y = fromSaved({ fx: 1, fy: away }, size(), bounds(), home(), 6, pin).y;
-			const p = stowedAt(y, size(), bounds(), options.stow.tab);
+			stowed = away.side;
+			const y = fromSaved({ fx: 1, fy: away.fy }, size(), bounds(), home(), 6, pin).y;
+			const p = clear(stowedAt(y, size(), bounds(), tabWidth(), 12, away.side));
 			if (current !== undefined && (current.x !== p.x || current.y !== p.y)) settle(p, false);
 			else place(p);
 			return;
 		}
-		stowed = false;
+		stowed = undefined;
 		const saved = loadFloats(storage)[key];
+		const first = options.stow?.initially;
+		if (first && saved === undefined) {
+			// Never moved: it starts put away, level with its home.
+			stowed = first;
+			place(clear(stowedAt(home().y, size(), bounds(), tabWidth(), 12, first)));
+			return;
+		}
 		if (saved === undefined || saved === "home") {
 			place(undefined);
 			return;
@@ -187,6 +246,7 @@ export function makeFloat(
 			place(undefined);
 			return;
 		}
+		snapped.p = clear(snapped.p);
 		// Already floating and the bounds moved under it (the sidebar folded): glide to where
 		// the same share of the column now puts it, rather than jumping there.
 		if (current !== undefined && (current.x !== snapped.p.x || current.y !== snapped.p.y)) {
@@ -198,12 +258,14 @@ export function makeFloat(
 
 	const unstow = (): void => {
 		if (!stowed) return;
-		stowed = false;
+		stowed = undefined;
 		saveStowed(key, undefined, storage);
+		// One that started put away has nothing saved, and taken out it is at home from now on.
+		if (options.stow?.initially && loadFloats(storage)[key] === undefined) remember("home");
 		const saved = loadFloats(storage)[key];
 		const back = saved === undefined || saved === "home" ? undefined : clamp(fromSaved(saved, size(), bounds(), home(), 6, pin), size(), bounds());
-		if (back === undefined || snapHome(back, home()).home) settle(home(), true);
-		else settle(back, false);
+		if (back === undefined || snapHome(back, home()).home) settle(home(), true, true);
+		else settle(clear(back), false, true);
 	};
 
 	const sendHome = (): void => {
@@ -213,7 +275,7 @@ export function makeFloat(
 			place(undefined);
 			return;
 		}
-		settle(home(), true);
+		settle(home(), true, true);
 	};
 
 	const endDrag = (event: PointerEvent): void => {
@@ -237,23 +299,27 @@ export function makeFloat(
 		// inside the bounds whatever else. A placement (the pointer paused before letting
 		// go) has no velocity and rests where it was put, edges and home still applying.
 		const velocity = velocityFrom(samples, event.timeStamp);
-		// Thrown hard at the right edge, it is put away. The position it had before this
-		// drag stays saved, because that is where the tab brings it back to.
-		if (options.stow && stowsRight(current, velocity, size(), bounds())) {
-			stowed = true;
-			saveStowed(key, verticalShare(current, size(), bounds(), 6, pin), storage);
-			settle(stowedAt(current.y, size(), bounds(), options.stow.tab), false);
+		// Thrown hard at its edge, it is put away. The position it had before this drag
+		// stays saved, because that is where the tab brings it back to.
+		const side = options.stow ? stowSide(current, velocity, size(), bounds()) : undefined;
+		if (options.stow && side) {
+			stowed = side;
+			// Down the edge as far as the throw was heading, bent up only if that is taken.
+			const at = clear(stowedAt(stowY(current, velocity, size(), bounds(), side), size(), bounds(), tabWidth(), 12, side));
+			saveStowed(key, { fy: verticalShare(at, size(), bounds(), 6, pin), side }, storage);
+			settle(at, false, true);
 			return;
 		}
 		const thrown = fling(current, velocity);
 		const rest = restingPlace(thrown, size(), bounds(), home());
 		if (rest.home) {
 			remember("home");
-			settle(rest.p, true);
+			settle(rest.p, true, true);
 			return;
 		}
-		remember(toFraction(rest.p, size(), bounds(), 6, pin));
-		settle(rest.p, false);
+		const clearOf = clear(rest.p);
+		remember(toFraction(clearOf, size(), bounds(), 6, pin));
+		settle(clearOf, false, true);
 	};
 
 	const onPointerDown = (event: PointerEvent): void => {
@@ -296,6 +362,101 @@ export function makeFloat(
 		sendHome();
 	};
 
+	/*
+	 * The tab of a tucked float is a handle too. Pressed and let go, it is a click, and the
+	 * tab's own button brings the float back. Dragged along the edge, the tab goes where it
+	 * is put (bent up clear of the others, as a throw is). Pulled in off the edge by
+	 * `PULL_OUT`, the float comes out and the rest is an ordinary drag of it.
+	 */
+	let tabDrag: { pointerId: number; tab: Element; startPointer: Point; startY: number; moved: boolean } | undefined;
+	/** A drag of the tab ends in a click on it; that click must not also bring the float back. */
+	const swallowClick = (): void => {
+		const swallow = (event: Event): void => {
+			event.stopPropagation();
+			event.preventDefault();
+		};
+		el.addEventListener("click", swallow, { capture: true, once: true });
+		setTimeout(() => el.removeEventListener("click", swallow, { capture: true }), 0);
+	};
+	const onTabDown = (event: PointerEvent): void => {
+		const tab = event.target instanceof Element ? event.target.closest("[data-stowtab]") : null;
+		if (!tab || !stowed || current === undefined || disabled() || event.button !== 0 || drag || tabDrag) return;
+		cancelSettle();
+		tabDrag = { pointerId: event.pointerId, tab, startPointer: { x: event.clientX, y: event.clientY }, startY: current.y, moved: false };
+		try {
+			tab.setPointerCapture(event.pointerId);
+		} catch {
+			// Without capture the drag still works while the pointer stays over the tab.
+		}
+	};
+	const onTabMove = (event: PointerEvent): void => {
+		if (!tabDrag || event.pointerId !== tabDrag.pointerId || current === undefined || !stowed) return;
+		const dx = event.clientX - tabDrag.startPointer.x;
+		const dy = event.clientY - tabDrag.startPointer.y;
+		if (!tabDrag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+		if (!tabDrag.moved) {
+			tabDrag.moved = true;
+			el.dataset.dragging = "true";
+		}
+		const inward = stowed === "right" ? -dx : dx;
+		if (inward > PULL_OUT) {
+			// Out it comes, held by its own handle: the float jumps so the top middle of the
+			// handle (the grip, or the strip along the composer's top) is under the pointer,
+			// as if it had been taken there. From here it is an ordinary drag, captured by the
+			// handle so the drag's own listeners take it.
+			const { pointerId } = tabDrag;
+			const box = el.getBoundingClientRect();
+			const grip = handle.getBoundingClientRect();
+			const held = { x: grip.left - box.left + grip.width / 2, y: grip.top - box.top + Math.min(7, grip.height / 2) };
+			try {
+				tabDrag.tab.releasePointerCapture(pointerId);
+			} catch {
+				// Already released.
+			}
+			swallowClick();
+			tabDrag = undefined;
+			stowed = undefined;
+			saveStowed(key, undefined, storage);
+			// Where the handle would be under the pointer; placed inside the bounds, but the drag
+			// starts from the unclamped spot, so a wide float that cannot fit there yet catches up
+			// with the pointer as soon as it has room, instead of lagging by the difference.
+			const grabbed = { x: current.x + event.clientX - (box.left + held.x), y: current.y + event.clientY - (box.top + held.y) };
+			const out = clamp(grabbed, size(), bounds());
+			place(out);
+			drag = {
+				pointerId,
+				startPointer: { x: event.clientX, y: event.clientY },
+				startPos: grabbed,
+				moved: true,
+				samples: [{ x: event.clientX, y: event.clientY, t: event.timeStamp }],
+			};
+			try {
+				handle.setPointerCapture(pointerId);
+			} catch {
+				// The drag follows while the pointer is over the handle.
+			}
+			return;
+		}
+		const y = clamp({ x: bounds().x, y: tabDrag.startY + dy }, size(), bounds(), 12).y;
+		place({ x: current.x, y });
+	};
+	const onTabUp = (event: PointerEvent): void => {
+		if (!tabDrag || event.pointerId !== tabDrag.pointerId) return;
+		const { moved, tab } = tabDrag;
+		tabDrag = undefined;
+		delete el.dataset.dragging;
+		try {
+			tab.releasePointerCapture(event.pointerId);
+		} catch {
+			// Capture may already be gone.
+		}
+		if (!moved || current === undefined || !stowed) return;
+		swallowClick();
+		const at = clear(current);
+		saveStowed(key, { fy: verticalShare(at, size(), bounds(), 6, pin), side: stowed }, storage);
+		settle(at, false, true);
+	};
+
 	const onResize = (): void => restore();
 
 	handle.addEventListener("pointerdown", onPointerDown);
@@ -303,6 +464,12 @@ export function makeFloat(
 	handle.addEventListener("pointerup", endDrag);
 	handle.addEventListener("pointercancel", endDrag);
 	handle.addEventListener("dblclick", onDoubleClick);
+	if (options.stow) {
+		el.addEventListener("pointerdown", onTabDown);
+		el.addEventListener("pointermove", onTabMove);
+		el.addEventListener("pointerup", onTabUp);
+		el.addEventListener("pointercancel", onTabUp);
+	}
 
 	let observer: ResizeObserver | undefined;
 	try {
@@ -321,13 +488,17 @@ export function makeFloat(
 		restore,
 		sendHome,
 		unstow,
-		stowed: () => stowed,
+		stowed: () => stowed !== undefined,
 		dispose() {
 			handle.removeEventListener("pointerdown", onPointerDown);
 			handle.removeEventListener("pointermove", onPointerMove);
 			handle.removeEventListener("pointerup", endDrag);
 			handle.removeEventListener("pointercancel", endDrag);
 			handle.removeEventListener("dblclick", onDoubleClick);
+			el.removeEventListener("pointerdown", onTabDown);
+			el.removeEventListener("pointermove", onTabMove);
+			el.removeEventListener("pointerup", onTabUp);
+			el.removeEventListener("pointercancel", onTabUp);
 			try {
 				window.removeEventListener("resize", onResize);
 			} catch {
@@ -336,6 +507,7 @@ export function makeFloat(
 			observer?.disconnect();
 			cancelSettle();
 			drag = undefined;
+			tabDrag = undefined;
 			delete el.dataset.dragging;
 		},
 	};

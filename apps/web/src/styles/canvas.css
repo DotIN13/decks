@@ -1035,68 +1035,59 @@
 	visibility: hidden;
 }
 	/*
-	 * The ear: a small pull tab at the screen's left edge that snaps the drawing toolbar open
-	 * and shut on touch devices. Always rendered, hidden on fine-pointer devices by CSS.
-	 *
-	 * The toolbar slides behind the left edge; the ear stays flush with it. Tapping the ear
-	 * toggles `data-open` on both, which drives the translate.
+	 * The column as a float (`App.tsx`, `chrome/float.ts`): the grip at its head is where a drag
+	 * starts, away from home the inline position wins over the centring transform, and thrown
+	 * hard at the left edge it stands behind it with only its tab showing.
 	 */
-	.pen-ear {
-	display: none; /* fine-pointer: the toolbar is always visible */
-	position: absolute;
-	z-index: calc(var(--z-float) + 1);
-	top: 50%;
-	left: calc(env(safe-area-inset-left));
-	width: 20px;
-	height: 48px;
-	transform: translateY(-50%);
+	.pen-grip {
+	display: flex;
+	flex: none;
 	align-items: center;
 	justify-content: center;
-	padding: 0;
-	border: 0;
-	border-radius: 0 6px 6px 0;
-	background: var(--panel);
-	box-shadow: var(--shadow-row);
+	width: 100%;
+	height: 14px;
+	color: var(--faint);
+	cursor: grab;
+	touch-action: none;
+}
+	.pen-grip:hover {
 	color: var(--muted);
-	cursor: pointer;
-	transition:
-		color 120ms ease,
-		transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-	.pen-ear > svg {
-	flex: none;
-	transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+	.pen-tools[data-dragging="true"],
+	.pen-tools[data-dragging="true"] .pen-grip {
+	cursor: grabbing;
 }
-	.pen-ear[data-open="true"] > svg {
-	transform: rotate(180deg);
+	.pen-tools[data-floating="true"] {
+	transform: none;
 }
+	/* The canvas's left edge is the sidebar's right, not the window's: put away on the left,
+	   the column still stands over the sidebar, so it gives up its own paint and its clicks,
+	   and the tab (`.stowtab`, `shell.css`) is all there is of it. */
+	.pen-tools {
+	--stowtab-w: 20px;
+	--stowtab-h: 48px;
+}
+	.pen-tools[data-stowed] {
+	overflow: hidden;
+	border-color: transparent;
+	background: transparent;
+	box-shadow: none;
+	pointer-events: none;
+}
+	/* Under a finger the grip and the tab are finger-sized. */
 	@media (pointer: coarse) {
-		.pen-ear {
-			display: flex;
+		.pen-grip {
+			height: 26px;
 		}
-		/* Slide the toolbar off the left edge; the ear peeks out as the visible handle.
-		   `left: 0` anchors the toolbar to the safe-area left edge. */
 		.pen-tools {
-			left: env(safe-area-inset-left);
-			transform: translateY(-50%) translateX(calc(-100% - 4px));
-			transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+			--stowtab-w: 28px;
+			--stowtab-h: 56px;
 		}
-		/* Landscape on phone: the ear is still on the left even though tools are a row under the
-		   right cluster — hide the ear there so only the portrait layout uses it. */
-		@media (max-height: 560px) and (orientation: landscape) {
-			.pen-ear { display: none; }
-			.pen-tools {
-				transform: none;
-			}
-		}
-		/* Open: slide the toolbar in flush with the safe area. The ear follows because it is
-		   a sibling absolutely positioned at `left: 0`. */
-		.pen-tools[data-open="true"] {
-			transform: translateY(-50%) translateX(20px);
-		}
-		/* When the panel sheet is open, hide the ear too. */
-		.app:has(.panel-shell[data-sheet="true"][data-open="true"]) .pen-ear {
-			visibility: hidden;
+	}
+	/* A phone on its side keeps the tools as a row under the right cluster, not dragged (`App.tsx`). */
+	@media (max-height: 560px) and (orientation: landscape) {
+		.pen-grip {
+			display: none;
 		}
 	}
 	.pen-tools > .pen-rule {

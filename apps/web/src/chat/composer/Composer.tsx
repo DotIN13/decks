@@ -548,7 +548,7 @@ export function Composer(props: {
 				<div class="dock-row mt-2 flex items-center gap-1.5">
 					<Show when={props.onHistory}>
 						<button
-							class="icon-button pointer-fine:hidden"
+							class="icon-button history-btn"
 							type="button"
 							data-on={props.historyOn ? "true" : undefined}
 							aria-pressed={props.historyOn}

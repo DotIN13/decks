@@ -290,6 +290,25 @@ export function App() {
 	const coarse = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : undefined;
 	const conversationFixed = () => floatsOff() || coarse?.matches === true;
 	/*
+	 * What a float must not land on: the other floats, as they stand now, in `workBox`'s frame.
+	 * Measured from the page rather than kept as state, so a float that has not been dragged,
+	 * a conversation that is shut and a toolbar that is not mounted all say so on their own.
+	 * Of a tucked float only its tab shows, so its tab is what there is to run into.
+	 */
+	const FLOATS = ".dock, .pen-tools, .stream[data-shown='true']";
+	const otherFloats = (el: HTMLElement) => () => {
+		const work = document.querySelector(".work")?.getBoundingClientRect();
+		return [...document.querySelectorAll<HTMLElement>(FLOATS)]
+			.filter((other) => other !== el && other.offsetParent !== null)
+			.map((other) => {
+				const shown = other.hasAttribute("data-stowed") ? other.querySelector(":scope > .stowtab") : null;
+				const r = (shown ?? other).getBoundingClientRect();
+				return { x: r.left - (work?.left ?? 0), y: r.top - (work?.top ?? 0), w: r.width, h: r.height };
+			});
+	};
+	/* Every mounted float, so one that has just landed can have the others step out of its way. */
+	const floats = new Map<HTMLElement, { restore: () => void }>();
+	/*
 	 * `pin: "bottom"` writes the position as a `bottom` rather than a `top`. The composer is
 	 * a column whose status row comes and goes above the box (it leaves when the conversation
 	 * opens), and pinned by its top the box slid up into the row's place. Pinned by its
@@ -297,9 +316,15 @@ export function App() {
 	 * dock's own CSS does at home. `read` is what a drag then starts from, because the top
 	 * the float remembers is stale the moment the height changes.
 	 */
-	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number }, off: () => boolean = floatsOff) =>
-		makeFloat(el, {
-			...(stow ? { stow } : {}),
+	const mountFloat = (el: HTMLElement, key: string, handle: HTMLElement, ignore: string, home: () => { x: number; y: number }, pin: "top" | "bottom" = "top", stow?: { tab: number | (() => number); initially?: "left" | "right" }, off: () => boolean = floatsOff) => {
+		/* How tall the tab is (`--stowtab-h`, `shell.css`): a tucked float is only its tab. */
+		const tabHeight = () => parseFloat(getComputedStyle(el).getPropertyValue("--stowtab-h")) || 48;
+		const float = makeFloat(el, {
+			...(stow ? { stow: { ...stow, tabHeight } } : {}),
+			others: otherFloats(el),
+			onSettled: () => {
+				for (const [other, handle] of floats) if (other !== el) handle.restore();
+			},
 			key,
 			handle,
 			ignore,
@@ -314,8 +339,9 @@ export function App() {
 				 * Put away, everything but the tab is out of reach as well as out of sight:
 				 * `inert`, so Tab does not walk into a text box that is off the screen.
 				 */
-				el.toggleAttribute("data-stowed", stowed);
-				for (const child of el.children) if (!child.classList.contains("dock-stowtab")) child.toggleAttribute("inert", stowed);
+				if (stowed) el.setAttribute("data-stowed", stowed);
+				else el.removeAttribute("data-stowed");
+				for (const child of el.children) if (!child.hasAttribute("data-stowtab")) child.toggleAttribute("inert", stowed !== undefined);
 				if (atHome || !p) {
 					el.removeAttribute("data-floating");
 					el.style.left = "";
@@ -334,6 +360,10 @@ export function App() {
 				}
 			},
 		});
+		floats.set(el, float);
+		const dispose = float.dispose;
+		return { ...float, dispose: () => { floats.delete(el); dispose(); } };
+	};
 	onMount(() => {
 		const dock = dockEl;
 		const handle = dock?.querySelector<HTMLElement>(".composer-box");
@@ -381,6 +411,49 @@ export function App() {
 			float.restore();
 		});
 		onCleanup(() => float.dispose());
+	};
+	/*
+	 * The drawing tools: the third float, taken by the grip at the column's head, on every
+	 * screen. Like the composer, a hard throw at either edge tucks it behind that edge with
+	 * its tab showing, and the tab can be dragged or pulled back out. Where room is short (a
+	 * phone, a narrow window) it starts tucked behind the left edge, as the pull tab it
+	 * replaces kept it. A phone on its side is the one exception: there the tools are a row
+	 * under the right-hand cluster (`canvas.css`), and the row stays where it is.
+	 *
+	 * Home is the CSS's own place, which on a phone is centred on the room between the top
+	 * clusters and the composer rather than on the window, so it is **measured** whenever the
+	 * column is standing there rather than worked out again here, with the window's middle
+	 * only until it first has been.
+	 */
+	const lying = typeof matchMedia === "function" ? matchMedia("(max-height: 560px) and (orientation: landscape)") : undefined;
+	const mountToolsFloat = (tools: HTMLElement, grip: HTMLElement): { unstow: () => void } => {
+		let seen: { x: number; y: number } | undefined;
+		const home = () => {
+			const work = document.querySelector(".work")?.getBoundingClientRect();
+			if (!tools.hasAttribute("data-floating") && !tools.hasAttribute("data-stowed")) {
+				const r = tools.getBoundingClientRect();
+				seen = { x: r.left - (work?.left ?? 0), y: r.top - (work?.top ?? 0) };
+			}
+			const box = workBox();
+			return seen ?? { x: box.x + 12, y: box.y + box.h / 2 - tools.offsetHeight / 2 };
+		};
+		const cssPx = (name: string, fallback: number) => parseFloat(getComputedStyle(tools).getPropertyValue(name)) || fallback;
+		const float = mountFloat(
+			tools,
+			"pen-tools",
+			grip,
+			"button, input, label",
+			home,
+			"top",
+			{ tab: () => cssPx("--stowtab-w", 20), ...(conversationFixed() ? { initially: "left" as const } : {}) },
+			() => lying?.matches === true,
+		);
+		createEffect(() => {
+			insets();
+			float.restore();
+		});
+		onCleanup(() => float.dispose());
+		return { unstow: () => float.unstow() };
 	};
 
 	/*
@@ -1542,6 +1615,7 @@ export function App() {
 								if (agentId) send({ type: "stage.pen.edit", agentId, ops });
 							}}
 							onStep={penStep}
+							onFloat={mountToolsFloat}
 							onArm={(next) => {
 								if (next !== "select") setTool("select");
 							}}
@@ -1763,7 +1837,7 @@ export function App() {
 				<div class="dock" ref={dockEl}>
 					{/* Only drawn while the bar is put away behind the right edge (a hard throw
 					    at it, `float.ts`): the one part of it left on screen, and the way back. */}
-					<button type="button" class="dock-stowtab" aria-label="Bring the input bar back" title="Bring the input bar back" onClick={() => unstowComposer()}>
+					<button type="button" class="stowtab" data-stowtab aria-label="Bring the input bar back" title="Bring the input bar back" onClick={() => unstowComposer()}>
 						<Icon of={ChevronLeft} size={16} />
 					</button>
 					<Show when={dialog()}>

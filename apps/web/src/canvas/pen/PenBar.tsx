@@ -4,11 +4,12 @@ import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
 import ArrowRight from "lucide-solid/icons/arrow-right";
 import ArrowUpRight from "lucide-solid/icons/arrow-up-right";
 import BringToFront from "lucide-solid/icons/bring-to-front";
-import ChevronRight from "lucide-solid/icons/chevron-right";
+import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Circle from "lucide-solid/icons/circle";
 import Copy from "lucide-solid/icons/copy";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import FrameIcon from "lucide-solid/icons/frame";
+import GripHorizontal from "lucide-solid/icons/grip-horizontal";
 import ImageDown from "lucide-solid/icons/image-down";
 import FileText from "lucide-solid/icons/file-text";
 import Minus from "lucide-solid/icons/minus";
@@ -21,7 +22,7 @@ import StickyNote from "lucide-solid/icons/sticky-note";
 import Trash2 from "lucide-solid/icons/trash-2";
 import Type from "lucide-solid/icons/type";
 import Undo2 from "lucide-solid/icons/undo-2";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, For, onMount, Show } from "solid-js";
 import { penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../../state/pen-tools.ts";
 import { Icon } from "../../ui/icons.tsx";
 
@@ -79,10 +80,17 @@ export function PenBar(props: {
 	onEdit: (ops: unknown[]) => void;
 	onStep: (direction: "undo" | "redo") => void;
 	onArm: (tool: PenTool) => void;
+	/** Make the tools column a float: dragged by `grip`, put away behind either edge (`App.tsx`). */
+	onFloat?: (tools: HTMLElement, grip: HTMLElement) => { unstow: () => void };
 	/** Download a picture of these items, taken by the server (`server/stage/shots.ts`). */
 	onExport: (ids: string[]) => void;
 }) {
-	const [earOpen, setEarOpen] = createSignal(false);
+	let toolsEl: HTMLDivElement | undefined;
+	let gripEl: HTMLDivElement | undefined;
+	let unstow = () => {};
+	onMount(() => {
+		if (toolsEl && gripEl && props.onFloat) unstow = props.onFloat(toolsEl, gripEl).unstow;
+	});
 
 	const selected = createMemo(() => {
 		const doc = props.doc;
@@ -156,18 +164,11 @@ export function PenBar(props: {
 
 	return (
 		<>
-		{/* The ear: always at the left edge on touch screens, opens/closes the toolbar. */}
-		<button
-			type="button"
-			class="pen-ear"
-			data-open={earOpen() ? "true" : undefined}
-			aria-label={earOpen() ? "Close drawing tools" : "Open drawing tools"}
-			title={earOpen() ? "Close drawing tools" : "Open drawing tools"}
-			onClick={() => setEarOpen((v) => !v)}
-		>
-			<Icon of={ChevronRight} size={14} />
-		</button>
-		<div class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools" data-open={earOpen() ? "true" : undefined}>
+		<div ref={toolsEl} class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
+			{/* Where a drag starts; a double-click sends the column home. Not a button, so the float's `ignore` passes it. */}
+			<div ref={gripEl} class="pen-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
+				<Icon of={GripHorizontal} size={14} />
+			</div>
 			<For each={TOOLS}>
 				{(entry) => (
 					<>
@@ -200,6 +201,10 @@ export function PenBar(props: {
 			</button>
 			<button type="button" class="icon-button" title="Redo (⇧⌘Z)" aria-label="Redo" onClick={() => props.onStep("redo")}>
 				<Icon of={Redo2} size={15} />
+			</button>
+			{/* Put away behind an edge, this is the part left showing, and the way back. */}
+			<button type="button" class="stowtab" data-stowtab aria-label="Bring the drawing tools back" title="Bring the drawing tools back" onClick={() => unstow()}>
+				<Icon of={ChevronLeft} size={14} />
 			</button>
 		</div>
 

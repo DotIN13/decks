@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createTouches, STALE_MS } from "./touch.ts";
+import { COAST_MAX, COAST_TAU, coastStart, coastStep, createTouches, STALE_MS } from "./touch.ts";
 import { pinchCamera, toScreen, toWorld } from "../camera/camera.ts";
 
 const view = { width: 800, height: 600 };
@@ -212,4 +212,21 @@ test("the pool says what it is holding, so a document can release its own", () =
 	assert.deepEqual(touches.ids(), [4, 9]);
 	for (const id of touches.ids()) touches.up(id);
 	assert.equal(touches.count(), 0);
+});
+
+test("a thrown pan coasts: it slows the way iOS does, and travels speed times tau", () => {
+	const v = coastStart({ vx: 2, vy: 0 })!;
+	let x = 0;
+	let left = v;
+	for (let i = 0; i < 300; i++) {
+		const step = coastStep(left, 16);
+		x += step.dx;
+		left = step.v;
+	}
+	// 2 px/ms for 325 ms of decay is 650 px, all of it spent within 300 frames.
+	assert.ok(Math.abs(x - 2 * COAST_TAU) < 1, `travelled ${x}`);
+	assert.ok(left.vx < 0.001);
+	// A finger that had stopped does not coast, and a flick is capped.
+	assert.equal(coastStart({ vx: 0.05, vy: 0.05 }), undefined);
+	assert.ok(Math.abs(Math.hypot(...Object.values(coastStart({ vx: 30, vy: 40 })!)) - COAST_MAX) < 1e-9);
 });

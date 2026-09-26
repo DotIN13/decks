@@ -134,39 +134,71 @@
 		transition: none;
 	}
 	/*
-	 * Put away: thrown hard at the right edge, the bar stands past it with only this tab
-	 * showing. The rest fades rather than being removed, so the dock keeps its size and the
-	 * glide back is the same box coming out again.
+	 * Put away: thrown hard at either edge, a float (the composer, the drawing tools) stands
+	 * past it with only this tab showing, on the side still on screen. The rest fades rather
+	 * than being removed, so the float keeps its size and the glide back is the same box
+	 * coming out again. `data-stowed` is the edge (`App.tsx`); each float sets the tab's size.
 	 */
-	.dock-stowtab {
+	.dock {
+		--stowtab-w: 36px;
+		--stowtab-h: 56px;
+	}
+	.stowtab {
 		position: absolute;
-		bottom: 0;
-		left: 0;
+		top: 50%;
 		display: none;
-		width: 36px;
-		height: 56px;
+		width: var(--stowtab-w, 28px);
+		height: var(--stowtab-h, 48px);
 		align-items: center;
 		justify-content: center;
 		padding: 0;
 		border: 1px solid var(--border-strong);
-		border-right: 0;
-		border-radius: var(--radius-panel, 12px) 0 0 12px;
 		background: var(--layer, var(--panel));
 		box-shadow: var(--shadow);
 		color: var(--muted);
 		cursor: pointer;
+		pointer-events: auto;
+		translate: 0 -50%;
 	}
-	.dock-stowtab:hover,
-	.dock-stowtab:focus-visible {
+	.stowtab:hover,
+	.stowtab:focus-visible {
 		color: var(--fg);
 	}
-	.dock[data-stowed] .dock-stowtab {
+	/* It can be dragged along its edge, or pulled back out (`float.ts`), as well as pressed. */
+	.stowtab {
+		touch-action: none;
+	}
+	[data-dragging="true"] > .stowtab {
+		cursor: grabbing;
+	}
+	[data-stowed] > .stowtab {
 		display: flex;
 	}
-	.dock > :not(.dock-stowtab) {
+	[data-stowed="right"] > .stowtab {
+		left: 0;
+		border-right: 0;
+		border-radius: var(--radius-panel, 12px) 0 0 var(--radius-panel, 12px);
+	}
+	/* Behind the left edge the tab is on the right, and its chevron points back in. */
+	[data-stowed="left"] > .stowtab {
+		right: 0;
+		border-left: 0;
+		border-radius: 0 var(--radius-panel, 12px) var(--radius-panel, 12px) 0;
+	}
+	[data-stowed="left"] > .stowtab > svg {
+		rotate: 180deg;
+	}
+	/* Behind the left edge is the sidebar, and a put-away float has no place there: it is cut
+	   to its tab, so nothing of it lies over the sidebar, seen or not. The negative insets
+	   keep the tab's shadow on the other three sides. */
+	[data-stowed="left"] {
+		clip-path: inset(-32px -32px -32px calc(100% - var(--stowtab-w, 28px)));
+	}
+	.dock > :not(.stowtab),
+	.pen-tools > :not(.stowtab) {
 		transition: opacity 160ms ease;
 	}
-	.dock[data-stowed] > :not(.dock-stowtab) {
+	[data-stowed] > :not(.stowtab) {
 		opacity: 0;
 		pointer-events: none;
 	}
@@ -322,7 +354,8 @@
 	   never fighting a transition. After both floating rules on purpose: they say
 	   `transition: none` at the same specificity, and the later rule wins. */
 	.dock[data-snapping="true"],
-	.stream[data-snapping="true"] {
+	.stream[data-snapping="true"],
+	.pen-tools[data-snapping="true"] {
 		transition:
 			left var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
 			top var(--snap-ms, 180ms) cubic-bezier(0.2, 0.7, 0.2, 1),
@@ -331,7 +364,8 @@
 	/* The frame it is handed back to the stylesheet: no transition, so `left` does not
 	   animate from the inline value to the calc while the transform switches at once. */
 	.dock[data-landing="true"],
-	.stream[data-landing="true"] {
+	.stream[data-landing="true"],
+	.pen-tools[data-landing="true"] {
 		transition: none;
 	}
 	/*
@@ -342,7 +376,8 @@
 	 * phone left it against the toolbar with half a screen of canvas between it and the bar
 	 * you were typing into, 12px off centre because only its right edge had a margin. The
 	 * bottom is the composer's own: its 12px, its measured height (`--dock`), the keyboard and
-	 * the safe area, and 8px of air. The height gives way before the toolbar does.
+	 * the safe area, and 8px of air. It is full height: from there up to 72px under the top,
+	 * which is the toolbar's row, so the history is never a half-screen window.
 	 *
 	 * `!important` on the size only: `resize: both` writes an inline width and height on a
 	 * laptop, and a window then narrowed would keep them. After the floating rules on
@@ -353,7 +388,7 @@
 			--stream-foot: calc(var(--dock, 88px) + 20px + var(--keyboard) + env(safe-area-inset-bottom));
 			top: auto;
 			bottom: var(--stream-foot);
-			height: min(420px, calc(100% - var(--stream-foot) - 72px)) !important;
+			height: calc(100% - var(--stream-foot) - 72px) !important;
 			min-height: 0;
 			resize: none;
 		}
@@ -382,7 +417,8 @@
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.dock[data-snapping="true"],
-		.stream[data-snapping="true"] {
+		.stream[data-snapping="true"],
+		.pen-tools[data-snapping="true"] {
 			transition-duration: 0s;
 		}
 	}
@@ -394,7 +430,7 @@
 	 * spring overshoot on the translate. Works only on coarse-pointer (phone/tablet); a
 	 * trackpad laptop with a narrow window keeps the standard desktop fade.
 	 */
-	@media (pointer: coarse) {
+	@media (max-width: 1100px), (pointer: coarse) {
 		.stream {
 			/* Start clipped from the top: the paper has not emerged yet. Hiding with clip-path
 			   rather than opacity lets the scroll container stay live for the opening frame,
@@ -411,7 +447,7 @@
 			clip-path: inset(0% 0 0 0 round 12px);
 		}
 	}
-	@media (pointer: coarse) and (prefers-reduced-motion: reduce) {
+	@media ((max-width: 1100px) or (pointer: coarse)) and (prefers-reduced-motion: reduce) {
 		.stream {
 			clip-path: none;
 			opacity: 0;
@@ -419,6 +455,22 @@
 		}
 		.stream[data-shown="true"] {
 			opacity: 1;
+		}
+	}
+}
+
+@layer components {
+	/*
+	 * The history button in the composer bar: visible on narrow screens and coarse-pointer
+	 * devices, hidden when wide + fine-pointer (desktop with plenty of room to float the stream).
+	 */
+	.history-btn {
+		display: none;
+	}
+	@media (max-width: 1100px), (pointer: coarse) {
+		/* grid, not flex: `.icon-button` centres its icon with `place-items`, which flex ignores. */
+		.history-btn {
+			display: grid;
 		}
 	}
 }

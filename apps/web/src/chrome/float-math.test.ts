@@ -14,6 +14,12 @@ import {
 	snapHome,
 	velocityFrom,
 	stowsRight,
+	stowsLeft,
+	stowSide,
+	avoid,
+	within,
+	stowY,
+	clearUpward,
 	stowedAt,
 	loadStowed,
 	saveStowed,
@@ -230,6 +236,20 @@ test("a hard throw at the right edge puts the float away, and nothing gentler do
 	assert.equal(stowsRight({ x: 100, y: 300 }, { vx: 1.3, vy: 0 }, size, { x: 0, y: 0, w: 2000, h: 600 }), false);
 });
 
+test("a hard throw at the left edge puts a left-hand float away, and nothing gentler does", () => {
+	// The bounds start at x 100 and the float stands at 300.
+	const box = { x: 100, y: 0, w: 800, h: 600 };
+	const p = { x: 300, y: 300 };
+	assert.equal(stowsLeft(p, { vx: -2, vy: 0.2 }, size, box), true);
+	assert.equal(stowsLeft({ x: 112, y: 300 }, { vx: 0, vy: 0 }, size, box), false);
+	assert.equal(stowsLeft(p, { vx: -0.8, vy: 0 }, size, box), false);
+	assert.equal(stowsLeft(p, { vx: -1.5, vy: 1.4 }, size, box), false);
+	assert.equal(stowsLeft(p, { vx: 3, vy: 0 }, size, box), false);
+	assert.equal(stowsLeft({ x: 1500, y: 300 }, { vx: -1.3, vy: 0 }, size, { x: 0, y: 0, w: 2000, h: 600 }), false);
+	// Stowed on the left, only the tab stands inside the bounds.
+	assert.deepEqual(stowedAt(300, size, box, 20, 12, "left"), { x: 100 - size.w + 20, y: 300 });
+});
+
 test("a stowed float shows only its tab, and stays inside the height", () => {
 	assert.deepEqual(stowedAt(300, size, bounds, 36), { x: 864, y: 300 });
 	assert.deepEqual(stowedAt(5000, size, bounds, 36), { x: 864, y: 538 });
@@ -237,10 +257,63 @@ test("a stowed float shows only its tab, and stays inside the height", () => {
 
 test("what is put away is remembered, taken out again, and garbage is nothing", () => {
 	const storage = fakeStorage();
-	saveStowed("composer", 0.75, storage);
-	assert.deepEqual(loadStowed(storage), { composer: 0.75 });
+	saveStowed("composer", { fy: 0.75, side: "left" }, storage);
+	assert.deepEqual(loadStowed(storage), { composer: { fy: 0.75, side: "left" } });
 	saveStowed("composer", undefined, storage);
 	assert.deepEqual(loadStowed(storage), {});
 	assert.deepEqual(loadStowed(fakeStorage({ [STOWED_KEY]: "{not json" })), {});
-	assert.deepEqual(loadStowed(fakeStorage({ [STOWED_KEY]: '{"a":"x","b":4}' })), { b: 1 });
+	// A bare share is the older form, from when the right edge was the only one.
+	assert.deepEqual(loadStowed(fakeStorage({ [STOWED_KEY]: '{"a":"x","b":4,"c":{"fy":0.5,"side":"up"}}' })), { b: { fy: 1, side: "right" } });
+});
+
+test("a throw goes behind whichever edge it reaches", () => {
+	const box = { x: 100, y: 0, w: 800, h: 600 };
+	assert.equal(stowSide({ x: 500, y: 300 }, { vx: 2, vy: 0 }, size, box), "right");
+	assert.equal(stowSide({ x: 300, y: 300 }, { vx: -2, vy: 0 }, size, box), "left");
+	assert.equal(stowSide({ x: 300, y: 300 }, { vx: 0, vy: 0 }, size, box), undefined);
+});
+
+test("a float that would land on another takes the nearest clear place beside it", () => {
+	const box = { x: 0, y: 0, w: 1000, h: 800 };
+	const other = { x: 400, y: 600, w: 300, h: 150 };
+	// Clear already: it stays.
+	assert.deepEqual(avoid({ x: 50, y: 50 }, { w: 40, h: 300 }, [other], box), { x: 50, y: 50 });
+	// Dropped on the other's left end: nearest is just to its left.
+	assert.deepEqual(avoid({ x: 420, y: 620 }, { w: 40, h: 100 }, [other], box), { x: 352, y: 620 });
+	// Nowhere clear: where it was.
+	assert.deepEqual(avoid({ x: 10, y: 10 }, { w: 980, h: 780 }, [{ x: 0, y: 0, w: 1000, h: 800 }], box), { x: 10, y: 10 });
+});
+
+test("only the part of a box inside the bounds can be run into", () => {
+	const box = { x: 100, y: 0, w: 800, h: 600 };
+	assert.deepEqual(within({ x: 80, y: 100, w: 40, h: 300 }, box), { x: 100, y: 100, w: 20, h: 300 });
+	assert.equal(within({ x: 0, y: 100, w: 40, h: 300 }, box), undefined);
+});
+
+test("a tucked float lands where the line of the throw meets the edge", () => {
+	const box = { x: 100, y: 0, w: 800, h: 600 };
+	const small = { w: 40, h: 100 };
+	// 360px to the right edge, one down for every two across: 180 lower.
+	assert.equal(stowY({ x: 500, y: 200 }, { vx: 2, vy: 1 }, small, box, "right"), 380);
+	// Straight across: the height it had.
+	assert.equal(stowY({ x: 500, y: 200 }, { vx: -2, vy: 0 }, small, box, "left"), 200);
+	// Up and to the left, steeply: stopped by the top margin.
+	assert.equal(stowY({ x: 500, y: 200 }, { vx: -1, vy: -3 }, small, box, "left"), 12);
+});
+
+test("a tucked float that would cover another bends up, and only up", () => {
+	const box = { x: 0, y: 0, w: 1000, h: 800 };
+	const tab = { x: 980, y: 500, w: 20, h: 60 };
+	// Landing on it: the first clear step above.
+	const up = clearUpward({ x: 980, y: 520 }, { w: 40, h: 100 }, [tab], box);
+	assert.equal(up.x, 980);
+	assert.ok(up.y + 100 + 8 <= 500 && up.y > 380, `y ${up.y}`);
+	// Clear already: it stays.
+	assert.deepEqual(clearUpward({ x: 980, y: 100 }, { w: 40, h: 100 }, [tab], box), { x: 980, y: 100 });
+	// Only its 56px tab shows: a 167px float moves just far enough for the tab to keep an 80px safe zone.
+	const tucked = clearUpward({ x: 980, y: 440 }, { w: 40, h: 167 }, [tab], box, { tab: 56, gap: 80 });
+	const gap = 500 - (tucked.y + (167 - 56) / 2 + 56);
+	assert.ok(gap >= 80 && gap < 84, `gap ${gap}`);
+	// No room above: where the throw sent it.
+	assert.deepEqual(clearUpward({ x: 980, y: 12 }, { w: 40, h: 100 }, [{ x: 980, y: 0, w: 20, h: 200 }], box), { x: 980, y: 12 });
 });

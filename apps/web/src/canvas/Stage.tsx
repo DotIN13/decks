@@ -17,7 +17,8 @@ import { deckBoardLink } from "../board/board-links.ts";
 import { shortLabel } from "../chat/composer/draft.ts";
 import type { LiveWebReply } from "../board/live-chat.ts";
 import { createEdgeSwipe } from "./edge-swipe.ts";
-import { createTouches, type Finger, type TouchStep } from "./touch.ts";
+import { coastStart, coastStep, createTouches, type Finger, type TouchStep } from "./touch.ts";
+import { velocityFrom, type Sample } from "../chrome/float-math.ts";
 import type { RendererChoice } from "../lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
@@ -1706,7 +1707,39 @@ export function Stage(props: {
 		}
 	};
 
+	/*
+	 * The coast after a thrown one-finger pan (`coastStep`, `touch.ts`). Its own frame, not a
+	 * glide's: a glide is the app moving the camera somewhere, and a finger landing must stop
+	 * a coast without also stopping that. Anything else that moves the camera stops it too,
+	 * because every one of those goes through `cancelGlide`.
+	 */
+	let coastRaf: number | undefined;
+	const cancelCoast = () => {
+		if (coastRaf === undefined) return;
+		cancelAnimationFrame(coastRaf);
+		coastRaf = undefined;
+	};
+	const coast = (start: { vx: number; vy: number }) => {
+		cancelCoast();
+		let v = start;
+		let last = performance.now();
+		const frame = () => {
+			const now = performance.now();
+			const step = coastStep(v, now - last);
+			last = now;
+			v = step.v;
+			writeCamera(pan(localCamera, step.dx, step.dy));
+			if (Math.hypot(v.vx, v.vy) < 0.01) {
+				coastRaf = undefined;
+				return;
+			}
+			coastRaf = requestAnimationFrame(frame);
+		};
+		coastRaf = requestAnimationFrame(frame);
+	};
+
 	const cancelGlide = () => {
+		cancelCoast();
 		glideToken++;
 		if (glideRaf !== undefined) {
 			cancelAnimationFrame(glideRaf);
@@ -1794,6 +1827,7 @@ export function Stage(props: {
 	onCleanup(() => {
 		if (rafId !== undefined) cancelAnimationFrame(rafId);
 		if (glideRaf !== undefined) cancelAnimationFrame(glideRaf);
+		cancelCoast();
 	});
 
 	/**
@@ -1971,6 +2005,14 @@ export function Stage(props: {
 	});
 	/** Fingers this document is carrying, as opposed to ones reported from a frame. */
 	const carried = new Set<number>();
+	/*
+	 * The pan so far, as a path the camera has been dragged along, for the speed at release.
+	 * A gesture that was ever more than a one-finger pan of the camera (a pinch, the edge
+	 * drawer, a finger a board claimed, the focus view's page) does not coast.
+	 */
+	let trail: Sample[] = [];
+	let trailAt = { x: 0, y: 0 };
+	let noCoast = false;
 
 	/**
 	 * A finger of this document's, in the stage's own coordinates.
@@ -1990,7 +2032,14 @@ export function Stage(props: {
 	/** One finger's worth of a gesture, from this document or from a board's. */
 	const touch = (phase: "down" | "move" | "up", finger: Finger): TouchStep => {
 		if (phase === "down") {
+			// A finger on the glass stops a coast, the way a hand stops a spinning list.
+			cancelCoast();
 			touches.down(finger);
+			if (touches.count() === 1) {
+				trail = [];
+				trailAt = { x: 0, y: 0 };
+				noCoast = false;
+			}
 			// After `touches.down`, so the count includes this finger: one is a drawer, two
 			// are a pinch.
 			edges.down(finger, touches.count());
@@ -2001,7 +2050,12 @@ export function Stage(props: {
 			touches.up(finger.id);
 			claimed.delete(finger.id);
 			edges.up(finger.id);
-			if (touches.count() === 0) setPanning(false);
+			if (touches.count() === 0) {
+				setPanning(false);
+				const thrown = noCoast || props.focus ? undefined : coastStart(velocityFrom(trail, performance.now()));
+				trail = [];
+				if (thrown) coast(thrown);
+			}
 			return { kind: "idle" };
 		}
 
@@ -2049,12 +2103,21 @@ export function Stage(props: {
 			return step;
 		}
 		if (step.kind === "pinch") {
+			noCoast = true;
 			claimed.clear();
 			edges.cancel();
 			pushCamera(pinchCamera(localCamera, view(), step.from, step.to));
 			return step;
 		}
-		if (step.kind === "pan" && !drawer && !claimed.has(finger.id)) pushCamera(pan(localCamera, step.dx, step.dy));
+		if (step.kind === "pan") {
+			if (drawer || claimed.has(finger.id)) noCoast = true;
+			else {
+				pushCamera(pan(localCamera, step.dx, step.dy));
+				trailAt = { x: trailAt.x + step.dx, y: trailAt.y + step.dy };
+				trail.push({ ...trailAt, t: performance.now() });
+				if (trail.length > 8) trail.shift();
+			}
+		}
 		return step;
 	};
 

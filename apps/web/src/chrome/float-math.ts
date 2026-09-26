@@ -277,20 +277,116 @@ export function stowsRight(p: Point, v: Velocity, size: Size, bounds: Box, optio
 	return p.x + size.w + v.vx * tau >= bounds.x + bounds.w;
 }
 
-/** Where a stowed float stands: past the right edge, with `tab` pixels of it still showing. */
-export function stowedAt(y: number, size: Size, bounds: Box, tab: number, margin = 12): Point {
+/** Which edge a float is put away behind. */
+export type Side = "left" | "right";
+
+/** The same throw at the left edge: fast, mostly sideways, and carried on it reaches it. */
+export function stowsLeft(p: Point, v: Velocity, _size: Size, bounds: Box, options: { minSpeed?: number; tau?: number } = {}): boolean {
+	const { minSpeed = 1.2, tau = 260 } = options;
+	if (-v.vx < minSpeed || -v.vx < Math.abs(v.vy) * 1.5) return false;
+	return p.x + v.vx * tau <= bounds.x;
+}
+
+/** Which edge a release puts the float away behind, if either: every float can go either way. */
+export function stowSide(p: Point, v: Velocity, size: Size, bounds: Box): Side | undefined {
+	if (stowsRight(p, v, size, bounds)) return "right";
+	if (stowsLeft(p, v, size, bounds)) return "left";
+	return undefined;
+}
+
+/** Where a stowed float stands: past its edge, with `tab` pixels of it still showing. */
+export function stowedAt(y: number, size: Size, bounds: Box, tab: number, margin = 12, side: Side = "right"): Point {
 	const inside = clamp({ x: bounds.x, y }, size, bounds, margin);
-	return { x: bounds.x + bounds.w - tab, y: inside.y };
+	return { x: side === "left" ? bounds.x - size.w + tab : bounds.x + bounds.w - tab, y: inside.y };
 }
 
 /**
- * Which floats are put away, and how far down the edge each one's tab is: a share of the
- * height, measured the way `toFraction` measures `fy`. Kept beside the positions rather
- * than in them, because the position is where the float comes *back* to.
+ * How far down its edge a thrown float lands: where the line of the throw meets the edge.
+ * The direction is the release velocity's, carried on in a straight line from where the
+ * float was let go until its leading side reaches the edge (the right side for the right
+ * edge, the left for the left), so a throw up and to the right tucks it higher than it
+ * started. Kept inside the height.
+ */
+export function stowY(p: Point, v: Velocity, size: Size, bounds: Box, side: Side, margin = 12): number {
+	const run = side === "right" ? bounds.x + bounds.w - (p.x + size.w) : p.x - bounds.x;
+	const along = Math.abs(v.vx) > 0 ? (v.vy / Math.abs(v.vx)) * Math.max(0, run) : 0;
+	return clamp({ x: bounds.x, y: p.y + along }, size, bounds, margin).y;
+}
+
+/**
+ * A tucked float that would cover another, turned up a little at a time: the throw's
+ * direction bends upward in `step` pixel steps along the edge until it is clear. Only the
+ * tab shows of a tucked float, so only the tab counts: `tab` is its height, centred on the
+ * float, and `others` are what shows of the others (their tabs, if they are tucked too).
+ * It only ever goes up, and never past the top margin; with no room above, `p` stands
+ * where the throw sent it.
+ */
+export function clearUpward(p: Point, size: Size, others: readonly Box[], bounds: Box, options: { tab?: number; gap?: number; margin?: number; step?: number } = {}): Point {
+	const { tab = size.h, gap = 8, margin = 12, step = 4 } = options;
+	const inset = (size.h - tab) / 2;
+	const hits = (q: Point): boolean =>
+		others.some((o) => q.x < o.x + o.w + gap && q.x + size.w + gap > o.x && q.y + inset < o.y + o.h + gap && q.y + inset + tab + gap > o.y);
+	for (let y = p.y; y + inset >= bounds.y + margin - 0.5; y -= step) if (!hits({ x: p.x, y })) return { x: p.x, y };
+	return p;
+}
+
+/**
+ * Keep a float off the others. `p` is where it would rest; `others` are the boxes the other
+ * floats stand in (only the part inside the bounds, so a put-away one is just its tab). If
+ * `p` overlaps none of them, with `gap` between, it stands. Otherwise it takes the nearest
+ * place beside one of them (above, below, left or right) that is inside the bounds and
+ * clear of all of them. With nowhere clear, `p`. A put-away float uses `clearUpward` instead.
+ */
+export function avoid(p: Point, size: Size, others: readonly Box[], bounds: Box, options: { gap?: number; margin?: number } = {}): Point {
+	const { gap = 8, margin = 12 } = options;
+	const hits = (q: Point): boolean =>
+		others.some((o) => q.x < o.x + o.w + gap && q.x + size.w + gap > o.x && q.y < o.y + o.h + gap && q.y + size.h + gap > o.y);
+	if (!hits(p)) return p;
+	const fits = (q: Point): boolean =>
+		q.y >= bounds.y + margin - 0.5 &&
+		q.y + size.h <= bounds.y + bounds.h - margin + 0.5 &&
+		q.x >= bounds.x + margin - 0.5 &&
+		q.x + size.w <= bounds.x + bounds.w - margin + 0.5;
+	const candidates: Point[] = [];
+	for (const o of others) {
+		candidates.push({ x: p.x, y: o.y - gap - size.h }, { x: p.x, y: o.y + o.h + gap }, { x: o.x - gap - size.w, y: p.y }, { x: o.x + o.w + gap, y: p.y });
+	}
+	let best: Point | undefined;
+	let bestDistance = Infinity;
+	for (const q of candidates) {
+		if (!fits(q) || hits(q)) continue;
+		const distance = Math.hypot(q.x - p.x, q.y - p.y);
+		if (distance < bestDistance) {
+			best = q;
+			bestDistance = distance;
+		}
+	}
+	return best ?? p;
+}
+
+/** A box cut to the bounds: what of it can be run into. `undefined` when none of it is inside. */
+export function within(box: Box, bounds: Box): Box | undefined {
+	const x1 = Math.max(box.x, bounds.x);
+	const y1 = Math.max(box.y, bounds.y);
+	const x2 = Math.min(box.x + box.w, bounds.x + bounds.w);
+	const y2 = Math.min(box.y + box.h, bounds.y + bounds.h);
+	return x2 > x1 && y2 > y1 ? { x: x1, y: y1, w: x2 - x1, h: y2 - y1 } : undefined;
+}
+
+/**
+ * Which floats are put away, behind which edge, and how far down it each one's tab is: a
+ * share of the height, measured the way `toFraction` measures `fy`. Kept beside the
+ * positions rather than in them, because the position is where the float comes *back* to.
+ * A bare number is what an earlier build stored, when the right edge was the only one.
  */
 export const STOWED_KEY = "decks.stowed";
 
-export function loadStowed(storage?: Pick<Storage, "getItem">): Record<string, number> {
+export interface Stowed {
+	fy: number;
+	side: Side;
+}
+
+export function loadStowed(storage?: Pick<Storage, "getItem">): Record<string, Stowed> {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse((storage ?? defaultStorage())?.getItem(STOWED_KEY) ?? "null");
@@ -298,22 +394,31 @@ export function loadStowed(storage?: Pick<Storage, "getItem">): Record<string, n
 		return {};
 	}
 	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
-	const out: Record<string, number> = {};
+	const out: Record<string, Stowed> = {};
+	const share = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : undefined);
 	for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-		if (typeof value === "number" && Number.isFinite(value)) out[key] = Math.min(1, Math.max(0, value));
+		const bare = share(value);
+		if (bare !== undefined) {
+			out[key] = { fy: bare, side: "right" };
+			continue;
+		}
+		if (typeof value !== "object" || value === null) continue;
+		const { fy, side } = value as { fy?: unknown; side?: unknown };
+		const at = share(fy);
+		if (at !== undefined && (side === "left" || side === "right")) out[key] = { fy: at, side };
 	}
 	return out;
 }
 
 /** `undefined` takes the float out again. */
-export function saveStowed(key: string, fy: number | undefined, storage?: Storage): void {
+export function saveStowed(key: string, stowed: Stowed | undefined, storage?: Storage): void {
 	const store = storage ?? defaultStorage();
 	if (!store) return;
-	const stowed = loadStowed(store);
-	if (fy === undefined) delete stowed[key];
-	else stowed[key] = fy;
+	const all = loadStowed(store);
+	if (stowed === undefined) delete all[key];
+	else all[key] = stowed;
 	try {
-		store.setItem(STOWED_KEY, JSON.stringify(stowed));
+		store.setItem(STOWED_KEY, JSON.stringify(all));
 	} catch {
 		// Not remembered; it is still put away for now.
 	}

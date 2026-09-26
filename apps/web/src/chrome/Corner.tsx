@@ -361,7 +361,7 @@ export function Corner(props: {
 
 			<button
 				type="button"
-				class="icon-button max-[360px]:hidden"
+				class="icon-button max-[1100px]:hidden pointer-coarse:hidden"
 				data-on={historyButton() === "on" ? "true" : historyButton() === "yield" ? "yield" : undefined}
 				aria-pressed={historyButton() !== "off"}
 				title={
