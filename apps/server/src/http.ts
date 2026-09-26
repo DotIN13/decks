@@ -5,6 +5,7 @@ import { readMeta } from "./deck/meta.ts";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cacheControlFor, compressedStatic } from "./static.ts";
+import { forwardRequest } from "./ports.ts";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { MAX_UPLOAD_BYTES } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/roots.ts";
@@ -60,6 +61,13 @@ function wildcard(req: Request): string {
 export function createHttpApp(app: App): Express {
 	const server = express();
 	server.disable("x-powered-by");
+	/*
+	 * Forwarded ports first (`ports.ts`), before any body is read: the request is somebody
+	 * else's server's, and a JSON parser here would eat the body it is waiting for.
+	 */
+	server.use((req, res, next) => {
+		if (!forwardRequest(req, res, app.forwards)) next();
+	});
 	server.use(express.json({ limit: "8mb" }));
 
 	const api = express.Router();

@@ -72,6 +72,9 @@ export default defineConfig({
 			 */
 			"/api": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true },
 			"/ws": { target: `ws://127.0.0.1:${API_PORT}`, ws: true },
+			// Forwarded ports (`server/ports.ts`), which the server answers for, websockets and all.
+			"/node/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true },
+			"/rnode/": { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: false, ws: true },
 		},
 	},
 	/*

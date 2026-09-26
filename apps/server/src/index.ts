@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { forwardUpgrade } from "./ports.ts";
 import { App } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { createHttpApp } from "./http.ts";
@@ -32,14 +33,15 @@ app.attach(hub);
  * One upgrade listener, two websockets.
  *
  * `/ws` is the browser; `/api/web/relay` is the Decks extension in the user's own Chrome,
- * dialling in with its pairing code (`browser/bridge.ts`). Anything else is not a websocket this
+ * dialling in with its pairing code (`browser/bridge.ts`); `/node/…` and `/rnode/…` are a
+ * forwarded port's own websockets (`ports.ts`). Anything else is not a websocket this
  * server has, and is dropped rather than left hanging.
  */
 httpServer.on("upgrade", (request, socket, head) => {
 	const path = new URL(request.url ?? "/", "http://decks").pathname;
 	if (path === "/ws") hub.handleUpgrade(request, socket, head);
 	else if (path === "/api/web/relay") app.web.handleUpgrade(request, socket, head);
-	else socket.destroy();
+	else if (!forwardUpgrade(request, socket, head, app.forwards)) socket.destroy();
 });
 
 httpServer.on("error", (error) => {
