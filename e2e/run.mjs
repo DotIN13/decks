@@ -128,6 +128,8 @@ const CHECKS = [
 	{ file: "placement.mjs", needsAgent: false },
 	/* The same rule when every camera is wrong: another window on another agent, this one panned away, a note in the slot. */
 	{ file: "placement-views.mjs", needsAgent: false },
+	/* An agent says where: newBoard and show with at, driven through a board's own code. */
+	{ file: "placement-at.mjs", needsAgent: false },
 	/*
 	 * A camera that *arrives*. Its own check rather than a section of `camera.mjs`, because that
 	 * one is about the camera's arithmetic and this one is about a clock: it samples the world

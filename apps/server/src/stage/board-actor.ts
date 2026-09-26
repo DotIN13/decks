@@ -31,7 +31,7 @@ export interface BoardConversation {
 	id: string;
 	context(): string[];
 	inPlay(): string[];
-	setInPlay(paths: string[]): void;
+	setInPlay(paths: string[], at?: Record<string, { x: number; y: number }>): void;
 	positions?(): Record<string, { x: number; y: number }>;
 	setPosition?(path: string, x: number, y: number): void;
 	camera(): Camera;
@@ -70,7 +70,7 @@ export function boardActor(options: { path: string; conversation: BoardConversat
 		identity: () => identity,
 		context: () => conversation.context(),
 		inPlay: () => conversation.inPlay(),
-		setInPlay: (paths) => conversation.setInPlay(paths),
+		setInPlay: (paths, at) => conversation.setInPlay(paths, at),
 		...(conversation.positions ? { positions: () => conversation.positions!() } : {}),
 		...(conversation.setPosition ? { setPosition: (board: string, x: number, y: number) => conversation.setPosition!(board, x, y) } : {}),
 		/*

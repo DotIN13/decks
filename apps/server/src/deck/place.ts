@@ -141,8 +141,14 @@ export function joinPlaces(options: {
 	 * on either. Boards themselves come from `places`.
 	 */
 	drawn?: readonly Box[];
+	/**
+	 * Where the caller said a joining board goes, top-left corner. Taken as given, near or far,
+	 * clear or not: an agent that names a place has decided, and saying what it sits on is the
+	 * tool's job (`stage/tool.ts`), not a reason to move it here.
+	 */
+	at?: Readonly<Record<string, { x: number; y: number }>>;
 }): Record<string, { x: number; y: number }> {
-	const { wanted, playing, places, size, drawn = [] } = options;
+	const { wanted, playing, places, size, drawn = [], at = {} } = options;
 	const joining = wanted.filter((path) => !playing.includes(path) && size(path) !== undefined);
 	const spots: Record<string, { x: number; y: number }> = {};
 	if (joining.length === 0) return spots;
@@ -167,9 +173,19 @@ export function joinPlaces(options: {
 		const box = boxOf(path);
 		if (box && keepsPlace(box, onCanvas)) occupied.push(box);
 	}
+	/* The named places first, so the boards placed for themselves keep clear of them. */
 	for (const path of joining) {
 		const dimensions = size(path);
-		if (!dimensions) continue;
+		const named = at[path];
+		if (!dimensions || !named) continue;
+		const spot = { x: Math.round(named.x), y: Math.round(named.y) };
+		spots[path] = spot;
+		onCanvas.push({ ...spot, ...dimensions });
+		occupied.push({ ...spot, ...dimensions });
+	}
+	for (const path of joining) {
+		const dimensions = size(path);
+		if (!dimensions || at[path]) continue;
 		const held = places[path];
 		if (held && keepsPlace({ ...held, ...dimensions }, onCanvas)) {
 			onCanvas.push({ ...held, ...dimensions });

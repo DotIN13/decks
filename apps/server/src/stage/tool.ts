@@ -1,4 +1,5 @@
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
+import { identityReminder } from "../agents/identity-reminder.ts";
 import { isIsolatedStage } from "./isolated-stages.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -91,7 +92,11 @@ export interface StageAgentHooks {
 	identity(): Identity;
 	context(): string[];
 	inPlay(): string[];
-	setInPlay(paths: string[]): void;
+	/**
+	 * Put exactly these boards on the stage. `at` names where joining ones go, top-left corner,
+	 * and is kept as given; any other joining board is placed beside the stage's newest.
+	 */
+	setInPlay(paths: string[], at?: Record<string, { x: number; y: number }>): void;
 	/** Where this stage has put its boards. Optional so a host that does not arrange can omit it. */
 	positions?(): Record<string, { x: number; y: number }>;
 	setPosition?(path: string, x: number, y: number): void;
@@ -368,6 +373,57 @@ export function createStageTool(deps: {
 		const mine = new Set(agent.inPlay());
 		return all.filter((board) => mine.has(board.path));
 	};
+	/**
+	 * Where a board goes, as an agent writes it: its top-left corner, `{ x1, y1 }` (`{ x, y }` is
+	 * taken too, the shape `move` uses). Nothing when it was not given; a sentence when it is not
+	 * two numbers, rather than a board quietly placed somewhere else.
+	 */
+	const cornerOf = (at: unknown): { x: number; y: number } | undefined => {
+		if (at === undefined || at === null) return undefined;
+		const raw = at as { x1?: unknown; y1?: unknown; x?: unknown; y?: unknown };
+		const x = raw.x1 ?? raw.x;
+		const y = raw.y1 ?? raw.y;
+		if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) {
+			throw new Error("at is the board's top-left corner on the stage, as in at: { x1: 1160, y1: 0 }.");
+		}
+		return { x: Math.round(x), y: Math.round(y) };
+	};
+	/**
+	 * Say where a board that just joined the stage went, when the agent needs telling.
+	 *
+	 * The agent is asked to say where every board goes, so the two cases worth a sentence are the
+	 * two where it did not get what it should want: it gave no place, and one was chosen for it;
+	 * or it gave one that sits on something already there. A place given and clear says nothing.
+	 */
+	const reportPlace = (path: string, named: { x: number; y: number } | undefined, before?: { x: number; y: number }) => {
+		const board = here().find((one) => one.path === path);
+		if (!board) return;
+		const box = { x: board.x, y: board.y, w: board.w, h: board.h };
+		const corner = `x1 ${box.x}, y1 ${box.y}`;
+		// A board shown again that came back to the place it had: nothing was chosen for it.
+		if (!named && before && before.x === box.x && before.y === box.y) return;
+		if (!named) {
+			notes.push(`No at was given, so ${path} went beside your newest board, at ${corner}. Say where each board goes with at: { x1, y1 }: stage.pen.read() lists what is on your stage and where.`);
+			return;
+		}
+		const hits = (other: { x: number; y: number; w: number; h: number }) =>
+			box.x < other.x + other.w && other.x < box.x + box.w && box.y < other.y + other.h && other.y < box.y + box.h;
+		const onStage = new Set(agent.inPlay());
+		const under = here()
+			.filter((one) => one.path !== path && onStage.has(one.path) && hits(one))
+			.map((one) => one.path);
+		const name = agent.stageName?.();
+		let drawn = 0;
+		try {
+			if (service.pens && name) drawn = service.pens.drawn(name).filter(hits).length;
+		} catch {
+			// A stage file that does not parse has no drawing to overlap.
+		}
+		if (under.length || drawn) {
+			const what = [...under, ...(drawn ? [`${drawn} drawn item${drawn === 1 ? "" : "s"}`] : [])].join(", ");
+			notes.push(`${path} is at ${corner}, as asked, and sits on ${what}. Move it with stage.move if that was not meant.`);
+		}
+	};
 	const notWhileIsolated = (what: string): never => {
 		throw new Error(`Isolated mode: ${what} is not available while this agent can see only its own stage.`);
 	};
@@ -408,9 +464,10 @@ export function createStageTool(deps: {
 		 * where the user left it until `show` is called. Returns the deck-relative path to
 		 * edit.
 		 */
-		newBoard: async (options: { title: string; template?: string; kind?: string; format?: string; w?: number; h?: number }) => {
+		newBoard: async (options: { title: string; template?: string; kind?: string; format?: string; w?: number; h?: number; at?: { x1: number; y1: number } }) => {
 			const title = options?.title?.trim();
 			if (!title) throw new Error("A board needs a title");
+			const named = cornerOf(options.at);
 			/*
 			 * What the board *is as a file*, which is all a new board is allowed to choose.
 			 *
@@ -453,7 +510,8 @@ export function createStageTool(deps: {
 				size: { w: width, ...(options.h ? { h: options.h } : {}) },
 				...(stageName ? { folder: stageBoardsDir(stageName) } : {}),
 			});
-			agent.setInPlay([...agent.inPlay(), path]);
+			agent.setInPlay([...agent.inPlay(), path], named ? { [path]: named } : undefined);
+			reportPlace(path, named);
 			agent.worked?.(path);
 			agent.acted?.("new", path);
 			/*
@@ -556,8 +614,10 @@ export function createStageTool(deps: {
 		 * should see what was asked for. The board's own links and the panel glide without being
 		 * asked, because those are a person's hands.
 		 */
-		show: async (target: string | string[], options?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }) => {
+		show: async (target: string | string[], options?: { fit?: "board" | "all"; highlight?: string; animate?: boolean; at?: { x1: number; y1: number } }) => {
 			const wanted = asList(target);
+			const named = cornerOf(options?.at);
+			if (named && wanted.length !== 1) throw new Error("at places one board: show them one at a time, each with its own at.");
 			const paths: string[] = [];
 			const items: Array<{ id: string; box: { x: number; y: number; w: number; h: number } }> = [];
 			for (const one of wanted) {
@@ -571,14 +631,24 @@ export function createStageTool(deps: {
 				items.push({ id: one, box });
 			}
 			const up = agent.inPlay();
-			agent.setInPlay([...up, ...paths.filter((one) => !up.includes(one))]);
+			const joining = paths.filter((one) => !up.includes(one));
+			const had = agent.positions?.() ?? {};
+			const [one] = paths;
+			if (named && one !== undefined && up.includes(one)) {
+				// Already on the stage: a place named for it is a move.
+				service.move(agent.id, one, named);
+				agent.acted?.("move", one);
+			}
+			agent.setInPlay([...up, ...joining], named && one !== undefined && joining.includes(one) ? { [one]: named } : undefined);
+			for (const path of joining) reportPlace(path, named, had[path]);
 			// One board named is the focusing gesture: "look at what I made". Several is arranging
 			// the canvas, and is nobody's byline. A drawn item is neither: it is already on the
 			// stage, and looking at it is not authorship of anything.
 			const [only] = paths;
 			if (only !== undefined && wanted.length === 1) agent.worked?.(only);
 			for (const one of paths) agent.acted?.("show", one);
-			return service.show(agent.id, paths, { ...(options ?? {}), ...(items.length > 0 ? { items } : {}) });
+			const { at: _at, ...showing } = options ?? {};
+			return service.show(agent.id, paths, { ...showing, ...(items.length > 0 ? { items } : {}) });
 		},
 		/** Take boards off this agent's stage, keeping them in context. */
 		hide: async (path: string | string[]) => {
@@ -928,6 +998,10 @@ export function createStageTool(deps: {
 			// After the value, because the value is the answer and this is a fact about the
 			// canvas the call happened on.
 			if (notes.length > 0) parts.push(...notes);
+			// Last, and after the run, so a call that has just set them hears nothing
+			// (`agents/identity-reminder.ts`).
+			const unsaid = identityReminder(agent.identity());
+			if (unsaid) parts.push(unsaid);
 
 			// Written after every run, failed ones included: a run that threw halfway may
 			// still have attached a board, and the snapshot is what the canvas is restored

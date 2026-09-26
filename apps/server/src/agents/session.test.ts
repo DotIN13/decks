@@ -748,6 +748,15 @@ test("a board joining the stage lands beside the stage's newest board", () => {
 	cleanup();
 });
 
+test("a board given a place when it joins keeps it, far from the rest or not", () => {
+	const { agent, cleanup } = agentOn(["one.html", "two.html"]);
+	agent.setPosition("boards/one.html", 0, 0);
+	agent.setInPlay(["boards/one.html"], { place: true });
+	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true, at: { "boards/two.html": { x: 50_000, y: 7000 } } });
+	assert.deepEqual(agent.positions()["boards/two.html"], { x: 50_000, y: 7000 });
+	cleanup();
+});
+
 /*
  * The bug that came back twice: a board was placed at the middle of a camera, and the camera was
  * another canvas's, then whichever browser panned last, so boards landed in somebody else's

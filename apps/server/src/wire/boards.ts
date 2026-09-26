@@ -335,7 +335,7 @@ async function runBoardEval(
 		id: focused.id,
 		context: () => [...focused.context],
 		inPlay: () => [...focused.inPlay],
-		setInPlay: (paths: string[]) => focused.setInPlay(paths, { place: true }),
+		setInPlay: (paths: string[], at?: Record<string, { x: number; y: number }>) => focused.setInPlay(paths, { place: true, ...(at ? { at } : {}) }),
 		positions: () => focused.positions(),
 		setPosition: (board: string, x: number, y: number) => focused.setPosition(board, x, y),
 		camera: () => wire.cameras.answer(focused.id),

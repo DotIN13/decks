@@ -18,7 +18,15 @@ import { StagePens } from "./pens.ts";
  * Neither is reachable from a browser check — the e2e suite needs a model to make an agent
  * call a tool at all — and both are the part a model actually reads.
  */
-function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }) {
+function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }, options: { stageful?: boolean; identity?: Partial<{ name: string; avatar: string; tags: string[]; workspace: string }> } = {}) {
+	/*
+	 * A stage that remembers, for the checks on what `newBoard` and `show` say about where a board
+	 * went. Placement here is a stand-in (a named place is kept, anything else goes to x 5000):
+	 * the rule itself is `deck/place.ts` and is tested there.
+	 */
+	const stageful = options.stageful === true;
+	let playing: string[] = [];
+	const spots: Record<string, { x: number; y: number }> = {};
 	const root = mkdtempSync(join(tmpdir(), "decks-tool-"));
 	mkdirSync(join(root, "boards"), { recursive: true });
 	writeFileSync(join(root, "boards", "plan.html"), `<!doctype html><title>plan</title><body class="board"></body>`);
@@ -53,6 +61,8 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			// below a reading of the loader's fallback instead.
 			const meta = `<meta name="board" content='{"w":${options.size?.w ?? 1000},"h":${options.size?.h ?? 700}}' />`;
 			writeFileSync(join(root, path), `<!doctype html><title>${options.title}</title>${meta}<body class="board"></body>`);
+			// Known to the deck at once, as the real service's is, so a stage can say where it went.
+			if (stageful) deck.refresh(path);
 			return path;
 		},
 		writeBoard: (path, html) => {
@@ -90,6 +100,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		broadcast: () => {},
 		camera: () => camera,
 		agents: () => others,
+		...(options.stageful ? { boards: () => deck.boards.map((board) => ({ ...board, ...(spots[board.path] ?? { x: 0, y: 0 }) })) } : {}),
 	});
 
 	const tool = createStageTool({
@@ -97,10 +108,17 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 		port: 4329,
 		agent: {
 			id: "a1",
-			identity: () => ({ name: "Ada", color: "#000", ...(room ? { workspace: room } : {}) }),
+			// Whole by default, so the reminder to say who you are (`agents/identity-reminder.ts`)
+			// stays out of the results these checks read; the one check on it passes a gap.
+			identity: () => ({ name: "Ada", color: "#000", avatar: "/api/avatar/a1", tags: ["testing"], workspace: room ?? "decks", ...options.identity }),
 			context: () => [],
-			inPlay: () => [],
-			setInPlay: () => {},
+			inPlay: () => (options.stageful ? playing : []),
+			setInPlay: (paths, at) => {
+				if (!options.stageful) return;
+				for (const path of paths) if (!playing.includes(path)) spots[path] = at?.[path] ?? spots[path] ?? { x: 5000, y: 0 };
+				playing = paths;
+			},
+			positions: () => spots,
 			rename: () => {},
 			setAvatar: () => {},
 			setTags: (tags) => tags as string[],
@@ -803,4 +821,38 @@ test("stage.screenshot hands the picture to the model with the run's result, and
 	} finally {
 		cleanup();
 	}
+});
+
+test("at is two numbers, and places one board at a time", async () => {
+	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 });
+	const bad = await tool.run(`return await stage.newBoard({ title: "Where", at: { x1: "left" } })`);
+	assert.equal(bad.isError, true);
+	assert.match(bad.text, /at is the board's top-left corner on the stage, as in at: \{ x1: 1160, y1: 0 \}/);
+	const two = await tool.run(`return await stage.show(["boards/plan.html", "boards/where.html"], { at: { x1: 0, y1: 0 } })`);
+	assert.equal(two.isError, true);
+	assert.match(two.text, /at places one board/);
+	cleanup();
+});
+
+test("newBoard says where a board went when it was not told, and what a named place sits on", async () => {
+	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 }, undefined, { stageful: true });
+	await tool.run(`return await stage.show("boards/plan.html", { at: { x1: 0, y1: 0 } })`);
+	const unnamed = await tool.run(`return await stage.newBoard({ title: "Somewhere" })`);
+	assert.match(unnamed.text, /No at was given, so boards\/somewhere\.html went beside your newest board, at x1 5000, y1 0/);
+	const clear = await tool.run(`return await stage.newBoard({ title: "Clear", at: { x1: 20000, y1: 0 } })`);
+	assert.doesNotMatch(clear.text, /No at was given|sits on/, "a place given and clear says nothing");
+	const onTop = await tool.run(`return await stage.newBoard({ title: "On top", at: { x1: 100, y1: 100 } })`);
+	assert.match(onTop.text, /boards\/on-top\.html is at x1 100, y1 100, as asked, and sits on boards\/plan\.html/);
+	cleanup();
+});
+
+test("every stage result asks an agent that has not said who it is, until it has", async () => {
+	const { tool, cleanup } = toolOn({ x: 0, y: 0, zoom: 1 }, undefined, { identity: { name: "Agent 3", tags: [] } });
+	const result = await tool.run(`return 1`);
+	assert.match(result.text, /^1\n\[Decks\] You have not said who you are: set it now with stage\.me\(\{ name: .*; tags: .* \}\)/);
+	assert.doesNotMatch(result.text, /avatar:|workspace:/, "only what is missing is asked for");
+	cleanup();
+	const whole = toolOn({ x: 0, y: 0, zoom: 1 });
+	assert.equal((await whole.tool.run(`return 1`)).text, "1", "and an agent that has said it all hears nothing");
+	whole.cleanup();
 });

@@ -28,7 +28,7 @@ A board is an ordinary, self-contained HTML page that you design. There is no co
 
 **Every root-level block is out of the page's flow.** `board.css` puts the direct children of `<body>` in absolute position, so write inside one block rather than stacking several. The `.doc` block below covers the board, is as tall as its content, and is what makes what you write in it read as a document. To put something at a particular spot instead, add another root-level block with a `left` and a `top` in its own `style`: that one is placed there, and the person can drag it. Both live in one file; there is no second format to choose.
 
-`const path = await stage.newBoard({ title })` writes this shell. Fill it in with the Write tool:
+`const path = await stage.newBoard({ title, at: { x1, y1 } })` writes this shell, with its top-left corner where you say on your stage (see "Your stage" below). Fill it in with the Write tool:
 
 ```html
 <!doctype html>
@@ -72,9 +72,11 @@ A screenshot (the board-debug skill has the script) is for a drawing you cannot 
 
 Each agent has its own stage: the boards it has put up, where each one sits, and what it holds. The person sees your stage when they are talking to you. `stage.show` and `newBoard` put a board on it, `stage.hide` takes one off and keeps holding it, and `stage.boards()` lists every board in the deck, placed as your stage has them, with `inContext` naming the agents holding each. Another agent's stage is its own: showing a board there is not something you can do, and nothing you do moves it.
 
+**Say where every board goes.** `newBoard` and `show` take `at: { x1, y1 }`, the board's top-left corner on your stage. Read the stage first: `stage.pen.read()` lists everything on it, boards and drawing, each with its `box`. Lay it out the way a reader moves through it: the boards of one piece of work in a row, left to right in reading order, 160 px apart; the next piece of work a new row, 160 px under the tallest board of the last; a follow-up just right of the board it follows. A board's height is measured after you write it, so leave room below it. Leave `at` out and the board goes beside your newest one, and the result says where; `stage.move` rearranges what is there.
+
 A stage is a native pen.dev file, `stages/<name>/stage.pen`: its boards, and a drawing around them — notes, text, shapes, icons, arrows and frames — changed with `stage.pen.edit([...])`. Use the drawing for what sits between boards (a note beside one, an arrow from one to the next, a titled area behind a group) and keep answers on boards. You work on one stage at a time: `stage.stages()` lists them, `stage.open(name)` moves you to one, `stage.newStage(title)` makes one. Read the pen-stage skill before your first edit.
 
-Give yourself a name and an avatar once, and keep your tags current: one verb does all of it, `stage.me({ name, avatar, tags, workspace })`, and `stage.me()` reads it back. `workspace` is the project you are working on, and `stage.agents({ filter: { workspace } })` lists who else is on it.
+**Say who you are before anything else.** Your first stage call in a session is `stage.me({ name, avatar, workspace, tags })`: a short name of your own (never "Agent 3"), an emoji avatar, the project you are working on as `workspace`, and up to four tags for what you are doing right now. Change the tags when the work changes and set them to `[]` when you finish; `stage.me()` reads it all back, and `stage.agents({ filter: { workspace } })` lists who else is on your project. Until all four are set, each message and each stage result reminds you.
 
 Hand work over with `stage.send`, which is the only way and always returns at once — a stage run is abandoned after twenty seconds and a turn is minutes, so nothing can wait for an answer inside a call. Two targets: a name from `stage.agents()`, or a shape `{ name, kind }` which makes the agent first. `reply: true` brings their report into your transcript, to read on your next turn. A long brief goes on a board, not in the task string.
 

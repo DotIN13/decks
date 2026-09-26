@@ -28,14 +28,19 @@ export interface Stage {
 	 * placed where they say and whose height is measured; "slides" is a reveal deck of
 	 * `<section>`s in a `.slides.html`. ("component" and "flow" named the two board formats
 	 * that are now one, and both still mean "board".)
+	 * `at` is where it goes: its top-left corner on your stage. Say it every time, after reading
+	 * the stage with `stage.pen.read()`. Left out, the board goes beside your newest board and
+	 * the result says where; a place that sits on something is kept, and the result says on what.
 	 */
-	newBoard(o: { title: string; format?: "board" | "slides"; w?: number; h?: number }): Promise<string>;
+	newBoard(o: { title: string; format?: "board" | "slides"; w?: number; h?: number; at?: { x1: number; y1: number } }): Promise<string>;
 	/**
-	 * Add these boards to your stage, beside what is there, and move the camera to them.
+	 * Add these boards to your stage and move the camera to them. `at` places the one board named,
+	 * top-left corner, as in `newBoard`; for a board already on the stage it moves it. A board
+	 * shown again with no `at` goes back where it was, or beside your newest board.
 	 * `highlight` outlines one `data-id`. A drawn item's id (`stage.pen`) can be named instead of
 	 * a board path, or beside one: the camera goes to it, and nothing is held or moved.
 	 */
-	show(target: string | string[], o?: { fit?: "board" | "all"; highlight?: string; animate?: boolean }): Promise<{ shown: string[] }>;
+	show(target: string | string[], o?: { fit?: "board" | "all"; highlight?: string; animate?: boolean; at?: { x1: number; y1: number } }): Promise<{ shown: string[] }>;
 	/**
 	 * Set a board's height from its measured content; the board must be shown first. The result
 	 * also says, in a sentence, what the browser found: the height, the word count, the smallest
@@ -126,7 +131,8 @@ export interface Stage {
 	/**
 	 * Who you are and what you are doing: read with nothing, change with a patch. Answers with the
 	 * identity as stored — tags are slugged, deduped and capped at four, and `workspace` (the
-	 * project you work in) is slugged too.
+	 * project you work in) is slugged too. Call it first in every session with all four set; until
+	 * they are, each message and each stage result reminds you.
 	 */
 	me(patch?: { name?: string; avatar?: { emoji: string } | { svg: string }; tags?: string[]; workspace?: string }): Promise<{ name: string; avatar?: string; color: string; tags?: string[]; workspace?: string }>;
 	/** Every agent; `filter.workspace` narrows to one project. */

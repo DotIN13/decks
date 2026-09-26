@@ -20,6 +20,7 @@ import type { Act } from "./acts.ts";
 import { forBrowser, HISTORY_ITEMS } from "./wire.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
+import { identityReminder } from "./identity-reminder.ts";
 import { IsolatedView } from "./isolation.ts";
 import { relink, stageBoardsDir } from "../deck/stage-boards.ts";
 import { copyStage, isIsolatedStage, markIsolated, numberedName, originOf } from "../stage/isolated-stages.ts";
@@ -607,7 +608,7 @@ export class DeckAgent {
 			identity: () => this.identity,
 			context: () => [...this.held],
 			inPlay: () => [...this.playing],
-			setInPlay: (paths: string[]) => this.setInPlay(paths, { place: true }),
+			setInPlay: (paths: string[], at?: Record<string, { x: number; y: number }>) => this.setInPlay(paths, { place: true, ...(at ? { at } : {}) }),
 			positions: () => ({ ...this.places }),
 			setPosition: (path: string, x: number, y: number) => this.setPosition(path, x, y),
 			rename: (name: string) => this.rename(name),
@@ -886,9 +887,9 @@ export class DeckAgent {
 	 * restore that re-ran the placement would rearrange a canvas the person laid out, every
 	 * time the server came back up.
 	 */
-	setInPlay(paths: string[], options: { place?: boolean } = {}): void {
+	setInPlay(paths: string[], options: { place?: boolean; at?: Record<string, { x: number; y: number }> } = {}): void {
 		const wanted = paths.filter((path, index) => paths.indexOf(path) === index);
-		if (options.place) this.placeJoining(wanted);
+		if (options.place) this.placeJoining(wanted, options.at);
 		// A board shown for the first time is the most recent touch, so it leads the held list.
 		for (const path of [...wanted].reverse()) if (!this.held.includes(path)) this.held.unshift(path);
 		this.playing = wanted;
@@ -927,9 +928,10 @@ export class DeckAgent {
 	 * Places written here are the stage's own, exactly as a drag is, so this happens once per
 	 * board rather than on every send.
 	 */
-	private placeJoining(wanted: string[]): void {
+	private placeJoining(wanted: string[], at?: Record<string, { x: number; y: number }>): void {
 		const spots = joinPlaces({
 			wanted,
+			...(at ? { at } : {}),
 			playing: this.playing,
 			places: this.places,
 			size: (path) => {
@@ -1318,6 +1320,12 @@ export class DeckAgent {
 		 * the agent should know the board moved *before* it reads what to do about it.
 		 */
 		const nudges = this.pending.splice(0);
+		/*
+		 * And who it has not said it is, until it has (`agents/identity-reminder.ts`). Never on a
+		 * slash command, which every runtime reads as an exact line.
+		 */
+		const unsaid = text.trimStart().startsWith("/") ? undefined : identityReminder(this.identity);
+		if (unsaid) nudges.push(unsaid);
 		const sent = nudges.length > 0 ? `${nudges.join("\n")}\n\n${text}` : text;
 		try {
 			await this.backend.prompt(sent);

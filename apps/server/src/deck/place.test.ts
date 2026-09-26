@@ -72,3 +72,17 @@ test("the nearest free spot wins, which is the short way round the board in the 
 	assert.ok(under.y >= wide.y + wide.h, "a wide one is passed underneath, for the same reason");
 	assert.equal(under.x, wide.x, "and kept in line with it");
 });
+
+test("a place the caller names is kept exactly, however far or crowded, and the rest keep clear of it", () => {
+	const spots = joinPlaces({
+		wanted: ["a", "far", "onTop", "free"],
+		playing: ["a"],
+		places: { a: { x: 0, y: 0 } },
+		size: () => ({ w: 1000, h: 800 }),
+		at: { far: { x: 90_000, y: 40_000 }, onTop: { x: 100, y: 100 } },
+	});
+	assert.deepEqual(spots.far, { x: 90_000, y: 40_000 }, "far from everything, and kept");
+	assert.deepEqual(spots.onTop, { x: 100, y: 100 }, "on top of a, and kept: saying so is the tool's job");
+	const free = { ...spots.free!, w: 1000, h: 800 };
+	for (const box of [{ x: 0, y: 0 }, spots.far!, spots.onTop!]) assert.equal(overlap(free, { ...box, w: 1000, h: 800 }), false, "the unnamed board misses all three");
+});

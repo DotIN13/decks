@@ -26,7 +26,7 @@ description: How to write a board. One format: a one-screen page you design, who
 
 **One format: a page you design, with placed blocks**
 
-- `stage.newBoard({ title })` writes `<body class="board">` with `../lib/board.css`, a `<style>`
+- `stage.newBoard({ title, at: { x1, y1 } })` writes `<body class="board">` with `../lib/board.css`, a `<style>`
   block and one block: `<div class="doc" data-id="doc">`. Write your own CSS; inside a block, lay
   out with flexbox or grid.
 - **Root-level blocks are out of the page's flow.** `board.css` puts every direct child of
