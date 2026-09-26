@@ -25,7 +25,7 @@ import { DECK_DIR, type Config } from "./config.ts";
 import { describeSync, syncExamplesDir, syncRuntimeLib } from "./deck/lib-sync.ts";
 import { Deck } from "./deck/loader.ts";
 import { watchDeck } from "./deck/watcher.ts";
-import type { CameraReading } from "./deck/place.ts";
+import { Cameras } from "./deck/cameras.ts";
 import { Hub, type View } from "./ws.ts";
 import type { DeckAgent } from "./agents/session.ts";
 import { StagePens, type PenEntry } from "./stage/pens.ts";
@@ -78,22 +78,8 @@ export class App {
 	private unwatch: (() => void) | undefined;
 	/** The safety net under the watcher — see `watch()`. */
 	private resyncTimer: NodeJS.Timeout | undefined;
-	/**
-	 * Where the browser last said it was looking.
-	 *
-	 * The camera belongs to the browser; the server keeps the last reading only so
-	 * an agent can ask what the user can see. It is a reading, not a source of
-	 * truth — nothing here ever moves it except at an agent's request.
-	 */
-	lastCamera: CameraReading = { at: { x: 0, y: 0, zoom: 1 } };
-	/**
-	 * And one per conversation, because the camera belongs to the conversation.
-	 *
-	 * The browser reports which agent's view it is reporting, so `stage.camera()` answers
-	 * "where is my stage looking" rather than "where is the user looking". An agent nobody
-	 * has looked at yet falls back to the last reading, which is the only honest guess.
-	 */
-	readonly cameras = new Map<string, CameraReading>();
+	/** Where each agent's stage is looking, as the browsers report it (`deck/cameras.ts`). */
+	readonly cameras = new Cameras();
 	/** Stage calls waiting for the browser to carry them out. */
 	readonly pendingStage = new Map<string, { resolve: (value: unknown) => void; timer: NodeJS.Timeout }>();
 	/** The Claude subscriptions this install can use, shared by every Claude agent. */
@@ -165,7 +151,7 @@ export class App {
 			call: (call) => this.callStage(call),
 			connected: () => (this.hub?.connections ?? 0) > 0,
 			broadcast: (message) => this.send(message),
-			camera: (agentId) => (this.cameras.get(agentId) ?? this.lastCamera).at,
+			camera: (agentId) => this.cameras.answer(agentId),
 			agents: () => this.agents.summaries(),
 		});
 		/*
@@ -251,7 +237,7 @@ export class App {
 				port: config.port,
 				act: (agentId, act) => this.acts.act(agentId, act),
 				defaultKind: config.backend,
-				camera: (agentId) => (this.cameras.get(agentId) ?? this.lastCamera).at,
+				camera: (agentId) => this.cameras.answer(agentId),
 				/*
 				 * A board joining a canvas was given a place (`agents/session.ts`). The browsers draw a
 				 * board where the deck state says it is, so the state goes out here — before the

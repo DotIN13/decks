@@ -1,6 +1,7 @@
 import type { Camera } from "@decks/protocol";
 import { canvasBox } from "../camera/insets.ts";
 import { camera, setCamera } from "../state/camera.ts";
+import { state } from "../state/deck.ts";
 import { send } from "../state/socket.ts";
 
 /**
@@ -28,20 +29,28 @@ let timer: number | undefined;
  * the number a board has to fit into, and that is the window minus the chrome standing
  * beside it — not `innerWidth`, which counts the boards panel as space a board could use.
  *
- * `agentId` names a *different* conversation's canvas: the camera is per conversation
- * (`camera/agent-view.ts`), and a parked view has to be reported for the agent it belongs
- * to rather than for whoever is on screen.
+ * **Every reading says whose stage it is**, because the server places an agent's new boards
+ * at the middle of that agent's view and nobody else's (`deck/cameras.ts` on the server). The
+ * view on screen is the focused conversation's; a parked view passes the agent it belongs to.
+ * With no agent to name, nothing is sent.
  */
-export function reportCamera(now: Camera, agentId?: string): void {
+export function reportCamera(now: Camera, agentId: string | undefined = state.focused): void {
+	if (!agentId) return;
 	const box = canvasBox({ width: window.innerWidth, height: window.innerHeight });
 	const sized: Camera = { ...now, width: Math.round(box.width), height: Math.round(box.height) };
-	send({ type: "camera.set", camera: sized, ...(agentId ? { agentId } : {}) });
+	send({ type: "camera.set", camera: sized, agentId });
 }
 
-/** The same, trailing a gesture by 250ms so a pan sends one frame and not a hundred. */
+/**
+ * The same, trailing a gesture by 250ms so a pan sends one frame and not a hundred.
+ *
+ * The agent is read now, not when the timer fires: a pan that ends just before a switch to
+ * another chat is still a reading of the first chat's stage.
+ */
 export function reportCameraSoon(now: Camera): void {
 	if (timer) clearTimeout(timer);
-	timer = window.setTimeout(() => reportCamera(now), 250);
+	const agentId = state.focused;
+	timer = window.setTimeout(() => reportCamera(now, agentId), 250);
 }
 
 /** Set the camera and report it — what a pan, a fit and a zoom all end with. */

@@ -1,5 +1,5 @@
 import type { ClientMessage, DeckState, ServerMessage } from "@decks/protocol";
-import type { CameraReading } from "../deck/place.ts";
+import type { Cameras } from "../deck/cameras.ts";
 import type { Registry } from "../agents/registry.ts";
 import type { Acts } from "../agents/acts.ts";
 import type { BoardService } from "../boards/service.ts";
@@ -105,9 +105,8 @@ export interface WireContext {
 	/** What a board frame acts on: the stage of the conversation this browser is in. */
 	target(): DeckAgent;
 
-	/** The camera a browser last reported, and the per-agent readings beside it. */
-	lastCamera: CameraReading;
-	readonly cameras: Map<string, CameraReading>;
+	/** Where each agent's stage is looking (`deck/cameras.ts`). */
+	readonly cameras: Cameras;
 	/** The canvas calls waiting on a browser, keyed by call id. */
 	readonly pendingStage: Map<string, PendingStage>;
 

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import type { ActKind, AgentChat, AgentKind, AgentMode, AgentModel, AgentState, AgentUsage, Camera, ChatItem, Identity, ModelOption, ServerMessage, ThinkingLevel, UsageReport } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
-import { joinPlaces } from "../deck/place.ts";
+import { joinPlaces, type Box } from "../deck/place.ts";
 import type { BoardSpot } from "../stage/pens.ts";
 import { runtimeOf } from "../runtimes/registry.ts";
 import type { StageService } from "../stage/service.ts";
@@ -724,7 +724,7 @@ export class DeckAgent {
 					const board = this.deck.board(path);
 					return board ? { w: board.w, h: board.h } : undefined;
 				},
-				camera: this.host.camera(this.id),
+				drawn: this.drawn(),
 			});
 			for (const [path, spot] of Object.entries(spots)) this.places[path] = spot;
 		}
@@ -896,18 +896,30 @@ export class DeckAgent {
 		this.publishContext();
 	}
 
+	/** What is drawn on this stage besides its boards, which a joining board keeps clear of. */
+	private drawn(): Box[] {
+		const name = this.stageName();
+		const pens = this.stage.pens;
+		if (!name || !pens) return [];
+		try {
+			return pens.drawn(name);
+		} catch {
+			// A stage file that does not parse still has its boards to place against.
+			return [];
+		}
+	}
+
 	/**
 	 * Give every board that is joining the canvas a place near what is already on it.
 	 *
 	 * The rule and the arithmetic are in `deck/place.ts`; what is here is the state it needs —
-	 * which boards are staying, where they are, and the camera this conversation is looking
-	 * through. Three cases, in order:
+	 * which boards are staying, where they are, and what is drawn around them. No camera: where a
+	 * board lands depends on the stage, never on who is looking at it. Three cases, in order:
 	 *
-	 * - a board with no place of its own gets one, in the middle of the view and clear of the
-	 *   boards already there. This is every new board: `stage.newBoard`, the ＋ in the corner, a
-	 *   mirror, a file that appeared in `boards/`;
-	 * - a board whose place is visible, or within a board's length of the ones on the canvas,
-	 *   keeps it. Hiding a board and playing it again puts it back where it was;
+	 * - a board with no place of its own gets the nearest open slot beside the stage's newest
+	 *   board, clear of every board and drawn item. This is every new board: `stage.newBoard`,
+	 *   the ＋ in the corner, a mirror, a file that appeared in `boards/`;
+	 * - a board whose place is within a board's length of the ones on the stage keeps it. Hiding a board and playing it again puts it back where it was;
 	 * - a board whose place is neither is placed again. That is the board picked out of the rail
 	 *   on a deck where the old deck-wide auto-layout had already stacked 900 boards into a
 	 *   column a million pixels tall: its recorded place is real, and it is nowhere near you.
@@ -924,7 +936,7 @@ export class DeckAgent {
 				const board = this.deck.board(path);
 				return board ? { w: board.w, h: board.h } : undefined;
 			},
-			camera: this.host.camera(this.id),
+			drawn: this.drawn(),
 		});
 		const entries = Object.entries(spots);
 		if (entries.length === 0) return;

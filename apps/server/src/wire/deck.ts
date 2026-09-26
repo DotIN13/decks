@@ -13,11 +13,10 @@ export const deck = {
 	},
 
 	"camera.set": (message, _reply, wire) => {
-		// Recorded, not acted on: the camera is the browser's, and this is the reading an
-		// agent gets when it asks what the user can see.
-		const reading = { at: message.camera };
-		wire.lastCamera = reading;
-		if (message.agentId) wire.cameras.set(message.agentId, reading);
+		// Recorded, not acted on: the camera is the browser's, and this is what one agent is told
+		// when it asks where its stage is looking (`deck/cameras.ts`). Nothing is placed by it.
+		if (!wire.agents.get(message.agentId)) return;
+		wire.cameras.report(message.agentId, message.camera);
 	},
 
 	/** The deck's timezone, from Settings. */

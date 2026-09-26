@@ -128,3 +128,22 @@ test("the person's edits undo and redo, and a step is refused once an agent has 
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("what is drawn on a stage, for placement: top-level items, not boards, not arrows", () => {
+	const dir = deck();
+	const pens = new StagePens(dir, () => {});
+	try {
+		const name = pens.claim("s");
+		pens.edit(name, [
+			{ op: "insert", node: { type: "browser", id: "b", url: "../../boards/one.html", width: 1000, height: 600, metadata: { type: "decks.board", path: "boards/one.html" } }, box: { x1: 0, y1: 0 } },
+			{ op: "insert", node: { type: "note", id: "n", content: "beside it", width: 200, height: 120 }, box: { x1: 1100, y1: 0 } },
+			{ op: "insert", node: { type: "frame", id: "f", width: 400, height: 300, children: [{ type: "rectangle", id: "inside", width: 50, height: 50 }] }, box: { x1: 0, y1: 800 } },
+			{ op: "insert", node: { type: "path", id: "a", metadata: { type: "decks.arrow", from: "n", to: "boards/one.html" } } },
+		]);
+		const drawn = pens.drawn(name);
+		assert.deepEqual(drawn.map((box) => [box.x, box.y]).sort(), [[0, 800], [1100, 0]], "the note and the frame, and nothing inside the frame");
+	} finally {
+		pens.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

@@ -473,9 +473,18 @@ export function App() {
 	 * `stage.viewport()` had nothing to answer with. Read at fire time rather than now,
 	 * because the deck arrives and fits itself in the first moments and this should carry
 	 * where that left the camera, not the {0,0,1} it started at.
+	 *
+	 * Once there is a conversation to report it for: a reading has to name whose stage it is,
+	 * and the deck may still be arriving at 400ms. A later switch reports from `landed`.
 	 */
-	onMount(() => {
-		const timer = window.setTimeout(() => reportCamera(camera()), 400);
+	let reportedOpening = false;
+	createEffect(() => {
+		const id = state.focused;
+		if (!id || reportedOpening) return;
+		reportedOpening = true;
+		const timer = window.setTimeout(() => {
+			if (state.focused === id) reportCamera(camera(), id);
+		}, 400);
 		onCleanup(() => clearTimeout(timer));
 	});
 
@@ -521,6 +530,9 @@ export function App() {
 		const size = { width: window.innerWidth, height: window.innerHeight };
 		const next = viewOnSwitch({ view, playing, boards: state.boards, viewport: size, region: canvasBox(size) });
 		if (next) setCamera(next);
+		// The camera is this conversation's now, moved or not: say so, or its next board is
+		// placed from the reading of whichever stage was on screen before (`camera-report.ts`).
+		reportCamera(camera(), id);
 		/* The board selection follows the camera. It was global, which made it inconsistent
 		   with the *component* selection — the two are the same kind of fact. */
 		setSelected(selectionOnSwitch(view, playing));

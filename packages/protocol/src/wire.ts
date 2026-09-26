@@ -168,7 +168,11 @@ export type ClientMessage =
 	 * looking" — which is what it always claimed to mean.
 	 */
 	/** Where the person is looking. `agentId` names a parked conversation's view. */
-	| { type: "camera.set"; camera: Camera; agentId?: string }
+	/**
+	 * Where one agent's stage is looking. `agentId` is required: a reading that does not say whose
+	 * stage it is would anchor new boards on somebody else's view (`deck/cameras.ts`).
+	 */
+	| { type: "camera.set"; camera: Camera; agentId: string }
 	/** A new agent — in a workspace, when made from under its heading. */
 	| { type: "agent.create"; kind?: AgentKind; workspace?: string }
 	| { type: "agent.focus"; id: string }

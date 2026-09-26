@@ -126,6 +126,8 @@ const CHECKS = [
 	 * and a view that never moves to it is still a board you cannot find.
 	 */
 	{ file: "placement.mjs", needsAgent: false },
+	/* The same rule when every camera is wrong: another window on another agent, this one panned away, a note in the slot. */
+	{ file: "placement-views.mjs", needsAgent: false },
 	/*
 	 * A camera that *arrives*. Its own check rather than a section of `camera.mjs`, because that
 	 * one is about the camera's arithmetic and this one is about a clock: it samples the world

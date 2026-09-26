@@ -135,7 +135,7 @@ export const boards = {
 	"board.play": (message, _reply, wire) => {
 		const agent = wire.target();
 		// A board picked out of the rail is a board joining the canvas, so it is placed beside what
-		// is on it unless the place it already has is somewhere you can see (`deck/place.ts`).
+		// is on it unless the place it already has is already beside it (`deck/place.ts`).
 		agent.setInPlay([...agent.inPlay, message.path], { place: true });
 	},
 
@@ -181,9 +181,9 @@ export const boards = {
 		/*
 		 * The place first, then the canvas. A drop and a double-click name the point themselves, and
 		 * a place that is already there is a place `setInPlay` keeps — so this order is what stops
-		 * the board being put in the middle of the view for one frame and then moved to the cursor.
-		 * With no point named — the ＋ in the corner — there is nothing to keep and the board lands
-		 * in the middle of what you are looking at.
+		 * the board being put beside the newest board for one frame and then moved to the cursor.
+		 * With no point named — the ＋ in the corner — there is nothing to keep and the board takes
+		 * the nearest open slot beside the stage's newest board (`deck/place.ts`).
 		 */
 		if (message.at && Number.isFinite(message.at.x) && Number.isFinite(message.at.y)) {
 			agent.setPosition(path, Math.round(message.at.x), Math.round(message.at.y));
@@ -338,7 +338,7 @@ async function runBoardEval(
 		setInPlay: (paths: string[]) => focused.setInPlay(paths, { place: true }),
 		positions: () => focused.positions(),
 		setPosition: (board: string, x: number, y: number) => focused.setPosition(board, x, y),
-		camera: () => (wire.cameras.get(focused.id) ?? wire.lastCamera).at,
+		camera: () => wire.cameras.answer(focused.id),
 		queue: () => focused.queue(),
 		agents: () => wire.agents.summaries(),
 		send: (fromId: string, target: string, spec: Parameters<Registry["send"]>[2]) => wire.agents.send(fromId, target, spec),

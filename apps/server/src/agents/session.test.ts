@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { AgentModel, AgentUsage, ChatItem, ModelOption, ServerMessage } from "@decks/protocol";
+import { Cameras } from "../deck/cameras.ts";
 import { Deck } from "../deck/loader.ts";
 import type { StageService } from "../stage/service.ts";
 import { DeckAgent } from "./session.ts";
@@ -29,6 +30,8 @@ function agentOn(
 		models?: ModelOption[];
 		/** What the browser last said this conversation was looking at, for the placement rule. */
 		camera?: { x: number; y: number; zoom: number; width?: number; height?: number };
+		/** The readings every browser has reported, as the server keeps them; one is made if not given. */
+		cameras?: Cameras;
 		restored?: {
 			id: string;
 			/** The transcript to leave on disk for this row — see `agentOn`. */
@@ -62,7 +65,7 @@ function agentOn(
 	 * agent's directory. `items` is this helper's shorthand for that and never reaches the
 	 * constructor, whose `restored` is about the *row* rather than the conversation.
 	 */
-	const { restored, camera, ...rest } = options;
+	const { restored, camera, cameras = new Cameras(), ...rest } = options;
 	if (restored && restored.items.length > 0) {
 		const folder = join(deck.path, ".decks", "agents", restored.id);
 		mkdirSync(folder, { recursive: true });
@@ -75,7 +78,7 @@ function agentOn(
 		{} as StageService,
 		{
 			port: 4329,
-			camera: () => camera ?? { x: 0, y: 0, zoom: 1, width: 1440, height: 900 },
+			camera: (id: string) => cameras.answer(id),
 			agents: () => [],
 			send: () => ({ queued: true as const, position: 1 }),
 			queue: () => [],
@@ -91,10 +94,11 @@ function agentOn(
 		// is the one thing that does — written above, read back only when asked for.
 		{ color: "#000", kind: "pi", snapshots: new AgentStateStore(), store, ...rest, ...(restored ? { restored: row } : {}) },
 	);
+	if (camera) cameras.report(agent.id, camera);
 	const context = () => agent.context.join(" ");
 	const inPlay = () => agent.inPlay.join(" ");
 	const last = () => sent.filter((message) => message.type === "context.changed").at(-1);
-	return { agent, store, sent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+	return { agent, cameras, store, sent, context, inPlay, last, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
 	test("a dormant chat's row names the model it was restored with", () => {
@@ -728,12 +732,36 @@ test("a restored row shows its last line before its transcript is read", () => {
  * deck that is a column a million pixels tall, so a board arrived forty screens from the one being
  * read and nothing moved to show it.
  */
-test("a board joining the canvas lands where the conversation is looking", () => {
-	const { agent, cleanup } = agentOn(["one.html"], { camera: { x: 6000, y: 6000, zoom: 1, width: 1440, height: 900 } });
+test("a board joining the stage lands beside the stage's newest board", () => {
+	const { agent, cleanup } = agentOn(["one.html", "two.html", "three.html"]);
+	agent.setPosition("boards/one.html", 0, 0);
 	agent.setInPlay(["boards/one.html"], { place: true });
-	const at = agent.positions()["boards/one.html"];
-	assert.ok(at, "the board was given a place");
-	assert.ok(Math.hypot(at.x - 6000, at.y - 6000) < 2000, `${JSON.stringify(at)} is in the view, not below the deck`);
+	// Two goes under one, so "beside the newest" and "right of them all" are different answers.
+	agent.setPosition("boards/two.html", 0, 1000);
+	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
+	agent.setInPlay(["boards/one.html", "boards/two.html", "boards/three.html"], { place: true });
+	const at = (path: string) => agent.positions()[path];
+	assert.deepEqual(at("boards/two.html"), { x: 0, y: 1000 }, "two kept its place under one");
+	const three = at("boards/three.html");
+	assert.equal(three?.y, 1000, `${JSON.stringify(three)} is level with two.html, the newest`);
+	assert.ok(three && three.x > 0 && three.x < 2000, "and just to its right");
+	cleanup();
+});
+
+/*
+ * The bug that came back twice: a board was placed at the middle of a camera, and the camera was
+ * another canvas's, then whichever browser panned last, so boards landed in somebody else's
+ * cluster, 95,000 px from their own. Placement reads the stage now and no camera at all.
+ */
+test("where any browser is looking, this chat's included, does not move where a board lands", () => {
+	const far = { x: -18_000, y: 950_000, zoom: 1, width: 1378, height: 702 };
+	const { agent, cameras, cleanup } = agentOn(["one.html", "two.html"], { camera: far });
+	cameras.report("someone-else", { ...far, x: 40_000 });
+	agent.setPosition("boards/one.html", 0, 0);
+	agent.setInPlay(["boards/one.html"], { place: true });
+	agent.setInPlay(["boards/one.html", "boards/two.html"], { place: true });
+	const two = agent.positions()["boards/two.html"];
+	assert.ok(two && Math.hypot(two.x, two.y) < 3000, `${JSON.stringify(two)} is beside one.html`);
 	cleanup();
 });
 
@@ -773,13 +801,12 @@ test("restoring a canvas places nothing: the arrangement is the one the person l
 });
 
 test("clearing the canvas and playing a board back leaves it where it was", () => {
-	const { agent, cleanup } = agentOn(["one.html"], { camera: { x: 40_000, y: 40_000, zoom: 1, width: 1440, height: 900 } });
+	const { agent, cleanup } = agentOn(["one.html"]);
 	agent.setPosition("boards/one.html", 0, 0);
 	agent.setInPlay(["boards/one.html"], { place: true });
 	agent.setInPlay([], { place: true });
 	agent.setInPlay(["boards/one.html"], { place: true });
-	// The camera is 40,000 px away and the canvas was empty, and neither is a reason to move a
-	// board somebody put somewhere: what moves instead is the camera, once the board is on.
+	// The canvas was empty, and that is no reason to move a board somebody put somewhere.
 	assert.deepEqual(agent.positions()["boards/one.html"], { x: 0, y: 0 });
 	cleanup();
 });

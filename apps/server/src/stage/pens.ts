@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { join } from "node:path";
-import { apply, baseTheme, emptyDocument, ids, parse, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed } from "@decks/pen";
+import { apply, ARROW, baseTheme, emptyDocument, ids, parse, PenError, placements, read, reroute, serialize, walk, type Frame, type Op, type OpResult, type PenDocument, type PenNode, type Placed } from "@decks/pen";
 import type { ServerMessage } from "@decks/protocol";
 import { slug } from "../agents/slug.ts";
 import { fileUrl } from "../deck/roots.ts";
@@ -255,6 +255,21 @@ export class StagePens {
 			const path = boardOf(node);
 			const box = path ? placed.get(node.id)?.box : undefined;
 			if (path && box && !out.some((one) => one.path === path)) out.push({ path, id: node.id, x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.w), h: Math.round(box.h) });
+		}
+		return out;
+	}
+
+	/**
+	 * Everything drawn on a stage that is not a board, as boxes: what a board joining the stage must
+	 * not land on (`deck/place.ts`). Only top-level items, since a frame's box already holds what is
+	 * in it. Arrows are left out: they run between things, and a board beside two others would
+	 * always be sitting on the arrow joining them.
+	 */
+	drawn(name: string): Array<{ x: number; y: number; w: number; h: number }> {
+		const out: Array<{ x: number; y: number; w: number; h: number }> = [];
+		for (const { node, box, parent } of this.placedOf(name).values()) {
+			if (parent !== undefined || boardOf(node) || node.metadata?.type === ARROW) continue;
+			if (box.w > 0 && box.h > 0) out.push({ x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.w), h: Math.round(box.h) });
 		}
 		return out;
 	}
