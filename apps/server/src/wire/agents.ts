@@ -27,7 +27,15 @@ export const agents = {
 		 * the focus — its parent is mid-turn and still has something to say.
 		 */
 		wire.agents.focus(agent.id);
+		/*
+		 * A fresh agent gets its own canvas so the person lands somewhere, not on another
+		 * agent's arrangement. The title comes from the agent's display name; newStage
+		 * throws if the name is already taken, in which case the agent still works — it
+		 * just shares the default stage — so the error is intentionally swallowed.
+		 */
+		try { agent.newStage?.(agent.chat().name); } catch { /* name clash — keep going */ }
 		void wire.publishAccounts();
+		wire.publishStages();
 	},
 
 	"agent.focus": (message, reply, wire) => {
