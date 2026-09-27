@@ -854,16 +854,17 @@
 	position: absolute;
 	inset: 0;
 }
-	/* The stage's drawing (`canvas/pen/layer.ts`): under the boards, and never in the way of a gesture. */
-	.stage > .pen-layer {
+	/*
+	 * The stage's drawing (`canvas/pen/layer.ts`): under the boards, and never in the way of a gesture.
+	 * The world's first child, with no `z-index`, so every board after it is over it. Both sheets are
+	 * placed in stage units by the layer, over the region it painted, and moved by the world's transform.
+	 */
+	.world > .pen-layer {
 	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
+	top: 0;
+	left: 0;
+	transform-origin: 0 0;
 	pointer-events: none;
-}
-	.stage[data-focus="true"] > .pen-layer {
-	display: none;
 }
 	/*
 	 * Boards are at the back (`pen/layer.ts`): the drawing's over sheet and its click shapes are among

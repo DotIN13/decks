@@ -37,10 +37,20 @@ import { backdrops, boundsOf } from "./bounds.ts";
  * against. A click on a shape is the drawing's; a click beside it reaches the board underneath.
  *
  * The document is laid out and recorded **once per change** into Skia pictures in stage
- * coordinates; every frame after that only replays them under the camera — a translate and a scale
- * — so a pan costs the same whether the drawing has five items or five hundred, and stays sharp at
- * any zoom because the pictures are vectors, not pixels. The under sheet is fixed to the window;
- * the over sheet lives among the boards, so it is placed back over the window each time it is drawn.
+ * coordinates, and stays sharp at any zoom because the pictures are vectors, not pixels.
+ *
+ * **A pan paints nothing.** Both sheets are in the world, among the boards, under the same transform
+ * that moves them: each is a canvas placed in stage units over a *painted region* — the window and a
+ * quarter of a window round it — and its pixels are the region at the zoom it was painted at, one
+ * pixel to a device pixel. A pan moves it with the boards and costs the drawing nothing; it is
+ * painted again only when the view nears the region's edge, when the drawing or the scheme or the
+ * window changes, or when a zoom comes to rest. While a zoom is under way the old painting is
+ * stretched by the world's transform, as the boards are, and it is painted sharp once, when the zoom
+ * stops (`ZOOM_REST_MS`). Replaying the whole picture into two window-sized WebGL canvases on every
+ * camera frame, which is what this did before, kept a weak GPU busy for the whole of a pan: the
+ * frames fell to forty a second and the stage trailed the hand.
+ *
+ * A sheet with nothing on it is hidden and never painted: most stages have nothing under their boards.
  *
  * CanvasKit is loaded the first time a document has anything in it, never for an empty stage.
  */
@@ -50,7 +60,50 @@ interface Sheet {
 	surface?: Surface;
 	size: string;
 	picture?: Picture;
+	/** Whether anything is drawn on this sheet at all; an empty one is hidden and never painted. */
+	filled?: boolean;
 }
+
+/**
+ * Where the sheets were last painted: a rectangle in stage units, and the zoom, the device pixel
+ * ratio and the window they were painted for. `scale` is device pixels to a stage unit.
+ */
+interface Region {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	zoom: number;
+	scale: number;
+	dpr: number;
+	pixels: { width: number; height: number };
+}
+
+/** How far past the window the sheets are painted, on each side, as a fraction of the window. */
+const MARGIN = 0.25;
+/** How long the zoom has to stay the same before the drawing is painted sharp at it. */
+const ZOOM_REST_MS = 200;
+/**
+ * The most pixels a sheet's backing store may have: a side the GPU can hold as one texture, and an
+ * area of a large window's worth at 2x. Past either the margin is given up first, then resolution.
+ */
+const MAX_AREA = 24_000_000;
+let maxSide: number | undefined;
+const sideLimit = (): number => {
+	if (maxSide === undefined) {
+		maxSide = 8192;
+		try {
+			const gl = document.createElement("canvas").getContext("webgl");
+			if (gl) {
+				maxSide = Math.min(maxSide, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);
+				gl.getExtension("WEBGL_lose_context")?.loseContext();
+			}
+		} catch {
+			// No WebGL to ask: the software surface has no texture limit, and 8192 is sane for it.
+		}
+	}
+	return maxSide;
+};
 
 export type SheetName = "under" | "over";
 
@@ -67,6 +120,12 @@ export class PenLayer {
 	private camera: Camera = { x: 0, y: 0, zoom: 1 };
 	private view = { width: 0, height: 0 };
 	private dirty = true;
+	/** The sheets no longer show what they should (a new picture, a slide, a new element or window). */
+	private stale = true;
+	private region: Region | undefined;
+	/** A zoom is under way: the painting is stretched until it rests (`ZOOM_REST_MS`). */
+	private zooming = false;
+	private zoomRest: ReturnType<typeof setTimeout> | undefined;
 	private frame = 0;
 	private starting: Promise<void> | undefined;
 	private readonly images = new Map<string, Image | "loading" | "failed">();
@@ -285,7 +344,9 @@ export class PenLayer {
 
 	attach(element: HTMLCanvasElement, sheet: SheetName = "under"): void {
 		this.sheets[sheet].surface?.delete();
-		this.sheets[sheet] = { element, size: "", ...(this.sheets[sheet].picture ? { picture: this.sheets[sheet].picture } : {}) };
+		const { picture, filled } = this.sheets[sheet];
+		this.sheets[sheet] = { element, size: "", ...(picture ? { picture } : {}), ...(filled !== undefined ? { filled } : {}) };
+		this.stale = true;
 		this.schedule();
 	}
 
@@ -337,7 +398,20 @@ export class PenLayer {
 		this.schedule();
 	}
 
+	/**
+	 * The camera the boards are under. A pan inside the painted region paints nothing (the sheets
+	 * are in the world and move with it); a change of zoom is noted, and the drawing painted sharp
+	 * at the new zoom once it has held still for `ZOOM_REST_MS`.
+	 */
 	setCamera(camera: Camera): void {
+		if (camera.zoom !== this.camera.zoom) {
+			this.zooming = true;
+			clearTimeout(this.zoomRest);
+			this.zoomRest = setTimeout(() => {
+				this.zooming = false;
+				this.schedule();
+			}, ZOOM_REST_MS);
+		}
 		this.camera = camera;
 		this.schedule();
 	}
@@ -345,6 +419,7 @@ export class PenLayer {
 	setView(view: { width: number; height: number }): void {
 		if (view.width === this.view.width && view.height === this.view.height) return;
 		this.view = view;
+		this.stale = true;
 		this.schedule();
 	}
 
@@ -352,6 +427,7 @@ export class PenLayer {
 		this.disposed = true;
 		this.dropSlide();
 		cancelAnimationFrame(this.frame);
+		clearTimeout(this.zoomRest);
 		for (const sheet of Object.values(this.sheets)) {
 			sheet.picture?.delete();
 			sheet.surface?.delete();
@@ -407,6 +483,7 @@ export class PenLayer {
 		for (const sheet of Object.values(this.sheets)) {
 			sheet.picture?.delete();
 			delete sheet.picture;
+			sheet.filled = false;
 		}
 		this.placed = new Map();
 		this.bounds = new Map();
@@ -461,6 +538,7 @@ export class PenLayer {
 			const recorder = new ck.PictureRecorder();
 			paintDocument(recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7)), parts[name], ctx);
 			this.sheets[name].picture = recorder.finishRecordingAsPicture();
+			this.sheets[name].filled = parts[name].length > 0;
 			recorder.delete();
 		}
 		this.writeHits();
@@ -491,27 +569,76 @@ export class PenLayer {
 		const { ck } = this;
 		if (this.disposed) return;
 		const empty = !this.doc || this.doc.children.length === 0;
-		for (const sheet of Object.values(this.sheets)) if (sheet.element) sheet.element.hidden = empty;
+		if (empty) for (const sheet of Object.values(this.sheets)) if (sheet.element) sheet.element.hidden = true;
 		if (empty || !ck) return;
 		if (this.dirty) {
 			this.dirty = false;
 			this.rebuild();
+			this.stale = true;
 		}
-		if (this.slide && !this.slide.base) this.recordSlide();
+		// A slide is painted on every frame it moves: what is carried is not where it was painted.
+		if (this.slide) {
+			if (!this.slide.base) this.recordSlide();
+			this.stale = true;
+		}
+		const region = this.nextRegion();
+		if (!region) return;
+		this.stale = false;
+		this.region = region;
 		const slide = this.slide?.base && this.slide.carried ? this.slide : undefined;
-		this.paint("under", slide ? slide.base!.under : this.sheets.under.picture);
-		this.paint("over", slide ? slide.base!.over : this.sheets.over.picture, slide ? { picture: slide.carried!, dx: slide.dx, dy: slide.dy } : undefined);
+		this.paint("under", region, slide ? slide.base!.under : this.sheets.under.picture);
+		this.paint("over", region, slide ? slide.base!.over : this.sheets.over.picture, slide ? { picture: slide.carried!, dx: slide.dx, dy: slide.dy } : undefined);
 	}
 
-	/** Draw one sheet: its picture under the camera, and anything being dragged on top of it. */
-	private paint(name: SheetName, picture: Picture | undefined, carried?: { picture: Picture; dx: number; dy: number }): void {
+	/**
+	 * The region to paint the sheets over now, or nothing when the painting on screen still does.
+	 *
+	 * It still does while the window is inside the painted region at the zoom it was painted at: a
+	 * pan. During a zoom it is kept, stretched, as long as it covers the window and is not blown up
+	 * past twice its resolution; the zoom coming to rest paints it again, sharp.
+	 */
+	private nextRegion(): Region | undefined {
+		const { width, height } = this.view;
+		if (width <= 0 || height <= 0) return undefined;
+		const dpr = window.devicePixelRatio || 1;
+		const { x, y, zoom } = this.camera;
+		const was = this.region;
+		if (was && !this.stale && was.dpr === dpr) {
+			// Half a screen pixel of slack, so a region that just covers the window is not painted every frame.
+			const slack = 0.5 / zoom;
+			const hw = width / 2 / zoom;
+			const hh = height / 2 / zoom;
+			const covered = x - hw >= was.x - slack && y - hh >= was.y - slack && x + hw <= was.x + was.w + slack && y + hh <= was.y + was.h + slack;
+			if (covered && (zoom === was.zoom || (this.zooming && zoom <= was.zoom * 2))) return undefined;
+		}
+		/*
+		 * The window and a margin round it, one pixel to a device pixel — unless that is more than
+		 * the GPU should hold, when the margin shrinks first and then the resolution.
+		 */
+		const limit = sideLimit();
+		const grow = Math.min(1 + 2 * MARGIN, limit / (width * dpr), limit / (height * dpr), Math.sqrt(MAX_AREA / (width * height)) / dpr);
+		const cover = Math.max(1, grow);
+		const scale = zoom * dpr * Math.min(1, grow);
+		const pixels = {
+			width: Math.max(1, Math.min(limit, Math.ceil(width * cover * dpr * Math.min(1, grow)))),
+			height: Math.max(1, Math.min(limit, Math.ceil(height * cover * dpr * Math.min(1, grow)))),
+		};
+		// The region's corner on a whole device pixel of the window, so what is painted lands on the pixels it was painted for.
+		const left = Math.round(((width - width * cover) / 2) * dpr) / dpr;
+		const top = Math.round(((height - height * cover) / 2) * dpr) / dpr;
+		return { x: x + (left - width / 2) / zoom, y: y + (top - height / 2) / zoom, w: pixels.width / scale, h: pixels.height / scale, zoom, scale, dpr, pixels };
+	}
+
+	/** Paint one sheet over a region: its picture, and anything being dragged on top of it. */
+	private paint(name: SheetName, region: Region, picture: Picture | undefined, carried?: { picture: Picture; dx: number; dy: number }): void {
 		const { ck } = this;
 		const sheet = this.sheets[name];
 		const element = sheet.element;
 		if (!ck || !element) return;
-		const dpr = window.devicePixelRatio || 1;
-		const width = Math.max(1, Math.round(this.view.width * dpr));
-		const height = Math.max(1, Math.round(this.view.height * dpr));
+		const filled = (sheet.filled && picture) || carried;
+		element.hidden = !filled;
+		if (!filled) return;
+		const { width, height } = region.pixels;
 		const size = `${width}x${height}`;
 		if (!sheet.surface || size !== sheet.size) {
 			sheet.surface?.delete();
@@ -521,24 +648,18 @@ export class PenLayer {
 			sheet.size = size;
 			if (!sheet.surface) return;
 		}
-		const { x, y, zoom } = this.camera;
-		if (name === "over") {
-			/*
-			 * The over sheet is among the boards, inside their transform, so it is placed back over the
-			 * window: the inverse of the camera. Set here, with the camera this picture is drawn for, so
-			 * between two frames it moves with the boards instead of a frame ahead of them.
-			 */
-			element.style.width = `${this.view.width}px`;
-			element.style.height = `${this.view.height}px`;
-			element.style.transform = `translate(${x - this.view.width / 2 / zoom}px, ${y - this.view.height / 2 / zoom}px) scale(${1 / zoom})`;
-		}
+		/*
+		 * Placed in stage units, in the world, where the region is: the world's transform puts it on
+		 * screen with the boards. Set here, with the picture drawn for it, so the two change together.
+		 */
+		element.style.width = `${region.w}px`;
+		element.style.height = `${region.h}px`;
+		element.style.transform = `translate(${region.x}px, ${region.y}px)`;
 		const canvas = sheet.surface.getCanvas();
 		canvas.clear(ck.TRANSPARENT);
 		canvas.save();
-		canvas.scale(dpr, dpr);
-		canvas.translate(this.view.width / 2, this.view.height / 2);
-		canvas.scale(zoom, zoom);
-		canvas.translate(-x, -y);
+		canvas.scale(region.scale, region.scale);
+		canvas.translate(-region.x, -region.y);
 		if (picture) canvas.drawPicture(picture);
 		if (carried) {
 			canvas.translate(carried.dx, carried.dy);

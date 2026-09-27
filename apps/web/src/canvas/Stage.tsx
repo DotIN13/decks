@@ -1641,7 +1641,10 @@ export function Stage(props: {
 	const writeTransform = (cam: Camera) => {
 		const v = view();
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
-		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
+		/*
+		 * The drawing is in the world and moves with it; it is told the camera so it can paint again
+		 * when the view nears the edge of what it painted, or a zoom comes to rest.
+		 */
 		penLayer.setCamera(cam);
 		// And the title bars, which are in a layer of their own that does not zoom.
 		const layer = barLayer();
@@ -2812,9 +2815,12 @@ export function Stage(props: {
 			 * editor's patch target and a deck's page handle all find the frame that is on screen,
 			 * and there is no second one for them to find instead.
 			 */}
-			{/* The drawing under the boards (`pen/layer.ts`). */}
-			<canvas class="pen-layer" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas)} />
 			<div class="world" data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
+				{/*
+				 * The drawing under the boards (`pen/layer.ts`): the world's first child, so every board
+				 * is over it, and in the world, so a pan moves it with them without painting it again.
+				 */}
+				<canvas class="pen-layer" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas)} />
 				<For each={props.boards.filter((board) => board.path !== props.focus)} fallback={null}>
 					{(board) => boardNode(board)}
 				</For>

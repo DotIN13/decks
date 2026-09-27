@@ -34,7 +34,7 @@ async function main(): Promise<void> {
 	const world = document.getElementById("world")!;
 	world.style.transform = `translate(${view.width / 2}px, ${view.height / 2}px) scale(${zoom}) translate(${-camera.x}px, ${-camera.y}px)`;
 
-	// The boards in the box, as the frames the canvas would show; before the over sheet, so under it.
+	// The boards in the box, as the frames the canvas would show: between the two sheets, so over the under one and under the over one.
 	const over = world.querySelector("canvas.over")!;
 	const inView = boards.filter((b) => b.x < box.x2 && b.x + b.w > box.x1 && b.y < box.y2 && b.y + b.h > box.y1);
 	const ready = inView.map(
