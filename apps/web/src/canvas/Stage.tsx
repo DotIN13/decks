@@ -239,6 +239,15 @@ export function Stage(props: {
 	let element!: HTMLDivElement;
 	let worldEl!: HTMLDivElement;
 	let localCamera = props.camera;
+	/**
+	 * Presses in hand that want to hear the camera move. A wheel or a glide during a drag moves the
+	 * world under a pointer that has not moved, so `follow` replays its last step against the new
+	 * camera, and what is carried stays under the cursor.
+	 */
+	const cameraWatchers = new Set<() => void>();
+	const cameraChanged = () => {
+		for (const watch of [...cameraWatchers]) watch();
+	};
 	/** When the camera last moved, read by `board-admission.ts`. */
 	let lastMoved = 0;
 	let rafId: number | undefined;
@@ -963,6 +972,9 @@ export function Stage(props: {
 	 * The pointer is captured by `on`, the stage unless said otherwise, and the click that ends the
 	 * press goes to whatever captured it — so a press on a board's title bar keeps it on the bar, or
 	 * its double-click would reach the canvas and make a board.
+	 *
+	 * The camera can move while the press is held (a wheel, a glide), and then the last step runs
+	 * again: a `move` that reads the pointer in world space (`worldAt`) follows the cursor.
 	 */
 	const follow = (event: PointerEvent, move: (e: PointerEvent) => void, done: (moved: boolean, e: PointerEvent) => void, on: HTMLElement = element) => {
 		try {
@@ -972,12 +984,19 @@ export function Stage(props: {
 		}
 		const start = { x: event.clientX, y: event.clientY };
 		let moved = false;
+		let last: PointerEvent | undefined;
 		const onMove = (e: PointerEvent) => {
 			if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 3) return;
 			moved = true;
+			last = e;
 			move(e);
 		};
+		const replay = () => {
+			if (moved && last) move(last);
+		};
+		cameraWatchers.add(replay);
 		const finish = (e: PointerEvent) => {
+			cameraWatchers.delete(replay);
 			on.removeEventListener("pointermove", onMove);
 			on.removeEventListener("pointerup", finish);
 			on.removeEventListener("pointercancel", finish);
@@ -1090,11 +1109,13 @@ export function Stage(props: {
 		const start = selectionBox(ids, boards);
 		const targets = snapTargets(ids, boards);
 		let offset = { dx: 0, dy: 0 };
+		const from = worldAt(event);
 		follow(
 			event,
 			(e) => {
-				let dx = (e.clientX - event.clientX) / localCamera.zoom;
-				let dy = (e.clientY - event.clientY) / localCamera.zoom;
+				const now = worldAt(e);
+				let dx = now.x - from.x;
+				let dy = now.y - from.y;
 				if (e.shiftKey) {
 					if (Math.abs(dx) > Math.abs(dy)) dy = 0;
 					else dx = 0;
@@ -1300,11 +1321,13 @@ export function Stage(props: {
 			...(handle.includes("n") ? (["y1"] as const) : []),
 			...(handle.includes("s") ? (["y2"] as const) : []),
 		];
+		const from = worldAt(event);
 		follow(
 			event,
 			(e) => {
-				const dx = (e.clientX - event.clientX) / localCamera.zoom;
-				const dy = (e.clientY - event.clientY) / localCamera.zoom;
+				const now = worldAt(e);
+				const dx = now.x - from.x;
+				const dy = now.y - from.y;
 				let x1 = start.x + (handle.includes("w") ? dx : 0);
 				let x2 = start.x + start.w + (handle.includes("e") ? dx : 0);
 				let y1 = start.y + (handle.includes("n") ? dy : 0);
@@ -1362,11 +1385,13 @@ export function Stage(props: {
 			...(!slides && handle.includes("s") ? (["y2"] as const) : []),
 		];
 		let next = start;
+		const from = worldAt(event);
 		follow(
 			event,
 			(e) => {
-				const dx = (e.clientX - event.clientX) / localCamera.zoom;
-				const dy = (e.clientY - event.clientY) / localCamera.zoom;
+				const now = worldAt(e);
+				const dx = now.x - from.x;
+				const dy = now.y - from.y;
 				let x1 = start.x + (handle.includes("w") ? dx : 0);
 				let x2 = start.x + start.w + (handle.includes("e") ? dx : 0);
 				let y1 = start.y + (!slides && handle.includes("n") ? dy : 0);
@@ -1697,6 +1722,7 @@ export function Stage(props: {
 		lastMoved = performance.now();
 		localCamera = cam;
 		writeTransform(cam);
+		cameraChanged();
 		pendingCamera = cam;
 		if (rafId === undefined) {
 			rafId = requestAnimationFrame(() => {
@@ -1822,6 +1848,7 @@ export function Stage(props: {
 			localCamera = target;
 		}
 		writeTransform(target);
+		if (moved) cameraChanged();
 	});
 
 	onCleanup(() => {

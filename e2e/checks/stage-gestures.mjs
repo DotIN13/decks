@@ -194,6 +194,45 @@ if (bar) {
 		return now && Math.abs(now.x - boardBefore.x - Math.round(30 / m.a)) <= 2;
 	});
 	say("…and the board moves with the items", !!boardMoved, JSON.stringify({ was: boardBefore?.x, now: onDisk().children.find((n) => n.metadata?.path === bar.path)?.x }));
+
+	// A scroll while carrying them moves the camera; what is carried stays under the cursor.
+	await drawnWhereFileSays("g-a");
+	const carried = { a: item("g-a"), b: item("g-b"), board: onDisk().children.find((n) => n.metadata?.path === bar.path) };
+	const a3 = await centre("g-a");
+	const pressedAt = toWorld(await matrix(), a3.x, a3.y);
+	await page.mouse.move(a3.x, a3.y);
+	await page.mouse.down();
+	await page.mouse.move(a3.x + 30, a3.y + 20, { steps: 4 });
+	await page.mouse.wheel(0, 160);
+	await settle(page, 400);
+	await page.mouse.move(a3.x + 40, a3.y + 20, { steps: 2 });
+	const m3 = await matrix();
+	const releasedAt = toWorld(m3, a3.x + 40, a3.y + 20);
+	await page.mouse.up();
+	const want = { dx: releasedAt.x - pressedAt.x, dy: releasedAt.y - pressedAt.y };
+	// Snapping may pull it a few screen pixels.
+	const slack = 10 / m3.a;
+	const followed = await until(() => {
+		const a = item("g-a");
+		const board = onDisk().children.find((n) => n.metadata?.path === bar.path);
+		const ok = (was, now) => Math.abs(now.x - was.x - want.dx) <= slack && Math.abs(now.y - was.y - want.dy) <= slack;
+		return ok(carried.a, a) && ok(carried.board, board) ? { a: [a.x - carried.a.x, a.y - carried.a.y], board: [board.x - carried.board.x, board.y - carried.board.y] } : undefined;
+	});
+	say(
+		"a scroll during a drag keeps the items and the board under the cursor",
+		!!followed && Math.abs(want.dy) > 50,
+		JSON.stringify({ want, a: [item("g-a").x - carried.a.x, item("g-a").y - carried.a.y] }),
+	);
+	// The items back where they were, and the camera too, for the checks after this one.
+	link.send({
+		type: "stage.pen.edit",
+		agentId,
+		ops: ["a", "b"].map((k) => ({ op: "update", id: `g-${k}`, set: { x: carried[k].x, y: carried[k].y } })),
+	});
+	await until(() => item("g-a").y === carried.a.y && item("g-b").y === carried.b.y);
+	await page.mouse.move(room.x + 5, room.y + 5);
+	await page.mouse.wheel(0, -160);
+	await settle(page, 400);
 	// Put it back where the fixture had it.
 	link.send({ type: "board.move", path: bar.path, x: boardBefore.x, y: boardBefore.y });
 }
