@@ -40,75 +40,132 @@ import { backdrops, boundsOf } from "./bounds.ts";
  * coordinates, and stays sharp at any zoom because the pictures are vectors, not pixels.
  *
  * **A pan paints nothing.** Both sheets are in the world, among the boards, under the same transform
- * that moves them: each is a canvas placed in stage units over a *painted region* — the window and a
- * quarter of a window round it — and its pixels are the region at the zoom it was painted at, one
- * pixel to a device pixel. A pan moves it with the boards and costs the drawing nothing; it is
- * painted again only when the view nears the region's edge, when the drawing or the scheme or the
- * window changes, or when a zoom comes to rest. While a zoom is under way the old painting is
- * stretched by the world's transform, as the boards are, and it is painted sharp once, when the zoom
- * stops (`ZOOM_REST_MS`). Replaying the whole picture into two window-sized WebGL canvases on every
- * camera frame, which is what this did before, kept a weak GPU busy for the whole of a pan: the
- * frames fell to forty a second and the stage trailed the hand.
+ * that moves them, and each is a grid of **tiles**: small `<canvas>` elements placed in stage units,
+ * each the picture painted over one square of 512 device pixels at the zoom it was painted for. The
+ * grid is fixed to the stage, not to the window, so a pan moves the tiles with the boards and costs
+ * the drawing nothing, and only the few tiles coming into view — a ring of one tile is kept painted
+ * round the window, ahead of the pan first — are painted, a few a frame (`TILE_MS`), nearest the
+ * middle first. Replaying the whole picture into two window-sized WebGL canvases on every camera
+ * frame kept a weak GPU busy for the whole of a pan (the frames fell to forty a second and the stage
+ * trailed the hand); painting one big region round the window and moving it was better, but painted
+ * all of it again every quarter of a window a pan went.
  *
- * A sheet with nothing on it is hidden and never painted: most stages have nothing under their boards.
+ * **One painter.** A page may only have a handful of WebGL contexts, so the tiles are plain 2D (or
+ * bitmap) canvases, and CanvasKit paints every one of them, in turn, on one hidden 512-pixel WebGL
+ * surface (`Painter`). Each finished tile is handed over whole: `transferToImageBitmap` gives the
+ * surface's pixels away as a texture, with no copy and no read back, and the tile shows it
+ * (`bitmaprenderer`). Where that is missing, the tile draws the surface onto itself instead, which is
+ * a copy on the GPU and never a read back either.
+ *
+ * **A zoom stretches, then sharpens.** While a zoom is under way the tiles are stretched by the
+ * world's transform, as the boards are. When it has been still for `ZOOM_REST_MS` a new generation of
+ * tiles is painted at the new zoom, a few a frame, over the old one, which is let go of once the new
+ * one covers the window: the drawing is never missing, only soft for a moment. A zoom that runs far
+ * out starts a coarser generation on the way, so what comes into view is filled rather than left bare.
+ *
+ * **Edges meet.** Two tiles side by side on a fractional pixel are each drawn with a soft edge by the
+ * compositor, and the two soft edges let the paper through as a faint line. So each sheet is nudged
+ * by less than a device pixel (`place`), with the camera, so that the tiles' corners land on whole
+ * device pixels: at the zoom they were painted for they are copied pixel for pixel, with no seam.
+ *
+ * **Only ink is painted.** A tile with nothing drawn in it (by the items' bounds, padded for shadows)
+ * is never made, and a sheet with nothing on it is hidden: most stages have nothing under their
+ * boards, and a sparse one costs a few tiles.
+ *
+ * **Changes.** A new picture (the drawing, a font or an image arriving, the scheme, an eraser, a word
+ * typed, a table scrolled) marks every tile stale; the ones in view are painted again at once, in the
+ * same frame, and the rest a few a frame. A drag slides what it carries on tiles of its own
+ * (`carried`), painted once and moved by a transform on every step after that.
  *
  * CanvasKit is loaded the first time a document has anything in it, never for an empty stage.
  */
 
+/** One tile: a square of `TILE` device pixels at a scale (`level`, device pixels to a stage unit), at column `c` and row `r`. */
+interface Tile {
+	element: HTMLCanvasElement;
+	level: number;
+	c: number;
+	r: number;
+	/** Painted from the sheet's current picture; a stale one still shows until it is painted again. */
+	fresh: boolean;
+}
+
+/** A set of tiles over one picture: the under sheet, the over sheet, or what a drag carries. */
 interface Sheet {
-	element?: HTMLCanvasElement;
-	surface?: Surface;
-	size: string;
+	element?: HTMLElement;
+	/** The sheet's recorded picture; a slide paints the sheet from its own instead. */
 	picture?: Picture;
 	/** Whether anything is drawn on this sheet at all; an empty one is hidden and never painted. */
 	filled?: boolean;
+	/** Where the picture draws, in stage units, padded for what a shadow or a stroke adds. */
+	ink: Frame[];
+	/** The picture the tiles were painted from: another one makes them stale. */
+	shown?: Picture;
+	/** Its tiles, by `level c r`. */
+	tiles: Map<string, Tile>;
+	/** Whether a cell has ink in it, by `level c r`; forgotten with the picture. */
+	inked: Map<string, boolean>;
+	/** Just made stale: the tiles in view are painted again in this frame, whatever it costs. */
+	urgent?: boolean;
+	/** The transform last written on the element, so an unchanged one is not written again. */
+	placed?: string;
 }
 
+/** The hidden surface every tile is painted on, and how its pixels get to the tile. */
+interface Painter {
+	surface: Surface;
+	source: OffscreenCanvas | HTMLCanvasElement;
+	transfer: boolean;
+}
+
+/** A tile's side, in device pixels. */
+const TILE = 512;
 /**
- * Where the sheets were last painted: a rectangle in stage units, and the zoom, the device pixel
- * ratio and the window they were painted for. `scale` is device pixels to a stage unit.
+ * A tile's bitmap, a pixel more than its side: each tile overlaps the ones to its right and below by
+ * one device pixel of the same picture. The edges cannot be made to meet exactly: far from the stage's
+ * origin (herobrine's drawing is 138,000 units down) the compositor works out where each tile lands in
+ * single precision, and two neighbours came out a fiftieth of a pixel apart, which showed as a faint
+ * line through the words. Overlapping by a pixel covers the gap whatever the rounding.
  */
-interface Region {
-	x: number;
-	y: number;
-	w: number;
-	h: number;
-	zoom: number;
-	scale: number;
-	dpr: number;
-	pixels: { width: number; height: number };
-}
-
-/** How far past the window the sheets are painted, on each side, as a fraction of the window. */
-const MARGIN = 0.25;
+const BITMAP = TILE + 1;
+/** Tiles kept painted round the window, on each side. */
+const RING = 1;
+/** How long a frame may spend painting tiles, and longer when the window has a hole in it. */
+const TILE_MS = 5;
+const HOLE_MS = 12;
 /** How long the zoom has to stay the same before the drawing is painted sharp at it. */
 const ZOOM_REST_MS = 200;
-/**
- * The most pixels a sheet's backing store may have: a side the GPU can hold as one texture, and an
- * area of a large window's worth at 2x. Past either the margin is given up first, then resolution.
- */
-const MAX_AREA = 24_000_000;
-let maxSide: number | undefined;
-const sideLimit = (): number => {
-	if (maxSide === undefined) {
-		maxSide = 8192;
-		try {
-			const gl = document.createElement("canvas").getContext("webgl");
-			if (gl) {
-				maxSide = Math.min(maxSide, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);
-				gl.getExtension("WEBGL_lose_context")?.loseContext();
-			}
-		} catch {
-			// No WebGL to ask: the software surface has no texture limit, and 8192 is sane for it.
-		}
-	}
-	return maxSide;
-};
+/** Tiles kept, all sheets together: each is a megabyte of texture. */
+const MAX_TILES = 256;
+/** Tile elements kept for reuse once let go of. */
+const POOL = 32;
+/** How far past an item's bounds it may draw — the app's note shadow — before its own effects are added. */
+const INK_PAD = 40;
 
 export type SheetName = "under" | "over";
 
 export class PenLayer {
-	private readonly sheets: Record<SheetName, Sheet> = { under: { size: "" }, over: { size: "" } };
+	/**
+	 * `progressive: false` paints every tile in view in the frame that needs it, and none round it:
+	 * the screenshot page (`shot.ts`) has one camera, and must have all of the drawing at once.
+	 */
+	constructor(options?: { progressive?: boolean }) {
+		this.progressive = options?.progressive ?? true;
+	}
+
+	private readonly progressive: boolean;
+	private readonly sheets: Record<SheetName, Sheet> = { under: { ink: [], tiles: new Map(), inked: new Map() }, over: { ink: [], tiles: new Map(), inked: new Map() } };
+	/** What a drag carries, on tiles of its own in the over sheet, moved by a transform as the drag goes. */
+	private readonly carried: Sheet = { ink: [], tiles: new Map(), inked: new Map() };
+	private painter: Painter | null | undefined;
+	/** Tile elements let go of, kept to be used again. */
+	private readonly pool: HTMLCanvasElement[] = [];
+	/** The scale the tiles are being painted at: the camera's, once a zoom rests. */
+	private level: number | undefined;
+	/** Which way the view last moved, in stage units: the ring ahead of a pan is painted first. */
+	private motion = { x: 0, y: 0 };
+	/** Where the world's box is on the page, for placing the tiles on whole device pixels. */
+	private origin = { x: 0, y: 0 };
 	private hits: SVGSVGElement | undefined;
 	/** The top-level items drawn under the boards (`backdrops`). */
 	private under = new Set<string>();
@@ -120,9 +177,6 @@ export class PenLayer {
 	private camera: Camera = { x: 0, y: 0, zoom: 1 };
 	private view = { width: 0, height: 0 };
 	private dirty = true;
-	/** The sheets no longer show what they should (a new picture, a slide, a new element or window). */
-	private stale = true;
-	private region: Region | undefined;
 	/** A zoom is under way: the painting is stretched until it rests (`ZOOM_REST_MS`). */
 	private zooming = false;
 	private zoomRest: ReturnType<typeof setTimeout> | undefined;
@@ -276,6 +330,8 @@ export class PenLayer {
 			const first = moving!.values().next().value!;
 			const kept = this.slide;
 			this.slide = { key, ids: new Set(moving!.keys()), dx: first.dx, dy: first.dy, ...(kept?.base ? { base: kept.base } : {}), ...(kept?.carried ? { carried: kept.carried } : {}) };
+			// A step moves the carried tiles, and paints only those it brings into view.
+			this.place();
 			this.schedule();
 			return;
 		}
@@ -303,7 +359,8 @@ export class PenLayer {
 		const ctx = { ck, fonts, doc: painted.doc, placed: painted.placed, scheme: this.scheme, image: (url: string) => this.image(url), icon: (library: string, name: string, weight: number) => this.icons.get(library, name, weight), scroll: this.scrollOf };
 		const record = (paint: (canvas: ReturnType<InstanceType<CanvasKit["PictureRecorder"]>["beginRecording"]>) => void) => {
 			const recorder = new ck.PictureRecorder();
-			paint(recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7)));
+			// With its bounds worked out, so a tile replays only what is drawn in it.
+			paint(recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7), true));
 			const picture = recorder.finishRecordingAsPicture();
 			recorder.delete();
 			return picture;
@@ -319,6 +376,31 @@ export class PenLayer {
 		});
 		// Carried on the over sheet, so what you are dragging is never hidden under a board.
 		slide.carried = record((canvas) => paintDocument(canvas, carried, ctx));
+		this.carried.ink = this.inkOf(carried);
+	}
+
+	/** Where some top-level items draw (`Sheet.ink`): their bounds, padded for shadows and strokes. */
+	private inkOf(nodes: readonly PenNode[]): Frame[] {
+		const ink: Frame[] = [];
+		for (const node of nodes) {
+			const box = this.bounds.get(node.id) ?? this.placed.get(node.id)?.box;
+			// Nothing known of where it draws: the whole stage, so it is never left out.
+			if (!box) return [{ x: -1e7, y: -1e7, w: 2e7, h: 2e7 }];
+			let pad = INK_PAD;
+			for (const inner of walk([node])) {
+				const stroke = typeof inner.strokeWidth === "number" ? inner.strokeWidth : 0;
+				let reach = stroke;
+				const effects = inner.effect === undefined ? [] : Array.isArray(inner.effect) ? inner.effect : [inner.effect];
+				for (const effect of effects) {
+					if (!effect || effect.type !== "shadow") continue;
+					const at = (value: unknown) => (typeof value === "number" ? Math.abs(value) : 100);
+					reach = Math.max(reach, at(effect.offset?.x ?? 0) + at(effect.offset?.y ?? 0) + at(effect.blur ?? 0) * 1.5 + at(effect.spread ?? 0) + stroke);
+				}
+				pad = Math.max(pad, INK_PAD + reach);
+			}
+			ink.push({ x: box.x - pad, y: box.y - pad, w: box.w + pad * 2, h: box.h + pad * 2 });
+		}
+		return ink;
 	}
 
 	/** Items drawn as if gone, while an eraser is over them and before the delete comes back. */
@@ -342,11 +424,28 @@ export class PenLayer {
 		this.schedule();
 	}
 
-	attach(element: HTMLCanvasElement, sheet: SheetName = "under"): void {
-		this.sheets[sheet].surface?.delete();
-		const { picture, filled } = this.sheets[sheet];
-		this.sheets[sheet] = { element, size: "", ...(picture ? { picture } : {}), ...(filled !== undefined ? { filled } : {}) };
-		this.stale = true;
+	/**
+	 * The element a sheet's tiles are put in: a box in the world, at its origin. The over sheet's
+	 * also holds the tiles of what a drag carries, over its own.
+	 */
+	attach(element: HTMLElement, sheet: SheetName = "under"): void {
+		const at = this.sheets[sheet];
+		// The tiles were in the element before, and went with it.
+		at.tiles.clear();
+		delete at.shown;
+		delete at.placed;
+		at.element = element;
+		if (sheet === "over") {
+			this.carried.tiles.clear();
+			delete this.carried.shown;
+			delete this.carried.placed;
+			const carried = document.createElement("div");
+			carried.className = "pen-carried";
+			element.append(carried);
+			this.carried.element = carried;
+		}
+		this.measure();
+		this.place();
 		this.schedule();
 	}
 
@@ -399,9 +498,9 @@ export class PenLayer {
 	}
 
 	/**
-	 * The camera the boards are under. A pan inside the painted region paints nothing (the sheets
-	 * are in the world and move with it); a change of zoom is noted, and the drawing painted sharp
-	 * at the new zoom once it has held still for `ZOOM_REST_MS`.
+	 * The camera the boards are under. A pan paints nothing (the tiles are in the world and move
+	 * with it) but the tiles it brings into view; a change of zoom is noted, and the drawing painted
+	 * sharp at the new zoom once it has held still for `ZOOM_REST_MS`.
 	 */
 	setCamera(camera: Camera): void {
 		if (camera.zoom !== this.camera.zoom) {
@@ -411,16 +510,55 @@ export class PenLayer {
 				this.zooming = false;
 				this.schedule();
 			}, ZOOM_REST_MS);
+		} else if (camera.x !== this.camera.x || camera.y !== this.camera.y) {
+			this.motion = { x: camera.x - this.camera.x, y: camera.y - this.camera.y };
 		}
 		this.camera = camera;
+		// In the same call as the world's transform, so the nudge onto whole pixels is never a frame behind it.
+		this.place();
 		this.schedule();
 	}
 
 	setView(view: { width: number; height: number }): void {
 		if (view.width === this.view.width && view.height === this.view.height) return;
 		this.view = view;
-		this.stale = true;
+		this.measure();
+		this.place();
 		this.schedule();
+	}
+
+	/** Where the world's box is on the page: the tiles are put on whole device pixels of the page, not of the box. */
+	private measure(): void {
+		const box = (this.sheets.under.element ?? this.sheets.over.element)?.parentElement?.parentElement?.getBoundingClientRect();
+		if (box) this.origin = { x: box.left, y: box.top };
+	}
+
+	/**
+	 * Nudge each sheet by less than a device pixel, so that at the camera's zoom the stage's origin —
+	 * and with it every tile's corner, at the zoom the tiles were painted for — is on a whole device
+	 * pixel (see the top of the file). What a drag carries is moved by whole device pixels too.
+	 */
+	private place(): void {
+		const dpr = window.devicePixelRatio || 1;
+		const { x, y, zoom } = this.camera;
+		const scale = zoom * dpr;
+		const ax = (this.origin.x + this.view.width / 2 - zoom * x) * dpr;
+		const ay = (this.origin.y + this.view.height / 2 - zoom * y) * dpr;
+		const nudge = `translate(${(Math.round(ax) - ax) / scale}px, ${(Math.round(ay) - ay) / scale}px)`;
+		for (const sheet of [this.sheets.under, this.sheets.over]) {
+			if (!sheet.element || sheet.placed === nudge) continue;
+			sheet.element.style.transform = nudge;
+			sheet.placed = nudge;
+		}
+		const carried = this.carried;
+		if (carried.element) {
+			const slide = this.slide;
+			const moved = slide ? `translate(${Math.round(slide.dx * scale) / scale}px, ${Math.round(slide.dy * scale) / scale}px)` : "";
+			if (carried.placed !== moved) {
+				carried.element.style.transform = moved;
+				carried.placed = moved;
+			}
+		}
 	}
 
 	dispose(): void {
@@ -428,10 +566,15 @@ export class PenLayer {
 		this.dropSlide();
 		cancelAnimationFrame(this.frame);
 		clearTimeout(this.zoomRest);
-		for (const sheet of Object.values(this.sheets)) {
+		for (const sheet of [this.sheets.under, this.sheets.over, this.carried]) {
 			sheet.picture?.delete();
-			sheet.surface?.delete();
+			for (const tile of sheet.tiles.values()) tile.element.remove();
+			sheet.tiles.clear();
 		}
+		this.carried.element?.remove();
+		this.pool.length = 0;
+		this.painter?.surface.delete();
+		this.painter = undefined;
 		for (const image of this.images.values()) if (typeof image === "object") image.delete();
 		this.images.clear();
 	}
@@ -536,9 +679,11 @@ export class PenLayer {
 		const parts = this.split(nodes);
 		for (const name of ["under", "over"] as const) {
 			const recorder = new ck.PictureRecorder();
-			paintDocument(recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7)), parts[name], ctx);
+			// With its bounds worked out, so a tile replays only what is drawn in it.
+			paintDocument(recorder.beginRecording(ck.LTRBRect(-1e7, -1e7, 1e7, 1e7), true), parts[name], ctx);
 			this.sheets[name].picture = recorder.finishRecordingAsPicture();
 			this.sheets[name].filled = parts[name].length > 0;
+			this.sheets[name].ink = this.inkOf(parts[name]);
 			recorder.delete();
 		}
 		this.writeHits();
@@ -569,104 +714,280 @@ export class PenLayer {
 		const { ck } = this;
 		if (this.disposed) return;
 		const empty = !this.doc || this.doc.children.length === 0;
-		if (empty) for (const sheet of Object.values(this.sheets)) if (sheet.element) sheet.element.hidden = true;
+		if (empty) {
+			for (const sheet of [this.sheets.under, this.sheets.over, this.carried]) {
+				this.release(sheet, () => true);
+				delete sheet.shown;
+			}
+			for (const sheet of Object.values(this.sheets)) if (sheet.element) sheet.element.hidden = true;
+		}
 		if (empty || !ck) return;
 		if (this.dirty) {
 			this.dirty = false;
 			this.rebuild();
-			this.stale = true;
 		}
-		// A slide is painted on every frame it moves: what is carried is not where it was painted.
-		if (this.slide) {
-			if (!this.slide.base) this.recordSlide();
-			this.stale = true;
-		}
-		const region = this.nextRegion();
-		if (!region) return;
-		this.stale = false;
-		this.region = region;
+		if (this.slide && !this.slide.base) this.recordSlide();
+		this.painter ??= this.makePainter();
+		const painter = this.painter;
+		const { width, height } = this.view;
+		if (!painter || width <= 0 || height <= 0) return;
+		const dpr = window.devicePixelRatio || 1;
+		const { x, y, zoom } = this.camera;
+		const level = this.levelFor(zoom * dpr);
+		const size = TILE / level;
 		const slide = this.slide?.base && this.slide.carried ? this.slide : undefined;
-		this.paint("under", region, slide ? slide.base!.under : this.sheets.under.picture);
-		this.paint("over", region, slide ? slide.base!.over : this.sheets.over.picture, slide ? { picture: slide.carried!, dx: slide.dx, dy: slide.dy } : undefined);
+		const { under, over } = this.sheets;
+		// What each set of tiles shows now, and how far it is moved: a slide paints the sheets without what it carries.
+		const sets: Array<{ sheet: Sheet; picture: Picture | undefined; dx: number; dy: number }> = [
+			{ sheet: under, picture: under.filled ? (slide ? slide.base!.under : under.picture) : undefined, dx: 0, dy: 0 },
+			{ sheet: over, picture: over.filled ? (slide ? slide.base!.over : over.picture) : undefined, dx: 0, dy: 0 },
+			{ sheet: this.carried, picture: slide?.carried, dx: slide?.dx ?? 0, dy: slide?.dy ?? 0 },
+		];
+		if (under.element) under.element.hidden = !sets[0]!.picture;
+		if (over.element) over.element.hidden = !sets[1]!.picture && !sets[2]!.picture;
+
+		/*
+		 * What there is to paint, most needed first: a sheet whose picture has just changed, in view
+		 * (all of it, now); a hole in the view, with nothing of another zoom standing in; the view at
+		 * this zoom, where an older zoom's tiles stand in; and the ring round the view, ahead of the
+		 * pan first. Tiles with no ink in them are never made.
+		 */
+		interface Job {
+			sheet: Sheet;
+			picture: Picture;
+			c: number;
+			r: number;
+			rank: number;
+			order: number;
+		}
+		const jobs: Job[] = [];
+		const ring = this.progressive && !this.zooming ? RING : 0;
+		const views = new Map<Sheet, { c0: number; c1: number; r0: number; r1: number }>();
+		for (const { sheet, picture, dx, dy } of sets) {
+			if (picture !== sheet.shown) {
+				sheet.shown = picture;
+				this.invalidate(sheet);
+			}
+			if (!picture || !sheet.element) {
+				this.release(sheet, () => true);
+				continue;
+			}
+			const x1 = x - width / 2 / zoom - dx;
+			const y1 = y - height / 2 / zoom - dy;
+			const x2 = x1 + width / zoom;
+			const y2 = y1 + height / zoom;
+			const cells = { c0: Math.floor(x1 / size), c1: Math.ceil(x2 / size) - 1, r0: Math.floor(y1 / size), r1: Math.ceil(y2 / size) - 1 };
+			views.set(sheet, cells);
+			const mx = (x1 + x2) / 2;
+			const my = (y1 + y2) / 2;
+			for (let r = cells.r0 - ring; r <= cells.r1 + ring; r++) {
+				for (let c = cells.c0 - ring; c <= cells.c1 + ring; c++) {
+					const tile = sheet.tiles.get(`${level} ${c} ${r}`);
+					if (tile?.fresh || !this.inked(sheet, level, c, r)) continue;
+					const inView = c >= cells.c0 && c <= cells.c1 && r >= cells.r0 && r <= cells.r1;
+					const ox = (c + 0.5) * size - mx;
+					const oy = (r + 0.5) * size - my;
+					const rank = !inView ? 3 : sheet.urgent || !this.progressive ? 0 : tile || this.covered(sheet, level, c, r) ? 2 : 1;
+					const behind = rank === 3 && ox * this.motion.x + oy * this.motion.y <= 0 ? 1e9 : 0;
+					jobs.push({ sheet, picture, c, r, rank, order: behind + Math.hypot(ox, oy) });
+				}
+			}
+		}
+		jobs.sort((a, b) => a.rank - b.rank || a.order - b.order);
+		const started = performance.now();
+		let done = 0;
+		for (const job of jobs) {
+			if (job.rank > 0 && done > 0 && performance.now() - started > (job.rank === 1 ? HOLE_MS : TILE_MS)) break;
+			this.paintTile(painter, job.sheet, job.picture, level, job.c, job.r);
+			done++;
+		}
+		const left = jobs.slice(done);
+
+		/*
+		 * Let go of tiles no longer wanted: this zoom's once they are more than a tile past the ring,
+		 * and another zoom's once this one covers the view, or when they are out of it.
+		 */
+		for (const { sheet } of sets) {
+			sheet.urgent = false;
+			const cells = views.get(sheet);
+			if (!cells) continue;
+			const covering = left.some((job) => job.sheet === sheet && job.rank <= 2);
+			const reach = RING + 1;
+			const view = { x1: cells.c0 * size, y1: cells.r0 * size, x2: (cells.c1 + 1) * size, y2: (cells.r1 + 1) * size };
+			this.release(sheet, (tile) => {
+				if (tile.level === level) return tile.c < cells.c0 - reach || tile.c > cells.c1 + reach || tile.r < cells.r0 - reach || tile.r > cells.r1 + reach;
+				if (!covering) return true;
+				const at = TILE / tile.level;
+				return tile.c * at >= view.x2 || (tile.c + 1) * at <= view.x1 || tile.r * at >= view.y2 || (tile.r + 1) * at <= view.y1;
+			});
+		}
+		// Past the cap, the tiles farthest from the view go first.
+		const all = sets.flatMap(({ sheet }) => [...sheet.tiles.values()].map((tile) => ({ sheet, tile })));
+		if (all.length > MAX_TILES) {
+			const away = ({ sheet, tile }: { sheet: Sheet; tile: Tile }) => {
+				const cells = views.get(sheet);
+				if (!cells || tile.level !== level) return Infinity;
+				return Math.max(cells.c0 - tile.c, tile.c - cells.c1, cells.r0 - tile.r, tile.r - cells.r1, 0);
+			};
+			const drop = new Set(all.sort((a, b) => away(b) - away(a)).slice(0, all.length - MAX_TILES).filter((one) => away(one) > 0).map((one) => one.tile));
+			for (const { sheet } of sets) this.release(sheet, (tile) => drop.has(tile));
+		}
+		if (left.length) this.schedule();
 	}
 
 	/**
-	 * The region to paint the sheets over now, or nothing when the painting on screen still does.
-	 *
-	 * It still does while the window is inside the painted region at the zoom it was painted at: a
-	 * pan. During a zoom it is kept, stretched, as long as it covers the window and is not blown up
-	 * past twice its resolution; the zoom coming to rest paints it again, sharp.
+	 * The scale the tiles are painted at: the camera's, except while a zoom is under way, when the
+	 * last one is kept and stretched — up to twice as large, and down to a little smaller, which the
+	 * ring round the view still covers. A zoom that goes further starts a generation at its scale, and
+	 * a coarser one than that on the way out, so that it lasts; the zoom at rest paints the exact one.
 	 */
-	private nextRegion(): Region | undefined {
-		const { width, height } = this.view;
-		if (width <= 0 || height <= 0) return undefined;
-		const dpr = window.devicePixelRatio || 1;
-		const { x, y, zoom } = this.camera;
-		const was = this.region;
-		if (was && !this.stale && was.dpr === dpr) {
-			// Half a screen pixel of slack, so a region that just covers the window is not painted every frame.
-			const slack = 0.5 / zoom;
-			const hw = width / 2 / zoom;
-			const hh = height / 2 / zoom;
-			const covered = x - hw >= was.x - slack && y - hh >= was.y - slack && x + hw <= was.x + was.w + slack && y + hh <= was.y + was.h + slack;
-			if (covered && (zoom === was.zoom || (this.zooming && zoom <= was.zoom * 2))) return undefined;
+	private levelFor(scale: number): number {
+		const was = this.level;
+		let level = was;
+		if (was === undefined || !this.zooming || !this.progressive) level = scale;
+		else if (scale > was * 2) level = scale;
+		else if (scale < was * 0.8) level = scale * 0.75;
+		if (level !== was && level !== undefined) {
+			this.level = level;
+			// Tiles already at this scale, from a zoom that came back to it, go on top of the ones about to be let go of.
+			for (const sheet of [this.sheets.under, this.sheets.over, this.carried]) {
+				for (const tile of sheet.tiles.values()) if (tile.level === level) sheet.element?.append(tile.element);
+			}
 		}
-		/*
-		 * The window and a margin round it, one pixel to a device pixel — unless that is more than
-		 * the GPU should hold, when the margin shrinks first and then the resolution.
-		 */
-		const limit = sideLimit();
-		const grow = Math.min(1 + 2 * MARGIN, limit / (width * dpr), limit / (height * dpr), Math.sqrt(MAX_AREA / (width * height)) / dpr);
-		const cover = Math.max(1, grow);
-		const scale = zoom * dpr * Math.min(1, grow);
-		const pixels = {
-			width: Math.max(1, Math.min(limit, Math.ceil(width * cover * dpr * Math.min(1, grow)))),
-			height: Math.max(1, Math.min(limit, Math.ceil(height * cover * dpr * Math.min(1, grow)))),
-		};
-		// The region's corner on a whole device pixel of the window, so what is painted lands on the pixels it was painted for.
-		const left = Math.round(((width - width * cover) / 2) * dpr) / dpr;
-		const top = Math.round(((height - height * cover) / 2) * dpr) / dpr;
-		return { x: x + (left - width / 2) / zoom, y: y + (top - height / 2) / zoom, w: pixels.width / scale, h: pixels.height / scale, zoom, scale, dpr, pixels };
+		return this.level!;
 	}
 
-	/** Paint one sheet over a region: its picture, and anything being dragged on top of it. */
-	private paint(name: SheetName, region: Region, picture: Picture | undefined, carried?: { picture: Picture; dx: number; dy: number }): void {
-		const { ck } = this;
-		const sheet = this.sheets[name];
-		const element = sheet.element;
-		if (!ck || !element) return;
-		const filled = (sheet.filled && picture) || carried;
-		element.hidden = !filled;
-		if (!filled) return;
-		const { width, height } = region.pixels;
-		const size = `${width}x${height}`;
-		if (!sheet.surface || size !== sheet.size) {
-			sheet.surface?.delete();
-			element.width = width;
-			element.height = height;
-			sheet.surface = ck.MakeWebGLCanvasSurface(element) ?? ck.MakeSWCanvasSurface(element) ?? undefined;
-			sheet.size = size;
-			if (!sheet.surface) return;
+	/** Whether a cell of a sheet at a scale has anything drawn in it, by the sheet's ink; kept until the picture changes. */
+	private inked(sheet: Sheet, level: number, c: number, r: number): boolean {
+		const key = `${level} ${c} ${r}`;
+		const known = sheet.inked.get(key);
+		if (known !== undefined) return known;
+		const size = TILE / level;
+		const x1 = c * size;
+		const y1 = r * size;
+		const x2 = x1 + size;
+		const y2 = y1 + size;
+		const inked = sheet.ink.some((b) => b.x < x2 && b.x + b.w > x1 && b.y < y2 && b.y + b.h > y1);
+		if (sheet.inked.size > 20_000) sheet.inked.clear();
+		sheet.inked.set(key, inked);
+		return inked;
+	}
+
+	/** Whether a cell not yet painted at this scale is covered by tiles of another, which stand in for it meanwhile. */
+	private covered(sheet: Sheet, level: number, c: number, r: number): boolean {
+		const size = TILE / level;
+		const x1 = c * size;
+		const y1 = r * size;
+		const levels = new Set<number>();
+		for (const tile of sheet.tiles.values()) if (tile.level !== level) levels.add(tile.level);
+		for (const other of levels) {
+			const at = TILE / other;
+			if (size / at > 8) continue;
+			let all = true;
+			for (let r2 = Math.floor(y1 / at); all && r2 * at < y1 + size; r2++) {
+				for (let c2 = Math.floor(x1 / at); c2 * at < x1 + size; c2++) {
+					if (!sheet.tiles.has(`${other} ${c2} ${r2}`) && this.inked(sheet, other, c2, r2)) {
+						all = false;
+						break;
+					}
+				}
+			}
+			if (all) return true;
 		}
-		/*
-		 * Placed in stage units, in the world, where the region is: the world's transform puts it on
-		 * screen with the boards. Set here, with the picture drawn for it, so the two change together.
-		 */
-		element.style.width = `${region.w}px`;
-		element.style.height = `${region.h}px`;
-		element.style.transform = `translate(${region.x}px, ${region.y}px)`;
-		const canvas = sheet.surface.getCanvas();
+		return false;
+	}
+
+	/**
+	 * A sheet's picture has changed: every tile shows the drawing as it was. This zoom's are kept on
+	 * screen until each is painted again — those in view in this frame — and another zoom's let go of.
+	 */
+	private invalidate(sheet: Sheet): void {
+		for (const tile of sheet.tiles.values()) tile.fresh = false;
+		sheet.inked.clear();
+		sheet.urgent = true;
+		this.release(sheet, (tile) => tile.level !== this.level);
+	}
+
+	/** Take tiles out of a sheet; a few elements are kept to be used again, and the rest let go of their pixels. */
+	private release(sheet: Sheet, test: (tile: Tile) => boolean): void {
+		for (const [key, tile] of sheet.tiles) {
+			if (!test(tile)) continue;
+			sheet.tiles.delete(key);
+			tile.element.remove();
+			if (this.pool.length < POOL) this.pool.push(tile.element);
+			else {
+				tile.element.width = 0;
+				tile.element.height = 0;
+			}
+		}
+	}
+
+	/**
+	 * The one surface every tile is painted on (see the top of the file): WebGL on a canvas that is
+	 * never on the page, so its pixels can be given away whole; a software one where there is no WebGL.
+	 */
+	private makePainter(): Painter | null {
+		const ck = this.ck!;
+		if (typeof OffscreenCanvas !== "undefined") {
+			const source = new OffscreenCanvas(BITMAP, BITMAP);
+			const surface = ck.MakeWebGLCanvasSurface(source) ?? ck.MakeSWCanvasSurface(new OffscreenCanvas(BITMAP, BITMAP));
+			if (surface) return { surface, source, transfer: typeof source.transferToImageBitmap === "function" };
+		}
+		const source = document.createElement("canvas");
+		source.width = BITMAP;
+		source.height = BITMAP;
+		const surface = ck.MakeWebGLCanvasSurface(source) ?? ck.MakeSWCanvasSurface(source);
+		return surface ? { surface, source, transfer: false } : null;
+	}
+
+	/** Paint one tile of a sheet: a new one placed in stage units where it goes, or a stale one again. */
+	private paintTile(painter: Painter, sheet: Sheet, picture: Picture, level: number, c: number, r: number): void {
+		const ck = this.ck!;
+		const key = `${level} ${c} ${r}`;
+		let tile = sheet.tiles.get(key);
+		if (!tile) {
+			let element = this.pool.pop();
+			if (!element) {
+				element = document.createElement("canvas");
+				element.width = BITMAP;
+				element.height = BITMAP;
+			}
+			/*
+			 * Sized in its own pixels and scaled down by the transform, never sized in stage units: the
+			 * browser gives a layer whole-number bounds in its own units, and a tile 106.43 stage units
+			 * wide was cut to 106 — a device pixel short of its neighbour at 240%, a line of paper
+			 * through the words.
+			 */
+			const size = TILE / level;
+			element.style.width = `${BITMAP}px`;
+			element.style.height = `${BITMAP}px`;
+			element.style.transform = `translate(${c * size}px, ${r * size}px) scale(${1 / level})`;
+			// Last in the sheet, so over an older zoom's tiles; what a drag carries is over them all (`canvas.css`).
+			sheet.element!.append(element);
+			tile = { element, level, c, r, fresh: false };
+			sheet.tiles.set(key, tile);
+		}
+		const canvas = painter.surface.getCanvas();
 		canvas.clear(ck.TRANSPARENT);
 		canvas.save();
-		canvas.scale(region.scale, region.scale);
-		canvas.translate(-region.x, -region.y);
-		if (picture) canvas.drawPicture(picture);
-		if (carried) {
-			canvas.translate(carried.dx, carried.dy);
-			canvas.drawPicture(carried.picture);
-		}
+		canvas.translate(-c * TILE, -r * TILE);
+		canvas.scale(level, level);
+		canvas.drawPicture(picture);
 		canvas.restore();
-		sheet.surface.flush();
+		painter.surface.flush();
+		if (painter.transfer) {
+			// The surface's pixels, given to the tile as they are: no copy, no read back.
+			tile.element.getContext("bitmaprenderer")!.transferFromImageBitmap((painter.source as OffscreenCanvas).transferToImageBitmap());
+		} else {
+			if (tile.element.width !== BITMAP) {
+				tile.element.width = BITMAP;
+				tile.element.height = BITMAP;
+			}
+			const ctx = tile.element.getContext("2d")!;
+			ctx.clearRect(0, 0, BITMAP, BITMAP);
+			ctx.drawImage(painter.source, 0, 0);
+		}
+		tile.fresh = true;
 	}
 
 	/**

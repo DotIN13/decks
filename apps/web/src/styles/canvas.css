@@ -856,8 +856,9 @@
 }
 	/*
 	 * The stage's drawing (`canvas/pen/layer.ts`): under the boards, and never in the way of a gesture.
-	 * The world's first child, with no `z-index`, so every board after it is over it. Both sheets are
-	 * placed in stage units by the layer, over the region it painted, and moved by the world's transform.
+	 * The world's first child, with no `z-index`, so every board after it is over it. Each sheet is a box
+	 * at the world's origin, and its tiles are placed in it in stage units by the layer and moved by the
+	 * world's transform; the over sheet's tiles of what a drag carries are over the rest of it.
 	 */
 	.world > .pen-layer {
 	position: absolute;
@@ -865,6 +866,15 @@
 	left: 0;
 	transform-origin: 0 0;
 	pointer-events: none;
+}
+	.world > :is(.pen-layer, .pen-over) :is(canvas, .pen-carried) {
+	position: absolute;
+	top: 0;
+	left: 0;
+	transform-origin: 0 0;
+}
+	.world > .pen-over > .pen-carried {
+	z-index: 1;
 }
 	/*
 	 * Boards are at the back (`pen/layer.ts`): the drawing's over sheet and its click shapes are among

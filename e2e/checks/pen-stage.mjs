@@ -80,10 +80,8 @@ const followed = await until(() => onDisk().children.find((n) => n.id === "e2e-a
 say("…and the arrow that ends on it follows", !!followed);
 
 // --- the drawing is drawn --------------------------------------------------------------------------
-const drawn = await until(() => page.evaluate(() => {
-	const canvas = document.querySelector(".pen-layer");
-	return !!canvas && !canvas.hidden && canvas.width > 1;
-}), 15000);
+// On either sheet: each is a box of tiles, hidden while nothing is drawn on it.
+const drawn = await until(() => page.evaluate(() => [...document.querySelectorAll(".pen-layer, .pen-over")].some((sheet) => !sheet.hidden && [...sheet.querySelectorAll("canvas")].some((tile) => tile.width > 1))), 15000);
 say("the drawing layer is on screen", !!drawn);
 
 // --- a picture of the stage, taken by the server's own Chromium --------------------------------------

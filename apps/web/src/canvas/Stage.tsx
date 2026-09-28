@@ -2817,10 +2817,10 @@ export function Stage(props: {
 			 */}
 			<div class="world" data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
 				{/*
-				 * The drawing under the boards (`pen/layer.ts`): the world's first child, so every board
-				 * is over it, and in the world, so a pan moves it with them without painting it again.
+				 * The drawing under the boards (`pen/layer.ts`), a box of tiles: the world's first child, so
+				 * every board is over it, and in the world, so a pan moves it with them without painting it again.
 				 */}
-				<canvas class="pen-layer" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas)} />
+				<div class="pen-layer" aria-hidden="true" hidden ref={(sheet) => penLayer.attach(sheet)} />
 				<For each={props.boards.filter((board) => board.path !== props.focus)} fallback={null}>
 					{(board) => boardNode(board)}
 				</For>
@@ -2829,7 +2829,7 @@ export function Stage(props: {
 				 * the boards, so over them; a click goes through to a board wherever nothing drawn is in
 				 * the way. See `pen/layer.ts`.
 				 */}
-				<canvas class="pen-over" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas, "over")} />
+				<div class="pen-over" aria-hidden="true" hidden ref={(sheet) => penLayer.attach(sheet, "over")} />
 				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />
 				<For each={penOutlines()}>
 					{(box) => (

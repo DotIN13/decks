@@ -36,25 +36,23 @@
 				background: #fff;
 				box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 8px 24px rgb(0 0 0 / 8%);
 			}
-			/* The drawing's two sheets, placed in stage units by `PenLayer`: the under one before the boards. */
-			#world > canvas.under {
+			/* The drawing's two sheets, boxes of tiles placed in stage units by `PenLayer`: the under one before the boards. */
+			#world > div,
+			#world > div * {
 				position: absolute;
 				top: 0;
 				left: 0;
 				transform-origin: 0 0;
 			}
-			#world > canvas.over {
-				position: absolute;
-				top: 0;
-				left: 0;
+			#world > div.over,
+			#world > div > .pen-carried {
 				z-index: 1;
-				transform-origin: 0 0;
 			}
 		</style>
 	</head>
 	<body>
 		<div id="stage">
-			<div id="world"><canvas class="under"></canvas><canvas class="over"></canvas></div>
+			<div id="world"><div class="under"></div><div class="over"></div></div>
 		</div>
 		<script type="module" src="/src/shot.ts"></script>
 	</body>

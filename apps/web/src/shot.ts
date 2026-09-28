@@ -35,7 +35,7 @@ async function main(): Promise<void> {
 	world.style.transform = `translate(${view.width / 2}px, ${view.height / 2}px) scale(${zoom}) translate(${-camera.x}px, ${-camera.y}px)`;
 
 	// The boards in the box, as the frames the canvas would show: between the two sheets, so over the under one and under the over one.
-	const over = world.querySelector("canvas.over")!;
+	const over = world.querySelector("div.over")!;
 	const inView = boards.filter((b) => b.x < box.x2 && b.x + b.w > box.x1 && b.y < box.y2 && b.y + b.h > box.y1);
 	const ready = inView.map(
 		(board) =>
@@ -55,15 +55,16 @@ async function main(): Promise<void> {
 			}),
 	);
 
-	const layer = new PenLayer();
+	// Every tile in view in the frame the drawing is drawn, so the picture is whole when it is taken.
+	const layer = new PenLayer({ progressive: false });
 	let lastDrawn = 0;
 	let drawnOnce = doc.children.length === 0;
 	layer.drawn = () => {
 		lastDrawn = performance.now();
 		drawnOnce = true;
 	};
-	layer.attach(document.querySelector("canvas.under")!, "under");
-	layer.attach(over as HTMLCanvasElement, "over");
+	layer.attach(document.querySelector<HTMLElement>("div.under")!, "under");
+	layer.attach(over as HTMLElement, "over");
 	layer.setView(view);
 	layer.setScheme(scheme);
 	layer.setBoards(boards);
