@@ -53,6 +53,14 @@ type Playwright = typeof import("playwright");
 type Browser = import("playwright").Browser;
 
 export type ThumbScheme = "light" | "dark";
+/**
+ * Which picture: `card` is the gallery's, cropped 4:3 from the top; `whole` is the whole board at
+ * the same width, which is what the canvas draws in place of a board that has no document
+ * (`canvas/pen/scene.ts`).
+ */
+export type ThumbKind = "card" | "whole";
+/** The tallest a whole picture is taken, in CSS px of the board: past it the rest is cut. */
+const WHOLE_MAX_H = 12_000;
 
 /** How wide a picture is, in real pixels. A gallery card is ~220 CSS px; 640 read soft on a retina grid. */
 export const THUMB_WIDTH = 720;
@@ -86,6 +94,7 @@ interface Job {
 	board: Board;
 	scheme: ThumbScheme;
 	file: string;
+	kind: ThumbKind;
 	/** Taken ahead of time, because the board changed, rather than because a browser asked. */
 	ahead?: boolean;
 	/** Everybody waiting on this one picture. */
@@ -97,13 +106,15 @@ interface Job {
  * width is in the name so that a change to `THUMB_WIDTH` is a miss rather than a smaller picture
  * served for as long as the board stays unchanged.
  */
-export function thumbName(path: string, rev: number, scheme: ThumbScheme): string {
-	return `${createHash("sha1").update(path).digest("hex").slice(0, 16)}-${rev}-${scheme}-${THUMB_WIDTH}.jpg`;
+export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: ThumbKind = "card"): string {
+	const hash = createHash("sha1").update(path).digest("hex").slice(0, 16);
+	return `${hash}-${rev}-${scheme}-${THUMB_WIDTH}${kind === "whole" ? "-whole" : ""}.jpg`;
 }
 
-/** Every picture of this board in this scheme, at any revision and width. */
-function pictureOf(path: string, scheme: ThumbScheme): RegExp {
-	return new RegExp(`^${thumbName(path, 0, scheme).slice(0, 16)}-\\d+-${scheme}(-\\d+)?\\.jpg$`);
+/** Every picture of this board in this scheme and kind, at any revision and width. */
+function pictureOf(path: string, scheme: ThumbScheme, kind: ThumbKind = "card"): RegExp {
+	const hash = thumbName(path, 0, scheme).slice(0, 16);
+	return kind === "whole" ? new RegExp(`^${hash}-\\d+-${scheme}-\\d+-whole\\.jpg$`) : new RegExp(`^${hash}-\\d+-${scheme}(-\\d+)?\\.jpg$`);
 }
 
 /**
@@ -151,8 +162,8 @@ export class ThumbService {
 	private broken: string | undefined;
 	/** Boards that changed and are being left to settle, by path. */
 	private settling = new Map<string, ReturnType<typeof setTimeout>>();
-	/** The schemes anybody has asked for. Read off the disk the first time, so it survives a restart. */
-	private schemes: Set<ThumbScheme> | undefined;
+	/** The schemes and kinds anybody has asked for, as `light` or `light/whole`. Read off the disk the first time, so it survives a restart. */
+	private schemes: Set<string> | undefined;
 
 	constructor(private host: ThumbHost, private launch: () => Promise<Browser> = launchChromium) {}
 
@@ -167,9 +178,9 @@ export class ThumbService {
 	 * `gone` is asked when the job's turn comes: a request whose browser has left is not worth
 	 * a page. Rejects when there is no Chromium, or the board would not draw.
 	 */
-	get(board: Board, scheme: ThumbScheme, gone: () => boolean = () => false): Promise<string> {
-		this.wanted().add(scheme);
-		return this.ask(board, scheme, gone, false);
+	get(board: Board, scheme: ThumbScheme, gone: () => boolean = () => false, kind: ThumbKind = "card"): Promise<string> {
+		this.wanted().add(kind === "card" ? scheme : `${scheme}/${kind}`);
+		return this.ask(board, scheme, gone, false, kind);
 	}
 
 	/**
@@ -184,7 +195,10 @@ export class ThumbService {
 		clearTimeout(this.settling.get(board.path));
 		const timer = setTimeout(() => {
 			this.settling.delete(board.path);
-			for (const scheme of this.wanted()) this.ask(board, scheme, () => false, true).catch(() => {});
+			for (const want of this.wanted()) {
+				const [scheme, kind] = want.split("/") as [ThumbScheme, ThumbKind | undefined];
+				this.ask(board, scheme, () => false, true, kind ?? "card").catch(() => {});
+			}
 		}, this.host.settleMs ?? SETTLE_MS);
 		timer.unref?.();
 		this.settling.set(board.path, timer);
@@ -202,13 +216,13 @@ export class ThumbService {
 		}
 	}
 
-	private wanted(): Set<ThumbScheme> {
+	private wanted(): Set<string> {
 		if (this.schemes) return this.schemes;
 		this.schemes = new Set();
 		try {
 			for (const name of readdirSync(this.host.dir)) {
-				if (/-light(-\d+)?\.jpg$/.test(name)) this.schemes.add("light");
-				else if (/-dark(-\d+)?\.jpg$/.test(name)) this.schemes.add("dark");
+				const found = /-(light|dark)(-\d+)?(?:-(whole))?\.jpg$/.exec(name);
+				if (found) this.schemes.add(found[3] ? `${found[1]}/${found[3]}` : found[1]!);
 			}
 		} catch {
 			/* nothing taken yet: nothing is wanted until somebody asks */
@@ -216,8 +230,8 @@ export class ThumbService {
 		return this.schemes;
 	}
 
-	private ask(board: Board, scheme: ThumbScheme, gone: () => boolean, ahead: boolean): Promise<string> {
-		const file = join(this.host.dir, thumbName(board.path, board.rev, scheme));
+	private ask(board: Board, scheme: ThumbScheme, gone: () => boolean, ahead: boolean, kind: ThumbKind = "card"): Promise<string> {
+		const file = join(this.host.dir, thumbName(board.path, board.rev, scheme, kind));
 		if (existsSync(file)) return Promise.resolve(file);
 		if (this.broken) return Promise.reject(new Error(this.broken));
 		return new Promise((resolve, reject) => {
@@ -232,7 +246,7 @@ export class ThumbService {
 				}
 				return;
 			}
-			const job: Job = { board, scheme, file, waiting: [{ resolve, reject, gone }] };
+			const job: Job = { board, scheme, kind, file, waiting: [{ resolve, reject, gone }] };
 			this.byFile.set(file, job);
 			/*
 			 * A picture taken ahead of time goes to the back, which is the front of the array:
@@ -240,7 +254,7 @@ export class ThumbService {
 			 * older revision of the same board, which nobody will ever ask for.
 			 */
 			if (ahead) {
-				const any = pictureOf(board.path, scheme);
+				const any = pictureOf(board.path, scheme, kind);
 				this.queue = this.queue.filter((one) => {
 					const name = one.file.slice(this.host.dir.length + 1);
 					const stale = any.test(name) && one.board.rev !== board.rev && one.ahead === true;
@@ -302,8 +316,10 @@ export class ThumbService {
 		 * as one.
 		 */
 		const full = thumbClip({ w: job.board.w, h: Number.MAX_SAFE_INTEGER });
+		// A whole picture is laid out at the board's own height, as the canvas lays it out.
+		const tall = job.kind === "whole" ? Math.max(full.height, Math.min(Math.round(job.board.h), WHOLE_MAX_H)) : full.height;
 		const context = await browser.newContext({
-			viewport: { width: full.width, height: full.height },
+			viewport: { width: full.width, height: tall },
 			deviceScaleFactor: full.scale,
 			colorScheme: job.scheme,
 			reducedMotion: "reduce",
@@ -315,7 +331,8 @@ export class ThumbService {
 			// `board.js` sets this after fonts, markdown, maths and diagrams. A board that never
 			// says so is drawn as it stands: a late picture beats none.
 			await page.waitForFunction("window.__boardReady === true", undefined, { timeout: READY_MS }).catch(() => {});
-			let clip = thumbClip(job.board);
+			const clipOf = (b: Pick<Board, "w" | "h">) => (job.kind === "whole" ? { ...thumbClip(b), height: Math.max(150, Math.min(Math.round(b.h), WHOLE_MAX_H)) } : thumbClip(b));
+			let clip = clipOf(job.board);
 			if (job.board.format !== "slides") {
 				const measured = await page.evaluate<number>(MEASURE).catch(() => 0);
 				// Never below what the board says it is: a stated height is a floor everywhere
@@ -323,7 +340,7 @@ export class ThumbService {
 				// board from the one on the canvas.
 				const h = Math.max(measured, job.board.h);
 				if (measured > 0 && h !== job.board.h) {
-					clip = thumbClip({ w: job.board.w, h });
+					clip = clipOf({ w: job.board.w, h });
 					this.host.measured?.(job.board.path, job.board.rev, h);
 				}
 			}
@@ -331,6 +348,8 @@ export class ThumbService {
 				type: "jpeg",
 				quality: 82,
 				clip: { x: 0, y: 0, width: clip.width, height: clip.height },
+				// A whole board can be taller than the window it was laid out in.
+				fullPage: job.kind === "whole",
 				animations: "disabled",
 				timeout: 15_000,
 			});
@@ -344,8 +363,8 @@ export class ThumbService {
 
 	/** A board's earlier revisions, in this scheme: nobody will ask for them again. */
 	private forgetOlder(job: Job): void {
-		const mine = thumbName(job.board.path, job.board.rev, job.scheme);
-		const any = pictureOf(job.board.path, job.scheme);
+		const mine = thumbName(job.board.path, job.board.rev, job.scheme, job.kind);
+		const any = pictureOf(job.board.path, job.scheme, job.kind);
 		try {
 			for (const name of readdirSync(this.host.dir)) {
 				if (name !== mine && any.test(name)) rmSync(join(this.host.dir, name), { force: true });

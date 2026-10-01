@@ -11,14 +11,52 @@ import type { Board, Camera } from "@decks/protocol";
 export const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 4;
 
+function thisDevice(): { coarse: boolean; short: number } | undefined {
+	return typeof matchMedia === "function" && typeof screen !== "undefined" ? { coarse: matchMedia("(pointer: coarse)").matches, short: Math.min(screen.width, screen.height) } : undefined;
+}
+
+/** A phone: a finger, and a screen under 600 px on its short side. */
+export function isPhone(device = thisDevice()): boolean {
+	return !!device?.coarse && device.short < 600;
+}
+
+/** The live zoom, on every device. */
+const LIVE_ZOOM = 0.2;
+
 /**
- * Below this, a board's frame stops taking pointer events.
+ * The zoom at which boards come alive: from here up a board has its page, and the page takes
+ * the pointer; below it a board is its picture on the sheet, and dragging across it pans.
  *
- * At a distance the boards are a map and dragging across one should pan; up close
- * they are documents and a click belongs to the page. 0.5 is where a board stops
- * being readable, which is the same place it stops being worth clicking into.
+ * 20% on every device. A phone and a tablet used to wait for a regular board to nearly fit the
+ * screen's width (37% on a phone), which kept a board a picture long after it was readable; a
+ * phone is still held to one live page at a time (`ONE_LIVE`), which is what keeps it alive.
+ *
+ * `device` is for a test, and kept so a device can differ again without changing the callers.
  */
-export const INTERACT_ZOOM = 0.5;
+export function interactZoom(_device?: { coarse: boolean; short: number }): number {
+	return LIVE_ZOOM;
+}
+
+/** This device's live zoom (`interactZoom`). */
+export const INTERACT_ZOOM = interactZoom();
+
+/**
+ * Only one board is live at a time on a phone: the one nearest the middle of the screen
+ * (`Stage`). A tablet and a desktop have every board in reach live.
+ */
+export const ONE_LIVE = isPhone();
+
+/**
+ * How many board pages a device keeps loaded once they have been shown (`Stage`, `BoardFrame`'s
+ * `kept`): dormant while off screen or zoomed out, so coming back is the page as it was left.
+ * About 4.5 MB each, measured on 48 example boards. A phone keeps two: every phone crash on record
+ * had thirteen pages alive.
+ */
+export function keptPages(device = thisDevice()): number {
+	if (!device?.coarse) return 32;
+	return device.short < 600 ? 2 : 12;
+}
+export const KEPT_PAGES = keptPages();
 
 export interface Viewport {
 	width: number;

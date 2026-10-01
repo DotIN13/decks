@@ -1,3 +1,6 @@
+import { stageOf } from "../state/stages.ts";
+import { handsOn } from "../camera/touched.ts";
+import { seenPicture } from "../canvas/shots/adaptors.ts";
 import type { AgentState, ServerMessage } from "@decks/protocol";
 import { reconcile } from "solid-js/store";
 import { prepend } from "../chat/history-page.ts";
@@ -12,7 +15,7 @@ import { reportCamera } from "./camera-report.ts";
 import { ensureAgent, nameOf, setState, state } from "../state/deck.ts";
 import { ensureHistory, resolveEarlier } from "../state/history.ts";
 import { boardChanged, forgetInFlight, forgetPatches, patchAccepted, patchRefused } from "../state/patches.ts";
-import { notice } from "../state/notices.ts";
+import { notice, offer } from "../state/notices.ts";
 import { setTimeZone } from "../lib/time.ts";
 import { setComponent, setMarks, setSelected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
@@ -422,6 +425,19 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 
 				case "stage.call": {
 					/*
+					 * A picture of a board as this browser has it, for an agent's screenshot: taken
+					 * asynchronously, so answered on its own (`canvas/shots/adaptors.ts`).
+					 */
+					if (message.call.op === "shot") {
+						const id = message.call.id;
+						const path = (message.call.args as { path?: string } | undefined)?.path;
+						const board = state.boards.find((one) => one.path === path);
+						void (board ? seenPicture(board) : Promise.resolve({ how: "none" as const, why: "no such board in this browser" }))
+							.catch((error: unknown) => ({ how: "none" as const, why: error instanceof Error ? error.message : String(error) }))
+							.then((value) => send({ type: "stage.result", result: { id, value } }));
+						return;
+					}
+					/*
 					 * An agent asking something of the canvas. It is answered, always —
 					 * the server is holding a tool call open on it, and a refusal it can
 					 * read beats a timeout it cannot.
@@ -441,12 +457,22 @@ export function handleFrame(message: ServerMessage, hooks: FrameHooks): void {
 							 */
 							focused: () => state.focused,
 							setCamera: (next, options) => moveCamera(next, options),
+							handsOn,
+							offerView: (agentId, camera, selected, what) =>
+								offer(`${nameOf(agentId)} ${what === "board" ? "wants to show a board" : "wants to move the view"}`, {
+									label: "Go",
+									run: () => {
+										moveCamera(camera, { animate: true });
+										if (selected) setSelected(selected);
+										reportCamera(camera, agentId);
+									},
+								}, "agent-view"),
 							rememberView: (agentId, camera, selected) => {
 								// On this device, like every other view (`camera/agent-views.ts`): an
 								// agent that moved a canvas nobody is looking at is remembered for the
 								// browser that was told, which is the same scope as the ones parked on
 								// a switch.
-								agentViews(state.deck?.path ?? "").keep(agentId, viewToPark(camera, selected));
+								agentViews(state.deck?.path ?? "").keep(agentId, stageOf(agentId)?.name, viewToPark(camera, selected));
 								// So `stage.camera()` answers for that agent's stage rather than falling
 								// back to wherever the last person to look at anything was.
 								reportCamera(camera, agentId);

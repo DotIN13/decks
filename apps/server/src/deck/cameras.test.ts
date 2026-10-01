@@ -25,3 +25,18 @@ test("a reading that says no agent is dropped", () => {
 	cameras.report(undefined, theirs);
 	assert.deepEqual(cameras.answer("a"), { x: 0, y: 0, zoom: 1 }, "not even as a size");
 });
+
+test("one agent's readings are kept per canvas and per device, and it is told the newest of its own canvas", () => {
+	const cameras = new Cameras();
+	const laptop = { x: 10, y: 10, zoom: 1 };
+	const phone = { x: 500, y: 20, zoom: 0.4 };
+	const elsewhere = { x: -9000, y: 0, zoom: 0.2 };
+	cameras.report("a", laptop, { stage: "main", device: "laptop" });
+	cameras.report("a", phone, { stage: "main", device: "phone" });
+	cameras.report("a", elsewhere, { stage: "sketches", device: "laptop" });
+	assert.deepEqual(cameras.answer("a", "main"), phone, "the newest reading of the canvas it is on");
+	assert.deepEqual(cameras.answer("a", "sketches"), elsewhere);
+	cameras.report("a", laptop, { stage: "main", device: "laptop" });
+	assert.deepEqual(cameras.answer("a", "main"), laptop, "the laptop's newer reading replaces its own, not the phone's");
+	assert.deepEqual(cameras.answer("a", "never"), { x: 0, y: 0, zoom: 1 }, "a canvas nobody looked at is the origin");
+});

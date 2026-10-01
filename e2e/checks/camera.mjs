@@ -1,5 +1,5 @@
 /** The camera, the embeds, and a file changed on disk reaching the frame. */
-import { boardPath, changed, deckState, open, read, say, settle, write } from "../harness.mjs";
+import { boardPath, changed, deckState, liveZoom, open, read, ready, say, selectBoard, settle, write } from "../harness.mjs";
 
 const plan = await boardPath("plan.html");
 const original = read(plan);
@@ -115,37 +115,10 @@ const zoomOf = () =>
 	page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(document.querySelector(".world").style.transform)?.[1] ?? 0));
 
 const fittedZoom = await zoomOf();
-/*
- * The bar's glyphs at the near end of the zoom, to compare with the far end.
- *
- * `Icon` sizes its SVG in pixels, and pixels inside a bar are *board* pixels — the bar is laid
- * out in board units and the camera cancels them — so the buttons stay 18 screen pixels while the
- * glyphs inside them scale with the camera: measured at 2.3px at 19% zoom and 48px at 400%,
- * overflowing the button they were drawn in. Sized from `--unit` now, and this is the assertion
- * that it stays that way: the same four glyphs, the same size, at both ends of a real zoom.
- */
-const iconsAt = () =>
-	page.evaluate(() => {
-		const acts = document.querySelector(".bar-layer .chrome .acts");
-		if (!acts) return null;
-		// The buttons show only under the pointer, and hidden they measure nothing: shown for the reading.
-		const was = acts.style.display;
-		acts.style.display = "flex";
-		const sizes = [...acts.children].map((child) => Math.round(child.querySelector("svg")?.getBoundingClientRect().width ?? 0));
-		acts.style.display = was;
-		return sizes;
-	});
-const iconsBefore = await iconsAt();
 await page.keyboard.press("Control+Equal");
 await settle(page, 400);
 const zoomedIn = await zoomOf();
 say("⌘+ zooms the canvas instead of the page", zoomedIn > fittedZoom * 1.1, `${fittedZoom.toFixed(3)} → ${zoomedIn.toFixed(3)}`);
-const iconsAfter = await iconsAt();
-say(
-	"…and the title bar's glyphs are the same size zoomed in as they were",
-	iconsBefore !== null && iconsAfter !== null && iconsAfter.every((icon, at) => icon === iconsBefore[at] && icon > 0),
-	`${(iconsBefore ?? []).join("/")} at ${fittedZoom.toFixed(2)} → ${(iconsAfter ?? []).join("/")} at ${zoomedIn.toFixed(2)}`,
-);
 
 await page.keyboard.press("Control+Minus");
 await settle(page, 400);
@@ -187,6 +160,8 @@ const verdict = await page.evaluate(() => window.__declined);
 say("…and the browser's own page zoom is declined", verdict === true, String(verdict ?? "nothing arrived"));
 await page.keyboard.press("Control+Digit0");
 await settle(page, 400);
+// Fitted, the fixture is just under the live zoom (20% on a desktop), so the boards have no pages until it is zoomed back in.
+await liveZoom(page);
 
 /*
  * With the focus inside a board, which is where it goes the moment anybody clicks one. The
@@ -194,6 +169,8 @@ await settle(page, 400);
  * `frame-gestures.ts` — take the zoom in the stage and not there, and ⌘+ works on empty
  * canvas and stops working as soon as you touch a board.
  */
+await ready(page);
+await settle(page, 400);
 const focused = await page.evaluate(() => {
 	const frame = document.querySelector(".board-node iframe");
 	frame?.contentWindow?.focus();
@@ -214,8 +191,20 @@ const afterInBoard = await zoomOf();
 say("…and all of it still works with a board focused", afterInBoard > beforeInBoard * 1.1, `${beforeInBoard.toFixed(3)} → ${afterInBoard.toFixed(3)}`);
 await page.keyboard.press("Control+Digit0");
 await settle(page, 400);
+await liveZoom(page);
 
 // 3. The embeds on the sources board.
+// Zoomed in about that board until it is live: fitted, the fixture is just under the live zoom.
+for (let i = 0; i < 12; i++) {
+	const live = await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true" && !!document.querySelector('.board-node[data-path="boards/sources.html"] iframe'));
+	if (live) break;
+	await page.evaluate(() => {
+		const r = document.querySelector('.board-node[data-path="boards/sources.html"]').getBoundingClientRect();
+		document.querySelector(".stage").dispatchEvent(new WheelEvent("wheel", { deltaY: -40, ctrlKey: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2, bubbles: true, cancelable: true }));
+	});
+	await settle(page, 350);
+}
+await ready(page);
 const embeds = await page.evaluate(() => {
 	const frame = [...document.querySelectorAll(".board-node iframe")].find((f) => f.src.includes("sources"));
 	const doc = frame?.contentDocument;
@@ -324,27 +313,30 @@ for (let step = 0; step < 10; step++) {
 }
 await settle(page, 900);
 /*
- * Bars are counted against the boards within a viewport of the screen — the margin the
- * stage loads documents for — rather than against the documents, because the two are no
- * longer the same set: a document outlives its board leaving the screen by a few seconds
+ * Bars are counted against the boards on screen or a quarter of a window from it, and wide
+ * enough there for a bar (`Stage.barWorth`), rather than against the documents, because the
+ * two are not the same set: a document outlives its board leaving the screen by a few seconds
  * (below), and a bar must not.
  */
 const barsNow = () =>
 	page.evaluate(() => {
+		// A bar is for a board on screen or a quarter of a window from it, and at least 64px wide there (`Stage.barWorth`).
+		const stage = document.querySelector(".stage").getBoundingClientRect();
 		const near = [...document.querySelectorAll(".board-node")].filter((node) => {
 			const r = node.getBoundingClientRect();
-			return r.right > -innerWidth && r.left < 2 * innerWidth && r.bottom > -innerHeight && r.top < 2 * innerHeight;
+			const mx = stage.width / 4;
+			const my = stage.height / 4;
+			return r.width >= 64 && r.right > stage.left - mx && r.left < stage.right + mx && r.bottom > stage.top - my && r.top < stage.bottom + my;
 		}).length;
 		return {
 			nodes: document.querySelectorAll(".board-node").length,
 			near,
 			documents: document.querySelectorAll(".board-node iframe").length,
-			bars: document.querySelectorAll(".bar-layer .chrome").length,
+			bars: document.querySelectorAll(".bar-layer").length,
 		};
 	});
 const bars = await barsNow();
-say("a board that is off screen draws no title bar", bars.bars < bars.nodes, JSON.stringify(bars));
-say("…and every board that is on screen still has one", bars.bars === bars.near, JSON.stringify(bars));
+say("boards draw no title bars, on screen or off: a selected board's name and actions are its pill", bars.bars === 0, JSON.stringify(bars));
 /*
  * 6. A document outlives its board leaving the screen, by a moment.
  *
@@ -386,12 +378,13 @@ await page.keyboard.press("Control+Digit0");
 await settle(page, 400);
 for (let i = 0; i < 10; i++) {
 	const live = await page.evaluate(() =>
-		[...document.querySelectorAll(".board-node")].some((n) => n.dataset.inert !== "true" && n.getBoundingClientRect().width > 320),
+		[...document.querySelectorAll(".board-node")].some((n) => n.dataset.inert !== "true" && n.querySelector("iframe") && n.getBoundingClientRect().width > 320 && n.getBoundingClientRect().height > 320),
 	);
 	if (live) break;
 	await page.keyboard.press("Control+Equal");
 	await settle(page, 350);
 }
+await ready(page);
 const grab = await page.evaluate(() => {
 	const nodes = [...document.querySelectorAll(".board-node")];
 	const offsets = [
@@ -406,7 +399,7 @@ const grab = await page.evaluate(() => {
 		const r = node.getBoundingClientRect();
 		if (r.width < 320 || r.height < 320) continue;
 		const frame = node.querySelector("iframe");
-		if (getComputedStyle(frame).pointerEvents === "none") continue;
+		if (!frame || getComputedStyle(frame).pointerEvents === "none") continue;
 		for (const [dx, dy] of offsets) {
 			const x = Math.min(Math.max(r.x + r.width / 2 + dx, 420), innerWidth - 340);
 			const y = Math.min(Math.max(r.y + r.height / 2 + dy, 140), innerHeight - 180);
@@ -521,7 +514,7 @@ say("a scroll landing on a board's outline pans the canvas", stuck.length === 0,
  */
 await page.keyboard.press("0");
 await settle(page, 900);
-await page.locator(`.bar-layer .chrome[data-path="${await page.evaluate(() => document.querySelector(".board-node").dataset.path)}"]`).click();
+await selectBoard(page, await page.evaluate(() => document.querySelector(".board-node").dataset.path));
 await page.keyboard.press("1");
 await settle(page, 5000);
 await page.evaluate(() => {
@@ -542,44 +535,43 @@ await settle(page, 1200);
 const churn = await page.evaluate(() => window.__frameChurn.join(""));
 say("a pan neither drops nor reloads a board's page", !churn.includes("-"), churn || "no frames added or removed");
 
-/*
- * A board's title bar is the same size on screen through a pinch, not only once it rests. It used
- * to be counter-scaled inside the zoomed world and held still while the camera moved, so it grew
- * and shrank with the board and snapped back; it lives in a layer that does not zoom now.
- */
-await page.keyboard.press("0");
-await settle(page, 900);
-await page.evaluate(() => {
-	window.__barFrames = [];
-	const tick = () => {
-		const node = document.querySelector(".board-node");
-		const bar = document.querySelector(`.bar-layer .chrome[data-path="${CSS.escape(node.dataset.path)}"]`);
-		if (bar) {
-			const b = bar.getBoundingClientRect();
-			const s = node.querySelector(".surface").getBoundingClientRect();
-			window.__barFrames.push([b.height, Math.abs(b.width - s.width), s.top - b.bottom]);
-		}
-		if (window.__barFrames.length < 150) requestAnimationFrame(tick);
-	};
-	requestAnimationFrame(tick);
+
+// --- a page shown once is kept: out below the live zoom and back, it is the same document ---
+await liveZoom(page);
+const marked = await page.evaluate(() => {
+	const frames = [...document.querySelectorAll(".board-node iframe")].filter((frame) => frame.contentWindow?.__boardReady === true);
+	for (const frame of frames) frame.contentWindow.__kept = 7;
+	return frames.map((frame) => frame.closest(".board-node").dataset.path);
 });
-await page.mouse.move(700, 450);
-await page.keyboard.down("Control");
-for (let i = 0; i < 20; i++) {
-	await page.mouse.wheel(0, -25);
-	await page.waitForTimeout(16);
+const zoomOut = () =>
+	page.evaluate(() => {
+		const stage = document.querySelector(".stage");
+		const rect = stage.getBoundingClientRect();
+		stage.dispatchEvent(new WheelEvent("wheel", { deltaY: 60, ctrlKey: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, bubbles: true, cancelable: true }));
+	});
+for (let i = 0; i < 20 && (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")); i++) {
+	await zoomOut();
+	await page.waitForTimeout(350);
 }
-await page.keyboard.up("Control");
-await settle(page, 800);
-const barFrames = await page.evaluate(() => window.__barFrames);
-const heights = barFrames.map((f) => f[0]);
-const widthOff = Math.max(...barFrames.map((f) => f[1]));
-const gaps = barFrames.map((f) => f[2]);
+await settle(page, 1500);
+const asleep = await page.evaluate((paths) => paths.map((path) => {
+	const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+	// The selected board stays live at any zoom, so it is the one that is not dormant.
+	const selected = node?.dataset.selected === "true";
+	return { dormant: selected || (node?.hasAttribute("data-dormant") ?? false), same: node?.querySelector("iframe")?.contentWindow?.__kept === 7 };
+}), marked);
 say(
-	"a board's title bar stays 24 pixels tall and its board's width through a pinch",
-	barFrames.length > 20 && heights.every((h) => h === 24) && widthOff <= 1 && gaps.every((g) => g >= 1 && g <= 3),
-	`${barFrames.length} frames, height ${Math.min(...heights)}..${Math.max(...heights)}, width off by up to ${widthOff.toFixed(1)}, gap ${Math.min(...gaps).toFixed(1)}..${Math.max(...gaps).toFixed(1)}`,
+	"zoomed out below the live zoom, a page that was shown stays loaded and dormant",
+	marked.length > 0 && asleep.every((one) => one.dormant && one.same),
+	JSON.stringify({ marked: marked.length, asleep }),
 );
+await liveZoom(page);
+await settle(page, 1500);
+const woke = await page.evaluate((paths) => paths.map((path) => {
+	const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+	return node?.querySelector("iframe")?.contentWindow?.__kept === 7;
+}), marked);
+say("…and zoomed back in it is the same page, not a fresh load", woke.length > 0 && woke.every(Boolean), JSON.stringify(woke));
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

@@ -21,6 +21,7 @@ import { forBrowser, HISTORY_ITEMS } from "./wire.ts";
 import { cleanTags, sameTags } from "./tags.ts";
 import { cleanWorkspace } from "./workspaces.ts";
 import { identityReminder } from "./identity-reminder.ts";
+import { canvasNameReminder } from "../stage/canvas-name.ts";
 import { IsolatedView } from "./isolation.ts";
 import { relink, stageBoardsDir } from "../deck/stage-boards.ts";
 import { copyStage, isIsolatedStage, markIsolated, numberedName, originOf } from "../stage/isolated-stages.ts";
@@ -190,6 +191,8 @@ export class DeckAgent {
 	 * every board a place under this stage's own boards.
 	 */
 	private places: Record<string, { x: number; y: number }> = {};
+	/** Where a new agent's first canvas comes from (`options.firstCanvas`); asked once, then let go. */
+	private firstCanvas: ((self: string) => string | undefined) | undefined;
 	/** The workspace it works in — its own fact, set by it or by you, kept on the record. */
 	private workspaceChosen: string | undefined;
 	/** The folder its stage drawing lives in, once it has one (`stage/pens.ts`). */
@@ -314,6 +317,12 @@ export class DeckAgent {
 			 * being inherited by a child that has never had one.
 			 */
 			workspace?: string;
+			/**
+			 * The canvas a new agent opens on, asked the first time it needs one: the latest canvas of
+			 * its workspace (`AgentRegistry.latestCanvas`). Nothing, or a canvas gone by then, makes one
+			 * of its own, as before.
+			 */
+			firstCanvas?: (self: string) => string | undefined;
 			/** The install's Claude subscriptions (`claude/accounts.ts`). */
 			accounts?: ClaudeAccountSwitcher;
 			accountsChanged?(): void;
@@ -365,6 +374,7 @@ export class DeckAgent {
 		},
 	) {
 		this.id = options.restored?.id ?? randomUUID();
+		this.firstCanvas = options.firstCanvas;
 		this.store = options.store;
 		this.restored = options.restored !== undefined;
 		/*
@@ -653,7 +663,11 @@ export class DeckAgent {
 		if (this.stageFolder || !claim) return this.stageFolder;
 		const pens = this.stage.pens;
 		if (!pens) return undefined;
-		this.stageFolder = pens.claim(this.identity.name);
+		// A new agent joins the latest canvas of its workspace; with none, it gets one of its own.
+		const joined = this.isolatedOn ? undefined : this.firstCanvas?.(this.id);
+		this.firstCanvas = undefined;
+		// Named after the agent until it names the canvas for what is on it (`stage/canvas-name.ts`).
+		this.stageFolder = joined && pens.names().includes(joined) ? joined : pens.claim(this.identity.name, { provisional: true });
 		this.save();
 		return this.stageFolder;
 	}
@@ -851,10 +865,10 @@ export class DeckAgent {
 	}
 
 	/** A new, empty stage, named from a title, and opened. Returns its folder name. */
-	newStage(title: string): string {
+	newStage(title: string, options: { provisional?: boolean } = {}): string {
 		const pens = this.stage.pens;
 		if (!pens) throw new Error("This server keeps no stage files.");
-		const name = pens.claim(title.trim() || this.identity.name);
+		const name = pens.claim(title.trim() || this.identity.name, { provisional: options.provisional === true || !title.trim() });
 		// Made while isolated, it is isolated, and comes back as an ordinary stage with the rest.
 		if (this.isolatedOn) markIsolated(pens, name);
 		this.openStage(name);
@@ -1324,8 +1338,12 @@ export class DeckAgent {
 		 * And who it has not said it is, until it has (`agents/identity-reminder.ts`). Never on a
 		 * slash command, which every runtime reads as an exact line.
 		 */
-		const unsaid = text.trimStart().startsWith("/") ? undefined : identityReminder(this.identity);
+		const slash = text.trimStart().startsWith("/");
+		const unsaid = slash ? undefined : identityReminder(this.identity);
 		if (unsaid) nudges.push(unsaid);
+		// The canvas's name, while it has none of its own or has outgrown it (`stage/canvas-name.ts`).
+		const unnamed = slash ? undefined : canvasNameReminder(this.stage.pens, this.stageFolder);
+		if (unnamed) nudges.push(unnamed);
 		const sent = nudges.length > 0 ? `${nudges.join("\n")}\n\n${text}` : text;
 		try {
 			await this.backend.prompt(sent);

@@ -1,6 +1,7 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import type { LucideIcon } from "lucide-solid";
 import ChevronDown from "lucide-solid/icons/chevron-down";
+import ChevronRight from "lucide-solid/icons/chevron-right";
 import PanelLeft from "lucide-solid/icons/panel-left";
 import Plus from "lucide-solid/icons/plus";
 import Pencil from "lucide-solid/icons/pencil";
@@ -210,6 +211,8 @@ export function AgentMenu(props: {
 	label?: string;
 	/** Open the Agents panel, for the agents this list has no room for. Without it, the count is only said. */
 	onMore?: () => void;
+	/** Make an agent: a last row, "New agent", that opens the runtimes as a submenu beside it. */
+	onNew?: (kind: AgentKind) => void;
 }) {
 
 	/*
@@ -484,6 +487,48 @@ export function AgentMenu(props: {
 						</button>
 					)}
 				</Show>
+			</Show>
+
+			{/*
+				Adding an agent from the list you choose one from: a row that opens the runtimes
+				beside it. `aria-haspopup="menu"` keeps this menu open while its submenu is.
+			*/}
+			<Show when={props.onNew}>
+				{(onNew) => (
+					<>
+						<div class="rule" aria-hidden="true" />
+						<Popover
+							placement="right-start"
+							label="New agent"
+							class="w-[248px]"
+							trigger={(api) => (
+								<button
+									type="button"
+									role="menuitem"
+									data-row
+									data-flat="true"
+									class="agent-menu-new"
+									ref={api.ref}
+									aria-haspopup="menu"
+									aria-expanded={api.open}
+									data-on={api.open ? "soft" : undefined}
+									onClick={api.toggle}
+								>
+									<Icon of={Plus} size={13} class="flex-none text-muted" />
+									<span class="row-label flex-1">New agent</span>
+									<Icon of={ChevronRight} size={13} class="flex-none text-faint" />
+								</button>
+							)}
+						>
+							<AgentChoices
+								onPick={(kind) => {
+									dismiss?.();
+									onNew()(kind);
+								}}
+							/>
+						</Popover>
+					</>
+				)}
 			</Show>
 
 					{/*

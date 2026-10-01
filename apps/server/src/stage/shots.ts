@@ -134,6 +134,37 @@ export class StageShots {
 	}
 
 	/**
+	 * Measure one board where no canvas has: `measure.html` lays it out at its own size in this
+	 * Chromium and runs the canvas's own measurement on it. Undefined when the board never got ready.
+	 */
+	async measure(board: { path: string; w: number; h: number }): Promise<{ w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined> {
+		const query = new URLSearchParams({ path: board.path, w: String(Math.round(board.w)), h: String(Math.round(board.h)) });
+		const url = `${this.host.webOrigin()}/measure.html?${query}`;
+		return this.host.borrow(async (browser) => {
+			const context = await browser.newContext({ viewport: { width: Math.max(320, Math.round(board.w)), height: Math.max(240, Math.round(board.h)) }, reducedMotion: "reduce" });
+			try {
+				const page = await context.newPage();
+				await page.goto(url, { waitUntil: "load", timeout: READY_MS });
+				await page.waitForFunction("window.__measured !== undefined || typeof window.__measureFailed === 'string'", undefined, { timeout: READY_MS });
+				const measured = (await page.evaluate("window.__measured ?? null")) as { w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | null;
+				return measured ?? undefined;
+			} finally {
+				await context.close().catch(() => {});
+			}
+		});
+	}
+
+	/** Keep a picture of one board where a screenshot keeps its pictures, or at `to`: the deck-relative file. */
+	keepBoard(path: string, bytes: Buffer, ext: "png" | "jpg", to?: string): string {
+		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+		const name = path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "board";
+		const target = to ? resolveInDeck(this.host.deck, to) : join(this.host.deck, ".decks", "shots", `${name}-${stamp}.${ext}`);
+		mkdirSync(dirname(target), { recursive: true });
+		writeFileSync(target, bytes);
+		return relative(this.host.deck, target);
+	}
+
+	/**
 	 * A small picture of a whole stage, for the manager's cards, taken once per revision.
 	 *
 	 * Kept on disk by name, revision and scheme, exactly as a board's picture is
@@ -171,4 +202,21 @@ export class StageShots {
 
 	/** A picture being taken now, by stage and scheme: the second asker waits for the first. */
 	private readonly thumbing = new Map<string, Promise<string>>();
+}
+
+/** A PNG's or JPEG's size in pixels, read from its header; zeros when it is neither. */
+export function imageSize(bytes: Buffer): { width: number; height: number } {
+	if (bytes.length > 24 && bytes.readUInt32BE(0) === 0x89504e47) return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+	if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+		let at = 2;
+		while (at + 9 < bytes.length) {
+			if (bytes[at] !== 0xff) break;
+			const marker = bytes[at + 1]!;
+			const length = bytes.readUInt16BE(at + 2);
+			// Start-of-frame markers carry the size: C0 to CF, except C4, C8 and CC.
+			if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return { width: bytes.readUInt16BE(at + 7), height: bytes.readUInt16BE(at + 5) };
+			at += 2 + length;
+		}
+	}
+	return { width: 0, height: 0 };
 }

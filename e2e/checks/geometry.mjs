@@ -13,7 +13,7 @@
  * write is the whole feature. The record and the file are then compared to each other, which is
  * the one thing that could disagree without either looking wrong on its own.
  */
-import { boardPath, changed, open, read, resetStage, say, settle, socket, write } from "../harness.mjs";
+import { boardPath, changed, flyToBoard, open, read, resetStage, say, settle, socket, write } from "../harness.mjs";
 
 
 const { browser, page, errors } = await open({ width: 1500, height: 1000, edit: true });
@@ -185,6 +185,13 @@ say(
 	drawn.w === afterMeta.w && drawn.h === afterMeta.h,
 	`drawn ${drawn.w}x${drawn.h}, file ${afterMeta.w}x${afterMeta.h}`,
 );
+// The person's own resize is theirs: the board's new file time must not read as an agent's change.
+await page.waitForTimeout(600);
+const glows = await page.evaluate((wanted) => {
+	const node = document.querySelector(`.board-node[data-path="${wanted}"]`);
+	return { glow: Boolean(node?.querySelector(".news-glow")) };
+}, componentPath);
+say("…and a board you resized does not glow as news", !glows.glow, JSON.stringify(glows));
 say("nothing else in the file moved", nowComponent.replace(/"w":\d+,"h":\d+/, '"w":0,"h":0') === wasComponent.replace(/"w":\d+,"h":\d+/, '"w":0,"h":0'), "the rest of the bytes are identical");
 
 // --- a board written as a document: both numbers are writable, and the height is a floor ---
@@ -235,7 +242,7 @@ say(
  * it needs a board to click.
  */
 const countNow = await page.evaluate(() => document.querySelectorAll(".board-node").length);
-await page.locator(`.bar-layer .chrome[data-path="${flowPath}"]`).dblclick({ position: { x: 24, y: 12 } });
+await flyToBoard(page, flowPath);
 await settle(page, 900);
 const countAfterBar = await page.evaluate(() => document.querySelectorAll(".board-node").length);
 /*

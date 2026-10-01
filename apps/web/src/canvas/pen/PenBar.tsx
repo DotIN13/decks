@@ -1,4 +1,5 @@
 import { arrowStyle, indexOf, isArrow, newId, ids as penIds, type ArrowHeads, type ArrowRoute, type PenDocument, type PenNode } from "@decks/pen";
+import { isPhone } from "../../camera/camera.ts";
 import type { LucideIcon } from "lucide-solid";
 import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
 import ArrowRight from "lucide-solid/icons/arrow-right";
@@ -40,7 +41,7 @@ import { Icon } from "../../ui/icons.tsx";
  * selected: summoned, like the inspector, so it may cover what is under it. Every control sends a
  * pen operation, the same one an agent would, and shows the value of the first selected item.
  */
-const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key: string; after?: boolean }> = [
+export const TOOLS: Array<{ tool: PenTool; icon: LucideIcon; label: string; key: string; after?: boolean }> = [
 	{ tool: "rectangle", icon: Square, label: "Rectangle: drag to size it, or click for one", key: "R" },
 	{ tool: "ellipse", icon: Circle, label: "Ellipse", key: "O" },
 	{ tool: "frame", icon: FrameIcon, label: "Frame: a box that holds what is drawn inside it", key: "F" },
@@ -164,6 +165,8 @@ export function PenBar(props: {
 
 	return (
 		<>
+		{/* Not on a phone: its tools are a double-tap on bare canvas there (`Stage.tsx`, the canvas menu), and undo and redo are in `⋯`. */}
+		<Show when={!isPhone()}>
 		<div ref={toolsEl} class="pen-tools float" role="toolbar" aria-orientation="vertical" aria-label="Drawing tools">
 			{/* Where a drag starts; a double-click sends the column home. Not a button, so the float's `ignore` passes it. */}
 			<div ref={gripEl} class="pen-grip" title="Drag to move; throw at either edge to put away; double-click to put back" aria-hidden="true">
@@ -207,6 +210,7 @@ export function PenBar(props: {
 				<Icon of={ChevronLeft} size={14} />
 			</button>
 		</div>
+		</Show>
 
 		<Show when={selected().length > 0}>
 		<div class="pen-bar float pill" role="toolbar" aria-label="The selected drawing">

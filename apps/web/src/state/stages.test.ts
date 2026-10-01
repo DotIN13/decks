@@ -9,6 +9,7 @@ import { searchStages } from "./stages.ts";
  */
 const row = (name: string, words: string, agents: string[] = []): StageRow => ({
 	name,
+	title: name,
 	boards: 3,
 	rev: 1,
 	words,

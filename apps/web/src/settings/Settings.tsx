@@ -3,6 +3,7 @@ import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
 import { createSignal, For, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { RENDERERS, type RendererChoice } from "../lib/renderer.ts";
+import { chooseShotAdaptor, SHOT_ADAPTORS, shotAdaptorId } from "../canvas/shots/adaptors.ts";
 import { Icon } from "../ui/icons.tsx";
 import { browserZone, clockTime } from "../lib/time.ts";
 import { state } from "../state/deck.ts";
@@ -539,6 +540,22 @@ function RendererSettings(props: { renderer: RendererChoice; onChange: (choice: 
 								title={option.note}
 								onClick={() => props.onChange(option.id)}
 							>
+								{option.label}
+							</button>
+						)}
+					</For>
+				</span>
+			</div>
+			{/* Where a board's picture comes from when it has no page (`canvas/shots/adaptors.ts`). */}
+			<div class="set-row">
+				<span class="set-k">
+					<span class="row-label">Pictures</span>
+					<span class="row-note">{SHOT_ADAPTORS.find((one) => one.id === shotAdaptorId())?.note}</span>
+				</span>
+				<span class="segmented set-pictures" role="radiogroup" aria-label="Pictures">
+					<For each={SHOT_ADAPTORS}>
+						{(option) => (
+							<button type="button" role="radio" aria-checked={shotAdaptorId() === option.id} data-on={shotAdaptorId() === option.id} title={option.note} onClick={() => chooseShotAdaptor(option.id)}>
 								{option.label}
 							</button>
 						)}

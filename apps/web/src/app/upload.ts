@@ -1,4 +1,5 @@
-import { MAX_UPLOAD_BYTES, type UploadedAsset } from "@decks/protocol";
+import { CONFIRM_UPLOAD_BYTES, MAX_UPLOAD_BYTES, type UploadedAsset } from "@decks/protocol";
+import { ask } from "../state/confirm.ts";
 
 /**
  * Sending a dropped file to the server, with something honest to show while it goes.
@@ -10,7 +11,33 @@ import { MAX_UPLOAD_BYTES, type UploadedAsset } from "@decks/protocol";
  * is used on. A drop that copies 8MB with nothing moving on screen reads as broken,
  * which makes the progress the feature rather than a nicety.
  */
-export function uploadAsset(file: File, onProgress?: (fraction: number) => void): Promise<UploadedAsset> {
+export async function uploadAsset(file: File, onProgress?: (fraction: number) => void): Promise<UploadedAsset> {
+	if (!(await mayUpload(file))) throw new Error("not uploaded");
+	return send(file, onProgress);
+}
+
+/** Files already asked about and agreed to (`mayUpload`), so a caller that asks first is not asked twice. */
+const agreed = new WeakSet<File>();
+
+/**
+ * Whether a file may be sent: a big one is asked about first, since it takes a while to send and
+ * keeps a lot of the deck's disk. A caller that makes something before uploading (a board for the
+ * file) asks this first, so a "no" leaves nothing behind.
+ */
+export async function mayUpload(file: File): Promise<boolean> {
+	if (file.size <= CONFIRM_UPLOAD_BYTES || file.size > MAX_UPLOAD_BYTES || agreed.has(file)) return true;
+	const mb = Math.round(file.size / 1024 / 1024);
+	const go = await ask({
+		title: `Upload ${file.name}?`,
+		body: `It is ${mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`}. It is copied into the deck's assets folder, which takes a while and keeps that much disk.`,
+		yes: "Upload",
+		no: "Cancel",
+	});
+	if (go) agreed.add(file);
+	return go;
+}
+
+function send(file: File, onProgress?: (fraction: number) => void): Promise<UploadedAsset> {
 	return new Promise((resolve, reject) => {
 		// Refused here as well as on the server: the point of a client-side check is
 		// not the limit, it is not spending a minute uploading something that will be

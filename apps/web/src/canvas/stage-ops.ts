@@ -29,6 +29,10 @@ export interface StageOpsHost {
 	 * (`App.tsx`), because a click *is* about the journey to what was clicked.
 	 */
 	setCamera(camera: Camera, options?: { animate?: boolean }): void;
+	/** The person has used the canvas in the last few seconds (`camera/touched.ts`): the view is theirs. */
+	handsOn?(): boolean;
+	/** Offer the held view instead: a notice whose button moves there (`state/notices.ts`, `offer`). */
+	offerView?(agentId: string, camera: Camera, selected: string | undefined, what: "board" | "view"): void;
 	/**
 	 * Keep a view for an agent that is not the one on screen.
 	 *
@@ -56,7 +60,16 @@ export interface StageOpsHost {
  * it to you when you open that chat. Returns the sentence to put in the agent's result, or
  * nothing when the agent asking is the one on screen and the op should simply happen.
  */
-function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: string): { deferred: string } | undefined {
+function defer(call: StageCall, host: StageOpsHost, camera: Camera, selected?: string, what: "board" | "view" = "view"): { deferred: string } | undefined {
+	/*
+	 * And the agent on screen waits too while the person is using the canvas: a view pulled out from
+	 * under someone reading or dragging is the same intrusion. Nothing is remembered for later, since
+	 * this is their conversation already; the board is on the stage where it was put.
+	 */
+	if (call.agentId && call.agentId === host.focused() && host.handsOn?.()) {
+		host.offerView?.(call.agentId, camera, selected, what);
+		return { deferred: "the person is using the canvas, so the view stayed where they had it and they were offered a button to go there" };
+	}
 	if (!call.agentId || call.agentId === host.focused()) return undefined;
 	host.rememberView(call.agentId, camera, selected);
 	return { deferred: "you are not the conversation on screen, so this view is waiting in your chat rather than moving the canvas" };
@@ -98,7 +111,7 @@ export function runStageCall(call: StageCall, host: StageOpsHost): unknown {
 			const boxes = [...boards.map(boxOf), ...items.map((item) => item.box)];
 			const fitAll = args.fit === "all" || boxes.length > 1;
 			const wanted = fit(fitAll ? boxes : [boxes[0]!], host.viewport());
-			const waiting = defer(call, host, wanted, boards[0]?.path);
+			const waiting = defer(call, host, wanted, boards[0]?.path, "board");
 			if (waiting) return { shown, ...waiting };
 			host.setCamera(wanted, { animate: args.animate === true });
 			if (boards[0]) host.select(boards[0].path);

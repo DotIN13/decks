@@ -33,6 +33,10 @@ export interface Notice {
 	id: number;
 	level: "info" | "warn" | "error";
 	text: string;
+	/** A button on the notice, for one that offers something rather than only saying it (`offer`). */
+	action?: { label: string; run: () => void };
+	/** Notices with the same key replace each other: one offer of a kind at a time. */
+	key?: string;
 }
 
 function createDeck() {

@@ -28,3 +28,16 @@ test("a picture frames what it names with a margin: an item, a board, several, e
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("a PNG's and a JPEG's size are read from their headers", async () => {
+	const { imageSize } = await import("./shots.ts");
+	const png = Buffer.alloc(33);
+	png.writeUInt32BE(0x89504e47, 0);
+	png.writeUInt32BE(1100, 16);
+	png.writeUInt32BE(758, 20);
+	assert.deepEqual(imageSize(png), { width: 1100, height: 758 });
+	// SOI, an APP0 of 16 bytes, then SOF0: length, precision, height 576, width 880.
+	const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, ...Array(14).fill(0), 0xff, 0xc0, 0x00, 0x11, 0x08, 0x02, 0x40, 0x03, 0x70, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+	assert.deepEqual(imageSize(jpeg), { width: 880, height: 576 });
+	assert.deepEqual(imageSize(Buffer.from("not a picture")), { width: 0, height: 0 });
+});

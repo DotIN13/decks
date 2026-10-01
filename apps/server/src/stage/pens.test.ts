@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -145,5 +145,23 @@ test("what is drawn on a stage, for placement: top-level items, not boards, not 
 	} finally {
 		pens.close();
 		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a stage's name is its own: kept as written, changed freely, and the folder never moves", () => {
+	const root = mkdtempSync(join(tmpdir(), "decks-titles-"));
+	try {
+		const pens = new StagePens(root, () => {});
+		const folder = pens.claim("Launch plan: Q4 (draft)");
+		assert.equal(folder, "launch-plan-q4-draft");
+		assert.equal(pens.titleOf(folder), "Launch plan: Q4 (draft)", "the title is kept exactly as given");
+		assert.equal(pens.setTitle(folder, "  Café  launch —  final "), "Café launch — final");
+		assert.equal(pens.titleOf(folder), "Café launch — final");
+		assert.deepEqual(pens.names(), [folder], "renaming moved no folder");
+		assert.throws(() => pens.setTitle(folder, "   "), /empty/);
+		mkdirSync(join(root, "old-one"));
+		assert.equal(pens.titleOf("old-one"), "old-one", "a stage from before titles is called by its folder");
+	} finally {
+		rmSync(root, { recursive: true, force: true });
 	}
 });

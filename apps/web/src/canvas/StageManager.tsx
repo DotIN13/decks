@@ -3,6 +3,8 @@ import Pencil from "lucide-solid/icons/pencil";
 import Trash from "lucide-solid/icons/trash-2";
 import Plus from "lucide-solid/icons/plus";
 import Search from "lucide-solid/icons/search";
+import X from "lucide-solid/icons/x";
+import LayoutDashboard from "lucide-solid/icons/layout-dashboard";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import type { StageRow } from "@decks/protocol";
 import { Icon } from "../ui/icons.tsx";
@@ -27,18 +29,25 @@ import { AgentFace } from "../agents/AgentPill.tsx";
  * So there is one 120ms fade, in and out, and nothing else. Opening a stage is a *click*: the panel closes and
  * the camera lands on the middle of that stage's work (`camera.middleOf`).
  *
+ * ### The layout
+ *
+ * A heading that says what this is and how many there are, the search, and a button that makes a
+ * canvas by naming it in place (it used to be the browser's own `prompt`). Then the canvases, the
+ * one you are on first and the rest by when they last changed, since the one you want is almost
+ * always one you were just in. A line of keys at the foot.
+ *
  * ### The card
  *
- * A picture of the whole stage, taken by the server once per revision (`/api/stage-thumb`), and
- * one line under it: the name, and the faces of whoever has it open. The count of boards and
- * "you are here" are in the card's tooltip, and the pill already names the stage you are on — a
- * second line, or a dark border, would have said it again.
+ * A picture of the whole canvas, taken by the server once per revision (`/api/stage-thumb`), on the
+ * canvas's own ground; an empty canvas says so instead of showing a blank tile. Under it the name
+ * with the faces of whoever is on it, and a quieter line with how many boards and when it last
+ * changed. Rename and delete float on the picture's corner, shown on hover or focus, so a wall of
+ * cards is a wall of pictures rather than of pencils and bins. The canvas you are on wears the
+ * accent and says "Current".
  */
 /** The panel's fade, in and out: `stages.css` says the same 120ms. */
 const FADE_MS = 120;
 
-/** A transparent pixel: what a card shows in place of a picture that could not be had. */
-const BLANK = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
 export function StageManager(props: {
 	stages: StageRow[];
@@ -125,6 +134,29 @@ export function StageManager(props: {
 		props.onClose();
 	};
 
+	/* The canvas you are on first, then the rest by when they last changed: the one you want is
+	   almost always one you were just in. A search leaves only what matches (`searchStages`). */
+	const ordered = createMemo(() => {
+		const list = rows().filter((one) => one.hit);
+		const at = (one: StageRow) => (one.name === props.here ? Number.POSITIVE_INFINITY : (one.changedAt ?? 0));
+		return list.sort((a, b) => at(b.stage) - at(a.stage) || a.stage.title.localeCompare(b.stage.title));
+	});
+
+	/* A new canvas is named in place, in the heading: the browser's own prompt was the one piece of
+	   this app that looked like a different app. */
+	const [naming, setNaming] = createSignal(false);
+	let nameField: HTMLInputElement | undefined;
+	createEffect(() => {
+		if (!props.open) setNaming(false);
+	});
+	const create = () => {
+		const title = nameField?.value.trim() ?? "";
+		if (!title) return;
+		setNaming(false);
+		props.onNew(title);
+		props.onClose();
+	};
+
 	return (
 		<Show when={mounted()}>
 			{/*
@@ -134,20 +166,64 @@ export function StageManager(props: {
 			<div
 				class="stage-manager"
 				role="dialog"
-				aria-label="Stages"
+				aria-label="Canvases"
 				data-open={shown() ? "true" : undefined}
 				onPointerDown={(event) => event.target === event.currentTarget && props.onClose()}
 			>
-				<div class="float stage-box">
+				<div class="stage-box">
 					<div class="stage-head">
-						<label class="field h-8 min-w-0 flex-1 gap-1.5 rounded-lg pointer-coarse:h-10">
-							<Icon of={Search} class="flex-none text-faint" size={13} />
+						<div class="stage-title-row">
+							<h2 class="stage-title">
+								Canvases
+								<span class="stage-count tabular-nums">{searching() ? `${found()} of ${offered().length}` : offered().length}</span>
+							</h2>
+							<Show
+								when={naming()}
+								fallback={
+									<button type="button" class="stage-new" onClick={() => setNaming(true)}>
+										<Icon of={Plus} size={14} />
+										New canvas
+									</button>
+								}
+							>
+								<form
+									class="stage-new-form"
+									onSubmit={(event) => {
+										event.preventDefault();
+										create();
+									}}
+								>
+									<input
+										ref={(element) => {
+											nameField = element;
+											queueMicrotask(() => element.focus());
+										}}
+										class="stage-new-field"
+										placeholder="Name the new canvas"
+										spellcheck={false}
+										onKeyDown={(event) => {
+											if (event.key !== "Escape") return;
+											event.preventDefault();
+											event.stopPropagation();
+											setNaming(false);
+											field?.focus();
+										}}
+									/>
+									<button type="submit" class="stage-new">Create</button>
+									<button type="button" class="stage-icon" aria-label="Cancel" onClick={() => setNaming(false)}>
+										<Icon of={X} size={14} />
+									</button>
+								</form>
+							</Show>
+						</div>
+						<label class="stage-search">
+							<Icon of={Search} class="flex-none text-faint" size={15} />
 							<input
 								ref={field}
 								type="text"
 								spellcheck={false}
-								class="min-w-0 flex-1 border-0 bg-none text-ui text-fg outline-none placeholder:text-faint pointer-coarse:text-[16px]"
-								placeholder={`Search ${offered().length} ${props.isolated ? "isolated " : ""}stage${offered().length === 1 ? "" : "s"}`}
+								placeholder={`Search ${offered().length} ${props.isolated ? "isolated " : ""}canvas${offered().length === 1 ? "" : "es"}`}
+								title="Matches a canvas's name, the words on its boards and notes, and who is on it"
 								value={query()}
 								onInput={(event) => setQuery(event.currentTarget.value)}
 								onKeyDown={(event) => {
@@ -159,33 +235,18 @@ export function StageManager(props: {
 									}
 									// The commonest search is two letters and the one answer: Enter opens it.
 									if (event.key !== "Enter") return;
-									const first = rows().find((one) => one.hit);
+									const first = ordered().find((one) => one.hit);
 									if (first) open(first.stage.name);
 								}}
 							/>
+							<Show when={searching() && found() > 0}>
+								<kbd class="stage-kbd">↵</kbd>
+							</Show>
 						</label>
-						<span class="stage-count tabular-nums">
-							{found()} of {offered().length}
-						</span>
-						<button
-							type="button"
-							class="icon-button"
-							title="New stage"
-							aria-label="New stage"
-							onClick={() => {
-								const title = window.prompt("Name the new stage");
-								if (title?.trim()) {
-									props.onNew(title.trim());
-									props.onClose();
-								}
-							}}
-						>
-							<Icon of={Plus} size={15} />
-						</button>
 					</div>
 
 					<div class="stage-wall">
-						<For each={rows()}>
+						<For each={ordered()}>
 							{(row) => (
 								<StageCard
 									row={row}
@@ -198,11 +259,33 @@ export function StageManager(props: {
 								/>
 							)}
 						</For>
+						<Show when={searching() && found() === 0}>
+							<p class="stage-none">No canvas matches “{query().trim()}”.</p>
+						</Show>
+					</div>
+
+					<div class="stage-keys" aria-hidden="true">
+						<span><kbd class="stage-kbd">↵</kbd> open the first match</span>
+						<span><kbd class="stage-kbd">esc</kbd> close</span>
 					</div>
 				</div>
 			</div>
 		</Show>
 	);
+}
+
+/** When a canvas last changed, as a short phrase: "just now", "5 min ago", "yesterday", "12 Sep". */
+function since(at: number | undefined, now = Date.now()): string | undefined {
+	if (!at) return undefined;
+	const minutes = Math.floor((now - at) / 60_000);
+	if (minutes < 1) return "just now";
+	if (minutes < 60) return `${minutes} min ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours} h ago`;
+	const days = Math.floor(hours / 24);
+	if (days === 1) return "yesterday";
+	if (days < 7) return `${days} days ago`;
+	return new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
 /**
@@ -234,113 +317,132 @@ function StageCard(props: {
 		settled = true;
 		const to = input?.value.trim() ?? "";
 		setEditing(false);
-		if (to && to !== stage().name) props.onRename(stage().name, to);
+		// The name only: the folder is the stage's id and stays (`StagePens.setTitle`).
+		if (to && to !== stage().title) props.onRename(stage().name, to);
 	};
 	const cancel = () => {
 		settled = true;
 		setEditing(false);
 	};
 
+	const here = () => stage().name === props.here;
+	const boards = () => stage().boards;
+	const meta = () => [boards() === 0 ? "Empty" : `${boards()} board${boards() === 1 ? "" : "s"}`, since(stage().changedAt)].filter(Boolean).join(" · ");
+	const [broken, setBroken] = createSignal(false);
+
 	return (
 		<div
 			class="stage-card"
 			data-name={stage().name}
-			data-here={stage().name === props.here ? "true" : undefined}
-			data-dim={props.row.hit ? undefined : "true"}
-			data-hit={props.searching && props.row.hit ? "true" : undefined}
-			title={`${stage().name} — ${stage().boards} board${stage().boards === 1 ? "" : "s"}${stage().name === props.here ? ", you are here" : stage().agents.length === 0 ? ", nobody here" : ""}`}
+			data-here={here() ? "true" : undefined}
+			title={`${stage().title}: ${meta()}${here() ? ", you are here" : stage().agents.length === 0 ? ", nobody on it" : ""}`}
 			onClick={() => !editing() && props.onOpen(stage().name)}
 			onPointerLeave={() => setConfirming(false)}
 		>
 			{/*
-				The picture is the stage as the server drew it, cached by the drawing's revision — so an
-				unchanged stage is never redrawn, and a changed one cannot show yesterday.
+				The picture is the canvas as the server drew it, cached by the drawing's revision — so an
+				unchanged canvas is never redrawn, and a changed one cannot show yesterday. An empty canvas,
+				or one with no picture to be had, says what it is rather than showing a blank tile.
 			*/}
-			<button type="button" class="stage-open" aria-label={`Open ${stage().name}`}>
-				<img
-					class="stage-shot"
-					src={`/api/stage-thumb/${encodeURIComponent(stage().name)}?v=${stage().rev}&scheme=${props.scheme}`}
-					alt=""
-					loading="lazy"
-					/*
-					 * No picture — an empty stage has nothing to draw, and a stage that went away since
-					 * the list was sent has no page — is the plain tile, never a broken image: a
-					 * transparent pixel keeps the card's ground and shape.
-					 */
-					onError={(event) => {
-						if (!event.currentTarget.src.startsWith("data:")) event.currentTarget.src = BLANK;
-					}}
-				/>
+			<button type="button" class="stage-open" aria-label={`Open ${stage().title}`}>
+				<Show
+					when={boards() > 0 && !broken()}
+					fallback={
+						<span class="stage-empty">
+							<Icon of={LayoutDashboard} size={22} />
+							<span>{boards() > 0 ? "No picture yet" : "Empty canvas"}</span>
+						</span>
+					}
+				>
+					<img
+						class="stage-shot"
+						src={`/api/stage-thumb/${encodeURIComponent(stage().name)}?v=${stage().rev}&scheme=${props.scheme}`}
+						alt=""
+						loading="lazy"
+						onError={() => setBroken(true)}
+						onLoad={(event) => event.currentTarget.setAttribute("data-loaded", "")}
+					/>
+				</Show>
+				<Show when={here()}>
+					<span class="stage-current">Current</span>
+				</Show>
 				{/* Copied back from an isolated stage when isolation ended: on the picture's corner, at a glance. */}
 				<Show when={stage().fromIsolation}>
-					<span class="stage-badge" title="Copied back from an isolated stage when isolation ended">
+					<span class="stage-badge" title="Copied back from an isolated canvas when isolation ended">
 						<Icon of={Lock} size={11} />
 						Isolated
 					</span>
 				</Show>
 			</button>
-			<span class="stage-foot">
-				<Show when={editing()} fallback={<span class="row-label">{stage().name}</span>}>
-					<input
-						ref={(element) => {
-							input = element;
-							queueMicrotask(() => {
-								element.focus();
-								element.select();
-							});
+			<span class="stage-acts" data-confirming={confirming() ? "true" : undefined} onClick={(event) => event.stopPropagation()}>
+				<Show
+					when={confirming()}
+					fallback={
+						<>
+							<button type="button" class="stage-icon" title="Rename" aria-label={`Rename ${stage().title}`} onClick={startEditing}>
+								<Icon of={Pencil} size={13} />
+							</button>
+							<button type="button" class="stage-icon" title="Delete" aria-label={`Delete ${stage().title}`} onClick={() => setConfirming(true)}>
+								<Icon of={Trash} size={13} />
+							</button>
+						</>
+					}
+				>
+					<button type="button" class="stage-icon" aria-label="Keep it" onClick={() => setConfirming(false)}>
+						<Icon of={X} size={13} />
+					</button>
+					<button
+						type="button"
+						class="stage-confirm"
+						title="Deletes the canvas, its drawing and any boards kept in its own folder. The deck's own boards stay."
+						onClick={() => {
+							setConfirming(false);
+							props.onDelete(stage().name);
 						}}
-						class="stage-rename"
-						value={stage().name}
-						spellcheck={false}
-						aria-label={`New name for ${stage().name}`}
-						onClick={(event) => event.stopPropagation()}
-						onKeyDown={(event) => {
-							// Handled here, so Escape cancels the rename rather than closing the manager.
-							if (event.key === "Enter") {
-								event.preventDefault();
-								commit();
-							} else if (event.key === "Escape") {
-								event.preventDefault();
-								event.stopPropagation();
-								cancel();
-							}
-						}}
-						onBlur={commit}
-					/>
-				</Show>
-				<span class="stage-faces">
-					<For each={stage().agents}>
-						{(agent) => <AgentFace chat={{ id: agent.id, name: agent.name, kind: "claude", state: "idle" } as never} identity={{ name: agent.name, color: agent.color }} size={16} ring={0} />}
-					</For>
-				</span>
-				<span class="stage-acts" onClick={(event) => event.stopPropagation()}>
-					<Show
-						when={confirming()}
-						fallback={
-							<>
-								<button type="button" class="icon-button" title="Rename" aria-label={`Rename ${stage().name}`} onClick={startEditing}>
-									<Icon of={Pencil} size={13} />
-								</button>
-								<button type="button" class="icon-button" title="Delete" aria-label={`Delete ${stage().name}`} onClick={() => setConfirming(true)}>
-									<Icon of={Trash} size={13} />
-								</button>
-							</>
-						}
 					>
-						<button
-							type="button"
-							class="stage-confirm"
-							title="Deletes the stage, its drawing and any boards kept in its own folder. The deck's own boards stay."
-							onClick={() => {
-								setConfirming(false);
-								props.onDelete(stage().name);
+						Delete canvas
+					</button>
+				</Show>
+			</span>
+			<span class="stage-foot">
+				<span class="stage-name-row">
+					<Show when={editing()} fallback={<span class="row-label">{stage().title}</span>}>
+						<input
+							ref={(element) => {
+								input = element;
+								queueMicrotask(() => {
+									element.focus();
+									element.select();
+								});
 							}}
-						>
-							Delete
-						</button>
+							class="stage-rename"
+							value={stage().title}
+							spellcheck={false}
+							aria-label={`New name for ${stage().title}`}
+							onClick={(event) => event.stopPropagation()}
+							onKeyDown={(event) => {
+								// Handled here, so Escape cancels the rename rather than closing the manager.
+								if (event.key === "Enter") {
+									event.preventDefault();
+									commit();
+								} else if (event.key === "Escape") {
+									event.preventDefault();
+									event.stopPropagation();
+									cancel();
+								}
+							}}
+							onBlur={commit}
+						/>
 					</Show>
+					<span class="stage-faces">
+						<For each={stage().agents}>
+							{(agent) => <AgentFace chat={{ id: agent.id, name: agent.name, kind: "claude", state: "idle" } as never} identity={{ name: agent.name, color: agent.color }} size={18} ring={0} />}
+						</For>
+					</span>
 				</span>
+				<span class="stage-meta">{meta()}</span>
 			</span>
 		</div>
 	);
+
 }

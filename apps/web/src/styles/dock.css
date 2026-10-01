@@ -156,6 +156,13 @@
 		--control-radius: 7px;
 	}
 
+	/* On a touch screen the row's controls are a fingertip high, and take the rounder corner with it. */
+	@media (pointer: coarse) {
+		.dock-row {
+			--control-radius: 999px;
+		}
+	}
+
 	/*
 	 * A chip in this row gives ground; a chip in a pill does not.
 	 *

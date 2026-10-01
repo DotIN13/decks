@@ -1,15 +1,10 @@
 import { AgentCursor } from "../canvas/AgentCursor.tsx";
+import { touchedCanvas } from "../camera/touched.ts";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
-import BookOpen from "lucide-solid/icons/book-open";
-import ExternalLink from "lucide-solid/icons/external-link";
-import Maximize from "lucide-solid/icons/maximize-2";
-import X from "lucide-solid/icons/x";
 import { SourceEditor } from "./SourceEditor.tsx";
-import { createEffect, createMemo, createSignal, For, Index, Match, onCleanup, Show, Switch } from "solid-js";
-import { Portal } from "solid-js/web";
+import { createEffect, createMemo, createSignal, For, Index, Match, onCleanup, Show, Switch, on, untrack } from "solid-js";
 import { unwrap } from "solid-js/store";
-import { Icon } from "../ui/icons.tsx";
-import { boardUrl, deckFileUrl } from "../lib/api.ts";
+import { boardUrl } from "../lib/api.ts";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
@@ -68,6 +63,17 @@ function copyOf(canvas: HTMLCanvasElement): HTMLCanvasElement {
  * rather than a read of the whole canvas: a board's page always paints a background, so a picture
  * with no opaque pixel at all is a snapshot of a page that has not painted yet.
  */
+/**
+ * The band along a live board's edge that moves it: screen pixels outside the border, and inside it.
+ * Wider under a finger, which needs a bigger target than a pointer.
+ */
+const COARSE = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+const EDGE_OUT_PX = COARSE ? 16 : 8;
+const EDGE_IN_PX = COARSE ? 6 : 4;
+
+/** How long a page going to sleep waits for the sheet's picture of it before hiding anyway. */
+const SLEEP_WAIT_MS = 800;
+
 const probe = typeof document === "undefined" ? undefined : Object.assign(document.createElement("canvas"), { width: 8, height: 8 });
 function isEmpty(canvas: HTMLCanvasElement): boolean {
 	const ctx = probe?.getContext("2d", { willReadFrequently: true });
@@ -98,10 +104,6 @@ export function BoardFrame(props: {
 	origin?: { x: number; y: number };
 	/** Whether the board is on screen or within a viewport of it — what the title bar keys on. */
 	visible: boolean;
-	/** The stage's layer that does not zoom, where the title bar lives (`Stage.tsx`). */
-	barLayer?: HTMLElement | undefined;
-	/** Put a bar on screen for a board at this place and width, and keep it there as the camera moves. */
-	placeBar?: (bar: HTMLElement, at: { x: number; y: number; w: number }) => void;
 	selected: boolean;
 	/** Bumped by `stage.reload`, for a change the watcher cannot see. */
 	nonce?: number;
@@ -116,6 +118,36 @@ export function BoardFrame(props: {
 	 * this colour (the writer's) until it is read. Absent for a board that is not news.
 	 */
 	news?: string;
+	/**
+	 * The board's document is showing, or has stopped showing: ready by its own word
+	 * (`__boardReady`), or three seconds after it loaded, whichever is first. Until then the stage
+	 * keeps the board's picture over it (`pen/scene.ts`), so a board never flashes white on its way
+	 * from a picture to a page.
+	 */
+	onLive?: (live: boolean) => void;
+	/**
+	 * Take a picture of the page as it is, before it is let go (`canvas/shots/adaptors.ts`). When
+	 * given, a page whose `mounted` turns off is held until the picture is taken, so the board
+	 * keeps looking the way the reader left it.
+	 */
+	capture?: (frame: HTMLIFrameElement) => Promise<void>;
+	/**
+	 * Keep the page when it stops being shown (`mounted` off): photographed, then dormant rather
+	 * than unloaded, so coming back is the page as it was left, not a fresh start. `Stage` keeps
+	 * the most recently shown pages, as many as the device can afford.
+	 */
+	kept?: boolean;
+	/** Loaded but off screen: dormant as a kept page is, until the camera rests on it (`Stage`). */
+	asleep?: boolean;
+	/** The sheet has this board's picture on screen, over the page: the page may now be hidden or let go. */
+	pictured?: boolean;
+	/** Asleep for a zoom: hidden only once `pictured`, never on the timer. */
+	covering?: boolean;
+	/**
+	 * A drag carries this board's picture (`PenLayer.carry`): the page stays where it was picked up,
+	 * hidden, until the move lands and the sheet draws the board in its new place.
+	 */
+	carried?: boolean;
 	/** The board was read on the canvas: zoomed in on, mostly on screen, at rest (`glow.ts`). */
 	onRead?: () => void;
 	onSelect: () => void;
@@ -127,6 +159,11 @@ export function BoardFrame(props: {
 	drag?: (event: PointerEvent) => boolean;
 	/** The pointer came onto the board or its title bar, or left both: for the stage's hover outline. */
 	onHover?: (on: boolean) => void;
+	/**
+	 * A drag of the board's own (a finger on its edge): where the board is being carried, and null
+	 * when it ends. The stage moves the selection outline with it and hides the pill and handles.
+	 */
+	onDragging?: (at: { x: number; y: number } | null) => void;
 	/** How far the stage is carrying this board in a drag of its own, until the move is sent. */
 	shift?: { dx: number; dy: number };
 	/**
@@ -250,6 +287,125 @@ export function BoardFrame(props: {
 	let detachEval: (() => void) | undefined;
 	/** The wait for `__boardReady`, cancelled if the frame reloads or goes away first. */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
+	/** Whether the stage has been told this board's document is showing (`onLive`). */
+	let liveNow = false;
+	/*
+	 * The page is being photographed on its way out (`capture`): kept until the picture is taken,
+	 * then let go. Started when the browser is next idle, so the copy does not land in the same
+	 * frames as the pages the camera just arrived at starting up.
+	 */
+	const [keptForShot, setKeptForShot] = createSignal(false);
+	/** Where this page's picture is: none asked for yet, being taken, or taken since it was last mounted. */
+	let shot: "none" | "taking" | "taken" = "none";
+	const takeShot = () => {
+		const frame = frameEl;
+		if (!frame) return setKeptForShot(false);
+		setKeptForShot(true);
+		const idle = (go: () => void) => (typeof requestIdleCallback === "function" ? requestIdleCallback(go, { timeout: 1000 }) : setTimeout(go, 50));
+		idle(() => {
+			// Mounted again before it was taken: the page stays, and nothing needs a picture.
+			if (props.mounted || frame !== frameEl || !props.capture) {
+				shot = "none";
+				return setKeptForShot(false);
+			}
+			void props
+				.capture(frame)
+				.catch(() => {})
+				.finally(() => {
+					shot = "taken";
+					if (props.kept || props.mounted) return setKeptForShot(false);
+					// Let go only once the sheet shows the picture in its place, as a page going to sleep does.
+					setLiveNow(false);
+					const began = performance.now();
+					const letGo = () => {
+						if (props.mounted || props.pictured || performance.now() - began > SLEEP_WAIT_MS) return setKeptForShot(false);
+						requestAnimationFrame(letGo);
+					};
+					letGo();
+				});
+		});
+	};
+	/*
+	 * Decided in the same step as whether the page is shown, not after it: by the time an effect
+	 * heard `mounted` turn off, the frame would already be gone.
+	 */
+	const hasPage = createMemo<boolean>((had) => {
+		if (props.mounted) {
+			shot = "none";
+			return true;
+		}
+		if (keptForShot()) return true;
+		if (had && props.kept && frameEl?.isConnected) {
+			// Kept: a picture first when it was showing, then the page stays, dormant (`dormant`).
+			if (shot === "none" && props.capture && liveNow) {
+				shot = "taking";
+				queueMicrotask(takeShot);
+			}
+			return true;
+		}
+		if (had && shot === "none" && props.capture && liveNow && frameEl?.isConnected) {
+			shot = "taking";
+			queueMicrotask(takeShot);
+			return true;
+		}
+		return false;
+	}, false);
+	let readying: ReturnType<typeof setTimeout> | undefined;
+	const setLiveNow = (on: boolean) => {
+		if (!on) clearTimeout(readying);
+		if (on === liveNow) return;
+		liveNow = on;
+		props.onLive?.(on);
+	};
+	/*
+	 * Dormant: kept, not shown, and its picture taken. Its box skips rendering
+	 * (`content-visibility: hidden`, `canvas.css`), which stops its animations and timers from
+	 * costing a frame while the document, its scroll and whatever was typed into it stay as they
+	 * were; the sheet draws its picture. Shown again, it is unhidden and says it is showing once
+	 * it has painted, with no load in between.
+	 */
+	const sleepy = createMemo(() => hasPage() && !keptForShot() && (props.asleep === true || (!props.mounted && props.kept === true)));
+	/*
+	 * Hidden only once the sheet's picture is over it: told first that the page is not showing, the
+	 * sheet draws the picture a frame or more later (later still when the picture is new), and a page
+	 * hidden before that left nothing on screen for those frames, which was the flicker of a zoom-out.
+	 * A board the sheet does not reach (off its edge) sleeps after a short wait instead.
+	 */
+	const [waited, setWaited] = createSignal(false);
+	let waiting: ReturnType<typeof setTimeout> | undefined;
+	onCleanup(() => clearTimeout(waiting));
+	createEffect(
+		on(sleepy, (now, was) => {
+			clearTimeout(waiting);
+			setWaited(false);
+			if (now) {
+				setLiveNow(false);
+				waiting = setTimeout(() => setWaited(true), SLEEP_WAIT_MS);
+			} else if (was && frameEl?.isConnected) whenReady(frameEl);
+		}, { defer: true }),
+	);
+	/* Covered for a zoom or a move, the page stays until its picture is drawn, however long that takes:
+	   hidden on the timer, a board whose picture was still coming was a blank for the whole gesture. */
+	const dormant = createMemo(() => sleepy() && (props.pictured === true || (!props.covering && waited())));
+	/** Say the document is showing once it says it is ready, or after three seconds of trying. */
+	const whenReady = (frame: HTMLIFrameElement) => {
+		clearTimeout(readying);
+		if (!props.onLive || liveNow) return;
+		const began = performance.now();
+		const check = () => {
+			readying = undefined;
+			// A dormant page that reloads (a new revision) is ready for when it is shown, not now.
+			if (frame !== frameEl || !frame.isConnected || sleepy()) return;
+			const ready = (frame.contentWindow as (Window & { __boardReady?: boolean }) | null)?.__boardReady === true;
+			if (ready || performance.now() - began > 3000) {
+				// One more frame, so what it painted is on screen before the picture over it goes.
+				requestAnimationFrame(() => frame === frameEl && !sleepy() && setLiveNow(true));
+				return;
+			}
+			readying = setTimeout(check, 50);
+		};
+		check();
+	};
 	onCleanup(() => {
 		detachSelect?.();
 		detachComments?.();
@@ -258,6 +414,7 @@ export function BoardFrame(props: {
 		detachDrop?.();
 		detachLive?.();
 		clearTimeout(measuring);
+		setLiveNow(false);
 	});
 
 	/**
@@ -303,8 +460,12 @@ export function BoardFrame(props: {
 	});
 
 	const [dragging, setDragging] = createSignal(false);
+
 	/** Where the board sits while a drag is in flight, before the server knows. */
 	const [ghost, setGhost] = createSignal<{ x: number; y: number } | null>(null);
+	createEffect(
+		on([dragging, ghost], ([now, at]) => props.onDragging?.(now ? (at ?? { x: props.board.x, y: props.board.y }) : null), { defer: true }),
+	);
 	/*
 	 * The box being resized, from the stage's handles (`Stage.tsx`), held from the first move until
 	 * the file comes back at it. The node is drawn at it, so the box follows the pointer without
@@ -320,7 +481,12 @@ export function BoardFrame(props: {
 	 * layout of every board. The focus view has no world and no camera, so it places the frame
 	 * itself (`canvas/Stage.tsx`).
 	 */
-	const at = () => props.origin ?? ghost() ?? (props.resized ? { x: props.resized.x, y: props.resized.y } : undefined) ?? (props.shift ? { x: props.board.x + props.shift.dx, y: props.board.y + props.shift.dy } : { x: props.board.x, y: props.board.y });
+	const at = () => props.origin ?? (props.carried ? undefined : ghost()) ?? (props.resized ? { x: props.resized.x, y: props.resized.y } : undefined) ?? { x: props.board.x, y: props.board.y };
+	/*
+	 * The stage's drag of this board, as a transform over where it is: a move of `left` and `top`
+	 * lays the page out again on every pointer move, where a transform is the compositor's alone.
+	 */
+	const shifted = () => (props.shift && !props.carried && !props.origin && !props.resized && !ghost() ? `translate(${props.shift.dx}px, ${props.shift.dy}px)` : undefined);
 	const frameSrc = () => {
 		if (props.previewSha) return `/api/revision/${props.previewSha}`;
 		// 0 means unpinned: show whatever the board now is.
@@ -347,7 +513,8 @@ export function BoardFrame(props: {
 	/** The board or its bar is under the pointer: the bar's buttons show for either (`canvas.css`). */
 	const [hovered, setHovered] = createSignal(false);
 	createEffect(() => props.onHover?.(hovered()));
-	const inert = createMemo(() => zoom() < INTERACT_ZOOM);
+	/* Below the live zoom a board is a tile to pan across; the selected one is live and takes the pointer at any zoom. */
+	const inert = createMemo(() => zoom() < INTERACT_ZOOM && !props.selected);
 
 	/*
 	 * A clock for re-measuring the board's own DOM.
@@ -369,17 +536,19 @@ export function BoardFrame(props: {
 	 * something inside `attachEditor`, because `enabled()` is a signal and that file is plain
 	 * DOM in somebody else's document with no way to observe one.
 	 *
-	 * Re-applied on every mount as well as every change: the frame reloads when another tab
-	 * edits the board, and a fresh document has none of our attributes on it.
+	 * Applied when the mode changes, and again as each document loads (`wire`): the frame reloads
+	 * when another tab edits the board, and a fresh document has none of our attributes on it. Not
+	 * on every mount and revision, which a zoom-out across forty boards made 442 ms of main thread.
 	 */
-	createEffect(() => {
-		const can = props.editor.enabled();
-		void props.mounted;
-		void props.board.rev;
-		const root = frameEl?.contentDocument?.documentElement;
+	const markEditing = (frame: HTMLIFrameElement | undefined) => {
+		const root = frame?.contentDocument?.documentElement;
 		if (!root) return;
-		if (can) root.setAttribute("data-decks-edit", "");
+		if (untrack(() => props.editor.enabled())) root.setAttribute("data-decks-edit", "");
 		else root.removeAttribute("data-decks-edit");
+	};
+	createEffect(() => {
+		props.editor.enabled();
+		markEditing(frameEl);
 	});
 
 
@@ -474,7 +643,12 @@ export function BoardFrame(props: {
 		const timer = setInterval(() => setTick((n) => n + 1), 120);
 		onCleanup(() => clearInterval(timer));
 	});
+	/*
+	 * Only while there is something the tick moves: the marks and the acts are its only readers, and
+	 * on a stage of hundreds of boards a tick per board per camera frame was script for nothing.
+	 */
 	createEffect(() => {
+		if ((props.marks?.length ?? 0) === 0 && (props.acts?.length ?? 0) === 0) return;
 		void props.camera;
 		void props.board.rev;
 		setTick((n) => n + 1);
@@ -497,6 +671,8 @@ export function BoardFrame(props: {
 	const applySrc = () => {
 		const next = frameSrc();
 		if (!frameEl || frameEl.getAttribute("src") === next) return;
+		// Deaf until the new document is wired: see `wire`.
+		delete frameEl.dataset.wired;
 		frameEl.setAttribute("src", next);
 	};
 	createEffect(applySrc);
@@ -507,6 +683,7 @@ export function BoardFrame(props: {
 	 */
 	const wire = (frame: HTMLIFrameElement) => {
 		paintFrame(frame);
+		markEditing(frame);
 		// Re-attached on every load: a reload is a new document, and the
 		// listeners went with the old one.
 		detachEditor?.();
@@ -544,9 +721,18 @@ export function BoardFrame(props: {
 		 * which is then thrown away.
 		 */
 		const doc = frame.contentDocument;
-		const select = () => props.onSelect();
+		// Shift and a mouse press on a live page adds the board to the selection, as on its picture.
+		const select = (event: PointerEvent) => {
+			if (event.shiftKey && event.pointerType === "mouse" && event.button === 0 && !props.focused && props.drag?.(event)) return;
+			props.onSelect();
+		};
 		doc?.addEventListener("pointerdown", select, true);
-		detachSelect = () => doc?.removeEventListener("pointerdown", select, true);
+		// A hand inside the page is a hand on the canvas: it holds the view against an agent's show.
+		for (const kind of ["pointerdown", "wheel", "keydown"] as const) doc?.addEventListener(kind, touchedCanvas, { capture: true, passive: true });
+		detachSelect = () => {
+			doc?.removeEventListener("pointerdown", select, true);
+			for (const kind of ["pointerdown", "wheel", "keydown"] as const) doc?.removeEventListener(kind, touchedCanvas, { capture: true });
+		};
 		// Words selected while browsing offer a comment on them (`comment-select.ts`).
 		detachComments?.();
 		detachComments = attachCommentSelect(frame, props.board.path);
@@ -554,6 +740,13 @@ export function BoardFrame(props: {
 		// Told where the board is, so a finger's position is arithmetic
 		// rather than a layout read on every event (`frame-gestures.ts`).
 		detachGestures = attachFrameGestures(frame, props.gestures, at);
+		/*
+		 * Now the frame may take the pointer (`canvas.css`, `iframe:not([data-wired])`). Until this
+		 * moment its document is loading, or `about:blank`, and hands nothing to the stage: a
+		 * trackpad pinch that landed there went to the browser and zoomed the whole page, which is
+		 * what a board turning live under a pinch did.
+		 */
+		frame.dataset.wired = "";
 		detachDrop = attachFrameDrop(frame, props.drops);
 		/*
 		 * A reloaded document holds nothing, so the record of what it has
@@ -602,6 +795,7 @@ export function BoardFrame(props: {
 	 * single touch anywhere on the canvas is read as a pinch.
 	 */
 	const unwire = (element: HTMLIFrameElement) => {
+		delete element.dataset.wired;
 		detachSelect?.();
 		detachComments?.();
 		detachEditor?.();
@@ -612,7 +806,10 @@ export function BoardFrame(props: {
 		detachEval?.();
 		detachSelect = detachComments = detachEditor = detachGestures = detachDrop = detachLive = detachLinks = detachEval = undefined;
 		clearTimeout(measuring);
-		if (frameEl === element) frameEl = undefined;
+		if (frameEl === element) {
+			frameEl = undefined;
+			setLiveNow(false);
+		}
 	};
 
 	/**
@@ -641,6 +838,7 @@ export function BoardFrame(props: {
 			attr:drawable=""
 			onLoad={(event) => {
 				wire(event.currentTarget);
+				whenReady(event.currentTarget);
 				// Nothing to draw here: a document that has just loaded has no snapshot
 				// recorded yet, so a draw now throws — after the resize has already cleared
 				// whatever the canvas was holding. The canvas's own `paint` event is what
@@ -874,28 +1072,56 @@ export function BoardFrame(props: {
 	 * Reading a board that is news takes its glow off, everywhere the person is signed in.
 	 *
 	 * Measured rather than derived: whether the board is mostly on the screen is a fact about
-	 * two rectangles, read once each time the camera comes to rest on a board that is news at a
+	 * two rectangles, read each time the camera changes while a board that is news is at a
 	 * readable zoom — which is rare, and nothing at all for a board that is not news. The rule
-	 * itself is `isRead` (`glow.ts`); a moment has to pass with it still true, so a camera that
-	 * stops on the way somewhere does not read every board it stopped on.
+	 * itself is `isRead` (`glow.ts`); it has to hold for `READ_MS` without a break.
+	 *
+	 * **Panning counts.** Reading a board is often scrolling along it, and a rule that wanted the
+	 * camera at rest never let a board that was being panned through lose its glow: every step of
+	 * the pan started the moment again. So the moment runs while the board stays close and mostly
+	 * on screen, moving or not, and only leaving that state starts it over. A fly past is over in
+	 * well under the moment, so it still reads nothing.
 	 */
 	const [reading, setReading] = createSignal(false);
+	let readTimer: ReturnType<typeof setTimeout> | undefined;
+	const stopReading = () => {
+		clearTimeout(readTimer);
+		readTimer = undefined;
+		setReading(false);
+	};
+	onCleanup(stopReading);
 	createEffect(() => {
-		if (!props.news || !props.visible || props.moving || zoom() < READ_ZOOM) return;
+		void props.camera;
 		const node = nodeEl;
-		if (!node) return;
-		const stage = node.closest(".stage")?.getBoundingClientRect();
-		const within = stage ? { x: stage.left, y: stage.top, w: stage.width, h: stage.height } : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
-		const rect = node.getBoundingClientRect();
-		if (!isRead({ zoom: zoom(), moving: false, box: { x: rect.left, y: rect.top, w: rect.width, h: rect.height }, within })) return;
+		let now = false;
+		if (props.news && props.visible && node && zoom() >= READ_ZOOM) {
+			const stage = node.closest(".stage")?.getBoundingClientRect();
+			const within = stage ? { x: stage.left, y: stage.top, w: stage.width, h: stage.height } : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+			const rect = node.getBoundingClientRect();
+			now = isRead({ zoom: zoom(), moving: false, box: { x: rect.left, y: rect.top, w: rect.width, h: rect.height }, within });
+		}
+		if (!now) return stopReading();
+		if (readTimer !== undefined) return;
 		// Being read: the glow fades over the same moment, and goes when the read is stamped.
 		setReading(true);
-		const timer = setTimeout(() => props.onRead?.(), READ_MS);
-		onCleanup(() => {
-			clearTimeout(timer);
-			setReading(false);
-		});
+		readTimer = setTimeout(() => {
+			readTimer = undefined;
+			props.onRead?.();
+		}, READ_MS);
 	});
+
+	/** Where the edge band sits, in board units: `EDGE_OUT_PX` outside the border and `EDGE_IN_PX` in. */
+	const edgeBand = (side: "n" | "s" | "w" | "e") => {
+		const out = EDGE_OUT_PX / props.camera.zoom;
+		const band = (EDGE_OUT_PX + EDGE_IN_PX) / props.camera.zoom;
+		const along = side === "n" || side === "s";
+		return {
+			left: `${side === "e" ? `calc(100% + ${out}px - ${band}px)` : `${-out}px`}`,
+			top: `${side === "s" ? `calc(100% + ${out}px - ${band}px)` : `${-out}px`}`,
+			width: along ? `calc(100% + ${2 * out}px)` : `${band}px`,
+			height: along ? `${band}px` : `calc(100% + ${2 * out}px)`,
+		};
+	};
 
 	return (
 		<div
@@ -909,192 +1135,17 @@ export function BoardFrame(props: {
 			data-hover={hovered() || undefined}
 			data-selected={props.selected}
 			data-inert={inert()}
+			data-dormant={dormant() ? "" : undefined}
+			data-carried={props.carried ? "" : undefined}
 			data-path={props.board.path}
 			style={{
 				left: `${at().x}px`,
 				top: `${at().y}px`,
+				transform: shifted(),
 				width: `${(sizing()?.w ?? props.board.w)}px`,
 				height: `${(sizing()?.h ?? props.board.h)}px`,
 			}}
 		>
-			{/*
-				Only for a board that is on screen — `visible`, not `mounted`: a document is
-				kept for a moment after its board leaves the screen, and a bar for it would
-				be laid out and painted on every zoom step for nothing.
-
-				The bar is the one thing on a board node that has to be redrawn when the
-				*zoom* changes and not when the camera merely moves: it is counter-scaled, so
-				its width and its offset are both functions of the zoom, and writing them
-				dirties layout. That is per board, per frame, for every board on the canvas —
-				and it was being paid for boards nobody could see. Measured on a canvas of
-				120 boards at 4× CPU throttle: 110ms of work per finger movement while
-				pinching, against 51ms while panning, and taking the bars away closed the gap
-				entirely (48ms). Off-screen boards do not load their documents for the same
-				reason; this is the rest of that rule.
-			*/}
-			<Show when={props.visible ? props.barLayer : undefined}>
-			{(layer) => (
-			<Portal mount={layer()}>
-			{/*
-				In the stage's bar layer, not in this node: the layer does not zoom, so the bar is the
-				same size on screen at every zoom and through a pinch, with nothing to counter-scale.
-				The stage moves it with the camera (`Stage.placeBar`); this says where the board is and
-				how wide — the size being dragged, like the node and the surface, not the record's, so
-				a resize takes its bar along with it before the write lands.
-			*/}
-			<div
-				class="chrome"
-				data-path={props.board.path}
-				data-dragging={dragging() || !!props.shift}
-				data-hover={hovered() || undefined}
-				ref={(bar) => {
-					createEffect(() => props.placeBar?.(bar, { x: at().x, y: at().y, w: sizing()?.w ?? props.board.w }));
-				}}
-				onPointerDown={startDrag}
-				onPointerEnter={() => setHovered(true)}
-				onPointerLeave={() => setHovered(false)}
-				onDblClick={() => props.onOpen()}
-			>
-				<span class="title">{props.board.title}</span>
-				<span class="file">{props.board.path}</span>
-				{/*
-					The right-hand end of the bar, as one group.
-
-					A group rather than two buttons that each ask to be pushed right: two
-					`margin-left: auto` siblings *share* the free space, so Present sat in the
-					middle of the bar and the × at the end, half a board apart. One auto margin,
-					on the box that holds them both.
-				*/}
-				<span class="acts">
-				{/*
-					The only thing on a board you cannot get from the keyboard without knowing
-					about it. `f` works once the board is selected, and nothing in the app says
-					so — a button in the title bar is where somebody looks for "how do I show
-					this to a room".
-
-					Every board now, not only a deck: a document is readable fullscreen and a board
-					of boxes is usable there, which is the point (`present/Present.tsx`). The word
-					changes with the format because "present" is what you do with a deck and
-					"fullscreen" is what you do with a board.
-
-					**Only a deck gets the word.** The bar is counter-scaled, so at the zoom where
-					a board is a tile its buttons take the whole of it — and "Fullscreen" is 64px
-					of the 160px a 760px board has down there, which puts an invisible button
-					where the *title* is. A double-click meant to fly to the board then presses
-					it. A deck's bar is 960px wide and the word is the design's own, so this is
-					about the boards whose bars are narrow rather than about words.
-
-					Not on a live board. A mirror draws itself from what the app posts into it,
-					so a second frame of it says nothing the first one does not, and its bar is
-					narrow enough that a third button is where the title was.
-				*/}
-				{/*
-					The board on its own, in its own tab.
-
-					A **link** rather than a button with `window.open` in it, and that is the whole
-					difference: the address ends up in the page, so it can be copied, middle-clicked
-					or opened with a modifier, and the browser's own "open in a new tab" is the
-					behaviour rather than an imitation of it.
-
-					No `?rev=`: a tab opened now shows the board as it *is* rather than as it was
-					when the canvas last loaded it (`deckFileUrl`). What arrives there is
-					browse-only — no canvas, so no camera, no editor and no inspector — and the
-					board is clickable at any size, which is not true of the canvas below half zoom.
-
-					Not on a live board: a mirror in a bare tab has nobody to feed it, and says so
-					itself (`.live[data-state="alone"]`).
-				*/}
-				<Show when={!props.board.live}>
-					<a
-						class="open-tab"
-						href={deckFileUrl(props.board.path)}
-						target="_blank"
-						rel="noopener"
-						title="Open this board in its own tab"
-						aria-label={`Open ${props.board.title} in its own tab`}
-						onPointerDown={(event) => event.stopPropagation()}
-					>
-						<Icon of={ExternalLink} size={12} />
-					</a>
-				</Show>
-				{/*
-					Focus: this board as the page, with the canvas out of the way.
-					
-					The fourth thing a board's bar offers — beside its file's address, filling the
-					window, and going away — and the only one about *reading* rather than about where
-					the board is. `BookOpen` rather than a document glyph: the fullscreen button next
-					to it is already the frame-corners one, and two squares would be two buttons
-					nobody can tell apart.
-				*/}
-				<Show when={props.onFocus}>
-					<button
-						class="focus-open"
-						type="button"
-						data-on={props.focused ? "soft" : undefined}
-						aria-pressed={props.focused}
-						title={
-							props.focused
-								? "Back to the canvas (or press d)"
-								: "Focus on this board: read and scroll it like a document (or press d)"
-						}
-						aria-label={props.focused ? `Show the whole canvas instead of ${props.board.title}` : `Focus on ${props.board.title}`}
-						onPointerDown={(event) => event.stopPropagation()}
-						onClick={(event) => {
-							event.stopPropagation();
-							props.onFocus?.();
-						}}
-					>
-						<Icon of={BookOpen} size={12} />
-					</button>
-				</Show>
-				<Show when={Boolean(props.onPresent && !props.board.live)}>
-					<button
-						class="present-open"
-						/* A deck's button is a word and sizes to it; every other board's is a
-						   glyph, and a glyph button has to be the same 18px box as the three beside
-						   it — which it was not, because `width: auto` plus its padding made it
-						   26px while they were 18. The attribute rather than `:has(svg)`: this file
-						   already says which one it is drawing, and a selector that re-derives it
-						   from the markup is a second answer to the same question. */
-						data-glyph={props.board.format === "slides" ? undefined : "true"}
-						type="button"
-						title={
-							props.board.format === "slides"
-								? "Present this deck fullscreen (or press f with it selected)"
-								: "Fill the window with this board (or press f with it selected)"
-						}
-						aria-label={`${props.board.format === "slides" ? "Present" : "Fullscreen"} ${props.board.title}`}
-						onPointerDown={(event) => event.stopPropagation()}
-						onClick={(event) => {
-							event.stopPropagation();
-							props.onPresent?.();
-						}}
-					>
-						<Show when={props.board.format === "slides"} fallback={<Icon of={Maximize} size={12} />}>Present</Show>
-					</button>
-				</Show>
-				<Show when={props.onHide}>
-					{(hide) => (
-						<button
-							class="hide"
-							type="button"
-							title="Take this board off the canvas. The agent keeps it in context."
-							aria-label="Take this board off the canvas"
-							onPointerDown={(event) => event.stopPropagation()}
-							onClick={(event) => {
-								event.stopPropagation();
-								hide()();
-							}}
-						>
-							<Icon of={X} size={14} />
-						</button>
-					)}
-				</Show>
-				</span>
-			</div>
-			</Portal>
-			)}
-			</Show>
 
 			{/*
 				The shadow and the outline, on a box of their own behind the surface. A shadow
@@ -1128,6 +1179,28 @@ export function BoardFrame(props: {
 				means "this board" and nothing else. The bar is counter-scaled, so it is 24
 				screen pixels however far out you are.
 			*/}
+			{/*
+				The band along the edge of a board whose page takes the pointer: a press on it moves the
+				board, since a press on the page is the page's. A child of the node, so a board stacked
+				over this one covers its band too. Mostly outside the border, so the page keeps its edges;
+				a mouse, a pen or one finger moves it; a second finger makes it a pinch.
+			*/}
+			<Show when={!inert() && !props.focused && !props.editing}>
+				<For each={["n", "s", "w", "e"] as const}>
+					{(side) => (
+						<div
+							class="board-edge"
+							data-side={side}
+							style={edgeBand(side)}
+							onPointerDown={(event) => {
+								// A finger moves the board too, and a second finger turns it into a pinch (`startDrag`).
+								if (event.pointerType === "touch") return startDrag(event);
+								props.drag?.(event);
+							}}
+						/>
+					)}
+				</For>
+			</Show>
 			<div
 				class="surface"
 				/*
@@ -1141,8 +1214,9 @@ export function BoardFrame(props: {
 					height: `${(sizing()?.h ?? props.board.h)}px`,
 				}}
 				onPointerDown={(event) => {
-					props.onSelect();
-					if (inert() && event.pointerType !== "touch") startDrag(event);
+					// A mouse on a board's picture moves it and selects it (Shift adds it), as its bar once did.
+					if (inert() && event.pointerType !== "touch" && event.button === 0) startDrag(event);
+					else props.onSelect();
 				}}
 			>
 				<Switch>
@@ -1168,15 +1242,15 @@ export function BoardFrame(props: {
 								onCleanup(() => element.removeEventListener("paint", onPaint));
 							}}
 						>
-							<Show when={props.mounted}>{frameNode()}</Show>
+							<Show when={hasPage()}>{frameNode()}</Show>
 						</canvas>
-						<Show when={!props.mounted && !drawn()}>
+						<Show when={!hasPage() && !drawn()}>
 							<div class="placeholder">{props.board.path}</div>
 						</Show>
 					</Match>
 					<Match when={true}>
 						<Show
-							when={props.mounted}
+							when={hasPage()}
 							fallback={<div class="placeholder">{props.board.path}</div>}
 						>
 							<Show when={props.editing} keyed>

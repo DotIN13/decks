@@ -4,13 +4,15 @@
  * A board an agent named while the person was elsewhere carries a glow on the canvas until it is
  * read (`isNews`, `panel/board-news.ts`). The focus view already counts as reading; this is the
  * other way, and the ordinary one: the person zooms in on the
- * board and rests on it. Three things have to be true at once, and stay true for a moment:
+ * board and stays on it. Two things have to be true at once, and stay true for a moment:
  *
  * - **Close enough to read.** Body text on a board is 17px, and at 70% it is 12px on the
  *   screen, which is where a title stops being the only thing you can make out.
  * - **Mostly on screen.** Half the board, or, for a board taller than the window, most of the
  *   window filled with it: a tall document read from its top is being read.
- * - **The camera at rest.** A board flown past at 100% was not read.
+ *
+ * The camera may move: panning along a board is reading it. A board flown past at 100% is still
+ * not read, because a fly is over before the moment is (`READ_MS`, held by `BoardFrame`).
  *
  * Pure, so the rule is tested without a canvas; the frame measures and calls.
  */

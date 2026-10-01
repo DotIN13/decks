@@ -15,7 +15,7 @@
  * wrapping removes two lines and every line after a deletion differs at its own index. Plus the half that must *not* run: a document has no
  * grid, no box to resize and nowhere to place a component, so the geometry half is off.
  */
-import { boardPath, differ, open, rangeOf, read, resetStage, say, settle, write } from "../harness.mjs";
+import { boardPath, differ, flyToBoard, open, rangeOf, read, resetStage, say, settle, write } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 1000, edit: true });
 await resetStage(page);
@@ -36,7 +36,7 @@ const sourceEditor = () => page.evaluate(() => Boolean(document.querySelector(".
  * — after which the board's own frame is gone and the run of words this check is about is in a
  * different document.
  */
-await page.locator('.bar-layer .chrome[data-path="boards/notes.html"]').dblclick({ position: { x: 24, y: 12 } });
+await flyToBoard(page, "boards/notes.html");
 await settle(page, 900);
 for (let i = 0; i < 6; i++) {
 	const level = await page.evaluate(() =>

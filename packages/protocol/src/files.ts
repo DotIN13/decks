@@ -2,12 +2,14 @@
 /**
  * The most bytes one dropped file may be, known to both sides.
  *
- * The browser needs it to refuse a 400MB video before spending a minute sending
- * it; the server needs it because a limit only the client enforces is not a
- * limit. 32MB is a photograph or a long PDF and not a video, which is the kind
- * of thing a board is for.
+ * The browser needs it to refuse a file before spending minutes sending it; the server
+ * needs it because a limit only the client enforces is not a limit. 2GB takes a long
+ * video; the server streams an upload to disk, so a big one costs disk and not memory.
  */
-export const MAX_UPLOAD_BYTES = 32 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
+
+/** Past this the browser asks before sending: a file this size takes a while and a lot of the deck's disk. */
+export const CONFIRM_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 /**
  * Where a dropped file landed, as `POST /api/upload` answers.

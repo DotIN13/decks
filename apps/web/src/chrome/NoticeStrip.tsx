@@ -1,4 +1,4 @@
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import { state } from "../state/deck.ts";
 
 /**
@@ -26,10 +26,19 @@ export function NoticeStrip() {
 			<For each={state.notices}>
 				{(item) => (
 					<div
-						class="notice rounded-[10px] border border-line bg-panel px-3 py-[7px] text-ui shadow-panel data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
+						class="notice flex items-center gap-3 rounded-[var(--radius-panel)] border border-line bg-panel px-3 py-[7px] text-ui shadow-panel data-[action]:pointer-events-auto data-[action]:py-[5px] data-[action]:pr-[5px] data-[level=error]:border-danger/50 data-[level=warn]:border-warn/50"
 						data-level={item.level}
+						data-action={item.action ? "" : undefined}
 					>
-						{item.text}
+						<span class="min-w-0 flex-1">{item.text}</span>
+						{/* Only a notice that offers something takes the pointer: the rest stay out of the canvas's way. */}
+						<Show when={item.action}>
+							{(action) => (
+								<button type="button" class="btn notice-action" data-primary="true" onClick={() => action().run()}>
+									{action().label}
+								</button>
+							)}
+						</Show>
 					</div>
 				)}
 			</For>

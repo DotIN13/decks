@@ -51,3 +51,10 @@ test("the popup sits under the selection, above it when there is no room, and ne
 	assert.equal(popupPlace({ left: 960, top: 100, right: 1000, bottom: 120 }, size, view).left, 692);
 	assert.equal(popupPlace({ left: 270, top: 100, right: 330, bottom: 120 }, size, { ...view, left: 264 }).left, 272, "clear of the sidebar");
 });
+
+test("a comment on the whole board has no quote, and says so", () => {
+	assert.equal(
+		commentBlock([comment({ quote: "", component: undefined })]),
+		"A comment on a board. The quoted words are what I selected:\n\n1. boards/plan.html, the whole board\n   Two sentences, please.",
+	);
+});

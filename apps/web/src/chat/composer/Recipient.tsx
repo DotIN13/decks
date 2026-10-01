@@ -1,6 +1,6 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
 import ChevronDown from "lucide-solid/icons/chevron-down";
-import { AgentFace, AgentMenu, NewAgentButton } from "../../agents/AgentPill.tsx";
+import { AgentFace, AgentMenu } from "../../agents/AgentPill.tsx";
 import { Icon } from "../../ui/icons.tsx";
 import type { Destination } from "../../app/send-from-bar.ts";
 
@@ -54,6 +54,7 @@ export function Recipient(props: RecipientProps) {
 				onFocus={props.onPick}
 				onClose={props.onClose}
 				{...(props.onMore ? { onMore: props.onMore } : {})}
+				onNew={props.onNew}
 				placement="top-start"
 				label="Who gets the line"
 				trigger={(api) => (
@@ -73,7 +74,6 @@ export function Recipient(props: RecipientProps) {
 					</button>
 				)}
 			/>
-			<NewAgentButton onNew={props.onNew} placement="top-start" size={12} class="dock-to-new" />
 		</span>
 	);
 }

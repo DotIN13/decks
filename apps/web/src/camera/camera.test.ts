@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { between, breathingRoom, clampZoom, easeOutCubic, EDGE_FLOOR, fit, fitInto, INTERACT_ZOOM, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, STAGE_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
+import { between, breathingRoom, clampZoom, easeOutCubic, EDGE_FLOOR, fit, fitInto, interactZoom, keepVisible, MAX_ZOOM, middleOf, MIN_ZOOM, STAGE_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout } from "./camera.ts";
 
 const view = { width: 1200, height: 800 };
 
@@ -258,11 +258,16 @@ test("every landing is at the same zoom, whatever the stage holds", () => {
 	const many = middleOf([{ x: 0, y: 0, w: 9000, h: 6000 }, { x: 200, y: 200, w: 200, h: 120 }], REGION, VIEW);
 	assert.equal(one.zoom, STAGE_ZOOM);
 	assert.equal(many.zoom, STAGE_ZOOM);
-	assert.ok(STAGE_ZOOM < INTERACT_ZOOM, "a looking scale, not a working one");
 });
 
 test("an empty stage leaves the camera where it is, at the same arriving zoom", () => {
 	const kept = middleOf([], REGION, VIEW, { x: 50, y: 60, zoom: 0.02 });
 	assert.deepEqual({ x: kept.x, y: kept.y }, { x: 50, y: 60 });
 	assert.equal(kept.zoom, STAGE_ZOOM);
+});
+
+test("boards come alive at 20% on every device", () => {
+	assert.equal(interactZoom({ coarse: false, short: 900 }), 0.2);
+	assert.equal(interactZoom({ coarse: true, short: 390 }), 0.2);
+	assert.equal(interactZoom({ coarse: true, short: 820 }), 0.2);
 });

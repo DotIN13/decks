@@ -1,5 +1,6 @@
 import { isoIn, nowWords, offsetLabel, partsIn, processZone } from "../lib/clock.ts";
 import { identityReminder } from "../agents/identity-reminder.ts";
+import { canvasNameReminder } from "./canvas-name.ts";
 import { isIsolatedStage } from "./isolated-stages.ts";
 import { stageBoardsDir } from "../deck/stage-boards.ts";
 import { existsSync, readFileSync } from "node:fs";
@@ -11,7 +12,7 @@ import { asBoardFormat, BOARD_FORMATS, boardWidth } from "../boards/templates.ts
 import { boxOf, placements, baseTheme, type Op } from "@decks/pen";
 import { runEval, safeJson } from "./eval.ts";
 import type { StageService, WebTarget } from "./service.ts";
-import type { ShotFormat, ShotOf } from "./shots.ts";
+import { imageSize, type ShotFormat, type ShotOf } from "./shots.ts";
 
 /**
  * The canvas tool, defined once for every runtime (DESIGN §6.3).
@@ -845,7 +846,7 @@ export function createStageTool(deps: {
 		/**
 		 * The stage's drawing: a native pen.dev document at `stages/<name>/stage.pen`.
 		 *
-		 * Notes, text, shapes, arrows and frames live here, drawn over the boards by the canvas, backdrops under them.
+		 * Notes, text, shapes, arrows and frames live here, all drawn over the boards by the canvas.
 		 * `read` gives every item as saved plus its `box` on the stage; `edit` applies pen operations
 		 * together or not at all and answers with each item's new box; `file` is the path, for an
 		 * agent that would rather edit the JSON with its own tools. The wording of the format is
@@ -859,6 +860,7 @@ export function createStageTool(deps: {
 			// Isolated, the isolated stages are all there are (`stage/isolated-stages.ts`).
 			return pens.names().filter((name) => !isolated() || isIsolatedStage(pens, name)).map((name) => ({
 				name,
+				title: pens.titleOf(name),
 				open: everyone.filter((other) => (other.id === agent.id ? mine : other.stage) === name).map((other) => other.name),
 				boards: pens.boards(name).length,
 				...(name === mine ? { mine: true } : {}),
@@ -868,8 +870,27 @@ export function createStageTool(deps: {
 		open: async (name: string) => {
 			if (typeof name !== "string" || !name.trim()) throw new Error('open names a stage, as in stage.open("deploy"); stage.stages() lists them.');
 			if (!agent.openStage) throw new Error("This agent cannot change stages.");
-			agent.openStage(name.trim());
-			return { stage: name.trim(), boards: agent.inPlay() };
+			// By its folder, or by what it is called: the person reads names, and an agent is told them.
+			const pens = service.pens;
+			const asked = name.trim();
+			const folder = pens && !pens.names().includes(asked) ? (pens.names().find((one) => pens.titleOf(one).toLowerCase() === asked.toLowerCase()) ?? asked) : asked;
+			agent.openStage(folder);
+			return { stage: folder, boards: agent.inPlay() };
+		},
+		/**
+		 * Name the canvas you are on, or read its name. The name is what the person reads; the folder
+		 * (`name` in `stages()`) stays as it is. Saying the same name again keeps it and marks what the
+		 * canvas holds now as what the name is for (`stage/canvas-name.ts`).
+		 */
+		title: async (title?: string) => {
+			const pens = needPens();
+			const name = needStage();
+			if (title !== undefined) {
+				if (typeof title !== "string" || !title.trim()) throw new Error('title takes the canvas\'s new name, as in stage.title("Launch plan"); stage.title() reads it.');
+				pens.setTitle(name, title);
+				service.stagesChanged?.();
+			}
+			return { stage: name, title: pens.titleOf(name) };
 		},
 		/** A new, empty stage named from a title, opened at once. */
 		newStage: async (title: string) => {
@@ -887,6 +908,33 @@ export function createStageTool(deps: {
 		screenshot: async (options?: { of?: ShotOf; scale?: number; format?: ShotFormat; to?: string; scheme?: "light" | "dark" }) => {
 			if (!service.shots) throw new Error("This server cannot take pictures of a stage.");
 			const { of, scale, format, to, scheme } = options ?? {};
+			/*
+			 * One board, by its path: as the person's browser has it now, so the picture shows what
+			 * they did on the page — drawn there by HTML-in-Canvas when it can be, from a snapshot of
+			 * the page otherwise. With no live page to draw, the server's picture from the file, and
+			 * the answer says it does not show their interaction.
+			 */
+			if (typeof of === "string" && format !== "pdf" && here().some((board) => board.path === of)) {
+				const seen = await service.seenBoard(agent.id, of);
+				let bytes: Buffer;
+				let mime: string;
+				let note: string;
+				if (seen.how !== "none") {
+					bytes = seen.bytes;
+					mime = seen.mime;
+					note = seen.how === "canvas" ? "As the person's browser shows it now, drawn there by HTML-in-Canvas: it includes what they did on the page." : "As the person's browser has it now, from a snapshot of the page: it includes what they did on the page, such as tabs pressed, text typed and boxes scrolled.";
+				} else {
+					if (!service.boardPicture) throw new Error("This server cannot take pictures of a board.");
+					bytes = await service.boardPicture(of, scheme === "dark" ? "dark" : "light");
+					mime = "image/jpeg";
+					note = `Taken by the server from the board's file, because ${seen.why}. It does not show anything the person did on the page (tabs pressed, text typed, boxes scrolled); ask them to open the board if that matters.`;
+				}
+				const size = imageSize(bytes);
+				const file = service.shots.keepBoard(of, bytes, mime === "image/jpeg" ? "jpg" : "png", to);
+				images.push({ data: bytes.toString("base64"), mimeType: mime });
+				const at = here().find((board) => board.path === of)!;
+				return { file, width: size.width, height: size.height, box: { x1: at.x, y1: at.y, x2: at.x + at.w, y2: at.y + at.h }, how: seen.how === "none" ? ("server" as const) : seen.how, note };
+			}
 			const shot = await service.shots.take({ stage: needStage(), of, ...(scale !== undefined ? { scale } : {}), ...(format ? { format } : {}), ...(to ? { to } : {}), ...(scheme ? { scheme } : {}) });
 			if (shot.format !== "pdf") images.push({ data: shot.bytes.toString("base64"), mimeType: shot.format === "jpeg" ? "image/jpeg" : "image/png" });
 			return { file: shot.file, width: shot.width, height: shot.height, box: shot.box };
@@ -1002,6 +1050,9 @@ export function createStageTool(deps: {
 			// (`agents/identity-reminder.ts`).
 			const unsaid = identityReminder(agent.identity());
 			if (unsaid) parts.push(unsaid);
+			// And a canvas with no name of its own, or one it has outgrown (`stage/canvas-name.ts`).
+			const unnamed = canvasNameReminder(service.pens, agent.stageName?.());
+			if (unnamed) parts.push(unnamed);
 
 			// Written after every run, failed ones included: a run that threw halfway may
 			// still have attached a board, and the snapshot is what the canvas is restored

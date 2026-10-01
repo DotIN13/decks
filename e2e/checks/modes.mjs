@@ -11,7 +11,7 @@
  * is not that it half-works but that something *else* was relying on editing being on: the
  * inspector, the tools, file drops. Those are the assertions here.
  */
-import { editMode, open, say, settle } from "../harness.mjs";
+import { editMode, open, say, selectBoard, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 
@@ -52,7 +52,7 @@ say("…and browse is the one pressed", browse.toggle === "Browse the boards", b
  * is live. Only the *editor* stands down. This is what makes a board that is a game playable
  * and a board that is prose copyable.
  */
-await page.locator(`.bar-layer .chrome[data-path="${await page.evaluate(() => document.querySelector(".board-node").dataset.path)}"]`).click();
+await selectBoard(page, await page.evaluate(() => document.querySelector(".board-node").dataset.path));
 await page.keyboard.press("1");
 await settle(page, 900);
 

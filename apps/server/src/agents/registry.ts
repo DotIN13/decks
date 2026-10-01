@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import type { AgentChat, AgentKind, AgentMode, AgentModel, AgentState, Camera, ModelOption, ServerMessage } from "@decks/protocol";
 import type { Deck } from "../deck/loader.ts";
 import { nowWords, processZone } from "../lib/clock.ts";
@@ -152,6 +153,11 @@ export class Registry {
 			 * nobody declared. A restored chat's own comes through `restored.workspace` instead.
 			 */
 			workspace?: string;
+			/**
+			 * The agent you were on when you made this one, for a new agent made without a workspace:
+			 * its workspace is the one whose latest canvas the new agent opens on (`latestCanvas`).
+			 */
+			near?: string;
 			/** Set only by `restore`: a chat from a previous run, with nothing running behind it. */
 			restored?: {
 				id: string;
@@ -221,6 +227,8 @@ export class Registry {
 				kind: options.kind ?? this.host.defaultKind,
 				snapshots: this.snapshots,
 				store: this.store,
+				// A new agent (not one read back off disk) opens on its workspace's latest canvas.
+				...(options.restored ? {} : { firstCanvas: (self: string) => this.latestCanvas(options.workspace ?? (options.near ? this.get(options.near)?.workspace : undefined), self) }),
 			},
 		);
 		this.agents.push(agent);
@@ -449,6 +457,33 @@ export class Registry {
 	 * creator's account, workspace and model unless told otherwise; a model the runtime cannot
 	 * open is a notice in the creator's transcript, not an error.
 	 */
+	/**
+	 * The latest canvas of a workspace: of the canvases its agents are on, the one drawn on or
+	 * changed most recently. "No workspace" is a group of its own. Nothing when none of its agents
+	 * has a canvas, and a new agent then makes its own.
+	 */
+	latestCanvas(workspace: string | undefined, except?: string): string | undefined {
+		const pens = this.stage.pens;
+		if (!pens) return undefined;
+		const canvases = new Set<string>();
+		for (const one of this.agents) {
+			if (one.id === except || one.workspace !== workspace) continue;
+			const name = one.stageName();
+			if (name) canvases.add(name);
+		}
+		let best: { name: string; at: number } | undefined;
+		for (const name of canvases) {
+			let at = 0;
+			try {
+				at = statSync(existsSync(pens.fileOf(name)) ? pens.fileOf(name) : join(pens.dir, name)).mtimeMs;
+			} catch {
+				continue;
+			}
+			if (!best || at > best.at) best = { name, at };
+		}
+		return best?.name;
+	}
+
 	async createFor(fromId: string, spec: CreateSpec): Promise<{ agent: string; name: string }> {
 		const from = this.get(fromId);
 		if (!from) throw new Error("The creating agent is gone");
@@ -457,6 +492,7 @@ export class Registry {
 		const kind = spec.kind ?? from.kind;
 		const inherited = !spec.model && kind === from.kind ? from.currentModel() : undefined;
 		const made = this.create({
+			near: fromId,
 			name: spec.name,
 			kind,
 			...(inherited ? { model: inherited } : {}),

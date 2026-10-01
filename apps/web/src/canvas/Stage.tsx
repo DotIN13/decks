@@ -1,9 +1,14 @@
+import { shotAdaptor } from "./shots/adaptors.ts";
+import { touchedCanvas } from "../camera/touched.ts";
+import { BoardCallout } from "./BoardCallout.tsx";
 import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import X from "lucide-solid/icons/x";
+import { TOOLS } from "./pen/PenBar.tsx";
+import { setCommenting } from "../state/comments.ts";
 import { Icon } from "../ui/icons.tsx";
-import { For, Show, batch, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
+import { For, Index, Show, batch, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import type { AgentAct } from "./acts.ts";
-import { between, boxOf, easeOutCubic, fitInto, INTERACT_ZOOM, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
+import { between, boxOf, easeOutCubic, fitInto, INTERACT_ZOOM, isPhone, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
@@ -23,7 +28,8 @@ import type { RendererChoice } from "../lib/renderer.ts";
 import { createRedrawQueue } from "./redraw-queue.ts";
 import { openThumbnails } from "./thumb-budget.ts";
 import { createAdmission } from "./board-admission.ts";
-import { PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts";
+import { debugOff, PenLayer, type PenHit, type PenPreview } from "./pen/layer.ts";
+import { BoxIndex } from "./spatial.ts";
 import { StageInk } from "./pen/StageInk.tsx";
 import { inkVariableEdit, strokeOf } from "./pen/ink.ts";
 import { PEN_TOOL_KEYS, penSelection, penTool, setPenSelection, setPenTool, type PenTool } from "../state/pen-tools.ts";
@@ -336,6 +342,11 @@ export function Stage(props: {
 		fitInto(boxes, view(), canvasBox(view()));
 
 	onMount(() => {
+		// A hand on the canvas holds the view against an agent's show (`camera/touched.ts`).
+		for (const kind of ["pointerdown", "wheel", "keydown"] as const) element.addEventListener(kind, touchedCanvas, { capture: true, passive: true });
+		onCleanup(() => {
+			for (const kind of ["pointerdown", "wheel", "keydown"] as const) element.removeEventListener(kind, touchedCanvas, { capture: true });
+		});
 		const measure = () => {
 			const viewport = { width: element.clientWidth, height: element.clientHeight };
 			setView(viewport);
@@ -556,6 +567,8 @@ export function Stage(props: {
 	 * budget is there to stop this making that case worse, not to rescue it.
 	 */
 	const LAYER_BUDGET = 48;
+	/** WebKit's engine, on a Mac or on any iPhone browser: its user agent names AppleWebKit and never Chrome/. */
+	const SLEEP_ON_ZOOM = typeof navigator !== "undefined" && /AppleWebKit/.test(navigator.userAgent) && !/Chrome\/|Android/.test(navigator.userAgent);
 
 	/**
 	 * The air a focused page keeps around it, in stage pixels.
@@ -568,15 +581,59 @@ export function Stage(props: {
 	const centre = () => ({ x: view().width / 2, y: view().height / 2 });
 
 	/*
-	 * The drawing under the boards (`canvas/pen/layer.ts`). The camera reaches it through
-	 * `writeTransform`; the document, the window's size and the colour scheme through these.
+	 * The stage's one sheet: the drawing and the boards' pictures, painted in a worker
+	 * (`canvas/pen/layer.ts`, `pen/scene.ts`). The camera reaches it through `writeTransform`; the
+	 * document, the window's size and the colour scheme through these.
 	 */
 	const penLayer = new PenLayer();
 	onCleanup(() => penLayer.dispose());
 	createEffect(() => penLayer.setView(view()));
 	createEffect(() => penLayer.setScheme(scheme()));
 	createEffect(() => penLayer.setDoc(props.pen?.doc, props.pen?.base ?? ""));
-	createEffect(() => penLayer.setBoards(props.boards));
+
+	/**
+	 * No board has a title bar: a board is picked by pressing it, and the selected one gets the
+	 * action pill (`BoardCallout`) on every device. When a board has a page is `INTERACT_ZOOM`, per
+	 * device, high enough on a phone that only a board or two are ever live: thirteen live pages on
+	 * a 2 to 10% zoom were what every recorded crash had in common.
+	 */
+	/** The board the action pill is for: the selected one, while it is on the canvas. */
+	const calloutBoard = createMemo(() => (props.selected ? props.boards.find((board) => board.path === props.selected) : undefined));
+
+	/**
+	 * Boards whose documents are showing, by how many of their frames say so: the sheet is a hole
+	 * over each of them, and the board's picture everywhere else. A count and not a set, so a frame
+	 * that goes as another comes for the same board never leaves it wrongly unmarked.
+	 */
+	const [liveBoards, setLiveBoards] = createSignal<ReadonlyMap<string, number>>(new Map());
+	/** When each board's page last came up, for keeping the most recent ones (`keptPages`). */
+	const [shownAt, setShownAt] = createSignal<ReadonlyMap<string, number>>(new Map());
+	/**
+	 * The pages kept after they stop being shown: the `KEPT_PAGES` most recently shown boards on
+	 * this canvas. The rest are let go as before. Only the DOM renderer keeps them: its page hides
+	 * under the sheet's picture, where a canvas renderer's own picture is the page.
+	 */
+	const keptPages = createMemo<ReadonlySet<string>>((was) => {
+		const onCanvas = new Set(props.boards.map((board) => board.path));
+		const next = [...shownAt()]
+			.filter(([path]) => onCanvas.has(path) && path !== props.focus)
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, KEPT_PAGES)
+			.map(([path]) => path);
+		return was && was.size === next.length && next.every((path) => was.has(path)) ? was : new Set(next);
+	});
+	const markLive = (path: string, on: boolean) => {
+		if (on) setShownAt((was) => new Map(was).set(path, performance.now()));
+		markLiveCount(path, on);
+	};
+	const markLiveCount = (path: string, on: boolean) =>
+		setLiveBoards((was) => {
+			const next = new Map(was);
+			const count = (next.get(path) ?? 0) + (on ? 1 : -1);
+			if (count > 0) next.set(path, count);
+			else next.delete(path);
+			return next;
+		});
 
 	/*
 	 * Editing the drawing by hand, in edit mode (`state/pen-tools.ts` holds the tool and the
@@ -597,9 +654,75 @@ export function Stage(props: {
 	 */
 	const [boardPicks, setBoardPicks] = createSignal<readonly string[]>([]);
 	/** Boards being dragged, and by how much, until the move is sent. */
+	/** A board moving itself, by a finger on its edge (`BoardFrame`'s own drag): the pill hides for it too. */
+	const [ownDrag, setOwnDrag] = createSignal<{ path: string; x: number; y: number } | undefined>();
 	const [boardDrag, setBoardDrag] = createSignal<{ paths: readonly string[]; dx: number; dy: number } | undefined>();
 	/** A board being resized by its handles, held from the first move until the board is at it. */
 	const [boardResize, setBoardResize] = createSignal<{ path: string; x: number; y: number; w: number; h: number } | undefined>();
+	/**
+	 * Each board as the sheet draws it: where it is, and whether it is a hole or a picture.
+	 *
+	 * A dragged board is where it was picked up, here: the sheet draws its picture once on the carried
+	 * layer and the page slides that with the pointer (`carry` below), so a move redraws nothing.
+	 */
+	createEffect(() => {
+		const live = liveBoards();
+		const look = scheme();
+		// A board drawn into a canvas of its own keeps its own picture: the sheet leaves it alone.
+		const own = props.renderer === "canvas-per-board";
+		const resize = boardResize();
+		penLayer.setBoards(
+			props.boards
+				.filter((board) => board.path !== props.focus)
+				.map((board) => {
+					const sized = resize?.path === board.path ? resize : undefined;
+					return {
+						path: board.path,
+						x: sized?.x ?? board.x,
+						y: sized?.y ?? board.y,
+						w: sized?.w ?? board.w,
+						h: sized?.h ?? board.h,
+						// Under the Canvas renderer a board draws its own picture, unless pictures are taken by
+						// HTML-in-Canvas, which hands them to the sheet like the other adaptors (`shots/adaptors.ts`).
+						live: (own && shotAdaptor().id !== "canvas") || live.has(board.path),
+						// A live board's picture is kept ready, for a zoom on WebKit or a drag to show at once.
+						...(live.has(board.path) ? { ready: true } : {}),
+						...(debugOff.has("pictures") ? {} : { picture: shotAdaptor().picture(board, look) }),
+						...(props.news?.[board.path] ? { news: resolveColour(props.news[board.path]!), glow: !paged(board) } : {}),
+					};
+				}),
+		);
+	});
+	createEffect(() => penLayer.setMoving(panning() || scaling() || moving() || gliding()));
+	/** The boards a drag carries and how far, for the carried layer; only boards that are pages, drawn as pictures there. */
+	createEffect(() => {
+		const drag = boardDrag();
+		const held = ownDrag();
+		const board = held ? props.boards.find((one) => one.path === held.path) : undefined;
+		const carried = props.renderer !== "dom" ? undefined : drag ? { paths: drag.paths, dx: drag.dx, dy: drag.dy } : held && board ? { paths: [held.path], dx: held.x - board.x, dy: held.y - board.y } : undefined;
+		penLayer.carry(carried?.paths ?? [], carried ?? { dx: 0, dy: 0 });
+	});
+	/** The boards whose carried picture is on screen: their pages hide where they were picked up (`BoardFrame`). */
+	const [carriedPages, setCarriedPages] = createSignal<ReadonlySet<string>>(new Set());
+	penLayer.carrying = setCarriedPages;
+	const resolvedColours = new Map<string, string>();
+	/**
+	 * A writer's colour as the sheet can paint it. A board with no writer's colour glows in
+	 * `var(--color-accent)`, which a canvas does not understand: the 2D one drew it in its default
+	 * black and Skia in nothing. So a `var()` is looked up here, on the page, in the current scheme.
+	 */
+	const resolveColour = (colour: string) => {
+		const name = /^var\((--[\w-]+)/.exec(colour.trim())?.[1];
+		if (!name) return colour;
+		/* Kept per scheme: reading a computed style makes the page recalculate its styles first, and
+		   the sheet's boards are re-sent on every move of a board drag, where that cost 8 ms a move. */
+		const key = `${scheme()}|${name}`;
+		const known = resolvedColours.get(key);
+		if (known) return known;
+		const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#3b5cf6";
+		resolvedColours.set(key, value);
+		return value;
+	};
 	/** Where the drag or resize in hand snapped, in stage pixels (`pen/snap.ts`). */
 	const [guides, setGuides] = createSignal<readonly Guide[]>([]);
 	/** The item under the pointer, outlined the way a design tool does before anything is pressed. */
@@ -612,6 +735,13 @@ export function Stage(props: {
 	const [endDraft, setEndDraft] = createSignal<{ x1: number; y1: number; x2: number; y2: number } | undefined>();
 	/** When a tool last made an item, so the second press of a double-click does not make a board. */
 	let penMadeAt = 0;
+	/** The boards the sheet has on screen as pictures (`layer.ts`, `pictured`). */
+	const [onSheet, setOnSheet] = createSignal<ReadonlySet<string>>(new Set());
+	penLayer.pictured = (paths) => {
+		const was = untrack(onSheet);
+		if (was.size === paths.size && [...paths].every((path) => was.has(path))) return;
+		setOnSheet(paths);
+	};
 	penLayer.drawn = () => {
 		if (unmute && penLayer.placed.get(unmute.id)?.node.content === unmute.value) unmuteNow();
 		/*
@@ -676,6 +806,7 @@ export function Stage(props: {
 			if (box) out.push({ id, x: box.x + drag.dx, y: box.y + drag.dy, w: box.w, h: box.h });
 		}
 		const moving = boardDrag();
+		const carried = ownDrag();
 		for (const path of boardPicks()) {
 			const board = props.boards.find((candidate) => candidate.path === path);
 			if (!board) continue;
@@ -688,7 +819,9 @@ export function Stage(props: {
 		if (board) {
 			const sized = boardResize();
 			const shift = moving?.paths.includes(board.path) ? moving : { dx: 0, dy: 0 };
-			out.push(sized?.path === board.path ? { id: `board:${board.path}`, x: sized.x, y: sized.y, w: sized.w, h: sized.h } : { id: `board:${board.path}`, x: board.x + shift.dx, y: board.y + shift.dy, w: board.w, h: board.h });
+			// Carried by a finger on its edge (`BoardFrame`'s own drag): outlined where the finger has it.
+			const at = carried?.path === board.path ? carried : { x: board.x + shift.dx, y: board.y + shift.dy };
+			out.push(sized?.path === board.path ? { id: `board:${board.path}`, x: sized.x, y: sized.y, w: sized.w, h: sized.h } : { id: `board:${board.path}`, x: at.x, y: at.y, w: board.w, h: board.h });
 		}
 		const marquee = penMarquee();
 		if (marquee) out.push({ id: "", x: Math.min(marquee.x1, marquee.x2), y: Math.min(marquee.y1, marquee.y2), w: Math.abs(marquee.x2 - marquee.x1), h: Math.abs(marquee.y2 - marquee.y1) });
@@ -706,7 +839,7 @@ export function Stage(props: {
 	/** The selected board's box, when it alone is selected and can be resized: the same eight handles as an item. */
 	const boardHandles = createMemo(() => {
 		const outlines = penOutlines();
-		if (!props.onResize || boardDrag() || outlines.length !== 1 || !outlines[0]!.id.startsWith("board:")) return undefined;
+		if (!props.onResize || boardDrag() || ownDrag() || outlines.length !== 1 || !outlines[0]!.id.startsWith("board:")) return undefined;
 		const path = outlines[0]!.id.slice("board:".length);
 		const board = props.boards.find((candidate) => candidate.path === path);
 		if (!board) return undefined;
@@ -1586,6 +1719,7 @@ export function Stage(props: {
 					selectMade([id]);
 					return;
 				}
+				if (!moved) return penMakeAt(tool, at);
 				const made = MADE[tool];
 				const x1 = Math.round(moved ? Math.min(at.x, end.x) : at.x);
 				const y1 = Math.round(moved ? Math.min(at.y, end.y) : at.y);
@@ -1603,49 +1737,64 @@ export function Stage(props: {
 		);
 	};
 
-	/*
-	 * The boards' title bars, in a layer over the canvas that does not zoom (`.bar-layer`).
-	 *
-	 * A bar is the same size on screen at every zoom, so inside the zooming world it had to be
-	 * counter-scaled — laid out again at every new zoom, which is why it used to be held still
-	 * while the camera moved and then jump to its size when it rested. Here it is laid out once
-	 * at its screen size and moved: a pan is a translate, which the compositor does, and a zoom
-	 * is that and the bar's width. Each board says where it is and how wide (`BoardFrame`), and
-	 * every camera frame places every bar from that, in the same call that moves the boards.
+	/**
+	 * One item of a tool, at its own size, at a stage point: a click with a tool armed, and a pick
+	 * from the canvas menu. Words open for typing at once.
 	 */
-	const [barLayer, setBarLayer] = createSignal<HTMLElement>();
-	const barAt = new WeakMap<HTMLElement, { x: number; y: number; w: number }>();
-	const barWidth = new WeakMap<HTMLElement, number>();
-	/** Above the board's top edge by the bar's 24 pixels and a 2-pixel gap. */
-	const BAR_ABOVE = 26;
-	const positionBar = (bar: HTMLElement, cam: Camera) => {
-		const at = barAt.get(bar);
-		if (!at) return;
-		const v = view();
-		const dpr = window.devicePixelRatio || 1;
-		// Whole device pixels, so the words are never drawn between two.
-		const x = Math.round((v.width / 2 + (at.x - cam.x) * cam.zoom) * dpr) / dpr;
-		const y = Math.round((v.height / 2 + (at.y - cam.y) * cam.zoom - BAR_ABOVE) * dpr) / dpr;
-		bar.style.transform = `translate(${x}px, ${y}px)`;
-		const width = Math.round(at.w * cam.zoom);
-		if (barWidth.get(bar) !== width) {
-			barWidth.set(bar, width);
-			bar.style.width = `${width}px`;
-		}
+	const penMakeAt = (tool: Exclude<PenTool, "select" | "arrow">, at: { x: number; y: number }) => {
+		penMadeAt = performance.now();
+		const id = freshId();
+		const made = MADE[tool];
+		const x1 = Math.round(at.x);
+		const y1 = Math.round(at.y);
+		const parent = frameAt(at);
+		const box = tool === "text" || tool === "note" ? { x1, y1 } : tool === "card" ? { x1, y1, x2: x1 + made.w } : { x1, y1, x2: x1 + made.w, y2: y1 + made.h };
+		penEdit([{ op: "insert", ...(parent ? { parent } : {}), node: { ...made.node, id }, box }]);
+		selectMade([id]);
+		if (tool === "text" || tool === "note" || tool === "card") openPenText({ id, node: { ...made.node, id } as PenNode, box: { x: x1, y: y1, w: made.w, h: tool === "card" ? 80 : made.h } }, true);
 	};
-	const placeBar = (bar: HTMLElement, at: { x: number; y: number; w: number }) => {
-		barAt.set(bar, at);
-		positionBar(bar, localCamera);
+
+	/**
+	 * The canvas menu: on a phone, the drawing's tools at the place a double-tap on bare canvas
+	 * landed. A phone has no room for the tool column (`PenBar`), and a menu where the finger is
+	 * puts the new thing where it was asked for: a pick makes it there, and the arrow, which needs
+	 * a drag, is put in hand. No board: on a phone a board is made from `⋯`, not by a double-tap.
+	 */
+	const [canvasMenu, setCanvasMenu] = createSignal<{ client: { x: number; y: number }; world: { x: number; y: number } } | undefined>();
+	let lastBareTap: { x: number; y: number; at: number } | undefined;
+	const pickFromMenu = (tool: Exclude<PenTool, "select">) => {
+		const menu = canvasMenu();
+		setCanvasMenu(undefined);
+		if (!menu) return;
+		if (tool === "arrow") setPenTool("arrow");
+		else penMakeAt(tool, menu.world);
 	};
+	createEffect(() => {
+		if (!canvasMenu()) return;
+		const away = (event: PointerEvent) => {
+			if (!(event.target as Element | null)?.closest?.(".canvas-menu")) setCanvasMenu(undefined);
+		};
+		const key = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setCanvasMenu(undefined);
+		};
+		window.addEventListener("pointerdown", away, true);
+		window.addEventListener("keydown", key);
+		onCleanup(() => {
+			window.removeEventListener("pointerdown", away, true);
+			window.removeEventListener("keydown", key);
+		});
+	});
+	// The camera moving takes it away: it belongs to a place on the canvas, which has just moved.
+	createEffect(() => {
+		void props.camera;
+		untrack(() => canvasMenu() && setCanvasMenu(undefined));
+	});
 
 	const writeTransform = (cam: Camera) => {
 		const v = view();
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
 		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
 		penLayer.setCamera(cam);
-		// And the title bars, which are in a layer of their own that does not zoom.
-		const layer = barLayer();
-		if (layer) for (const bar of layer.querySelectorAll<HTMLElement>(".chrome")) positionBar(bar, cam);
 	};
 
 
@@ -2040,7 +2189,6 @@ export function Stage(props: {
 	let trail: Sample[] = [];
 	let trailAt = { x: 0, y: 0 };
 	let noCoast = false;
-
 	/**
 	 * A finger of this document's, in the stage's own coordinates.
 	 *
@@ -2395,6 +2543,47 @@ export function Stage(props: {
 		return type === "note" || type === "prompt" || type === "context";
 	};
 
+	/**
+	 * A tap on bare canvas lets go of the drawn items and boards selected, as a click there does
+	 * (`penPress`, the marquee). On the lift, not the landing: a finger that pans or becomes a pinch
+	 * keeps the selection, so you can look around something you have picked.
+	 */
+	const tapToDeselect = (event: PointerEvent) => {
+		const pointer = event.pointerId;
+		const from = { x: event.clientX, y: event.clientY };
+		const since = performance.now();
+		let pinched = false;
+		let travelled = false;
+		const done = () => {
+			window.removeEventListener("pointermove", move);
+			window.removeEventListener("pointerup", up);
+			window.removeEventListener("pointercancel", done);
+		};
+		const move = (e: PointerEvent) => {
+			if (e.pointerId !== pointer && e.pointerType === "touch") pinched = true;
+			// Judged on the furthest the finger went: a pan that comes back to where it began is still a pan.
+			else if (e.pointerId === pointer && Math.hypot(e.clientX - from.x, e.clientY - from.y) >= 10) travelled = true;
+		};
+		const up = (e: PointerEvent) => {
+			if (e.pointerId !== pointer) return;
+			done();
+			if (pinched || travelled || performance.now() - since > 600) return;
+			batch(() => {
+				setPenSelection([]);
+				setBoardPicks([]);
+			});
+			// A second tap close by, soon after: the canvas menu, on a phone.
+			if (!isPhone()) return;
+			const now = performance.now();
+			const twice = lastBareTap && now - lastBareTap.at < 350 && Math.hypot(e.clientX - lastBareTap.x, e.clientY - lastBareTap.y) < 30;
+			lastBareTap = twice ? undefined : { x: e.clientX, y: e.clientY, at: now };
+			if (twice) setCanvasMenu({ client: { x: e.clientX, y: e.clientY }, world: worldAt(e) });
+		};
+		window.addEventListener("pointermove", move);
+		window.addEventListener("pointerup", up);
+		window.addEventListener("pointercancel", done);
+	};
+
 	/** The last tap on a drawn item, so a second one soon after on the same item opens its words. */
 	let lastTap: { id: string; at: number } | undefined;
 	/**
@@ -2507,7 +2696,8 @@ export function Stage(props: {
 				return;
 			}
 		}
-		if (!props.onCreateBoard) return;
+		// Not on a phone: a double-tap there is the canvas menu, and a board is made from `⋯`.
+		if (!props.onCreateBoard || isPhone()) return;
 		/*
 		 * Only on the bare stage itself. Not on a board, its title bar, something drawn, or anything
 		 * laid over the drawing — the editor a note's words are typed in is one, and a double-click
@@ -2540,6 +2730,7 @@ export function Stage(props: {
 			}
 			beginTouch(event);
 			if (pen && onDrawn(event.target)) touchOnDrawing(event);
+			else if (pen) tapToDeselect(event);
 			return;
 		}
 
@@ -2601,6 +2792,117 @@ export function Stage(props: {
 	};
 
 	/**
+	 * The boards that exist on the page at all: the ones `isVisible` would say yes to, found through a
+	 * spatial index (`spatial.ts`) rather than by asking every board — and any board that must stay
+	 * whatever the camera does: one whose document is showing (it is let go of by the admission's own
+	 * clock, `board-admission.ts`, and leaves here after that), the selected one, the one being
+	 * edited, dragged or resized.
+	 *
+	 * A board outside that is not a node: no frame component, no title bar, nothing re-evaluated when
+	 * the camera moves. Every per-board thing a frame of the camera costs — `isVisible`, the admission,
+	 * the bar, the glow's read check — is then paid for the boards near the window, not for the stage.
+	 * The sheet draws the rest (`pen/scene.ts`), from the same kind of index.
+	 */
+	const boardIndex = createMemo(() => new BoxIndex(props.boards));
+	const boardSlot = createMemo(() => new Map(props.boards.map((board, i) => [board.path, i])));
+	/** The stage rectangle `isVisible` answers for: the window, and one window more on each side. */
+	const reach = () => {
+		const v = view();
+		const corner = toWorld(props.camera, v, { x: -v.width, y: -v.height });
+		return { x: corner.x, y: corner.y, w: (3 * v.width) / props.camera.zoom, h: (3 * v.height) / props.camera.zoom };
+	};
+	const rendered = createMemo<readonly Board[]>((was) => {
+		const boards = props.boards;
+		if (view().width === 0) return was ?? [];
+		const found = new Set(boardIndex().search(reach()));
+		const keep = (path: string | undefined) => {
+			const at = path === undefined ? undefined : boardSlot().get(path);
+			if (at !== undefined) found.add(at);
+		};
+		for (const path of liveBoards().keys()) keep(path);
+		// A kept page stays a node wherever the camera goes, or leaving would unload it.
+		for (const path of keptPages()) keep(path);
+		keep(props.selected);
+		keep(props.editing?.path);
+		for (const path of boardDrag()?.paths ?? []) keep(path);
+		keep(boardResize()?.path);
+		const next = [...found]
+			.sort((a, b) => a - b)
+			.map((at) => boards[at]!)
+			.filter((board) => board.path !== props.focus);
+		// The same boards as last frame, which is nearly every frame of a pan: the same array, so nothing downstream runs.
+		return was && was.length === next.length && next.every((board, i) => board === was[i]) ? was : next;
+	});
+
+	/**
+	 * The zoom as of the camera's last rest. What a board is given by size — a document, its glow —
+	 * changes when the camera stops, never partway through a pinch, where a board crossing the line
+	 * would have its page torn down or started mid-gesture.
+	 */
+	const restZoom = createMemo<number>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera.zoom));
+	/**
+	 * Boards are live: the camera rested at this device's live zoom or above (`INTERACT_ZOOM`, 20%
+	 * on a desktop), the same zoom at which a page takes the pointer. Below it a board is its picture
+	 * on the sheet (`pen/scene.ts`), which also draws its news glow; above it, it has a document and
+	 * the page's own glow, which breathes.
+	 */
+	const liveZoom = createMemo(() => restZoom() >= INTERACT_ZOOM);
+	/**
+	 * On screen as of the camera's last rest, with a tenth of the window to spare. A page loaded for
+	 * a board just off screen, ready for a pan, sleeps until then (`BoardFrame`, `asleep`): 48
+	 * example pages cost 80% of a core at idle shown, and nothing asleep. From the resting camera,
+	 * so a pan does not wake and sleep pages under the pointer.
+	 */
+	const restOnScreen = (board: Board) => {
+		const v = view();
+		const cam = restCamera();
+		const a = toScreen(cam, v, { x: board.x, y: board.y });
+		const b = toScreen(cam, v, { x: board.x + board.w, y: board.y + board.h });
+		const mx = v.width * 0.1;
+		const my = v.height * 0.1;
+		return b.x > -mx && a.x < v.width + mx && b.y > -my && a.y < v.height + my;
+	};
+	/**
+	 * WebKit (Safari, and every browser on an iPhone) puts live pages to sleep for the length of a
+	 * zoom. It ignores the layer promise that lets Chrome stretch a page's picture while the scale
+	 * moves (`[data-scaling]`, `canvas.css`), and draws every page again at every step instead: a
+	 * recorded iPhone pinch over one animated board spent 65 to 100ms a frame compositing it. Asleep,
+	 * the sheet shows the page's picture and the page stops rendering, still loaded; at rest it wakes
+	 * under the picture and takes its place, as a page panned back into view does.
+	 */
+	const sleepOnZoom = createMemo(() => SLEEP_ON_ZOOM && scaling());
+	/** The camera as of its last rest, as `restZoom` is the zoom. */
+	const restCamera = createMemo<Camera>((was) => (was !== undefined && (moving() || scaling() || panning() || gliding()) ? was : props.camera));
+	/**
+	 * On a phone, the one board that is live (`ONE_LIVE`): of the boards on screen, the one the
+	 * middle of the screen is on, or else nearest it; the one on top where two overlap. Decided
+	 * when the camera rests, so a pan hands the page from one board to the next once, at the end.
+	 */
+	const centreBoard = createMemo<string | undefined>(() => {
+		if (!ONE_LIVE || !liveZoom()) return undefined;
+		const v = view();
+		if (v.width === 0) return undefined;
+		const c = restCamera();
+		const window = { x: c.x - v.width / 2 / c.zoom, y: c.y - v.height / 2 / c.zoom, w: v.width / c.zoom, h: v.height / c.zoom };
+		let best: string | undefined;
+		let nearest = Infinity;
+		for (const at of boardIndex().search(window)) {
+			const board = props.boards[at]!;
+			const dx = Math.max(board.x - c.x, 0, c.x - (board.x + board.w));
+			const dy = Math.max(board.y - c.y, 0, c.y - (board.y + board.h));
+			const d = Math.hypot(dx, dy);
+			if (d <= nearest) {
+				nearest = d;
+				best = board.path;
+			}
+		}
+		return best;
+	});
+	/** Whether a board is drawn as a page rather than its picture, as far as the zoom decides. */
+	const paged = (board: Board) => props.selected === board.path || (ONE_LIVE ? centreBoard() === board.path : liveZoom());
+
+
+	/**
 	 * Which boards have a document, and the gate that holds them at the open
 	 * (`board-admission.ts`).
 	 *
@@ -2627,6 +2929,7 @@ export function Stage(props: {
 		},
 	});
 	createEffect(() => admission.begin());
+
 
 
 
@@ -2685,7 +2988,13 @@ export function Stage(props: {
 							moving={moving()}
 							pictures={pictures}
 							camera={props.camera}
-							mounted={alone || (admission.mayHaveDocument(board) && admission.isMounted(board))}
+							mounted={
+								alone ||
+								/* The selected board and the edited one are live at any zoom, on any device. */
+								props.selected === board.path ||
+								props.editing?.path === board.path ||
+								(ONE_LIVE ? centreBoard() === board.path : liveZoom() && admission.mayHaveDocument(board) && admission.isMounted(board))
+							}
 							/*
 							 * No title bar in the focus view, and that is a decision rather than an
 							 * omission: the bar is canvas furniture — it is how you *identify and
@@ -2695,8 +3004,14 @@ export function Stage(props: {
 							 * panel still says which board it is.
 							 */
 							visible={alone ? false : isVisible(board)}
-							barLayer={barLayer()}
-							placeBar={placeBar}
+							{...(alone ? {} : { onLive: (on: boolean) => markLive(board.path, on) })}
+							kept={!alone && props.renderer === "dom" && keptPages().has(board.path)}
+							onDragging={(at) => setOwnDrag(at ? { path: board.path, ...at } : undefined)}
+							pictured={onSheet().has(board.path)}
+							covering={sleepOnZoom()}
+							carried={carriedPages().has(board.path)}
+							asleep={!alone && props.renderer === "dom" && props.editing?.path !== board.path && (sleepOnZoom() || (props.selected !== board.path && !restOnScreen(board)))}
+							{...(!alone && shotAdaptor().capture ? { capture: (frame: HTMLIFrameElement) => shotAdaptor().capture!(frame, board) } : {})}
 							{...(alone ? { origin: { x: 0, y: 0 } } : {})}
 							selected={props.selected === board.path}
 							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
@@ -2710,7 +3025,7 @@ export function Stage(props: {
 							cursor={props.cursor?.path === board.path ? props.cursor : undefined}
 							marks={(props.marks ?? []).filter((mark) => mark.path === board.path)}
 							acts={actsByPath().get(board.path)}
-							news={props.news?.[board.path]}
+							news={alone || paged(board) ? props.news?.[board.path] : undefined}
 							onRead={() => props.onRead?.(board.path)}
 							editor={props.editor}
 							gestures={gestures}
@@ -2784,8 +3099,11 @@ export function Stage(props: {
 			data-focus={props.focus ? "true" : undefined}
 			data-panning={panning()}
 			data-pen-tool={props.onPenEdit && !props.drawing && penTool() !== "select" ? penTool() : undefined}
-			data-scaling={scaling() && props.boards.filter(isVisible).length <= LAYER_BUDGET}
+			data-scaling={scaling() && rendered().filter(isVisible).length <= LAYER_BUDGET}
 			data-gliding={gliding()}
+			/* The camera rests at or above this device's live zoom: boards have pages and take the pointer. */
+			data-live={liveZoom() ? "true" : undefined}
+			data-moving={moving() || panning() || gliding() ? "true" : undefined}
 			ref={element}
 			onWheel={onWheel}
 			onPointerDown={onPointerDown}
@@ -2812,29 +3130,30 @@ export function Stage(props: {
 			 * editor's patch target and a deck's page handle all find the frame that is on screen,
 			 * and there is no second one for them to find instead.
 			 */}
-			{/* The drawing under the boards (`pen/layer.ts`). */}
-			<canvas class="pen-layer" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas)} />
 			<div class="world" data-hidden={props.focus ? "true" : undefined} inert={props.focus ? true : undefined} ref={worldEl}>
-				<For each={props.boards.filter((board) => board.path !== props.focus)} fallback={null}>
+				<For each={rendered()} fallback={null}>
 					{(board) => boardNode(board)}
 				</For>
 				{/*
-				 * The drawing over the boards, and the invisible shapes that catch clicks on it: after
-				 * the boards, so over them; a click goes through to a board wherever nothing drawn is in
-				 * the way. See `pen/layer.ts`.
+				 * The stage's one sheet — the drawing, and each board's picture or a hole over its
+				 * document — and the invisible shapes that catch clicks on the drawing: after the boards,
+				 * so over them; a click goes through to a board wherever nothing drawn is in the way. See
+				 * `pen/layer.ts` and `pen/scene.ts`.
 				 */}
-				<canvas class="pen-over" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas, "over")} />
+				<canvas class="stage-sheet" aria-hidden="true" hidden ref={(canvas) => penLayer.attach(canvas)} />
 				<svg class="pen-hits" aria-hidden="true" width="1" height="1" ref={(svg) => penLayer.attachHits(svg)} />
-				<For each={penOutlines()}>
+				{/* By index, not by box: a drag makes a new box every move, and a new element for it every
+				    move made the page restyle what it holds (`Index` keeps the element and moves it). */}
+				<Index each={penOutlines()}>
 					{(box) => (
 						<div
 							class="pen-selection"
-							data-board={box.id.startsWith("board:") ? "true" : undefined}
-							data-round={rounded(box.id) ? "true" : undefined}
-							style={{ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
+							data-board={box().id.startsWith("board:") ? "true" : undefined}
+							data-round={rounded(box().id) ? "true" : undefined}
+							style={{ left: `${box().x}px`, top: `${box().y}px`, width: `${box().w}px`, height: `${box().h}px`, "box-shadow": `0 0 0 ${1.5 / props.camera.zoom}px var(--color-accent)` }}
 						/>
 					)}
-				</For>
+				</Index>
 				<Show when={hoverBox()}>
 					{(box) => (
 						<div
@@ -3032,8 +3351,62 @@ export function Stage(props: {
 					}}
 				</Show>
 			</div>
-			{/* The boards' title bars: over the canvas, and not zoomed with it (`placeBar` above). */}
-			<div class="bar-layer" data-hidden={props.focus ? "true" : undefined} ref={setBarLayer} />
+			<Show when={canvasMenu()} keyed>
+				{(menu) => (
+					<div
+						class="popover canvas-menu"
+						role="menu"
+						aria-label="Add to the canvas"
+						style={{
+							left: `${Math.max(8, Math.min(menu.client.x - 110, window.innerWidth - 228))}px`,
+							top: `${menu.client.y}px`,
+							width: "220px",
+							// Above the finger in the lower half of the screen, under it in the upper half.
+							transform: menu.client.y > window.innerHeight / 2 ? "translateY(calc(-100% - 12px))" : "translateY(12px)",
+						}}
+					>
+						<For each={TOOLS}>
+							{(entry) => (
+								<button type="button" role="menuitem" data-row data-flat="true" data-tool={entry.tool} onClick={() => pickFromMenu(entry.tool as Exclude<PenTool, "select">)}>
+									<span class="row-icon">
+										<Icon of={entry.icon} size={15} />
+									</span>
+									<span class="row-label">{entry.label.split(":")[0]}</span>
+								</button>
+							)}
+						</For>
+					</div>
+				)}
+			</Show>
+			{/*
+				Boards have no title bars: the selected board's name and actions are a pill over it
+				(`BoardCallout`), on every device. Kept mounted through a movement and only hidden, so a
+				drag that began on its grip keeps the element it captured the pointer on.
+			*/}
+			<Show when={!props.focus && !props.drawing ? calloutBoard() : undefined} keyed>
+				{(board) => (
+					<BoardCallout
+						board={board}
+						hidden={moving() || panning() || scaling() || gliding() || !!boardDrag() || !!boardResize() || !!ownDrag()}
+						camera={props.camera}
+						view={view()}
+						onOpen={() => pushCamera(frame([boxOf(board)]))}
+						{...(props.onFocusBoard ? { onFocus: () => props.onFocusBoard?.(board.path) } : {})}
+						{...(props.onPresent ? { onPresent: () => props.onPresent?.(board.path, board.format === "slides" ? (deckIn(board.path)?.current() ?? 0) : 0) } : {})}
+						{...(props.onHide ? { onHide: () => props.onHide?.(board.path) } : {})}
+						onComment={() =>
+							setCommenting({
+								path: board.path,
+								quote: "",
+								title: board.title,
+								open: true,
+								// Under the pill, which follows the board as the camera moves.
+								anchor: () => document.querySelector(".stage > .board-callout")?.getBoundingClientRect(),
+							})
+						}
+					/>
+				)}
+			</Show>
 			<Show when={props.drawing && props.onPenEdit && !props.focus}>
 				<StageInk
 					camera={props.camera}

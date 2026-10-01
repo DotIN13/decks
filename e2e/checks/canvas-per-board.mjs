@@ -7,7 +7,7 @@
  * whose snapshot Chrome leaves empty — clicks still reach a board's page, and a scroll over a
  * board still pans. Needs no model.
  */
-import { open, resetStage, say, settle } from "../harness.mjs";
+import { liveZoom, open, resetStage, say, selectBoard, settle } from "../harness.mjs";
 
 await resetStage();
 const { browser, page, context, errors } = await open({ width: 1400, height: 900 });
@@ -16,12 +16,14 @@ await context.addInitScript(() => {
 	if (window.top === window.self) localStorage.setItem("decks.renderer", "canvas-per-board");
 });
 await page.reload();
-await settle(page, 5000);
+// Boards have pages only from the live zoom up, and the fixture fits just under it.
+await liveZoom(page);
+await settle(page, 3000);
 say("the renderer is on", (await page.evaluate(() => document.querySelector(".stage")?.dataset.renderer)) === "canvas-per-board");
 say("each board is a canvas with its page inside it", (await page.locator(".board-node canvas.picture iframe").count()) > 0);
 
 const node = page.locator(".board-node").first();
-await page.locator(`.bar-layer .chrome[data-path="${await page.evaluate(() => document.querySelector(".board-node").dataset.path)}"]`).click();
+await selectBoard(page, await page.evaluate(() => document.querySelector(".board-node").dataset.path));
 await page.keyboard.press("1");
 await settle(page, 2500);
 await page.mouse.click(1395, 895);

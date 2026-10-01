@@ -1,10 +1,13 @@
+import { ConfirmDialog } from "./ui/ConfirmDialog.tsx";
 import type { Board, Camera, ThinkingLevel } from "@decks/protocol";
 import ChevronLeft from "lucide-solid/icons/chevron-left";
 import Info from "lucide-solid/icons/info";
+import Redo2 from "lucide-solid/icons/redo-2";
+import Undo2 from "lucide-solid/icons/undo-2";
 import Moon from "lucide-solid/icons/moon";
 import SettingsIcon from "lucide-solid/icons/settings";
 import Sun from "lucide-solid/icons/sun";
-import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show} from "solid-js";
+import {createEffect, createMemo, createSignal, on as watch, onCleanup, onMount, Show, untrack} from "solid-js";
 import type { EditorHost, Tool } from "./board/Editor.ts";
 import { Settings } from "./settings/Settings.tsx";
 import {forgetAskedResults, setToolResultSender} from "./chat/tool-results.ts";
@@ -57,8 +60,8 @@ import { stageOf, stages } from "./state/stages.ts";
 import { Corner } from "./chrome/Corner.tsx";
 import { NoticeStrip } from "./chrome/NoticeStrip.tsx";
 import { LeftPanel, type PanelTab } from "./panel/LeftPanel.tsx";
-import {boxOf, fitInto, INTERACT_ZOOM, keepVisible, middleOf} from "./camera/camera.ts";
-import { selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
+import {boxOf, fitInto, INTERACT_ZOOM, isPhone, keepVisible, middleOf} from "./camera/camera.ts";
+import { type AgentView, selectionOnSwitch, viewOnSwitch, viewToPark } from "./camera/agent-view.ts";
 import { agentViews } from "./camera/agent-views.ts";
 import {closeHistory, historyShown, openHistory, setInspectable, toggleHistory} from "./state/edge.ts";
 import { canvasBox, insets, watchInsets } from "./camera/insets.ts";
@@ -149,7 +152,7 @@ export function App() {
 	onMount(() => {
 		const park = () => {
 			const id = state.focused;
-			if (id) views().keep(id, viewToPark(camera(), selected()));
+			if (id) views().keep(id, stageOf(id)?.name, viewToPark(camera(), selected()));
 		};
 		addEventListener("pagehide", park);
 		onCleanup(() => removeEventListener("pagehide", park));
@@ -244,19 +247,20 @@ export function App() {
 		const note = { id: `c${Date.now().toString(36)}`, board: target.path, quote: target.quote, text, at: Date.now(), ...(target.component ? { component: target.component } : {}) };
 		if (how === "keep") {
 			addComment(agentId, note);
-			markComment(note.id, target.range);
+			if (target.range) markComment(note.id, target.range);
 			// Handed to the composer the way a dropped file is: a one-shot draft, here a pill.
 			setDraft({ text: "", at: Date.now(), insert: true, agentId, comment: note.id });
 		} else {
 			clearMarks(agentId);
 			send({ type: "agent.prompt", id: agentId, text: commentBlock([note]) });
 		}
-		target.frame.contentDocument?.getSelection()?.removeAllRanges();
+		target.frame?.contentDocument?.getSelection()?.removeAllRanges();
 		setCommenting(undefined);
 	};
 	/* The popup belongs to browsing with the pen down; anything else puts it away. */
 	createEffect(() => {
-		if (mode() !== "browse" || drawing()) setCommenting(undefined);
+		// A comment on the whole board, from its pill, is not a selection and stays in any mode.
+		if ((mode() !== "browse" || drawing()) && untrack(commenting)?.range) setCommenting(undefined);
 	});
 
 	/*
@@ -526,7 +530,7 @@ export function App() {
 		if (!id || id !== state.focused) return;
 		awaiting = undefined;
 		const playing = state.agents[id]?.inPlay ?? [];
-		const view = views().of(id);
+		const view = views().of(id, stageOf(id)?.name);
 		const size = { width: window.innerWidth, height: window.innerHeight };
 		const next = viewOnSwitch({ view, playing, boards: state.boards, viewport: size, region: canvasBox(size) });
 		if (next) setCamera(next);
@@ -546,7 +550,7 @@ export function App() {
 		if (!id) return undefined;
 		const size = { width: window.innerWidth, height: window.innerHeight };
 		return viewOnSwitch({
-			view: views().of(id),
+			view: views().of(id, stageOf(id)?.name),
 			playing: state.agents[id]?.inPlay ?? [],
 			boards: state.boards,
 			viewport: size,
@@ -1011,7 +1015,7 @@ export function App() {
 		 * stage leaves the camera alone, a remembered view comes back *exactly*, and an agent
 		 * with no memory gets a fit of what it holds.
 		 */
-		if (leaving) views().keep(leaving, viewToPark(camera(), selected()));
+		if (leaving) views().keep(leaving, stageOf(leaving)?.name, viewToPark(camera(), selected()));
 
 		setState("focused", id);
 		setUnread(id, 0);
@@ -1121,7 +1125,26 @@ export function App() {
 	 * `middleOf` rather than a fit: see `camera/camera.ts` for why one stray board must not decide
 	 * where a whole stage is read from.
 	 */
-	const landOnStage = () => {
+	/*
+	 * Moving between canvases, whoever moved: the view of the canvas left is parked for this agent
+	 * on this device, and the view this device last had of the canvas arrived at comes back — or,
+	 * the first time there, the middle of what it holds. A view is agent × canvas × device
+	 * (`camera/agent-views.ts`); a switch of agent parks and takes views on its own (`switchAgent`).
+	 */
+	let onCanvas: { agent?: string; stage?: string } = {};
+	createEffect(() => {
+		const agent = state.focused;
+		const stage = stageOf(agent)?.name;
+		const was = onCanvas;
+		onCanvas = { agent, stage };
+		if (!agent || was.agent !== agent || was.stage === undefined || was.stage === stage) return;
+		untrack(() => {
+			views().keep(agent, was.stage, viewToPark(camera(), selected()));
+			landOnStage(views().of(agent, stage));
+		});
+	});
+
+	const landOnStage = (view?: AgentView) => {
 		const asked = Date.now();
 		const stop = () => clearInterval(timer);
 		const timer = setInterval(() => {
@@ -1132,8 +1155,10 @@ export function App() {
 			const boards = stageBoards();
 			if (boards.length === 0 && Date.now() - asked < 1200) return;
 			stop();
-			const view = { width: stage.clientWidth, height: stage.clientHeight };
-			moveCamera(middleOf(boards.map(boxOf), canvasBox(view), view, camera()), { animate: true });
+			const size = { width: stage.clientWidth, height: stage.clientHeight };
+			moveCamera(view ? view.camera : middleOf(boards.map(boxOf), canvasBox(size), size, camera()), { animate: true });
+			setSelected(view?.selected);
+			reportCamera(camera(), state.focused);
 		}, 200);
 	};
 
@@ -1445,7 +1470,7 @@ export function App() {
 					focused={state.focused}
 					unread={unread}
 					onFocus={focusAgent}
-					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) })}
+					onNew={(kind) => send({ type: "agent.create", ...(kind ? { kind } : {}), ...(state.focused ? { near: state.focused } : {}) })}
 					onClose={closeAgent}
 					onMoreAgents={openAgentsPanel}
 					mode={mode()}
@@ -1458,7 +1483,7 @@ export function App() {
 					onDrawing={setDrawing}
 					boardsOpen={boardsOpen()}
 					onToggleBoards={() => showBoards(!boardsOpen())}
-					{...(stageOf(state.focused) ? { stage: stageOf(state.focused)!.name } : {})}
+					{...(stageOf(state.focused) ? { stage: stageOf(state.focused)!.title } : {})}
 					{...(stages().length > 0 ? { onStages: () => void setStagesOpen((was) => !was), stagesOpen: stagesOpen() } : {})}
 				/>
 
@@ -1479,14 +1504,13 @@ export function App() {
 					onPick={(name) => {
 						const agentId = state.focused;
 						if (!agentId || stageOf(agentId)?.name === name) return;
+						// The camera follows when the server says the agent is there (the canvas effect above).
 						send({ type: "agent.stage", id: agentId, stage: name });
-						landOnStage();
 					}}
 					onNew={(title) => {
 						const agentId = state.focused;
 						if (!agentId) return;
 						send({ type: "stage.new", id: agentId, title });
-						landOnStage();
 					}}
 					scheme={scheme()}
 				/>
@@ -1555,6 +1579,13 @@ export function App() {
 					usage={state.focused ? state.agents[state.focused]?.usage : undefined}
 					onContext={() => openUsage(state.focused)}
 					overflow={[
+						// On a phone the drawing's tool column is gone (`PenBar`), and its undo and redo live here.
+						...(isPhone() && stagePen()
+							? [
+									{ label: "Undo", icon: Undo2, onPick: () => penStep("undo") },
+									{ label: "Redo", icon: Redo2, onPick: () => penStep("redo") },
+								]
+							: []),
 						{ label: "Shortcuts", icon: Info, onPick: () => setOps(true) },
 						{
 							label: "Settings",
@@ -1649,6 +1680,8 @@ export function App() {
 					<CanvasOps onClose={() => setOps(false)} />
 				</Show>
 
+				<ConfirmDialog />
+
 				<Show when={picking()}>
 					{(request) => (
 						<FilePicker
@@ -1703,7 +1736,7 @@ export function App() {
 					identities={state.identities}
 					unread={unread}
 					onFocusAgent={focusAgent}
-					onNewAgent={(workspace, kind) => send({ type: "agent.create", kind, ...(workspace ? { workspace } : {}) })}
+					onNewAgent={(workspace, kind) => send({ type: "agent.create", kind, ...(workspace ? { workspace } : {}), ...(state.focused ? { near: state.focused } : {}) })}
 					onCloseAgent={closeAgent}
 					onMirrorAgent={(id) =>
 						void files.askForBoard((request) => send({ type: "agent.mirror", agentId: id, request })).then((path) => path && frameWhenPlaced(path))
@@ -1903,7 +1936,7 @@ export function App() {
 							dest: destination(barText(), barContext()),
 							label: destinationLabel(destination(barText(), barContext())),
 							onPick: focusAgent,
-							onNew: (kind) => send({ type: "agent.create", ...(kind ? { kind } : {}) }),
+							onNew: (kind) => send({ type: "agent.create", ...(kind ? { kind } : {}), ...(state.focused ? { near: state.focused } : {}) }),
 							onClose: closeAgent,
 							onMore: openAgentsPanel,
 						}}

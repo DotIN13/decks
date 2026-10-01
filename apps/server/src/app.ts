@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { fromIsolation, isIsolatedStage } from "./stage/isolated-stages.ts";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { examplesDir, runtimeLib } from "@decks/runtime";
 import type { Board, ClientMessage, DeckState, RuntimeInfo, ServerMessage, StageCall } from "@decks/protocol";
@@ -148,10 +148,15 @@ export class App {
 				const board = this.deck.board(path);
 				return board ? this.thumbs.views(board) : undefined;
 			},
-			call: (call) => this.callStage(call),
+			measureAway: async (path) => {
+				const board = this.deck.board(path);
+				return board && this.stage.shots ? this.stage.shots.measure(board) : undefined;
+			},
+			call: (call, timeoutMs) => this.callStage(call, timeoutMs),
 			connected: () => (this.hub?.connections ?? 0) > 0,
 			broadcast: (message) => this.send(message),
-			camera: (agentId) => this.cameras.answer(agentId),
+			stagesChanged: () => this.publishStages(),
+			camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.stageName()),
 			agents: () => this.agents.summaries(),
 		});
 		/*
@@ -216,6 +221,11 @@ export class App {
 			webOrigin: () => (process.env.DECKS_WEB_PORT ? `http://127.0.0.1:${process.env.DECKS_WEB_PORT}` : apiOrigin()),
 			borrow: (use) => this.thumbs.borrow(use),
 		});
+		this.stage.boardPicture = async (path, scheme) => {
+			const board = deck.board(path);
+			if (!board) throw new Error(`There is no board ${path}.`);
+			return readFileSync(await this.thumbs.get(board, scheme, () => false, "whole"));
+		};
 		this.settings = new SettingsStore(deck.path, (text) => this.send({ type: "notice", level: "warn", text }));
 		this.acts = new Acts({
 			emit: (message) => this.send(message),
@@ -237,7 +247,7 @@ export class App {
 				port: config.port,
 				act: (agentId, act) => this.acts.act(agentId, act),
 				defaultKind: config.backend,
-				camera: (agentId) => this.cameras.answer(agentId),
+				camera: (agentId) => this.cameras.answer(agentId, this.agents.get(agentId)?.stageName()),
 				/*
 				 * A board joining a canvas was given a place (`agents/session.ts`). The browsers draw a
 				 * board where the deck state says it is, so the state goes out here — before the
@@ -383,13 +393,13 @@ export class App {
 	 * answers times out into a result rather than leaving the agent's tool call
 	 * hanging on a tab that was closed mid-gesture.
 	 */
-	private callStage(call: Omit<StageCall, "id">): Promise<unknown> {
+	private callStage(call: Omit<StageCall, "id">, timeoutMs = 5000): Promise<unknown> {
 		const id = randomUUID();
 		return new Promise((resolve) => {
 			const timer = setTimeout(() => {
 				this.pendingStage.delete(id);
 				resolve({ skipped: "the canvas did not answer in time" });
-			}, 5000);
+			}, timeoutMs);
 			this.pendingStage.set(id, { resolve, timer });
 			this.send({ type: "stage.call", call: { ...call, id } });
 		});
@@ -811,8 +821,16 @@ export class App {
 		const everyone = this.agents?.all() ?? [];
 		const stages = pens.names().map((name) => {
 			const { boards, rev, words } = pens.summary(name);
+			let changedAt: number | undefined;
+			try {
+				changedAt = Math.round(statSync(existsSync(pens.fileOf(name)) ? pens.fileOf(name) : join(pens.dir, name)).mtimeMs);
+			} catch {
+				/* gone between the listing and the look */
+			}
 			return {
 				name,
+				title: pens.titleOf(name),
+				...(changedAt ? { changedAt } : {}),
 				boards,
 				rev,
 				words,

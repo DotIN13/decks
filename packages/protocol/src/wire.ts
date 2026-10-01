@@ -24,7 +24,12 @@ import type { ActKind, StageCall, StageResult, Camera } from "./stage.ts";
  * opened is still a stage and has to be listed.
  */
 export interface StageRow {
+	/** The folder: the stage's id, which agents open it by and never changes. */
 	name: string;
+	/** What it is called, which the person can change freely (`stage.json` beside the drawing). */
+	title: string;
+	/** When its drawing last changed, in ms since the epoch: the manager's order and its "2 h ago". */
+	changedAt?: number;
 	boards: number;
 	rev: number;
 	agents: Array<{ id: string; name: string; color: string }>;
@@ -172,9 +177,11 @@ export type ClientMessage =
 	 * Where one agent's stage is looking. `agentId` is required: a reading that does not say whose
 	 * stage it is would anchor new boards on somebody else's view (`deck/cameras.ts`).
 	 */
-	| { type: "camera.set"; camera: Camera; agentId: string }
+	/** Where one agent's canvas is looking on one device: `stage` names the canvas, `device` the browser. */
+	| { type: "camera.set"; camera: Camera; agentId: string; stage?: string; device?: string }
 	/** A new agent — in a workspace, when made from under its heading. */
-	| { type: "agent.create"; kind?: AgentKind; workspace?: string }
+	/** `near`: the agent on screen when it was asked for; without a `workspace`, its workspace's latest canvas is the new agent's. */
+	| { type: "agent.create"; kind?: AgentKind; workspace?: string; near?: string }
 	| { type: "agent.focus"; id: string }
 	/**
 	 * Take an agent off the list.

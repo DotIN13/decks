@@ -92,12 +92,73 @@ export class StagePens {
 			.sort();
 	}
 
-	/** Take a folder for a new stage, named from a title; made now, so two agents cannot take one name. */
-	claim(title: string): string {
+	/**
+	 * Take a folder for a new stage, named from a title; made now, so two agents cannot take one name.
+	 * The title is kept as given. `provisional` is a name nobody chose for what is on the canvas —
+	 * the agent's own, given to the canvas it lands on — which the agent is asked to replace
+	 * (`naming`).
+	 */
+	claim(title: string, options: { provisional?: boolean } = {}): string {
 		const name = this.freshName(title);
 		mkdirSync(join(this.dir, name), { recursive: true });
+		if (title.trim()) this.setTitle(name, title, { provisional: options.provisional === true });
 		if (!this.watcher) this.watch();
 		return name;
+	}
+
+	/**
+	 * A stage's name as the person reads it, which is not its folder's.
+	 *
+	 * The folder is the stage's id — agents open it, board paths run through it, and a camera is
+	 * kept under it — so it is a slug made once and never moved. The name beside it, in
+	 * `stage.json`, is whatever the person or an agent calls the canvas, spaces, capitals and all,
+	 * and changing it touches nothing else. A stage with no `stage.json` is called by its folder.
+	 */
+	titleOf(name: string): string {
+		return this.naming(name).title ?? name;
+	}
+
+	/**
+	 * How a stage came by its name: the name, whether anybody chose it (`provisional` when it is the
+	 * agent's own, given at claim), and the boards it held when it was named — what an agent is
+	 * asked about when the canvas has since filled with other things (`stage/canvas-name.ts`).
+	 */
+	naming(name: string): { title?: string; provisional: boolean; boards?: string[] } {
+		try {
+			const parsed = JSON.parse(readFileSync(join(this.dir, name, "stage.json"), "utf8")) as { title?: unknown; provisional?: unknown; boards?: unknown };
+			const title = typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : undefined;
+			const boards = Array.isArray(parsed.boards) ? parsed.boards.filter((one): one is string => typeof one === "string") : undefined;
+			return { ...(title ? { title } : {}), provisional: parsed.provisional === true, ...(boards ? { boards } : {}) };
+		} catch {
+			/* no stage.json, or one that does not parse: no name but the folder's */
+			return { provisional: false };
+		}
+	}
+
+	/**
+	 * Call a stage something else. Only the name changes; the folder, its boards and its drawing stay
+	 * where they are. The boards on it now are written down with the name, as what it was named for.
+	 */
+	setTitle(name: string, title: string, options: { provisional?: boolean } = {}): string {
+		if (!this.names().includes(name)) throw new Error(`No stage "${name}".`);
+		const clean = title.replace(/\s+/g, " ").trim().slice(0, 80);
+		if (!clean) throw new Error("A stage's name cannot be empty.");
+		const file = join(this.dir, name, "stage.json");
+		let kept: Record<string, unknown> = {};
+		try {
+			kept = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+		} catch {
+			/* a first title */
+		}
+		const { provisional: _was, ...rest } = kept;
+		let boards: string[] = [];
+		try {
+			boards = this.boards(name).map((one) => one.path);
+		} catch {
+			/* a stage with no drawing yet holds no boards */
+		}
+		writeFileSync(file, `${JSON.stringify({ ...rest, title: clean, boards, ...(options.provisional ? { provisional: true } : {}) }, null, "\t")}\n`);
+		return clean;
 	}
 
 	/**

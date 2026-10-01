@@ -1,5 +1,5 @@
 import type { Op } from "@decks/pen";
-import { deleteStage, renameStage } from "../stage/stage-admin.ts";
+import { deleteStage } from "../stage/stage-admin.ts";
 import type { WirePart } from "./context.ts";
 
 /**
@@ -62,12 +62,15 @@ export const pen = {
 		wire.publishStages();
 	},
 
-	/** Rename a stage (`stage/stage-admin.ts`): its folder, its boards' paths, and every agent on it. */
+	/**
+	 * Rename a stage: its name, and nothing else (`StagePens.setTitle`). The folder is the stage's id
+	 * and stays, so no board path, camera or agent moves with a new name.
+	 */
 	"stage.rename": (message, reply, wire) => {
 		const pens = wire.stage.pens;
 		if (!pens || typeof message.name !== "string" || typeof message.to !== "string") return;
 		try {
-			renameStage({ deck: wire.deck, pens, agents: wire.agents.all() }, message.name, message.to);
+			pens.setTitle(message.name, message.to);
 		} catch (error) {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
 			return;

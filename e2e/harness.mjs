@@ -175,7 +175,10 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	const watch = setInterval(() => void answer(), 700);
 	page.on("close", () => clearInterval(watch));
 
-	if (boards) await ready(page);
+	if (boards) {
+		await liveZoom(page);
+		await ready(page);
+	}
 	/*
 	 * Editing is off by default in the app now, so a check about editing has to ask for it.
 	 *
@@ -211,7 +214,48 @@ export async function editMode(page, on = true) {
 	await page.waitForTimeout(120);
 }
 
+/**
+ * Zoom in about the middle until boards are live (`data-live` on the stage), if they are not.
+ *
+ * Boards have pages and take the pointer only at the device's live zoom (`INTERACT_ZOOM`, 20% on
+ * a desktop), and a fixture fitted into a laptop window opens just under it. Every check that
+ * reaches into a board needs it live, so this is where they get it; a check about the fitted
+ * camera itself reads it before calling anything that zooms.
+ */
+export async function liveZoom(page, { tries = 12 } = {}) {
+	await page.waitForSelector(".stage", { timeout: 30000 });
+	await page.waitForSelector(".board-node", { timeout: 30000 }).catch(() => {});
+	for (let i = 0; i < tries; i++) {
+		await page.waitForTimeout(i === 0 ? 400 : 350);
+		if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live === "true")) {
+			// Live is decided when the camera rests; the pages start a moment later. Wait for one.
+			await page
+				.waitForFunction(() => [...document.querySelectorAll(".board-node iframe")].some((frame) => frame.contentWindow?.__boardReady === true), null, { timeout: 15000 })
+				.catch(() => {});
+			return true;
+		}
+		if ((await page.locator(".board-node").count()) === 0) return false;
+		await page.evaluate(() => {
+			const stage = document.querySelector(".stage");
+			const rect = stage.getBoundingClientRect();
+			stage.dispatchEvent(new WheelEvent("wheel", { deltaY: -40, ctrlKey: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2, bubbles: true, cancelable: true }));
+		});
+	}
+	return false;
+}
+
 export async function ready(page, { timeout = 30000 } = {}) {
+	/*
+	 * Below the device's live zoom a board is its picture on the stage's sheet and none has a
+	 * document (`Stage.tsx`, `data-live`): ready is the boards being on the stage, and the sheet
+	 * having drawn them.
+	 */
+	await page.waitForSelector(".stage", { timeout });
+	if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live !== "true")) {
+		await page.waitForSelector(".board-node", { timeout });
+		await page.waitForFunction(() => document.querySelector(".stage-sheet")?.hidden === false, null, { timeout });
+		return;
+	}
 	await page.waitForSelector(".board-node iframe", { timeout });
 	await page.waitForFunction(
 		() => {
@@ -652,4 +696,125 @@ export function rangeOfAttr(html, attr, value) {
 	const open = html.indexOf(">", at);
 	const close = open === -1 ? -1 : html.indexOf("</" + name[1] + ">", open);
 	return open === -1 || close === -1 ? undefined : { start, end: close + name[1].length + 3, open: open + 1, close };
+}
+
+/**
+ * Select a board the way a person does now that boards have no title bars: click it. The point is
+ * one that is really on the board — not under the sidebar, a toolbar, the composer or the pill — and
+ * then the board's pill (`canvas/BoardCallout.tsx`) is waited for.
+ */
+const innerWidthOf = (page) => page.viewportSize()?.width ?? 1440;
+
+export async function selectBoard(page, path, { timeout = 4000 } = {}) {
+	const spot = () => page.evaluate((wanted) => {
+		const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
+		if (!node) return null;
+		const r = node.getBoundingClientRect();
+		for (const fy of [0.08, 0.2, 0.35, 0.5, 0.65, 0.8]) {
+			for (const fx of [0.5, 0.25, 0.75, 0.1, 0.9]) {
+				const x = r.x + r.width * fx;
+				const y = r.y + r.height * fy;
+				if (x < 1 || y < 1 || x > innerWidth - 2 || y > innerHeight - 2) continue;
+				const hit = document.elementFromPoint(x, y);
+				if (hit && (hit.closest(".board-node") === node) && !hit.closest("a, button, input, textarea, select")) return { x, y };
+			}
+		}
+		return null;
+	}, path);
+	let at = await spot();
+	// Off screen, or under the chrome: fit the canvas, as a person looking for it would.
+	if (!at) {
+		const fitButton = page.locator('button[aria-label="Fit the boards on the canvas"]').first();
+		if (await fitButton.isVisible().catch(() => false)) {
+			await fitButton.click();
+			await page.waitForTimeout(900);
+			at = await spot();
+		}
+	}
+	// Still under the composer or a panel: pan it to the middle of the window.
+	if (!at) {
+		const off = await page.evaluate((wanted) => {
+			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
+			if (!node) return null;
+			const r = node.getBoundingClientRect();
+			return { dx: r.x + r.width / 2 - innerWidth / 2, dy: r.y + r.height / 2 - innerHeight / 2 };
+		}, path);
+		if (off) {
+			await page.mouse.move(innerWidthOf(page) / 2, 200);
+			await page.mouse.wheel(off.dx, off.dy);
+			await page.waitForTimeout(500);
+			at = await spot();
+		}
+	}
+	if (!at) {
+		const why = await page.evaluate((wanted) => {
+			const node = [...document.querySelectorAll(".board-node")].find((one) => one.dataset.path === wanted);
+			if (!node) return "not on the canvas";
+			const r = node.getBoundingClientRect();
+			const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+			return `at ${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}, its middle under ${hit?.tagName.toLowerCase()}.${String(hit?.className ?? "").split(" ")[0]}`;
+		}, path);
+		throw new Error(`no uncovered point on ${path} to click: ${why}`);
+	}
+	await page.mouse.click(at.x, at.y);
+	await page.waitForSelector(".board-callout:not([data-hidden])", { timeout });
+	await page.waitForTimeout(150);
+}
+
+/** Select a board and fly the camera to it with the pill's Fit — what a double-click on its bar used to do. */
+export async function flyToBoard(page, path) {
+	await selectBoard(page, path);
+	await pillButton(page, "Fit").click();
+	await page.waitForTimeout(900);
+}
+
+/** One of the selected board's actions, by its word: Fit, Focus, Fullscreen, Present, New tab, Hide. */
+export function pillButton(page, label) {
+	return page.locator(`.board-callout [role=menuitem][aria-label="${label}"]`).first();
+}
+
+/**
+ * A point on the band along a live board's edge, which moves it (`BoardFrame`): on the
+ * screen and uncovered, or null. The band shows on a board whose page takes the pointer.
+ */
+export async function boardEdge(page, path) {
+	return page.evaluate((wanted) => {
+		for (const band of document.querySelectorAll(".board-edge")) {
+			if (band.closest(".board-node")?.dataset.path !== wanted) continue;
+			const r = band.getBoundingClientRect();
+			const along = band.dataset.side === "n" || band.dataset.side === "s";
+			for (const f of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+				// The outer part of the band: clear of the page's own edge.
+				const x = along ? r.x + r.width * f : band.dataset.side === "w" ? r.x + 3 : r.right - 3;
+				const y = along ? (band.dataset.side === "n" ? r.y + 3 : r.bottom - 3) : r.y + r.height * f;
+				if (x < 1 || y < 1 || x > innerWidth - 2 || y > innerHeight - 2) continue;
+				if (document.elementFromPoint(x, y) === band) return { x, y, side: band.dataset.side };
+			}
+		}
+		return null;
+	}, path);
+}
+
+/**
+ * An agent of its own on an empty canvas: made over a socket in a workspace nothing else uses, so
+ * it gets a fresh canvas rather than joining its workspace's latest one, and then picked from the
+ * composer's agent list, which goes to its stage. Returns the chat, `{ id, name }`; a check that
+ * makes one removes it at the end (`agent.remove`) so the checks after it see the deck they expect.
+ */
+export async function freshAgent(page, workspace) {
+	const link = await socket();
+	await page.waitForTimeout(300);
+	const known = new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
+	link.send({ type: "agent.create", workspace });
+	let made;
+	for (let i = 0; i < 60 && !made; i += 1) {
+		made = (link.last("agents")?.chats ?? []).find((chat) => !known.has(chat.id));
+		if (!made) await page.waitForTimeout(150);
+	}
+	link.close();
+	if (!made) throw new Error(`no agent was made in ${workspace}`);
+	await openAgents(page);
+	await page.locator('.popover [data-agent="true"]').filter({ hasText: made.name }).first().click();
+	await page.waitForTimeout(800);
+	return made;
 }

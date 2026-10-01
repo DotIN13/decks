@@ -43,6 +43,8 @@ export function commentBlock(comments: BoardComment[]): string {
 	const items = comments.map((comment, index) => {
 		const where = comment.component ? `${comment.board}, in #${comment.component}` : comment.board;
 		const said = comment.text.trim().split("\n").map((line) => `   ${line}`).join("\n");
+		// No quote: a comment on the whole board, from its pill.
+		if (!comment.quote) return `${index + 1}. ${where}, the whole board\n${said}`;
 		return `${index + 1}. ${where}\n   > ${comment.quote}\n${said}`;
 	});
 	return `${head}\n\n${items.join("\n\n")}`;

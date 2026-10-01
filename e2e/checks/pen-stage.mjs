@@ -7,7 +7,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { API, deckState, editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
+import { API, deckState, editMode, open, resetStage, say, selectBoard, settle, socket } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -81,8 +81,9 @@ say("…and the arrow that ends on it follows", !!followed);
 
 // --- the drawing is drawn --------------------------------------------------------------------------
 const drawn = await until(() => page.evaluate(() => {
-	const canvas = document.querySelector(".pen-layer");
-	return !!canvas && !canvas.hidden && canvas.width > 1;
+	// The stage's one sheet, painted in a worker: shown, and sized from the frame it was handed.
+	const canvas = document.querySelector(".stage-sheet");
+	return !!canvas && !canvas.hidden && parseFloat(canvas.style.width) > 1;
 }), 15000);
 say("the drawing layer is on screen", !!drawn);
 
@@ -191,7 +192,7 @@ if (boardItem) {
 	await until(() => onDisk().children.some((n) => n.id === "e2e-over"));
 	await page.keyboard.press("Escape");
 	// Close enough that the board is live: below that zoom a board is a picture and a click only selects it.
-	await page.locator(`.bar-layer .chrome[data-path="${firstBoard}"]`).click();
+	await selectBoard(page, firstBoard);
 	await page.keyboard.press("1");
 	await settle(page, 1200);
 	await page.keyboard.press("Escape");

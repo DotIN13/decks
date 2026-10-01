@@ -226,3 +226,13 @@ test("a flow document is measured in the page, pictured to that height, and the 
 	assert.deepEqual(told, [["boards/notes.html", 3, 1234]]);
 	thumbs.dispose();
 });
+
+test("the two kinds of picture have names of their own, and neither is taken for the other's older revision", async () => {
+	const { thumbName: name } = await import("./thumbs.ts");
+	const card = name("boards/a.html", 3, "light");
+	const whole = name("boards/a.html", 3, "light", "whole");
+	assert.equal(new Set([card, whole]).size, 2);
+	// The card's pattern for "any revision of this picture" must not reach the whole one.
+	const cardAny = new RegExp(`^${card.slice(0, 16)}-\\d+-light(-\\d+)?\\.jpg$`);
+	assert.ok(cardAny.test(card) && !cardAny.test(whole));
+});

@@ -46,18 +46,61 @@ export function iconUrl(library: string, name: string, weight: number): string |
 	return undefined;
 }
 
+/**
+ * An SVG element as the parser below reads it: its name, its attributes and its children.
+ *
+ * Read with a few regular expressions rather than `DOMParser`, because the drawing is laid out and
+ * painted in a worker (`scene.worker.ts`) and a worker has no DOM. An icon file is a handful of
+ * shapes with plain attributes, which is all this has to understand.
+ */
+interface SvgElement {
+	name: string;
+	attrs: Map<string, string>;
+	children: SvgElement[];
+}
+
+const decode = (value: string) => value.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+function parseSvg(text: string): SvgElement | undefined {
+	const body = text.replace(/<!--[\s\S]*?-->/g, "").replace(/<\?[\s\S]*?\?>/g, "").replace(/<!DOCTYPE[\s\S]*?>/gi, "");
+	const root: SvgElement = { name: "#root", attrs: new Map(), children: [] };
+	const stack = [root];
+	const tag = /<(\/?)([A-Za-z][\w:.-]*)((?:\s+[\w:.-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>/g;
+	const attr = /([\w:.-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+	for (let found = tag.exec(body); found; found = tag.exec(body)) {
+		const [, closing, name, rest, selfClosing] = found;
+		if (closing) {
+			if (stack.length > 1) stack.pop();
+			continue;
+		}
+		const attrs = new Map<string, string>();
+		for (let a = attr.exec(rest ?? ""); a; a = attr.exec(rest ?? "")) attrs.set(a[1]!, decode(a[2] ?? a[3] ?? a[4] ?? ""));
+		attr.lastIndex = 0;
+		// An inline style says the same things as attributes, and wins over them.
+		for (const decl of (attrs.get("style") ?? "").split(";")) {
+			const [key, value] = decl.split(":").map((part) => part.trim());
+			if (key && value) attrs.set(key, value);
+		}
+		const element: SvgElement = { name: name!.toLowerCase(), attrs, children: [] };
+		stack[stack.length - 1]!.children.push(element);
+		if (!selfClosing) stack.push(element);
+	}
+	return root.children.find((child) => child.name === "svg");
+}
+
 /** Turn an SVG's drawable elements into path parts, with the fill and stroke each inherits. */
 export function parseIcon(svgText: string, weight: number): IconShape | undefined {
-	const doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
-	const root = doc.documentElement;
-	if (!root || root.nodeName.toLowerCase() !== "svg") return undefined;
-	const box = (root.getAttribute("viewBox") ?? "0 0 24 24").trim().split(/[\s,]+/).map(Number);
+	const root = parseSvg(svgText);
+	if (!root) return undefined;
+	const box = (root.attrs.get("viewBox") ?? root.attrs.get("viewbox") ?? "0 0 24 24").trim().split(/[\s,]+/).map(Number);
 	const viewBox: [number, number, number, number] = [box[0] ?? 0, box[1] ?? 0, box[2] || 24, box[3] || 24];
 	const parts: IconPart[] = [];
 	// lucide and feather draw at stroke 2 for weight 400; heavier weights thicken it.
 	const strokeScale = Math.max(0.5, weight / 400);
-	const walk = (el: Element, inherited: { fill: string; stroke: string; width: number; cap: string; join: string; rule: string }) => {
-		const read = (name: string, fallback: string) => el.getAttribute(name) ?? fallback;
+	const walk = (el: SvgElement, inherited: { fill: string; stroke: string; width: number; cap: string; join: string; rule: string }) => {
+		// What is only defined for reuse, or a title, draws nothing where it is written.
+		if (el.name === "defs" || el.name === "title" || el.name === "clippath" || el.name === "mask") return;
+		const read = (name: string, fallback: string) => el.attrs.get(name) ?? fallback;
 		const style = { fill: read("fill", inherited.fill), stroke: read("stroke", inherited.stroke), width: Number(read("stroke-width", String(inherited.width))), cap: read("stroke-linecap", inherited.cap), join: read("stroke-linejoin", inherited.join), rule: read("fill-rule", inherited.rule) };
 		const d = toPath(el);
 		if (d) {
@@ -71,28 +114,28 @@ export function parseIcon(svgText: string, weight: number): IconShape | undefine
 				evenOdd: style.rule === "evenodd",
 			});
 		}
-		for (const child of Array.from(el.children)) walk(child, style);
+		for (const child of el.children) walk(child, style);
 	};
 	walk(root, { fill: "black", stroke: "none", width: 1, cap: "butt", join: "miter", rule: "nonzero" });
 	return parts.length ? { viewBox, parts } : undefined;
 }
 
-const num = (el: Element, name: string) => Number(el.getAttribute(name) ?? 0);
+const num = (el: SvgElement, name: string) => Number(el.attrs.get(name) ?? 0);
 
 /** An SVG shape element as a path string; undefined for anything that draws nothing. */
-function toPath(el: Element): string | undefined {
-	switch (el.nodeName.toLowerCase()) {
+function toPath(el: SvgElement): string | undefined {
+	switch (el.name) {
 		case "path":
-			return el.getAttribute("d") ?? undefined;
+			return el.attrs.get("d") ?? undefined;
 		case "line":
 			return `M${num(el, "x1")} ${num(el, "y1")}L${num(el, "x2")} ${num(el, "y2")}`;
 		case "polyline":
 		case "polygon": {
-			const points = (el.getAttribute("points") ?? "").trim().split(/[\s,]+/).map(Number);
+			const points = (el.attrs.get("points") ?? "").trim().split(/[\s,]+/).map(Number);
 			if (points.length < 4) return undefined;
 			let d = `M${points[0]} ${points[1]}`;
 			for (let i = 2; i + 1 < points.length; i += 2) d += `L${points[i]} ${points[i + 1]}`;
-			return el.nodeName.toLowerCase() === "polygon" ? `${d}Z` : d;
+			return el.name === "polygon" ? `${d}Z` : d;
 		}
 		case "circle": {
 			const [cx, cy, r] = [num(el, "cx"), num(el, "cy"), num(el, "r")];
@@ -104,7 +147,7 @@ function toPath(el: Element): string | undefined {
 		}
 		case "rect": {
 			const [x, y, w, h] = [num(el, "x"), num(el, "y"), num(el, "width"), num(el, "height")];
-			const r = Math.min(Number(el.getAttribute("rx") ?? el.getAttribute("ry") ?? 0), w / 2, h / 2);
+			const r = Math.min(Number(el.attrs.get("rx") ?? el.attrs.get("ry") ?? 0), w / 2, h / 2);
 			if (!r) return `M${x} ${y}h${w}v${h}h${-w}Z`;
 			return `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}Z`;
 		}

@@ -45,7 +45,7 @@ const NOTE_COLORS: Record<string, string> = { note: "#fde68a", prompt: "#ddd6fe"
 /** A board's corner on the canvas (`--radius-panel`). */
 export const NOTE_RADIUS = 12;
 /** The app's `--shadow`, light and dark (`index.css`): each layer's drop, blur and darkness. */
-const SHADOWS = {
+export const SHADOWS = {
 	light: [{ y: 1, blur: 2, alpha: 0.06 }, { y: 4, blur: 12, alpha: 0.05 }],
 	dark: [{ y: 1, blur: 2, alpha: 0.4 }, { y: 6, blur: 18, alpha: 0.3 }],
 } as const;

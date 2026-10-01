@@ -331,7 +331,7 @@ const TEXTUAL = new Set([
  * refuses SVG, which has no bitmap to decode, so the `<img>` path is still needed:
  * an SVG with a `width`/`height` or a `viewBox` reports a natural size there.
  */
-async function naturalSize(file: File): Promise<{ width: number; height: number } | undefined> {
+export async function naturalSize(file: File): Promise<{ width: number; height: number } | undefined> {
 	if (typeof createImageBitmap === "function") {
 		try {
 			const bitmap = await createImageBitmap(file);

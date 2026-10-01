@@ -14,14 +14,14 @@ as it is, and every type and field here is pen's, untranslated. It holds two kin
   them inside a frame that lays them out. Never make a board by inserting a `browser` item: write it
   with `stage.newBoard` and show it.
 - **The drawing**: notes, text, shapes, icons, arrows and frames. Use it for what sits *between*
-  boards — a note beside one, an arrow from one to the next, a titled area behind a group. Put an
+  boards — a note beside one, an arrow from one to the next, an outline round a group. Put an
   answer on a board; put the arrangement around it here.
 
-**Boards are at the back.** The drawing is shown over the boards, so a note placed on a board
-covers that part of it. One exception: an item listed *before* a board in the file that holds the
-whole board (a frame or panel round it) is a backdrop, and is drawn under the boards. The person
-can use a board everywhere nothing is drawn over it, and not where something is. So keep notes
-beside a board rather than on it, unless covering part of it is the point.
+**Boards are at the back.** Every drawn item is shown over the boards, wherever it sits in the
+file, so a note placed on a board covers that part of it, and a filled frame round a group of
+boards hides them. To mark out a group, give the frame a stroke and no fill. The person can use a
+board everywhere nothing is drawn over it, and not where something is. So keep notes beside a
+board rather than on it, unless covering part of it is the point.
 
 The person can move, delete and rewrite drawn items by hand in edit mode, so read before you edit:
 the file may have changed since you last looked.

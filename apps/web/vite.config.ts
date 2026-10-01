@@ -75,12 +75,18 @@ export default defineConfig({
 		},
 	},
 	/*
-	 * Two pages: the app, and `shot.html`, the page the server's own Chromium loads to take a
-	 * picture of a stage (`server/stage/shots.ts`). The editor's dev page is not built.
+	 * Three pages: the app, `shot.html`, the page the server's own Chromium loads to take a picture
+	 * of a stage, and `measure.html`, where it measures a board no canvas has (`server/stage/shots.ts`).
+	 * The editor's dev page is not built.
 	 */
+	/*
+	 * The stage's sheet is painted in a module worker (`canvas/pen/scene.worker.ts`), which imports
+	 * CanvasKit on demand: a code-split worker has to be an ES module.
+	 */
+	worker: { format: "es" },
 	build: {
 		target: "es2022",
 		sourcemap: true,
-		rollupOptions: { input: { index: fileURLToPath(new URL("./index.html", import.meta.url)), shot: fileURLToPath(new URL("./shot.html", import.meta.url)) } },
+		rollupOptions: { input: { index: fileURLToPath(new URL("./index.html", import.meta.url)), shot: fileURLToPath(new URL("./shot.html", import.meta.url)), measure: fileURLToPath(new URL("./measure.html", import.meta.url)) } },
 	},
 });

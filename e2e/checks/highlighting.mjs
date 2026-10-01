@@ -21,7 +21,7 @@
  */
 import { rmSync, writeFileSync } from "node:fs";
 import { chromium } from "playwright";
-import { WEB, deckState, open, read, resetStage, say, settle } from "../harness.mjs";
+import { WEB, deckState, flyToBoard, open, read, resetStage, say, settle } from "../harness.mjs";
 
 const deck = await deckState();
 const fixture = `${deck.path}/boards/highlight-fixture.html`;
@@ -203,7 +203,7 @@ try {
 
 		// Fly to the fixture, and zoom past the threshold below which a frame takes no pointer
 		// events at all.
-		await app.page.locator('.bar-layer .chrome[data-path="boards/highlight-fixture.html"]').dblclick({ position: { x: 24, y: 12 } });
+		await flyToBoard(app.page, "boards/highlight-fixture.html");
 		await settle(app.page, 800);
 		for (let attempt = 0; attempt < 8; attempt++) {
 			const level = await app.page.evaluate(() =>

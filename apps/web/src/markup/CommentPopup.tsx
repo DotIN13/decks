@@ -33,14 +33,20 @@ export function CommentPopup(props: {
 }) {
 	let box: HTMLDivElement | undefined;
 	let field: HTMLTextAreaElement | undefined;
-	const [open, setOpen] = createSignal(false);
+	const [open, setOpen] = createSignal(props.target.open ?? false);
 	const [text, setText] = createSignal("");
 	const [at, setAt] = createSignal<{ left: number; top: number } | undefined>(undefined);
 
 	/** The selection in window pixels: the frame is scaled by the camera, its contents are not. */
 	const place = () => {
-		const { frame, range } = props.target;
-		if (!box || !frame.isConnected) return;
+		const { frame, range, anchor } = props.target;
+		if (!box) return;
+		if (anchor) {
+			const around = anchor();
+			if (around) setAt(popupPlace(around, { w: box.offsetWidth, h: box.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, left: props.left }));
+			return;
+		}
+		if (!frame?.isConnected || !range) return;
 		const inner = range.getBoundingClientRect();
 		const outer = frame.getBoundingClientRect();
 		const k = frame.clientWidth > 0 ? outer.width / frame.clientWidth : 1;
@@ -55,6 +61,7 @@ export function CommentPopup(props: {
 		queueMicrotask(place);
 	});
 	onMount(() => {
+		if (open()) queueMicrotask(() => field?.focus());
 		window.addEventListener("resize", place);
 		// A press anywhere else in the app puts it away, unless there is something typed to lose.
 		const away = (event: PointerEvent) => {
@@ -101,9 +108,14 @@ export function CommentPopup(props: {
 					</button>
 				}
 			>
-				<div class="comment-quote" title={props.target.quote}>
-					{props.target.quote}
-				</div>
+				<Show
+					when={props.target.quote}
+					fallback={<div class="comment-quote" data-whole="true">On the whole board{props.target.title ? `: ${props.target.title}` : ""}</div>}
+				>
+					<div class="comment-quote" title={props.target.quote}>
+						{props.target.quote}
+					</div>
+				</Show>
 				<textarea
 					ref={field}
 					class="comment-field"

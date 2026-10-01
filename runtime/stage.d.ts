@@ -103,9 +103,18 @@ export interface Stage {
 	 * Stages are files, `stages/<name>/stage.pen`, and you work on one at a time: its boards are the
 	 * ones you show, hide and move, and the person sees it when talking to you. `stages` lists every
 	 * stage and who has it open; `open` moves you to one; `newStage` makes an empty one and opens it.
-	 * Two agents on one stage share its boards and its drawing.
+	 * Two agents on one stage share its boards and its drawing. A stage's `name` is its folder, which
+	 * never changes; its `title` is what the person calls it and can change at any time. Say the
+	 * title to the person; `open` takes either.
 	 */
-	stages(): Promise<Array<{ name: string; open: string[]; boards: number; mine?: true }>>;
+	stages(): Promise<Array<{ name: string; title: string; open: string[]; boards: number; mine?: true }>>;
+	/**
+	 * Name the canvas you are on, or read its name with nothing. Name it for what is on it, as a few
+	 * words a person would look for; the folder does not change. You are reminded while the canvas
+	 * has boards and no name of its own, or holds mostly boards it did not have when it was named:
+	 * rename it then, or say the same name again to keep it.
+	 */
+	title(title?: string): Promise<{ stage: string; title: string }>;
 	open(name: string): Promise<{ stage: string; boards: string[] }>;
 	newStage(title: string): Promise<{ stage: string }>;
 	/**
@@ -113,10 +122,15 @@ export interface Stage {
 	 * You see it in this call's result; it is also saved to `file`. `of` is an item's id, a board's
 	 * path, a list of them, or a box; nothing is the whole stage. Check your drawing with it after a
 	 * big change. `format` "jpeg" or "pdf", and `to` a deck path, make a file to hand on.
+	 *
+	 * One board's path alone is that board as the person's browser has it now, with what they did on
+	 * the page (tabs pressed, text typed, boxes scrolled): `how` is "canvas" or "snapshot". When the
+	 * board has no live page there, `how` is "server": a picture from the file, without any of that,
+	 * and `note` says so.
 	 */
-	screenshot(o?: { of?: string | string[] | Partial<Box>; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark" }): Promise<{ file: string; width: number; height: number; box: Box }>;
+	screenshot(o?: { of?: string | string[] | Partial<Box>; scale?: number; format?: "png" | "jpeg" | "pdf"; to?: string; scheme?: "light" | "dark" }): Promise<{ file: string; width: number; height: number; box: Box; how?: "canvas" | "snapshot" | "server"; note?: string }>;
 	/**
-	 * Your stage's drawing — notes, text, shapes, arrows and frames, drawn over the boards except a backdrop listed before the board it holds — kept as a
+	 * Your stage's drawing — notes, text, shapes, arrows and frames, all drawn over the boards — kept as a
 	 * native pen.dev `.pen` file in pen's own types and fields; the pen-stage skill teaches them.
 	 * `read` gives every item as saved plus its `box` on the stage. `edit` applies edits together or
 	 * not at all. A `box` places an item on the stage; the server turns it into pen's own x, y, width

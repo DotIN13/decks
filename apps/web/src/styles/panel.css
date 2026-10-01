@@ -118,25 +118,9 @@
 	}
 
 	/*
-	 * The grid: the same boards as pictures, two across.
-	 *
-	 * Worth having for the seven boards an agent chose and not for the seventy-eight in the
-	 * deck, which is why it is a toggle in the foot rather than the default — at 92px of
-	 * thumbnail the old rail showed five of seventy-eight and needed fourteen screens for
-	 * the rest, and that is the whole reason a modal had to exist.
-	 */
-	.panel-list[data-density="grid"] {
-		display: grid;
-		align-content: start;
-		gap: 8px;
-		grid-template-columns: 1fr 1fr;
-	}
-
-	/*
 	 * A section is `display: contents` so its rows are children of the list itself.
 	 *
-	 * Otherwise the grid would lay out three section boxes rather than nine tiles, and the
-	 * list's gap would apply between groups instead of between rows. The cost is that the
+	 * Otherwise the list's gap would apply between groups instead of between rows. The cost is that the
 	 * 8px between sections has to hang off the label rather than the wrapper, which is what
 	 * the rule below does.
 	 */
@@ -247,10 +231,6 @@
 	/* The row that is in flight, left behind at half strength so the list still says where it came from. */
 	.agent-row[data-dragging] {
 		opacity: 0.45;
-	}
-
-	.panel-list[data-density="grid"] .panel-meta {
-		grid-column: 1 / -1;
 	}
 
 	/* The foot: what the list adds up to, and how it is drawn. */
@@ -1184,17 +1164,11 @@
 	}
 
 	/*
-	 * The picture, 20×14.
-	 *
-	 * The border is doing more work than the fill: at this size a bordered rectangle already
-	 * reads as a board, which is what lets the row look right before any picture exists.
-	 * `object-position: 0 0` because a board is written top-left first — a centre crop of a
-	 * 1400×900 board is the middle of it, which is usually the least characteristic part.
+	 * The box a board's picture used to be drawn in, 20×14, kept empty (`BoardRow`). The border is
+	 * what makes it read as a board.
 	 */
 	.board-thumb {
-		position: relative;
 		display: block;
-		overflow: hidden;
 		box-sizing: border-box;
 		width: 20px;
 		height: 14px;
@@ -1205,16 +1179,6 @@
 		transition: border-color 120ms ease;
 	}
 
-	.board-thumb > img {
-		display: block;
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		object-position: 0 0;
-	}
-
-	/* The current board's picture takes the accent; another agent's takes that agent's
-	   identity colour, which the component sets inline and so wins over both. */
 	.board-row[data-current="true"] .board-thumb {
 		border-color: var(--color-accent);
 	}

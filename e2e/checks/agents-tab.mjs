@@ -806,52 +806,13 @@ say(
 await page.mouse.move(700, 500);
 await settle(page, 300);
 
-// --- the boards' grid and the agents' lines are two settings ---------------------------
+// --- the square beside the search is the agents' alone ----------------------------------
 
-/*
- * The square is one button with two jobs, one per tab, and the two must not leak: the boards'
- * grid once laid agent rows two across, because the list carried the density on both tabs.
- */
-const agentLayout = () =>
-	page.evaluate(() => {
-		const rows = [...document.querySelectorAll(".agent-row")].map((row) => row.getBoundingClientRect());
-		return {
-			density: document.querySelector(".panel-list")?.getAttribute("data-density") ?? null,
-			lines: document.querySelector(".row-list.agent-list")?.getAttribute("data-lines"),
-			/* One column: every row starts at the same left, each below the last. */
-			column: rows.length > 1 && rows.every((box) => Math.round(box.left) === Math.round(rows[0].left)) && rows.every((box, i) => i === 0 || box.top >= rows[i - 1].bottom - 1),
-		};
-	});
-const boardsView = async () => {
-	await page.getByRole("tab", { name: "Boards" }).click();
-	await settle(page, 300);
-	return page.evaluate(() => document.querySelector(".panel-view")?.getAttribute("data-view"));
-};
-const densityBefore = await boardsView();
-await page.locator(".panel-view").click();
+/* The boards list has one look, a line per board, so on Boards the square is not there. */
+await page.getByRole("tab", { name: "Boards" }).click();
 await settle(page, 300);
-const densityGrid = await page.evaluate(() => document.querySelector(".panel-view")?.getAttribute("data-view"));
-await page.getByRole("tab", { name: "Agents" }).click();
-await settle(page, 400);
-const underGrid = await agentLayout();
-say(
-	"with the boards as a grid, the agents are still one column, at the line count they had",
-	densityGrid !== densityBefore && underGrid.density === null && underGrid.column && underGrid.lines === "1",
-	JSON.stringify({ boards: `${densityBefore}→${densityGrid}`, ...underGrid }),
-);
-await page.locator('.panel-view[data-view="lines-1"]').click();
-await settle(page, 300);
-const densityAfterLines = await boardsView();
-say("…and switching agent lines leaves the boards' density alone", densityAfterLines === densityGrid, `${densityGrid} → ${densityAfterLines}`);
-/* Put both back: the boards as they were, the agents in one line. */
-await page.locator(".panel-view").click();
-await settle(page, 300);
-await page.getByRole("tab", { name: "Agents" }).click();
-await settle(page, 300);
-await page.locator('.panel-view[data-view="lines-2"]').click();
-await settle(page, 300);
-const restored = { lines: await page.evaluate(() => document.querySelector(".panel-view")?.getAttribute("data-view")), boards: await boardsView() };
-say("…and both are back where they were", restored.lines === "lines-1" && restored.boards === densityBefore, JSON.stringify(restored));
+const onBoards = await page.evaluate(() => ({ square: document.querySelectorAll(".panel-view").length, density: document.querySelector(".panel-list")?.getAttribute("data-density") ?? null }));
+say("the boards tab has no grid switch, and the list no density", onBoards.square === 0 && onBoards.density === null, JSON.stringify(onBoards));
 await page.getByRole("tab", { name: "Agents" }).click();
 await settle(page, 300);
 

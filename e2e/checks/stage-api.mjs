@@ -4,7 +4,7 @@
  * Needs a model. The user-facing half — hiding, the rail click, the empty-context fallback
  * — is in tiers.mjs and needs nothing.
  */
-import { ask, deckState, emptyCanvas, newAgent, open, openPanel, say, settle } from "../harness.mjs";
+import { ask, deckState, emptyCanvas, freshAgent, open, openPanel, say, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const two = deck.boards.map((board) => board.path).slice(0, 2);
@@ -31,9 +31,10 @@ const inPanel = () =>
 		[...document.querySelectorAll('.panel-section:not([data-kind="deck"]) .board-row .row-name')].map((n) => n.textContent).sort(),
 	);
 
-// A fresh agent, so nothing it holds is inherited.
-await newAgent(page);
-await settle(page, 1200);
+// A fresh agent, so nothing it holds is inherited: in a workspace of its own, since a new agent
+// otherwise joins its workspace's latest canvas and holds what is on it.
+const made = await freshAgent(page, "stage-api-fresh");
+await settle(page, 400);
 await page.mouse.move(800, 500);
 // A fresh agent holds nothing, so its canvas is empty until it shows something.
 await emptyCanvas(page);
@@ -50,5 +51,9 @@ await ask(page, `With one stage_eval call, hide ${two[1]}.`);
 say("hide takes one off, leaving the other", (await onCanvas()).join() === two[0], (await onCanvas()).join(" "));
 say("…and the panel still lists both", (await inPanel()).length === 2, (await inPanel()).join(" "));
 
+const tidy = await socket();
+tidy.send({ type: "agent.remove", id: made.id });
+await new Promise((resolve) => setTimeout(resolve, 300));
+tidy.close();
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

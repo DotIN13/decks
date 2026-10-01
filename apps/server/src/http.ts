@@ -10,7 +10,8 @@ import { MAX_UPLOAD_BYTES } from "@decks/protocol";
 import { fileUrl, PathRefused, resolveFileRequest, resolveInDeck } from "./deck/roots.ts";
 import { browse } from "./files/browse.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
-import { refuseCrossSite, storeAsset, UploadRefused } from "./files/upload.ts";
+import { refuseCrossSite, storeAssetStream, UploadRefused } from "./files/upload.ts";
+import { renderSnapshot } from "./boards/snapshot.ts";
 import type { App } from "./app.ts";
 
 /**
@@ -161,7 +162,7 @@ export function createHttpApp(app: App): Express {
 			let gone = false;
 			res.on("close", () => (gone = !res.writableEnded));
 			try {
-				const file = await app.thumbs.get(board, req.query.scheme === "dark" ? "dark" : "light", () => gone);
+				const file = await app.thumbs.get(board, req.query.scheme === "dark" ? "dark" : "light", () => gone, req.query.whole === "1" ? "whole" : "card");
 				if (gone) return;
 				res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
 				res.type("jpeg");
@@ -355,15 +356,42 @@ export function createHttpApp(app: App): Express {
 	 * for a chunked body that lied. Either way the answer is a 413 with a sentence,
 	 * not a truncated file.
 	 */
+	/**
+	 * A board drawn from a snapshot of the reader's page (`boards/snapshot.ts`): the page's markup
+	 * as it stood, drawn by the server's Chrome at the board's own address. The answer is the picture.
+	 */
+	api.post(
+		"/snapshot",
+		express.text({ type: () => true, limit: "24mb" }),
+		asyncRoute(async (req, res) => {
+			refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			const path = normalizeBoardPath(typeof req.query.path === "string" ? req.query.path : "");
+			if (!app.deck.board(path)) {
+				res.status(404).type("text").send("No such board.");
+				return;
+			}
+			const shot = await renderSnapshot(app.thumbs, `http://127.0.0.1:${req.socket.localPort}`, {
+				path,
+				html: typeof req.body === "string" ? req.body : "",
+				w: Number(req.query.w) || 1000,
+				h: Number(req.query.h) || 700,
+				scheme: req.query.scheme === "dark" ? "dark" : "light",
+			});
+			res.setHeader("Cache-Control", "no-store");
+			res.type("jpeg").send(shot);
+		}),
+	);
+
 	api.post(
 		"/upload",
-		express.raw({ type: () => true, limit: MAX_UPLOAD_BYTES }),
-		(req, res) => {
+		asyncRoute(async (req, res) => {
 			refuseCrossSite(typeof req.headers["sec-fetch-site"] === "string" ? req.headers["sec-fetch-site"] : undefined);
+			// Refused on the declared length before a byte is read; the stream enforces it again for a body that lied.
+			const declared = Number(req.headers["content-length"] ?? 0);
+			if (declared > MAX_UPLOAD_BYTES) throw new UploadRefused(`That file is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB.`, 413);
 			const name = typeof req.query.name === "string" ? req.query.name : "";
-			const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-			res.json(storeAsset(app.deck.path, name, bytes));
-		},
+			res.json(await storeAssetStream(app.deck.path, name, req));
+		}),
 	);
 
 	/**

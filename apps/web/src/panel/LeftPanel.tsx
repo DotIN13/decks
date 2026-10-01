@@ -1,5 +1,4 @@
 import type { Board } from "@decks/protocol";
-import LayoutGrid from "lucide-solid/icons/layout-grid";
 import Rows2 from "lucide-solid/icons/rows-2";
 import Rows3 from "lucide-solid/icons/rows-3";
 import Search from "lucide-solid/icons/search";
@@ -7,7 +6,7 @@ import X from "lucide-solid/icons/x";
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { DecksMark, Icon } from "../ui/icons.tsx";
-import { BoardRow, BoardTile } from "./BoardRow.tsx";
+import { BoardRow } from "./BoardRow.tsx";
 import { panelSections } from "./panel-groups.ts";
 import { clampPanelWidth, loadPanelWidth, PANEL_MAX, PANEL_MIN, PANEL_WIDTH, savePanelWidth } from "./panel-width.ts";
 import type { AgentChat, Identity } from "@decks/protocol";
@@ -80,9 +79,6 @@ import { carriesAgent, draggedAgent } from "../agents/agent-drag.ts";
  * search matches — is in `panel-groups.ts`, where it can be tested without a DOM.
  */
 
-/** How the list draws each board: a line, or a picture with a caption. */
-export type Density = "list" | "grid";
-
 /**
  * Which list the panel is showing.
  *
@@ -128,9 +124,6 @@ export function LeftPanel(props: {
 	 * a rule that depends on which heading it is under is a rule to remember. The row does
 	 * the asking — two presses, `BoardRow.tsx` — so by the time this is called it has been
 	 * said twice.
-	 *
-	 * The grid has none: a tile is `RailItem`, the same component the canvas uses, and a
-	 * destructive control there would be one on the thumbnails as well.
 	 */
 	onDelete?: (board: Board) => void;
 	/** Take a board off the canvas, keeping the file. */
@@ -173,10 +166,8 @@ export function LeftPanel(props: {
 	onAgentRename?: (id: string, name: string) => void;
 }) {
 	const ids = createUniqueId();
-	/* Pictures or rows for the boards: one setting for the one list, not remembered. */
-	const [density, setDensity] = createSignal<Density>("list");
 	/*
-	 * One line or two per agent. Remembered, like a density: it is how this person likes the
+	 * One line or two per agent. Remembered: it is how this person likes the
 	 * list, not a question about it. Two is what it opens on, because the second line is the
 	 * one fact worth reading at a glance: what each agent is doing.
 	 */
@@ -414,11 +405,31 @@ export function LeftPanel(props: {
 	/** How close to the bottom, in pixels, before the next chunk is drawn. */
 	const LOAD_MORE_AT = 400;
 	const [rowBudget, setRowBudget] = createSignal(FIRST_ROWS);
+	/**
+	 * Whether the list has rows at all: while the panel is open, and for its slide out after.
+	 *
+	 * A closed panel is still in the document, slid off the edge and transparent (`panel.css`), and
+	 * every row in it held the server's picture of its board: 720 by 540 pixels decoded, 1.5MB, for a
+	 * box of 20 by 14. Measured on an iPhone, the closed panel was painting 214 of them while the canvas
+	 * was panned — about 330MB of pictures nobody could see, the largest thing in a tab that iOS kept
+	 * killing. So a closed panel lets its rows go, and their pictures with them; they come back the
+	 * moment it opens.
+	 */
+	const [listed, setListed] = createSignal(props.open);
+	createEffect(() => {
+		if (props.open) {
+			setListed(true);
+			return;
+		}
+		const timer = setTimeout(() => setListed(false), 260);
+		onCleanup(() => clearTimeout(timer));
+	});
 	/** The sections of the list that is showing — boards, or agents. */
 	const groups = (): Array<{ rows: unknown[] }> => (tab() === "agents" ? agentList : sections());
 	const visibleRows = () => groups().reduce((sum, section) => sum + section.rows.length, 0);
 	/** How many of the section at `index`'s rows fit in what the sections above it left. */
 	const allowance = (index: number): number => {
+		if (!listed()) return 0;
 		const all = groups();
 		let before = 0;
 		for (let i = 0; i < index; i += 1) before += all[i]?.rows.length ?? 0;
@@ -522,7 +533,7 @@ export function LeftPanel(props: {
 				 * A stationary column, not a card. Beside the canvas it runs the full height of
 				 * the window at the left edge, with the deck mark on top, and never moves while
 				 * the middle slides. A sheet keeps the geometry it had: it covers the canvas on a
-				 * phone and starts under the pill.
+				 * phone and starts under the pill, 8px clear of it.
 				 */
 				style={sheet() ? undefined : { width: `${width()}px` }}
 				data-resizing={resizing() ? "true" : undefined}
@@ -530,7 +541,7 @@ export function LeftPanel(props: {
 					sheet()
 						? /* Over the composer (10) on a phone, under the toolbars (20): the two used to
 						     share 10, and the bar, later in the document, drew across the sheet's foot. */
-							"z-[12] top-[calc(max(12px,env(safe-area-inset-top))_+_52px)] bottom-0 left-0"
+							"z-[12] top-[calc(max(12px,env(safe-area-inset-top))_+_60px)] bottom-0 left-0"
 						: "z-10 top-0 bottom-0 left-0 rounded-none border-y-0 border-l-0"
 				}`}
 			>
@@ -697,33 +708,22 @@ export function LeftPanel(props: {
 						</Show>
 					</label>
 					{/*
-						One control beside the search, and it is the foot's two, folded into one press.
-
-						Pictures or rows is a question about *thumbnails*, so it belongs to Boards; on
-						Agents the same square switches rows between one line and two. The icon is what
-						a press will give you, and `data-view` is what is showing now, for a check.
+						One control beside the search, on Agents only: one line or two per agent. The
+						boards list is one way, a line per board with no picture, so it has nothing to
+						switch. `data-view` is what is showing now, for a check.
 					*/}
-					<button
-						type="button"
-						class="icon-button panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
-						data-view={tab() === "boards" ? density() : `lines-${lines()}`}
-						aria-label={
-							tab() === "boards"
-								? density() === "list"
-									? "Show boards as a grid"
-									: "Show boards as a list"
-								: lines() === 2
-									? "One line per agent"
-									: "Two lines per agent"
-						}
-						title={tab() === "boards" ? (density() === "list" ? "Grid" : "List") : lines() === 2 ? "One line per agent" : "Two lines per agent"}
-						onClick={() => {
-							if (tab() === "boards") setDensity(density() === "list" ? "grid" : "list");
-							else goLines(lines() === 2 ? 1 : 2);
-						}}
-					>
-						<Icon of={tab() === "boards" ? (density() === "list" ? LayoutGrid : Rows3) : lines() === 2 ? Rows3 : Rows2} size={13} />
-					</button>
+					<Show when={tab() === "agents"}>
+						<button
+							type="button"
+							class="icon-button panel-view size-8 flex-none rounded-lg pointer-coarse:size-10"
+							data-view={`lines-${lines()}`}
+							aria-label={lines() === 2 ? "One line per agent" : "Two lines per agent"}
+							title={lines() === 2 ? "One line per agent" : "Two lines per agent"}
+							onClick={() => goLines(lines() === 2 ? 1 : 2)}
+						>
+							<Icon of={lines() === 2 ? Rows3 : Rows2} size={13} />
+						</button>
+					</Show>
 					</div>
 				</div>
 
@@ -731,12 +731,8 @@ export function LeftPanel(props: {
 					ref={list}
 					id={`${ids}-list`}
 					/*
-					 * `items` as well as `panel-list`, and it is not decoration: `RailItem` roots
-					 * its viewport observer at the nearest `.items`, so a grid tile can tell
-					 * whether it is on screen. Without it the observer falls back to the window
-					 * and mounts a document for every board in the deck at once.
 					 */
-					class="panel-list items"
+					class="panel-list"
 					/*
 					 * Which list this is, for the stylesheet and for a check.
 					 *
@@ -747,8 +743,6 @@ export function LeftPanel(props: {
 					 * argument as `data-kind` on a section: name the thing rather than infer it from content.
 					 */
 					data-tab={tab()}
-					/* The boards' grid only: set on the agents tab too, it laid the agent rows out two across. */
-					data-density={tab() === "boards" ? density() : undefined}
 					onKeyDown={rove}
 					onScroll={growIfNearEnd}
 				>
@@ -886,48 +880,19 @@ export function LeftPanel(props: {
 										<span class="flex-1" />
 										<span class="count tabular-nums">{section.rows.length}</span>
 									</div>
-									{/*
-										The branch is outside the `For`, and it has to be.
-										*
-										* `For` maps its items once each and calls the callback untracked — that
-										* is what makes it keyed rather than re-rendering — so a `density()`
-										* read *inside* the callback is a read nothing is listening to. The
-										* rows kept the shape they were first drawn with and the toggle in the
-										* foot did nothing but change one attribute.
-										*
-										* Two `For`s rather than a `Show` per row: the choice is the list's,
-										* not each row's, so paying for it per row would be paying for it
-										* seventy-eight times to answer the same question.
-									*/}
-									<Show
-										when={density() === "grid"}
-										fallback={
-											<For each={section.rows.slice(0, allowance(index()))}>
-												{(row) => (
-													<BoardRow
-														board={row.board}
-														current={props.current === row.board.path}
-														dim={row.dim}
-														onCanvas={row.onCanvas}
-														{...(props.onDelete ? { onDelete: () => props.onDelete?.(row.board) } : {})}
-														{...(props.onHide ? { onHide: () => props.onHide?.(row.board) } : {})}
-														onPick={() => props.onPick(row.board)}
-													/>
-												)}
-											</For>
-										}
-									>
-										<For each={section.rows.slice(0, allowance(index()))}>
-											{(row) => (
-												<BoardTile
-													board={row.board}
-													current={props.current === row.board.path}
-													dim={row.dim}
-													onPick={() => props.onPick(row.board)}
-												/>
-											)}
-										</For>
-									</Show>
+									<For each={section.rows.slice(0, allowance(index()))}>
+										{(row) => (
+											<BoardRow
+												board={row.board}
+												current={props.current === row.board.path}
+												dim={row.dim}
+												onCanvas={row.onCanvas}
+												{...(props.onDelete ? { onDelete: () => props.onDelete?.(row.board) } : {})}
+												{...(props.onHide ? { onHide: () => props.onHide?.(row.board) } : {})}
+												onPick={() => props.onPick(row.board)}
+											/>
+										)}
+									</For>
 								</div>
 							)}
 					</For>

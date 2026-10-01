@@ -12,8 +12,10 @@ import type { AgentView } from "./agent-view.ts";
  * (`AgentRecord.positions`); where you were *looking* at it is yours.
  *
  * So `localStorage`, which is exactly that scope: one origin, one browser, gone when the site
- * data is cleared. Keyed by deck as well as by agent, because a browser can be pointed at two
- * data directories and an agent id from one means nothing in the other.
+ * data is cleared. Keyed by deck, because a browser can be pointed at two data directories and
+ * an agent id from one means nothing in the other; and inside a deck by **agent and canvas**
+ * together, because one agent moves between canvases and a view of one says nothing about where
+ * to look on another. The device is the storage itself. So a view is agent × canvas × device.
  *
  * It has to be written on the way out and read on the way in, and a reload is the whole point:
  * before this, a view lived in memory and a refresh started you at a fresh fit — which for a
@@ -24,10 +26,10 @@ const PREFIX = "decks.views:";
 
 /** One deck's views, read once and written back on every change. */
 export interface AgentViews {
-	/** What this conversation was last left looking at, if it has been left yet. */
-	of(agentId: string): AgentView | undefined;
-	/** Remember it, for this device. */
-	keep(agentId: string, view: AgentView): void;
+	/** What this conversation was last left looking at on this canvas, if it has been left there yet. */
+	of(agentId: string, stage: string | undefined): AgentView | undefined;
+	/** Remember it, for this agent on this canvas, on this device. */
+	keep(agentId: string, stage: string | undefined, view: AgentView): void;
 	/** Drop the views of agents that no longer exist, so the key cannot grow forever. */
 	retain(agentIds: string[]): void;
 }
@@ -95,21 +97,30 @@ export function createAgentViews(deckPath: string, storage: ViewStorage | undefi
 	};
 
 	return {
-		of: (agentId) => read()[agentId],
-		keep: (agentId, view) => {
-			read()[agentId] = { camera: { ...view.camera }, ...(view.selected ? { selected: view.selected } : {}) };
+		// A view kept before canvases were part of the key is the agent's alone: it is used for
+		// whichever canvas asks first, until that canvas has a view of its own.
+		of: (agentId, stage) => read()[keyOf(agentId, stage)] ?? read()[agentId],
+		keep: (agentId, stage, view) => {
+			const views = read();
+			views[keyOf(agentId, stage)] = { camera: { ...view.camera }, ...(view.selected ? { selected: view.selected } : {}) };
+			delete views[agentId];
 			write();
 		},
 		retain: (agentIds) => {
 			const alive = new Set(agentIds);
 			const views = read();
-			const kept = Object.keys(views).filter((id) => alive.has(id));
+			const kept = Object.keys(views).filter((key) => alive.has(agentOf(key)));
 			if (kept.length === Object.keys(views).length) return;
 			held = Object.fromEntries(kept.map((id) => [id, views[id]!]));
 			write();
 		},
 	};
 }
+
+/** The key one view is kept under: the agent, and the canvas it was on. */
+const keyOf = (agentId: string, stage: string | undefined) => (stage ? `${agentId}@${stage}` : agentId);
+/** Which agent a key is for. */
+const agentOf = (key: string) => key.split("@")[0]!;
 
 /**
  * A stored view, if that is what it is.

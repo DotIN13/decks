@@ -34,15 +34,22 @@ export interface StageHost {
 	extent(path: string, rev: number): { w: number; h: number; page?: number } | undefined;
 	/** Wait for a measurement of this revision — every frame takes one when it loads. */
 	awaitExtent(path: string, rev: number, ms: number): Promise<{ w: number; h: number; page?: number } | undefined>;
+	/**
+	 * Measure the board in the server's own browser, at its own size, the way a canvas would: for a
+	 * board no canvas is showing. Absent, or undefined, when there is no browser to do it with.
+	 */
+	measureAway?(path: string): Promise<{ w: number; h: number; page?: number; words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } | undefined>;
 	/** Words counted and the smallest type on the board at this revision, when a browser reported them. */
 	/** Press every control on the board in a headless page and report the views that break it. Advice: absent when it cannot run. */
 	views?(path: string): Promise<{ controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] } | undefined>;
 	reading?(path: string, rev: number): { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number };
 	/** Send to the focused browser, and resolve when it answers. */
-	call(call: Omit<StageCall, "id">): Promise<unknown>;
+	call(call: Omit<StageCall, "id">, timeoutMs?: number): Promise<unknown>;
 	/** Is anyone looking? */
 	connected(): boolean;
 	broadcast(message: ServerMessage): void;
+	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
+	stagesChanged?(): void;
 	/** The camera the browser last reported for one agent's canvas. */
 	camera(agentId: string): Camera;
 	/** Agents, for `stage.agents()` and for `inContext` on every board. */
@@ -105,6 +112,8 @@ const FIT_MARGIN = 48;
 
 /** How long `fit` waits for the frame to load and report, before saying nobody looked. */
 const FIT_WAIT_MS = 5000;
+/** How long `fit` waits for a canvas before measuring the board in the server's own browser as well. */
+const AWAY_AFTER_MS = 1200;
 
 export class StageService {
 	/**
@@ -124,11 +133,18 @@ export class StageService {
 	pens: StagePens | undefined;
 	/** Pictures of a stage, taken in the server's own Chromium (`stage/shots.ts`). */
 	shots: StageShots | undefined;
+	/** The server's own picture of a whole board, fresh from its file (`boards/thumbs.ts`): what a screenshot falls back to. */
+	boardPicture: ((path: string, scheme: "light" | "dark") => Promise<Buffer>) | undefined;
 
 	constructor(
 		private deck: Deck,
 		private readonly host: StageHost,
 	) {}
+
+	/** The list of canvases changed without a drawing changing (a name): tell the browsers. */
+	stagesChanged(): void {
+		this.host.stagesChanged?.();
+	}
 
 	setDeck(deck: Deck): void {
 		this.deck = deck;
@@ -259,7 +275,7 @@ export class StageService {
 
 		const margin = Math.max(0, Math.min(400, Math.round(options?.margin ?? FIT_MARGIN)));
 
-		const measured = await this.measure(path, board.rev);
+		const { reading: away, ...measured } = await this.measure(path, board.rev);
 		/*
 		 * The margin is room under the last *placed* box, and nothing else.
 		 *
@@ -277,29 +293,43 @@ export class StageService {
 		 */
 		const ends = measured.page !== undefined && measured.page >= measured.h;
 		const h = ends ? measured.h : measured.h + margin;
-		const reading = this.host.reading?.(path, board.rev) ?? {};
+		const reading = away ?? this.host.reading?.(path, board.rev) ?? {};
 		// Six seconds at most: the check is advice, and a fit that hangs on it is worse than one without it.
 		const views = await Promise.race([this.host.views?.(path) ?? Promise.resolve(undefined), new Promise<undefined>((done) => setTimeout(() => done(undefined), 6000))]).catch(() => undefined);
 		return { board: h === board.h ? board : this.resize(path, { h }), content: measured, reading, ...(views ? { views } : {}) };
 	}
 
 	/**
-	 * What the browser last said this revision of a board measures.
+	 * What this revision of a board measures, laid out in a browser.
 	 *
-	 * The measurement comes from the browser because the browser is the only place a board
-	 * is laid out. Every frame reports one when it loads and on every revision, so the
-	 * usual case is instant; a board nobody is showing has never been measured and says so
-	 * rather than guessing, which is the only honest answer and also a useful one — it
-	 * means "put it on the canvas".
+	 * The canvas's own measurement first: every frame reports one when it loads and on every
+	 * revision, so a board on screen answers at once. A board nobody is looking at — the usual
+	 * case for an agent writing on its own stage while the person watches another — has no frame,
+	 * and after a short wait for one it is measured in the server's own browser instead
+	 * (`measureAway`), at its own size and by the same code. Whichever answers first is used; the
+	 * error is left for when neither can.
 	 */
-	private async measure(path: string, rev: number): Promise<{ w: number; h: number; page?: number }> {
-		const extent = this.host.extent(path, rev) ?? (await this.host.awaitExtent(path, rev, FIT_WAIT_MS));
-		if (!extent) {
+	private async measure(path: string, rev: number): Promise<{ w: number; h: number; page?: number; reading?: { words?: number; minFont?: number; overflowX?: number; cut?: number; overlaps?: number } }> {
+		const known = this.host.extent(path, rev);
+		if (known) return known;
+		const canvas = this.host.awaitExtent(path, rev, FIT_WAIT_MS);
+		const away = this.host.measureAway
+			? new Promise<void>((done) => setTimeout(done, AWAY_AFTER_MS)).then(async () => {
+					// A canvas that answered in the meantime wins: its numbers are the person's own browser's.
+					if (this.host.extent(path, rev)) return undefined;
+					const found = await this.host.measureAway?.(path).catch(() => undefined);
+					if (!found) return undefined;
+					const { w, h, page, ...reading } = found;
+					return { w, h, ...(page === undefined ? {} : { page }), reading };
+				})
+			: Promise.resolve(undefined);
+		const first = await Promise.race([canvas.then((extent) => extent ?? away), away.then((extent) => extent ?? canvas)]);
+		if (!first) {
 			throw new Error(
 				`Nothing has measured ${path} yet. A board is measured in the frame showing it, so put it on the canvas — stage.show("${path}") — and ask again.`,
 			);
 		}
-		return extent;
+		return first;
 	}
 
 	/** An agent's avatar, drawn by the agent, stored beside the deck. */
@@ -395,13 +425,26 @@ export class StageService {
 		return this.ask(agentId, { op: "annotate", args: { agentId, path, marks: marks ?? null } });
 	}
 
-	private async ask(agentId: string, call: Omit<StageCall, "id" | "agentId">): Promise<unknown> {
+	/**
+	 * A board as the person's browser has it now (`stage.call` op `shot`): drawn there by
+	 * HTML-in-Canvas, or from a snapshot the server's Chrome draws, so it shows what the person did
+	 * on the page. `none` when no browser is looking or it has no live page for the board.
+	 */
+	async seenBoard(agentId: string, path: string): Promise<{ how: "canvas" | "snapshot"; bytes: Buffer; mime: string } | { how: "none"; why: string }> {
+		const value = (await this.ask(agentId, { op: "shot", args: { path } }, 20_000)) as { how?: string; data?: string; mime?: string; why?: string; skipped?: string } | undefined;
+		if (value && (value.how === "canvas" || value.how === "snapshot") && typeof value.data === "string") {
+			return { how: value.how, bytes: Buffer.from(value.data, "base64"), mime: value.mime ?? "image/png" };
+		}
+		return { how: "none", why: value?.why ?? value?.skipped ?? "the person's browser did not answer" };
+	}
+
+	private async ask(agentId: string, call: Omit<StageCall, "id" | "agentId">, timeoutMs?: number): Promise<unknown> {
 		if (!this.host.connected()) {
 			// Not an error: an agent can do useful work with nobody watching, and it
 			// should be told rather than blocked.
 			return { skipped: "no browser is connected to the canvas" };
 		}
-		return this.host.call({ ...call, agentId });
+		return this.host.call({ ...call, agentId }, timeoutMs);
 	}
 }
 

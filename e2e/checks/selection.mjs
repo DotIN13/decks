@@ -21,7 +21,7 @@
  * that board, whatever its format, in either mode** — and it does so without reloading the frame,
  * because a selection that redrew the page under the pointer would be worse than no selection.
  */
-import { boardPath, editMode, open, resetStage, say, settle } from "../harness.mjs";
+import { boardPath, editMode, flyToBoard, open, resetStage, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 1000 });
 await resetStage(page);
@@ -54,7 +54,7 @@ const inside = (board) => {
  * lands on one of them presses it.
  */
 const first = (await boardPath("plan.html")) && "boards/plan.html";
-await page.locator(`.bar-layer .chrome[data-path="${first}"]`).dblclick({ position: { x: 24, y: 12 } });
+await flyToBoard(page, first);
 await settle(page, 900);
 say("flying to a board selects it from its title bar", (await selected()).includes(first), (await selected()).join(", ") || "nothing selected");
 
@@ -80,7 +80,17 @@ say("two boards are on screen with their frames taking the pointer", live.length
  * says anything: a press on the board you already selected cannot tell a handler from silence.
  */
 const other = live.find((board) => board.path !== first);
-const at = other && inside(other);
+/* A point whose press reaches the board's own page: the middle of what is on screen, or failing that
+   the nearest point clear of a neighbour's edge band, which a board raised over this one keeps. */
+const at = other && (await page.evaluate(([path, first]) => {
+	const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+	const [x0, x1, y0, y1] = first;
+	const hits = (x, y) => document.elementFromPoint(x, y)?.closest(".board-node") === node && !document.elementFromPoint(x, y)?.classList.contains("board-edge");
+	for (let d = 0; d <= 200; d += 10) for (const [dx, dy] of [[0, -d], [0, d], [-d, 0], [d, 0]]) {
+		const x = (x0 + x1) / 2 + dx, y = (y0 + y1) / 2 + dy;
+		if (hits(x, y)) return { x, y };
+	}
+}, [other.path, (() => { const p = inside(other); return p ? [p.x - 1, p.x + 1, p.y - 1, p.y + 1] : [0, 0, 0, 0]; })()]));
 await page.evaluate((path) => {
 	const frame = document.querySelector(`.board-node[data-path="${path}"] iframe`);
 	if (frame) frame.contentWindow.__stillHere = 7;
@@ -90,7 +100,8 @@ if (at && other) {
 	await page.mouse.click(at.x, at.y);
 	await settle(page, 350);
 	const now = await selected();
-	say("a press inside a board's own body selects it", now.includes(other.path), `pressed ${other.path}, selected ${now.join(", ") || "nothing"}`);
+	const under = await page.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); const r = (e) => { const b = e?.getBoundingClientRect(); return b ? [b.x, b.y, b.width, b.height].map(Math.round).join(",") : "-"; }; return `${el?.tagName.toLowerCase()}.${String(el?.className ?? "").split(" ")[0]} ${el?.dataset?.side} ${r(el)} ${el?.closest("[data-path]")?.getAttribute("data-path") ?? el?.dataset?.board ?? ""}`; }, [at.x, at.y]);
+	say("a press inside a board's own body selects it", now.includes(other.path), `pressed ${other.path} at ${Math.round(at.x)},${Math.round(at.y)} on ${under}, selected ${now.join(", ") || "nothing"}`);
 	say("…and it is the only one selected", now.length === 1, `${now.length} selected`);
 	const here = await page.evaluate(
 		(path) => document.querySelector(`.board-node[data-path="${path}"] iframe`)?.contentWindow?.__stillHere ?? null,

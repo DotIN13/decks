@@ -26,15 +26,14 @@ export function stageOf(agentId: string | undefined): StageRow | undefined {
 /**
  * The stages a query matches, and whether each did.
  *
- * Matched on the name, the words its boards and notes carry, and who is on it — the three
- * things a person has to go on when they are looking for the room they left something in. The
- * list keeps its order and its length: a stage that does not match is dimmed where it stands
- * rather than removed, so the wall does not reflow under the hand that is typing.
+ * Matched on the name, the folder, the words its boards and notes carry, and who is on it — the
+ * things a person has to go on when they are looking for the room they left something in. Every
+ * stage comes back with `hit`, in its order; the manager shows only the hits.
  */
 export function searchStages(list: StageRow[], query: string): Array<{ stage: StageRow; hit: boolean }> {
 	const q = query.trim().toLowerCase();
 	return list.map((stage) => ({
 		stage,
-		hit: q === "" || `${stage.name} ${stage.words} ${stage.agents.map((agent) => agent.name).join(" ")}`.toLowerCase().includes(q),
+		hit: q === "" || `${stage.title} ${stage.name} ${stage.words} ${stage.agents.map((agent) => agent.name).join(" ")}`.toLowerCase().includes(q),
 	}));
 }

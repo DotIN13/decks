@@ -19,6 +19,7 @@ export const agents = {
 		const agent = wire.agents.create({
 			// From under a workspace heading: the agent is in that project.
 			...(message.workspace ? { workspace: message.workspace } : {}),
+			...(typeof message.near === "string" ? { near: message.near } : {}),
 			... (message.kind ? { kind: message.kind } : {}),
 		});
 		/*
@@ -28,12 +29,18 @@ export const agents = {
 		 */
 		wire.agents.focus(agent.id);
 		/*
-		 * A fresh agent gets its own canvas so the person lands somewhere, not on another
-		 * agent's arrangement. The title comes from the agent's display name; newStage
-		 * throws if the name is already taken, in which case the agent still works — it
-		 * just shares the default stage — so the error is intentionally swallowed.
+		 * A fresh agent opens the latest canvas of its workspace — the one given, or else the
+		 * workspace of the agent you were on — so a new helper lands where the work already is.
+		 * A workspace with no canvas yet gets a new one, titled from the agent's name.
 		 */
-		try { agent.newStage?.(agent.chat().name); } catch { /* name clash — keep going */ }
+		const workspace = message.workspace ?? (typeof message.near === "string" ? wire.agents.get(message.near)?.workspace : undefined);
+		const latest = wire.agents.latestCanvas(workspace, agent.id);
+		try {
+			if (latest) agent.openStage(latest);
+			else agent.newStage?.(agent.chat().name, { provisional: true });
+		} catch {
+			/* a name clash or a canvas gone meanwhile: the agent still works, on a canvas of its own once it needs one */
+		}
 		void wire.publishAccounts();
 		wire.publishStages();
 	},

@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { createReadStream, createWriteStream, existsSync, linkSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import type { Readable } from "node:stream";
 import { join } from "node:path";
 import { MAX_UPLOAD_BYTES, type UploadedAsset } from "@decks/protocol";
 import { resolveAssetWrite } from "../deck/roots.ts";
@@ -154,4 +155,78 @@ export function storeAsset(deckRoot: string, requested: string, bytes: Buffer): 
 	}
 
 	throw new UploadRefused(`there are already too many files called ${name}`, 409);
+}
+
+/** The sha256 of a file on disk, read as a stream: a video is not read into memory to be compared. */
+function digestOfFile(path: string): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const hash = createHash("sha256");
+		createReadStream(path)
+			.on("data", (chunk) => hash.update(chunk))
+			.on("end", () => resolve(hash.digest("hex")))
+			.on("error", reject);
+	});
+}
+
+/**
+ * `storeAsset` for a request body, streamed to disk.
+ *
+ * The bytes go into a hidden part file in `assets/` as they arrive, hashed on the way, and the cap
+ * is enforced on the stream, so a 2GB video costs 2GB of disk and a few kilobytes of memory. Then
+ * the same naming as `storeAsset`: an identical file already under the name is reused, a different
+ * one moves this to the next name, and nothing is overwritten — the part file is *linked* to its
+ * name, which fails if the name was taken in between, and then removed.
+ */
+export async function storeAssetStream(deckRoot: string, requested: string, body: Readable): Promise<UploadedAsset> {
+	const name = assetName(requested);
+	mkdirSync(join(deckRoot, "assets"), { recursive: true });
+	// Our own name, never the requester's, and opened `wx`: nothing there is followed or overwritten.
+	const part = join(deckRoot, "assets", `.upload-${randomUUID()}.part`);
+	const hash = createHash("sha256");
+	let bytes = 0;
+	try {
+		await new Promise<void>((resolve, reject) => {
+			const out = createWriteStream(part, { flags: "wx" });
+			body.on("data", (chunk: Buffer) => {
+				bytes += chunk.length;
+				if (bytes > MAX_UPLOAD_BYTES) {
+					body.destroy();
+					out.destroy();
+					reject(new UploadRefused(`that file is larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB`, 413));
+					return;
+				}
+				hash.update(chunk);
+			});
+			body.on("error", reject);
+			body.on("aborted", () => reject(new UploadRefused("the upload was cut off")));
+			out.on("error", reject);
+			out.on("finish", resolve);
+			body.pipe(out);
+		});
+		if (bytes === 0) throw new UploadRefused("that file is empty");
+		const digest = hash.digest("hex");
+		for (let n = 1; n <= 99; n++) {
+			const candidate = n === 1 ? name : suffixed(name, n);
+			const target = resolveAssetWrite(deckRoot, candidate);
+			const relative = `assets/${candidate}`;
+			if (existsSync(target)) {
+				if (statSync(target).size === bytes && (await digestOfFile(target)) === digest) return { path: relative, name: candidate, bytes, reused: true };
+				continue;
+			}
+			try {
+				linkSync(part, target);
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
+				throw error;
+			}
+			return { path: relative, name: candidate, bytes, reused: false };
+		}
+		throw new UploadRefused(`there are already too many files called ${name}`, 409);
+	} finally {
+		try {
+			unlinkSync(part);
+		} catch {
+			/* never written, or already gone */
+		}
+	}
 }

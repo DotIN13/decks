@@ -17,7 +17,7 @@
  * questions are fed: a question outstanding for the agent you are *not* looking at cannot be
  * produced on demand any other way.
  */
-import { deckState, open, ready, say, settle, socket, still } from "../harness.mjs";
+import { deckState, open, ready, say, selectBoard, settle, socket, still } from "../harness.mjs";
 
 const { browser, page, errors, stopAnswering } = await open({ width: 1500, height: 1000 });
 /* The harness presses Allow on any dialog it sees, and this check is about dialogs being left alone. */
@@ -67,7 +67,8 @@ say("the fixture has at least two boards to be far apart", paths.length >= 2, JS
  */
 const make = async (name, path, y) => {
 	const known = new Set((link.last("agents")?.chats ?? []).map((chat) => chat.id));
-	link.send({ type: "agent.create" });
+	// A workspace of its own: a new agent joins its workspace's latest canvas, and this check wants each on its own.
+	link.send({ type: "agent.create", workspace: `per-agent-${name.toLowerCase()}` });
 	const id = await until(() => (link.last("agents")?.chats ?? []).find((chat) => !known.has(chat.id))?.id, `${name} to exist`);
 	link.send({ type: "agent.rename", id, name });
 	if (path) {
@@ -145,7 +146,7 @@ await page.locator('[aria-label="Fit the boards on the canvas"]').click();
 await still(page);
 await settle(page, 300);
 await page.locator(".dockfield").fill("meant for Ada");
-await page.locator(`.bar-layer .chrome[data-path="${await page.evaluate(() => document.querySelector(".board-node").dataset.path)}"]`).click();
+await selectBoard(page, await page.evaluate(() => document.querySelector(".board-node").dataset.path));
 await page.waitForSelector('.board-node[data-selected="true"]', { timeout: 5000 });
 await settle(page, 350);
 await feed({ type: "extension.ui.prompt", agentId: A, prompt: { id: "q1", method: "confirm", title: "Run it?", message: "asked of Ada" } });

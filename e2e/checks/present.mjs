@@ -17,7 +17,7 @@
  * reach *it* — and Escape then has to work from inside a board's document, which it can only
  * do because the overlay listens there too (same origin) rather than only on this window.
  */
-import { WEB, deckState, editMode, open, say, settle } from "../harness.mjs";
+import { WEB, deckState, editMode, flyToBoard, open, say, selectBoard, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 900 });
 
@@ -37,15 +37,31 @@ const sizeOf = (path) =>
 		return { w: board?.w ?? 0, h: board?.h ?? 0 };
 	}, path);
 
-/** Press the board's own fullscreen button — the affordance, not a keyboard route. */
-const present = (path) =>
-	page.evaluate((wanted) => {
-		const button = document.querySelector(`.bar-layer .chrome[data-path="${wanted}"] .present-open`);
-		if (!button) return false;
-		button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-		button.click();
-		return true;
-	}, path);
+/** Press the board's own fullscreen button, on its pill — the affordance, not a keyboard route. */
+const present = async (path) => {
+	await selectBoard(page, path);
+	const button = page.locator('.board-callout [role=menuitem]:is([aria-label="Present"], [aria-label="Fullscreen"])').first();
+	if ((await button.count()) === 0) return false;
+	await button.click();
+	return true;
+};
+
+/**
+ * What each board's pill offers: selected one at a time, since only the selected board has one.
+ * `label` is the fullscreen button's word, `href` the new-tab link's address.
+ */
+const pills = [];
+for (const { path } of await page.evaluate(() => [...document.querySelectorAll(".board-node")].map((node) => ({ path: node.dataset.path })))) {
+	let items = [];
+	try {
+		await selectBoard(page, path);
+		items = await page.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem]")].map((one) => ({ text: one.getAttribute("aria-label") ?? "", href: one.getAttribute("href") })));
+	} catch {
+		/* a board with no uncovered point to click: it has no pill here */
+	}
+	pills.push({ path, label: items.find((one) => one.text === "Present" || one.text === "Fullscreen")?.text ?? null, href: items.find((one) => one.text === "New tab")?.href ?? null });
+}
+await page.keyboard.press("Escape");
 
 const overlay = () =>
 	page.evaluate(() => {
@@ -77,12 +93,7 @@ const leave = async () => {
  * a mirror draws itself from what the app posts into it, so a second frame of it is the same
  * view twice — and its bar is narrow enough that the extra button lands where its title is.
  */
-const buttons = await page.evaluate(() =>
-	[...document.querySelectorAll(".board-node")].map((node) => ({
-		path: node.dataset.path,
-		label: document.querySelector(`.bar-layer .chrome[data-path="${node.dataset.path}"] .present-open`)?.getAttribute("aria-label") ?? null,
-	})),
-);
+const buttons = pills.map(({ path, label }) => ({ path, label }));
 const live = formats.filter((board) => board.live);
 const plain = formats.filter((board) => !board.live);
 const labelOf = (board) => buttons.find((button) => button.path === board.path)?.label ?? null;
@@ -105,12 +116,7 @@ say(
  * canvas last loaded it — and what arrives there is browse-only, which is asserted by
  * loading it rather than by reading the attribute and hoping.
  */
-const tabs = await page.evaluate(() =>
-	[...document.querySelectorAll(".board-node")].map((node) => ({
-		path: node.dataset.path,
-		href: document.querySelector(`.bar-layer .chrome[data-path="${node.dataset.path}"] .open-tab`)?.getAttribute("href") ?? null,
-	})),
-);
+const tabs = pills.map(({ path, href }) => ({ path, href }));
 const tabOf = (board) => tabs.find((tab) => tab.path === board.path)?.href ?? null;
 say(
 	"every board that can be shown has an address of its own",
@@ -154,17 +160,9 @@ const documentButton = buttons.find((button) => button.path === ours("boards/not
 const boxesButton = buttons.find((button) => button.path === ours("boards/plan.html"));
 say("…a deck's is named Present", deckButton?.label?.startsWith("Present") === true, String(deckButton?.label));
 say(
-	"…and a board's is named Fullscreen, however it is written, without the word on the bar",
+	"…and a board's is named Fullscreen, however it is written",
 	documentButton?.label?.startsWith("Fullscreen") === true && boxesButton?.label?.startsWith("Fullscreen") === true,
 	`${documentButton?.label} / ${boxesButton?.label}`,
-);
-const words = await page.evaluate(() =>
-	[...document.querySelectorAll(".bar-layer .chrome .present-open")].map((button) => button.textContent?.trim() ?? ""),
-);
-say(
-	"…so only a deck's bar carries the word, and the narrow ones are a glyph",
-	words.filter((word) => word.length > 0).length === 1,
-	JSON.stringify(words),
 );
 
 /*
@@ -274,7 +272,7 @@ say("…and Escape leaves it too", (await leave()) === false, "overlay gone");
 // Editing on, because the inspector is the editor's properties panel: in browse mode a click
 // selects nothing and there is no panel to look at (`e2e/checks/modes.mjs`).
 await editMode(page);
-await page.locator('.bar-layer .chrome[data-path="boards/sources.html"]').dblclick();
+await flyToBoard(page, "boards/sources.html");
 await settle(page, 900);
 for (let i = 0; i < 6; i++) {
 	const level = await page.evaluate(() =>
@@ -337,7 +335,7 @@ say("leaving the embed with Escape", (await leave()) === false, "overlay gone");
  *    is also the assertion that the key and the panel agree.
  */
 const pickBox = async (id) => {
-	await page.locator('.bar-layer .chrome[data-path="boards/sources.html"]').dblclick();
+	await flyToBoard(page, "boards/sources.html");
 	await settle(page, 700);
 	const box = await page.frameLocator('.board-node[data-path="boards/sources.html"] iframe').locator(`[data-id="${id}"]`).boundingBox();
 	await page.mouse.click(box.x + 16, box.y + 16);

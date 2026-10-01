@@ -12,7 +12,7 @@
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { boardPath, deckState, open, read, say, settle } from "../harness.mjs";
+import { boardPath, deckState, open, read, say, selectBoard, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open();
 
@@ -34,7 +34,7 @@ await page.evaluate(() => {
 });
 const prompts = () => page.evaluate(() => window.__prompts);
 
-await page.locator(`.bar-layer .chrome[data-path="${await page.evaluate(() => document.querySelector(".board-node").dataset.path)}"]`).click();
+await selectBoard(page, await page.evaluate(() => document.querySelector(".board-node").dataset.path));
 await page.keyboard.press("1");
 await settle(page, 900);
 
@@ -143,7 +143,7 @@ const inks = () => stage().children.filter((n) => n.type === "path" && n.metadat
 const startInks = inks().length;
 const drawn = () => inks().length - startInks;
 
-await page.locator(`.bar-layer .chrome[data-path="${path}"]`).click();
+await selectBoard(page, path);
 await page.keyboard.press("1");
 await settle(page, 900);
 await page.click('[aria-label="Draw on the stage"]');
@@ -155,13 +155,13 @@ const x0 = sheet.x + sheet.width * 0.35;
 const y0 = sheet.y + sheet.height * 0.3;
 
 /*
- * The stroke must not blink when the pen lifts: it stays on the glass until the stage has drawn
- * it. Every frame from the lift on, either the glass still holds it or the stage's own list of
- * strokes has it — never neither.
+ * The stroke must not blink when the pen lifts: it stays on the sheet as live ink until the stage
+ * has drawn it as an item. Every frame from the lift on, either the live ink still holds it or the
+ * stage's own list of strokes has it — never neither.
  */
 await page.evaluate(() => {
 	window.__lift = [];
-	const strokesOnGlass = () => [...document.querySelectorAll(".stage-ink g > path:not(.ink-loop)")].filter((p) => p.getAttribute("d")).length;
+	const strokesOnGlass = () => window.__decksSheet?.ink ?? 0;
 	window.__watchLift = () => {
 		const start = performance.now();
 		const tick = () => {
@@ -174,13 +174,19 @@ await page.evaluate(() => {
 await page.mouse.move(x0, y0);
 await page.mouse.down();
 for (let i = 1; i <= 16; i++) await page.mouse.move(x0 + i * 7, y0 + Math.sin(i / 2.5) * 24);
+// The stroke under the pen is the sheet's: handed to it as live ink, and a frame shown since.
+const shownBefore = await page.evaluate(() => window.__decksSheet?.shown ?? 0);
+await page.mouse.move(x0 + 120, y0 + 10);
+await page.waitForFunction((n) => (window.__decksSheet?.shown ?? 0) > n, shownBefore, { timeout: 3000 }).catch(() => {});
+const mid = await page.evaluate(() => ({ ink: window.__decksSheet?.ink, shown: window.__decksSheet?.shown, hidden: document.querySelector(".stage-sheet")?.hidden, glass: document.querySelectorAll(".stage-ink g > path:not(.ink-loop)").length }));
+say("the stroke under the pen is drawn on the sheet, not on the glass", mid.ink === 1 && mid.shown > shownBefore && mid.hidden === false && mid.glass === 0, JSON.stringify(mid));
 await page.evaluate(() => window.__watchLift());
 await page.mouse.up();
 await settle(page, 900);
 const lift = await page.evaluate(() => window.__lift);
 // The glass goes from holding the stroke to empty exactly once, and by then the stage has it.
 const handedOver = lift.findIndex((n) => n === 0);
-say("lifting the pen does not blink: the glass holds the stroke until the stage has drawn it", lift[0] === 1 && handedOver > 0 && lift.slice(handedOver).every((n) => n === 0) && inks().length - startInks === 1, lift.join(""));
+say("lifting the pen does not blink: the sheet holds the stroke as live ink until the stage has drawn it", lift[0] === 1 && handedOver > 0 && lift.slice(handedOver).every((n) => n === 0) && inks().length - startInks === 1, lift.join(""));
 const firstInk = inks().at(-1);
 say("a stroke over a board goes on the stage, as a pen path with its points", drawn() === 1 && typeof firstInk?.geometry === "string" && Array.isArray(firstInk?.metadata?.points), JSON.stringify(firstInk)?.slice(0, 200));
 say("…in the ink colour, which follows light and dark", firstInk?.stroke === "$decks-ink" && Array.isArray(stage().variables?.["decks-ink"]?.value), JSON.stringify(stage().variables));

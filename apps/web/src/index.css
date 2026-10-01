@@ -37,8 +37,6 @@
 @import "./styles/stages.css";
 @import "./styles/shell.css";
 @import "./styles/ink.css";
-@import "./styles/board-picture.css";
-@import "./styles/rail.css";
 @import "./styles/settings.css";
 @import "./styles/marks.css";
 @import "./styles/markdown.css";
@@ -363,6 +361,16 @@
 		   still a fingertip, and the pill grows to hold it. */
 		--control: 40px;
 		--control-sm: 30px;
+		/*
+		 * The phone's corners, as the Claude app on iOS draws them: a button is a circle, a labelled
+		 * control a capsule, and a floating bar half its own height, so the 52px toolbars are
+		 * capsules too and the 40px buttons in them sit concentric at a 6px inset. Larger floats (the
+		 * composer, the sheet, a menu) take the same 26px, which on them reads as a soft card.
+		 */
+		--radius-panel: 26px;
+		--control-radius: 999px;
+		--row-radius: 26px;
+		--radius-item: 14px;
 	}
 }
 

@@ -1,30 +1,6 @@
 import { pathBounds, type Frame, type PenNode, type Placed } from "@decks/pen";
 
 /**
- * The top-level items drawn under the boards: each one listed before a board in the file that
- * holds that whole board. That is a backdrop — a frame round a board, a panel behind a group of
- * them — and drawing it over the board would bury the board. Everything else is drawn over them.
- */
-export function backdrops(nodes: readonly PenNode[], bounds: ReadonlyMap<string, Frame>, placed: ReadonlyMap<string, Placed>): Set<string> {
-	const out = new Set<string>();
-	const isBoard = (node: PenNode) => node.type === "browser" && node.metadata?.type === "decks.board";
-	nodes.forEach((node, index) => {
-		if (isBoard(node)) return;
-		const b = bounds.get(node.id);
-		if (!b) return;
-		for (const later of nodes.slice(index + 1)) {
-			if (!isBoard(later)) continue;
-			const board = placed.get(later.id)?.box;
-			if (board && board.x >= b.x && board.y >= b.y && board.x + board.w <= b.x + b.w && board.y + board.h <= b.y + b.h) {
-				out.add(node.id);
-				return;
-			}
-		}
-	});
-	return out;
-}
-
-/**
  * What each item looks like it covers, which is not always the box it was given.
  *
  * A path fills its box with its `viewBox`, so a petal drawn in one corner of a 600 by 700 viewBox

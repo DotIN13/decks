@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { Camera } from "@decks/protocol";
 import { runtimeDir } from "@decks/runtime";
 import { Deck } from "../deck/loader.ts";
-import { StageService } from "./service.ts";
+import { type StageHost, StageService } from "./service.ts";
 import { createStageTool, type CreateSpec, type QueuedWork, type SendSpec } from "./tool.ts";
 import { StagePens } from "./pens.ts";
 
@@ -18,7 +18,7 @@ import { StagePens } from "./pens.ts";
  * Neither is reachable from a browser check — the e2e suite needs a model to make an agent
  * call a tool at all — and both are the part a model actually reads.
  */
-function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }, options: { stageful?: boolean; identity?: Partial<{ name: string; avatar: string; tags: string[]; workspace: string }> } = {}) {
+function toolOn(camera: Camera, views?: { controls: number; opening: number; views: Array<{ label: string; h: number; overflowX: number }>; errors: string[] }, options: { stageful?: boolean; identity?: Partial<{ name: string; avatar: string; tags: string[]; workspace: string }>; measureAway?: StageHost["measureAway"] } = {}) {
 	/*
 	 * A stage that remembers, for the checks on what `newBoard` and `show` say about where a board
 	 * went. Placement here is a stand-in (a named place is kept, anything else goes to x 5000):
@@ -86,6 +86,7 @@ function toolOn(camera: Camera, views?: { controls: number; opening: number; vie
 			return { ...(words === undefined ? {} : { words }), ...(minFont === undefined ? {} : { minFont }), ...(overflowX === undefined ? {} : { overflowX }) };
 		},
 		...(views ? { views: async () => views } : {}),
+		...(options.measureAway ? { measureAway: options.measureAway } : {}),
 		/* Every op the browser was asked to carry out, so a test can read what travelled. */
 		call: async (asked: unknown) => {
 			calls.push(asked);
@@ -360,6 +361,26 @@ test("fit says to put the board on the canvas rather than guessing a height", as
 	const result = await tool.run(`return await stage.fit("boards/plan.html")`);
 	assert.equal(result.isError, true);
 	assert.match(result.text, /put it on the canvas/);
+	cleanup();
+});
+
+/*
+ * A board nobody is looking at has no frame to measure it, which was most fits by an agent working
+ * on its own stage. The server's own browser measures it then, and fit acts on that reading.
+ */
+test("fit measures a board no canvas is showing in the server's own browser", async () => {
+	const asked: string[] = [];
+	const { tool, deck, cleanup } = toolOn({ x: 0, y: 0, zoom: 1, width: 1400, height: 900 }, undefined, {
+		measureAway: async (path) => {
+			asked.push(path);
+			return { w: 1000, h: 612, page: 612, words: 90, minFont: 16 };
+		},
+	});
+	const result = await tool.run(`return await stage.fit("boards/plan.html")`);
+	assert.equal(result.isError, false, result.text);
+	assert.deepEqual(asked, ["boards/plan.html"]);
+	assert.equal(deck.board("boards/plan.html")?.h, 612, "the document's own height, with no margin added");
+	assert.match(result.text, /90 words/, "and the reading it took is the one fit reports");
 	cleanup();
 });
 

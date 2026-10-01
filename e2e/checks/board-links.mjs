@@ -16,7 +16,7 @@
  * The same assertion ends every case, and it is the point of the whole feature: the board that
  * carried the link is still the board in the frame.
  */
-import { editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
+import { editMode, open, resetStage, say, selectBoard, settle, socket } from "../harness.mjs";
 
 const { browser, context, page, errors } = await open({ width: 1500, height: 1000 });
 await resetStage(page);
@@ -189,13 +189,10 @@ await editMode(page, false);
 link.send({ type: "board.hide", path: LINKED });
 await settle(page, 500);
 await focus(SOURCE);
-const presented = await page.evaluate((wanted) => {
-	const button = document.querySelector(`.bar-layer .chrome[data-path="${wanted}"] .present-open`);
-	if (!button) return false;
-	button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-	button.click();
-	return true;
-}, SOURCE);
+await selectBoard(page, SOURCE);
+const fullscreen = page.locator('.board-callout [role=menuitem]:is([aria-label="Present"], [aria-label="Fullscreen"])').first();
+const presented = (await fullscreen.count()) > 0;
+if (presented) await fullscreen.click();
 await settle(page, 900);
 const overlay = await page.evaluate(() => Boolean(document.querySelector(".present")));
 await page.frameLocator(".present .present-frame").locator('a[href="risks.html"]').click();

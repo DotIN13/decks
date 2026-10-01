@@ -248,49 +248,123 @@ const agent = {
 	await browser.close();
 }
 
-// --- a coarse pointer: a board's bar, with a board on the screen ----------------------
+// --- a coarse pointer: no bars, and a tapped board's menu ------------------------------
 
 /*
- * Its own context, and no synthetic agent in it.
- *
- * The block above replaces the focused agent with a fed one whose canvas is empty, on purpose —
- * it is about a panel that is drawn at every width. A bar belongs to a *board*, though, and
- * `resetStage` plays the deck onto the agent the **server** has focused: with a fed agent in
- * place those plays land on a canvas the browser is not looking at, and the first version of
- * this measured `.bar-layer .chrome` as `null` three times. So: a real session, the deck
- * played, and then the bar.
+ * Its own context, and no synthetic agent in it: `resetStage` plays the deck onto the agent the
+ * server has focused, so a fed agent in place would put the boards on a canvas the browser is not
+ * looking at. A touchscreen draws no title bars; a tap selects a board, and its actions are a
+ * menu over it (`canvas/BoardCallout.tsx`).
  */
 {
 	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
 	await resetStage();
 	await settle(page, 1400);
-	const acts = await page.evaluate(() => {
-		const bar = document.querySelector(".bar-layer .chrome");
-		if (!bar) return null;
-		const buttons = [...bar.querySelectorAll(".acts > *")];
+	const bars = await page.evaluate(() => document.querySelectorAll(".bar-layer .chrome").length);
+	say("a touchscreen draws no title bars", bars === 0, `${bars} bars`);
+	const target = await page.evaluate(() => {
+		// The part of each board inside the open screen (under the toolbar, over the composer), and the board with the most of it.
+		const open = { x1: 8, y1: 100, x2: innerWidth - 8, y2: innerHeight - 170 };
+		const found = [...document.querySelectorAll(".board-node")]
+			.map((node) => {
+				const r = node.getBoundingClientRect();
+				const x1 = Math.max(r.left, open.x1), y1 = Math.max(r.top, open.y1), x2 = Math.min(r.right, open.x2), y2 = Math.min(r.bottom, open.y2);
+				return { x1, y1, x2, y2, area: Math.max(0, x2 - x1) * Math.max(0, y2 - y1) };
+			})
+			.sort((a, b) => b.area - a.area)[0];
+		return found && found.area > 0 ? { x: (found.x1 + found.x2) / 2, y: (found.y1 + found.y2) / 2 } : null;
+	});
+	const under = target ? await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); const n = e?.closest(".board-node"); return `${e?.tagName}.${String(e?.className).split(" ")[0]} inert=${n?.dataset.inert} wired=${n?.querySelector("iframe")?.hasAttribute("data-wired")} zoom=${document.querySelector(".world")?.style.transform.match(/scale\(([\d.]+)/)?.[1]}`; }, [target.x, target.y]) : "no target";
+	if (target) await page.touchscreen.tap(target.x, target.y);
+	await settle(page, 900);
+	const tapped = await page.evaluate(() => document.querySelector('.board-node[data-selected="true"]')?.dataset.path ?? null);
+	const menu = await page.evaluate(() => {
+		const callout = document.querySelector(".board-callout");
+		if (!callout) return null;
+		const items = [...callout.querySelectorAll("[role=menuitem]")];
 		const box = (el) => el.getBoundingClientRect();
-		const squares = buttons.filter((el) => el.className !== "present-open" || el.dataset.glyph === "true");
 		return {
-			count: buttons.length,
-			visible: buttons.filter((el) => getComputedStyle(el).opacity === "1").length,
-			rows: new Set(buttons.map((el) => Math.round(box(el).y))).size,
-			sizes: [...new Set(squares.map((el) => `${Math.round(box(el).width)}x${Math.round(box(el).height)}`))],
-			classes: buttons.map((el) => el.className),
+			items: items.map((el) => el.getAttribute("aria-label") ?? ""),
+			rows: new Set(items.map((el) => Math.round(box(el).y))).size,
+			heights: [...new Set(items.map((el) => Math.round(box(el).height)))],
+			inside: box(callout).left >= 0 && box(callout).right <= innerWidth,
+			span: [Math.round(box(callout).left), Math.round(box(callout).right), innerWidth],
 		};
 	});
-	say(
-		"a board's bar offers every control on a touchscreen, not only the one that removes it",
-		acts !== null && acts.count >= 4 && acts.visible === acts.count,
-		JSON.stringify(acts),
-	);
-	say("…all of them on one row", acts !== null && acts.rows === 1, `${acts?.rows} row(s) of ${acts?.count}`);
-	say(
-		"…and every square the same 24px target, which is not the size any of them had",
-		acts !== null && acts.sizes.length === 1 && Math.abs(Number.parseInt(acts.sizes[0], 10) - 24) <= 1,
-		JSON.stringify(acts?.sizes),
-	);
+	say("a tap on a board shows its menu, with every action the bar had", menu !== null && ["Fit", "Focus", "New tab", "Hide"].every((word) => menu.items.includes(word)), JSON.stringify({ menu, under, tapped }));
+	say("…on one row, on the screen, every item a 40px target", menu !== null && menu.rows === 1 && menu.inside && menu.heights.length === 1 && menu.heights[0] >= 40, JSON.stringify(menu));
 
+	/* One finger on the selected board's edge moves the board: a phone has no mouse to drag it by. */
+	const edge = await page.evaluate(() => {
+		const node = document.querySelector('.board-node[data-selected="true"]');
+		if (!node) return null;
+		for (const band of node.querySelectorAll(".board-edge")) {
+			const r = band.getBoundingClientRect();
+			const along = band.dataset.side === "n" || band.dataset.side === "s";
+			for (const f of [0.3, 0.7, 0.5]) {
+				const x = along ? r.x + r.width * f : band.dataset.side === "w" ? r.x + 5 : r.right - 5;
+				const y = along ? (band.dataset.side === "n" ? r.y + 5 : r.bottom - 5) : r.y + r.height * f;
+				if (x > 4 && y > 90 && x < innerWidth - 4 && y < innerHeight - 180 && document.elementFromPoint(x, y) === band) {
+					// Where the board is on the canvas, not on screen: a pan would move it on screen too.
+					const zoom = Number(document.querySelector(".world")?.style.transform.match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
+					return { x, y, path: node.dataset.path, left: Number.parseFloat(node.style.left), top: Number.parseFloat(node.style.top), zoom, band: Math.round(along ? r.height : r.width) };
+				}
+			}
+		}
+		return null;
+	});
+	say("a selected board has an edge a finger can take, 22 px wide", edge !== null && edge.band >= 20, JSON.stringify(edge));
+	if (edge) {
+		const cdp = await page.context().newCDPSession(page);
+		const point = (x, y) => [{ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 }];
+		await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(edge.x, edge.y) });
+		for (let i = 1; i <= 8; i++) {
+			await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(edge.x + i * 6, edge.y + i * 4) });
+			await page.waitForTimeout(16);
+		}
+		/*
+		 * Mid-drag, the board's picture is carried on the sheet's carried layer and its page waits, hidden,
+		 * where it was picked up (`PenLayer.carry`): the outline and the picture are both the finger's
+		 * travel from the page, 48 by 32, and there are no resize handles to leave behind.
+		 */
+		await page.waitForFunction((path) => document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`)?.hasAttribute("data-carried"), edge.path, { timeout: 3000 }).catch(() => {});
+		const midway = await page.evaluate((path) => {
+			const element = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
+			const node = element.getBoundingClientRect();
+			const outline = document.querySelector('.pen-selection[data-board="true"]')?.getBoundingClientRect();
+			const zoom = Number(document.querySelector(".world")?.style.transform.match(/scale\(([\d.]+)\)/)?.[1] ?? 1);
+			const carried = document.querySelector(".stage-carried:not([hidden])")?.style.transform.match(/^translate\(([-\d.]+)px, ([-\d.]+)px\)/);
+			return {
+				hidden: element.hasAttribute("data-carried") && getComputedStyle(element.querySelector(".surface")).visibility === "hidden",
+				dx: outline ? Math.round(outline.left - node.left) : null,
+				dy: outline ? Math.round(outline.top - node.top) : null,
+				picture: carried ? [Math.round(Number(carried[1]) * zoom), Math.round(Number(carried[2]) * zoom)] : null,
+				handles: document.querySelectorAll(".pen-handle[data-board]").length,
+			};
+		}, edge.path);
+		say(
+			"…its picture carried with the finger, its outline with it, its page waiting unseen and its handles put away",
+			midway.hidden && Math.abs(midway.dx - 48) <= 1 && Math.abs(midway.dy - 32) <= 1 && midway.picture !== null && Math.abs(midway.picture[0] - 48) <= 1 && Math.abs(midway.picture[1] - 32) <= 1 && midway.handles === 0,
+			JSON.stringify(midway),
+		);
+		await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+		const moved = await page
+			.waitForFunction(
+				(was) => {
+					const node = document.querySelector(`.board-node[data-path="${CSS.escape(was.path)}"]`);
+					const left = Number.parseFloat(node?.style.left ?? "NaN");
+					const top = Number.parseFloat(node?.style.top ?? "NaN");
+					// 48 by 32 screen pixels, in canvas units at this zoom.
+					return Math.abs(left - was.left - 48 / was.zoom) < 12 / was.zoom && Math.abs(top - was.top - 32 / was.zoom) < 12 / was.zoom ? { left, top } : false;
+				},
+				edge,
+				{ timeout: 5000 },
+			)
+			.then((handle) => handle.jsonValue())
+			.catch(() => null);
+		say("…and one finger dragged along it moves the board with the finger", moved !== null, JSON.stringify({ was: [edge.left, edge.top], now: moved }));
+	}
 
-	say("no console errors in a phone's board bar", errors.length === 0, errors.join(" | "));
+	say("no console errors in a phone's board menu", errors.length === 0, errors.join(" | "));
 	await browser.close();
 }

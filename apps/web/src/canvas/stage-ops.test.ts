@@ -17,12 +17,13 @@ import { runStageCall, type StageOpsHost } from "./stage-ops.ts";
 
 const board = (path: string, x: number, y: number): Board => ({ path, format: "board" as const, title: path, x, y, w: 800, h: 600, rev: 1, inContext: [] });
 
-function host(focused: string | undefined) {
+function host(focused: string | undefined, hands = false) {
 	const moved: Camera[] = [];
 	/** The same calls, carrying the flag the caller asked for — see the tests at the end. */
 	const animated: Array<{ camera: Camera }> = [];
 	const remembered: Array<{ agentId: string; camera: Camera; selected?: string }> = [];
 	const selected: Array<string | undefined> = [];
+	const offered: Array<{ agentId: string; camera: Camera; selected?: string; what: string }> = [];
 	const api: StageOpsHost = {
 		boards: () => [board("boards/plan.html", 0, 0), board("boards/risks.html", 6000, 0)],
 		viewport: () => ({ width: 1200, height: 800 }),
@@ -36,8 +37,10 @@ function host(focused: string | undefined) {
 		reload: () => {},
 		cursor: () => {},
 		annotate: () => {},
+		handsOn: () => hands,
+		offerView: (agentId, camera, select, what) => offered.push({ agentId, camera, ...(select ? { selected: select } : {}), what }),
 	};
-	return { api, moved, animated, remembered, selected };
+	return { api, moved, animated, remembered, selected, offered };
 }
 
 const call = (agentId: string, op: StageCall["op"], args: unknown): StageCall => ({ id: "c1", agentId, op, args });
@@ -175,4 +178,20 @@ test("a show of nothing this canvas has is an error, not a camera move", () => {
 
 	assert.match(result.error ?? "", /none of those boards/);
 	assert.equal(moved.length, 0);
+});
+
+test("while the person is using the canvas, the agent on screen is offered a button instead of moving it", () => {
+	const { api, moved, selected, remembered, offered } = host("A", true);
+	const shown = runStageCall(call("A", "show", { paths: ["boards/risks.html"] }), api) as { shown: string[]; deferred?: string };
+	assert.equal(moved.length, 0, "the view stayed where the person had it");
+	assert.deepEqual(selected, [], "and nothing was selected under them");
+	assert.deepEqual(remembered, [], "nothing parked: it is their conversation already");
+	assert.match(shown.deferred ?? "", /using the canvas/);
+	assert.deepEqual(offered.map((one) => [one.agentId, one.what, one.selected]), [["A", "board", "boards/risks.html"]]);
+
+	const camera = runStageCall(call("A", "camera", { x: 10, y: 20, zoom: 1 }), api) as { deferred?: string };
+	assert.equal(moved.length, 0, "a camera move waits the same way");
+	assert.match(camera.deferred ?? "", /using the canvas/);
+	assert.deepEqual(offered.at(-1)?.camera, { x: 10, y: 20, zoom: 1 });
+	assert.equal(offered.at(-1)?.what, "view");
 });

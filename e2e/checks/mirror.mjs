@@ -11,7 +11,7 @@
  * The delta rule itself — what to send a board that already holds some turns — is
  * `board/live-chat.test.ts`. This drives the button a person would press.
  */
-import { open, say, settle } from "../harness.mjs";
+import { flyToBoard, open, say, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1400, height: 980 });
 
@@ -208,7 +208,7 @@ const zoom = () => page.evaluate(() => Number((document.querySelector('.pill [ar
  * pointer events at all: every wheel assertion below would pass for the wrong reason on a
  * canvas fitted to twenty boards, which is exactly how this check first went green.
  */
-await page.locator('.bar-layer .chrome[data-path^="boards/mirrors/"]').first().dblclick();
+await flyToBoard(page, await page.evaluate(() => [...document.querySelectorAll(".board-node")].find((node) => node.dataset.path.startsWith("boards/mirrors/"))?.dataset.path));
 await settle(page, 900);
 await page.waitForFunction(
 	() =>

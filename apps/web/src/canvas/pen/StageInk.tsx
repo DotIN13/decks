@@ -4,6 +4,8 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "so
 import { inkColor, inkSelection, inkSize, inkTool, penSeen, setInkSelection, setPenSeen } from "../../state/ink.ts";
 import { inkItem } from "./ink.ts";
 import type { PenLayer, PenPreview } from "./layer.ts";
+import type { LiveInk } from "./scene.ts";
+import { scheme } from "../../lib/theme.ts";
 
 /** What the lasso holds is marked with this path, since ink is the stage's now and not a board's. */
 export const STAGE_INK = "stage";
@@ -12,9 +14,10 @@ export const STAGE_INK = "stage";
  * Drawing on the stage: a sheet of glass over the whole canvas while the draw tool is on.
  *
  * What is drawn goes into the stage's `.pen` file as ink (`ink.ts`), one pen `path` per stroke,
- * through the same edits an agent sends. The strokes already there are drawn by the stage's own
- * drawing layer; this sheet draws only what has no place there yet — the stroke under the pen,
- * the lasso's loop, and the box round what the lasso took — in stage pixels, under the camera.
+ * through the same edits an agent sends. All ink is drawn on the stage's one sheet (`scene.ts`):
+ * the strokes in the file as items, and the stroke under the pen, before it is in the file, handed
+ * to the sheet as it grows (`PenLayer.ink`). This glass draws nothing of the ink itself; it takes
+ * the pointer, and shows the lasso's loop and the box round what the lasso took.
  *
  * **Which pointer draws.** A pen always does, with its pressure. A mouse does. A finger does until
  * a pen has been seen in this session; from then on a finger is the canvas's, and goes on up to the
@@ -37,30 +40,31 @@ export function StageInk(props: {
 	/** Take back the last edit, or put it back: a two- or three-finger tap. */
 	onStep?: (direction: "undo" | "redo") => void;
 }) {
-	let live: SVGPathElement | undefined;
 	let loop: SVGPathElement | undefined;
-	let group: SVGGElement | undefined;
+	/** The stroke under the pen, as the sheet draws it. */
+	let live: LiveInk | undefined;
+	/** The painter is loaded when the draw tool is picked up, so the first stroke is not waiting on it. */
+	props.layer.ink([], true);
 
 	/*
-	 * A finished stroke stays on the glass until the stage has drawn it: it is sent to the server and
-	 * drawn from the answer, and taking it off at the lift left a frame or more with no stroke at all.
-	 * Each one waiting is a copy of the live path, marked with its id and taken off the moment that id
-	 * is among the strokes the stage drew — the same frame the drawing shows it — or after a few
+	 * A finished stroke stays on the sheet as live ink until the stage has drawn it: it is sent to the
+	 * server and drawn from the answer, and taking it off at the lift left a frame or more with no
+	 * stroke at all. Each one waiting is the live stroke under its id, taken off the moment that id
+	 * is among the strokes the stage drew — the same layout the drawing shows it in — or after a few
 	 * seconds if the edit never came back.
 	 */
-	const waiting = new Map<string, { path: SVGPathElement; timer: ReturnType<typeof setTimeout> }>();
+	const waiting = new Map<string, { ink: LiveInk; timer: ReturnType<typeof setTimeout> }>();
+	const sendInk = () => props.layer.ink([...[...waiting.values()].map((held) => held.ink), ...(live ? [live] : [])]);
 	const settle = (id: string) => {
 		const held = waiting.get(id);
 		if (!held) return;
 		clearTimeout(held.timer);
-		held.path.remove();
 		waiting.delete(id);
+		sendInk();
 	};
 	const hold = (id: string) => {
-		if (!live || !group) return;
-		const path = live.cloneNode() as SVGPathElement;
-		group.insertBefore(path, live);
-		waiting.set(id, { path, timer: setTimeout(() => settle(id), 5000) });
+		if (!live) return;
+		waiting.set(id, { ink: { ...live, id }, timer: setTimeout(() => settle(id), 5000) });
 	};
 	createEffect(() => {
 		const drawn = new Set(props.strokes().map((stroke) => stroke.id));
@@ -123,20 +127,27 @@ export function StageInk(props: {
 	});
 
 	const clearLive = () => {
-		live?.setAttribute("d", "");
+		const had = !!live;
+		live = undefined;
+		if (had) sendInk();
 		loop?.setAttribute("d", "");
 	};
 
-	/** The stroke under the pen, drawn straight into the DOM: a signal per sample is a frame late. */
+	/** The `ink` colour as the pen variable resolves it (`inkVariableEdit`): dark on light, light on dark. */
+	const inkHex = () => (scheme() === "dark" ? "#e6e6e6" : "#1f2328");
+
+	/** The stroke under the pen, handed to the sheet on every sample; the sheet draws it at its next frame. */
 	const paintLive = (drawn: Extract<Gesture, { kind: "draw" }>) => {
-		if (!live) return;
 		const shape = strokeShape({ id: "live", ...drawn.stroke, points: drawn.points });
-		const paint = drawn.stroke.color === "ink" ? "var(--fg)" : inkPaint(drawn.stroke.color);
-		live.setAttribute("d", shape.d);
-		live.setAttribute("fill", shape.filled ? paint : "none");
-		live.setAttribute("stroke", shape.filled ? "none" : paint);
-		live.setAttribute("stroke-width", String(drawn.stroke.size));
-		live.setAttribute("opacity", drawn.stroke.tool === "marker" ? "0.4" : "1");
+		live = {
+			id: "live",
+			d: shape.d,
+			filled: shape.filled,
+			color: drawn.stroke.color === "ink" ? inkHex() : inkPaint(drawn.stroke.color),
+			size: drawn.stroke.size,
+			opacity: drawn.stroke.tool === "marker" ? 0.4 : 1,
+		};
+		sendInk();
 	};
 
 	const erase = (erasing: Extract<Gesture, { kind: "erase" }>, x: number, y: number) => {
@@ -426,6 +437,7 @@ export function StageInk(props: {
 		cancel();
 		setInkSelection(undefined);
 		for (const id of [...waiting.keys()]) settle(id);
+		props.layer.ink([]);
 	});
 
 	return (
@@ -441,8 +453,7 @@ export function StageInk(props: {
 			// A long press with a pencil or a finger is not a request for the browser's menu.
 			onContextMenu={(event) => event.preventDefault()}
 		>
-			<g ref={group} transform={transform()}>
-				<path ref={live} d="" stroke-linecap="round" stroke-linejoin="round" />
+			<g transform={transform()}>
 				<path ref={loop} class="ink-loop" d="" />
 				<Show when={selection()}>
 					{(box) => (

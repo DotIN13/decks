@@ -67,13 +67,19 @@ export const boards = {
 		try {
 			if (board.format === "slides") {
 				// `writeBoard` inside broadcasts the new board, so this one needs no second message.
-				if (w !== undefined) wire.boards.resize(message.path, { w });
+				if (w !== undefined) {
+					wire.boards.resize(message.path, { w });
+					wire.boards.wrote(message.path, "you");
+				}
 				return;
 			}
 			const wanted = { ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) };
 			if (wanted.w === undefined && wanted.h === undefined) return;
 			// `writeBoard` inside broadcasts the new board, so this one needs no second message.
 			wire.boards.resize(message.path, wanted);
+			/* The person's own drag rewrote the file: said to be theirs, or its new time reads as
+			   somebody else's change and the board glows as news (`panel/board-news.ts`). */
+			wire.boards.wrote(message.path, "you");
 		} catch (error) {
 			reply({ type: "notice", level: "warn", text: (error as Error).message });
 		}
@@ -338,7 +344,7 @@ async function runBoardEval(
 		setInPlay: (paths: string[], at?: Record<string, { x: number; y: number }>) => focused.setInPlay(paths, { place: true, ...(at ? { at } : {}) }),
 		positions: () => focused.positions(),
 		setPosition: (board: string, x: number, y: number) => focused.setPosition(board, x, y),
-		camera: () => wire.cameras.answer(focused.id),
+		camera: () => wire.cameras.answer(focused.id, focused.stageName?.()),
 		queue: () => focused.queue(),
 		agents: () => wire.agents.summaries(),
 		send: (fromId: string, target: string, spec: Parameters<Registry["send"]>[2]) => wire.agents.send(fromId, target, spec),

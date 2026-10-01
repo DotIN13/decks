@@ -13,7 +13,7 @@
  *
  * The panel's width handle is `panel.mjs`'s, and switching agent is `per-agent.mjs`'s.
  */
-import { open, say, settle, socket } from "../harness.mjs";
+import { deckState, open, say, settle, socket } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1500, height: 1000 });
 await settle(page, 600);
@@ -39,10 +39,10 @@ const pill = await page.evaluate(() => ({
 say("the top-left pill has the boards panel's button, and no Home, dashboard tabs or canvas name", pill.home === 0 && pill.canvas === 0 && pill.tabs === 0 && pill.boards === 1, JSON.stringify(pill));
 
 /*
- * The left panel's board rows draw pictures the server took (`boards/thumbs.ts`), of boards
- * this browser may never have had open: there is no second way to picture a board, and no
- * board is mounted as a document to make one. 720 real pixels wide, and asked for by revision
- * so it can be cached for a year.
+ * The left panel's board rows are an empty box, a name and a dot: no picture of the board, and no board
+ * mounted as a document, so a long list costs a line of text a row. The server still takes
+ * pictures (`boards/thumbs.ts`) for the stage's sheet, asked for by revision so each can be
+ * cached for a year.
  */
 {
 	const boardsTab = page.locator('.panel-shell [role="tab"]', { hasText: "Boards" });
@@ -52,31 +52,24 @@ say("the top-left pill has the boards panel's button, and no Home, dashboard tab
 	}
 	await boardsTab.click();
 	await settle(page, 400);
-	const ready = await page
-		.waitForFunction(
-			() => {
-				const pictures = [...document.querySelectorAll(".board-thumb .board-picture")];
-				return pictures.length > 0 && pictures.every((one) => one.dataset.state === "ready");
-			},
-			undefined,
-			{ timeout: 30000 },
-		)
-		.then(() => true)
-		.catch(() => false);
 	const rows = await page.evaluate(() => ({
 		rows: document.querySelectorAll(".board-row").length,
-		ready: document.querySelectorAll('.board-thumb .board-picture[data-state="ready"]').length,
-		pictures: [...document.querySelectorAll(".board-thumb img")].map((one) => ({ w: one.naturalWidth, src: one.getAttribute("src") ?? "" })),
+		named: [...document.querySelectorAll(".board-row")].every((row) => (row.querySelector(".row-name")?.textContent ?? "").length > 0),
+		boxes: [...document.querySelectorAll(".board-row")].filter((row) => { const box = row.querySelector(".board-thumb"); return box && box.childElementCount === 0 && box.getBoundingClientRect().width === 20; }).length,
+		pictures: document.querySelectorAll(".panel-shell img").length,
 		frames: document.querySelectorAll(".panel-shell iframe").length,
+		grid: document.querySelectorAll('.panel-view[aria-label*="grid" i]').length,
 	}));
-	say("the left panel's rows draw the server's pictures, with no document mounted", ready && rows.rows > 0 && rows.ready === rows.rows && rows.pictures.every((one) => one.src.startsWith("/api/thumb/")) && rows.frames === 0, JSON.stringify({ ...rows, pictures: rows.pictures.length }));
-	say("…720 pixels wide, asked for by revision and scheme", rows.pictures.length > 0 && rows.pictures.every((one) => one.w === 720 && /\/api\/thumb\/.+\?v=\d+&scheme=(light|dark)$/.test(one.src)), JSON.stringify(rows.pictures.slice(0, 3)));
-	const again = await page.evaluate(async (src) => {
+	say("the left panel's board rows are an empty box and a name, with no picture, no document and no grid switch", rows.rows > 0 && rows.named && rows.boxes === rows.rows && rows.pictures === 0 && rows.frames === 0 && rows.grid === 0, JSON.stringify(rows));
+	const board = (await deckState()).boards[0];
+	const again = await page.evaluate(async ({ path, rev }) => {
+		const src = `/api/thumb/${path.split("/").map(encodeURIComponent).join("/")}?v=${rev}&scheme=light&whole=1`;
+		await fetch(src);
 		const started = performance.now();
 		const answer = await fetch(src, { cache: "no-store" });
-		return { status: answer.status, type: answer.headers.get("content-type"), cache: answer.headers.get("cache-control"), ms: Math.round(performance.now() - started) };
-	}, rows.pictures[0]?.src);
-	say("…and a second ask is answered from the disk, cacheable for a year", again.status === 200 && again.type === "image/jpeg" && /immutable/.test(again.cache ?? "") && again.ms < 300, JSON.stringify(again));
+		return { src, status: answer.status, type: answer.headers.get("content-type"), cache: answer.headers.get("cache-control"), ms: Math.round(performance.now() - started) };
+	}, { path: board.path, rev: board.rev });
+	say("…and the server's picture of a board, asked a second time, is answered from the disk, cacheable for a year", again.status === 200 && again.type === "image/jpeg" && /immutable/.test(again.cache ?? "") && again.ms < 300, JSON.stringify(again));
 }
 
 /*

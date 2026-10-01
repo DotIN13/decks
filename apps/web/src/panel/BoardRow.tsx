@@ -2,40 +2,24 @@ import type { Board } from "@decks/protocol";
 import Trash2 from "lucide-solid/icons/trash-2";
 import EyeOff from "lucide-solid/icons/eye-off";
 import { createSignal, onCleanup, Show } from "solid-js";
-import { RailItem } from "./BoardRail.tsx";
-import { BoardPicture } from "./BoardPicture.tsx";
 import { Icon } from "../ui/icons.tsx";
-import { deckFileUrl } from "../lib/api.ts";
 import { basename } from "./panel-groups.ts";
 
 /** How long an armed delete waits for the second press before forgetting it was asked. */
 const ARMED_MS = 4000;
 
 /**
- * One board, as a line: a 20×14 picture of it, its filename, and a dot if it is up.
- *
- * The row that replaced `RailItem` in the panel, and the reason the list stopped looking
- * empty. The old one was a 92px thumbnail plus a two-line label, which showed five boards of
- * seventy-eight and is why finding one meant opening a modal over the canvas you were
- * looking at; the first fix drawn for it was a 32px row carrying a 10px glyph, and *that*
- * read as a list of nothing — "crowded on top, sparse for board lists" was the complaint.
- * **So the cure for the sparseness is content, not tighter leading**: 28px, and a real
- * picture in it.
+ * One board, as a line: an empty box the shape of a board, its filename, and a dot if it is up.
  *
  * It says the **filename**, not the title. A row this size reads left to right like a
  * filename, which is what a board mostly is — and titles are sentences, which ellipsise into
  * indistinguishable prefixes at 160px of width. The title is the tooltip, and `panel-groups`
  * searches both, so nothing is lost by not drawing it.
  *
- * ### Why it never mounts a document
- *
- * At 20×14 a live document would be absurd: seventy-eight of them parsing `board.css`, KaTeX
- * and Mermaid to fill a space the size of a full stop. The row draws the server's picture of
- * the board (`BoardPicture`), which exists for every board and is taken again when the board
- * changes. Where the server cannot take pictures, it is the `<meta name="poster">` the board
- * offered, and otherwise an empty bordered rectangle: the same box, the same size, so the
- * list does not reflow when a picture arrives. The border matters more than the fill, because
- * a rectangle *is* a board at this size.
+ * **The box, with nothing in it.** The row used to draw a picture of the board in its 20×14 box,
+ * fetched from the server and decoded per row; on a phone a list of them held hundreds of
+ * megabytes of images to draw full stops. The box stays, bordered and empty: at this size a
+ * rectangle already reads as a board, and it keeps the names in one column.
  */
 export function BoardRow(props: {
 	board: Board;
@@ -129,7 +113,7 @@ export function BoardRow(props: {
 					press();
 				}}
 			>
-				<BoardThumb board={props.board} />
+				<span class="board-thumb" aria-hidden="true" />
 				<span class="row-name">{name()}</span>
 				<Show when={props.onCanvas}>
 					{/* Decorative: "on the canvas" is already said by the section this row is in. */}
@@ -179,43 +163,5 @@ export function BoardRow(props: {
 				</button>
 			</Show>
 		</div>
-	);
-}
-
-/**
- * The same board as a tile, for when the list is switched to a grid.
- *
- * Here rather than in a file of its own because it is one board drawn two ways, and the
- * picture — which is the part with an argument behind it — is the same picture. The grid is
- * worth having for a context of seven boards an agent chose, and not for seventy-eight; that
- * is why it is a toggle in the foot and not the default.
- *
- * The grid delegates to `RailItem` rather than drawing its own picture, so a board as a tile
- * is one thing wherever it is drawn.
- */
-export function BoardTile(props: { board: Board; current?: boolean; dim?: boolean; onPick: () => void }) {
-	return <RailItem board={props.board} current={props.current ?? false} offCanvas={props.dim} onPick={props.onPick} />;
-}
-
-/**
- * The picture itself, 20×14, bordered.
- *
- * Exported so a row somewhere else — a search result, an `@board` mention — can draw a board
- * the same way rather than inventing a second small thumbnail.
- *
- * The border used to be tintable, so a board another agent held could wear that agent's
- * colour. The panel no longer lists anybody else's holdings, so there was one caller and
- * it passed nothing: a parameter kept for a case that cannot arise is a parameter the next
- * reader has to rule out.
- */
-function BoardThumb(props: { board: Board; class?: string }) {
-	/* What is drawn where the server cannot take pictures: the poster the board offered, or nothing. */
-	const poster = () => (props.board.poster ? <img src={deckFileUrl(props.board.poster, props.board.rev)} alt="" /> : undefined);
-	return (
-		<span class={`board-thumb ${props.class ?? ""}`}>
-			{/* `alt=""` on purpose: the filename is right beside it, and "the-shell.html
-			    (thumbnail)" read out after "the-shell.html" is noise. */}
-			<BoardPicture board={props.board} fallback={poster()} />
-		</span>
 	);
 }

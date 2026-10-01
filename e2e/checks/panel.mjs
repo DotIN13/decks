@@ -448,6 +448,10 @@ try {
 {
 	const { browser, page, errors } = await open({ device: "iPhone 14 Pro" });
 	try {
+		// A closed panel draws no rows (`LeftPanel.tsx`, `listed`), so the rows are measured with it open.
+		if (await page.locator('[aria-label="Show the boards panel"]').count()) await page.locator('[aria-label="Show the boards panel"]').first().click();
+		await page.waitForSelector(".panel-shell[data-open='true'] .board-act", { timeout: 6000 });
+		await page.waitForTimeout(300);
 		const rail = await page.evaluate(() => {
 			const mid = (el) => {
 				const b = el.getBoundingClientRect();

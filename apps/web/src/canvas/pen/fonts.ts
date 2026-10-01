@@ -48,6 +48,8 @@ export class PenFonts {
 	/** Bumped when a font lands, so pictures drawn without it are redrawn. */
 	generation = 0;
 	private readonly settled = new Map<string, Promise<boolean>>();
+	/** Every font file handed to CanvasKit, and its size: each is copied into the wasm heap, which never shrinks. */
+	readonly loaded: Array<{ url: string; bytes: number }> = [];
 
 	constructor(private readonly ck: CanvasKit) {
 		this.provider = ck.TypefaceFontProvider.Make();
@@ -104,7 +106,9 @@ export class PenFonts {
 			try {
 				const response = await fetch(source);
 				if (!response.ok) continue;
-				this.provider.registerFont(await response.arrayBuffer(), family);
+				const bytes = await response.arrayBuffer();
+				this.provider.registerFont(bytes, family);
+				this.loaded.push({ url: source.slice(source.lastIndexOf("/fonts/") + 7), bytes: bytes.byteLength });
 				this.generation++;
 				return true;
 			} catch {

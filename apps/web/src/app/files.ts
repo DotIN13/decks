@@ -2,17 +2,40 @@ import { onCleanup, onMount } from "solid-js";
 import type { BoardPatch } from "@decks/protocol";
 import { toWorld } from "../camera/camera.ts";
 import { camera } from "../state/camera.ts";
-import { flow, guardDocumentDrops, isImage, shapeFor, type FileDropHost } from "../board/file-drop.ts";
+import { flow, guardDocumentDrops, isImage, naturalSize, shapeFor, type FileDropHost } from "../board/file-drop.ts";
+import { MARKDOWN } from "@decks/pen";
 import type { EditorHost } from "../board/Editor.ts";
 import { state } from "../state/deck.ts";
 import { notice, working } from "../state/notices.ts";
 import { selected } from "../state/selection.ts";
 import { send } from "../state/socket.ts";
 import { setDraft } from "../state/ui.ts";
-import { embedPath, uploadAsset } from "./upload.ts";
+import { embedPath, mayUpload, uploadAsset } from "./upload.ts";
 
 /** The heading a board made by a drop starts under, and where its first row sits. */
 const FIRST_ROW = 152;
+
+/** Pictures the stage's painter decodes itself: these go on the canvas as they are. SVG does not, so it goes on a board. */
+const RASTER = new Set(["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "ico"]);
+/** Words the stage can show as a card: markdown, and plain text, which reads as markdown well enough. */
+const WORDS = new Set(["md", "markdown", "mdx", "txt", "text"]);
+/** A card holds a note's worth of words, not a book: past this a text file goes on a board. */
+const CARD_BYTES = 256 * 1024;
+/** How wide a dropped picture lands on the stage, at most, in stage pixels. */
+const PICTURE_W = 640;
+/** How wide a dropped text file's card is, in stage pixels. */
+const CARD_W = 480;
+/** The gap between items dropped together. */
+const GAP = 32;
+
+const extensionOf = (file: File) => (file.name.split(".").pop() ?? "").toLowerCase();
+const isRaster = (file: File) => RASTER.has(extensionOf(file)) || (file.type.startsWith("image/") && file.type !== "image/svg+xml");
+const isWords = (file: File) => file.size <= CARD_BYTES && (WORDS.has(extensionOf(file)) || file.type === "text/markdown" || file.type === "text/plain");
+/** Whether a file can be an item on the stage itself rather than something on a board. */
+export const onStage = (file: File) => isRaster(file) || isWords(file);
+
+/** A deck-relative asset path as the stage file writes it: from `stages/<name>/`, two folders up. */
+const fromStage = (asset: string) => `../../${asset}`;
 
 /** A byte count as a sentence a person reads while waiting. */
 function sizeLabel(bytes: number): string {
@@ -164,13 +187,77 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 	};
 
 	/**
-	 * Files dropped on empty canvas: a board of their own, centred where they landed.
-	 *
-	 * Laid out first, the same way a drop on a board is (`flow`), under the heading a new board
-	 * comes with, so the board can be asked for at the size that holds them. Then made, placed,
-	 * and filled through the ordinary drop path — one upload and one insert per file.
+	 * Files dropped on empty canvas. Pictures and text files go on the stage itself, where they
+	 * landed (`ontoStage`); anything else — a PDF, a video, a web page — gets a board of its own
+	 * there (`onNewBoard`).
 	 */
-	const onEmptyCanvas = async (files: File[], at: { x: number; y: number }) => {
+	const onEmptyCanvas = async (dropped: File[], at: { x: number; y: number }) => {
+		const stage = document.querySelector(".stage");
+		if (!stage) return;
+		// Asked first, before anything is made for them: a big file said no to leaves no board behind.
+		const files: File[] = [];
+		for (const file of dropped) if (await mayUpload(file)) files.push(file);
+		if (files.length === 0) return;
+		const direct = files.filter(onStage);
+		const rest = files.filter((file) => !onStage(file));
+		const middle = toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, at);
+		if (direct.length > 0) await ontoStage(direct, middle);
+		if (rest.length > 0) await onNewBoard(rest, at);
+	};
+
+	/**
+	 * Pictures and text files, put on the stage itself: a picture is a rectangle filled with it, at
+	 * its own proportions, and a text file is a markdown card holding its words. Copied into the
+	 * deck first like every other file, so the stage file refers to `assets/`, never to the desktop.
+	 * Laid in a row centred on `middle`, a stage point.
+	 */
+	const ontoStage = async (files: File[], middle: { x: number; y: number }) => {
+		const agentId = state.focused;
+		if (!agentId) return;
+		const report = working(files.length > 1 ? `Adding ${files.length} files…` : `Adding ${files[0]?.name ?? "file"}…`);
+		const items: Array<{ node: Record<string, unknown>; w: number; h?: number }> = [];
+		const failures: string[] = [];
+		for (const [index, file] of files.entries()) {
+			const of = files.length > 1 ? `${index + 1} of ${files.length} · ` : "";
+			try {
+				if (isWords(file)) {
+					const words = await file.text();
+					items.push({ node: { type: "note", name: file.name, content: words, metadata: { type: MARKDOWN, file: file.name } }, w: CARD_W });
+					continue;
+				}
+				const natural = (await naturalSize(file)) ?? { width: 480, height: 360 };
+				const asset = await uploadAsset(file, (fraction) => report.update(`${of}${file.name} · ${Math.round(fraction * 100)}% of ${sizeLabel(file.size)}`));
+				const w = Math.min(PICTURE_W, natural.width);
+				const h = Math.round((w * natural.height) / Math.max(1, natural.width));
+				items.push({ node: { type: "rectangle", name: file.name, cornerRadius: 8, fill: { type: "image", url: fromStage(asset.path), mode: "fill" } }, w, h });
+			} catch (error) {
+				failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+		if (items.length > 0) {
+			const total = items.reduce((sum, item) => sum + item.w, 0) + GAP * (items.length - 1);
+			const tallest = Math.max(...items.map((item) => item.h ?? 240));
+			let x = Math.round(middle.x - total / 2);
+			const y = Math.round(middle.y - tallest / 2);
+			const stamp = Date.now().toString(36);
+			const ops = items.map((item, i) => {
+				const box = item.h === undefined ? { x1: x, y1: y, x2: x + item.w } : { x1: x, y1: y, x2: x + item.w, y2: y + item.h };
+				x += item.w + GAP;
+				return { op: "insert", node: { ...item.node, id: `drop-${stamp}-${i}` }, box };
+			});
+			send({ type: "stage.pen.edit", agentId, ops });
+		}
+		const added = items.length === 0 ? "" : `${items.length === 1 ? files[0]?.name : `${items.length} files`} put on the canvas`;
+		report.done([added, ...failures].filter(Boolean).join(" · ") || undefined, failures.length > 0 ? "warn" : "info");
+	};
+
+	/**
+	 * Files the stage cannot hold as items of its own (a PDF, a video, a web page): a board of their
+	 * own, centred where they landed. Laid out first, the same way a drop on a board is (`flow`),
+	 * under the heading a new board comes with, so the board can be asked for at the size that holds
+	 * them; then made, placed, and filled through the ordinary drop path.
+	 */
+	const onNewBoard = async (files: File[], at: { x: number; y: number }) => {
 		const stage = document.querySelector(".stage");
 		if (!stage) return;
 		const shapes = await Promise.all(files.map(shapeFor));
@@ -215,6 +302,14 @@ export function createFileDrops(deps: { editor: EditorHost }) {
 		const path = selected();
 		const board = path ? state.boards.find((candidate) => candidate.path === path) : undefined;
 		if (!board) {
+			// Nothing selected: pictures and text land on the canvas, in the middle of the view.
+			const stage = document.querySelector(".stage");
+			const direct = files.filter(onStage);
+			if (stage && direct.length > 0) {
+				void ontoStage(direct, toWorld(camera(), { width: stage.clientWidth, height: stage.clientHeight }, { x: stage.clientWidth / 2, y: stage.clientHeight / 2 }));
+				if (direct.length < files.length) notice("info", "Only pictures and text files can go straight on the canvas. Pick a board to paste the rest onto it.");
+				return;
+			}
 			notice("info", "Pick a board first. A pasted file becomes an embed, and an embed lives on a board.");
 			return;
 		}

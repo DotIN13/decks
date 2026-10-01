@@ -162,10 +162,10 @@ export function Composer(props: {
 		props.onText?.(draftText(next));
 		if (held !== undefined) parked.set(held, next);
 	};
-	const pillFor = (comment: BoardComment): DraftMention => ({ type: "mention", kind: "comment", id: comment.id, label: commentLabel(comment.quote) });
+	const pillFor = (comment: BoardComment): DraftMention => ({ type: "mention", kind: "comment", id: comment.id, label: comment.quote ? commentLabel(comment.quote) : comment.board.split("/").pop() ?? comment.board });
 	const describe = (node: DraftMention) => {
 		const comment = props.comments?.find((candidate) => candidate.id === node.id);
-		return comment ? `“${comment.quote}”\n${comment.text}` : undefined;
+		return comment ? (comment.quote ? `“${comment.quote}”\n${comment.text}` : `${comment.board}\n${comment.text}`) : undefined;
 	};
 
 	/**

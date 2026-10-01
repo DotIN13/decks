@@ -41,6 +41,23 @@ export const notice = (level: Notice["level"], text: string) => {
 };
 
 /**
+ * A notice with a button: something the person may take or leave, such as an agent's view that was
+ * held while they were using the canvas (`canvas/stage-ops.ts`). A newer offer with the same `key`
+ * replaces the older one, pressing the button takes the notice away, and an offer not taken goes
+ * after twelve seconds.
+ */
+export const offer = (text: string, action: { label: string; run: () => void }, key: string) => {
+	const id = ++noticeId;
+	const drop = () => setState("notices", (all) => all.filter((item) => item.id !== id));
+	const run = () => {
+		drop();
+		action.run();
+	};
+	setState("notices", (all) => [...all.filter((item) => item.key !== key), { id, level: "info" as const, text, key, action: { label: action.label, run } }]);
+	setTimeout(drop, 12000);
+};
+
+/**
  * A notice that lasts as long as the work it describes.
  *
  * The caller holds the handle: `update` rewrites the line in place as the work progresses,

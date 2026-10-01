@@ -206,7 +206,20 @@ export function watchInsets(root: HTMLElement = document.body): void {
 	};
 	const resized = () => soon(false);
 
-	const tree = new MutationObserver(() => soon(true));
+	/*
+	 * Only a change that adds or drops chrome: the tree observer sees every node the app adds, and
+	 * measuring reads layout, which during a board drag (guides, handles, a board's move) was a
+	 * forced layout on every frame, 10 ms each.
+	 */
+	const isChrome = (node: Node) => node instanceof Element && (node.hasAttribute("data-inset") || node.querySelector("[data-inset]") !== null);
+	const tree = new MutationObserver((records) => {
+		for (const record of records) {
+			if (record.type === "attributes" || [...record.addedNodes].some(isChrome) || [...record.removedNodes].some(isChrome)) {
+				soon(true);
+				return;
+			}
+		}
+	});
 	tree.observe(root, { childList: true, subtree: true, attributeFilter: ["data-inset"] });
 	window.addEventListener("resize", resized);
 	// The first reading is taken at once: the camera's first fit is waiting on it.

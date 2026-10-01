@@ -26,7 +26,7 @@ import { Portal } from "solid-js/web";
  * - **Focus returns to the trigger** when it closes, so the tab order does not restart at
  *   the top of the document every time you change a model.
  */
-export type Placement = "top-start" | "top" | "top-end" | "bottom-start" | "bottom" | "bottom-end";
+export type Placement = "top-start" | "top" | "top-end" | "bottom-start" | "bottom" | "bottom-end" | "right-start";
 
 /** How far off the trigger the card sits. */
 const GUTTER = 6;
@@ -47,6 +47,8 @@ export function Popover(props: {
 	/** Named for screen readers, since the trigger is usually an icon. */
 	label?: string;
 }) {
+	// A submenu opens beside its row (`right-start`), and the menu it came from treats it as its own.
+	const sub = () => props.placement === "right-start";
 	const [open, setOpen] = createSignal(false);
 	const [at, setAt] = createSignal<{ left: number; top: number } | undefined>();
 	let trigger: HTMLElement | undefined;
@@ -86,6 +88,29 @@ export function Popover(props: {
 		const along = (group ?? trigger).getBoundingClientRect();
 		const c = card.getBoundingClientRect();
 		const placement = props.placement ?? "top-start";
+		if (placement === "right-start") {
+			/*
+			 * Beside the menu it came from, level with the row that opened it; on the left when the
+			 * right has no room. A phone has room on neither side, and a submenu over its own menu
+			 * hid the row that opened it, so there it stands above that menu, or below it.
+			 */
+			const menu = (trigger.closest(".popover") ?? trigger).getBoundingClientRect();
+			const fitsRight = menu.right + GUTTER + c.width <= window.innerWidth - MARGIN;
+			const fitsLeft = menu.left - GUTTER - c.width >= MARGIN;
+			let left: number;
+			let top: number;
+			if (fitsRight || fitsLeft) {
+				left = fitsRight ? menu.right + GUTTER : menu.left - c.width - GUTTER;
+				top = t.top - 5;
+			} else {
+				left = menu.left;
+				top = menu.top - GUTTER - c.height >= MARGIN ? menu.top - GUTTER - c.height : menu.bottom + GUTTER;
+			}
+			left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, window.innerWidth - c.width - MARGIN));
+			top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, window.innerHeight - c.height - MARGIN));
+			setAt({ left, top });
+			return;
+		}
 		const above = placement.startsWith("top");
 
 		let left: number;
@@ -148,10 +173,14 @@ export function Popover(props: {
 		const away = (event: PointerEvent) => {
 			const target = event.target as Node | null;
 			if (card?.contains(target ?? null) || trigger?.contains(target ?? null)) return;
+			// A press inside a submenu opened from this card is a press in this menu.
+			if (!sub() && (target as Element | null)?.closest?.(".popover[data-sub]")) return;
 			change(false);
 		};
 		const keys = (event: KeyboardEvent) => {
 			if (event.key === "Escape") {
+				// A submenu that is open takes the Escape, and its menu stays.
+				if (!sub() && document.querySelector(".popover[data-sub]")) return;
 				event.preventDefault();
 				change(false);
 				return;
@@ -213,6 +242,7 @@ export function Popover(props: {
 				<div
 					ref={card}
 					class={`popover ${props.class ?? ""}`}
+					data-sub={sub() ? "" : undefined}
 					role="menu"
 					aria-label={props.label}
 					/* Hidden until placed, so it never flashes at 0,0 on the way to its corner. */

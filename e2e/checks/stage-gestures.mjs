@@ -12,7 +12,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { deckState, editMode, open, resetStage, say, settle, socket } from "../harness.mjs";
+import { boardEdge, deckState, editMode, open, resetStage, say, selectBoard, settle, socket } from "../harness.mjs";
 
 const until = async (test, ms = 8000) => {
 	const deadline = Date.now() + ms;
@@ -162,23 +162,24 @@ const movedBoth = await until(() => {
 });
 say("dragging one selected item moves the whole selection", !!movedBoth, JSON.stringify({ before: [before.a.x, before.b.x], now: [item("g-a").x, item("g-b").x] }));
 
+// A press on a board's picture, clear of anything drawn over it: the part its title bar used to be.
 const bar = await page.evaluate(() => {
-	for (const chrome of document.querySelectorAll(".bar-layer .chrome")) {
-		const r = chrome.getBoundingClientRect();
-		// Its title, at the left end, or failing that the bare part of it nearest the right.
-		for (const x of [r.x + 30, r.x + r.width * 0.5, r.x + r.width - 60]) {
-			const y = r.y + r.height / 2;
+	for (const node of document.querySelectorAll(".board-node")) {
+		const r = node.getBoundingClientRect();
+		for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5], [0.2, 0.8]]) {
+			const x = r.x + r.width * fx;
+			const y = r.y + r.height * fy;
 			const at = document.elementFromPoint(x, y);
-			if (x > 320 && x < 1560 && y > 90 && y < 900 && at?.closest(".chrome") === chrome && !at.closest("button")) return { x, y, path: chrome.dataset.path };
+			if (x > 320 && x < 1560 && y > 90 && y < 900 && at?.closest(".board-node") === node && !at.closest("a, button")) return { x, y, path: node.dataset.path };
 		}
 	}
 });
-say("a board's title bar is on screen", !!bar);
+say("a board is on screen to press", !!bar);
 if (bar) {
 	await page.keyboard.down("Shift");
 	await page.mouse.click(bar.x, bar.y);
 	await page.keyboard.up("Shift");
-	say("Shift and a press on a title bar adds that board to the selection", (await count(".pen-selection")) === 3, String(await count(".pen-selection")));
+	say("Shift and a press on a board adds it to the selection", (await count(".pen-selection")) === 3, String(await count(".pen-selection")));
 	const boardBefore = onDisk().children.find((n) => n.metadata?.path === bar.path);
 	await drawnWhereFileSays("g-a");
 	const a2 = await centre("g-a");
@@ -410,6 +411,30 @@ let ITEM_WASH = "";
 	await touch("pointerup", 31, a.x + 60, a.y);
 	const dragged = await until(() => Math.abs(item("g-a").x - was - Math.round(60 / m.a)) <= 2);
 	say("…and once it is selected, a finger drags it", !!dragged, JSON.stringify({ was, now: item("g-a").x }));
+	// Bare canvas: a finger that pans keeps the selection, and a tap there lets it go, as a click does.
+	const bare = await page.evaluate(() => {
+		for (let y = 120; y < innerHeight - 200; y += 16) for (let x = 40; x < innerWidth - 40; x += 16) if (document.elementFromPoint(x, y)?.classList.contains("stage")) return { x, y };
+		return null;
+	});
+	if (bare) {
+		const target = ".stage";
+		await until(() => count(".pen-selection").then((n) => n === 1), 2000);
+		// Out and back, resting before the lift, so the camera ends where it was for the checks after this one.
+		await touch("pointerdown", 31, bare.x, bare.y);
+		for (const dx of [8, 16, 24, 32, 24, 16, 8, 0]) await touch("pointermove", 31, bare.x + dx, bare.y, target);
+		await settle(page, 200);
+		await touch("pointerup", 31, bare.x, bare.y, target);
+		await settle(page, 300);
+		const kept = await count(".pen-selection");
+		const back = await page.evaluate(() => {
+			for (let y = 120; y < innerHeight - 200; y += 16) for (let x = 40; x < innerWidth - 40; x += 16) if (document.elementFromPoint(x, y)?.classList.contains("stage")) return { x, y };
+			return null;
+		});
+		await touch("pointerdown", 31, back.x, back.y);
+		await touch("pointerup", 31, back.x, back.y, target);
+		const gone = await until(() => count(".pen-selection").then((n) => n === 0), 2000);
+		say("a finger's pan over bare canvas keeps the item selected, and a tap there lets it go", kept === 1 && !!gone, JSON.stringify({ kept, bare, back }));
+	} else say("a finger's tap on bare canvas lets the item go", false, "no bare canvas on screen");
 	await page.keyboard.press("Escape");
 }
 
@@ -509,15 +534,17 @@ let ITEM_WASH = "";
 	} else say("a board is on screen to hover", false);
 }
 
-// --- a board's bar and handles: the words fill the bar at rest; the handles are an item's, at any zoom --
+// --- a board's handles: an item's, at any zoom --
 {
 	// The boards sit behind the panel and under the composer here, so the canvas is panned to them and back.
 	const find = () => page.evaluate(() => {
-		for (const chrome of document.querySelectorAll(".bar-layer .chrome")) {
-			const r = chrome.getBoundingClientRect();
-			for (const x of [r.x + 30, r.x + r.width * 0.3, r.x + r.width * 0.5]) {
-				const y = r.y + r.height / 2;
-				if (x > 320 && x < 1500 && y > 290 && y < 880 && document.elementFromPoint(x, y)?.closest(".chrome") === chrome) return { x, y, path: chrome.dataset.path };
+		for (const node of document.querySelectorAll(".board-node")) {
+			const r = node.getBoundingClientRect();
+			for (const [fx, fy] of [[0.5, 0.1], [0.3, 0.3], [0.7, 0.5]]) {
+				const x = r.x + r.width * fx;
+				const y = r.y + r.height * fy;
+				const at = document.elementFromPoint(x, y);
+				if (x > 320 && x < 1500 && y > 290 && y < 880 && at?.closest(".board-node") === node && !at.closest("a, button")) return { x, y, path: node.dataset.path };
 			}
 		}
 	});
@@ -530,15 +557,8 @@ let ITEM_WASH = "";
 		await settle(page, 400);
 		target = await find();
 	}
-	say("a board's title bar is on screen to press", !!target);
+	say("a board is on screen to press", !!target);
 	if (target) {
-		const acts = () => page.evaluate((path) => getComputedStyle(document.querySelector(`.bar-layer .chrome[data-path="${CSS.escape(path)}"] .acts`)).display, target.path);
-		await page.mouse.move(target.x, target.y - 200);
-		await settle(page, 150);
-		say("at rest a bar's buttons take no room, so its title and path have the whole bar", (await acts()) === "none", await acts());
-		await page.mouse.move(target.x, target.y);
-		await settle(page, 150);
-		say("…and they show while the pointer is over it", (await acts()) === "flex", await acts());
 		await page.mouse.click(target.x, target.y);
 		const handles = () => page.evaluate((path) => [...document.querySelectorAll(`.pen-handle[data-board="${CSS.escape(path)}"]`)].map((h) => Math.round(h.getBoundingClientRect().width)), target.path);
 		const outline = () => page.evaluate(() => {
@@ -638,23 +658,50 @@ await page.keyboard.press("Escape");
 
 /*
  * Last, because it moves the view: this check opens past the right-hand edge of every board, and a
- * title bar has to be on screen to be dragged by. Everything measured in screen pixels is done.
+ * board has to be on screen to be dragged by its pill. Everything measured in screen pixels is done.
  */
 {
 	await page.mouse.move(900, 500);
 	await page.mouse.wheel(-700, 0);
 	await settle(page, 400);
-	const chrome = await page.evaluate(() => {
-		for (const bar of document.querySelectorAll(".bar-layer .chrome")) {
-			const r = bar.getBoundingClientRect();
-			const x = r.x + 30;
-			const y = r.y + r.height / 2;
+	// A live board is dragged by the band along its edge.
+	const path = await page.evaluate(() => {
+		for (const node of document.querySelectorAll(".board-node")) {
+			const r = node.getBoundingClientRect();
+			const x = r.x + r.width / 2;
+			const y = r.y + Math.min(r.height / 2, 60);
 			const at = document.elementFromPoint(x, y);
-			if (x > 320 && x < 1560 && y > 90 && y < 900 && at?.closest(".chrome") === bar && !at.closest("button")) return { x, y, path: bar.dataset.path };
+			if (x > 320 && x < 1560 && y > 150 && y < 800 && at?.closest(".board-node") === node) return node.dataset.path;
 		}
 	});
-	say("a board's title bar is on screen to drag by", !!chrome, JSON.stringify(chrome ?? null));
+	let chrome;
+	if (path) {
+		await selectBoard(page, path);
+		await page.waitForSelector(".board-edge", { timeout: 4000 }).catch(() => {});
+		const edge = await boardEdge(page, path);
+		if (edge) chrome = { ...edge, path };
+	}
+	say("a live board has an edge to drag by", !!chrome, JSON.stringify(chrome ?? null));
 	if (chrome) {
+		// Dragged by its edge, the board moves, and the page inside it is not pressed.
+		const start = onDisk().children.find((n) => n.metadata?.path === chrome.path);
+		await page.mouse.move(chrome.x, chrome.y);
+		await page.mouse.down();
+		await page.mouse.move(chrome.x + 30, chrome.y + 10, { steps: 4 });
+		await page.mouse.move(chrome.x + 60, chrome.y + 20, { steps: 4 });
+		await page.mouse.up();
+		const moved = await until(() => {
+			const now = onDisk().children.find((n) => n.metadata?.path === chrome.path);
+			return now && start && now.x > start.x ? now : undefined;
+		});
+		say("a drag on a live board's edge moves the board", !!moved, JSON.stringify({ was: [start?.x, start?.y], now: [moved?.x, moved?.y] }));
+		if (moved) {
+			link.send({ type: "board.move", path: chrome.path, x: start.x, y: start.y });
+			await until(() => onDisk().children.find((n) => n.metadata?.path === chrome.path)?.x === start.x);
+			await settle(page, 500);
+			const again = await boardEdge(page, chrome.path);
+			if (again) Object.assign(chrome, again);
+		}
 		const box = await page.locator(".composer-box").boundingBox();
 		const was = onDisk().children.find((n) => n.metadata?.path === chrome.path);
 		await page.mouse.move(chrome.x, chrome.y);

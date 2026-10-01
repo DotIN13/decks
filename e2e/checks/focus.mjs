@@ -11,7 +11,7 @@
  * The board is the flow fixture, because it is the one board in this deck that is longer than
  * the window and "scroll easily" is what the view is for.
  */
-import { editMode, open, say, settle } from "../harness.mjs";
+import { editMode, open, pillButton, say, selectBoard, settle } from "../harness.mjs";
 
 const { browser, page, errors } = await open({ width: 1440, height: 1000 });
 const NOTES = "boards/notes.html";
@@ -27,40 +27,18 @@ const onCanvas = await page.locator(`.board-node[data-path="${NOTES}"]`).count()
 say("the flow board is on the canvas to focus on", onCanvas === 1, `${onCanvas} node(s)`);
 
 /*
- * The button, not the key: the bar above *this* board is where the affordance lives — beside
- * the file's address, filling the window, and taking the board away — and the key is the
- * shorthand for the same thing.
- *
- * With a mouse the buttons take no room until the bar is hovered, so it is hovered first.
+ * The button, not the key: the pill over *this* board is where the affordance lives — its name,
+ * filling the window, a tab of its own, and taking the board away — and the key is the shorthand
+ * for the same thing. The pill shows when the board is selected, so it is selected first.
  */
-const hoverBar = () => page.locator(`.bar-layer .chrome[data-path="${NOTES}"] .title`).hover();
-await hoverBar();
-const bar = await page.evaluate((path) => {
-	const acts = document.querySelector(`.bar-layer .chrome[data-path="${path}"] .acts`);
-	return [...(acts?.children ?? [])].map((child) => ({
-		cls: child.className,
-		w: Math.round(child.getBoundingClientRect().width),
-		icon: Math.round(child.querySelector("svg")?.getBoundingClientRect().width ?? 0),
-	}));
-}, NOTES);
+await selectBoard(page, NOTES);
+const bar = await page.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem]")].map((one) => one.getAttribute("aria-label") ?? ""));
 say(
-	/*
-	 * Four buttons, and there used to be five: `doc-open` sat first in this bar and opened a GrapesJS
-	 * model over a flow document, which is where a document could be rearranged block by block. That
-	 * editor is gone — it drew the board as a stack of full-width blocks and refused most of the
-	 * writes it did make — so the bar is the address, focus, fullscreen and going away, and a
-	 * document is edited by ⌥ and the text. Asserted as an exact list rather than a "contains",
-	 * because a bar is the one place where an extra control is a change to every board's chrome.
-	 */
-	"the bar above the board offers its address, focus, fullscreen and going away, in that order",
-	bar.length === 4 && bar.map((b) => b.cls).join(",") === "open-tab,focus-open,present-open,hide",
-	JSON.stringify(bar.map((b) => b.cls)),
+	"the pill over the board offers fit, focus, fullscreen, a tab, a comment and going away, in that order",
+	bar.join(",") === "Fit,Focus,Fullscreen,New tab,Comment,Hide",
+	JSON.stringify(bar),
 );
-say(
-	"…and the five are the same width, glyph or word",
-	new Set(bar.map((b) => b.w)).size === 1,
-	JSON.stringify(bar.map((b) => `${b.cls}:${b.w}`)),
-);
+
 
 // A marker on every frame's own window before the view changes, and counted again after: a
 // reload takes it with it, so "the canvas was not taken apart" is a fact rather than a hope.
@@ -81,28 +59,9 @@ const markedBefore = await page.evaluate(() => {
 	}
 	return marked;
 });
-/*
- * The board's own bar, clear of the top-left pill before it is pressed.
- *
- * A float over the canvas intercepts presses, and the pill has grown a canvas switcher: where
- * the camera happens to leave a board is not what this check is about, so the canvas is panned
- * until the button is its own. Two turns of the wheel is plenty; the loop is so a change in the
- * pill's height cannot quietly make this a coin toss again.
- */
-const openButton = page.locator(`.bar-layer .chrome[data-path="${NOTES}"] .focus-open`);
-for (let tries = 0; tries < 4; tries += 1) {
-	await hoverBar();
-	const pill = await page.locator('.float.pill[data-inset="top"]').first().boundingBox();
-	const button = await openButton.boundingBox();
-	if (!pill || !button) break;
-	const clear = button.y > pill.y + pill.height + 6 || button.x > pill.x + pill.width + 6;
-	if (clear) break;
-	await page.mouse.move(900, 600);
-	await page.mouse.wheel(0, -160);
-	await settle(page, 250);
-}
-await hoverBar();
-await openButton.click();
+/* Focus, from the board's own pill. */
+await selectBoard(page, NOTES);
+await pillButton(page, "Focus").click();
 await settle(page, 700);
 
 const state = () =>
@@ -201,16 +160,8 @@ say("…with nothing drawn over it, which is what makes it pressable", exit.hit 
  * without a gesture could leave it held over the wrong scale — so the pan pays for itself and
  * `camera.mjs` asserts that nothing puts the promise back.
  */
-const raster = await page.evaluate(() => {
-	const bar = document.querySelector(".bar-layer .chrome");
-	const world = document.querySelector(".world");
-	return { barTransform: getComputedStyle(bar).transform, worldWillChange: getComputedStyle(world).willChange };
-});
-say(
-	"the bar is drawn at the size it is laid out, not scaled, so zooming cannot soften it",
-	raster.barTransform === "none" && raster.worldWillChange === "auto",
-	JSON.stringify(raster),
-);
+const raster = await page.evaluate(() => ({ worldWillChange: getComputedStyle(document.querySelector(".world")).willChange }));
+say("the world is not promised a raster, so zooming cannot soften what it draws", raster.worldWillChange === "auto", JSON.stringify(raster));
 
 /*
  * One corner, and the page draws it.
@@ -326,6 +277,23 @@ say(
 	!byButton.open && !byButton.worldHidden && !byButton.worldInert,
 	JSON.stringify({ open: byButton.open, hidden: byButton.worldHidden, inert: byButton.worldInert }),
 );
+
+await page.keyboard.press("Escape");
+await settle(page, 300);
+await selectBoard(page, NOTES);
+// Last, since it leaves a comment over the input bar: the pill's Comment opens the comment box straight away, on the whole board, and Enter keeps it for the next message.
+await pillButton(page, "Comment").click();
+await page.waitForSelector(".comment-popup .comment-field", { timeout: 4000 });
+const whole = await page.evaluate(() => ({ focused: document.activeElement?.classList.contains("comment-field") ?? false, about: document.querySelector(".comment-popup .comment-quote")?.textContent?.trim() ?? "" }));
+say("the pill's Comment opens the box focused, about the whole board", whole.focused && whole.about.startsWith("On the whole board"), JSON.stringify(whole));
+await page.keyboard.type("Shorter, please.");
+await page.keyboard.press("Enter");
+const chip = await page
+	.waitForSelector('.composer-box [data-component="mention-pill"][data-kind="comment"]', { timeout: 4000 })
+	.then((el) => el.textContent())
+	.catch(() => null);
+say("…and Enter puts it over the input bar, named by its board", chip?.trim() === NOTES.split("/").pop(), String(chip));
+await page.evaluate(() => localStorage.removeItem("decks.comments"));
 
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

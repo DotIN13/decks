@@ -31,6 +31,23 @@
 
 	/* A toolbar keeps the strong line where the other floats take the quieter window
 	   border in dark: it is a small box of controls, read like a chip, not a window. */
+	/*
+	 * On a phone the toolbars, the toast and the menus stay a little square where the rest of the chrome takes
+	 * the iOS shapes (`index.css`, the coarse tokens): a bar of tools reads as an instrument, not a
+	 * capsule. 22px around buttons of 16px, a 6px inset apart, so the two curves stay concentric.
+	 */
+	@media (pointer: coarse) {
+		:is(.float.pill, .pen-tools, .stage > .board-callout, .notices, .popover) {
+			--radius-panel: 22px;
+			--control-radius: 16px;
+		}
+
+		/* A menu's rows are capsules: a highlighted row reads as a pill inside the card, as iOS draws one. */
+		.popover {
+			--radius-item: 999px;
+		}
+	}
+
 	.float.pill {
 		border-color: var(--line-strong);
 	}

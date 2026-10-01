@@ -5,7 +5,7 @@
  * socket — no model needed. The agent-side half (`attach`/`show` from `stage_eval`) is
  * checked in stage-api.mjs, which does need one.
  */
-import { deckState, emptyCanvas, newAgent, open, openAllBoards, openPanel, say, settle, socket } from "../harness.mjs";
+import { deckState, emptyCanvas, freshAgent, open, openAgents, openAllBoards, openPanel, pillButton, say, selectBoard, settle, socket } from "../harness.mjs";
 
 const deck = await deckState();
 const paths = deck.boards.map((board) => board.path).sort();
@@ -63,8 +63,12 @@ await page.mouse.move(800, 500);
  * the stage is what the agent put in play, and the panel's first two headings are what it
  * holds.
  */
-await newAgent(page);
-await settle(page, 1200);
+/*
+ * A new agent opens its workspace's latest canvas, which here is the deck's: so this one is made in
+ * a workspace of its own, where there is no canvas yet and it gets an empty one, and picked from
+ * the composer's agent list, which goes to its stage.
+ */
+const made = await freshAgent(page, "tiers-fresh");
 await emptyCanvas(page);
 say("an agent holding nothing puts nothing on its stage", (await onCanvas()).length === 0, (await onCanvas()).join(" ") || "(empty)");
 await openPanel(page);
@@ -91,6 +95,7 @@ say("…and no two chats share one", new Set(chatNames.map((name) => name.toLowe
  */
 const two = paths.slice(0, 2);
 const link = await socket();
+if (made) link.send({ type: "agent.focus", id: made.id });
 for (const path of two) link.send({ type: "board.play", path });
 await page.waitForFunction((wanted) => document.querySelectorAll(".board-node").length === wanted, two.length, { timeout: 8000 });
 say("the stage narrows to what the agent holds", (await onCanvas()).join() === two.join(), (await onCanvas()).join(" "));
@@ -103,8 +108,8 @@ say("the panel's own two headings list the same two", (await mine()).join() === 
 // wherever the previous check put it the button can sit off-screen or exactly where the
 // neighbouring board begins — which is a fact about the camera, not about hiding.
 const first = two[0];
-await page.locator(`.bar-layer .chrome[data-path="${first}"]`).hover();
-await page.locator(`.bar-layer .chrome[data-path="${first}"] .hide`).click();
+await selectBoard(page, first);
+await pillButton(page, "Hide").click();
 await page.waitForFunction((wanted) => !document.querySelector(`.board-node[data-path="${wanted}"]`), first, { timeout: 8000 });
 say("the hide button takes a board off the stage", !(await onCanvas()).includes(first), `canvas=${(await onCanvas()).join(" ") || "(empty)"}`);
 /*
@@ -121,6 +126,9 @@ await page.waitForFunction((wanted) => Boolean(document.querySelector(`.board-no
 await page.mouse.move(800, 500);
 say("clicking a rail item plays it", (await onCanvas()).includes(first), (await onCanvas()).join(" "));
 
+// The agent this check made is its own: removed, so the checks after it see the deck they expect.
+if (made) link.send({ type: "agent.remove", id: made.id });
+await new Promise((resolve) => setTimeout(resolve, 300));
 link.close();
 say("no page errors", errors.length === 0, errors.join(" | "));
 await browser.close();

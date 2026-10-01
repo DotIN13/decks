@@ -107,7 +107,8 @@
 }
 	/* The renderer choice: room on each side of a word, which `.segmented` alone does not give,
    so a bold "Documents" is not pressed against its own highlight. */
-.set-renderer > button {
+.set-renderer > button,
+.set-pictures > button {
 	padding: 0 12px;
 }
 

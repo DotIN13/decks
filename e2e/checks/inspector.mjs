@@ -23,7 +23,7 @@
 // about boards rather than about the protocol, and it lives in its own package.
 import { BOX_CLASSES } from "@decks/board-kit";
 import { rmSync } from "node:fs";
-import { boardPath, differ, open, rangeOfAttr, read, say, socket, still, write } from "../harness.mjs";
+import { boardPath, differ, open, rangeOfAttr, read, say, socket, still, write, boardEdge } from "../harness.mjs";
 
 /**
  * Wait until the file *says* something, rather than until it differs.
@@ -209,7 +209,7 @@ try {
 					if (document.elementFromPoint(x, y)?.classList.contains("stage")) return { x, y };
 				}
 			}
-			return null;
+			return { none: true };
 		});
 	await pick("note");
 	/*
@@ -227,13 +227,24 @@ try {
 		return false;
 	};
 
-	const bare = await bareStage();
+	let bare = await bareStage();
+	/* The board can fill the window, its edge band taking the margin round it: out a step, and the same
+	   component picked again, so the press is still "outside" a live selection. */
+	if (bare?.none) {
+		await page.keyboard.press("Control+Minus");
+		await still(page);
+		await page.waitForTimeout(400);
+		await pick("note");
+		bare = await bareStage();
+	}
 	await page.mouse.click(bare.x, bare.y);
 	say("a press on bare canvas lets it go too", await gone(), JSON.stringify(bare));
 
 	await pick("note");
-	const bar = await page.locator(`.bar-layer .chrome[data-path="${path}"]`).boundingBox();
-	await page.mouse.click(bar.x + 30, bar.y + 8);
+	// The band along the board's edge: the place its title bar used to be.
+	await page.waitForSelector(".board-edge", { timeout: 4000 });
+	const bar = await boardEdge(page, await page.evaluate(() => document.querySelector('.board-node[data-selected="true"]')?.dataset.path));
+	await page.mouse.click(bar?.x ?? 0, bar?.y ?? 0);
 	/*
 	 * The detail names what the press actually landed on, because this one assertion fails in a full-suite
 	 * run and passes alone: it is order-dependent, so the useful question is not "did the inspector close"
@@ -245,9 +256,9 @@ try {
 		const id = el.closest("[data-id]")?.getAttribute("data-id");
 		const owner = el.closest("[data-path]")?.getAttribute("data-path");
 		return `${el.tagName.toLowerCase()}.${(el.className || "").toString().split(" ")[0]}${id ? ` in [data-id=${id}]` : ""}${owner ? ` on ${owner}` : ""}`;
-	}, [bar.x + 30, bar.y + 8]);
+	}, [bar?.x ?? 0, bar?.y ?? 0]);
 	say(
-		"…as does a press on the board's own title",
+		"…as does a press on the board's edge",
 		await gone(),
 		JSON.stringify({ bar, under, inspectors: await inspector.count(), nodes: await page.locator(".board-node").count(), selected: await page.locator(".board-node[data-selected='true']").count() }),
 	);
@@ -558,14 +569,12 @@ try {
 	 * Zoomed out past `INTERACT_ZOOM`, however many presses that takes.
 	 *
 	 * This was a single press of `0` — the app's fit-the-map key — and a 5s wait for the zoom to land under
-	 * 50%. With the fixture *alone* on the canvas the fit stops above that, so the wait timed out and took
+	 * the live zoom. With the fixture *alone* on the canvas the fit stops above that, so the wait timed out and took
 	 * the check's last two assertions with it. The claim here is the state, not the keystroke.
 	 */
-	for (let attempt = 0; attempt < 10; attempt++) {
-		const level = await page.evaluate(() =>
-			Number((document.querySelector('.pill [aria-label^="Zoom"]')?.textContent ?? "100%").replace(/[^0-9.]/g, "")),
-		);
-		if (level < 50) break;
+	for (let attempt = 0; attempt < 16; attempt++) {
+		// Under the device's live zoom (20% on a desktop), which the stage says as `data-live`.
+		if (await page.evaluate(() => document.querySelector(".stage")?.dataset.live !== "true")) break;
 		await page.keyboard.press(attempt === 0 ? "0" : "Control+Minus");
 		await page.waitForTimeout(250);
 	}

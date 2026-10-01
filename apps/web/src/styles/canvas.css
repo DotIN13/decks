@@ -255,7 +255,7 @@
 		 * means the corner shows whatever the app is behind the page rather than a white wedge
 		 * under a board that may not be white.
 		 */
-		border-radius: var(--radius-panel, 12px);
+		border-radius: var(--radius-board, 12px);
 		background: transparent;
 		box-shadow: 0 1px 3px rgb(0 0 0 / 18%), 0 14px 40px rgb(0 0 0 / 16%);
 	}
@@ -362,10 +362,20 @@
 			   because its zoom keys stop where the page fits. */
 			overflow-x: auto;
 		}
+		/* Centred on the screen: the band between the two toolbars is a sliver on a phone, and its
+		   middle put the chip off to the right, under the corner cluster. */
 		.focus-exit {
 			top: calc(var(--inset-top, 52px) + 8px);
+			left: 50%;
 			height: 36px;
 			padding: 0 12px;
+		}
+	}
+
+	/* No key to name where there is no keyboard. */
+	@media (hover: none) {
+		.focus-exit > kbd {
+			display: none;
 		}
 	}
 
@@ -535,189 +545,25 @@
 .board-node {
 	position: absolute;
 }
-	/*
- * A board's title bar, in the stage's bar layer rather than in the board.
- *
- * It stays 24 screen pixels tall however far out the camera is. Inside the zoomed world that
- * meant counter-scaling it: a layout at every new zoom, so it was held still during a pinch
- * (growing and shrinking with the board) and snapped to size when the camera rested, and its
- * text was soft at high zoom from being resampled twice. The layer does not zoom, so the bar is
- * laid out once at its size on screen and only moved: a translate on every camera frame, and a
- * new width when the zoom changes (`Stage.placeBar`). What was the "bar layer outside
- * `.world`" this note used to name as the fix for the blur is this.
- */
-.bar-layer .chrome {
-	position: absolute;
-	/*
-	 * One screen pixel. The bar used to sit in the zoomed world and write every length as
-	 * `N * --unit` with `--unit` at `1px / zoom`; in the bar layer nothing is zoomed, so a pixel
-	 * is a pixel and the rules below keep their `N * --unit` unchanged. The stage places the box
-	 * with a transform and sets its width (`Stage.placeBar`).
-	 */
-	--unit: 1px;
-	top: 0;
-	left: 0;
-	pointer-events: auto;
-	display: flex;
-	/*
-	 * The text on the baseline, the controls on the centre.
-	 *
-	 * The title is 13px sans and the path 11px mono, and centring two boxes of different
-	 * heights puts their *baselines* half a pixel apart, which is exactly as far as it takes for
-	 * a row to look wrong without being able to say why. Baseline alignment is the thing being
-	 * asked for. The button group is not text and has no baseline to share, so it takes the
-	 * centre back for itself.
-	 */
-	align-items: baseline;
-	/* Clipped to the board's own on-screen width. The bar is counter-scaled, so its
-	   text is a constant size while the board shrinks — at 7% zoom, which is what
-	   fitting three boards into a phone comes to, the path label was three times the
-	   width of the board and written across the board next to it. */
-	overflow: hidden;
-	gap: calc(8 * var(--unit));
-	height: calc(24 * var(--unit));
-	font-size: calc(13 * var(--unit));
-	color: var(--muted);
-	cursor: grab;
-	user-select: none;
-}
-	.bar-layer .chrome[data-dragging="true"] {
-	cursor: grabbing;
-}
-	.bar-layer .chrome .title {
-	overflow: hidden;
-	font-weight: 600;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-	/*
- * The controls at the right-hand end of a board's title bar, as one group.
- *
- * The group is what carries `margin-left: auto`, and that is the whole point of it: two
- * buttons each asking for an automatic left margin *split the free space between them*, so
- * a deck's Present button sat half a board away from the × it belongs beside — 500px of
- * empty bar between two controls that are one cluster.
- */
-.bar-layer .chrome .acts {
-	display: flex;
-	flex: none;
-	margin-left: auto;
-	gap: calc(2 * var(--unit));
-	align-items: center;
-	/* Centred against a baseline-aligned row — see the note on the bar. */
-	align-self: center;
-}
-	/*
- * The board bar's buttons — taking a board off the canvas, and filling the window with it.
- * Appears on hover, like the message actions. Two of them are buttons and the third is an
- * `<a>` — the board's own address, so the browser's "open in a new tab" is the behaviour
- * rather than an imitation of it — and all three take their shape from the rule below.
- *
- * Three selectors rather than one class shared by all, and that is a bug this had: the
- * fullscreen button carried `.hide` because a *deck* was the only board with two buttons in
- * its bar, so nothing noticed. The moment every board got one, `e2e/checks/tiers.mjs`'s
- * `locator(".chrome .hide").click()` matched two elements and Playwright's strict mode
- * refused — a selector that means "the ×" would have meant "one of the two".
- *
- * **One size, in one place: `--act`.** The box is `calc(var(--act) * var(--unit))`, and the
- * coarse-pointer block below moves the whole cluster to 24 by setting that one number. It used
- * to state `width: calc(18 * var(--unit))` five times here and then override `.hide` alone
- * with a raw `24px` down there — so on a phone the × was a different size from the three beside
- * it, and, because a raw length here is board pixels rather than screen pixels, it came out
- * *smaller* than they were. Measured with an iPhone 14 Pro context: `9×9` for the × against
- * `18×18` for its neighbours, five pixels lower in the same row.
- */
-.bar-layer .chrome .hide,
-.bar-layer .chrome .present-open,
-.bar-layer .chrome .open-tab,
-.bar-layer .chrome .focus-open {
-	display: grid;
-	width: calc(var(--act, 18) * var(--unit));
-	height: calc(var(--act, 18) * var(--unit));
-	padding: 0;
-	border: 0;
-	border-radius: calc(5 * var(--unit));
-	background: none;
-	color: var(--faint);
-	cursor: pointer;
-	opacity: 0;
-	place-items: center;
-	transition: opacity 120ms ease;
-}
-	.bar-layer .chrome:is(:hover, [data-hover="true"]) .hide,
-.bar-layer .chrome:is(:hover, [data-hover="true"]) .present-open,
-.bar-layer .chrome:is(:hover, [data-hover="true"]) .open-tab,
-.bar-layer .chrome:is(:hover, [data-hover="true"]) .focus-open {
-	opacity: 1;
-}
+	
+	
+	
+	
+	
+	
 	/*
  * With a pointer that hovers, the buttons take no room until the board or its bar is under it: the
  * title and the path have the whole bar at rest, and give way to the buttons on hover. A touch
  * screen has no hover, so there they are always shown (the (hover: none) rule below).
  */
 @media (hover: hover) {
-	.bar-layer .chrome:not(:hover, [data-hover="true"]) .acts {
-		display: none;
-	}
+	
 }
-	.bar-layer .chrome .hide:hover,
-.bar-layer .chrome .present-open:hover,
-.bar-layer .chrome .open-tab:hover,
-.bar-layer .chrome .focus-open:hover {
-	background: var(--line);
-	color: var(--fg);
-}
-	/*
- * Present, in a deck's title bar: `.hide`-shaped, but a word rather than a glyph, because
- * "present" has no icon anybody reads correctly.
- *
- * Here beside `.hide` rather than with the rest of the presentation CSS in `styles/canvas.css`,
- * and that is not filing — it is the only place it works. Both files declare their rules
- * inside `@layer components` and this one is imported *after* canvas.css, so at equal
- * specificity `.hide`'s `width: 18px` won and the button was an 18px box with the word
- * clipped inside it.
- */
-.bar-layer .chrome .present-open {
-	width: auto;
-	padding: 0 calc(7 * var(--unit));
-	font-size: calc(10.5 * var(--unit));
-	letter-spacing: 0.02em;
-}
-	/*
- * And the glyph inside is the same size at every zoom, which it was not.
- *
- * `Icon` sizes its SVG in *pixels* — `width="12"` — and pixels here are board pixels, because
- * this box is laid out in board units. So the buttons stayed 18 screen pixels while the glyph
- * inside them scaled with the camera: measured, 2.3px at 19% and 48px at 400%, overflowing the
- * button it was drawn in. CSS beats the width/height *attributes*, so one rule puts all four on
- * the same unit — and on one size, which they were not: the × was 14 to the others' 12.
- */
-.bar-layer .chrome .acts svg {
-	width: calc(12 * var(--unit));
-	height: calc(12 * var(--unit));
-}
-	/* The same box as the three beside it: one square, whichever glyph is in it. */
-.bar-layer .chrome .present-open[data-glyph="true"] {
-	width: calc(var(--act, 18) * var(--unit));
-	padding: 0;
-}
-	.bar-layer .chrome .file {
-	/*
-	 * The path is what gives way when the bar is clipped, and it takes saying so twice.
-	 * A nowrap flex item's automatic minimum size is its content, so it refused to shrink
-	 * at all and the *title* absorbed the whole overflow — a phone showed three board
-	 * paths and no board names. `overflow: hidden` is what lets it go below its content,
-	 * and the shrink factor is what makes it go first.
-	 */
-	overflow: hidden;
-	min-width: 0;
-	flex-shrink: 3;
-	color: var(--faint);
-	font-family: var(--font-mono);
-	font-size: calc(11 * var(--unit));
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
+	
+	
+	
+	
+	
 	/*
  * The shadow and the outline live on a box *behind* the surface, never on the surface.
  *
@@ -733,7 +579,7 @@
  */
 .board-node > .shade {
 	position: absolute;
-	border-radius: var(--radius-panel, 12px);
+	border-radius: var(--radius-board, 12px); /* A board keeps its 12px on a phone: the sheet draws its picture with that corner (`pen/scene.ts`). */
 	box-shadow: var(--shadow);
 	inset: 0;
 	outline: 1px solid var(--line);
@@ -758,7 +604,7 @@
 .board-node > .news-glow {
 	position: absolute;
 	inset: 0;
-	border-radius: var(--radius-panel, 12px);
+	border-radius: var(--radius-board, 12px);
 	pointer-events: none;
 	opacity: 1;
 	transition: opacity var(--read-ms, 1500ms) ease-out;
@@ -767,12 +613,22 @@
 	content: "";
 	position: absolute;
 	inset: 0;
-	border-radius: var(--radius-panel, 12px);
+	border-radius: var(--radius-board, 12px);
 	box-shadow:
 		0 0 60px 10px color-mix(in srgb, var(--news, var(--color-accent)) 40%, transparent),
 		0 4px 18px rgb(0 0 0 / 19%);
 	will-change: opacity;
 	animation: news-breathe 2.6s ease-in-out infinite;
+}
+	/*
+	 * Still while the camera moves. The breath is an animation the page restyles every frame, one per
+	 * board that is news: measured on a stage of four hundred news boards, 2,300 style recalculations
+	 * per step of a pan, the largest single cost of the pan. Paused while moving, it costs nothing per
+	 * frame and breathes on from there once the camera rests. Paused, not removed: removing it jumped
+	 * the glow to full strength, from a breath that rests at 65%, so every pan darkened it.
+	 */
+	.stage[data-moving="true"] .board-node > .news-glow::after {
+	animation-play-state: paused;
 }
 	/* Being read — zoomed in on, mostly on screen, at rest: the glow fades over the read's own
    moment and is at nothing when the read is stamped and the box goes. */
@@ -791,12 +647,26 @@
 	.board-node > .surface {
 	position: relative;
 	overflow: hidden;
-	border-radius: var(--radius-panel, 12px);
+	border-radius: var(--radius-board, 12px);
 	background: var(--bg);
 }
 	.board-node > .surface > iframe {
 	display: block;
 	border: 0;
+}
+	/*
+	 * A kept page that is not shown (`BoardFrame`, `dormant`): the document stays, its rendering is
+	 * skipped. Measured on 48 example boards: 79% of a core at idle with their pages shown, 18% with
+	 * the frames `visibility: hidden`, 0.1% like this. The sheet draws the board's picture over it.
+	 */
+	.board-node[data-dormant] > .surface {
+	/* The page cannot be hit while hidden, so a press lands on the box, which picks the board and wakes it. */
+	content-visibility: hidden;
+}
+/* Carried by a drag: the sheet's carried layer shows the board's picture under the pointer, and the
+   page waits here, unseen, for the move to land (`PenLayer.carry`). Kept, not unloaded. */
+.board-node[data-carried] > :is(.shade, .surface) {
+	visibility: hidden;
 }
 	/* The board's outline, taken by the canvas so a scroll landing on it pans (`BoardFrame.tsx`). */
 	.board-node > .surface > .edge {
@@ -819,6 +689,11 @@
    board is a pan and not a click into somebody's page. Descendant rather than child,
    because under the canvas-per-board renderer the frame sits inside a canvas. */
 .board-node[data-inert="true"] .surface iframe {
+	pointer-events: none;
+}
+	/* A frame whose document is not wired yet hands nothing to the stage, so a pinch there would
+   zoom the browser's page: the stage takes the pointer until it is (`BoardFrame`, `wire`). */
+.board-node .surface iframe:not([data-wired]) {
 	pointer-events: none;
 }
 	/*
@@ -854,44 +729,107 @@
 	position: absolute;
 	inset: 0;
 }
-	/* The stage's drawing (`canvas/pen/layer.ts`): under the boards, and never in the way of a gesture. */
-	.stage > .pen-layer {
+	
+	
+	/*
+	 * The pill over a selected board (`canvas/BoardCallout.tsx`): the comment popup's card
+	 * (`.floatcard` in `chrome.css`: `--panel`, the strong hairline, the menu shadow), so the two
+	 * things that float over a board look alike and follow the theme; a toolbar's row of icons.
+	 */
+	.stage > .board-callout {
 	position: absolute;
-	inset: 0;
-	width: 100%;
-	height: 100%;
-	pointer-events: none;
+	z-index: 6;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	height: calc(var(--control, 28px) + 10px);
+	padding: 0 5px;
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-panel, 12px);
+	background: var(--panel);
+	box-shadow: var(--shadow-menu);
+	color: var(--fg);
+	transform: translate(-50%, -100%);
+	pointer-events: auto;
+	animation: board-callout-in 90ms ease-out;
 }
-	.stage[data-focus="true"] > .pen-layer {
-	display: none;
+	.stage > .board-callout[data-below="true"] {
+	transform: translate(-50%, 0);
+	animation-name: board-callout-in-below;
+}
+	/* Gone at once while the camera or the board moves, and back with a fade when it rests. */
+	.stage > .board-callout:not([data-hidden]) {
+	transition: opacity 90ms ease-out;
+}
+	.stage > .board-callout[data-hidden] {
+	visibility: hidden;
+	opacity: 0;
+}
+	.stage > .board-callout > a.icon-button {
+	color: var(--muted);
+	text-decoration: none;
+}
+	/* Present, on a slide deck: the word the bar said, at the width it needs. */
+	.stage > .board-callout > .icon-button:has(> .callout-word) {
+	width: auto;
+	padding: 0 8px;
+	font-size: var(--type-ui);
+	font-weight: 500;
+}
+	/* A hairline before Hide: the one action that takes the board away. */
+	.stage > .board-callout > .callout-rule {
+	width: 1px;
+	height: 16px;
+	margin: 0 2px;
+	background: var(--line-strong);
+}
+	@keyframes board-callout-in {
+	from {
+		opacity: 0;
+		transform: translate(-50%, calc(-100% + 4px));
+	}
+}
+	@keyframes board-callout-in-below {
+	from {
+		opacity: 0;
+		transform: translate(-50%, -4px);
+	}
+}
+	/* The band along a live board's edge that moves it (`BoardFrame`): invisible, a move cursor. */
+	.stage .board-edge {
+	position: absolute;
+	/* Over the surface's own edge ring (`.surface > .edge`, 1), which would otherwise take its inner part. */
+	z-index: 2;
+	cursor: move;
+	touch-action: none;
 }
 	/*
-	 * Boards are at the back (`pen/layer.ts`): the drawing's over sheet and its click shapes are among
-	 * the boards and above them, and what the drawing's editing puts on screen is above everything. A
-	 * board is never lifted over the drawing, selected or not: a click reaches it wherever nothing drawn
-	 * is in the way, so there is nothing to lift it for.
+	 * The stage's one sheet (`canvas/pen/layer.ts`): the drawing, and each board as its picture or as
+	 * a hole over its document, painted in a worker and placed by the camera it was drawn for. Over
+	 * the boards' surfaces, and never in the way of a gesture.
 	 */
-	/*
-	 * The boards' title bars, over the canvas and not zoomed with it (`Stage.tsx`, `placeBar`).
-	 * Over the boards because it comes after them, and with no `z-index` of its own: one lifted it
-	 * over the app's floating panels too, and a long bar running under the inspector took its clicks.
-	 */
-	.stage > .bar-layer {
-	position: absolute;
-	inset: 0;
-	overflow: hidden;
-	pointer-events: none;
-}
-	.stage > .bar-layer[data-hidden="true"] {
-	display: none;
-}
-	.world > .pen-over {
+	.world > .stage-sheet {
 	position: absolute;
 	top: 0;
 	left: 0;
 	z-index: 1;
 	transform-origin: 0 0;
 	pointer-events: none;
+}
+	/*
+	 * What an agent pins over a board — its cursor, what it holds, what it just wrote, a mark — stays
+	 * over the sheet, which draws the board itself (its picture, or a hole over its page) and would
+	 * otherwise paint them out.
+	 *
+	 * **Only these.** The shadow and the news glow stay under the sheet: they paint outside the
+	 * board's box, where the sheet is clear unless a backdrop is drawn there, and the sheet draws both
+	 * itself for a board on a backdrop (`pen/scene.ts`). Lifting every board's shadow and glow over
+	 * the sheet was measured: each one overlapping a GPU layer became a layer of its own, and a glide
+	 * across thirteen boards dropped to a frame every 90 to 140ms. These exist only while an agent is
+	 * at work, so they cost that only then.
+	 */
+	.world > .board-node > :is(.agent-cursor, .act-hold, .act-land, .board-mark) {
+	z-index: 2;
 }
 	.world > .pen-hits {
 	position: absolute;
@@ -922,7 +860,7 @@
 }
 	/* A board's hover outline follows the board's own corners, and so does a note's or a card's, which share them. */
 	.world > :is(.pen-hover, .pen-selection):is([data-board="true"], [data-round="true"]) {
-	border-radius: var(--radius-panel, 12px);
+	border-radius: var(--radius-board, 12px);
 }
 	/* Where a drag or a resize snapped: a line it lines up on, or a gap it repeats. */
 	.world > .pen-guides {
@@ -1074,10 +1012,20 @@
 	box-shadow: none;
 	pointer-events: none;
 }
-	/* Under a finger the grip and the tab are finger-sized. */
+	/* Under a finger the grip and the tab are finger-sized. The tools themselves are 36px, so the
+	   whole column stands in the room between a phone's toolbars and its composer rather than
+	   scrolling: at 40px it needed 430px of a 402px gap on an iPhone 14 Pro. */
 	@media (pointer: coarse) {
 		.pen-grip {
-			height: 26px;
+			height: 22px;
+		}
+		.pen-tools {
+			gap: 1px;
+			padding: 4px;
+		}
+		.pen-tools > .icon-button {
+			width: 36px;
+			height: 36px;
 		}
 		.pen-tools {
 			--stowtab-w: 28px;
@@ -1226,48 +1174,11 @@
 
 	/* The same rules, under the same query. */
 	@media (hover: none) {
-	/*
-	 * Hidden until hovered is hidden forever here, and that is true of **every** control in a
-	 * board's bar, not only the one that takes the board away.
-	 *
-	 * The acts are `opacity: 0` and revealed by `.board-node:hover`. A touchscreen has no
-	 * hover, so none of them were ever revealed — and only `.hide` was listed here, which is
-	 * why a phone showed the × alone: the board's address, the focus view and filling the
-	 * window with it were all in the DOM, at the right size, invisible, with the one control
-	 * that *removes* something as the only one offering itself. Measured with an iPhone 14 Pro
-	 * context before the fix: `.hide` at `opacity: 1`, the other three at `opacity: 0`.
-	 *
-	 * The four selectors are the four the shape rule uses, deliberately: the list of what a bar
-	 * draws has to be one list, or the next control added to it is visible everywhere except
-	 * the device where it is the only route to what it does.
-	 */
-	.bar-layer .chrome .hide,
-	.bar-layer .chrome .present-open,
-	.bar-layer .chrome .open-tab,
-	.bar-layer .chrome .focus-open {
-		opacity: 1;
-	}
+	
 }
 
 	/* The same rules, under the same query. */
 	@media (pointer: coarse) {
-	/*
-	 * A finger's target, for the whole cluster: one number, four boxes.
-	 *
-	 * This was `.hide` alone at a raw `24px`, and every part of that was wrong. Alone, because
-	 * the other three stayed at their desktop 18 and sat 2.5 units higher in the row — a × that
-	 * was a different size from the buttons it belongs with, which is what "not well aligned"
-	 * was. Raw, because a length in this bar is **board** pixels, not screen ones: the bar is
-	 * counter-scaled by *multiplying* (`--unit`), not by a transform, so `24px` came out 9 screen
-	 * px at a phone's fitted zoom while everything around it was 18. `--act` is set once and the
-	 * shape rule multiplies it, so 24 here means 24 screen pixels at any zoom — which is what the
-	 * comment always claimed.
-	 *
-	 * 24 rather than 44: the bar it sits in is 24 tall, and a target taller than the thing it
-	 * belongs to would cover the board underneath it.
-	 */
-	.bar-layer .chrome .acts {
-		--act: 24;
-	}
+	
 }
 }

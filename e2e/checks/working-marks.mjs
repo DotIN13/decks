@@ -58,14 +58,16 @@ const KINDS = ["pi", "claude", "opencode", "antigravity"];
 
 /*
  * The add-agent menu is the one surface that draws all four still marks at once: the panel's rows
- * draw faces, and a face is an avatar rather than a runtime. It opens from the composer's `+`.
+ * draw faces, and a face is an avatar rather than a runtime. It opens from the composer's agent
+ * list, as the submenu of its "New agent" row.
  */
-await page.locator(".dock-to-new").click();
-await page.waitForSelector(".popover [data-row]", { timeout: 4000 });
+await page.locator(".dock-to-chip").click();
+await page.locator(".popover .agent-menu-new").click();
+await page.waitForSelector(".popover[data-sub] [data-row]", { timeout: 4000 });
 await settle(page, 300);
 
 const still = await page.evaluate(() =>
-	[...document.querySelectorAll(".popover [data-row] svg[data-agent]")].map((svg) => ({
+	[...document.querySelectorAll(".popover[data-sub] [data-row] svg[data-agent]")].map((svg) => ({
 		agent: svg.dataset.agent,
 		/* The drawing, and not the definitions a working mark carries: `defs` holds a clip and a
 		   mask path, which are not part of what the mark draws. */

@@ -3,6 +3,8 @@ import { canvasBox } from "../camera/insets.ts";
 import { camera, setCamera } from "../state/camera.ts";
 import { state } from "../state/deck.ts";
 import { send } from "../state/socket.ts";
+import { deviceId } from "../state/device.ts";
+import { stageOf } from "../state/stages.ts";
 
 /**
  * Telling the server where the user is looking — which is not every frame.
@@ -29,7 +31,7 @@ let timer: number | undefined;
  * the number a board has to fit into, and that is the window minus the chrome standing
  * beside it — not `innerWidth`, which counts the boards panel as space a board could use.
  *
- * **Every reading says whose stage it is**, because the server places an agent's new boards
+ * **Every reading says whose stage it is, which canvas, and which device**, because the server places an agent's new boards
  * at the middle of that agent's view and nobody else's (`deck/cameras.ts` on the server). The
  * view on screen is the focused conversation's; a parked view passes the agent it belongs to.
  * With no agent to name, nothing is sent.
@@ -38,7 +40,8 @@ export function reportCamera(now: Camera, agentId: string | undefined = state.fo
 	if (!agentId) return;
 	const box = canvasBox({ width: window.innerWidth, height: window.innerHeight });
 	const sized: Camera = { ...now, width: Math.round(box.width), height: Math.round(box.height) };
-	send({ type: "camera.set", camera: sized, agentId });
+	const stage = stageOf(agentId)?.name;
+	send({ type: "camera.set", camera: sized, agentId, ...(stage ? { stage } : {}), device: deviceId });
 }
 
 /**
