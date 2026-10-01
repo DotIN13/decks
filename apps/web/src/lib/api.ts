@@ -27,6 +27,9 @@ export function boardUrl(board: Pick<Board, "path" | "rev">): string {
 	return `/api/board/${path}?rev=${board.rev}`;
 }
 
+/** The server's `PICTURE_LOOK` (`boards/thumbs.ts`): raised with it, so a picture taken before a change to how every board looks is a URL the browser has not kept. */
+const PICTURE_LOOK = 3;
+
 /**
  * The server's picture of a board (`boards/thumbs.ts` over there), in the app's scheme.
  *
@@ -35,7 +38,7 @@ export function boardUrl(board: Pick<Board, "path" | "rev">): string {
  */
 export function thumbUrl(board: Pick<Board, "path" | "rev">, scheme: "light" | "dark"): string {
 	const path = board.path.split("/").map(encodeURIComponent).join("/");
-	return `/api/thumb/${path}?v=${board.rev}&scheme=${scheme}`;
+	return `/api/thumb/${path}?v=${board.rev}&scheme=${scheme}&look=${PICTURE_LOOK}`;
 }
 
 /** A deck-relative path (a poster, an asset) as a URL. */

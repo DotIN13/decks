@@ -732,6 +732,129 @@
 	
 	
 	/*
+	 * A board's title bar, on a desktop (`BoardFrame`, `Stage.placeBar`): in a layer over the canvas
+	 * that does not zoom, so it is 24 screen pixels tall at every zoom and only moved. Its buttons are
+	 * every action the touch screens' pill has, shown while the board or its bar is under the pointer
+	 * or the board is selected; at rest the title and the path have the whole bar.
+	 */
+	.stage > .bar-layer {
+	position: absolute;
+	inset: 0;
+	/* Never scrolled to show a bar's button past the edge, as `hidden` would be. */
+	overflow: clip;
+	pointer-events: none;
+}
+	.stage > .bar-layer[data-hidden="true"] {
+	display: none;
+}
+	/*
+	 * Zoomed out below the live zoom, the bars fade away, and fade back as the zoom comes up through it
+	 * (`Stage.writeTransform`). Not the selected board's: on a desktop its bar is the only place its
+	 * actions are, so it stays at every zoom.
+	 */
+	.stage > .bar-layer .chrome {
+	transition: opacity 180ms ease-out;
+}
+	.stage > .bar-layer[data-low="true"] .chrome:not([data-selected]) {
+	opacity: 0;
+	pointer-events: none;
+}
+	.bar-layer .chrome {
+	position: absolute;
+	top: 0;
+	left: 0;
+	display: flex;
+	overflow: hidden;
+	align-items: baseline;
+	gap: 8px;
+	height: 24px;
+	color: var(--muted);
+	font-size: 13px;
+	cursor: grab;
+	pointer-events: auto;
+	user-select: none;
+}
+	.bar-layer .chrome[data-dragging="true"] {
+	cursor: grabbing;
+}
+	.bar-layer .chrome .title {
+	overflow: hidden;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+	.bar-layer .chrome[data-selected] .title {
+	color: var(--fg);
+}
+	/* The path gives way first when the bar is narrow: a nowrap item will not shrink below its content otherwise. */
+	.bar-layer .chrome .file {
+	overflow: hidden;
+	min-width: 0;
+	flex-shrink: 3;
+	color: var(--faint);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+	/* The buttons as one group at the right-hand end: one auto margin, on the box that holds them all. */
+	.bar-layer .chrome .acts {
+	display: flex;
+	flex: none;
+	align-self: center;
+	align-items: center;
+	gap: 2px;
+	margin-left: auto;
+}
+	.bar-layer .chrome:not(:hover, [data-hover="true"], [data-selected]) .acts {
+	display: none;
+}
+	.bar-layer .chrome .act {
+	display: grid;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--muted);
+	text-decoration: none;
+	cursor: pointer;
+	place-items: center;
+}
+	.bar-layer .chrome .act:hover {
+	background: var(--line);
+	color: var(--fg);
+}
+	.bar-layer .chrome .act[aria-pressed="true"] {
+	color: var(--color-accent);
+}
+	.bar-layer .chrome .act svg {
+	width: 13px;
+	height: 13px;
+}
+	/* Present, on a deck: a word, at the width it needs. */
+	.bar-layer .chrome .act[data-word="true"] {
+	width: auto;
+	padding: 0 7px;
+	font-size: 11px;
+	letter-spacing: 0.02em;
+}
+	/* A hairline before Hide: the one action that takes the board away. */
+	.bar-layer .chrome .act.hide {
+	position: relative;
+	margin-left: 7px;
+}
+	.bar-layer .chrome .act.hide::before {
+	position: absolute;
+	top: 4px;
+	left: -5px;
+	width: 1px;
+	height: 12px;
+	background: var(--line-strong);
+	content: "";
+}
+	/*
 	 * The pill over a selected board (`canvas/BoardCallout.tsx`): the comment popup's card
 	 * (`.floatcard` in `chrome.css`: `--panel`, the strong hairline, the menu shadow), so the two
 	 * things that float over a board look alike and follow the theme; a toolbar's row of icons.

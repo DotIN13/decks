@@ -40,7 +40,7 @@ const sizeOf = (path) =>
 /** Press the board's own fullscreen button, on its pill — the affordance, not a keyboard route. */
 const present = async (path) => {
 	await selectBoard(page, path);
-	const button = page.locator('.board-callout [role=menuitem]:is([aria-label="Present"], [aria-label="Fullscreen"])').first();
+	const button = page.locator('.board-callout [role=menuitem]:is([aria-label="Present"], [aria-label="Fullscreen"]), .bar-layer .chrome[data-selected] :is([data-act="Present"], [data-act="Fullscreen"])').first();
 	if ((await button.count()) === 0) return false;
 	await button.click();
 	return true;
@@ -55,7 +55,7 @@ for (const { path } of await page.evaluate(() => [...document.querySelectorAll("
 	let items = [];
 	try {
 		await selectBoard(page, path);
-		items = await page.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem]")].map((one) => ({ text: one.getAttribute("aria-label") ?? "", href: one.getAttribute("href") })));
+		items = await page.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem], .bar-layer .chrome[data-selected] [data-act]")].map((one) => ({ text: one.dataset.act ?? one.getAttribute("aria-label") ?? "", href: one.getAttribute("href") })));
 	} catch {
 		/* a board with no uncovered point to click: it has no pill here */
 	}

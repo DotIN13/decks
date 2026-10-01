@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ThumbService } from "./thumbs.ts";
+import { type ThumbService, wholeScale, wholeShot } from "./thumbs.ts";
 
 /**
  * A picture of a board as a reader left it, drawn by the server's Chrome from a snapshot of the
@@ -38,14 +38,14 @@ export async function renderSnapshot(thumbs: ThumbService, origin: string, ask: 
 	const h = Math.max(120, Math.min(MAX_H, Math.round(ask.h)));
 	const address = `${origin}/api/board/${ask.path.split("/").map(encodeURIComponent).join("/")}?snapshot=${randomUUID()}`;
 	return thumbs.borrow(async (browser) => {
-		const context = await browser.newContext({ viewport: { width: w, height: Math.min(h, 2000) }, deviceScaleFactor: 1, colorScheme: ask.scheme, reducedMotion: "reduce", javaScriptEnabled: true });
+		const context = await browser.newContext({ viewport: { width: w, height: Math.min(h, 2000) }, deviceScaleFactor: wholeScale({ w, h }), colorScheme: ask.scheme, reducedMotion: "reduce", javaScriptEnabled: true });
 		try {
 			// The snapshot is served at the board's own address: same origin, same relative URLs.
 			await context.route(address, (route) => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: ask.html }));
 			const page = await context.newPage();
 			await page.goto(address, { waitUntil: "load", timeout: 15_000 });
 			await page.evaluate(RESTORE);
-			return await page.screenshot({ type: "jpeg", quality: 85, clip: { x: 0, y: 0, width: w, height: h }, fullPage: true, animations: "disabled", timeout: 15_000 });
+			return await wholeShot(page, { width: w, height: h }, wholeScale({ w, h }));
 		} finally {
 			await context.close().catch(() => {});
 		}

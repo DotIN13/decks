@@ -12,6 +12,7 @@ import { browse } from "./files/browse.ts";
 import { assetHeaders, boardHeaders, quarantine } from "./files/serve.ts";
 import { refuseCrossSite, storeAssetStream, UploadRefused } from "./files/upload.ts";
 import { renderSnapshot } from "./boards/snapshot.ts";
+import { pictureType } from "./boards/thumbs.ts";
 import type { App } from "./app.ts";
 
 /**
@@ -165,7 +166,7 @@ export function createHttpApp(app: App): Express {
 				const file = await app.thumbs.get(board, req.query.scheme === "dark" ? "dark" : "light", () => gone, req.query.whole === "1" ? "whole" : "card");
 				if (gone) return;
 				res.setHeader("Cache-Control", req.query.v === String(board.rev) ? "private, max-age=31536000, immutable" : "no-cache");
-				res.type("jpeg");
+				res.type(file.endsWith(".webp") ? "webp" : "jpeg");
 				await sendFile(res, file);
 			} catch (error) {
 				if (!gone) res.status(503).type("text").send((error as Error).message);
@@ -378,7 +379,7 @@ export function createHttpApp(app: App): Express {
 				scheme: req.query.scheme === "dark" ? "dark" : "light",
 			});
 			res.setHeader("Cache-Control", "no-store");
-			res.type("jpeg").send(shot);
+			res.type(pictureType(shot)).send(shot);
 		}),
 	);
 

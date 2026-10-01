@@ -8,7 +8,7 @@ import { setCommenting } from "../state/comments.ts";
 import { Icon } from "../ui/icons.tsx";
 import { For, Index, Show, batch, createEffect, createMemo, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import type { AgentAct } from "./acts.ts";
-import { between, boxOf, easeOutCubic, fitInto, INTERACT_ZOOM, isPhone, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
+import { between, boxOf, easeOutCubic, fitInto, hasTitleBars, INTERACT_ZOOM, isPhone, KEPT_PAGES, ONE_LIVE, pan, pinchCamera, toScreen, toWorld, zoomAbout, type Viewport } from "../camera/camera.ts";
 import { canvasBox } from "../camera/insets.ts";
 import { checkStageOrigin, stagePoint } from "../camera/coords.ts";
 import { BoardFrame, type BoardEditing } from "../board/BoardFrame.tsx";
@@ -1790,11 +1790,63 @@ export function Stage(props: {
 		untrack(() => canvasMenu() && setCanvasMenu(undefined));
 	});
 
+	/*
+	 * The boards' title bars, on a desktop, in a layer over the canvas that does not zoom
+	 * (`.bar-layer`): laid out once at their size on screen and moved, a translate on every camera
+	 * frame and a new width when the zoom changes. Each board says where it is and how wide
+	 * (`BoardFrame`), and every camera frame places every bar from that, in the same call that
+	 * moves the boards. A touch screen has no bars: the selected board gets the pill instead.
+	 */
+	const BARS = hasTitleBars();
+	const [barLayer, setBarLayer] = createSignal<HTMLElement>();
+	const barAt = new WeakMap<HTMLElement, { x: number; y: number; w: number }>();
+	const barWidth = new WeakMap<HTMLElement, number>();
+	/** Above the board's top edge by the bar's 24 pixels and a 2-pixel gap. */
+	const BAR_ABOVE = 26;
+	/** A board narrower than this on screen gets no bar: its words would not fit, and a bar costs a layout per zoom. */
+	const BAR_MIN_PX = 64;
+	const positionBar = (bar: HTMLElement, cam: Camera) => {
+		const at = barAt.get(bar);
+		if (!at) return;
+		const v = view();
+		const dpr = window.devicePixelRatio || 1;
+		// Whole device pixels, so the words are never drawn between two.
+		const x = Math.round((v.width / 2 + (at.x - cam.x) * cam.zoom) * dpr) / dpr;
+		const y = Math.round((v.height / 2 + (at.y - cam.y) * cam.zoom - BAR_ABOVE) * dpr) / dpr;
+		bar.style.transform = `translate(${x}px, ${y}px)`;
+		const width = Math.round(at.w * cam.zoom);
+		if (barWidth.get(bar) !== width) {
+			barWidth.set(bar, width);
+			bar.style.width = `${width}px`;
+		}
+	};
+	const placeBar = (bar: HTMLElement, at: { x: number; y: number; w: number }) => {
+		barAt.set(bar, at);
+		positionBar(bar, localCamera);
+	};
+	/** Whether a board has a bar: at least `BAR_MIN_PX` wide on screen, and on it or a quarter of a window from it, as of the camera's last rest. */
+	const barWorth = (board: Board) => {
+		if (board.w * restZoom() < BAR_MIN_PX) return false;
+		const v = view();
+		const cam = restCamera();
+		const a = toScreen(cam, v, { x: board.x, y: board.y });
+		const b = toScreen(cam, v, { x: board.x + board.w, y: board.y + board.h });
+		return b.x > -v.width / 4 && a.x < (v.width * 5) / 4 && b.y > -v.height / 4 && a.y < (v.height * 5) / 4;
+	};
+
 	const writeTransform = (cam: Camera) => {
 		const v = view();
 		worldEl.style.transform = `translate(${v.width / 2}px, ${v.height / 2}px) scale(${cam.zoom}) translate(${-cam.x}px, ${-cam.y}px)`;
 		// The drawing moves in the same call as the boards, so the two can never be a frame apart.
 		penLayer.setCamera(cam);
+		// And the title bars, which are in a layer of their own that does not zoom.
+		const layer = barLayer();
+		if (layer) {
+			for (const bar of layer.querySelectorAll<HTMLElement>(".chrome")) positionBar(bar, cam);
+			// Below the live zoom the bars fade out, and fade back in as the zoom crosses it, mid-gesture (`canvas.css`).
+			const low = cam.zoom < INTERACT_ZOOM;
+			if (low !== (layer.dataset.low === "true")) layer.dataset.low = low ? "true" : "false";
+		}
 	};
 
 
@@ -3014,6 +3066,20 @@ export function Stage(props: {
 							{...(!alone && shotAdaptor().capture ? { capture: (frame: HTMLIFrameElement) => shotAdaptor().capture!(frame, board) } : {})}
 							{...(alone ? { origin: { x: 0, y: 0 } } : {})}
 							selected={props.selected === board.path}
+							{...(!alone && BARS && (barWorth(board) || props.selected === board.path) ? { barLayer: barLayer(), placeBar } : {})}
+							{...(!alone && BARS
+								? {
+										onComment: () =>
+											setCommenting({
+												path: board.path,
+												quote: "",
+												title: board.title,
+												open: true,
+												// Under the bar, which follows the board as the camera moves.
+												anchor: () => document.querySelector(`.bar-layer .chrome[data-path="${CSS.escape(board.path)}"]`)?.getBoundingClientRect(),
+											}),
+									}
+								: {})}
 							{...(props.editing?.path === board.path ? { editing: props.editing.editing } : {})}
 							{...(props.onPresent
 								? {
@@ -3383,7 +3449,9 @@ export function Stage(props: {
 				(`BoardCallout`), on every device. Kept mounted through a movement and only hidden, so a
 				drag that began on its grip keeps the element it captured the pointer on.
 			*/}
-			<Show when={!props.focus && !props.drawing ? calloutBoard() : undefined} keyed>
+			{/* The boards' title bars: over the canvas, and not zoomed with it (`placeBar` above). */}
+			<div class="bar-layer" data-hidden={props.focus ? "true" : undefined} data-low={untrack(() => props.camera.zoom) < INTERACT_ZOOM ? "true" : "false"} ref={setBarLayer} />
+			<Show when={!BARS && !props.focus && !props.drawing ? calloutBoard() : undefined} keyed>
 				{(board) => (
 					<BoardCallout
 						board={board}

@@ -64,7 +64,7 @@ test("a card shows the board's full width and as much height as 4:3 allows", () 
 
 test("a picture's name is safe for a file system and changes with the revision and the scheme", () => {
 	const name = thumbName("boards/深海/plan one.html", 7, "light");
-	assert.match(name, /^[0-9a-f]{16}-7-light-720\.jpg$/);
+	assert.match(name, /^[0-9a-f]{16}-7-light-720-l\d+\.jpg$/);
 	assert.notEqual(name, thumbName("boards/深海/plan one.html", 8, "light"));
 	assert.notEqual(name, thumbName("boards/深海/plan one.html", 7, "dark"));
 });
@@ -233,6 +233,6 @@ test("the two kinds of picture have names of their own, and neither is taken for
 	const whole = name("boards/a.html", 3, "light", "whole");
 	assert.equal(new Set([card, whole]).size, 2);
 	// The card's pattern for "any revision of this picture" must not reach the whole one.
-	const cardAny = new RegExp(`^${card.slice(0, 16)}-\\d+-light(-\\d+)?\\.jpg$`);
+	const cardAny = new RegExp(`^${card.slice(0, 16)}-\\d+-light(-\\d+)?(-l\\d+)?\\.jpg$`);
 	assert.ok(cardAny.test(card) && !cardAny.test(whole));
 });

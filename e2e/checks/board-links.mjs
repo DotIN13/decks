@@ -190,7 +190,7 @@ link.send({ type: "board.hide", path: LINKED });
 await settle(page, 500);
 await focus(SOURCE);
 await selectBoard(page, SOURCE);
-const fullscreen = page.locator('.board-callout [role=menuitem]:is([aria-label="Present"], [aria-label="Fullscreen"])').first();
+const fullscreen = page.locator('.board-callout [role=menuitem]:is([aria-label="Present"], [aria-label="Fullscreen"]), .bar-layer .chrome[data-selected] :is([data-act="Present"], [data-act="Fullscreen"])').first();
 const presented = (await fullscreen.count()) > 0;
 if (presented) await fullscreen.click();
 await settle(page, 900);

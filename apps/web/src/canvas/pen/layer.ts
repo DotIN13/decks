@@ -30,8 +30,14 @@ const OVERSCAN = 0.12;
 /** The sheet's pixel density at most. A phone at three is nine times a plain screen's pixels for a picture nobody reads closely. */
 const MAX_DPR = 2;
 const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-/** Board pictures decoded at once, in pixels: a phone's memory is the reason for the difference. */
-const PICTURE_BUDGET = coarse ? 6_000_000 : 24_000_000;
+/**
+ * Board pictures decoded at once, in pixels (4 bytes each), on every device: 32M is 128 MB, about a
+ * tenth of what iOS lets a Safari tab have before it kills it. A phone's was 6M after the crashes,
+ * whose causes were live pages and the closed panel's pictures, both fixed.
+ */
+const PICTURE_BUDGET = 32_000_000;
+/** The widest a board's picture is decoded: a phone's screen never needs 2048 for one board. */
+const PICTURE_WIDEST = coarse ? 1024 : 2048;
 
 /**
  * The stage's drawing, as the page sees it: one `<canvas>` among the boards, and a layer of
@@ -493,7 +499,7 @@ export class PenLayer {
 	setView(view: { width: number; height: number }): void {
 		this.view = view;
 		const dpr = Math.min(MAX_DPR, (typeof devicePixelRatio === "number" ? devicePixelRatio : 1) || 1);
-		this.send({ type: "view", width: view.width, height: view.height, dpr, overscan: OVERSCAN, budget: PICTURE_BUDGET });
+		this.send({ type: "view", width: view.width, height: view.height, dpr, overscan: OVERSCAN, budget: PICTURE_BUDGET, widest: PICTURE_WIDEST });
 		if (this.placedList.length > 0) this.writeHits();
 	}
 

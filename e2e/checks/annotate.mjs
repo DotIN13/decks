@@ -49,6 +49,9 @@ const node = `.board-node[data-path="${path}"]`;
 const selectWords = async (from, to) => {
 	const at = await page.evaluate((selector) => {
 		const frame = document.querySelector(`${selector} iframe`);
+		/* A press inside what is still selected drags those words instead of selecting anew, as a reader
+		   who clicks away first never sees; the last selection is let go here. */
+		frame?.contentWindow?.getSelection()?.removeAllRanges();
 		const element = frame?.contentDocument?.querySelector("[data-id] p, [data-id] li, p");
 		if (!frame || !element) return null;
 		const outer = frame.getBoundingClientRect();
@@ -83,7 +86,8 @@ say("…and the popup is gone", (await page.locator(".comment-popup").count()) =
 const marked = await page.evaluate((selector) => document.querySelector(`${selector} iframe`).contentWindow.CSS.highlights?.has("decks-comment") ?? null, node);
 say("…and its words are marked on the board, without touching the document", marked === true && read(file) === before, String(marked));
 
-await selectWords(190, 330);
+// Clear of the first comment's words, which stay marked: in Inter they reach past 190 px.
+await selectWords(400, 540);
 await page.click(".comment-start");
 await page.fill(".comment-field", "Shorter.");
 await page.keyboard.press("Control+Enter");

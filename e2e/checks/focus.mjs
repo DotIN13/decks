@@ -32,7 +32,7 @@ say("the flow board is on the canvas to focus on", onCanvas === 1, `${onCanvas} 
  * for the same thing. The pill shows when the board is selected, so it is selected first.
  */
 await selectBoard(page, NOTES);
-const bar = await page.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem]")].map((one) => one.getAttribute("aria-label") ?? ""));
+const bar = await page.evaluate(() => [...document.querySelectorAll(".board-callout [role=menuitem], .bar-layer .chrome[data-selected] [data-act]")].map((one) => one.dataset.act ?? one.getAttribute("aria-label") ?? ""));
 say(
 	"the pill over the board offers fit, focus, fullscreen, a tab, a comment and going away, in that order",
 	bar.join(",") === "Fit,Focus,Fullscreen,New tab,Comment,Hide",

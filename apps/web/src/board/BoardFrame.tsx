@@ -4,7 +4,15 @@ import type { Board, Camera, ChatItem, WebStatus } from "@decks/protocol";
 import { SourceEditor } from "./SourceEditor.tsx";
 import { createEffect, createMemo, createSignal, For, Index, Match, onCleanup, Show, Switch, on, untrack } from "solid-js";
 import { unwrap } from "solid-js/store";
-import { boardUrl } from "../lib/api.ts";
+import { boardUrl, deckFileUrl } from "../lib/api.ts";
+import { Portal } from "solid-js/web";
+import { Icon } from "../ui/icons.tsx";
+import ExternalLink from "lucide-solid/icons/external-link";
+import X from "lucide-solid/icons/x";
+import MessageSquarePlus from "lucide-solid/icons/message-square-plus";
+import BookOpen from "lucide-solid/icons/book-open";
+import Maximize from "lucide-solid/icons/maximize-2";
+import Scan from "lucide-solid/icons/scan";
 import { INTERACT_ZOOM } from "../camera/camera.ts";
 import { attachEditor, type EditorHost } from "./Editor.ts";
 import { turnCards, type TurnCard } from "../chat/turn-cards.ts";
@@ -203,6 +211,12 @@ export function BoardFrame(props: {
 	editing?: BoardEditing;
 	/** Take this board off the canvas. It stays in the agent's context. */
 	onHide?: () => void;
+	/** Comment on the whole board, from its title bar. */
+	onComment?: () => void;
+	/** The stage's layer that does not zoom, where the title bar lives (`Stage.tsx`); none on a touch screen. */
+	barLayer?: HTMLElement | undefined;
+	/** Put a bar on screen for a board at this place and width, and keep it there as the camera moves. */
+	placeBar?: (bar: HTMLElement, at: { x: number; y: number; w: number }) => void;
 	/** Editing lives inside the frame, because the frame is same-origin (§4). */
 	editor: EditorHost;
 	/** Canvas gestures that start inside the frame and belong to the stage. */
@@ -387,6 +401,17 @@ export function BoardFrame(props: {
 	/* Covered for a zoom or a move, the page stays until its picture is drawn, however long that takes:
 	   hidden on the timer, a board whose picture was still coming was a blank for the whole gesture. */
 	const dormant = createMemo(() => sleepy() && (props.pictured === true || (!props.covering && waited())));
+	/*
+	 * A loaded page that is shown and awake says so, whichever way it got here. Shown again while its
+	 * picture was being handed to the sheet (`takeShot`), it had been told it was not showing and was
+	 * never asked again, since it never slept: the sheet kept drawing its picture over it until the
+	 * board next left the screen, so a board you zoomed in on and clicked stayed a picture.
+	 */
+	createEffect(() => {
+		if (!hasPage() || sleepy() || keptForShot()) return;
+		const frame = frameEl;
+		if (frame?.isConnected && frame.dataset.wired !== undefined && !liveNow) whenReady(frame);
+	});
 	/** Say the document is showing once it says it is ready, or after three seconds of trying. */
 	const whenReady = (frame: HTMLIFrameElement) => {
 		clearTimeout(readying);
@@ -1153,6 +1178,82 @@ export function BoardFrame(props: {
 				step of a pan — see `.board-node > .shade` in `index.css`.
 			*/}
 			<div class="shade" aria-hidden="true" />
+
+			{/*
+				The title bar, on a desktop: in the stage's bar layer, which does not zoom, so it is the
+				same size on screen at every zoom and is only moved (`Stage.placeBar`). It holds every
+				action the touch screens' pill has (`BoardCallout`), shown while the board or its bar is
+				under the pointer, or the board is selected.
+			*/}
+			<Show when={props.barLayer}>
+				{(layer) => (
+					<Portal mount={layer()}>
+						<div
+							class="chrome"
+							data-path={props.board.path}
+							data-dragging={dragging() || !!props.shift}
+							data-hover={hovered() || undefined}
+							data-selected={props.selected || undefined}
+							ref={(bar) => {
+								createEffect(() => props.placeBar?.(bar, { x: at().x, y: at().y, w: sizing()?.w ?? props.board.w }));
+							}}
+							onPointerDown={startDrag}
+							onPointerEnter={() => setHovered(true)}
+							onPointerLeave={() => setHovered(false)}
+							onDblClick={() => props.onOpen()}
+						>
+							<span class="title">{props.board.title}</span>
+							<span class="file">{props.board.path}</span>
+							<span class="acts" onPointerDown={(event) => event.stopPropagation()} onDblClick={(event) => event.stopPropagation()}>
+								<button type="button" class="act" data-act="Fit" title="Fit the board to the screen" aria-label={`Fit ${props.board.title}`} onClick={() => props.onOpen()}>
+									<Icon of={Scan} size={12} />
+								</button>
+								<Show when={props.onFocus}>
+									<button
+										type="button"
+										class="act"
+										data-act="Focus"
+										aria-pressed={props.focused}
+										title={props.focused ? "Back to the canvas (or press d)" : "Focus on this board (or press d)"}
+										aria-label={props.focused ? `Show the whole canvas instead of ${props.board.title}` : `Focus on ${props.board.title}`}
+										onClick={() => props.onFocus?.()}
+									>
+										<Icon of={BookOpen} size={12} />
+									</button>
+								</Show>
+								<Show when={props.onPresent && !props.board.live}>
+									<button
+										type="button"
+										class="act"
+										data-act={props.board.format === "slides" ? "Present" : "Fullscreen"}
+										data-word={props.board.format === "slides" ? "true" : undefined}
+										title={props.board.format === "slides" ? "Present this deck fullscreen (or press f)" : "Fill the window with this board (or press f)"}
+										aria-label={`${props.board.format === "slides" ? "Present" : "Fullscreen"} ${props.board.title}`}
+										onClick={() => props.onPresent?.()}
+									>
+										<Show when={props.board.format === "slides"} fallback={<Icon of={Maximize} size={12} />}>Present</Show>
+									</button>
+								</Show>
+								<Show when={!props.board.live}>
+									<a class="act" data-act="New tab" href={deckFileUrl(props.board.path)} target="_blank" rel="noopener" title="Open this board in its own tab" aria-label={`Open ${props.board.title} in its own tab`}>
+										<Icon of={ExternalLink} size={12} />
+									</a>
+								</Show>
+								<Show when={props.onComment}>
+									<button type="button" class="act" data-act="Comment" title="Comment on this board" aria-label={`Comment on ${props.board.title}`} onClick={() => props.onComment?.()}>
+										<Icon of={MessageSquarePlus} size={12} />
+									</button>
+								</Show>
+								<Show when={props.onHide}>
+									<button type="button" class="act hide" data-act="Hide" title="Take this board off the canvas. The agent keeps it in context." aria-label={`Hide ${props.board.title}`} onClick={() => props.onHide?.()}>
+										<Icon of={X} size={12} />
+									</button>
+								</Show>
+							</span>
+						</div>
+					</Portal>
+				)}
+			</Show>
 
 			{/*
 				The glow on a board that is news: a soft drop shadow in the writer's colour, on a

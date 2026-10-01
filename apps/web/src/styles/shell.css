@@ -488,11 +488,15 @@
  * high. Under the old two-row grid it was a grid item and got its height from `1fr`, which
  * hid the problem; deleting the title bar exposed it, and the symptom was the dock hanging
  * off the top of the window with the canvas invisible behind it.
+ *
+ * `clip`, not `hidden`: a hidden box still scrolls when something inside it is brought into view,
+ * and a board's title-bar button past the window's edge, focused or pressed, slid the whole canvas
+ * 12px left under every board after it.
  */
 .work {
 	position: absolute;
 	inset: 0;
-	overflow: hidden;
+	overflow: clip;
 }
 
 	/* The same rules, under the same query. */

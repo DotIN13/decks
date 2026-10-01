@@ -21,11 +21,15 @@ import { snapshotOf } from "./snapshot.ts";
  *   the Canvas renderer, where the page is a child of the board's own canvas, and only where the API
  *   is on (`chrome://flags/#canvas-draw-element`).
  *
+ * They are tried in that order, canvas, snapshot, server, starting from the one chosen: `canvas`
+ * falls back to a snapshot where Chrome cannot draw the page (the Documents renderer, or no flag),
+ * `snapshot` to the server's picture, and an agent's screenshot (`seenPicture`) does the same.
+ *
  * There was a fourth, modern-screenshot in this browser, copying every element's computed style onto
  * a clone and drawing it again as an SVG image. It stalled the page for up to two seconds a board,
  * since only the page's own thread can read its styles, and was taken out.
  */
-export type ShotAdaptorId = "server" | "snapshot" | "canvas";
+export type ShotAdaptorId = "canvas" | "snapshot" | "server";
 
 export interface ShotAdaptor {
 	id: ShotAdaptorId;
@@ -112,7 +116,7 @@ export async function takeSnapshot(frame: HTMLIFrameElement, board: Board): Prom
 export const snapshotAdaptor: ShotAdaptor = {
 	id: "snapshot",
 	label: "Snapshot",
-	note: "The page as you left it, sent to the server's Chrome to draw. A few ms here, a round trip there.",
+	note: "The page as you left it, drawn by the server, else the server's own.",
 	picture: takenOrServer,
 	capture: (frame, board) => keep("snapshot", board, () => takeSnapshot(frame, board)),
 };
@@ -157,27 +161,38 @@ export async function takeInCanvas(frame: HTMLIFrameElement, board: Board): Prom
 export const canvasAdaptor: ShotAdaptor = {
 	id: "canvas",
 	label: "Canvas",
-	note: "Drawn by Chrome straight from the live page. Needs the Canvas renderer and chrome://flags/#canvas-draw-element.",
+	note: "Chrome draws the live page (Canvas renderer and flag), else a snapshot, else the server's.",
 	picture: takenOrServer,
-	capture: (frame, board) => keep("canvas", board, () => takeInCanvas(frame, board)),
+	capture: (frame, board) => keep(canDrawInCanvas(frame) ? "canvas" : "snapshot", board, () => canvasOrSnapshot(frame, board)),
 };
 
-export const SHOT_ADAPTORS: ShotAdaptor[] = [serverAdaptor, snapshotAdaptor, canvasAdaptor];
+/** HTML-in-Canvas where this page can be drawn by it, and a snapshot where not or where it failed. */
+async function canvasOrSnapshot(frame: HTMLIFrameElement, board: Board): Promise<Blob | undefined> {
+	if (canDrawInCanvas(frame)) {
+		const drawn = await takeInCanvas(frame, board).catch(() => undefined);
+		if (drawn) return drawn;
+	}
+	return takeSnapshot(frame, board);
+}
+
+/** In the order they are tried, and the order Settings lists them. */
+export const SHOT_ADAPTORS: ShotAdaptor[] = [canvasAdaptor, snapshotAdaptor, serverAdaptor];
 
 const KEY = "decks.pictures";
 const isId = (value: unknown): value is ShotAdaptorId => SHOT_ADAPTORS.some((one) => one.id === value);
 const load = (): ShotAdaptorId => {
 	try {
 		const saved = localStorage.getItem(KEY);
-		return isId(saved) ? saved : "server";
+		return isId(saved) ? saved : "canvas";
 	} catch {
-		return "server";
+		return "canvas";
 	}
 };
-const [chosen, setChosen] = createSignal<ShotAdaptorId>(typeof localStorage === "undefined" ? "server" : load());
+/* Canvas when nothing was chosen: the start of the order, so every way is tried. */
+const [chosen, setChosen] = createSignal<ShotAdaptorId>(typeof localStorage === "undefined" ? "canvas" : load());
 
 /** The adaptor in use, chosen in Settings and remembered per browser. */
-export const shotAdaptor = () => SHOT_ADAPTORS.find((one) => one.id === chosen()) ?? serverAdaptor;
+export const shotAdaptor = () => SHOT_ADAPTORS.find((one) => one.id === chosen()) ?? canvasAdaptor;
 export const shotAdaptorId = chosen;
 export function chooseShotAdaptor(id: ShotAdaptorId): void {
 	setChosen(id);
@@ -190,18 +205,21 @@ export function chooseShotAdaptor(id: ShotAdaptorId): void {
 
 /**
  * A board as the person's browser has it now, for an agent's `stage.screenshot` (`stage.call` op
- * `shot`): drawn by HTML-in-Canvas when the page can be, from a snapshot when it cannot, and
- * `none` when this browser has no live page for the board, which leaves the server's picture to
- * the server. Both of the first two show what the person did on the page.
+ * `shot`), in the pictures' order from the one chosen in Settings: HTML-in-Canvas when the page can
+ * be drawn by it, a snapshot when not, and `none` (the server's picture, taken by the server) when
+ * neither can or this browser has no live page for the board. The first two show what the person
+ * did on the page.
  */
 export async function seenPicture(board: Board): Promise<{ how: "canvas" | "snapshot"; mime: string; data: string } | { how: "none"; why: string }> {
 	const frame = Array.from(document.querySelectorAll<HTMLIFrameElement>("iframe[data-path]")).find(
 		(one) => one.dataset.path === board.path && one.isConnected && (one.contentWindow as (Window & { __boardReady?: boolean }) | null)?.__boardReady === true,
 	);
 	if (!frame) return { how: "none", why: "the board has no live page in the person's browser" };
+	const from = chosen();
+	if (from === "server") return { how: "none", why: "pictures are set to Server in the person's Settings" };
 	let how: "canvas" | "snapshot" = "snapshot";
 	let blob: Blob | undefined;
-	if (canDrawInCanvas(frame)) {
+	if (from === "canvas" && canDrawInCanvas(frame)) {
 		how = "canvas";
 		blob = await takeInCanvas(frame, board).catch(() => undefined);
 	}

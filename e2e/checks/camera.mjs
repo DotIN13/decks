@@ -332,11 +332,11 @@ const barsNow = () =>
 			nodes: document.querySelectorAll(".board-node").length,
 			near,
 			documents: document.querySelectorAll(".board-node iframe").length,
-			bars: document.querySelectorAll(".bar-layer").length,
+			bars: document.querySelectorAll(".bar-layer .chrome").length,
 		};
 	});
 const bars = await barsNow();
-say("boards draw no title bars, on screen or off: a selected board's name and actions are its pill", bars.bars === 0, JSON.stringify(bars));
+say("only the boards on screen or near it, and wide enough there, have title bars", bars.bars > 0 && bars.bars <= bars.near, JSON.stringify(bars));
 /*
  * 6. A document outlives its board leaving the screen, by a moment.
  *
@@ -554,12 +554,19 @@ for (let i = 0; i < 20 && (await page.evaluate(() => document.querySelector(".st
 	await page.waitForTimeout(350);
 }
 await settle(page, 1500);
-const asleep = await page.evaluate((paths) => paths.map((path) => {
+const sleeping = () => page.evaluate((paths) => paths.map((path) => {
 	const node = document.querySelector(`.board-node[data-path="${CSS.escape(path)}"]`);
 	// The selected board stays live at any zoom, so it is the one that is not dormant.
 	const selected = node?.dataset.selected === "true";
 	return { dormant: selected || (node?.hasAttribute("data-dormant") ?? false), same: node?.querySelector("iframe")?.contentWindow?.__kept === 7 };
 }), marked);
+/* A page sleeps once its picture is taken (the Default pictures send each one to the server's Chrome,
+   two at a time), so seven take a few seconds: waited for, up to eight. */
+let asleep = await sleeping();
+for (let i = 0; i < 26 && !asleep.every((one) => one.dormant); i++) {
+	await page.waitForTimeout(250);
+	asleep = await sleeping();
+}
 say(
 	"zoomed out below the live zoom, a page that was shown stays loaded and dormant",
 	marked.length > 0 && asleep.every((one) => one.dormant && one.same),

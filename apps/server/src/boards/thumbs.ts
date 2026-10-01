@@ -51,6 +51,7 @@ import type { Board } from "@decks/protocol";
 
 type Playwright = typeof import("playwright");
 type Browser = import("playwright").Browser;
+type Page = import("playwright").Page;
 
 export type ThumbScheme = "light" | "dark";
 /**
@@ -64,6 +65,43 @@ const WHOLE_MAX_H = 12_000;
 
 /** How wide a picture is, in real pixels. A gallery card is ~220 CSS px; 640 read soft on a retina grid. */
 export const THUMB_WIDTH = 720;
+/**
+ * A whole picture is taken at up to twice the board's own size, so a board the canvas draws as its
+ * picture stays sharp on a 2x screen up to life size (`canvas/pen/scene.ts` decodes it at the size
+ * it is drawn). Capped at 2048 px wide and 16M pixels in all, and never below the card's width.
+ */
+export function wholeScale(board: Pick<Board, "w" | "h">): number {
+	const w = Math.max(200, Math.round(board.w));
+	const h = Math.max(150, Math.min(Math.round(board.h), WHOLE_MAX_H));
+	return Math.max(THUMB_WIDTH / w, Math.min(2, 2048 / w, Math.sqrt(16_000_000 / (w * h))));
+}
+/**
+ * A whole picture, as WebP at quality 88: at twice a board's size it looks the same as a JPEG at
+ * that quality and is half the bytes (three boards at 2000 px wide: 141, 163 and 302 KB against
+ * 263, 306 and 569). Lossless WebP was measured too, and came out a tenth larger than the JPEG.
+ * Playwright writes only PNG and JPEG, so Chrome is asked directly, at `scale` image pixels per
+ * CSS pixel (it does not apply the device scale to a clip itself); a page that cannot be asked (a
+ * test's stand-in) gets a JPEG, which `pictureType` tells apart by its bytes.
+ */
+export async function wholeShot(page: Page, clip: { width: number; height: number }, scale: number): Promise<Buffer> {
+	const context = typeof page.context === "function" ? page.context() : undefined;
+	if (context && typeof context.newCDPSession === "function") {
+		const cdp = await context.newCDPSession(page);
+		try {
+			const { data } = await cdp.send("Page.captureScreenshot", { format: "webp", quality: 88, clip: { x: 0, y: 0, width: clip.width, height: clip.height, scale }, captureBeyondViewport: true });
+			return Buffer.from(data, "base64");
+		} finally {
+			await cdp.detach().catch(() => {});
+		}
+	}
+	return page.screenshot({ type: "jpeg", quality: 88, clip: { x: 0, y: 0, width: clip.width, height: clip.height }, fullPage: true, animations: "disabled", timeout: 15_000 });
+}
+
+/** What a picture file holds, from its first bytes: a whole picture is WebP, a card JPEG. */
+export function pictureType(bytes: Uint8Array): "webp" | "jpeg" {
+	return bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 ? "webp" : "jpeg";
+}
+
 /** The gallery's card: `aspect-ratio: 4 / 3`, cropped from the board's top left. */
 const ASPECT = 3 / 4;
 const CONCURRENCY = 2;
@@ -108,13 +146,23 @@ interface Job {
  */
 export function thumbName(path: string, rev: number, scheme: ThumbScheme, kind: ThumbKind = "card"): string {
 	const hash = createHash("sha1").update(path).digest("hex").slice(0, 16);
-	return `${hash}-${rev}-${scheme}-${THUMB_WIDTH}${kind === "whole" ? "-whole" : ""}.jpg`;
+	return `${hash}-${rev}-${scheme}-${THUMB_WIDTH}${kind === "whole" ? "-whole" : ""}-l${PICTURE_LOOK}.${kind === "whole" ? "webp" : "jpg"}`;
 }
+
+/**
+ * How boards are drawn, as far as their pictures go: raised when a change to the shipped `lib/`
+ * changes every board's look, so every picture is a miss once and is taken again. 2: the board
+ * fonts are shipped (`lib/type/`), where the server's Chrome had drawn Liberation Sans. 3: a whole
+ * picture is taken at up to twice the board's size (`wholeScale`), where it was 720 px wide, and as
+ * WebP (`wholeShot`). The app
+ * puts the same number in each picture's address (`thumbUrl`), which the browser keeps a year.
+ */
+export const PICTURE_LOOK = 3;
 
 /** Every picture of this board in this scheme and kind, at any revision and width. */
 function pictureOf(path: string, scheme: ThumbScheme, kind: ThumbKind = "card"): RegExp {
 	const hash = thumbName(path, 0, scheme).slice(0, 16);
-	return kind === "whole" ? new RegExp(`^${hash}-\\d+-${scheme}-\\d+-whole\\.jpg$`) : new RegExp(`^${hash}-\\d+-${scheme}(-\\d+)?\\.jpg$`);
+	return kind === "whole" ? new RegExp(`^${hash}-\\d+-${scheme}-\\d+-whole(-l\\d+)?\\.(jpg|webp)$`) : new RegExp(`^${hash}-\\d+-${scheme}(-\\d+)?(-l\\d+)?\\.jpg$`);
 }
 
 /**
@@ -221,7 +269,7 @@ export class ThumbService {
 		this.schemes = new Set();
 		try {
 			for (const name of readdirSync(this.host.dir)) {
-				const found = /-(light|dark)(-\d+)?(?:-(whole))?\.jpg$/.exec(name);
+				const found = /-(light|dark)(-\d+)?(?:-(whole))?(?:-l\d+)?\.(?:jpg|webp)$/.exec(name);
 				if (found) this.schemes.add(found[3] ? `${found[1]}/${found[3]}` : found[1]!);
 			}
 		} catch {
@@ -320,7 +368,7 @@ export class ThumbService {
 		const tall = job.kind === "whole" ? Math.max(full.height, Math.min(Math.round(job.board.h), WHOLE_MAX_H)) : full.height;
 		const context = await browser.newContext({
 			viewport: { width: full.width, height: tall },
-			deviceScaleFactor: full.scale,
+			deviceScaleFactor: job.kind === "whole" ? wholeScale({ w: job.board.w, h: tall }) : full.scale,
 			colorScheme: job.scheme,
 			reducedMotion: "reduce",
 		});
@@ -344,15 +392,10 @@ export class ThumbService {
 					this.host.measured?.(job.board.path, job.board.rev, h);
 				}
 			}
-			const shot = await page.screenshot({
-				type: "jpeg",
-				quality: 82,
-				clip: { x: 0, y: 0, width: clip.width, height: clip.height },
-				// A whole board can be taller than the window it was laid out in.
-				fullPage: job.kind === "whole",
-				animations: "disabled",
-				timeout: 15_000,
-			});
+			const shot =
+				job.kind === "whole"
+					? await wholeShot(page, clip, wholeScale({ w: job.board.w, h: tall }))
+					: await page.screenshot({ type: "jpeg", quality: 82, clip: { x: 0, y: 0, width: clip.width, height: clip.height }, animations: "disabled", timeout: 15_000 });
 			mkdirSync(this.host.dir, { recursive: true });
 			writeFileSync(job.file, shot);
 			this.forgetOlder(job);

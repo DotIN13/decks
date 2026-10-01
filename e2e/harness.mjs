@@ -137,15 +137,17 @@ export async function open({ width = 1500, height = 950, scheme = "dark", boards
 	 * symptom was a panel that forgot its tab and its fold partway through a check, which
 	 * reads as a bug in the panel.
 	 */
-	await page.addInitScript((wanted) => {
+	await page.addInitScript(([wanted, renderer]) => {
 		if (window.top !== window.self) return;
 		try {
 			localStorage.clear();
 			localStorage.setItem("decks.scheme", wanted);
+			// `DECKS_E2E_RENDERER=canvas-per-board` runs a check on the Canvas renderer instead of the default.
+			if (renderer) localStorage.setItem("decks.renderer", renderer);
 		} catch {
 			/* private mode, or a page that has no storage access yet */
 		}
-	}, scheme);
+	}, [scheme, process.env.DECKS_E2E_RENDERER ?? ""]);
 	/*
 	 * The plain web root. There is one screen in the app — the focused agent's stage — and the
 	 * server remembers which agent each browser is on, so there is no address to name a place
@@ -701,7 +703,7 @@ export function rangeOfAttr(html, attr, value) {
 /**
  * Select a board the way a person does now that boards have no title bars: click it. The point is
  * one that is really on the board — not under the sidebar, a toolbar, the composer or the pill — and
- * then the board's pill (`canvas/BoardCallout.tsx`) is waited for.
+ * then the board's pill (`canvas/BoardCallout.tsx`), or on a desktop its selected title bar, is waited for.
  */
 const innerWidthOf = (page) => page.viewportSize()?.width ?? 1440;
 
@@ -757,7 +759,8 @@ export async function selectBoard(page, path, { timeout = 4000 } = {}) {
 		throw new Error(`no uncovered point on ${path} to click: ${why}`);
 	}
 	await page.mouse.click(at.x, at.y);
-	await page.waitForSelector(".board-callout:not([data-hidden])", { timeout });
+	// The pill on a touch screen; on a desktop the board's own title bar, selected.
+	await page.waitForSelector(`.board-callout:not([data-hidden]), .bar-layer .chrome[data-selected][data-path="${path}"]`, { timeout });
 	await page.waitForTimeout(150);
 }
 
@@ -770,7 +773,8 @@ export async function flyToBoard(page, path) {
 
 /** One of the selected board's actions, by its word: Fit, Focus, Fullscreen, Present, New tab, Hide. */
 export function pillButton(page, label) {
-	return page.locator(`.board-callout [role=menuitem][aria-label="${label}"]`).first();
+	// The pill on a touch screen, the selected board's title bar on a desktop: the same actions under the same names.
+	return page.locator(`.board-callout [role=menuitem][aria-label="${label}"], .bar-layer .chrome[data-selected] [data-act="${label}"]`).first();
 }
 
 /**

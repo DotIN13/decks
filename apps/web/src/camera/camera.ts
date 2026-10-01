@@ -20,6 +20,11 @@ export function isPhone(device = thisDevice()): boolean {
 	return !!device?.coarse && device.short < 600;
 }
 
+/** A pointer that hovers and is precise, so boards carry title bars and the selected one no action pill (`Stage`). */
+export function hasTitleBars(device = thisDevice()): boolean {
+	return !device?.coarse;
+}
+
 /** The live zoom, on every device. */
 const LIVE_ZOOM = 0.2;
 

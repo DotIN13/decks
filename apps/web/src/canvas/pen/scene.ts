@@ -98,7 +98,7 @@ export type SceneInput =
 	| { type: "doc"; doc: PenDocument | undefined; base: string; seq: number }
 	| { type: "boards"; boards: SceneBoard[] }
 	| { type: "scheme"; scheme: "light" | "dark" }
-	| { type: "view"; width: number; height: number; dpr: number; overscan: number; budget: number }
+	| { type: "view"; width: number; height: number; dpr: number; overscan: number; budget: number; widest: number }
 	| { type: "camera"; camera: Camera; moving: boolean }
 	| { type: "preview"; moving: Array<[string, PenPreview]> | undefined }
 	/** Boards being carried by a drag: drawn into the carried picture, not the sheet (`drawFrame`). */
@@ -156,8 +156,36 @@ interface DrawnItem {
 	picture: Picture;
 }
 
-/** Picture widths the scene decodes at, in pixels: the smallest that covers the board on screen. */
-const LEVELS = [96, 192, 384, 720];
+/**
+ * Picture widths the scene decodes at, in pixels: the smallest that covers the board on screen, and
+ * never wider than the picture itself (`natural`). A whole picture is up to twice the board's width
+ * (`wholeScale` on the server), so a board zoomed in on stays sharp.
+ */
+const LEVELS = [96, 192, 384, 720, 1024, 1440, 2048];
+
+/** A picture's width from its header, without decoding it: WebP (the server's whole pictures) or JPEG; undefined for anything else. */
+async function pictureWidth(blob: Blob): Promise<number | undefined> {
+	const bytes = new Uint8Array(await blob.slice(0, 256 * 1024).arrayBuffer());
+	const tag = (at: number) => String.fromCharCode(bytes[at]!, bytes[at + 1]!, bytes[at + 2]!, bytes[at + 3]!);
+	if (bytes.length > 30 && tag(0) === "RIFF" && tag(8) === "WEBP") {
+		const chunk = tag(12);
+		if (chunk === "VP8X") return 1 + (bytes[24]! | (bytes[25]! << 8) | (bytes[26]! << 16));
+		if (chunk === "VP8L") return 1 + (bytes[21]! | ((bytes[22]! & 0x3f) << 8));
+		if (chunk === "VP8 ") return (bytes[26]! | (bytes[27]! << 8)) & 0x3fff;
+		return undefined;
+	}
+	if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
+	let at = 2;
+	while (at + 9 < bytes.length) {
+		if (bytes[at] !== 0xff) return undefined;
+		const marker = bytes[at + 1]!;
+		const length = (bytes[at + 2]! << 8) | bytes[at + 3]!;
+		// A start-of-frame segment (baseline, progressive and the rest, not the tables between them) holds the size.
+		if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return (bytes[at + 7]! << 8) | bytes[at + 8]!;
+		at += 2 + length;
+	}
+	return undefined;
+}
 /** Pictures fetched at once. The server takes two at a time; four keeps it busy. */
 const FETCHES = 4;
 /** How long the camera has to be still before a picture is decoded at a new size. */
@@ -167,6 +195,8 @@ interface PictureEntry {
 	path: string;
 	url: string;
 	blob?: Blob;
+	/** The picture's own width, from its header: no level is decoded wider. */
+	natural?: number;
 	fetching?: boolean;
 	failed?: boolean;
 	/** The decoded picture, and the width it was decoded at. */
@@ -193,7 +223,7 @@ export class StageScene {
 	/** The frame last handed to the page: the camera it was drawn for, and what it covers. */
 	private shown: { camera: Camera; rect: Rect } | undefined;
 	private movedAt = 0;
-	private view = { width: 0, height: 0, dpr: 1, overscan: 0, budget: 16_000_000 };
+	private view = { width: 0, height: 0, dpr: 1, overscan: 0, budget: 16_000_000, widest: 2048 };
 	private boards: SceneBoard[] = [];
 	private boardFrames = new Map<string, Frame>();
 	private dirty = true;
@@ -309,7 +339,7 @@ export class StageScene {
 				this.dirty = true;
 				break;
 			case "view":
-				this.view = { width: message.width, height: message.height, dpr: message.dpr, overscan: message.overscan, budget: message.budget };
+				this.view = { width: message.width, height: message.height, dpr: message.dpr, overscan: message.overscan, budget: message.budget, widest: message.widest };
 				break;
 			case "camera":
 				this.camera = message.camera;
@@ -789,8 +819,10 @@ export class StageScene {
 				continue;
 			}
 			const need = board.w * zoom * this.view.dpr;
-			const levels = this.off.has("small") ? LEVELS.slice(0, 2) : LEVELS;
-			const level = levels.find((one) => one >= need) ?? levels[levels.length - 1]!;
+			// A phone stops at 1024 (`PICTURE_WIDEST` in `layer.ts`).
+			const levels = this.off.has("small") ? LEVELS.slice(0, 2) : LEVELS.filter((one) => one <= this.view.widest);
+			const most = entry.natural ?? levels[levels.length - 1]!;
+			const level = Math.min(levels.find((one) => one >= need) ?? levels[levels.length - 1]!, most);
 			const has = entry.bitmap || entry.image ? entry.level : 0;
 			// Decoded once as soon as it arrives; at a new size only when the camera has stopped.
 			const busy = this.off.has("serial") && [...this.entries.values()].some((one) => one.decoding !== undefined);
@@ -804,7 +836,8 @@ export class StageScene {
 		this.fetching++;
 		void fetch(entry.url, { credentials: "same-origin" })
 			.then((response) => (response.ok ? response.blob() : Promise.reject(new Error(String(response.status)))))
-			.then((blob) => {
+			.then(async (blob) => {
+				entry.natural = await pictureWidth(blob).catch(() => undefined);
 				entry.blob = blob;
 			})
 			.catch(() => {
@@ -821,7 +854,7 @@ export class StageScene {
 		const blob = entry.blob;
 		if (!blob) return;
 		entry.decoding = level;
-		void createImageBitmap(blob, { resizeWidth: level, resizeQuality: "medium" } as ImageBitmapOptions)
+		void createImageBitmap(blob, { resizeWidth: level, resizeQuality: "high" } as ImageBitmapOptions)
 			.then((bitmap) => {
 				if (this.disposed || this.entries.get(entry.path) !== entry) {
 					bitmap.close();

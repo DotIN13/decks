@@ -12,6 +12,55 @@
  * of saying so. `board.css` has always stated it; a page that links this file alone was
  * getting it from neither.
  */
+/*
+ * The two families the stacks below name first, shipped with the board (`type/`), so a board
+ * reads the same in any browser and in the server's Chrome that draws its picture. Without
+ * them "Inter" matched nothing on a machine without it installed, and each fell back to its
+ * own system font: a Mac's live page and the server's picture of it were two typefaces.
+ */
+@font-face {
+	font-family: "Inter";
+	font-style: normal;
+	font-weight: 100 900;
+	font-display: swap;
+	src: url("type/InterVariable.woff2") format("woff2");
+}
+@font-face {
+	font-family: "Inter";
+	font-style: italic;
+	font-weight: 100 900;
+	font-display: swap;
+	src: url("type/InterVariable-Italic.woff2") format("woff2");
+}
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url("type/JetBrainsMono-Regular.woff2") format("woff2");
+}
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: normal;
+	font-weight: 500;
+	font-display: swap;
+	src: url("type/JetBrainsMono-Medium.woff2") format("woff2");
+}
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: normal;
+	font-weight: 600 800;
+	font-display: swap;
+	src: url("type/JetBrainsMono-Bold.woff2") format("woff2");
+}
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: italic;
+	font-weight: 400;
+	font-display: swap;
+	src: url("type/JetBrainsMono-Italic.woff2") format("woff2");
+}
+
 :root {
 	--b-grey-50: #ffffff;
 	--b-grey-100: #fafafa;
