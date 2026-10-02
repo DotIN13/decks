@@ -224,7 +224,8 @@ export function ModelPicker(props: {
 				conditional; both traded a fact that is always true for a layout that is only
 				sometimes tidy.
 			*/}
-			<div class="max-h-[min(33vh,300px)] overflow-y-auto">
+			{/* `px-1.5`: the rows stand in from the card's edge as the search field and the subscription rows do. */}
+			<div class="max-h-[min(33vh,300px)] overflow-y-auto px-1.5">
 				<Show when={matches().length > 0} fallback={<p class="meta m-0 px-2 py-2.5">No model matches that</p>}>
 					<For each={matches()}>
 						{(option) => (

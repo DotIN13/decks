@@ -388,20 +388,23 @@
 			touch-action: none;
 		}
 	}
+	/* The grip is the composer's own (`.dock-grip`), and the title and × stay centred in the header under it. */
 	@media (pointer: coarse) {
+		/* 8px of the header is the grip's (4px down, 4px tall), so the title and × centre in the 40px under it. */
 		.stream[data-shown="true"] .stream-head {
-			height: 44px;
-			padding-top: 6px;
+			box-sizing: border-box;
+			height: 48px;
+			padding-top: 8px;
 		}
 		.stream-grip {
 			position: absolute;
-			top: 6px;
+			top: 4px;
 			left: 50%;
 			display: block;
-			width: 36px;
-			height: 5px;
-			margin-left: -18px;
-			border-radius: 3px;
+			width: 28px;
+			height: 4px;
+			margin-left: -14px;
+			border-radius: 2px;
 			background: var(--line-strong);
 			opacity: 0.8;
 		}

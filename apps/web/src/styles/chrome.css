@@ -46,6 +46,11 @@
 		.popover {
 			--radius-item: 999px;
 		}
+		/* A row with a line of explanation under its name is two lines tall, and a capsule that tall is an
+		   oval: it takes the card's corner less the card's 6px inset instead (22 − 6), as iOS rounds a cell. */
+		.popover [data-row]:has(> .row-note) {
+			border-radius: 16px;
+		}
 	}
 
 	.float.pill {

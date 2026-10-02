@@ -1,4 +1,5 @@
 import type { AgentChat, AgentKind, Identity } from "@decks/protocol";
+import { createMemo, Show } from "solid-js";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import { AgentFace, AgentMenu } from "../../agents/AgentPill.tsx";
 import { Icon } from "../../ui/icons.tsx";
@@ -39,10 +40,17 @@ export function Recipient(props: RecipientProps) {
 		if (props.dest.kind === "note") return "a board";
 		return "No agent";
 	};
-	const face = () => {
-		const chat = agent();
-		return chat ? <AgentFace chat={chat} identity={props.identities[chat.id]} size={16} ring={1} /> : undefined;
-	};
+	/*
+	 * The face stays mounted while the recipient stays the same. The destination is worked out
+	 * again from the text on every keystroke, so a face made inside that computation was a new
+	 * element, and a new image, per letter: the avatar flickered while you typed.
+	 */
+	const agentId = createMemo(() => agent()?.id);
+	const face = (
+		<Show when={agentId()}>
+			{(id) => <AgentFace chat={props.chats.find((chat) => chat.id === id())!} identity={props.identities[id()]} size={16} ring={1} />}
+		</Show>
+	);
 	return (
 		<span class="dock-to" data-dest={props.label} data-kind={props.dest.kind}>
 			<span class="dock-to-word">To</span>
@@ -68,7 +76,7 @@ export function Recipient(props: RecipientProps) {
 						aria-label={`Who gets the line: ${props.label}. Press to choose.`}
 						onClick={api.toggle}
 					>
-						{face()}
+						{face}
 						<span class="dock-to-name">{name()}</span>
 						<Icon of={ChevronDown} size={11} />
 					</button>
