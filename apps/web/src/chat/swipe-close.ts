@@ -109,6 +109,9 @@ export function attachSwipeClose(
 }
 const PULL_START = 6; // pixels down before the pull takes the sheet
 const PULL_FRACTION = 0.2; // of the sheet's own height
+/** The curve iOS moves its sheets on, and how long a sheet let go short of closing takes to settle back. */
+const SHEET_CURVE = "cubic-bezier(0.32, 0.72, 0, 1)";
+const SETTLE_MS = 320;
 
 /**
  * Pull the history down by its grip to put it away, as a phone's bottom sheet goes.
@@ -127,14 +130,51 @@ export function attachPullClose(sheet: HTMLElement, grip: HTMLElement, isOpen: (
 	let lastDy = 0;
 	let speed = 0;
 
-	const reset = () => {
+	let settling: ReturnType<typeof setTimeout> | undefined;
+	const unlisten = () => {
 		owner = undefined;
 		pulling = false;
-		sheet.style.transition = "";
-		sheet.style.transform = "";
 		window.removeEventListener("pointermove", onMove);
 		window.removeEventListener("pointerup", onUp);
 		window.removeEventListener("pointercancel", onUp);
+	};
+	const reset = () => {
+		clearTimeout(settling);
+		unlisten();
+		sheet.style.transition = "";
+		sheet.style.transform = "";
+	};
+
+	/*
+	 * Let go: the sheet carries on the way the finger sent it, on iOS's own sheet curve, rather
+	 * than being clipped away where it stood. Going, it runs down past the bottom of the screen at
+	 * the speed it was thrown (never slower than a brisk 0.9 px/ms), and only then is the history
+	 * closed, out of sight; the inline transform is dropped two frames later, behind the closed
+	 * clip. Staying, it eases back up on the same curve.
+	 */
+	const letGo = (go: boolean) => {
+		unlisten();
+		clearTimeout(settling);
+		if (!go) {
+			sheet.style.transition = `transform ${SETTLE_MS}ms ${SHEET_CURVE}`;
+			sheet.style.transform = "";
+			settling = setTimeout(() => (sheet.style.transition = ""), SETTLE_MS + 40);
+			return;
+		}
+		const rest = Math.max(0, window.innerHeight - sheet.getBoundingClientRect().top + 24);
+		const ms = Math.round(Math.min(420, Math.max(220, rest / Math.max(0.9, speed))));
+		sheet.style.transition = `transform ${ms}ms ${SHEET_CURVE}`;
+		sheet.style.transform = `translateY(${dy + rest}px)`;
+		settling = setTimeout(() => {
+			sheet.style.transition = "none";
+			onClose();
+			requestAnimationFrame(() =>
+				requestAnimationFrame(() => {
+					sheet.style.transform = "";
+					sheet.style.transition = "";
+				}),
+			);
+		}, ms);
 	};
 
 	const onDown = (event: PointerEvent) => {
@@ -170,8 +210,8 @@ export function attachPullClose(sheet: HTMLElement, grip: HTMLElement, isOpen: (
 	const onUp = (event: PointerEvent) => {
 		if (event.pointerId !== owner) return;
 		const go = pulling && (dy > sheet.clientHeight * PULL_FRACTION || (speed > VELOCITY && event.timeStamp - lastMove < 80));
-		reset();
-		if (go) onClose();
+		if (pulling) letGo(go);
+		else unlisten();
 	};
 
 	grip.addEventListener("pointerdown", onDown);
