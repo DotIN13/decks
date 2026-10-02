@@ -45,6 +45,23 @@
 	.panel-shell {
 		box-sizing: border-box;
 	}
+	/*
+	 * The panel is controls, not text to copy: a tap on a tab, a name or a tag is a press. Left
+	 * selectable, Chrome on Android took a tap on one as picking out a word and offered its own
+	 * actions for it (an email to write, a search) over the panel. The search field stays a field.
+	 */
+	@media (pointer: coarse) {
+		.panel-shell,
+		.panel-shell button {
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			user-select: none;
+		}
+		.panel-shell :is(input, textarea, [contenteditable="true"]) {
+			-webkit-user-select: text;
+			user-select: text;
+		}
+	}
 
 	/*
 	 * The handle that sets the panel's width: 8px straddling the right edge, so it is easy to
