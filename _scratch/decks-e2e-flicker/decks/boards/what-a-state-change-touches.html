@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>What a state change touches, and the strip</title>
+		<meta name="board" content='{"w":1040,"h":968,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<!--
+			The pictures that go with `boards/the-panel-agents-first-and-a-list-that-stopped-f.html`:
+			what a state change used to touch and what it touches now, the strip as it now reads, and
+			the check's own output from both sides.
+
+			The output is pasted rather than described, and it is the only thing on this board that
+			cannot be read off the file: `e2e/checks/panel-steady.mjs`, run against `origin/main` and
+			then against `8b87dd1`.
+		-->
+
+		<section class="card" data-id="traces" style="left: 32px; top: 32px; width: 976px">
+			<h3>What one state change touches</h3>
+			<svg viewBox="0 0 928 216" width="100%" height="216" role="img" aria-label="Five agent rows, twice. On the left a state change re-creates all five. On the right it updates one row and leaves four alone.">
+				<text x="8" y="16" font-size="11" fill="var(--b-muted)">before: Pi's state changes</text>
+				<text x="492" y="16" font-size="11" fill="var(--b-muted)">after: the same change</text>
+
+				<g>
+					<rect x="8" y="32" width="396" height="24" rx="6" fill="var(--b-bg-layer)" stroke="var(--b-danger)" stroke-width="1.5" stroke-dasharray="4 3" />
+					<circle cx="26" cy="44" r="4" fill="var(--b-accent)" />
+					<text x="40" y="48" font-size="12" fill="var(--b-fg)">Ada</text>
+					<text x="396" y="48" font-size="11" fill="var(--b-danger)" text-anchor="end">re-created</text>
+
+					<rect x="8" y="64" width="396" height="24" rx="6" fill="var(--b-bg-layer)" stroke="var(--b-danger)" stroke-width="1.5" stroke-dasharray="4 3" />
+					<circle cx="26" cy="76" r="4" fill="var(--b-accent)" />
+					<text x="40" y="80" font-size="12" fill="var(--b-fg)">Pi</text>
+					<text x="396" y="80" font-size="11" fill="var(--b-danger)" text-anchor="end">re-created</text>
+
+					<rect x="8" y="96" width="396" height="24" rx="6" fill="var(--b-bg-layer)" stroke="var(--b-danger)" stroke-width="1.5" stroke-dasharray="4 3" />
+					<circle cx="26" cy="108" r="4" fill="var(--b-accent)" />
+					<text x="40" y="112" font-size="12" fill="var(--b-fg)">Wren</text>
+					<text x="396" y="112" font-size="11" fill="var(--b-danger)" text-anchor="end">re-created</text>
+
+					<rect x="8" y="128" width="396" height="24" rx="6" fill="var(--b-bg-layer)" stroke="var(--b-danger)" stroke-width="1.5" stroke-dasharray="4 3" />
+					<circle cx="26" cy="140" r="4" fill="var(--b-faint)" />
+					<text x="40" y="144" font-size="12" fill="var(--b-fg)">Mira</text>
+					<text x="396" y="144" font-size="11" fill="var(--b-danger)" text-anchor="end">re-created</text>
+
+					<rect x="8" y="160" width="396" height="24" rx="6" fill="var(--b-bg-layer)" stroke="var(--b-danger)" stroke-width="1.5" stroke-dasharray="4 3" />
+					<circle cx="26" cy="172" r="4" fill="var(--b-faint)" />
+					<text x="40" y="176" font-size="12" fill="var(--b-fg)">Rook</text>
+					<text x="396" y="176" font-size="11" fill="var(--b-danger)" text-anchor="end">re-created</text>
+				</g>
+
+				<g>
+					<rect x="492" y="32" width="396" height="24" rx="6" fill="var(--b-bg-layer)" stroke="var(--b-border)" />
+					<circle cx="510" cy="44" r="4" fill="var(--b-accent)" />
+					<text x="524" y="48" font-size="12" fill="var(--b-fg)">Ada</text>
+
+					<rect x="492" y="64" width="396" height="24" rx="6" fill="var(--b-accent-soft)" stroke="var(--b-accent)" stroke-width="1.5" />
+					<circle cx="510" cy="76" r="4" fill="var(--b-accent)" />
+					<text x="524" y="80" font-size="12" fill="var(--b-fg)">Pi</text>
+					<text x="880" y="80" font-size="11" fill="var(--b-accent)" text-anchor="end">its dot and its word change</text>
+
+					<rect x="492" y="96" width="396" height="24" rx="6" fill="var(--b-bg-layer)" stroke="var(--b-border)" />
+					<circle cx="510" cy="108" r="4" fill="var(--b-accent)" />
+					<text x="524" y="112" font-size="12" fill="var(--b-fg)">Wren</text>
+
+					<rect x="492" y="128" width="396" height="24" rx="6" fill="var(--b-bg-layer)" stroke="var(--b-border)" />
+					<circle cx="510" cy="140" r="4" fill="var(--b-faint)" />
+					<text x="524" y="144" font-size="12" fill="var(--b-fg)">Mira</text>
+
+					<rect x="492" y="160" width="396" height="24" rx="6" fill="var(--b-bg-layer)" stroke="var(--b-border)" />
+					<circle cx="510" cy="172" r="4" fill="var(--b-faint)" />
+					<text x="524" y="176" font-size="12" fill="var(--b-fg)">Rook</text>
+				</g>
+
+				<text x="8" y="204" font-size="11" fill="var(--b-muted)">All 5 re-created, and the avatars, tag chips, popup and focus with them.</text>
+				<text x="492" y="204" font-size="11" fill="var(--b-muted)">1 row updated where it stands. Nothing added, nothing removed.</text>
+			</svg>
+		</section>
+
+		<section class="card" data-id="strip" style="left: 32px; top: 336px; width: 472px">
+			<h3>Agents first, Boards second</h3>
+			<img
+				src="../assets/panel-agents-agents-first.png"
+				alt="The panel's header with Agents first and Boards second, above a search field, the Wants you heading and two agent rows"
+				style="width: 264px; border: 1px solid var(--b-border); border-radius: 8px"
+			/>
+			<p>
+				The order is the panel's reading order: the agents are the list that changes while you
+				watch, and a list you check on is read before a list you browse. The left and right arrows
+				walk the strip in that order now.
+			</p>
+			<p style="color: var(--b-muted); font-size: 12px">
+				The panel still opens on Boards, which is the canvas the app opened on. Flipping that is one
+				line, if you want it flipped.
+			</p>
+		</section>
+
+		<section class="card" data-id="evidence" style="left: 520px; top: 336px; width: 488px">
+			<h3>The check, from both sides</h3>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 0">
+				<code>e2e/checks/panel-steady.mjs</code>, whose output this is, drives the socket itself, so
+				there is no agent and no model anywhere in it.
+			</p>
+			<pre style="font-size: 10.5px; line-height: 1.5"><code># origin/main
+FAIL  a state change adds no node, removes none
+FAIL  …every row is the element it was
+FAIL  …with a keyboard reader still on their row
+FAIL  the working face keeps its pulse running
+FAIL  a popup stays open while the list is redrawn
+FAIL  in the workspace grouping, nothing moves
+7 passed, 11 failed assertions</code></pre>
+			<pre style="font-size: 10.5px; line-height: 1.5"><code># 8b87dd1
+PASS  a state change adds no node, removes none
+PASS  …every row is the element it was
+PASS  …with a keyboard reader still on their row
+PASS  the working face keeps its pulse running
+PASS  a popup stays open while the list is redrawn
+PASS  in the workspace grouping, nothing moves
+18 passed, 0 failed assertions</code></pre>
+			<p style="color: var(--b-muted); font-size: 12px">
+				The assertion text is cut to the first clause so that it fits here. The numbers behind it are
+				<code>0 added, 0 removed</code>, <code>14 of 14 kept</code>, and one animation that carries on
+				at 950ms where it left off at 433ms.
+			</p>
+		</section>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

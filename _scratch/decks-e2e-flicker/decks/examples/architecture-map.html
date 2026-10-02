@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Service ownership in the checkout dependency graph</title>
+		<meta name="board" content='{"w":1100,"h":1032,"bg":"grid"}' />
+		<link rel="stylesheet" href="../lib/board.css" />
+		<script type="importmap">
+		{
+		  "imports": {
+		    "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+		    "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+		    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+		    "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.15.0/+esm",
+		    "chart.js": "https://cdn.jsdelivr.net/npm/chart.js@4.5.1/+esm"
+		  }
+		}
+		</script>
+	</head>
+	<body class="board">
+		<div class="text" data-id="heading" style="left: 48px; top: 40px; width: 1004px">
+			<h1>Service ownership in the checkout dependency graph</h1>
+		</div>
+
+		<div class="callout" data-id="finding" data-tone="accent" style="left: 48px; top: 112px; width: 1004px">
+			<p><b>Every cart and place-order call on this surface passes through catalog, inventory and payments.</b> Payments has no owner on the roster and its on-call rotation points at a mailbox that no longer exists.</p>
+		</div>
+
+		<section class="card" data-id="graph" style="left: 48px; top: 200px; width: 1004px">
+			<h3>Service graph, drawn from the traffic matrix</h3>
+			<div id="graph" style="position: relative; height: 340px"></div>
+			<div id="legend" style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px"></div>
+			<p style="color: var(--b-muted); font-size: 12px; margin-top: 8px">A line points from a caller to the service it depends on. Node size is requests per second. Click a node to see what it reaches; drag to rearrange.</p>
+		</section>
+
+		<section class="card" data-id="ownership" style="left: 48px; top: 688px; width: 512px">
+			<h3>Who owns what</h3>
+			<table class="table">
+				<thead>
+					<tr><th>Surface</th><th>Service</th><th>Owner</th></tr>
+				</thead>
+				<tbody>
+					<tr><td>Checkout</td><td>checkout, cart</td><td>Porter</td></tr>
+					<tr><td>Discovery</td><td>catalog, search, recommend</td><td>Lee</td></tr>
+					<tr><td>Orders</td><td>orders</td><td>Amin</td></tr>
+					<tr><td>Fulfilment</td><td>inventory, warehouse, tracking</td><td>Bo</td></tr>
+					<tr><td>Accounts</td><td>api-gateway, auth, accounts</td><td>Porter</td></tr>
+					<tr><td><b style="color: var(--b-danger)">None</b></td><td>payments, ledger</td><td><b style="color: var(--b-danger)">no owner on the roster</b></td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<div class="callout" data-id="next" data-tone="warn" style="left: 608px; top: 688px; width: 444px">
+			<p><b>What to do first.</b> Put payments and ledger on an owner and a real rotation, then look at checkout: its three downstream hops are the only path in the graph that a single change can break all at once.</p>
+		</div>
+
+		<script type="module">
+			const host = document.querySelector("#graph");
+			if (host) {
+				const d3 = await import("d3");
+
+				const teams = {
+					Platform: "#5b8ff9",
+					Orders: "#4fb0c5",
+					Checkout: "#4cc58a",
+					Discovery: "#b07cf0",
+					Fulfilment: "#f4a94b",
+					Money: "#e0564f",
+				};
+
+				const nodes = [
+					{ id: "api", name: "api-gateway", team: "Platform", rate: 1820 },
+					{ id: "auth", name: "auth", team: "Platform", rate: 540 },
+					{ id: "accounts", name: "accounts", team: "Platform", rate: 120 },
+					{ id: "orders", name: "orders", team: "Orders", rate: 640 },
+					{ id: "checkout", name: "checkout", team: "Checkout", rate: 720 },
+					{ id: "cart", name: "cart", team: "Checkout", rate: 230 },
+					{ id: "catalog", name: "catalog", team: "Discovery", rate: 310 },
+					{ id: "search", name: "search", team: "Discovery", rate: 90 },
+					{ id: "recommend", name: "recommend", team: "Discovery", rate: 45 },
+					{ id: "inventory", name: "inventory", team: "Fulfilment", rate: 280 },
+					{ id: "warehouse", name: "warehouse", team: "Fulfilment", rate: 150 },
+					{ id: "tracking", name: "tracking", team: "Fulfilment", rate: 40 },
+					{ id: "payments", name: "payments", team: "Money", rate: 410 },
+					{ id: "ledger", name: "ledger", team: "Money", rate: 60 },
+				];
+				const links = [
+					{ source: "api", target: "auth" },
+					{ source: "api", target: "orders" },
+					{ source: "api", target: "search" },
+					{ source: "orders", target: "catalog" },
+					{ source: "orders", target: "payments" },
+					{ source: "orders", target: "inventory" },
+					{ source: "checkout", target: "cart" },
+					{ source: "checkout", target: "catalog" },
+					{ source: "checkout", target: "inventory" },
+					{ source: "checkout", target: "payments" },
+					{ source: "cart", target: "catalog" },
+					{ source: "recommend", target: "catalog" },
+					{ source: "recommend", target: "orders" },
+					{ source: "inventory", target: "warehouse" },
+					{ source: "warehouse", target: "tracking" },
+					{ source: "payments", target: "ledger" },
+					{ source: "auth", target: "accounts" },
+				];
+
+				const width = host.clientWidth || 900;
+				const height = 340;
+				const svg = d3.select(host).append("svg").attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height).style("display", "block");
+
+				const byId = new Map(nodes.map((node) => [node.id, node]));
+				for (const link of links) {
+					link.source = byId.get(link.source);
+					link.target = byId.get(link.target);
+				}
+
+				const tooltip = d3.select(host).append("div").style("position", "absolute").style("left", "0").style("top", "0").style("pointer-events", "none").style("opacity", "0").style("z-index", "5")
+					.style("background", "var(--b-bg-layer)").style("border", "1px solid var(--b-border-strong)").style("border-radius", "6px")
+					.style("padding", "8px 10px").style("font-size", "12px").style("max-width", "220px").style("box-shadow", "var(--b-shadow)");
+
+				const line = svg.append("g").selectAll("line").data(links).join("line")
+					.attr("stroke", "var(--b-border-strong)").attr("stroke-width", 1.2).attr("opacity", 0.7);
+
+				const circle = svg.append("g").selectAll("circle").data(nodes).join("circle")
+					.attr("r", (node) => 6 + Math.sqrt(node.rate) * 0.55)
+					.attr("fill", (node) => teams[node.team])
+					.attr("fill-opacity", 0.88)
+					.attr("stroke", "var(--b-bg)").attr("stroke-width", 2)
+					.style("cursor", "pointer");
+
+				const label = svg.append("g").selectAll("text").data(nodes).join("text")
+					.text((node) => node.name)
+					.attr("font-size", 11)
+					.attr("fill", "var(--b-muted)")
+					.attr("dy", 3)
+					.attr("text-anchor", "middle");
+
+				// The legend, drawn as chips: team name in its own colour, so the palette is
+				// named without a colour-coded key elsewhere on the board.
+				d3.select("#legend").selectAll("span").data(Object.entries(teams)).join("span")
+					.style("display", "inline-block").style("padding", "2px 10px").style("border-radius", "999px")
+					.style("border", "1px solid var(--b-border)").style("background", "var(--b-bg-layer)").style("font-size", "12px").style("color", "var(--b-muted)")
+					.html(([team, color]) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px"></span>${team}`);
+
+				const simulation = d3.forceSimulation(nodes)
+					.force("link", d3.forceLink(links).id((node) => node.id).distance(80))
+					.force("charge", d3.forceManyBody().strength(-260))
+					.force("center", d3.forceCenter(width / 2, height / 2))
+					.force("x", d3.forceX(width / 2).strength(0.06))
+					.force("y", d3.forceY(height / 2).strength(0.08))
+					.force("collide", d3.forceCollide((node) => 10 + Math.sqrt(node.rate) * 0.55))
+					.on("tick", () => {
+						// Nothing leaves the card: a node whose label is cut off at the border reads as
+						// a service that was not drawn, which is worse than a tight layout.
+						for (const node of nodes) {
+							const r = 6 + Math.sqrt(node.rate) * 0.55;
+							node.x = Math.max(r + 6, Math.min(width - r - 6, node.x));
+							node.y = Math.max(r + 24, Math.min(height - r - 8, node.y));
+						}
+						line.attr("x1", (link) => link.source.x).attr("y1", (link) => link.source.y).attr("x2", (link) => link.target.x).attr("y2", (link) => link.target.y);
+						circle.attr("cx", (node) => node.x).attr("cy", (node) => node.y);
+						label.attr("x", (node) => node.x).attr("y", (node) => node.y - (6 + Math.sqrt(node.rate) * 0.55) - 7);
+					});
+
+				// Draggable, so a reader can untangle what the layout folded together.
+				circle.call(d3.drag().on("start", (event, node) => { simulation.alphaTarget(0.3).restart(); node.fx = node.x; node.fy = node.y; }).on("drag", (event, node) => { node.fx = event.x; node.fy = event.y; }).on("end", (event, node) => { simulation.alphaTarget(0); node.fx = null; node.fy = null; }));
+
+				// Hover shows who it is; click focuses its reach.
+				circle.on("mouseenter", (event, node) => {
+					tooltip.style("opacity", "1").html(`<b>${node.name}</b><br>${node.team} &middot; ${node.rate} requests per second`).style("left", `${event.offsetX + 12}px`).style("top", `${event.offsetY + 12}px`);
+				}).on("mousemove", (event) => {
+					tooltip.style("left", `${event.offsetX + 12}px`).style("top", `${event.offsetY + 12}px`);
+				}).on("mouseleave", () => tooltip.style("opacity", "0"));
+
+				let focused = null;
+				circle.on("click", (event, node) => {
+					focused = focused === node ? null : node;
+					const reach = focused ? new Set([focused, ...links.filter((link) => link.source === focused).map((link) => link.target), ...links.filter((link) => link.target === focused).map((link) => link.source)]) : null;
+					circle.attr("fill-opacity", (one) => (reach ? (reach.has(one) ? 0.95 : 0.1) : 0.88)).attr("stroke-width", (one) => (reach ? (one === focused ? 3 : 1) : 2)).attr("stroke", (one) => (one === focused ? "var(--b-accent)" : "var(--b-bg)"));
+					line.attr("opacity", (link) => (reach && reach.has(link.source) && reach.has(link.target) ? 1 : 0.08)).attr("stroke-width", (link) => (reach && (link.source === focused || link.target === focused) ? 2.4 : 1.2));
+					label.attr("fill", (one) => (reach && !reach.has(one) ? "var(--b-faint)" : "var(--b-muted)") );
+				});
+			}
+		</script>
+
+		<script src="../lib/board.js"></script>
+	</body>
+</html>

@@ -1,0 +1,117 @@
+diff --git a/apps/web/src/canvas/BoardFrame.tsx b/apps/web/src/canvas/BoardFrame.tsx
+index 27079ed..caf2d6f 100644
+--- a/apps/web/src/canvas/BoardFrame.tsx
++++ b/apps/web/src/canvas/BoardFrame.tsx
+@@ -282,7 +282,22 @@ export function BoardFrame(props: {
+ 		const url = boardUrl({ path: props.board.path, rev });
+ 		return props.nonce ? `${url}&r=${props.nonce}` : url;
+ 	};
+-	const zoom = createMemo(() => props.camera.zoom);
++	/**
++	 * The camera's scale, as the board's *chrome* uses it: held still while the camera moves.
++	 *
++	 * Everything counter-scaled here — the title bar, its buttons, the resize handle, an
++	 * agent's marks and cursor — is sized in `--unit`, which is `1px / var(--zoom)`. So a new
++	 * zoom is not a repaint, it is a **layout** of every one of those boxes, and during a
++	 * camera fly that is sixteen bars laid out on every frame. Measured on one 420ms fly over
++	 * sixteen boards: the move was drawn 21 times with the bars as they were and 25 times with
++	 * them taken away entirely, and style and layout came to 187ms of the flight.
++	 *
++	 * So the chrome rides with the world while the camera is moving — for those few hundred
++	 * milliseconds a bar scales like the board it sits on — and takes its true size again the
++	 * moment the camera rests, which is when anyone looks at it. The memo returns its previous
++	 * value rather than reading the camera, so nothing downstream even re-runs.
++	 */
++	const zoom = createMemo((previous?: number) => (props.moving && previous !== undefined ? previous : props.camera.zoom));
+ 	const inert = createMemo(() => zoom() < INTERACT_ZOOM);
+ 
+ 	/*
+diff --git a/apps/web/src/canvas/Stage.tsx b/apps/web/src/canvas/Stage.tsx
+index 12037af..1c4cb67 100644
+--- a/apps/web/src/canvas/Stage.tsx
++++ b/apps/web/src/canvas/Stage.tsx
+@@ -196,6 +196,16 @@ export function Stage(props: {
+ 	let glideToken = 0;
+ 	let glideRaf: number | undefined;
+ 	let lastGlideToken = -1;
++	/**
++	 * A glide the app has asked for and this file has not started yet.
++	 *
++	 * The camera signal and the glide request arrive in the same batch, and the boards are
++	 * rendered from that batch **before** the effect below gets to start the loop — so for one
++	 * pass "the camera has moved" is true and "the camera is moving" is not yet, and a board
++	 * that the new camera brings into view would begin parsing its document exactly then, at
++	 * the top of the flight. This closes that window: the request itself counts as movement.
++	 */
++	const glidePending = () => props.glide !== undefined && props.glide.token !== lastGlideToken;
+ 	const [view, setView] = createSignal<Viewport>({ width: 0, height: 0 });
+ 	/**
+ 	 * A pan *gesture* is in flight — a finger down, a drag on bare canvas, space and a drag.
+@@ -1205,6 +1215,7 @@ export function Stage(props: {
+ 		boards: () => props.boards,
+ 		isVisible,
+ 		view,
++		moving: () => moving() || gliding() || glidePending(),
+ 		lastMoved: () => lastMoved,
+ 		screenCentre: (board) => toScreen(props.camera, view(), { x: board.x + board.w / 2, y: board.y + board.h / 2 }),
+ 		mayStart: () => props.boardsMayStart,
+diff --git a/apps/web/src/canvas/board-admission.ts b/apps/web/src/canvas/board-admission.ts
+index 25a9bc2..a7fdaed 100644
+--- a/apps/web/src/canvas/board-admission.ts
++++ b/apps/web/src/canvas/board-admission.ts
+@@ -49,6 +49,13 @@ export interface AdmissionHost {
+ 	isVisible: (board: Board) => boolean;
+ 	/** How large the stage is; zero before the first measurement. */
+ 	view: () => { width: number; height: number };
++	/**
++	 * Whether the camera is moving right now — a pan, a pinch or a glide.
++	 *
++	 * A reactive read, unlike `lastMoved`: a board held back during a movement has to be let
++	 * in when it ends, and this is what re-runs the question.
++	 */
++	moving: () => boolean;
+ 	/**
+ 	 * When the camera last moved, as `performance.now()`.
+ 	 *
+@@ -76,6 +83,8 @@ export interface Admission {
+ 
+ export function createAdmission(host: AdmissionHost): Admission {
+ 	const lastSeen = new Map<string, number>();
++	/** Boards with a document **right now**, so a movement never takes one away or starts one. */
++	const live = new Set<string>();
+ 	const [sweep, setSweep] = createSignal(0);
+ 	let sweeper: ReturnType<typeof setTimeout> | undefined;
+ 
+@@ -96,6 +105,24 @@ export function createAdmission(host: AdmissionHost): Admission {
+ 		const now = performance.now();
+ 		if (host.isVisible(board)) {
+ 			lastSeen.set(board.path, now);
++			/*
++			 * **A document is never *started* in the middle of a movement**, which is the other
++			 * half of the rule above it: one is never let go in the middle of one either.
++			 *
++			 * A camera fly sweeps the visible margin across the deck, and every board it passes
++			 * used to begin parsing right then — `board.css`, `board.js`, the markdown, the
++			 * maths — on the same main thread the flight is drawn on. Measured on a 420ms fly
++			 * over 16 boards: nine documents started mid-flight, and the frames they landed in
++			 * were 78, 80, 66, 41 and 37ms long, so the move was drawn eleven times instead of
++			 * twenty-five. Held back, they start when the camera stops, which is 160ms after it
++			 * does and is the moment a person starts reading rather than moving.
++			 *
++			 * `live` is what it has *now*, not what it has ever had: a board on screen keeps its
++			 * document through the movement, and one whose document was let go while it was away
++			 * is a new start again, because reloading it costs exactly what the first load did.
++			 */
++			if (!live.has(board.path) && host.moving()) return false;
++			live.add(board.path);
+ 			return true;
+ 		}
+ 		const seen = lastSeen.get(board.path);
+@@ -111,6 +138,7 @@ export function createAdmission(host: AdmissionHost): Admission {
+ 			sweepLater(Math.max(KEEP_MS - gone, QUIET_MS - still) + 50);
+ 			return true;
+ 		}
++		live.delete(board.path);
+ 		return false;
+ 	};
+ 
